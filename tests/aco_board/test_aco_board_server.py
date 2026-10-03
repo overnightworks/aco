@@ -138,12 +138,10 @@ def test_nothing_open_shows_nichts_offen(
 
 
 def test_every_load_reads_aco_afresh(repository: FakeAcoRepository, board: BoardClient) -> None:
-    repository.set_rulings(row(1, "First", line(1, "Before?")))
-    assert _page(board).card_keys() == [(1, 1)]
+    for item, index in [(1, 1), (2, 4)]:
+        repository.set_rulings(row(item, "Changed between loads", line(index, "Open?")))
 
-    repository.set_rulings(row(2, "Second", line(4, "After?")))
-
-    assert _page(board).card_keys() == [(2, 4)]
+        assert _page(board).card_keys() == [(item, index)]
 
 
 @pytest.mark.parametrize("outcome", ["yes", "no"])
@@ -626,10 +624,21 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
     repository: FakeAcoRepository, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    repository.delay("rulings", 0.3)
+    browser_left, read_returned = threading.Event(), threading.Event()
 
-    with serving(AcoCli(directory=repository.directory)) as board:
+    class ReadAfterTheBrowserLeft(AcoCli):
+        def expectation_lines(self) -> tuple[ExpectationLine, ...]:
+            assert browser_left.wait(timeout=10)
+            try:
+                return super().expectation_lines()
+            finally:
+                read_returned.set()
+
+    with serving(ReadAfterTheBrowserLeft(directory=repository.directory)) as board:
         board.send_and_reset(f"GET /?t={board.token} HTTP/1.1\r\nHost: x\r\n\r\n".encode())
+        browser_left.set()
+        # Past the read its handler thread surely exists, so the wait below joins it.
+        assert read_returned.wait(timeout=10)
         _wait_for_request_handlers()
 
     assert repository.calls() == [["rulings", "--json"]]
