@@ -186,23 +186,26 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
     assert seen_while_shutdown_waited == [[]]
 
 
-def test_serve_offers_no_way_to_listen_beyond_loopback(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit) as refused:
-        cli.main(["serve", "--host", "0.0.0.0"])
-
-    assert refused.value.code == 2
-    assert "--host" in capsys.readouterr().err
+_NOT_A_PORT = "is not a port between 0 and 65535"
 
 
-@pytest.mark.parametrize("port", ["65536", "-1", "eighty"])
-def test_serve_refuses_a_port_outside_0_to_65535(
-    capsys: pytest.CaptureFixture[str], port: str
+@pytest.mark.parametrize(
+    ("arguments", "refusal"),
+    [
+        pytest.param(["--host", "0.0.0.0"], "--host", id="no-way-to-listen-beyond-loopback"),
+        pytest.param(["--port", "65536"], _NOT_A_PORT, id="port-above-65535"),
+        pytest.param(["--port", "-1"], _NOT_A_PORT, id="negative-port"),
+        pytest.param(["--port", "eighty"], _NOT_A_PORT, id="port-not-a-number"),
+    ],
+)
+def test_serve_refuses_an_argument_outside_its_contract_as_a_usage_error(
+    capsys: pytest.CaptureFixture[str], arguments: list[str], refusal: str
 ) -> None:
     with pytest.raises(SystemExit) as refused:
-        cli.main(["serve", "--port", port])
+        cli.main(["serve", *arguments])
 
     assert refused.value.code == 2
-    assert "is not a port between 0 and 65535" in capsys.readouterr().err
+    assert refusal in capsys.readouterr().err
 
 
 def test_serve_refuses_a_port_already_in_use(capsys: pytest.CaptureFixture[str]) -> None:

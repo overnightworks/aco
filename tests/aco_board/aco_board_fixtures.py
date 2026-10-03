@@ -10,6 +10,7 @@ adapter and server against state it controls. Every invocation is appended to
 
 from __future__ import annotations
 
+import errno
 import http.client
 import json
 import os
@@ -182,10 +183,26 @@ class Response:
         return parsed
 
 
+# A board that refuses a request on its headers answers and closes without
+# reading the rest; the kernel then resets the connection. The answer already
+# arrived, so the reset ends the conversation instead of failing it.
+_PEER_ALREADY_CLOSED = frozenset({errno.ENOTCONN, errno.EPIPE, errno.ECONNRESET})
+
+
+@contextmanager
+def _unless_the_peer_already_closed() -> Iterator[None]:
+    try:
+        yield
+    except OSError as error:
+        if error.errno not in _PEER_ALREADY_CLOSED:
+            raise
+
+
 def _received_until_closed(connection: socket.socket) -> bytes:
     received = b""
-    while chunk := connection.recv(65536):
-        received += chunk
+    with _unless_the_peer_already_closed():
+        while chunk := connection.recv(65536):
+            received += chunk
     return received
 
 
@@ -231,8 +248,9 @@ class BoardClient:
     def send_raw(self, request: bytes) -> bytes:
         """Send bytes as they are, beneath any HTTP client's own checks."""
         with self._connection() as connection:
-            connection.sendall(request)
-            connection.shutdown(socket.SHUT_WR)
+            with _unless_the_peer_already_closed():
+                connection.sendall(request)
+                connection.shutdown(socket.SHUT_WR)
             return _received_until_closed(connection)
 
     def send_unfinished(self, request: bytes) -> bytes:
