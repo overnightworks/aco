@@ -62,7 +62,8 @@ def _serve_until_done(
 
     def drive() -> None:
         try:
-            assert printed.first_line_printed.wait(_URL_WAIT_SECONDS)
+            if not printed.first_line_printed.wait(_URL_WAIT_SECONDS):
+                raise TimeoutError(f"aco-board serve printed no URL within {_URL_WAIT_SECONDS}s")
             # Every scenario requests at least once, so serving has begun
             # before the interrupt arrives.
             scenario(BoardClient.from_url(printed.first_line()))
