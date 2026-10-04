@@ -154,6 +154,15 @@ describe('nextOpenAfter', () => {
 		expect(nextOpenAfter(allRuled, 'repo:42:1')).toBeNull();
 	});
 
+	test('skips lines belonging to a repo that failed to read', () => {
+		const withAFailedRepo = [
+			...repos,
+			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [line()] })] })
+		];
+
+		expect(nextOpenAfter(withAFailedRepo, 'repo:42:1')).toBe('repo:42:2');
+	});
+
 	test('skips a line that was already ruled when picking the next one', () => {
 		const withARuledMiddle = [
 			repo({
