@@ -1,32 +1,46 @@
 """The board's loopback HTTP transport.
 
 Binds `127.0.0.1` only -- there is no host option -- and answers only a
-request carrying the per-start access token: `GET /?t=TOKEN` renders the page
-from a fresh read of the decision source, `POST /rule` submits one decision.
-A malformed or stalled request gets a fixed 4xx answer, never a traceback.
+request carrying the per-start access token. The JSON API under `/api/`
+takes it in the `X-Board-Token` header and checks it before any other work:
+`GET /api/board` answers every line from a fresh read of the decision
+source, `POST /api/rule` submits one decision. The legacy page takes it as
+`GET /?t=TOKEN` and in the body of `POST /rule`. A malformed or stalled
+request gets a fixed 4xx answer, never a traceback; no answer carries a
+cross-origin header, so a page from another origin can never read one.
 """
 
 from __future__ import annotations
 
 import hmac
-import json
 import secrets
 import socket
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import TypeGuard, cast
+from typing import cast
 from urllib.parse import parse_qs, urlsplit
 
-from . import page
+from . import api, page
 from .board import Board
-from .ports import NOTE_MAX_LENGTH, Decision, DecisionSourceUnavailableError, Outcome
+from .ports import DecisionSourceUnavailableError
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"
+TOKEN_HEADER = "X-Board-Token"
 PAGE_PATH = "/"
 RULE_PATH = "/rule"
+API_PREFIX = "/api/"
+API_BOARD_PATH = "/api/board"
+API_RULE_PATH = "/api/rule"
+_FORBIDDEN = "forbidden: missing or wrong token"
+_NOT_FOUND = "not found"
+_BAD_CONTENT_LENGTH = "bad request: Content-Length"
+_BAD_DECISION = "bad request: decision"
+_BODY_INCOMPLETE = "request timeout: body incomplete"
+_TEXT_CONTENT_TYPE = "text/plain; charset=utf-8"
 _MAX_REQUEST_BYTES = 16 * 1024
 """A decision is two numbers, an outcome, a fingerprint, and a short note;
 anything larger is refused before it is read."""
@@ -35,12 +49,7 @@ REQUEST_DEADLINE_SECONDS = 10.0
 sends its small request at once, so a client still silent after this is
 dropped rather than holding a handler thread."""
 
-
-@dataclass(frozen=True)
-class _DecisionRequest:
-    token: str
-    fingerprint: str
-    decision: Decision
+_Refusal = Callable[[HTTPStatus, str], None]
 
 
 class _ClientDisconnectedError(Exception):
@@ -103,57 +112,6 @@ def start_board(
     return RunningBoard(httpd=httpd, url=url)
 
 
-def _parsed_decision_request(raw: bytes) -> _DecisionRequest | None:
-    fields = _json_object(raw)
-    if fields is None:
-        return None
-    token, fingerprint = fields.get("token"), fields.get("fingerprint")
-    item, line = fields.get("item"), fields.get("line")
-    outcome, note = fields.get("outcome"), fields.get("note")
-    if (
-        isinstance(token, str)
-        and isinstance(fingerprint, str)
-        and _is_position(item)
-        and _is_position(line)
-        and isinstance(outcome, str)
-        and outcome in {member.value for member in Outcome}
-        and (note is None or _is_note_text(note))
-    ):
-        decision = Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
-        return _DecisionRequest(token=token, fingerprint=fingerprint, decision=decision)
-    return None
-
-
-def _json_object(raw: bytes) -> dict[str, object] | None:
-    try:
-        fields: object = json.loads(raw)
-    # ValueError covers undecodable bytes, invalid JSON, and an integer past
-    # Python's digit limit; RecursionError a body nested deeper than the stack.
-    except (ValueError, RecursionError):
-        return None
-    if not isinstance(fields, dict):
-        return None
-    return cast(dict[str, object], fields)
-
-
-def _is_note_text(note: object) -> TypeGuard[str]:
-    """Short text a command-line argument can carry: no NUL, no lone surrogate."""
-    if not isinstance(note, str) or len(note.strip()) > NOTE_MAX_LENGTH or "\0" in note:
-        return False
-    try:
-        note.encode("utf-8")
-    except UnicodeEncodeError:
-        return False
-    return True
-
-
-def _note(raw: str | None) -> str | None:
-    """An empty or blank note is no note."""
-    if raw is None or not raw.strip():
-        return None
-    return raw.strip()
-
-
 def _content_length(header: str) -> int | None:
     """The declared body size, or None unless it is a decimal within the limit."""
     # The length check comes first: `int()` refuses a digit string past
@@ -162,11 +120,6 @@ def _content_length(header: str) -> int | None:
         return None
     length = int(header)
     return length if length <= _MAX_REQUEST_BYTES else None
-
-
-def _is_position(value: object) -> TypeGuard[int]:
-    """A positive item or line number; a JSON `true` is not one."""
-    return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
 class _BoardRequestHandler(BaseHTTPRequestHandler):
@@ -205,17 +158,23 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as error:
             raise _ClientDisconnectedError from error
 
-    def _respond_text(self, status: HTTPStatus, body: str) -> None:
-        self._respond(status, body, "text/plain; charset=utf-8")
+    def _refuse_as_text(self, status: HTTPStatus, sentence: str) -> None:
+        self._respond(status, sentence, _TEXT_CONTENT_TYPE)
+
+    def _refuse_as_json(self, status: HTTPStatus, sentence: str) -> None:
+        self._respond(status, api.error_json(sentence), api.JSON_CONTENT_TYPE)
 
     def do_GET(self) -> None:
         split = urlsplit(self.path)
+        if split.path.startswith(API_PREFIX):
+            self._answer_api(self._get_board if split.path == API_BOARD_PATH else None)
+            return
         if split.path != PAGE_PATH:
-            self._respond_text(HTTPStatus.NOT_FOUND, "not found")
+            self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
             return
         tokens = parse_qs(split.query).get(TOKEN_FIELD)
         if not self._authorized(tokens[0] if tokens else None):
-            self._respond_text(HTTPStatus.FORBIDDEN, "forbidden: missing or wrong token")
+            self._refuse_as_text(HTTPStatus.FORBIDDEN, _FORBIDDEN)
             return
         nonce = secrets.token_urlsafe(16)
         try:
@@ -228,28 +187,69 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         self._respond(HTTPStatus.OK, rendered, page.HTML_CONTENT_TYPE, nonce=nonce)
 
     def do_POST(self) -> None:
-        if urlsplit(self.path).path != RULE_PATH:
-            self._respond_text(HTTPStatus.NOT_FOUND, "not found")
+        path = urlsplit(self.path).path
+        if path.startswith(API_PREFIX):
+            self._answer_api(self._post_rule if path == API_RULE_PATH else None)
             return
+        if path != RULE_PATH:
+            self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
+            return
+        raw = self._read_body(self._refuse_as_text)
+        if raw is None:
+            return
+        request, token = api.parse_decision_request(raw), api.legacy_body_token(raw)
+        if request is None or token is None:
+            self._refuse_as_text(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
+            return
+        if not self._authorized(token):
+            self._refuse_as_text(HTTPStatus.FORBIDDEN, _FORBIDDEN)
+            return
+        self._decide(request)
+
+    def _answer_api(self, route: Callable[[], None] | None) -> None:
+        """Check the header token before anything else -- the path, the body,
+        or the board -- so a request without it never reaches aco."""
+        if not self._authorized(self.headers.get(TOKEN_HEADER)):
+            self._refuse_as_json(HTTPStatus.FORBIDDEN, _FORBIDDEN)
+            return
+        if route is None:
+            self._refuse_as_json(HTTPStatus.NOT_FOUND, _NOT_FOUND)
+            return
+        route()
+
+    def _get_board(self) -> None:
+        try:
+            snapshot = self._server().board.snapshot()
+        except DecisionSourceUnavailableError as error:
+            self._refuse_as_json(HTTPStatus.BAD_GATEWAY, str(error))
+            return
+        self._respond(HTTPStatus.OK, api.board_json(snapshot), api.JSON_CONTENT_TYPE)
+
+    def _post_rule(self) -> None:
+        raw = self._read_body(self._refuse_as_json)
+        if raw is None:
+            return
+        request = api.parse_decision_request(raw)
+        if request is None:
+            self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
+            return
+        self._decide(request)
+
+    def _read_body(self, refuse: _Refusal) -> bytes | None:
+        """The whole declared body, or None once `refuse` has answered why not."""
         length = _content_length(self.headers.get("Content-Length", ""))
         if length is None:
-            self._respond_text(HTTPStatus.BAD_REQUEST, "bad request: Content-Length")
-            return
+            refuse(HTTPStatus.BAD_REQUEST, _BAD_CONTENT_LENGTH)
+            return None
         try:
-            raw = self.rfile.read(length)
+            return self.rfile.read(length)
         except TimeoutError:
-            self._respond_text(HTTPStatus.REQUEST_TIMEOUT, "request timeout: body incomplete")
-            return
-        request = _parsed_decision_request(raw)
-        if request is not None and not self._authorized(request.token):
-            self._respond_text(HTTPStatus.FORBIDDEN, "forbidden: missing or wrong token")
-            return
-        if request is None:
-            self._respond_text(HTTPStatus.BAD_REQUEST, "bad request: decision")
-            return
+            refuse(HTTPStatus.REQUEST_TIMEOUT, _BODY_INCOMPLETE)
+            return None
+
+    def _decide(self, request: api.DecisionRequest) -> None:
         result = self._server().board.decide(request.decision, request.fingerprint)
-        answer = json.dumps({"status": result.status.value, "message": result.message})
-        self._respond(HTTPStatus.OK, answer, "application/json")
+        self._respond(HTTPStatus.OK, api.decision_result_json(result), api.JSON_CONTENT_TYPE)
 
     def log_message(self, format: str, *_args: object) -> None:
         # The default request log would print the page URL, token included,

@@ -10,9 +10,8 @@ import base64
 import html
 import json
 import threading
-from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack
 from pathlib import Path
 
 import pytest
@@ -21,47 +20,20 @@ from aco_board_fixtures import (
     BoardPage,
     Card,
     FakeAcoRepository,
-    empty_repository_with_fake_aco,
     line,
     row,
+    serving,
 )
 
 from aco_board.aco_cli import AcoCli
-from aco_board.board import LINE_CHANGED, Board
+from aco_board.board import LINE_CHANGED
 from aco_board.ports import (
     NOTE_MAX_LENGTH,
     Decision,
-    DecisionPort,
     DecisionResult,
     ExpectationLine,
 )
-from aco_board.server import LOOPBACK_HOST, start_board
-
-
-@pytest.fixture
-def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeAcoRepository:
-    return empty_repository_with_fake_aco(tmp_path, monkeypatch)
-
-
-@contextmanager
-def serving(decisions: DecisionPort, **board_options: float) -> Iterator[BoardClient]:
-    running = start_board(0, Board(decisions), **board_options)
-    server_thread = threading.Thread(
-        target=running.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
-    )
-    server_thread.start()
-    try:
-        yield BoardClient.from_url(running.url)
-    finally:
-        running.httpd.shutdown()
-        running.httpd.server_close()
-        server_thread.join()
-
-
-@pytest.fixture
-def board(repository: FakeAcoRepository) -> Iterator[BoardClient]:
-    with serving(AcoCli(directory=repository.directory)) as client:
-        yield client
+from aco_board.server import LOOPBACK_HOST
 
 
 def _page(board: BoardClient) -> BoardPage:

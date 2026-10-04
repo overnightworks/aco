@@ -18,14 +18,20 @@ import socket
 import stat
 import struct
 import sys
-from collections.abc import Iterator
+import threading
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from email.message import Message
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+
+from aco_board.board import Board
+from aco_board.ports import DecisionPort
+from aco_board.server import TOKEN_HEADER, start_board
 
 _FAKE_ACO = """\
 import argparse, json, pathlib, sys, time
@@ -187,15 +193,47 @@ class FakeAcoRepository:
         return [call for call in self.calls() if call[0] == "rule"]
 
 
+@contextmanager
+def serving(decisions: DecisionPort, **board_options: float) -> Iterator[BoardClient]:
+    """The real board server on a free loopback port, stopped on exit."""
+    running = start_board(0, Board(decisions), **board_options)
+    server_thread = threading.Thread(
+        target=running.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
+    )
+    server_thread.start()
+    try:
+        yield BoardClient.from_url(running.url)
+    finally:
+        running.httpd.shutdown()
+        running.httpd.server_close()
+        server_thread.join()
+
+
 @dataclass(frozen=True)
 class Response:
     status: int
     body: str
-    content_security_policy: str | None
+    headers: Message
+    """Case-insensitive, as HTTP header names are."""
+
+    @property
+    def content_security_policy(self) -> str | None:
+        return self.headers.get("Content-Security-Policy")
 
     def json(self) -> dict[str, object]:
         parsed: dict[str, object] = json.loads(self.body)
         return parsed
+
+    @classmethod
+    def from_raw(cls, answer: bytes) -> Response:
+        """An answer read straight off the socket, beneath any HTTP client."""
+        head, _, body = answer.partition(b"\r\n\r\n")
+        status_line, *header_lines = head.decode("latin-1").split("\r\n")
+        headers = Message()
+        for header_line in header_lines:
+            name, _, value = header_line.partition(":")
+            headers[name] = value.strip()
+        return cls(int(status_line.split(" ")[1]), body.decode("utf-8"), headers)
 
 
 # A board that refuses a request on its headers answers and closes without
@@ -305,15 +343,48 @@ class BoardClient:
     def post_raw(self, body: str) -> Response:
         return self._request("POST", "/rule", body)
 
-    def _request(self, method: str, path: str, body: str | None = None) -> Response:
+    def call_api(
+        self,
+        method: str,
+        path: str,
+        body: str | None = None,
+        *,
+        presented: str | None,
+        headers: Mapping[str, str] | None = None,
+    ) -> Response:
+        """Send `presented` as the API token header, or no such header for None."""
+        token_header = {} if presented is None else {TOKEN_HEADER: presented}
+        return self._request(method, path, body, {**token_header, **(headers or {})})
+
+    def get_board_json(self) -> Response:
+        return self.call_api("GET", "/api/board", presented=self.token)
+
+    def decide_through_api(self, line: Mapping[str, object], item: int, outcome: str) -> Response:
+        """Post `outcome` for a line exactly as `GET /api/board` listed it."""
+        payload = {
+            "item": item,
+            "line": line["index"],
+            "fingerprint": line["fingerprint"],
+            "outcome": outcome,
+            "note": None,
+        }
+        return self.call_api("POST", "/api/rule", json.dumps(payload), presented=self.token)
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        body: str | None = None,
+        headers: Mapping[str, str] | None = None,
+    ) -> Response:
         connection = http.client.HTTPConnection(self.host, self.port, timeout=30)
         try:
-            connection.request(method, path, body=body)
+            connection.request(method, path, body=body, headers=dict(headers or {}))
             response = connection.getresponse()
             return Response(
                 status=response.status,
                 body=response.read().decode("utf-8"),
-                content_security_policy=response.getheader("Content-Security-Policy"),
+                headers=response.headers,
             )
         finally:
             connection.close()
