@@ -36,7 +36,7 @@ UV_PYTHON="$(uv python find)"
 export UV_PYTHON
 tool_path="$scratch/path"
 mkdir -p "$tool_path"
-for tool in uv unzip tar gzip grep sed sort diff rm sleep head; do
+for tool in uv unzip tar gzip grep sed sort diff rm sleep head cat; do
     ln -s "$(command -v "$tool")" "$tool_path/$tool"
 done
 export PATH="$tool_path"

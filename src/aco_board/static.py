@@ -95,7 +95,12 @@ def resolve_contained(root: Path, relative_path: str) -> Path | None:
         resolved = candidate.resolve(strict=True)
     except OSError:
         return None
-    contained = resolved == candidate and resolved.is_relative_to(resolved_root)
+    # `resolved_root == root` catches `root` itself -- or a directory above it,
+    # up to `STATIC_ROOT` -- being a symlink: resolving it would otherwise move
+    # the containment boundary to wherever that symlink points.
+    contained = (
+        resolved_root == root and resolved == candidate and resolved.is_relative_to(resolved_root)
+    )
     if not contained or not resolved.is_file():
         return None
     return resolved

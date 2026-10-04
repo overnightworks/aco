@@ -225,27 +225,26 @@ def test_the_board_keeps_no_copy_of_a_decision(
     assert [item["number"] for item in _listed_items(board)] == [42]
 
 
-@pytest.mark.parametrize("note", ["nur mit Konto", "--später", "-x"])
+@pytest.mark.parametrize(
+    ("outcome", "raw_note", "stored_text"),
+    [
+        ("no", "  nur mit Konto  ", "Guests? Anmerkung: nur mit Konto"),
+        ("no", "  --später  ", "Guests? Anmerkung: --später"),
+        ("no", "  -x  ", "Guests? Anmerkung: -x"),
+        ("yes", "   ", "Guests?"),
+    ],
+    ids=["note", "note-looking-like-a-long-option", "note-looking-like-a-short-option", "blank"],
+)
 def test_a_note_is_stored_with_the_ruling(
-    repository: FakeAcoRepository, board: BoardClient, note: str
+    repository: FakeAcoRepository, board: BoardClient, outcome: str, raw_note: str, stored_text: str
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
     listed_line = _listed_items(board)[0]["lines"][0]
 
-    answer = board.decide_through_api(listed_line, 42, "no", note=f"  {note}  ")
+    answer = board.decide_through_api(listed_line, 42, outcome, note=raw_note)
 
     assert answer.json()["status"] == "ruled"
-    assert repository.stored_line(42, 1)["text"] == f"Guests? Anmerkung: {note}"
-
-
-def test_a_blank_note_is_no_note(repository: FakeAcoRepository, board: BoardClient) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    listed_line = _listed_items(board)[0]["lines"][0]
-
-    board.decide_through_api(listed_line, 42, "yes", note="   ")
-
-    assert repository.rule_calls() == [["rule", "42", "--line", "1", "--yes", "--json"]]
-    assert repository.stored_line(42, 1)["text"] == "Guests?"
+    assert repository.stored_line(42, 1)["text"] == stored_text
 
 
 def test_a_failing_aco_rule_keeps_the_line_with_acos_sentence(
@@ -264,35 +263,43 @@ def test_a_failing_aco_rule_keeps_the_line_with_acos_sentence(
     assert [item["number"] for item in _listed_items(board)] == [42]
 
 
-def test_aco_missing_during_a_decision_keeps_the_line_undecided(
+def _aco_missing_from_path(
+    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del repository
+    monkeypatch.setenv("PATH", str(tmp_path / "no-aco-here"))
+
+
+def _aco_rulings_unreadable(
+    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del tmp_path, monkeypatch
+    repository.fail_rulings("ERROR: no forge adapter for host")
+
+
+@pytest.mark.parametrize(
+    ("arrange", "message"),
+    [
+        (_aco_missing_from_path, "aco is not installed on PATH"),
+        (_aco_rulings_unreadable, "aco rulings failed: ERROR: no forge adapter for host"),
+    ],
+    ids=["aco-missing-from-path", "aco-rulings-unreadable"],
+)
+def test_a_broken_aco_during_a_decision_keeps_the_line_undecided(
     repository: FakeAcoRepository,
     board: BoardClient,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    arrange: Callable[[FakeAcoRepository, Path, pytest.MonkeyPatch], None],
+    message: str,
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
     listed_line = _listed_items(board)[0]["lines"][0]
-    monkeypatch.setenv("PATH", str(tmp_path / "no-aco-here"))
+    arrange(repository, tmp_path, monkeypatch)
 
     answer = board.decide_through_api(listed_line, 42, "yes")
 
-    assert answer.json() == {"status": "failed", "message": "aco is not installed on PATH"}
-    assert repository.rule_calls() == []
-
-
-def test_an_unreadable_aco_during_a_decision_writes_nothing(
-    repository: FakeAcoRepository, board: BoardClient
-) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    listed_line = _listed_items(board)[0]["lines"][0]
-    repository.fail_rulings("ERROR: no forge adapter for host")
-
-    answer = board.decide_through_api(listed_line, 42, "yes")
-
-    assert answer.json() == {
-        "status": "failed",
-        "message": "aco rulings failed: ERROR: no forge adapter for host",
-    }
+    assert answer.json() == {"status": "failed", "message": message}
     assert repository.rule_calls() == []
 
 

@@ -26,7 +26,7 @@ from aco_board_fixtures import (
     row,
 )
 
-from aco_board import cli
+from aco_board import cli, static
 from aco_board.aco_cli import AcoCli
 from aco_board.board import Boards
 from aco_board.ports import Decision, DecisionResult
@@ -285,3 +285,28 @@ def test_serve_refuses_a_port_already_in_use(capsys: pytest.CaptureFixture[str])
         assert cli.main(["serve", "--port", str(busy_port)]) == 1
 
     assert f"cannot listen on {LOOPBACK_HOST}:{busy_port}" in capsys.readouterr().err
+
+
+def test_serve_refuses_to_start_once_the_shell_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """ABRD-25: the check runs before any bind attempt (`start_board` calls
+    `static.ensure_built` first), so a board that cannot start never holds the
+    port it would have used."""
+    missing_root = tmp_path / "unbuilt"
+    monkeypatch.setattr(static, "STATIC_ROOT", missing_root)
+    with socket.socket() as probe:
+        probe.bind((LOOPBACK_HOST, 0))
+        free_port = probe.getsockname()[1]
+
+    exit_code = cli.main(["serve", "--port", str(free_port)])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        f"ERROR: {missing_root / 'index.html'} is missing; build the frontend first "
+        "(pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend build)\n"
+    )
+    with socket.socket() as still_free:
+        still_free.bind((LOOPBACK_HOST, free_port))

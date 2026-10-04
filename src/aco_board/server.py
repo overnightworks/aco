@@ -287,6 +287,11 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         if path.startswith(API_PREFIX):
             self._answer_api(self._post_rule if path == API_RULE_PATH else None)
             return
+        if path == PAGE_PATH or path.startswith(static.ASSETS_PREFIX):
+            self._refuse_as_text(
+                HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED, allow=_allowed_methods(path)
+            )
+            return
         self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
 
     def _answer_api(self, route: Callable[[], None] | None) -> None:

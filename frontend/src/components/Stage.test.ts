@@ -108,6 +108,50 @@ test('an already-ruled refusal hides the choices and offers a reload', async () 
 	expect(reload).toHaveBeenCalledTimes(1);
 });
 
+test('a hostile picture is embedded only as an image, never as markup', () => {
+	const hostile =
+		'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">' +
+		'<script>alert(2)</script><foreignObject><iframe/></foreignObject></svg>';
+	const card = line({ index: 1, question: 'Guests allowed?', picture: hostile });
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+
+	const { container } = render(Stage, {
+		repos,
+		selectedKey: lineKey('repo', 42, card),
+		decisions: storeAnswering({ status: 'ruled', message: null })
+	});
+
+	const image = screen.getByAltText('Bild zur Frage');
+	expect(image.tagName).toBe('IMG');
+	const source = image.getAttribute('src') ?? '';
+	expect(source.startsWith('data:image/svg+xml;base64,')).toBe(true);
+	const encoded = source.slice(source.indexOf(',') + 1);
+	expect(Buffer.from(encoded, 'base64').toString('utf-8')).toBe(hostile);
+	expect(container.querySelectorAll('svg, script, foreignObject, iframe')).toHaveLength(0);
+});
+
+test('hostile question, sentence and example text render as text, never as markup', () => {
+	const hostileQuestion = '"><img src=x onerror=alert(1)>';
+	const hostileExample = '<script>alert(2)</script>';
+	const card = line({
+		index: 1,
+		question: hostileQuestion,
+		text: 'Guests may join the call.',
+		example: hostileExample
+	});
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+
+	const { container } = render(Stage, {
+		repos,
+		selectedKey: lineKey('repo', 42, card),
+		decisions: storeAnswering({ status: 'ruled', message: null })
+	});
+
+	expect(screen.getByRole('heading', { name: hostileQuestion })).toBeInTheDocument();
+	expect(screen.getByText(hostileExample)).toBeInTheDocument();
+	expect(container.querySelectorAll('script, svg, img')).toHaveLength(0);
+});
+
 test('a plain failure keeps the choices usable for a retry', async () => {
 	const card = line({ index: 1 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];

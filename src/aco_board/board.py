@@ -32,11 +32,11 @@ SHUTTING_DOWN = "board is shutting down"
 
 def wire_fingerprint(repo: str, line: ExpectationLine) -> str:
     """The fingerprint a card exposes across the wire: `line`'s own fingerprint
-    bound to the `repo` label it was read under. Every reading path (the JSON
-    API, the legacy page) and `Boards.decide`'s own repo-binding check share
-    this one function, so a card's content being identical in two configured
-    repos never lets its fingerprint satisfy the other repo's check, even
-    with the two labels swapped (issue #637)."""
+    bound to the `repo` label it was read under. The JSON API and
+    `Boards.decide`'s own repo-binding check share this one function, so a
+    card's content being identical in two configured repos never lets its
+    fingerprint satisfy the other repo's check, even with the two labels
+    swapped (issue #637)."""
     bound = json.dumps([repo, line.fingerprint], ensure_ascii=False)
     return hashlib.sha256(bound.encode("utf-8", "surrogatepass")).hexdigest()
 

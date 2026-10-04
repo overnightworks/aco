@@ -9,6 +9,7 @@ shell does (`specs/aco-board.spec.md` ABRD-12).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -35,40 +36,95 @@ def test_resolve_contained_finds_a_real_file(static_root: Path) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "relative_path",
-    ["../index.html", "assets/../../index.html", "%2e%2e/index.html", "assets/%2e%2e%2findex.html"],
-    ids=["literal-dotdot", "nested-dotdot", "encoded-dotdot", "encoded-dotdot-slash"],
-)
-def test_resolve_contained_refuses_a_path_that_climbs_out(
-    static_root: Path, relative_path: str
-) -> None:
-    assert static.resolve_contained(static_root, relative_path) is None
+def _escaping_literal(relative_path: str) -> Callable[[Path, Path], tuple[Path, str]]:
+    """A request path that tries to escape `static_root` without touching the
+    filesystem -- every variant still ends up refused as "missing", never as
+    a resolved file outside the root."""
+
+    def arrange(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
+        del tmp_path
+        return static_root, relative_path
+
+    return arrange
 
 
-def test_resolve_contained_refuses_a_symlinked_file(static_root: Path, tmp_path: Path) -> None:
+def _via_a_symlinked_file(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
     secret = tmp_path / "secret.js"
     secret.write_text("outside", encoding="utf-8")
     (static_root / "assets" / "linked.js").symlink_to(secret)
+    return static_root, "assets/linked.js"
 
-    assert static.resolve_contained(static_root, "assets/linked.js") is None
 
-
-def test_resolve_contained_refuses_a_symlinked_directory(static_root: Path, tmp_path: Path) -> None:
+def _via_a_symlinked_directory(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "leaked.js").write_text("outside", encoding="utf-8")
     (static_root / "assets" / "alias").symlink_to(outside, target_is_directory=True)
-
-    assert static.resolve_contained(static_root, "assets/alias/leaked.js") is None
-
-
-def test_resolve_contained_refuses_a_missing_file(static_root: Path) -> None:
-    assert static.resolve_contained(static_root, "assets/missing.js") is None
+    return static_root, "assets/alias/leaked.js"
 
 
-def test_resolve_contained_refuses_a_directory(static_root: Path) -> None:
-    assert static.resolve_contained(static_root, "assets") is None
+def _via_a_symlinked_root(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
+    """The root passed to `resolve_contained` (`static/assets` in production,
+    `static.py:66`) is itself a symlink: every file under it would otherwise
+    resolve as "contained" against wherever that symlink points."""
+    del static_root
+    real_assets = tmp_path / "real-assets"
+    real_assets.mkdir()
+    (real_assets / "index.js").write_text("console.log(1)", encoding="utf-8")
+    symlinked_root = tmp_path / "assets-alias"
+    symlinked_root.symlink_to(real_assets, target_is_directory=True)
+    return symlinked_root, "index.js"
+
+
+def _a_missing_file(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
+    del tmp_path
+    return static_root, "assets/missing.js"
+
+
+def _a_directory_itself(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
+    del tmp_path
+    return static_root, "assets"
+
+
+@pytest.mark.parametrize(
+    "arrange",
+    [
+        _escaping_literal("../index.html"),
+        _escaping_literal("assets/../../index.html"),
+        _escaping_literal("%2e%2e/index.html"),
+        _escaping_literal("assets/%2e%2e%2findex.html"),
+        _escaping_literal("assets/%252e%252e/index.html"),
+        _escaping_literal("assets\\..\\..\\index.html"),
+        _escaping_literal("/etc/passwd"),
+        _via_a_symlinked_file,
+        _via_a_symlinked_directory,
+        _via_a_symlinked_root,
+        _a_missing_file,
+        _a_directory_itself,
+    ],
+    ids=[
+        "literal-dotdot",
+        "nested-dotdot",
+        "encoded-dotdot",
+        "encoded-dotdot-slash",
+        "double-encoded-dotdot",
+        "backslash-not-a-separator",
+        "absolute-path-stays-relative",
+        "symlinked-file",
+        "symlinked-directory",
+        "symlinked-root",
+        "missing-file",
+        "a-directory-itself",
+    ],
+)
+def test_resolve_contained_refuses_an_unservable_path(
+    static_root: Path,
+    tmp_path: Path,
+    arrange: Callable[[Path, Path], tuple[Path, str]],
+) -> None:
+    root, relative_path = arrange(static_root, tmp_path)
+
+    assert static.resolve_contained(root, relative_path) is None
 
 
 def test_asset_refuses_an_unrecognized_extension(static_root: Path) -> None:
@@ -113,62 +169,67 @@ def test_start_board_refuses_to_bind_once_the_shell_is_missing(
         start_board(0, Boards({}))
 
 
+@pytest.mark.parametrize(
+    ("path", "content_type"),
+    [
+        ("/", "text/html; charset=utf-8"),
+        ("/assets/index.js", "text/javascript; charset=utf-8"),
+        ("/assets/index.js?v=1", "text/javascript; charset=utf-8"),
+        ("/assets/index.js#ignored", "text/javascript; charset=utf-8"),
+    ],
+    ids=["shell", "asset", "asset-with-query", "asset-with-fragment"],
+)
 def test_the_shell_and_its_assets_need_no_token(
-    repository: FakeAcoRepository,
+    repository: FakeAcoRepository, path: str, content_type: str
 ) -> None:
     with serving(AcoCli(directory=repository.directory)) as board:
-        shell = board.get_shell()
-        asset = board.call_api("GET", "/assets/index.js", presented=None)
+        response = board.call_api("GET", path, presented=None)
 
-    assert shell.status == 200
-    assert shell.headers["Content-Type"] == "text/html; charset=utf-8"
-    assert asset.status == 200
-    assert asset.headers["Content-Type"] == "text/javascript; charset=utf-8"
+    assert response.status == 200
+    assert response.headers["Content-Type"] == content_type
 
 
-def test_a_missing_asset_and_an_unknown_path_both_answer_404(
-    repository: FakeAcoRepository,
-) -> None:
+@pytest.mark.parametrize(
+    "path",
+    ["/assets/missing.js", "/assets/../server.py", "/elsewhere", "/assets/", "/assets"],
+    ids=[
+        "missing-asset",
+        "traversal",
+        "unknown-path",
+        "assets-directory-with-slash",
+        "assets-directory-without-slash",
+    ],
+)
+def test_an_unservable_path_answers_404(repository: FakeAcoRepository, path: str) -> None:
     with serving(AcoCli(directory=repository.directory)) as board:
-        missing_asset = board.call_api("GET", "/assets/missing.js", presented=None)
-        traversal = board.call_api("GET", "/assets/../server.py", presented=None)
-        unknown_path = board.call_api("GET", "/elsewhere", presented=None)
+        response = board.call_api("GET", path, presented=None)
 
-    assert missing_asset.status == 404
-    assert traversal.status == 404
-    assert unknown_path.status == 404
+    assert response.status == 404
 
 
 @pytest.mark.parametrize("path", ["/", "/assets/index.js"], ids=["shell", "asset"])
+@pytest.mark.parametrize("method", ["PUT", "POST", "HEAD"])
 def test_a_method_the_shell_or_an_asset_does_not_serve_is_refused(
-    repository: FakeAcoRepository, path: str
+    repository: FakeAcoRepository, method: str, path: str
 ) -> None:
     with serving(AcoCli(directory=repository.directory)) as board:
-        response = board.call_api("PUT", path, presented=None)
+        response = board.call_api(method, path, presented=None)
 
     assert response.status == 405
     assert response.headers["Allow"] == "GET"
 
 
 @pytest.mark.parametrize("path", ["/", "/assets/index.js"], ids=["shell", "asset"])
-def test_posting_to_the_shell_or_an_asset_path_is_not_found(
+def test_every_shell_and_asset_answer_carries_the_guard_headers(
     repository: FakeAcoRepository, path: str
 ) -> None:
     with serving(AcoCli(directory=repository.directory)) as board:
-        response = board.call_api("POST", path, presented=None)
+        response = board.call_api("GET", path, presented=None)
 
-    assert response.status == 404
-
-
-def test_every_shell_and_asset_answer_carries_the_guard_headers(
-    repository: FakeAcoRepository,
-) -> None:
-    with serving(AcoCli(directory=repository.directory)) as board:
-        shell = board.get_shell()
-
-    assert shell.headers["Cache-Control"] == "no-store"
-    assert shell.headers["Referrer-Policy"] == "no-referrer"
-    policy = shell.content_security_policy or ""
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    policy = response.content_security_policy or ""
     assert "script-src 'self'" in policy
+    assert "img-src data:" in policy
     assert "'nonce-" not in policy
-    assert not any(name.lower().startswith("access-control-") for name in shell.headers)
+    assert not any(name.lower().startswith("access-control-") for name in response.headers)
