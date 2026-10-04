@@ -49,12 +49,12 @@ function startFakeBoardServer(): Promise<{
 	});
 }
 
-function listeningPort(vite: ViteDevServer): number {
-	const address = vite.httpServer?.address();
-	if (address === null || address === undefined || typeof address === 'string') {
-		throw new Error('the dev server did not report a listening TCP port');
+function resolvedAppUrl(vite: ViteDevServer): string {
+	const url = vite.resolvedUrls?.local[0];
+	if (url === undefined) {
+		throw new Error('the dev server did not report a local listening URL');
 	}
-	return address.port;
+	return url;
 }
 
 export default async function globalSetup(): Promise<() => Promise<void>> {
@@ -64,10 +64,10 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 	const vite = await createServer({
 		configFile: path.join(FRONTEND_ROOT, 'vite.config.ts'),
 		root: FRONTEND_ROOT,
-		server: { port: 0, strictPort: false }
+		server: { host: '127.0.0.1', port: 0, strictPort: false }
 	});
 	await vite.listen();
-	const appUrl = `http://127.0.0.1:${listeningPort(vite)}/`;
+	const appUrl = resolvedAppUrl(vite);
 
 	writeFileSync(
 		RUNTIME_FILE,
