@@ -30,9 +30,12 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from aco_board.board import Board
+from aco_board.board import Board, Boards
 from aco_board.ports import DecisionPort
 from aco_board.server import TOKEN_HEADER, start_board
+
+DEFAULT_LABEL = "repo"
+"""The one repo label a single-repo test gets when it does not name its own."""
 
 _FAKE_ACO = """\
 import argparse, json, pathlib, sys, time
@@ -127,7 +130,13 @@ def empty_repository_with_fake_aco(
     """A repository without expectation lines, its fake `aco` first on PATH."""
     install_fake_aco(tmp_path / "bin")
     monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
-    directory = tmp_path / "repository"
+    return named_repository(tmp_path, "repository")
+
+
+def named_repository(tmp_path: Path, name: str) -> FakeAcoRepository:
+    """A further repository directory without expectation lines, sharing
+    whichever fake `aco` is already on PATH."""
+    directory = tmp_path / name
     directory.mkdir()
     fake = FakeAcoRepository(directory)
     fake.set_rulings()
@@ -195,15 +204,27 @@ class FakeAcoRepository:
 
 
 @contextmanager
-def serving(decisions: DecisionPort, **board_options: float) -> Iterator[BoardClient]:
-    """The real board server on a free loopback port, stopped on exit."""
-    running = start_board(0, Board(decisions), **board_options)
+def serving(
+    decisions: DecisionPort, *, label: str = DEFAULT_LABEL, **board_options: float
+) -> Iterator[BoardClient]:
+    """The real board server for one repository labelled `label`, stopped on exit."""
+    with serving_many({label: decisions}, **board_options) as client:
+        yield client
+
+
+@contextmanager
+def serving_many(
+    decisions_by_label: Mapping[str, DecisionPort], **board_options: float
+) -> Iterator[BoardClient]:
+    """The real board server for every labelled repository, stopped on exit."""
+    boards = Boards({label: Board(decisions) for label, decisions in decisions_by_label.items()})
+    running = start_board(0, boards, **board_options)
     server_thread = threading.Thread(
         target=running.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
     )
     server_thread.start()
     try:
-        yield BoardClient.from_url(running.url)
+        yield BoardClient.from_url(running.url, repos=tuple(decisions_by_label))
     finally:
         running.httpd.shutdown()
         running.httpd.server_close()
@@ -265,13 +286,20 @@ class BoardClient:
     host: str
     port: int
     token: str
+    repos: tuple[str, ...] = (DEFAULT_LABEL,)
+    """Every repo label this board was started with, in configured order."""
+
+    @property
+    def repo(self) -> str:
+        """The one repo most single-repo tests mean when they say none."""
+        return self.repos[0]
 
     @classmethod
-    def from_url(cls, url: str) -> BoardClient:
+    def from_url(cls, url: str, *, repos: tuple[str, ...] = (DEFAULT_LABEL,)) -> BoardClient:
         split = urlsplit(url)
         assert split.hostname is not None
         assert split.port is not None
-        return cls(split.hostname, split.port, parse_qs(split.query)["t"][0])
+        return cls(split.hostname, split.port, parse_qs(split.query)["t"][0], repos)
 
     def get_page(self, token: str | None = None) -> Response:
         presented = self.token if token is None else token
@@ -291,6 +319,7 @@ class BoardClient:
         """Post `outcome` for `card` the way the page script posts a click."""
         payload = {
             "token": self.token if token is None else token,
+            "repo": card.repo,
             "item": card.item,
             "line": card.line,
             "fingerprint": card.fingerprint,
@@ -372,9 +401,12 @@ class BoardClient:
     def get_board_json(self) -> Response:
         return self.call_api("GET", "/api/board", presented=self.token)
 
-    def decide_through_api(self, line: Mapping[str, object], item: int, outcome: str) -> Response:
+    def decide_through_api(
+        self, line: Mapping[str, object], item: int, outcome: str, *, repo: str | None = None
+    ) -> Response:
         """Post `outcome` for a line exactly as `GET /api/board` listed it."""
         payload = {
+            "repo": self.repo if repo is None else repo,
             "item": item,
             "line": line["index"],
             "fingerprint": line["fingerprint"],
@@ -408,6 +440,7 @@ class Card:
     item: int
     line: int
     fingerprint: str
+    repo: str = DEFAULT_LABEL
     texts: dict[str, str] = field(default_factory=dict)
     image_sources: list[str] = field(default_factory=list)
 
@@ -434,7 +467,8 @@ class BoardPage(HTMLParser):
         if tag == "article" and css_class == "card":
             item, line = attributes.get("data-item"), attributes.get("data-line")
             fingerprint = attributes.get("data-fingerprint") or ""
-            self.cards.append(Card(int(item or 0), int(line or 0), fingerprint))
+            repo = attributes.get("data-repo") or DEFAULT_LABEL
+            self.cards.append(Card(int(item or 0), int(line or 0), fingerprint, repo))
             self._in_card = True
         if tag == "img" and self._in_card:
             self.cards[-1].image_sources.append(attributes.get("src") or "")

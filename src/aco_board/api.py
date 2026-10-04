@@ -9,10 +9,11 @@ answer and the request look like.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
-from .board import BoardSnapshot
+from .board import RepoReading, RepoUnavailable
 from .ports import NOTE_MAX_LENGTH, Decision, DecisionResult, ExpectationLine, Outcome
 
 JSON_CONTENT_TYPE = "application/json"
@@ -20,17 +21,29 @@ JSON_CONTENT_TYPE = "application/json"
 
 @dataclass(frozen=True)
 class DecisionRequest:
+    repo: str
+    """The label of the configured repo this decision belongs to."""
     fingerprint: str
     """The fingerprint of the card as it was shown when the operator chose."""
     decision: Decision
 
 
-def board_json(snapshot: BoardSnapshot) -> str:
-    """Every line, open and ruled, grouped under its item in the source's own order."""
+def board_json(readings: Sequence[RepoReading]) -> str:
+    """Every configured repo, in configured order, with its items or its error."""
+    return json.dumps({"repos": [_repo_json(reading) for reading in readings]})
+
+
+def _repo_json(reading: RepoReading) -> dict[str, object]:
+    if isinstance(reading, RepoUnavailable):
+        return {"name": reading.name, "error": reading.reason, "items": []}
     lines_by_item: dict[int, list[ExpectationLine]] = {}
-    for line in snapshot.lines:
+    for line in reading.lines:
         lines_by_item.setdefault(line.item, []).append(line)
-    return json.dumps({"items": [_item_json(lines) for lines in lines_by_item.values()]})
+    return {
+        "name": reading.name,
+        "error": None,
+        "items": [_item_json(lines) for lines in lines_by_item.values()],
+    }
 
 
 def decision_result_json(result: DecisionResult) -> str:
@@ -42,14 +55,21 @@ def error_json(sentence: str) -> str:
 
 
 def parse_decision_request(raw: bytes) -> DecisionRequest | None:
-    """The decision a request body names, or None unless every field is well-formed."""
+    """The decision a request body names, or None unless every field is well-formed.
+
+    `repo` is checked here only for its shape; whether it names a configured
+    repo is the caller's own lookup, made before any `aco` call.
+    """
     fields = _json_object(raw)
     if fields is None:
         return None
+    repo = fields.get("repo")
     fingerprint, item, line = fields.get("fingerprint"), fields.get("item"), fields.get("line")
     outcome, note = fields.get("outcome"), fields.get("note")
     if (
-        isinstance(fingerprint, str)
+        isinstance(repo, str)
+        and repo != ""
+        and isinstance(fingerprint, str)
         and _is_position(item)
         and _is_position(line)
         and isinstance(outcome, str)
@@ -57,7 +77,7 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
         and (note is None or _is_note_text(note))
     ):
         decision = Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
-        return DecisionRequest(fingerprint=fingerprint, decision=decision)
+        return DecisionRequest(repo=repo, fingerprint=fingerprint, decision=decision)
     return None
 
 

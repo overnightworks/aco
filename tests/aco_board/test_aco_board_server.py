@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 from aco_board_fixtures import (
+    DEFAULT_LABEL,
     BoardClient,
     BoardPage,
     Card,
@@ -482,6 +483,7 @@ def test_a_malformed_decision_is_refused_without_writing(
 def _decision_body(token: str, **overrides: object) -> str:
     fields: dict[str, object] = {
         "token": token,
+        "repo": DEFAULT_LABEL,
         "item": 42,
         "line": 1,
         "fingerprint": "any",
@@ -503,6 +505,7 @@ def _decision_body(token: str, **overrides: object) -> str:
         {"note": "\ud800"},
         {"note": "nul\u0000byte"},
         {"note": "x" * (NOTE_MAX_LENGTH + 1)},
+        {"repo": "other-repo"},
     ],
     ids=[
         "outcome-unknown",
@@ -514,6 +517,7 @@ def _decision_body(token: str, **overrides: object) -> str:
         "note-lone-surrogate",
         "note-nul",
         "note-too-long",
+        "repo-unknown",
     ],
 )
 def test_a_decision_outside_yes_no_or_later_on_a_real_line_is_refused(
@@ -550,7 +554,8 @@ def _post(body: bytes, length: bytes | None = None) -> bytes:
         (_post(b'{"token": "\xed\xa0\x80"}'), b"400"),
         (
             _post(
-                b'{"token": "\\ud800", "item": 42, "line": 1, "fingerprint": "f", "outcome": "yes"}'
+                b'{"token": "\\ud800", "repo": "repo", "item": 42, "line": 1, '
+                b'"fingerprint": "f", "outcome": "yes"}'
             ),
             b"403",
         ),
