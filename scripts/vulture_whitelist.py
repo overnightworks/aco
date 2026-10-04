@@ -40,10 +40,15 @@ assertions, `tests/test_cli.py`'s `"age_days"` envelope pin).
 `NoItemKind.DOCS`: `GitHubForge.allowed_merge_methods` iterates `MergeMethod`
 to read each of GitHub's merge settings, and no code names the one method
 `aco land` never merges with.
+
+`aco_board.ports.Outcome.LATER` (issue #624) is built only by `Outcome(value)`
+from `aco rulings --json` and a board decision's posted outcome; no code
+names the one outcome the board writes as neither yes nor no.
 """
 
 from datetime import UTC, date, datetime
 
+from aco_board.ports import Outcome
 from agent_coordination.board import (
     Board,
     BoardItem,
@@ -145,6 +150,7 @@ _referenced_only_for_vulture = (
     NoItemKind.DOCS,
     NoItemKind.FIX,
     MergeMethod.REBASE,
+    Outcome.LATER,
     ForgeUnsupportedError,
     Capability.UNSUPPORTED,
     _BoardRequestHandler.do_GET,

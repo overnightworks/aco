@@ -26,8 +26,8 @@ yet. `<n>` is an item number, `<k>` an expectation line's 1-based index.
 
 - [ ] [ABRD-01] Deciding a shown open card with outcome `yes`, `no`, or `later` runs `aco rule <n> --line <k>` with `--yes`, `--no`, or `--later` and `--json` (see E-ABRD-01).
 - [ ] [ABRD-02] A card whose title, text, question, example, picture, or recommended outcome changed since it was shown is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run (see E-ABRD-02).
-- [ ] [ABRD-03] The board runs one `aco rule` at a time: a decision arriving while another is being written waits for it, so both rulings are stored.
-- [ ] [ABRD-04] Stopping the board waits for an `aco rule` already running; a decision arriving after that is refused `board is shutting down`, no `aco rule` run.
+- [ ] [ABRD-03] The board runs one `aco rule` at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
+- [ ] [ABRD-04] Stopping the board waits for an `aco rule` already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, no `aco rule` run.
 - [ ] [ABRD-05] A note is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other note refuses the decision before any `aco` call; a blank note is no note.
 
 ## Reading the lines

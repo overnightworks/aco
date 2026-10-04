@@ -141,6 +141,11 @@ def _line(item: int, title: str, line: object) -> ExpectationLine:
     fields = _as_object(line)
     if fields is None:
         raise _unreadable(f"#{item} has a line that is not an object")
+    # RUL-10 always names a line's ruling and its date, null while open; a
+    # missing key is a broken shape, never an open line.
+    for key in ("ruling", "ruled_on"):
+        if key not in fields:
+            raise _unreadable(f"#{item} line has no {key}")
     return ExpectationLine(
         item=item,
         item_title=title,

@@ -265,13 +265,23 @@ def test_an_unreadable_aco_shows_its_reason_instead_of_cards(
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": null, "question": 3}]}]}',
+            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null, "question": 3}]}]}',
             "question is not text",
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": null, "default": "maybe"}]}]}',
+            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null, "default": "maybe"}]}]}',
             "default is not an outcome",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruled_on": null}]}]}',
+            "#1 line has no ruling",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": null}]}]}',
+            "#1 line has no ruled_on",
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
@@ -293,6 +303,8 @@ def test_an_unreadable_aco_shows_its_reason_instead_of_cards(
         "line-not-an-object",
         "question-not-text",
         "default-not-an-outcome",
+        "ruling-missing",
+        "ruled-on-missing",
         "ruling-not-an-outcome",
         "ruled-on-not-a-date",
     ],
@@ -436,11 +448,20 @@ def test_a_card_shown_for_another_line_with_the_same_words_is_refused_without_wr
     assert repository.rulings_state() == state_before
 
 
-def test_simultaneous_decisions_on_one_item_are_all_stored(
-    repository: FakeAcoRepository, board: BoardClient
+@pytest.mark.parametrize(
+    ("clicked_lines", "statuses"),
+    [((1, 2), ["ruled", "ruled"]), ((1, 1), ["already_ruled", "ruled"])],
+    ids=["distinct-lines-both-stored", "same-line-stored-once"],
+)
+def test_simultaneous_decisions_on_one_item_are_each_written_in_turn(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    clicked_lines: tuple[int, int],
+    statuses: list[str],
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?"), line(2, "Links?")))
-    cards = _page(board).cards
+    page = _page(board)
+    cards = [page.card(42, index) for index in clicked_lines]
     # Each `aco rule` waits between reading and rewriting the body, so two
     # unserialized writes would overlap and the later one would drop the first.
     repository.delay("rule", 0.3)
@@ -448,9 +469,9 @@ def test_simultaneous_decisions_on_one_item_are_all_stored(
     with ThreadPoolExecutor(max_workers=2) as clicks:
         answers = list(clicks.map(lambda card: board.decide(card, "yes"), cards))
 
-    assert [answer.json()["status"] for answer in answers] == ["ruled", "ruled"]
-    assert repository.stored_line(42, 1)["ruling"] == "yes"
-    assert repository.stored_line(42, 2)["ruling"] == "yes"
+    assert sorted(str(answer.json()["status"]) for answer in answers) == statuses
+    for index in set(clicked_lines):
+        assert repository.stored_line(42, index)["ruling"] == "yes"
 
 
 def test_a_page_without_or_with_a_wrong_token_is_refused_without_reading_aco(

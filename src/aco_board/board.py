@@ -38,7 +38,8 @@ class Board:
         self._decisions = decisions
         # `aco rule` rewrites the whole item body, so two writes at once could
         # each drop the other's ruling; the board writes one at a time.
-        self._write_lock = threading.Lock()
+        self._turn = threading.Condition()
+        self._writing = False
         self._closed = False
 
     def snapshot(self) -> BoardSnapshot:
@@ -54,19 +55,39 @@ class Board:
         comparison on purpose: whether it is already ruled, out of range, or its
         item unknown is the source's own refusal, which `rule` reports.
         """
-        with self._write_lock:
-            if self._closed:
-                return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
+        if not self._take_turn():
+            return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
+        try:
             return self._decide_one(decision, fingerprint)
+        finally:
+            self._end_turn()
 
     def close_writes(self) -> None:
-        """Wait for a decision already being written, then refuse every later one.
+        """Refuse every decision not yet being written, then wait for the one that is.
 
         A caller stopping the process calls this first, so a ruling inside the
-        source's write is never cut off with its outcome unknown.
+        source's write is never cut off with its outcome unknown. Refusing
+        comes first so a decision still waiting for its turn cannot slip in
+        behind the running write once stopping began.
         """
-        with self._write_lock:
+        with self._turn:
             self._closed = True
+            self._turn.notify_all()
+            self._turn.wait_for(lambda: not self._writing)
+
+    def _take_turn(self) -> bool:
+        """Wait until no decision is being written; False once writes closed."""
+        with self._turn:
+            self._turn.wait_for(lambda: self._closed or not self._writing)
+            if self._closed:
+                return False
+            self._writing = True
+            return True
+
+    def _end_turn(self) -> None:
+        with self._turn:
+            self._writing = False
+            self._turn.notify_all()
 
     def _decide_one(self, decision: Decision, fingerprint: str) -> DecisionResult:
         try:

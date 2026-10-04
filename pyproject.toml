@@ -101,6 +101,15 @@ layers = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Decision board transport does not reach the aco adapter"
+type = "forbidden"
+# The layers contract alone lets `server` and `page` import `aco_cli`, which
+# sits below them; only `cli` may wire the adapter in (issue #617).
+source_modules = ["aco_board.server", "aco_board.page"]
+forbidden_modules = ["aco_board.aco_cli"]
+allow_indirect_imports = false
+
+[[tool.importlinter.contracts]]
 name = "aco does not import the decision board"
 type = "forbidden"
 source_modules = ["agent_coordination"]
