@@ -110,7 +110,7 @@ transition), and which of the three causes applies.
 - [ ] [CAS-20] An item write whose `expected` no longer matches the item's current stored oid refuses `item '<id>' was written since it was read (expected <oid>, found <oid-or-None>); re-read and retry`.
 - [ ] [CAS-21] Two item writes on distinct ids racing for the same tip both land (except CAS-51): each attempt places its own id into the `items/` of the tip it read, so the other writer's id stays.
 - [ ] [CAS-61] A write carries every tree entry it does not write unchanged by name, mode and blob, foreign `items/` names included; `items/` stays while only such entries remain.
-- [ ] [CAS-51] An item write holding the whole `items/` it checked (`item close`, `item edit --kind`) refuses `items/ was written since this write checked it; re-read and retry` once any other item changed.
+- [ ] [CAS-51] An item write holding the whole `items/` it checked (`item edit --kind`) refuses `items/ was written since this write checked it; re-read and retry` once any other item changed.
 - [ ] [CAS-52] `item close` re-checks PIN-26 on every attempt: a claim that lands on the item between a rejected push and its retry refuses the close with PIN-26's sentence, the item left open.
 - [ ] [CAS-59] A `state-ref` claim re-checks on every attempt that its item is the blob its checks read open: a close or edit landed since refuses with CAS-20's sentence and writes no claim.
 - [ ] [CAS-60] Under `storage = "github"` a claim makes no such check: the forge holds the item's state and this ref no fact of it, so a close racing the claim is the forge's to judge.

@@ -8,8 +8,8 @@ own trailer block` vs. `## The pull request body's own grammar`, below).
 This file owns both grammars, `aco check <pr>`'s classification, the
 parent-closing rule, what `aco release --merged` verifies, and the
 "Landungen" landing view `aco board` derives from them.
-Each command's own spec (none exist yet for `check`/`release`/`board`) would
-cite these IDs rather than restate them. `aco check <sha>` and, under
+Each command's own spec (`specs/check.spec.md`, `specs/release.spec.md`,
+`specs/board.spec.md`) cites these IDs rather than restates them. `aco check <sha>` and, under
 `storage = "state-ref"`, `release --merged <sha|empty>` (issue #359) read
 the trunk's own trailer block directly and need no forge at all: a commit's
 trailer is local history, unlike a pull request's classification. Under

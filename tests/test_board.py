@@ -3853,7 +3853,7 @@ def test_measurements_counts_an_unparsed_lifecycle_commit() -> None:
 
 
 def test_measurements_counts_an_unparsed_commit_even_with_no_measured_class() -> None:
-    """`unparsed` never hides behind `classes` being empty (BOARD-30, issue
+    """`unparsed` never hides behind `classes` being empty (BOARD-27, issue
     #357 R2): a board with no measured lane at all still surfaces every
     unparsed commit."""
     projected = projected_board(
