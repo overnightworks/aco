@@ -320,17 +320,20 @@ exact text sections, JSON keys, HTML layout, and estimate derivation are
 
 `aco-board serve [--port N] [--repo PFAD]...` serves one or more
 repositories' open expectation lines, under one URL, as yes/no cards on
-127.0.0.1; the access token is in the printed URL. Each `--repo` (repeatable)
+127.0.0.1; the access token travels only in the printed URL's `#` fragment,
+which a browser never sends back to the server. Each `--repo` (repeatable)
 is labelled by its resolved directory's name; without it, the current
 directory is the one repository served. A choice can be undone for 8
 seconds, then it is written through `aco rule` in its own repository.
 
-`frontend/` holds the board's coming browser app (Svelte, built with pnpm;
-the Node range and pnpm version are pinned in its `package.json`). Its build output is
-committed under `src/aco_board/static/` and is not served yet. After changing
-`frontend/`, run `pnpm --dir frontend install --frozen-lockfile && pnpm --dir
-frontend build` and commit the rebuilt files with the change: CI's `frontend`
-job fails when they differ from a fresh build.
+`frontend/` holds the board's browser app (Svelte, built with pnpm; the Node
+range and pnpm version are pinned in its `package.json`). Its build output is
+committed under `src/aco_board/static/`, which `aco-board serve` delivers at
+`/` and `/assets/**` without a token; only the JSON API under `/api/` needs
+one. After changing `frontend/`, run `pnpm --dir frontend install
+--frozen-lockfile && pnpm --dir frontend build` and commit the rebuilt files
+with the change: CI's `frontend` job fails when they differ from a fresh
+build.
 
 ## Scope and boundaries
 

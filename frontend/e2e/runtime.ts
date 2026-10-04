@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export interface BoardRuntime {
-	/** The Vite dev server's own origin, no path or fragment. */
+	/** The real board server's own origin, no path or fragment. */
 	appUrl: string;
 	/** The fake board's access token, as it belongs in a `#t=` fragment. */
 	token: string;

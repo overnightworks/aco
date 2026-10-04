@@ -1,7 +1,7 @@
 # `aco-board serve`
 
-`aco-board serve --repo PFAD...` (issues #617, #620, #637) shows one or more
-repositories' open expectation lines on one loopback page and writes each
+`aco-board serve --repo PFAD...` (issues #617, #620, #637, #652) shows one or
+more repositories' open expectation lines in a browser SPA and writes each
 decision through the installed `aco` command line, never through aco's own
 modules; without `--repo`, the current directory is the one repository
 served. This file owns the board's decision rules: which outcomes it writes,
@@ -10,10 +10,11 @@ it may carry -- across every configured repository, since one write turn and
 one drain span all of them. It cites the read shape `specs/rulings.spec.md`
 owns (RUL-10) and the write `specs/rule.spec.md` owns (RULE-01, RULE-03)
 rather than restating them. It also owns the JSON API under `/api/` -- its
-shapes, token, and headers; the legacy page at `/` and `POST /rule` is not
-specified here beyond naming a repo. `<n>` is an item number, `<k>` an
-expectation line's 1-based index, `<repo>` a configured repository's label --
-the resolved directory's name.
+shapes, token, and headers -- and the shell's own delivery contract (who may
+fetch it, and how it is contained to its own files); the SPA's own behaviour
+once loaded is `frontend/`'s. `<n>` is an item number, `<k>` an expectation
+line's 1-based index, `<repo>` a configured repository's label -- the
+resolved directory's name.
 
 ## Behavior table
 
@@ -49,7 +50,7 @@ the resolved directory's name.
 
 - [ ] [ABRD-14] `aco-board serve --repo PFAD` (repeatable) configures the repos served, labelled `<repo>` by each resolved directory's name; without `--repo`, the current directory is the one repository.
 - [ ] [ABRD-15] `GET /api/board` and the legacy page answer once any repo's read succeeded; a failed repo carries its own error sentence and no items or cards, others unaffected (see E-ABRD-06).
-- [ ] [ABRD-16] A decision naming a `repo` outside the configured labels is refused `bad request: decision` before any `aco` call, on both `POST /api/rule` and the legacy `POST /rule` (see E-ABRD-07).
+- [ ] [ABRD-16] A decision naming a `repo` outside the configured labels is refused `bad request: decision` before any `aco` call (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running `aco rule` in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
 - [ ] [ABRD-19] A `--repo` path that is not a directory is a usage error; two resolved paths with the same label refuse the start with `ERROR: two repositories named <repo>: <p1>, <p2>`.
@@ -64,6 +65,13 @@ the resolved directory's name.
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
+
+## The SPA shell
+
+- [ ] [ABRD-22] `GET /` answers the committed shell and `GET /assets/**` its committed built files, no token needed; each refuses a method other than `GET` with 405 and `Allow: GET` (see E-ABRD-08).
+- [ ] [ABRD-23] `GET /assets/**` answers only a regular file under the committed `static/` directory: a `..` segment, encoded or not, or an in-between symlink answers `not found`, like a missing file.
+- [ ] [ABRD-24] The CSP on the shell and its assets carries no nonce: `script-src 'self'` (its one script loads from `/assets/`) and `img-src data:`, alongside ABRD-12's own directives.
+- [ ] [ABRD-25] `aco-board serve` refuses to start with `ERROR: <path> is missing; build the frontend first (...)` once the committed shell is absent, never binding a board that could only answer its API.
 
 ## Never
 
@@ -168,3 +176,21 @@ answer 200: {"status": "ruled", "message": null}
 Posting the same body with `"repo": "c"` -- not a configured repo -- answers 400 `{"error": "bad request: decision"}`, no call in `a` or `b`.
 
 Posting it with `"repo": "b"` instead -- `a`'s own fingerprint, against `b`'s identical card -- answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`, no call in `a` or `b` (ABRD-21).
+
+### E-ABRD-08 -- the shell and its assets need no token
+
+Setup: fake-aco, item `#42` with one open line `Guests?`
+
+```text
+request: GET / (no X-Board-Token header, no token in the path at all)
+aco calls: none
+answer 200: the committed `static/index.html`, Content-Type text/html
+
+request: GET /assets/index.js
+aco calls: none
+answer 200: the committed `static/assets/index.js`, Content-Type text/javascript
+
+request: GET /assets/../server.py (a traversal attempt, literal or percent-encoded)
+aco calls: none
+answer 404: not found (text/plain) -- the same answer a missing asset gets (ABRD-23)
+```

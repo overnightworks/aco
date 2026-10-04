@@ -81,13 +81,6 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
     return None
 
 
-def legacy_body_token(raw: bytes) -> str | None:
-    """The access token the legacy `POST /rule` carries in its body, if it is text."""
-    fields = _json_object(raw)
-    token = fields.get("token") if fields is not None else None
-    return token if isinstance(token, str) else None
-
-
 def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:
     first = lines[0]
     return {

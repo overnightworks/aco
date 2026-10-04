@@ -19,7 +19,6 @@ from typing import Any, cast
 import pytest
 from aco_board_fixtures import (
     BoardClient,
-    BoardPage,
     FakeAcoRepository,
     install_fake_aco,
     line,
@@ -109,8 +108,11 @@ def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrup
 
     def look(board: BoardClient) -> None:
         seen.append(board)
-        assert BoardPage(board.get_page().body).card_keys() == [(1, 1)]
-        assert board.get_page_without_token().status == 403
+        shell = board.get_shell()
+        assert shell.status == 200
+        assert shell.headers["Content-Type"] == "text/html; charset=utf-8"
+        [repo] = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
+        assert [item["number"] for item in repo["items"]] == [1]
 
     assert _serve_until_done(monkeypatch, here.directory, look) == 0
     [board] = seen
@@ -237,8 +239,9 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
     with ThreadPoolExecutor(max_workers=1) as clicks:
 
         def click_then_interrupt(board: BoardClient) -> None:
-            card = BoardPage(board.get_page().body).card(42, 1)
-            clicks.submit(board.decide, card, "yes")
+            repos = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
+            repo_name, listed_line = repos[0]["name"], repos[0]["items"][0]["lines"][0]
+            clicks.submit(board.decide_through_api, listed_line, 42, "yes", repo=repo_name)
             assert ruling_entered.wait(_URL_WAIT_SECONDS)
             releaser.start()
 
