@@ -297,7 +297,7 @@ def test_an_api_request_outside_its_routes_answers_why_as_json(
 ) -> None:
     response = board.call_api(method, path, presented=board.token)
 
-    assert (response.status, response.json()) == answer
+    assert answer == (response.status, response.json())
     assert response.headers.get("Allow") == allow
     assert repository.calls() == []
 
