@@ -1,7 +1,0 @@
-claim_id = "ca25ad3f47604c10b51296262a74a2db"
-agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
-role = "builder"
-base = "d87e9daa94aca7ddb561d777c12b99372c822880"
-branch = "claude/issue-638-freeze-board-picture"
-scope = ["docs/board/README.md", "docs/board/mockup.html"]
-opened_commit = "43c2ed657c9ed984fabc93d8a686a3f8beef0200"
