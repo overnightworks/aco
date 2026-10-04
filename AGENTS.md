@@ -5,7 +5,7 @@ Entry points (pointers only; the facts live there): `README.md` is operator docu
 
 Repository facts (owners in parentheses; do not fork them here):
 - Python >= 3.11 (`pyproject.toml`).
-- Verification: `ruff check .` and `pytest` (`.github/workflows/ci.yml`).
+- Verification: `ruff check .` and `pytest`; for `frontend/`, `pnpm --dir frontend install --frozen-lockfile`, then `pnpm --dir frontend` `check`, `lint`, `knip`, `test`, and `build`, and commit the rebuilt `src/aco_board/static/` (`.github/workflows/ci.yml`).
 - Package version: `src/agent_coordination/__init__.py` (`__version__`).
 - Build in a linked isolated worktree. Use live `aco status` then `claim` before the first edit. Do not use Atelier's Auto-Runner.
 

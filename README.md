@@ -323,7 +323,7 @@ as yes/no cards on 127.0.0.1; the access token is in the printed URL. A
 choice can be undone for 8 seconds, then it is written through `aco rule`.
 
 `frontend/` holds the board's coming browser app (Svelte, built with pnpm;
-the Node version is pinned in its `package.json`). Its build output is
+the Node range and pnpm version are pinned in its `package.json`). Its build output is
 committed under `src/aco_board/static/` and is not served yet. After changing
 `frontend/`, run `pnpm --dir frontend install --frozen-lockfile && pnpm --dir
 frontend build` and commit the rebuilt files with the change: CI's `frontend`
