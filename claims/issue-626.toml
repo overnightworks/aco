@@ -1,8 +1,0 @@
-claim_id = "c142ab95040e40fc97978ed6b60b8f9a"
-agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
-role = "builder"
-base = "0eba9635a5afcc969408449f0532b6bb3d0224a1"
-branch = "claude/issue-626-frontend-toolchain"
-scope = [".github/workflows/ci.yml", ".gitignore", "AGENTS.md", "CLAUDE.md", "README.md", "frontend", "scripts/check_root_layout.py", "sonar-project.properties", "src/aco_board/static"]
-opened_commit = "cbce23f78ff1cde2c98316194ee67fbf208765b7"
-whole_reason = "Gerüst ohne Verhalten laut S3a1-Zeile in #617."
