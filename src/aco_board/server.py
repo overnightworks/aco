@@ -29,8 +29,7 @@ from typing import cast
 from urllib.parse import parse_qs, urlsplit
 
 from . import api, page
-from .board import Board
-from .ports import DecisionSourceUnavailableError
+from .board import Boards, all_repos_unavailable
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"
@@ -81,10 +80,10 @@ class _BoardServer(ThreadingHTTPServer):
     # never waits for one a stalled client holds -- only for a ruling write.
 
     def __init__(
-        self, port: int, token: str, board: Board, request_deadline_seconds: float
+        self, port: int, token: str, boards: Boards, request_deadline_seconds: float
     ) -> None:
         # Set before binding: a failed bind already calls `server_close`.
-        self.board = board
+        self.boards = boards
         super().__init__((LOOPBACK_HOST, port), _BoardRequestHandler)
         self.token = token
         self.request_deadline_seconds = request_deadline_seconds
@@ -103,11 +102,11 @@ class _BoardServer(ThreadingHTTPServer):
 
         Handler threads are daemons, so the process may exit while one is
         inside `aco rule`, leaving the ruling's outcome unknown. Closing the
-        board's writes waits for that write -- as long as the source's own
+        boards' writes waits for that write -- as long as the source's own
         timeout lets it run -- and refuses every later one.
         """
         super().server_close()
-        self.board.close_writes()
+        self.boards.close_writes()
 
 
 @dataclass(frozen=True)
@@ -118,13 +117,13 @@ class RunningBoard:
 
 def start_board(
     port: int,
-    board: Board,
+    boards: Boards,
     *,
     request_deadline_seconds: float = REQUEST_DEADLINE_SECONDS,
 ) -> RunningBoard:
     """Bind `127.0.0.1:port` (0 picks a free port) with a fresh token."""
     token = secrets.token_urlsafe(32)
-    httpd = _BoardServer(port, token, board, request_deadline_seconds)
+    httpd = _BoardServer(port, token, boards, request_deadline_seconds)
     bound_port = httpd.server_address[1]
     url = f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}?{TOKEN_FIELD}={token}"
     return RunningBoard(httpd=httpd, url=url)
@@ -257,14 +256,10 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             self._refuse_as_text(HTTPStatus.FORBIDDEN, _FORBIDDEN)
             return
         nonce = secrets.token_urlsafe(16)
-        try:
-            snapshot = self._server().board.snapshot()
-        except DecisionSourceUnavailableError as error:
-            unavailable = page.render_unavailable(str(error), nonce)
-            self._respond(HTTPStatus.BAD_GATEWAY, unavailable, page.HTML_CONTENT_TYPE, nonce=nonce)
-            return
-        rendered = page.render_board(snapshot.open_lines, nonce)
-        self._respond(HTTPStatus.OK, rendered, page.HTML_CONTENT_TYPE, nonce=nonce)
+        readings = self._server().boards.snapshot()
+        status = HTTPStatus.BAD_GATEWAY if all_repos_unavailable(readings) else HTTPStatus.OK
+        rendered = page.render_board(readings, nonce)
+        self._respond(status, rendered, page.HTML_CONTENT_TYPE, nonce=nonce)
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
@@ -283,6 +278,9 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return
         if not self._authorized(token):
             self._refuse_as_text(HTTPStatus.FORBIDDEN, _FORBIDDEN)
+            return
+        if not self._repo_known(request.repo):
+            self._refuse_as_text(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
             return
         self._decide(request)
 
@@ -307,22 +305,24 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         self._refuse_as_json(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED, allow=allow)
 
     def _get_board(self) -> None:
-        try:
-            snapshot = self._server().board.snapshot()
-        except DecisionSourceUnavailableError as error:
-            self._refuse_as_json(HTTPStatus.BAD_GATEWAY, str(error))
-            return
-        self._respond(HTTPStatus.OK, api.board_json(snapshot), api.JSON_CONTENT_TYPE)
+        readings = self._server().boards.snapshot()
+        status = HTTPStatus.BAD_GATEWAY if all_repos_unavailable(readings) else HTTPStatus.OK
+        self._respond(status, api.board_json(readings), api.JSON_CONTENT_TYPE)
 
     def _post_rule(self) -> None:
         raw = self._read_body(self._refuse_as_json)
         if raw is None:
             return
         request = api.parse_decision_request(raw)
-        if request is None:
+        if request is None or not self._repo_known(request.repo):
             self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
             return
         self._decide(request)
+
+    def _repo_known(self, repo: str) -> bool:
+        """Whether `repo` names one of this server's configured repos -- checked
+        before any `aco` call, so a request for an unknown repo never reaches it."""
+        return repo in self._server().boards.labels
 
     def _read_body(self, refuse: _Refusal) -> bytes | None:
         """The whole declared body, or None once `refuse` has answered why not."""
@@ -344,7 +344,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         return body
 
     def _decide(self, request: api.DecisionRequest) -> None:
-        result = self._server().board.decide(request.decision, request.fingerprint)
+        result = self._server().boards.decide(request.repo, request.decision, request.fingerprint)
         self._respond(HTTPStatus.OK, api.decision_result_json(result), api.JSON_CONTENT_TYPE)
 
     def log_message(self, format: str, *_args: object) -> None:

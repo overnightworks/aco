@@ -13,6 +13,7 @@ import base64
 from collections.abc import Sequence
 from html import escape
 
+from .board import RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import NOTE_MAX_LENGTH, ExpectationLine, Outcome
 
 HTML_CONTENT_TYPE = "text/html; charset=utf-8"
@@ -91,7 +92,7 @@ async function send(card, outcome) {
     const response = await fetch('/rule', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({token, item: Number(card.dataset.item),
+      body: JSON.stringify({token, repo: card.dataset.repo, item: Number(card.dataset.item),
                             line: Number(card.dataset.line),
                             fingerprint: card.dataset.fingerprint, outcome, note: note || null}),
     });
@@ -159,11 +160,14 @@ def content_security_policy(nonce: str | None) -> str:
     )
 
 
-def render_board(open_lines: Sequence[ExpectationLine], nonce: str) -> str:
-    cards = "".join(_card(line) for line in open_lines)
-    empty_hidden = " hidden" if open_lines else ""
+def render_board(readings: Sequence[RepoReading], nonce: str) -> str:
+    """Every configured repo, in configured order, under its own heading --
+    its open lines as cards, or its error sentence once its read failed."""
+    sections = [_repo_section(reading) for reading in readings]
+    open_count = sum(count for _, count in sections)
+    empty_hidden = " hidden" if open_count else ""
     body = (
-        f"<main><h1>Entscheiden</h1>{cards}"
+        f"<main><h1>Entscheiden</h1>{''.join(section for section, _ in sections)}"
         f'<p class="empty"{empty_hidden}>{NOTHING_OPEN}</p></main>'
         '<div class="toasts" aria-live="polite"></div>'
         f'<script nonce="{nonce}">{_SCRIPT}</script>'
@@ -171,12 +175,14 @@ def render_board(open_lines: Sequence[ExpectationLine], nonce: str) -> str:
     return _document(body, nonce, body_attributes=f' data-undo-seconds="{UNDO_SECONDS}"')
 
 
-def render_unavailable(sentence: str, nonce: str) -> str:
-    body = (
-        '<main><h1>Entscheiden</h1><p class="unavailable">'
-        f"aco konnte nicht gelesen werden: {escape(sentence)}</p></main>"
-    )
-    return _document(body, nonce, body_attributes="")
+def _repo_section(reading: RepoReading) -> tuple[str, int]:
+    heading = f"<h2>{escape(reading.name)}</h2>"
+    if isinstance(reading, RepoUnavailable):
+        sentence = f"aco konnte nicht gelesen werden: {escape(reading.reason)}"
+        return f'{heading}<p class="unavailable">{sentence}</p>', 0
+    open_lines = tuple(line for line in reading.lines if line.is_open)
+    cards = "".join(_card(line, reading.name) for line in open_lines)
+    return f"{heading}{cards}", len(open_lines)
 
 
 def _document(body: str, nonce: str, *, body_attributes: str) -> str:
@@ -188,7 +194,7 @@ def _document(body: str, nonce: str, *, body_attributes: str) -> str:
     )
 
 
-def _card(line: ExpectationLine) -> str:
+def _card(line: ExpectationLine, repo: str) -> str:
     heading = line.question if line.question is not None else line.text
     sentence = f'<p class="text">{escape(line.text)}</p>' if line.question is not None else ""
     example = f'<p class="example">{escape(line.example)}</p>' if line.example is not None else ""
@@ -199,7 +205,7 @@ def _card(line: ExpectationLine) -> str:
     )
     return (
         f'<article class="card" data-item="{line.item}" data-line="{line.index}" '
-        f'data-fingerprint="{line.fingerprint}">'
+        f'data-fingerprint="{wire_fingerprint(repo, line)}" data-repo="{escape(repo)}">'
         f'<p class="item">#{line.item} · {escape(line.item_title)} · Zeile {line.index}</p>'
         f'<p class="question">{escape(heading)}</p>{sentence}{example}{picture}'
         f'<textarea rows="2" maxlength="{NOTE_MAX_LENGTH}" '

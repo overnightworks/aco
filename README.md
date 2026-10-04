@@ -318,9 +318,12 @@ landed; fewer measurements, including zero, show `schwach` instead. The
 exact text sections, JSON keys, HTML layout, and estimate derivation are
 `specs/board.spec.md`'s own.
 
-`aco-board serve [--port N]` serves this repository's open expectation lines
-as yes/no cards on 127.0.0.1; the access token is in the printed URL. A
-choice can be undone for 8 seconds, then it is written through `aco rule`.
+`aco-board serve [--port N] [--repo PFAD]...` serves one or more
+repositories' open expectation lines, under one URL, as yes/no cards on
+127.0.0.1; the access token is in the printed URL. Each `--repo` (repeatable)
+is labelled by its resolved directory's name; without it, the current
+directory is the one repository served. A choice can be undone for 8
+seconds, then it is written through `aco rule` in its own repository.
 
 `frontend/` holds the board's coming browser app (Svelte, built with pnpm;
 the Node range and pnpm version are pinned in its `package.json`). Its build output is

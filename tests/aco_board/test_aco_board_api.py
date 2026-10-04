@@ -13,12 +13,14 @@ from typing import Any, cast
 
 import pytest
 from aco_board_fixtures import (
+    DEFAULT_LABEL,
     BoardClient,
     FakeAcoRepository,
     Response,
     line,
     row,
     serving,
+    serving_two,
 )
 
 from aco_board.aco_cli import AcoCli
@@ -31,11 +33,21 @@ _ORIGIN_ELSEWHERE = {"Origin": "http://elsewhere.example"}
 def _listed_items(board: BoardClient) -> list[dict[str, Any]]:
     response = board.get_board_json()
     assert response.status == 200
-    return cast(list[dict[str, Any]], response.json()["items"])
+    [repo] = cast(list[dict[str, Any]], response.json()["repos"])
+    assert repo["name"] == board.repo
+    assert repo["error"] is None
+    return cast(list[dict[str, Any]], repo["items"])
 
 
 def _decision_body(**overrides: object) -> str:
-    fields = {"item": 42, "line": 1, "fingerprint": "any", "outcome": "yes", "note": None}
+    fields = {
+        "repo": DEFAULT_LABEL,
+        "item": 42,
+        "line": 1,
+        "fingerprint": "any",
+        "outcome": "yes",
+        "note": None,
+    }
     return json.dumps({**fields, **overrides})
 
 
@@ -240,9 +252,17 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
         (_decision_body(outcome="maybe"), {}, "bad request: decision"),
         (_decision_body(line=0), {}, "bad request: decision"),
         (_decision_body(note="x" * (NOTE_MAX_LENGTH + 1)), {}, "bad request: decision"),
+        (_decision_body(repo="other-repo"), {}, "bad request: decision"),
         ("{}", {"Content-Length": "abc"}, "bad request: Content-Length"),
     ],
-    ids=["not-json", "outcome-unknown", "line-zero", "note-too-long", "content-length"],
+    ids=[
+        "not-json",
+        "outcome-unknown",
+        "line-zero",
+        "note-too-long",
+        "repo-unknown",
+        "content-length",
+    ],
 )
 def test_a_malformed_api_decision_is_refused_with_an_error_envelope_without_aco(
     repository: FakeAcoRepository,
@@ -377,9 +397,101 @@ def test_an_unavailable_aco_answers_502_with_its_reason(
     with serving(decisions) as board:
         response = board.get_board_json()
 
-    assert (response.status, response.json()) == (502, {"error": error})
+    assert response.status == 502
+    assert response.json() == {"repos": [{"name": DEFAULT_LABEL, "error": error, "items": []}]}
     assert response.headers["Content-Type"] == "application/json"
     _assert_guarded(response)
+
+
+def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
+    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+) -> None:
+    repository_a, repository_b = two_repositories
+    repository_a.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository_b.fail_rulings("ERROR: no forge adapter for host")
+
+    with serving_two(two_repositories) as board:
+        response = board.get_board_json()
+
+    assert response.status == 200
+    payload = response.json()
+    repos = cast(list[dict[str, Any]], payload["repos"])
+    assert [repo["name"] for repo in repos] == ["a", "b"]
+    [listed_line] = cast(list[dict[str, Any]], repos[0]["items"][0]["lines"])
+    assert isinstance(listed_line.pop("fingerprint"), str)
+    assert repos[0] == {
+        "name": "a",
+        "error": None,
+        "items": [{"number": 42, "title": "Share page", "lines": [listed_line]}],
+    }
+    assert listed_line == {
+        "index": 1,
+        "text": "Guests?",
+        "question": None,
+        "example": None,
+        "picture": None,
+        "default": None,
+        "ruling": None,
+        "ruled_on": None,
+    }
+    assert repos[1] == {
+        "name": "b",
+        "error": "aco rulings failed: ERROR: no forge adapter for host",
+        "items": [],
+    }
+
+
+def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
+    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+) -> None:
+    repository_a, repository_b = two_repositories
+    repository_a.fail_rulings("a is down")
+    repository_b.fail_rulings("b is down")
+
+    with serving_two(two_repositories) as board:
+        response = board.get_board_json()
+
+    assert response.status == 502
+    assert response.json() == {
+        "repos": [
+            {"name": "a", "error": "aco rulings failed: a is down", "items": []},
+            {"name": "b", "error": "aco rulings failed: b is down", "items": []},
+        ]
+    }
+
+
+@pytest.mark.parametrize(
+    ("target_repo", "expected_status", "expected_message"),
+    [("a", "ruled", None), ("b", "failed", LINE_CHANGED)],
+    ids=["its-own-repo", "a-different-repo-with-an-identical-card"],
+)
+def test_a_decision_only_writes_the_repo_its_fingerprint_was_read_from(
+    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+    target_repo: str,
+    expected_status: str,
+    expected_message: str | None,
+) -> None:
+    """ABRD-16/21: a card decided against its own repo writes there; posted
+    against another configured repo instead -- even one holding an identical
+    line -- it is refused like a changed line, no write in either repo
+    (issue #637)."""
+    repository_a, repository_b = two_repositories
+    identical_card = row(42, "Share page", line(1, "Guests?"))
+    repository_a.set_rulings(identical_card)
+    repository_b.set_rulings(identical_card)
+
+    with serving_two(two_repositories) as board:
+        payload = board.get_board_json().json()
+        repos = cast(list[dict[str, Any]], payload["repos"])
+        listed_in_a = repos[0]["items"][0]["lines"][0]
+
+        answer = board.decide_through_api(listed_in_a, 42, "yes", repo=target_repo)
+
+    assert answer.json() == {"status": expected_status, "message": expected_message}
+    assert repository_a.rule_calls() == (
+        [["rule", "42", "--line", "1", "--yes", "--json"]] if target_repo == "a" else []
+    )
+    assert repository_b.rule_calls() == []
 
 
 @pytest.mark.parametrize(

@@ -11,6 +11,9 @@ from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
     empty_repository_with_fake_aco,
+    install_fake_aco,
+    named_repository,
+    path_with,
     serving,
 )
 
@@ -26,3 +29,13 @@ def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeAcoReposi
 def board(repository: FakeAcoRepository) -> Iterator[BoardClient]:
     with serving(AcoCli(directory=repository.directory)) as client:
         yield client
+
+
+@pytest.fixture
+def two_repositories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[FakeAcoRepository, FakeAcoRepository]:
+    """Two labelled repositories, `a` and `b`, sharing one fake `aco` on PATH."""
+    install_fake_aco(tmp_path / "bin")
+    monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
+    return named_repository(tmp_path, "a"), named_repository(tmp_path, "b")

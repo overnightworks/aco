@@ -14,6 +14,7 @@ import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from aco_board_fixtures import (
@@ -28,7 +29,7 @@ from aco_board_fixtures import (
 
 from aco_board import cli
 from aco_board.aco_cli import AcoCli
-from aco_board.board import Board
+from aco_board.board import Boards
 from aco_board.ports import Decision, DecisionResult
 from aco_board.server import LOOPBACK_HOST
 
@@ -53,7 +54,10 @@ class _PrintedLines(io.StringIO):
 
 
 def _serve_until_done(
-    monkeypatch: pytest.MonkeyPatch, directory: Path, scenario: Callable[[BoardClient], None]
+    monkeypatch: pytest.MonkeyPatch,
+    directory: Path,
+    scenario: Callable[[BoardClient], None],
+    *extra_arguments: str,
 ) -> int:
     """Run `aco-board serve` in `directory`, drive `scenario`, then press Ctrl-C."""
     printed = _PrintedLines()
@@ -75,7 +79,7 @@ def _serve_until_done(
 
     driver = threading.Thread(target=drive)
     driver.start()
-    exit_code = cli.main(["serve", "--port", "0"])
+    exit_code = cli.main(["serve", "--port", "0", *extra_arguments])
     driver.join()
     if failures:
         raise failures[0]
@@ -89,7 +93,7 @@ def fake_aco_on_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _repository(directory: Path, *rows: dict[str, object]) -> FakeAcoRepository:
-    directory.mkdir()
+    directory.mkdir(parents=True)
     repository = FakeAcoRepository(directory)
     repository.set_rulings(*rows)
     return repository
@@ -115,6 +119,92 @@ def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrup
 
 
 @pytest.mark.usefixtures("fake_aco_on_path")
+def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository_a = _repository(tmp_path / "a", row(1, "In a", line(1, "A?")))
+    repository_b = _repository(tmp_path / "b", row(2, "In b", line(1, "B?")))
+
+    def decide_only_in_a(board: BoardClient) -> None:
+        payload = board.get_board_json().json()
+        repo_list = cast("list[dict[str, Any]]", payload["repos"])
+        repos = {repo["name"]: repo for repo in repo_list}
+        assert set(repos) == {"a", "b"}
+        assert [item["number"] for item in repos["a"]["items"]] == [1]
+        assert [item["number"] for item in repos["b"]["items"]] == [2]
+
+        listed_line = repos["a"]["items"][0]["lines"][0]
+        answer = board.decide_through_api(listed_line, 1, "yes", repo="a")
+        assert answer.json() == {"status": "ruled", "message": None}
+
+    exit_code = _serve_until_done(
+        monkeypatch,
+        tmp_path,
+        decide_only_in_a,
+        "--repo",
+        str(repository_a.directory),
+        "--repo",
+        str(repository_b.directory),
+    )
+
+    assert exit_code == 0
+    assert repository_a.rule_calls() == [["rule", "1", "--line", "1", "--yes", "--json"]]
+    assert repository_b.rule_calls() == []
+
+
+def _two_directories_named_the_same(tmp_path: Path) -> list[str]:
+    first = _repository(tmp_path / "left" / "shared", row(1, "A", line(1, "A?")))
+    second = _repository(tmp_path / "right" / "shared", row(2, "B", line(1, "B?")))
+    return ["--repo", str(first.directory), "--repo", str(second.directory)]
+
+
+def _a_symlink_resolving_to_a_configured_directory(tmp_path: Path) -> list[str]:
+    """A second `--repo` spelling that resolves to the same directory as the
+    first (issue #637 follow-up): `ABRD-19`'s own-directory check must read
+    the resolved path, not the string a symlink was given as."""
+    real = _repository(tmp_path / "shared", row(1, "A", line(1, "A?")))
+    alias = tmp_path / "alias"
+    alias.symlink_to(real.directory, target_is_directory=True)
+    return ["--repo", str(real.directory), "--repo", str(alias)]
+
+
+def _a_missing_directory(tmp_path: Path) -> list[str]:
+    return ["--repo", str(tmp_path / "no-such-directory")]
+
+
+def _exit_code(arguments: list[str]) -> int:
+    """`cli.main`'s own exit code, whether it returns one or raises the
+    `SystemExit` argparse's own usage-error path (a bad `--repo` directory)."""
+    try:
+        return cli.main(["serve", "--port", "0", *arguments])
+    except SystemExit as refused:
+        return cast(int, refused.code)
+
+
+@pytest.mark.usefixtures("fake_aco_on_path")
+@pytest.mark.parametrize(
+    ("build_arguments", "expected_code", "expected_message"),
+    [
+        (_two_directories_named_the_same, 1, "two repositories named shared"),
+        (_a_symlink_resolving_to_a_configured_directory, 1, "two repositories named shared"),
+        (_a_missing_directory, 2, "is not a directory"),
+    ],
+    ids=["duplicate-label", "symlink-resolves-to-a-configured-repo", "missing-directory"],
+)
+def test_serve_refuses_a_bad_repo_argument_as_a_usage_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    build_arguments: Callable[[Path], list[str]],
+    expected_code: int,
+    expected_message: str,
+) -> None:
+    exit_code = _exit_code(build_arguments(tmp_path))
+
+    assert exit_code == expected_code
+    assert expected_message in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("fake_aco_on_path")
 def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -129,13 +219,13 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
             assert ruling_may_finish.wait(_URL_WAIT_SECONDS)
             return super().rule(decision)
 
-    class ShutdownWatchedBoard(Board):
+    class ShutdownWatchedBoards(Boards):
         def close_writes(self) -> None:
             shutdown_waits.set()
             super().close_writes()
 
     monkeypatch.setattr(cli, "AcoCli", HeldRuling)
-    monkeypatch.setattr(cli, "Board", ShutdownWatchedBoard)
+    monkeypatch.setattr(cli, "Boards", ShutdownWatchedBoards)
     seen_while_shutdown_waited: list[list[list[str]]] = []
 
     def release_once_shutdown_waits() -> None:
