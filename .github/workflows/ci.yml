@@ -215,6 +215,19 @@ jobs:
           retention-days: 7
           overwrite: true
 
+  # The same script gates release.yml, so CI proves exactly what a release
+  # uploads: wheel and sdist carry the committed board assets and install
+  # with no Node on PATH.
+  package:
+    name: Package smoke (wheel, sdist, tool install without Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          python-version: '3.11'
+      - run: bash scripts/package_smoke.sh
+
   frontend:
     name: Frontend (svelte-check, lint, knip, vitest, assets fresh)
     runs-on: ubuntu-latest
