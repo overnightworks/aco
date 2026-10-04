@@ -1336,8 +1336,9 @@ class ExpectationLine:
     --line` accepts and what `rulings` prints -- `text` its full prose, and
     `ruling`/`ruled_on` present only once a `rule` call has replaced its
     `default`. `default` is the line's own default (`str | None`, `None`
-    once ruled) -- `board_html`'s open-line cards read it from here rather
-    than re-parsing the block. `question`/`example`/`picture` (issue #295)
+    once ruled) -- `aco rulings --json`'s own line payload reads it from
+    here rather than re-parsing the block. `question`/`example`/`picture`
+    (issue #295)
     are the card's optional operator-language heading, illustration
     sentence, and inline SVG -- `None` when `aco ask` was not given them,
     in which case a card falls back to `text`."""
@@ -1421,9 +1422,8 @@ def rule_expectation(
     transcribed remark belongs.
 
     Refuses an already-ruled entry by name -- a changed ruling is a new
-    line, never an overwrite -- and an out-of-range index. This is also the
-    write path `board --serve` (#234) will call from a click, so it
-    validates `ruling` itself rather than trust only its CLI caller.
+    line, never an overwrite -- and an out-of-range index. It validates
+    `ruling` itself rather than trust only its CLI caller.
     """
     if ruling not in BLOCK_EXPECTATION_RULINGS:
         raise protocol.ClaimError(

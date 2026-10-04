@@ -12,8 +12,8 @@ pays the git, filesystem, or `gh` read behind it.
 One context stands for one directory. `for_directory` answers for another
 checkout (`start`'s freshly created worktree, `rescope`'s checkout resolved
 from its own paths); `fresh` re-reads the same
-directory from scratch (`board --serve` takes one per request, so nothing is
-held across requests); `observed_afresh` drops exactly its state-ref
+directory from scratch (`land`'s delegated release takes one rather than
+reusing a context it already read from); `observed_afresh` drops exactly its state-ref
 observation and the forge built from it, and keeps every other fact it read
 -- toplevel, board configuration, remote, forge repository, default
 branch, trunk -- so the next ask re-reads only the state ref. `protect`
@@ -287,9 +287,9 @@ class RunContext:
         return child
 
     def fresh(self) -> RunContext:
-        """The same directory with nothing read yet (`board --serve`'s
-        per-request context, `land`'s delegated release). The run's trunk
-        fetch is no read and carries over with the remote it fetched, so
+        """The same directory with nothing read yet (`land`'s delegated
+        release). The run's trunk fetch is no read and carries over with the
+        remote it fetched, so
         the fresh context resolves the trunk anew without fetching that
         remote a second time, yet fetches the canonical remote its reread
         configuration names when that is another (issue #488)."""

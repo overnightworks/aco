@@ -394,21 +394,6 @@ class StateRefBoard:
         if self._foreign_filenames:
             items.item_id_from_filename(self._foreign_filenames[0])
 
-    def hold_well_formed(self) -> None:
-        """Refuses with the lowest malformed item's own sentence and repair
-        while `items/` holds any, then `hold_items` through every later write
-        of this instance (issue #447): a malformed item's parent, state, and
-        blockers are unknown, so `board --serve`'s ruling click would guess
-        past it -- the one whole-board write that keeps PIN-29 "before any
-        write". Reads that only project the board list it instead (issue
-        #517). An entry that names no item refuses the click as it refuses
-        every whole-store read (PIN-13, issue #565)."""
-        self._refuse_a_foreign_entry()
-        if self._malformed:
-            item_id = min(self._malformed)
-            raise _malformed_item_refusal(item_id, self._malformed[item_id])
-        self.hold_items()
-
     def hold_items(self) -> None:
         """Every later write of this instance commits only onto the very
         `items/` this instance read (issue #447), so an item written or gone

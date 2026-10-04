@@ -69,7 +69,6 @@ layers = [
     "cli",
     "session",
     "protect",
-    "board_html | board_serve",
     "workspace",
     "terminal",
     "providers",

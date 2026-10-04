@@ -386,7 +386,8 @@ class ContextReads:
 
     def drain(self) -> CountedReads:
         """The reads counted since the last drain, forgotten after: one step
-        of a longer sequence (`board --serve`'s requests) counted alone."""
+        of a longer sequence (a multi-step command such as `land`) counted
+        alone."""
         taken = dict(self.toplevels), dict(self.configs), dict(self.observations)
         self.toplevels.clear()
         self.configs.clear()

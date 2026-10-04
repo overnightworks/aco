@@ -9,7 +9,6 @@ import re
 import shlex
 import stat
 import sys
-import threading
 import tomllib
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -23,8 +22,6 @@ from typing import Any, Literal, NoReturn, TypeVar, cast
 from . import (
     __version__,
     board,
-    board_html,
-    board_serve,
     body,
     checkout,
     forge,
@@ -388,9 +385,6 @@ JSON_FLAG = "--json"
 KEEP_WORKTREE_FLAG = "--keep-worktree"
 LONG_OPTION_PREFIX = "--"
 JSON_HELP = "print the result as JSON instead of the human lines"
-# `--html` with no value: `argparse`'s `nargs="?"` const, distinct from the
-# `None` default (flag absent) -- `_cmd_board_html` treats it as "stdout".
-STDOUT_HTML_PATH = ""
 AGENT_HELP = (
     f"the acting agent's name; filled from a non-empty {checkout.IDENTITY_ENVIRONMENT_ORDER} "
     "when omitted"
@@ -457,42 +451,12 @@ def _add_status_parser(commands: argparse._SubParsersAction) -> None:
 
 
 def _add_board_parser(commands: argparse._SubParsersAction) -> None:
-    board_command = commands.add_parser(
-        "board", help="project the open work board; only --serve writes"
-    )
-    output = board_command.add_mutually_exclusive_group()
-    _add_json_flag(output)
-    output.add_argument(
-        "--html",
-        nargs="?",
-        const=STDOUT_HTML_PATH,
-        default=None,
-        metavar="PATH",
-        help="write a static HTML board page (stdout when PATH is omitted)",
-    )
-    output.add_argument(
+    board_command = commands.add_parser("board", help="project the open work board, read-only")
+    _add_json_flag(board_command)
+    board_command.add_argument(
         "--serve",
         action="store_true",
-        help=(
-            "serve the board page on 127.0.0.1 with a one-click aco-rule form per "
-            "expectation line (issue #280); a write command, so it needs the writer"
-        ),
-    )
-    board_command.add_argument(
-        "--port",
-        type=int,
-        default=0,
-        metavar="PORT",
-        help="loopback port for --serve; 0 (default) picks an ephemeral one",
-    )
-    board_command.add_argument(
-        "--new-token",
-        action="store_true",
-        help=(
-            "mint a fresh persistent loopback token for --serve (issue #388), "
-            "replacing this board's own at "
-            "${XDG_CONFIG_HOME:-~/.config}/aco/boards/<board>/token"
-        ),
+        help=argparse.SUPPRESS,
     )
 
 
@@ -4201,9 +4165,9 @@ def _claim_lifecycle(worktree: Path, state: protocol.ClaimState) -> store.ClaimL
 
 def _claim_history(worktree: Path, state: protocol.ClaimState) -> _ClaimHistory:
     """`_board`'s own bundle of the two store history reads a full board
-    build needs, from one already-fetched state -- `board`, `rulings`,
-    `next`, and `board --html`/`--serve` all read this rather than
-    `_claim_ages` and `_claim_lifecycle` separately."""
+    build needs, from one already-fetched state -- `board`, `rulings`, and
+    `next` all read this rather than `_claim_ages` and `_claim_lifecycle`
+    separately."""
     lifecycle = _claim_lifecycle(worktree, state)
     return _ClaimHistory(
         ages=_claim_ages(worktree, state),
@@ -5047,111 +5011,47 @@ def _observed_board(
     return _ObservedBoard(projected, live_claims)
 
 
-def _lane_claimants(observed: protocol.ClaimState) -> dict[int, board_html.LaneClaimant]:
-    """Every live claim's agent, role, and branch, keyed by the issue it
-    holds -- the one field (`branch`) `board.BoardItem.active_claim` never
-    carries, since `board.py` joins it into a display string instead."""
-    return {
-        claim.identity.issue: board_html.LaneClaimant(claim.agent, claim.role, claim.branch)
-        for claim in observed.claims.values()
-        if isinstance(claim.identity, protocol.IssueIdentity)
-    }
-
-
-def _board_page(context: RunContext) -> board_html.BoardPage:
-    """The one board build both `board --html` (issue #276) and `board
-    --serve` (issue #280) render -- every `gh`/local-git read `board`
-    already performs, including `_board`'s own `checkout.trunk_landings`
-    read, which now also serves the Landungen section's rows directly
-    through `projected.landings` (issue #371). `--html` calls this fresh
-    every time; `--serve` (issue #440) holds its own result between `GET`s
-    instead, rebuilding only on a ruling or an explicit reload."""
-    fetched = _store_observation_and_issues(context)
-    projected = _board(
-        context,
-        tuple(fetched.observed.claims.values()),
-        issues=fetched.issues,
-        history=_claim_history(context.toplevel, fetched.observed),
-    )
-    bodies = {issue.number: issue.body for issue in fetched.issues}
-    toplevel = context.toplevel
-    config = context.config
-    sources = board_html.BoardSources(
-        bodies=bodies,
-        claimants=_lane_claimants(fetched.observed),
-        state_tip="" if fetched.observed.tip is None else str(fetched.observed.tip),
-        checkout=toplevel,
-        storage=config.storage,
-    )
-    return board_html.build_page(projected, sources)
-
-
-def _board_html_page(
-    context: RunContext, *, served: board_html.ServedRuleForm | None = None
-) -> str:
-    """`board --html`'s own static rendering (issue #276): `_board_page`,
-    rendered fresh every call so a written page never shows stale state."""
-    return board_html.render(_board_page(context), served=served)
-
-
-def _cmd_board_html(parsed: argparse.Namespace, context: RunContext) -> None:
-    """`board --html` (issue #276): writes `_board_html_page`'s static
-    rendering to `PATH`, or to stdout when `PATH` is omitted."""
-    rendered = _board_html_page(context)
-    if parsed.html:
-        Path(parsed.html).write_text(rendered, encoding="utf-8")
-    else:
-        print(rendered, end="")
-
-
 class BoardReason(StrEnum):
     """`aco board`'s own `--json` `reason` vocabulary (issue #412,
-    `specs/board.spec.md`): `projected` the only success -- `--html` and
-    `--serve` never reach it, since neither ever sets `--json`.
-    `invalid_usage` covers `--new-token` without `--serve` (BOARD-39), no
-    `--json`/`--html`/`--serve` given at all (BOARD-44), and `--repo` under
-    `storage = state-ref` (PIN-04); every other refusal -- an unsupported
-    forge host (BOARD-02), a state-ref checkout with no resolvable default
-    branch (PIN-05) -- falls to `unavailable`, matching `ask`/`rule`/
-    `brief`'s own catch-all."""
+    `specs/board.spec.md`): `projected` the only success. `invalid_usage`
+    covers a bare `aco board` naming no `--json` (BOARD-44), a retired
+    `--serve` (issue #644), and `--repo` under `storage = state-ref`
+    (PIN-04); every other refusal -- an unsupported forge host (BOARD-02),
+    a state-ref checkout with no resolvable default branch (PIN-05) --
+    falls to `unavailable`, matching `ask`/`rule`/`brief`'s own catch-all."""
 
     PROJECTED = "projected"
     INVALID_USAGE = "invalid_usage"
     UNAVAILABLE = "unavailable"
 
 
-class _BoardNewTokenUsageError(protocol.ClaimError):
-    """`--new-token` without `--serve` (BOARD-39): named so `--json` can
-    choose `invalid_usage` over the broad `unavailable` catch-all every
-    other `board` refusal falls to."""
+class _BoardServeRemovedError(protocol.ClaimError):
+    """`--serve` (issue #280) was removed once `aco-board` took over the
+    decision board (issue #644): named so `--json` can choose
+    `invalid_usage` over the broad `unavailable` catch-all every other
+    `board` refusal falls to."""
 
 
 class _BoardNoModeUsageError(protocol.ClaimError):
-    """Neither `--json` nor `--html` given, and `--serve` already diverted
-    before `_cmd_board` ever runs (BOARD-44): the retired text table (issue
-    #420, #390 Befund 13) leaves `board` with no default mode of its own
-    any more, so a bare `aco board` must name one instead of guessing."""
+    """No `--json` given, and `--serve` already diverted before `_cmd_board`
+    ever runs (BOARD-44): the retired text table (issue #420, #390 Befund
+    13) leaves `board` with no default mode of its own any more, so a bare
+    `aco board` must name `--json` instead of guessing."""
 
 
-BOARD_NO_MODE_MESSAGE = "aco board requires --json, --html, or --serve"
+BOARD_SERVE_REMOVED_MESSAGE = "--serve was removed; run aco-board serve instead"
+BOARD_NO_MODE_MESSAGE = "aco board requires --json"
 
 
 def _cmd_board(parsed: argparse.Namespace, context: RunContext) -> int:
     as_json = parsed.json
     try:
-        if parsed.new_token:
-            # `--new-token` only ever mints through `--serve`'s own writer
-            # session (issue #388): reaching here means `--serve` was not
-            # given, so minting here would be a silent no-op the caller
-            # cannot observe rather than a refusal by name.
-            raise _BoardNewTokenUsageError("--new-token requires --serve")
-        if parsed.html is not None:
-            _cmd_board_html(parsed, context)
-            return 0
+        if parsed.serve:
+            raise _BoardServeRemovedError(BOARD_SERVE_REMOVED_MESSAGE)
         if not as_json:
             raise _BoardNoModeUsageError(BOARD_NO_MODE_MESSAGE)
         projected = _observed_board(context).board
-    except (_BoardNewTokenUsageError, _BoardNoModeUsageError) as error:
+    except (_BoardServeRemovedError, _BoardNoModeUsageError) as error:
         return _refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:
         return _refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
@@ -8284,13 +8184,11 @@ def _emit_rule_result(
 def rule_item(
     context: RunContext, number: int, line: int, ruling: str, note: str | None
 ) -> tuple[body.ExpectationLine, int]:
-    """`_cmd_rule`'s own write, extracted (issue #280) so `board --serve`'s
-    `POST /rule` calls the exact same path a CLI `aco rule` invocation does
-    -- one owner for "click -> ruled line", never a second one behind the
-    loopback server. Returns the newly ruled line and how many the item
-    still has open; raises `protocol.ClaimError` by name for every refusal
-    (already ruled, out of range, a bad outcome, a malformed or missing
-    item), which both callers turn into their own by-name response."""
+    """`_cmd_rule`'s own write (issue #280): returns the newly ruled line and
+    how many the item still has open; raises `protocol.ClaimError` by name
+    for every refusal (already ruled, out of range, a bad outcome, a
+    malformed or missing item), which `_cmd_rule` turns into its own
+    by-name response."""
     client = context.forge_writer
     current_body, config = _require_writable_target(client, context, number, command="rule")
     ruled_on = datetime.now(UTC).date()
@@ -8351,152 +8249,6 @@ def _cmd_rule(parsed: argparse.Namespace, context: RunContext) -> int:
         return _refuse(RuleReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
         return _refuse(RuleReason.UNAVAILABLE, error, as_json=as_json)
-
-
-def _board_token_location(repository: forge.RepositoryId) -> workspace.BoardTokenLocation:
-    """`board --serve`'s token file for the repository this command already
-    resolved (issue #431) -- one board, one token, so the URL an operator
-    opens can only ever reach this repository's own served board."""
-    return workspace.default_board_token_location(repository.host, repository.path, os.environ)
-
-
-@dataclass
-class _ServedBoardCache:
-    """`board --serve`'s own held page (issue #440): built once by the first
-    `GET` (or the first after a rebuild) and reused by every one after it,
-    instead of paying `_board_page`'s full forge fetch again on every
-    request -- the fix for the operator's own report of a 19s-per-load
-    board. Every ruling `POST /rule` -- written, refused, or raised (BOARD-48)
-    -- marks `built` stale, so the next `GET` rebuilds it; an explicit
-    `?reload=1` rebuilds on that very `GET`. `lock` serializes a rebuild
-    against a concurrent request: `ThreadingHTTPServer` runs each one on its
-    own thread. A rebuild reads through the asking request's own context
-    (issues #447, #457), never one held by the cache: a state-ref forge is a
-    snapshot of the store at resolution, so one held for the server's
-    lifetime would never show a later write."""
-
-    built: tuple[board_html.BoardPage, datetime] | None = None
-    refusal: str | None = None
-    stale: bool = False
-    lock: threading.Lock = field(default_factory=threading.Lock)
-
-    def held(
-        self, context: RunContext, *, reload: bool
-    ) -> tuple[board_html.BoardPage, datetime, str | None]:
-        """The held page, when it was built, and the refusal the last rebuild
-        met, if any (issues #447, #481): rebuilt through `context` first when
-        nothing is held yet, it is stale, or `reload` asks -- a request the
-        held page answers never reads `context` at all. A refused rebuild --
-        an item PIN-16 names missing or an unreachable remote alike -- keeps the
-        last page built and its refusal until a later rebuild succeeds, so
-        every request in between, the reload's own redirect target
-        included, shows that page with the sentence beside its age instead
-        of failing; only a first build has no page to keep, and raises."""
-        with self.lock:
-            built = self.built
-            if built is None or self.stale or reload:
-                built = self._rebuild(context)
-            return (*built, self.refusal)
-
-    def _rebuild(self, context: RunContext) -> tuple[board_html.BoardPage, datetime]:
-        try:
-            self.built = (_board_page(context), datetime.now(UTC))
-        except protocol.ClaimError as refusal:
-            if self.built is None:
-                raise
-            self.refusal = str(refusal)
-            return self.built
-        self.refusal = None
-        self.stale = False
-        return self.built
-
-    def discard(self) -> None:
-        with self.lock:
-            self.stale = True
-
-
-def _board_server(parsed: argparse.Namespace, context: RunContext) -> board_serve.BoardServer:
-    """`board --serve`'s bound, listening server (issue #280), built but not
-    yet run: a loopback page built through `_board_page` and held in
-    `_ServedBoardCache` between requests (issue #440), and writes through
-    `rule_item`, exactly like `aco rule` does apart -- `board_serve.py` is
-    transport only, so this function is still the one place that resolves
-    the forge, the persistent token (issue #388: `workspace.board_token`,
-    `--new-token` mints a fresh one), renders a page, and rules a line.
-    Every HTTP request reads through its own fresh child of the run's
-    context (issue #457), never one memoised across requests.
-    `resolve_token` is only called by `start` itself once the socket is
-    already bound, so `render_page`'s own closure reads the resolved value
-    back out of `token_holder` -- never a token read before the busy-port
-    check that could bind. Split from `_cmd_board_serve`'s own
-    `serve_forever` loop so a test can bind a real ephemeral port and drive
-    it without blocking."""
-    client = context.forge_writer
-    token_holder: list[str] = []
-    cache = _ServedBoardCache()
-
-    def resolve_token() -> str:
-        token = workspace.board_token(
-            _board_token_location(client.repository), mint_new=parsed.new_token
-        )
-        token_holder.append(token)
-        return token
-
-    def render_page(refused: str | None, reload: bool) -> str:
-        page, built_at, store_refusal = cache.held(context.fresh(), reload=reload)
-        notices = dict.fromkeys(
-            sentence for sentence in (refused, store_refusal) if sentence is not None
-        )
-        served = board_html.ServedRuleForm(
-            token=token_holder[0],
-            refused=" ".join(notices) or None,
-            age=datetime.now(UTC) - built_at,
-        )
-        return board_html.render(page, served=served)
-
-    def post_rule(item: int, line: int, ruling: str, note: str | None) -> board_serve.RuleOutcome:
-        # A refused click (a line already ruled elsewhere) means the held
-        # page is stale too, so every click rebuilds, not only a write.
-        # Discarding only after `rule_item` returns or raises (issue #440
-        # review) keeps a concurrent GET that races the write from rebuilding
-        # and holding a pre-ruling page: discarding first left a window where
-        # such a GET restored exactly the staleness this cache exists to
-        # remove. The click writes through a store read afresh and holds
-        # PIN-29 through its write (issue #447): the server's startup
-        # snapshot cannot see an item that went bad while it ran, and a
-        # preflight alone could not see one going bad before the write.
-        try:
-            request_context = context.fresh()
-            clicked = request_context.forge_writer
-            if isinstance(clicked, state_board.StateRefBoard):
-                clicked.hold_well_formed()
-            rule_item(request_context, item, line, ruling, note)
-        except protocol.ClaimError as error:
-            return board_serve.RuleOutcome(refusal=str(error))
-        finally:
-            cache.discard()
-        return board_serve.RuleOutcome(refusal=None)
-
-    # Building the first page before `start` makes a store the board read
-    # refuses (issue #447) stop the server before any token write or ruling click;
-    # the first `GET` then serves this very page instead of building again.
-    # No request exists yet, so it reads through the run's own context.
-    cache.held(context, reload=False)
-    return board_serve.start(
-        port=parsed.port, resolve_token=resolve_token, render_page=render_page, rule_item=post_rule
-    )
-
-
-def _cmd_board_serve(parsed: argparse.Namespace, context: RunContext) -> int:
-    server = _board_server(parsed, context)
-    print(server.url, flush=True)
-    try:
-        server.httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.httpd.server_close()
-    return 0
 
 
 @dataclass(frozen=True)
@@ -9020,10 +8772,6 @@ def _dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
         # The release branch is dispatch data, read before the command
         # starts, never a repository fact the context would hold (#418).
         result = entry.handler(parsed, context, release_branch)
-    elif parsed.command == "board" and parsed.serve:
-        # `board --serve` writes through a click (issue #280), so it runs
-        # its own handler rather than `board`'s read-only output modes.
-        result = _cmd_board_serve(parsed, context)
     else:
         result = entry.handler(parsed, context)
     return 0 if result is None else result

@@ -12,7 +12,6 @@ is proven against a real object database, not an invented one.
 from __future__ import annotations
 
 import hashlib
-import html
 import io
 import json
 import re
@@ -916,7 +915,6 @@ class TestMalformedItem:
                 ),
                 id="compose-item",
             ),
-            pytest.param(StateRefBoard.hold_well_formed, id="ruling-click-hold"),
         ],
     )
     def test_a_whole_store_read_refuses_beside_an_entry_that_names_no_item(
@@ -1410,14 +1408,14 @@ class TestStateRefBoardWrites:
     def test_a_write_holding_a_well_formed_store_refuses_once_another_item_went_bad(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        """PIN-29 (issue #447): after `hold_well_formed`, this instance's
+        """CAS-51 (issue #447): after `hold_items`, this instance's
         writes land only onto the store it checked -- its own write still
         lands, but an item another writer turned malformed since refuses
         the next one before anything is written."""
         _push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         adapter = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
-        adapter.hold_well_formed()
+        adapter.hold_items()
         body = adapter.item_reference(CHILD_A_NUMBER).body
         assert body is not None
         edited = body.replace("Prose.", "Edited prose.", 1)
@@ -2849,10 +2847,9 @@ class TestCliStateRefForge:
     ) -> None:
         """Issue #371, Beweis 1: two trailer-carrying trunk commits each land
         their own item under `storage = state-ref` -- `board --json`'s
-        `landings` array and `board --html`'s Landungen section both read
-        `checkout.trunk_landings` directly, one row per item with its own
-        sha and no `pull_request`, independent of any pull-request listing
-        this storage can never perform."""
+        `landings` array reads `checkout.trunk_landings` directly, one row
+        per item with its own sha and no `pull_request`, independent of any
+        pull-request listing this storage can never perform."""
         first_id, second_id = "aco-000005", "aco-000006"
         first_number = items.item_number(first_id)
         second_number = items.item_number(second_id)
@@ -2880,13 +2877,6 @@ class TestCliStateRefForge:
         assert landings[first_number]["pull_request"] is None
         assert landings[second_number]["sha"] == second_sha
         assert landings[second_number]["pull_request"] is None
-        first_date = datetime.fromisoformat(landings[first_number]["committed_at"]).date()
-        second_date = datetime.fromisoformat(landings[second_number]["committed_at"]).date()
-
-        assert issue_claim.main([*board_command, "--html"]) == 0
-        rendered_html = capsys.readouterr().out
-        assert f"<li>{first_id} {first_date} <code>{first_sha[:7]}</code></li>" in rendered_html
-        assert f"<li>{second_id} {second_date} <code>{second_sha[:7]}</code></li>" in rendered_html
 
     @pytest.mark.parametrize("canonical_remote", ["origin", "hub"])
     def test_board_refuses_without_the_canonical_remotes_head(
@@ -3534,7 +3524,7 @@ class TestCliStateRefForge:
                     id=f"{case_id}-beside-an-entry-that-names-no-item",
                 )
                 for case_id, arguments in (
-                    ("board", ["board", "--html"]),
+                    ("board", ["board", "--json"]),
                     ("next", ["next"]),
                     ("rulings", ["rulings"]),
                     ("item-new", ["item", "new", "--title", "Fresh"]),
@@ -3755,9 +3745,8 @@ class TestCliStateRefForge:
         """Issue #517 line 4: `Slice A` turned unreadable -- `Slice B` is
         blocked by it and a childless container with an uncut row is nested
         under it -- yet `board`, `next` and `rulings` still read, `board`
-        and `next` naming it by its defect -- `board --html` by the same
-        reason (BOARD-54) --, `item show` still reads every other item, and
-        only `item show` of that item refuses."""
+        and `next` naming it by its defect (BOARD-54), `item show` still
+        reads every other item, and only `item show` of that item refuses."""
         nested_id = "aco-00000b"
         nested_body = _container_body_with_slices(((1, "Cut it"),), parent=CHILD_A_ID)
         item_files = {
@@ -3771,8 +3760,6 @@ class TestCliStateRefForge:
         board_items = json.loads(capsys.readouterr().out)["items"]
         next_exit_code = issue_claim.main(["next"])
         next_out = capsys.readouterr().out
-        html_exit_code = issue_claim.main(["board", "--html"])
-        rendered_html = capsys.readouterr().out
         rulings_exit_code = issue_claim.main(["rulings"])
         other_show_exit_code = issue_claim.main(["item", "show", CHILD_B_ID])
         capsys.readouterr()
@@ -3781,10 +3768,9 @@ class TestCliStateRefForge:
         assert (
             board_exit_code,
             next_exit_code,
-            html_exit_code,
             rulings_exit_code,
             other_show_exit_code,
-        ) == (0, 3, 0, 0, 0)
+        ) == (0, 3, 0, 0)
         assert {item["number"] for item in board_items} == {
             CONTAINER_NUMBER,
             CHILD_A_NUMBER,
@@ -3792,8 +3778,6 @@ class TestCliStateRefForge:
             items.item_number(nested_id),
         }
         assert unreadable_line in next_out
-        unreadable_reason = next_out.split(f"\n{CHILD_A_ID}: ", 1)[1].split("\n", 1)[0]
-        assert html.escape(unreadable_reason) in rendered_html
         assert f"\n{nested_id}: " in next_out
         assert f"\n{CHILD_B_ID}: blocked by {CHILD_A_ID}" in next_out
         assert (own_show_exit_code, capsys.readouterr().err) == (
@@ -3859,32 +3843,6 @@ class TestCliStateRefForge:
             in next_out
         )
         assert close_err == f"ERROR: {_malformed_item_refusal()}\n"
-
-    def test_board_html_names_an_unreadable_child_inside_its_readable_containers_topic(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        """Issue #517 line 4 (BOARD-54): `Slice A` turned unreadable while
-        its `[record].parent` still names the container, so `board --html`
-        prints its reason inside that container's topic, beside its part."""
-        item_files = _item_files_with_a_malformed_item(
-            _blank_title_item(parent=CONTAINER_ID), CHILD_A_ID
-        )
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
-        issue_claim.main(["next"])
-        next_out = capsys.readouterr().out
-        unreadable_reason = next_out.split(f"\n{CHILD_A_ID}: ", 1)[1].split("\n", 1)[0]
-
-        html_exit_code = issue_claim.main(["board", "--html"])
-
-        after_container_title = capsys.readouterr().out.split(f"{CONTAINER_ID} Epic</strong>", 1)[1]
-        container_topic = after_container_title.split("<strong>", 1)[0]
-        assert html_exit_code == 0
-        assert f'<span class="problem">{html.escape(unreadable_reason)}</span>' in container_topic
 
     def test_item_edit_with_a_valid_record_repairs_a_malformed_item(
         self,
