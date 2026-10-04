@@ -47,6 +47,16 @@ _BAD_DECISION = "bad request: decision"
 _BODY_INCOMPLETE = "request timeout: body incomplete"
 _METHOD_NOT_ALLOWED = "method not allowed"
 _SERVED_METHODS = frozenset({"GET", "POST"})
+_DEFAULT_ALLOW = ", ".join(sorted(_SERVED_METHODS))
+_ALLOWED_METHODS_BY_PATH = {
+    PAGE_PATH: "GET",
+    RULE_PATH: "POST",
+    API_BOARD_PATH: "GET",
+    API_RULE_PATH: "POST",
+}
+"""The one method each known route serves, for a 405's `Allow` header; a path
+outside this table still lives under a method the board serves at all, so it
+advertises every method (`_DEFAULT_ALLOW`)."""
 _TEXT_CONTENT_TYPE = "text/plain; charset=utf-8"
 _MAX_REQUEST_BYTES = 16 * 1024
 """A decision is two numbers, an outcome, a fingerprint, and a short note;
@@ -170,13 +180,21 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         )
 
     def _respond(
-        self, status: HTTPStatus, body: str, content_type: str, *, nonce: str | None = None
+        self,
+        status: HTTPStatus,
+        body: str,
+        content_type: str,
+        *,
+        nonce: str | None = None,
+        allow: str | None = None,
     ) -> None:
         encoded = body.encode("utf-8")
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(encoded)))
+            if allow is not None:
+                self.send_header("Allow", allow)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy", page.content_security_policy(nonce))
@@ -186,11 +204,15 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as error:
             raise _ClientDisconnectedError from error
 
-    def _refuse_as_text(self, status: HTTPStatus, sentence: str) -> None:
-        self._respond(status, sentence, _TEXT_CONTENT_TYPE)
+    def _refuse_as_text(
+        self, status: HTTPStatus, sentence: str, *, allow: str | None = None
+    ) -> None:
+        self._respond(status, sentence, _TEXT_CONTENT_TYPE, allow=allow)
 
-    def _refuse_as_json(self, status: HTTPStatus, sentence: str) -> None:
-        self._respond(status, api.error_json(sentence), api.JSON_CONTENT_TYPE)
+    def _refuse_as_json(
+        self, status: HTTPStatus, sentence: str, *, allow: str | None = None
+    ) -> None:
+        self._respond(status, api.error_json(sentence), api.JSON_CONTENT_TYPE, allow=allow)
 
     def parse_request(self) -> bool:
         """Answer a method the board does not serve here, so the stdlib never
@@ -201,10 +223,12 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return True
         # Its body, if any, stays unread, so the connection cannot carry on.
         self.close_connection = True
-        if urlsplit(self.path).path.startswith(API_PREFIX):
-            self._answer_api(self._refuse_method)
+        path = urlsplit(self.path).path
+        allow = _ALLOWED_METHODS_BY_PATH.get(path, _DEFAULT_ALLOW)
+        if path.startswith(API_PREFIX):
+            self._answer_api(lambda: self._refuse_method(allow))
         else:
-            self._refuse_as_text(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED)
+            self._refuse_as_text(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED, allow=allow)
         return False
 
     def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
@@ -279,8 +303,8 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         presented = self.headers.get_all(TOKEN_HEADER) or []
         return presented[0] if len(presented) == 1 else None
 
-    def _refuse_method(self) -> None:
-        self._refuse_as_json(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED)
+    def _refuse_method(self, allow: str) -> None:
+        self._refuse_as_json(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED, allow=allow)
 
     def _get_board(self) -> None:
         try:
@@ -308,13 +332,16 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return None
         deadline_seconds = self._server().request_deadline_seconds
         try:
-            return read_before_deadline(self.rfile, self.connection, length, deadline_seconds)
+            body = read_before_deadline(self.rfile, self.connection, length, deadline_seconds)
         except TimeoutError:
+            # The read shrank the socket timeout; restore it before writing
+            # the refusal, so that answer is not cut short by the nearly
+            # exhausted deadline it is reporting.
+            self.connection.settimeout(deadline_seconds)
             refuse(HTTPStatus.REQUEST_TIMEOUT, _BODY_INCOMPLETE)
             return None
-        finally:
-            # The read shrank the socket timeout; the answer gets a full one.
-            self.connection.settimeout(deadline_seconds)
+        self.connection.settimeout(deadline_seconds)
+        return body
 
     def _decide(self, request: api.DecisionRequest) -> None:
         result = self._server().board.decide(request.decision, request.fingerprint)

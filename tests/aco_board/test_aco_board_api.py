@@ -276,14 +276,14 @@ _METHOD_NOT_ALLOWED = (405, {"error": "method not allowed"})
 
 
 @pytest.mark.parametrize(
-    ("method", "path", "answer"),
+    ("method", "path", "answer", "allow"),
     [
-        ("GET", "/api/elsewhere", _NOT_FOUND),
-        ("GET", "/api/rule", _NOT_FOUND),
-        ("POST", "/api/board", _NOT_FOUND),
-        ("PUT", "/api/rule", _METHOD_NOT_ALLOWED),
-        ("DELETE", "/api/board", _METHOD_NOT_ALLOWED),
-        ("OPTIONS", "/api/elsewhere", _METHOD_NOT_ALLOWED),
+        ("GET", "/api/elsewhere", _NOT_FOUND, None),
+        ("GET", "/api/rule", _NOT_FOUND, None),
+        ("POST", "/api/board", _NOT_FOUND, None),
+        ("PUT", "/api/rule", _METHOD_NOT_ALLOWED, "POST"),
+        ("DELETE", "/api/board", _METHOD_NOT_ALLOWED, "GET"),
+        ("OPTIONS", "/api/elsewhere", _METHOD_NOT_ALLOWED, "GET, POST"),
     ],
     ids=["unknown", "rule-by-get", "board-by-post", "put", "delete", "options"],
 )
@@ -293,10 +293,12 @@ def test_an_api_request_outside_its_routes_answers_why_as_json(
     method: str,
     path: str,
     answer: tuple[int, dict[str, str]],
+    allow: str | None,
 ) -> None:
     response = board.call_api(method, path, presented=board.token)
 
     assert (response.status, response.json()) == answer
+    assert response.headers.get("Allow") == allow
     assert repository.calls() == []
 
 
@@ -381,21 +383,21 @@ def test_an_unavailable_aco_answers_502_with_its_reason(
 
 
 @pytest.mark.parametrize(
-    ("method", "path", "body", "presented_own_token", "status", "content_type"),
+    ("method", "path", "body", "presented_own_token", "status", "content_type", "allow"),
     [
-        ("GET", "/api/board", None, True, 200, "application/json"),
-        ("POST", "/api/rule", _decision_body(item=7), True, 200, "application/json"),
-        ("GET", "/api/board", None, False, 403, "application/json"),
-        ("POST", "/api/rule", "not json", True, 400, "application/json"),
-        ("GET", "/api/elsewhere", None, True, 404, "application/json"),
-        ("OPTIONS", "/api/rule", None, False, 403, "application/json"),
-        ("PUT", "/api/rule", _decision_body(), False, 403, "application/json"),
-        ("PUT", "/api/rule", _decision_body(), True, 405, "application/json"),
-        ("HEAD", "/api/board", None, False, 403, "application/json"),
-        ("HEAD", "/api/board", None, True, 405, "application/json"),
-        ("GET", "/?t={token}", None, False, 200, "text/html; charset=utf-8"),
-        ("GET", "/", None, False, 403, "text/plain; charset=utf-8"),
-        ("PUT", "/", None, False, 405, "text/plain; charset=utf-8"),
+        ("GET", "/api/board", None, True, 200, "application/json", None),
+        ("POST", "/api/rule", _decision_body(item=7), True, 200, "application/json", None),
+        ("GET", "/api/board", None, False, 403, "application/json", None),
+        ("POST", "/api/rule", "not json", True, 400, "application/json", None),
+        ("GET", "/api/elsewhere", None, True, 404, "application/json", None),
+        ("OPTIONS", "/api/rule", None, False, 403, "application/json", None),
+        ("PUT", "/api/rule", _decision_body(), False, 403, "application/json", None),
+        ("PUT", "/api/rule", _decision_body(), True, 405, "application/json", "POST"),
+        ("HEAD", "/api/board", None, False, 403, "application/json", None),
+        ("HEAD", "/api/board", None, True, 405, "application/json", "GET"),
+        ("GET", "/?t={token}", None, False, 200, "text/html; charset=utf-8", None),
+        ("GET", "/", None, False, 403, "text/plain; charset=utf-8", None),
+        ("PUT", "/", None, False, 405, "text/plain; charset=utf-8", "GET"),
     ],
     ids=[
         "api-board",
@@ -421,6 +423,7 @@ def test_every_answer_is_uncached_unreferred_framed_by_none_and_never_cross_orig
     presented_own_token: bool,
     status: int,
     content_type: str,
+    allow: str | None,
 ) -> None:
     presented = board.token if presented_own_token else None
     response = board.call_api(
@@ -429,6 +432,7 @@ def test_every_answer_is_uncached_unreferred_framed_by_none_and_never_cross_orig
 
     assert response.status == status
     assert response.headers["Content-Type"] == content_type
+    assert response.headers.get("Allow") == allow
     _assert_guarded(response)
 
 

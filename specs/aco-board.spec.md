@@ -45,7 +45,7 @@ headers; the legacy page at `/` and `POST /rule` is not specified here.
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the start token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, answers 408 `{"error": "request timeout: body incomplete"}`; a failing or hung `aco rulings` answers 502 `{"error": "<reason>"}`.
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
-- [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}`; elsewhere such a method answers 405 as text.
+- [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
 
 ## Never
 
