@@ -7,9 +7,19 @@ import { defineConfig } from 'vitest/config';
 // CI gate reports as drift.
 const STATIC_DIRECTORY = '../src/aco_board/static';
 
+// `pnpm dev` proxies the API to a board already running on its default
+// loopback port; the E2E harness (frontend/e2e/global-setup.ts) overrides
+// this with its own ephemeral server instead. First used with issue #643.
+const DEFAULT_BOARD_API_TARGET = 'http://127.0.0.1:8765';
+
 export default defineConfig({
 	plugins: [svelte({ configFile: false }), svelteTesting()],
 	base: './',
+	server: {
+		proxy: {
+			'/api': process.env.VITE_BOARD_API_TARGET ?? DEFAULT_BOARD_API_TARGET
+		}
+	},
 	build: {
 		outDir: STATIC_DIRECTORY,
 		emptyOutDir: true,
@@ -29,9 +39,15 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			include: ['src/**/*.{ts,svelte}'],
-			exclude: ['src/**/*.test.ts', 'src/**/*.d.ts', 'src/test-setup.ts'],
+			exclude: ['src/**/*.test.ts', 'src/**/*.d.ts', 'src/test-setup.ts', 'src/test-support/**'],
 			reporter: ['text', 'lcov'],
-			reportsDirectory: '../reports/frontend-coverage'
+			reportsDirectory: '../reports/frontend-coverage',
+			// `.svelte` carries no logic (see app/model and app/state's own
+			// docstrings, issue #368), so its owners are held to full coverage.
+			thresholds: {
+				'src/app/model/**': { statements: 100, branches: 100, functions: 100, lines: 100 },
+				'src/app/state/**': { statements: 100, branches: 100, functions: 100, lines: 100 }
+			}
 		}
 	}
 });

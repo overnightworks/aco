@@ -221,3 +221,10 @@ __marimo__/
 # to the Sonar job at reports/frontend-coverage/lcov.info
 frontend/node_modules/
 /reports/
+
+# Playwright's own run artifacts and the E2E launcher's discovered server
+# details (frontend/e2e/global-setup.ts); sonar-project.properties excludes
+# the same two directories.
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/.runtime.json

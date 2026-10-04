@@ -276,6 +276,40 @@ jobs:
           path: reports
           if-no-files-found: error
 
+  e2e:
+    name: E2E (Playwright, desktop)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          python-version: '3.12'
+      # The fake board server (tests/aco_board/e2e_server.py) the launcher
+      # spawns is the only Python side this job needs; no Node is involved.
+      - run: uv sync --locked --group dev
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v6
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7
+        with:
+          node-version-file: frontend/package.json
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright's Chromium
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run E2E specs (bootstrap, empty, unavailable, no-access -- desktop)
+        working-directory: frontend
+        run: pnpm exec playwright test
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results
+          if-no-files-found: ignore
+
   sonar:
     needs: [check, frontend]
     runs-on: ubuntu-latest
