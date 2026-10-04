@@ -7,7 +7,7 @@ merges -- the same two keys, but not the same value grammar (`## The trunk's
 own trailer block` vs. `## The pull request body's own grammar`, below).
 This file owns both grammars, `aco check <pr>`'s classification, the
 parent-closing rule, what `aco release --merged` verifies, and the
-"Landungen" landing view `aco board`/`aco board --html` derive from them.
+"Landungen" landing view `aco board` derives from them.
 Each command's own spec (none exist yet for `check`/`release`/`board`) would
 cite these IDs rather than restate them. `aco check <sha>` and, under
 `storage = "state-ref"`, `release --merged <sha|empty>` (issue #359) read
@@ -36,7 +36,7 @@ matching line.
 
 ## Behavior table
 
-| state \ trigger | trunk trailer (`aco board`) | `aco check <pr>` \| `aco check <sha>` | `aco release --merged <pr>` \| `--merged <sha\|empty>` (state-ref) | Landungen (`aco board`/`--html`) |
+| state \ trigger | trunk trailer (`aco board`) | `aco check <pr>` \| `aco check <sha>` | `aco release --merged <pr>` \| `--merged <sha\|empty>` (state-ref) | Landungen (`aco board`) |
 |---|---|---|---|---|
 | single `Work-Item:` trailer | LAND-01 | LAND-48 | LAND-47, LAND-52, LAND-59 | LAND-42 |
 | repeated `Work-Item:` trailer | LAND-02 | LAND-48 | LAND-52, LAND-59 | LAND-42 |
@@ -72,7 +72,7 @@ matching line.
 | `--abandoned` outcome | — | — | LAND-39 | — |
 | issue-less lane, `storage = "state-ref"` | — | — | LAND-56 | — |
 | still-open item a merged PR already declared | — | — | — | LAND-43, LAND-51, LAND-53 |
-| the Landungen view's own rows | — | — | — | LAND-44, LAND-45, LAND-46, LAND-54 |
+| the Landungen view's own rows | — | — | — | LAND-44, LAND-45, LAND-54 |
 
 ## The trunk's own trailer block
 
@@ -166,14 +166,15 @@ sentence>`, not restated.
 ## The Landungen view
 
 - [ ] [LAND-41] `aco board` marks an item `code-landed` when a merged pull request carries a closing or landing keyword (`Lands`/`Implements` too) naming it — wider than `check`'s own closing reference.
-- [ ] [LAND-42] `aco board`/`--html` also mark an item `code-landed` from the trunk's own trailer block alone (LAND-01/LAND-02), independent of any pull request — one union, never two disagreeing sets.
+- [ ] [LAND-42] `aco board` also marks an item `code-landed` from the trunk's own trailer block alone (LAND-01/LAND-02), independent of any pull request — one union, never two disagreeing sets.
 - [ ] [LAND-43] `aco board`'s `RECOVERY` names a still-open item there from a merged pull request's typed `Work-Item:` line (why one can be open there is CLAIM-52's fact, `specs/claim-record.spec.md`).
 - [ ] [LAND-51] `aco board`'s recovery reading is keyed on that typed `Work-Item:` line alone, never on the trunk trailer and never on an issue's update time.
 - [ ] [LAND-53] `aco next` names every recovery item first, each as `RECOVERY\n<label>: close or re-project`, ahead of the item it recommends next.
 - [ ] [LAND-44] `aco board`'s Landungen view lists one row per trunk-trailer-landed item, sha and date from that commit, under both storages, item open or closed.
 - [ ] [LAND-45] Under `github` only, Landungen adds one row per item a merged pull request plainly landed (LAND-41) with no trailer, deduped against trailer rows, which always win.
-- [ ] [LAND-46] `board --html`'s Landungen section renders `<label> <date> <sha7>` or `<label> <date> PR #<n>`; empty renders `nichts`, never a capability-gated line.
 - [ ] [LAND-54] `board --json`'s `"landings"` rows each carry `{"item", "committed_at", "sha", "pull_request"}`, exactly one of `sha`/`pull_request` non-`null`.
+
+- LAND-46 (retired 04.10.2026, issue #644, operator ruling #617 line 4): `board --html`'s Landungen rendering no longer exists; `aco-board` (issue #624) is the one decision board, and `board --json`'s own `"landings"` rows (LAND-54, `specs/board.spec.md` BOARD-12) carry the equivalent fact.
 
 ## Never
 
