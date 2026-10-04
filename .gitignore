@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend (frontend/): installed packages, and the coverage report CI hands
+# to the Sonar job at reports/frontend-coverage/lcov.info
+frontend/node_modules/
+/reports/

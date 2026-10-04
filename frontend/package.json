@@ -1,0 +1,41 @@
+{
+	"name": "aco-board-frontend",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"packageManager": "pnpm@10.32.1",
+	"engines": {
+		"node": "^22.12.0"
+	},
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+		"lint": "eslint . && prettier --check .",
+		"format": "prettier --write .",
+		"knip": "knip",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
+	},
+	"devDependencies": {
+		"@eslint/js": "10.0.1",
+		"@sveltejs/vite-plugin-svelte": "7.3.0",
+		"@testing-library/jest-dom": "7.0.1",
+		"@testing-library/svelte": "5.4.2",
+		"@vitest/coverage-v8": "4.1.11",
+		"eslint": "10.9.1",
+		"eslint-config-prettier": "10.1.8",
+		"eslint-plugin-svelte": "3.23.0",
+		"globals": "17.12.0",
+		"jsdom": "30.0.1",
+		"knip": "6.39.0",
+		"prettier": "3.9.6",
+		"prettier-plugin-svelte": "4.1.1",
+		"svelte": "5.57.0",
+		"svelte-check": "4.7.6",
+		"typescript": "5.9.3",
+		"typescript-eslint": "8.69.0",
+		"vite": "8.2.2",
+		"vitest": "4.1.11"
+	}
+}
