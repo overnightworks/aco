@@ -322,6 +322,13 @@ exact text sections, JSON keys, HTML layout, and estimate derivation are
 as yes/no cards on 127.0.0.1; the access token is in the printed URL. A
 choice can be undone for 8 seconds, then it is written through `aco rule`.
 
+`frontend/` holds the board's coming browser app (Svelte, built with pnpm;
+the Node version is pinned in its `package.json`). Its build output is
+committed under `src/aco_board/static/` and is not served yet. After changing
+`frontend/`, run `pnpm --dir frontend install --frozen-lockfile && pnpm --dir
+frontend build` and commit the rebuilt files with the change: CI's `frontend`
+job fails when they differ from a fresh build.
+
 ## Scope and boundaries
 
 GitHub through the `gh` CLI is the one forge adapter that exists today. A
