@@ -42,9 +42,10 @@ headers; the legacy page at `/` and `POST /rule` is not specified here.
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"items": [{"number", "title", "lines"}]}` in aco's order; each line has `index, text, question, example, picture, default, ruling, ruled_on, fingerprint` (see E-ABRD-03).
 - [ ] [ABRD-09] `POST /api/rule` takes `item`, `line`, `fingerprint`, `outcome`, `note` and answers 200 `{"status", "message"}`; a malformed body answers 400 `{"error": "bad request: decision"}` (see E-ABRD-04).
-- [ ] [ABRD-10] Every `/api/` request needs the start token in header `X-Board-Token`; a missing or wrong one answers 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
-- [ ] [ABRD-11] A body still short of its `Content-Length` after 10 seconds answers 408 `{"error": "request timeout: body incomplete"}`; a failing or hung `aco rulings` answers 502 `{"error": "<reason>"}`.
-- [ ] [ABRD-12] Every answer carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
+- [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the start token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
+- [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, answers 408 `{"error": "request timeout: body incomplete"}`; a failing or hung `aco rulings` answers 502 `{"error": "<reason>"}`.
+- [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
+- [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}`; elsewhere such a method answers 405 as text.
 
 ## Never
 

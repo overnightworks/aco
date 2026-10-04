@@ -14,6 +14,7 @@ import errno
 import http.client
 import json
 import os
+import select
 import socket
 import stat
 import struct
@@ -311,6 +312,18 @@ class BoardClient:
         whatever the board answers before it closes the connection."""
         with self._connection() as connection:
             connection.sendall(request)
+            return _received_until_closed(connection)
+
+    def send_dripping(self, head: bytes, body: bytes, interval_seconds: float) -> bytes:
+        """Send `head`, then `body` one byte per interval, never pausing long
+        enough to look stalled; return the answer once the board sends one."""
+        with self._connection() as connection:
+            connection.sendall(head)
+            for byte in body:
+                answer_waiting, _, _ = select.select([connection], [], [], interval_seconds)
+                if answer_waiting:
+                    break
+                connection.sendall(bytes([byte]))
             return _received_until_closed(connection)
 
     @contextmanager

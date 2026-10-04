@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import html
 import json
+import socket
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -33,7 +34,7 @@ from aco_board.ports import (
     DecisionResult,
     ExpectationLine,
 )
-from aco_board.server import LOOPBACK_HOST
+from aco_board.server import LOOPBACK_HOST, read_before_deadline
 
 
 def _page(board: BoardClient) -> BoardPage:
@@ -542,6 +543,7 @@ def _post(body: bytes, length: bytes | None = None) -> bytes:
         (_post(b"{}", b"\xd9\xa3"), b"400"),
         (_post(b"{}", b"9" * 5000), b"400"),
         (_post(b"{}", b"16385"), b"400"),
+        (_post(b"{}", b"40"), b"400"),
         (_post(b"x" * 16385), b"400"),
         (_post(b"[" * 16000), b"400"),
         (_post(b'{"item": 1' + b"0" * 5000 + b"}"), b"400"),
@@ -564,6 +566,7 @@ def _post(body: bytes, length: bytes | None = None) -> bytes:
         "content-length-non-ascii-digit",
         "content-length-past-int-limit",
         "content-length-over-limit",
+        "body-cut-short",
         "body-over-limit",
         "body-nested-too-deep",
         "body-integer-past-int-limit",
@@ -612,6 +615,15 @@ def test_a_stalled_request_is_dropped_after_the_deadline_without_a_traceback(
     assert (answer.split(b" ")[1] if answer else None) == status
     assert "Traceback" not in capsys.readouterr().err
     assert repository.calls() == []
+
+
+def test_a_body_still_arriving_when_its_deadline_has_passed_times_out() -> None:
+    reader_end, sender_end = socket.socketpair()
+    with reader_end, sender_end, reader_end.makefile("rb") as rfile:
+        sender_end.sendall(b'{"item": 42}')
+
+        with pytest.raises(TimeoutError):
+            read_before_deadline(rfile, reader_end, 40, deadline_seconds=0.0)
 
 
 def test_a_stalled_request_does_not_hold_up_shutdown(repository: FakeAcoRepository) -> None:

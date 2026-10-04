@@ -197,8 +197,24 @@ def test_a_line_changed_since_listing_answers_why_without_writing(
         ("POST", "/api/rule", _decision_body()),
         ("POST", "/api/rule", "not json"),
         ("GET", "/api/elsewhere", None),
+        ("PUT", "/api/rule", _decision_body()),
+        ("DELETE", "/api/board", None),
+        ("PATCH", "/api/rule", _decision_body()),
+        ("OPTIONS", "/api/board", None),
+        ("BREW", "/api/board", None),
     ],
-    ids=["board", "board-query-token", "rule", "rule-malformed", "unknown-route"],
+    ids=[
+        "board",
+        "board-query-token",
+        "rule",
+        "rule-malformed",
+        "unknown-route",
+        "put",
+        "delete",
+        "patch",
+        "options",
+        "unknown-method",
+    ],
 )
 def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
     repository: FakeAcoRepository,
@@ -241,28 +257,76 @@ def test_a_malformed_api_decision_is_refused_with_an_error_envelope_without_aco(
     assert repository.calls() == []
 
 
-@pytest.mark.parametrize(
-    ("method", "path"),
-    [("GET", "/api/elsewhere"), ("GET", "/api/rule"), ("POST", "/api/board")],
-    ids=["unknown", "rule-by-get", "board-by-post"],
-)
-def test_an_unknown_api_route_answers_not_found_as_json(
-    repository: FakeAcoRepository, board: BoardClient, method: str, path: str
+def test_a_repeated_token_header_is_refused_even_when_both_carry_the_token(
+    repository: FakeAcoRepository, board: BoardClient
 ) -> None:
-    response = board.call_api(method, path, presented=board.token)
+    token_header = b"X-Board-Token: " + board.token.encode() + b"\r\n"
+    answer = board.send_raw(b"GET /api/board HTTP/1.1\r\nHost: x\r\n" + token_header * 2 + b"\r\n")
 
-    assert (response.status, response.json()) == (404, {"error": "not found"})
+    response = Response.from_raw(answer)
+    assert (response.status, response.json()) == (
+        403,
+        {"error": "forbidden: missing or wrong token"},
+    )
     assert repository.calls() == []
 
 
-def test_an_api_body_that_never_completes_answers_408_as_json(
+_NOT_FOUND = (404, {"error": "not found"})
+_METHOD_NOT_ALLOWED = (405, {"error": "method not allowed"})
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "answer"),
+    [
+        ("GET", "/api/elsewhere", _NOT_FOUND),
+        ("GET", "/api/rule", _NOT_FOUND),
+        ("POST", "/api/board", _NOT_FOUND),
+        ("PUT", "/api/rule", _METHOD_NOT_ALLOWED),
+        ("DELETE", "/api/board", _METHOD_NOT_ALLOWED),
+        ("OPTIONS", "/api/elsewhere", _METHOD_NOT_ALLOWED),
+    ],
+    ids=["unknown", "rule-by-get", "board-by-post", "put", "delete", "options"],
+)
+def test_an_api_request_outside_its_routes_answers_why_as_json(
     repository: FakeAcoRepository,
+    board: BoardClient,
+    method: str,
+    path: str,
+    answer: tuple[int, dict[str, str]],
+) -> None:
+    response = board.call_api(method, path, presented=board.token)
+
+    assert (response.status, response.json()) == answer
+    assert repository.calls() == []
+
+
+_BODY_LENGTH = 40
+
+
+def _send_part_and_stall(board: BoardClient, head: bytes) -> bytes:
+    return board.send_unfinished(head + b'{"item": 42}')
+
+
+def _drip_slower_than_the_deadline(board: BoardClient, head: bytes) -> bytes:
+    # Forty bytes a twentieth of a second apart take two seconds, ten times
+    # the deadline, while no single pause comes near it.
+    return board.send_dripping(head, b"x" * _BODY_LENGTH, interval_seconds=0.05)
+
+
+@pytest.mark.parametrize(
+    "send_body",
+    [_send_part_and_stall, _drip_slower_than_the_deadline],
+    ids=["stalled", "dripping"],
+)
+def test_an_api_body_not_complete_by_the_deadline_answers_408_as_json(
+    repository: FakeAcoRepository, send_body: Callable[[BoardClient, bytes], bytes]
 ) -> None:
     with serving(AcoCli(directory=repository.directory), request_deadline_seconds=0.2) as board:
-        answer = board.send_unfinished(
+        answer = send_body(
+            board,
             b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: "
             + board.token.encode()
-            + b'\r\nContent-Length: 40\r\n\r\n{"item": 42}'
+            + f"\r\nContent-Length: {_BODY_LENGTH}\r\n\r\n".encode(),
         )
 
     response = Response.from_raw(answer)
@@ -324,8 +388,14 @@ def test_an_unavailable_aco_answers_502_with_its_reason(
         ("GET", "/api/board", None, False, 403, "application/json"),
         ("POST", "/api/rule", "not json", True, 400, "application/json"),
         ("GET", "/api/elsewhere", None, True, 404, "application/json"),
+        ("OPTIONS", "/api/rule", None, False, 403, "application/json"),
+        ("PUT", "/api/rule", _decision_body(), False, 403, "application/json"),
+        ("PUT", "/api/rule", _decision_body(), True, 405, "application/json"),
+        ("HEAD", "/api/board", None, False, 403, "application/json"),
+        ("HEAD", "/api/board", None, True, 405, "application/json"),
         ("GET", "/?t={token}", None, False, 200, "text/html; charset=utf-8"),
         ("GET", "/", None, False, 403, "text/plain; charset=utf-8"),
+        ("PUT", "/", None, False, 405, "text/plain; charset=utf-8"),
     ],
     ids=[
         "api-board",
@@ -333,8 +403,14 @@ def test_an_unavailable_aco_answers_502_with_its_reason(
         "api-forbidden",
         "api-bad-request",
         "api-not-found",
+        "api-options-forbidden",
+        "api-put-forbidden",
+        "api-put-not-allowed",
+        "api-head-forbidden",
+        "api-head-not-allowed",
         "legacy-page",
         "legacy-forbidden",
+        "legacy-put-not-allowed",
     ],
 )
 def test_every_answer_is_uncached_unreferred_framed_by_none_and_never_cross_origin(
@@ -354,6 +430,33 @@ def test_every_answer_is_uncached_unreferred_framed_by_none_and_never_cross_orig
     assert response.status == status
     assert response.headers["Content-Type"] == content_type
     _assert_guarded(response)
+
+
+@pytest.mark.parametrize(
+    ("request_bytes", "status"),
+    [
+        (b"GET /api/board HTTP/9.9\r\nHost: x\r\n\r\n", 505),
+        (b"GET /api/board HTTP/1.1 extra\r\nHost: x\r\n\r\n", 400),
+        (b"GET /api/board HTTP/1.1\r\n" + b"X: y\r\n" * 101 + b"\r\n", 431),
+        (b"GET /" + b"a" * 65537 + b" HTTP/1.1\r\n\r\n", 414),
+    ],
+    ids=["version-unsupported", "request-line-malformed", "too-many-headers", "line-too-long"],
+)
+def test_a_request_the_http_layer_cannot_parse_is_refused_with_every_guard_header(
+    repository: FakeAcoRepository, board: BoardClient, request_bytes: bytes, status: int
+) -> None:
+    response = Response.from_raw(board.send_raw(request_bytes))
+
+    assert response.status == status
+    assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
+    _assert_guarded(response)
+    assert repository.calls() == []
+
+
+def test_a_head_request_answers_with_headers_only(board: BoardClient) -> None:
+    response = Response.from_raw(board.send_raw(b"HEAD /api/board HTTP/1.1\r\nHost: x\r\n\r\n"))
+
+    assert (response.status, response.body) == (403, "")
 
 
 def test_a_cross_origin_preflight_is_granted_nothing(

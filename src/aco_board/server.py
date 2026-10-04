@@ -2,12 +2,15 @@
 
 Binds `127.0.0.1` only -- there is no host option -- and answers only a
 request carrying the per-start access token. The JSON API under `/api/`
-takes it in the `X-Board-Token` header and checks it before any other work:
-`GET /api/board` answers every line from a fresh read of the decision
-source, `POST /api/rule` submits one decision. The legacy page takes it as
+takes it in exactly one `X-Board-Token` header and checks it before any
+other work, whatever the method: `GET /api/board` answers every line from a
+fresh read of the decision source, `POST /api/rule` submits one decision,
+and every other method is refused. The legacy page takes it as
 `GET /?t=TOKEN` and in the body of `POST /rule`. A malformed or stalled
-request gets a fixed 4xx answer, never a traceback; no answer carries a
-cross-origin header, so a page from another origin can never read one.
+request gets a fixed 4xx answer, never a traceback; every answer, the HTTP
+layer's own refusals included, carries the same guard headers, and none
+carries a cross-origin header, so a page from another origin can never read
+one.
 """
 
 from __future__ import annotations
@@ -16,10 +19,12 @@ import hmac
 import secrets
 import socket
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BufferedIOBase
 from typing import cast
 from urllib.parse import parse_qs, urlsplit
 
@@ -40,13 +45,16 @@ _NOT_FOUND = "not found"
 _BAD_CONTENT_LENGTH = "bad request: Content-Length"
 _BAD_DECISION = "bad request: decision"
 _BODY_INCOMPLETE = "request timeout: body incomplete"
+_METHOD_NOT_ALLOWED = "method not allowed"
+_SERVED_METHODS = frozenset({"GET", "POST"})
 _TEXT_CONTENT_TYPE = "text/plain; charset=utf-8"
 _MAX_REQUEST_BYTES = 16 * 1024
 """A decision is two numbers, an outcome, a fingerprint, and a short note;
 anything larger is refused before it is read."""
 REQUEST_DEADLINE_SECONDS = 10.0
-"""How long one socket read or write on a connection may wait; a browser
-sends its small request at once, so a client still silent after this is
+"""How long one socket read or write on a connection may wait, and how long
+a whole request body may take to arrive; a browser sends its small request
+at once, so a client still silent -- or still trickling -- after this is
 dropped rather than holding a handler thread."""
 
 _Refusal = Callable[[HTTPStatus, str], None]
@@ -112,6 +120,25 @@ def start_board(
     return RunningBoard(httpd=httpd, url=url)
 
 
+def read_before_deadline(
+    rfile: BufferedIOBase, connection: socket.socket, length: int, deadline_seconds: float
+) -> bytes:
+    """Up to `length` bytes, raising TimeoutError once `deadline_seconds`
+    pass in total -- however steadily a slow client keeps sending."""
+    deadline = time.monotonic() + deadline_seconds
+    received = bytearray()
+    while len(received) < length:
+        seconds_left = deadline - time.monotonic()
+        if seconds_left <= 0:
+            raise TimeoutError
+        connection.settimeout(seconds_left)
+        chunk = rfile.read1(length - len(received))
+        if not chunk:
+            break
+        received += chunk
+    return bytes(received)
+
+
 def _content_length(header: str) -> int | None:
     """The declared body size, or None unless it is a decimal within the limit."""
     # The length check comes first: `int()` refuses a digit string past
@@ -154,7 +181,8 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy", page.content_security_policy(nonce))
             self.end_headers()
-            self.wfile.write(encoded)
+            if self.command != "HEAD":
+                self.wfile.write(encoded)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as error:
             raise _ClientDisconnectedError from error
 
@@ -163,6 +191,34 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
 
     def _refuse_as_json(self, status: HTTPStatus, sentence: str) -> None:
         self._respond(status, api.error_json(sentence), api.JSON_CONTENT_TYPE)
+
+    def parse_request(self) -> bool:
+        """Answer a method the board does not serve here, so the stdlib never
+        dispatches it to its bare 501 -- the API's token check comes first."""
+        if not super().parse_request():
+            return False
+        if self.command in _SERVED_METHODS:
+            return True
+        # Its body, if any, stays unread, so the connection cannot carry on.
+        self.close_connection = True
+        if urlsplit(self.path).path.startswith(API_PREFIX):
+            self._answer_api(self._refuse_method)
+        else:
+            self._refuse_as_text(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED)
+        return False
+
+    def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
+        """The HTTP layer's own refusal of a request it could not parse, sent
+        with the board's guard headers. The request line may not have parsed,
+        so neither the path nor the stdlib's message -- which echoes the
+        request -- shapes the answer."""
+        del message, explain
+        self.close_connection = True
+        # A request line refused before its version parsed leaves the stdlib's
+        # HTTP/0.9 default, under which `send_response` writes no status line
+        # and no header at all; the board answers in its own version instead.
+        self.request_version = self.protocol_version
+        self._refuse_as_text(HTTPStatus(code), HTTPStatus(code).phrase.lower())
 
     def do_GET(self) -> None:
         split = urlsplit(self.path)
@@ -209,13 +265,22 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
     def _answer_api(self, route: Callable[[], None] | None) -> None:
         """Check the header token before anything else -- the path, the body,
         or the board -- so a request without it never reaches aco."""
-        if not self._authorized(self.headers.get(TOKEN_HEADER)):
+        if not self._authorized(self._header_token()):
             self._refuse_as_json(HTTPStatus.FORBIDDEN, _FORBIDDEN)
             return
         if route is None:
             self._refuse_as_json(HTTPStatus.NOT_FOUND, _NOT_FOUND)
             return
         route()
+
+    def _header_token(self) -> str | None:
+        # Two token headers are refused rather than one of them picked: a
+        # proxy and a client disagreeing on which counts is no authorization.
+        presented = self.headers.get_all(TOKEN_HEADER) or []
+        return presented[0] if len(presented) == 1 else None
+
+    def _refuse_method(self) -> None:
+        self._refuse_as_json(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED)
 
     def _get_board(self) -> None:
         try:
@@ -241,11 +306,15 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         if length is None:
             refuse(HTTPStatus.BAD_REQUEST, _BAD_CONTENT_LENGTH)
             return None
+        deadline_seconds = self._server().request_deadline_seconds
         try:
-            return self.rfile.read(length)
+            return read_before_deadline(self.rfile, self.connection, length, deadline_seconds)
         except TimeoutError:
             refuse(HTTPStatus.REQUEST_TIMEOUT, _BODY_INCOMPLETE)
             return None
+        finally:
+            # The read shrank the socket timeout; the answer gets a full one.
+            self.connection.settimeout(deadline_seconds)
 
     def _decide(self, request: api.DecisionRequest) -> None:
         result = self._server().board.decide(request.decision, request.fingerprint)
