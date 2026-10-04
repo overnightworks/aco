@@ -2033,6 +2033,7 @@ def _rulings_line_json(line: body.ExpectationLine) -> dict[str, object]:
         "text": line.text,
         "ruling": line.ruling,
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
+        "default": line.default,
     }
     payload.update(
         (key, value)

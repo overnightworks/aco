@@ -1968,11 +1968,14 @@ class TestCliStateRefForge:
         state-ref` appends the proposed line straight into `items/<id>.md`
         through `_StoreItemWriter` -- no `gh`, no forge -- and a second `aco
         rulings` invocation (its own fresh fetch, standing in for a second
-        process) reads the line back open."""
+        process) reads the line back open, its `--json` carrying the asked
+        `--default` (RUL-12)."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         asked_text = "Does a second process see the appended line?"
 
-        asked = issue_claim.main(["ask", str(CHILD_A_NUMBER), "--text", asked_text])
+        asked = issue_claim.main(
+            ["ask", str(CHILD_A_NUMBER), "--text", asked_text, "--default", "no"]
+        )
         assert asked == 0
         capsys.readouterr()
 
@@ -1986,6 +1989,13 @@ class TestCliStateRefForge:
         assert rulings_status == 0
         lines = capsys.readouterr().out.splitlines()
         assert any(line.strip() == f"2 open: {asked_text}" for line in lines)
+
+        asked_line = json.loads(_run_ok(["rulings", "--json"], capsys))["rulings"][0]["lines"][1]
+        assert (asked_line["text"], asked_line["ruling"], asked_line["default"]) == (
+            asked_text,
+            None,
+            "no",
+        )
 
     def test_ask_with_a_picture_writes_the_card_fields_into_the_state_ref_item(
         self,
