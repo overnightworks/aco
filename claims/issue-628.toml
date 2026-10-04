@@ -1,8 +1,0 @@
-claim_id = "985f2cb1301548199c568a965f4f2625"
-agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
-role = "builder"
-base = "2012db193c8fde77b96dba41b80d75386d89c970"
-branch = "claude/issue-628-packaging-proof"
-scope = [".github/workflows/ci.yml", ".github/workflows/release.yml", "pyproject.toml", "scripts/package_smoke.sh"]
-opened_commit = "1095c47ed7ddbd29f735a582b8e0cb9aeaa8cab1"
-whole_reason = "Package-data plus ein Smoke-Skript, das CI und Release gleich aufrufen – eine Scheibe laut Plan."
