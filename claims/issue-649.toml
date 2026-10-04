@@ -1,8 +1,0 @@
-claim_id = "755e2ba921734b2cba163847fc3f49c1"
-agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
-role = "builder"
-base = "0e065c248a520eb3b069d91bc055f7a414ea8d75"
-branch = "claude/issue-649-decide-view"
-scope = ["frontend", "src/aco_board/static"]
-opened_commit = "d11d02c2156e92f50f647c8631cf8c4d3eb231fb"
-whole_reason = "Die Entscheidungs-Oberfläche samt Komponenten, Zustandsmodell, E2E-Specs und neu gebauten Assets."
