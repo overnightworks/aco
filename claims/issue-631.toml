@@ -1,0 +1,8 @@
+claim_id = "002b312235f64097900bc990dbc8ef21"
+agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
+role = "builder"
+base = "05769460ec2f01728d8e388a705847e892bc14bb"
+branch = "claude/issue-631-board-api"
+scope = ["pyproject.toml", "specs/aco-board.spec.md", "src/aco_board/api.py", "src/aco_board/server.py", "tests/aco_board"]
+opened_commit = "f4bbd16f015d7fc6b0a17caf72cd7716c27d6397"
+whole_reason = "Draht-Schicht api.py plus Transport-Anbindung in server.py, Spec-HTTP-Zeilen und Tests – eine Scheibe laut Plan (#617)."
