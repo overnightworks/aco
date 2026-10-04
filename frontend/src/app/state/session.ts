@@ -23,9 +23,21 @@ export interface BootstrapEnvironment {
 export function bootstrapToken(env: BootstrapEnvironment): string | null {
 	const fromHash = tokenFromHash(env.hash);
 	if (fromHash === null) {
-		return env.storage.getItem(TOKEN_STORAGE_KEY);
+		try {
+			return env.storage.getItem(TOKEN_STORAGE_KEY);
+		} catch {
+			// A broken session store (private-mode quota, enterprise lockdown)
+			// reads the same as a tab that never saw the link: no access.
+			return null;
+		}
 	}
-	env.storage.setItem(TOKEN_STORAGE_KEY, fromHash);
+	try {
+		env.storage.setItem(TOKEN_STORAGE_KEY, fromHash);
+	} catch {
+		// The link itself already proved this token; a failed persist only
+		// costs this tab a reload, so keep the token for this page view
+		// instead of turning a storage quirk into a false access denial.
+	}
 	env.replaceState(env.pathWithSearch);
 	return fromHash;
 }

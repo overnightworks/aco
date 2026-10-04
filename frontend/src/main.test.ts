@@ -12,6 +12,7 @@ afterEach(() => {
 	document.body.replaceChildren();
 	window.sessionStorage.clear();
 	window.history.replaceState(null, '', '/');
+	vi.restoreAllMocks();
 });
 
 test('starting the page mounts the board shell into #app', async () => {
@@ -34,4 +35,15 @@ test('a hash token is carried into session storage and the URL fragment is gone 
 
 	expect(window.location.hash).toBe('');
 	expect(window.sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('my-token');
+});
+
+test('a session store that throws on read degrades to "no access" instead of crashing bootstrap', async () => {
+	document.body.innerHTML = '<div id="app"></div>';
+	vi.spyOn(window.sessionStorage, 'getItem').mockImplementation(() => {
+		throw new Error('SecurityError: storage disabled');
+	});
+
+	await import('./main');
+
+	expect(screen.getByRole('alert')).toHaveTextContent('Zugang fehlt');
 });

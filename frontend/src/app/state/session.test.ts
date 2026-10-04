@@ -58,6 +58,32 @@ test('no hash token and nothing stored reads as no access', () => {
 	expect(replaceState).not.toHaveBeenCalled();
 });
 
+test('a broken session store reading fails loud nowhere -- no hash token reads as no access', () => {
+	const { env, replaceState } = fakeEnvironment({ hash: '' });
+	env.storage.getItem = () => {
+		throw new Error('SecurityError: storage disabled');
+	};
+
+	expect(bootstrapToken(env)).toBeNull();
+	expect(replaceState).not.toHaveBeenCalled();
+});
+
+test('a broken session store that cannot persist a hash token still clears the fragment and keeps the token for this page view', () => {
+	const { env, storage, replaceState } = fakeEnvironment({
+		hash: '#t=secret',
+		pathWithSearch: '/?view=decide'
+	});
+	env.storage.setItem = () => {
+		throw new Error('QuotaExceededError');
+	};
+
+	const token = bootstrapToken(env);
+
+	expect(token).toBe('secret');
+	expect(storage.has(TOKEN_STORAGE_KEY)).toBe(false);
+	expect(replaceState).toHaveBeenCalledWith('/?view=decide');
+});
+
 test('windowBootstrapEnvironment reads a real window and clears its fragment', () => {
 	window.history.replaceState(null, '', '/?x=1#t=from-window');
 	window.sessionStorage.clear();
