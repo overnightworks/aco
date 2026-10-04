@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { lineStatusText } from '../app/model/boardSummary';
+	import { lineKey } from '../app/model/decision';
 	import type { RepoReading } from '../types';
 
-	let { repos }: { repos: RepoReading[] } = $props();
+	let {
+		repos,
+		selectedKey,
+		onSelect
+	}: { repos: RepoReading[]; selectedKey: string | null; onSelect: (key: string) => void } =
+		$props();
 </script>
 
 <section aria-label="Zeilen je Item">
@@ -14,9 +20,21 @@
 				<h2>#{item.number} {item.title}</h2>
 				<ul>
 					{#each item.lines as line (line.index)}
+						{@const key = lineKey(repo.name, item.number, line)}
 						<li>
-							<span>{line.text}</span>
-							<span>{lineStatusText(line)}</span>
+							{#if line.ruling === null}
+								<button
+									type="button"
+									aria-current={key === selectedKey}
+									onclick={() => onSelect(key)}
+								>
+									<span>{line.text}</span>
+									<span>{lineStatusText(line)}</span>
+								</button>
+							{:else}
+								<span>{line.text}</span>
+								<span>{lineStatusText(line)}</span>
+							{/if}
 						</li>
 					{/each}
 				</ul>
