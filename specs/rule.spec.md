@@ -2,9 +2,10 @@
 
 `aco rule ITEM --line N (--yes|--no|--later) [--note TEXT]`: moves one
 proposed `[[expectation]]` line to ruled, transcribing the operator's own
-word (`aco ask` proposes; this command decides). This command and
-`board --serve`'s own `POST /rule` form (issue #280) share the one write
-path; a refusal reads the identical sentence through either caller. This
+word (`aco ask` proposes; this command decides). This CLI invocation is the
+one write path for a ruling (issue #644 retired `board --serve`'s own
+in-process `POST /rule` form; `aco-board`'s decision board shells out to
+this exact command instead, `specs/aco-board.spec.md` ABRD-01). This
 file owns the ruling's own refusals -- an already-ruled
 line, an out-of-range one -- the `RULED` line, its own `reason` vocabulary,
 and every refusal `aco ask` shares only by substituting `command` ("rule"
@@ -70,7 +71,7 @@ the same sentence; RULE-07's sentence is identical for both commands.
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
 - `aco rule` never rewrites a byte outside the ruled entry: the body's surrounding bytes stay exactly as written.
 - `aco rule` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it ever resolves the forge or the item.
-- `board --serve`'s own `POST /rule` form is transport only: it calls this exact write, never a second one, so a line already ruled through the served board refuses the same RULE-04 sentence a CLI `aco rule` would.
+- `aco-board`'s own decision board (`specs/aco-board.spec.md` ABRD-01) is transport only: it shells out to this exact command, never a second write path of its own, so a line already ruled through it refuses the same RULE-04 sentence a direct `aco rule` would.
 
 ## Examples
 
