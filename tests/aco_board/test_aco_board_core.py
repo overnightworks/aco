@@ -84,15 +84,39 @@ class _HeldDecisions:
         return DecisionResult(DecisionStatus.RULED, "ruled")
 
 
-def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins() -> None:
+def _signal_when_a_decision_waits_for_its_turn(
+    board: Board, monkeypatch: pytest.MonkeyPatch
+) -> threading.Event:
+    """An event set once a caller is inside the board's turn wait.
+
+    The event is set while that caller still holds the turn lock, so whoever
+    takes the lock next, `close_writes` included, finds it already waiting.
+    """
+    turn = board._turn
+    entered = threading.Event()
+    wait = turn.wait
+
+    def signalling_wait(timeout: float | None = None) -> bool:
+        entered.set()
+        return wait(timeout)
+
+    monkeypatch.setattr(turn, "wait", signalling_wait)
+    return entered
+
+
+def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     decisions = _HeldDecisions()
     board = Board(decisions)
+    waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(board, monkeypatch)
     running, waiting = Decision(42, 1, Outcome.YES, None), Decision(42, 2, Outcome.NO, None)
 
     with ThreadPoolExecutor(max_workers=3) as threads:
         running_answer = threads.submit(board.decide, running, "shown")
         assert decisions.writing.wait(_WAIT_SECONDS)
         waiting_answer = threads.submit(board.decide, waiting, "shown")
+        assert waiting_for_turn.wait(_WAIT_SECONDS)
         stopping = threads.submit(board.close_writes)
 
         # Answered while the running write is still held: the waiting
