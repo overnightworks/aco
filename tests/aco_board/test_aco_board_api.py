@@ -580,6 +580,7 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
     ("body", "headers", "error"),
     [
         ("not json", {}, "bad request: decision"),
+        ("[1, 2, 3]", {}, "bad request: decision"),
         (_decision_body(outcome="maybe"), {}, "bad request: decision"),
         (_decision_body(outcome=["yes"]), {}, "bad request: decision"),
         (_decision_body(item=True), {}, "bad request: decision"),
@@ -594,6 +595,7 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
     ],
     ids=[
         "not-json",
+        "json-not-an-object",
         "outcome-unknown",
         "outcome-not-text",
         "item-true",

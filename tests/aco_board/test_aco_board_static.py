@@ -86,6 +86,11 @@ def _a_directory_itself(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
     return static_root, "assets"
 
 
+def _a_missing_root(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
+    del static_root
+    return tmp_path / "does-not-exist", "index.html"
+
+
 @pytest.mark.parametrize(
     "arrange",
     [
@@ -96,11 +101,13 @@ def _a_directory_itself(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
         _escaping_literal("assets/%252e%252e/index.html"),
         _escaping_literal("assets\\..\\..\\index.html"),
         _escaping_literal("/etc/passwd"),
+        _escaping_literal("assets/ind\x00ex.html"),
         _via_a_symlinked_file,
         _via_a_symlinked_directory,
         _via_a_symlinked_root,
         _a_missing_file,
         _a_directory_itself,
+        _a_missing_root,
     ],
     ids=[
         "literal-dotdot",
@@ -110,11 +117,13 @@ def _a_directory_itself(static_root: Path, tmp_path: Path) -> tuple[Path, str]:
         "double-encoded-dotdot",
         "backslash-not-a-separator",
         "absolute-path-stays-relative",
+        "nul-byte",
         "symlinked-file",
         "symlinked-directory",
         "symlinked-root",
         "missing-file",
         "a-directory-itself",
+        "missing-root",
     ],
 )
 def test_resolve_contained_refuses_an_unservable_path(
@@ -203,6 +212,16 @@ def test_the_shell_and_its_assets_need_no_token(
 def test_an_unservable_path_answers_404(repository: FakeAcoRepository, path: str) -> None:
     with serving(AcoCli(directory=repository.directory)) as board:
         response = board.call_api("GET", path, presented=None)
+
+    assert response.status == 404
+
+
+def test_posting_to_an_unknown_path_answers_404(repository: FakeAcoRepository) -> None:
+    """Unlike `/` and `/assets/**`, a path the board does not route at all stays
+    a `404` for POST too: only the shell and the assets have a real `GET`-only
+    route to refuse with `405` (server.py's `do_POST` fallback)."""
+    with serving(AcoCli(directory=repository.directory)) as board:
+        response = board.call_api("POST", "/elsewhere", presented=None)
 
     assert response.status == 404
 
