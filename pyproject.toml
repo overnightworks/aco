@@ -18,6 +18,11 @@ aco-board = "aco_board.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The board's built assets are committed under src/aco_board/static/ so a
+# Python-only install needs no Node; scripts/package_smoke.sh proves they ship.
+[tool.setuptools.package-data]
+aco_board = ["static/**"]
+
 [tool.setuptools.dynamic]
 version = {attr = "agent_coordination.__version__"}
 
