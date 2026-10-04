@@ -13,21 +13,15 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
-from pathlib import Path
 
 import pytest
-from aco_board_fixtures import FakeAcoRepository, empty_repository_with_fake_aco, line, row
+from aco_board_fixtures import FakeAcoRepository, line, row
 
 from aco_board.aco_cli import AcoCli
 from aco_board.board import SHUTTING_DOWN, Board
 from aco_board.ports import Decision, DecisionResult, DecisionStatus, ExpectationLine, Outcome
 
 _WAIT_SECONDS = 5
-
-
-@pytest.fixture
-def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeAcoRepository:
-    return empty_repository_with_fake_aco(tmp_path, monkeypatch)
 
 
 @pytest.mark.parametrize(
