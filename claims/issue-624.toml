@@ -1,0 +1,8 @@
+claim_id = "1192a03708464ab3afd1955e12c0e01e"
+agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
+role = "builder"
+base = "6ad524b8a77b9ac8b13da912c3adbcf55503847a"
+branch = "claude/issue-624-board-core"
+scope = ["pyproject.toml", "specs/aco-board.spec.md", "src/aco_board/aco_cli.py", "src/aco_board/board.py", "src/aco_board/cli.py", "src/aco_board/page.py", "src/aco_board/ports.py", "src/aco_board/server.py", "tests/aco_board"]
+opened_commit = "cf56595f980a8701812bd59dfb92e38635edec35"
+whole_reason = "Kern-Herauslösung aus server.py in board.py mit typisierten Ports und Layers-Vertrag; Legacy-Seite bleibt – eine kohärente Scheibe laut Architektur-Plan."
