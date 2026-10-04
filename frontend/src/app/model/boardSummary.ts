@@ -56,7 +56,7 @@ export function cardSentence(line: ExpectationLine): string | null {
  * a line's `picture` field reaches the DOM. */
 export function pictureDataUri(svg: string): string {
 	const bytes = new TextEncoder().encode(svg);
-	const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+	const binary = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
 	return `data:image/svg+xml;base64,${btoa(binary)}`;
 }
 
