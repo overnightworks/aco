@@ -1337,8 +1337,10 @@ def test_rulings_renders_text_json_and_empty_success(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Issue #379: a fully-ruled item is listed too (`0/2`, both lines), the
-    `--json` line carries `ruling`/`ruled_on` instead of `state`, and the
-    empty sentence fires only once no listed item carries any line."""
+    `--json` line carries `ruling`/`ruled_on` instead of `state` plus its
+    `default` -- the proposed outcome while open, `null` once ruled (RUL-10, RUL-12,
+    E-RUL-03/E-RUL-05) -- and the empty sentence fires only once no listed
+    item carries any line."""
     open_issue = rulings_issue(
         10,
         "Open expectation",
@@ -1366,12 +1368,19 @@ def test_rulings_renders_text_json_and_empty_success(
                 "open": 1,
                 "total": 2,
                 "lines": [
-                    {"index": 1, "text": "Open decision 0.", "ruling": None, "ruled_on": None},
+                    {
+                        "index": 1,
+                        "text": "Open decision 0.",
+                        "ruling": None,
+                        "ruled_on": None,
+                        "default": "later",
+                    },
                     {
                         "index": 2,
                         "text": "Settled decision 0.",
                         "ruling": "yes",
                         "ruled_on": RULED_ON.isoformat(),
+                        "default": None,
                     },
                 ],
             }
@@ -1409,12 +1418,14 @@ def test_rulings_renders_text_json_and_empty_success(
                         "text": "Settled decision 0.",
                         "ruling": "yes",
                         "ruled_on": RULED_ON.isoformat(),
+                        "default": None,
                     },
                     {
                         "index": 2,
                         "text": "Settled decision 1.",
                         "ruling": "yes",
                         "ruled_on": RULED_ON.isoformat(),
+                        "default": None,
                     },
                 ],
             }
@@ -1483,6 +1494,7 @@ def test_rulings_json_carries_question_example_and_picture(
                         "text": "Open decision.",
                         "ruling": None,
                         "ruled_on": None,
+                        "default": "later",
                         "question": "Ship it?",
                         "example": "Release on Friday.",
                         "picture": picture,
