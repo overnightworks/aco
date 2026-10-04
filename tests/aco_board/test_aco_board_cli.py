@@ -292,14 +292,19 @@ def test_serve_refuses_to_start_once_the_shell_is_missing(
 ) -> None:
     """ABRD-25: the check runs before any bind attempt (`start_board` calls
     `static.ensure_built` first), so a board that cannot start never holds the
-    port it would have used."""
+    port it would have used. Proven by keeping the port occupied for the whole
+    call: a bind-then-check implementation would instead fail trying to bind,
+    surfacing the "cannot listen" / address-in-use message (see
+    `test_serve_refuses_a_port_already_in_use`) rather than the asset-missing
+    one asserted below."""
     missing_root = tmp_path / "unbuilt"
     monkeypatch.setattr(static, "STATIC_ROOT", missing_root)
-    with socket.socket() as probe:
-        probe.bind((LOOPBACK_HOST, 0))
-        free_port = probe.getsockname()[1]
+    with socket.socket() as occupant:
+        occupant.bind((LOOPBACK_HOST, 0))
+        occupant.listen()
+        occupied_port = occupant.getsockname()[1]
 
-    exit_code = cli.main(["serve", "--port", str(free_port)])
+        exit_code = cli.main(["serve", "--port", str(occupied_port)])
 
     assert exit_code == 1
     captured = capsys.readouterr()
@@ -308,5 +313,3 @@ def test_serve_refuses_to_start_once_the_shell_is_missing(
         f"ERROR: {missing_root / 'index.html'} is missing; build the frontend first "
         "(pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend build)\n"
     )
-    with socket.socket() as still_free:
-        still_free.bind((LOOPBACK_HOST, free_port))

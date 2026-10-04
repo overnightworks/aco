@@ -130,16 +130,18 @@ test('a hostile picture is embedded only as an image, never as markup', () => {
 	expect(container.querySelectorAll('svg, script, foreignObject, iframe')).toHaveLength(0);
 });
 
-test('hostile question, sentence and example text render as text, never as markup', () => {
+test('hostile question, sentence, example and item title render as text, never as markup', () => {
 	const hostileQuestion = '"><img src=x onerror=alert(1)>';
-	const hostileExample = '<script>alert(2)</script>';
+	const hostileSentence = '<script>alert(2)</script>';
+	const hostileExample = '<svg onload=alert(3)>';
+	const hostileTitle = '<img src=x onerror=alert(4)>';
 	const card = line({
 		index: 1,
 		question: hostileQuestion,
-		text: 'Guests may join the call.',
+		text: hostileSentence,
 		example: hostileExample
 	});
-	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+	const repos = [repo({ items: [item({ number: 42, title: hostileTitle, lines: [card] })] })];
 
 	const { container } = render(Stage, {
 		repos,
@@ -148,8 +150,11 @@ test('hostile question, sentence and example text render as text, never as marku
 	});
 
 	expect(screen.getByRole('heading', { name: hostileQuestion })).toBeInTheDocument();
+	expect(screen.getByText(hostileSentence)).toBeInTheDocument();
 	expect(screen.getByText(hostileExample)).toBeInTheDocument();
+	expect(screen.getByText(`#42 · ${hostileTitle} · Zeile 1`)).toBeInTheDocument();
 	expect(container.querySelectorAll('script, svg, img')).toHaveLength(0);
+	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
 test('a plain failure keeps the choices usable for a retry', async () => {
