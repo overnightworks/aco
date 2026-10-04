@@ -17,10 +17,10 @@ it, `<k>` an expectation line's 1-based index.
 |---|---|---|
 | unsupported forge host / untracked pin | BOARD-01/02 (cited) | BOARD-01/02 (cited) |
 | `--repo` under `storage = "state-ref"` | BOARD-42 (cited) | BOARD-42 (cited), RUL-09 |
-| an item with an open expectation line | RUL-01, RUL-02 | RUL-05, RUL-10 |
+| an item with an open expectation line | RUL-01, RUL-02 | RUL-05, RUL-10, RUL-12 |
 | several such items | RUL-03 | RUL-05, RUL-10 |
 | an item whose every line is already ruled | RUL-01, RUL-04 | RUL-05, RUL-10 |
-| a ruled line | RUL-02 | RUL-05, RUL-10 |
+| a ruled line | RUL-02 | RUL-05, RUL-10, RUL-12 |
 | a line's `question`/`example`/`picture` | — | RUL-06 |
 | no item on the whole board carries an expectation line | RUL-07 | RUL-08 |
 | a title or line holds a display control | RUL-11 | RUL-10, RUL-11 |
@@ -36,7 +36,8 @@ it, `<k>` an expectation line's 1-based index.
 ## `--json`
 
 - [ ] [RUL-05] `rulings --json` wraps OUT-nn (`reason: "listed"`) around a `rulings` array (see E-RUL-03, E-RUL-05).
-- [ ] [RUL-10] Each `rulings` row is `{"number", "title", "open", "total", "lines"}`; each line `{"index", "text", "ruling", "ruled_on"}`, both `null` when open, untruncated text (see E-RUL-03, E-RUL-05).
+- [ ] [RUL-10] Each `rulings` row is `{"number", "title", "open", "total", "lines"}`; each line `{"index", "text", "ruling", "ruled_on", "default"}`, untruncated text (see E-RUL-03, E-RUL-05).
+- [ ] [RUL-12] An open line has `ruling`/`ruled_on` `null` and `default` its proposed outcome, `"yes"`, `"no"`, or `"later"` (ASK-02); a ruled line has `default` `null` (see E-RUL-03, E-RUL-05).
 - [ ] [RUL-06] A line's `question`/`example`/`picture` (`aco ask`, ASK-03) each add their own key, present only when that field was given.
 - [ ] [RUL-09] `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-RUL-06).
 
@@ -68,7 +69,7 @@ uses).
 
 ### E-RUL-01 — one item, an open line and a ruled line
 
-Setup: bare-remote, fake `gh`, issue `#10` open, one open and one ruled `[[expectation]]` line
+Setup: bare-remote, fake `gh`, issue `#10` open, one open (`default = "later"`) and one ruled `[[expectation]]` line
 
 ```console
 $ aco rulings
@@ -101,7 +102,7 @@ Setup: bare-remote, fake `gh`, issue `#10` as in E-RUL-01
 
 ```console
 $ aco rulings --json
-{"ok": true, "reason": "listed", "rulings": [{"number": 10, "title": "Open expectation", "open": 1, "total": 2, "lines": [{"index": 1, "text": "Open decision 0.", "ruling": null, "ruled_on": null}, {"index": 2, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19"}]}]}
+{"ok": true, "reason": "listed", "rulings": [{"number": 10, "title": "Open expectation", "open": 1, "total": 2, "lines": [{"index": 1, "text": "Open decision 0.", "ruling": null, "ruled_on": null, "default": "later"}, {"index": 2, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null}]}]}
 exit 0
 ```
 
@@ -129,7 +130,7 @@ $ aco rulings
   2 ruled yes 2026-09-19: Settled decision 1.
 exit 0
 $ aco rulings --json
-{"ok": true, "reason": "listed", "rulings": [{"number": 11, "title": "Fully ruled", "open": 0, "total": 2, "lines": [{"index": 1, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19"}, {"index": 2, "text": "Settled decision 1.", "ruling": "yes", "ruled_on": "2026-09-19"}]}]}
+{"ok": true, "reason": "listed", "rulings": [{"number": 11, "title": "Fully ruled", "open": 0, "total": 2, "lines": [{"index": 1, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null}, {"index": 2, "text": "Settled decision 1.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null}]}]}
 exit 0
 ```
 
