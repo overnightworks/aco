@@ -1,0 +1,8 @@
+claim_id = "17239809b53b4d13b6377cdbb025ace1"
+agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
+role = "builder"
+base = "1e9f8489b2452bd73f254e7ce69f5c19f82c07ff"
+branch = "claude/issue-652-serve-spa"
+scope = ["README.md", "frontend/e2e", "frontend/playwright.config.ts", "pyproject.toml", "scripts/package_smoke.sh", "scripts/test_inventory_dropped.txt", "specs/aco-board.spec.md", "src/aco_board", "tests/aco_board"]
+opened_commit = "6cf5b2f52d5a5a3fc873b4636732b3e1ef2f93be"
+whole_reason = "Der Wechsel der ausgelieferten Oberfläche betrifft Server, statische Auslieferung, CSP, Tests, Smoke und Doku nur gemeinsam."
