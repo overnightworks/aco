@@ -35,3 +35,22 @@ export interface RepoReading {
 export interface BoardResponse {
 	repos: RepoReading[];
 }
+
+/** `POST /api/rule`'s body (`specs/aco-board.spec.md` ABRD-09): `fingerprint`
+ * is the card's own, bound to `repo` as read (ABRD-21) -- never the line's
+ * bare fingerprint. */
+export interface DecisionRequest {
+	repo: string;
+	item: number;
+	line: number;
+	fingerprint: string;
+	outcome: Outcome;
+	note: string | null;
+}
+
+export interface DecisionResult {
+	/** `aco_board.ports.DecisionStatus`'s three values, the only ones `POST
+	 * /api/rule` ever answers with a 200. */
+	status: 'ruled' | 'already_ruled' | 'failed';
+	message: string | null;
+}

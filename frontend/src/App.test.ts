@@ -69,3 +69,14 @@ test('a board with lines shows the track list', async () => {
 
 	expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('#42 Share page');
 });
+
+test('selecting an open line opens it in the stage', async () => {
+	const openLine = line({ index: 1, text: 'Guests?', question: 'Guests allowed?' });
+	const repos = [repo({ items: [item({ number: 42, title: 'Share page', lines: [openLine] })] })];
+	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
+
+	render(App, { token: 'a-token' });
+	(await screen.findByRole('button', { name: /Guests\?/ })).click();
+
+	expect(await screen.findByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
+});
