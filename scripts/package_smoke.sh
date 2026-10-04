@@ -21,6 +21,13 @@ fi
 mkdir -p "$out_dir"
 out_dir="$(cd "$out_dir" && pwd)"
 
+# The committed assets are the manifest both archives must match exactly; a file
+# that exists only in the working tree (a stray build output, a sourcemap) would
+# otherwise ship unproven. Read before the narrowed PATH hides git.
+expected_static="$scratch/expected-static"
+git -C "$repository_root" ls-files -- src/aco_board/static \
+    | sed 's|^src/aco_board/static/||' | sort >"$expected_static"
+
 # A PATH holding only the tools this script needs proves the install path never
 # reaches for Node, which a developer machine or CI runner usually has.
 # UV_PYTHON pins the interpreter found now, before the narrowed PATH hides it.
@@ -28,7 +35,7 @@ UV_PYTHON="$(uv python find)"
 export UV_PYTHON
 tool_path="$scratch/path"
 mkdir -p "$tool_path"
-for tool in uv unzip tar gzip grep rm; do
+for tool in uv unzip tar gzip grep sed sort diff rm; do
     ln -s "$(command -v "$tool")" "$tool_path/$tool"
 done
 export PATH="$tool_path"
@@ -38,32 +45,63 @@ if command -v node >/dev/null; then
 fi
 
 uv build --quiet --out-dir "$out_dir" "$repository_root"
+
+# The release uploads every distribution in OUT_DIR, so it must hold exactly
+# the one wheel and one sdist proven below.
+shopt -s nullglob
+distributions=("$out_dir"/*)
 wheels=("$out_dir"/*.whl)
 sdists=("$out_dir"/*.tar.gz)
+shopt -u nullglob
+if ((${#wheels[@]} != 1 || ${#sdists[@]} != 1 || ${#distributions[@]} != 2)); then
+    echo "ERROR: $out_dir must hold exactly one wheel and one sdist, found:" >&2
+    printf '  %s\n' "${distributions[@]##*/}" >&2
+    exit 1
+fi
+wheel="${wheels[0]}"
+sdist="${sdists[0]}"
 
 # Listings are read whole before grep: `lister | grep -q` lets grep close the
 # pipe early, and pipefail would report the lister's SIGPIPE as a missing file.
-wheel_listing="$(unzip -l "${wheels[0]}")"
-sdist_listing="$(tar tzf "${sdists[0]}")"
-for asset in aco_board/static/index.html aco_board/static/assets/index.js; do
-    grep -q "$asset" <<<"$wheel_listing" || {
-        echo "ERROR: wheel lacks $asset" >&2
+wheel_listing="$(unzip -Z1 "$wheel")"
+sdist_listing="$(tar tzf "$sdist")"
+
+# Frontend sources, node_modules and sourcemaps never ship, wherever they sit.
+check_no_build_inputs() {
+    local archive="$1" listing="$2" forbidden
+    forbidden="$(grep -E '(^|/)(frontend|node_modules)/|\.map$' <<<"$listing" || true)"
+    if [[ -n "$forbidden" ]]; then
+        echo "ERROR: $archive carries build inputs:" >&2
+        sed 's/^/  /' <<<"$forbidden" >&2
         exit 1
-    }
-    grep -q "src/$asset" <<<"$sdist_listing" || {
-        echo "ERROR: sdist lacks src/$asset" >&2
+    fi
+}
+
+# Compares an archive's static files, relative to aco_board/static/, with the
+# committed manifest and names every missing or extra file.
+check_static_manifest() {
+    local archive="$1" listing="$2" static_prefix="$3" shipped
+    shipped="$(grep -E "^${static_prefix}[^/]" <<<"$listing" | grep -v '/$' \
+        | sed -E "s|^${static_prefix}||" | sort || true)"
+    if ! diff -u --label committed --label "$archive" "$expected_static" - <<<"$shipped" >&2; then
+        echo "ERROR: $archive static files differ from src/aco_board/static (see diff above)" >&2
         exit 1
-    }
-done
-echo "wheel and sdist carry the board assets"
+    fi
+}
+
+check_no_build_inputs "${wheel##*/}" "$wheel_listing"
+check_no_build_inputs "${sdist##*/}" "$sdist_listing"
+check_static_manifest "${wheel##*/}" "$wheel_listing" 'aco_board/static/'
+check_static_manifest "${sdist##*/}" "$sdist_listing" '[^/]+/src/aco_board/static/'
+echo "wheel and sdist carry exactly the committed board assets"
 
 UV_TOOL_DIR="$scratch/tools" UV_TOOL_BIN_DIR="$scratch/bin" \
-    uv tool install --force "${wheels[0]}"
+    uv tool install --force "$wheel"
 "$scratch/bin/aco" --help >/dev/null
 "$scratch/bin/aco-board" --help >/dev/null
 echo "installed aco and aco-board run"
 
-uv run --isolated --no-project --with "${wheels[0]}" python -c "
+uv run --isolated --no-project --with "$wheel" python -c "
 import sys
 from importlib.resources import files
 sys.exit(0 if files('aco_board').joinpath('static/index.html').is_file() else 1)
