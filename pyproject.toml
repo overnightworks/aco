@@ -85,6 +85,22 @@ layers = [
 # never the reverse.
 
 [[tool.importlinter.contracts]]
+name = "Decision board layers"
+type = "layers"
+containers = ["aco_board"]
+exhaustive = true
+# Issue #617: the board's rules (`board`) know only the port, never the aco
+# adapter; the two are independent neighbours that `cli` wires together, and
+# the transport (`server`, `page`) reaches the rules only through `board`.
+layers = [
+    "cli",
+    "server",
+    "page",
+    "board | aco_cli",
+    "ports",
+]
+
+[[tool.importlinter.contracts]]
 name = "aco does not import the decision board"
 type = "forbidden"
 source_modules = ["agent_coordination"]

@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .aco_cli import AcoCli
+from .board import Board
 from .server import LOOPBACK_HOST, start_board
 
 _HIGHEST_PORT = 65535
@@ -48,19 +49,19 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
-    decisions = AcoCli(directory=Path.cwd())
+    board = Board(AcoCli(directory=Path.cwd()))
     try:
-        board = start_board(arguments.port, decisions)
+        running = start_board(arguments.port, board)
     except OSError as error:
         print(
             f"ERROR: cannot listen on {LOOPBACK_HOST}:{arguments.port}: {error.strerror}",
             file=sys.stderr,
         )
         return 1
-    print(board.url, flush=True)
+    print(running.url, flush=True)
     try:
         with contextlib.suppress(KeyboardInterrupt):
-            board.httpd.serve_forever()
+            running.httpd.serve_forever()
     finally:
-        board.httpd.server_close()
+        running.httpd.server_close()
     return 0

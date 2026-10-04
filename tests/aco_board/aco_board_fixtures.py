@@ -25,6 +25,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import pytest
+
 _FAKE_ACO = """\
 import argparse, json, pathlib, sys, time
 
@@ -110,6 +112,19 @@ def install_fake_aco(bin_directory: Path) -> None:
 
 def path_with(bin_directory: Path) -> str:
     return f"{bin_directory}{os.pathsep}{os.environ.get('PATH', '')}"
+
+
+def empty_repository_with_fake_aco(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> FakeAcoRepository:
+    """A repository without expectation lines, its fake `aco` first on PATH."""
+    install_fake_aco(tmp_path / "bin")
+    monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
+    directory = tmp_path / "repository"
+    directory.mkdir()
+    fake = FakeAcoRepository(directory)
+    fake.set_rulings()
+    return fake
 
 
 def line(index: int, text: str, *, ruling: str | None = None, **card: str) -> dict[str, object]:
@@ -234,7 +249,7 @@ class BoardClient:
         note: str | None = None,
         token: str | None = None,
     ) -> Response:
-        """Click Ja or Nein on `card` the way the page script posts it."""
+        """Post `outcome` for `card` the way the page script posts a click."""
         payload = {
             "token": self.token if token is None else token,
             "item": card.item,

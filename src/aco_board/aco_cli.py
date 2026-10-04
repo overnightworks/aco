@@ -1,7 +1,7 @@
 """`DecisionPort` over the installed `aco` command line.
 
 Reads with `aco rulings --json` (specs/rulings.spec.md) and writes with
-`aco rule ITEM --line N --yes|--no [--note TEXT] --json` (specs/rule.spec.md).
+`aco rule ITEM --line N --yes|--no|--later [--note TEXT] --json` (specs/rule.spec.md).
 Every call runs in the directory the board was started in, so the board only
 ever sees that repository, and passes its arguments as a list, never through
 a shell.
@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import TypeVar
 
@@ -21,6 +22,7 @@ from .ports import (
     DecisionSourceUnavailableError,
     DecisionStatus,
     ExpectationLine,
+    Outcome,
 )
 
 ACO_EXECUTABLE = "aco"
@@ -144,10 +146,14 @@ def _line(item: int, title: str, line: object) -> ExpectationLine:
         item_title=title,
         index=_required(fields, "index", int),
         text=_required(fields, "text", str),
-        is_open=fields.get("ruling") is None,
         question=_optional_text(fields, "question"),
         example=_optional_text(fields, "example"),
         picture=_optional_text(fields, "picture"),
+        # `default` arrives with specs/rulings.spec.md RUL-10's own extension;
+        # an aco from before it omits the key, which reads as no recommendation.
+        default=_optional_outcome(fields, "default"),
+        ruling=_optional_outcome(fields, "ruling"),
+        ruled_on=_optional_date(fields, "ruled_on"),
     )
 
 
@@ -172,6 +178,26 @@ def _optional_text(fields: dict[str, object], key: str) -> str | None:
     if not isinstance(value, str):
         raise _unreadable(f"{key} is not text")
     return value
+
+
+def _optional_outcome(fields: dict[str, object], key: str) -> Outcome | None:
+    value = _optional_text(fields, key)
+    if value is None:
+        return None
+    try:
+        return Outcome(value)
+    except ValueError as error:
+        raise _unreadable(f"{key} is not an outcome") from error
+
+
+def _optional_date(fields: dict[str, object], key: str) -> date | None:
+    value = _optional_text(fields, key)
+    if value is None:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError as error:
+        raise _unreadable(f"{key} is not a date") from error
 
 
 def _unreadable(detail: str) -> DecisionSourceUnavailableError:

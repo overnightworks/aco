@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 from typing import Protocol
 
@@ -17,6 +18,7 @@ from typing import Protocol
 class Outcome(StrEnum):
     YES = "yes"
     NO = "no"
+    LATER = "later"
 
 
 @dataclass(frozen=True)
@@ -25,14 +27,23 @@ class ExpectationLine:
     item_title: str
     index: int
     text: str
-    is_open: bool
     question: str | None
     example: str | None
     picture: str | None
+    default: Outcome | None
+    """The outcome the source recommends for an open line; None when it names none."""
+    ruling: Outcome | None
+    ruled_on: date | None
+
+    @property
+    def is_open(self) -> bool:
+        return self.ruling is None
 
     @property
     def fingerprint(self) -> str:
-        """Names exactly what a card shows the operator: every field it renders."""
+        """Names exactly what a decision card shows the operator: every field it
+        renders. The ruling and its date are left out on purpose: a ruled line
+        is no longer decidable, so no card for it is ever submitted."""
         shown = json.dumps(
             [
                 self.item,
@@ -42,10 +53,17 @@ class ExpectationLine:
                 self.question,
                 self.example,
                 self.picture,
+                self.default,
             ],
             ensure_ascii=False,
         )
         return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+NOTE_MAX_LENGTH = 280
+"""The longest note a decision may carry, after trimming. A note travels to
+the source as one command-line argument, so it is also free of NUL and
+encodable as UTF-8."""
 
 
 @dataclass(frozen=True)
