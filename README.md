@@ -304,19 +304,15 @@ is refused by name.
 
 ## Board
 
-`aco board` projects the open work board: a fixed-width text table by
-default, `--json`, or a static `--html` page -- all three read-only.
-`--serve` instead runs a live page on 127.0.0.1 with a one-click ruling form
-per expectation line, so it is the one form of this command that writes; its
-loopback token persists across restarts and reinstalls (`--new-token` mints
-a fresh one), so the token is always stable. The full printed URL is stable
-too only once the port is fixed with `--port`: the default `--port 0` picks
-a fresh ephemeral port on every start.
+`aco board --json` projects the open work board, read-only; it is the one
+machine-readable source `aco-board` itself reads. `--html` and `--serve`
+(issue #280) were removed once `aco-board` took over the decision board
+(issue #644): `aco board --serve` now refuses, pointing at `aco-board serve`
+instead.
 Every item that carries a top-level `size = "S"|"M"|"L"` shows a measured
 estimate (`~4h (M, n=5)`) only once three or more same-size claims have
 landed; fewer measurements, including zero, show `schwach` instead. The
-exact text sections, JSON keys, HTML layout, and estimate derivation are
-`specs/board.spec.md`'s own.
+exact JSON keys and estimate derivation are `specs/board.spec.md`'s own.
 
 `aco-board serve [--port N] [--repo PFAD]...` serves one or more
 repositories' open expectation lines, under one URL, as yes/no cards on
@@ -388,7 +384,7 @@ by exactly one file below; this table is the map, not a copy.
 | `aco reset` | `specs/reset.spec.md` | rebuilds a broken or rewritten state ref |
 | `aco check` | `specs/check.spec.md` | answers whether a pull request, an issue, or a trunk commit is sound |
 | `aco brief` | `specs/brief.spec.md` | composes one item's body, claim, tip, and touched files |
-| `aco board` | `specs/board.spec.md` | projects the open board (text, `--json`, `--html`, `--serve`) |
+| `aco board` | `specs/board.spec.md` | projects the open board (`--json` only) |
 | `aco ask` | `specs/ask.spec.md` | proposes one expectation line on an item |
 | `aco rule` | `specs/rule.spec.md` | rules one proposed expectation line |
 | `aco rulings` | `specs/rulings.spec.md` | lists every item with an open expectation line |

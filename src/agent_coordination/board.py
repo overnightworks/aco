@@ -397,9 +397,9 @@ LandingEvidence = TrunkLandingEvidence | PullRequestLandingEvidence
 class LandingRow:
     """One row of the board's Landungen view (issue #371): `item` landed at
     `committed_at`, evidenced by `evidence`. This is the one projection
-    `board`, `--json`, and `board --html` all read, so no two ever disagree
-    about what landed and when -- independent of whether `item` is still
-    open, unlike `Stage.CODE_LANDED`."""
+    `board --json` reads, so no two readers ever disagree about what landed
+    and when -- independent of whether `item` is still open, unlike
+    `Stage.CODE_LANDED`."""
 
     item: int
     committed_at: datetime
@@ -2362,9 +2362,8 @@ def board_payload(board: Board) -> dict[str, object]:
     already JSON-primitive -- dates and datetimes turned to ISO text,
     blocker references split and re-keyed, every tuple turned into a list
     -- so `cli.py`'s emitter can serialize it with a plain `json.dumps`,
-    with no `default=` fallback of its own. The one owner both
-    `board --json` and a future embedded read share; `board --html`/
-    `--serve` render through `board_html.py` instead and never call this."""
+    with no `default=` fallback of its own. The one owner both `board
+    --json` and a future embedded read share."""
     payload = asdict(board)
     repository = payload.pop("repository")
     for group in ("items", "ready_now", "stale", "recovery"):
@@ -2408,58 +2407,6 @@ def _project_measurements(measurements: dict[str, object]) -> None:
             entry[key] = cast(datetime, entry[key]).astimezone(UTC).isoformat()
 
 
-NO_SIZE_CELL = "keine Größe"
-WEAK_ESTIMATE_CELL = "schwach"
-UNPARSED_TRAILER_SENTENCE = "Commits ohne lesbaren Item-Trailer"
-
-
-def estimate_cell(item: BoardItem) -> str:
-    """`item`'s own board cell (issue #357): `keine Größe` when the item
-    names none at all, `schwach` when it does but its class has fewer than
-    `metrics.WEAK_SAMPLE_THRESHOLD` measured lanes (zero included -- a class
-    with no measured lane at all carries no `Estimate` either, exactly as
-    weak as one that does but says so through `Estimate.weak`), else the
-    measured median rounded to the hour."""
-    if item.size is None:
-        return NO_SIZE_CELL
-    if item.estimate is None or item.estimate.weak:
-        return WEAK_ESTIMATE_CELL
-    estimate = item.estimate
-    return f"~{round(estimate.median_hours)}h ({estimate.size.value}, n={estimate.n})"
-
-
-def _class_measurement_line(entry: SizeClassMeasurement) -> str:
-    stats = entry.stats
-    weak = " (schwach)" if stats.weak else ""
-    return (
-        f"{stats.size.value}: n={stats.n}, median {round(stats.median_hours)}h, "
-        f"p80 {round(stats.p80_hours)}h{weak}, "
-        f"{entry.first_event_at.date().isoformat()}..{entry.last_event_at.date().isoformat()}"
-    )
-
-
-def measurements_lines(measurements: Measurements) -> list[str]:
-    """`Measurements`, rendered as the board's own "Messungen"/"keine
-    Messungen" lines (issue #357) -- the one text `render`, `board_html.py`,
-    and `board --json`'s human-facing callers all read from, rather than
-    each formatting `Measurements` its own way. `unfinished`/`unparsed`
-    (BOARD-30) each append their own line whenever non-zero, independent of
-    whether any class was itself measured -- an unparsed commit is never
-    hidden just because nothing else could be measured."""
-    as_of = measurements.as_of.isoformat()
-    if measurements.classes:
-        since = measurements.since.date().isoformat() if measurements.since is not None else as_of
-        lines = [f"Messungen (Stand {as_of}, seit {since})"]
-        lines.extend(_class_measurement_line(entry) for entry in measurements.classes)
-    else:
-        lines = [f"keine Messungen seit {as_of}"]
-    if measurements.unfinished:
-        lines.append(f"{measurements.unfinished} Lanes ohne Ende")
-    if measurements.unparsed:
-        lines.append(f"{measurements.unparsed} {UNPARSED_TRAILER_SENTENCE}")
-    return lines
-
-
 # The forge form an item takes under `GITHUB`: text for a label or a
 # command argument, a bare number for a `--json` field (issue #513).
 _ForgeName = TypeVar("_ForgeName", int, str)
@@ -2475,7 +2422,7 @@ def _storage_item_name(number: int, storage: Storage, forge_name: _ForgeName) ->
     still carry one -- keeps the forge form under either pin, since no id
     names it and a dressed-up `aco-1000000` would not parse back. `board`
     is the lowest layer that may import `items` (the Layers contract), so
-    `cli` and `board_html` both call into it here."""
+    `cli` calls into it here."""
     if storage is Storage.STATE_REF and not names_no_item(number, storage):
         return items.format_item_id(number)
     return forge_name
@@ -2619,13 +2566,6 @@ def cut_command(number: int, storage: Storage) -> str:
     #510, #604): `next`'s own action line and a `SKIPPED` container's reason
     (issue #513) print this one command, which takes that row's own title."""
     return advice_command("cut", item_argument(number, storage))
-
-
-# git's own default abbreviation length -- a Landungen row's sha is evidence
-# to look up, not a full identity, so the short form is enough (issue #371).
-# The one owner: `board_html` renders the same evidence and imports this
-# rather than keeping its own copy (issue #371 review finding R4).
-SHORT_SHA_LENGTH = 7
 
 
 @dataclass(frozen=True)
