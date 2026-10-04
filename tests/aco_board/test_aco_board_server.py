@@ -21,32 +21,31 @@ from aco_board_fixtures import (
     BoardPage,
     Card,
     FakeAcoRepository,
-    install_fake_aco,
+    empty_repository_with_fake_aco,
     line,
-    path_with,
     row,
 )
 
 from aco_board.aco_cli import AcoCli
-from aco_board.page import NOTE_MAX_LENGTH
-from aco_board.ports import Decision, DecisionPort, DecisionResult, ExpectationLine
-from aco_board.server import LINE_CHANGED, LOOPBACK_HOST, start_board
+from aco_board.board import LINE_CHANGED, Board
+from aco_board.ports import (
+    NOTE_MAX_LENGTH,
+    Decision,
+    DecisionPort,
+    DecisionResult,
+    ExpectationLine,
+)
+from aco_board.server import LOOPBACK_HOST, start_board
 
 
 @pytest.fixture
 def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeAcoRepository:
-    install_fake_aco(tmp_path / "bin")
-    monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
-    directory = tmp_path / "repository"
-    directory.mkdir()
-    fake = FakeAcoRepository(directory)
-    fake.set_rulings()
-    return fake
+    return empty_repository_with_fake_aco(tmp_path, monkeypatch)
 
 
 @contextmanager
 def serving(decisions: DecisionPort, **board_options: float) -> Iterator[BoardClient]:
-    running = start_board(0, decisions, **board_options)
+    running = start_board(0, Board(decisions), **board_options)
     server_thread = threading.Thread(
         target=running.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
     )
@@ -144,7 +143,7 @@ def test_every_load_reads_aco_afresh(repository: FakeAcoRepository, board: Board
         assert _page(board).card_keys() == [(item, index)]
 
 
-@pytest.mark.parametrize("outcome", ["yes", "no"])
+@pytest.mark.parametrize("outcome", ["yes", "no", "later"])
 def test_a_choice_is_written_through_aco_rule_and_its_card_leaves(
     repository: FakeAcoRepository, board: BoardClient, outcome: str
 ) -> None:
@@ -266,8 +265,33 @@ def test_an_unreadable_aco_shows_its_reason_instead_of_cards(
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": null, "question": 3}]}]}',
+            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null, "question": 3}]}]}',
             "question is not text",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null, "default": "maybe"}]}]}',
+            "default is not an outcome",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruled_on": null}]}]}',
+            "#1 line has no ruling",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": null}]}]}',
+            "#1 line has no ruled_on",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": "perhaps", "ruled_on": "2026-10-01"}]}]}',
+            "ruling is not an outcome",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": "yes", "ruled_on": "gestern"}]}]}',
+            "ruled_on is not a date",
         ),
     ],
     ids=[
@@ -278,6 +302,11 @@ def test_an_unreadable_aco_shows_its_reason_instead_of_cards(
         "lines-not-a-list",
         "line-not-an-object",
         "question-not-text",
+        "default-not-an-outcome",
+        "ruling-missing",
+        "ruled-on-missing",
+        "ruling-not-an-outcome",
+        "ruled-on-not-a-date",
     ],
 )
 def test_unreadable_rulings_json_shows_why_instead_of_cards(
@@ -364,6 +393,7 @@ _SHOWN_FIELDS = {
     "question": "Darf Ben kommentieren?",
     "example": "Ben schreibt",
     "picture": '<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4"/></svg>',
+    "default": "yes",
 }
 
 
@@ -381,8 +411,9 @@ def _shown_row(**changes: str) -> dict[str, object]:
         {"question": "Darf Ben löschen?"},
         {"example": "Ben löscht"},
         {"picture": '<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>'},
+        {"default": "no"},
     ],
-    ids=["title", "text", "question", "example", "picture"],
+    ids=["title", "text", "question", "example", "picture", "default"],
 )
 def test_a_card_whose_line_changed_since_rendering_is_refused_without_writing(
     repository: FakeAcoRepository, board: BoardClient, change: dict[str, str]
@@ -417,11 +448,20 @@ def test_a_card_shown_for_another_line_with_the_same_words_is_refused_without_wr
     assert repository.rulings_state() == state_before
 
 
-def test_simultaneous_decisions_on_one_item_are_all_stored(
-    repository: FakeAcoRepository, board: BoardClient
+@pytest.mark.parametrize(
+    ("clicked_lines", "statuses"),
+    [((1, 2), ["ruled", "ruled"]), ((1, 1), ["already_ruled", "ruled"])],
+    ids=["distinct-lines-both-stored", "same-line-stored-once"],
+)
+def test_simultaneous_decisions_on_one_item_are_each_written_in_turn(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    clicked_lines: tuple[int, int],
+    statuses: list[str],
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?"), line(2, "Links?")))
-    cards = _page(board).cards
+    page = _page(board)
+    cards = [page.card(42, index) for index in clicked_lines]
     # Each `aco rule` waits between reading and rewriting the body, so two
     # unserialized writes would overlap and the later one would drop the first.
     repository.delay("rule", 0.3)
@@ -429,9 +469,9 @@ def test_simultaneous_decisions_on_one_item_are_all_stored(
     with ThreadPoolExecutor(max_workers=2) as clicks:
         answers = list(clicks.map(lambda card: board.decide(card, "yes"), cards))
 
-    assert [answer.json()["status"] for answer in answers] == ["ruled", "ruled"]
-    assert repository.stored_line(42, 1)["ruling"] == "yes"
-    assert repository.stored_line(42, 2)["ruling"] == "yes"
+    assert sorted(str(answer.json()["status"]) for answer in answers) == statuses
+    for index in set(clicked_lines):
+        assert repository.stored_line(42, index)["ruling"] == "yes"
 
 
 def test_a_page_without_or_with_a_wrong_token_is_refused_without_reading_aco(
@@ -481,7 +521,7 @@ def _decision_body(token: str, **overrides: object) -> str:
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"outcome": "later"},
+        {"outcome": "maybe"},
         {"outcome": ["yes"]},
         {"item": True},
         {"line": 0},
@@ -492,7 +532,7 @@ def _decision_body(token: str, **overrides: object) -> str:
         {"note": "x" * (NOTE_MAX_LENGTH + 1)},
     ],
     ids=[
-        "outcome-later",
+        "outcome-unknown",
         "outcome-not-text",
         "item-true",
         "line-zero",
@@ -503,7 +543,7 @@ def _decision_body(token: str, **overrides: object) -> str:
         "note-too-long",
     ],
 )
-def test_a_decision_outside_yes_or_no_on_a_real_line_is_refused(
+def test_a_decision_outside_yes_no_or_later_on_a_real_line_is_refused(
     repository: FakeAcoRepository, board: BoardClient, overrides: dict[str, object]
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
@@ -650,7 +690,19 @@ class _HugeLineSource:
 
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         huge_text = "x" * (32 * 1024 * 1024)
-        return (ExpectationLine(42, "Share page", 1, huge_text, True, None, None, None),)
+        huge_line = ExpectationLine(
+            item=42,
+            item_title="Share page",
+            index=1,
+            text=huge_text,
+            question=None,
+            example=None,
+            picture=None,
+            default=None,
+            ruling=None,
+            ruled_on=None,
+        )
+        return (huge_line,)
 
     def rule(self, decision: Decision) -> DecisionResult:
         raise AssertionError("loading the page must not write")

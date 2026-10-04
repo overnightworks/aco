@@ -13,7 +13,6 @@ import json
 import secrets
 import socket
 import sys
-import threading
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,14 +20,8 @@ from typing import TypeGuard, cast
 from urllib.parse import parse_qs, urlsplit
 
 from . import page
-from .ports import (
-    Decision,
-    DecisionPort,
-    DecisionResult,
-    DecisionSourceUnavailableError,
-    DecisionStatus,
-    Outcome,
-)
+from .board import Board
+from .ports import NOTE_MAX_LENGTH, Decision, DecisionSourceUnavailableError, Outcome
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"
@@ -41,7 +34,6 @@ REQUEST_DEADLINE_SECONDS = 10.0
 """How long one socket read or write on a connection may wait; a browser
 sends its small request at once, so a client still silent after this is
 dropped rather than holding a handler thread."""
-LINE_CHANGED = "Diese Zeile hat sich geändert, bitte neu laden"
 
 
 @dataclass(frozen=True)
@@ -62,15 +54,12 @@ class _BoardServer(ThreadingHTTPServer):
     # never waits for one a stalled client holds -- only for a ruling write.
 
     def __init__(
-        self, port: int, token: str, decisions: DecisionPort, request_deadline_seconds: float
+        self, port: int, token: str, board: Board, request_deadline_seconds: float
     ) -> None:
-        # `aco rule` rewrites the whole item body, so two writes at once could
-        # each drop the other's ruling; this server writes one at a time. Made
-        # before binding: a failed bind already calls `server_close`.
-        self.write_lock = threading.Lock()
+        # Set before binding: a failed bind already calls `server_close`.
+        self.board = board
         super().__init__((LOOPBACK_HOST, port), _BoardRequestHandler)
         self.token = token
-        self.decisions = decisions
         self.request_deadline_seconds = request_deadline_seconds
 
     def handle_error(
@@ -86,12 +75,12 @@ class _BoardServer(ThreadingHTTPServer):
         """Stop listening, then wait for a ruling already being written.
 
         Handler threads are daemons, so the process may exit while one is
-        inside `aco rule`, leaving the ruling's outcome unknown. Taking the
-        write lock waits for that write -- as long as the source's own timeout
-        lets it run -- and is never released, so no later write starts.
+        inside `aco rule`, leaving the ruling's outcome unknown. Closing the
+        board's writes waits for that write -- as long as the source's own
+        timeout lets it run -- and refuses every later one.
         """
         super().server_close()
-        self.write_lock.acquire()
+        self.board.close_writes()
 
 
 @dataclass(frozen=True)
@@ -102,41 +91,16 @@ class RunningBoard:
 
 def start_board(
     port: int,
-    decisions: DecisionPort,
+    board: Board,
     *,
     request_deadline_seconds: float = REQUEST_DEADLINE_SECONDS,
 ) -> RunningBoard:
     """Bind `127.0.0.1:port` (0 picks a free port) with a fresh token."""
     token = secrets.token_urlsafe(32)
-    httpd = _BoardServer(port, token, decisions, request_deadline_seconds)
+    httpd = _BoardServer(port, token, board, request_deadline_seconds)
     bound_port = httpd.server_address[1]
     url = f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}?{TOKEN_FIELD}={token}"
     return RunningBoard(httpd=httpd, url=url)
-
-
-def submit_decision(
-    decisions: DecisionPort, decision: Decision, fingerprint: str
-) -> DecisionResult:
-    """Write `decision` unless the open line it names no longer reads as shown.
-
-    The fingerprint comparison is the board's only own check: the card was
-    rendered from an earlier read, and an open line whose item, title,
-    index, text, question, example, or picture changed since must not be
-    ruled blind. A line that is no longer open skips the comparison on
-    purpose: whether it is already ruled, out of range, or its item unknown
-    is the source's own refusal, which `rule` reports.
-    """
-    try:
-        lines = decisions.expectation_lines()
-    except DecisionSourceUnavailableError as error:
-        return DecisionResult(DecisionStatus.FAILED, str(error))
-    named = (decision.item, decision.index)
-    if any(
-        (line.item, line.index) == named and line.is_open and line.fingerprint != fingerprint
-        for line in lines
-    ):
-        return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-    return decisions.rule(decision)
 
 
 def _parsed_decision_request(raw: bytes) -> _DecisionRequest | None:
@@ -174,7 +138,7 @@ def _json_object(raw: bytes) -> dict[str, object] | None:
 
 def _is_note_text(note: object) -> TypeGuard[str]:
     """Short text a command-line argument can carry: no NUL, no lone surrogate."""
-    if not isinstance(note, str) or len(note.strip()) > page.NOTE_MAX_LENGTH or "\0" in note:
+    if not isinstance(note, str) or len(note.strip()) > NOTE_MAX_LENGTH or "\0" in note:
         return False
     try:
         note.encode("utf-8")
@@ -206,7 +170,7 @@ def _is_position(value: object) -> TypeGuard[int]:
 
 
 class _BoardRequestHandler(BaseHTTPRequestHandler):
-    def _board(self) -> _BoardServer:
+    def _server(self) -> _BoardServer:
         # `_BoardServer.__init__` is this handler's only constructor.
         return cast(_BoardServer, self.server)
 
@@ -214,7 +178,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         # The per-server form of `StreamRequestHandler.timeout`, whose class
         # attribute every board would share; set before the request is read.
         super().setup()
-        self.connection.settimeout(self._board().request_deadline_seconds)
+        self.connection.settimeout(self._server().request_deadline_seconds)
 
     def _authorized(self, candidate: str | None) -> bool:
         # The token is ASCII, so a non-ASCII candidate (a lone surrogate
@@ -222,7 +186,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         return (
             candidate is not None
             and candidate.isascii()
-            and hmac.compare_digest(candidate, self._board().token)
+            and hmac.compare_digest(candidate, self._server().token)
         )
 
     def _respond(
@@ -255,15 +219,13 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return
         nonce = secrets.token_urlsafe(16)
         try:
-            lines = self._board().decisions.expectation_lines()
+            snapshot = self._server().board.snapshot()
         except DecisionSourceUnavailableError as error:
             unavailable = page.render_unavailable(str(error), nonce)
             self._respond(HTTPStatus.BAD_GATEWAY, unavailable, page.HTML_CONTENT_TYPE, nonce=nonce)
             return
-        open_lines = tuple(line for line in lines if line.is_open)
-        self._respond(
-            HTTPStatus.OK, page.render_board(open_lines, nonce), page.HTML_CONTENT_TYPE, nonce=nonce
-        )
+        rendered = page.render_board(snapshot.open_lines, nonce)
+        self._respond(HTTPStatus.OK, rendered, page.HTML_CONTENT_TYPE, nonce=nonce)
 
     def do_POST(self) -> None:
         if urlsplit(self.path).path != RULE_PATH:
@@ -285,9 +247,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         if request is None:
             self._respond_text(HTTPStatus.BAD_REQUEST, "bad request: decision")
             return
-        board = self._board()
-        with board.write_lock:
-            result = submit_decision(board.decisions, request.decision, request.fingerprint)
+        result = self._server().board.decide(request.decision, request.fingerprint)
         answer = json.dumps({"status": result.status.value, "message": result.message})
         self._respond(HTTPStatus.OK, answer, "application/json")
 

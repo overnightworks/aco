@@ -13,12 +13,11 @@ import base64
 from collections.abc import Sequence
 from html import escape
 
-from .ports import ExpectationLine, Outcome
+from .ports import NOTE_MAX_LENGTH, ExpectationLine, Outcome
 
 HTML_CONTENT_TYPE = "text/html; charset=utf-8"
 UNDO_SECONDS = 8
 NOTHING_OPEN = "Nichts offen"
-NOTE_MAX_LENGTH = 280
 
 _STYLE = """
 :root{--bg:#F3F2F6;--surface:#FFFFFF;--line:#E1DEE8;--line-strong:#C9C4D4;--fg:#17141F;
