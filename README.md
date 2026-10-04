@@ -304,8 +304,10 @@ is refused by name.
 
 ## Board
 
-`aco board --json` projects the open work board, read-only; it is the one
-machine-readable source `aco-board` itself reads. `--html` and `--serve`
+`aco board --json` projects the open work board, read-only, as the
+machine-readable status overview for agents and scripts; `aco-board` reads
+its own decisions through `aco rulings --json` and writes them through
+`aco rule` instead (`specs/aco-board.spec.md`). `--html` and `--serve`
 (issue #280) were removed once `aco-board` took over the decision board
 (issue #644): `aco board --serve` now refuses, pointing at `aco-board serve`
 instead.

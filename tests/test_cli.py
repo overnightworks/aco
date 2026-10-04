@@ -1023,16 +1023,37 @@ def test_board_naming_no_output_mode_refuses_before_any_read(
     assert capsys.readouterr().err == "ERROR: aco board requires --json\n"
 
 
+@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
 def test_board_serve_refuses_naming_aco_board_serve_instead(
-    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], as_json: bool
 ) -> None:
     """Issue #644: `aco board --serve` is retired now that `aco-board` is
     the one decision board -- it refuses with a usage error pointing at
-    `aco-board serve` instead of starting a loopback server."""
-    status = issue_claim.main(["board", "--serve"])
+    `aco-board serve` instead of starting a loopback server, whether or not
+    `--json` is also given (BOARD-55), and before any forge, pin, or
+    state-ref repository read: each is forbidden outright below rather than
+    merely absent, so a refusal that slipped past this early check would
+    fail the test instead of silently reading real state."""
 
+    def unused(*_args: object, **_kwargs: object) -> object:
+        pytest.fail("board --serve must refuse before any pin or repository read")
+
+    _forbid_forge_resolution(monkeypatch)
+    monkeypatch.setattr(checkout, "path_is_tracked", unused)
+    monkeypatch.setattr(store, "fetch_state", unused)
+
+    status = issue_claim.main(["board", "--serve", *(["--json"] if as_json else [])])
+
+    captured = capsys.readouterr()
     assert status == 2
-    assert capsys.readouterr().err == "ERROR: --serve was removed; run aco-board serve instead\n"
+    message = "--serve was removed; run aco-board serve instead"
+    if as_json:
+        assert json.loads(captured.out) == {
+            "ok": False,
+            "reason": "invalid_usage",
+            "message": message,
+        }
+    assert captured.err == f"ERROR: {message}\n"
 
 
 def test_board_skips_the_children_list_for_a_container_with_zero_children(
@@ -19610,6 +19631,11 @@ ARGPARSE_USAGE_REFUSALS = [
         id="release-abbreviating-its-outcome",
     ),
     pytest.param(["status", "--js"], "unrecognized arguments: --js", id="status-abbreviating-json"),
+    pytest.param(
+        ["board", "--html"],
+        "unrecognized arguments: --html",
+        id="board-naming-the-retired-html-flag",
+    ),
     pytest.param(
         ["release", "42", "--merged", "--jso"],
         "unrecognized arguments: --jso",
