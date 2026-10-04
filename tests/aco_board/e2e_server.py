@@ -1,11 +1,12 @@
 """The real board server behind a fake `aco`, for Playwright's E2E harness.
 
 `frontend/e2e/global-setup.ts` spawns this as `uv run python
-tests/aco_board/e2e_server.py` and launches the Vite dev server's `/api`
-proxy against the port it prints. It speaks the same protocol a live
-`aco-board serve` does (`aco_board.server.start_board`), so a spec drives the
-real wire form (`specs/aco-board.spec.md` ABRD-08/09/21) end to end -- the
-only thing fake is `aco` itself (`aco_board_fixtures.install_fake_aco`).
+tests/aco_board/e2e_server.py` and points every spec straight at the port it
+prints -- no dev server, no proxy: it serves the same committed, built SPA a
+live `aco-board serve` does. It speaks the same protocol, too
+(`aco_board.server.start_board`), so a spec drives the real wire form
+(`specs/aco-board.spec.md` ABRD-08/09/21) end to end -- the only thing fake
+is `aco` itself (`aco_board_fixtures.install_fake_aco`).
 
 One line of JSON on stdout once the server is listening:
 `{"host", "port", "token", "repo_directory"}`. The repo directory lets a spec
@@ -52,7 +53,7 @@ def main() -> None:
     ready = {
         "host": served.hostname,
         "port": served.port,
-        "token": parse_qs(served.query)["t"][0],
+        "token": parse_qs(served.fragment)["t"][0],
         "repo_directory": str(repository.directory),
     }
     print(json.dumps(ready), flush=True)

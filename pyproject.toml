@@ -96,12 +96,13 @@ containers = ["aco_board"]
 exhaustive = true
 # Issue #617: the board's rules (`board`) know only the port, never the aco
 # adapter; the two are independent neighbours that `cli` wires together, and
-# the transport (`server`, `page`, `api`) reaches the rules only through
-# `board`. `page` (legacy HTML) and `api` (JSON wire form) are independent.
+# the transport (`server`, `static`, `api`) reaches the rules only through
+# `board`. `static` (the built SPA shell) and `api` (JSON wire form) are
+# independent (issue #652).
 layers = [
     "cli",
     "server",
-    "page | api",
+    "api | static",
     "board | aco_cli",
     "ports",
 ]
@@ -109,10 +110,10 @@ layers = [
 [[tool.importlinter.contracts]]
 name = "Decision board transport does not reach the aco adapter"
 type = "forbidden"
-# The layers contract alone lets `server`, `page`, and `api` import
+# The layers contract alone lets `server`, `static`, and `api` import
 # `aco_cli`, which sits below them; only `cli` may wire the adapter in
 # (issue #617).
-source_modules = ["aco_board.server", "aco_board.page", "aco_board.api"]
+source_modules = ["aco_board.server", "aco_board.static", "aco_board.api"]
 forbidden_modules = ["aco_board.aco_cli"]
 allow_indirect_imports = false
 

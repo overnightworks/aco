@@ -1,6 +1,6 @@
 import { rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './consoleGuard';
 import { readBoardRuntime } from './runtime';
 
 const EMPTY_BOARD_MESSAGE =

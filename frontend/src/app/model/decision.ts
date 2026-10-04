@@ -9,8 +9,8 @@
 import type { DecisionRequest, DecisionResult, ExpectationLine, Outcome } from '../../types';
 
 export const UNDO_SECONDS = 8;
-/** Mirrors `UNDO_SECONDS` in `src/aco_board/page.py`: both surfaces give the
- * operator the same window to change their mind before a decision writes. */
+/** The operator's window to change their mind before a decision writes; the
+ * SPA is this value's one owner. */
 
 export const NOTE_MAX_LENGTH = 280;
 /** Mirrors `NOTE_MAX_LENGTH` in `src/aco_board/ports.py` (ABRD-05); the
@@ -20,8 +20,7 @@ export const NOTE_MAX_LENGTH = 280;
 export const ALREADY_RULED_MESSAGE =
 	'Schon entschieden: diese Zeile wurde inzwischen woanders entschieden.';
 /** `aco rule`'s own already-ruled sentence (RULE-04) is written for a command
- * line; this is the board's own operator-facing copy, the same one
- * `src/aco_board/page.py` shows for the identical case. */
+ * line; this is the SPA's own operator-facing copy for the identical case. */
 
 export const LINE_CHANGED_MESSAGE = 'Diese Zeile hat sich geändert, bitte neu laden';
 /** The exact refusal `board.py`'s `LINE_CHANGED` sends for ABRD-02: a public

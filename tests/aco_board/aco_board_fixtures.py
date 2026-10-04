@@ -22,9 +22,8 @@ import sys
 import threading
 from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from email.message import Message
-from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -314,34 +313,11 @@ class BoardClient:
         split = urlsplit(url)
         assert split.hostname is not None
         assert split.port is not None
-        return cls(split.hostname, split.port, parse_qs(split.query)["t"][0], repos)
+        return cls(split.hostname, split.port, parse_qs(split.fragment)["t"][0], repos)
 
-    def get_page(self, token: str | None = None) -> Response:
-        presented = self.token if token is None else token
-        return self._request("GET", f"/?t={presented}")
-
-    def get_page_without_token(self) -> Response:
+    def get_shell(self) -> Response:
+        """`GET /`, the SPA shell every board answers with, no token needed."""
         return self._request("GET", "/")
-
-    def decide(
-        self,
-        card: Card,
-        outcome: str,
-        *,
-        note: str | None = None,
-        token: str | None = None,
-    ) -> Response:
-        """Post `outcome` for `card` the way the page script posts a click."""
-        payload = {
-            "token": self.token if token is None else token,
-            "repo": card.repo,
-            "item": card.item,
-            "line": card.line,
-            "fingerprint": card.fingerprint,
-            "outcome": outcome,
-            "note": note,
-        }
-        return self.post_raw(json.dumps(payload))
 
     def send_raw(self, request: bytes) -> bytes:
         """Send bytes as they are, beneath any HTTP client's own checks."""
@@ -397,9 +373,6 @@ class BoardClient:
     def _connection(self) -> socket.socket:
         return socket.create_connection((self.host, self.port), timeout=30)
 
-    def post_raw(self, body: str) -> Response:
-        return self._request("POST", "/rule", body)
-
     def call_api(
         self,
         method: str,
@@ -417,7 +390,13 @@ class BoardClient:
         return self.call_api("GET", "/api/board", presented=self.token)
 
     def decide_through_api(
-        self, line: Mapping[str, object], item: int, outcome: str, *, repo: str | None = None
+        self,
+        line: Mapping[str, object],
+        item: int,
+        outcome: str,
+        *,
+        repo: str | None = None,
+        note: str | None = None,
     ) -> Response:
         """Post `outcome` for a line exactly as `GET /api/board` listed it."""
         payload = {
@@ -426,7 +405,7 @@ class BoardClient:
             "line": line["index"],
             "fingerprint": line["fingerprint"],
             "outcome": outcome,
-            "note": None,
+            "note": note,
         }
         return self.call_api("POST", "/api/rule", json.dumps(payload), presented=self.token)
 
@@ -448,62 +427,3 @@ class BoardClient:
             )
         finally:
             connection.close()
-
-
-@dataclass
-class Card:
-    item: int
-    line: int
-    fingerprint: str
-    repo: str = DEFAULT_LABEL
-    texts: dict[str, str] = field(default_factory=dict)
-    image_sources: list[str] = field(default_factory=list)
-
-
-class BoardPage(HTMLParser):
-    """The page as a browser would build it: cards, elements, visible text."""
-
-    def __init__(self, html: str) -> None:
-        super().__init__()
-        self.cards: list[Card] = []
-        self.element_names: list[str] = []
-        self.script_count = 0
-        self.empty_state_shown = False
-        self._text_class: str | None = None
-        self._in_card = False
-        self.feed(html)
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        attributes = dict(attrs)
-        self.element_names.append(tag)
-        css_class = attributes.get("class")
-        if tag == "script":
-            self.script_count += 1
-        if tag == "article" and css_class == "card":
-            item, line = attributes.get("data-item"), attributes.get("data-line")
-            fingerprint = attributes.get("data-fingerprint") or ""
-            repo = attributes.get("data-repo") or DEFAULT_LABEL
-            self.cards.append(Card(int(item or 0), int(line or 0), fingerprint, repo))
-            self._in_card = True
-        if tag == "img" and self._in_card:
-            self.cards[-1].image_sources.append(attributes.get("src") or "")
-        if tag == "p" and css_class == "empty" and "hidden" not in attributes:
-            self.empty_state_shown = True
-        self._text_class = css_class if tag == "p" and self._in_card else None
-
-    def handle_data(self, data: str) -> None:
-        if self._text_class is not None:
-            texts = self.cards[-1].texts
-            texts[self._text_class] = texts.get(self._text_class, "") + data
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag == "p":
-            self._text_class = None
-        if tag == "article":
-            self._in_card = False
-
-    def card_keys(self) -> list[tuple[int, int]]:
-        return [(card.item, card.line) for card in self.cards]
-
-    def card(self, item: int, line: int) -> Card:
-        return next(card for card in self.cards if (card.item, card.line) == (item, line))

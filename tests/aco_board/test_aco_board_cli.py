@@ -19,7 +19,6 @@ from typing import Any, cast
 import pytest
 from aco_board_fixtures import (
     BoardClient,
-    BoardPage,
     FakeAcoRepository,
     install_fake_aco,
     line,
@@ -27,7 +26,7 @@ from aco_board_fixtures import (
     row,
 )
 
-from aco_board import cli
+from aco_board import cli, static
 from aco_board.aco_cli import AcoCli
 from aco_board.board import Boards
 from aco_board.ports import Decision, DecisionResult
@@ -109,8 +108,11 @@ def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrup
 
     def look(board: BoardClient) -> None:
         seen.append(board)
-        assert BoardPage(board.get_page().body).card_keys() == [(1, 1)]
-        assert board.get_page_without_token().status == 403
+        shell = board.get_shell()
+        assert shell.status == 200
+        assert shell.headers["Content-Type"] == "text/html; charset=utf-8"
+        [repo] = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
+        assert [item["number"] for item in repo["items"]] == [1]
 
     assert _serve_until_done(monkeypatch, here.directory, look) == 0
     [board] = seen
@@ -237,8 +239,9 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
     with ThreadPoolExecutor(max_workers=1) as clicks:
 
         def click_then_interrupt(board: BoardClient) -> None:
-            card = BoardPage(board.get_page().body).card(42, 1)
-            clicks.submit(board.decide, card, "yes")
+            repos = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
+            repo_name, listed_line = repos[0]["name"], repos[0]["items"][0]["lines"][0]
+            clicks.submit(board.decide_through_api, listed_line, 42, "yes", repo=repo_name)
             assert ruling_entered.wait(_URL_WAIT_SECONDS)
             releaser.start()
 
@@ -282,3 +285,31 @@ def test_serve_refuses_a_port_already_in_use(capsys: pytest.CaptureFixture[str])
         assert cli.main(["serve", "--port", str(busy_port)]) == 1
 
     assert f"cannot listen on {LOOPBACK_HOST}:{busy_port}" in capsys.readouterr().err
+
+
+def test_serve_refuses_to_start_once_the_shell_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """ABRD-25: the check runs before any bind attempt (`start_board` calls
+    `static.ensure_built` first), so a board that cannot start never holds the
+    port it would have used. Proven by keeping the port occupied for the whole
+    call: a bind-then-check implementation would instead fail trying to bind,
+    surfacing the "cannot listen" / address-in-use message (see
+    `test_serve_refuses_a_port_already_in_use`) rather than the asset-missing
+    one asserted below."""
+    missing_root = tmp_path / "unbuilt"
+    monkeypatch.setattr(static, "STATIC_ROOT", missing_root)
+    with socket.socket() as occupant:
+        occupant.bind((LOOPBACK_HOST, 0))
+        occupant.listen()
+        occupied_port = occupant.getsockname()[1]
+
+        exit_code = cli.main(["serve", "--port", str(occupied_port)])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        f"ERROR: {missing_root / 'index.html'} is missing; build the frontend first "
+        "(pnpm --dir frontend install --frozen-lockfile && pnpm --dir frontend build)\n"
+    )

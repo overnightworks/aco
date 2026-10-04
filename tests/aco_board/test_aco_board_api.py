@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -200,6 +202,335 @@ def test_a_line_changed_since_listing_answers_why_without_writing(
     assert repository.rulings_state() == stored_before
 
 
+def test_the_board_reads_fresh_on_every_listing(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    for item, index in [(1, 1), (2, 4)]:
+        repository.set_rulings(row(item, "Changed between loads", line(index, "Open?")))
+
+        [listed_item] = _listed_items(board)
+        [listed_line] = listed_item["lines"]
+        assert (listed_item["number"], listed_line["index"]) == (item, index)
+
+
+def test_the_board_keeps_no_copy_of_a_decision(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    listed_line = _listed_items(board)[0]["lines"][0]
+    board.decide_through_api(listed_line, 42, "yes")
+
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+
+    assert [item["number"] for item in _listed_items(board)] == [42]
+
+
+@pytest.mark.parametrize(
+    ("outcome", "raw_note", "stored_text"),
+    [
+        ("no", "  nur mit Konto  ", "Guests? Anmerkung: nur mit Konto"),
+        ("no", "  --später  ", "Guests? Anmerkung: --später"),
+        ("no", "  -x  ", "Guests? Anmerkung: -x"),
+        ("yes", "   ", "Guests?"),
+    ],
+    ids=["note", "note-looking-like-a-long-option", "note-looking-like-a-short-option", "blank"],
+)
+def test_a_note_is_stored_with_the_ruling(
+    repository: FakeAcoRepository, board: BoardClient, outcome: str, raw_note: str, stored_text: str
+) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    listed_line = _listed_items(board)[0]["lines"][0]
+
+    answer = board.decide_through_api(listed_line, 42, outcome, note=raw_note)
+
+    assert answer.json()["status"] == "ruled"
+    assert repository.stored_line(42, 1)["text"] == stored_text
+
+
+def test_a_failing_aco_rule_keeps_the_line_with_acos_sentence(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository.refuse_rule("unavailable", "the forge rejected the body write")
+    listed_line = _listed_items(board)[0]["lines"][0]
+
+    answer = board.decide_through_api(listed_line, 42, "yes")
+
+    assert answer.json() == {
+        "status": "failed",
+        "message": "aco rule failed: the forge rejected the body write",
+    }
+    assert [item["number"] for item in _listed_items(board)] == [42]
+
+
+def _aco_missing_from_path(
+    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del repository
+    monkeypatch.setenv("PATH", str(tmp_path / "no-aco-here"))
+
+
+def _aco_rulings_unreadable(
+    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del tmp_path, monkeypatch
+    repository.fail_rulings("ERROR: no forge adapter for host")
+
+
+@pytest.mark.parametrize(
+    ("arrange", "message"),
+    [
+        (_aco_missing_from_path, "aco is not installed on PATH"),
+        (_aco_rulings_unreadable, "aco rulings failed: ERROR: no forge adapter for host"),
+    ],
+    ids=["aco-missing-from-path", "aco-rulings-unreadable"],
+)
+def test_a_broken_aco_during_a_decision_keeps_the_line_undecided(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    arrange: Callable[[FakeAcoRepository, Path, pytest.MonkeyPatch], None],
+    message: str,
+) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    listed_line = _listed_items(board)[0]["lines"][0]
+    arrange(repository, tmp_path, monkeypatch)
+
+    answer = board.decide_through_api(listed_line, 42, "yes")
+
+    assert answer.json() == {"status": "failed", "message": message}
+    assert repository.rule_calls() == []
+
+
+@pytest.mark.parametrize(
+    ("stdout", "error"),
+    [
+        ("not json", "aco rulings failed: exit 0 without a message"),
+        ('{"ok": true, "rulings": {}}', "aco rulings --json is unreadable: rulings is not a list"),
+        (
+            '{"ok": true, "rulings": [1]}',
+            "aco rulings --json is unreadable: a rulings row is not an object",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": true, "title": "T", "lines": []}]}',
+            "aco rulings --json is unreadable: number is not a int",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T"}]}',
+            "aco rulings --json is unreadable: #1 lines is not a list",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": [2]}]}',
+            "aco rulings --json is unreadable: #1 has a line that is not an object",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null, "question": 3}]}]}',
+            "aco rulings --json is unreadable: question is not text",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null, "default": "maybe"}]}]}',
+            "aco rulings --json is unreadable: default is not an outcome",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruled_on": null}]}]}',
+            "aco rulings --json is unreadable: #1 line has no ruling",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": null}]}]}',
+            "aco rulings --json is unreadable: #1 line has no ruled_on",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": "perhaps", "ruled_on": "2026-10-01"}]}]}',
+            "aco rulings --json is unreadable: ruling is not an outcome",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "ruling": "yes", "ruled_on": "gestern"}]}]}',
+            "aco rulings --json is unreadable: ruled_on is not a date",
+        ),
+    ],
+    ids=[
+        "not-json",
+        "rulings-not-a-list",
+        "row-not-an-object",
+        "number-not-an-int",
+        "lines-not-a-list",
+        "line-not-an-object",
+        "question-not-text",
+        "default-not-an-outcome",
+        "ruling-missing",
+        "ruled-on-missing",
+        "ruling-not-an-outcome",
+        "ruled-on-not-a-date",
+    ],
+)
+def test_unreadable_rulings_json_answers_502_with_why(
+    repository: FakeAcoRepository, board: BoardClient, stdout: str, error: str
+) -> None:
+    repository.answer_rulings_with(stdout)
+
+    response = board.get_board_json()
+
+    assert response.status == 502
+    assert response.json() == {"repos": [{"name": DEFAULT_LABEL, "error": error, "items": []}]}
+
+
+def test_a_hung_aco_rule_keeps_the_line_undecided(repository: FakeAcoRepository) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository.delay("rule", 30)
+
+    with serving(AcoCli(directory=repository.directory, timeout_seconds=5)) as board:
+        listed_line = _listed_items(board)[0]["lines"][0]
+        answer = board.decide_through_api(listed_line, 42, "yes")
+        listed_after = _listed_items(board)
+
+    assert answer.json() == {
+        "status": "failed",
+        "message": "aco rule did not answer within 5 seconds",
+    }
+    assert [item["number"] for item in listed_after] == [42]
+
+
+@pytest.mark.parametrize(
+    ("item", "index", "sentence"),
+    [
+        (42, 9, "line 9 out of range: this item has 1 expectation line(s)"),
+        (99, 1, "#99 does not exist"),
+    ],
+    ids=["unknown-line", "unknown-item"],
+)
+def test_a_line_aco_does_not_know_is_refused_with_acos_sentence(
+    repository: FakeAcoRepository, board: BoardClient, item: int, index: int, sentence: str
+) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    state_before = repository.rulings_state()
+    payload = {
+        "repo": board.repo,
+        "item": item,
+        "line": index,
+        "fingerprint": "never rendered",
+        "outcome": "yes",
+        "note": None,
+    }
+
+    answer = board.call_api("POST", "/api/rule", json.dumps(payload), presented=board.token)
+
+    assert answer.json() == {"status": "failed", "message": f"aco rule failed: {sentence}"}
+    assert repository.rulings_state() == state_before
+
+
+_SHOWN_FIELDS = {
+    "title": "Share page",
+    "text": "Guests may comment.",
+    "question": "Darf Ben kommentieren?",
+    "example": "Ben schreibt",
+    "picture": '<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4"/></svg>',
+    "default": "yes",
+}
+
+
+def _shown_row(**changes: str) -> dict[str, object]:
+    card = {**_SHOWN_FIELDS, **changes}
+    title, text = card.pop("title"), card.pop("text")
+    return row(42, title, line(1, text, **card))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"title": "Share link"},
+        {"text": "Guests may delete."},
+        {"question": "Darf Ben löschen?"},
+        {"example": "Ben löscht"},
+        {"picture": '<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>'},
+        {"default": "no"},
+    ],
+    ids=["title", "text", "question", "example", "picture", "default"],
+)
+def test_a_line_whose_shown_field_changed_is_refused_without_writing(
+    repository: FakeAcoRepository, board: BoardClient, change: dict[str, str]
+) -> None:
+    repository.set_rulings(_shown_row())
+    listed_line = _listed_items(board)[0]["lines"][0]
+    repository.set_rulings(_shown_row(**change))
+    state_before = repository.rulings_state()
+
+    answer = board.decide_through_api(listed_line, 42, "yes")
+
+    assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
+    assert repository.rule_calls() == []
+    assert repository.rulings_state() == state_before
+
+
+@pytest.mark.parametrize("twin", [(43, 1), (42, 2)], ids=["item", "index"])
+def test_a_twin_line_with_the_same_words_is_refused_without_writing(
+    repository: FakeAcoRepository, board: BoardClient, twin: tuple[int, int]
+) -> None:
+    repository.set_rulings(
+        row(42, "Share page", line(1, "Guests?"), line(2, "Guests?")),
+        row(43, "Share page", line(1, "Guests?")),
+    )
+    twin_item, twin_index = twin
+    twin_line = next(
+        listed_line
+        for item in _listed_items(board)
+        if item["number"] == twin_item
+        for listed_line in item["lines"]
+        if listed_line["index"] == twin_index
+    )
+    state_before = repository.rulings_state()
+    payload = {
+        "repo": board.repo,
+        "item": 42,
+        "line": 1,
+        "fingerprint": twin_line["fingerprint"],
+        "outcome": "yes",
+        "note": None,
+    }
+
+    answer = board.call_api("POST", "/api/rule", json.dumps(payload), presented=board.token)
+
+    assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
+    assert repository.rule_calls() == []
+    assert repository.rulings_state() == state_before
+
+
+@pytest.mark.parametrize(
+    ("clicked_lines", "statuses"),
+    [((1, 2), ["ruled", "ruled"]), ((1, 1), ["already_ruled", "ruled"])],
+    ids=["distinct-lines-both-stored", "same-line-stored-once"],
+)
+def test_simultaneous_decisions_on_one_item_are_each_written_in_turn(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    clicked_lines: tuple[int, int],
+    statuses: list[str],
+) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?"), line(2, "Links?")))
+    listed = _listed_items(board)[0]["lines"]
+    clicked = [listed[index - 1] for index in clicked_lines]
+    # Each `aco rule` waits between reading and rewriting the body, so two
+    # unserialized writes would overlap and the later one would drop the first.
+    repository.delay("rule", 0.3)
+
+    with ThreadPoolExecutor(max_workers=2) as clicks:
+        answers = list(
+            clicks.map(
+                lambda listed_line: board.decide_through_api(listed_line, 42, "yes"), clicked
+            )
+        )
+
+    assert sorted(str(answer.json()["status"]) for answer in answers) == statuses
+    for index in set(clicked_lines):
+        assert repository.stored_line(42, index)["ruling"] == "yes"
+
+
 @pytest.mark.parametrize("presented", [None, "wrong", "ä" * 43], ids=["none", "wrong", "latin-1"])
 @pytest.mark.parametrize(
     ("method", "path", "body"),
@@ -249,16 +580,30 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
     ("body", "headers", "error"),
     [
         ("not json", {}, "bad request: decision"),
+        ("[1, 2, 3]", {}, "bad request: decision"),
         (_decision_body(outcome="maybe"), {}, "bad request: decision"),
+        (_decision_body(outcome=["yes"]), {}, "bad request: decision"),
+        (_decision_body(item=True), {}, "bad request: decision"),
         (_decision_body(line=0), {}, "bad request: decision"),
+        (_decision_body(fingerprint=None), {}, "bad request: decision"),
+        (_decision_body(note=7), {}, "bad request: decision"),
+        (_decision_body(note="\ud800"), {}, "bad request: decision"),
+        (_decision_body(note="nul\u0000byte"), {}, "bad request: decision"),
         (_decision_body(note="x" * (NOTE_MAX_LENGTH + 1)), {}, "bad request: decision"),
         (_decision_body(repo="other-repo"), {}, "bad request: decision"),
         ("{}", {"Content-Length": "abc"}, "bad request: Content-Length"),
     ],
     ids=[
         "not-json",
+        "json-not-an-object",
         "outcome-unknown",
+        "outcome-not-text",
+        "item-true",
         "line-zero",
+        "no-fingerprint",
+        "note-not-text",
+        "note-lone-surrogate",
+        "note-nul",
         "note-too-long",
         "repo-unknown",
         "content-length",
@@ -507,8 +852,8 @@ def test_a_decision_only_writes_the_repo_its_fingerprint_was_read_from(
         ("PUT", "/api/rule", _decision_body(), True, 405, "application/json", "POST"),
         ("HEAD", "/api/board", None, False, 403, "application/json", None),
         ("HEAD", "/api/board", None, True, 405, "application/json", "GET"),
-        ("GET", "/?t={token}", None, False, 200, "text/html; charset=utf-8", None),
-        ("GET", "/", None, False, 403, "text/plain; charset=utf-8", None),
+        ("GET", "/", None, False, 200, "text/html; charset=utf-8", None),
+        ("GET", "/assets/index.js", None, False, 200, "text/javascript; charset=utf-8", None),
         ("PUT", "/", None, False, 405, "text/plain; charset=utf-8", "GET"),
     ],
     ids=[
@@ -522,9 +867,9 @@ def test_a_decision_only_writes_the_repo_its_fingerprint_was_read_from(
         "api-put-not-allowed",
         "api-head-forbidden",
         "api-head-not-allowed",
-        "legacy-page",
-        "legacy-forbidden",
-        "legacy-put-not-allowed",
+        "shell-needs-no-token",
+        "asset-needs-no-token",
+        "shell-put-not-allowed",
     ],
 )
 def test_every_answer_is_uncached_unreferred_framed_by_none_and_never_cross_origin(

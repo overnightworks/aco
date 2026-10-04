@@ -1,10 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * No `webServer` here: the app and its API target are both ephemeral and
- * assigned together (`frontend/e2e/global-setup.ts` starts the fake board
- * server, then points a Vite dev server's `/api` proxy at it). A single
- * worker keeps every spec driving the one shared server sequentially.
+ * No `webServer` here: the app itself is ephemeral
+ * (`frontend/e2e/global-setup.ts` starts the real board server, which
+ * answers both the SPA and its API from one port -- no dev server, no
+ * proxy). A single worker keeps every spec driving that one shared server
+ * sequentially.
  */
 export default defineConfig({
 	testDir: './e2e',

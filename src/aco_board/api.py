@@ -18,6 +18,14 @@ from .ports import NOTE_MAX_LENGTH, Decision, DecisionResult, ExpectationLine, O
 
 JSON_CONTENT_TYPE = "application/json"
 
+_VALID_OUTCOME_VALUES = frozenset(
+    outcome.value for outcome in (Outcome.YES, Outcome.NO, Outcome.LATER)
+)
+"""The three outcomes a posted decision may name, spelled out by name rather
+than taken from a generic `Outcome` iteration: this is the one place that
+decides which wire values are valid, so it is also the one place every
+member needs to be named."""
+
 
 @dataclass(frozen=True)
 class DecisionRequest:
@@ -73,19 +81,12 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
         and _is_position(item)
         and _is_position(line)
         and isinstance(outcome, str)
-        and outcome in {member.value for member in Outcome}
+        and outcome in _VALID_OUTCOME_VALUES
         and (note is None or _is_note_text(note))
     ):
         decision = Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
         return DecisionRequest(repo=repo, fingerprint=fingerprint, decision=decision)
     return None
-
-
-def legacy_body_token(raw: bytes) -> str | None:
-    """The access token the legacy `POST /rule` carries in its body, if it is text."""
-    fields = _json_object(raw)
-    token = fields.get("token") if fields is not None else None
-    return token if isinstance(token, str) else None
 
 
 def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:

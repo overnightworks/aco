@@ -8,12 +8,12 @@ function renderList(
 	overrides: { selectedKey?: string | null } = {}
 ) {
 	const onSelect = vi.fn();
-	render(TrackList, {
+	const rendered = render(TrackList, {
 		repos,
 		selectedKey: overrides.selectedKey ?? null,
 		onSelect
 	});
-	return { onSelect };
+	return { onSelect, container: rendered.container };
 }
 
 test('an item title stands once as a group header, its lines below it', () => {
@@ -41,6 +41,26 @@ test('a ruled line shows its outcome and date instead of a recommendation', () =
 	]);
 
 	expect(screen.getByText('Nein · 2026-10-01')).toBeInTheDocument();
+});
+
+test('hostile item title, line text, repo label and error text is shown as text, never as markup', () => {
+	const hostileTitle = '<script>alert(1)</script>';
+	const hostileText = '"><img src=x onerror=alert(2)>';
+	const hostileName = '<svg onload=alert(3)>';
+	const hostileError = '<img src=x onerror=alert(4)>';
+	const { container } = renderList([
+		repo({ name: hostileName, error: hostileError, items: [] }),
+		repo({
+			name: 'clean',
+			items: [item({ number: 42, title: hostileTitle, lines: [line({ text: hostileText })] })]
+		})
+	]);
+
+	expect(screen.getByRole('alert')).toHaveTextContent(`${hostileName}: ${hostileError}`);
+	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(`#42 ${hostileTitle}`);
+	expect(screen.getByText(hostileText)).toBeInTheDocument();
+	expect(container.querySelectorAll('script, img, svg')).toHaveLength(0);
+	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
 test('a failed repo shows its error sentence instead of its items', () => {

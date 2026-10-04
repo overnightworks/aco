@@ -1,16 +1,16 @@
 """The board's loopback HTTP transport.
 
-Binds `127.0.0.1` only -- there is no host option -- and answers only a
-request carrying the per-start access token. The JSON API under `/api/`
-takes it in exactly one `X-Board-Token` header and checks it before any
-other work, whatever the method: `GET /api/board` answers every line from a
-fresh read of the decision source, `POST /api/rule` submits one decision,
-and every other method is refused. The legacy page takes it as
-`GET /?t=TOKEN` and in the body of `POST /rule`. A malformed or stalled
-request gets a fixed 4xx answer, never a traceback; every answer, the HTTP
-layer's own refusals included, carries the same guard headers, and none
-carries a cross-origin header, so a page from another origin can never read
-one.
+Binds `127.0.0.1` only -- there is no host option. `/` and `/assets/**`
+deliver the SPA shell and its built assets (`static.py`) to anyone on the
+loopback interface, carrying no decision data, so they need no token; the
+JSON API under `/api/` takes the per-start access token in exactly one
+`X-Board-Token` header and checks it before any other work, whatever the
+method: `GET /api/board` answers every line from a fresh read of the
+decision source, `POST /api/rule` submits one decision, and every other
+method is refused. A malformed or stalled request gets a fixed 4xx answer,
+never a traceback; every answer, the HTTP layer's own refusals included,
+carries the same guard headers, and none carries a cross-origin header, so a
+page from another origin can never read one.
 """
 
 from __future__ import annotations
@@ -26,16 +26,15 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BufferedIOBase
 from typing import cast
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
-from . import api, page
+from . import api, static
 from .board import Boards, all_repos_unavailable
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"
 TOKEN_HEADER = "X-Board-Token"
 PAGE_PATH = "/"
-RULE_PATH = "/rule"
 API_PREFIX = "/api/"
 API_BOARD_PATH = "/api/board"
 API_RULE_PATH = "/api/rule"
@@ -49,14 +48,29 @@ _SERVED_METHODS = frozenset({"GET", "POST"})
 _DEFAULT_ALLOW = ", ".join(sorted(_SERVED_METHODS))
 _ALLOWED_METHODS_BY_PATH = {
     PAGE_PATH: "GET",
-    RULE_PATH: "POST",
     API_BOARD_PATH: "GET",
     API_RULE_PATH: "POST",
 }
-"""The one method each known route serves, for a 405's `Allow` header; a path
-outside this table still lives under a method the board serves at all, so it
-advertises every method (`_DEFAULT_ALLOW`)."""
+"""The one method each known fixed route serves, for a 405's `Allow` header;
+an asset path (every filename under `static.ASSETS_PREFIX`) is handled
+alongside these in `_allowed_methods`, and a path outside both still lives
+under a method the board serves at all, so it advertises every method
+(`_DEFAULT_ALLOW`)."""
 _TEXT_CONTENT_TYPE = "text/plain; charset=utf-8"
+CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; script-src 'self'; img-src data:; connect-src 'self'; "
+    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+)
+"""The shell's one script loads from `/assets/index.js`, never inline, and a
+line's picture is only ever an `<img>` data URI -- neither needs a nonce."""
+
+
+def _allowed_methods(path: str) -> str:
+    if path == PAGE_PATH or path.startswith(static.ASSETS_PREFIX):
+        return "GET"
+    return _ALLOWED_METHODS_BY_PATH.get(path, _DEFAULT_ALLOW)
+
+
 _MAX_REQUEST_BYTES = 16 * 1024
 """A decision is two numbers, an outcome, a fingerprint, and a short note;
 anything larger is refused before it is read."""
@@ -121,11 +135,18 @@ def start_board(
     *,
     request_deadline_seconds: float = REQUEST_DEADLINE_SECONDS,
 ) -> RunningBoard:
-    """Bind `127.0.0.1:port` (0 picks a free port) with a fresh token."""
+    """Bind `127.0.0.1:port` (0 picks a free port) with a fresh token.
+
+    Raises `static.StaticAssetsMissingError` before binding if the frontend
+    was never built, rather than start a board that can only answer its API.
+    """
+    static.ensure_built()
     token = secrets.token_urlsafe(32)
     httpd = _BoardServer(port, token, boards, request_deadline_seconds)
     bound_port = httpd.server_address[1]
-    url = f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}?{TOKEN_FIELD}={token}"
+    # A fragment, not a query: the browser never sends it back to the server,
+    # so the shell at `PAGE_PATH` needs no token to answer it (ABRD-10).
+    url = f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}#{TOKEN_FIELD}={token}"
     return RunningBoard(httpd=httpd, url=url)
 
 
@@ -181,37 +202,37 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
     def _respond(
         self,
         status: HTTPStatus,
-        body: str,
+        body: bytes,
         content_type: str,
         *,
-        nonce: str | None = None,
         allow: str | None = None,
     ) -> None:
-        encoded = body.encode("utf-8")
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Content-Length", str(len(body)))
             if allow is not None:
                 self.send_header("Allow", allow)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Referrer-Policy", "no-referrer")
-            self.send_header("Content-Security-Policy", page.content_security_policy(nonce))
+            self.send_header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
             self.end_headers()
             if self.command != "HEAD":
-                self.wfile.write(encoded)
+                self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) as error:
             raise _ClientDisconnectedError from error
 
     def _refuse_as_text(
         self, status: HTTPStatus, sentence: str, *, allow: str | None = None
     ) -> None:
-        self._respond(status, sentence, _TEXT_CONTENT_TYPE, allow=allow)
+        self._respond(status, sentence.encode("utf-8"), _TEXT_CONTENT_TYPE, allow=allow)
 
     def _refuse_as_json(
         self, status: HTTPStatus, sentence: str, *, allow: str | None = None
     ) -> None:
-        self._respond(status, api.error_json(sentence), api.JSON_CONTENT_TYPE, allow=allow)
+        self._respond(
+            status, api.error_json(sentence).encode("utf-8"), api.JSON_CONTENT_TYPE, allow=allow
+        )
 
     def parse_request(self) -> bool:
         """Answer a method the board does not serve here, so the stdlib never
@@ -223,7 +244,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         # Its body, if any, stays unread, so the connection cannot carry on.
         self.close_connection = True
         path = urlsplit(self.path).path
-        allow = _ALLOWED_METHODS_BY_PATH.get(path, _DEFAULT_ALLOW)
+        allow = _allowed_methods(path)
         if path.startswith(API_PREFIX):
             self._answer_api(lambda: self._refuse_method(allow))
         else:
@@ -248,41 +269,30 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         if split.path.startswith(API_PREFIX):
             self._answer_api(self._get_board if split.path == API_BOARD_PATH else None)
             return
-        if split.path != PAGE_PATH:
-            self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
+        if split.path == PAGE_PATH:
+            served = static.shell()
+            self._respond(HTTPStatus.OK, served.content, served.content_type)
             return
-        tokens = parse_qs(split.query).get(TOKEN_FIELD)
-        if not self._authorized(tokens[0] if tokens else None):
-            self._refuse_as_text(HTTPStatus.FORBIDDEN, _FORBIDDEN)
+        if split.path.startswith(static.ASSETS_PREFIX):
+            asset = static.asset(split.path)
+            if asset is None:
+                self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
+                return
+            self._respond(HTTPStatus.OK, asset.content, asset.content_type)
             return
-        nonce = secrets.token_urlsafe(16)
-        readings = self._server().boards.snapshot()
-        status = HTTPStatus.BAD_GATEWAY if all_repos_unavailable(readings) else HTTPStatus.OK
-        rendered = page.render_board(readings, nonce)
-        self._respond(status, rendered, page.HTML_CONTENT_TYPE, nonce=nonce)
+        self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
         if path.startswith(API_PREFIX):
             self._answer_api(self._post_rule if path == API_RULE_PATH else None)
             return
-        if path != RULE_PATH:
-            self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
+        if path == PAGE_PATH or path.startswith(static.ASSETS_PREFIX):
+            self._refuse_as_text(
+                HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED, allow=_allowed_methods(path)
+            )
             return
-        raw = self._read_body(self._refuse_as_text)
-        if raw is None:
-            return
-        request, token = api.parse_decision_request(raw), api.legacy_body_token(raw)
-        if request is None or token is None:
-            self._refuse_as_text(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
-            return
-        if not self._authorized(token):
-            self._refuse_as_text(HTTPStatus.FORBIDDEN, _FORBIDDEN)
-            return
-        if not self._repo_known(request.repo):
-            self._refuse_as_text(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
-            return
-        self._decide(request)
+        self._refuse_as_text(HTTPStatus.NOT_FOUND, _NOT_FOUND)
 
     def _answer_api(self, route: Callable[[], None] | None) -> None:
         """Check the header token before anything else -- the path, the body,
@@ -307,7 +317,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
     def _get_board(self) -> None:
         readings = self._server().boards.snapshot()
         status = HTTPStatus.BAD_GATEWAY if all_repos_unavailable(readings) else HTTPStatus.OK
-        self._respond(status, api.board_json(readings), api.JSON_CONTENT_TYPE)
+        self._respond(status, api.board_json(readings).encode("utf-8"), api.JSON_CONTENT_TYPE)
 
     def _post_rule(self) -> None:
         raw = self._read_body(self._refuse_as_json)
@@ -345,7 +355,9 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
 
     def _decide(self, request: api.DecisionRequest) -> None:
         result = self._server().boards.decide(request.repo, request.decision, request.fingerprint)
-        self._respond(HTTPStatus.OK, api.decision_result_json(result), api.JSON_CONTENT_TYPE)
+        self._respond(
+            HTTPStatus.OK, api.decision_result_json(result).encode("utf-8"), api.JSON_CONTENT_TYPE
+        )
 
     def log_message(self, format: str, *_args: object) -> None:
         # The default request log would print the page URL, token included,

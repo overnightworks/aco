@@ -12,6 +12,7 @@ from pathlib import Path
 from .aco_cli import AcoCli
 from .board import Board, Boards
 from .server import LOOPBACK_HOST, start_board
+from .static import StaticAssetsMissingError
 
 _HIGHEST_PORT = 65535
 
@@ -106,6 +107,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"ERROR: cannot listen on {LOOPBACK_HOST}:{arguments.port}: {error.strerror}",
             file=sys.stderr,
         )
+        return 1
+    except StaticAssetsMissingError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
         return 1
     print(running.url, flush=True)
     try:

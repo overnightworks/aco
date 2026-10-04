@@ -11,7 +11,8 @@ set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
+serve_pid=""
+trap '[[ -n "$serve_pid" ]] && kill "$serve_pid" 2>/dev/null; rm -rf "$scratch"' EXIT
 out_dir="${1:-$scratch/dist}"
 
 if [[ -n "$(ls -A "$out_dir" 2>/dev/null)" ]]; then
@@ -35,7 +36,7 @@ UV_PYTHON="$(uv python find)"
 export UV_PYTHON
 tool_path="$scratch/path"
 mkdir -p "$tool_path"
-for tool in uv unzip tar gzip grep sed sort diff rm; do
+for tool in uv unzip tar gzip grep sed sort diff rm sleep head cat; do
     ln -s "$(command -v "$tool")" "$tool_path/$tool"
 done
 export PATH="$tool_path"
@@ -107,3 +108,31 @@ from importlib.resources import files
 sys.exit(0 if files('aco_board').joinpath('static/index.html').is_file() else 1)
 "
 echo "importlib.resources finds aco_board/static/index.html"
+
+# Proves the installed tool actually answers the shell over HTTP -- the
+# importlib.resources check above only proves the file ships, not that
+# `aco-board serve` can reach it.
+serve_log="$scratch/serve.log"
+"$scratch/bin/aco-board" serve --port 0 --repo "$scratch" >"$serve_log" 2>&1 &
+serve_pid=$!
+for ((attempt = 0; attempt < 50; attempt++)); do
+    [[ -s "$serve_log" ]] && break
+    sleep 0.1
+done
+served_url="$(head -n1 "$serve_log")"
+if [[ -z "$served_url" ]]; then
+    echo "ERROR: aco-board serve printed no URL; log:" >&2
+    cat "$serve_log" >&2
+    exit 1
+fi
+uv run --isolated --no-project python -c "
+import sys, urllib.request
+url = '$served_url'.split('#', 1)[0]
+with urllib.request.urlopen(url, timeout=5) as response:
+    body = response.read()
+    ok = response.status == 200 and response.headers.get('Content-Type', '').startswith('text/html')
+    sys.exit(0 if ok and b'<div id=\"app\">' in body else 1)
+"
+kill "$serve_pid" 2>/dev/null || true
+serve_pid=""
+echo "aco-board serve answers / over HTTP"

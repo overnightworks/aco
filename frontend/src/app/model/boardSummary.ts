@@ -39,21 +39,20 @@ export function lineStatusText(line: ExpectationLine): string {
 }
 
 /** The stage's heading: the tapped question, or the line's own sentence when
- * the source names no distinct question (mirrors `aco_board.page._card`). */
+ * the source names no distinct question. */
 export function cardHeading(line: ExpectationLine): string {
 	return line.question ?? line.text;
 }
 
 /** The stage's own sentence, shown only when a distinct question already
  * carries the heading -- never duplicated when the sentence *is* the
- * heading (mirrors `aco_board.page._card`). */
+ * heading. */
 export function cardSentence(line: ExpectationLine): string | null {
 	return line.question !== null ? line.text : null;
 }
 
-/** An SVG picture as a data URI, the same embedding `aco_board.page._picture`
- * uses: a browser never runs script inside an image, so this is the only way
- * a line's `picture` field reaches the DOM. */
+/** An SVG picture as a data URI: a browser never runs script inside an
+ * image, so this is the only way a line's `picture` field reaches the DOM. */
 export function pictureDataUri(svg: string): string {
 	const bytes = new TextEncoder().encode(svg);
 	const binary = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
