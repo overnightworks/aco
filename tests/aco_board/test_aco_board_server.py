@@ -25,6 +25,7 @@ from aco_board_fixtures import (
     line,
     row,
     serving,
+    serving_two,
 )
 
 from aco_board.aco_cli import AcoCli
@@ -423,6 +424,37 @@ def test_a_card_shown_for_another_line_with_the_same_words_is_refused_without_wr
 
 
 @pytest.mark.parametrize(
+    ("target_repo", "expected_status", "expected_message"),
+    [("a", "ruled", None), ("b", "failed", LINE_CHANGED)],
+    ids=["its-own-repo", "a-different-repo-with-an-identical-card"],
+)
+def test_a_legacy_decision_only_writes_the_repo_its_fingerprint_was_read_from(
+    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+    target_repo: str,
+    expected_status: str,
+    expected_message: str | None,
+) -> None:
+    """ABRD-21: the legacy `/rule` route binds a card's fingerprint to its own
+    repo exactly like `/api/rule` (issue #637)."""
+    repository_a, repository_b = two_repositories
+    identical_card = row(42, "Share page", line(1, "Guests?"))
+    repository_a.set_rulings(identical_card)
+    repository_b.set_rulings(identical_card)
+
+    with serving_two(two_repositories) as board:
+        card_in_a = next(card for card in _page(board).cards if card.repo == "a")
+        card_in_a.repo = target_repo
+
+        answer = board.decide(card_in_a, "yes")
+
+    assert answer.json() == {"status": expected_status, "message": expected_message}
+    assert repository_a.rule_calls() == (
+        [["rule", "42", "--line", "1", "--yes", "--json"]] if target_repo == "a" else []
+    )
+    assert repository_b.rule_calls() == []
+
+
+@pytest.mark.parametrize(
     ("clicked_lines", "statuses"),
     [((1, 2), ["ruled", "ruled"]), ((1, 1), ["already_ruled", "ruled"])],
     ids=["distinct-lines-both-stored", "same-line-stored-once"],
@@ -775,8 +807,11 @@ def test_a_picture_is_embedded_only_as_an_image_never_as_markup(
 
 
 def test_text_from_aco_is_shown_as_text_never_as_markup(
-    repository: FakeAcoRepository, board: BoardClient
+    repository: FakeAcoRepository,
 ) -> None:
+    """Also covers a hostile repo label (issue #637 follow-up): `ABRD-14`
+    labels a repo from a directory name, which a filesystem lets hold markup
+    just as freely as a line's own text."""
     repository.set_rulings(
         row(
             42,
@@ -784,10 +819,15 @@ def test_text_from_aco_is_shown_as_text_never_as_markup(
             line(1, '<img src=x onerror="alert(1)">', example="<script>x</script>"),
         )
     )
+    hostile_label = "<script>alert(3)</script>"
 
-    page = BoardPage(board.get_page().body)
+    with serving(AcoCli(directory=repository.directory), label=hostile_label) as client:
+        response = client.get_page()
+        page = BoardPage(response.body)
 
     [card] = page.cards
     assert card.texts["question"] == '<img src=x onerror="alert(1)">'
     assert card.image_sources == []
+    assert card.repo == hostile_label
     assert page.script_count == 1
+    assert hostile_label not in response.body

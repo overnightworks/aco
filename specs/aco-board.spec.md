@@ -30,6 +30,7 @@ the resolved directory's name.
 | every configured repo's `aco rulings` fails or hangs | ABRD-20 | ABRD-20 |
 | an `/api/` request without the right token | ABRD-10 | ABRD-10 |
 | a decision naming a repo outside the configured ones | — | ABRD-16 |
+| a card's fingerprint submitted against a different configured repo | — | ABRD-21 |
 
 ## Writing a decision
 
@@ -52,6 +53,7 @@ the resolved directory's name.
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running `aco rule` in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
 - [ ] [ABRD-19] A `--repo` path that is not a directory is a usage error; two resolved paths with the same label refuse the start with `ERROR: two repositories named <repo>: <p1>, <p2>`.
+- [ ] [ABRD-21] A card's fingerprint binds the `repo` it was read under; posted against another configured repo, identical content included, it is refused like a changed line (see E-ABRD-07).
 
 ## The JSON API
 
@@ -70,6 +72,7 @@ the resolved directory's name.
 - No answer carries an `Access-Control-*` header, so a page from another origin can neither read an answer nor send the token header (ABRD-10).
 - A missing `default` key is never unreadable: a line from an aco whose RUL-10 rows do not yet carry that field has no recommended outcome.
 - The board never resolves a repo label from a request into a path: a label is only ever a lookup key among the repos `--repo` configured at start (ABRD-16).
+- A card's fingerprint never satisfies another configured repo's check, even with identical line content: it binds the repo label it was read under (ABRD-21).
 
 ## Examples
 
@@ -153,13 +156,15 @@ Had `a`'s fake-aco failed too, the answer would be 502 with the same two-entry `
 
 ### E-ABRD-07 -- a decision routes only into its named repo
 
-Setup: `aco-board serve --repo a --repo b`; repo `a`'s fake-aco lists item `#42` with one open line `Guests?`; repo `b` has no open lines
+Setup: `aco-board serve --repo a --repo b`; repo `a` and repo `b`'s fake-acos each list an identical item `#42` with one open line `Guests?`
 
 ```text
 request: POST /api/rule, header X-Board-Token: <start token>
-body: {"repo": "a", "item": 42, "line": 1, "fingerprint": "<as listed>", "outcome": "yes", "note": null}
+body: {"repo": "a", "item": 42, "line": 1, "fingerprint": "<as listed in a>", "outcome": "yes", "note": null}
 aco calls: aco rule 42 --line 1 --yes --json in a; no call in b
 answer 200: {"status": "ruled", "message": null}
 ```
 
 Posting the same body with `"repo": "c"` -- not a configured repo -- answers 400 `{"error": "bad request: decision"}`, no call in `a` or `b`.
+
+Posting it with `"repo": "b"` instead -- `a`'s own fingerprint, against `b`'s identical card -- answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`, no call in `a` or `b` (ABRD-21).

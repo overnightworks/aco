@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
-from .board import RepoReading, RepoUnavailable
+from .board import RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import NOTE_MAX_LENGTH, Decision, DecisionResult, ExpectationLine, Outcome
 
 JSON_CONTENT_TYPE = "application/json"
@@ -42,7 +42,7 @@ def _repo_json(reading: RepoReading) -> dict[str, object]:
     return {
         "name": reading.name,
         "error": None,
-        "items": [_item_json(lines) for lines in lines_by_item.values()],
+        "items": [_item_json(lines, reading.name) for lines in lines_by_item.values()],
     }
 
 
@@ -88,16 +88,16 @@ def legacy_body_token(raw: bytes) -> str | None:
     return token if isinstance(token, str) else None
 
 
-def _item_json(lines: list[ExpectationLine]) -> dict[str, object]:
+def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:
     first = lines[0]
     return {
         "number": first.item,
         "title": first.item_title,
-        "lines": [_line_json(line) for line in lines],
+        "lines": [_line_json(line, repo) for line in lines],
     }
 
 
-def _line_json(line: ExpectationLine) -> dict[str, object]:
+def _line_json(line: ExpectationLine, repo: str) -> dict[str, object]:
     return {
         "index": line.index,
         "text": line.text,
@@ -107,7 +107,7 @@ def _line_json(line: ExpectationLine) -> dict[str, object]:
         "default": line.default,
         "ruling": line.ruling,
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
-        "fingerprint": line.fingerprint,
+        "fingerprint": wire_fingerprint(repo, line),
     }
 
 

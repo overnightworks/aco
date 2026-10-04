@@ -13,7 +13,7 @@ import base64
 from collections.abc import Sequence
 from html import escape
 
-from .board import RepoReading, RepoUnavailable
+from .board import RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import NOTE_MAX_LENGTH, ExpectationLine, Outcome
 
 HTML_CONTENT_TYPE = "text/html; charset=utf-8"
@@ -205,7 +205,7 @@ def _card(line: ExpectationLine, repo: str) -> str:
     )
     return (
         f'<article class="card" data-item="{line.item}" data-line="{line.index}" '
-        f'data-fingerprint="{line.fingerprint}" data-repo="{escape(repo)}">'
+        f'data-fingerprint="{wire_fingerprint(repo, line)}" data-repo="{escape(repo)}">'
         f'<p class="item">#{line.item} · {escape(line.item_title)} · Zeile {line.index}</p>'
         f'<p class="question">{escape(heading)}</p>{sentence}{example}{picture}'
         f'<textarea rows="2" maxlength="{NOTE_MAX_LENGTH}" '

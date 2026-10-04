@@ -21,7 +21,7 @@ import struct
 import sys
 import threading
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from email.message import Message
 from html.parser import HTMLParser
@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from aco_board.aco_cli import AcoCli
 from aco_board.board import Board, Boards
 from aco_board.ports import DecisionPort
 from aco_board.server import TOKEN_HEADER, start_board
@@ -229,6 +230,20 @@ def serving_many(
         running.httpd.shutdown()
         running.httpd.server_close()
         server_thread.join()
+
+
+def serving_two(
+    repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+) -> AbstractContextManager[BoardClient]:
+    """The real board server for two repositories labelled `a` and `b` -- the
+    arrangement every `two_repositories`-backed test shares."""
+    repository_a, repository_b = repositories
+    return serving_many(
+        {
+            "a": AcoCli(directory=repository_a.directory),
+            "b": AcoCli(directory=repository_b.directory),
+        }
+    )
 
 
 @dataclass(frozen=True)

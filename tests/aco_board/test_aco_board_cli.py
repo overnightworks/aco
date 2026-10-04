@@ -152,32 +152,56 @@ def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
     assert repository_b.rule_calls() == []
 
 
-@pytest.mark.usefixtures("fake_aco_on_path")
-def test_serve_refuses_two_repositories_with_the_same_label(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def _two_directories_named_the_same(tmp_path: Path) -> list[str]:
     first = _repository(tmp_path / "left" / "shared", row(1, "A", line(1, "A?")))
     second = _repository(tmp_path / "right" / "shared", row(2, "B", line(1, "B?")))
-
-    exit_code = cli.main(
-        ["serve", "--port", "0", "--repo", str(first.directory), "--repo", str(second.directory)]
-    )
-
-    assert exit_code == 1
-    error = capsys.readouterr().err
-    assert "two repositories named shared" in error
-    assert str(first.directory.resolve()) in error
-    assert str(second.directory.resolve()) in error
+    return ["--repo", str(first.directory), "--repo", str(second.directory)]
 
 
-def test_serve_refuses_a_missing_repository_as_a_usage_error(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def _a_symlink_resolving_to_a_configured_directory(tmp_path: Path) -> list[str]:
+    """A second `--repo` spelling that resolves to the same directory as the
+    first (issue #637 follow-up): `ABRD-19`'s own-directory check must read
+    the resolved path, not the string a symlink was given as."""
+    real = _repository(tmp_path / "shared", row(1, "A", line(1, "A?")))
+    alias = tmp_path / "alias"
+    alias.symlink_to(real.directory, target_is_directory=True)
+    return ["--repo", str(real.directory), "--repo", str(alias)]
+
+
+def _a_missing_directory(tmp_path: Path) -> list[str]:
+    return ["--repo", str(tmp_path / "no-such-directory")]
+
+
+def _exit_code(arguments: list[str]) -> int:
+    """`cli.main`'s own exit code, whether it returns one or raises the
+    `SystemExit` argparse's own usage-error path (a bad `--repo` directory)."""
+    try:
+        return cli.main(["serve", "--port", "0", *arguments])
+    except SystemExit as refused:
+        return cast(int, refused.code)
+
+
+@pytest.mark.usefixtures("fake_aco_on_path")
+@pytest.mark.parametrize(
+    ("build_arguments", "expected_code", "expected_message"),
+    [
+        (_two_directories_named_the_same, 1, "two repositories named shared"),
+        (_a_symlink_resolving_to_a_configured_directory, 1, "two repositories named shared"),
+        (_a_missing_directory, 2, "is not a directory"),
+    ],
+    ids=["duplicate-label", "symlink-resolves-to-a-configured-repo", "missing-directory"],
+)
+def test_serve_refuses_a_bad_repo_argument_as_a_usage_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    build_arguments: Callable[[Path], list[str]],
+    expected_code: int,
+    expected_message: str,
 ) -> None:
-    with pytest.raises(SystemExit) as refused:
-        cli.main(["serve", "--repo", str(tmp_path / "no-such-directory")])
+    exit_code = _exit_code(build_arguments(tmp_path))
 
-    assert refused.value.code == 2
-    assert "is not a directory" in capsys.readouterr().err
+    assert exit_code == expected_code
+    assert expected_message in capsys.readouterr().err
 
 
 @pytest.mark.usefixtures("fake_aco_on_path")

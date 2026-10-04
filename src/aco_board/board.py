@@ -10,6 +10,8 @@ including the single-repo case, so that lock never exists twice.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import threading
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -26,6 +28,17 @@ from .ports import (
 
 LINE_CHANGED = "Diese Zeile hat sich geändert, bitte neu laden"
 SHUTTING_DOWN = "board is shutting down"
+
+
+def wire_fingerprint(repo: str, line: ExpectationLine) -> str:
+    """The fingerprint a card exposes across the wire: `line`'s own fingerprint
+    bound to the `repo` label it was read under. Every reading path (the JSON
+    API, the legacy page) and `Boards.decide`'s own repo-binding check share
+    this one function, so a card's content being identical in two configured
+    repos never lets its fingerprint satisfy the other repo's check, even
+    with the two labels swapped (issue #637)."""
+    bound = json.dumps([repo, line.fingerprint], ensure_ascii=False)
+    return hashlib.sha256(bound.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -64,14 +77,17 @@ class Board:
         """A fresh read of the source; raises `DecisionSourceUnavailableError`."""
         return BoardSnapshot(self._decisions.expectation_lines())
 
-    def decide_one(self, decision: Decision, fingerprint: str) -> DecisionResult:
+    def decide_one(self, decision: Decision, repo: str, fingerprint: str) -> DecisionResult:
         """Write `decision` unless the open line it names no longer reads as shown.
 
         The fingerprint comparison is the board's only own check: the card was
         built from an earlier read, and an open line whose shown fields changed
-        since must not be ruled blind. A line that is no longer open skips the
-        comparison on purpose: whether it is already ruled, out of range, or its
-        item unknown is the source's own refusal, which `rule` reports.
+        since must not be ruled blind. It compares `wire_fingerprint(repo, ...)`,
+        not the line's own bare fingerprint, so the same content read under
+        another repo's label never passes here either (issue #637). A line
+        that is no longer open skips the comparison on purpose: whether it is
+        already ruled, out of range, or its item unknown is the source's own
+        refusal, which `rule` reports.
 
         Callers serialize writes across every repo (`Boards`); this method
         itself holds no lock, so it must never run concurrently with another
@@ -83,7 +99,9 @@ class Board:
             return DecisionResult(DecisionStatus.FAILED, str(error))
         named = (decision.item, decision.index)
         if any(
-            (line.item, line.index) == named and line.is_open and line.fingerprint != fingerprint
+            (line.item, line.index) == named
+            and line.is_open
+            and wire_fingerprint(repo, line) != fingerprint
             for line in lines
         ):
             return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
@@ -123,11 +141,17 @@ class Boards:
             return tuple(_reading(label, futures[label]) for label in self._boards)
 
     def decide(self, repo: str, decision: Decision, fingerprint: str) -> DecisionResult:
-        """Write through `repo`'s board; `repo` must already be one of `labels`."""
+        """Write through `repo`'s board; `repo` must already be one of `labels`.
+
+        `fingerprint` is `wire_fingerprint`'s value for the card as shown,
+        bound to `repo`: `Board.decide_one` checks it against the same
+        binding during its own fresh read, so an identical line read under
+        another configured repo's label never satisfies it (issue #637).
+        """
         if not self._take_turn():
             return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
         try:
-            return self._boards[repo].decide_one(decision, fingerprint)
+            return self._boards[repo].decide_one(decision, repo, fingerprint)
         finally:
             self._end_turn()
 
