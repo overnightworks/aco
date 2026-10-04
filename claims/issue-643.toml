@@ -1,0 +1,8 @@
+claim_id = "d0cc1fd2218544acb88bfd30a1ebaa96"
+agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
+role = "builder"
+base = "f3f2cdb70725b595bec806e5f5ed728840ba2644"
+branch = "claude/issue-643-spa-foundation"
+scope = [".github/workflows/ci.yml", "frontend", "src/aco_board/static", "tests/aco_board/e2e_server.py"]
+opened_commit = "9b586920dbb45fe22e47a36e19eebfb7e52a0c78"
+whole_reason = "Fundament der Svelte-Oberfläche samt E2E-Harness und CI-Job; trennbar nur um den Preis einer ungetesteten Hülle."
