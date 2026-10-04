@@ -1,8 +1,0 @@
-claim_id = "05851836401440e19b80d2bdb9b9dd84"
-agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
-role = "builder"
-base = "d87e9daa94aca7ddb561d777c12b99372c822880"
-branch = "claude/issue-637-multi-repo-board"
-scope = ["README.md", "specs/aco-board.spec.md", "src/aco_board/api.py", "src/aco_board/board.py", "src/aco_board/cli.py", "src/aco_board/page.py", "src/aco_board/server.py", "tests/aco_board"]
-opened_commit = "9875be485bc7fce841af33803c6c615927d3bcce"
-whole_reason = "Mehrere Repos berühren Kern, Draht, Transport, Seite, CLI, Spec und Tests zusammen; die Form ändert sich nur gemeinsam."
