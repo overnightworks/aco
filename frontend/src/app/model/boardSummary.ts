@@ -66,9 +66,11 @@ export interface SelectedLine {
 	line: ExpectationLine;
 }
 
-/** The one line `key` (`decision.ts`'s own) names, or `null` once it names
- * none still open and shown -- a stale key after a reload reads the same as
- * no selection, rather than showing data that no longer exists. */
+/** The one line `key` (`decision.ts`'s own) names, matched regardless of its
+ * ruling -- a ruled line still resolves, so `Stage.svelte` can render it
+ * read-only -- or `null` once no line in `repos` carries that key at all: a
+ * key for a line that has disappeared from the data reads the same as no
+ * selection, rather than showing data that no longer exists. */
 export function findSelectedLine(repos: RepoReading[], key: string | null): SelectedLine | null {
 	if (key === null) {
 		return null;
@@ -86,4 +88,30 @@ export function findSelectedLine(repos: RepoReading[], key: string | null): Sele
 		}
 	}
 	return null;
+}
+
+/** The next still-open line after `key`, in the same board order the list
+ * shows, wrapping to the first open line when `key` was the last one, or
+ * `null` once nothing is open any more (picture: `mockup.html`'s own
+ * `nextOpenAfter`, which `Stage`'s auto-advance after a decision mirrors). */
+export function nextOpenAfter(repos: RepoReading[], key: string): string | null {
+	const order: string[] = [];
+	const openKeys = new Set<string>();
+	for (const repoReading of repos) {
+		if (repoReading.error !== null) {
+			continue;
+		}
+		for (const item of repoReading.items) {
+			for (const line of item.lines) {
+				const candidateKey = lineKey(repoReading.name, item.number, line);
+				order.push(candidateKey);
+				if (line.ruling === null) {
+					openKeys.add(candidateKey);
+				}
+			}
+		}
+	}
+	const open = order.filter((candidateKey) => openKeys.has(candidateKey) && candidateKey !== key);
+	const position = order.indexOf(key);
+	return open.find((candidateKey) => order.indexOf(candidateKey) > position) ?? open[0] ?? null;
 }

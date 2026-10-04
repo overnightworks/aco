@@ -44,6 +44,11 @@ function withoutKey<Value>(record: Record<string, Value>, key: string): Record<s
 export class DecisionStore {
 	#pending: Record<string, PendingEntry> = $state({});
 	#banners: Record<string, DecisionBanner> = $state({});
+	/** The key this store itself just wrote a ruling for, reread and reloaded
+	 * -- `App.svelte` advances the stage off it (`boardSummary.nextOpenAfter`)
+	 * when it is still the one shown, never for a manual reload after a
+	 * refusal banner. */
+	#justRuled: string | null = $state(null);
 
 	constructor(
 		private readonly token: string,
@@ -66,6 +71,10 @@ export class DecisionStore {
 
 	banner(key: string): DecisionBanner | null {
 		return this.#banners[key] ?? null;
+	}
+
+	get justRuled(): string | null {
+		return this.#justRuled;
 	}
 
 	/** Starts the undo window for one card as shown; never sends before it elapses. */
@@ -110,6 +119,7 @@ export class DecisionStore {
 		}
 		if (outcome.kind === 'ruled') {
 			await this.reload();
+			this.#justRuled = key;
 			return;
 		}
 		this.#banners = { ...this.#banners, [key]: outcome };

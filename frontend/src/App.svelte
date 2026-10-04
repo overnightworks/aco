@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isBoardEmpty } from './app/model/boardSummary';
+	import { isBoardEmpty, nextOpenAfter } from './app/model/boardSummary';
 	import { BoardStore } from './app/state/board.svelte';
 	import { DecisionStore } from './app/state/decision.svelte';
 	import Stage from './components/Stage.svelte';
@@ -19,6 +19,16 @@
 		} else {
 			void board.load(token);
 			decisions = new DecisionStore(token, () => board.load(token));
+		}
+	});
+
+	// Once a decision this tab made lands and the board re-reads from it, the
+	// stage leaves the now-ruled card for the next open one -- but only while
+	// it is still the card shown, never yanking the operator off a different
+	// card they moved to in the meantime (picture: `nextOpenAfter`).
+	$effect(() => {
+		if (decisions !== null && decisions.justRuled !== null && decisions.justRuled === selectedKey) {
+			selectedKey = nextOpenAfter(board.repos, decisions.justRuled);
 		}
 	});
 </script>

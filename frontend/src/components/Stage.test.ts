@@ -57,6 +57,27 @@ test('a selected line shows only its own question, example, sentence and recomme
 	expect(screen.getByText('Notiz').closest('details')).not.toHaveAttribute('open');
 });
 
+test('an already-ruled selected line shows a read-only box, never live choice buttons', () => {
+	const card = line({
+		index: 1,
+		question: 'Guests allowed?',
+		ruling: 'yes',
+		ruled_on: '2026-10-01'
+	});
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+
+	render(Stage, {
+		repos,
+		selectedKey: lineKey('repo', 42, card),
+		decisions: storeAnswering({ status: 'ruled', message: null })
+	});
+
+	expect(screen.getByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
+	expect(screen.getByText('Ja · 2026-10-01')).toBeInTheDocument();
+	expect(screen.queryByRole('group', { name: 'Entscheidung' })).not.toBeInTheDocument();
+	expect(screen.queryByText('Notiz')).not.toBeInTheDocument();
+});
+
 test('choosing an outcome starts the undo window and disables the buttons', async () => {
 	const card = line({ index: 1 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];

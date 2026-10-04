@@ -154,3 +154,50 @@ test('pendingEntries names what is waiting, for the toast to show', () => {
 
 	expect(store.pendingEntries).toEqual([{ key, outcome: 'no', message: 'Nein: Guests allowed?' }]);
 });
+
+test('justRuled names the key a successful write just resolved, for the stage to move on from', async () => {
+	const send = sender({ status: 'ruled', message: null });
+	const store = new DecisionStore(
+		'token',
+		vi.fn(async () => {}),
+		send
+	);
+
+	expect(store.justRuled).toBeNull();
+	store.decide('repo', 42, card, 'yes', null);
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.justRuled).toBe(key);
+});
+
+test('two lines pending at once each write exactly once, and undoing one leaves the other untouched', async () => {
+	const otherCard = line({
+		index: 5,
+		text: 'Hosts?',
+		question: 'Hosts allowed?',
+		fingerprint: 'fp2'
+	});
+	const otherKey = lineKey('repo', 42, otherCard);
+	const send = sender({ status: 'ruled', message: null });
+	const store = new DecisionStore(
+		'token',
+		vi.fn(async () => {}),
+		send
+	);
+
+	store.decide('repo', 42, card, 'yes', null);
+	store.decide('repo', 42, otherCard, 'no', null);
+	expect(store.isPending(key)).toBe(true);
+	expect(store.isPending(otherKey)).toBe(true);
+
+	store.undo(key);
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.isPending(key)).toBe(false);
+	expect(store.isPending(otherKey)).toBe(false);
+	expect(send).toHaveBeenCalledTimes(1);
+	expect(send).toHaveBeenCalledWith(
+		'token',
+		expect.objectContaining({ line: otherCard.index, outcome: 'no' })
+	);
+});

@@ -6,6 +6,7 @@ import {
 	findSelectedLine,
 	isBoardEmpty,
 	lineStatusText,
+	nextOpenAfter,
 	outcomeLabel,
 	pictureDataUri,
 	totalLineCount
@@ -106,5 +107,65 @@ describe('findSelectedLine', () => {
 			item: openItem,
 			line: openLine
 		});
+	});
+
+	test('a key naming an already-ruled line still resolves it, so Stage can show it read-only', () => {
+		const ruledLine = line({ index: 2, ruling: 'yes', ruled_on: '2026-10-01' });
+		const ruledItem = item({ number: 42, title: 'Share page', lines: [ruledLine] });
+		const withRuled = [repo({ name: 'a', items: [ruledItem] })];
+
+		expect(findSelectedLine(withRuled, 'a:42:2')).toEqual({
+			repo: 'a',
+			item: ruledItem,
+			line: ruledLine
+		});
+	});
+});
+
+describe('nextOpenAfter', () => {
+	const first = line({ index: 1 });
+	const second = line({ index: 2 });
+	const third = line({ index: 3 });
+	const repos = [repo({ items: [item({ number: 42, lines: [first, second, third] })] })];
+
+	test('moves to the next open line in board order', () => {
+		expect(nextOpenAfter(repos, 'repo:42:1')).toBe('repo:42:2');
+	});
+
+	test('wraps to the first open line once the given key was the last in order', () => {
+		expect(nextOpenAfter(repos, 'repo:42:3')).toBe('repo:42:1');
+	});
+
+	test('returns null once no line is open any more', () => {
+		const allRuled = [
+			repo({
+				items: [
+					item({
+						number: 42,
+						lines: [
+							line({ index: 1, ruling: 'yes', ruled_on: '2026-10-01' }),
+							line({ index: 2, ruling: 'no', ruled_on: '2026-10-01' })
+						]
+					})
+				]
+			})
+		];
+
+		expect(nextOpenAfter(allRuled, 'repo:42:1')).toBeNull();
+	});
+
+	test('skips a line that was already ruled when picking the next one', () => {
+		const withARuledMiddle = [
+			repo({
+				items: [
+					item({
+						number: 42,
+						lines: [first, line({ index: 2, ruling: 'yes', ruled_on: '2026-10-01' }), third]
+					})
+				]
+			})
+		];
+
+		expect(nextOpenAfter(withARuledMiddle, 'repo:42:1')).toBe('repo:42:3');
 	});
 });

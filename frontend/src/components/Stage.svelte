@@ -3,6 +3,7 @@
 		cardHeading,
 		cardSentence,
 		findSelectedLine,
+		lineStatusText,
 		pictureDataUri
 	} from '../app/model/boardSummary';
 	import { NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
@@ -26,6 +27,7 @@
 		<p>Alles entschieden. Neue Fragen erscheinen links, sobald ein Agent eine stellt.</p>
 	{:else}
 		{@const activeKey = lineKey(selected.repo, selected.item.number, selected.line)}
+		{@const ruled = selected.line.ruling !== null}
 		{@const banner = decisions.banner(activeKey)}
 		{@const locked = banner !== null && banner.kind !== 'failed'}
 		<article class="card">
@@ -42,39 +44,46 @@
 			{#if selected.line.picture !== null}
 				<img alt="Bild zur Frage" src={pictureDataUri(selected.line.picture)} />
 			{/if}
-			{#if banner !== null}
-				<p role="alert" class="banner">{banner.message}</p>
-				{#if locked}
-					<button type="button" onclick={() => decisions.reloadAfterBanner(activeKey)}>
-						Neu laden
-					</button>
+			{#if ruled}
+				<div class="ruledbox">
+					<p>{lineStatusText(selected.line)}</p>
+					<p class="hint">Nur zum Lesen. Umentscheiden heißt: eine neue Zeile in aco.</p>
+				</div>
+			{:else}
+				{#if banner !== null}
+					<p role="alert" class="banner">{banner.message}</p>
+					{#if locked}
+						<button type="button" onclick={() => decisions.reloadAfterBanner(activeKey)}>
+							Neu laden
+						</button>
+					{/if}
 				{/if}
-			{/if}
-			{#if !locked}
-				<details class="note">
-					<summary>Notiz</summary>
-					<textarea
-						bind:value={noteText}
-						maxlength={NOTE_MAX_LENGTH}
-						placeholder="Optional – wird als „Anmerkung: …“ an den Satz gehängt"></textarea>
-				</details>
-				<ChoiceButtons
-					default={selected.line.default}
-					disabled={decisions.isPending(activeKey)}
-					onChoose={(outcome: Outcome) => {
-						if (selected === null) {
-							return;
-						}
-						decisions.decide(
-							selected.repo,
-							selected.item.number,
-							selected.line,
-							outcome,
-							noteOrNull(noteText)
-						);
-						noteText = '';
-					}}
-				/>
+				{#if !locked}
+					<details class="note">
+						<summary>Notiz</summary>
+						<textarea
+							bind:value={noteText}
+							maxlength={NOTE_MAX_LENGTH}
+							placeholder="Optional – wird als „Anmerkung: …“ an den Satz gehängt"></textarea>
+					</details>
+					<ChoiceButtons
+						default={selected.line.default}
+						disabled={decisions.isPending(activeKey)}
+						onChoose={(outcome: Outcome) => {
+							if (selected === null) {
+								return;
+							}
+							decisions.decide(
+								selected.repo,
+								selected.item.number,
+								selected.line,
+								outcome,
+								noteOrNull(noteText)
+							);
+							noteText = '';
+						}}
+					/>
+				{/if}
 			{/if}
 		</article>
 	{/if}

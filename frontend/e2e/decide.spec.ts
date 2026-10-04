@@ -62,6 +62,36 @@ test('once the window elapses, exactly one decision is written', async ({ page }
 
 	await expect(page.getByText('Nein · 2026-10-03')).toBeVisible({ timeout: 10_000 });
 	expect(ruleRequests).toBe(1);
+	// Nothing else was open: the stage goes back to "all decided", not a stale card.
+	await expect(page.getByText('Alles entschieden')).toBeVisible();
+});
+
+test('deciding moves the stage to the next open card, and the ruled one keeps no buttons', async ({
+	page
+}) => {
+	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	writeRulings(repoDirectory, [
+		row(
+			605,
+			'Access',
+			line(1, 'Guests may join the call.', { question: 'Guests allowed?', default: 'yes' }),
+			line(2, 'Hosts may close the room.', { question: 'Hosts allowed?', default: 'no' })
+		)
+	]);
+
+	await page.goto(`${appUrl}#t=${token}`);
+	await page.getByRole('button', { name: /Guests may join the call\./ }).click();
+	await choices(page).getByRole('button', { name: /Ja/ }).click();
+
+	await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeVisible({
+		timeout: 10_000
+	});
+	await expect(choices(page).getByRole('button', { name: /Nein/ })).toBeVisible();
+
+	// The just-ruled line stays visible in the list, but as read-only text.
+	await expect(page.getByRole('button', { name: /Guests may join the call\./ })).not.toBeVisible();
+	await expect(page.getByText('Guests may join the call.')).toBeVisible();
+	await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
 });
 
 test('a question changed mid-undo refuses to save and asks for a reload', async ({ page }) => {
