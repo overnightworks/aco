@@ -48,7 +48,7 @@ def test_a_snapshot_reads_a_lines_recommendation_and_ruling(
 
     [read_line] = Board(AcoCli(directory=repository.directory)).snapshot().lines
 
-    assert (read_line.default, read_line.ruling, read_line.ruled_on, read_line.is_open) == read
+    assert read == (read_line.default, read_line.ruling, read_line.ruled_on, read_line.is_open)
 
 
 def test_a_decision_after_writes_closed_is_refused_without_writing(
