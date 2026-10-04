@@ -486,9 +486,109 @@ svg.i{width:16px;height:16px;flex:none}
 }
 @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
 </style>
+<style>
+/* ---------- 3a: simple decision card for today's aco lines (Ja / Nein / Später) ---------- */
+/* mockup switch: lets the reviewer flip variant and state; not part of the board */
+.mock{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;padding:6px 16px;background:var(--surface-2);border-bottom:1px dashed var(--line-strong);font-size:12.5px;color:var(--fg-3)}
+.mock-l{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.mseg{display:flex;background:var(--bg);border-radius:999px;padding:2px}
+.mseg button{padding:4px 10px;border-radius:999px;font-size:12.5px;color:var(--fg-2)}
+.mseg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.mock label{display:inline-flex;gap:6px;align-items:center}
+.mock select{padding:3px 8px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);font-size:12.5px}
+/* filter bar: search + counter always, item/status on demand */
+.fbar{display:flex;gap:6px;margin:0 16px 10px}
+.fsearch{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 12px;height:38px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);color:var(--fg-3)}
+.fsearch:focus-within{border-color:var(--accent)}
+.fsearch input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:14px;color:var(--fg)}
+.fsearch input::-webkit-search-cancel-button{display:none}
+.fcount{font-size:11.5px;color:var(--fg-3);white-space:nowrap}
+.ftoggle{width:38px;height:38px;border-radius:50%;border:1px solid var(--line-strong);display:grid;place-items:center;color:var(--fg-2);position:relative;flex:none}
+.ftoggle[aria-expanded="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.ftoggle .fdot{position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--surface)}
+.fmore{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 16px 12px}
+.fmore label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--fg-3);font-weight:500;min-width:0}
+.fmore select{padding:7px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);font-size:13.5px;min-width:0}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;margin:0 16px 10px}
+.fchip{display:inline-flex;gap:4px;align-items:center;font-size:12.5px;font-weight:500;padding:4px 6px 4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+/* list grouped by item: "#n Titel" once, its lines below */
+.igrp{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:14px 20px 6px;font:600 13px/1.3 var(--font-display)}
+.igrp .num{color:var(--fg-3);font:500 12px var(--font-mono);margin-right:6px}
+.igrp .n{font:500 11px var(--font-mono);color:var(--fg-3);white-space:nowrap}
+.lrow{display:grid;grid-template-columns:28px minmax(0,1fr);gap:3px 10px;width:100%;text-align:left;padding:10px 20px;border-left:3px solid transparent}
+.lrow:hover{background:var(--surface-2)}
+.lrow[aria-current="true"]{background:var(--accent-soft);border-left-color:var(--accent)}
+.lrow .no{font:500 12.5px var(--font-mono);color:var(--fg-3);grid-row:span 2;padding-top:2px}
+.lrow .t{font-weight:600;line-height:1.3;min-width:0}
+.lrow .meta{font-size:12.5px;color:var(--fg-3);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.lrow.ruled .t{font-weight:500;color:var(--fg-2)}
+.verdict{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.verdict svg{width:12px;height:12px}
+.verdict.yes{background:var(--good-soft);color:var(--good)}
+.verdict.no{background:var(--crit-soft);color:var(--crit)}
+.verdict.later{background:var(--warn-soft);color:var(--warn)}
+/* the card */
+.stage-in.card{max-width:720px;margin-inline:0;gap:20px}
+.sent{margin:0;font-size:16px;color:var(--fg);border-left:3px solid var(--accent);padding:2px 0 2px 12px;max-width:65ch}
+.lpic{margin:0;display:flex;flex-direction:column;gap:8px}
+.lpic .scene.wide,.lpic .scene.term{max-width:560px}
+.lnote summary{list-style:none;cursor:pointer;display:inline-flex;gap:6px;align-items:center;font-size:14px;font-weight:500;color:var(--fg-2);padding:4px 0}
+.lnote summary::-webkit-details-marker{display:none}
+.lnote summary .chev{color:var(--fg-3);transition:transform .15s}
+.lnote[open] summary .chev{transform:rotate(180deg)}
+.lnote textarea{margin-top:8px;width:100%;min-height:72px;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;background:var(--surface);resize:vertical}
+.lnote small{display:block;font-size:12px;color:var(--fg-3);margin-top:4px}
+.choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.cbtn{position:relative;padding:14px 10px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);font:600 16px/1.2 var(--font-display)}
+.cbtn:hover{border-color:var(--fg)}
+.cbtn.rec{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.cbtn .rec-tag{left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--surface);color:var(--accent);border:1.5px solid var(--accent);padding:4px 8px}
+.ruledbox{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-radius:var(--r);background:var(--surface-2);font-size:14px;color:var(--fg-2)}
+.ruledbox .hint{flex-basis:100%;font-size:12.5px;color:var(--fg-3)}
+.lbanner{display:flex;gap:10px 12px;align-items:center;flex-wrap:wrap;border-radius:var(--r);padding:12px 16px;font-size:14px;background:var(--warn-soft);color:var(--fg)}
+.lbanner b{color:var(--warn)}
+.lbanner .linkbtn{margin-left:auto}
+/* no key / aco down: one sentence and the way out */
+.gate{flex:1;display:grid;place-items:center;padding:40px 16px}
+.gate-in{width:100%;max-width:520px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.gate-ic{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);color:var(--fg-2)}
+.gate-ic svg{width:22px;height:22px}
+.gate h1{font:700 28px/1.1 var(--font-display);letter-spacing:-.02em;margin:0}
+.gate p{margin:0;color:var(--fg-2);font-size:16px}
+.gate pre{margin:0;width:100%;background:var(--term-bg);color:var(--term-fg);border-radius:10px;padding:12px 14px;font:500 13px/1.6 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.gate pre .dim{color:var(--term-dim)}
+.gate small{color:var(--fg-3);font-size:13px}
+/* Verlauf: decided lines, read-only, details on demand */
+.hnote{margin:-8px 0 0;color:var(--fg-3);font-size:14px}
+.hline + .hline{border-top:1px solid var(--line)}
+.hline summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 14px;align-items:center;padding:14px 18px}
+.hline summary::-webkit-details-marker{display:none}
+.hline summary:hover{background:var(--surface-2)}
+.hline .q{font-weight:600;min-width:0}
+.hline .sub{grid-column:1;font-size:12.5px;color:var(--fg-3)}
+.hline .verdict{grid-row:1 / span 2;grid-column:2}
+.hline .date{grid-row:1 / span 2;grid-column:3;font-size:12.5px;color:var(--fg-3)}
+.hbody{padding:0 18px 16px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--fg-2)}
+.hbody p{margin:0}
+@media (max-width:760px){
+  .mock{padding:6px 12px}
+  .stage-in.card{gap:18px}
+  .choices{position:fixed;left:0;right:0;bottom:0;z-index:12;padding:18px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -10px 30px -20px rgba(0,0,0,.4)}
+  .cbtn{padding:13px 6px}
+  .hline summary{grid-template-columns:minmax(0,1fr) auto;padding:12px 14px}
+  .hline .q,.hline .sub{grid-column:1 / -1}
+  .hline .verdict{grid-row:3;grid-column:1;justify-self:start}
+  .hline .date{grid-row:3;grid-column:2}
+}
+</style>
 </head>
 <body>
 <div class="app">
+  <div class="mock" aria-label="Mockup-Schalter"><span class="mock-l">Mockup</span>
+    <div class="mseg" role="group" aria-label="Kartenvariante"><button data-variant="3a" aria-pressed="true">Karte heute (3a)</button><button data-variant="3b" aria-pressed="false">Optionskarten später (3b)</button></div>
+    <label>Zustand <select data-sim aria-label="Zustand">
+      <option value="normal">normal</option><option value="noaccess">Zugang fehlt</option><option value="empty">nichts offen</option><option value="down">aco nicht erreichbar</option><option value="changed">Frage geändert</option><option value="already">schon entschieden</option></select></label>
+  </div>
   <header class="top">
     <div class="brand"><span class="disc" aria-hidden="true"></span><span class="word">Board</span></div>
     <nav class="nav" aria-label="Bereiche">
@@ -504,7 +604,14 @@ svg.i{width:16px;height:16px;flex:none}
       <section class="stage" id="stage" aria-live="polite"></section>
     </div>
   </main>
-  <main class="view" id="v-history" hidden><div class="page"><h1>Verlauf</h1><div class="rows" id="histRows"></div></div></main>
+  <main class="view" id="v-ask" hidden>
+    <div class="decide" id="ask">
+      <aside class="tracks" aria-label="Offene Fragen" id="lineTracks"></aside>
+      <section class="stage" id="lineStage" aria-live="polite"></section>
+    </div>
+  </main>
+  <main class="view" id="v-gate" hidden><div class="gate"><div class="gate-in" id="gateBody"></div></div></main>
+  <main class="view" id="v-history" hidden><div class="page"><h1>Verlauf</h1><p class="hnote" id="histNote" hidden>Nur zum Lesen. Umentscheiden heißt: eine neue Zeile in aco.</p><div class="rows" id="histRows"></div></div></main>
   <main class="view" id="v-status" hidden><div class="page"><h1>Status</h1><div id="statusRows"></div></div></main>
 </div>
 <div class="takebar" id="takebar" hidden></div>
@@ -883,12 +990,249 @@ function bindCarousel(){
 function renderTakebar(){
   const bar = document.getElementById('takebar');
   const d = byId(state.openId);
-  const show = isPhone() && state.view==='decide' && state.phoneOpen && d && state.ovIdx===null && !state.readOnly;
+  const show = state.variant==='3b' && isPhone() && state.view==='decide' && state.phoneOpen && d && state.ovIdx===null && !state.readOnly;
   bar.hidden = !show;
   if (!show) return;
   const o = d.opts[state.slide], rec = state.slide === d.rec;
   bar.innerHTML = `<span class="tb-t"><b>${esc(o.a)}</b><span>${state.slide+1} von ${d.opts.length} · ${o.p} %${rec?' · empfohlen':''}</span></span><button class="btn-p${rec?' rec':''}" data-take="${state.slide}">Nehmen</button>`;
 }
+</script>
+<script>
+/* ---------- 3a: today's real asks — one aco expectation line per card, Ja / Nein / Später ---------- */
+SCENES.cookie401 = ['term', term([
+  ['d','# Anna hat sich am Laptop abgemeldet; ihr Handy fragt danach noch einmal'],
+  ['p','curl -b session=9c1e… https://app/api/me'],
+  ['e','401 Unauthorized'],
+  ['dim','  Der Cache kannte die Session – sie zählt trotzdem nicht mehr.']], 'webauth')];
+SCENES.newAsk = ['wide', `<div class="sc"><div class="r-head">Board · nach Neuladen</div>
+  <div class="plain"><div class="pl-h" style="color:var(--shot-fg)">#33 Ein Owner fürs Session-Beenden</div>
+  <div class="pl-row"><span>01</span><span>Ist die Session nach dem Abmelden überall tot?</span></div>
+  <div class="pl-row"><span>02</span><span>Darf ein Cache-Fehler beim Löschen durchschlagen?</span></div>
+  <div class="pl-row" style="color:var(--shot-fg);font-weight:600"><span>05</span><span>Neue Frage des Agenten</span><span class="m r-badge feat">neu</span></div></div></div>`];
+
+const RULING = {yes:'Ja', no:'Nein', later:'Später'};
+const CHOICES = ['yes','no','later'];
+const STATUS_OF = l => l.ruling === null ? 'open' : l.ruling === 'later' ? 'later' : 'decided';
+const STATUS_FILTER = [['open','offen'],['decided','entschieden'],['later','später'],['all','alle']];
+const DEFAULT_FILTER = {text:'', item:'all', status:'open'};
+const GATE_SIMS = new Set(['noaccess','down']);
+const UNDO_MS = 8000;
+const TODAY = '2026-10-04';
+const ICON3A = {
+  search: svg('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'),
+  filter: svg('<path d="M4 6h16M7 12h10M10 18h4"/>'),
+  verdict: {yes: svg('<path d="M5 12l5 5 9-10"/>'), no: svg('<path d="M6 6l12 12M18 6L6 18"/>'), later: svg('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>')}
+};
+
+/* example data shaped like `aco rulings --json` plus the ask fields (question, example, picture, default) */
+const ITEMS = [
+ {n:622, title:'Board 3a: Layout aus dem Bild', lines:[
+  {i:1, q:'Erscheint eine neue Frage nach Neuladen links unter ihrem Item?', text:'Eine neue offene Frage erscheint nach Neuladen links unter ihrem Item.',
+   ex:'Ein Agent ruft aco ask für #33 auf. Du lädst das Board neu, die Frage steht links unter „#33 Ein Owner fürs Session-Beenden“.', pic:'newAsk', def:'yes', ruling:null},
+  {i:4, q:'Sagt das Board „Frage hat sich geändert“, statt zu speichern?', text:'Ändert ein Agent die Frage, während du schaust, sagt das Board \'Frage hat sich geändert\' statt zu speichern.',
+   ex:'Du liest Zeile 2, der Agent schärft sie nach. Dein Ja wird nicht gespeichert; das Board zeigt dir die neue Fassung.', def:'yes', ruling:null},
+  {i:9, q:'Lässt sich Ja, Nein oder Später 8 Sekunden lang rückgängig machen?', text:'Ja, Nein und Später lassen sich 8 Sekunden lang rückgängig machen, bevor sie gespeichert werden.',
+   ex:'Du tippst aus Versehen Nein. Unten steht „Rückgängig“ – ein Tipp, und nichts wurde gespeichert.', def:'yes', ruling:null},
+  {i:10, q:'Bleibt ein gespeichertes Ruling im Board fest?', text:'Ein gespeichertes Ruling wird im Board nicht zurückgenommen; der Verlauf zeigt es nur zum Lesen (Umentscheiden = neue Zeile, wie in aco).',
+   def:'yes', ruling:'yes', ruled_on:'2026-10-04', note:'Operator 04.10.2026: \'ja\' auf \'alles wie empfohlen\''},
+  {i:11, q:'Listet der Verlauf die neuesten Entscheidungen oben?', text:'Der Verlauf listet entschiedene Zeilen, die neuesten oben.',
+   def:'yes', ruling:'yes', ruled_on:'2026-10-04', note:'Operator 04.10.2026: \'ja\' auf \'alles wie empfohlen\''},
+  {i:12, q:'Sind Gruppen ohne offene Frage links eingeklappt?', text:'Gruppen ohne offene Frage sind links eingeklappt.',
+   def:'later', ruling:'later', ruled_on:'2026-10-04', note:'Operator 04.10.2026: \'ja\' auf \'alles wie empfohlen\' (Empfehlung später)'}]},
+ {n:33, title:'Ein Owner fürs Session-Beenden', lines:[
+  {i:1, q:'Ist die Session nach dem Abmelden überall tot?', text:'end_session löscht erst den Store-Eintrag, dann den Cache-Eintrag; eine Folgeanfrage mit dem alten Cookie bekommt 401, auch wenn der Cache sie vorher kannte.',
+   ex:'Anna meldet sich am Laptop ab. Ihr Handy schickt danach noch den alten Cookie und bekommt 401 – obwohl der Cache die Session kannte.', pic:'cookie401', def:'yes', ruling:null},
+  {i:2, q:'Darf ein Cache-Fehler beim Löschen durchschlagen?', text:'Wirft der Cache beim Löschen, propagiert der Fehler (Host antwortet 5xx); webauth schluckt ihn nicht.',
+   ex:'Redis ist kurz weg, als Ben sich abmeldet. Der Host antwortet 503, statt still „abgemeldet“ zu sagen.', def:'yes', ruling:null},
+  {i:3, q:'Räumt prune_sessions Store und Cache auf?', text:'prune_sessions löscht überzählige Sessions im Store und im Cache.',
+   def:'yes', ruling:'yes', ruled_on:'2026-10-04', note:'Operator im Chat 04.10.2026: \'ja\' auf \'alles wie empfohlen\''},
+  {i:4, q:'Gibt es genau eine Stelle, die Store und Cache gemeinsam löscht?', text:'set_password/change_role nutzen end_user_sessions; es gibt genau eine Stelle, die Store und Cache gemeinsam löscht.',
+   def:'yes', ruling:'yes', ruled_on:'2026-10-04', note:'Operator im Chat 04.10.2026: \'ja\' auf \'alles wie empfohlen\''}]}
+];
+const keyOf = (it, l) => `${it.n}-${l.i}`;
+const ALL_LINES = ITEMS.flatMap(it => it.lines.map(l => ({it, l, key:keyOf(it,l)})));
+const lineByKey = key => ALL_LINES.find(x => x.key === key);
+const germanDate = iso => iso.split('-').reverse().join('.');
+const verdict = r => `<span class="verdict ${r}">${ICON3A.verdict[r]}${RULING[r]}</span>`;
+
+Object.assign(state, {variant:'3a', sim:'normal', lineKey:null, lineOpen:false, f:{...DEFAULT_FILTER}, filterOpen:false, pending:null, refusal:null});
+
+/* ---------- filter: free text searches question + sentence (incl. appended note), never example or picture ---------- */
+const searchable = l => `${l.q} ${l.text}${l.note ? ' Anmerkung: ' + l.note : ''}`.toLowerCase();
+const isPending = x => state.pending?.key === x.key;
+function matchesFilter(x){
+  const {text, item, status} = state.f;
+  if (status !== 'all' && STATUS_OF(x.l) !== status) return false;
+  if (item !== 'all' && String(x.it.n) !== item) return false;
+  return !text.trim() || searchable(x.l).includes(text.trim().toLowerCase());
+}
+const visibleLines = () => state.sim === 'empty' ? [] : ALL_LINES.filter(x => !isPending(x) && matchesFilter(x));
+const openLines = () => state.sim === 'empty' ? [] : ALL_LINES.filter(x => !isPending(x) && STATUS_OF(x.l) === 'open');
+const filterIsNarrowed = () => state.f.item !== DEFAULT_FILTER.item || state.f.status !== DEFAULT_FILTER.status;
+
+function filterBar(){
+  const sel = (name, options) => `<select data-f="${name}">${options.map(([v,l]) => `<option value="${v}" ${state.f[name]===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  const items = [['all','Alle Items'], ...ITEMS.map(it => [String(it.n), `#${it.n} ${it.title}`])];
+  const chips = [];
+  if (state.f.item !== 'all') chips.push(['item', `Item #${state.f.item}`]);
+  if (state.f.status !== DEFAULT_FILTER.status) chips.push(['status', `Status: ${STATUS_FILTER.find(([v]) => v === state.f.status)[1]}`]);
+  return `<div class="fbar"><label class="fsearch">${ICON3A.search}<input id="fText" type="search" placeholder="Suchen" aria-label="Frage oder Satz suchen" value="${esc(state.f.text)}"><span class="fcount mono" id="fCount"></span></label>
+      <button class="ftoggle" data-ftoggle aria-expanded="${state.filterOpen}" aria-label="Filter nach Item und Status" title="Filter">${ICON3A.filter}${filterIsNarrowed() && !state.filterOpen ? '<span class="fdot"></span>' : ''}</button></div>
+    ${state.filterOpen ? `<div class="fmore"><label>Item ${sel('item', items)}</label><label>Status ${sel('status', STATUS_FILTER)}</label></div>`
+      : chips.length ? `<div class="fchips">${chips.map(([k,l]) => `<button class="fchip" data-fclear="${k}">${esc(l)} ${sized(ICON.close,12)}</button>`).join('')}</div>` : ''}
+    <div id="lineList"></div>`;
+}
+
+/* ---------- list: "#n Titel" once, its lines below ---------- */
+function lineRow(x){
+  const st = STATUS_OF(x.l);
+  const meta = st === 'open' ? `Empfohlen: ${RULING[x.l.def]}` : `${verdict(x.l.ruling)}<span>${germanDate(x.l.ruled_on)}</span>`;
+  return `<button class="lrow${st==='open'?'':' ruled'}" data-line="${x.key}" aria-current="${x.key===state.lineKey}">
+    <span class="no">${String(x.l.i).padStart(2,'0')}</span><span class="t">${esc(x.l.q)}</span><span class="meta">${meta}</span></button>`;
+}
+function renderLineList(){
+  const vis = visibleLines();
+  if (!vis.some(x => x.key === state.lineKey)) state.lineKey = (vis.find(x => STATUS_OF(x.l) === 'open') ?? vis[0])?.key ?? null;
+  document.getElementById('fCount').textContent = `${vis.length} von ${state.sim==='empty' ? 0 : ALL_LINES.length}`;
+  let body;
+  if (state.sim === 'empty') body = `<div class="empty">Nichts offen. Neue Fragen erscheinen hier nach Neuladen, sobald ein Agent eine stellt.</div>`;
+  else if (!vis.length) body = `<div class="empty">Keine Zeile passt zum Filter.<button class="linkbtn" data-freset>Filter zurücksetzen</button></div>`;
+  else body = ITEMS.map(it => {
+    const rows = vis.filter(x => x.it === it);
+    if (!rows.length) return '';
+    const open = it.lines.filter(l => STATUS_OF(l) === 'open' && !isPending({key:keyOf(it,l)})).length;
+    return `<div class="igrp"><span><span class="num">#${it.n}</span>${esc(it.title)}</span><span class="n">${open} offen</span></div>${rows.map(lineRow).join('')}`;
+  }).join('');
+  document.getElementById('lineList').innerHTML = body;
+}
+function renderLineTracks(){ document.getElementById('lineTracks').innerHTML = filterBar(); renderLineList(); }
+
+/* ---------- the card: question, sentence, example, optional picture, Notiz folded, Ja / Nein / Später ---------- */
+function refusalBanner(x){
+  if (state.refusal?.key !== x.key) return '';
+  return state.refusal.kind === 'changed'
+    ? `<div class="lbanner" role="alert"><span><b>Frage hat sich geändert.</b> Ein Agent hat diese Zeile umformuliert, während du geschaut hast. Nichts wurde gespeichert.</span><button class="linkbtn" data-reload>Neue Fassung laden</button></div>`
+    : `<div class="lbanner" role="alert"><span><b>Schon entschieden.</b> Diese Zeile wurde inzwischen anderswo entschieden. Nichts wurde gespeichert.</span><button class="linkbtn" data-reload>Neu laden</button></div>`;
+}
+function renderLineStage(){
+  const st = document.getElementById('lineStage');
+  const x = lineByKey(state.lineKey);
+  document.getElementById('ask').classList.toggle('open', state.lineOpen && !!x);
+  if (!x){ st.innerHTML = `<div class="stage-in card"><p class="question">Alles entschieden.</p><p class="situation">Neue Fragen erscheinen links, sobald ein Agent eine stellt.</p></div>`; return; }
+  const {it, l} = x, ruled = STATUS_OF(l) !== 'open';
+  const decision = ruled
+    ? `<div class="ruledbox">${verdict(l.ruling)}<span>entschieden am <span class="mono">${germanDate(l.ruled_on)}</span></span>${l.note?`<span>· Anmerkung: ${esc(l.note)}</span>`:''}<span class="hint">Nur zum Lesen. Umentscheiden heißt: eine neue Zeile in aco.</span></div>`
+    : `<details class="lnote"><summary>${sized(ICON.pen,15)}Notiz<span class="chev">${ICON.chev}</span></summary><textarea id="lineNote" maxlength="500" placeholder="Optional – wird als „Anmerkung: …“ an den Satz gehängt"></textarea><small>Gilt für den Knopf, den du danach tippst.</small></details>
+       <div class="choices" role="group" aria-label="Entscheidung">${CHOICES.map(c => `<button class="cbtn${c===l.def?' rec':''}" data-rule="${c}">${c===l.def?'<span class="rec-tag">Empfohlen</span>':''}${RULING[c]}</button>`).join('')}</div>`;
+  st.innerHTML = `<div class="stage-in card">
+    <button class="back" data-lback>${sized(ICON.back,16)} Liste</button>
+    <div class="eyebrow"><b>#${it.n}</b><span>${esc(it.title)}</span><span>· Zeile ${l.i}</span></div>
+    <h1 class="question">${esc(l.q)}</h1>
+    ${refusalBanner(x)}
+    <div><span class="lab">Satz</span><p class="sent">${esc(l.text)}</p></div>
+    ${l.ex?`<div><span class="lab">Beispiel</span><p class="story">${esc(l.ex)}</p></div>`:''}
+    ${l.pic?`<figure class="lpic"><span class="lab">Bild</span>${scene(l.pic)}</figure>`:''}
+    ${decision}
+  </div>`;
+}
+
+/* ---------- deciding: nothing is saved for 8 s; a newer choice saves the pending one first ---------- */
+function nextOpenAfter(key){
+  const open = visibleLines().filter(x => STATUS_OF(x.l) === 'open' && x.key !== key);
+  const order = ALL_LINES.map(x => x.key);
+  return (open.find(x => order.indexOf(x.key) > order.indexOf(key)) ?? open[0])?.key ?? null;
+}
+function savePending(){
+  const p = state.pending; if (!p) return;
+  clearTimeout(p.timer);
+  Object.assign(lineByKey(p.key).l, {ruling:p.choice, ruled_on:TODAY, note:p.note});
+  state.pending = null;
+  renderAsk(); renderHistory();
+}
+function undoPending(){
+  const p = state.pending; if (!p) return;
+  clearTimeout(p.timer);
+  state.pending = null; state.lineKey = p.key;
+  renderAsk();
+}
+function ruleLine(choice){
+  const x = lineByKey(state.lineKey);
+  if (state.sim === 'changed' || state.sim === 'already'){ state.refusal = {key:x.key, kind:state.sim}; renderLineStage(); return; }
+  const note = document.getElementById('lineNote')?.value.trim() ?? '';
+  savePending();
+  state.pending = {key:x.key, choice, note, timer:setTimeout(savePending, UNDO_MS)};
+  state.lineKey = nextOpenAfter(x.key); state.lineOpen = false;
+  renderAsk();
+  showToast(`#${x.it.n} · Zeile ${x.l.i}: ${RULING[choice]}`, undoPending);
+}
+
+/* ---------- Verlauf: ruled_on desc, then item desc, then line desc; read-only ---------- */
+function renderLineHistory(){
+  const ruled = ALL_LINES.filter(x => STATUS_OF(x.l) !== 'open')
+    .sort((a,b) => b.l.ruled_on.localeCompare(a.l.ruled_on) || b.it.n - a.it.n || b.l.i - a.l.i);
+  document.getElementById('histNote').hidden = false;
+  document.getElementById('histRows').innerHTML = ruled.map(({it, l}) => `<details class="hline">
+    <summary><span class="q">${esc(l.q)}</span>${verdict(l.ruling)}<span class="date mono">${germanDate(l.ruled_on)}</span>
+      <span class="sub">#${it.n} ${esc(it.title)} · Zeile ${l.i}</span></summary>
+    <div class="hbody"><p><span class="lab">Satz</span>${esc(l.text)}</p>${l.note?`<p><span class="lab">Anmerkung</span>${esc(l.note)}</p>`:''}</div></details>`).join('');
+}
+function renderHistory(){
+  if (state.variant === '3b'){ document.getElementById('histNote').hidden = true; renderHistory3b(); }
+  else renderLineHistory();
+}
+
+/* ---------- gate states: no key in this tab, aco down ---------- */
+function renderGate(){
+  document.getElementById('gateBody').innerHTML = state.sim === 'noaccess'
+    ? `<span class="gate-ic">${ICON.lock}</span><h1>Zugang fehlt</h1>
+       <p>Diesem Tab fehlt der Schlüssel. Starte das Board im Repo und öffne den Link, den es ausgibt.</p>
+       <pre><span class="dim">$</span> aco-board serve
+<span class="dim">Board: http://127.0.0.1:8765/#t=…</span></pre>
+       <small>Der Schlüssel steht nur im Link. Ein Lesezeichen ohne ihn führt hierher.</small>`
+    : `<span class="gate-ic">${ICON.wait}</span><h1>aco antwortet nicht</h1>
+       <p>Das Board läuft, aber aco liefert gerade keine Zeilen. Nichts ist verloren.</p>
+       <button class="btn-p" data-simreset>Neu laden</button>`;
+}
+
+function renderAsk(){
+  renderLineTracks(); renderLineStage();
+  if (state.variant === '3a') document.getElementById('openCount').textContent = openLines().length || '';
+}
+function renderAskAll(){
+  const gate = GATE_SIMS.has(state.sim);
+  document.getElementById('v-gate').hidden = !gate;
+  document.getElementById('v-ask').hidden = gate || state.view !== 'decide' || state.variant !== '3a';
+  document.getElementById('v-decide').hidden = gate || state.view !== 'decide' || state.variant !== '3b';
+  if (gate) for (const v of ['history','status']) document.getElementById('v-'+v).hidden = true;
+  document.querySelectorAll('[data-variant]').forEach(b => b.setAttribute('aria-pressed', b.dataset.variant === state.variant));
+  document.querySelector('[data-sim]').value = state.sim;
+  if (gate) renderGate();
+  renderAsk();
+}
+
+/* ---------- events (own data-* names, so the 3b handler never reacts) ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  const ds = t.dataset;
+  if (ds.variant){ state.variant = ds.variant; state.view = 'decide'; renderAll(); return; }
+  if (ds.line){ state.lineKey = ds.line; state.lineOpen = true; state.refusal = null; renderAsk(); document.getElementById('lineStage').scrollTop = 0; window.scrollTo(0,0); return; }
+  if (ds.lback !== undefined){ state.lineOpen = false; renderLineStage(); return; }
+  if (ds.rule){ ruleLine(ds.rule); return; }
+  if (ds.ftoggle !== undefined){ state.filterOpen = !state.filterOpen; renderLineTracks(); return; }
+  if (ds.fclear){ state.f[ds.fclear] = DEFAULT_FILTER[ds.fclear]; renderAsk(); return; }
+  if (ds.freset !== undefined){ state.f = {...DEFAULT_FILTER}; renderAsk(); return; }
+  if (ds.reload !== undefined){ state.refusal = null; state.sim = 'normal'; renderAll(); return; }
+  if (ds.simreset !== undefined){ state.sim = 'normal'; renderAll(); return; }
+});
+document.addEventListener('input', e => {
+  if (e.target.id !== 'fText') return;
+  state.f.text = e.target.value; renderLineList(); renderLineStage();
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.f){ state.f[t.dataset.f] = t.value; renderAsk(); }
+  else if (t.dataset.sim !== undefined){ state.sim = t.value; state.refusal = null; renderAll(); }
+});
 </script>
 <script>
 /* ---------- full-screen option view: Heute · Soll · in 4 Wochen ---------- */
@@ -953,7 +1297,7 @@ function sendAsk(){
 }
 
 /* ---------- Verlauf + Status ---------- */
-function renderHistory(){
+function renderHistory3b(){
   const L = {offen:'offen', arbeit:'in Arbeit', um:'umgesetzt', end:'endgültig'};
   const I = {offen:'<circle cx="12" cy="12" r="8"/>', arbeit:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>', um:'<path d="M5 12l5 5 9-10"/>', end:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'};
   const today = state.done.map(x => { const d = byId(x.id); return {q:d.q, proj:d.proj, a:d.opts[x.idx].a, state:'offen', age:'heute', change:true, id:d.id}; });
@@ -989,6 +1333,7 @@ function renderAll(){
   for (const v of ['decide','history','status']) document.getElementById('v-'+v).hidden = state.view!==v;
   document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-current', b.dataset.view===state.view?'page':'false'));
   renderTracks(); renderStage(); renderOverlay(); renderHistory(); renderStatus();
+  renderAskAll();
 }
 
 /* ---------- events ---------- */
@@ -1037,10 +1382,14 @@ document.addEventListener('keydown', e => {
 });
 phoneQuery.addEventListener('change', () => { state.slide = 0; renderStage(); });
 
-/* deep links for review: #d-c opens a decision, #ov-a-0 an option, #proj groups, #focus-songmaker, #ask, #ro-h0 a read-only decision, #v-status */
+/* deep links for review: 3a #l-33-1 opens a line, #f-decided filters, #s-noaccess|empty|down|changed|already sets a state; 3b #d-c opens a decision, #ov-a-0 an option, #proj groups, #focus-songmaker, #ask, #ro-h0 a read-only decision, #v-status */
 (function fromHash(){
   const h = location.hash.slice(1);
   let m;
+  if (/^(d-|ov-|zr-|proj$|focus-|ask-|ro-)/.test(h)) state.variant = '3b';
+  if ((m = h.match(/^s-(noaccess|empty|down|changed|already)$/))) state.sim = m[1];
+  else if ((m = h.match(/^l-(\d+-\d+)$/))) { state.lineKey = m[1]; state.lineOpen = true; }
+  else if ((m = h.match(/^f-(open|decided|later|all)$/))) state.f.status = m[1];
   if ((m = h.match(/^d-(\w)$/))) { state.openId = m[1]; state.phoneOpen = true; }
   else if ((m = h.match(/^ov-(\w)-(\d)$/))) { state.openId = m[1]; state.phoneOpen = true; state.ovIdx = +m[2]; }
   else if ((m = h.match(/^zr-(\w)-(\d)$/))) { state.openId = m[1]; state.phoneOpen = true; state.ovIdx = +m[2]; state.ovFrame = 'zeit'; }
