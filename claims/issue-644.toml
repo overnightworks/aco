@@ -1,8 +1,0 @@
-claim_id = "de25948f684041039d614043f1daef03"
-agent = "Claude 255c9087-94fa-477f-af88-8eb64e5acd39"
-role = "builder"
-base = "f3f2cdb70725b595bec806e5f5ed728840ba2644"
-branch = "claude/issue-644-remove-board-serve"
-scope = ["README.md", "pyproject.toml", "scripts/test_budget_ratchet.txt", "scripts/vulture_whitelist.py", "sonar-project.properties", "specs", "src/agent_coordination", "tests"]
-opened_commit = "a8f29be16c66246af5531b6b7daf70bbea1d6c49"
-whole_reason = "Entfernen einer öffentlichen Fläche berührt Code, Tests, Spezifikationen und Doku gemeinsam; halb entfernt wäre schlimmer."
