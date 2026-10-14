@@ -1,0 +1,7 @@
+claim_id = "23fe525f5a7245769dda77cfb66cf2f9"
+agent = "claude-head"
+role = "builder"
+base = "46d07285a4644dc25d0f343e3003329a5d0b2aba"
+branch = "claude-head/issue-22-state-fetch-no-maintenance"
+scope = ["specs/ref-store-cas.spec.md", "src/agent_coordination/store.py", "tests/test_store.py"]
+opened_commit = "e212825f076a8b5e65a3b4349d2fb3da8764e44a"
