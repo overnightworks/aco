@@ -178,6 +178,16 @@ _MAX_TRANSITION_ATTEMPTS = 32
 _LINEAGE_STAMP_DIRECTORY = "aco"
 _LINEAGE_STAMP_FILENAME = "last-oid"
 
+# The options every state-store fetch carries, so a fetch writes only objects
+# and the ref its own refspec names. `--no-tags` and `--no-write-fetch-head`
+# keep it out of the shared `refs/tags/*` and `FETCH_HEAD` (issue #298 finding
+# 2; `_fetch_into_anchor` and `_fetch_ref_objects` say why per caller).
+# `--no-auto-maintenance` keeps it from starting a repack of the object store
+# every linked worktree shares: since git 2.54 that repack can `rmdir` an
+# empty `objects/xx` under another agent's concurrent `hash-object -w`
+# (issue #22).
+_STATE_FETCH_OPTIONS = ("--no-tags", "--no-write-fetch-head", "--no-auto-maintenance")
+
 # `fetch_state` fetches `STATE_REF` straight into this ref through the
 # fetch's own destination refspec, instead of reading the tip back from
 # `FETCH_HEAD`. One mechanism now settles two separate problems:
@@ -711,7 +721,7 @@ def _fetch_into_anchor(worktree: Path, remote: str) -> ObjectId:
     side effect aco wants from this fetch.
     """
     refspec = f"+{STATE_REF}:{_FETCH_ANCHOR_REF}"
-    result = _run_git(worktree, ["fetch", "--no-tags", "--no-write-fetch-head", remote, refspec])
+    result = _run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, refspec])
     if result.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")
@@ -737,7 +747,7 @@ def _fetch_ref_objects(worktree: Path, remote: str) -> None:
     auto-following into the shared local `refs/tags/*` namespace -- the
     write-nothing contract issue #298 finding 2 requires of it.
     """
-    result = _run_git(worktree, ["fetch", "--no-tags", "--no-write-fetch-head", remote, STATE_REF])
+    result = _run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, STATE_REF])
     if result.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")

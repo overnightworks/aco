@@ -103,10 +103,14 @@ def _git(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 @pytest.fixture
 def bare_remote(tmp_path: Path) -> Path:
-    """An empty bare repository standing in for the canonical remote."""
+    """An empty bare repository standing in for the canonical remote.
+
+    `maintenance.auto=false` keeps `receive-pack` from starting maintenance
+    here, so a client-side maintenance assertion sees only its own fetch."""
     remote = tmp_path / "remote.git"
     remote.mkdir()
     _git("init", "--bare", "-b", "main", cwd=remote)
+    _git("config", "maintenance.auto", "false", cwd=remote)
     return remote
 
 
@@ -1067,6 +1071,43 @@ def test_first_fetch_in_a_worktree_accepts_any_tip_without_a_prior_stamp(
     state = store.fetch_state(worktree=fresh, remote=str(bare_remote))
 
     assert state.tip is not None
+
+
+@pytest.mark.parametrize(
+    "state_fetch",
+    [
+        pytest.param(store.fetch_state, id="fetch_state"),
+        pytest.param(store.peek_state, id="peek_state"),
+    ],
+)
+def test_a_state_fetch_starts_no_git_maintenance_on_the_shared_object_store(
+    bare_remote: Path, worktree: Path, tmp_path: Path, state_fetch: Callable[..., object]
+) -> None:
+    """Issue #22: a fetch-started repack of the object store linked
+    worktrees share can remove an `objects/xx` directory under another
+    agent's concurrent `hash-object -w`. The reader is forced to run
+    loose-objects maintenance in the foreground on every auto run, so a
+    fetch that started maintenance would leave a `loose-*.pack` behind."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    reader = tmp_path / "reader"
+    reader.mkdir()
+    _git("init", "-b", "main", cwd=reader)
+    (reader / "README").write_text("loose object\n")
+    _git("add", "README", cwd=reader)
+    _git("commit", "-m", "loose objects", cwd=reader)
+    for key, value in [
+        ("maintenance.autoDetach", "false"),
+        ("maintenance.loose-objects.enabled", "true"),
+        ("maintenance.loose-objects.auto", "-1"),
+    ]:
+        _git("config", key, value, cwd=reader)
+    objects = reader / ".git" / "objects"
+    loose_objects_before = set(objects.glob("??/*"))
+
+    state_fetch(worktree=reader, remote=str(bare_remote))
+
+    assert list(objects.glob("pack/loose-*.pack")) == []
+    assert loose_objects_before <= set(objects.glob("??/*"))
 
 
 def test_linked_worktrees_fetch_concurrently_and_write_distinct_lineage_stamps(
