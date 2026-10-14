@@ -179,7 +179,7 @@ cannot read needs `--force-unreadable` besides (`specs/reset.spec.md`).
 - No refusal advises deleting or force-pushing `refs/aco/state` by hand: a stuck ref names only `aco reset`, which exports the state into a bundle by default before it deletes anything (CAS-15).
 - A worktree's own lineage stamp and fetch anchor are never shared with another linked worktree of the same checkout: each has its own git-dir.
 - A malformed fetched tree is never partially trusted: the whole read fails loud (CAS-22..38), never a single quarantined claim or resource; a malformed item file alone is refused only by its own read (`specs/item.spec.md` ITEM-38) and the writes `specs/storage-pin.spec.md` PIN-29 names, every board read lists it (`specs/board.spec.md` BOARD-54), and ITEM-42 alone reads its still-valid `record.title`.
-- No state-store fetch ever lands a tag or `FETCH_HEAD`: each carries `--no-tags --no-write-fetch-head`, so it writes only objects and the ref its own refspec names (issue #298 finding 2).
+- No state-store fetch ever lands a tag or `FETCH_HEAD` or starts git maintenance: each carries `--no-tags --no-write-fetch-head --no-auto-maintenance`, so it writes only objects and the ref its own refspec names (issue #298 finding 2), and never repacks the object store linked worktrees share under another agent's concurrent object write (issue #22).
 - A read that does not advance local state (CAS-49) never writes this worktree's fetch anchor or lineage stamp; only an anchoring fetch (CAS-07) moves `refs/worktree/aco/state` and that stamp.
 
 ## Examples
