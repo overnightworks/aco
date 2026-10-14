@@ -33,8 +33,8 @@ homes the per-module copies should move into)
     or plain) whose body calls one of ``SETUP_CALL_NAMES`` with one of ``SETUP_COMMANDS`` as
     its first argument: the per-module setup-wrapper copies a shared fixture should replace.
     aco has not named such a call-and-command pair yet (no scaffolding CLI a test wraps
-    per-module the way the earlier project's tests wrap ``invoke_cli("init"/"add", ...)``), so both sets
-    are empty below and this metric reads 0 until one is named.
+    per-module the way the earlier project's tests wrap ``invoke_cli("init"/"add", ...)``),
+    so both sets are empty below and this metric reads 0 until one is named.
 (f) ``literal_siblings`` -- test names in one scope (a class, or the module's top level)
     that differ only by a token in ``SIBLING_TOKEN_GROUPS``: the names are normalised by
     replacing those ``_``-delimited tokens with a placeholder per group, and each group of
