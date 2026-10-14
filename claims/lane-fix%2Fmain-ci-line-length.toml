@@ -1,7 +1,0 @@
-claim_id = "9c31e9f103a246b2bd46544ed06f125d"
-agent = "claude-head"
-role = "builder"
-base = "016e17901e83e9a8d58cc74b24b3aa82d637f917"
-branch = "fix/main-ci-line-length"
-scope = ["scripts/test_budget.py"]
-opened_commit = "e4584ab78f46660dd048a6069295275c11a24eb5"
