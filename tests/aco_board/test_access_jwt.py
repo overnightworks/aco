@@ -943,16 +943,20 @@ def test_https_fetch_gives_up_on_a_stalled_network_at_its_deadline(
 
 
 # A child interpreter, so the lookup it strands cannot reach another test.
+# Each lookup the system resolver is stuck in holds the thread that called it.
 _FETCHES_DURING_ONE_STALLED_LOOKUP = """
 import contextlib, socket, threading
-threads_before = threading.active_count()
 from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
 
-socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
+stranded_lookups = []
+def stall(*args, **_kwargs):
+    stranded_lookups.append(args)
+    threading.Event().wait()
+socket.getaddrinfo = stall
 for _ in range(3):
     with contextlib.suppress(KeySetFetchError):
         fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
-print(threading.active_count() - threads_before)
+print(len(stranded_lookups))
 """
 # A child held at exit by its stranded lookup never finishes; one that is not
 # finishes in the time its imports take.
@@ -991,26 +995,39 @@ for _ in range(100):
 print(refused)
 """
 
-# A thread start this slow would hold a fetch that starts its resolver itself
-# many times past its deadline.
+# Threads that come up this late would hold an import or a fetch that waits
+# for one many times past the fetch's deadline.
 _SLOW_THREAD_START_SECONDS = 5.0
-_FETCH_WHILE_THREADS_START_SLOWLY = f"""
-import socket, threading, time
-from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
+# Every thread comes up late from before the import on: a start that waits for
+# its thread waits that long, and a thread started without waiting runs that
+# late. The child prints how long the import took, then how long the fetch did.
+_IMPORT_AND_FETCH_WHILE_THREADS_START_SLOWLY = f"""
+import _thread, socket, threading, time
 
-socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
+def run_late(function):
+    def late(*args):
+        time.sleep({_SLOW_THREAD_START_SECONDS})
+        function(*args)
+    return late
+start_new_thread = _thread.start_new_thread
+_thread.start_new_thread = lambda function, args: start_new_thread(run_late(function), args)
 start_thread = threading.Thread.start
 def start_slowly(thread):
     time.sleep({_SLOW_THREAD_START_SECONDS})
     start_thread(thread)
 threading.Thread.start = start_slowly
-started = time.monotonic()
+
+import_started = time.monotonic()
+from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
+print(time.monotonic() - import_started)
+socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
+fetch_started = time.monotonic()
 try:
     fetch_key_set_over_https(
         "https://team.example/certs", deadline_seconds={_STALL_DEADLINE_SECONDS}
     )
 except KeySetFetchError:
-    print(time.monotonic() - started)
+    print(time.monotonic() - fetch_started)
 """
 
 
@@ -1035,10 +1052,13 @@ def test_a_stalled_name_resolution_refuses_further_lookups_at_once_instead_of_qu
     assert _run_child(_FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS) == "100"
 
 
-def test_a_slow_thread_start_never_holds_a_fetch_past_its_deadline() -> None:
-    elapsed = float(_run_child(_FETCH_WHILE_THREADS_START_SLOWLY))
+def test_a_slow_thread_start_holds_neither_the_import_nor_a_fetch_past_its_deadline() -> None:
+    import_seconds, fetch_seconds = map(
+        float, _run_child(_IMPORT_AND_FETCH_WHILE_THREADS_START_SLOWLY).split()
+    )
 
-    assert elapsed < _STALL_DEADLINE_SECONDS + _SCHEDULING_SLACK_SECONDS
+    assert import_seconds < _SLOW_THREAD_START_SECONDS
+    assert fetch_seconds < _STALL_DEADLINE_SECONDS + _SCHEDULING_SLACK_SECONDS
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(

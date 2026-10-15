@@ -20,6 +20,7 @@ the last good set; that set expires on the injected monotonic clock.
 
 from __future__ import annotations
 
+import _thread
 import base64
 import contextlib
 import http.client
@@ -325,20 +326,22 @@ class _NameResolver:
     only stop waiting for it, and only the system resolver ends a lookup. One
     thread for every lookup and a bounded line of lookups waiting for it bound
     what a stalled resolver holds: a lookup that finds the line full is refused
-    at once, a lookup whose caller gave up before it started is skipped, and as
-    a daemon the thread never holds the interpreter's exit. The thread starts
-    with the resolver, because `Thread.start` waits for it without a timeout
-    and no lookup's deadline could bound that wait."""
+    at once, and a lookup whose caller gave up before it started is skipped.
+
+    The first lookup starts the thread through `_thread`, which neither waits
+    for the thread to run, as `threading.Thread.start` does without a timeout,
+    nor joins it at the interpreter's exit. A thread that comes up late only
+    keeps the lookup waiting, and that wait is held to the lookup's deadline."""
 
     def __init__(self) -> None:
         self._lookups: queue.Queue[tuple[Future[list[_AddressInfo]], str, int]] = queue.Queue(
             maxsize=_WAITING_NAME_LOOKUPS_LIMIT
         )
-        threading.Thread(
-            target=self._resolve_forever, name="key-set-name-resolver", daemon=True
-        ).start()
+        self._start_lock = threading.Lock()
+        self._started = False
 
     def addresses(self, host: str, port: int, deadline: float) -> list[_AddressInfo]:
+        self._start_resolving_once()
         lookup: Future[list[_AddressInfo]] = Future()
         try:
             self._lookups.put_nowait((lookup, host, port))
@@ -350,6 +353,12 @@ class _NameResolver:
             raise _deadline_passed() from error
         finally:
             lookup.cancel()
+
+    def _start_resolving_once(self) -> None:
+        with self._start_lock:
+            if not self._started:
+                _thread.start_new_thread(self._resolve_forever, ())
+                self._started = True
 
     def _resolve_forever(self) -> NoReturn:
         while True:
