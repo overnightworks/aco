@@ -831,7 +831,36 @@ def https_key_set_server(
         serving.join(timeout=10)
 
 
-def test_https_fetch_returns_the_served_key_set(https_key_set_server: HttpsKeySetServer) -> None:
+# A family the host refuses to open a socket for, as a host booted without
+# IPv6 refuses an IPv6 answer.
+_UNOPENABLE_ADDRESS = (
+    max(socket.AddressFamily) + 1,
+    socket.SOCK_STREAM,
+    socket.IPPROTO_TCP,
+    "",
+    ("::1", 443),
+)
+
+
+@pytest.mark.parametrize(
+    "addresses_before_the_server",
+    [
+        pytest.param([], id="the-server-is-the-only-address"),
+        pytest.param([_UNOPENABLE_ADDRESS], id="an-address-the-host-cannot-open-comes-first"),
+    ],
+)
+def test_https_fetch_returns_the_served_key_set(
+    https_key_set_server: HttpsKeySetServer,
+    monkeypatch: pytest.MonkeyPatch,
+    addresses_before_the_server: list[tuple[object, ...]],
+) -> None:
+    resolve = socket.getaddrinfo
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: addresses_before_the_server + resolve(*args, **kwargs),
+    )
+
     document = fetch_key_set_over_https(f"{https_key_set_server.base_url}/certs")
 
     assert json.loads(document)["keys"][0]["kid"] == "current-key"

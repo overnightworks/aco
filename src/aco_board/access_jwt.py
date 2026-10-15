@@ -290,12 +290,14 @@ def _connect_before(deadline: float, host: str, port: int) -> socket.socket:
     failure = OSError(f"{host} resolved to no address")
     for family, kind, protocol, _canonical_name, address in addresses:
         time_left = _time_left_before(deadline)
-        connection = socket.socket(family, kind, protocol)
+        connection = None
         try:
+            connection = socket.socket(family, kind, protocol)
             connection.settimeout(time_left)
             connection.connect(address)
         except OSError as error:
-            connection.close()
+            if connection is not None:
+                connection.close()
             failure = error
         else:
             return connection
