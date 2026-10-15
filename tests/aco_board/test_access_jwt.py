@@ -945,10 +945,10 @@ def test_https_fetch_gives_up_on_a_stalled_network_at_its_deadline(
 # A child interpreter, so the lookup it strands cannot reach another test.
 _FETCHES_DURING_ONE_STALLED_LOOKUP = """
 import contextlib, socket, threading
+threads_before = threading.active_count()
 from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
 
 socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
-threads_before = threading.active_count()
 for _ in range(3):
     with contextlib.suppress(KeySetFetchError):
         fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
@@ -980,23 +980,23 @@ for _ in range(100):
 print(refused)
 """
 
-# The resolver thread takes as long to start as the whole fetch may; a fetch
-# that waits for its lookup the full deadline after that overshoots it twice.
-_SLOW_RESOLVER_START_SECONDS = 2.0
-_FETCH_WHILE_THE_RESOLVER_STARTS_SLOWLY = f"""
+# A thread start this slow would hold a fetch that starts its resolver itself
+# many times past its deadline.
+_SLOW_THREAD_START_SECONDS = 5.0
+_FETCH_WHILE_THREADS_START_SLOWLY = f"""
 import socket, threading, time
 from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
 
 socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
 start_thread = threading.Thread.start
 def start_slowly(thread):
-    time.sleep({_SLOW_RESOLVER_START_SECONDS})
+    time.sleep({_SLOW_THREAD_START_SECONDS})
     start_thread(thread)
 threading.Thread.start = start_slowly
 started = time.monotonic()
 try:
     fetch_key_set_over_https(
-        "https://team.example/certs", deadline_seconds={_SLOW_RESOLVER_START_SECONDS}
+        "https://team.example/certs", deadline_seconds={_STALL_DEADLINE_SECONDS}
     )
 except KeySetFetchError:
     print(time.monotonic() - started)
@@ -1024,10 +1024,10 @@ def test_a_stalled_name_resolution_refuses_further_lookups_at_once_instead_of_qu
     assert _run_child(_FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS) == "100"
 
 
-def test_a_slow_resolver_start_counts_against_the_fetch_deadline() -> None:
-    elapsed = float(_run_child(_FETCH_WHILE_THE_RESOLVER_STARTS_SLOWLY))
+def test_a_slow_thread_start_never_holds_a_fetch_past_its_deadline() -> None:
+    elapsed = float(_run_child(_FETCH_WHILE_THREADS_START_SLOWLY))
 
-    assert elapsed < _SLOW_RESOLVER_START_SECONDS + _SCHEDULING_SLACK_SECONDS
+    assert elapsed < _STALL_DEADLINE_SECONDS + _SCHEDULING_SLACK_SECONDS
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(

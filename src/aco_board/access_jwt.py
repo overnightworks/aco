@@ -326,18 +326,20 @@ class _NameResolver:
     thread for every lookup and a bounded line of lookups waiting for it bound
     what a stalled resolver holds: a lookup that finds the line full is refused
     at once, a lookup whose caller gave up before it started is skipped, and as
-    a daemon the thread never holds the interpreter's exit."""
+    a daemon the thread never holds the interpreter's exit. The thread starts
+    with the resolver, because `Thread.start` waits for it without a timeout
+    and no lookup's deadline could bound that wait."""
 
     def __init__(self) -> None:
         self._lookups: queue.Queue[tuple[Future[list[_AddressInfo]], str, int]] = queue.Queue(
             maxsize=_WAITING_NAME_LOOKUPS_LIMIT
         )
-        self._worker_start = threading.Lock()
-        self._worker: threading.Thread | None = None
+        threading.Thread(
+            target=self._resolve_forever, name="key-set-name-resolver", daemon=True
+        ).start()
 
     def addresses(self, host: str, port: int, deadline: float) -> list[_AddressInfo]:
         lookup: Future[list[_AddressInfo]] = Future()
-        self._start_worker_once()
         try:
             self._lookups.put_nowait((lookup, host, port))
         except queue.Full as error:
@@ -348,14 +350,6 @@ class _NameResolver:
             raise _deadline_passed() from error
         finally:
             lookup.cancel()
-
-    def _start_worker_once(self) -> None:
-        with self._worker_start:
-            if self._worker is None:
-                self._worker = threading.Thread(
-                    target=self._resolve_forever, name="key-set-name-resolver", daemon=True
-                )
-                self._worker.start()
 
     def _resolve_forever(self) -> NoReturn:
         while True:
