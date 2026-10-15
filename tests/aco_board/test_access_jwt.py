@@ -583,6 +583,7 @@ def _defective_key_sets() -> list[Any]:
             json.dumps({"keys": [valid_jwk]}).encode()[:-1] + b', "extra": 1e999999}',
             id="number-overflowing-to-infinity",
         ),
+        pytest.param(gzip.compress(_key_set_document(valid_jwk)), id="compressed"),
     ]
 
 
