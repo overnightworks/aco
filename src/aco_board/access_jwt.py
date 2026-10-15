@@ -405,7 +405,7 @@ def _public_signing_key(jwk: object) -> tuple[str, RSAPublicKey]:
         raise _InvalidKeySetError("key is not an object")
     if jwk.get("kty") != "RSA" or _PRIVATE_RSA_MEMBERS & jwk.keys():
         raise _InvalidKeySetError("key is not a public RSA key")
-    if jwk.get("alg", _ALGORITHM) != _ALGORITHM or jwk.get("use", "sig") != "sig":
+    if not _is_rs256_verification_key(jwk):
         raise _InvalidKeySetError("key is not an RS256 signing key")
     key_id = jwk.get("kid")
     modulus, exponent = jwk.get("n"), jwk.get("e")
@@ -420,6 +420,18 @@ def _public_signing_key(jwk: object) -> tuple[str, RSAPublicKey]:
     if key.key_size < MIN_RSA_KEY_BITS:
         raise _InvalidKeySetError(f"key {key_id!r} is shorter than {MIN_RSA_KEY_BITS} bits")
     return key_id, key
+
+
+def _is_rs256_verification_key(jwk: Mapping[str, object]) -> bool:
+    """A key may limit itself by `alg`, `use` and `key_ops`; each it names
+    must allow verifying an RS256 signature."""
+    key_operations = jwk.get("key_ops", ["verify"])
+    return (
+        jwk.get("alg", _ALGORITHM) == _ALGORITHM
+        and jwk.get("use", "sig") == "sig"
+        and isinstance(key_operations, list)
+        and "verify" in key_operations
+    )
 
 
 def _base64url_unsigned(value: str) -> int:

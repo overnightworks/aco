@@ -520,6 +520,14 @@ def _defective_key_sets() -> list[Any]:
             _key_set_document(_public_jwk(current, "current-key", use="enc")), id="key-use-enc"
         ),
         pytest.param(
+            _key_set_document(_public_jwk(current, "current-key", key_ops=["encrypt"])),
+            id="key-ops-without-verify",
+        ),
+        pytest.param(
+            _key_set_document(_public_jwk(current, "current-key", key_ops="verify")),
+            id="key-ops-not-a-list",
+        ),
+        pytest.param(
             _key_set_document(_public_jwk(current, "current-key", kid=7)), id="key-kid-not-a-string"
         ),
         pytest.param(
@@ -544,6 +552,14 @@ def test_a_defective_key_set_is_refused_as_a_whole(
     access.serve(response)
 
     assert access.verifier.verify(access.token()) == Rejected(RejectionReason.KEY_SET_UNAVAILABLE)
+
+
+def test_a_key_whose_key_ops_include_verify_is_accepted(access: AccessScenario) -> None:
+    access.serve(
+        _key_set_document(_public_jwk(_rsa_key("current"), "current-key", key_ops=["verify"]))
+    )
+
+    assert access.verifier.verify(access.token()) == Verified("operator@example.org")
 
 
 @pytest.mark.parametrize("response", _defective_key_sets())
