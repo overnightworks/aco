@@ -458,6 +458,15 @@ _DEEP_ARRAY = "[" * 2_000 + "]" * 2_000
             RejectionReason.MALFORMED_TOKEN,
             id="claim-with-a-non-json-constant",
         ),
+        pytest.param(
+            lambda access: _jws(
+                {"alg": "RS256", "kid": "current-key"},
+                '{"score": -1e999999}',
+                _rs256(_rsa_key("current")),
+            ),
+            RejectionReason.MALFORMED_TOKEN,
+            id="claim-overflowing-to-infinity",
+        ),
     ],
 )
 def test_a_defective_token_is_refused_with_its_reason(
@@ -568,6 +577,10 @@ def _defective_key_sets() -> list[Any]:
         pytest.param(
             json.dumps({"keys": [valid_jwk], "extra": float("nan")}).encode(),
             id="non-json-constant",
+        ),
+        pytest.param(
+            json.dumps({"keys": [valid_jwk]}).encode()[:-1] + b', "extra": 1e999999}',
+            id="number-overflowing-to-infinity",
         ),
     ]
 

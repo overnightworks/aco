@@ -24,6 +24,7 @@ import base64
 import contextlib
 import http.client
 import json
+import math
 import re
 import socket
 import ssl
@@ -418,6 +419,7 @@ def _strict_json_object(document: bytes) -> dict[str, object]:
             text,
             object_pairs_hook=_object_without_duplicates,
             parse_constant=_refuse_non_json_constant,
+            parse_float=_finite_number,
         )
     except ValueError as error:
         raise _RefusalError(RejectionReason.MALFORMED_TOKEN) from error
@@ -457,6 +459,15 @@ def _object_without_duplicates(members: list[tuple[str, object]]) -> dict[str, o
 def _refuse_non_json_constant(constant: str) -> NoReturn:
     """The stdlib parser reads `NaN`, `Infinity` and `-Infinity`; JSON has none."""
     raise ValueError(f"{constant} is not JSON")
+
+
+def _finite_number(literal: str) -> float:
+    """A literal such as `1e999999` is valid JSON that `float` rounds to an
+    infinity, the value `_refuse_non_json_constant` keeps out."""
+    number = float(literal)
+    if not math.isfinite(number):
+        raise ValueError(f"{literal} overflows to a non-finite number")
+    return number
 
 
 def _parse_key_set(document: bytes) -> Mapping[str, RSAPublicKey]:
