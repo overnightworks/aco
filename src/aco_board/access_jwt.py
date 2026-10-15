@@ -313,18 +313,24 @@ _AddressInfo = tuple[
 ]
 
 
+# A verifier fetches single-flight, so a second lookup waiting behind the one
+# in progress means the resolver is stalled.
+_WAITING_NAME_LOOKUPS_LIMIT = 1
+
+
 class _NameResolver:
     """Resolves names on one daemon thread for the whole process.
 
     `getaddrinfo` takes no timeout and cannot be interrupted, so a caller can
     only stop waiting for it, and only the system resolver ends a lookup. One
-    thread for every lookup bounds what a stalled resolver holds to that thread,
-    a lookup whose caller gave up before it started is skipped, and as a daemon
-    the thread never holds the interpreter's exit."""
+    thread for every lookup and a bounded line of lookups waiting for it bound
+    what a stalled resolver holds: a lookup that finds the line full is refused
+    at once, a lookup whose caller gave up before it started is skipped, and as
+    a daemon the thread never holds the interpreter's exit."""
 
     def __init__(self) -> None:
-        self._lookups: queue.SimpleQueue[tuple[Future[list[_AddressInfo]], str, int]] = (
-            queue.SimpleQueue()
+        self._lookups: queue.Queue[tuple[Future[list[_AddressInfo]], str, int]] = queue.Queue(
+            maxsize=_WAITING_NAME_LOOKUPS_LIMIT
         )
         self._worker_start = threading.Lock()
         self._worker: threading.Thread | None = None
@@ -333,7 +339,10 @@ class _NameResolver:
         time_left = _time_left_before(deadline)
         lookup: Future[list[_AddressInfo]] = Future()
         self._start_worker_once()
-        self._lookups.put((lookup, host, port))
+        try:
+            self._lookups.put_nowait((lookup, host, port))
+        except queue.Full as error:
+            raise KeySetFetchError(f"name resolution for {host} is stalled") from error
         try:
             return lookup.result(timeout=time_left)
         except TimeoutError as error:

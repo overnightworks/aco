@@ -959,16 +959,47 @@ print(threading.active_count() - threads_before)
 _CHILD_EXIT_TIMEOUT_SECONDS = 20
 
 
-def test_a_stalled_name_resolution_holds_one_thread_and_never_the_interpreter_exit() -> None:
+# Every fetch after the stalled lookup and the one waiting behind it is given
+# a deadline the child cannot outwait; only a refusal at once lets it finish.
+_FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS = f"""
+import contextlib, socket, threading
+from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
+
+socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
+for _ in range(2):
+    with contextlib.suppress(KeySetFetchError):
+        fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
+refused = 0
+for _ in range(100):
+    try:
+        fetch_key_set_over_https(
+            "https://team.example/certs", deadline_seconds={2 * _CHILD_EXIT_TIMEOUT_SECONDS}
+        )
+    except KeySetFetchError:
+        refused += 1
+print(refused)
+"""
+
+
+def _run_child(script: str) -> str:
     child = subprocess.run(
-        [sys.executable, "-c", _FETCHES_DURING_ONE_STALLED_LOOKUP],
+        [sys.executable, "-c", script],
         capture_output=True,
         text=True,
         timeout=_CHILD_EXIT_TIMEOUT_SECONDS,
         check=True,
     )
+    return child.stdout.strip()
 
-    assert child.stdout.strip() == "1"
+
+def test_a_stalled_name_resolution_holds_one_thread_and_never_the_interpreter_exit() -> None:
+    assert _run_child(_FETCHES_DURING_ONE_STALLED_LOOKUP) == "1"
+
+
+def test_a_stalled_name_resolution_refuses_further_lookups_at_once_instead_of_queueing_them() -> (
+    None
+):
+    assert _run_child(_FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS) == "100"
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(
