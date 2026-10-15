@@ -10,6 +10,7 @@ HTTPS boundary, is driven against a loopback TLS server.
 from __future__ import annotations
 
 import base64
+import contextlib
 import datetime
 import hashlib
 import hmac
@@ -18,6 +19,7 @@ import json
 import ssl
 import string
 import threading
+import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -691,6 +693,11 @@ def test_a_team_name_outside_the_cloudflare_pattern_or_an_empty_audience_is_refu
 # The real HTTPS boundary, served from loopback under a self-signed certificate.
 
 
+_TRICKLE_INTERVAL_SECONDS = 0.05
+_TRICKLED_BYTES = 200
+"""Ten seconds of trickle; the fetch under test is given ten intervals."""
+
+
 @dataclass
 class HttpsKeySetServer:
     base_url: str
@@ -748,12 +755,32 @@ def https_key_set_server(
                 self.send_response(302)
                 self.send_header("Location", "/certs")
                 self.end_headers()
-                return
-            body = _key_set_document(_public_jwk(_rsa_key("current"), "current-key"))
+            elif self.path == "/trickle":
+                self._trickle(b" " * _TRICKLED_BYTES)
+            elif self.path == "/oversized":
+                self._answer(b" " * (2 * MAX_KEY_SET_BYTES))
+            else:
+                self._answer(_key_set_document(_public_jwk(_rsa_key("current"), "current-key")))
+
+        def _answer(self, body: bytes) -> None:
+            self._start_body(len(body))
+            # The fetch may hang up once it read its limit.
+            with contextlib.suppress(OSError):
+                self.wfile.write(body)
+
+        def _trickle(self, body: bytes) -> None:
+            """One byte per interval: each read finishes well inside the
+            fetch's socket timeout, the whole answer far past its deadline."""
+            self._start_body(len(body))
+            with contextlib.suppress(OSError):
+                for byte in body:
+                    self.wfile.write(bytes([byte]))
+                    time.sleep(_TRICKLE_INTERVAL_SECONDS)
+
+        def _start_body(self, length: int) -> None:
             self.send_response(200)
-            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Length", str(length))
             self.end_headers()
-            self.wfile.write(body)
 
         def log_message(self, format: str, *args: Any) -> None:
             del format, args
@@ -776,6 +803,24 @@ def test_https_fetch_returns_the_served_key_set(https_key_set_server: HttpsKeySe
     document = fetch_key_set_over_https(f"{https_key_set_server.base_url}/certs")
 
     assert json.loads(document)["keys"][0]["kid"] == "current-key"
+
+
+def test_https_fetch_gives_up_on_a_trickling_answer_at_its_deadline(
+    https_key_set_server: HttpsKeySetServer,
+) -> None:
+    with pytest.raises(KeySetFetchError):
+        fetch_key_set_over_https(
+            f"{https_key_set_server.base_url}/trickle",
+            deadline_seconds=10 * _TRICKLE_INTERVAL_SECONDS,
+        )
+
+
+def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(
+    https_key_set_server: HttpsKeySetServer,
+) -> None:
+    document = fetch_key_set_over_https(f"{https_key_set_server.base_url}/oversized")
+
+    assert len(document) == MAX_KEY_SET_BYTES + 1
 
 
 def test_https_fetch_refuses_a_certificate_the_system_does_not_trust(

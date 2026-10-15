@@ -54,8 +54,13 @@ writes.
 `src` yet: the server wiring that reads the `Cf-Access-Jwt-Assertion` header
 and builds the verifier from configuration is slice AC2 of #6. Each is a named
 future caller, and tests already drive all three.
+
+`fetch_key_set_over_https` assigns `http.client.HTTPSConnection.sock` a
+connection it opened itself so its deadline holds from the first TLS byte;
+`http.client` reads `self.sock` to send the request, not this package.
 """
 
+import http.client
 from datetime import UTC, date, datetime
 
 from aco_board.access_jwt import AccessJwtVerifier, fetch_key_set_over_https
@@ -165,6 +170,7 @@ _referenced_only_for_vulture = (
     Capability.UNSUPPORTED,
     AccessJwtVerifier.verify,
     fetch_key_set_over_https,
+    http.client.HTTPSConnection.sock,
     _BoardRequestHandler.do_GET,
     _BoardRequestHandler.do_POST,
     _BoardRequestHandler.log_message,

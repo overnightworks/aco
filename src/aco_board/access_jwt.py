@@ -21,15 +21,19 @@ the last good set; that set expires on the injected monotonic clock.
 from __future__ import annotations
 
 import base64
+import contextlib
 import http.client
 import json
 import re
+import socket
 import ssl
 import threading
-import urllib.request
-from collections.abc import Callable, Mapping
+import time
+import urllib.parse
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from http import HTTPStatus
 from types import MappingProxyType
 from typing import NoReturn, TypeGuard
 
@@ -251,23 +255,73 @@ class AccessJwtVerifier:
             self._refresh_lock.release()
 
 
-def fetch_key_set_over_https(url: str) -> bytes:
+def fetch_key_set_over_https(
+    url: str, *, deadline_seconds: float = KEY_SET_FETCH_TIMEOUT_SECONDS
+) -> bytes:
     """The production `KeySetFetch`: HTTPS only, no redirect followed, no proxy
-    from the environment, and at most one byte past the key-set limit read, so
-    the verifier refuses an oversized answer without buffering it."""
-    opener = urllib.request.OpenerDirector()
-    for handler in (
-        urllib.request.HTTPSHandler(context=_certificate_verifying_tls()),
-        urllib.request.UnknownHandler(),
-        urllib.request.HTTPErrorProcessor(),
-        urllib.request.HTTPDefaultErrorHandler(),
-    ):
-        opener.add_handler(handler)
+    from the environment, the whole exchange cut off at its deadline, and at
+    most one byte past the key-set limit read, so the verifier refuses an
+    oversized answer without buffering it."""
+    deadline = time.monotonic() + deadline_seconds
+    origin = urllib.parse.urlsplit(url)
+    host = origin.hostname
+    if origin.scheme != "https" or not host:
+        raise KeySetFetchError(f"refusing to fetch the key set from {url}: not an https URL")
+    port = origin.port or http.client.HTTPS_PORT
     try:
-        with opener.open(url, timeout=KEY_SET_FETCH_TIMEOUT_SECONDS) as response:
-            return response.read(MAX_KEY_SET_BYTES + 1)
+        with (
+            socket.create_connection((host, port), timeout=deadline_seconds) as connection,
+            _cut_off_at(deadline, connection),
+        ):
+            return _get_over_tls(connection, host, port, origin.path or "/")
     except (OSError, http.client.HTTPException) as error:
         raise KeySetFetchError(f"fetching the key set from {url} failed: {error}") from error
+
+
+def _get_over_tls(connection: socket.socket, host: str, port: int, path: str) -> bytes:
+    tls = _certificate_verifying_tls()
+    # Handed the connection ready-made, so `_cut_off_at` holds it from the
+    # first TLS byte; `http.client` follows no redirect and reads no proxy.
+    exchange = http.client.HTTPSConnection(host, port, context=tls)
+    try:
+        exchange.sock = tls.wrap_socket(connection, server_hostname=host)
+        exchange.request("GET", path)
+        response = exchange.getresponse()
+        if response.status != HTTPStatus.OK:
+            raise KeySetFetchError(f"the key set origin answered {response.status}, not 200")
+        return response.read(MAX_KEY_SET_BYTES + 1)
+    finally:
+        exchange.close()
+
+
+@contextlib.contextmanager
+def _cut_off_at(deadline: float, connection: socket.socket) -> Iterator[None]:
+    """Shuts `connection` down at `deadline`, wherever the exchange stands.
+    The socket timeout bounds each read alone, so without this a peer sending
+    a byte just inside it would hold the refresh, and its lock, indefinitely."""
+    # A duplicate descriptor stays usable after TLS takes `connection` over,
+    # and shutting it down ends the one connection both name.
+    watched = connection.dup()
+    cut_off = threading.Event()
+
+    def shut_down() -> None:
+        cut_off.set()
+        # A connection the peer already broke needs no cutting.
+        with contextlib.suppress(OSError):
+            watched.shutdown(socket.SHUT_RDWR)
+
+    timer = threading.Timer(deadline - time.monotonic(), shut_down)
+    timer.daemon = True
+    timer.start()
+    try:
+        yield
+    finally:
+        timer.cancel()
+        timer.join()
+        watched.close()
+    # A body cut short reads as a short body, not as an error.
+    if cut_off.is_set():
+        raise KeySetFetchError("the key set fetch passed its deadline")
 
 
 def _certificate_verifying_tls() -> ssl.SSLContext:
