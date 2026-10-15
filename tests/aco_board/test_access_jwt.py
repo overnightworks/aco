@@ -20,6 +20,7 @@ import json
 import ssl
 import string
 import threading
+import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -723,10 +724,16 @@ def test_a_team_name_outside_the_cloudflare_pattern_or_an_empty_audience_is_refu
 # The real HTTPS boundary, served from loopback under a self-signed certificate.
 
 
+_SILENT_HOLD_SECONDS = 10
+"""How long `/silent` keeps a request unanswered unless the test releases it."""
+
+
 @dataclass
 class HttpsKeySetServer:
     base_url: str
     requested_paths: list[str]
+    silent_request_arrived: threading.Event
+    release_silent_request: threading.Event
 
 
 def _served_key_set() -> bytes:
@@ -780,16 +787,18 @@ def https_key_set_server(
     certificate_path, key_path = _self_signed_loopback_certificate(tmp_path)
     monkeypatch.setenv("SSL_CERT_FILE", str(certificate_path))
     requested_paths: list[str] = []
+    silent_request_arrived, release_silent_request = threading.Event(), threading.Event()
 
     class KeySetHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             requested_paths.append(self.path)
-            if self.path == "/moved":
-                self.send_response(302)
-                self.send_header("Location", "/certs")
-                self.end_headers()
+            if self.path == "/silent":
+                silent_request_arrived.set()
+                release_silent_request.wait(timeout=_SILENT_HOLD_SECONDS)
+            elif self.path == "/moved":
+                self._send_head(302, {"Location": "/certs", "Content-Length": "0"})
             elif self.path == "/missing":
-                self.send_error(404)
+                self._send_head(404, {"Content-Length": "0"})
             elif self.path == "/oversized":
                 self._answer(b" " * (2 * MAX_KEY_SET_BYTES))
             elif self.path == "/compressed":
@@ -798,17 +807,22 @@ def https_key_set_server(
                 self._answer(_served_key_set())
 
         def _answer(self, body: bytes, content_encoding: str | None = None) -> None:
-            self._start_body(len(body), content_encoding)
+            headers = {"Content-Length": str(len(body))}
+            if content_encoding is not None:
+                headers["Content-Encoding"] = content_encoding
+            self._send_head(200, headers)
             # The fetch may hang up once it read its limit.
             with contextlib.suppress(OSError):
                 self.wfile.write(body)
 
-        def _start_body(self, length: int, content_encoding: str | None = None) -> None:
-            self.send_response(200)
-            self.send_header("Content-Length", str(length))
-            if content_encoding is not None:
-                self.send_header("Content-Encoding", content_encoding)
-            self.end_headers()
+        def _send_head(self, status: int, headers: dict[str, str]) -> None:
+            # The fetch may already have hung up, refusing the certificate or
+            # the answer.
+            with contextlib.suppress(OSError):
+                self.send_response(status)
+                for name, value in headers.items():
+                    self.send_header(name, value)
+                self.end_headers()
 
         def log_message(self, format: str, *args: Any) -> None:
             del format, args
@@ -820,8 +834,14 @@ def https_key_set_server(
     serving = threading.Thread(target=server.serve_forever, daemon=True)
     serving.start()
     try:
-        yield HttpsKeySetServer(f"https://127.0.0.1:{server.server_port}", requested_paths)
+        yield HttpsKeySetServer(
+            f"https://127.0.0.1:{server.server_port}",
+            requested_paths,
+            silent_request_arrived,
+            release_silent_request,
+        )
     finally:
+        release_silent_request.set()
         server.shutdown()
         server.server_close()
         serving.join(timeout=10)
@@ -831,6 +851,40 @@ def test_https_fetch_returns_the_served_key_set(https_key_set_server: HttpsKeySe
     document = fetch_key_set_over_https(f"{https_key_set_server.base_url}/certs")
 
     assert json.loads(document)["keys"][0]["kid"] == "current-key"
+
+
+def test_https_fetch_gives_up_on_an_origin_silent_past_the_read_timeout(
+    https_key_set_server: HttpsKeySetServer,
+) -> None:
+    started = time.monotonic()
+    with pytest.raises(KeySetFetchError):
+        fetch_key_set_over_https(f"{https_key_set_server.base_url}/silent", timeout_seconds=0.2)
+
+    assert time.monotonic() - started < _SILENT_HOLD_SECONDS / 2
+
+
+def test_a_request_during_a_stalled_key_set_fetch_is_refused_without_waiting(
+    https_key_set_server: HttpsKeySetServer, access: AccessScenario
+) -> None:
+    verifier = AccessJwtVerifier(
+        team=access.team,
+        audience=access.audience,
+        fetch_key_set=lambda _url: fetch_key_set_over_https(
+            f"{https_key_set_server.base_url}/silent"
+        ),
+        wall_clock=access.wall_clock,
+        monotonic_clock=access.monotonic_clock,
+    )
+    token = access.token()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        refreshing = pool.submit(verifier.verify, token)
+        assert https_key_set_server.silent_request_arrived.wait(timeout=10)
+
+        assert verifier.verify(token) == Rejected(RejectionReason.KEY_SET_UNAVAILABLE)
+        assert not refreshing.done()
+
+        https_key_set_server.release_silent_request.set()
+        assert refreshing.result(timeout=10) == Rejected(RejectionReason.KEY_SET_UNAVAILABLE)
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(
