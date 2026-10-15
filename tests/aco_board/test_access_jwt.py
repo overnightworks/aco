@@ -19,6 +19,8 @@ import json
 import socket
 import ssl
 import string
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -909,6 +911,35 @@ def test_https_fetch_gives_up_on_a_stalled_network_at_its_deadline(
         released.set()
 
     assert elapsed < _STALL_DEADLINE_SECONDS + _SCHEDULING_SLACK_SECONDS
+
+
+# A child interpreter, so the lookup it strands cannot reach another test.
+_FETCHES_DURING_ONE_STALLED_LOOKUP = """
+import contextlib, socket, threading
+from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
+
+socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
+threads_before = threading.active_count()
+for _ in range(3):
+    with contextlib.suppress(KeySetFetchError):
+        fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
+print(threading.active_count() - threads_before)
+"""
+# A child held at exit by its stranded lookup never finishes; one that is not
+# finishes in the time its imports take.
+_CHILD_EXIT_TIMEOUT_SECONDS = 20
+
+
+def test_a_stalled_name_resolution_holds_one_thread_and_never_the_interpreter_exit() -> None:
+    child = subprocess.run(
+        [sys.executable, "-c", _FETCHES_DURING_ONE_STALLED_LOOKUP],
+        capture_output=True,
+        text=True,
+        timeout=_CHILD_EXIT_TIMEOUT_SECONDS,
+        check=True,
+    )
+
+    assert child.stdout.strip() == "1"
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(

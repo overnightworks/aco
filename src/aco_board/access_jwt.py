@@ -25,6 +25,7 @@ import contextlib
 import http.client
 import json
 import math
+import queue
 import re
 import socket
 import ssl
@@ -32,7 +33,7 @@ import threading
 import time
 import urllib.parse
 from collections.abc import Callable, Iterator, Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import StrEnum
 from http import HTTPStatus
@@ -261,9 +262,10 @@ def fetch_key_set_over_https(
     url: str, *, deadline_seconds: float = KEY_SET_FETCH_TIMEOUT_SECONDS
 ) -> bytes:
     """The production `KeySetFetch`: HTTPS only, no redirect followed, no proxy
-    from the environment, name resolution, connecting and the exchange all held
-    to one deadline, and at most one byte past the key-set limit read, so the
-    verifier refuses an oversized answer without buffering it."""
+    from the environment, the wait for name resolution, connecting and the
+    exchange all held to one deadline, and at most one byte past the key-set
+    limit read, so the verifier refuses an oversized answer without buffering
+    it."""
     deadline = time.monotonic() + deadline_seconds
     origin = urllib.parse.urlsplit(url)
     host = origin.hostname
@@ -284,17 +286,7 @@ def _connect_before(deadline: float, host: str, port: int) -> socket.socket:
     """Resolves `host` and connects to the first of its addresses that
     answers, all before `deadline`. `socket.create_connection` would resolve
     without any timeout and give every address the whole one."""
-    # `getaddrinfo` takes no timeout and cannot be interrupted, so it runs on a
-    # worker this fetch stops waiting for at the deadline; the system resolver
-    # alone ends that worker.
-    resolver = ThreadPoolExecutor(max_workers=1)
-    try:
-        resolving = resolver.submit(socket.getaddrinfo, host, port, type=socket.SOCK_STREAM)
-        addresses = resolving.result(timeout=_time_left_before(deadline))
-    except TimeoutError as error:
-        raise _deadline_passed() from error
-    finally:
-        resolver.shutdown(wait=False)
+    addresses = _SYSTEM_NAME_RESOLVER.addresses(host, port, deadline)
     failure = OSError(f"{host} resolved to no address")
     for family, kind, protocol, _canonical_name, address in addresses:
         time_left = _time_left_before(deadline)
@@ -308,6 +300,65 @@ def _connect_before(deadline: float, host: str, port: int) -> socket.socket:
         else:
             return connection
     raise failure
+
+
+_AddressInfo = tuple[
+    socket.AddressFamily,
+    socket.SocketKind,
+    int,
+    str,
+    tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes],
+]
+
+
+class _NameResolver:
+    """Resolves names on one daemon thread for the whole process.
+
+    `getaddrinfo` takes no timeout and cannot be interrupted, so a caller can
+    only stop waiting for it, and only the system resolver ends a lookup. One
+    thread for every lookup bounds what a stalled resolver holds to that thread,
+    a lookup whose caller gave up before it started is skipped, and as a daemon
+    the thread never holds the interpreter's exit."""
+
+    def __init__(self) -> None:
+        self._lookups: queue.SimpleQueue[tuple[Future[list[_AddressInfo]], str, int]] = (
+            queue.SimpleQueue()
+        )
+        self._worker_start = threading.Lock()
+        self._worker: threading.Thread | None = None
+
+    def addresses(self, host: str, port: int, deadline: float) -> list[_AddressInfo]:
+        time_left = _time_left_before(deadline)
+        lookup: Future[list[_AddressInfo]] = Future()
+        self._start_worker_once()
+        self._lookups.put((lookup, host, port))
+        try:
+            return lookup.result(timeout=time_left)
+        except TimeoutError as error:
+            lookup.cancel()
+            raise _deadline_passed() from error
+
+    def _start_worker_once(self) -> None:
+        with self._worker_start:
+            if self._worker is None:
+                self._worker = threading.Thread(
+                    target=self._resolve_forever, name="key-set-name-resolver", daemon=True
+                )
+                self._worker.start()
+
+    def _resolve_forever(self) -> NoReturn:
+        while True:
+            lookup, host, port = self._lookups.get()
+            if not lookup.set_running_or_notify_cancel():
+                continue
+            # Handed to the waiting caller, which raises it as its own.
+            try:
+                lookup.set_result(socket.getaddrinfo(host, port, type=socket.SOCK_STREAM))
+            except Exception as error:
+                lookup.set_exception(error)
+
+
+_SYSTEM_NAME_RESOLVER = _NameResolver()
 
 
 def _time_left_before(deadline: float) -> float:
