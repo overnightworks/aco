@@ -336,7 +336,6 @@ class _NameResolver:
         self._worker: threading.Thread | None = None
 
     def addresses(self, host: str, port: int, deadline: float) -> list[_AddressInfo]:
-        time_left = _time_left_before(deadline)
         lookup: Future[list[_AddressInfo]] = Future()
         self._start_worker_once()
         try:
@@ -344,10 +343,11 @@ class _NameResolver:
         except queue.Full as error:
             raise KeySetFetchError(f"name resolution for {host} is stalled") from error
         try:
-            return lookup.result(timeout=time_left)
+            return lookup.result(timeout=_time_left_before(deadline))
         except TimeoutError as error:
-            lookup.cancel()
             raise _deadline_passed() from error
+        finally:
+            lookup.cancel()
 
     def _start_worker_once(self) -> None:
         with self._worker_start:

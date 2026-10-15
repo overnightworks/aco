@@ -980,6 +980,28 @@ for _ in range(100):
 print(refused)
 """
 
+# The resolver thread takes as long to start as the whole fetch may; a fetch
+# that waits for its lookup the full deadline after that overshoots it twice.
+_SLOW_RESOLVER_START_SECONDS = 2.0
+_FETCH_WHILE_THE_RESOLVER_STARTS_SLOWLY = f"""
+import socket, threading, time
+from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
+
+socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
+start_thread = threading.Thread.start
+def start_slowly(thread):
+    time.sleep({_SLOW_RESOLVER_START_SECONDS})
+    start_thread(thread)
+threading.Thread.start = start_slowly
+started = time.monotonic()
+try:
+    fetch_key_set_over_https(
+        "https://team.example/certs", deadline_seconds={_SLOW_RESOLVER_START_SECONDS}
+    )
+except KeySetFetchError:
+    print(time.monotonic() - started)
+"""
+
 
 def _run_child(script: str) -> str:
     child = subprocess.run(
@@ -1000,6 +1022,12 @@ def test_a_stalled_name_resolution_refuses_further_lookups_at_once_instead_of_qu
     None
 ):
     assert _run_child(_FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS) == "100"
+
+
+def test_a_slow_resolver_start_counts_against_the_fetch_deadline() -> None:
+    elapsed = float(_run_child(_FETCH_WHILE_THE_RESOLVER_STARTS_SLOWLY))
+
+    assert elapsed < _SLOW_RESOLVER_START_SECONDS + _SCHEDULING_SLACK_SECONDS
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(
