@@ -52,8 +52,9 @@ _ALGORITHM = "RS256"
 _JWS_COMPACT_SEGMENTS = 3
 _TEAM_NAME = re.compile(r"[a-z0-9-]{1,63}")
 _BASE64URL = re.compile(r"[A-Za-z0-9_-]*")
-# Members through which a token could name, embed or constrain its own key.
-_FORBIDDEN_HEADER_MEMBERS = frozenset({"crit", "jwk", "jku", "x5u", "x5c"})
+# Members through which a token could name, embed or constrain its own key,
+# and `b64`, which would change how PyJWT reads the payload segment.
+_FORBIDDEN_HEADER_MEMBERS = frozenset({"crit", "jwk", "jku", "x5u", "x5c", "b64"})
 _PRIVATE_RSA_MEMBERS = frozenset({"d", "p", "q", "dp", "dq", "qi", "oth"})
 
 WallClock = Callable[[], float]
@@ -174,6 +175,11 @@ class AccessJwtVerifier:
             )
         except jwt.InvalidSignatureError as error:
             raise _RefusalError(RejectionReason.INVALID_SIGNATURE) from error
+        # After InvalidSignatureError, which subclasses it. `_parse_token`
+        # already refuses what PyJWT cannot decode; this keeps a disagreement
+        # between the two parses a rejection rather than an exception.
+        except jwt.DecodeError as error:
+            raise _RefusalError(RejectionReason.MALFORMED_TOKEN) from error
         except jwt.InvalidAudienceError as error:
             raise _RefusalError(RejectionReason.INVALID_AUDIENCE) from error
         except jwt.InvalidIssuerError as error:
@@ -319,10 +325,14 @@ def _integer_claim(claims: Mapping[str, object], name: str) -> int:
 
 def _base64url_decode(segment: str) -> bytes:
     """Decodes unpadded base64url, refusing what the lenient stdlib decoder
-    would silently skip, so this parse and PyJWT's read the same bytes."""
+    would silently skip or round off, so this parse accepts exactly the
+    canonical segments PyJWT accepts and both read the same bytes."""
     if not _BASE64URL.fullmatch(segment):
         raise ValueError("not base64url")
-    return base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
+    decoded = base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
+    if base64.urlsafe_b64encode(decoded).rstrip(b"=") != segment.encode():
+        raise ValueError("not canonical base64url")
+    return decoded
 
 
 def _strict_json_object(document: bytes) -> dict[str, object]:

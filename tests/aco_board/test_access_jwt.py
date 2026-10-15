@@ -16,6 +16,7 @@ import hmac
 import ipaddress
 import json
 import ssl
+import string
 import threading
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -84,6 +85,17 @@ def _jws(header: dict[str, Any] | str, claims: dict[str, Any] | str, sign: Calla
     signing_input = f"{_segment(header)}.{_segment(claims)}"
     signature = base64.urlsafe_b64encode(sign(signing_input.encode())).rstrip(b"=").decode()
     return f"{signing_input}.{signature}"
+
+
+_BASE64URL_ALPHABET = string.ascii_uppercase + string.ascii_lowercase + string.digits + "-_"
+
+
+def _with_unused_signature_bits_set(token: str) -> str:
+    """The same signature bytes spelled non-canonically. The last character
+    of a 256-byte signature carries two signature bits and four unused zero
+    bits, so the next alphabet character only sets an unused bit."""
+    last = token[-1]
+    return token[:-1] + _BASE64URL_ALPHABET[_BASE64URL_ALPHABET.index(last) + 1]
 
 
 def _changed(base: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
@@ -389,6 +401,11 @@ _DEEP_ARRAY = "[" * 2_000 + "]" * 2_000
             for member in ("crit", "jwk", "jku", "x5u", "x5c")
         ),
         pytest.param(
+            lambda access: access.token(header={"b64": False}),
+            RejectionReason.FORBIDDEN_HEADER,
+            id="header-b64-false",
+        ),
+        pytest.param(
             lambda access: access.token({"padding": "x" * MAX_TOKEN_CHARACTERS}),
             RejectionReason.TOKEN_TOO_LONG,
             id="oversized-token",
@@ -427,6 +444,11 @@ _DEEP_ARRAY = "[" * 2_000 + "]" * 2_000
             lambda access: _jws({"alg": "RS256", "kid": "current-key"}, "[]", lambda _: b"s"),
             RejectionReason.MALFORMED_TOKEN,
             id="claims-not-an-object",
+        ),
+        pytest.param(
+            lambda access: _with_unused_signature_bits_set(access.token()),
+            RejectionReason.MALFORMED_TOKEN,
+            id="non-canonical-base64url",
         ),
     ],
 )
