@@ -258,14 +258,19 @@ def fetch_key_set_over_https(
 ) -> bytes:
     """The production `KeySetFetch`: HTTPS under the system's trusted
     certificates, no retry, no redirect followed, no proxy from the
-    environment, and at most one byte past the key-set limit read, so the
-    verifier refuses an oversized answer without buffering it.
+    environment, no content decoding, and at most one byte past the key-set
+    limit read, so the verifier refuses an oversized answer without buffering
+    it. A compressed answer reaches the verifier still compressed and fails
+    as invalid JSON.
 
-    Connecting and each read wait at most `deadline_seconds`, and no read
-    starts once it has passed. Name resolution is not bounded: urllib3 asks
-    the system resolver, which takes no timeout, so a stalled lookup holds
-    this refresh until the resolver gives up, while every other request fails
-    closed without waiting for it."""
+    `deadline_seconds` is not a total bound on the fetch. Connecting waits up
+    to it for each address the name resolves to. The TLS handshake, the
+    status line, the headers and each chunk-size line are bounded per socket
+    read, not in total. The body is checked against the deadline between
+    reads. Name resolution is not bounded at all: urllib3 asks the system
+    resolver, which takes no timeout. A peer that stalls any of these holds
+    this refresh, while every other request fails closed without waiting
+    for it."""
     origin = urllib.parse.urlsplit(url)
     if origin.scheme != "https" or not origin.hostname:
         raise KeySetFetchError(f"refusing to fetch the key set from {url}: not an https URL")
@@ -274,7 +279,9 @@ def fetch_key_set_over_https(
         with urllib3.PoolManager(
             timeout=urllib3.Timeout(total=deadline_seconds), retries=False
         ) as pool:
-            response = pool.request("GET", url, redirect=False, preload_content=False)
+            response = pool.request(
+                "GET", url, redirect=False, preload_content=False, decode_content=False
+            )
             try:
                 if response.status != HTTPStatus.OK:
                     raise KeySetFetchError(

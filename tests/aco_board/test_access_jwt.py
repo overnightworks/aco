@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import datetime
+import gzip
 import hashlib
 import hmac
 import ipaddress
@@ -733,6 +734,10 @@ class HttpsKeySetServer:
     requested_paths: list[str]
 
 
+def _compressed_key_set() -> bytes:
+    return gzip.compress(_key_set_document(_public_jwk(_rsa_key("current"), "current-key")))
+
+
 def _self_signed_loopback_certificate(directory: Path) -> tuple[Path, Path]:
     key = _rsa_key("loopback-tls")
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
@@ -790,11 +795,13 @@ def https_key_set_server(
                 self.send_error(404)
             elif self.path == "/oversized":
                 self._answer(b" " * (2 * MAX_KEY_SET_BYTES))
+            elif self.path == "/compressed":
+                self._answer(_compressed_key_set(), content_encoding="gzip")
             else:
                 self._answer(_key_set_document(_public_jwk(_rsa_key("current"), "current-key")))
 
-        def _answer(self, body: bytes) -> None:
-            self._start_body(len(body))
+        def _answer(self, body: bytes, content_encoding: str | None = None) -> None:
+            self._start_body(len(body), content_encoding)
             # The fetch may hang up once it read its limit.
             with contextlib.suppress(OSError):
                 self.wfile.write(body)
@@ -808,9 +815,11 @@ def https_key_set_server(
                     self.wfile.write(bytes([byte]))
                     time.sleep(_TRICKLE_INTERVAL_SECONDS)
 
-        def _start_body(self, length: int) -> None:
+        def _start_body(self, length: int, content_encoding: str | None = None) -> None:
             self.send_response(200)
             self.send_header("Content-Length", str(length))
+            if content_encoding is not None:
+                self.send_header("Content-Encoding", content_encoding)
             self.end_headers()
 
         def log_message(self, format: str, *args: Any) -> None:
@@ -852,6 +861,14 @@ def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(
     document = fetch_key_set_over_https(f"{https_key_set_server.base_url}/oversized")
 
     assert len(document) == MAX_KEY_SET_BYTES + 1
+
+
+def test_https_fetch_hands_back_a_compressed_answer_still_compressed(
+    https_key_set_server: HttpsKeySetServer,
+) -> None:
+    document = fetch_key_set_over_https(f"{https_key_set_server.base_url}/compressed")
+
+    assert json.loads(gzip.decompress(document))["keys"][0]["kid"] == "current-key"
 
 
 def test_https_fetch_refuses_a_certificate_the_system_does_not_trust(
