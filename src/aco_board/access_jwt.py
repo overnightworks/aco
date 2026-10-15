@@ -257,7 +257,7 @@ def fetch_key_set_over_https(url: str) -> bytes:
     the verifier refuses an oversized answer without buffering it."""
     opener = urllib.request.OpenerDirector()
     for handler in (
-        urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        urllib.request.HTTPSHandler(context=_certificate_verifying_tls()),
         urllib.request.UnknownHandler(),
         urllib.request.HTTPErrorProcessor(),
         urllib.request.HTTPDefaultErrorHandler(),
@@ -268,6 +268,16 @@ def fetch_key_set_over_https(url: str) -> bytes:
             return response.read(MAX_KEY_SET_BYTES + 1)
     except (OSError, http.client.HTTPException) as error:
         raise KeySetFetchError(f"fetching the key set from {url} failed: {error}") from error
+
+
+def _certificate_verifying_tls() -> ssl.SSLContext:
+    """The system's trusted certificates, a verified chain and a matching host
+    name. The default context already requires both; they are stated so the
+    one thing this key-set origin is trusted for stays visible here."""
+    context = ssl.create_default_context()
+    context.check_hostname = True
+    context.verify_mode = ssl.CERT_REQUIRED
+    return context
 
 
 def _library_checks() -> Options:

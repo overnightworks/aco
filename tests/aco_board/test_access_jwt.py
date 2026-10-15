@@ -778,6 +778,15 @@ def test_https_fetch_returns_the_served_key_set(https_key_set_server: HttpsKeySe
     assert json.loads(document)["keys"][0]["kid"] == "current-key"
 
 
+def test_https_fetch_refuses_a_certificate_the_system_does_not_trust(
+    https_key_set_server: HttpsKeySetServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("SSL_CERT_FILE")
+
+    with pytest.raises(KeySetFetchError):
+        fetch_key_set_over_https(f"{https_key_set_server.base_url}/certs")
+
+
 def test_https_fetch_never_follows_a_redirect(https_key_set_server: HttpsKeySetServer) -> None:
     with pytest.raises(KeySetFetchError):
         fetch_key_set_over_https(f"{https_key_set_server.base_url}/moved")
