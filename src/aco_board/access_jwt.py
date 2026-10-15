@@ -21,9 +21,12 @@ the last good set; that set expires on the injected monotonic clock.
 from __future__ import annotations
 
 import base64
+import http.client
+import io
 import json
 import math
 import re
+import socket
 import threading
 import time
 import urllib.parse
@@ -32,12 +35,16 @@ from dataclasses import dataclass
 from enum import StrEnum
 from http import HTTPStatus
 from types import MappingProxyType
-from typing import NoReturn, TypeGuard
+from typing import TYPE_CHECKING, NoReturn, TypeGuard
 
 import jwt
 import urllib3
+import urllib3.connection
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey, RSAPublicNumbers
 from jwt.types import Options
+
+if TYPE_CHECKING:
+    from _typeshed import WriteableBuffer
 
 LEEWAY_SECONDS = 60
 MAX_TOKEN_CHARACTERS = 8 * 1024
@@ -263,22 +270,21 @@ def fetch_key_set_over_https(
     it. A compressed answer reaches the verifier still compressed and fails
     as invalid JSON.
 
-    `deadline_seconds` is not a total bound on the fetch. Connecting waits up
-    to it for each address the name resolves to. The TLS handshake, the
-    status line, the headers and each chunk-size line are bounded per socket
-    read, not in total. The body is checked against the deadline between
-    reads. Name resolution is not bounded at all: urllib3 asks the system
-    resolver, which takes no timeout. A peer that stalls any of these holds
-    this refresh, while every other request fails closed without waiting
-    for it."""
+    `deadline_seconds` bounds the answer in total, from its status line to
+    the end of its body. Before that, connecting waits up to it for each
+    address the name resolves to, and the TLS handshake is bounded per
+    socket read. urllib3 passes the system resolver no timeout, so a stalled
+    lookup holds this refresh until the resolver gives up. Whatever stalls one
+    of these earlier steps holds this refresh, while every other request fails
+    closed without waiting for it."""
     origin = urllib.parse.urlsplit(url)
     if origin.scheme != "https" or not origin.hostname:
         raise KeySetFetchError(f"refusing to fetch the key set from {url}: not an https URL")
-    deadline = time.monotonic() + deadline_seconds
     try:
         with urllib3.PoolManager(
             timeout=urllib3.Timeout(total=deadline_seconds), retries=False
         ) as pool:
+            pool.pool_classes_by_scheme = {"https": _HTTPSPoolAnsweringBeforeDeadline}
             response = pool.request(
                 "GET", url, redirect=False, preload_content=False, decode_content=False
             )
@@ -287,26 +293,60 @@ def fetch_key_set_over_https(
                     raise KeySetFetchError(
                         f"the key set origin answered {response.status}, not 200"
                     )
-                return _key_set_body_before(deadline, response)
+                return response.read(MAX_KEY_SET_BYTES + 1)
             finally:
                 response.close()
     except (urllib3.exceptions.HTTPError, OSError) as error:
         raise KeySetFetchError(f"fetching the key set from {url} failed: {error}") from error
 
 
-def _key_set_body_before(deadline: float, response: urllib3.BaseHTTPResponse) -> bytes:
-    """urllib3's timeout bounds each read alone, so a peer sending a byte
-    just inside it would hold the refresh, and its lock, indefinitely; the
-    body is therefore read piece by piece and given up at `deadline`."""
-    body = bytearray()
-    while len(body) <= MAX_KEY_SET_BYTES:
-        if time.monotonic() >= deadline:
-            raise KeySetFetchError("the key set fetch passed its deadline")
-        piece = response.read1(MAX_KEY_SET_BYTES + 1 - len(body))
-        if not piece:
-            break
-        body += piece
-    return bytes(body)
+class _ReadsBeforeDeadline(io.RawIOBase):
+    """The socket reads under one HTTP answer, each allowed only the time
+    left before `deadline`. A socket timeout bounds each read alone, so a peer
+    sending a byte just inside it would otherwise hold the answer for as long
+    as it keeps trickling."""
+
+    def __init__(self, socket_reads: io.RawIOBase, sock: socket.socket, deadline: float) -> None:
+        super().__init__()
+        self._socket_reads = socket_reads
+        self._socket = sock
+        self._deadline = deadline
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: WriteableBuffer) -> int | None:
+        seconds_left = self._deadline - time.monotonic()
+        if seconds_left <= 0:
+            raise TimeoutError("the key set fetch passed its deadline")
+        self._socket.settimeout(seconds_left)
+        return self._socket_reads.readinto(buffer)
+
+    def close(self) -> None:
+        self._socket_reads.close()
+        super().close()
+
+
+class _HTTPResponseBeforeDeadline(http.client.HTTPResponse):
+    def __init__(self, sock: socket.socket, debuglevel: int = 0, method: str | None = None) -> None:
+        super().__init__(sock, debuglevel, method)
+        # Under `Timeout(total=...)` urllib3 gives the socket what the total
+        # has left just before it reads the answer.
+        seconds_left = sock.gettimeout()
+        if seconds_left is None:
+            raise TypeError("the key set fetch runs only under a total timeout")
+        deadline = time.monotonic() + seconds_left
+        self.fp = io.BufferedReader(_ReadsBeforeDeadline(self.fp.detach(), sock, deadline))
+
+
+class _HTTPSConnectionAnsweringBeforeDeadline(urllib3.connection.HTTPSConnection):
+    response_class = _HTTPResponseBeforeDeadline
+
+
+class _HTTPSPoolAnsweringBeforeDeadline(urllib3.HTTPSConnectionPool):
+    # urllib3's own HTTPSConnection fails this declared protocol under pyright
+    # just the same; the subclass changes only how the answer is read.
+    ConnectionCls = _HTTPSConnectionAnsweringBeforeDeadline  # pyright: ignore[reportAssignmentType]
 
 
 def _library_checks() -> Options:

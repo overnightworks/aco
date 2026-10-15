@@ -734,8 +734,12 @@ class HttpsKeySetServer:
     requested_paths: list[str]
 
 
+def _served_key_set() -> bytes:
+    return _key_set_document(_public_jwk(_rsa_key("current"), "current-key"))
+
+
 def _compressed_key_set() -> bytes:
-    return gzip.compress(_key_set_document(_public_jwk(_rsa_key("current"), "current-key")))
+    return gzip.compress(_served_key_set())
 
 
 def _self_signed_loopback_certificate(directory: Path) -> tuple[Path, Path]:
@@ -789,8 +793,12 @@ def https_key_set_server(
                 self.send_response(302)
                 self.send_header("Location", "/certs")
                 self.end_headers()
-            elif self.path == "/trickle":
+            elif self.path == "/trickle-body":
+                self._start_body(_TRICKLED_BYTES)
                 self._trickle(b" " * _TRICKLED_BYTES)
+            elif self.path == "/trickle-headers":
+                self._trickle(b"HTTP/1.1 200 OK\r\nX-Pad: " + b"a" * _TRICKLED_BYTES + b"\r\n")
+                self._answer_without_status(_served_key_set())
             elif self.path == "/missing":
                 self.send_error(404)
             elif self.path == "/oversized":
@@ -798,7 +806,7 @@ def https_key_set_server(
             elif self.path == "/compressed":
                 self._answer(_compressed_key_set(), content_encoding="gzip")
             else:
-                self._answer(_key_set_document(_public_jwk(_rsa_key("current"), "current-key")))
+                self._answer(_served_key_set())
 
         def _answer(self, body: bytes, content_encoding: str | None = None) -> None:
             self._start_body(len(body), content_encoding)
@@ -806,14 +814,19 @@ def https_key_set_server(
             with contextlib.suppress(OSError):
                 self.wfile.write(body)
 
-        def _trickle(self, body: bytes) -> None:
+        def _trickle(self, raw: bytes) -> None:
             """One byte per interval: each read finishes well inside the
             fetch's socket timeout, the whole answer far past its deadline."""
-            self._start_body(len(body))
             with contextlib.suppress(OSError):
-                for byte in body:
+                for byte in raw:
                     self.wfile.write(bytes([byte]))
                     time.sleep(_TRICKLE_INTERVAL_SECONDS)
+
+        def _answer_without_status(self, body: bytes) -> None:
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            with contextlib.suppress(OSError):
+                self.wfile.write(body)
 
         def _start_body(self, length: int, content_encoding: str | None = None) -> None:
             self.send_response(200)
@@ -845,14 +858,18 @@ def test_https_fetch_returns_the_served_key_set(https_key_set_server: HttpsKeySe
     assert json.loads(document)["keys"][0]["kid"] == "current-key"
 
 
+@pytest.mark.parametrize("path", ["/trickle-headers", "/trickle-body"])
 def test_https_fetch_gives_up_on_a_trickling_answer_at_its_deadline(
-    https_key_set_server: HttpsKeySetServer,
+    https_key_set_server: HttpsKeySetServer, path: str
 ) -> None:
+    started = time.monotonic()
     with pytest.raises(KeySetFetchError):
         fetch_key_set_over_https(
-            f"{https_key_set_server.base_url}/trickle",
+            f"{https_key_set_server.base_url}{path}",
             deadline_seconds=10 * _TRICKLE_INTERVAL_SECONDS,
         )
+
+    assert time.monotonic() - started < _TRICKLED_BYTES * _TRICKLE_INTERVAL_SECONDS / 2
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(

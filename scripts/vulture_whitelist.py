@@ -54,11 +54,23 @@ writes.
 `src` yet: the server wiring that reads the `Cf-Access-Jwt-Assertion` header
 and builds the verifier from configuration is slice AC2 of #6. Each is a named
 future caller, and tests already drive all three.
+
+The key-set fetch hands urllib3 its own pool and connection class
+(`pool_classes_by_scheme`, `ConnectionCls`) and http.client its own answer
+class (`response_class`); urllib3 and http.client read those attributes,
+never a call or read this package writes.
 """
 
 from datetime import UTC, date, datetime
 
-from aco_board.access_jwt import AccessJwtVerifier, fetch_key_set_over_https
+import urllib3
+
+from aco_board.access_jwt import (
+    AccessJwtVerifier,
+    _HTTPSConnectionAnsweringBeforeDeadline,
+    _HTTPSPoolAnsweringBeforeDeadline,
+    fetch_key_set_over_https,
+)
 from aco_board.server import _BoardRequestHandler as _BoardApiRequestHandler
 from agent_coordination.board import (
     Board,
@@ -165,6 +177,9 @@ _referenced_only_for_vulture = (
     Capability.UNSUPPORTED,
     AccessJwtVerifier.verify,
     fetch_key_set_over_https,
+    urllib3.PoolManager().pool_classes_by_scheme,
+    _HTTPSPoolAnsweringBeforeDeadline.ConnectionCls,
+    _HTTPSConnectionAnsweringBeforeDeadline.response_class,
     _BoardRequestHandler.do_GET,
     _BoardRequestHandler.do_POST,
     _BoardRequestHandler.log_message,
