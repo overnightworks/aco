@@ -31,7 +31,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import TypeGuard
+from typing import NoReturn, TypeGuard
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey, RSAPublicNumbers
@@ -345,7 +345,11 @@ def _strict_json_object(document: bytes) -> dict[str, object]:
     if _nesting_depth(text) > MAX_JSON_NESTING_DEPTH:
         raise _RefusalError(RejectionReason.NESTING_TOO_DEEP)
     try:
-        parsed = json.loads(text, object_pairs_hook=_object_without_duplicates)
+        parsed = json.loads(
+            text,
+            object_pairs_hook=_object_without_duplicates,
+            parse_constant=_refuse_non_json_constant,
+        )
     except ValueError as error:
         raise _RefusalError(RejectionReason.MALFORMED_TOKEN) from error
     if not isinstance(parsed, dict):
@@ -379,6 +383,11 @@ def _object_without_duplicates(members: list[tuple[str, object]]) -> dict[str, o
     if len(parsed) != len(members):
         raise _RefusalError(RejectionReason.DUPLICATE_MEMBER)
     return parsed
+
+
+def _refuse_non_json_constant(constant: str) -> NoReturn:
+    """The stdlib parser reads `NaN`, `Infinity` and `-Infinity`; JSON has none."""
+    raise ValueError(f"{constant} is not JSON")
 
 
 def _parse_key_set(document: bytes) -> Mapping[str, RSAPublicKey]:

@@ -450,6 +450,11 @@ _DEEP_ARRAY = "[" * 2_000 + "]" * 2_000
             RejectionReason.MALFORMED_TOKEN,
             id="non-canonical-base64url",
         ),
+        pytest.param(
+            lambda access: access.token({"score": float("-inf")}),
+            RejectionReason.MALFORMED_TOKEN,
+            id="claim-with-a-non-json-constant",
+        ),
     ],
 )
 def test_a_defective_token_is_refused_with_its_reason(
@@ -542,6 +547,10 @@ def _defective_key_sets() -> list[Any]:
         pytest.param(b'{"keys": {"current-key": {}}}', id="keys-not-a-list"),
         pytest.param(b'{"keys": [], "keys": []}', id="duplicate-member"),
         pytest.param(b'{"keys": [', id="malformed-json"),
+        pytest.param(
+            json.dumps({"keys": [valid_jwk], "extra": float("nan")}).encode(),
+            id="non-json-constant",
+        ),
     ]
 
 
