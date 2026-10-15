@@ -943,20 +943,16 @@ def test_https_fetch_gives_up_on_a_stalled_network_at_its_deadline(
 
 
 # A child interpreter, so the lookup it strands cannot reach another test.
-# Each lookup the system resolver is stuck in holds the thread that called it.
 _FETCHES_DURING_ONE_STALLED_LOOKUP = """
 import contextlib, socket, threading
+threads_before = threading.active_count()
 from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
 
-stranded_lookups = []
-def stall(*args, **_kwargs):
-    stranded_lookups.append(args)
-    threading.Event().wait()
-socket.getaddrinfo = stall
+socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
 for _ in range(3):
     with contextlib.suppress(KeySetFetchError):
         fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
-print(len(stranded_lookups))
+print(threading.active_count() - threads_before)
 """
 # A child held at exit by its stranded lookup never finishes; one that is not
 # finishes in the time its imports take.

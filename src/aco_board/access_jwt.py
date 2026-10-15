@@ -326,16 +326,20 @@ class _NameResolver:
     only stop waiting for it, and only the system resolver ends a lookup. One
     thread for every lookup and a bounded line of lookups waiting for it bound
     what a stalled resolver holds: a lookup that finds the line full is refused
-    at once, and a lookup whose caller gave up before it started is skipped.
+    at once, a lookup whose caller gave up before it started is skipped, and as
+    a daemon the thread never holds the interpreter's exit.
 
-    The first lookup starts the thread through `_thread`, which neither waits
-    for the thread to run, as `threading.Thread.start` does without a timeout,
-    nor joins it at the interpreter's exit. A thread that comes up late only
-    keeps the lookup waiting, and that wait is held to the lookup's deadline."""
+    The first lookup starts the thread. `Thread.start` waits for its thread to
+    run without a timeout, so a bare `_thread` thread does that waiting and no
+    lookup does: a thread that comes up late only keeps the lookup waiting, and
+    that wait is held to the lookup's deadline."""
 
     def __init__(self) -> None:
         self._lookups: queue.Queue[tuple[Future[list[_AddressInfo]], str, int]] = queue.Queue(
             maxsize=_WAITING_NAME_LOOKUPS_LIMIT
+        )
+        self._resolver_thread = threading.Thread(
+            target=self._resolve_forever, name="key-set-name-resolver", daemon=True
         )
         self._start_lock = threading.Lock()
         self._started = False
@@ -357,7 +361,7 @@ class _NameResolver:
     def _start_resolving_once(self) -> None:
         with self._start_lock:
             if not self._started:
-                _thread.start_new_thread(self._resolve_forever, ())
+                _thread.start_new_thread(self._resolver_thread.start, ())
                 self._started = True
 
     def _resolve_forever(self) -> NoReturn:
