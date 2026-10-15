@@ -10,6 +10,10 @@ readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "MIT"
 authors = [{name = "agent-coordination contributors"}]
+dependencies = [
+    "cryptography>=50.0.2",
+    "pyjwt[crypto]>=2.15.1",
+]
 
 [project.scripts]
 aco = "agent_coordination.cli:main"
