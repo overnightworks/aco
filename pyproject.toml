@@ -102,13 +102,15 @@ exhaustive = true
 # adapter; the two are independent neighbours that `cli` wires together, and
 # the transport (`server`, `static`, `api`) reaches the rules only through
 # `board`. `static` (the built SPA shell) and `api` (JSON wire form) are
-# independent (issue #652).
+# independent (issue #652). `access_jwt` (issue #25) verifies Cloudflare
+# Access tokens for the server and sits at the bottom, reaching no board
+# module.
 layers = [
     "cli",
     "server",
     "api | static",
     "board | aco_cli",
-    "ports",
+    "ports | access_jwt",
 ]
 
 [[tool.importlinter.contracts]]

@@ -1,0 +1,416 @@
+"""Cloudflare Access identity-token verification for the decision board.
+
+The board is reached behind Cloudflare Access and verifies the Access JWT
+itself (ruling R2, issue #6). `AccessJwtVerifier.verify` takes the raw token
+and answers `Verified(email)` or `Rejected(reason)`; reading the request
+header and building the verifier from configuration belong to the server
+wiring.
+
+The token is parsed strictly by this module before PyJWT sees it: bounded
+length and nesting, no duplicate JSON members, an RS256-only header naming its
+key by `kid`, and no header member that would let the token choose its own
+key. PyJWT then verifies the signature, audience and issuer; the time claims
+are checked here against the injected wall clock, so leeway has one owner.
+
+Signing keys come from the team's own certs URL through the injected fetch.
+A fetched key set replaces the cached one only once every key in it is a
+valid public RSA signing key, so a failed or poisoned refresh never evicts
+the last good set; that set expires on the injected monotonic clock.
+"""
+
+from __future__ import annotations
+
+import base64
+import http.client
+import json
+import re
+import ssl
+import threading
+import urllib.request
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
+from types import MappingProxyType
+from typing import TypeGuard
+
+import jwt
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey, RSAPublicNumbers
+from jwt.types import Options
+
+LEEWAY_SECONDS = 60
+MAX_TOKEN_CHARACTERS = 8 * 1024
+MAX_JSON_NESTING_DEPTH = 8
+MAX_KEY_ID_CHARACTERS = 128
+KEY_SET_TTL_SECONDS = 60 * 60
+KEY_SET_REFRESH_COOLDOWN_SECONDS = 30
+KEY_SET_FETCH_TIMEOUT_SECONDS = 5
+MAX_KEY_SET_BYTES = 64 * 1024
+MAX_KEY_SET_KEYS = 10
+MIN_RSA_KEY_BITS = 2048
+
+_ALGORITHM = "RS256"
+_JWS_COMPACT_SEGMENTS = 3
+_TEAM_NAME = re.compile(r"[a-z0-9-]{1,63}")
+_BASE64URL = re.compile(r"[A-Za-z0-9_-]*")
+# Members through which a token could name, embed or constrain its own key.
+_FORBIDDEN_HEADER_MEMBERS = frozenset({"crit", "jwk", "jku", "x5u", "x5c"})
+_PRIVATE_RSA_MEMBERS = frozenset({"d", "p", "q", "dp", "dq", "qi", "oth"})
+
+WallClock = Callable[[], float]
+"""Seconds since the epoch, compared with the token's `exp`, `iat` and `nbf`."""
+MonotonicClock = Callable[[], float]
+"""Seconds on a clock that never jumps; ages the key set and its cooldown."""
+KeySetFetch = Callable[[str], bytes]
+"""Fetches the key set document at the URL, raising `KeySetFetchError` on failure."""
+
+
+class RejectionReason(StrEnum):
+    TOKEN_TOO_LONG = "token-too-long"
+    MALFORMED_TOKEN = "malformed-token"
+    DUPLICATE_MEMBER = "duplicate-member"
+    NESTING_TOO_DEEP = "nesting-too-deep"
+    FORBIDDEN_HEADER = "forbidden-header"
+    UNSUPPORTED_ALGORITHM = "unsupported-algorithm"
+    INVALID_KEY_ID = "invalid-key-id"
+    UNKNOWN_KEY_ID = "unknown-key-id"
+    KEY_SET_UNAVAILABLE = "key-set-unavailable"
+    INVALID_SIGNATURE = "invalid-signature"
+    INVALID_AUDIENCE = "invalid-audience"
+    INVALID_ISSUER = "invalid-issuer"
+    INVALID_CLAIM = "invalid-claim"
+    SERVICE_TOKEN = "service-token"
+    WRONG_TOKEN_TYPE = "wrong-token-type"
+    EXPIRED = "expired"
+    ISSUED_IN_FUTURE = "issued-in-future"
+    NOT_YET_VALID = "not-yet-valid"
+
+
+@dataclass(frozen=True)
+class Verified:
+    email: str
+
+
+@dataclass(frozen=True)
+class Rejected:
+    reason: RejectionReason
+
+
+class KeySetFetchError(Exception):
+    """The key set could not be fetched: refused, timed out, redirected, or broken off."""
+
+
+class _RefusalError(Exception):
+    def __init__(self, reason: RejectionReason) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+class _InvalidKeySetError(Exception):
+    """A fetched key set that must not replace the cached one."""
+
+
+@dataclass(frozen=True)
+class _ParsedToken:
+    key_id: str
+    claims: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class _KeySet:
+    keys: Mapping[str, RSAPublicKey]
+    fetched_at: float
+
+
+class AccessJwtVerifier:
+    """Verifies Cloudflare Access identity tokens for one team and one application.
+
+    Safe to share between the server's request threads: the cached key set is
+    an immutable snapshot swapped in whole, and one refresh runs at a time.
+    """
+
+    def __init__(
+        self,
+        *,
+        team: str,
+        audience: str,
+        fetch_key_set: KeySetFetch,
+        wall_clock: WallClock,
+        monotonic_clock: MonotonicClock,
+    ) -> None:
+        if not _TEAM_NAME.fullmatch(team):
+            raise ValueError(f"Cloudflare Access team name {team!r} is not [a-z0-9-]{{1,63}}")
+        if not audience:
+            raise ValueError("Cloudflare Access audience tag must not be empty")
+        self._issuer = f"https://{team}.cloudflareaccess.com"
+        self._key_set_url = f"{self._issuer}/cdn-cgi/access/certs"
+        self._audience = audience
+        self._fetch_key_set = fetch_key_set
+        self._wall_clock = wall_clock
+        self._monotonic_clock = monotonic_clock
+        self._key_set: _KeySet | None = None
+        self._last_refresh_at: float | None = None
+        self._refresh_lock = threading.Lock()
+
+    def verify(self, token: str) -> Verified | Rejected:
+        try:
+            return Verified(self._verified_email(token))
+        except _RefusalError as refusal:
+            return Rejected(refusal.reason)
+
+    def _verified_email(self, token: str) -> str:
+        parsed = _parse_token(token)
+        self._verify_signature_audience_and_issuer(token, self._signing_key(parsed.key_id))
+        return self._identity_email(parsed.claims)
+
+    def _verify_signature_audience_and_issuer(self, token: str, key: RSAPublicKey) -> None:
+        try:
+            jwt.decode(
+                token,
+                key=key,
+                algorithms=[_ALGORITHM],
+                audience=self._audience,
+                issuer=self._issuer,
+                options=_library_checks(),
+            )
+        except jwt.InvalidSignatureError as error:
+            raise _RefusalError(RejectionReason.INVALID_SIGNATURE) from error
+        except jwt.InvalidAudienceError as error:
+            raise _RefusalError(RejectionReason.INVALID_AUDIENCE) from error
+        except jwt.InvalidIssuerError as error:
+            raise _RefusalError(RejectionReason.INVALID_ISSUER) from error
+        except jwt.MissingRequiredClaimError as error:
+            raise _RefusalError(RejectionReason.INVALID_CLAIM) from error
+
+    def _identity_email(self, claims: Mapping[str, object]) -> str:
+        if "common_name" in claims or "email" not in claims:
+            raise _RefusalError(RejectionReason.SERVICE_TOKEN)
+        email = claims["email"]
+        if not isinstance(email, str) or not email:
+            raise _RefusalError(RejectionReason.INVALID_CLAIM)
+        if claims.get("type") != "app":
+            raise _RefusalError(RejectionReason.WRONG_TOKEN_TYPE)
+        self._check_time_claims(claims)
+        return email
+
+    def _check_time_claims(self, claims: Mapping[str, object]) -> None:
+        expires_at = _integer_claim(claims, "exp")
+        issued_at = _integer_claim(claims, "iat")
+        not_before = _integer_claim(claims, "nbf") if "nbf" in claims else None
+        now = self._wall_clock()
+        if now >= expires_at + LEEWAY_SECONDS:
+            raise _RefusalError(RejectionReason.EXPIRED)
+        if issued_at > now + LEEWAY_SECONDS:
+            raise _RefusalError(RejectionReason.ISSUED_IN_FUTURE)
+        if not_before is not None and not_before > now + LEEWAY_SECONDS:
+            raise _RefusalError(RejectionReason.NOT_YET_VALID)
+
+    def _signing_key(self, key_id: str) -> RSAPublicKey:
+        key_set = self._key_set
+        if not self._is_current(key_set) or key_id not in key_set.keys:
+            self._refresh_key_set()
+            key_set = self._key_set
+        if not self._is_current(key_set):
+            raise _RefusalError(RejectionReason.KEY_SET_UNAVAILABLE)
+        key = key_set.keys.get(key_id)
+        if key is None:
+            raise _RefusalError(RejectionReason.UNKNOWN_KEY_ID)
+        return key
+
+    def _is_current(self, key_set: _KeySet | None) -> TypeGuard[_KeySet]:
+        return (
+            key_set is not None
+            and self._monotonic_clock() - key_set.fetched_at < KEY_SET_TTL_SECONDS
+        )
+
+    def _refresh_key_set(self) -> None:
+        # A request arriving while another refreshes does not wait for it: it
+        # fails closed on the snapshot it already holds, so a flood of unknown
+        # `kid`s costs one fetch and no blocked server threads.
+        if not self._refresh_lock.acquire(blocking=False):
+            return
+        try:
+            now = self._monotonic_clock()
+            if (
+                self._last_refresh_at is not None
+                and now - self._last_refresh_at < KEY_SET_REFRESH_COOLDOWN_SECONDS
+            ):
+                return
+            self._last_refresh_at = now
+            try:
+                keys = _parse_key_set(self._fetch_key_set(self._key_set_url))
+            except (KeySetFetchError, _InvalidKeySetError):
+                return
+            self._key_set = _KeySet(keys=keys, fetched_at=now)
+        finally:
+            self._refresh_lock.release()
+
+
+def fetch_key_set_over_https(url: str) -> bytes:
+    """The production `KeySetFetch`: HTTPS only, no redirect followed, no proxy
+    from the environment, and at most one byte past the key-set limit read, so
+    the verifier refuses an oversized answer without buffering it."""
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        urllib.request.UnknownHandler(),
+        urllib.request.HTTPErrorProcessor(),
+        urllib.request.HTTPDefaultErrorHandler(),
+    ):
+        opener.add_handler(handler)
+    try:
+        with opener.open(url, timeout=KEY_SET_FETCH_TIMEOUT_SECONDS) as response:
+            return response.read(MAX_KEY_SET_BYTES + 1)
+    except (OSError, http.client.HTTPException) as error:
+        raise KeySetFetchError(f"fetching the key set from {url} failed: {error}") from error
+
+
+def _library_checks() -> Options:
+    """PyJWT's options, built fresh for every call so no caller can alter a
+    shared one. Time claims are off here because `_check_time_claims` owns
+    them; `sub` and `jti` are not part of the Access identity profile."""
+    return {
+        "verify_signature": True,
+        "verify_aud": True,
+        "verify_iss": True,
+        "verify_exp": False,
+        "verify_iat": False,
+        "verify_nbf": False,
+        "verify_sub": False,
+        "verify_jti": False,
+    }
+
+
+def _parse_token(token: str) -> _ParsedToken:
+    if len(token) > MAX_TOKEN_CHARACTERS:
+        raise _RefusalError(RejectionReason.TOKEN_TOO_LONG)
+    segments = token.split(".")
+    if len(segments) != _JWS_COMPACT_SEGMENTS:
+        raise _RefusalError(RejectionReason.MALFORMED_TOKEN)
+    try:
+        header_bytes, claims_bytes, _signature = (_base64url_decode(part) for part in segments)
+    except ValueError as error:
+        raise _RefusalError(RejectionReason.MALFORMED_TOKEN) from error
+    header = _strict_json_object(header_bytes)
+    claims = _strict_json_object(claims_bytes)
+    return _ParsedToken(key_id=_header_key_id(header), claims=claims)
+
+
+def _header_key_id(header: Mapping[str, object]) -> str:
+    if _FORBIDDEN_HEADER_MEMBERS & header.keys():
+        raise _RefusalError(RejectionReason.FORBIDDEN_HEADER)
+    if header.get("alg") != _ALGORITHM:
+        raise _RefusalError(RejectionReason.UNSUPPORTED_ALGORITHM)
+    key_id = header.get("kid")
+    if not _is_key_id(key_id):
+        raise _RefusalError(RejectionReason.INVALID_KEY_ID)
+    return key_id
+
+
+def _is_key_id(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and 0 < len(value) <= MAX_KEY_ID_CHARACTERS
+
+
+def _integer_claim(claims: Mapping[str, object], name: str) -> int:
+    value = claims.get(name)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise _RefusalError(RejectionReason.INVALID_CLAIM)
+    return value
+
+
+def _base64url_decode(segment: str) -> bytes:
+    """Decodes unpadded base64url, refusing what the lenient stdlib decoder
+    would silently skip, so this parse and PyJWT's read the same bytes."""
+    if not _BASE64URL.fullmatch(segment):
+        raise ValueError("not base64url")
+    return base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
+
+
+def _strict_json_object(document: bytes) -> dict[str, object]:
+    try:
+        text = document.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise _RefusalError(RejectionReason.MALFORMED_TOKEN) from error
+    # Measured before parsing: the stdlib parser recurses per level and would
+    # raise RecursionError on hostile nesting rather than a parse error.
+    if _nesting_depth(text) > MAX_JSON_NESTING_DEPTH:
+        raise _RefusalError(RejectionReason.NESTING_TOO_DEEP)
+    try:
+        parsed = json.loads(text, object_pairs_hook=_object_without_duplicates)
+    except ValueError as error:
+        raise _RefusalError(RejectionReason.MALFORMED_TOKEN) from error
+    if not isinstance(parsed, dict):
+        raise _RefusalError(RejectionReason.MALFORMED_TOKEN)
+    return parsed
+
+
+def _nesting_depth(text: str) -> int:
+    depth = deepest = 0
+    in_string = escaped = False
+    for character in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+        elif character == '"':
+            in_string = True
+        elif character in "[{":
+            depth += 1
+            deepest = max(deepest, depth)
+        elif character in "]}":
+            depth -= 1
+    return deepest
+
+
+def _object_without_duplicates(members: list[tuple[str, object]]) -> dict[str, object]:
+    parsed = dict(members)
+    if len(parsed) != len(members):
+        raise _RefusalError(RejectionReason.DUPLICATE_MEMBER)
+    return parsed
+
+
+def _parse_key_set(document: bytes) -> Mapping[str, RSAPublicKey]:
+    if len(document) > MAX_KEY_SET_BYTES:
+        raise _InvalidKeySetError("key set response is too large")
+    try:
+        parsed = _strict_json_object(document)
+    except _RefusalError as refusal:
+        raise _InvalidKeySetError(f"key set is not strict JSON: {refusal.reason}") from None
+    jwks = parsed.get("keys")
+    if not isinstance(jwks, list) or not 0 < len(jwks) <= MAX_KEY_SET_KEYS:
+        raise _InvalidKeySetError("key set must hold between one and the maximum of keys")
+    keys: dict[str, RSAPublicKey] = {}
+    for jwk in jwks:
+        key_id, key = _public_signing_key(jwk)
+        if key_id in keys:
+            raise _InvalidKeySetError(f"key set repeats kid {key_id!r}")
+        keys[key_id] = key
+    return MappingProxyType(keys)
+
+
+def _public_signing_key(jwk: object) -> tuple[str, RSAPublicKey]:
+    if not isinstance(jwk, dict):
+        raise _InvalidKeySetError("key is not an object")
+    if jwk.get("kty") != "RSA" or _PRIVATE_RSA_MEMBERS & jwk.keys():
+        raise _InvalidKeySetError("key is not a public RSA key")
+    if jwk.get("alg", _ALGORITHM) != _ALGORITHM or jwk.get("use", "sig") != "sig":
+        raise _InvalidKeySetError("key is not an RS256 signing key")
+    key_id = jwk.get("kid")
+    modulus, exponent = jwk.get("n"), jwk.get("e")
+    if not _is_key_id(key_id) or not isinstance(modulus, str) or not isinstance(exponent, str):
+        raise _InvalidKeySetError("key lacks a valid kid, n or e")
+    try:
+        key = RSAPublicNumbers(
+            e=_base64url_unsigned(exponent), n=_base64url_unsigned(modulus)
+        ).public_key()
+    except ValueError as error:
+        raise _InvalidKeySetError(f"key {key_id!r} is not a valid RSA key") from error
+    if key.key_size < MIN_RSA_KEY_BITS:
+        raise _InvalidKeySetError(f"key {key_id!r} is shorter than {MIN_RSA_KEY_BITS} bits")
+    return key_id, key
+
+
+def _base64url_unsigned(value: str) -> int:
+    return int.from_bytes(_base64url_decode(value), byteorder="big")
