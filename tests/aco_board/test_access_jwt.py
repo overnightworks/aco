@@ -26,8 +26,9 @@ from dataclasses import dataclass, field
 from functools import cache
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
+import jwt
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -465,6 +466,21 @@ def test_a_defective_token_is_refused_with_its_reason(
     reason: RejectionReason,
 ) -> None:
     assert access.verifier.verify(build_token(access)) == Rejected(reason)
+
+
+def test_a_token_pyjwt_cannot_decode_is_refused_as_malformed(
+    access: AccessScenario, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The strict parse refuses every token PyJWT cannot decode today; should a
+    later PyJWT read a segment differently, its DecodeError is still a rejection."""
+
+    def decode_differently(*args: object, **kwargs: object) -> NoReturn:
+        del args, kwargs
+        raise jwt.DecodeError("this PyJWT reads the segment differently")
+
+    monkeypatch.setattr(jwt, "decode", decode_differently)
+
+    assert access.verifier.verify(access.token()) == Rejected(RejectionReason.MALFORMED_TOKEN)
 
 
 @pytest.mark.parametrize(
