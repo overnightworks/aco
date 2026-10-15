@@ -32,6 +32,7 @@ import threading
 import time
 import urllib.parse
 from collections.abc import Callable, Iterator, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
 from http import HTTPStatus
@@ -260,9 +261,9 @@ def fetch_key_set_over_https(
     url: str, *, deadline_seconds: float = KEY_SET_FETCH_TIMEOUT_SECONDS
 ) -> bytes:
     """The production `KeySetFetch`: HTTPS only, no redirect followed, no proxy
-    from the environment, the whole exchange cut off at its deadline, and at
-    most one byte past the key-set limit read, so the verifier refuses an
-    oversized answer without buffering it."""
+    from the environment, name resolution, connecting and the exchange all held
+    to one deadline, and at most one byte past the key-set limit read, so the
+    verifier refuses an oversized answer without buffering it."""
     deadline = time.monotonic() + deadline_seconds
     origin = urllib.parse.urlsplit(url)
     host = origin.hostname
@@ -271,12 +272,53 @@ def fetch_key_set_over_https(
     port = origin.port or http.client.HTTPS_PORT
     try:
         with (
-            socket.create_connection((host, port), timeout=deadline_seconds) as connection,
+            _connect_before(deadline, host, port) as connection,
             _cut_off_at(deadline, connection),
         ):
             return _get_over_tls(connection, host, port, origin.path or "/")
     except (OSError, http.client.HTTPException) as error:
         raise KeySetFetchError(f"fetching the key set from {url} failed: {error}") from error
+
+
+def _connect_before(deadline: float, host: str, port: int) -> socket.socket:
+    """Resolves `host` and connects to the first of its addresses that
+    answers, all before `deadline`. `socket.create_connection` would resolve
+    without any timeout and give every address the whole one."""
+    # `getaddrinfo` takes no timeout and cannot be interrupted, so it runs on a
+    # worker this fetch stops waiting for at the deadline; the system resolver
+    # alone ends that worker.
+    resolver = ThreadPoolExecutor(max_workers=1)
+    try:
+        resolving = resolver.submit(socket.getaddrinfo, host, port, type=socket.SOCK_STREAM)
+        addresses = resolving.result(timeout=_time_left_before(deadline))
+    except TimeoutError as error:
+        raise _deadline_passed() from error
+    finally:
+        resolver.shutdown(wait=False)
+    failure = OSError(f"{host} resolved to no address")
+    for family, kind, protocol, _canonical_name, address in addresses:
+        time_left = _time_left_before(deadline)
+        connection = socket.socket(family, kind, protocol)
+        try:
+            connection.settimeout(time_left)
+            connection.connect(address)
+        except OSError as error:
+            connection.close()
+            failure = error
+        else:
+            return connection
+    raise failure
+
+
+def _time_left_before(deadline: float) -> float:
+    time_left = deadline - time.monotonic()
+    if time_left <= 0:
+        raise _deadline_passed()
+    return time_left
+
+
+def _deadline_passed() -> KeySetFetchError:
+    return KeySetFetchError("the key set fetch passed its deadline")
 
 
 def _get_over_tls(connection: socket.socket, host: str, port: int, path: str) -> bytes:
@@ -327,7 +369,7 @@ def _cut_off_at(deadline: float, connection: socket.socket) -> Iterator[None]:
         watched.close()
     # Reached after a cut too: a body cut short may just read short.
     if cut_off.is_set():
-        raise KeySetFetchError("the key set fetch passed its deadline")
+        raise _deadline_passed()
 
 
 def _certificate_verifying_tls() -> ssl.SSLContext:

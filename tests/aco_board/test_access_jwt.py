@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import socket
 import ssl
 import string
 import threading
@@ -842,6 +843,72 @@ def test_https_fetch_gives_up_on_a_trickling_answer_at_its_deadline(
             f"{https_key_set_server.base_url}/trickle",
             deadline_seconds=10 * _TRICKLE_INTERVAL_SECONDS,
         )
+
+
+_STALL_DEADLINE_SECONDS = 0.2
+# Room for thread scheduling on a loaded machine; a fetch that waited out
+# each stall in turn overshoots its deadline by many times this.
+_SCHEDULING_SLACK_SECONDS = 1.0
+_UNANSWERED_ADDRESSES = [
+    (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (f"192.0.2.{host}", 443))
+    for host in range(1, 11)
+]
+
+
+class _UnansweredSocket:
+    """Every connect waits out the whole timeout it was given, as a dead route does."""
+
+    def __init__(self, *_args: object) -> None:
+        self._timeout = 0.0
+
+    def settimeout(self, timeout: float) -> None:
+        self._timeout = timeout
+
+    def connect(self, _address: object) -> NoReturn:
+        time.sleep(self._timeout)
+        raise TimeoutError("timed out")
+
+    def close(self) -> None:
+        pass
+
+
+def _resolve_promptly(_released: threading.Event) -> Callable[..., object]:
+    return lambda *_args, **_kwargs: _UNANSWERED_ADDRESSES
+
+
+def _resolve_after_release(released: threading.Event) -> Callable[..., object]:
+    def resolve(*_args: object, **_kwargs: object) -> object:
+        released.wait(timeout=25 * _STALL_DEADLINE_SECONDS)
+        return _UNANSWERED_ADDRESSES
+
+    return resolve
+
+
+@pytest.mark.parametrize(
+    "resolver",
+    [
+        pytest.param(_resolve_promptly, id="every-address-leaves-its-connect-unanswered"),
+        pytest.param(_resolve_after_release, id="name-resolution-stalls"),
+    ],
+)
+def test_https_fetch_gives_up_on_a_stalled_network_at_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+    resolver: Callable[[threading.Event], Callable[..., object]],
+) -> None:
+    released = threading.Event()
+    monkeypatch.setattr(socket, "getaddrinfo", resolver(released))
+    monkeypatch.setattr(socket, "socket", _UnansweredSocket)
+    started = time.monotonic()
+    try:
+        with pytest.raises(KeySetFetchError):
+            fetch_key_set_over_https(
+                "https://team.example/certs", deadline_seconds=_STALL_DEADLINE_SECONDS
+            )
+        elapsed = time.monotonic() - started
+    finally:
+        released.set()
+
+    assert elapsed < _STALL_DEADLINE_SECONDS + _SCHEDULING_SLACK_SECONDS
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(
