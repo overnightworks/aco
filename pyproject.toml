@@ -13,7 +13,7 @@ authors = [{name = "agent-coordination contributors"}]
 dependencies = [
     "cryptography>=50.0.2",
     "pyjwt[crypto]>=2.15.1",
-    "urllib3>=2",
+    "urllib3>=2.6.3",
 ]
 
 [project.scripts]
