@@ -666,27 +666,25 @@ def test_parallel_unknown_kids_share_one_fetch_and_each_fails_closed(
 
 
 @pytest.mark.parametrize(
-    "team", ["", "Example", "example.team", "example/team", "example-team\n", "t" * 64]
+    ("team", "audience", "refused"),
+    [
+        *(
+            pytest.param(team, "example-audience-tag", "team", id=f"team-{team!r}")
+            for team in ("", "Example", "example.team", "example/team", "example-team\n", "t" * 64)
+        ),
+        pytest.param("example-team", "", "audience", id="empty-audience"),
+    ],
 )
-def test_a_team_name_outside_the_cloudflare_pattern_is_refused(team: str) -> None:
-    with pytest.raises(ValueError, match="team"):
+def test_a_team_name_outside_the_cloudflare_pattern_or_an_empty_audience_is_refused(
+    access: AccessScenario, team: str, audience: str, refused: str
+) -> None:
+    with pytest.raises(ValueError, match=refused):
         AccessJwtVerifier(
             team=team,
-            audience="example-audience-tag",
-            fetch_key_set=FakeKeySetEndpoint(b""),
-            wall_clock=FakeClock(0),
-            monotonic_clock=FakeClock(0),
-        )
-
-
-def test_an_empty_audience_is_refused() -> None:
-    with pytest.raises(ValueError, match="audience"):
-        AccessJwtVerifier(
-            team="example-team",
-            audience="",
-            fetch_key_set=FakeKeySetEndpoint(b""),
-            wall_clock=FakeClock(0),
-            monotonic_clock=FakeClock(0),
+            audience=audience,
+            fetch_key_set=access.endpoint,
+            wall_clock=access.wall_clock,
+            monotonic_clock=access.monotonic_clock,
         )
 
 
