@@ -20,21 +20,14 @@ the last good set; that set expires on the injected monotonic clock.
 
 from __future__ import annotations
 
-import _thread
 import base64
-import contextlib
-import http.client
 import json
 import math
-import queue
 import re
-import socket
-import ssl
 import threading
 import time
 import urllib.parse
-from collections.abc import Callable, Iterator, Mapping
-from concurrent.futures import Future
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from http import HTTPStatus
@@ -42,6 +35,7 @@ from types import MappingProxyType
 from typing import NoReturn, TypeGuard
 
 import jwt
+import urllib3
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey, RSAPublicNumbers
 from jwt.types import Options
 
@@ -262,193 +256,50 @@ class AccessJwtVerifier:
 def fetch_key_set_over_https(
     url: str, *, deadline_seconds: float = KEY_SET_FETCH_TIMEOUT_SECONDS
 ) -> bytes:
-    """The production `KeySetFetch`: HTTPS only, no redirect followed, no proxy
-    from the environment, the wait for name resolution, connecting and the
-    exchange all held to one deadline, and at most one byte past the key-set
-    limit read, so the verifier refuses an oversized answer without buffering
-    it."""
-    deadline = time.monotonic() + deadline_seconds
+    """The production `KeySetFetch`: HTTPS under the system's trusted
+    certificates, no retry, no redirect followed, no proxy from the
+    environment, and at most one byte past the key-set limit read, so the
+    verifier refuses an oversized answer without buffering it.
+
+    Connecting and each read wait at most `deadline_seconds`, and no read
+    starts once it has passed. Name resolution is not bounded: urllib3 asks
+    the system resolver, which takes no timeout, so a stalled lookup holds
+    this refresh until the resolver gives up, while every other request fails
+    closed without waiting for it."""
     origin = urllib.parse.urlsplit(url)
-    host = origin.hostname
-    if origin.scheme != "https" or not host:
+    if origin.scheme != "https" or not origin.hostname:
         raise KeySetFetchError(f"refusing to fetch the key set from {url}: not an https URL")
-    port = origin.port or http.client.HTTPS_PORT
+    deadline = time.monotonic() + deadline_seconds
     try:
-        with (
-            _connect_before(deadline, host, port) as connection,
-            _cut_off_at(deadline, connection),
-        ):
-            return _get_over_tls(connection, host, port, origin.path or "/")
-    except (OSError, http.client.HTTPException) as error:
+        with urllib3.PoolManager(
+            timeout=urllib3.Timeout(total=deadline_seconds), retries=False
+        ) as pool:
+            response = pool.request("GET", url, redirect=False, preload_content=False)
+            try:
+                if response.status != HTTPStatus.OK:
+                    raise KeySetFetchError(
+                        f"the key set origin answered {response.status}, not 200"
+                    )
+                return _key_set_body_before(deadline, response)
+            finally:
+                response.close()
+    except (urllib3.exceptions.HTTPError, OSError) as error:
         raise KeySetFetchError(f"fetching the key set from {url} failed: {error}") from error
 
 
-def _connect_before(deadline: float, host: str, port: int) -> socket.socket:
-    """Resolves `host` and connects to the first of its addresses that
-    answers, all before `deadline`. `socket.create_connection` would resolve
-    without any timeout and give every address the whole one."""
-    addresses = _SYSTEM_NAME_RESOLVER.addresses(host, port, deadline)
-    failure = OSError(f"{host} resolved to no address")
-    for family, kind, protocol, _canonical_name, address in addresses:
-        time_left = _time_left_before(deadline)
-        connection = None
-        try:
-            connection = socket.socket(family, kind, protocol)
-            connection.settimeout(time_left)
-            connection.connect(address)
-        except OSError as error:
-            if connection is not None:
-                connection.close()
-            failure = error
-        else:
-            return connection
-    raise failure
-
-
-_AddressInfo = tuple[
-    socket.AddressFamily,
-    socket.SocketKind,
-    int,
-    str,
-    tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes],
-]
-
-
-# A verifier fetches single-flight, so a second lookup waiting behind the one
-# in progress means the resolver is stalled.
-_WAITING_NAME_LOOKUPS_LIMIT = 1
-
-
-class _NameResolver:
-    """Resolves names on one daemon thread for the whole process.
-
-    `getaddrinfo` takes no timeout and cannot be interrupted, so a caller can
-    only stop waiting for it, and only the system resolver ends a lookup. One
-    thread for every lookup and a bounded line of lookups waiting for it bound
-    what a stalled resolver holds: a lookup that finds the line full is refused
-    at once, a lookup whose caller gave up before it started is skipped, and as
-    a daemon the thread never holds the interpreter's exit.
-
-    The first lookup starts the thread. `Thread.start` waits for its thread to
-    run without a timeout, so a bare `_thread` thread does that waiting and no
-    lookup does: a thread that comes up late only keeps the lookup waiting, and
-    that wait is held to the lookup's deadline."""
-
-    def __init__(self) -> None:
-        self._lookups: queue.Queue[tuple[Future[list[_AddressInfo]], str, int]] = queue.Queue(
-            maxsize=_WAITING_NAME_LOOKUPS_LIMIT
-        )
-        self._resolver_thread = threading.Thread(
-            target=self._resolve_forever, name="key-set-name-resolver", daemon=True
-        )
-        self._start_lock = threading.Lock()
-        self._started = False
-
-    def addresses(self, host: str, port: int, deadline: float) -> list[_AddressInfo]:
-        self._start_resolving_once()
-        lookup: Future[list[_AddressInfo]] = Future()
-        try:
-            self._lookups.put_nowait((lookup, host, port))
-        except queue.Full as error:
-            raise KeySetFetchError(f"name resolution for {host} is stalled") from error
-        try:
-            return lookup.result(timeout=_time_left_before(deadline))
-        except TimeoutError as error:
-            raise _deadline_passed() from error
-        finally:
-            lookup.cancel()
-
-    def _start_resolving_once(self) -> None:
-        with self._start_lock:
-            if not self._started:
-                _thread.start_new_thread(self._resolver_thread.start, ())
-                self._started = True
-
-    def _resolve_forever(self) -> NoReturn:
-        while True:
-            lookup, host, port = self._lookups.get()
-            if not lookup.set_running_or_notify_cancel():
-                continue
-            # Handed to the waiting caller, which raises it as its own.
-            try:
-                lookup.set_result(socket.getaddrinfo(host, port, type=socket.SOCK_STREAM))
-            except Exception as error:
-                lookup.set_exception(error)
-
-
-_SYSTEM_NAME_RESOLVER = _NameResolver()
-
-
-def _time_left_before(deadline: float) -> float:
-    time_left = deadline - time.monotonic()
-    if time_left <= 0:
-        raise _deadline_passed()
-    return time_left
-
-
-def _deadline_passed() -> KeySetFetchError:
-    return KeySetFetchError("the key set fetch passed its deadline")
-
-
-def _get_over_tls(connection: socket.socket, host: str, port: int, path: str) -> bytes:
-    tls = _certificate_verifying_tls()
-    # Handed the connection ready-made, so `_cut_off_at` holds it from the
-    # first TLS byte; `http.client` follows no redirect and reads no proxy.
-    exchange = http.client.HTTPSConnection(host, port, context=tls)
-    try:
-        exchange.sock = tls.wrap_socket(connection, server_hostname=host)
-        exchange.request("GET", path)
-        with exchange.getresponse() as response:
-            if response.status != HTTPStatus.OK:
-                raise KeySetFetchError(f"the key set origin answered {response.status}, not 200")
-            return response.read(MAX_KEY_SET_BYTES + 1)
-    finally:
-        exchange.close()
-
-
-@contextlib.contextmanager
-def _cut_off_at(deadline: float, connection: socket.socket) -> Iterator[None]:
-    """Shuts `connection` down at `deadline`, wherever the exchange stands.
-    The socket timeout bounds each read alone, so without this a peer sending
-    a byte just inside it would hold the refresh, and its lock, indefinitely."""
-    # A duplicate descriptor stays usable after TLS takes `connection` over,
-    # and shutting it down ends the one connection both name.
-    watched = connection.dup()
-    cut_off = threading.Event()
-
-    def shut_down() -> None:
-        cut_off.set()
-        # A connection the peer already broke needs no cutting.
-        with contextlib.suppress(OSError):
-            watched.shutdown(socket.SHUT_RDWR)
-
-    timer = threading.Timer(deadline - time.monotonic(), shut_down)
-    timer.daemon = True
-    timer.start()
-    try:
-        yield
-    except (OSError, http.client.HTTPException):
-        # Wherever the cut lands, the exchange fails with what it was doing
-        # then; the deadline is the cause worth reporting.
-        if not cut_off.is_set():
-            raise
-    finally:
-        timer.cancel()
-        timer.join()
-        watched.close()
-    # Reached after a cut too: a body cut short may just read short.
-    if cut_off.is_set():
-        raise _deadline_passed()
-
-
-def _certificate_verifying_tls() -> ssl.SSLContext:
-    """The system's trusted certificates, a verified chain and a matching host
-    name. The default context already requires both; they are stated so the
-    one thing this key-set origin is trusted for stays visible here."""
-    context = ssl.create_default_context()
-    context.check_hostname = True
-    context.verify_mode = ssl.CERT_REQUIRED
-    return context
+def _key_set_body_before(deadline: float, response: urllib3.BaseHTTPResponse) -> bytes:
+    """urllib3's timeout bounds each read alone, so a peer sending a byte
+    just inside it would hold the refresh, and its lock, indefinitely; the
+    body is therefore read piece by piece and given up at `deadline`."""
+    body = bytearray()
+    while len(body) <= MAX_KEY_SET_BYTES:
+        if time.monotonic() >= deadline:
+            raise KeySetFetchError("the key set fetch passed its deadline")
+        piece = response.read1(MAX_KEY_SET_BYTES + 1 - len(body))
+        if not piece:
+            break
+        body += piece
+    return bytes(body)
 
 
 def _library_checks() -> Options:

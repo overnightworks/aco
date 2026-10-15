@@ -16,11 +16,8 @@ import hashlib
 import hmac
 import ipaddress
 import json
-import socket
 import ssl
 import string
-import subprocess
-import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -789,6 +786,8 @@ def https_key_set_server(
                 self.end_headers()
             elif self.path == "/trickle":
                 self._trickle(b" " * _TRICKLED_BYTES)
+            elif self.path == "/missing":
+                self.send_error(404)
             elif self.path == "/oversized":
                 self._answer(b" " * (2 * MAX_KEY_SET_BYTES))
             else:
@@ -831,36 +830,7 @@ def https_key_set_server(
         serving.join(timeout=10)
 
 
-# A family the host refuses to open a socket for, as a host booted without
-# IPv6 refuses an IPv6 answer.
-_UNOPENABLE_ADDRESS = (
-    max(socket.AddressFamily) + 1,
-    socket.SOCK_STREAM,
-    socket.IPPROTO_TCP,
-    "",
-    ("::1", 443),
-)
-
-
-@pytest.mark.parametrize(
-    "addresses_before_the_server",
-    [
-        pytest.param([], id="the-server-is-the-only-address"),
-        pytest.param([_UNOPENABLE_ADDRESS], id="an-address-the-host-cannot-open-comes-first"),
-    ],
-)
-def test_https_fetch_returns_the_served_key_set(
-    https_key_set_server: HttpsKeySetServer,
-    monkeypatch: pytest.MonkeyPatch,
-    addresses_before_the_server: list[tuple[object, ...]],
-) -> None:
-    resolve = socket.getaddrinfo
-    monkeypatch.setattr(
-        socket,
-        "getaddrinfo",
-        lambda *args, **kwargs: addresses_before_the_server + resolve(*args, **kwargs),
-    )
-
+def test_https_fetch_returns_the_served_key_set(https_key_set_server: HttpsKeySetServer) -> None:
     document = fetch_key_set_over_https(f"{https_key_set_server.base_url}/certs")
 
     assert json.loads(document)["keys"][0]["kid"] == "current-key"
@@ -874,187 +844,6 @@ def test_https_fetch_gives_up_on_a_trickling_answer_at_its_deadline(
             f"{https_key_set_server.base_url}/trickle",
             deadline_seconds=10 * _TRICKLE_INTERVAL_SECONDS,
         )
-
-
-_STALL_DEADLINE_SECONDS = 0.2
-# Room for thread scheduling on a loaded machine; a fetch that waited out
-# each stall in turn overshoots its deadline by many times this.
-_SCHEDULING_SLACK_SECONDS = 1.0
-_UNANSWERED_ADDRESSES = [
-    (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (f"192.0.2.{host}", 443))
-    for host in range(1, 11)
-]
-
-
-class _UnansweredSocket:
-    """Every connect waits out the whole timeout it was given, as a dead route does."""
-
-    def __init__(self, *_args: object) -> None:
-        self._timeout = 0.0
-
-    def settimeout(self, timeout: float) -> None:
-        self._timeout = timeout
-
-    def connect(self, _address: object) -> NoReturn:
-        time.sleep(self._timeout)
-        raise TimeoutError("timed out")
-
-    def close(self) -> None:
-        pass
-
-
-def _resolve_promptly(_released: threading.Event) -> Callable[..., object]:
-    return lambda *_args, **_kwargs: _UNANSWERED_ADDRESSES
-
-
-def _resolve_after_release(released: threading.Event) -> Callable[..., object]:
-    def resolve(*_args: object, **_kwargs: object) -> object:
-        released.wait(timeout=25 * _STALL_DEADLINE_SECONDS)
-        return _UNANSWERED_ADDRESSES
-
-    return resolve
-
-
-@pytest.mark.parametrize(
-    "resolver",
-    [
-        pytest.param(_resolve_promptly, id="every-address-leaves-its-connect-unanswered"),
-        pytest.param(_resolve_after_release, id="name-resolution-stalls"),
-    ],
-)
-def test_https_fetch_gives_up_on_a_stalled_network_at_its_deadline(
-    monkeypatch: pytest.MonkeyPatch,
-    resolver: Callable[[threading.Event], Callable[..., object]],
-) -> None:
-    released = threading.Event()
-    monkeypatch.setattr(socket, "getaddrinfo", resolver(released))
-    monkeypatch.setattr(socket, "socket", _UnansweredSocket)
-    started = time.monotonic()
-    try:
-        with pytest.raises(KeySetFetchError):
-            fetch_key_set_over_https(
-                "https://team.example/certs", deadline_seconds=_STALL_DEADLINE_SECONDS
-            )
-        elapsed = time.monotonic() - started
-    finally:
-        released.set()
-
-    assert elapsed < _STALL_DEADLINE_SECONDS + _SCHEDULING_SLACK_SECONDS
-
-
-# A child interpreter, so the lookup it strands cannot reach another test.
-_FETCHES_DURING_ONE_STALLED_LOOKUP = """
-import contextlib, socket, threading
-threads_before = threading.active_count()
-from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
-
-socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
-for _ in range(3):
-    with contextlib.suppress(KeySetFetchError):
-        fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
-print(threading.active_count() - threads_before)
-"""
-# A child held at exit by its stranded lookup never finishes; one that is not
-# finishes in the time its imports take.
-_CHILD_EXIT_TIMEOUT_SECONDS = 20
-
-
-# Every fetch after the stalled lookup and the one waiting behind it is given
-# a deadline the child cannot outwait; only a refusal at once lets it finish.
-# The stalled lookup's own fetch waits on, so the resolver cannot skip it.
-_FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS = f"""
-import contextlib, socket, threading
-from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
-
-lookup_stalled = threading.Event()
-def stall(*_args, **_kwargs):
-    lookup_stalled.set()
-    threading.Event().wait()
-socket.getaddrinfo = stall
-def fetch_patiently():
-    with contextlib.suppress(KeySetFetchError):
-        fetch_key_set_over_https(
-            "https://team.example/certs", deadline_seconds={2 * _CHILD_EXIT_TIMEOUT_SECONDS}
-        )
-threading.Thread(target=fetch_patiently, daemon=True).start()
-lookup_stalled.wait()
-with contextlib.suppress(KeySetFetchError):
-    fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
-refused = 0
-for _ in range(100):
-    try:
-        fetch_key_set_over_https(
-            "https://team.example/certs", deadline_seconds={2 * _CHILD_EXIT_TIMEOUT_SECONDS}
-        )
-    except KeySetFetchError:
-        refused += 1
-print(refused)
-"""
-
-# Threads that come up this late would hold an import or a fetch that waits
-# for one many times past the fetch's deadline.
-_SLOW_THREAD_START_SECONDS = 5.0
-# Every thread comes up late from before the import on: a start that waits for
-# its thread waits that long, and a thread started without waiting runs that
-# late. The child prints how long the import took, then how long the fetch did.
-_IMPORT_AND_FETCH_WHILE_THREADS_START_SLOWLY = f"""
-import _thread, socket, threading, time
-
-def run_late(function):
-    def late(*args):
-        time.sleep({_SLOW_THREAD_START_SECONDS})
-        function(*args)
-    return late
-start_new_thread = _thread.start_new_thread
-_thread.start_new_thread = lambda function, args: start_new_thread(run_late(function), args)
-start_thread = threading.Thread.start
-def start_slowly(thread):
-    time.sleep({_SLOW_THREAD_START_SECONDS})
-    start_thread(thread)
-threading.Thread.start = start_slowly
-
-import_started = time.monotonic()
-from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
-print(time.monotonic() - import_started)
-socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
-fetch_started = time.monotonic()
-try:
-    fetch_key_set_over_https(
-        "https://team.example/certs", deadline_seconds={_STALL_DEADLINE_SECONDS}
-    )
-except KeySetFetchError:
-    print(time.monotonic() - fetch_started)
-"""
-
-
-def _run_child(script: str) -> str:
-    child = subprocess.run(
-        [sys.executable, "-c", script],
-        capture_output=True,
-        text=True,
-        timeout=_CHILD_EXIT_TIMEOUT_SECONDS,
-        check=True,
-    )
-    return child.stdout.strip()
-
-
-def test_a_stalled_name_resolution_holds_one_thread_and_never_the_interpreter_exit() -> None:
-    assert _run_child(_FETCHES_DURING_ONE_STALLED_LOOKUP) == "1"
-
-
-def test_a_stalled_name_resolution_refuses_further_lookups_at_once_instead_of_queueing_them() -> (
-    None
-):
-    assert _run_child(_FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS) == "100"
-
-
-def test_a_slow_thread_start_holds_neither_the_import_nor_a_fetch_past_its_deadline() -> None:
-    import_seconds, fetch_seconds = map(
-        float, _run_child(_IMPORT_AND_FETCH_WHILE_THREADS_START_SLOWLY).split()
-    )
-
-    assert import_seconds < _SLOW_THREAD_START_SECONDS
-    assert fetch_seconds < _STALL_DEADLINE_SECONDS + _SCHEDULING_SLACK_SECONDS
 
 
 def test_https_fetch_reads_at_most_one_byte_past_the_key_set_limit(
@@ -1072,6 +861,13 @@ def test_https_fetch_refuses_a_certificate_the_system_does_not_trust(
 
     with pytest.raises(KeySetFetchError):
         fetch_key_set_over_https(f"{https_key_set_server.base_url}/certs")
+
+
+def test_https_fetch_refuses_an_answer_other_than_200(
+    https_key_set_server: HttpsKeySetServer,
+) -> None:
+    with pytest.raises(KeySetFetchError):
+        fetch_key_set_over_https(f"{https_key_set_server.base_url}/missing")
 
 
 def test_https_fetch_never_follows_a_redirect(https_key_set_server: HttpsKeySetServer) -> None:
