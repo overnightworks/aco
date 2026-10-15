@@ -286,10 +286,10 @@ def _get_over_tls(connection: socket.socket, host: str, port: int, path: str) ->
     try:
         exchange.sock = tls.wrap_socket(connection, server_hostname=host)
         exchange.request("GET", path)
-        response = exchange.getresponse()
-        if response.status != HTTPStatus.OK:
-            raise KeySetFetchError(f"the key set origin answered {response.status}, not 200")
-        return response.read(MAX_KEY_SET_BYTES + 1)
+        with exchange.getresponse() as response:
+            if response.status != HTTPStatus.OK:
+                raise KeySetFetchError(f"the key set origin answered {response.status}, not 200")
+            return response.read(MAX_KEY_SET_BYTES + 1)
     finally:
         exchange.close()
 
@@ -315,11 +315,16 @@ def _cut_off_at(deadline: float, connection: socket.socket) -> Iterator[None]:
     timer.start()
     try:
         yield
+    except (OSError, http.client.HTTPException):
+        # Wherever the cut lands, the exchange fails with what it was doing
+        # then; the deadline is the cause worth reporting.
+        if not cut_off.is_set():
+            raise
     finally:
         timer.cancel()
         timer.join()
         watched.close()
-    # A body cut short reads as a short body, not as an error.
+    # Reached after a cut too: a body cut short may just read short.
     if cut_off.is_set():
         raise KeySetFetchError("the key set fetch passed its deadline")
 
