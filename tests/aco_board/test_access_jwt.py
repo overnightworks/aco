@@ -961,14 +961,25 @@ _CHILD_EXIT_TIMEOUT_SECONDS = 20
 
 # Every fetch after the stalled lookup and the one waiting behind it is given
 # a deadline the child cannot outwait; only a refusal at once lets it finish.
+# The stalled lookup's own fetch waits on, so the resolver cannot skip it.
 _FETCHES_REFUSED_WHILE_A_LOOKUP_STALLS = f"""
 import contextlib, socket, threading
 from aco_board.access_jwt import KeySetFetchError, fetch_key_set_over_https
 
-socket.getaddrinfo = lambda *_args, **_kwargs: threading.Event().wait()
-for _ in range(2):
+lookup_stalled = threading.Event()
+def stall(*_args, **_kwargs):
+    lookup_stalled.set()
+    threading.Event().wait()
+socket.getaddrinfo = stall
+def fetch_patiently():
     with contextlib.suppress(KeySetFetchError):
-        fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
+        fetch_key_set_over_https(
+            "https://team.example/certs", deadline_seconds={2 * _CHILD_EXIT_TIMEOUT_SECONDS}
+        )
+threading.Thread(target=fetch_patiently, daemon=True).start()
+lookup_stalled.wait()
+with contextlib.suppress(KeySetFetchError):
+    fetch_key_set_over_https("https://team.example/certs", deadline_seconds=0.1)
 refused = 0
 for _ in range(100):
     try:
