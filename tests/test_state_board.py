@@ -5262,7 +5262,7 @@ class TestCliStateRefForge:
             capsys,
         ).expect_success()
         # `claim`'s own success line now prints the state-ref id too
-        # (issue #300 residual 1: `_claim_subject` takes `config.storage`).
+        # (issue #300 residual 1: `board.claim_subject` takes `config.storage`).
         assert claim_out.splitlines()[0] == f"CLAIMED issue {child_id}: state-ref-claim"
 
         assert f"CLAIMED issue {child_id}" in run_cli(["status", child_id], capsys).expect_success()

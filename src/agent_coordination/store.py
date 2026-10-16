@@ -45,6 +45,7 @@ from .protocol import (
     ActiveClaim,
     ClaimError,
     ClaimId,
+    ClaimIdentity,
     ClaimIntent,
     ClaimState,
     ClaimTransitionIntent,
@@ -52,6 +53,7 @@ from .protocol import (
     ItemCloseIntent,
     ItemWriteIntent,
     LandingIntent,
+    LaneIdentity,
     MalformedStateTreeError,
     ObjectId,
     OperationAlreadyApplied,
@@ -72,6 +74,7 @@ from .protocol import (
     serialize_claim_toml,
     serialize_empty_schema_toml,
     serialize_resource_toml,
+    transition_item_identifier,
 )
 
 STATE_REF = "refs/aco/state"
@@ -1571,7 +1574,7 @@ class TransitionSubject:
 class ClaimTransitionSubject:
     """One claim-shaped transition's own commit-message identity (issue
     #357 R2): `text` is the human-facing subject line
-    (`cli._transition_subject`'s own `"claim issue 42"` prose) and `item`
+    (`transition_subject`'s own `"claim issue 42"` prose) and `item`
     -- `protocol.transition_item_identifier`'s own bare identifier -- is
     mandatory: every claim/rescope/release produces a machine-readable
     `item:` trailer, the one field `claim_lifecycle`'s reader parses back,
@@ -1582,6 +1585,19 @@ class ClaimTransitionSubject:
 
     text: str
     item: str
+
+
+def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> ClaimTransitionSubject:
+    """One claim-shaped transition's own `ClaimTransitionSubject` (§1
+    "Commit message"; issue #357 R2): `text` is `claim issue 42`, `rescope
+    lane docs/lane-cleanup`, and so on -- `action` plus `issue`/`lane` plus
+    `transition_item_identifier`'s own bare identifier; `item` is
+    that same identifier again, carried separately into the commit's own
+    mandatory `item:` trailer rather than reconstructed from `text` by
+    `claim_lifecycle`'s reader."""
+    kind = "lane" if isinstance(identity, LaneIdentity) else "issue"
+    item = transition_item_identifier(identity, branch)
+    return ClaimTransitionSubject(f"{action} {kind} {item}", item=item)
 
 
 def _transition_message(

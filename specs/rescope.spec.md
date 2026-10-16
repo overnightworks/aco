@@ -4,7 +4,7 @@
 writes the same scope into the claimed item's own body (issue #554). This
 file owns the command's own location resolution (`--add`/`--drop` absolute
 or repository-relative, issues #314, #554), its checkout preconditions, the
-scope-combining refusals, its own `_selected_store_claim` lookup (RESC-14),
+scope-combining refusals, its own lookup of the store claim it rescopes (RESC-14),
 the item-body write beside the claim (RESC-22..25), the
 `RESCOPED ...`/`--json` report, and its own `--json` `reason` vocabulary.
 `specs/output.spec.md` owns the `--json` envelope itself (OUT-nn: key
@@ -21,7 +21,7 @@ the sentence naming a canonical remote with no URL configured (PROT-45),
 and the sentences for a path no claim can ever cover (PROT-14, PROT-42,
 PROT-43) that `rescope` shares verbatim, `protect`'s own docstring names the
 sharing; `specs/claim.spec.md` owns the issueless-lane branch refusal
-(CLM-07) `_resolved_identity` shares with `rescope` too. This file cites
+(CLM-07) that the identity resolution shares with `rescope` too. This file cites
 those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 `<path>` a path, `<claim-id>` the selected claim's own id; `<subject>` and
 `<identity>` are `specs/release.spec.md`'s own, naming an item `<label>`.

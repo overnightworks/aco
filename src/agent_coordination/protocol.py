@@ -134,7 +134,7 @@ def transition_item_identifier(identity: ClaimIdentity, branch: str) -> str:
     for `claim_lifecycle` to read back unparsed, matching
     `metrics.LaneEvent.item`'s own bare shape -- never a second grammar a
     reader has to reconstruct from the commit's human-prose subject line.
-    `cli._transition_subject` also reads this for the identifier half of its
+    `store.transition_subject` also reads this for the identifier half of its
     own `"claim issue 42"`/`"rescope lane docs/x"` prose.
     """
     if isinstance(identity, LaneIdentity):
@@ -1688,3 +1688,79 @@ def parse_resource_toml(content: str, *, name: str, tip: ObjectId) -> ResourceRe
             f"resource file {name}.toml at {tip} field 'occupied' must be positive integers"
         )
     return ResourceRecord(name=name, occupied=tuple(occupied))
+
+
+def resolved_identity(issue: int | None, branch: str) -> ClaimIdentity:
+    """Resolve the CLI's discriminated identity: an explicit issue, or a lane.
+
+    Omitting the positional issue number means lane mode, derived from `branch`
+    (the same checkout branch `--base`/`--branch` auto-fill and the release
+    branch-matching fallback already use). Lane mode is refused outright unless
+    `branch` follows the issueless-lane convention, so a builder who simply forgot
+    the issue number never gets a silent, unlabeled, non-projected lane claim.
+    """
+    if issue is not None:
+        return IssueIdentity(issue)
+    if not branch.startswith(ISSUELESS_LANE_BRANCH_PREFIXES):
+        prefixes = " or ".join(repr(prefix) for prefix in ISSUELESS_LANE_BRANCH_PREFIXES)
+        raise ClaimError(
+            f"branch {branch!r} is not an issueless lane; pass an issue number, or "
+            f"check out a branch prefixed {prefixes}"
+        )
+    return LaneIdentity()
+
+
+def touch_json(claim: ScopedClaim) -> dict[str, object]:
+    return {
+        **identity_json(claim.identity),
+        "claim_id": claim.claim_id,
+        "agent": claim.agent,
+        "scope": list(claim.scope),
+    }
+
+
+def identity_json(identity: ClaimIdentity) -> dict[str, object]:
+    """`issue`/`lane` pair for one claim's discriminated identity, for JSON output.
+
+    A lane claim's name lives in the sibling `branch` field of the same JSON
+    object, so `lane` stays a bare marker instead of duplicating it.
+    """
+    if isinstance(identity, LaneIdentity):
+        return {"issue": None, "lane": True}
+    return {"issue": identity.issue, "lane": None}
+
+
+def resource_fields(resource: ResourceHold | None) -> dict[str, object]:
+    if resource is None:
+        return {"resource": None, "resource_value": None}
+    return {"resource": resource.name, "resource_value": resource.value}
+
+
+def claim_identity_fields(claim: ActiveClaim) -> dict[str, object]:
+    """The one claim-identity dict every `--json` view of a live claim
+    shares -- `status`, `status --path`, `claim`, and `rescope` (issue #406,
+    #390 finding 6) each spread this instead of typing the same seven
+    fields out by hand a fifth time with their own drifting order. A view
+    still projects its own remaining fields explicitly beside it: `resource`/
+    `resource_value` (every view but `rescope`, which names no `--resource`
+    flag of its own), `whole` (`status` and `status --path` alone), and
+    whatever else is that view's own (`overlaps`/`age`/`old` for `status`,
+    `versioned_files`/`touches`/`checks` for `claim`)."""
+    return {
+        **identity_json(claim.identity),
+        "claim_id": claim.claim_id,
+        "agent": claim.agent,
+        "role": claim.role,
+        "base": claim.base,
+        "branch": claim.branch,
+        "scope": list(claim.scope),
+    }
+
+
+def require_state_ref(state: ClaimState) -> None:
+    if state.tip is None:
+        raise ClaimError(MISSING_STATE_REF)
+
+
+def optional_issue_number(value: int | None) -> int | None:
+    return None if value is None else int(value)
