@@ -47,6 +47,7 @@ order `merge`, `squash`, `rebase`.
 | the head no longer starts with `<reviewed>` | LANDCMD-31 |
 | no `--head` given | LANDCMD-32 |
 | pull request not open | LANDCMD-02 |
+| the default branch adopts the quality gate and the completed checks hold no `quality / verdict` | LANDCMD-43 |
 | not mergeable | LANDCMD-03 |
 | no CI checks at all | LANDCMD-04 |
 | a check still running | LANDCMD-05 |
@@ -82,6 +83,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - [ ] [LANDCMD-32] Without `--head`, `aco land` pins whatever head preflight reads (LANDCMD-12); a rerun (LANDCMD-18) never compares `--head`, since its merge already happened.
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
+- [ ] [LANDCMD-43] Where the default branch holds `quality/config.toml`, completed checks (or none) without one named `quality / verdict` refuse `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`; a running check defers it (E-LANDCMD-43).
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
@@ -135,7 +137,7 @@ the default branch` on every rerun; it is removed by hand.
 - `aco land` never runs `release`'s own close, store transition, `freed`/`next` report, or worktree cleanup a second time; it delegates to the one existing `release --merged` path (`specs/release.spec.md`).
 - A step after the merge never re-merges: recovery always resumes from the pull request's own already-merged state, read fresh on every rerun.
 - Once merged, the delegated release never reads the pull request's own mutable body for routing: a fixer editing it away afterward changes nothing this pull request already landed (LAND-64).
-- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41) refuses.
+- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43) refuses.
 - `aco land` never takes its storage, canonical remote, forge, or claim store from a head's `<path>`: this checkout's own tracked copy governs, and the head's copy is only checked (LANDCMD-22..24).
 
 ## Examples
@@ -189,6 +191,16 @@ Setup: bare-remote, fake `gh`, pull request `#57` closed without merging
 ```console
 $ aco land 57
 2> ERROR: pull request #57 is not open; it cannot be landed
+exit 2
+```
+
+### E-LANDCMD-43 — a pull request without the quality verdict refuses where the default branch adopts the gate
+
+Setup: bare-remote, fake `gh`, default branch `main` holding `quality/config.toml`, pull request `#57` open, `mergeable_state` `blocked`, one completed check `build`
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 has no quality / verdict check; main adopts the quality gate (quality/config.toml)
 exit 2
 ```
 

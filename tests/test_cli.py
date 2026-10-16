@@ -213,6 +213,9 @@ class FakeForge:
     deleted_branches: list[str] = field(default_factory=list)
     head_board_config: str | None = ""
     file_reads: list[tuple[Path, str]] = field(default_factory=list)
+    quality_config: str | None = None
+    quality_config_error: forge.ForgeError | None = None
+    quality_config_reads: list[str] = field(default_factory=list)
     requests: int = field(default=0, init=False)
     _requests_lock: threading.Lock = field(
         default_factory=threading.Lock, init=False, repr=False, compare=False
@@ -380,6 +383,11 @@ class FakeForge:
         unconfigured checkout does -- and `None` removes it. Each read's
         path and commit land in `file_reads`."""
         self._run()
+        if path == issue_claim.LAND_QUALITY_CONFIG_PATH:
+            self.quality_config_reads.append(sha)
+            if self.quality_config_error is not None:
+                raise self.quality_config_error
+            return self.quality_config
         self.file_reads.append((path, sha))
         return self.head_board_config
 
@@ -17701,6 +17709,119 @@ def test_land_refuses_every_readiness_defect_before_any_write(
     assert len(error_line.rstrip("\n")) <= issue_claim.LAND_REFUSAL_LINE_LENGTH_LIMIT
     assert client.merge_calls == []
     assert client.deleted_branches == []
+
+
+QUALITY_VERDICT = forge.CheckRun("quality / verdict", forge.CHECK_CONCLUSION_SUCCESS)
+NO_QUALITY_VERDICT_REFUSAL = (
+    "pull request #12 has no quality / verdict check; main adopts the quality gate "
+    "(quality/config.toml)"
+)
+
+
+@pytest.mark.parametrize(
+    ("quality_config", "readiness", "reason"),
+    [
+        pytest.param(
+            "",
+            _land_readiness(),
+            NO_QUALITY_VERDICT_REFUSAL,
+            id="adopted-without-verdict",
+        ),
+        pytest.param(
+            "",
+            _land_readiness(checks=()),
+            NO_QUALITY_VERDICT_REFUSAL,
+            id="adopted-without-any-check",
+        ),
+        pytest.param(
+            "",
+            _land_readiness(checks=(forge.CheckRun("quality / verdict (push)", "success"),)),
+            NO_QUALITY_VERDICT_REFUSAL,
+            id="adopted-with-a-differently-named-verdict",
+        ),
+        pytest.param(
+            "",
+            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ()),
+            NO_QUALITY_VERDICT_REFUSAL,
+            id="adopted-blocked-without-verdict-names-the-cause",
+        ),
+        pytest.param(
+            "",
+            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", (QUALITY_VERDICT,)),
+            "pull request #12 is not mergeable (blocked)",
+            id="adopted-blocked-with-verdict",
+        ),
+        pytest.param(
+            None,
+            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ()),
+            "pull request #12 is not mergeable (blocked)",
+            id="unadopted-blocked-without-verdict-is-unchanged",
+        ),
+        pytest.param(
+            "",
+            _land_readiness(checks=(forge.CheckRun("build", None),)),
+            "pull request #12 has checks still running: build; wait for every check to succeed",
+            id="adopted-running-check-defers-the-verdict",
+        ),
+        pytest.param(
+            "",
+            _land_readiness(checks=(forge.CheckRun("quality / verdict", "failure"),)),
+            "pull request #12 has non-successful checks: quality / verdict (failure); "
+            "land only after every check succeeds",
+            id="adopted-red-verdict-keeps-the-existing-refusal",
+        ),
+        pytest.param(
+            "",
+            _land_readiness(checks=(QUALITY_VERDICT,)),
+            "pull request #12 carries no `Work-Item:` or `No-Item:` line",
+            id="adopted-with-verdict-passes-on-to-the-next-check",
+        ),
+    ],
+)
+def test_land_requires_the_quality_verdict_where_the_default_branch_adopts_the_gate(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    quality_config: str | None,
+    readiness: forge.LandingReadiness,
+    reason: str,
+) -> None:
+    """LANDCMD-43: presence of `quality/config.toml` on the default branch --
+    read once, from that branch, never the pull request head -- makes the
+    completed checks need `quality / verdict`; a running check defers it and
+    a repository without the file lands as before."""
+    client = _land_preflight_client(monkeypatch, readiness=readiness, body="Advances #72")
+    client.quality_config = quality_config
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+
+    assert capsys.readouterr().err == f"ERROR: {reason}\n"
+    assert client.quality_config_reads == ["main"]
+    assert client.merge_calls == []
+
+
+def test_land_does_not_read_the_quality_config_for_a_closed_pull_request(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    closed = forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ())
+    client = _land_preflight_client(monkeypatch, readiness=closed)
+    client.quality_config = ""
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+
+    assert capsys.readouterr().err == "ERROR: pull request #12 is not open; it cannot be landed\n"
+    assert client.quality_config_reads == []
+
+
+def test_land_fails_loud_when_the_quality_config_cannot_be_read(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
+    client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) != 0
+
+    assert "HTTP 500" in capsys.readouterr().err
+    assert client.merge_calls == []
 
 
 def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
