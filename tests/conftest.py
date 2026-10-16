@@ -13,6 +13,10 @@ import pytest
 
 from agent_coordination import checkout, protect
 
+# Registers `bare_remote` and `worktree` for every module by name: an import
+# of a fixture only to receive it as a parameter reads as unused to ruff.
+pytest_plugins = ["cli_fixtures"]
+
 
 @pytest.fixture(autouse=True)
 def _isolate_protect_unguarded(monkeypatch: pytest.MonkeyPatch) -> None:

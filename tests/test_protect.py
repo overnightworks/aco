@@ -35,7 +35,7 @@ from cli_fixtures import (
     _set_agent_identity_env,
     stub_board_config_tracked,
 )
-from test_cli import FakeForge
+from github_fixtures import FakeForge
 
 from agent_coordination import (
     board,
