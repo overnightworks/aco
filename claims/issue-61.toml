@@ -1,8 +1,0 @@
-claim_id = "399cf4f001c642f0a30b62878c044ede"
-agent = "claude"
-role = "builder"
-base = "db5faee1b2d852d54fa561f4fd08d5434ddff6fe"
-branch = "claude/issue-61-store-fixtures"
-scope = ["tests/store_fixtures.py", "tests/test_protocol.py", "tests/test_state_board.py", "tests/test_store.py"]
-opened_commit = "c3d649d3649a855de6bde90118450832b980fab9"
-whole_reason = "Eine Verschiebung der State-Ref-Hilfen aus test_store.py in ein Fixture-Modul samt allen Importen; halb verschoben bliebe der Test-zu-Test-Import."
