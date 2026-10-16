@@ -1,0 +1,8 @@
+claim_id = "169c78bd8c2b4520af060c78ab24358b"
+agent = "claude"
+role = "builder"
+base = "ba42c8ff2a7ce381bd222b116c1a186c99e7d37e"
+branch = "claude/issue-68-cmd-workspace-bootstrap"
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_bootstrap.py", "src/agent_coordination/cmd_workspace.py", "tests/test_session.py", "tests/test_workspace_cli.py"]
+opened_commit = "3774a8f14732857b37e3b26eb807f095359ae88d"
+whole_reason = "Zwei Befehlsfamilien ziehen samt Vertrag und Patches aus cli.py; halb verschoben bräche Import oder Vertrag."
