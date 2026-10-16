@@ -263,7 +263,7 @@ def test_run_ci_skips_a_change_without_rewrite_or_family_move(
         ("def test_flat():\n    pass\n", "test_flat"),
         ("class TestGroup:\n    def test_member(self):\n        pass\n", "TestGroup::test_member"),
         (
-            "class TestOuter:\n    class TestInner:\n        def test_deep(self):\n            pass",
+            "class TestOuter:\n    class TestInner:\n        def test_deep(self): pass",
             "TestOuter::TestInner::test_deep",
         ),
     ],
