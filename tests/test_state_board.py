@@ -53,7 +53,7 @@ from cli_fixtures import (
     terminal_on_stdin,
 )
 from github_fixtures import FakeForge
-from test_store import _blob, _push_raw_state_tree, _raw_tree, _state_ref_listing
+from store_fixtures import blob, push_raw_state_tree, raw_tree, state_ref_listing
 
 from agent_coordination import board, checkout, forge, items, process, protocol, store
 from agent_coordination import cli as issue_claim
@@ -556,12 +556,12 @@ def _push_item_tree(remote: Path, worktree_path: Path, item_files: dict[str, byt
     hand-crafted archive or a bypass of `store.read_item_files`'s own read
     path."""
     item_entries = [
-        ("100644", "blob", _blob(worktree_path, content), name)
+        ("100644", "blob", blob(worktree_path, content), name)
         for name, content in item_files.items()
     ]
-    items_tree = _raw_tree(worktree_path, item_entries)
-    schema_blob = _blob(worktree_path, protocol.serialize_empty_schema_toml().encode())
-    return _push_raw_state_tree(
+    items_tree = raw_tree(worktree_path, item_entries)
+    schema_blob = blob(worktree_path, protocol.serialize_empty_schema_toml().encode())
+    return push_raw_state_tree(
         remote,
         worktree_path,
         [
@@ -3606,13 +3606,13 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
         stdin_source = closed_stdin if piped_body is None else piping(piped_body)
         foreign_paths = [f"items/{name}".encode() for name in foreign]
-        before = _state_ref_listing(bare_remote)
+        before = state_ref_listing(bare_remote)
 
         with stdin_source(tmp_path) as stdin:
             monkeypatch.setattr(sys, "stdin", stdin)
             status = issue_claim.main(arguments)
 
-        after = _state_ref_listing(bare_remote)
+        after = state_ref_listing(bare_remote)
         assert (status, capsys.readouterr().out, after != before) == (0, printed, True)
         assert [after[path] for path in foreign_paths] == [before[path] for path in foreign_paths]
 
@@ -3651,12 +3651,12 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, {**_item_files(), **foreign}
         )
-        before = _state_ref_listing(bare_remote)
+        before = state_ref_listing(bare_remote)
 
         status = issue_claim.main(arguments)
 
         assert (status, capsys.readouterr().out) == (0, printed)
-        assert _state_ref_listing(bare_remote) == before
+        assert state_ref_listing(bare_remote) == before
 
     @pytest.mark.parametrize(
         ("item_id", "refusal"),
@@ -3690,12 +3690,12 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
         _stub_claim_checkout(monkeypatch)
         monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Codex Sol")
-        before = _state_ref_listing(bare_remote)
+        before = state_ref_listing(bare_remote)
 
         status = issue_claim.main(["start", item_id, "--slug", "s", "--scope", "README"])
 
         assert (status, capsys.readouterr().err) == (2, f"ERROR: {refusal}\n")
-        assert _state_ref_listing(bare_remote) == before
+        assert state_ref_listing(bare_remote) == before
         assert not (worktree.parent / f"{worktree.name}-worktrees").exists()
 
     @pytest.mark.parametrize(*_MALFORMED_CONTENTS)

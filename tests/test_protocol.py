@@ -15,7 +15,7 @@ from dataclasses import replace
 
 import pytest
 from board_fixtures import _active_claim, request
-from test_store import _STATE_WITH_TIP, _claim_intent
+from store_fixtures import STATE_WITH_TIP, claim_intent
 
 from agent_coordination import board, protocol
 from agent_coordination.body import Storage
@@ -344,7 +344,7 @@ def _landing_intent(
 
 
 def _claimed_state_with_item() -> protocol.ClaimState:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     return replace(claimed, items={_LANDING_ITEM_ID: _LANDING_ITEM_OID})
 
 
@@ -472,11 +472,9 @@ def test_apply_claim_intent_replaying_its_own_claim_refuses_once_its_pinned_item
     """Issue #496 / CAS-59: the item pin is checked on every attempt, the
     retry of a claim whose own earlier push already landed included -- its
     consumed claim id does not let it past an item written since."""
-    pinned = replace(
-        _claim_intent(), item_pin=protocol.ItemPin(_LANDING_ITEM_ID, _LANDING_ITEM_OID)
-    )
+    pinned = replace(claim_intent(), item_pin=protocol.ItemPin(_LANDING_ITEM_ID, _LANDING_ITEM_OID))
     claimed = protocol.apply(
-        replace(_STATE_WITH_TIP, items={_LANDING_ITEM_ID: _LANDING_ITEM_OID}), pinned
+        replace(STATE_WITH_TIP, items={_LANDING_ITEM_ID: _LANDING_ITEM_OID}), pinned
     )
     changed_since_the_claim = replace(claimed, items=items_after_the_claim)
 
@@ -491,21 +489,21 @@ def test_apply_claim_intent_replaying_its_own_claim_refuses_once_its_pinned_item
     ("held", "conflicting_identity", "forge_sentence", "named_sentence"),
     [
         pytest.param(
-            _claim_intent(identity=protocol.IssueIdentity(42), branch="ada/issue-42"),
+            claim_intent(identity=protocol.IssueIdentity(42), branch="ada/issue-42"),
             protocol.IssueIdentity(42),
             "issue #42 is claimed by Ada (builder) on issue #42 branch ada/issue-42",
             "issue aco-00002a is claimed by Ada (builder) on issue aco-00002a branch ada/issue-42",
             id="issue",
         ),
         pytest.param(
-            _claim_intent(identity=protocol.LaneIdentity(), branch="docs/guide"),
+            claim_intent(identity=protocol.LaneIdentity(), branch="docs/guide"),
             protocol.LaneIdentity(),
             "lane 'docs/guide' is claimed by Ada (builder) on lane 'docs/guide' branch docs/guide",
             "lane 'docs/guide' is claimed by Ada (builder) on lane 'docs/guide' branch docs/guide",
             id="lane",
         ),
         pytest.param(
-            _claim_intent(
+            claim_intent(
                 identity=protocol.IssueIdentity(42), resource_name="display", resource_value=2
             ),
             protocol.IssueIdentity(43),
@@ -514,7 +512,7 @@ def test_apply_claim_intent_replaying_its_own_claim_refuses_once_its_pinned_item
             id="resource",
         ),
         pytest.param(
-            _claim_intent(
+            claim_intent(
                 identity=protocol.IssueIdentity(16777216), resource_name="display", resource_value=2
             ),
             protocol.IssueIdentity(43),
@@ -538,7 +536,7 @@ def test_a_claim_conflict_names_its_item_in_the_state_ref_form_the_cli_asks_for(
     `#<n>` (PIN-30's second exception, #476 review finding 2) rather than an
     `aco-1000000` no command takes back. The CLI offers no explicit resource
     value, so CLAIM-42 is driven at the store's own transition."""
-    claimed = protocol.apply(_STATE_WITH_TIP, held)
+    claimed = protocol.apply(STATE_WITH_TIP, held)
     second = replace(
         held,
         identity=conflicting_identity,
