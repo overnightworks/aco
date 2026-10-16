@@ -26,11 +26,11 @@ from cli_fixtures import (
     _real_git,
     fresh_observation,
     init_bare_repository,
+    redirect_toplevel,
     set_git_identity,
     stub_board_config_tracked,
 )
 from github_fixtures import FakeForge
-from test_cli import _redirect_toplevel
 
 from agent_coordination import cli as issue_claim
 from agent_coordination import github, process, protocol, store
@@ -1385,7 +1385,7 @@ def test_cli_bootstrap_creates_the_empty_state_ref_without_a_ledger(
         lambda remote: "git@github.com:example/agent-coordination.git",
     )
     _real_git(worktree, "remote", "add", "origin", str(bare_remote))
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
 
     status = issue_claim.main(["--repo", "example/agent-coordination", "bootstrap"])
@@ -1408,7 +1408,7 @@ def test_cli_bootstrap_is_idempotent_on_a_second_run(
         lambda remote: "git@github.com:example/agent-coordination.git",
     )
     _real_git(worktree, "remote", "add", "origin", str(bare_remote))
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     issue_claim.main(["--repo", "example/agent-coordination", "bootstrap"])
     first_output = capsys.readouterr().out
