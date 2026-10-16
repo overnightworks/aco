@@ -6840,6 +6840,8 @@ LAND_REINSTALL_LINE = "reinstall: uv tool install --force --from . agent-coordin
 # printed-line budget (issue #405 round-4 finding) -- so several long check
 # names can never print a refusal line past 200 characters.
 LAND_CHECK_NAME_LENGTH_LIMIT = 40
+LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
+LAND_QUALITY_VERDICT_CHECK = "quality / verdict"
 LAND_REFUSAL_LINE_LENGTH_LIMIT = 200
 LAND_REFUSAL_SENTENCE_LENGTH_LIMIT = LAND_REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
 
@@ -6917,9 +6919,41 @@ def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str
     return None
 
 
-def _refuse_land_readiness(readiness: forge.LandingReadiness) -> None:
+def _land_lacks_quality_verdict(checks: tuple[forge.CheckRun, ...]) -> bool:
+    """Whether every check completed and none is the quality verdict: a
+    check still running may yet be the verdict, so it is not missing."""
+    return all(check.conclusion is not None for check in checks) and not any(
+        check.name == LAND_QUALITY_VERDICT_CHECK for check in checks
+    )
+
+
+def _refuse_land_missing_quality_verdict(
+    client: github.GitHubForge,
+    readiness: forge.LandingReadiness,
+    resolve_default_branch: Callable[[], str],
+) -> None:
+    """LANDCMD-43: where the default branch -- never the pull request head --
+    holds the quality gate's configuration, presence alone adopts the gate
+    and the verdict must be among the checks."""
+    default_branch = resolve_default_branch()
+    adopted = client.file_at_commit(LAND_QUALITY_CONFIG_PATH, default_branch) is not None
+    if adopted and _land_lacks_quality_verdict(readiness.checks):
+        raise protocol.ClaimUnavailableError(
+            _land_bounded_refusal(
+                f"pull request #{readiness.number} has no {LAND_QUALITY_VERDICT_CHECK} check; "
+                f"{default_branch} adopts the quality gate ({LAND_QUALITY_CONFIG_PATH})"
+            )
+        )
+
+
+def _refuse_land_readiness(
+    client: github.GitHubForge,
+    readiness: forge.LandingReadiness,
+    resolve_default_branch: Callable[[], str],
+) -> None:
     if not readiness.open:
         raise protocol.ClaimUnavailableError(_land_not_open_refusal(readiness.number))
+    _refuse_land_missing_quality_verdict(client, readiness, resolve_default_branch)
     if readiness.mergeable_state != forge.MERGEABLE_STATE_CLEAN:
         raise protocol.ClaimUnavailableError(
             _land_not_mergeable_refusal(readiness.number, readiness.mergeable_state)
@@ -7020,7 +7054,7 @@ def _land_preflight(
     """
     readiness = client.landing_readiness(number)
     _refuse_unreviewed_head(readiness, parsed.head)
-    _refuse_land_readiness(readiness)
+    _refuse_land_readiness(client, readiness, lambda: context.run.default_branch)
     detail = client.landing(number)
     structural = _structural_classification(context, detail)
     if isinstance(structural, board.ClassificationDefect):
