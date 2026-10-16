@@ -21865,9 +21865,36 @@ def test_cli_brief_json_prints_one_object_with_body_claim_tip_and_touched(
         },
         "tip": tip,
         "touched": ["README.md"],
+        "outside_claim": [],
     }
     assert output == json.dumps(expected) + "\n"
     assert json.loads(output) == expected
+
+
+@pytest.mark.parametrize(
+    ("claimed", "expected_outside_claim"), [(True, ["board.py"]), (False, None)]
+)
+def test_cli_brief_json_names_touched_paths_the_claim_scope_does_not_cover(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    claimed: bool,
+    expected_outside_claim: list[str] | None,
+) -> None:
+    repository, base, _tip = _scratch_lane_repository(monkeypatch, tmp_path)
+    (repository / "board.py").write_text("print()\n")
+    _real_git(repository, "add", "board.py")
+    _real_git(repository, "commit", "-q", "-m", "work outside the claim")
+    client = FakeForge()
+    client.issue_references[258] = forge.ItemReference(forge.ItemState.OPEN, "Brief", "Body.")
+    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
+    _patch_store_write(monkeypatch, *([_brief_claim(base)] if claimed else []))
+    monkeypatch.chdir(repository)
+
+    status = issue_claim.main(["--repo", REPOSITORY, "brief", "258", "--json"])
+
+    assert status == 0
+    assert json.loads(capsys.readouterr().out)["outside_claim"] == expected_outside_claim
 
 
 _NO_TRUNK_SENTENCE = (
@@ -22137,6 +22164,7 @@ def test_cli_brief_step_json_adds_rules_and_checks_to_the_existing_object(
         },
         "tip": tip,
         "touched": ["README.md"],
+        "outside_claim": [],
         "rules": ["Stay in scope."],
         "checks": ["ruff check ."],
     }
