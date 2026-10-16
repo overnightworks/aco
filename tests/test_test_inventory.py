@@ -2,7 +2,7 @@
 
 Each case drives the gate against a real, freshly initialized git repository under
 `tmp_path`. Git itself is the boundary the gate queries, so faking its output would test
-the wrong layer.
+the wrong layer. It also pins that `test_inventory` and `test_budget` find the same tests.
 """
 
 from __future__ import annotations
@@ -263,7 +263,7 @@ def test_run_ci_skips_a_change_without_rewrite_or_family_move(
         ("def test_flat():\n    pass\n", "test_flat"),
         ("class TestGroup:\n    def test_member(self):\n        pass\n", "TestGroup::test_member"),
         (
-            "class TestOuter:\n    class TestInner:\n        def test_deep(self): pass",
+            "class TestOuter:\n    class TestInner:\n        def test_deep(self): pass\n",
             "TestOuter::TestInner::test_deep",
         ),
     ],

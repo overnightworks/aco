@@ -98,7 +98,7 @@ from dataclasses import asdict, dataclass, field
 from fractions import Fraction
 from pathlib import Path
 
-from test_inventory import iter_spec_citations, iter_test_functions
+from test_inventory import is_test_function, iter_spec_citations, iter_test_functions
 
 # --- aco configuration --------------------------------------------------------------------
 # The one place blueprint-specific names were replaced with aco's own. Everything below this block
@@ -457,9 +457,7 @@ def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: l
     metrics.init_helpers = sum(
         1
         for node in module.body
-        if isinstance(node, _FUNCTIONS)
-        and not node.name.startswith("test_")
-        and wraps_setup_command(node)
+        if isinstance(node, _FUNCTIONS) and not is_test_function(node) and wraps_setup_command(node)
     )
 
 

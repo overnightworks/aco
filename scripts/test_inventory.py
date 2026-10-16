@@ -270,7 +270,7 @@ def module_scope(tree: ast.Module) -> ModuleScope:
 # --- test discovery --------------------------------------------------------------------------
 
 
-def _is_test_function(node: ast.AST) -> TypeGuard[FunctionNode]:
+def is_test_function(node: ast.AST) -> TypeGuard[FunctionNode]:
     return isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(
         "test_"
     )
@@ -282,7 +282,7 @@ def iter_test_functions(
     """Every ``test_*`` function in *body* with the classes enclosing it, outermost first,
     descending into nested classes. The one decider of what a test is."""
     for node in body:
-        if _is_test_function(node):
+        if is_test_function(node):
             yield owners, node
         elif isinstance(node, ast.ClassDef):
             yield from iter_test_functions(node.body, (*owners, node))

@@ -246,7 +246,7 @@ ignore_imports = [
 ]
 
 [tool.pyright]
-extraPaths = ["src"]
+extraPaths = ["src", "scripts"]
 venvPath = "."
 venv = ".venv"
 
