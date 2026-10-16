@@ -33,7 +33,7 @@ ALLOWED_ROOT_FILES = frozenset(
 # their configuration in the project directory, and its build lands in
 # src/aco_board/static/, so the project itself cannot move under src/.
 ALLOWED_ROOT_DIRECTORIES = frozenset(
-    {".aco", ".github", "docs", "frontend", "scripts", "specs", "src", "tests"}
+    {".aco", ".github", "docs", "frontend", "quality", "scripts", "specs", "src", "tests"}
 )
 
 VIOLATION_MESSAGE = (
