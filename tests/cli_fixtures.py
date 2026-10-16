@@ -90,13 +90,13 @@ def landed_from_another_clone(tmp_path: Path, *git_step: str) -> str:
     `git_step` -- a commit or a merge -- so a checkout that has not fetched
     since stands behind the remote (issue #488)."""
     other = tmp_path / "other"
-    _real_git(tmp_path, "clone", "-q", str(tmp_path / "remote.git"), str(other))
-    _real_git(other, "config", "user.name", "Other")
-    _real_git(other, "config", "user.email", "other@example.com")
-    _real_git(other, "config", "commit.gpgsign", "false")
-    _real_git(other, *git_step)
-    _real_git(other, "push", "-q", "origin", "HEAD:main")
-    return _real_git(other, "rev-parse", "HEAD").stdout.strip()
+    real_git(tmp_path, "clone", "-q", str(tmp_path / "remote.git"), str(other))
+    real_git(other, "config", "user.name", "Other")
+    real_git(other, "config", "user.email", "other@example.com")
+    real_git(other, "config", "commit.gpgsign", "false")
+    real_git(other, *git_step)
+    real_git(other, "push", "-q", "origin", "HEAD:main")
+    return real_git(other, "rev-parse", "HEAD").stdout.strip()
 
 
 def fetched_once_then_read(calls: list[tuple[str, Path]]) -> dict[Path, bool]:
@@ -148,7 +148,7 @@ def sealed_git_environment() -> dict[str, str]:
     }
 
 
-def _real_git(
+def real_git(
     repository: Path, *arguments: str, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -164,7 +164,7 @@ def _real_git(
 def init_bare_repository(path: Path) -> Path:
     """A real bare repository on `main` at `path`, created with its parents."""
     path.mkdir(parents=True, exist_ok=True)
-    _real_git(path, "init", "-q", "--bare", "-b", "main")
+    real_git(path, "init", "-q", "--bare", "-b", "main")
     return path
 
 
@@ -180,11 +180,11 @@ def _real_repository_with_bare_remote(
     remote = init_bare_repository(tmp_path / "remote.git")
     repo = tmp_path / "repo"
     repo.mkdir()
-    _real_git(repo, "init", "-q", "-b", "main")
-    _real_git(repo, "config", "user.name", "Test")
-    _real_git(repo, "config", "user.email", "test@example.com")
-    _real_git(repo, "config", "commit.gpgsign", "false")
-    _real_git(repo, "remote", "add", remote_name, str(remote))
+    real_git(repo, "init", "-q", "-b", "main")
+    real_git(repo, "config", "user.name", "Test")
+    real_git(repo, "config", "user.email", "test@example.com")
+    real_git(repo, "config", "commit.gpgsign", "false")
+    real_git(repo, "remote", "add", remote_name, str(remote))
     return repo, remote
 
 
@@ -193,8 +193,8 @@ def bare_remote_repository_with_one_commit(tmp_path: Path) -> Path:
     commit on `main`, pushed to `origin` with `origin/HEAD` resolved."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     return repo
 
@@ -212,7 +212,7 @@ def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def head_sha(repository: Path) -> str:
-    return _real_git(repository, "rev-parse", "HEAD").stdout.strip()
+    return real_git(repository, "rev-parse", "HEAD").stdout.strip()
 
 
 @pytest.fixture
@@ -222,7 +222,7 @@ def bare_remote(tmp_path: Path) -> Path:
     `maintenance.auto=false` keeps `receive-pack` from starting maintenance
     here, so a client-side maintenance assertion sees only its own fetch."""
     remote = init_bare_repository(tmp_path / "remote.git")
-    _real_git(remote, "config", "maintenance.auto", "false")
+    real_git(remote, "config", "maintenance.auto", "false")
     return remote
 
 
@@ -237,10 +237,10 @@ def worktree(tmp_path: Path) -> Path:
     """
     checkout = tmp_path / "worktree"
     checkout.mkdir()
-    _real_git(checkout, "init", "-b", "main")
+    real_git(checkout, "init", "-b", "main")
     (checkout / "README").write_text("placeholder\n")
-    _real_git(checkout, "add", "README")
-    _real_git(checkout, "commit", "-m", "initial")
+    real_git(checkout, "add", "README")
+    real_git(checkout, "commit", "-m", "initial")
     return checkout
 
 
@@ -248,8 +248,8 @@ def _push_repository_trunk(repo: Path, remote_name: str) -> None:
     """`repo`'s current `main` pushed to `remote_name`, with `<remote_name>/HEAD`
     resolved -- the trailing half of the skeleton every trunk-history
     fixture repeats once its own commits are built (issue #359 CI)."""
-    _real_git(repo, "push", "-q", remote_name, "main")
-    _real_git(repo, "remote", "set-head", remote_name, "main")
+    real_git(repo, "push", "-q", remote_name, "main")
+    real_git(repo, "remote", "set-head", remote_name, "main")
 
 
 def dangle_recorded_head(repo: Path, remote_name: str) -> None:
@@ -257,9 +257,9 @@ def dangle_recorded_head(repo: Path, remote_name: str) -> None:
     that branch `main` and `<remote_name>/master` is gone from `repo`
     (issue #490): the recorded `HEAD` dangles, while `<remote_name>/main`
     stands at `repo`'s `main`."""
-    _real_git(repo, "push", "-q", remote_name, "main", "main:master")
-    _real_git(repo, "remote", "set-head", remote_name, "master")
-    _real_git(repo, "push", "-q", "--delete", remote_name, "master")
+    real_git(repo, "push", "-q", remote_name, "main", "main:master")
+    real_git(repo, "remote", "set-head", remote_name, "master")
+    real_git(repo, "push", "-q", "--delete", remote_name, "master")
 
 
 def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -542,7 +542,7 @@ def arguments_bash_hands_aco(advice: str, tmp_path: Path) -> tuple[int, list[str
     recorder.chmod(0o755)
     repository = tmp_path / "throwaway"
     repository.mkdir(exist_ok=True)
-    _real_git(repository, "init", "--quiet")
+    real_git(repository, "init", "--quiet")
     environment = {**os.environ, "PATH": f"{shim_directory}{os.pathsep}{os.environ['PATH']}"}
     ran = subprocess.run(
         ["bash", "-c", advice], cwd=repository, env=environment, capture_output=True, check=False

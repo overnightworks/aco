@@ -20,13 +20,13 @@ from board_fixtures import BASE, request, write_repository_config
 from cli_fixtures import (
     _git_checkout,
     _push_repository_trunk,
-    _real_git,
     _real_repository_with_bare_remote,
     _set_agent_identity_env,
     _stub_one_git_call,
     bare_remote_repository_with_one_commit,
     dangle_recorded_head,
     init_bare_repository,
+    real_git,
 )
 
 from agent_coordination import board, checkout, process
@@ -67,7 +67,7 @@ def test_remote_url_reads_the_git_config_of_the_given_directory(
     calling process's cwd when none is given."""
     repo, origin = _real_repository_with_bare_remote(tmp_path)
     remote_urls = {"origin": str(origin), "upstream": "git@github.com:owner/repository.git"}
-    _real_git(repo, "remote", "add", "upstream", remote_urls["upstream"])
+    real_git(repo, "remote", "add", "upstream", remote_urls["upstream"])
     outside_every_repository = tmp_path / "elsewhere"
     outside_every_repository.mkdir()
     monkeypatch.chdir(repo if from_repository_cwd else outside_every_repository)
@@ -343,12 +343,12 @@ def _scratch_git_repository(tmp_path: Path, *init_options: str) -> Path:
     `init_options` shape its git directory's layout."""
     repository = tmp_path / "repo"
     repository.mkdir()
-    _real_git(repository, "init", "-q", "-b", "main", *init_options)
-    _real_git(repository, "config", "user.name", "Test")
-    _real_git(repository, "config", "user.email", "test@example.com")
+    real_git(repository, "init", "-q", "-b", "main", *init_options)
+    real_git(repository, "config", "user.name", "Test")
+    real_git(repository, "config", "user.email", "test@example.com")
     (repository / "README.md").write_text("hello\n")
-    _real_git(repository, "add", "README.md")
-    _real_git(repository, "commit", "-q", "-m", "initial")
+    real_git(repository, "add", "README.md")
+    real_git(repository, "commit", "-q", "-m", "initial")
     return repository
 
 
@@ -388,7 +388,7 @@ def test_dirty_paths_reads_a_rename_from_real_git_status(
     handled; prove it against a real rename rather than a hand-typed line
     that could not tell us whether the code actually handles it."""
     repository = _scratch_git_repository(tmp_path)
-    _real_git(repository, "mv", "README.md", "RENAMED.md")
+    real_git(repository, "mv", "README.md", "RENAMED.md")
     monkeypatch.chdir(repository)
 
     assert checkout._dirty_paths(checkout.git_output(["status", "--porcelain"])) == (
@@ -435,7 +435,7 @@ def _repo_with_linked_worktree(tmp_path: Path) -> tuple[Path, Path]:
     main = _scratch_git_repository(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-1-widget"
     worktree.parent.mkdir(parents=True)
-    _real_git(main, "worktree", "add", "-q", str(worktree), "-b", "codex/issue-1-widget")
+    real_git(main, "worktree", "add", "-q", str(worktree), "-b", "codex/issue-1-widget")
     return main, worktree
 
 
@@ -738,8 +738,8 @@ def _untracked_board_config(repository: Path) -> None:
 
 def _write_gitignore_for_dot_directories(repository: Path) -> None:
     (repository / ".gitignore").write_text(".*/\n")
-    _real_git(repository, "add", ".gitignore")
-    _real_git(repository, "commit", "-q", "-m", "ignore dot directories")
+    real_git(repository, "add", ".gitignore")
+    real_git(repository, "commit", "-q", "-m", "ignore dot directories")
 
 
 def _ignored_board_config(repository: Path) -> None:
@@ -749,15 +749,15 @@ def _ignored_board_config(repository: Path) -> None:
 
 def _tracked_board_config(repository: Path) -> None:
     _untracked_board_config(repository)
-    _real_git(repository, "add", board.CONFIG_PATH.as_posix())
-    _real_git(repository, "commit", "-q", "-m", "add board config")
+    real_git(repository, "add", board.CONFIG_PATH.as_posix())
+    real_git(repository, "commit", "-q", "-m", "add board config")
 
 
 def _tracked_but_ignored_board_config(repository: Path) -> None:
     _write_gitignore_for_dot_directories(repository)
     _untracked_board_config(repository)
-    _real_git(repository, "add", "-f", board.CONFIG_PATH.as_posix())
-    _real_git(repository, "commit", "-q", "-m", "add board config despite ignore")
+    real_git(repository, "add", "-f", board.CONFIG_PATH.as_posix())
+    real_git(repository, "commit", "-q", "-m", "add board config despite ignore")
 
 
 @pytest.mark.parametrize(
@@ -810,7 +810,7 @@ def test_file_at_revision_reads_the_committed_text_not_the_worktree_copy(
 
 
 def _lose_the_committed_readme_blob(repository: Path) -> None:
-    blob = _real_git(repository, "rev-parse", "main:README.md").stdout.strip()
+    blob = real_git(repository, "rev-parse", "main:README.md").stdout.strip()
     (repository / ".git" / "objects" / blob[:2] / blob[2:]).unlink()
 
 
@@ -882,7 +882,7 @@ def test_trunk_ref_after_fails_loud_when_no_candidate_branch_resolves(
     candidate's age as unknown (BRIEF-20); a git failure other than a
     missing ref is git's own, never read as one (issue #492)."""
     if is_repository:
-        _real_git(tmp_path, "init", "-q", "-b", "trunk")
+        real_git(tmp_path, "init", "-q", "-b", "trunk")
 
     with pytest.raises(ClaimError, match=failure):
         checkout.trunk_ref_after("hub", None, directory=tmp_path)
@@ -905,17 +905,17 @@ def test_trunk_ref_after_falls_back_to_the_local_branch_name_when_remote_head_wa
 
 
 def _record_origin_head(repo: Path, _remote: Path) -> None:
-    _real_git(repo, "push", "-q", "origin", "main")
-    _real_git(repo, "remote", "set-head", "origin", "main")
+    real_git(repo, "push", "-q", "origin", "main")
+    real_git(repo, "remote", "set-head", "origin", "main")
 
 
 def _leave_origin_head_unrecorded(repo: Path, _remote: Path) -> None:
-    _real_git(repo, "push", "-q", "origin", "main")
+    real_git(repo, "push", "-q", "origin", "main")
 
 
 def _record_origin_head_as_a_plain_ref(repo: Path, _remote: Path) -> None:
-    _real_git(repo, "push", "-q", "origin", "main")
-    _real_git(repo, "update-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    real_git(repo, "push", "-q", "origin", "main")
+    real_git(repo, "update-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 
 
 def _dangle_origin_head_after_a_rename(repo: Path, _remote: Path) -> None:
@@ -938,7 +938,7 @@ def test_a_dangling_or_plain_recorded_head_counts_as_unrecorded_and_the_trunk_gu
     as never recorded -- no default branch, and the trunk guesses on with
     `origin/main` instead of handing git a ref it cannot resolve."""
     repo, remote = _real_repository_with_bare_remote(tmp_path)
-    _real_git(repo, "commit", "-q", "--allow-empty", "-m", "initial")
+    real_git(repo, "commit", "-q", "--allow-empty", "-m", "initial")
     record(repo, remote)
     recorded_head = checkout.recorded_head_ref("origin", directory=repo)
 
@@ -1000,17 +1000,17 @@ def _minimal_pushed_repository(tmp_path: Path) -> Path:
     remote = init_bare_repository(tmp_path / "remote.git")
     repo = tmp_path / "repo"
     repo.mkdir()
-    _real_git(repo, "init", "-q", "-b", "main")
-    _real_git(repo, "config", "user.name", "Test")
-    _real_git(repo, "config", "user.email", "test@example.com")
-    _real_git(repo, "config", "commit.gpgsign", "false")
-    _real_git(repo, "remote", "add", "hub", str(remote))
+    real_git(repo, "init", "-q", "-b", "main")
+    real_git(repo, "config", "user.name", "Test")
+    real_git(repo, "config", "user.email", "test@example.com")
+    real_git(repo, "config", "commit.gpgsign", "false")
+    real_git(repo, "remote", "add", "hub", str(remote))
     return repo
 
 
 def _push_to_hub(repo: Path) -> None:
-    _real_git(repo, "push", "-q", "hub", "main")
-    _real_git(repo, "remote", "set-head", "hub", "main")
+    real_git(repo, "push", "-q", "hub", "main")
+    real_git(repo, "remote", "set-head", "hub", "main")
 
 
 @pytest.mark.parametrize(
@@ -1032,9 +1032,9 @@ def test_trunk_landings_classifies_a_control_byte_inside_a_trailer_value_as_one_
     lands neither #12 nor #13."""
     repo = _minimal_pushed_repository(tmp_path)
     (repo / "f.txt").write_text("content\n")
-    _real_git(repo, "add", "f.txt")
+    real_git(repo, "add", "f.txt")
     value = f"#12{byte}#13"
-    _real_git(repo, "commit", "-q", "-m", "change", "-m", f"Work-Item: {value}")
+    real_git(repo, "commit", "-q", "-m", "change", "-m", f"Work-Item: {value}")
     _push_to_hub(repo)
 
     [landing] = checkout.trunk_landings("refs/remotes/hub/main", 20, directory=repo)
@@ -1056,54 +1056,54 @@ def _trunk_history_repository(tmp_path: Path) -> Path:
     real git repository per proof would only repeat the same setup."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path, remote_name="hub")
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
 
     # A merge commit whose own message carries the trailer block.
-    _real_git(repo, "checkout", "-q", "-b", "feature")
+    real_git(repo, "checkout", "-q", "-b", "feature")
     (repo / "feature.txt").write_text("feature\n")
-    _real_git(repo, "add", "feature.txt")
-    _real_git(repo, "commit", "-q", "-m", "feature work")
-    _real_git(repo, "checkout", "-q", "main")
-    _real_git(
+    real_git(repo, "add", "feature.txt")
+    real_git(repo, "commit", "-q", "-m", "feature work")
+    real_git(repo, "checkout", "-q", "main")
+    real_git(
         repo, "merge", "-q", "--no-ff", "-m", "Merge feature", "-m", "Work-Item: #10", "feature"
     )
 
     # A squash commit whose trailer block repeats `Work-Item:` -- every
     # named item lands (issue #304).
-    _real_git(repo, "checkout", "-q", "-b", "squashed")
+    real_git(repo, "checkout", "-q", "-b", "squashed")
     (repo / "squash.txt").write_text("one\n")
-    _real_git(repo, "add", "squash.txt")
-    _real_git(repo, "commit", "-q", "-m", "squash step 1")
+    real_git(repo, "add", "squash.txt")
+    real_git(repo, "commit", "-q", "-m", "squash step 1")
     (repo / "squash.txt").write_text("one\ntwo\n")
-    _real_git(repo, "add", "squash.txt")
-    _real_git(repo, "commit", "-q", "-m", "squash step 2")
-    _real_git(repo, "checkout", "-q", "main")
-    _real_git(repo, "merge", "-q", "--squash", "squashed")
-    _real_git(repo, "commit", "-q", "-m", "Squash landing", "-m", "Work-Item: #11\nWork-Item: #12")
+    real_git(repo, "add", "squash.txt")
+    real_git(repo, "commit", "-q", "-m", "squash step 2")
+    real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "merge", "-q", "--squash", "squashed")
+    real_git(repo, "commit", "-q", "-m", "Squash landing", "-m", "Work-Item: #11\nWork-Item: #12")
 
     # A commit landed through a real rebase, its trailer block preserved.
-    _real_git(repo, "checkout", "-q", "-b", "docslane", "feature")
+    real_git(repo, "checkout", "-q", "-b", "docslane", "feature")
     (repo / "docs.txt").write_text("docs\n")
-    _real_git(repo, "add", "docs.txt")
-    _real_git(repo, "commit", "-q", "-m", "docs change", "-m", "No-Item: docs")
-    _real_git(repo, "rebase", "-q", "main")
-    _real_git(repo, "checkout", "-q", "main")
-    _real_git(repo, "merge", "-q", "--ff-only", "docslane")
+    real_git(repo, "add", "docs.txt")
+    real_git(repo, "commit", "-q", "-m", "docs change", "-m", "No-Item: docs")
+    real_git(repo, "rebase", "-q", "main")
+    real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "merge", "-q", "--ff-only", "docslane")
 
     # A `Work-Item:` line in prose, never its own trailer block -- not a
     # landing (issue #304 proof 2).
     (repo / "prose.txt").write_text("prose\n")
-    _real_git(repo, "add", "prose.txt")
-    _real_git(repo, "commit", "-q", "-m", "Prose change", "-m", "Explanation prose.\nWork-Item: #7")
+    real_git(repo, "add", "prose.txt")
+    real_git(repo, "commit", "-q", "-m", "Prose change", "-m", "Explanation prose.\nWork-Item: #7")
 
     # A side branch that never joins the trunk's first-parent line
     # (issue #304 proof 3).
-    _real_git(repo, "checkout", "-q", "-b", "sidebranch")
+    real_git(repo, "checkout", "-q", "-b", "sidebranch")
     (repo / "side.txt").write_text("side\n")
-    _real_git(repo, "add", "side.txt")
-    _real_git(repo, "commit", "-q", "-m", "side change", "-m", "Work-Item: #99")
-    _real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "add", "side.txt")
+    real_git(repo, "commit", "-q", "-m", "side change", "-m", "Work-Item: #99")
+    real_git(repo, "checkout", "-q", "main")
 
     _push_repository_trunk(repo, "hub")
     return repo
@@ -1126,7 +1126,7 @@ def test_trunk_landings_classify_merge_squash_and_rebase_commits_from_their_trai
         board.NoItemClassification(board.NoItemKind.DOCS),  # the rebased commit
         None,  # `Work-Item:` in prose, not a trailer (proof 2)
     ]
-    side_sha = _real_git(repo, "rev-parse", "sidebranch").stdout.strip()
+    side_sha = real_git(repo, "rev-parse", "sidebranch").stdout.strip()
     assert side_sha not in {landing.sha for landing in landings}  # proof 3
 
     # `depth` bounds the walk to the most recent commits, oldest of those first.
@@ -1311,7 +1311,7 @@ def test_branch_exists_reads_real_local_refs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository = _scratch_git_repository(tmp_path)
-    _real_git(repository, "branch", "feature")
+    real_git(repository, "branch", "feature")
     monkeypatch.chdir(repository)
 
     assert checkout.branch_exists("feature") is True
@@ -1332,7 +1332,7 @@ def test_create_linked_worktree_builds_from_the_trunk_ref(
     _build_start_worktree(worktree, "codex/issue-9-widget")
 
     assert (worktree / "base.txt").read_text() == "base\n"
-    assert _real_git(worktree, "branch", "--show-current").stdout.strip() == "codex/issue-9-widget"
+    assert real_git(worktree, "branch", "--show-current").stdout.strip() == "codex/issue-9-widget"
 
 
 def test_existing_start_worktree_is_absent_before_the_build_and_standing_after(
@@ -1356,7 +1356,7 @@ def test_create_linked_worktree_builds_a_repository_nested_in_an_outer_working_t
     """Issue #448 review finding (START-01): an outer checkout's `.git` above
     the not-yet-created worktree path -- a home directory that is itself a
     git repository -- never turns git's "cannot change to" into a refusal."""
-    _real_git(tmp_path, "init", "-q")
+    real_git(tmp_path, "init", "-q")
     repo = bare_remote_repository_with_one_commit(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     branch = "codex/issue-9-widget"
@@ -1365,7 +1365,7 @@ def test_create_linked_worktree_builds_a_repository_nested_in_an_outer_working_t
     assert checkout.existing_start_worktree(worktree, branch) is False
     _build_start_worktree(worktree, branch)
 
-    assert _real_git(worktree, "branch", "--show-current").stdout.strip() == branch
+    assert real_git(worktree, "branch", "--show-current").stdout.strip() == branch
 
 
 def test_existing_start_worktree_refuses_a_dirty_resume(
@@ -1387,7 +1387,7 @@ def test_existing_start_worktree_refuses_a_branch_taken_by_no_worktree_of_this_i
 ) -> None:
     repo = bare_remote_repository_with_one_commit(tmp_path)
     branch = "codex/issue-9-widget"
-    _real_git(repo, "branch", branch)
+    real_git(repo, "branch", branch)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     monkeypatch.chdir(repo)
 
@@ -1417,7 +1417,7 @@ def test_existing_start_worktree_refuses_a_worktree_on_a_different_branch(
     repo = bare_remote_repository_with_one_commit(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     worktree.parent.mkdir(parents=True)
-    _real_git(repo, "worktree", "add", "-q", str(worktree), "-b", "codex/issue-9-old-slug")
+    real_git(repo, "worktree", "add", "-q", str(worktree), "-b", "codex/issue-9-old-slug")
     monkeypatch.chdir(repo)
 
     with pytest.raises(ClaimError, match="exists on branch 'codex/issue-9-old-slug'"):
@@ -1483,13 +1483,13 @@ def _checkout_whose_git_directory_names_it(tmp_path: Path) -> Path:
     repository = _scratch_git_repository(
         tmp_path, f"--separate-git-dir={tmp_path / 'modules' / 'repo'}"
     )
-    _real_git(repository, "config", "core.worktree", "../../repo")
+    real_git(repository, "config", "core.worktree", "../../repo")
     return repository
 
 
 def _linked_lane_of(main: Path, tmp_path: Path) -> Path:
     lane = tmp_path / "lane"
-    _real_git(main, "worktree", "add", "-q", str(lane), "-b", "codex/issue-1-widget")
+    real_git(main, "worktree", "add", "-q", str(lane), "-b", "codex/issue-1-widget")
     return lane
 
 
@@ -1646,15 +1646,15 @@ def test_remove_linked_worktree_deletes_the_directory_and_the_branch(
 
 def test_branch_merged_into_default_is_true_only_after_a_real_merge(tmp_path: Path) -> None:
     repo = bare_remote_repository_with_one_commit(tmp_path)
-    _real_git(repo, "checkout", "-q", "-b", "feature")
+    real_git(repo, "checkout", "-q", "-b", "feature")
     (repo / "feature.txt").write_text("feature\n")
-    _real_git(repo, "add", "feature.txt")
-    _real_git(repo, "commit", "-q", "-m", "feature work")
-    _real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "add", "feature.txt")
+    real_git(repo, "commit", "-q", "-m", "feature work")
+    real_git(repo, "checkout", "-q", "main")
     trunk = "refs/remotes/origin/main"
     before = checkout.branch_merged_into_default("feature", trunk=trunk, directory=repo)
 
-    _real_git(repo, "merge", "-q", "--no-ff", "-m", "Merge feature", "feature")
+    real_git(repo, "merge", "-q", "--no-ff", "-m", "Merge feature", "feature")
     _push_repository_trunk(repo, "origin")
     after = checkout.branch_merged_into_default("feature", trunk=trunk, directory=repo)
 
@@ -1776,11 +1776,11 @@ def test_merge_base_names_the_shared_commit_and_none_for_unrelated_histories(
     tmp_path: Path,
 ) -> None:
     repo = bare_remote_repository_with_one_commit(tmp_path)
-    shared = _real_git(repo, "rev-parse", "HEAD").stdout.strip()
-    _real_git(repo, "checkout", "-q", "-b", "feature")
-    _real_git(repo, "commit", "-q", "--allow-empty", "-m", "feature work")
-    _real_git(repo, "checkout", "-q", "--orphan", "unrelated")
-    _real_git(repo, "commit", "-q", "--allow-empty", "-m", "unrelated root")
+    shared = real_git(repo, "rev-parse", "HEAD").stdout.strip()
+    real_git(repo, "checkout", "-q", "-b", "feature")
+    real_git(repo, "commit", "-q", "--allow-empty", "-m", "feature work")
+    real_git(repo, "checkout", "-q", "--orphan", "unrelated")
+    real_git(repo, "commit", "-q", "--allow-empty", "-m", "unrelated root")
 
     related = checkout.merge_base("feature", "main", directory=repo)
     unrelated = checkout.merge_base("unrelated", "main", directory=repo)

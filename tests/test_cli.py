@@ -57,7 +57,6 @@ from cli_fixtures import (
     _forbid_protect_git_github_and_identity,
     _git_checkout,
     _push_repository_trunk,
-    _real_git,
     _real_repository_with_bare_remote,
     _set_agent_identity_env,
     _stub_one_git_call,
@@ -79,6 +78,7 @@ from cli_fixtures import (
     piped_body_on_stdin,
     piping,
     read_end_of_a_pipe_carrying,
+    real_git,
     redirect_toplevel,
     run_context_over,
     stub_board_config_tracked,
@@ -1708,8 +1708,8 @@ def _start_scenario(
     claim test in this module, which never builds one at all."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     _serve_start_board(monkeypatch, _start_item())
     _patch_store_write(monkeypatch)
@@ -1815,7 +1815,7 @@ def test_start_from_a_linked_worktree_builds_beside_the_main_checkout(
 def _stand_in_another_lane(monkeypatch: pytest.MonkeyPatch, repo: Path, tmp_path: Path) -> Path:
     """Run from a linked worktree of `repo` on another item's lane."""
     other_lane = tmp_path / "other-lane"
-    _real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-9-other", str(other_lane))
+    real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-9-other", str(other_lane))
     redirect_toplevel(monkeypatch, other_lane)
     monkeypatch.chdir(other_lane)
     return other_lane
@@ -1858,8 +1858,8 @@ def test_start_from_a_linked_worktree_checks_against_the_main_checkouts_board_co
     lane = stand_in_a_lane(monkeypatch, repo, tmp_path)
     (lane / board.CONFIG_PATH).parent.mkdir()
     (lane / board.CONFIG_PATH).write_text('priority_labels = ["cleanup"]\n')
-    _real_git(lane, "add", str(board.CONFIG_PATH))
-    _real_git(lane, "commit", "-q", "-m", "lane changes its board config")
+    real_git(lane, "add", str(board.CONFIG_PATH))
+    real_git(lane, "commit", "-q", "-m", "lane changes its board config")
     security = board_issue(
         500,
         "Security first",
@@ -1936,8 +1936,8 @@ def test_start_refuses_an_unsafe_identity_prefix_before_any_git_write(
 
 def _worktrees_and_branches(repo: Path) -> tuple[str, str]:
     return (
-        _real_git(repo, "worktree", "list", "--porcelain").stdout,
-        _real_git(repo, "branch", "--list").stdout,
+        real_git(repo, "worktree", "list", "--porcelain").stdout,
+        real_git(repo, "branch", "--list").stdout,
     )
 
 
@@ -2124,7 +2124,7 @@ def test_start_names_a_runnable_command_for_a_detached_worktree(
     parent_with_space.mkdir()
     repo, worktree, fake = _detached_start_worktree(monkeypatch, parent_with_space)
     if branch_exists:
-        _real_git(repo, "branch", _START_BRANCH)
+        real_git(repo, "branch", _START_BRANCH)
     redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     before = _worktrees_and_branches(repo)
@@ -2136,7 +2136,7 @@ def test_start_names_a_runnable_command_for_a_detached_worktree(
     assert (status, capsys.readouterr().err) == (2, f"ERROR: {named}\n")
     assert (_worktrees_and_branches(repo), fake.transitions) == (before, [])
     subprocess.run(["bash", "-c", advice], check=True, capture_output=True)
-    assert _real_git(worktree, "branch", "--show-current").stdout.strip() == _START_BRANCH
+    assert real_git(worktree, "branch", "--show-current").stdout.strip() == _START_BRANCH
 
 
 def _detached_start_worktree(
@@ -2147,7 +2147,7 @@ def _detached_start_worktree(
     repo = _start_scenario(monkeypatch, tmp_path)
     fake = _patch_store_write(monkeypatch)
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    _real_git(repo, "worktree", "add", "-q", "--detach", str(worktree))
+    real_git(repo, "worktree", "add", "-q", "--detach", str(worktree))
     return repo, worktree, fake
 
 
@@ -2210,8 +2210,8 @@ def _trunk_moves_after_the_fetch(monkeypatch: pytest.MonkeyPatch, repo: Path) ->
 
     def check_then_the_trunk_moves(trunk: str, *, directory: Path) -> str:
         checked = real_trunk_commit(trunk, directory=directory)
-        _real_git(repo, "commit", "-q", "--allow-empty", "-m", "moved")
-        _real_git(repo, "push", "-q", "origin", "HEAD:main")
+        real_git(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+        real_git(repo, "push", "-q", "origin", "HEAD:main")
         return checked
 
     monkeypatch.setattr(checkout, "trunk_commit", check_then_the_trunk_moves)
@@ -2388,8 +2388,8 @@ def test_start_keeps_its_worktree_when_the_report_fails_after_the_claim(
 def _remove_the_lane_pair(repo: Path) -> None:
     """Item #314's worktree and branch are gone while its claim stays live."""
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    _real_git(repo, "worktree", "remove", str(worktree))
-    _real_git(repo, "branch", "-D", _START_BRANCH)
+    real_git(repo, "worktree", "remove", str(worktree))
+    real_git(repo, "branch", "-D", _START_BRANCH)
 
 
 def _keep_the_lane_pair(_repo: Path) -> None:
@@ -2440,15 +2440,15 @@ def test_start_refuses_to_rebuild_a_live_claim_whose_scope_the_trunk_no_longer_g
     repo = _start_scenario(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "versioned_paths", _REAL_VERSIONED_PATHS)
     (repo / "a,b.py").write_text("x\n")
-    _real_git(repo, "add", "a,b.py")
-    _real_git(repo, "commit", "-q", "-m", "comma path")
+    real_git(repo, "add", "a,b.py")
+    real_git(repo, "commit", "-q", "-m", "comma path")
     _push_repository_trunk(repo, "origin")
     _serve_start_board(monkeypatch, _start_item(complete_contract("Build it.", scope=["a,b.py"])))
     monkeypatch.chdir(repo)
     assert issue_claim.main(["--repo", REPOSITORY, "start", "314"]) == 0
     _remove_the_lane_pair(repo)
-    _real_git(repo, "rm", "-q", "a,b.py")
-    _real_git(repo, "commit", "-q", "-m", "comma path gone")
+    real_git(repo, "rm", "-q", "a,b.py")
+    real_git(repo, "commit", "-q", "-m", "comma path gone")
     _push_repository_trunk(repo, "origin")
     capsys.readouterr()
     before = _worktrees_and_branches(repo)
@@ -2502,8 +2502,8 @@ def test_start_resumes_a_wide_claim_without_repeating_whole(
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     for name in ("a.py", "b.py", "c.py", "d.py"):
         (repo / name).write_text("x\n")
-    _real_git(repo, "add", *("a.py", "b.py", "c.py", "d.py"))
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", *("a.py", "b.py", "c.py", "d.py"))
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     issue = board_issue(
         314,
@@ -2567,8 +2567,8 @@ def test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item(
     on a terminal id a deterministic `start-72` would have left behind."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     issue = board_issue(72, "Cleanup", complete_contract("Build it.", scope=["src"]))
     client = FakeForge(board_issues=(issue,))
@@ -2583,9 +2583,9 @@ def test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item(
     worktree = repo.parent / f"{repo.name}-worktrees" / _CLEANUP_WORKTREE_NAME
 
     (worktree / "feature.txt").write_text("feature\n")
-    _real_git(worktree, "add", "feature.txt")
-    _real_git(worktree, "commit", "-q", "-m", "feature work")
-    _real_git(
+    real_git(worktree, "add", "feature.txt")
+    real_git(worktree, "commit", "-q", "-m", "feature work")
+    real_git(
         repo,
         "merge",
         "-q",
@@ -2596,7 +2596,7 @@ def test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item(
         f"Work-Item: #{WORK_ITEM_ISSUE}",
         _CLEANUP_BRANCH,
     )
-    merge_commit = _real_git(repo, "rev-parse", "HEAD").stdout.strip()
+    merge_commit = real_git(repo, "rev-parse", "HEAD").stdout.strip()
     _push_repository_trunk(repo, "origin")
     client.landings[12] = landing_pull_request(
         body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
@@ -2746,11 +2746,11 @@ def _real_state_ref_repository(
     write_repository_config(
         repo, f'storage = "state-ref"\ncanonical_remote = "{canonical_remote}"\n'
     )
-    _real_git(repo, "add", board.CONFIG_PATH.as_posix())
-    _real_git(repo, "commit", "-q", "-m", "pin state-ref storage")
+    real_git(repo, "add", board.CONFIG_PATH.as_posix())
+    real_git(repo, "commit", "-q", "-m", "pin state-ref storage")
     _push_repository_trunk(repo, canonical_remote)
     if canonical_remote != "origin":
-        _real_git(repo, "remote", "add", "origin", str(remote))
+        real_git(repo, "remote", "add", "origin", str(remote))
     store.bootstrap(worktree=repo, remote=str(remote))
     seeded = {
         number: _seed_state_ref_item(repo, remote, number, content)
@@ -2796,7 +2796,7 @@ def test_state_ref_reads_answer_from_a_subdirectory_as_from_the_checkout_root(
     (issue #562)."""
     repo, _remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     linked = tmp_path / "linked"
-    _real_git(repo, "worktree", "add", "-q", "-b", "lane", str(linked))
+    real_git(repo, "worktree", "add", "-q", "-b", "lane", str(linked))
     readings = ((repo, repo), (repo, repo / "src"), (linked, linked), (linked, linked / "src"))
     answers: list[tuple[int, str]] = []
     for toplevel, directory in readings:
@@ -2830,7 +2830,7 @@ def test_start_under_state_ref_claims_the_worktree_it_builds(
 
     assert status == 0
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    state_tip = _real_git(repo, "ls-remote", "origin", store.STATE_REF).stdout.split()[0]
+    state_tip = real_git(repo, "ls-remote", "origin", store.STATE_REF).stdout.split()[0]
     assert _lineage_observation(worktree)[0] == state_tip
     claim_id = _claimed_line_id(capsys.readouterr().out, f"issue {item_id}")
     live = store.fetch_state(worktree=worktree, remote="origin").claims
@@ -2854,12 +2854,12 @@ def _lane_on_a_state_ref_board_with_registries(
     configuration = repo / board.CONFIG_PATH
     pinned = configuration.read_text()
     configuration.write_text(f'{pinned}lane_shared = ["scripts/registry.txt", "src/x.py"]\n')
-    _real_git(repo, "add", "scripts", "src", board.CONFIG_PATH.as_posix())
-    _real_git(repo, "commit", "-q", "-m", "registries")
+    real_git(repo, "add", "scripts", "src", board.CONFIG_PATH.as_posix())
+    real_git(repo, "commit", "-q", "-m", "registries")
     _push_repository_trunk(repo, "origin")
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
     configuration.write_text(f"{pinned}{trunk_lane_shared}")
-    _real_git(repo, "commit", "-q", "-am", "trunk configuration")
+    real_git(repo, "commit", "-q", "-am", "trunk configuration")
     _push_repository_trunk(repo, "origin")
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     redirect_toplevel(monkeypatch, worktree)
@@ -3016,7 +3016,7 @@ def test_rescope_under_state_ref_moves_the_claim_and_the_item_body_scope_togethe
 
 def _into_another_repository(worktree: Path) -> Path:
     other = worktree.parent / "other"
-    _real_git(worktree.parent, "init", "-q", str(other))
+    real_git(worktree.parent, "init", "-q", str(other))
     return other / "f.md"
 
 
@@ -3172,7 +3172,7 @@ def test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resu
     repo, _remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     if worktree_stood:
-        _real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(worktree))
+        real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(worktree))
     landed: list[protocol.ObjectId] = []
     real_push = store.GitPushTransport.push
 
@@ -3295,7 +3295,7 @@ def test_start_removes_only_its_own_build_when_the_store_refuses_its_sent_push_f
     repo, bare_remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     if worktree_stood:
-        _real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(worktree))
+        real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(worktree))
     arrange(monkeypatch, repo, bare_remote)
 
     status = issue_claim.main(["start", "314", "--scope", "src/x.py"])
@@ -3307,7 +3307,7 @@ def test_start_removes_only_its_own_build_when_the_store_refuses_its_sent_push_f
     assert (removal in err) is not worktree_stood
     assert "outcome unknown" not in err
     assert worktree.exists() is worktree_stood
-    assert (_START_BRANCH in _real_git(repo, "branch", "--list").stdout) is worktree_stood
+    assert (_START_BRANCH in real_git(repo, "branch", "--list").stdout) is worktree_stood
     live = store.fetch_state(worktree=repo, remote="origin").claims.values()
     assert _START_BRANCH not in {claim.branch for claim in live}
 
@@ -3322,7 +3322,7 @@ def _claim_in_lane_worktree(
     monkeypatch: pytest.MonkeyPatch, repo: Path, tmp_path: Path
 ) -> list[str]:
     worktree = tmp_path / "lane"
-    _real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
+    real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return ["claim", "314", "--scope", "src/x.py"]
@@ -3450,7 +3450,7 @@ def test_a_claim_whose_item_closes_after_its_checks_refuses_and_writes_nothing(
         *build_lines,
     ]
     assert not worktree.exists()
-    assert _START_BRANCH not in _real_git(repo, "branch", "--list").stdout
+    assert _START_BRANCH not in real_git(repo, "branch", "--list").stdout
     refetched = store.fetch_state(worktree=repo, remote="origin")
     assert not refetched.claims
     assert refetched.items[items.format_item_id(314)] == closed_oid
@@ -3465,8 +3465,8 @@ def test_a_github_claim_lands_though_a_stale_ledger_item_changes_under_its_rejec
     _use_real_store(monkeypatch)
     repo, bare_remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     store.bootstrap(worktree=repo, remote=str(bare_remote))
     open_oid = _land_real_item(repo, bare_remote, issue=314, content=b"open\n")
@@ -7130,12 +7130,12 @@ def test_next_advises_a_pull_that_runs_as_printed_where_it_stands(
     repo, _remote, _seeded = _real_state_ref_repository(monkeypatch, tmp_path, {314: item_body})
     (repo / "src").mkdir()
     (repo / "src" / "x.py").write_text("x = 1\n")
-    _real_git(repo, "add", "src/x.py")
-    _real_git(repo, "commit", "-q", "-m", "version src/x.py")
+    real_git(repo, "add", "src/x.py")
+    real_git(repo, "commit", "-q", "-m", "version src/x.py")
     _push_repository_trunk(repo, "origin")
     if stands_in_lane:
         lane = tmp_path / "lane"
-        _real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(lane))
+        real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(lane))
         redirect_toplevel(monkeypatch, lane)
         monkeypatch.chdir(lane)
 
@@ -7620,7 +7620,7 @@ def _brief_step_under_brief_config(
     item, _stored = _foreign_body_item(monkeypatch, tmp_path)
     repo = Path.cwd()
     write_repository_config(repo, content, path=board.BRIEF_CONFIG_PATH)
-    _real_git(repo, "add", board.BRIEF_CONFIG_PATH.as_posix())
+    real_git(repo, "add", board.BRIEF_CONFIG_PATH.as_posix())
     monkeypatch.setattr(checkout, "path_is_tracked", _REAL_PATH_IS_TRACKED)
     return ["brief", item, "--step", "build"]
 
@@ -7778,7 +7778,7 @@ def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item
         },
     )
     lane = tmp_path / "repo-worktrees" / "issue-21-nested"
-    _real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-21-nested")
+    real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-21-nested")
     redirect_toplevel(monkeypatch, lane)
     monkeypatch.chdir(lane)
     nested = items.format_item_id(21)
@@ -7830,7 +7830,7 @@ def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_doe
         },
     )
     lane = tmp_path / "repo-worktrees" / "issue-11-work"
-    _real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-11-work")
+    real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-11-work")
     redirect_toplevel(monkeypatch, lane)
     monkeypatch.chdir(lane)
     waiting, pullable = items.format_item_id(10), items.format_item_id(11)
@@ -8933,12 +8933,12 @@ def _landing_repository(tmp_path: Path) -> Path:
     giving the off-trunk refusal proof a real sha to reject."""
     repo = bare_remote_repository_with_one_commit(tmp_path)
 
-    _real_git(repo, "checkout", "-q", "-b", "feature")
+    real_git(repo, "checkout", "-q", "-b", "feature")
     (repo / "feature.txt").write_text("feature\n")
-    _real_git(repo, "add", "feature.txt")
-    _real_git(repo, "commit", "-q", "-m", "feature work")
-    _real_git(repo, "checkout", "-q", "main")
-    _real_git(
+    real_git(repo, "add", "feature.txt")
+    real_git(repo, "commit", "-q", "-m", "feature work")
+    real_git(repo, "checkout", "-q", "main")
+    real_git(
         repo,
         "merge",
         "-q",
@@ -8950,21 +8950,21 @@ def _landing_repository(tmp_path: Path) -> Path:
         "feature",
     )
 
-    _real_git(repo, "checkout", "-q", "-b", "squashed")
+    real_git(repo, "checkout", "-q", "-b", "squashed")
     (repo / "squash.txt").write_text("one\n")
-    _real_git(repo, "add", "squash.txt")
-    _real_git(repo, "commit", "-q", "-m", "squash step")
-    _real_git(repo, "checkout", "-q", "main")
-    _real_git(repo, "merge", "-q", "--squash", "squashed")
-    _real_git(repo, "commit", "-q", "-m", "Squash landing", "-m", "Work-Item: #11\nWork-Item: #12")
+    real_git(repo, "add", "squash.txt")
+    real_git(repo, "commit", "-q", "-m", "squash step")
+    real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "merge", "-q", "--squash", "squashed")
+    real_git(repo, "commit", "-q", "-m", "Squash landing", "-m", "Work-Item: #11\nWork-Item: #12")
 
-    _real_git(repo, "checkout", "-q", "-b", "docslane", "feature")
+    real_git(repo, "checkout", "-q", "-b", "docslane", "feature")
     (repo / "docs.txt").write_text("docs\n")
-    _real_git(repo, "add", "docs.txt")
-    _real_git(repo, "commit", "-q", "-m", "rebased landing", "-m", "Work-Item: #13")
-    _real_git(repo, "rebase", "-q", "main")
-    _real_git(repo, "checkout", "-q", "main")
-    _real_git(repo, "merge", "-q", "--ff-only", "docslane")
+    real_git(repo, "add", "docs.txt")
+    real_git(repo, "commit", "-q", "-m", "rebased landing", "-m", "Work-Item: #13")
+    real_git(repo, "rebase", "-q", "main")
+    real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "merge", "-q", "--ff-only", "docslane")
 
     _push_repository_trunk(repo, "origin")
     return repo
@@ -9053,7 +9053,7 @@ def test_release_merged_closes_and_releases_atomically_under_the_state_ref_pin(
     _repo, client = _landing_scenario(monkeypatch, tmp_path)
     args = ["release", str(number), "--agent", "Codex Sol", "--claim-id", f"claim-{number}"]
     if use_sha:
-        sha = _real_git(_repo, "rev-parse", landing_ref).stdout.strip()
+        sha = real_git(_repo, "rev-parse", landing_ref).stdout.strip()
         args += ["--merged", sha]
     else:
         args += ["--merged"]
@@ -9143,7 +9143,7 @@ def test_release_merged_refuses_a_trunk_item_the_state_ref_has_no_entry_for(
     `#11`'s own item -- `release --merged` for `#12` refuses by name,
     before any claim or write, rather than crashing on a decode miss."""
     repo, client = _landing_scenario(monkeypatch, tmp_path)
-    sha = _real_git(repo, "rev-parse", "main~1").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main~1").stdout.strip()
 
     status = issue_claim.main(["release", "12", "--agent", "Codex Sol", "--merged", sha])
 
@@ -9172,7 +9172,7 @@ def test_release_merged_refuses_a_landing_it_cannot_verify_under_the_state_ref_p
     a different item, or one outside the first-parent trunk all refuse by
     name, close nothing, and leave the claim live."""
     repo, client = _landing_scenario(monkeypatch, tmp_path)
-    sha = _real_git(repo, "rev-parse", landing_ref).stdout.strip()
+    sha = real_git(repo, "rev-parse", landing_ref).stdout.strip()
 
     status = issue_claim.main(
         ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
@@ -9284,15 +9284,15 @@ def _land_real_item(
 
 
 def _state_ref_paths(repo: Path, tip: str) -> set[str]:
-    return set(_real_git(repo, "ls-tree", "-r", "--name-only", tip).stdout.splitlines())
+    return set(real_git(repo, "ls-tree", "-r", "--name-only", tip).stdout.splitlines())
 
 
 def _state_ref_blob(repo: Path, tip: str, path: str) -> str:
-    return _real_git(repo, "show", f"{tip}:{path}").stdout
+    return real_git(repo, "show", f"{tip}:{path}").stdout
 
 
 def _state_ref_tip(repo: Path, remote: Path) -> str:
-    return _real_git(repo, "ls-remote", str(remote), store.STATE_REF).stdout.split()[0]
+    return real_git(repo, "ls-remote", str(remote), store.STATE_REF).stdout.split()[0]
 
 
 def _state_ref_item_state(repo: Path, tip: str, number: int) -> items.RecordState:
@@ -9316,11 +9316,11 @@ def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose
     through the real state re-read from the real ref, and moves the ref not
     at all."""
     repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
-    sha = _real_git(repo, "rev-parse", "main~2").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
     item_id = items.format_item_id(10)
     tip_before = _state_ref_tip(repo, remote)
     assert "claims/issue-10.toml" in _state_ref_paths(repo, tip_before)
-    count_before = int(_real_git(repo, "rev-list", "--count", tip_before).stdout.strip())
+    count_before = int(real_git(repo, "rev-list", "--count", tip_before).stdout.strip())
 
     status = issue_claim.main(
         ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
@@ -9328,9 +9328,9 @@ def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose
 
     assert status == 0
     tip_after = _state_ref_tip(repo, remote)
-    count_after = int(_real_git(repo, "rev-list", "--count", tip_after).stdout.strip())
+    count_after = int(real_git(repo, "rev-list", "--count", tip_after).stdout.strip())
     assert count_after == count_before + 1
-    assert _real_git(repo, "rev-parse", f"{tip_after}^").stdout.strip() == tip_before
+    assert real_git(repo, "rev-parse", f"{tip_after}^").stdout.strip() == tip_before
     paths_after = _state_ref_paths(repo, tip_after)
     assert "claims/issue-10.toml" not in paths_after
     assert f"items/{item_id}.md" in paths_after
@@ -9359,7 +9359,7 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
     trunk commit, closes nothing, moves `refs/aco/state` not at all, and
     reports only the cleanup (REL-47, REL-49, REL-51, REL-52)."""
     repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
-    sha = _real_git(repo, "rev-parse", "main~2").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
     branch = "codex/issue-10-claims"
     rerun = f"aco release {items.format_item_id(10)} --merged {sha} --branch {branch}"
     kept = (
@@ -9417,7 +9417,7 @@ def test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_
     newer lane's worktree and branch -- on the landed branch itself for
     REL-53 -- all survive, and `refs/aco/state` does not move."""
     repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
-    sha = _real_git(repo, "rev-parse", "main~2").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
     landed_branch = "codex/issue-10-claims"
     newer_branch = reclaim_on or "codex/issue-10-again"
     newer_worktree = tmp_path / "issue-10-newer"
@@ -9428,7 +9428,7 @@ def test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_
         )
         == 0
     )
-    _real_git(repo, "worktree", "add", "-q", "-b", newer_branch, str(newer_worktree), "main")
+    real_git(repo, "worktree", "add", "-q", "-b", newer_branch, str(newer_worktree), "main")
     if reclaim_on is not None:
         _land_real_claim(
             repo, remote, issue=10, claim_id="claim-10-again", branch=reclaim_on, base=sha
@@ -9472,7 +9472,7 @@ def test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_
     ]
     assert live_branches == ([] if reclaim_on is None else [reclaim_on])
     assert newer_worktree.is_dir()
-    assert _real_git(repo, "branch", "--list", newer_branch).stdout.strip()
+    assert real_git(repo, "branch", "--list", newer_branch).stdout.strip()
 
 
 def test_release_merged_rerun_under_state_ref_refuses_a_newer_claim_before_judging_the_item(
@@ -9485,7 +9485,7 @@ def test_release_merged_rerun_under_state_ref_refuses_a_newer_claim_before_judgi
     names the newer claim on another branch (REL-48) rather than the closed
     item, and moves `refs/aco/state` not at all."""
     repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
-    sha = _real_git(repo, "rev-parse", "main~2").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
     landed_branch = "codex/issue-10-claims"
     newer_branch = "codex/issue-10-again"
     landing = ["release", "10", "--agent", "Codex Sol", "--merged", sha]
@@ -9527,11 +9527,11 @@ def _unrelated_racer_commit(worktree: Path, remote: Path) -> str:
     """Pushes one commit carrying the current state tree unchanged -- a
     writer whose own change is unrelated to the transition it races."""
     current = _state_ref_tip(worktree, remote)
-    tree = _real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
-    racer = _real_git(
+    tree = real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
+    racer = real_git(
         worktree, "commit-tree", tree, "-p", current, "-m", "unrelated racer"
     ).stdout.strip()
-    _real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
+    real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
     return racer
 
 
@@ -9580,7 +9580,7 @@ def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
     # the claim was ever half-landed there: the item is still open at its
     # pre-landing oid and the claim is still present, exactly as they were
     # before this transition ever touched the ref.
-    racer_item_oid = _real_git(
+    racer_item_oid = real_git(
         worktree, "rev-parse", f"{racer_commit}:items/{item_id}.md"
     ).stdout.strip()
     assert racer_item_oid == open_oid
@@ -9590,7 +9590,7 @@ def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
     assert new_state.tip is not None
     # The retry rebuilt directly on the racer's own commit -- no commit from
     # the rejected first attempt sits between them.
-    parent = _real_git(worktree, "rev-parse", f"{new_state.tip}^").stdout.strip()
+    parent = real_git(worktree, "rev-parse", f"{new_state.tip}^").stdout.strip()
     assert parent == racer_commit
     refetched = store.fetch_state(worktree=worktree, remote=str(bare_remote))
     assert refetched.items[item_id] == closed_oid
@@ -11121,17 +11121,17 @@ def test_cli_status_shows_a_live_store_claim_then_the_lane_shared_files(
     monkeypatch.setattr(checkout, "file_at_revision", _LIVE_FILE_AT_REVISION)
     monkeypatch.setattr(checkout, "versioned_paths", _REAL_VERSIONED_PATHS)
     monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
-    _real_git(tmp_path, "init", "-q", "-b", initial_branch)
-    _real_git(tmp_path, "config", "user.name", "Test")
-    _real_git(tmp_path, "config", "user.email", "test@example.com")
+    real_git(tmp_path, "init", "-q", "-b", initial_branch)
+    real_git(tmp_path, "config", "user.name", "Test")
+    real_git(tmp_path, "config", "user.email", "test@example.com")
     write_repository_config(tmp_path, 'lane_shared = ["scripts/a.py", "scripts/b.txt"]\n')
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts" / "a.py").write_text("")
     (tmp_path / "scripts" / "b.txt").write_text("")
-    _real_git(tmp_path, "add", "-f", board.CONFIG_PATH.as_posix(), "scripts")
-    _real_git(tmp_path, "commit", "-q", "-m", "trunk configuration")
+    real_git(tmp_path, "add", "-f", board.CONFIG_PATH.as_posix(), "scripts")
+    real_git(tmp_path, "commit", "-q", "-m", "trunk configuration")
     if published_trunk is not None:
-        _real_git(tmp_path, "update-ref", published_trunk, "HEAD")
+        real_git(tmp_path, "update-ref", published_trunk, "HEAD")
     (tmp_path / board.CONFIG_PATH).write_text(
         'lane_shared = ["scripts/a.py", "scripts/b.txt", "src/x.py"]\n'
     )
@@ -16183,8 +16183,8 @@ def _refused_trailer_repository(
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "work.txt").write_text("work\n")
-    _real_git(repo, "add", "work.txt")
-    _real_git(repo, "commit", "-q", "-m", "refused landing", "-m", trailer)
+    real_git(repo, "add", "work.txt")
+    real_git(repo, "commit", "-q", "-m", "refused landing", "-m", trailer)
     _push_repository_trunk(repo, "origin")
     redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
@@ -16206,7 +16206,7 @@ def test_check_sha_refuses_a_contradictory_trailer(
     The `--json` form carries the same refusal through the one envelope,
     its `message` the line's own finding (issue #435)."""
     repo = _refused_trailer_repository(monkeypatch, tmp_path, trailer)
-    sha = _real_git(repo, "rev-parse", "main").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main").stdout.strip()
 
     status = issue_claim.main(["check", sha])
     printed = capsys.readouterr()
@@ -16260,7 +16260,7 @@ def test_check_sha_refuses_a_trailer_number_past_the_id_space_only_under_state_r
     repo = _refused_trailer_repository(monkeypatch, tmp_path, trailer)
     if pin_state_ref:
         _write_state_ref_pin(repo)
-    sha = _real_git(repo, "rev-parse", "main").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main").stdout.strip()
 
     status = issue_claim.main(["check", sha])
     printed = capsys.readouterr()
@@ -16288,7 +16288,7 @@ def test_release_merged_by_sha_refuses_a_contradictory_trailer(
     `ClassificationDefect` branch."""
     repo = _refused_trailer_repository(monkeypatch, tmp_path, trailer)
     _write_state_ref_pin(repo)
-    sha = _real_git(repo, "rev-parse", "main").stdout.strip()
+    sha = real_git(repo, "rev-parse", "main").stdout.strip()
 
     status = issue_claim.main(["release", "20", "--agent", "Codex Sol", "--merged", sha])
 
@@ -16330,15 +16330,15 @@ def _release_cleanup_repository(tmp_path: Path, *, merge_into_main: bool = True)
     git state at all."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
-    _real_git(repo, "checkout", "-q", "-b", _CLEANUP_BRANCH)
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "checkout", "-q", "-b", _CLEANUP_BRANCH)
     (repo / "feature.txt").write_text("feature\n")
-    _real_git(repo, "add", "feature.txt")
-    _real_git(repo, "commit", "-q", "-m", "feature work")
-    _real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "add", "feature.txt")
+    real_git(repo, "commit", "-q", "-m", "feature work")
+    real_git(repo, "checkout", "-q", "main")
     if merge_into_main:
-        _real_git(repo, "merge", "-q", "--no-ff", "-m", "Merge feature", _CLEANUP_BRANCH)
+        real_git(repo, "merge", "-q", "--no-ff", "-m", "Merge feature", _CLEANUP_BRANCH)
     _push_repository_trunk(repo, "origin")
     return repo
 
@@ -16361,8 +16361,8 @@ def _release_cleanup_scenario(
     repo = _release_cleanup_repository(tmp_path, merge_into_main=merge_into_main)
     merge_commit = MERGE_COMMIT_SHA
     if landed_elsewhere:
-        _real_git(repo, "push", "-q", "origin", _CLEANUP_BRANCH)
-        _real_git(repo, "remote", "set-head", "origin", "--delete")
+        real_git(repo, "push", "-q", "origin", _CLEANUP_BRANCH)
+        real_git(repo, "remote", "set-head", "origin", "--delete")
         merge_commit = landed_from_another_clone(
             tmp_path,
             *("merge", "-q", "--no-ff", f"origin/{_CLEANUP_BRANCH}", "-m", "Merge feature"),
@@ -16371,7 +16371,7 @@ def _release_cleanup_scenario(
     worktree = repo.parent / f"{repo.name}-worktrees" / _CLEANUP_WORKTREE_NAME
     if link_worktree:
         worktree.parent.mkdir(parents=True)
-        _real_git(repo, "worktree", "add", "-q", str(worktree), _CLEANUP_BRANCH)
+        real_git(repo, "worktree", "add", "-q", str(worktree), _CLEANUP_BRANCH)
     standing = request(
         "landing", "Ada", issue=WORK_ITEM_ISSUE, branch=_CLEANUP_BRANCH, scope=("src",)
     )
@@ -16422,14 +16422,14 @@ def _start_from_a_stale_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     """`start` once the remote's `main` moved on from another clone: the
     exit code, and whether its worktree stands on that remote tip."""
     repo = _start_scenario(monkeypatch, tmp_path)
-    _real_git(repo, "remote", "set-head", "origin", "--delete")
+    real_git(repo, "remote", "set-head", "origin", "--delete")
     remote_tip = landed_from_another_clone(
         tmp_path, "commit", "-q", "--allow-empty", "-m", "landed elsewhere"
     )
     monkeypatch.chdir(repo)
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    return status, _real_git(worktree, "rev-parse", "HEAD").stdout.strip() == remote_tip
+    return status, real_git(worktree, "rev-parse", "HEAD").stdout.strip() == remote_tip
 
 
 def _release_a_merge_the_remote_alone_holds(
@@ -16451,7 +16451,7 @@ def _route_a_land_rerun_by_a_merge_the_remote_alone_holds(
     """A rerun of `land` for a pull request merged on the remote alone: the
     item its release routes to, by the new merge commit's own trailer."""
     _release_cleanup_scenario(monkeypatch, tmp_path, merge_into_main=False, landed_elsewhere=True)
-    merge_sha = _real_git(tmp_path / "remote.git", "rev-parse", "main").stdout.strip()
+    merge_sha = real_git(tmp_path / "remote.git", "rev-parse", "main").stdout.strip()
     return issue_claim._land_release_routing(None, merge_sha, run_context_over(FakeForge()))
 
 
@@ -16612,10 +16612,10 @@ def _leave_hub_refs_without_a_url(monkeypatch: pytest.MonkeyPatch, repo: Path) -
     """`hub` was fetched with its `HEAD` recorded, then lost its URL: its
     remote-tracking refs outlive it (issue #512)."""
     _leave_hub_unconfigured(monkeypatch, repo)
-    _real_git(repo, "remote", "add", "hub", str(repo.parent / "remote.git"))
-    _real_git(repo, "fetch", "-q", "hub")
-    _real_git(repo, "remote", "set-head", "hub", "main")
-    _real_git(repo, "config", "--remove-section", "remote.hub")
+    real_git(repo, "remote", "add", "hub", str(repo.parent / "remote.git"))
+    real_git(repo, "fetch", "-q", "hub")
+    real_git(repo, "remote", "set-head", "hub", "main")
+    real_git(repo, "config", "--remove-section", "remote.hub")
 
 
 def _leave_hub_never_added(
@@ -16639,7 +16639,7 @@ def _leave_hub_a_local_fetch_line(
 ) -> None:
     """A local `remote.hub.fetch` without `remote.hub.url`."""
     _leave_hub_refs_without_a_url(monkeypatch, repo)
-    _real_git(repo, "config", "remote.hub.fetch", "+refs/heads/*:refs/remotes/hub/*")
+    real_git(repo, "config", "remote.hub.fetch", "+refs/heads/*:refs/remotes/hub/*")
 
 
 _UNCONFIGURED_HUB_SENTENCE = "cannot determine the trunk: canonical remote 'hub' is not configured"
@@ -16651,7 +16651,7 @@ def _check_an_unpushed_commit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     prove the forge closed nothing."""
     _serve_start_board(monkeypatch, _start_item())
     repo, sha_of = _check_sha(monkeypatch, tmp_path)
-    _real_git(repo, "commit", "-q", "--allow-empty", "-m", "unpushed", "-m", "Work-Item: #20")
+    real_git(repo, "commit", "-q", "--allow-empty", "-m", "unpushed", "-m", "Work-Item: #20")
     return ["check", sha_of("HEAD")]
 
 
@@ -16661,8 +16661,8 @@ def _claim_in_a_linked_worktree_on_main(
     """CLM-01's case (issue #512): a linked worktree sitting on `main`."""
     repo = _start_scenario(monkeypatch, tmp_path)
     worktree = tmp_path / "lane"
-    _real_git(repo, "checkout", "-q", "--detach")
-    _real_git(repo, "worktree", "add", "-q", str(worktree), "main")
+    real_git(repo, "checkout", "-q", "--detach")
+    real_git(repo, "worktree", "add", "-q", str(worktree), "main")
     _name_hub_as_the_canonical_remote(worktree)
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
@@ -16739,7 +16739,7 @@ def test_every_command_names_a_canonical_remote_with_no_url_configured(
     argv = arrange(monkeypatch, tmp_path)
     repo = tmp_path / "repo"
     unconfigure_hub(monkeypatch, repo, isolated_global_git_config)
-    refs_before = _real_git(repo, "for-each-ref").stdout
+    refs_before = real_git(repo, "for-each-ref").stdout
     claims_before = store.fetch_state(worktree=repo, remote="hub").claims
     client = github.GitHubForge(github.repository_id(REPOSITORY))
     assert isinstance(client, FakeForge)
@@ -16749,7 +16749,7 @@ def test_every_command_names_a_canonical_remote_with_no_url_configured(
 
     printed = capsys.readouterr()
     assert (status, printed.out, printed.err) == (2, expected_out, _UNCONFIGURED_HUB)
-    assert _real_git(repo, "for-each-ref").stdout == refs_before
+    assert real_git(repo, "for-each-ref").stdout == refs_before
     assert store.fetch_state(worktree=repo, remote="hub").claims == claims_before
     assert (client.landing_comments, client.closed_issues) == ({}, closed_before)
 
@@ -16758,12 +16758,12 @@ def _rename_master_to_trunk(repo: Path, remote: Path, *, keep_recorded_head: boo
     """The remote renames `master` to `trunk` after `repo` recorded
     `origin/HEAD` naming it: `fetch --prune` leaves that record dangling,
     or it is deleted when `keep_recorded_head` is false."""
-    _real_git(repo, "push", "-q", "origin", "master")
-    _real_git(repo, "remote", "set-head", "origin", "master")
-    _real_git(remote, "branch", "-m", "master", "trunk")
-    _real_git(repo, "fetch", "-q", "--prune", "origin")
+    real_git(repo, "push", "-q", "origin", "master")
+    real_git(repo, "remote", "set-head", "origin", "master")
+    real_git(remote, "branch", "-m", "master", "trunk")
+    real_git(repo, "fetch", "-q", "--prune", "origin")
     if not keep_recorded_head:
-        _real_git(repo, "remote", "set-head", "origin", "--delete")
+        real_git(repo, "remote", "set-head", "origin", "--delete")
 
 
 def _push_nothing(_repo: Path, _remote: Path) -> None:
@@ -16822,11 +16822,11 @@ def test_check_never_takes_a_local_branch_for_the_trunk_of_a_remote_with_branche
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     _ask_git_which_remotes_are_configured(monkeypatch)
     repo, remote = _real_repository_with_bare_remote(tmp_path)
-    _real_git(repo, "commit", "-q", "--allow-empty", "-m", "initial")
-    _real_git(repo, "branch", "-m", "main", "master")
+    real_git(repo, "commit", "-q", "--allow-empty", "-m", "initial")
+    real_git(repo, "branch", "-m", "main", "master")
     arrange_remote(repo, remote)
-    _real_git(repo, "commit", "-q", "--allow-empty", "-m", "unpushed", "-m", "No-Item: docs")
-    sha = _real_git(repo, "rev-parse", "HEAD").stdout.strip()
+    real_git(repo, "commit", "-q", "--allow-empty", "-m", "unpushed", "-m", "No-Item: docs")
+    sha = real_git(repo, "rev-parse", "HEAD").stdout.strip()
     redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
 
@@ -16961,10 +16961,10 @@ def _checked_out_elsewhere_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     linked worktree; cleanup declines rather than trying (and failing) to
     remove the main checkout as if it were one."""
     repo = _release_cleanup_repository(tmp_path)
-    _real_git(repo, "checkout", "-q", _CLEANUP_BRANCH)
+    real_git(repo, "checkout", "-q", _CLEANUP_BRANCH)
     bystander = repo.parent / f"{repo.name}-worktrees" / "issue-1-bystander"
     bystander.parent.mkdir(parents=True)
-    _real_git(repo, "worktree", "add", "-q", str(bystander), "-b", "codex/issue-1-bystander")
+    real_git(repo, "worktree", "add", "-q", str(bystander), "-b", "codex/issue-1-bystander")
     standing = request(
         "landing", "Ada", issue=WORK_ITEM_ISSUE, branch=_CLEANUP_BRANCH, scope=("src",)
     )
@@ -17143,18 +17143,18 @@ def _land_repository(
     (issue #405 CI coverage follow-up)."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
     if set_head:
         _push_repository_trunk(repo, "origin")
     else:
-        _real_git(repo, "push", "-q", "origin", "main")
-    _real_git(repo, "checkout", "-q", "-b", branch)
+        real_git(repo, "push", "-q", "origin", "main")
+    real_git(repo, "checkout", "-q", "-b", branch)
     (repo / "feature.txt").write_text("feature\n")
-    _real_git(repo, "add", "feature.txt")
-    _real_git(repo, "commit", "-q", "-m", "feature work")
-    _real_git(repo, "push", "-q", "origin", branch)
-    _real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "add", "feature.txt")
+    real_git(repo, "commit", "-q", "-m", "feature work")
+    real_git(repo, "push", "-q", "origin", branch)
+    real_git(repo, "checkout", "-q", "main")
     return repo
 
 
@@ -17741,7 +17741,7 @@ def test_land_merges_a_green_pull_request_and_runs_the_release_path(
     configuration read at the very head sha the merge is pinned to."""
     repo, client = _land_scenario(monkeypatch, tmp_path)
     client.head_board_config = head_board_config
-    trunk_before = _real_git(repo, "rev-parse", "main").stdout.strip()
+    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
 
@@ -17752,7 +17752,7 @@ def test_land_merges_a_green_pull_request_and_runs_the_release_path(
     assert paragraphs[-1] == f"Work-Item: #{WORK_ITEM_ISSUE}"
     assert client.deleted_branches == [LANDING_BRANCH]
     assert client.closed_issues == {WORK_ITEM_ISSUE}
-    trunk_after = _real_git(repo, "rev-parse", "main").stdout.strip()
+    trunk_after = real_git(repo, "rev-parse", "main").stdout.strip()
     assert trunk_after != trunk_before
     assert client.landings[12].merge_commit == trunk_after
     out = capsys.readouterr().out
@@ -17793,7 +17793,7 @@ def test_land_merges_only_the_head_its_reviewers_saw(
     reviewed sha; a moved head refuses before any write, and a value that
     is no 7-40 hex digit sha refuses before the forge is read at all."""
     repo, client = _land_scenario(monkeypatch, tmp_path)
-    trunk_before = _real_git(repo, "rev-parse", "main").stdout.strip()
+    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
 
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", reviewed_head])
 
@@ -17802,7 +17802,7 @@ def test_land_merges_only_the_head_its_reviewers_saw(
     if refusal is None:
         assert (status, error, pinned) == (0, "", [MERGE_COMMIT_SHA])
         return
-    trunk_after = _real_git(repo, "rev-parse", "main").stdout.strip()
+    trunk_after = real_git(repo, "rev-parse", "main").stdout.strip()
     assert (status, error, pinned, trunk_after, client.requests > 0) == (
         2,
         f"ERROR: {refusal}\n",
@@ -17985,15 +17985,15 @@ def test_land_merges_with_the_method_the_repository_allows(
     client.allowed_methods = allowed
     client.branch_rules = {"main": rules}
     lane = tmp_path / "lane"
-    _real_git(repo, "worktree", "add", "-q", str(lane), LANDING_BRANCH)
-    _real_git(repo, "branch", "-q", "--set-upstream-to", f"origin/{LANDING_BRANCH}", LANDING_BRANCH)
-    lane_tip = _real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
+    real_git(repo, "worktree", "add", "-q", str(lane), LANDING_BRANCH)
+    real_git(repo, "branch", "-q", "--set-upstream-to", f"origin/{LANDING_BRANCH}", LANDING_BRANCH)
+    lane_tip = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
     client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=lane_tip)
     if pinned is not None:
         write_repository_config(repo, f'merge_method = "{pinned}"\n')
-        _real_git(repo, "add", "-f", str(board.CONFIG_PATH))
-        _real_git(repo, "commit", "-q", "-m", "pin the merge method")
-        _real_git(repo, "push", "-q", "origin", "main")
+        real_git(repo, "add", "-f", str(board.CONFIG_PATH))
+        real_git(repo, "commit", "-q", "-m", "pin the merge method")
+        real_git(repo, "push", "-q", "origin", "main")
 
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
@@ -18003,14 +18003,14 @@ def test_land_merges_with_the_method_the_repository_allows(
         assert (status, error, client.merge_calls) == (2, f"ERROR: {outcome}\n", [])
         return
     [(_number, _head_sha, method, title, body)] = client.merge_calls
-    trunk = _real_git(repo, "rev-parse", "main").stdout.strip()
-    parents = _real_git(repo, "rev-list", "--parents", "-n", "1", trunk).stdout.split()[1:]
+    trunk = real_git(repo, "rev-parse", "main").stdout.strip()
+    parents = real_git(repo, "rev-list", "--parents", "-n", "1", trunk).stdout.split()[1:]
     assert (status, error, method, title, len(parents)) == (0, "", *outcome)
     assert body.strip().split("\n\n")[-1] == f"Work-Item: #{WORK_ITEM_ISSUE}"
     assert client.closed_issues == {WORK_ITEM_ISSUE}
     assert "worktree: removed\n" in output.out
     assert (lane.exists(), checkout.branch_exists(LANDING_BRANCH)) == (False, False)
-    upstream = _real_git(repo, "config", f"branch.{LANDING_BRANCH}.remote", check=False)
+    upstream = real_git(repo, "config", f"branch.{LANDING_BRANCH}.remote", check=False)
     assert upstream.stdout == ""
 
 
@@ -18047,8 +18047,8 @@ def test_a_squashed_lane_goes_only_on_the_pull_requests_recorded_head(
     repo, client = _land_scenario(monkeypatch, tmp_path)
     client.allowed_methods = frozenset({_SQUASH})
     lane = tmp_path / "lane"
-    _real_git(repo, "worktree", "add", "-q", str(lane), LANDING_BRANCH)
-    pinned_head = _real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
+    real_git(repo, "worktree", "add", "-q", str(lane), LANDING_BRANCH)
+    pinned_head = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
     client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=pinned_head)
     if squashed_before_this_run:
         client.merge_landing(
@@ -18059,8 +18059,8 @@ def test_a_squashed_lane_goes_only_on_the_pull_requests_recorded_head(
             body=f"Work-Item: #{WORK_ITEM_ISSUE}",
         )
     if lane_moved_on:
-        _real_git(lane, "commit", "-q", "--allow-empty", "-m", "after the pin")
-    lane_tip = _real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
+        real_git(lane, "commit", "-q", "--allow-empty", "-m", "after the pin")
+    lane_tip = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
 
     status = issue_claim.main(["--repo", REPOSITORY, *command])
 
@@ -18072,7 +18072,7 @@ def test_a_squashed_lane_goes_only_on_the_pull_requests_recorded_head(
     )
     assert (status, output.err) == (0, "")
     assert worktree_line in output.out
-    kept_tip = _real_git(repo, "rev-parse", "--verify", "--quiet", LANDING_BRANCH, check=False)
+    kept_tip = real_git(repo, "rev-parse", "--verify", "--quiet", LANDING_BRANCH, check=False)
     assert (lane.exists(), kept_tip.stdout.split()) == (
         lane_moved_on,
         [lane_tip] if lane_moved_on else [],
@@ -18084,8 +18084,8 @@ def _leave_the_lane_alone(_monkeypatch: pytest.MonkeyPatch, _repo: Path, _lane: 
 
 
 def _commit_past_the_landed_head(_monkeypatch: pytest.MonkeyPatch, _repo: Path, lane: Path) -> str:
-    _real_git(lane, "commit", "-q", "--allow-empty", "-m", "raced past the landed head")
-    return _real_git(lane, "rev-parse", "HEAD").stdout.strip()
+    real_git(lane, "commit", "-q", "--allow-empty", "-m", "raced past the landed head")
+    return real_git(lane, "rev-parse", "HEAD").stdout.strip()
 
 
 def _refuse_the_branch_configuration_listing(
@@ -18111,7 +18111,7 @@ def _fail_the_git_launch(
     is the compare-and-delete, which then never ran, or `None`."""
 
     def fail_that_launch(monkeypatch: pytest.MonkeyPatch, _repo: Path, lane: Path) -> str | None:
-        tip = _real_git(lane, "rev-parse", "HEAD").stdout.strip()
+        tip = real_git(lane, "rev-parse", "HEAD").stdout.strip()
         run_git = process.run_git
 
         def raise_for_that_call(
@@ -18130,7 +18130,7 @@ def _fail_the_git_launch(
 def _lock_the_repository_configuration(
     _monkeypatch: pytest.MonkeyPatch, _repo: Path, lane: Path
 ) -> None:
-    common = _real_git(lane, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    common = real_git(lane, "rev-parse", "--path-format=absolute", "--git-common-dir")
     (Path(common.stdout.strip()) / "config.lock").touch()
 
 
@@ -18139,7 +18139,7 @@ def _recreate_the_branch_after_its_deletion(
 ) -> str:
     """Let another process create the lane's branch again, on the same tip,
     right after the cleanup's compare-and-delete; return that tip."""
-    tip = _real_git(lane, "rev-parse", "HEAD").stdout.strip()
+    tip = real_git(lane, "rev-parse", "HEAD").stdout.strip()
     run_git = checkout._git_run
 
     def run_then_recreate(
@@ -18147,7 +18147,7 @@ def _recreate_the_branch_after_its_deletion(
     ) -> process.CapturedResult:
         result = run_git(arguments, directory=directory)
         if arguments[:2] == ["update-ref", "-d"]:
-            _real_git(repo, "branch", "-q", LANDING_BRANCH, tip)
+            real_git(repo, "branch", "-q", LANDING_BRANCH, tip)
         return result
 
     monkeypatch.setattr(checkout, "_git_run", run_then_recreate)
@@ -18159,10 +18159,10 @@ def _configure_only_a_dotted_sibling(
 ) -> None:
     """Drop the lane's own `branch.<name>` section and configure a sibling
     branch whose name extends the lane's with a dot, under `branch.<name>.x`."""
-    _real_git(repo, "config", "--remove-section", f"branch.{LANDING_BRANCH}")
+    real_git(repo, "config", "--remove-section", f"branch.{LANDING_BRANCH}")
     sibling = f"{LANDING_BRANCH}.x"
-    _real_git(repo, "branch", "-q", sibling, LANDING_BRANCH)
-    _real_git(repo, "config", f"branch.{sibling}.remote", "origin")
+    real_git(repo, "branch", "-q", sibling, LANDING_BRANCH)
+    real_git(repo, "config", f"branch.{sibling}.remote", "origin")
 
 
 def _describe_another_branch_in_latin1(
@@ -18170,14 +18170,14 @@ def _describe_another_branch_in_latin1(
 ) -> None:
     """Give another branch a description whose bytes are no UTF-8, written
     straight into the repository configuration as an editor would."""
-    common = _real_git(lane, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    common = real_git(lane, "rev-parse", "--path-format=absolute", "--git-common-dir")
     with (Path(common.stdout.strip()) / "config").open("ab") as configuration:
         configuration.write(b'[branch "other"]\n\tdescription = caf\xe9\n')
 
 
 def _branch_configuration(repo: Path) -> list[str]:
     """The keys under `branch.*`: names only, since a value may be no UTF-8."""
-    listed = _real_git(repo, "config", "--name-only", "--get-regexp", r"^branch\.", check=False)
+    listed = real_git(repo, "config", "--name-only", "--get-regexp", r"^branch\.", check=False)
     return listed.stdout.splitlines()
 
 
@@ -18281,11 +18281,11 @@ def test_land_cleans_up_a_squashed_lane_branch_by_compare_and_delete(
     repo, client = _land_scenario(monkeypatch, tmp_path)
     client.allowed_methods = frozenset({_SQUASH})
     lane = tmp_path / "lane"
-    _real_git(repo, "worktree", "add", "-q", str(lane), LANDING_BRANCH)
+    real_git(repo, "worktree", "add", "-q", str(lane), LANDING_BRANCH)
     unconfigured = _branch_configuration(repo)
-    _real_git(repo, "branch", "-q", "--set-upstream-to", f"origin/{LANDING_BRANCH}", LANDING_BRANCH)
+    real_git(repo, "branch", "-q", "--set-upstream-to", f"origin/{LANDING_BRANCH}", LANDING_BRANCH)
     lane_section = set(_branch_configuration(repo)) - set(unconfigured)
-    pinned_head = _real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
+    pinned_head = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
     client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=pinned_head)
     remove = checkout.remove_linked_worktree
     kept_tips: list[str] = []
@@ -18305,7 +18305,7 @@ def test_land_cleans_up_a_squashed_lane_branch_by_compare_and_delete(
     assert (status, output.err) == (0, "")
     assert worktree_line in output.out
     assert not lane.exists()
-    tip = _real_git(repo, "rev-parse", "--verify", "--quiet", LANDING_BRANCH, check=False)
+    tip = real_git(repo, "rev-parse", "--verify", "--quiet", LANDING_BRANCH, check=False)
     assert tip.stdout.split() == kept_tips
     expected = [line for line in configuration if lane_section_kept or line not in lane_section]
     assert _branch_configuration(repo) == expected
@@ -18328,7 +18328,7 @@ def test_land_merges_a_foreign_claim_under_a_coordinator_override(
     assert status == 0
     [(number, head_sha, _method, _title, _body)] = client.merge_calls
     assert (number, head_sha) == (12, MERGE_COMMIT_SHA)
-    assert client.landings[12].merge_commit == _real_git(repo, "rev-parse", "main").stdout.strip()
+    assert client.landings[12].merge_commit == real_git(repo, "rev-parse", "main").stdout.strip()
 
 
 def _break_delete_branch(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
@@ -18517,7 +18517,7 @@ def test_land_rerun_refuses_a_bad_override_or_a_missing_git_identity_before_any_
     _land_mark_already_merged(client)
     if not git_identity:
         _without_git_identity(monkeypatch, repo)
-    trunk_before = _real_git(repo, "rev-parse", "main").stdout.strip()
+    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
 
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12", *override_arguments])
 
@@ -18526,7 +18526,7 @@ def test_land_rerun_refuses_a_bad_override_or_a_missing_git_identity_before_any_
     assert client.merge_calls == []
     assert client.deleted_branches == []
     assert client.closed_issues == set()
-    assert _real_git(repo, "rev-parse", "main").stdout.strip() == trunk_before
+    assert real_git(repo, "rev-parse", "main").stdout.strip() == trunk_before
 
 
 def test_land_refuses_under_the_state_ref_pin(
@@ -18600,9 +18600,9 @@ def test_land_prints_the_reinstall_line_in_this_packages_own_repository(
     no second time (issue #605, LANDCMD-38)."""
     repo, _client = _land_scenario(monkeypatch, tmp_path)
     (repo / "pyproject.toml").write_text('[project]\nname = "agent-coordination"\n')
-    _real_git(repo, "add", "pyproject.toml")
-    _real_git(repo, "commit", "-q", "-m", "add pyproject.toml")
-    _real_git(repo, "push", "-q", "origin", "main")
+    real_git(repo, "add", "pyproject.toml")
+    real_git(repo, "commit", "-q", "-m", "add pyproject.toml")
+    real_git(repo, "push", "-q", "origin", "main")
     reinstall = "reinstall: uv tool install --force --from . agent-coordination"
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
@@ -18651,23 +18651,23 @@ def _land_on_the_forges_trunk(
     repo, client = _land_scenario(monkeypatch, tmp_path, set_head=False)
     client.default_branch_name = "trunk"
     client.landings[12] = replace(client.landings[12], target_branch="trunk")
-    _real_git(repo, "branch", "-m", "main", "trunk")
+    real_git(repo, "branch", "-m", "main", "trunk")
     if canonical != "origin":
         client.merge_remote = tmp_path / f"{canonical}.git"
-        _real_git(tmp_path, "init", "-q", "--bare", str(client.merge_remote))
-        _real_git(repo, "remote", "add", canonical, str(client.merge_remote))
+        real_git(tmp_path, "init", "-q", "--bare", str(client.merge_remote))
+        real_git(repo, "remote", "add", canonical, str(client.merge_remote))
         client.head_board_config = f'canonical_remote = "{canonical}"\n'
         write_repository_config(repo, client.head_board_config)
-        _real_git(repo, "add", "-f", board.CONFIG_PATH.as_posix())
-        _real_git(repo, "commit", "-q", "-m", "canonical remote")
-        _real_git(repo, "push", "-q", canonical, LANDING_BRANCH)
-    _real_git(repo, "push", "-q", canonical, "trunk", "trunk:main")
+        real_git(repo, "add", "-f", board.CONFIG_PATH.as_posix())
+        real_git(repo, "commit", "-q", "-m", "canonical remote")
+        real_git(repo, "push", "-q", canonical, LANDING_BRANCH)
+    real_git(repo, "push", "-q", canonical, "trunk", "trunk:main")
     if not leftover_main:
-        bare = Path(_real_git(repo, "remote", "get-url", canonical).stdout.strip())
-        _real_git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
-        _real_git(repo, "push", "-q", canonical, "--delete", "main")
-    _real_git(repo, "checkout", "-q", "-B", checked_out)
-    _real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
+        bare = Path(real_git(repo, "remote", "get-url", canonical).stdout.strip())
+        real_git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
+        real_git(repo, "push", "-q", canonical, "--delete", "main")
+    real_git(repo, "checkout", "-q", "-B", checked_out)
+    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
     return repo, client
 
 
@@ -18725,7 +18725,7 @@ def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     fetches = [call for call in trunk_calls if call[0] == "fetch"]
-    local_trunk = _real_git(repo, "rev-parse", "trunk").stdout.strip()
+    local_trunk = real_git(repo, "rev-parse", "trunk").stdout.strip()
     output = capsys.readouterr()
     assert (status, output.err, fetches) == (
         expected_status,
@@ -18759,7 +18759,7 @@ def _git_trailers(repository: Path, scratch: Path, message: str) -> tuple[str, .
     the checkout."""
     message_file = scratch / "trailer-message"
     message_file.write_text(message)
-    parsed = _real_git(
+    parsed = real_git(
         repository, "interpret-trailers", "--parse", "--no-divider", str(message_file)
     )
     return tuple(parsed.stdout.splitlines())
@@ -18858,7 +18858,7 @@ def test_land_message_keeps_the_classification_inside_gits_trailer_block(
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     [(_number, _head_sha, _method, _title, body)] = client.merge_calls
-    landed_message = _real_git(repo, "log", "-1", "--format=%B", "main").stdout
+    landed_message = real_git(repo, "log", "-1", "--format=%B", "main").stdout
     assert (status, body, _git_trailers(repo, tmp_path, landed_message)) == (0, message, trailers)
     assert client.closed_issues == {WORK_ITEM_ISSUE}
 
@@ -18893,7 +18893,7 @@ def test_land_message_keeps_every_trailer_git_reads_at_the_body_end(
 
     [(_number, _head_sha, _method, title, _body)] = client.merge_calls
     body_trailers = _git_trailers(repo, tmp_path, f"{title}\n\n{body_after_removal}\n")
-    landed_message = _real_git(repo, "log", "-1", "--format=%B", "main").stdout
+    landed_message = real_git(repo, "log", "-1", "--format=%B", "main").stdout
     assert (status, bool(body_trailers), _git_trailers(repo, tmp_path, landed_message)) == (
         0,
         True,
@@ -18912,12 +18912,12 @@ def test_land_message_joins_the_classification_git_reads_under_a_configured_key(
     repo, client = _land_scenario(
         monkeypatch, tmp_path, body=f"{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n{_CO_AUTHOR}"
     )
-    _real_git(repo, "config", "trailer.work-item.key", "WORK-ITEM")
+    real_git(repo, "config", "trailer.work-item.key", "WORK-ITEM")
 
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     [(_number, _head_sha, _method, _title, body)] = client.merge_calls
-    landed_message = _real_git(repo, "log", "-1", "--format=%B", "main").stdout
+    landed_message = real_git(repo, "log", "-1", "--format=%B", "main").stdout
     assert (status, body, _git_trailers(repo, tmp_path, landed_message)) == (
         0,
         f"{_CLOSES}\n\n{_CO_AUTHOR}\n{_WORK_ITEM_TRAILER}\n",
@@ -18930,7 +18930,7 @@ def _trace_git_to_stderr(monkeypatch: pytest.MonkeyPatch, _repo: Path) -> None:
 
 
 def _warn_about_the_trailer_configuration(_monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
-    _real_git(repo, "config", "trailer.foo.where", "bogus")
+    real_git(repo, "config", "trailer.foo.where", "bogus")
 
 
 @pytest.mark.parametrize(
@@ -19087,13 +19087,13 @@ def _land_from_a_separate_clone(
     remote = tmp_path / "remote.git"
     store.bootstrap(worktree=repo, remote=str(remote))
     _claim_the_landing_issue(repo, remote, "landing-claim")
-    _real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
+    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
     clone = tmp_path / "landing-clone"
-    _real_git(tmp_path, "clone", "-q", str(remote), str(clone))
+    real_git(tmp_path, "clone", "-q", str(remote), str(clone))
     _without_git_identity(monkeypatch, clone)
     if git_identity:
-        _real_git(clone, "config", "user.name", "Lander")
-        _real_git(clone, "config", "user.email", "lander@example.com")
+        real_git(clone, "config", "user.name", "Lander")
+        real_git(clone, "config", "user.email", "lander@example.com")
     redirect_toplevel(monkeypatch, clone)
     monkeypatch.chdir(clone)
     return repo, clone, client
@@ -19124,9 +19124,9 @@ def _without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) 
     """`checkout_path` with no git identity git may use or guess: none
     configured locally or in the environment (the caller isolates the global
     configuration)."""
-    _real_git(checkout_path, "config", "user.useConfigOnly", "true")
-    _real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
-    _real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
+    real_git(checkout_path, "config", "user.useConfigOnly", "true")
+    real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
+    real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
     for variable in (
         "GIT_AUTHOR_NAME",
         "GIT_AUTHOR_EMAIL",
@@ -19218,7 +19218,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     taken while that release verifies the landing keeps the lane (REL-55)."""
     repo, clone, client = _land_from_a_separate_clone(monkeypatch, tmp_path, git_identity=True)
     client.allowed_methods = frozenset({_SQUASH})
-    recorded_head = _real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
+    recorded_head = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
     client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=recorded_head)
     remote = tmp_path / "remote.git"
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
@@ -20042,17 +20042,17 @@ def _check_trunk_repository(tmp_path: Path) -> Path:
     trunk ones: it exists in this repository, but never on its trunk."""
     repo = bare_remote_repository_with_one_commit(tmp_path)
     (repo / "work.txt").write_text("work\n")
-    _real_git(repo, "add", "work.txt")
-    _real_git(repo, "commit", "-q", "-m", "work item change", "-m", "Work-Item: #20")
+    real_git(repo, "add", "work.txt")
+    real_git(repo, "commit", "-q", "-m", "work item change", "-m", "Work-Item: #20")
     (repo / "docs.txt").write_text("docs\n")
-    _real_git(repo, "add", "docs.txt")
-    _real_git(repo, "commit", "-q", "-m", "docs change", "-m", "No-Item: docs")
+    real_git(repo, "add", "docs.txt")
+    real_git(repo, "commit", "-q", "-m", "docs change", "-m", "No-Item: docs")
     _push_repository_trunk(repo, "origin")
-    _real_git(repo, "checkout", "-q", "-b", "side")
+    real_git(repo, "checkout", "-q", "-b", "side")
     (repo / "side.txt").write_text("side\n")
-    _real_git(repo, "add", "side.txt")
-    _real_git(repo, "commit", "-q", "-m", "side change", "-m", "Work-Item: #21")
-    _real_git(repo, "checkout", "-q", "main")
+    real_git(repo, "add", "side.txt")
+    real_git(repo, "commit", "-q", "-m", "side change", "-m", "Work-Item: #21")
+    real_git(repo, "checkout", "-q", "main")
     return repo
 
 
@@ -20065,7 +20065,7 @@ def _check_sha(
     repo = _check_trunk_repository(tmp_path)
     redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
-    return repo, lambda ref: _real_git(repo, "rev-parse", ref).stdout.strip()
+    return repo, lambda ref: real_git(repo, "rev-parse", ref).stdout.strip()
 
 
 _UNWALKED_SHA = "0" * 40
@@ -21076,8 +21076,8 @@ def test_an_untrusted_board_config_refuses_every_store_command_by_name(
     whose recorded default branch CLM-01 judges (CLM-30, issue #490)."""
     repository, remote = _real_repository_with_bare_remote(tmp_path)
     (repository / "README.md").write_text("hello\n")
-    _real_git(repository, "add", "README.md")
-    _real_git(repository, "commit", "-q", "-m", "initial")
+    real_git(repository, "add", "README.md")
+    real_git(repository, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repository, "origin")
     if config_on_disk:
         _write_untracked_board_config(repository)
@@ -21089,7 +21089,7 @@ def test_an_untrusted_board_config_refuses_every_store_command_by_name(
     status = issue_claim.main(arguments)
 
     assert (status, capsys.readouterr().err) == (2, refusal)
-    assert _real_git(remote, "for-each-ref", "refs/aco").stdout == ""
+    assert real_git(remote, "for-each-ref", "refs/aco").stdout == ""
 
 
 @dataclass(frozen=True)
@@ -21121,15 +21121,15 @@ def _run_printed_restore_from_a_subdirectory(refusal: str, lane: Path) -> None:
     subdirectory = lane / "docs"
     subdirectory.mkdir()
     printed_command = refusal.split("restore it with ", 1)[1]
-    _real_git(subdirectory, *shlex.split(printed_command)[1:])
+    real_git(subdirectory, *shlex.split(printed_command)[1:])
 
 
 def _advance_origin_main(repository: Path, lane: Path) -> None:
     (repository / "later.txt").write_text("later\n")
-    _real_git(repository, "add", "later.txt")
-    _real_git(repository, "commit", "-q", "-m", "later trunk work")
+    real_git(repository, "add", "later.txt")
+    real_git(repository, "commit", "-q", "-m", "later trunk work")
     _push_repository_trunk(repository, "origin")
-    _real_git(lane, "fetch", "-q", "origin")
+    real_git(lane, "fetch", "-q", "origin")
 
 
 @pytest.mark.parametrize(
@@ -21193,27 +21193,27 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
     CHECK-15's sentence. Nothing is written."""
     repository, remote = _real_repository_with_bare_remote(tmp_path)
     (repository / "README.md").write_text("hello\n")
-    _real_git(repository, "add", "README.md")
-    _real_git(repository, "commit", "-q", "-m", "initial")
-    _real_git(repository, "branch", "lane")
+    real_git(repository, "add", "README.md")
+    real_git(repository, "commit", "-q", "-m", "initial")
+    real_git(repository, "branch", "lane")
     if lane_history.adopted:
         _write_untracked_board_config(repository)
-        _real_git(repository, "add", board.CONFIG_PATH.as_posix())
-        _real_git(repository, "commit", "-q", "-m", "adopt aco")
+        real_git(repository, "add", board.CONFIG_PATH.as_posix())
+        real_git(repository, "commit", "-q", "-m", "adopt aco")
     if lane_history.trunk_resolves:
         _push_repository_trunk(repository, "origin")
     else:
-        _real_git(repository, "push", "-q", "origin", "main:trunk")
+        real_git(repository, "push", "-q", "origin", "main:trunk")
     if lane_history.fetch_is_stale:
-        _real_git(repository, "update-ref", "refs/remotes/origin/main", "main~1")
+        real_git(repository, "update-ref", "refs/remotes/origin/main", "main~1")
     if not lane_history.origin_kept:
-        _real_git(repository, "remote", "remove", "origin")
+        real_git(repository, "remote", "remove", "origin")
     lane = tmp_path / "lane"
-    _real_git(repository, "worktree", "add", "-q", str(lane), "lane")
+    real_git(repository, "worktree", "add", "-q", str(lane), "lane")
     if lane_history.merged_then_removed:
-        _real_git(lane, "merge", "-q", "origin/main")
-        _real_git(lane, "rm", "-q", board.CONFIG_PATH.as_posix())
-        _real_git(lane, "commit", "-q", "-m", "drop the pin")
+        real_git(lane, "merge", "-q", "origin/main")
+        real_git(lane, "rm", "-q", board.CONFIG_PATH.as_posix())
+        real_git(lane, "commit", "-q", "-m", "drop the pin")
     if lane_history.trunk_moved_on:
         _advance_origin_main(repository, lane)
     redirect_toplevel(monkeypatch, lane)
@@ -21225,10 +21225,10 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
     status = issue_claim.main(["claim", "1", "--scope", "README.md"])
 
     assert (status, capsys.readouterr().err) == (2, refusal)
-    assert _real_git(remote, "for-each-ref", "refs/aco").stdout == ""
+    assert real_git(remote, "for-each-ref", "refs/aco").stdout == ""
     if refusal == _RESTORE_BOARD_CONFIG_ERROR:
         _run_printed_restore_from_a_subdirectory(refusal, lane)
-        tracked = _real_git(lane, "ls-files", board.CONFIG_PATH.as_posix()).stdout
+        tracked = real_git(lane, "ls-files", board.CONFIG_PATH.as_posix()).stdout
         assert tracked == f"{board.CONFIG_PATH.as_posix()}\n"
 
 
@@ -21267,22 +21267,22 @@ def _scratch_lane_repository(
     base commit carries it as the trunk's `.aco/board.toml`."""
     monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
     repository = tmp_path
-    _real_git(repository, "init", "-q", "-b", "main")
-    _real_git(repository, "remote", "add", "origin", str(tmp_path / "origin.git"))
-    _real_git(repository, "config", "user.name", "Test")
-    _real_git(repository, "config", "user.email", "test@example.com")
+    real_git(repository, "init", "-q", "-b", "main")
+    real_git(repository, "remote", "add", "origin", str(tmp_path / "origin.git"))
+    real_git(repository, "config", "user.name", "Test")
+    real_git(repository, "config", "user.email", "test@example.com")
     (repository / "README.md").write_text("hello\n")
-    _real_git(repository, "add", "README.md")
+    real_git(repository, "add", "README.md")
     if board_config is not None:
         write_repository_config(repository, board_config)
-        _real_git(repository, "add", "-f", board.CONFIG_PATH.as_posix())
-    _real_git(repository, "commit", "-q", "-m", "initial")
-    base = _real_git(repository, "rev-parse", "HEAD").stdout.strip()
-    _real_git(repository, "checkout", "-q", "-b", "codex/issue-258-brief")
+        real_git(repository, "add", "-f", board.CONFIG_PATH.as_posix())
+    real_git(repository, "commit", "-q", "-m", "initial")
+    base = real_git(repository, "rev-parse", "HEAD").stdout.strip()
+    real_git(repository, "checkout", "-q", "-b", "codex/issue-258-brief")
     (repository / "README.md").write_text("hello\nbrief\n")
-    _real_git(repository, "add", "README.md")
-    _real_git(repository, "commit", "-q", "-m", "lane work")
-    tip = _real_git(repository, "rev-parse", "HEAD").stdout.strip()
+    real_git(repository, "add", "README.md")
+    real_git(repository, "commit", "-q", "-m", "lane work")
+    tip = real_git(repository, "rev-parse", "HEAD").stdout.strip()
     return repository, base, tip
 
 
@@ -21505,8 +21505,8 @@ def test_cli_brief_json_names_touched_paths_the_claim_scope_does_not_cover(
 ) -> None:
     repository, base, _tip = _scratch_lane_repository(monkeypatch, tmp_path)
     (repository / "board.py").write_text("print()\n")
-    _real_git(repository, "add", "board.py")
-    _real_git(repository, "commit", "-q", "-m", "work outside the claim")
+    real_git(repository, "add", "board.py")
+    real_git(repository, "commit", "-q", "-m", "work outside the claim")
     client = FakeForge()
     client.issue_references[258] = forge.ItemReference(forge.ItemState.OPEN, "Brief", "Body.")
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
@@ -21528,13 +21528,13 @@ _NO_TRUNK_SENTENCE = (
 def _land_on_trunk_and_pull_into_lane(repository: Path, path: str) -> None:
     """Another lane lands `path` on `origin/main` while the local `main`
     stays at the base; the lane then merges `origin/main` in."""
-    _real_git(repository, "checkout", "-q", "--detach", "main")
+    real_git(repository, "checkout", "-q", "--detach", "main")
     (repository / path).write_text("landed elsewhere\n")
-    _real_git(repository, "add", path)
-    _real_git(repository, "commit", "-q", "-m", "another lane lands")
-    _real_git(repository, "update-ref", "refs/remotes/origin/main", "HEAD")
-    _real_git(repository, "checkout", "-q", "codex/issue-258-brief")
-    _real_git(repository, "merge", "-q", "--no-edit", "origin/main")
+    real_git(repository, "add", path)
+    real_git(repository, "commit", "-q", "-m", "another lane lands")
+    real_git(repository, "update-ref", "refs/remotes/origin/main", "HEAD")
+    real_git(repository, "checkout", "-q", "codex/issue-258-brief")
+    real_git(repository, "merge", "-q", "--no-edit", "origin/main")
 
 
 def _text_touched(output: str) -> list[str]:
@@ -21575,7 +21575,7 @@ def test_cli_brief_touched_lists_only_the_lane_own_change_after_a_trunk_pull(
 
 
 def _rename_the_local_main(_monkeypatch: pytest.MonkeyPatch, repository: Path) -> None:
-    _real_git(repository, "branch", "-m", "main", "trunk")
+    real_git(repository, "branch", "-m", "main", "trunk")
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -21638,10 +21638,10 @@ def _write_repository_configs(
     `brief.toml` on disk outside git's index, for the genuine untracked-file
     refusal."""
     write_repository_config(toplevel)
-    _real_git(toplevel, "add", board.CONFIG_PATH.as_posix())
+    real_git(toplevel, "add", board.CONFIG_PATH.as_posix())
     write_repository_config(toplevel, brief_content, path=board.BRIEF_CONFIG_PATH)
     if brief_tracked:
-        _real_git(toplevel, "add", board.BRIEF_CONFIG_PATH.as_posix())
+        real_git(toplevel, "add", board.BRIEF_CONFIG_PATH.as_posix())
 
 
 def _brief_step_scenario(
@@ -23006,13 +23006,13 @@ def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[
     init_bare_repository(bare_remote)
     repository = tmp_path / "repo"
     repository.mkdir()
-    _real_git(repository, "init", "-q", "-b", "main")
-    _real_git(repository, "config", "user.email", "test@example.com")
-    _real_git(repository, "config", "user.name", "Test")
+    real_git(repository, "init", "-q", "-b", "main")
+    real_git(repository, "config", "user.email", "test@example.com")
+    real_git(repository, "config", "user.name", "Test")
     (repository / "README.md").write_text("hello\n")
-    _real_git(repository, "add", "README.md")
-    _real_git(repository, "commit", "-q", "-m", "initial")
-    _real_git(repository, "remote", "add", "origin", str(bare_remote))
+    real_git(repository, "add", "README.md")
+    real_git(repository, "commit", "-q", "-m", "initial")
+    real_git(repository, "remote", "add", "origin", str(bare_remote))
     redirect_toplevel(monkeypatch, repository)
     return repository, bare_remote
 
@@ -23066,9 +23066,9 @@ def _force_advance_state_ref(repository: Path, bare_remote: Path, tip: str) -> s
     """Simulate someone else's push landing on `STATE_REF` between reset's
     own read of `tip` and its lease-guarded delete -- the exact race
     `--force-with-lease` exists to catch."""
-    tree = _real_git(repository, "rev-parse", f"{tip}^{{tree}}").stdout.strip()
-    new_commit = _real_git(repository, "commit-tree", tree, "-p", tip, "-m", "moved").stdout.strip()
-    _real_git(repository, "push", "--force", str(bare_remote), f"{new_commit}:{store.STATE_REF}")
+    tree = real_git(repository, "rev-parse", f"{tip}^{{tree}}").stdout.strip()
+    new_commit = real_git(repository, "commit-tree", tree, "-p", tip, "-m", "moved").stdout.strip()
+    real_git(repository, "push", "--force", str(bare_remote), f"{new_commit}:{store.STATE_REF}")
     return new_commit
 
 
@@ -23110,7 +23110,7 @@ def test_cli_reset_dry_run_prints_five_would_lines_and_changes_nothing(
     ]
     assert not bundle_path.exists()
     assert (
-        _real_git(
+        real_git(
             repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF
         ).stdout.split("\t")[0]
         == tip
@@ -23158,10 +23158,10 @@ def test_cli_reset_confirm_exports_a_verifiable_bundle_and_bootstraps_a_fresh_re
     assert lines[4].startswith("bootstrapped a fresh empty state at ")
     fresh_tip = lines[4].removeprefix("bootstrapped a fresh empty state at ")
     assert fresh_tip != tip
-    _real_git(repository, "bundle", "verify", str(bundle_path))
-    heads = _real_git(repository, "bundle", "list-heads", str(bundle_path)).stdout
+    real_git(repository, "bundle", "verify", str(bundle_path))
+    heads = real_git(repository, "bundle", "list-heads", str(bundle_path)).stdout
     assert heads.strip() == f"{tip} {store.EXPORT_BUNDLE_REF}"
-    probe = _real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
+    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
     assert probe.stdout.split("\t")[0] == fresh_tip
     assert not store.local_state_ref_exists(repository)
 
@@ -23245,7 +23245,7 @@ def test_cli_reset_refuses_naming_every_live_claim_and_touches_nothing(
     assert _lineage_observation(repository) == lineage_before
 
     # Reset needs no attached branch, so neither may the advice it prints.
-    _real_git(repository, "checkout", "-q", "--detach")
+    real_git(repository, "checkout", "-q", "--detach")
     printed_releases = [
         claim.split(", release: ", 1)[1]
         for claim in captured.err.rstrip("\n").split("gone: ", 1)[1].split("; ")
@@ -23270,18 +23270,18 @@ def _push_schema_one_state(tmp_path: Path, bare_remote: Path) -> str:
     repository so the work repository never holds its objects locally."""
     legacy = tmp_path / "legacy"
     legacy.mkdir()
-    _real_git(legacy, "init", "-q", "-b", "main")
-    _real_git(legacy, "config", "user.email", "test@example.com")
-    _real_git(legacy, "config", "user.name", "Test")
+    real_git(legacy, "init", "-q", "-b", "main")
+    real_git(legacy, "config", "user.email", "test@example.com")
+    real_git(legacy, "config", "user.name", "Test")
     (legacy / "schema.toml").write_text("version = 1\n")
-    _real_git(legacy, "add", "schema.toml")
-    _real_git(legacy, "commit", "-q", "-m", "schema 1 ledger")
-    _real_git(legacy, "push", "-q", str(bare_remote), f"HEAD:{store.STATE_REF}")
-    return _real_git(legacy, "rev-parse", "HEAD").stdout.strip()
+    real_git(legacy, "add", "schema.toml")
+    real_git(legacy, "commit", "-q", "-m", "schema 1 ledger")
+    real_git(legacy, "push", "-q", str(bare_remote), f"HEAD:{store.STATE_REF}")
+    return real_git(legacy, "rev-parse", "HEAD").stdout.strip()
 
 
 def _remote_state_tip(repository: Path, bare_remote: Path) -> str:
-    return _real_git(repository, "ls-remote", str(bare_remote), store.STATE_REF).stdout.split("\t")[
+    return real_git(repository, "ls-remote", str(bare_remote), store.STATE_REF).stdout.split("\t")[
         0
     ]
 
@@ -23359,7 +23359,7 @@ def test_cli_reset_force_unreadable_exports_deletes_and_bootstraps_a_fresh_state
         "cleared lineage stamps and fetch anchors in 1 worktree",
     ]
     fresh_tip = lines[4].removeprefix("bootstrapped a fresh empty state at ")
-    heads = _real_git(repository, "bundle", "list-heads", str(bundle_path)).stdout
+    heads = real_git(repository, "bundle", "list-heads", str(bundle_path)).stdout
     assert heads.strip() == f"{tip} {store.EXPORT_BUNDLE_REF}"
     fresh_state = store.fetch_state(worktree=repository, remote=str(bare_remote))
     assert (fresh_state.tip, fresh_state.claims) == (fresh_tip, {})
@@ -23406,7 +23406,7 @@ def test_cli_reset_confirm_deletes_a_local_ref_a_foreign_tool_left_behind(
     _use_real_store(monkeypatch)
     repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
     tip = store.bootstrap(worktree=repository, remote=str(bare_remote))
-    _real_git(repository, "update-ref", store.STATE_REF, tip)
+    real_git(repository, "update-ref", store.STATE_REF, tip)
     export_dir = tmp_path / "export"
     export_dir.mkdir()
     monkeypatch.chdir(repository)
@@ -23417,7 +23417,7 @@ def test_cli_reset_confirm_deletes_a_local_ref_a_foreign_tool_left_behind(
     lines = capsys.readouterr().out.splitlines()
     assert lines[2] == f"deleted local {store.STATE_REF}"
     assert not store.local_state_ref_exists(repository)
-    probe = _real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
+    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
     assert probe.stdout.split("\t")[0] != tip
 
 
@@ -23442,7 +23442,7 @@ def test_cli_reset_export_failure_leaves_the_ref_untouched(
 
     assert status == 2
     assert "cannot export" in capsys.readouterr().err
-    probe = _real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
+    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
     assert probe.stdout.split("\t")[0] == tip
     assert not store.local_state_ref_exists(repository)
     assert _lineage_observation(repository) == lineage_before
@@ -23486,12 +23486,12 @@ def test_cli_reset_a_moved_remote_tip_leaves_the_bundle_intact_and_names_the_rep
     assert "re-run `aco reset --confirm`" in err
     assert "--force-with-lease" not in err
     bundle_path = next(export_dir.iterdir())
-    _real_git(repository, "bundle", "verify", str(bundle_path))
+    real_git(repository, "bundle", "verify", str(bundle_path))
     # `export_state_bundle` never touches the shared `STATE_REF` at all
     # (19.09.2026 REVISE findings 1+2), so the remote-deletion failure
     # leaves nothing local to have been left behind either.
     assert not store.local_state_ref_exists(repository)
-    probe = _real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
+    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
     assert probe.stdout.split("\t")[0] != tip
 
 
@@ -23539,7 +23539,7 @@ def test_cli_reset_restore_from_the_bundle_into_a_fresh_repository_recovers_stat
     # The bundle carries `EXPORT_BUNDLE_REF`'s name, not `STATE_REF`'s
     # (19.09.2026 REVISE findings 1+2) -- this is the exact command
     # `_reset_restore_command` prints, proven end to end here.
-    _real_git(
+    real_git(
         restored_remote,
         "fetch",
         "-q",
@@ -23548,8 +23548,8 @@ def test_cli_reset_restore_from_the_bundle_into_a_fresh_repository_recovers_stat
     )
     fresh_repository = tmp_path / "fresh"
     fresh_repository.mkdir()
-    _real_git(fresh_repository, "init", "-q", "-b", "main")
-    _real_git(fresh_repository, "remote", "add", "origin", str(restored_remote))
+    real_git(fresh_repository, "init", "-q", "-b", "main")
+    real_git(fresh_repository, "remote", "add", "origin", str(restored_remote))
     monkeypatch.chdir(fresh_repository)
 
     status = issue_claim.main(["status"])
@@ -23575,7 +23575,7 @@ def test_cli_reset_recovers_from_a_deleted_ref_this_worktree_had_already_observe
     store.bootstrap(worktree=repository, remote=str(bare_remote))
     store.fetch_state(worktree=repository, remote=str(bare_remote))
     assert store._read_lineage_stamp(repository) is not None
-    _real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
+    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
     with pytest.raises(protocol.StateLineageError):
         store.fetch_state(worktree=repository, remote=str(bare_remote))
     export_dir = tmp_path / "export"
@@ -23673,7 +23673,7 @@ def _state_ref_release_merged_command(
     repo, _remote, _oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
     landing_trailer = f"Work-Item: {items.format_item_id(314)}"
-    _real_git(repo, "commit", "-q", "--allow-empty", "-m", "Land", "-m", landing_trailer)
+    real_git(repo, "commit", "-q", "--allow-empty", "-m", "Land", "-m", landing_trailer)
     _push_repository_trunk(repo, "origin")
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     return _read_once(["release", "314", "--merged", "--keep-worktree"], toplevel=repo)
@@ -23728,7 +23728,7 @@ def _claim_untracked_scope_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     gate to the run's own held toplevel, never to a second git read."""
     repo, _remote, _oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     worktree = tmp_path / "lane"
-    _real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
+    real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return _read_once(["claim", "314", "--scope", "src/x.py"], toplevel=worktree)

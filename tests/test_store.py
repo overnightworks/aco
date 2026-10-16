@@ -23,9 +23,9 @@ from typing import NamedTuple
 
 import pytest
 from cli_fixtures import (
-    _real_git,
     fresh_observation,
     init_bare_repository,
+    real_git,
     redirect_toplevel,
     set_git_identity,
     stub_board_config_tracked,
@@ -340,9 +340,9 @@ def test_state_ref_is_never_checked_out(bare_remote: Path, worktree: Path) -> No
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
     assert not (worktree / "schema.toml").exists()
-    status = _real_git(worktree, "status", "--porcelain")
+    status = real_git(worktree, "status", "--porcelain")
     assert status.stdout == ""
-    local_refs = _real_git(worktree, "for-each-ref", store.STATE_REF)
+    local_refs = real_git(worktree, "for-each-ref", store.STATE_REF)
     assert local_refs.stdout == ""
 
 
@@ -360,16 +360,16 @@ def test_fetch_state_anchors_the_tip_without_creating_the_shared_state_ref(
     created = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     reader = tmp_path / "reader"
     reader.mkdir()
-    _real_git(reader, "init", "-b", "main")
+    real_git(reader, "init", "-b", "main")
     fetch_head = (
-        Path(_real_git(reader, "rev-parse", "--absolute-git-dir").stdout.strip()) / "FETCH_HEAD"
+        Path(real_git(reader, "rev-parse", "--absolute-git-dir").stdout.strip()) / "FETCH_HEAD"
     )
 
     state = store.fetch_state(worktree=reader, remote=str(bare_remote))
 
     assert state.tip == created
-    assert _real_git(reader, "for-each-ref", store.STATE_REF).stdout == ""
-    anchor = _real_git(reader, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip()
+    assert real_git(reader, "for-each-ref", store.STATE_REF).stdout == ""
+    anchor = real_git(reader, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip()
     assert anchor == created
     assert not fetch_head.exists()
 
@@ -386,19 +386,19 @@ def test_peek_state_reads_the_current_tip_without_touching_the_anchor_or_lineage
     (CAS-49)."""
     first_tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    anchor_before = _real_git(worktree, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip()
+    anchor_before = real_git(worktree, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip()
     stamp_before = store._read_lineage_stamp(worktree)
     assert (anchor_before, stamp_before) == (first_tip, first_tip)
-    tree = _real_git(worktree, "rev-parse", f"{first_tip}^{{tree}}").stdout.strip()
-    second_tip = _real_git(
+    tree = real_git(worktree, "rev-parse", f"{first_tip}^{{tree}}").stdout.strip()
+    second_tip = real_git(
         worktree, "commit-tree", tree, "-p", first_tip, "-m", "a later transition"
     ).stdout.strip()
-    _real_git(worktree, "push", str(bare_remote), f"{second_tip}:{store.STATE_REF}")
+    real_git(worktree, "push", str(bare_remote), f"{second_tip}:{store.STATE_REF}")
 
     state = store.peek_state(worktree=worktree, remote=str(bare_remote))
 
     assert state.tip == second_tip
-    assert _real_git(worktree, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip() == anchor_before
+    assert real_git(worktree, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip() == anchor_before
     assert store._read_lineage_stamp(worktree) == stamp_before
 
 
@@ -420,10 +420,10 @@ def test_peek_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     created = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     reader = tmp_path / "reader"
     reader.mkdir()
-    _real_git(reader, "init", "-b", "main")
-    _real_git(reader, "commit", "--allow-empty", "-m", "unrelated branch tip")
-    foreign_tip = _real_git(reader, "rev-parse", "HEAD").stdout.strip()
-    _real_git(reader, "push", str(bare_remote), f"{foreign_tip}:refs/heads/foreign")
+    real_git(reader, "init", "-b", "main")
+    real_git(reader, "commit", "--allow-empty", "-m", "unrelated branch tip")
+    foreign_tip = real_git(reader, "rev-parse", "HEAD").stdout.strip()
+    real_git(reader, "push", str(bare_remote), f"{foreign_tip}:refs/heads/foreign")
     real_run_captured = process.run_captured
 
     def race_a_foreign_fetch_right_after_the_stores_own(
@@ -431,7 +431,7 @@ def test_peek_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     ) -> process.CapturedResult:
         result = real_run_captured(command)
         if command[3] == "fetch" and str(bare_remote) in command:
-            _real_git(reader, "fetch", str(bare_remote), "refs/heads/foreign")
+            real_git(reader, "fetch", str(bare_remote), "refs/heads/foreign")
         return result
 
     with pytest.MonkeyPatch.context() as monkeypatch:
@@ -494,15 +494,15 @@ def test_peeking_a_remote_without_a_state_ref_reads_the_empty_state_and_writes_n
     """A remote that never carried `STATE_REF` reads as the empty ledger for
     both write-free peeks, and the read leaves no ref, lineage stamp, or
     `FETCH_HEAD` behind in the worktree."""
-    refs_before = _real_git(worktree, "for-each-ref").stdout
+    refs_before = real_git(worktree, "for-each-ref").stdout
     fetch_head = (
-        Path(_real_git(worktree, "rev-parse", "--absolute-git-dir").stdout.strip()) / "FETCH_HEAD"
+        Path(real_git(worktree, "rev-parse", "--absolute-git-dir").stdout.strip()) / "FETCH_HEAD"
     )
 
     observed = peek(worktree=worktree, remote=str(bare_remote))
 
     assert observed == protocol.EMPTY_STATE
-    assert _real_git(worktree, "for-each-ref").stdout == refs_before
+    assert real_git(worktree, "for-each-ref").stdout == refs_before
     assert store._read_lineage_stamp(worktree) is None
     assert not fetch_head.exists()
 
@@ -523,10 +523,10 @@ def test_fetch_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     created = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     reader = tmp_path / "reader"
     reader.mkdir()
-    _real_git(reader, "init", "-b", "main")
-    _real_git(reader, "commit", "--allow-empty", "-m", "unrelated branch tip")
-    foreign_tip = _real_git(reader, "rev-parse", "HEAD").stdout.strip()
-    _real_git(reader, "push", str(bare_remote), f"{foreign_tip}:refs/heads/foreign")
+    real_git(reader, "init", "-b", "main")
+    real_git(reader, "commit", "--allow-empty", "-m", "unrelated branch tip")
+    foreign_tip = real_git(reader, "rev-parse", "HEAD").stdout.strip()
+    real_git(reader, "push", str(bare_remote), f"{foreign_tip}:refs/heads/foreign")
     real_run_captured = process.run_captured
 
     def race_a_foreign_fetch_right_after_the_stores_own(
@@ -534,7 +534,7 @@ def test_fetch_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     ) -> process.CapturedResult:
         result = real_run_captured(command)
         if command[3] == "fetch" and str(bare_remote) in command:
-            _real_git(reader, "fetch", str(bare_remote), "refs/heads/foreign")
+            real_git(reader, "fetch", str(bare_remote), "refs/heads/foreign")
         return result
 
     with pytest.MonkeyPatch.context() as monkeypatch:
@@ -884,7 +884,7 @@ def non_file_items_store(
         case "tree":
             target = raw_tree(worktree, [])
         case "commit":
-            target = _real_git(worktree, "rev-parse", "HEAD").stdout.strip()
+            target = real_git(worktree, "rev-parse", "HEAD").stdout.strip()
         case _:
             target = blob(worktree, b"aco-000002.md")
     items_tree = raw_tree(worktree, [(mode, kind, target, name)])
@@ -986,7 +986,7 @@ def test_first_fetch_in_a_worktree_accepts_any_tip_without_a_prior_stamp(
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     fresh = tmp_path / "fresh"
     fresh.mkdir()
-    _real_git(fresh, "init", "-b", "main")
+    real_git(fresh, "init", "-b", "main")
 
     state = store.fetch_state(worktree=fresh, remote=str(bare_remote))
 
@@ -1011,16 +1011,16 @@ def test_a_state_fetch_starts_no_git_maintenance_on_the_shared_object_store(
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     reader = tmp_path / "reader"
     reader.mkdir()
-    _real_git(reader, "init", "-b", "main")
+    real_git(reader, "init", "-b", "main")
     (reader / "README").write_text("loose object\n")
-    _real_git(reader, "add", "README")
-    _real_git(reader, "commit", "-m", "loose objects")
+    real_git(reader, "add", "README")
+    real_git(reader, "commit", "-m", "loose objects")
     for key, value in [
         ("maintenance.autoDetach", "false"),
         ("maintenance.loose-objects.enabled", "true"),
         ("maintenance.loose-objects.auto", "-1"),
     ]:
-        _real_git(reader, "config", key, value)
+        real_git(reader, "config", key, value)
     objects = reader / ".git" / "objects"
     loose_objects_before = set(objects.glob("??/*"))
 
@@ -1035,14 +1035,14 @@ def test_linked_worktrees_fetch_concurrently_and_write_distinct_lineage_stamps(
 ) -> None:
     main_repo = tmp_path / "main"
     main_repo.mkdir()
-    _real_git(main_repo, "init", "-b", "main")
+    real_git(main_repo, "init", "-b", "main")
     (main_repo / "README").write_text("placeholder\n")
-    _real_git(main_repo, "add", "README")
-    _real_git(main_repo, "commit", "-m", "initial")
+    real_git(main_repo, "add", "README")
+    real_git(main_repo, "commit", "-m", "initial")
     linked_a = tmp_path / "linked-a"
     linked_b = tmp_path / "linked-b"
-    _real_git(main_repo, "worktree", "add", "-b", "lane-a", str(linked_a))
-    _real_git(main_repo, "worktree", "add", "-b", "lane-b", str(linked_b))
+    real_git(main_repo, "worktree", "add", "-b", "lane-a", str(linked_a))
+    real_git(main_repo, "worktree", "add", "-b", "lane-b", str(linked_b))
     tip = store.bootstrap(worktree=main_repo, remote=str(bare_remote))
 
     barrier = threading.Barrier(2)
@@ -1340,7 +1340,7 @@ def test_cli_bootstrap_creates_the_empty_state_ref_without_a_ledger(
         "remote_url",
         lambda remote: "git@github.com:example/agent-coordination.git",
     )
-    _real_git(worktree, "remote", "add", "origin", str(bare_remote))
+    real_git(worktree, "remote", "add", "origin", str(bare_remote))
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
 
@@ -1363,7 +1363,7 @@ def test_cli_bootstrap_is_idempotent_on_a_second_run(
         "remote_url",
         lambda remote: "git@github.com:example/agent-coordination.git",
     )
-    _real_git(worktree, "remote", "add", "origin", str(bare_remote))
+    real_git(worktree, "remote", "add", "origin", str(bare_remote))
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     issue_claim.main(["--repo", "example/agent-coordination", "bootstrap"])
@@ -1383,15 +1383,15 @@ def test_cli_bootstrap_with_a_path_for_repo_writes_no_state_ref(
 ) -> None:
     """Issue #465 proof 2: a path handed to `--repo` refuses instead of
     bootstrapping the checkout's own `origin` in its place."""
-    _real_git(worktree, "remote", "add", "origin", str(bare_remote))
+    real_git(worktree, "remote", "add", "origin", str(bare_remote))
     monkeypatch.chdir(worktree)
 
     status = issue_claim.main(["--repo", str(worktree), "bootstrap"])
 
     assert status == 2
     assert capsys.readouterr().out == ""
-    assert _real_git(bare_remote, "for-each-ref", "refs/aco").stdout == ""
-    assert _real_git(worktree, "for-each-ref", "refs/aco").stdout == ""
+    assert real_git(bare_remote, "for-each-ref", "refs/aco").stdout == ""
+    assert real_git(worktree, "for-each-ref", "refs/aco").stdout == ""
 
 
 def test_list_tree_fails_loud_when_the_tree_is_unresolvable(worktree: Path) -> None:
@@ -1659,7 +1659,7 @@ def _raw_commit_message(remote: Path, commit: str) -> str:
     -p` read past its header block, never `git log --format=%B`, which
     prints one extra trailing blank line of its own that a byte-for-byte
     pin would otherwise mistake for part of the commit."""
-    _headers, message = _real_git(remote, "cat-file", "-p", commit).stdout.split("\n\n", 1)
+    _headers, message = real_git(remote, "cat-file", "-p", commit).stdout.split("\n\n", 1)
     return message
 
 
@@ -1758,7 +1758,7 @@ def test_claim_ages_survives_a_gc_prune_of_the_just_fetched_history(
     claim = _committed_claim(bare_remote, worktree, issue=1)
     state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
     assert state.tip is not None
-    _real_git(worktree, "gc", "--prune=now")
+    real_git(worktree, "gc", "--prune=now")
 
     ages = store.claim_ages(worktree=worktree, tip=state.tip, claims=(claim,))
 
@@ -2837,7 +2837,7 @@ def test_commit_transition_reads_the_ref_afresh_once_after_a_rejected_push(
 
     assert (git_call_spy["ls-remote"], git_call_spy["fetch"]) == (1, 1)
     assert set(result.claims) == expected_claims
-    commits = _real_git(bare_remote, "rev-list", "--count", store.STATE_REF).stdout
+    commits = real_git(bare_remote, "rev-list", "--count", store.STATE_REF).stdout
     assert int(commits) == 1 + len(expected_claims)
 
 
@@ -2948,17 +2948,17 @@ def test_commit_transition_ten_thread_contention_lands_every_distinct_key(
     against a local bare repo, bound at 30 seconds."""
     main_repo = tmp_path / "main"
     main_repo.mkdir()
-    _real_git(main_repo, "init", "-b", "main")
+    real_git(main_repo, "init", "-b", "main")
     (main_repo / "README").write_text("placeholder\n")
-    _real_git(main_repo, "add", "README")
-    _real_git(main_repo, "commit", "-m", "initial")
+    real_git(main_repo, "add", "README")
+    real_git(main_repo, "commit", "-m", "initial")
     store.bootstrap(worktree=main_repo, remote=str(bare_remote))
 
     issue_numbers = range(1, 11)
     worktrees: dict[int, Path] = {}
     for issue in issue_numbers:
         linked = tmp_path / f"linked-{issue}"
-        _real_git(main_repo, "worktree", "add", "-b", f"lane-{issue}", str(linked))
+        real_git(main_repo, "worktree", "add", "-b", f"lane-{issue}", str(linked))
         worktrees[issue] = linked
 
     barrier = threading.Barrier(10)
@@ -3177,7 +3177,7 @@ def _linked_worktrees(main_repo: Path, tmp_path: Path, names: tuple[str, ...]) -
     worktrees: dict[str, Path] = {}
     for name in names:
         linked = tmp_path / f"linked-{name}"
-        _real_git(main_repo, "worktree", "add", "-b", f"lane-{name}", str(linked))
+        real_git(main_repo, "worktree", "add", "-b", f"lane-{name}", str(linked))
         worktrees[name] = linked
     return worktrees
 
@@ -3192,10 +3192,10 @@ def test_commit_transition_two_threads_creating_different_item_ids_both_land(
     `test_commit_transition_two_writers_different_item_ids_both_land`)."""
     main_repo = tmp_path / "main"
     main_repo.mkdir()
-    _real_git(main_repo, "init", "-b", "main")
+    real_git(main_repo, "init", "-b", "main")
     (main_repo / "README").write_text("placeholder\n")
-    _real_git(main_repo, "add", "README")
-    _real_git(main_repo, "commit", "-m", "initial")
+    real_git(main_repo, "add", "README")
+    real_git(main_repo, "commit", "-m", "initial")
     store.bootstrap(worktree=main_repo, remote=str(bare_remote))
 
     item_ids = ("aco-000001", "aco-000002")
@@ -3241,10 +3241,10 @@ def test_commit_transition_two_threads_racing_the_same_item_id_lands_exactly_one
     sequentially, never a silent overwrite of the winner's content."""
     main_repo = tmp_path / "main"
     main_repo.mkdir()
-    _real_git(main_repo, "init", "-b", "main")
+    real_git(main_repo, "init", "-b", "main")
     (main_repo / "README").write_text("placeholder\n")
-    _real_git(main_repo, "add", "README")
-    _real_git(main_repo, "commit", "-m", "initial")
+    real_git(main_repo, "add", "README")
+    real_git(main_repo, "commit", "-m", "initial")
     store.bootstrap(worktree=main_repo, remote=str(bare_remote))
 
     racer_contents = {"racer-a": b"from a\n", "racer-b": b"from b\n"}
@@ -3375,7 +3375,7 @@ def test_fetch_state_git_call_count_is_independent_of_claim_count(
     _push_seeded_state(bare_remote, worktree, claim_count)
     reader = tmp_path / "reader"
     reader.mkdir()
-    _real_git(reader, "init", "-b", "main")
+    real_git(reader, "init", "-b", "main")
     git_call_spy.clear()
 
     state = store.fetch_state(worktree=reader, remote=str(bare_remote))
@@ -3409,7 +3409,7 @@ def test_fetch_state_populates_items_from_the_one_existing_ls_tree_call(
     )
     reader = tmp_path / "reader"
     reader.mkdir()
-    _real_git(reader, "init", "-b", "main")
+    real_git(reader, "init", "-b", "main")
     git_call_spy.clear()
 
     state = store.fetch_state(worktree=reader, remote=str(bare_remote))
@@ -3441,7 +3441,7 @@ def test_status_git_call_count_is_independent_of_claim_count(
     _push_seeded_state(bare_remote, worktree, claim_count)
     reader = tmp_path / "reader"
     reader.mkdir()
-    _real_git(reader, "init", "-b", "main")
+    real_git(reader, "init", "-b", "main")
     git_call_spy.clear()
 
     state = store.fetch_state(worktree=reader, remote=str(bare_remote))
@@ -4308,7 +4308,7 @@ def test_fetch_state_refuses_a_deleted_ref_this_worktree_has_observed(
     bare_remote: Path, worktree: Path
 ) -> None:
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
+    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
 
     with pytest.raises(protocol.StateLineageError, match="now absent"):
         store.fetch_state(worktree=worktree, remote=str(bare_remote))
@@ -4318,7 +4318,7 @@ def test_bootstrap_refuses_a_deleted_ref_this_worktree_has_observed(
     bare_remote: Path, worktree: Path
 ) -> None:
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
+    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
 
     with pytest.raises(protocol.StateLineageError, match="now absent"):
         store.bootstrap(worktree=worktree, remote=str(bare_remote))
@@ -4391,20 +4391,20 @@ def test_export_state_bundle_writes_a_verifiable_bundle_and_never_touches_the_sh
             parent=tip,
             files={store.SCHEMA_TOML_FILENAME: protocol.serialize_empty_schema_toml().encode()},
         )
-        _real_git(worktree, "update-ref", store.STATE_REF, foreign_tip)
+        real_git(worktree, "update-ref", store.STATE_REF, foreign_tip)
     destination = tmp_path / "export" / "state.bundle"
     destination.parent.mkdir()
 
     returned = store.export_state_bundle(worktree=worktree, tip=tip, destination=destination)
 
     assert returned == destination
-    _real_git(worktree, "bundle", "verify", str(destination))
-    heads = _real_git(worktree, "bundle", "list-heads", str(destination)).stdout
+    real_git(worktree, "bundle", "verify", str(destination))
+    heads = real_git(worktree, "bundle", "list-heads", str(destination)).stdout
     assert heads.strip() == f"{tip} {store.EXPORT_BUNDLE_REF}"
     if foreign_tip is None:
         assert not store.local_state_ref_exists(worktree)
     else:
-        assert _real_git(worktree, "rev-parse", store.STATE_REF).stdout.strip() == foreign_tip
+        assert real_git(worktree, "rev-parse", store.STATE_REF).stdout.strip() == foreign_tip
     assert (
         store._run_git(
             worktree, ["show-ref", "--verify", "--quiet", store.EXPORT_BUNDLE_REF]
@@ -4875,7 +4875,7 @@ def test_export_state_bundle_names_every_uncleaned_leftover_and_preserves_the_or
     else:
         assert not list(destination.parent.glob(f".{destination.name}.*"))
     if case.verify_bundle:
-        _real_git(worktree, "bundle", "verify", str(destination))
+        real_git(worktree, "bundle", "verify", str(destination))
 
     case.postcheck(worktree)
 
@@ -4903,7 +4903,7 @@ def test_delete_state_ref_reports_whether_a_local_ref_was_deleted(
     remote itself is unchanged and unchecked in that case)."""
     tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     if local_ref_present:
-        _real_git(worktree, "update-ref", store.STATE_REF, tip)
+        real_git(worktree, "update-ref", store.STATE_REF, tip)
     expected_remote_tip = protocol.ObjectId(tip) if pass_expected_remote_tip else None
 
     deleted_local = store.delete_state_ref(
@@ -4920,7 +4920,7 @@ def test_delete_state_ref_fails_loud_when_the_local_ref_cannot_be_deleted(
     bare_remote: Path, worktree: Path
 ) -> None:
     tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _real_git(worktree, "update-ref", store.STATE_REF, tip)
+    real_git(worktree, "update-ref", store.STATE_REF, tip)
     lock_path = store._git_dir(worktree) / "refs" / "aco" / "state.lock"
     lock_path.touch()
     try:
@@ -4937,7 +4937,7 @@ def test_delete_state_ref_refuses_a_stale_lease_and_leaves_everything_intact(
     bare_remote: Path, worktree: Path
 ) -> None:
     stale_tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _real_git(worktree, "update-ref", store.STATE_REF, stale_tip)
+    real_git(worktree, "update-ref", store.STATE_REF, stale_tip)
     # The remote moves on after `stale_tip` was read but before the lease-guarded
     # delete runs -- the exact race `--force-with-lease` exists to catch.
     _push_custom_tree(
@@ -4988,7 +4988,7 @@ def test_delete_state_ref_treats_a_lost_leased_push_as_success_when_the_ref_is_a
     the push's own response is lost. A re-probe finds the ref honestly
     gone, so `delete_state_ref` must not report failure for it."""
     tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
+    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
     _fake_failed_remote_delete(monkeypatch)
 
     deleted_local = store.delete_state_ref(
@@ -5133,7 +5133,7 @@ def test_clear_lineage_stamps_lets_a_bootstrap_after_a_ref_rewrite_succeed_in_ev
     linked = _linked_worktrees(worktree, tmp_path, ("lane",))["lane"]
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     store.fetch_state(worktree=linked, remote=str(bare_remote))
-    _real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
+    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
 
     store.clear_lineage_stamps(worktree=worktree)
     fresh_tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))

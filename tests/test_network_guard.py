@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from cli_fixtures import _real_git, _real_repository_with_bare_remote, sealed_git_environment
+from cli_fixtures import _real_repository_with_bare_remote, real_git, sealed_git_environment
 from network_guard import GIT_ALLOW_PROTOCOL_ENV, UNREACHABLE_GH_HOST
 
 _PROJECT_CONFIGURATION = Path(__file__).parent.parent / "pyproject.toml"
@@ -131,8 +131,8 @@ def _push_a_commit(
     """A first commit of the shared real-git repository pushed to
     `remote_url` of its bare remote, the push allowed to fail."""
     repository, bare_remote = _real_repository_with_bare_remote(tmp_path)
-    _real_git(repository, "commit", "-q", "--allow-empty", "-m", "first")
-    return _real_git(repository, "push", "-q", remote_url(bare_remote), "main", check=False)
+    real_git(repository, "commit", "-q", "--allow-empty", "-m", "first")
+    return real_git(repository, "push", "-q", remote_url(bare_remote), "main", check=False)
 
 
 @pytest.mark.parametrize(
@@ -204,10 +204,10 @@ def test_a_module_outside_tests_is_guarded_by_the_project_plugin_alone(
     operator_repository = tmp_path / "operator:temp"
     scratch = operator_repository / "scratch"
     scratch.mkdir(parents=True)
-    _real_git(operator_repository, "init", "-q")
-    _real_git(operator_repository, "config", "protocol.https.allow", "never")
+    real_git(operator_repository, "init", "-q")
+    real_git(operator_repository, "config", "protocol.https.allow", "never")
     # Its own repository ends discovery at the scratch directory, whatever encloses it.
-    _real_git(scratch, "init", "-q")
+    real_git(scratch, "init", "-q")
     monkeypatch.setenv("GIT_DIR", str(operator_repository / ".git"))
     monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
     monkeypatch.setenv("GIT_CONFIG_KEY_0", "protocol.https.allow")
