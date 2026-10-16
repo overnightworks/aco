@@ -1,8 +1,0 @@
-claim_id = "43f204c88459482ead2652a4801f5194"
-agent = "claude"
-role = "builder"
-base = "6e9818354a854f64cb07c0773579a1dba51420d3"
-branch = "claude/issue-66-report-module"
-scope = ["pyproject.toml", "src/agent_coordination/board.py", "src/agent_coordination/cli.py", "src/agent_coordination/report.py", "tests/test_cli.py"]
-opened_commit = "d453f41642f4fe5243425432fdada5309754fa90"
-whole_reason = "Eine Verschiebung von vier Namen aus cli.py in report.py samt Layers-Zeile und Aufrufern; halb verschoben bräche der Import."
