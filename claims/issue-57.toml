@@ -1,0 +1,8 @@
+claim_id = "353dbf651aba4ead8994525bfd0d51d4"
+agent = "claude"
+role = "builder"
+base = "389af6153f05e39383b5a57a47c8ecf77100a4f4"
+branch = "claude/issue-57-stdin-helpers-to-fixtures"
+scope = ["tests/cli_fixtures.py", "tests/test_cli.py", "tests/test_state_board.py", "tests/test_store.py"]
+opened_commit = "96886ac39bcfae3aee453d9be11d964996c869bc"
+whole_reason = "Eine Verschiebung von Test-Hilfen aus test_cli.py in cli_fixtures.py samt allen Importen; halb verschoben bliebe der Import aus test_cli."
