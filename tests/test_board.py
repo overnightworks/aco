@@ -847,7 +847,7 @@ def test_has_further_work(next_line: str | None, expected: bool) -> None:
     assert board.has_further_work(next_line) is expected
 
 
-def issues_created_at(*created_ats: str) -> tuple:
+def issues_created_at(*created_ats: str) -> tuple[board.Issue, ...]:
     return tuple(
         replace(board_issue(number, "Item", ""), created_at=created_at)
         for number, created_at in enumerate(created_ats, start=1)
@@ -886,7 +886,10 @@ def test_oldest_created_at_fails_loud_on_a_malformed_github_timestamp(raw_timest
 def test_oldest_created_at_is_the_earliest_filing_in_utc(
     created_ats: tuple[str, ...], expected: datetime | None
 ) -> None:
-    assert board.oldest_created_at(issues_created_at(*created_ats)) == expected
+    oldest = board.oldest_created_at(issues_created_at(*created_ats))
+
+    assert oldest == expected
+    assert oldest is None or oldest.utcoffset() == timedelta(0)
 
 
 def test_a_fresh_unfilled_block_is_an_incomplete_contract_with_no_defects() -> None:
