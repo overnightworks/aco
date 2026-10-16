@@ -57,7 +57,7 @@ def resume_command(
             if model is not None:
                 command.extend(("--model", model))
             return command
-        case Provider.GROK:
+        case _:
             command = ["grok", "--resume", session_id, "--cwd", str(directory)]
             if model is not None:
                 command.extend(("--model", model))

@@ -1142,6 +1142,28 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     assert "without the ref ever moving" in str(raised.value)
 
 
+def test_push_retry_exhausts_on_a_remote_that_never_gets_a_state_ref(
+    bare_remote: Path, worktree: Path
+) -> None:
+    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    pending = store.PendingCommit(
+        tree_oid=store._write_bootstrap_tree(worktree),
+        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
+        operation_id="never-applied",
+    )
+
+    with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes"):
+        store.push_tree(
+            worktree=worktree,
+            remote=str(bare_remote),
+            observed=observed,
+            pending=pending,
+            transport=_AlwaysRejectingTransport(),
+        )
+
+    assert _state_ref_oid(bare_remote) is None
+
+
 def test_push_retry_exhausts_and_names_a_race_when_the_ref_keeps_moving(
     bare_remote: Path, worktree: Path
 ) -> None:
@@ -2536,6 +2558,24 @@ def test_a_tree_write_that_would_drop_an_item_refuses(
 
     with pytest.raises(protocol.ClaimError, match="never removes an item"):
         store._write_incremental_state_tree(worktree, observed=observed, new_state=without_items)
+
+
+def test_a_tree_write_lists_every_newly_consumed_id(bare_remote: Path, worktree: Path) -> None:
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    consumed_ids = frozenset({protocol.ClaimId("a1"), protocol.ClaimId("a2")})
+
+    tree = store._write_incremental_state_tree(
+        worktree, observed=observed, new_state=replace(observed, consumed_ids=consumed_ids)
+    )
+
+    listed = subprocess.run(
+        ["git", "-C", str(worktree), "ls-tree", "--name-only", f"{tree}:{store.IDS_DIRECTORY}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    assert sorted(listed) == ["a1", "a2"]
 
 
 def test_commit_transition_a_local_two_racer_claim_on_different_keys_both_land(

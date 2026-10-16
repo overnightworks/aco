@@ -1730,6 +1730,28 @@ def test_next_action_closes_a_container_with_no_open_child_and_no_further_work()
     assert action.container_progress == board.ContainerProgress(3, 3, ())
 
 
+def test_zero_cost_closes_names_a_closable_container_that_also_landed_once() -> None:
+    container = board.Issue(
+        140,
+        "Container",
+        (),
+        complete_contract("keiner", done_when="All slices land."),
+        "2026-08-20T00:00:00Z",
+        "2026-08-20T00:00:00Z",
+        kind=ItemKind.CONTAINER,
+        children_closed=3,
+        children_total=3,
+    )
+    landing = board.PullRequest(
+        150, "Lands it", "Work-Item: #140\n\nCloses #140", "branch", "2026-08-20T00:00:00Z"
+    )
+    projected = projected_board(
+        (container,), (), (landing,), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+    )
+
+    assert board.zero_cost_closes(projected) == (140,)
+
+
 def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work() -> None:
     """An empty `Next` line alone must not close a container that still has
     an undispatched `[[slice]]` entry (#112 finding 1)."""

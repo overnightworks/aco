@@ -323,7 +323,34 @@ def test_hidden_login_runner_reports_a_recording_failure(monkeypatch) -> None:
     assert notifications == ["Workspace recovery could not record its attempt."]
 
 
-def test_login_status_reports_a_completed_attempt(capsys, monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("attempt_fields", "expected_attempt_report"),
+    [
+        pytest.param(
+            {
+                "completed_at": "2026-09-09T00:00:01+00:00",
+                "outcomes": [{"outcome": "started", "project": "alpha"}],
+                "state": "completed",
+            },
+            "attempt: 123e4567-e89b-42d3-a456-426614174000 2026-09-09T00:00:00+00:00 completed\n"
+            "alpha: started\n"
+            "completed: 2026-09-09T00:00:01+00:00\n",
+            id="completed",
+        ),
+        pytest.param(
+            {"outcomes": [], "state": "running"},
+            "attempt: 123e4567-e89b-42d3-a456-426614174000 2026-09-09T00:00:00+00:00 running\n",
+            id="still-running",
+        ),
+    ],
+)
+def test_login_status_reports_an_attempt(
+    capsys,
+    monkeypatch,
+    tmp_path: Path,
+    attempt_fields: dict[str, object],
+    expected_attempt_report: str,
+) -> None:
     configuration = tmp_path / "config"
     state = tmp_path / "state"
     monkeypatch.setenv("XDG_CONFIG_HOME", str(configuration))
@@ -337,11 +364,9 @@ def test_login_status_reports_a_completed_attempt(capsys, monkeypatch, tmp_path:
         json.dumps(
             {
                 "attempt_id": "123e4567-e89b-42d3-a456-426614174000",
-                "completed_at": "2026-09-09T00:00:01+00:00",
-                "outcomes": [{"outcome": "started", "project": "alpha"}],
                 "started_at": "2026-09-09T00:00:00+00:00",
-                "state": "completed",
                 "version": 1,
+                **attempt_fields,
             }
         )
     )
@@ -349,11 +374,7 @@ def test_login_status_reports_a_completed_attempt(capsys, monkeypatch, tmp_path:
     assert cli.main(["login", "status"]) == 0
 
     assert capsys.readouterr().out == (
-        "launcher: disabled\n"
-        "configuration: missing\n"
-        "attempt: 123e4567-e89b-42d3-a456-426614174000 2026-09-09T00:00:00+00:00 completed\n"
-        "alpha: started\n"
-        "completed: 2026-09-09T00:00:01+00:00\n"
+        "launcher: disabled\nconfiguration: missing\n" + expected_attempt_report
     )
 
 

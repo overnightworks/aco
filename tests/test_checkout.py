@@ -487,11 +487,13 @@ def test_resolve_path_checkout_is_independent_of_the_calling_process_cwd(
     assert resolved.branch == "codex/issue-1-widget"
 
 
+@pytest.mark.parametrize("exists", [True, False], ids=["existing", "not-created-yet"])
 def test_resolve_path_checkout_denies_a_directory_outside_every_repository(
-    tmp_path: Path,
+    tmp_path: Path, exists: bool
 ) -> None:
     outside = tmp_path / "not-a-repo"
-    outside.mkdir()
+    if exists:
+        outside.mkdir()
 
     assert checkout.resolve_path_checkout(outside) is None
 

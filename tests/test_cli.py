@@ -1176,7 +1176,7 @@ def _fake_lane_worktree_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 
 def _stub_issue_reference(
     monkeypatch: pytest.MonkeyPatch,
-    states: dict[int, tuple[forge.ItemState, str, str]],
+    states: dict[int, tuple[forge.ItemState, str | None, str]],
 ) -> None:
     """Overrides the autouse OPEN default for exactly the given issue numbers."""
 
@@ -4326,23 +4326,25 @@ def test_claim_does_not_require_out_of_order_for_the_top_ranked_item(
 
 
 @pytest.mark.parametrize(
-    ("state", "check", "expected_text"),
+    ("state", "title", "check", "expected_text"),
     [
-        (forge.ItemState.CLOSED, "closed-issue", "issue #72 is closed"),
-        (forge.ItemState.MISSING, "missing-issue", "issue #72 does not exist here"),
+        (forge.ItemState.CLOSED, "Some title", "closed-issue", "issue #72 is closed"),
+        (forge.ItemState.MISSING, "Some title", "missing-issue", "issue #72 does not exist here"),
+        (forge.ItemState.MISSING, None, "missing-issue", "issue #72 does not exist here"),
     ],
-    ids=["closed", "missing"],
+    ids=["closed", "missing", "missing-without-title"],
 )
 def test_claim_refuses_a_closed_or_missing_target(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     state: forge.ItemState,
+    title: str | None,
     check: str,
     expected_text: str,
 ) -> None:
     _configured_board_client(monkeypatch, tmp_path)
-    _stub_issue_reference(monkeypatch, {72: (state, "Some title", "")})
+    _stub_issue_reference(monkeypatch, {72: (state, title, "")})
     monkeypatch.setattr(
         issue_claim,
         "_request",
@@ -15357,7 +15359,8 @@ def _two_dependants_freed_by_the_landing() -> tuple[
     (issue #256) -- the fixture `release --merged`'s own `freed`/`next`
     tests share, so a lower- and a higher-scored freed pick differ only by
     which one unblocks something else, and a not-fully-freed item stays out
-    of `freed` even once its local blocker is gone."""
+    of `freed` even once its local blocker is gone, and a fifth item freed
+    by an earlier landing is not this landing's to report."""
     lower, lower_dependencies = blocked_issue(80, "Lower priority freed item", _landed_dependency())
     higher, higher_dependencies = blocked_issue(
         81, "Higher priority freed item", _landed_dependency()
@@ -15369,12 +15372,20 @@ def _two_dependants_freed_by_the_landing() -> tuple[
         _landed_dependency(),
         block_dependency(9, repository="other/repo"),
     )
-    issues = (lower, higher, waiting, still_foreign_blocked)
+    freed_earlier, freed_earlier_dependencies = blocked_issue(
+        84,
+        "Freed by an earlier landing",
+        block_dependency(
+            60, state=board.BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)
+        ),
+    )
+    issues = (lower, higher, waiting, still_foreign_blocked, freed_earlier)
     dependencies = {
         **lower_dependencies,
         **higher_dependencies,
         **waiting_dependencies,
         **still_foreign_blocked_dependencies,
+        **freed_earlier_dependencies,
     }
     return issues, dependencies
 
@@ -19182,13 +19193,20 @@ def test_land_from_a_separate_clone_releases_or_refuses_before_the_merge(
 
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
-    ("claimed_meanwhile", "worktree"),
+    ("claimed_meanwhile", "keep_worktree_flag", "worktree"),
     [
-        pytest.param(False, "removed", id="removes-the-lane"),
+        pytest.param(False, False, "removed", id="removes-the-lane"),
         pytest.param(
             True,
+            False,
             "kept -- claimed again while this release ran",
             id="a-claim-taken-meanwhile-keeps-the-lane",
+        ),
+        pytest.param(
+            False,
+            True,
+            "kept -- --keep-worktree was given",
+            id="the-keep-worktree-flag-keeps-the-lane",
         ),
     ],
 )
@@ -19197,6 +19215,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     claimed_meanwhile: bool,
+    keep_worktree_flag: bool,
     worktree: str,
 ) -> None:
     """Issue #605 lines 1, 3 and 4 (E-LANDCMD-18a, E-REL-24): once a landing
@@ -19242,7 +19261,9 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
 
         monkeypatch.setattr(client, "landing", landing_while_start_claims_again)
 
-    release_status = issue_claim.main(["--repo", REPOSITORY, *shlex.split(rerun)[1:]])
+    release_arguments = [*shlex.split(rerun)[1:], *(["--keep-worktree"] * keep_worktree_flag)]
+
+    release_status = issue_claim.main(["--repo", REPOSITORY, *release_arguments])
 
     release_output = capsys.readouterr()
     assert (release_status, release_output.err, release_output.out) == (
@@ -19250,8 +19271,9 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
         "",
         f"LANDED pull request #12 already; nothing left to release\nworktree: {worktree}\n",
     )
-    assert (tmp_path / "lane").exists() is claimed_meanwhile
-    assert checkout.branch_exists(LANDING_BRANCH) is claimed_meanwhile
+    lane_kept = claimed_meanwhile or keep_worktree_flag
+    assert (tmp_path / "lane").exists() is lane_kept
+    assert checkout.branch_exists(LANDING_BRANCH) is lane_kept
     claims = store.fetch_state(worktree=repo, remote=str(remote)).claims
     assert (len(client.merge_calls), bool(claims)) == (1, claimed_meanwhile)
     assert (
@@ -21342,7 +21364,8 @@ def test_cli_brief_reports_no_active_claim_with_empty_tip_and_touched_files(
         forge.ItemState.OPEN, "Brief", "No claim yet."
     )
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    _patch_store_write(monkeypatch)
+    other_items_claim = _store_claim_from_request(request(issue=259, claim_id="other-claim"))
+    _patch_store_write(monkeypatch, other_items_claim)
     monkeypatch.chdir(repository)
 
     status = issue_claim.main(["--repo", REPOSITORY, "brief", "258"])
