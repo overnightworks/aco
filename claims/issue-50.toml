@@ -1,8 +1,0 @@
-claim_id = "e3da9a5442e5461d905986f2e2e6e698"
-agent = "claude"
-role = "builder"
-base = "05950293f8991f4bed3e2942efa3751f8571b960"
-branch = "claude/issue-50-public-protocol-board-names"
-scope = ["src/agent_coordination/board.py", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/protocol.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_protocol.py"]
-opened_commit = "dfbf7d6712d7bae306fe217c306f3544a9974c23"
-whole_reason = "Eine mechanische Umbenennung über Owner-Module und ihre Aufrufer; halb umbenannt bricht der Import."
