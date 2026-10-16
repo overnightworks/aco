@@ -41,10 +41,10 @@ homes the per-module copies should move into)
     ``k`` names that collapse to one key counts ``k - 1`` siblings -- the literal-only copies
     one parametrized test replaces. No aco-specific token group is named yet, so this also
     reads 0 until one is.
-(g) ``spec_ids`` -- reported, never gated. aco has a ``specs/`` tree but no
-    ``spec_coverage.py`` owner yet and no test docstring cites a spec ID, so this stays
-    dormant at 0 (frozenset()), the same dormancy ``scripts/test_inventory.py``
-    documents for its own spec-ID section.
+(g) ``spec_ids`` -- the distinct spec IDs the ``test_*`` docstrings of the tree cite after a
+    ``Spec:`` marker, read with ``test_inventory.iter_spec_citations``. Compared as a SET: an ID
+    the merge-base cites and the tree does not BLOCKS like (c), even when another ID is gained.
+    The finding names the lost IDs and the files that cited them at the base.
 
 Target-relative rule (issue #319, base-selection concept agreed 2026-09-19)
 ----------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ out full history and a shallow local clone is deepened first (``git fetch --unsh
 
 Against that baseline:
 
-* (c) falling, or (d), (e) or (f) rising, BLOCKS (``FAIL``, exit 1) -- unless
+* (c) falling, (g) losing an ID, or (d), (e) or (f) rising, BLOCKS (``FAIL``, exit 1) -- unless
   ``scripts/test_budget_ratchet.txt`` gained a ``# budget: <why> [SPEC-IDs]`` line in this
   change (present in the head's ledger, absent from the target's copy). A raise is paid for in
   the same change as the test growth it buys and named so a reviewer can weigh it -- never to
@@ -98,6 +98,9 @@ from dataclasses import asdict, dataclass, field
 from fractions import Fraction
 from pathlib import Path
 
+# Sibling script: ``scripts/`` is sys.path[0] when this file runs as a script.
+from test_inventory import iter_spec_citations
+
 # --- aco configuration --------------------------------------------------------------------
 # The one place blueprint-specific names were replaced with aco's own. Everything below this block
 # is the generic algorithm.
@@ -120,7 +123,8 @@ SIBLING_TOKEN_GROUPS: tuple[frozenset[str], ...] = ()
 
 FILE_KEYS = ("lines", "tests", "parametrized", "clone_lines", "init_helpers", "literal_siblings")
 SHARE_METRIC = "parametrized_share_pct"
-TREE_KEYS = (*FILE_KEYS, SHARE_METRIC, "spec_ids")
+SPEC_METRIC = "spec_ids"
+TREE_KEYS = (*FILE_KEYS, SHARE_METRIC, SPEC_METRIC)
 FAIL = "FAIL"
 WARN = "WARN"
 # Metrics compared against the target: the direction that is the wrong way (+1 rising,
@@ -159,6 +163,7 @@ class FileMetrics:
     clone_lines: int = 0
     init_helpers: int = 0
     literal_siblings: int = 0
+    credited: frozenset[str] = frozenset()
 
     @property
     def unparametrized(self) -> int:
@@ -168,7 +173,10 @@ class FileMetrics:
 @dataclass
 class TreeReport:
     files: dict[str, FileMetrics] = field(default_factory=dict)
-    credited: frozenset[str] = frozenset()
+
+    @property
+    def credited(self) -> frozenset[str]:
+        return frozenset().union(*(metrics.credited for metrics in self.files.values()))
 
     def _total(self, key: str) -> int:
         return sum(getattr(metrics, key) for metrics in self.files.values())
@@ -442,6 +450,11 @@ def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: l
         if len(tokens) >= MIN_TOKENS:
             lines = (func.end_lineno or func.lineno) - func.lineno + 1
             units.append(_Unit(rel, lines, _shingles(tokens)))
+    metrics.credited = frozenset(
+        spec_id
+        for _scope, func, _parametrized in _iter_tests(module.body, "", False)
+        for spec_id in iter_spec_citations(ast.get_docstring(func) or "")
+    )
     metrics.literal_siblings = sum(
         count - 1 for names in scopes.values() for count in names.values() if count > 1
     )
@@ -454,15 +467,8 @@ def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: l
     )
 
 
-def _credited_spec_ids(root: Path, tree: str) -> frozenset[str]:
-    """The spec IDs *tree* credits. Dormant: aco has no ``spec_coverage.py`` owner yet
-    (see the module docstring) and no test docstring cites a spec ID, so this is
-    always empty."""
-    return frozenset()
-
-
 def measure_tree(root: Path, tree: str) -> TreeReport:
-    report = TreeReport(credited=_credited_spec_ids(root, tree))
+    report = TreeReport()
     units: list[_Unit] = []
     for path in sorted((root / tree).rglob("*.py")):
         rel = path.relative_to(root).as_posix()
@@ -643,7 +649,30 @@ def compare(reports: dict[str, TreeReport], target: dict[str, TreeReport]) -> li
                     _detail(report, previous, metric, change),
                 )
             )
+        lost = _lost_spec_finding(tree, report, previous)
+        if lost:
+            findings.append(lost)
     return findings
+
+
+def _lost_spec_finding(tree: str, report: TreeReport, previous: TreeReport) -> Finding | None:
+    """A FAIL finding when the target cites a spec ID the tree no longer does."""
+    lost = sorted(previous.credited - report.credited)
+    if not lost:
+        return None
+    citing_files = sorted(
+        rel for rel, metrics in previous.files.items() if metrics.credited & set(lost)
+    )
+    return Finding(
+        tree,
+        SPEC_METRIC,
+        FAIL,
+        report.spec_ids,
+        previous.spec_ids,
+        report.spec_ids - previous.spec_ids,
+        [],
+        f"lost {', '.join(lost)}; cited at the target in {', '.join(citing_files)}",
+    )
 
 
 def blocks(findings: list[Finding], new_entries: list[str]) -> bool:
@@ -675,9 +704,9 @@ def _print_table(reports: dict[str, TreeReport], target: dict[str, TreeReport]) 
 
 def _print_findings(findings: list[Finding], new_entries: list[str]) -> None:
     for finding in findings:
-        rose = _WRONG_WAY[finding.metric] > 0
+        comparator = {1: ">", -1: "<"}.get(_WRONG_WAY.get(finding.metric, 0), "vs")
         head = (
-            f"{finding.tree} {finding.metric}: {_number(finding.current)} {'>' if rose else '<'} "
+            f"{finding.tree} {finding.metric}: {_number(finding.current)} {comparator} "
             f"target {_number(finding.target)} ({_signed(finding.delta)})"
         )
         if finding.detail:
@@ -688,7 +717,7 @@ def _print_findings(findings: list[Finding], new_entries: list[str]) -> None:
             print(f"ALLOWED {head} -- justified by a new line in {RATCHET_REL}", file=sys.stderr)
         else:
             print(
-                f"{FAIL} {head} -- a raise needs a `{RATCHET_ENTRY_PREFIX} <why> [SPEC-IDs]` "
+                f"{FAIL} {head} -- this needs a `{RATCHET_ENTRY_PREFIX} <why> [SPEC-IDs]` "
                 f"line added to {RATCHET_REL} in this change",
                 file=sys.stderr,
             )
