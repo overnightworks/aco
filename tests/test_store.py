@@ -1151,6 +1151,7 @@ def test_push_retry_exhausts_on_a_remote_that_never_gets_a_state_ref(
         message="bootstrap empty claim state\n\noperation_id: never-applied\n",
         operation_id="never-applied",
     )
+    transport = _AlwaysRejectingTransport()
 
     with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes"):
         store.push_tree(
@@ -1158,7 +1159,7 @@ def test_push_retry_exhausts_on_a_remote_that_never_gets_a_state_ref(
             remote=str(bare_remote),
             observed=observed,
             pending=pending,
-            transport=_AlwaysRejectingTransport(),
+            transport=transport,
         )
 
     assert _state_ref_oid(bare_remote) is None
