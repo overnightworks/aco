@@ -1,8 +1,0 @@
-claim_id = "186b6750e81e4a24af52d886dd93af59"
-agent = "claude"
-role = "builder"
-base = "ff8c28e1936c1c2e57da31f97a976b2c2b2df4ad"
-branch = "claude/issue-55-public-checkout-names"
-scope = ["src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/session.py", "tests/cli_fixtures.py", "tests/conftest.py", "tests/test_board.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_protect.py", "tests/test_state_board.py"]
-opened_commit = "cde032b268aaaa48a19ef98df0fd1fbab09cf1db"
-whole_reason = "Eine mechanische Umbenennung der checkout-Prozessgrenze über alle Aufrufer und Monkeypatches; halb umbenannt bricht jeder Monkeypatch."
