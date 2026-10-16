@@ -37,7 +37,7 @@ name (`tests/test_board.py`'s `priority_bucket`/`stale` attribute
 assertions, `tests/test_cli.py`'s `"age_days"` envelope pin).
 `BoardItem.claim_age`, `SizeClassMeasurement.first_event_at`/`last_event_at`,
 and `Measurements.unfinished`/`as_of` (issue #644) lost their own literal
-readers the same way when `board_html.py` -- the last caller of the served
+readers the same way when the old board page module -- the last caller of the served
 and static board pages, and of the text `measurements_lines`/`estimate_cell`
 formatters deleted alongside it -- went too: each is still part of
 `board_payload`'s own `--json` contract, exercised by
