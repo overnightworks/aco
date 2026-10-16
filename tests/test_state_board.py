@@ -48,6 +48,7 @@ from cli_fixtures import (
     piping,
     real_git,
     redirect_toplevel,
+    run_cli,
     set_git_identity,
     stub_board_config_tracked,
     terminal_on_stdin,
@@ -1718,16 +1719,6 @@ class TestStateRefBoardAtomicLanding:
         }
 
 
-def _run_ok(arguments: list[str], capsys: pytest.CaptureFixture[str]) -> str:
-    """Run `arguments` through `main`, asserting success, and return the
-    captured stdout -- the one shape every README-sequence step in
-    `TestCliStateRefForge` shares (issue #292 proof 4)."""
-    status = issue_claim.main(arguments)
-    out = capsys.readouterr().out
-    assert status == 0, out
-    return out
-
-
 def _stub_claim_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
     """The checkout reads `claim` makes that no state-ref proof is about --
     the worktree's own validation, scope directories, and versioned files
@@ -1737,21 +1728,11 @@ def _stub_claim_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("README",))
 
 
-def _run_refused(arguments: list[str], capsys: pytest.CaptureFixture[str]) -> str:
-    """`_run_ok`'s own counterpart for a step the README names as a
-    refusal: run `arguments`, assert the CLI's own refusal exit code, and
-    return the captured stderr."""
-    status = issue_claim.main(arguments)
-    err = capsys.readouterr().err
-    assert status == 2, err
-    return err
-
-
 def _first_ruling_date(capsys: pytest.CaptureFixture[str]) -> str:
     """`rulings --json`'s first listed line's own `ruled_on` (issue #412's
     envelope: the array now sits under the `rulings` key), read back so a
     README-sequence assertion never has to guess the wall clock."""
-    payload = json.loads(_run_ok(["rulings", "--json"], capsys))
+    payload = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())
     return str(payload["rulings"][0]["lines"][0]["ruled_on"])
 
 
@@ -1955,7 +1936,9 @@ class TestCliStateRefForge:
         lines = capsys.readouterr().out.splitlines()
         assert any(line.strip() == f"2 open: {asked_text}" for line in lines)
 
-        asked_line = json.loads(_run_ok(["rulings", "--json"], capsys))["rulings"][0]["lines"][1]
+        asked_line = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())["rulings"][
+            0
+        ]["lines"][1]
         assert (asked_line["text"], asked_line["ruling"], asked_line["default"]) == (
             asked_text,
             None,
@@ -2335,7 +2318,12 @@ class TestCliStateRefForge:
         )
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
 
-        child_id = _run_ok(["cut", str(CONTAINER_NUMBER)], capsys).strip().rsplit(" ", 1)[1]
+        child_id = (
+            run_cli(["cut", str(CONTAINER_NUMBER)], capsys)
+            .expect_success()
+            .strip()
+            .rsplit(" ", 1)[1]
+        )
 
         state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
         assert state.tip is not None
@@ -2349,7 +2337,7 @@ class TestCliStateRefForge:
         )
         container_body = files_after[f"{CONTAINER_ID}.md"].decode()
         monkeypatch.setattr(sys, "stdin", io.StringIO(container_body))
-        assert _run_ok(["body", "--check"], capsys) == "body ok\n"
+        assert run_cli(["body", "--check"], capsys).expect_success() == "body ok\n"
 
     def _nested_container_files(
         self, slice_rows: tuple[tuple[int, str], ...]
@@ -4822,7 +4810,7 @@ class TestCliStateRefForge:
         )
         capsys.readouterr()
 
-        err = _run_refused(["item", "close", str(CLOSE_BLOCKER_NUMBER)], capsys)
+        err = run_cli(["item", "close", str(CLOSE_BLOCKER_NUMBER)], capsys).expect_refusal()
 
         assert f"{CLOSE_BLOCKER_ID} has a live claim (Codex Sol (builder))" in err
 
@@ -5033,7 +5021,7 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         _stub_claim_checkout(monkeypatch)
         fresh_title = f"Fresh work (#{items.item_number(CONTAINER_ID)} slice 2)"
-        item_id = _run_ok(["item", "new", "--title", fresh_title], capsys).strip()
+        item_id = run_cli(["item", "new", "--title", fresh_title], capsys).expect_success().strip()
         named = {"item": item_id, "seeded": CHILD_A_ID}
 
         issue_claim.main([argument.format(**named) for argument in arguments])
@@ -5058,7 +5046,9 @@ class TestCliStateRefForge:
         parent to warn about and never prints an id it cannot take back."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         _stub_claim_checkout(monkeypatch)
-        item_id = _run_ok(["item", "new", "--title", "Fresh work (#16777216 slice 2)"], capsys)
+        item_id = run_cli(
+            ["item", "new", "--title", "Fresh work (#16777216 slice 2)"], capsys
+        ).expect_success()
 
         issue_claim.main(["claim", item_id.strip(), "--agent", "Codex Sol", "--scope", "README"])
 
@@ -5079,7 +5069,9 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         self._claim_child_a(monkeypatch, capsys)
 
-        overlapping = _run_ok(["claim", "--branch", "docs/overlap", *self._CLAIMANT], capsys)
+        overlapping = run_cli(
+            ["claim", "--branch", "docs/overlap", *self._CLAIMANT], capsys
+        ).expect_success()
 
         assert f"overlaps issue {CHILD_A_ID} on README" in overlapping
         assert f"#{CHILD_A_NUMBER}" not in overlapping
@@ -5132,7 +5124,7 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         self._claim_child_a(monkeypatch, capsys)
 
-        err = _run_refused(arguments, capsys)
+        err = run_cli(arguments, capsys).expect_refusal()
 
         assert err == f"ERROR: {refusal}\n"
 
@@ -5162,10 +5154,10 @@ class TestCliStateRefForge:
             ),
         )
 
-        rescoped = _run_ok(
+        rescoped = run_cli(
             ["rescope", CHILD_A_ID, "--agent", "Codex Sol", "--add", str(worktree / "NOTES")],
             capsys,
-        )
+        ).expect_success()
 
         assert rescoped.startswith(f"RESCOPED issue {CHILD_A_ID}: ")
 
@@ -5175,7 +5167,9 @@ class TestCliStateRefForge:
         """A standing claim on the seeded actionable `CHILD_A`, scoped to
         `README` -- the one claim the overlap and rescope proofs share."""
         _stub_claim_checkout(monkeypatch)
-        _run_ok(["claim", CHILD_A_ID, "--branch", self._CHILD_A_BRANCH, *self._CLAIMANT], capsys)
+        run_cli(
+            ["claim", CHILD_A_ID, "--branch", self._CHILD_A_BRANCH, *self._CLAIMANT], capsys
+        ).expect_success()
 
     def test_readme_week_without_a_forge_runs_end_to_end_against_a_fresh_bare_remote(
         self,
@@ -5194,12 +5188,16 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, {})
         _stub_claim_checkout(monkeypatch)
 
-        bootstrap_out = _run_ok(["bootstrap"], capsys).strip()
+        bootstrap_out = run_cli(["bootstrap"], capsys).expect_success().strip()
         assert protocol.COMMIT_PATTERN.fullmatch(bootstrap_out)
 
-        container_id = _run_ok(
-            ["item", "new", "--kind", "container", "--title", "A week without a forge"], capsys
-        ).strip()
+        container_id = (
+            run_cli(
+                ["item", "new", "--kind", "container", "--title", "A week without a forge"], capsys
+            )
+            .expect_success()
+            .strip()
+        )
         assert items.ITEM_ID_PATTERN.fullmatch(container_id)
 
         container_body = _filled_body(
@@ -5210,15 +5208,17 @@ class TestCliStateRefForge:
         )
 
         monkeypatch.setattr(sys, "stdin", io.StringIO(container_body))
-        assert _run_ok(["body", "--check"], capsys) == "body ok\n"
+        assert run_cli(["body", "--check"], capsys).expect_success() == "body ok\n"
 
         edit_container = ["item", "edit", container_id]
         assert main_with_piped_stdin(monkeypatch, container_body, edit_container) == 0
         assert capsys.readouterr().out == f"EDITED {container_id}\n"
 
-        child_id = _run_ok(
-            ["item", "new", "--title", "Ship slice one", "--parent", container_id], capsys
-        ).strip()
+        child_id = (
+            run_cli(["item", "new", "--title", "Ship slice one", "--parent", container_id], capsys)
+            .expect_success()
+            .strip()
+        )
         assert items.ITEM_ID_PATTERN.fullmatch(child_id)
         child_number = items.item_number(child_id)
 
@@ -5230,19 +5230,19 @@ class TestCliStateRefForge:
         )
 
         monkeypatch.setattr(sys, "stdin", io.StringIO(child_body))
-        assert _run_ok(["body", "--check"], capsys) == "body ok\n"
+        assert run_cli(["body", "--check"], capsys).expect_success() == "body ok\n"
 
         assert main_with_piped_stdin(monkeypatch, child_body, ["item", "edit", child_id]) == 0
         assert capsys.readouterr().out == f"EDITED {child_id}\n"
 
-        board_payload = json.loads(_run_ok(["board", "--json"], capsys))
+        board_payload = json.loads(run_cli(["board", "--json"], capsys).expect_success())
         assert "Ship slice one" in {item["title"] for item in board_payload["items"]}
 
-        next_out = _run_ok(["next"], capsys)
+        next_out = run_cli(["next"], capsys).expect_success()
         assert child_id in next_out
         assert f"#{child_number}" not in next_out
 
-        claim_out = _run_ok(
+        claim_out = run_cli(
             [
                 "claim",
                 child_id,
@@ -5260,16 +5260,19 @@ class TestCliStateRefForge:
                 "state-ref-claim",
             ],
             capsys,
-        )
+        ).expect_success()
         # `claim`'s own success line now prints the state-ref id too
         # (issue #300 residual 1: `_claim_subject` takes `config.storage`).
         assert claim_out.splitlines()[0] == f"CLAIMED issue {child_id}: state-ref-claim"
 
-        assert f"CLAIMED issue {child_id}" in _run_ok(["status", child_id], capsys)
+        assert f"CLAIMED issue {child_id}" in run_cli(["status", child_id], capsys).expect_success()
 
-        assert "release the claim first" in _run_refused(["item", "close", child_id], capsys)
+        assert (
+            "release the claim first"
+            in run_cli(["item", "close", child_id], capsys).expect_refusal()
+        )
 
-        release_out = _run_ok(
+        release_out = run_cli(
             [
                 "release",
                 child_id,
@@ -5281,25 +5284,28 @@ class TestCliStateRefForge:
                 "landed as 1234567890123456789012345678901234567890",
             ],
             capsys,
-        )
+        ).expect_success()
         # `release`'s own `RELEASED ...` line prints the state-ref id too
         # (issue #300 residual 1); an abandoned release prints neither
         # `freed:` nor `next:`.
         assert release_out.strip() == f"RELEASED issue {child_id}: state-ref-claim"
 
-        assert _run_ok(["status", child_id], capsys).strip() == f"UNCLAIMED issue {child_id}"
+        assert (
+            run_cli(["status", child_id], capsys).expect_success().strip()
+            == f"UNCLAIMED issue {child_id}"
+        )
 
-        close_out = _run_ok(["item", "close", child_id], capsys)
+        close_out = run_cli(["item", "close", child_id], capsys).expect_success()
         # `child_id` was `container_id`'s only child, but the container's own
         # `Next` line still names work, so the parent hint
         # `release --merged` shares never offers to close it (issue #503).
         assert close_out.splitlines() == [f"CLOSED {child_id}", "freed: none"]
 
         asked_text = "Does the runbook still hold without a forge?"
-        asked_out = _run_ok(["ask", container_id, "--text", asked_text], capsys)
+        asked_out = run_cli(["ask", container_id, "--text", asked_text], capsys).expect_success()
         assert asked_out.strip() == f"ASKED {container_id} line 1: {asked_text}"
 
-        ruled_out = _run_ok(["rule", container_id, "--line", "1", "--yes"], capsys)
+        ruled_out = run_cli(["rule", container_id, "--line", "1", "--yes"], capsys).expect_success()
         assert ruled_out.strip() == f"RULED {container_id} line 1 yes; 0 line(s) still open"
 
         # `container_id`'s only expectation line is now ruled, so `rulings`
@@ -5307,14 +5313,16 @@ class TestCliStateRefForge:
         # sentence (issue #379). Read `ruled_on` back from the CLI's own
         # `--json` line rather than the wall clock, so the assertion cannot
         # flake across a UTC midnight between the `rule` call above and here.
-        assert _run_ok(["rulings"], capsys).strip() == (
+        assert run_cli(["rulings"], capsys).expect_success().strip() == (
             f"{container_id} 0/1: A week without a forge\n  1 ruled yes "
             f"{_first_ruling_date(capsys)}: {asked_text}"
         )
 
-        child_state = json.loads(_run_ok(["item", "show", child_id, "--json"], capsys))["state"]
+        child_state = json.loads(
+            run_cli(["item", "show", child_id, "--json"], capsys).expect_success()
+        )["state"]
         assert child_state == "closed"
-        container_state = json.loads(_run_ok(["item", "show", container_id, "--json"], capsys))[
-            "state"
-        ]
+        container_state = json.loads(
+            run_cli(["item", "show", container_id, "--json"], capsys).expect_success()
+        )["state"]
         assert container_state == "open"

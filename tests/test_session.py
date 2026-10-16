@@ -19,8 +19,8 @@ from cli_fixtures import (
     fetched_once_then_read,
     init_bare_repository,
     landed_from_another_clone,
-    main_exit_code,
     real_git,
+    run_cli,
     stub_board_config_tracked,
     trunk_git_calls,
 )
@@ -595,6 +595,7 @@ def _forbid_context_reads(monkeypatch: pytest.MonkeyPatch) -> None:
 )
 def test_a_command_that_needs_no_repository_reads_no_context(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     command: list[str],
     stdin: str,
@@ -607,7 +608,7 @@ def test_a_command_that_needs_no_repository_reads_no_context(
     monkeypatch.setattr(cli, "_workspace_config_path", lambda: tmp_path / "workspace.toml")
     monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
 
-    assert main_exit_code(command) == exit_code
+    assert run_cli(command, capsys).status == exit_code
 
 
 @pytest.mark.parametrize(
@@ -644,13 +645,14 @@ def test_a_repo_that_is_not_owner_slash_repo_refuses_before_any_git_or_gh_call(
 
     monkeypatch.setattr(subprocess, "Popen", no_process)
 
-    assert main_exit_code(["--repo", repo, *command]) == 2
+    run = run_cli(["--repo", repo, *command], capsys)
+
     refusal = f"ERROR: repository must be OWNER/REPO, not '{repo}'\n"
-    assert capsys.readouterr() == (envelope, refusal)
+    assert (run.status, run.stdout, run.stderr) == (2, envelope, refusal)
 
 
 def test_protect_judges_its_payload_without_ever_building_a_run_context(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Issue #457 proof 2: `protect` is dispatched before the run's context
     exists and judges from its own payload's path -- here a real one
@@ -664,4 +666,4 @@ def test_protect_judges_its_payload_without_ever_building_a_run_context(
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "notes.txt")}}
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
 
-    assert main_exit_code(["protect"]) == 0
+    assert run_cli(["protect"], capsys).status == 0

@@ -73,13 +73,13 @@ from cli_fixtures import (
     fresh_observation,
     init_bare_repository,
     landed_from_another_clone,
-    main_exit_code,
     main_with_piped_stdin,
     piped_body_on_stdin,
     piping,
     read_end_of_a_pipe_carrying,
     real_git,
     redirect_toplevel,
+    run_cli,
     run_context_over,
     stub_board_config_tracked,
     stub_every_remote_configured,
@@ -23865,6 +23865,7 @@ def _start_lost_answer_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
     pipe_onto_stdin: Callable[[str], None],
     arrange: Callable[[pytest.MonkeyPatch, Path], _CountedRun],
 ) -> None:
@@ -23882,7 +23883,7 @@ def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(
         pipe_onto_stdin(run.piped)
     reads = count_context_reads(monkeypatch)
 
-    exit_code = main_exit_code(run.argv)
+    exit_code = run_cli(run.argv, capsys).status
 
     assert (exit_code, *reads.drain()) == (
         run.exit_code,

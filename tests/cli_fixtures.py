@@ -443,12 +443,35 @@ def run_context_over(client: forge.ForgeReader) -> RunContext:
     return RunContext(None, build_forge=lambda _context: client)
 
 
-def main_exit_code(argv: list[str]) -> int | str | None:
-    """`main`'s exit code, whether it returns it or argparse exits with it."""
+@dataclass(frozen=True)
+class CliRun:
+    """One `main` run: its exit status and everything it printed."""
+
+    status: int | str | None
+    stdout: str
+    stderr: str
+
+    def expect_success(self) -> str:
+        """The stdout of a run that exited 0; a failure shows that stdout."""
+        assert self.status == 0, self.stdout
+        return self.stdout
+
+    def expect_refusal(self) -> str:
+        """The stderr of a run the CLI refused with exit 2; a failure shows
+        that stderr."""
+        assert self.status == 2, self.stderr
+        return self.stderr
+
+
+def run_cli(argv: list[str], capsys: pytest.CaptureFixture[str]) -> CliRun:
+    """Run `argv` through `main`, whether it returns its exit status or
+    argparse exits with it, and read back what it printed."""
     try:
-        return cli.main(argv)
+        status = cli.main(argv)
     except SystemExit as exit_request:
-        return exit_request.code
+        status = exit_request.code
+    captured = capsys.readouterr()
+    return CliRun(status, captured.out, captured.err)
 
 
 CountedReads = tuple[dict[Path | None, int], dict[Path | None, int], dict[Path, int]]
