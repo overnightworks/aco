@@ -1067,7 +1067,9 @@ class _UsageErrorParser(argparse.ArgumentParser):
     def parse_known_args(
         self, args: Iterable[str] | None = None, *rest: Any, **keywords: Any
     ) -> tuple[Any, list[str]]:
-        self.received_tokens = tuple(args or ())
+        if self.subcommands:
+            self.subcommands.forget_received_tokens()
+        self.received_tokens = tuple(sys.argv[1:] if args is None else args)
         return super().parse_known_args(self.received_tokens, *rest, **keywords)
 
     def error(self, message: str) -> NoReturn:
@@ -1076,22 +1078,31 @@ class _UsageErrorParser(argparse.ArgumentParser):
 
 class _Subcommands:
     """The subcommand level of one `aco` parser: builders add their command
-    through it, and it keeps the parsers it made so a refused parse can tell
-    which command was chosen (the one that was handed tokens)."""
+    through it, and a refused parse can ask which command was chosen (the
+    one that was handed tokens)."""
 
     def __init__(self, parent: _UsageErrorParser, dest: str) -> None:
         self._action = parent.add_subparsers(dest=dest, required=True)
-        self._parsers: list[_UsageErrorParser] = []
 
     def add_parser(self, name: str, **kwargs: Any) -> _UsageErrorParser:
-        parser = self._action.add_parser(name, **kwargs)
-        self._parsers.append(parser)
-        return parser
+        return self._action.add_parser(name, **kwargs)
 
-    def chosen(self) -> _UsageErrorParser | None:
+    def chosen(self) -> tuple[_UsageErrorParser, tuple[str, ...]] | None:
         return next(
-            (parser for parser in self._parsers if parser.received_tokens is not None), None
+            (
+                (parser, parser.received_tokens)
+                for parser in self._action.choices.values()
+                if parser.received_tokens is not None
+            ),
+            None,
         )
+
+    def forget_received_tokens(self) -> None:
+        """A reused parser must not report the command an earlier parse chose."""
+        for parser in self._action.choices.values():
+            parser.received_tokens = None
+            if parser.subcommands:
+                parser.subcommands.forget_received_tokens()
 
 
 def _add_subcommands(parser: _UsageErrorParser, dest: str) -> _Subcommands:
@@ -8993,10 +9004,10 @@ def _reached_levels(
     parser, tokens = root, tuple(given)
     while True:
         yield parser, tokens
-        chosen = parser.subcommands.chosen() if parser.subcommands else None
-        if chosen is None or chosen.received_tokens is None:
+        level = parser.subcommands.chosen() if parser.subcommands else None
+        if level is None:
             return
-        parser, tokens = chosen, chosen.received_tokens
+        parser, tokens = level
 
 
 # Every argparse `type=` that reads an item reference. `check`'s subject also
