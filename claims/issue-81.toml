@@ -1,0 +1,8 @@
+claim_id = "c479464579ce4822b17d8244eda45a19"
+agent = "claude"
+role = "builder"
+base = "d251855ab073964d3d2f2fbe47ee0678107304db"
+branch = "claude/issue-81-s5-trunk-trailer-to-checkout"
+scope = ["src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/github.py", "tests/test_cli.py"]
+opened_commit = "15795f707a133b0a4f99e80e5290a4eede7c2944"
+whole_reason = "Elf Namen der Landungsprüfung ziehen aus cli.py nach checkout und github samt Aufrufern und Testverweisen; halb verschoben bräche der Import."
