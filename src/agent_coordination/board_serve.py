@@ -315,7 +315,10 @@ def start(
     token = resolve_token()
     httpd.token = token
     bound_port = httpd.server_address[1]
-    url = f"http://{LOOPBACK_HOST}:{bound_port}{_ROOT_PATH}?{TOKEN_FIELD}={token}"
+    url = (
+        f"http://{LOOPBACK_HOST}:{bound_port}{_ROOT_PATH}"  # NOSONAR(python:S5332) loopback only
+        f"?{TOKEN_FIELD}={token}"
+    )
     return BoardServer(httpd=httpd, url=url, token=token)
 
 
