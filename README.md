@@ -311,10 +311,8 @@ its own decisions through `aco rulings --json` and writes them through
 (issue #280) were removed once `aco-board` took over the decision board
 (issue #5): `aco board --serve` now refuses, pointing at `aco-board serve`
 instead.
-Every item carries `size` (`"S"`, `"M"`, `"L"` or `null`) and `estimate`:
-`null` without a size, otherwise the measured median hours of same-size landed
-claims with their count `n`; `weak` is `true` while that count is too small to
-trust. The exact JSON keys and estimate derivation are `specs/board.spec.md`'s own.
+Items with a top-level `size` also carry a size estimate in `aco board --json`;
+its keys, its derivation and when it is `null` or weak are `specs/board.spec.md`'s own.
 
 `aco-board serve [--port N] [--repo PFAD]...` serves one or more
 repositories' open expectation lines, under one URL, as yes/no cards on
