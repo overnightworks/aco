@@ -1078,7 +1078,7 @@ def open_dependency_blockers(
     return tuple(sorted(references, key=lambda reference: _blocker_sort_key(reference, repository)))
 
 
-def _dependency_freed_on(
+def dependency_freed_on(
     dependencies: tuple[IssueDependency, ...], repository: str
 ) -> datetime | None:
     """An item's `freed_on` (#150 §6): only same-repository dependencies
@@ -1116,6 +1116,10 @@ def _timestamp(value: str) -> datetime:
     if parsed.tzinfo is None:
         raise protocol.ClaimError("GitHub returned a malformed board timestamp")
     return parsed.astimezone(UTC)
+
+
+def oldest_created_at(issues: tuple[Issue, ...]) -> datetime | None:
+    return min((_timestamp(issue.created_at) for issue in issues), default=None)
 
 
 def _single_concrete_next(value: str | None) -> bool:
@@ -1845,9 +1849,7 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         parsed_bodies=parsed_bodies,
         blockers=blockers,
         freed_on={
-            issue.number: _dependency_freed_on(
-                inputs.dependencies.get(issue.number, ()), repository
-            )
+            issue.number: dependency_freed_on(inputs.dependencies.get(issue.number, ()), repository)
             for issue in issues
         },
         unblocks=unblocks,

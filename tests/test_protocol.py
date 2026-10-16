@@ -36,7 +36,7 @@ def test_issue_identity_requires_a_positive_integer(bad_issue: int) -> None:
 
 def test_outbound_resource_name_refuses_a_value_that_is_not_a_resource_name() -> None:
     with pytest.raises(ClaimError, match="resource is not a resource name"):
-        protocol._outbound_resource_name("not a valid name!")
+        protocol.outbound_resource_name("not a valid name!")
 
 
 def test_merged_release_reason_names_the_pull_request() -> None:
@@ -56,12 +56,12 @@ def test_combined_scope_refuses_an_invalid_rescope(
     add: tuple[str, ...], drop: tuple[str, ...], match: str
 ) -> None:
     with pytest.raises(ClaimUnavailableError, match=match):
-        protocol._combined_scope(("src",), add, drop)
+        protocol.combined_scope(("src",), add, drop)
 
 
 def test_outbound_text_refuses_a_non_string_field() -> None:
     with pytest.raises(ClaimError, match="agent must be text"):
-        protocol._outbound_text(123, "agent", maximum=128)
+        protocol.outbound_text(123, "agent", maximum=128)
 
 
 @pytest.mark.parametrize(
@@ -69,13 +69,13 @@ def test_outbound_text_refuses_a_non_string_field() -> None:
     ["Codex\nSol", "Codex\x1fSol", " ", "x" * 129],
 )
 def test_outbound_text_rejects_controlled_or_overlong_fields(invalid: str) -> None:
-    """`_outbound_text` is the one owner of this validation since issue #176
+    """`outbound_text` is the one owner of this validation since issue #176
     moved it out of the deleted ledger comment writers (`claim_comment` /
     `release_comment` / `supersede_comment`) and onto every real call site
     that builds an intent: `cli._request`'s agent/role, and `release`'s
     abandoned reason."""
     with pytest.raises(ClaimError, match="agent must be one bounded non-empty line"):
-        protocol._outbound_text(invalid, "agent", maximum=128)
+        protocol.outbound_text(invalid, "agent", maximum=128)
 
 
 @pytest.mark.parametrize(
@@ -94,11 +94,11 @@ def test_outbound_text_rejects_controlled_or_overlong_fields(invalid: str) -> No
     ],
 )
 def test_claim_branch_must_be_a_safe_git_ref(branch: object, match: str) -> None:
-    """`_valid_branch` guards every branch that reaches a claim -- `cli._request`
+    """`valid_branch` guards every branch that reaches a claim -- `cli._request`
     is its live caller, taking the value from `--branch` or the checked-out
     branch name, neither of which this repository controls."""
     with pytest.raises(InvalidClaimMarkerError, match=match):
-        protocol._valid_branch({"branch": branch})
+        protocol.valid_branch({"branch": branch})
 
 
 @pytest.mark.parametrize(
@@ -146,7 +146,7 @@ def test_claim_scope_keeps_a_path_with_a_printable_space() -> None:
 
 def test_claim_scope_is_recorded_and_serialized_in_canonical_order() -> None:
     """`valid_scope` is the one place a claim's scope order is decided --
-    `cli._request` calls it at creation, `_combined_scope` calls it again at
+    `cli._request` calls it at creation, `combined_scope` calls it again at
     rescope -- so a claim recorded from paths given in caller order still
     lands in `claims/<key>.toml` sorted (issue #331 R1): the body-scope
     projection `board._canonical_scope` reuses this exact function, never a

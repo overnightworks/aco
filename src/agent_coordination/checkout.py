@@ -17,9 +17,9 @@ from .protocol import (
     ClaimError,
     ClaimRequest,
     InvalidClaimMarkerError,
-    _outbound_text,
     is_safe_branch_name,
     named_with_overflow_count,
+    outbound_text,
     valid_scope,
 )
 
@@ -1136,7 +1136,7 @@ def merge_base(first: str, second: str, *, directory: Path) -> str | None:
 
 def resolved_agent(explicit: str | None) -> str:
     if explicit is not None:
-        return _outbound_text(explicit, "agent", maximum=128)
+        return outbound_text(explicit, "agent", maximum=128)
     agent = session_agent()
     if agent is None:
         raise ClaimError(
@@ -1152,13 +1152,13 @@ def session_agent() -> str | None:
     not, issue #448)."""
     configured = os.environ.get(ACO_AGENT_ENV)
     if configured:
-        return _outbound_text(configured, "agent", maximum=128)
+        return outbound_text(configured, "agent", maximum=128)
     grok_session = os.environ.get(GROK_SESSION_ID_ENV)
     if grok_session:
-        return _outbound_text(f"Grok {grok_session}", "agent", maximum=128)
+        return outbound_text(f"Grok {grok_session}", "agent", maximum=128)
     claude_session = os.environ.get(CLAUDE_CODE_SESSION_ID_ENV)
     if claude_session:
-        return _outbound_text(f"Claude {claude_session}", "agent", maximum=128)
+        return outbound_text(f"Claude {claude_session}", "agent", maximum=128)
     return None
 
 

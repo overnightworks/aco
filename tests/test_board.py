@@ -847,19 +847,50 @@ def test_has_further_work(next_line: str | None, expected: bool) -> None:
     assert board.has_further_work(next_line) is expected
 
 
+def issues_created_at(*created_ats: str) -> tuple[board.Issue, ...]:
+    return tuple(
+        replace(board_issue(number, "Item", ""), created_at=created_at)
+        for number, created_at in enumerate(created_ats, start=1)
+    )
+
+
 @pytest.mark.parametrize(
     "raw_timestamp",
     [
         pytest.param("not-a-timestamp", id="unparsable"),
         pytest.param("2026-08-20T00:00:00", id="missing-offset"),
+        pytest.param("2026-13-45T00:00:00Z", id="impossible-date"),
     ],
 )
-def test_timestamp_fails_loud_on_a_malformed_github_timestamp(raw_timestamp: str) -> None:
-    """`board._timestamp` backs an issue's `age_days`/`idle_days` (its
-    `created_at`/`updated_at`); GitHub's own timestamp shape is the only
-    thing it ever trusts."""
+def test_oldest_created_at_fails_loud_on_a_malformed_github_timestamp(raw_timestamp: str) -> None:
+    issues = issues_created_at(raw_timestamp)
     with pytest.raises(ClaimError, match="GitHub returned a malformed board timestamp"):
-        board._timestamp(raw_timestamp)
+        board.oldest_created_at(issues)
+
+
+@pytest.mark.parametrize(
+    ("created_ats", "expected"),
+    [
+        pytest.param((), None, id="no-issues"),
+        pytest.param(
+            ("2026-08-20T02:00:00+02:00", "2026-08-19T23:00:00Z"),
+            datetime(2026, 8, 19, 23, tzinfo=UTC),
+            id="earliest-in-utc",
+        ),
+        pytest.param(
+            ("2026-08-20T02:00:00+02:00",),
+            datetime(2026, 8, 20, 0, tzinfo=UTC),
+            id="offset-converted-to-utc",
+        ),
+    ],
+)
+def test_oldest_created_at_is_the_earliest_filing_in_utc(
+    created_ats: tuple[str, ...], expected: datetime | None
+) -> None:
+    oldest = board.oldest_created_at(issues_created_at(*created_ats))
+
+    assert oldest == expected
+    assert oldest is None or oldest.utcoffset() == timedelta(0)
 
 
 def test_a_fresh_unfilled_block_is_an_incomplete_contract_with_no_defects() -> None:

@@ -12905,7 +12905,7 @@ def test_cli_rescope_drop_of_a_value_not_in_scope_refuses_with_the_claims_own_re
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """`--drop` of a comma-bearing value the live claim never held is
-    refused by `_combined_scope`'s own 'not in this claim's scope' sentence
+    refused by `combined_scope`'s own 'not in this claim's scope' sentence
     (issue #207): the ungrounded-comma refusal never runs over `--drop` at
     all, because that existing refusal already covers every value not
     currently held, with a truer reason naming the claim rather than the
@@ -17718,7 +17718,7 @@ def test_land_refuses_a_coordinator_override_with_no_role_before_the_merge(
 ) -> None:
     """Issue #405 point 8 review finding (LANDCMD-19): `--coordinator-override`
     with no `--role` refuses via `_land_preflight`'s own call to `release`'s
-    `protocol._require_coordinator_override`, before any merge."""
+    `protocol.require_coordinator_override`, before any merge."""
     client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--coordinator-override"]) == 2
