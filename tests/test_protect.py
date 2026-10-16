@@ -33,6 +33,7 @@ from cli_fixtures import (
     _real_git,
     _real_repository_with_bare_remote,
     _set_agent_identity_env,
+    init_bare_repository,
     stub_board_config_tracked,
 )
 from github_fixtures import FakeForge
@@ -2254,8 +2255,7 @@ def _hook_in_a_bare_repository(tmp_path: Path) -> Path:
     without a forge"): a bare repository has no `.git` entry at all, yet a
     write into its hooks is a write into a repository."""
     served = tmp_path / "served.git"
-    served.mkdir()
-    _real_git(served, "init", "-q", "--bare")
+    init_bare_repository(served)
     return served / "hooks" / "pre-receive"
 
 

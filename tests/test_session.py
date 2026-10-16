@@ -18,6 +18,7 @@ from cli_fixtures import (
     _real_git,
     _real_repository_with_bare_remote,
     fetched_once_then_read,
+    init_bare_repository,
     landed_from_another_clone,
     main_exit_code,
     stub_board_config_tracked,
@@ -370,7 +371,7 @@ def test_every_trunk_read_names_the_canonical_remote_never_a_diverging_origin(
     `HEAD` for them."""
     repository = _pushed_repository(tmp_path, 'canonical_remote = "hub"\n')
     hub = tmp_path / "hub.git"
-    _real_git(tmp_path, "init", "-q", "--bare", "-b", "main", str(hub))
+    init_bare_repository(hub)
     _real_git(repository, "remote", "add", "hub", str(hub))
     _commit(repository, "second")
     _push_repository_trunk(repository, "hub")
@@ -397,7 +398,7 @@ def test_a_fresh_context_whose_configuration_names_another_remote_fetches_that_r
     `hub` before answering, never taking `origin`'s fetch for `hub`'s."""
     repository = _pushed_repository(tmp_path)
     hub = tmp_path / "hub.git"
-    _real_git(tmp_path, "init", "-q", "--bare", "-b", "main", str(hub))
+    init_bare_repository(hub)
     _real_git(repository, "remote", "add", "hub", str(hub))
     stale = _commit(repository, "second")
     _push_repository_trunk(repository, "hub")

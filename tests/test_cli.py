@@ -61,10 +61,12 @@ from cli_fixtures import (
     _set_agent_identity_env,
     _stub_one_git_call,
     arrange_scope_width,
+    bare_remote_repository_with_one_commit,
     count_context_reads,
     dangle_recorded_head,
     fetched_once_then_read,
     fresh_observation,
+    init_bare_repository,
     landed_from_another_clone,
     main_exit_code,
     run_context_over,
@@ -8960,10 +8962,7 @@ def _landing_repository(tmp_path: Path) -> Path:
     <sha|empty>`/`check <sha>` (LAND-47/LAND-48/LAND-52) to walk. `feature`
     never joins the first-parent line itself (only its merge commit does),
     giving the off-trunk refusal proof a real sha to reject."""
-    repo, _remote = _real_repository_with_bare_remote(tmp_path)
-    (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    repo = bare_remote_repository_with_one_commit(tmp_path)
 
     _real_git(repo, "checkout", "-q", "-b", "feature")
     (repo / "feature.txt").write_text("feature\n")
@@ -20009,10 +20008,7 @@ def _check_trunk_repository(tmp_path: Path) -> Path:
     the same grammar `check <pr>` reads from a pull request body with. A
     fourth commit sits on the `side` branch, classified as soundly as the
     trunk ones: it exists in this repository, but never on its trunk."""
-    repo, _remote = _real_repository_with_bare_remote(tmp_path)
-    (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     (repo / "work.txt").write_text("work\n")
     _real_git(repo, "add", "work.txt")
     _real_git(repo, "commit", "-q", "-m", "work item change", "-m", "Work-Item: #20")
@@ -23053,7 +23049,7 @@ def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[
     never written, so `board.load_config` falls back to its own default
     `canonical_remote = "origin"` -- exactly this remote's name."""
     bare_remote = tmp_path / "remote.git"
-    _real_git(tmp_path, "init", "--bare", "-q", "-b", "main", str(bare_remote))
+    init_bare_repository(bare_remote)
     repository = tmp_path / "repo"
     repository.mkdir()
     _real_git(repository, "init", "-q", "-b", "main")
@@ -23585,7 +23581,7 @@ def test_cli_reset_restore_from_the_bundle_into_a_fresh_repository_recovers_stat
     bundle_path = next(export_dir.iterdir())
 
     restored_remote = tmp_path / "restored-remote.git"
-    _real_git(tmp_path, "init", "--bare", "-q", "-b", "main", str(restored_remote))
+    init_bare_repository(restored_remote)
     # The bundle carries `EXPORT_BUNDLE_REF`'s name, not `STATE_REF`'s
     # (19.09.2026 REVISE findings 1+2) -- this is the exact command
     # `_reset_restore_command` prints, proven end to end here.
