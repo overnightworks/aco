@@ -1,8 +1,0 @@
-claim_id = "36ff211c58ac403796889cfa7f07ecb5"
-agent = "claude"
-role = "builder"
-base = "6e9818354a854f64cb07c0773579a1dba51420d3"
-branch = "claude/issue-65-run-cli-runner"
-scope = ["tests/cli_fixtures.py", "tests/test_cli.py", "tests/test_session.py", "tests/test_state_board.py"]
-opened_commit = "d098827eb7e2ce9b8f5f374615640e39273c418c"
-whole_reason = "Ein gemeinsamer CLI-Runner ersetzt drei Hilfen samt ihrer Aufrufer in vier Testdateien; halb umgestellt blieben zwei Wege."
