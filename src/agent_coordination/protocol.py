@@ -275,7 +275,7 @@ def _required_text(payload: dict[str, object], key: str, *, maximum: int = 512) 
     return normalized
 
 
-def _outbound_text(value: object, field: str, *, maximum: int) -> str:
+def outbound_text(value: object, field: str, *, maximum: int) -> str:
     if not isinstance(value, str):
         raise ClaimError(f"{field} must be text")
     normalized = value.strip()
@@ -289,8 +289,8 @@ def _outbound_text(value: object, field: str, *, maximum: int) -> str:
     return normalized
 
 
-def _outbound_resource_name(value: object) -> str:
-    name = _outbound_text(value, "resource", maximum=64)
+def outbound_resource_name(value: object) -> str:
+    name = outbound_text(value, "resource", maximum=64)
     if RESOURCE_NAME_PATTERN.fullmatch(name) is None:
         raise ClaimError("resource is not a resource name")
     return name
@@ -308,7 +308,7 @@ def identity_summary(identity: ClaimIdentity, branch: str, item_label: ItemLabel
 
 
 def is_safe_branch_name(branch: str) -> bool:
-    """Whether `branch` is a safe Git ref name: the one rule `_valid_branch`
+    """Whether `branch` is a safe Git ref name: the one rule `valid_branch`
     enforces on a stored claim marker, factored out so `start` (issue #322)
     can hold a freshly built branch name to the identical rule -- including
     the same `BRANCH_NAME_MAX_LENGTH` bound, not a shape check that merely
@@ -331,7 +331,7 @@ def is_safe_branch_name(branch: str) -> bool:
     )
 
 
-def _valid_branch(payload: dict[str, object]) -> str:
+def valid_branch(payload: dict[str, object]) -> str:
     branch = _required_text(payload, "branch", maximum=BRANCH_NAME_MAX_LENGTH)
     if not is_safe_branch_name(branch):
         raise InvalidClaimMarkerError(f"claim marker branch is not a safe Git ref: {branch!r}")
@@ -367,7 +367,7 @@ def valid_scope(scope: object) -> tuple[str, ...]:
     """The one canonical scope form (issue #331): sorted, deduplicated,
     every entry a validated repository-relative path. Every claim's scope
     passes through here at creation (`cli._request`) and at rescope
-    (`_combined_scope`), so a live claim's scope is always already this
+    (`combined_scope`), so a live claim's scope is always already this
     exact form; `board._canonical_scope` calls this same function to
     project a body's own `scope = [...]`, rather than sorting a second
     time, so the two stay comparable as tuples regardless of the order
@@ -615,7 +615,7 @@ class ClaimConflictIndex:
     descendant_paths: dict[tuple[str, ...], set[str]]
 
 
-def _claim_conflict_index(claims: tuple[ScopedClaim, ...]) -> ClaimConflictIndex:
+def claim_conflict_index(claims: tuple[ScopedClaim, ...]) -> ClaimConflictIndex:
     """Index identities and paths once for status conflict and overlap notes."""
     conflict_ids: set[str] = set()
     overlap_ids: set[str] = set()
@@ -653,15 +653,15 @@ def _claim_conflict_index(claims: tuple[ScopedClaim, ...]) -> ClaimConflictIndex
     )
 
 
-def _related_claim_ids(index: ClaimConflictIndex, selected: tuple[ScopedClaim, ...]) -> set[str]:
+def related_claim_ids(index: ClaimConflictIndex, selected: tuple[ScopedClaim, ...]) -> set[str]:
     related = {claim.claim_id for claim in selected}
     for claim in selected:
         related.update(index.claims_by_identity[_identity_key(claim)])
-        related.update(_overlap_peer_ids(index, claim))
+        related.update(overlap_peer_ids(index, claim))
     return related
 
 
-def _overlap_peer_ids(index: ClaimConflictIndex, claim: ScopedClaim) -> set[str]:
+def overlap_peer_ids(index: ClaimConflictIndex, claim: ScopedClaim) -> set[str]:
     related: set[str] = set()
     for path in claim.scope:
         parts = PurePosixPath(path).parts
@@ -672,7 +672,7 @@ def _overlap_peer_ids(index: ClaimConflictIndex, claim: ScopedClaim) -> set[str]
     return related
 
 
-def _combined_scope(
+def combined_scope(
     current: tuple[str, ...], add: tuple[str, ...], drop: tuple[str, ...]
 ) -> tuple[str, ...]:
     current_set = set(current)
@@ -693,7 +693,7 @@ def _combined_scope(
 COORDINATOR_ROLE = "coordinator"
 
 
-def _require_coordinator_override(role: str | None) -> None:
+def require_coordinator_override(role: str | None) -> None:
     if role != COORDINATOR_ROLE:
         raise ClaimUnavailableError("a coordinator override requires --role coordinator")
 
@@ -1173,7 +1173,7 @@ def _same_claimant(
     return (current.agent, current.role) == (intent.agent, intent.role)
 
 
-def _claimant_text(agent: str, role: str) -> str:
+def claimant_text(agent: str, role: str) -> str:
     """Render the `(agent, role)` tuple `_same_claimant` compares, for a
     refusal that must name which two claimants disagreed."""
     return f"{agent} ({role})"
@@ -1324,8 +1324,8 @@ def _apply_rescope_intent(state: ClaimState, intent: RescopeIntent) -> ClaimStat
     if not _same_claimant(current, intent):
         raise ClaimUnavailableError(
             "only the original claimant may rescope "
-            f"(holder={_claimant_text(current.agent, current.role)!r}, "
-            f"this session={_claimant_text(intent.agent, intent.role)!r})"
+            f"(holder={claimant_text(current.agent, current.role)!r}, "
+            f"this session={claimant_text(intent.agent, intent.role)!r})"
         )
     whole_reason = current.whole_reason if intent.whole_reason is None else intent.whole_reason
     new_claim = replace(current, scope=intent.scope, whole_reason=whole_reason)
@@ -1338,17 +1338,17 @@ def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingInte
     or an explicit coordinator override by role coordinator. Shared by
     `ReleaseIntent` and `LandingIntent` (issue #359): a landing's own claim
     release is authorized exactly the way an ordinary release is, never a
-    second rule. Delegates its own role check to `_require_coordinator_override`
+    second rule. Delegates its own role check to `require_coordinator_override`
     (issue #405 round-4 finding 2) -- the one printer for CLAIM-39's sentence,
     never a second wording of the same refusal."""
     if intent.coordinator_override:
-        _require_coordinator_override(intent.role)
+        require_coordinator_override(intent.role)
         return
     if not _same_claimant(current, intent):
         raise ClaimUnavailableError(
             "only the original claimant may release; use an explicit coordinator override "
-            f"(holder={_claimant_text(current.agent, current.role)!r}, "
-            f"this session={_claimant_text(intent.agent, intent.role)!r})"
+            f"(holder={claimant_text(current.agent, current.role)!r}, "
+            f"this session={claimant_text(intent.agent, intent.role)!r})"
         )
 
 
@@ -1408,7 +1408,7 @@ def _live_claim_sentence(
 ) -> str:
     return (
         f"{item_label(issue.issue)} has a live claim "
-        f"({_claimant_text(live_claim.agent, live_claim.role)}); release the claim first"
+        f"({claimant_text(live_claim.agent, live_claim.role)}); release the claim first"
     )
 
 

@@ -147,7 +147,7 @@ def _optional_whole_reason(arguments: argparse.Namespace) -> str | None:
     raw = getattr(arguments, "whole", None)
     if raw is None:
         return None
-    return protocol._outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
+    return protocol.outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
 
 
 def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
@@ -165,7 +165,7 @@ def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
 
 
 _WHOLE_REASON_LABEL = "whole reason"
-"""`protocol._outbound_text`'s own field name for a `--whole`/body `whole` value
+"""`protocol.outbound_text`'s own field name for a `--whole`/body `whole` value
 (issue #399), named once here beside the width-gate refusal it justifies --
 `_optional_whole_reason`, `_cmd_item_edit_whole` and `_whole_from_item_body`
 all bound the same reason text and must refuse by the same name."""
@@ -243,7 +243,7 @@ def _reject_ungrounded_comma_scope(
 
     Never call this over `--drop`: a value the live claim already holds is a
     fact about the claim, not a typo about the checkout, and dropping a value
-    the claim does not hold is already refused by `_combined_scope` with a
+    the claim does not hold is already refused by `combined_scope` with a
     truer sentence naming the claim rather than the checkout -- adding this
     check there would either block the very repair this refusal exists to
     leave open (dropping an already-claimed ungrounded value), or never fire
@@ -319,7 +319,7 @@ def _resolved_claim_branch(arguments: argparse.Namespace, *, directory: Path | N
         if arguments.branch is None
         else arguments.branch
     )
-    return protocol._valid_branch({"branch": branch})
+    return protocol.valid_branch({"branch": branch})
 
 
 def _request(
@@ -348,8 +348,8 @@ def _claim_request(
     request's scope ever reaches a wide-scope check or a write. With
     `--base` and `--branch` given it reads no checkout at all (issue #479:
     `start` checks its claim before the worktree exists)."""
-    agent = protocol._outbound_text(checkout.resolved_agent(arguments.agent), "agent", maximum=128)
-    role = protocol._outbound_text(arguments.role, "role", maximum=64)
+    agent = protocol.outbound_text(checkout.resolved_agent(arguments.agent), "agent", maximum=128)
+    role = protocol.outbound_text(arguments.role, "role", maximum=64)
     base = (
         checkout._git_output(["rev-parse", "HEAD"], directory=directory)
         if arguments.base is None
@@ -365,7 +365,7 @@ def _claim_request(
     whole_reason = _optional_whole_reason(arguments)
     resource = getattr(arguments, "resource", None)
     if resource is not None:
-        resource = protocol._outbound_resource_name(resource)
+        resource = protocol.outbound_resource_name(resource)
     return protocol.ClaimRequest(
         identity=identity,
         agent=agent,
@@ -1113,13 +1113,13 @@ def _status_claims(
         if issue is None
         or (isinstance(claim.identity, protocol.IssueIdentity) and claim.identity.issue == issue)
     )
-    index = protocol._claim_conflict_index(claims)
+    index = protocol.claim_conflict_index(claims)
     if not selected:
         return (), index
     related_ids = (
         {claim.claim_id for claim in claims}
         if issue is None
-        else protocol._related_claim_ids(index, selected)
+        else protocol.related_claim_ids(index, selected)
     )
     related = tuple(claim for claim in claims if claim.claim_id in related_ids)
     return related, index
@@ -1208,7 +1208,7 @@ def _print_claim_status_lines(
     if claim.whole_reason is not None:
         print(f"  whole: {claim.whole_reason}")
     note = _overlap_note(
-        claims_by_id, protocol._overlap_peer_ids(context.index, claim), context.storage
+        claims_by_id, protocol.overlap_peer_ids(context.index, claim), context.storage
     )
     if note is not None:
         print(f"  {note}")
@@ -1276,7 +1276,7 @@ def _status_claim_json(
         **_claim_identity_fields(claim),
         **_resource_fields(claim.resource),
         **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
-        "overlaps": _overlap_subjects(claims_by_id, protocol._overlap_peer_ids(index, claim)),
+        "overlaps": _overlap_subjects(claims_by_id, protocol.overlap_peer_ids(index, claim)),
         "state": "CONFLICT" if claim.claim_id in index.conflict_ids else "CLAIMED",
         "age": age,
         "old": old,
@@ -1408,7 +1408,7 @@ class RescopeReason(StrEnum):
     `specs/rescope.spec.md`): `rescoped` the only success. `invalid_usage`
     covers a malformed `--add`/`--drop` value (a relative entry, one outside
     the checkout, a comma-bearing entry matching no versioned file, or a
-    combination `protocol._combined_scope` refuses); `precondition_failed`
+    combination `protocol.combined_scope` refuses); `precondition_failed`
     covers this claim's own current state disallowing the rescope (no live
     claim on the target identity/branch, a different agent than the
     claimant, or a scope too wide for the width gate without `--whole`).
@@ -1556,7 +1556,7 @@ def _freed_item_numbers(
     """Open items whose last open blocker was `landed` (issue #256): every
     local `blocked_by` dependency of the item is now closed, `landed` was
     one of them, and nothing else -- local or foreign -- still blocks it.
-    Reuses `board.open_dependency_blockers`/`board._dependency_freed_on`,
+    Reuses `board.open_dependency_blockers`/`board.dependency_freed_on`,
     the same per-item blocker facts `_issue_check`'s own refusal already
     reads, rather than re-deriving them from `Board`'s aggregate fields:
     those only ever describe the *currently* open issues, so a landed
@@ -1569,7 +1569,7 @@ def _freed_item_numbers(
     repository = landed.repository
     freed: list[int] = []
     for number, local in dependencies.items():
-        if board._dependency_freed_on(local, repository) is None:
+        if board.dependency_freed_on(local, repository) is None:
             continue
         if board.open_dependency_blockers(local, repository):
             continue
@@ -1676,7 +1676,7 @@ def _merged_pull_request_floor(issues: tuple[board.Issue, ...], now: datetime) -
     """
     if not issues:
         return now
-    return min(board._timestamp(issue.created_at) for issue in issues)
+    return min(datetime.fromisoformat(issue.created_at) for issue in issues)
 
 
 # A container's children are their own `gh list_children` subprocess call;
@@ -3174,7 +3174,7 @@ def _release_outcome(merged: int | None, abandoned: str | None) -> protocol.Rele
     if merged is not None:
         return protocol.MergedRelease(merged)
     return protocol.AbandonedRelease(
-        protocol._outbound_text(abandoned, "abandoned reason", maximum=512)
+        protocol.outbound_text(abandoned, "abandoned reason", maximum=512)
     )
 
 
@@ -3846,7 +3846,7 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
         located = _located_block_or_refuse(
             number, current_body, command=ITEM_EDIT_WHOLE_COMMAND, storage=storage
         )
-        reason = protocol._outbound_text(parsed.whole, _WHOLE_REASON_LABEL, maximum=512)
+        reason = protocol.outbound_text(parsed.whole, _WHOLE_REASON_LABEL, maximum=512)
         new_data = {**located.data, "whole": reason}
         outcome = _write_block_data(client, number, current_body, located, new_data)
         _print_item_edit_whole_result(number, reason, storage, outcome, as_json=as_json)
@@ -5139,7 +5139,7 @@ def _cmd_next(parsed: argparse.Namespace, context: RunContext) -> int:
 class _RescopeInvalidUsageError(protocol.ClaimError):
     """A rescope `--add`/`--drop` value itself is malformed or contradictory
     -- relative, outside the checkout, a comma-bearing entry matching no
-    versioned file, or a combination `protocol._combined_scope` refuses
+    versioned file, or a combination `protocol.combined_scope` refuses
     (issue #406) -- named so `--json` can choose `invalid_usage` over the
     broad `unavailable` every checkout- or store-level refusal falls to."""
 
@@ -5245,13 +5245,13 @@ def _rescope_write(parsed: argparse.Namespace, run_context: RunContext) -> int:
     if requested.agent != selected.agent:
         raise _RescopePreconditionError(
             "only the original claimant may rescope "
-            f"(holder={protocol._claimant_text(selected.agent, selected.role)!r}, "
-            f"this session={protocol._claimant_text(requested.agent, selected.role)!r})"
+            f"(holder={protocol.claimant_text(selected.agent, selected.role)!r}, "
+            f"this session={protocol.claimant_text(requested.agent, selected.role)!r})"
         )
     versioned = checkout.versioned_paths(directory=worktree)
     try:
         _reject_ungrounded_comma_scope(requested.add, versioned, flag="--add")
-        combined = protocol._combined_scope(selected.scope, requested.add, requested.drop)
+        combined = protocol.combined_scope(selected.scope, requested.add, requested.drop)
     except protocol.ClaimError as error:
         raise _RescopeInvalidUsageError(str(error)) from error
     item = _rescoped_item_body(checkout_context, selected.identity)
@@ -6278,8 +6278,8 @@ def _authorize_releaser(
                 "only the original claimant may release; repeat as the holder with "
                 f"`{_holder_repeat_command(repeat, selected, role)}`, or use an explicit "
                 "coordinator override "
-                f"(holder={protocol._claimant_text(selected.agent, selected.role)!r}, "
-                f"this session={protocol._claimant_text(parsed.agent, role)!r})"
+                f"(holder={protocol.claimant_text(selected.agent, selected.role)!r}, "
+                f"this session={protocol.claimant_text(parsed.agent, role)!r})"
             )
     resolved_role = role if role is not None else selected.role
     return _ResolvedRelease(selected, resolved_role)
@@ -7288,7 +7288,7 @@ def _cmd_land(parsed: argparse.Namespace, context: RunContext) -> None:
     if config.storage is not body.Storage.GITHUB:
         raise protocol.ClaimUnavailableError(LAND_GITHUB_ONLY_REFUSAL)
     if parsed.coordinator_override:
-        protocol._require_coordinator_override(parsed.role)
+        protocol.require_coordinator_override(parsed.role)
     client = cast(github.GitHubForge, context.forge)
     number = parsed.pull_request
     repository = client.repository.path
@@ -7719,10 +7719,10 @@ def _requested_body_scope(raw: list[str] | None) -> tuple[str, ...] | None:
 def _requested_whole_reason(raw: str | None) -> str | None:
     """A `--whole` flag's own bounded text (issue #399), or `None` when it
     was never given -- `item new`'s own entry point into the same
-    `protocol._outbound_text` bound `claim`'s own `--whole` already enforces
+    `protocol.outbound_text` bound `claim`'s own `--whole` already enforces
     (`_optional_whole_reason`), so the two never drift on what a legal
     reason looks like."""
-    return None if raw is None else protocol._outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
+    return None if raw is None else protocol.outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
 
 
 # Fixed text naming no child number (issue #606 line 2), so the child is
@@ -8417,7 +8417,7 @@ def _cmd_ask(parsed: argparse.Namespace, context: RunContext) -> int:
 
 def _release_branch_for(parsed: argparse.Namespace) -> str | None:
     if parsed.coordinator_override:
-        protocol._require_coordinator_override(parsed.role)
+        protocol.require_coordinator_override(parsed.role)
     if parsed.branch is not None:
         # An explicit --branch selects the lane identity by name, exactly
         # like claim's own --branch, but never requires the checkout to be
