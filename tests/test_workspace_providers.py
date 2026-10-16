@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -28,6 +29,13 @@ def test_claude_resume_keeps_an_explicit_model() -> None:
         "--model",
         "sonnet",
     ]
+
+
+def test_resume_refuses_a_provider_it_has_no_native_command_for() -> None:
+    unknown_provider = cast(providers.Provider, "future")
+
+    with pytest.raises(AssertionError):
+        providers.resume_command(unknown_provider, SESSION_ID, PROJECT_DIRECTORY)
 
 
 def test_grok_resume_uses_the_registered_uuid_and_canonical_directory() -> None:

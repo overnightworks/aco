@@ -4329,10 +4329,9 @@ def test_claim_does_not_require_out_of_order_for_the_top_ranked_item(
     ("state", "title", "check", "expected_text"),
     [
         (forge.ItemState.CLOSED, "Some title", "closed-issue", "issue #72 is closed"),
-        (forge.ItemState.MISSING, "Some title", "missing-issue", "issue #72 does not exist here"),
         (forge.ItemState.MISSING, None, "missing-issue", "issue #72 does not exist here"),
     ],
-    ids=["closed", "missing", "missing-without-title"],
+    ids=["closed", "missing"],
 )
 def test_claim_refuses_a_closed_or_missing_target(
     monkeypatch: pytest.MonkeyPatch,

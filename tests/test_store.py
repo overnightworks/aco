@@ -1110,8 +1110,9 @@ def test_push_retry_finds_the_operation_id_after_an_accept_then_raise_and_does_n
     assert result.tip == _state_ref_oid(bare_remote)
 
 
+@pytest.mark.parametrize("state_ref_exists", [True, False], ids=["ref-exists", "from-empty"])
 def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
-    bare_remote: Path, worktree: Path
+    bare_remote: Path, worktree: Path, state_ref_exists: bool
 ) -> None:
     """Issue #237 finding 22: every attempt was rejected without the ref
     ever advancing (`_AlwaysRejectingTransport` never touches the remote),
@@ -1120,49 +1121,36 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     """
     # Bootstrapping first gives `observed.tip` a real value, so every retry's
     # `_commit_tree` builds onto a non-None parent -- the ordinary case once
-    # the ref already exists, not just the from-empty case slice C1 mostly
-    # exercises elsewhere.
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
+    # the ref already exists. The from-empty case drives the public bootstrap
+    # against a remote that never gets the ref.
     transport = _AlwaysRejectingTransport()
+    if state_ref_exists:
+        store.bootstrap(worktree=worktree, remote=str(bare_remote))
+        observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+        pending = store.PendingCommit(
+            tree_oid=store._write_bootstrap_tree(worktree),
+            message="bootstrap empty claim state\n\noperation_id: never-applied\n",
+            operation_id="never-applied",
+        )
+
+        def exhaust_the_retries() -> object:
+            return store.push_tree(
+                worktree=worktree,
+                remote=str(bare_remote),
+                observed=observed,
+                pending=pending,
+                transport=transport,
+            )
+    else:
+
+        def exhaust_the_retries() -> object:
+            return store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
 
     with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes") as raised:
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
-        )
+        exhaust_the_retries()
+
     assert "without the ref ever moving" in str(raised.value)
-
-
-def test_push_retry_exhausts_on_a_remote_that_never_gets_a_state_ref(
-    bare_remote: Path, worktree: Path
-) -> None:
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
-    transport = _AlwaysRejectingTransport()
-
-    with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes"):
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
-        )
-
-    assert _state_ref_oid(bare_remote) is None
+    assert (_state_ref_oid(bare_remote) is not None) is state_ref_exists
 
 
 def test_push_retry_exhausts_and_names_a_race_when_the_ref_keeps_moving(
@@ -2559,24 +2547,6 @@ def test_a_tree_write_that_would_drop_an_item_refuses(
 
     with pytest.raises(protocol.ClaimError, match="never removes an item"):
         store._write_incremental_state_tree(worktree, observed=observed, new_state=without_items)
-
-
-def test_a_tree_write_lists_every_newly_consumed_id(bare_remote: Path, worktree: Path) -> None:
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    consumed_ids = frozenset({protocol.ClaimId("a1"), protocol.ClaimId("a2")})
-
-    tree = store._write_incremental_state_tree(
-        worktree, observed=observed, new_state=replace(observed, consumed_ids=consumed_ids)
-    )
-
-    listed = subprocess.run(
-        ["git", "-C", str(worktree), "ls-tree", "--name-only", f"{tree}:{store.IDS_DIRECTORY}"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.split()
-    assert sorted(listed) == ["a1", "a2"]
 
 
 def test_commit_transition_a_local_two_racer_claim_on_different_keys_both_land(

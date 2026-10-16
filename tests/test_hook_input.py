@@ -473,8 +473,11 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             id="a-heredoc-operator-immediately-followed-by-another-operator-names-no-delimiter",
         ),
         pytest.param(
-            "cat <<'' > /tmp/x",
-            ((hook_input.PATTERN_REDIRECT_OVERWRITE, "/tmp/x"),),
+            "cat <<'' > /tmp/x\nrm f",
+            (
+                (hook_input.PATTERN_REDIRECT_OVERWRITE, "/tmp/x"),
+                (hook_input.PATTERN_REMOVE, "f"),
+            ),
             id="a-heredoc-whose-quoted-delimiter-is-empty-registers-no-body",
         ),
         pytest.param(
