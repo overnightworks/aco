@@ -19655,24 +19655,24 @@ def test_a_parse_without_arguments_reads_the_process_arguments(
 
 
 @pytest.mark.parametrize(
-    ("earlier", "later", "reached"),
+    ("earlier", "later", "asked_for_json"),
     [
         pytest.param(
             ["bootstrap", "--json"],
             ["status", "--json", "--nope"],
-            ["aco", "aco status"],
+            True,
             id="another-command",
         ),
         pytest.param(
             ["item", "show", "--json"],
             ["item", "--json"],
-            ["aco", "aco item"],
+            False,
             id="a-command-whose-subcommand-is-missing",
         ),
     ],
 )
 def test_a_reused_parser_reports_only_the_command_of_its_latest_parse(
-    earlier: list[str], later: list[str], reached: list[str]
+    earlier: list[str], later: list[str], asked_for_json: bool
 ) -> None:
     """Descendant state from an earlier refused parse must not leak into the
     next one, or its `--json` would be read off the wrong command."""
@@ -19682,9 +19682,7 @@ def test_a_reused_parser_reports_only_the_command_of_its_latest_parse(
     with pytest.raises(issue_claim._UsageError):
         parser.parse_args(later)
 
-    levels = issue_claim._reached_levels(parser, later)
-
-    assert [each.prog for each, _tokens in levels] == reached
+    assert issue_claim._asked_for_json(parser, later) is asked_for_json
 
 
 def test_every_item_or_json_argument_is_recorded_as_declared() -> None:
