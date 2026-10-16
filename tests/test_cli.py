@@ -19640,6 +19640,69 @@ def test_a_json_flag_no_command_declares_never_reaches_the_envelope(
     assert captured.err.startswith("usage: aco")
 
 
+def test_a_parse_without_arguments_reads_the_process_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A parser handed no arguments parses `sys.argv[1:]`, as argparse does,
+    so the refusal names the unknown flag rather than a missing command."""
+    parser = issue_claim._parser()
+    monkeypatch.setattr(sys, "argv", ["aco", "status", "--json", "--nope"])
+
+    with pytest.raises(issue_claim._UsageError) as refused:
+        parser.parse_args()
+
+    assert str(refused.value) == "unrecognized arguments: --nope"
+
+
+@pytest.mark.parametrize(
+    ("earlier", "later", "asked_for_json"),
+    [
+        pytest.param(
+            ["bootstrap", "--json"],
+            ["status", "--json", "--nope"],
+            True,
+            id="another-command",
+        ),
+        pytest.param(
+            ["item", "show", "--json"],
+            ["item", "--json"],
+            False,
+            id="a-command-whose-subcommand-is-missing",
+        ),
+    ],
+)
+def test_a_reused_parser_reports_only_the_command_of_its_latest_parse(
+    earlier: list[str], later: list[str], asked_for_json: bool
+) -> None:
+    """Descendant state from an earlier refused parse must not leak into the
+    next one, or its `--json` would be read off the wrong command."""
+    parser = issue_claim._parser()
+    with pytest.raises(issue_claim._UsageError):
+        parser.parse_args(earlier)
+    with pytest.raises(issue_claim._UsageError):
+        parser.parse_args(later)
+
+    assert issue_claim._asked_for_json(parser, later) is asked_for_json
+
+
+def test_every_item_or_json_argument_is_recorded_as_declared() -> None:
+    """A refused parse reads `--json` and item references only from
+    `declared_actions`; an argument added through an argparse group bypasses
+    it, so a future grouped one must fail here rather than go unseen."""
+    unrecorded = [
+        f"{each.prog} {action.dest}"
+        for each in _every_parser(issue_claim._parser())
+        for action in each._actions
+        if (
+            issue_claim.JSON_FLAG in action.option_strings
+            or action.type in issue_claim._ITEM_ARGUMENT_TYPES
+        )
+        and action not in cast(issue_claim._UsageErrorParser, each).declared_actions
+    ]
+
+    assert unrecorded == []
+
+
 PARENT_ISSUE = 79
 
 

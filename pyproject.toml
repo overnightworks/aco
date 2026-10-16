@@ -50,7 +50,7 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "PL", "FURB", "N"]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "PL", "FURB", "N", "SLF001"]
 
 [tool.ruff.lint.per-file-ignores]
 # Test literals are scenario data, not domain magic numbers; a pytest test
@@ -58,8 +58,9 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "PL", "FURB", "N"]
 # `parametrize`, not a free design choice, so its argument count isn't a
 # design smell the way a production function's is. This is a standing
 # policy for fixture-shaped signatures, not a per-finding exception, so it
-# stays a file-wide ignore rather than a line marker.
-"tests/**" = ["PLR2004", "PLR0913", "PLR0917"]
+# stays a file-wide ignore rather than a line marker. Tests also inspect
+# private owners and parser internals (SLF001) to pin what they guard.
+"tests/**" = ["PLR2004", "PLR0913", "PLR0917", "SLF001"]
 
 [tool.importlinter]
 root_packages = ["agent_coordination", "aco_board"]
