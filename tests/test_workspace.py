@@ -320,6 +320,26 @@ def test_login_reports_an_owned_launcher_for_an_old_distribution_as_stale(tmp_pa
     )
 
 
+def test_login_enable_rewrites_an_owned_launcher_of_an_old_distribution(tmp_path: Path) -> None:
+    config_path = tmp_path / "config" / "aco" / "workspace.toml"
+    project_path = tmp_path / "project"
+    project_path.mkdir()
+    workspace.register_project(
+        workspace.WorkspaceRegistration("alpha", project_path, SESSION_ID, "workspace head"),
+        config_path,
+    )
+    environment = {"XDG_CONFIG_HOME": str(tmp_path / "config")}
+    workspace.enable_login(config_path, environment, Path("/old/python"))
+
+    changed = workspace.enable_login(config_path, environment, Path("/new/python"))
+
+    assert changed is True
+    assert (
+        workspace.login_launcher_state(environment, Path("/new/python"))
+        is workspace.LoginLauncherState.ENABLED
+    )
+
+
 def test_login_recovery_keeps_unknown_outcomes_after_interruption(
     monkeypatch, tmp_path: Path
 ) -> None:

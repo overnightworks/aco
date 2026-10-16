@@ -380,6 +380,26 @@ def test_run_bounded_treats_a_broken_input_pipe_as_fully_sent(
     assert observed.output == b"done\n"
 
 
+def test_run_bounded_sends_input_the_pipe_accepts_in_pieces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pipe that takes only part of the input per write must still deliver
+    all of it, in order."""
+    real_write = process.os.write
+
+    def short_write(file_descriptor: int, data: bytes) -> int:
+        return real_write(file_descriptor, bytes(data[:4]))
+
+    monkeypatch.setattr(process.os, "write", short_write)
+
+    observed = process.run_bounded(
+        [sys.executable, "-c", "import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())"],
+        input_data=b"input sent in pieces",
+    )
+
+    assert observed.output == b"input sent in pieces"
+
+
 def test_run_bounded_reaps_the_child_when_the_selector_fails_to_close(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

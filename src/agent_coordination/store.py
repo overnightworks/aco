@@ -1458,14 +1458,12 @@ def _reuse_or_write_ids_subtree(
     """
     if old_ids == new_ids:
         return existing.oid
-    empty_blob: ObjectId | None = None
+    empty_blob = _empty_blob_oid(worktree)
     entries: list[_TreeEntry] = []
     for claim_id in new_ids:
         if claim_id in old_ids:
             entries.append(_carried_entry(existing.children, claim_id))
         else:
-            if empty_blob is None:
-                empty_blob = _empty_blob_oid(worktree)
             entries.append(("100644", "blob", empty_blob, claim_id))
     return _mktree(worktree, entries)
 

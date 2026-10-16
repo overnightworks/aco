@@ -2219,14 +2219,22 @@ def test_merged_pull_request_history_below_the_cap_warns_of_nothing(
     assert capsys.readouterr().err == ""
 
 
-def test_recent_merged_pull_requests_skips_an_entry_with_no_merge_time(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "merged_at",
+    [
+        pytest.param(None, id="no-merge-time"),
+        pytest.param("2026-08-01T00:00:00Z", id="merged-earlier-on-the-cutoff-day"),
+    ],
+)
+def test_recent_merged_pull_requests_skips_an_entry_outside_the_window(
+    monkeypatch: pytest.MonkeyPatch, merged_at: str | None
 ) -> None:
     """`mergedAt` can be `None` on an otherwise well-shaped merged-search row
     (a defensive read, not a documented GitHub behavior); such a row cannot
     be dated against the window, so it is skipped rather than crashing the
-    whole fetch."""
-    since = datetime(2026, 8, 1, tzinfo=UTC)
+    whole fetch. The day-sharded search also returns the whole cutoff day, so
+    a merge from before the cutoff's time of day is filtered out too."""
+    since = datetime(2026, 8, 1, 12, tzinfo=UTC)
 
     class FixedDateTime(datetime):
         @classmethod
@@ -2239,7 +2247,7 @@ def test_recent_merged_pull_requests_skips_an_entry_with_no_merge_time(
         "title": "Fixes #1",
         "body": "",
         "headRefName": "codex/issue-1",
-        "mergedAt": None,
+        "mergedAt": merged_at,
     }
     client = GitHubForge(
         github.repository_id("example/agent-coordination"), run=lambda arguments: json.dumps(row)

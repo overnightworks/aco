@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
+from typing import assert_never
 
 
 class NativeCommandState(StrEnum):
@@ -62,6 +63,8 @@ def resume_command(
             if model is not None:
                 command.extend(("--model", model))
             return command
+        case _:
+            assert_never(provider)
 
 
 def native_executable(provider: Provider) -> str | None:
