@@ -1,0 +1,7 @@
+claim_id = "126fa5a4cadd435c85fc6275c2c6e452"
+agent = "claude"
+role = "builder"
+base = "8fddd020d4369540b73f447f3a8dc63671da3c6e"
+branch = "claude/issue-74-test-bootstrap-pilot"
+scope = ["tests/test_bootstrap.py", "tests/test_cli.py"]
+opened_commit = "a787b0ee4a426c079bf5abccc68bb462f192aa6f"
