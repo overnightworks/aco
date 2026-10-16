@@ -27,7 +27,7 @@ def _numbered_lines(count: int) -> str:
     return "".join(f"assert {number} == {number}\n" for number in range(count))
 
 
-def _test(name: str, *literals: str) -> str:
+def _test(name: str, *literals: str | int) -> str:
     """A test module fragment asserting each of *literals* (default: the name's own)."""
     asserted = literals or (f"{name}-literal",)
     body = "".join(f"    assert value == {literal!r}\n" for literal in asserted)
@@ -124,6 +124,16 @@ def test_rewritten_modules_names_only_a_module_shrunk_past_the_threshold(
             {_path("alpha"): _test("alpha") + _test("gamma"), _path("beta"): _test("delta")},
             [],
         ),
+        (
+            {_path("alpha"): _test("alpha", 0, "")},
+            {_path("alpha"): _test("gamma", 0, ""), _path("beta"): _test("delta", 0, "")},
+            [],
+        ),
+        (
+            {_path("alpha"): _test("alpha", 0, "old-only")},
+            {_path("alpha"): _test("gamma"), _path("beta"): _test("delta", 0)},
+            [],
+        ),
     ],
     ids=[
         "tests-moved-to-a-new-module",
@@ -132,6 +142,8 @@ def test_rewritten_modules_names_only_a_module_shrunk_past_the_threshold(
         "tests-removed-without-any-appearing",
         "tests-renamed-within-one-module",
         "rename-in-one-module-plus-an-unrelated-new-test-elsewhere",
+        "rename-plus-an-unrelated-new-test-sharing-only-generic-literals",
+        "a-lost-test-and-a-new-test-sharing-only-a-number-is-no-move",
     ],
 )
 def test_family_move_modules_names_the_modules_a_move_involves(
@@ -211,6 +223,29 @@ def test_run_ci_judges_a_family_move_by_the_literal_union(
         True,
     )
     assert "rewrite" not in captured.out + captured.err
+
+
+def test_run_ci_still_judges_a_rewrite_when_an_unrelated_test_shares_only_a_generic_literal(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = _commit_modules(
+        repo,
+        {
+            _path("alpha"): _test("alpha", "must-preserve", 0),
+            _path("beta"): _test("beta", "must-preserve"),
+        },
+    )
+    _commit_modules(
+        repo,
+        {
+            _path("alpha"): _test("renamed", "reworded"),
+            _path("beta"): _test("beta", "must-preserve") + _test("gamma", 0),
+        },
+    )
+
+    exit_code = run_ci(base)
+
+    assert (exit_code, "'must-preserve'" in capsys.readouterr().err) == (1, True)
 
 
 def test_run_ci_skips_a_change_without_rewrite_or_family_move(

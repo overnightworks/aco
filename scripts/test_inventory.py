@@ -65,7 +65,11 @@ HEAD). A deleted file is still judged when its tests' literals travel into a new
 
 A **family move** is the other way a literal can vanish unseen: an assert literal of a test that
 exists at the base and is gone at HEAD reappears in a test that is new at HEAD in a *different*
-module (the literal travels). A rename inside one module plus an unrelated new test elsewhere is
+module (the literal travels). Only a *distinctive* literal is evidence of travel: a ``str`` or
+``bytes`` whose content, stripped of surrounding whitespace, has at least
+``DISTINCTIVE_LITERAL_MIN_LENGTH`` characters; numbers, booleans and shorter texts (``0``,
+``True``, ``''``, ``'ok'``) recur in unrelated tests, so they prove no move (they still count in
+the union comparison below). A rename inside one module plus an unrelated new test elsewhere is
 no move. No single module need shrink past the threshold -- a family leaving a 24 000-line file
 never does -- so the gate compares the literal union of every module involved instead, and judges
 a module in a move only by that union, never additionally as a rewrite.
@@ -131,6 +135,9 @@ SHINGLE_SIZE = 6
 CLONE_THRESHOLD = 0.80
 FAIL = "FAIL"
 _LITERAL_TYPES = (str, bytes, int)
+# Numbers, booleans and short texts (``0``, ``True``, ``''``, ``'ok'``) recur in unrelated tests,
+# so sharing one proves no test moved.
+DISTINCTIVE_LITERAL_MIN_LENGTH = 4
 _LAYOUT_TOKENS = frozenset(
     {
         tokenize.COMMENT,
@@ -760,6 +767,13 @@ def rewritten_modules(base: str) -> list[str]:
     return sorted(rewritten)
 
 
+def is_distinctive_literal(key: str) -> bool:
+    """Whether the literal *key* is evidence that a test travelled: a ``str``/``bytes`` text of
+    at least ``DISTINCTIVE_LITERAL_MIN_LENGTH`` characters once surrounding whitespace is cut."""
+    value = ast.literal_eval(key)
+    return isinstance(value, str | bytes) and len(value.strip()) >= DISTINCTIVE_LITERAL_MIN_LENGTH
+
+
 def _literals_by_test(path: str, source: str | None) -> dict[str, frozenset[str]]:
     """``test qualname -> assert-literal keys`` of *source*; empty for a module absent there."""
     if source is None:
@@ -784,7 +798,7 @@ def family_move_modules(base: str) -> list[str]:
     involved: set[str] = set()
     for source, gone in lost.items():
         for destination, arrived in gained.items():
-            if source != destination and gone & arrived:
+            if source != destination and any(map(is_distinctive_literal, gone & arrived)):
                 involved |= {source, destination}
     return sorted(involved)
 
