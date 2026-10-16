@@ -309,12 +309,12 @@ machine-readable status overview for agents and scripts; `aco-board` reads
 its own decisions through `aco rulings --json` and writes them through
 `aco rule` instead (`specs/aco-board.spec.md`). `--html` and `--serve`
 (issue #280) were removed once `aco-board` took over the decision board
-(issue #644): `aco board --serve` now refuses, pointing at `aco-board serve`
+(issue #5): `aco board --serve` now refuses, pointing at `aco-board serve`
 instead.
-Every item that carries a top-level `size = "S"|"M"|"L"` shows a measured
-estimate (`~4h (M, n=5)`) only once three or more same-size claims have
-landed; fewer measurements, including zero, show `schwach` instead. The
-exact JSON keys and estimate derivation are `specs/board.spec.md`'s own.
+Every item carries `size` (`"S"`, `"M"`, `"L"` or `null`) and `estimate`:
+`null` without a size, otherwise the measured median hours of same-size landed
+claims with their count `n`; `weak` is `true` while that count is too small to
+trust. The exact JSON keys and estimate derivation are `specs/board.spec.md`'s own.
 
 `aco-board serve [--port N] [--repo PFAD]...` serves one or more
 repositories' open expectation lines, under one URL, as yes/no cards on
