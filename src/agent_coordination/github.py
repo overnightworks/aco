@@ -38,19 +38,17 @@ GRAPHQL_ITEM_REFERENCE_BATCH_SIZE = 100
 # (`OPEN`/`CLOSED`) and `PullRequest` (`OPEN`/`CLOSED`/`MERGED`); `forge.
 # ItemReference.state` only ever distinguishes open from not, matching the
 # REST issues endpoint `item_reference` reads a single number through, so a
-# merged pull request reads exactly like a closed one here too.
-_GRAPHQL_ITEM_STATES: dict[str, forge.ItemState] = {
-    "OPEN": forge.ItemState.OPEN,
-    "CLOSED": forge.ItemState.CLOSED,
-    "MERGED": forge.ItemState.CLOSED,
-}
-# GraphQL's own schema: `Issue.state` is `OPEN`/`CLOSED` only -- `MERGED`
-# exists solely on `PullRequestState`, so an `Issue` node claiming `MERGED`
-# is impossible on the wire and a malformed response, never a state to
-# normalize (issue #440 review).
-_GRAPHQL_ITEM_STATES_BY_TYPENAME: dict[str, frozenset[str]] = {
-    "Issue": frozenset({"OPEN", "CLOSED"}),
-    "PullRequest": frozenset({"OPEN", "CLOSED", "MERGED"}),
+# merged pull request reads exactly like a closed one here too. GraphQL's own
+# schema has `MERGED` solely on `PullRequestState`, so an `Issue` node
+# claiming it is impossible on the wire and a malformed response, never a
+# state to normalize (issue #440 review).
+_GRAPHQL_ITEM_STATES_BY_TYPENAME: dict[str, dict[str, forge.ItemState]] = {
+    "Issue": {"OPEN": forge.ItemState.OPEN, "CLOSED": forge.ItemState.CLOSED},
+    "PullRequest": {
+        "OPEN": forge.ItemState.OPEN,
+        "CLOSED": forge.ItemState.CLOSED,
+        "MERGED": forge.ItemState.CLOSED,
+    },
 }
 _MALFORMED_BATCHED_ITEM_REFERENCE = "GitHub returned a malformed batched item reference"
 GH_TIMEOUT_SECONDS = 60
@@ -261,16 +259,13 @@ def _parsed_item_reference_node(node: object) -> forge.ItemReference:
     if (
         not isinstance(typename, str)
         or not isinstance(state, str)
-        # Every state named per typename is already a key of
-        # `_GRAPHQL_ITEM_STATES`, so this alone also rejects a state
-        # `_GRAPHQL_ITEM_STATES` does not know at all.
-        or state not in _GRAPHQL_ITEM_STATES_BY_TYPENAME.get(typename, frozenset())
+        or state not in _GRAPHQL_ITEM_STATES_BY_TYPENAME.get(typename, {})
         or not isinstance(title, str)
         or (body is not None and not isinstance(body, str))
     ):
         raise forge.ForgeMalformedResponseError(_MALFORMED_BATCHED_ITEM_REFERENCE)
     return forge.ItemReference(
-        _GRAPHQL_ITEM_STATES[state], title, body or "", typename == "PullRequest"
+        _GRAPHQL_ITEM_STATES_BY_TYPENAME[typename][state], title, body or "", typename == "PullRequest"
     )
 
 
