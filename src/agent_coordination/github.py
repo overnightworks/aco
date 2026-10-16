@@ -265,7 +265,10 @@ def _parsed_item_reference_node(node: object) -> forge.ItemReference:
     ):
         raise forge.ForgeMalformedResponseError(_MALFORMED_BATCHED_ITEM_REFERENCE)
     return forge.ItemReference(
-        _GRAPHQL_ITEM_STATES_BY_TYPENAME[typename][state], title, body or "", typename == "PullRequest"
+        _GRAPHQL_ITEM_STATES_BY_TYPENAME[typename][state],
+        title,
+        body or "",
+        typename == "PullRequest",
     )
 
 
