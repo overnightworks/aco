@@ -148,7 +148,7 @@ def start_board(
     # so the shell at `PAGE_PATH` needs no token to answer it (ABRD-10).
     url = (
         # S5332: loopback only, no TLS by ruled design (#620 line 4)
-        f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}"  # NOSONAR(python:S5332)
+        f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}"  # NOSONAR(S5332) loopback-only URL
         f"#{TOKEN_FIELD}={token}"
     )
     return RunningBoard(httpd=httpd, url=url)

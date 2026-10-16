@@ -317,7 +317,7 @@ def start(
     bound_port = httpd.server_address[1]
     url = (
         # S5332: loopback only, no TLS by ruled design (#280 line 3)
-        f"http://{LOOPBACK_HOST}:{bound_port}{_ROOT_PATH}"  # NOSONAR(python:S5332)
+        f"http://{LOOPBACK_HOST}:{bound_port}{_ROOT_PATH}"  # NOSONAR(S5332) loopback-only URL
         f"?{TOKEN_FIELD}={token}"
     )
     return BoardServer(httpd=httpd, url=url, token=token)
