@@ -32,6 +32,7 @@ def _tree_citing(root: Path, *spec_ids: str) -> Path:
         (("BOOT-01", "BOOT-02"), ("BOOT-01",), 1, True),
         (("BOOT-01",), ("BOOT-01", "BOOT-01"), 1, False),
         (("BOOT-01",), (), 0, True),
+        (("BOOT-04",), ("BOOT-07",), 1, True),
     ],
     ids=[
         "unchanged-citations-pass",
@@ -39,9 +40,10 @@ def _tree_citing(root: Path, *spec_ids: str) -> Path:
         "fewer-citations-fail",
         "a-repeated-citation-counts-once",
         "dropping-every-citation-fails",
+        "swapping-one-id-for-another-fails",
     ],
 )
-def test_the_tree_may_not_cite_fewer_spec_ids_than_the_merge_base(
+def test_the_tree_may_not_lose_a_spec_id_the_merge_base_cites(
     tmp_path: Path,
     base_ids: tuple[str, ...],
     head_ids: tuple[str, ...],
@@ -56,4 +58,23 @@ def test_the_tree_may_not_cite_fewer_spec_ids_than_the_merge_base(
     assert (head["tests"].spec_ids, test_budget.blocks(findings, [])) == (
         expected_count,
         expected_blocks,
+    )
+
+
+def test_a_lost_spec_id_is_named_with_the_files_that_cited_it_at_the_base(
+    tmp_path: Path,
+) -> None:
+    head = test_budget.measure(_tree_citing(tmp_path / "head", "BOOT-07"))
+    base = test_budget.measure(_tree_citing(tmp_path / "base", "BOOT-04"))
+
+    (finding,) = test_budget.compare(head, base)
+
+    assert (
+        finding.metric,
+        "BOOT-04" in finding.detail,
+        "tests/test_example.py" in finding.detail,
+    ) == (
+        "spec_ids",
+        True,
+        True,
     )

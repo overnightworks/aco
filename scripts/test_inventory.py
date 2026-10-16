@@ -60,13 +60,15 @@ A test module counts as **rewritten** when the diff against the base removes ``g
 base line count -- the simplest honest signal that a file was rebuilt rather than edited, and
 the same number a reviewer sees in the diff stat. A brand-new file (absent at the base) has
 nothing to shrink and is never "rewritten" by this rule; neither is a deleted file (absent at
-HEAD), whose removal is the change's own reviewed decision rather than a rewrite that quietly
-drops literals.
+HEAD). A deleted file is still judged when its tests' literals travel into a new test elsewhere
+(family move, below); a deletion whose literals go nowhere is the change's own reviewed decision.
 
-A **family move** is the other way a literal can vanish unseen: in one diff, test functions
-leave one test module (or the module is deleted) and test functions appear in another (possibly
-new) module. No single module need shrink past the threshold -- a family leaving a 24 000-line
-file never does -- so the gate compares the literal union of every module involved instead.
+A **family move** is the other way a literal can vanish unseen: an assert literal of a test that
+exists at the base and is gone at HEAD reappears in a test that is new at HEAD in a *different*
+module (the literal travels). A rename inside one module plus an unrelated new test elsewhere is
+no move. No single module need shrink past the threshold -- a family leaving a 24 000-line file
+never does -- so the gate compares the literal union of every module involved instead, and judges
+a module in a move only by that union, never additionally as a rewrite.
 
 With neither a rewritten module nor a family move in the diff, the job SKIPS with a one-line
 sentence naming the base and the threshold (exit 0). Otherwise each rewritten module, and the
@@ -758,29 +760,33 @@ def rewritten_modules(base: str) -> list[str]:
     return sorted(rewritten)
 
 
-def _test_names(path: str, source: str | None) -> frozenset[str]:
-    """The qualified names of the tests in *source*; none for a module absent at that commit."""
+def _literals_by_test(path: str, source: str | None) -> dict[str, frozenset[str]]:
+    """``test qualname -> assert-literal keys`` of *source*; empty for a module absent there."""
     if source is None:
-        return frozenset()
+        return {}
     tree = ast.parse(source, filename=path)
-    cases, _classes, _single = iter_tests(tree, module_scope(tree))
-    return frozenset(case.qualname for case in cases)
+    scope = module_scope(tree)
+    cases, _classes, _single = iter_tests(tree, scope)
+    return {case.qualname: frozenset(test_literals(case, scope)) for case in cases}
 
 
 def family_move_modules(base: str) -> list[str]:
-    """Every test module involved in a family move against *base*: tests leave one module and
-    tests appear in a different one in the same diff (see the module docstring)."""
-    losing: set[str] = set()
-    gaining: set[str] = set()
+    """Every test module involved in a family move against *base*: an assert literal of a test
+    that is gone at HEAD reappears in a test that is new at HEAD in a different module (see the
+    module docstring)."""
+    lost: dict[str, set[str]] = {}
+    gained: dict[str, set[str]] = {}
     for path in changed_test_module_stats(base):
-        before = _test_names(path, git_show_file(base, path))
-        after = _test_names(path, git_show_file("HEAD", path))
-        if before - after:
-            losing.add(path)
-        if after - before:
-            gaining.add(path)
-    involved = losing | gaining
-    return sorted(involved) if losing and gaining and len(involved) > 1 else []
+        before = _literals_by_test(path, git_show_file(base, path))
+        after = _literals_by_test(path, git_show_file("HEAD", path))
+        lost[path] = set().union(*(before[name] for name in before.keys() - after.keys()))
+        gained[path] = set().union(*(after[name] for name in after.keys() - before.keys()))
+    involved: set[str] = set()
+    for source, gone in lost.items():
+        for destination, arrived in gained.items():
+            if source != destination and gone & arrived:
+                involved |= {source, destination}
+    return sorted(involved)
 
 
 def load_dropped(path: Path) -> dict[str, frozenset[str]]:
@@ -839,8 +845,8 @@ def run_ci(target: str | None) -> int:
     except TargetError as exc:
         print(f"{FAIL}: {exc}", file=sys.stderr)
         return 1
-    groups = [([path], "rewrite") for path in rewritten_modules(base)]
     family = family_move_modules(base)
+    groups = [([path], "rewrite") for path in rewritten_modules(base) if path not in family]
     if family:
         groups.append((family, "family move"))
     if not groups:

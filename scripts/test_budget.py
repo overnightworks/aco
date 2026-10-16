@@ -42,8 +42,9 @@ homes the per-module copies should move into)
     one parametrized test replaces. No aco-specific token group is named yet, so this also
     reads 0 until one is.
 (g) ``spec_ids`` -- the distinct spec IDs the ``test_*`` docstrings of the tree cite after a
-    ``Spec:`` marker, read with ``test_inventory.iter_spec_citations``. Falling BLOCKS like (c):
-    a change may not cover fewer criteria than its merge-base.
+    ``Spec:`` marker, read with ``test_inventory.iter_spec_citations``. Compared as a SET: an ID
+    the merge-base cites and the tree does not BLOCKS like (c), even when another ID is gained.
+    The finding names the lost IDs and the files that cited them at the base.
 
 Target-relative rule (issue #319, base-selection concept agreed 2026-09-19)
 ----------------------------------------------------------------------------------------------
@@ -62,7 +63,7 @@ out full history and a shallow local clone is deepened first (``git fetch --unsh
 
 Against that baseline:
 
-* (c) or (g) falling, or (d), (e) or (f) rising, BLOCKS (``FAIL``, exit 1) -- unless
+* (c) falling, (g) losing an ID, or (d), (e) or (f) rising, BLOCKS (``FAIL``, exit 1) -- unless
   ``scripts/test_budget_ratchet.txt`` gained a ``# budget: <why> [SPEC-IDs]`` line in this
   change (present in the head's ledger, absent from the target's copy). A raise is paid for in
   the same change as the test growth it buys and named so a reviewer can weigh it -- never to
@@ -122,7 +123,8 @@ SIBLING_TOKEN_GROUPS: tuple[frozenset[str], ...] = ()
 
 FILE_KEYS = ("lines", "tests", "parametrized", "clone_lines", "init_helpers", "literal_siblings")
 SHARE_METRIC = "parametrized_share_pct"
-TREE_KEYS = (*FILE_KEYS, SHARE_METRIC, "spec_ids")
+SPEC_METRIC = "spec_ids"
+TREE_KEYS = (*FILE_KEYS, SHARE_METRIC, SPEC_METRIC)
 FAIL = "FAIL"
 WARN = "WARN"
 # Metrics compared against the target: the direction that is the wrong way (+1 rising,
@@ -133,7 +135,6 @@ WATCHED = (
     ("clone_lines", 1, FAIL),
     ("init_helpers", 1, FAIL),
     ("literal_siblings", 1, FAIL),
-    ("spec_ids", -1, FAIL),
 )
 _WRONG_WAY = {metric: direction for metric, direction, _ in WATCHED}
 # The per-file column that explains a move of each watched metric, and whether it moves with
@@ -144,7 +145,6 @@ _EXPLAINS = {
     "clone_lines": ("clone_lines", 1),
     "init_helpers": ("init_helpers", 1),
     "literal_siblings": ("literal_siblings", 1),
-    "spec_ids": ("spec_ids", 1),
 }
 TOP_FILES = 5
 
@@ -168,10 +168,6 @@ class FileMetrics:
     @property
     def unparametrized(self) -> int:
         return self.tests - self.parametrized
-
-    @property
-    def spec_ids(self) -> int:
-        return len(self.credited)
 
 
 @dataclass
@@ -653,7 +649,30 @@ def compare(reports: dict[str, TreeReport], target: dict[str, TreeReport]) -> li
                     _detail(report, previous, metric, change),
                 )
             )
+        lost = _lost_spec_finding(tree, report, previous)
+        if lost:
+            findings.append(lost)
     return findings
+
+
+def _lost_spec_finding(tree: str, report: TreeReport, previous: TreeReport) -> Finding | None:
+    """A FAIL finding when the target cites a spec ID the tree no longer does."""
+    lost = sorted(previous.credited - report.credited)
+    if not lost:
+        return None
+    citing_files = sorted(
+        rel for rel, metrics in previous.files.items() if metrics.credited & set(lost)
+    )
+    return Finding(
+        tree,
+        SPEC_METRIC,
+        FAIL,
+        report.spec_ids,
+        previous.spec_ids,
+        report.spec_ids - previous.spec_ids,
+        [],
+        f"lost {', '.join(lost)}; cited at the target in {', '.join(citing_files)}",
+    )
 
 
 def blocks(findings: list[Finding], new_entries: list[str]) -> bool:
@@ -685,9 +704,9 @@ def _print_table(reports: dict[str, TreeReport], target: dict[str, TreeReport]) 
 
 def _print_findings(findings: list[Finding], new_entries: list[str]) -> None:
     for finding in findings:
-        rose = _WRONG_WAY[finding.metric] > 0
+        comparator = {1: ">", -1: "<"}.get(_WRONG_WAY.get(finding.metric, 0), "vs")
         head = (
-            f"{finding.tree} {finding.metric}: {_number(finding.current)} {'>' if rose else '<'} "
+            f"{finding.tree} {finding.metric}: {_number(finding.current)} {comparator} "
             f"target {_number(finding.target)} ({_signed(finding.delta)})"
         )
         if finding.detail:
@@ -698,7 +717,7 @@ def _print_findings(findings: list[Finding], new_entries: list[str]) -> None:
             print(f"ALLOWED {head} -- justified by a new line in {RATCHET_REL}", file=sys.stderr)
         else:
             print(
-                f"{FAIL} {head} -- a raise needs a `{RATCHET_ENTRY_PREFIX} <why> [SPEC-IDs]` "
+                f"{FAIL} {head} -- this needs a `{RATCHET_ENTRY_PREFIX} <why> [SPEC-IDs]` "
                 f"line added to {RATCHET_REL} in this change",
                 file=sys.stderr,
             )

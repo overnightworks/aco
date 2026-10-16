@@ -18,22 +18,20 @@ rewritten_modules = test_inventory.rewritten_modules
 family_move_modules = test_inventory.family_move_modules
 run_ci = test_inventory.run_ci
 
-_MODULE = "tests/test_example.py"
-_ALPHA_MODULE = "tests/test_alpha.py"
-_BETA_MODULE = "tests/test_beta.py"
-_LEDGER = "scripts/test_inventory_dropped.txt"
-_TEN_LINES = "".join(f"assert {number} == {number}\n" for number in range(10))
-_TWO_LINES = "assert 0 == 0\nassert 1 == 1\n"
+
+def _path(module: str) -> str:
+    return f"tests/test_{module}.py"
 
 
-def _test_source(name: str, literal: str) -> str:
-    return f"def test_{name}():\n    assert value == {literal!r}\n"
+def _numbered_lines(count: int) -> str:
+    return "".join(f"assert {number} == {number}\n" for number in range(count))
 
 
-_ALPHA_TEST = _test_source("alpha", "alpha-literal")
-_BETA_TEST = _test_source("beta", "beta-literal")
-_BETA_REWORDED_TEST = _test_source("beta", "reworded-literal")
-_GAMMA_TEST = _test_source("gamma", "gamma-literal")
+def _test(name: str, *literals: str) -> str:
+    """A test module fragment asserting each of *literals* (default: the name's own)."""
+    asserted = literals or (f"{name}-literal",)
+    body = "".join(f"    assert value == {literal!r}\n" for literal in asserted)
+    return f"def test_{name}():\n{body}"
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -71,9 +69,9 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @pytest.mark.parametrize(
     ("base_content", "head_content", "expected"),
     [
-        (_TEN_LINES, None, []),
-        (None, _TEN_LINES, []),
-        (_TEN_LINES, _TWO_LINES, [_MODULE]),
+        (_numbered_lines(10), None, []),
+        (None, _numbered_lines(10), []),
+        (_numbered_lines(10), _numbered_lines(2), [_path("example")]),
     ],
     ids=[
         "deleted-module-is-not-a-rewrite",
@@ -87,8 +85,8 @@ def test_rewritten_modules_names_only_a_module_shrunk_past_the_threshold(
     head_content: str | None,
     expected: list[str],
 ) -> None:
-    base = _commit_modules(repo, {_MODULE: base_content})
-    _commit_modules(repo, {_MODULE: head_content})
+    base = _commit_modules(repo, {_path("example"): base_content})
+    _commit_modules(repo, {_path("example"): head_content})
 
     assert rewritten_modules(base) == expected
 
@@ -97,28 +95,33 @@ def test_rewritten_modules_names_only_a_module_shrunk_past_the_threshold(
     ("base_modules", "head_modules", "expected"),
     [
         (
-            {_ALPHA_MODULE: _ALPHA_TEST + _BETA_TEST},
-            {_ALPHA_MODULE: _ALPHA_TEST, _BETA_MODULE: _BETA_TEST},
-            [_ALPHA_MODULE, _BETA_MODULE],
+            {_path("alpha"): _test("alpha") + _test("beta")},
+            {_path("alpha"): _test("alpha"), _path("beta"): _test("beta")},
+            [_path("alpha"), _path("beta")],
         ),
         (
-            {_ALPHA_MODULE: _ALPHA_TEST + _BETA_TEST},
-            {_ALPHA_MODULE: None, _BETA_MODULE: _ALPHA_TEST + _BETA_TEST},
-            [_ALPHA_MODULE, _BETA_MODULE],
+            {_path("alpha"): _test("alpha") + _test("beta")},
+            {_path("alpha"): None, _path("beta"): _test("alpha") + _test("beta")},
+            [_path("alpha"), _path("beta")],
         ),
         (
-            {_ALPHA_MODULE: _ALPHA_TEST},
-            {_ALPHA_MODULE: _ALPHA_TEST, _BETA_MODULE: _BETA_TEST},
+            {_path("alpha"): _test("alpha")},
+            {_path("alpha"): _test("alpha"), _path("beta"): _test("beta")},
             [],
         ),
         (
-            {_ALPHA_MODULE: _ALPHA_TEST + _BETA_TEST},
-            {_ALPHA_MODULE: _ALPHA_TEST},
+            {_path("alpha"): _test("alpha") + _test("beta")},
+            {_path("alpha"): _test("alpha")},
             [],
         ),
         (
-            {_ALPHA_MODULE: _ALPHA_TEST + _BETA_TEST},
-            {_ALPHA_MODULE: _ALPHA_TEST + _GAMMA_TEST},
+            {_path("alpha"): _test("alpha") + _test("beta")},
+            {_path("alpha"): _test("alpha") + _test("gamma")},
+            [],
+        ),
+        (
+            {_path("alpha"): _test("alpha") + _test("beta")},
+            {_path("alpha"): _test("alpha") + _test("gamma"), _path("beta"): _test("delta")},
             [],
         ),
     ],
@@ -128,6 +131,7 @@ def test_rewritten_modules_names_only_a_module_shrunk_past_the_threshold(
         "tests-added-without-any-leaving",
         "tests-removed-without-any-appearing",
         "tests-renamed-within-one-module",
+        "rename-in-one-module-plus-an-unrelated-new-test-elsewhere",
     ],
 )
 def test_family_move_modules_names_the_modules_a_move_involves(
@@ -142,26 +146,43 @@ def test_family_move_modules_names_the_modules_a_move_involves(
     assert family_move_modules(base) == expected
 
 
-# The source keeps its gamma test so it shrinks by a third, short of the rewrite threshold.
-_MOVED_BETA = {_ALPHA_MODULE: _ALPHA_TEST + _GAMMA_TEST, _BETA_MODULE: _BETA_TEST}
-_MOVED_REWORDED_BETA = {
-    _ALPHA_MODULE: _ALPHA_TEST + _GAMMA_TEST,
-    _BETA_MODULE: _BETA_REWORDED_TEST,
-}
-_REWORDED_LEDGER = f"{_BETA_MODULE}\t'beta-literal'\treworded on purpose\n"
+def _moved_beta(*beta_literals: str) -> dict[str, str | None]:
+    """The alpha module keeps two tests (it shrinks short of the rewrite threshold) while
+    the beta test, with *beta_literals*, appears in a second module."""
+    return {
+        _path("alpha"): _test("alpha") + _test("gamma"),
+        _path("beta"): _test("beta", *beta_literals),
+    }
 
 
 @pytest.mark.parametrize(
-    ("head_modules", "ledger", "expected_exit", "expected_stderr"),
+    ("head_modules", "ledger", "expected_exit", "expected_stdout", "expected_stderr"),
     [
-        (_MOVED_BETA, None, 0, ""),
-        (_MOVED_REWORDED_BETA, None, 1, "'beta-literal'"),
-        (_MOVED_REWORDED_BETA, _REWORDED_LEDGER, 0, ""),
+        (_moved_beta("kept", "also-kept"), None, 0, "family move", ""),
+        (_moved_beta("kept"), None, 1, "", "'also-kept'"),
+        (
+            _moved_beta("kept"),
+            f"{_path('beta')}\t'also-kept'\treworded on purpose\n",
+            0,
+            "family move",
+            "",
+        ),
+        (
+            {
+                _path("alpha"): _test("alpha"),
+                _path("beta"): _test("beta", "kept", "also-kept") + _test("gamma"),
+            },
+            None,
+            0,
+            "family move",
+            "",
+        ),
     ],
     ids=[
         "move-keeping-every-literal-passes",
         "move-losing-a-literal-fails",
         "move-losing-a-ledgered-literal-passes",
+        "module-rewritten-and-moved-gets-only-the-union-verdict",
     ],
 )
 def test_run_ci_judges_a_family_move_by_the_literal_union(
@@ -170,24 +191,33 @@ def test_run_ci_judges_a_family_move_by_the_literal_union(
     head_modules: dict[str, str | None],
     ledger: str | None,
     expected_exit: int,
+    expected_stdout: str,
     expected_stderr: str,
 ) -> None:
-    base = _commit_modules(repo, {_ALPHA_MODULE: _ALPHA_TEST + _BETA_TEST + _GAMMA_TEST})
+    base = _commit_modules(
+        repo, {_path("alpha"): _test("alpha") + _test("beta", "kept", "also-kept") + _test("gamma")}
+    )
     _commit_modules(repo, head_modules)
     if ledger is not None:
-        (repo / _LEDGER).parent.mkdir()
-        (repo / _LEDGER).write_text(ledger, encoding="utf-8")
+        (repo / test_inventory.DROPPED_REL).parent.mkdir()
+        (repo / test_inventory.DROPPED_REL).write_text(ledger, encoding="utf-8")
 
     exit_code = run_ci(base)
 
-    assert (exit_code, expected_stderr in capsys.readouterr().err) == (expected_exit, True)
+    captured = capsys.readouterr()
+    assert (exit_code, expected_stdout in captured.out, expected_stderr in captured.err) == (
+        expected_exit,
+        True,
+        True,
+    )
+    assert "rewrite" not in captured.out + captured.err
 
 
 def test_run_ci_skips_a_change_without_rewrite_or_family_move(
     repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    base = _commit_modules(repo, {_ALPHA_MODULE: _ALPHA_TEST})
-    _commit_modules(repo, {_ALPHA_MODULE: _ALPHA_TEST + _BETA_TEST})
+    base = _commit_modules(repo, {_path("alpha"): _test("alpha")})
+    _commit_modules(repo, {_path("alpha"): _test("alpha") + _test("beta")})
 
     exit_code = run_ci(base)
 
