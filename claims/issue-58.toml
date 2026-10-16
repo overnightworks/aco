@@ -3,5 +3,5 @@ agent = "claude"
 role = "builder"
 base = "389af6153f05e39383b5a57a47c8ecf77100a4f4"
 branch = "claude/issue-58-argparse-public-api"
-scope = ["pyproject.toml", "src/agent_coordination/cli.py"]
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "tests/test_cli.py"]
 opened_commit = "9def6266dcf5c4d81c5ff46e11edb996f9f1ccbf"
