@@ -311,8 +311,8 @@ its own decisions through `aco rulings --json` and writes them through
 (issue #280) were removed once `aco-board` took over the decision board
 (issue #5): `aco board --serve` now refuses, pointing at `aco-board serve`
 instead.
-Items with a top-level `size` also carry a size estimate in `aco board --json`;
-its keys, its derivation and when it is `null` or weak are `specs/board.spec.md`'s own.
+Each item in `aco board --json` carries `size` and a nullable `estimate`;
+`specs/board.spec.md` defines their JSON representation.
 
 `aco-board serve [--port N] [--repo PFAD]...` serves one or more
 repositories' open expectation lines, under one URL, as yes/no cards on
