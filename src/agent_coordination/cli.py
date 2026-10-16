@@ -4856,6 +4856,13 @@ def _brief_json(composition: _BriefComposition) -> int:
         else _brief_claim_json(live, composition.observed_at, composition.lane_shared),
         "tip": composition.tip,
         "touched": list(composition.touched),
+        "outside_claim": None
+        if live is None
+        else [
+            path
+            for path in composition.touched
+            if not protocol.scopes_overlap(live.claim.scope, (path,))
+        ],
     }
     step_rules = composition.step_rules
     if step_rules is not None:

@@ -26,12 +26,12 @@ collection point prints `ERROR: <sentence>` on stderr, exit `2`.
 
 | state \ trigger | `aco brief <item>` (text) | `aco brief <item> --json` |
 |---|---|---|
-| a live issue claim, lane branch resolves | BRIEF-01, BRIEF-02, BRIEF-11, BRIEF-26, BRIEF-05 | BRIEF-06, BRIEF-10 |
-| a live issue claim, lane branch gone | BRIEF-04 | BRIEF-06, BRIEF-10 |
+| a live issue claim, lane branch resolves | BRIEF-01, BRIEF-02, BRIEF-11, BRIEF-26, BRIEF-05 | BRIEF-06, BRIEF-10, BRIEF-27 |
+| a live issue claim, lane branch gone | BRIEF-04 | BRIEF-06, BRIEF-10, BRIEF-27 |
 | a live issue claim, lane branch read or `<trunk>` diff fails outright | BRIEF-18 | BRIEF-18 |
 | a live issue claim, lane branch resolves, no `<trunk>`, `<remote>` has no branch | BRIEF-20 | BRIEF-20 |
 | a live issue claim, lane branch resolves, no `<trunk>`, `<remote>` has branches | BRIEF-21 | BRIEF-21 |
-| no live issue claim | BRIEF-03 | BRIEF-06 |
+| no live issue claim | BRIEF-03 | BRIEF-06, BRIEF-27 |
 | `<item>` names no item at all | BRIEF-08 | BRIEF-08 |
 | the body holds a display control | BRIEF-23 | BRIEF-06 |
 | a non-GitHub canonical remote | BRIEF-07 | BRIEF-07 |
@@ -57,6 +57,7 @@ collection point prints `ERROR: <sentence>` on stderr, exit `2`.
 ## `--json`
 
 - [ ] [BRIEF-06] `aco brief <item> --json` prints `specs/output.spec.md`'s envelope, `reason: "composed"`, `"body", "claim", "tip", "touched"` (as `TOUCHED`), `"claim"` `null` without a live claim (see E-BRIEF-14).
+- [ ] [BRIEF-27] `"outside_claim"`, after `"touched"`, lists, in `"touched"`'s order, each touched path the live claim's scope does not cover, `[]` when all are covered, `null` without a live claim (see E-BRIEF-04).
 - [ ] [BRIEF-10] A non-`null` `"claim"` object is `{"agent", "role", "branch", "base", "scope", "whole", "age"}` then STAT-22's keys, `"whole"` `null` without one (see E-BRIEF-04).
 
 ## `--step`
@@ -178,7 +179,7 @@ one commit on `ada/issue-42` past `<base>` touching `README.md`, pushed to
 
 ```console
 $ aco brief 42 --json
-{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"]}
+{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"], "outside_claim": []}
 exit 0
 ```
 
