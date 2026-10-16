@@ -18,10 +18,7 @@ Three sections, each sorted so two runs over the same file are byte-identical:
 (a) **Spec IDs** -- every criterion ID cited after a ``Spec:`` marker in a ``test_*``
     docstring (the comma-separated list that follows ``Spec:`` up to the first
     ``--``/em-dash/``.``; a prose mention elsewhere in the docstring is not a citation).
-    Dormant for aco: ``specs/`` exists but there is no ``spec_coverage.py`` owner yet, so no
-    test docstring carries a ``Spec:`` marker and this section is always empty -- the
-    detection itself needs no aco-specific change, it simply finds nothing until a spec
-    coverage gate exists.
+    ``scripts/test_budget.py`` reads the same citations to ratchet the tree's spec coverage.
 (b) **Assert literals** -- every literal a test *asserts about*, with the tests that hold it.
     A literal is a ``str``/``bytes``/``int``/``bool`` constant (an f-string contributes its
     constant parts). It counts when it sits in an *assertion site* -- a bare ``assert``'s test
@@ -66,15 +63,20 @@ nothing to shrink and is never "rewritten" by this rule; neither is a deleted fi
 HEAD), whose removal is the change's own reviewed decision rather than a rewrite that quietly
 drops literals.
 
-With no rewritten module in the diff, the job SKIPS with a one-line sentence naming the base and
-the threshold (exit 0). With one or more, each rewritten module's BASE and HEAD inventories are
-compared: every assert-literal key the base held that HEAD does not is a dropped literal. A
-dropped literal blocks (``FAIL``, exit 1) unless it is listed in
-``scripts/test_inventory_dropped.txt`` (module path, literal ``repr()``, reason -- tab
-separated, one per line, written by hand in the same change that drops it, the same "a reviewer
-reads the reason" exception ``test_budget.py``'s ``# budget:`` ledger and
-``similar_methods.py``'s exemption ledger use). Spec IDs are compared the same way but, being
-always empty today, never produce a finding.
+A **family move** is the other way a literal can vanish unseen: in one diff, test functions
+leave one test module (or the module is deleted) and test functions appear in another (possibly
+new) module. No single module need shrink past the threshold -- a family leaving a 24 000-line
+file never does -- so the gate compares the literal union of every module involved instead.
+
+With neither a rewritten module nor a family move in the diff, the job SKIPS with a one-line
+sentence naming the base and the threshold (exit 0). Otherwise each rewritten module, and the
+family move's module union as one unit, is compared BASE against HEAD: every assert-literal key
+the base held that HEAD does not is a dropped literal. A dropped literal blocks (``FAIL``,
+exit 1) unless it is listed in ``scripts/test_inventory_dropped.txt`` (module path, literal
+``repr()``, reason -- tab separated, one per line, written by hand in the same change that drops
+it, the same "a reviewer reads the reason" exception ``test_budget.py``'s ``# budget:`` ledger
+and ``similar_methods.py``'s exemption ledger use); for a family move a line under any involved
+module covers the union. Spec IDs are not compared here; ``test_budget.py`` ratchets them.
 
 Usage:
     uv run scripts/test_inventory.py tests/test_cli.py           # text inventory of one file
@@ -730,7 +732,7 @@ def changed_test_module_stats(base: str) -> dict[str, tuple[int, int]]:
     """``path -> (added, deleted)`` from ``git diff --numstat`` against *base*, for every
     tracked test module the diff touches."""
     pattern = f"{TESTS_DIR.as_posix()}/{TEST_MODULE_GLOB}"
-    result = _git("diff", "--numstat", base, "HEAD", "--", pattern)
+    result = _git("diff", "--numstat", "--no-renames", base, "HEAD", "--", pattern)
     stats: dict[str, tuple[int, int]] = {}
     for line in result.stdout.decode("utf-8").splitlines():
         added, deleted, path = line.split("\t", 2)
@@ -756,6 +758,31 @@ def rewritten_modules(base: str) -> list[str]:
     return sorted(rewritten)
 
 
+def _test_names(path: str, source: str | None) -> frozenset[str]:
+    """The qualified names of the tests in *source*; none for a module absent at that commit."""
+    if source is None:
+        return frozenset()
+    tree = ast.parse(source, filename=path)
+    cases, _classes, _single = iter_tests(tree, module_scope(tree))
+    return frozenset(case.qualname for case in cases)
+
+
+def family_move_modules(base: str) -> list[str]:
+    """Every test module involved in a family move against *base*: tests leave one module and
+    tests appear in a different one in the same diff (see the module docstring)."""
+    losing: set[str] = set()
+    gaining: set[str] = set()
+    for path in changed_test_module_stats(base):
+        before = _test_names(path, git_show_file(base, path))
+        after = _test_names(path, git_show_file("HEAD", path))
+        if before - after:
+            losing.add(path)
+        if after - before:
+            gaining.add(path)
+    involved = losing | gaining
+    return sorted(involved) if losing and gaining and len(involved) > 1 else []
+
+
 def load_dropped(path: Path) -> dict[str, frozenset[str]]:
     """``module path -> {literal repr}`` from *path* (tab-separated ``path, key, reason`` per
     line); a missing ledger allows nothing. Written by hand in the change that drops the
@@ -771,12 +798,38 @@ def load_dropped(path: Path) -> dict[str, frozenset[str]]:
     return {module_path: frozenset(keys) for module_path, keys in grouped.items()}
 
 
-def undocumented_drops(
-    base_inventory: Inventory, head_inventory: Inventory, allowed: frozenset[str]
-) -> list[str]:
-    """Assert-literal keys the base inventory held that HEAD dropped, minus *allowed*."""
-    dropped = set(base_inventory.literals) - set(head_inventory.literals)
-    return sorted(dropped - allowed)
+def literal_keys(commit: str, paths: list[str]) -> set[str]:
+    """The assert-literal keys of the union of *paths* at *commit*; an absent path adds none."""
+    keys: set[str] = set()
+    for path in paths:
+        source = git_show_file(commit, path)
+        if source is not None:
+            keys |= build_inventory_from_source(source, path).literals.keys()
+    return keys
+
+
+def _dropped_literals(base: str, paths: list[str]) -> set[str]:
+    return literal_keys(base, paths) - literal_keys("HEAD", paths)
+
+
+def _report_group(
+    base: str, paths: list[str], reason: str, dropped_allowed: dict[str, frozenset[str]]
+) -> bool:
+    """Compare the literal union of *paths* BASE against HEAD; say whether it failed."""
+    label = " + ".join(paths)
+    dropped = _dropped_literals(base, paths)
+    allowed = frozenset().union(*(dropped_allowed.get(path, frozenset()) for path in paths))
+    undocumented = sorted(dropped - allowed)
+    if not undocumented:
+        print(f"OK {label}: {reason}, {len(dropped)} literal(s) dropped, all documented")
+        return False
+    print(
+        f"{FAIL} {label}: literal(s) dropped by the {reason} without a {DROPPED_REL} entry:",
+        file=sys.stderr,
+    )
+    for key in undocumented:
+        print(f"    {key}", file=sys.stderr)
+    return True
 
 
 def run_ci(target: str | None) -> int:
@@ -786,37 +839,21 @@ def run_ci(target: str | None) -> int:
     except TargetError as exc:
         print(f"{FAIL}: {exc}", file=sys.stderr)
         return 1
-    rewritten = rewritten_modules(base)
-    if not rewritten:
+    groups = [([path], "rewrite") for path in rewritten_modules(base)]
+    family = family_move_modules(base)
+    if family:
+        groups.append((family, "family move"))
+    if not groups:
         print(
             f"test-inventory: no {TEST_MODULE_GLOB} diff against {base[:12]} removes "
-            f"{REWRITE_DROP_THRESHOLD_PCT}% or more of its base line count; skipping "
-            "(no rewritten test module in this change).",
+            f"{REWRITE_DROP_THRESHOLD_PCT}% or more of its base line count and no test family "
+            "moves between modules; skipping (no rewrite or family move in this change).",
         )
         return 0
 
     dropped_allowed = load_dropped(DROPPED_REL)
-    failed = False
-    for path in rewritten:
-        base_source = git_show_file(base, path)
-        assert base_source is not None  # rewritten_modules() already required a base version
-        base_inventory = build_inventory_from_source(base_source, path)
-        head_inventory = build_inventory(Path(path))
-        undocumented = undocumented_drops(
-            base_inventory, head_inventory, dropped_allowed.get(path, frozenset())
-        )
-        if undocumented:
-            failed = True
-            print(
-                f"{FAIL} {path}: literal(s) dropped by the rewrite without a {DROPPED_REL} entry:",
-                file=sys.stderr,
-            )
-            for key in undocumented:
-                print(f"    {key}", file=sys.stderr)
-        else:
-            dropped_count = len(set(base_inventory.literals) - set(head_inventory.literals))
-            print(f"OK {path}: rewritten, {dropped_count} literal(s) dropped, all documented")
-    return 1 if failed else 0
+    verdicts = [_report_group(base, paths, reason, dropped_allowed) for paths, reason in groups]
+    return 1 if any(verdicts) else 0
 
 
 def main(argv: list[str] | None = None) -> int:
