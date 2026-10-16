@@ -1,0 +1,8 @@
+claim_id = "77400276d4ec4bd1a70a5b2c7600a861"
+agent = "claude"
+role = "builder"
+base = "f0014806270c782333384c219aec2dd186a6d81b"
+branch = "claude/issue-70-branch-coverage-gate"
+scope = [".github/workflows/ci.yml", "pyproject.toml", "src/agent_coordination", "tests"]
+opened_commit = "761223c518f574298b23b7cd53e2427b3118c0a9"
+whole_reason = "Gate und Lücke gehören zusammen: das Gate ohne geschlossene Lücke macht CI rot, die Lücke ohne Gate wächst wieder; die fehlenden Zweige liegen in zehn Dateien."
