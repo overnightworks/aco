@@ -194,7 +194,7 @@ def _reject_wide_scope(
     body it already read; a lane claim names no item, passes no
     `whole_from_body`, and keeps the plain refusal. `directories` are
     the scope entries that name a directory in the tree `versioned` lists
-    (`checkout._scope_directories`)."""
+    (`checkout.scope_directories`)."""
     n, total, share = _scope_cost(versioned, scope)
     trip = _wide_scope_trip(scope, versioned, directories=directories)
     if trip is None:
@@ -224,7 +224,7 @@ def _wide_scope_trip(
 def _checkout_scope_is_wide(scope: tuple[str, ...], context: RunContext) -> bool:
     """Whether the width gate calls `scope` wide in `context`'s checkout,
     measured as `_scope_versioning` measures a claim there."""
-    directories = checkout._scope_directories(
+    directories = checkout.scope_directories(
         scope, directory=context.directory, toplevel=lambda: context.toplevel
     )
     versioned = checkout.versioned_paths(directory=context.directory)
@@ -333,7 +333,7 @@ def _request(
     remote's recorded default branch `default_branch` answers (issue
     #490)."""
     request = _claim_request(arguments, directory=directory)
-    checkout._validate_checkout(request, default_branch=default_branch, directory=directory)
+    checkout.validate_checkout(request, default_branch=default_branch, directory=directory)
     return request
 
 
@@ -351,7 +351,7 @@ def _claim_request(
     agent = protocol.outbound_text(checkout.resolved_agent(arguments.agent), "agent", maximum=128)
     role = protocol.outbound_text(arguments.role, "role", maximum=64)
     base = (
-        checkout._git_output(["rev-parse", "HEAD"], directory=directory)
+        checkout.git_output(["rev-parse", "HEAD"], directory=directory)
         if arguments.base is None
         else arguments.base
     )
@@ -4453,7 +4453,7 @@ def _rescope_command(
             "rescope requires a non-empty current branch; "
             "check out the claim branch, or pass an issue number"
         )
-    checkout._refuse_shared_checkout(
+    checkout.refuse_shared_checkout(
         path_checkout,
         default_branch=checkout_context.recorded_default_branch,
         canonical_remote=checkout_context.canonical_remote,
@@ -5258,7 +5258,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: RunContext) -> int:
             combined,
             versioned,
             requested.whole_reason or selected.whole_reason,
-            directories=checkout._scope_directories(
+            directories=checkout.scope_directories(
                 combined,
                 directory=checkout_context.directory,
                 toplevel=lambda: checkout_context.toplevel,
@@ -5511,7 +5511,7 @@ def _scope_versioning(
     `start`'s fetched trunk, before any worktree of it exists)."""
     versioned = checkout.versioned_paths(directory=context.directory, revision=revision)
     _reject_ungrounded_comma_scope(scope, versioned, flag="--scope")
-    directories = checkout._scope_directories(
+    directories = checkout.scope_directories(
         scope, directory=context.directory, toplevel=lambda: context.toplevel, revision=revision
     )
     n, total, share, effective_whole_reason = _reject_wide_scope(
@@ -6129,7 +6129,7 @@ def _validate_built_worktree(
     another fetch moved the trunk between the checks and the build, and
     rerunning `start` checks the trunk as it stands now (START-26)."""
     try:
-        checkout._validate_checkout(
+        checkout.validate_checkout(
             request,
             default_branch=lambda: context.recorded_default_branch,
             directory=target.path,

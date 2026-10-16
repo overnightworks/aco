@@ -321,7 +321,7 @@ class RunContext:
         defaults (#178)."""
         try:
             return Path(
-                checkout._git_output(["rev-parse", "--show-toplevel"], directory=self.directory)
+                checkout.git_output(["rev-parse", "--show-toplevel"], directory=self.directory)
             )
         except protocol.ClaimError as error:
             raise protocol.ClaimUnavailableError(

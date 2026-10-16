@@ -351,7 +351,7 @@ def _forbid_git_fill(monkeypatch: pytest.MonkeyPatch) -> None:
     def unused(arguments: list[str]) -> str:
         pytest.fail("agent identity must be resolved before git fill")
 
-    monkeypatch.setattr(checkout, "_git_output", unused)
+    monkeypatch.setattr(checkout, "git_output", unused)
 
 
 def _assert_missing_identity_message(message: str) -> None:
@@ -367,7 +367,7 @@ def _forbid_protect_git_github_and_identity(monkeypatch: pytest.MonkeyPatch) -> 
         pytest.fail("this protect path must not use identity, git, GitHub, or the store")
 
     monkeypatch.setattr(checkout, "session_agent", unused)
-    monkeypatch.setattr(checkout, "_git_output", unused)
+    monkeypatch.setattr(checkout, "git_output", unused)
     monkeypatch.setattr(github, "GitHubForge", unused)
     monkeypatch.setattr(github, "discover_repository", unused)
     monkeypatch.setattr(store, "fetch_state", unused)
@@ -408,12 +408,12 @@ def arrange_scope_width(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     monkeypatch.setattr(
         checkout,
-        "_scope_directories",
+        "scope_directories",
         lambda paths, **_kwargs: tuple(path for path in paths if path in directories),
     )
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: versioned or ())
     if validate_checkout:
-        monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
+        monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
 
 
 def run_context_over(client: forge.ForgeReader) -> RunContext:
@@ -464,7 +464,7 @@ def count_context_reads(monkeypatch: pytest.MonkeyPatch) -> ContextReads:
     fakes the test already installed, so it is called after the arrangement
     and before the command."""
     reads = ContextReads()
-    git_output = checkout._git_output
+    git_output = checkout.git_output
     path_is_tracked = checkout.path_is_tracked
     fetch_state = store.fetch_state
 
@@ -484,7 +484,7 @@ def count_context_reads(monkeypatch: pytest.MonkeyPatch) -> ContextReads:
             reads.configs[directory] += 1
         return path_is_tracked(path, directory=directory, revision=revision)
 
-    monkeypatch.setattr(checkout, "_git_output", counting_git_output)
+    monkeypatch.setattr(checkout, "git_output", counting_git_output)
     monkeypatch.setattr(checkout, "path_is_tracked", counting_path_is_tracked)
     monkeypatch.setattr(store, "fetch_state", counting_fetch_state)
     return reads

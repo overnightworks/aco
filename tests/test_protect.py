@@ -96,7 +96,7 @@ def _protect_git_values(
     common_directory: Path | None = None,
     origin_head: str | None = "refs/remotes/origin/main",
 ) -> dict[tuple[str, ...], str]:
-    """The `_git_output` answers `checkout.resolve_path_checkout` needs for a
+    """The `git_output` answers `checkout.resolve_path_checkout` needs for a
     write inside `work` (issue #314): a linked worktree by default, or a
     shared main checkout when `git_directory`/`common_directory` are pinned
     equal. Every payload path these tests use resolves to this one fake
@@ -143,7 +143,7 @@ def _patch_protect_git(
     common_directory: Path | None = None,
     origin_head: str | None = "refs/remotes/origin/main",
 ) -> None:
-    """Fake `checkout._git_output` for exactly one checkout, rooted at
+    """Fake `checkout.git_output` for exactly one checkout, rooted at
     `work` (issue #314 repeat gate, finding 2). The fake maps every queried
     `directory` to `work`'s own answers only when that directory *is* `work`
     or one of its descendants -- a payload path's parent, or `work` itself --
@@ -198,7 +198,7 @@ def _patch_protect_git(
             raise ClaimError("unknown git failure")
         return values[key]
 
-    monkeypatch.setattr(checkout, "_git_output", git)
+    monkeypatch.setattr(checkout, "git_output", git)
 
 
 def _protect_active_claim(
@@ -1508,7 +1508,7 @@ def test_protect_deny_is_forge_free_against_a_non_github_remote(
 
 
 # Issue #314's own proofs: real linked worktrees (`git worktree add`), never
-# `_git_output` mocking, since the whole point is that `protect`/`rescope`
+# `git_output` mocking, since the whole point is that `protect`/`rescope`
 # judge the payload's own checkout -- proving that requires a resolver that
 # actually looks at different real directories, which a fake indifferent to
 # `directory` cannot exercise.
@@ -1721,7 +1721,7 @@ def test_protect_allows_the_same_payload_path_from_every_cwd(
     linked worktree, must allow from all four measured cwds -- the main
     checkout on its default branch, the main checkout on another branch, a
     directory outside every repository, and an unrelated worktree. The old
-    cwd-implicit `_git_output` calls allowed only from the fourth."""
+    cwd-implicit `git_output` calls allowed only from the fourth."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
@@ -2105,7 +2105,7 @@ def test_rescope_rejects_a_wide_scope_from_a_foreign_cwd_via_the_resolved_checko
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Issue #314 repeat gate B4: the width guard's own directory classifier
-    (`checkout._scope_directories`) must read the resolved checkout's own
+    (`checkout.scope_directories`) must read the resolved checkout's own
     directory, never the calling process's cwd. From a foreign cwd -- which
     has no `docs` directory at all, and is not even a git checkout -- an
     absolute `--add` naming the claimed worktree's own `docs` directory
@@ -2168,7 +2168,7 @@ def test_protect_denies_a_relative_payload_path_even_from_the_claimed_worktree_c
 
 def _real_main_checkout_target(tmp_path: Path) -> Path:
     """Finding R3's own proof target: a real main checkout's own file, no
-    fake `_git_output` involved."""
+    fake `git_output` involved."""
     main, _worktree = _protect_real_repo_with_worktree(tmp_path)
     return main / "README.md"
 
@@ -3357,12 +3357,12 @@ def _claim_refusal(
 ) -> tuple[int, str]:
     """`claim` standing in `path`'s worktree: its toplevel read asks that
     worktree, past the autouse toplevel isolation."""
-    isolated_git_output = checkout._git_output
+    isolated_git_output = checkout.git_output
 
     def git_output(arguments: list[str], *, directory: Path | None = None) -> str:
         return isolated_git_output(arguments, directory=directory or path.parent)
 
-    monkeypatch.setattr(checkout, "_git_output", git_output)
+    monkeypatch.setattr(checkout, "git_output", git_output)
     monkeypatch.chdir(path.parent)
     status = issue_claim.main(["claim", "72", "--scope", path.name])
     return status, capsys.readouterr().err.removeprefix("ERROR: ").removesuffix("\n")

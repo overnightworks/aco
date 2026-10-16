@@ -3535,7 +3535,7 @@ def test_trunk_log_classifies_valid_neighbors_of_a_malformed_work_item(
     records = (
         (malformed_record, valid_record) if malformed_first else (valid_record, malformed_record)
     )
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: "".join(records))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: "".join(records))
 
     walked = checkout.trunk_landings("refs/remotes/origin/main", 2, directory=tmp_path)
     landings = {landing.sha: landing.classification for landing in walked}
