@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import shlex
@@ -25,12 +24,12 @@ from . import (
     body,
     checkout,
     cmd_bootstrap,
+    cmd_protect,
     cmd_workspace,
     forge,
     github,
     items,
     metrics,
-    protect,
     protocol,
     providers,
     report,
@@ -42,9 +41,7 @@ from .session import (
     LaneSharedUnavailable,
     RepoMeaninglessUnderStateRefError,
     RunContext,
-    board_config,
     lane_shared_files,
-    trunk_lane_shared,
     trunk_lane_shared_reading,
 )
 
@@ -3358,21 +3355,6 @@ def _pending_landing_close(
     return None
 
 
-def _canonical_remote_name(toplevel: Path) -> str:
-    """The configured `canonical_remote` of the checkout at `toplevel`, for
-    `protect` (handed into `protect.judge` as `canonical_remote_for`), which
-    judges from its own payload's resolved checkout and never builds a
-    `RunContext` (issue #457)."""
-    return board_config(toplevel).canonical_remote
-
-
-def _checkout_trunk_lane_shared(toplevel: Path) -> tuple[str, ...]:
-    """The lane-shared files the trunk of the checkout at `toplevel` names,
-    for `protect` (handed into `protect.judge` as `lane_shared_for`, issue
-    #575), resolved over that checkout's own canonical remote."""
-    return trunk_lane_shared(_canonical_remote_name(toplevel), toplevel)
-
-
 @dataclass(frozen=True)
 class _StoreItemWriter:
     """`state_board.ItemWriter`, implemented over `store` (issue #283): the
@@ -4322,32 +4304,6 @@ def _no_active_build_claim(
     """REL-09's refusal, naming the item in `storage`'s form (issue #471)."""
     subject = protocol.identity_summary(identity, branch, board.item_labeller(storage))
     return protocol.ClaimUnavailableError(f"{subject} has no active build claim")
-
-
-def _hook_payload() -> dict[str, object] | None:
-    try:
-        payload = json.loads(sys.stdin.read())
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _protect() -> int:
-    # Grok fail-opens on crash or non-JSON hook output; deny instead of raising.
-    try:
-        payload = _hook_payload()
-        verdict = protect.judge(
-            payload,
-            canonical_remote_for=_canonical_remote_name,
-            lane_shared_for=_checkout_trunk_lane_shared,
-        )
-    except Exception as error:
-        verdict = protect.Verdict.deny(str(error))
-    if verdict.stdout_text is not None:
-        print(verdict.stdout_text)
-    if verdict.stderr_text is not None:
-        print(verdict.stderr_text, file=sys.stderr)
-    return verdict.exit_code
 
 
 def _optional_issue_number(value: int | None) -> int | None:
@@ -8941,7 +8897,7 @@ def main(arguments: list[str] | None = None) -> int:
         if parsed.command in {"_run-at-login", "register", "run", "login"}:
             return cmd_workspace.run(parsed)
         if parsed.command == "protect":
-            return _protect()
+            return cmd_protect.run()
         context = _run_context(parsed.repo)
         refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
         return refusal if refusal is not None else _read_status_body_or_dispatch(parsed, context)

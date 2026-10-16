@@ -104,6 +104,7 @@ from agent_coordination import (
     items,
     metrics,
     process,
+    protect,
     protocol,
     report,
     state_board,
@@ -14369,18 +14370,12 @@ def test_cli_claim_json_transport_failure_reports_unavailable_not_conflict(
     _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
-def test_cli_module_entry_point_exits_with_mains_return_code(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`python -m agent_coordination.cli` and the installed console script run
-    the `if __name__ == "__main__":` guard, not `main()` as a library call --
-    exercise that guard directly rather than only ever calling `main()`.
-
-    `protect` on an unparseable payload is the one command that answers
-    without git, GitHub, or the store, so the exit code this observes is
-    `main`'s own return value and nothing else's."""
+def _run_cli_module_as_main_with_hook_stdin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, hook_stdin: str
+) -> str | int | None:
+    """The exit code of `python -m agent_coordination.cli protect` fed
+    `hook_stdin`, in a home and a working directory with no git, GitHub or
+    store behind them."""
     home = tmp_path / "home"
     work = tmp_path / "work"
     home.mkdir()
@@ -14389,7 +14384,7 @@ def test_cli_module_entry_point_exits_with_mains_return_code(
     monkeypatch.chdir(work)
     _forbid_protect_git_github_and_identity(monkeypatch)
     monkeypatch.setattr(sys, "argv", ["aco", "--repo", REPOSITORY, "protect"])
-    monkeypatch.setattr(sys, "stdin", io.StringIO("not a hook payload"))
+    monkeypatch.setattr(sys, "stdin", io.StringIO(hook_stdin))
 
     with (
         pytest.warns(RuntimeWarning, match="agent_coordination.cli"),
@@ -14397,11 +14392,72 @@ def test_cli_module_entry_point_exits_with_mains_return_code(
     ):
         runpy.run_module("agent_coordination.cli", run_name="__main__")
 
-    assert exited.value.code == 2
-    assert json.loads(capsys.readouterr().out) == {
-        "decision": "deny",
-        "reason": "invalid hook payload",
-    }
+    return exited.value.code
+
+
+@pytest.mark.parametrize(
+    ("hook_stdin", "exit_code", "stdout", "stderr"),
+    [
+        pytest.param(
+            "not a hook payload",
+            2,
+            '{"decision": "deny", "reason": "invalid hook payload"}\n',
+            "invalid hook payload\n",
+            id="an-unparseable-payload-denies",
+        ),
+        pytest.param(
+            '{"tool_name": "Read", "tool_input": {}}',
+            0,
+            "",
+            "",
+            id="a-read-tool-allows-silently",
+        ),
+    ],
+)
+def test_cli_module_entry_point_exits_with_mains_return_code(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    hook_stdin: str,
+    exit_code: int,
+    stdout: str,
+    stderr: str,
+) -> None:
+    """`python -m agent_coordination.cli` and the installed console script run
+    the `if __name__ == "__main__":` guard, not `main()` as a library call --
+    exercise that guard directly rather than only ever calling `main()`.
+
+    `protect` on a payload it needs no git for is the one command that answers
+    without git, GitHub, or the store, so the exit code this observes is
+    `main`'s own return value and nothing else's."""
+    code = _run_cli_module_as_main_with_hook_stdin(monkeypatch, tmp_path, hook_stdin)
+
+    assert code == exit_code
+    captured = capsys.readouterr()
+    assert (captured.out, captured.err) == (stdout, stderr)
+
+
+def test_cli_module_entry_point_denies_when_the_judge_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """PROT-17: an exception out of `protect.judge` still reaches the host as
+    a deny with the exception's bare text and no traceback."""
+
+    def judge_that_raises(*_args: object, **_keywords: object) -> protect.Verdict:
+        raise RuntimeError("judge exploded")
+
+    monkeypatch.setattr(protect, "judge", judge_that_raises)
+
+    code = _run_cli_module_as_main_with_hook_stdin(monkeypatch, tmp_path, "{}")
+
+    assert code == 2
+    captured = capsys.readouterr()
+    assert (json.loads(captured.out), captured.err) == (
+        {"decision": "deny", "reason": "judge exploded"},
+        "judge exploded\n",
+    )
 
 
 def test_cli_claim_resource_prints_the_allocated_value(

@@ -1,6 +1,6 @@
 """Direct `protect` hook behavior: the pre-tool-use guard that denies a
 mutating tool call outside a covering claim. Every test here drives
-`issue_claim._protect`/`_protect_write` through `main(["protect"])` with the
+`cmd_protect.run`/`protect.judge` through `main(["protect"])` with the
 hook's JSON payload on stdin (`_protect_main`) -- `protect` is the hook entry
 point with its own doctrine, so this stays its owner file even though it
 goes through `main`, unlike ordinary CLI-command tests in
@@ -502,6 +502,20 @@ def test_protect_invalid_hook_payload_denies_without_raising(
     _assert_protect_decision(capsys, decision="deny", reason="invalid hook payload")
     assert list(home.iterdir()) == []
     assert list(work.iterdir()) == []
+
+
+def test_protect_unreadable_stdin_denies_without_raising(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _isolate_protect_home(monkeypatch, tmp_path)
+    _forbid_protect_git_github_and_identity(monkeypatch)
+    not_utf8 = io.TextIOWrapper(io.BytesIO(b"\xff\xfe\x80"), encoding="utf-8")
+    monkeypatch.setattr(sys, "stdin", not_utf8)
+
+    assert issue_claim.main(["--repo", "example/agent-coordination", "protect"]) == 2
+    _assert_protect_decision(capsys, decision="deny", reason="invalid hook payload")
 
 
 @pytest.mark.parametrize(
