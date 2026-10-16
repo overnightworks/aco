@@ -105,6 +105,7 @@ from agent_coordination import (
     metrics,
     process,
     protocol,
+    report,
     state_board,
     store,
 )
@@ -5767,7 +5768,7 @@ def test_rule_refuses_a_non_github_canonical_remote_by_host(
     """`rule` resolves its forge (`context.forge_writer`) before its own
     typed-refusal handlers (issue #396 review finding): a resolution
     failure -- here a canonical remote on a host no adapter serves -- must
-    still reach `rule`'s own `_refuse`, not `main`'s legacy `error` object."""
+    still reach `rule`'s own `report.refuse`, not `main`'s legacy `error` object."""
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/agent-coordination.git"
     )
@@ -6068,7 +6069,7 @@ def test_ask_refuses_a_non_github_canonical_remote_by_host(
     """`ask` resolves its forge (`context.forge_writer`) before its own
     typed-refusal handlers (issue #396 review finding): a resolution
     failure -- here a canonical remote on a host no adapter serves -- must
-    still reach `ask`'s own `_refuse`, not `main`'s legacy `error` object."""
+    still reach `ask`'s own `report.refuse`, not `main`'s legacy `error` object."""
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/agent-coordination.git"
     )
@@ -14180,7 +14181,7 @@ def test_cli_release_json_prints_effective_posted_identity(
 
 
 def _assert_json_refusal_object(err: str, out: str, *, reason: str) -> None:
-    """`ask`/`rule`/`brief`'s own `_emit_json` refusal (issue #396,
+    """`ask`/`rule`/`brief`'s own `report.emit_json` refusal (issue #396,
     `specs/output.spec.md`): the identical sentence stderr already printed,
     now under `message`, next to `reason` instead of a dropped `error`
     key. Compares the raw JSON text, not a parsed dict, so a reordering of
@@ -19693,7 +19694,7 @@ def test_every_item_or_json_argument_is_recorded_as_declared() -> None:
         for each in _every_parser(issue_claim._parser())
         for action in each._actions
         if (
-            issue_claim.JSON_FLAG in action.option_strings
+            report.JSON_FLAG in action.option_strings
             or action.type in issue_claim._ITEM_ARGUMENT_TYPES
         )
         and action not in cast(issue_claim._UsageErrorParser, each).declared_actions

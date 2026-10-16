@@ -2363,7 +2363,7 @@ def board_payload(board: Board) -> dict[str, object]:
     """`board`'s own `--json`/envelope payload (issue #412): every value
     already JSON-primitive -- dates and datetimes turned to ISO text,
     blocker references split and re-keyed, every tuple turned into a list
-    -- so `cli.py`'s emitter can serialize it with a plain `json.dumps`,
+    -- so `report.emit_json` can serialize it with a plain `json.dumps`,
     with no `default=` fallback of its own. The one owner both `board
     --json` and a future embedded read share."""
     payload = asdict(board)

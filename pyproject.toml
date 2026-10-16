@@ -73,6 +73,7 @@ containers = ["agent_coordination"]
 exhaustive = true
 layers = [
     "cli",
+    "report",
     "session",
     "protect",
     "workspace",

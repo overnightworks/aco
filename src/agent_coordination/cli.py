@@ -31,6 +31,7 @@ from . import (
     protect,
     protocol,
     providers,
+    report,
     state_board,
     store,
     terminal,
@@ -46,8 +47,6 @@ from .session import (
     trunk_lane_shared,
     trunk_lane_shared_reading,
 )
-
-CLI_ERROR_PREFIX = "ERROR: "
 
 DEFAULT_CLAIM_ROLE = "builder"
 NEXT_PULL_DESCRIPTION = (
@@ -381,7 +380,6 @@ def _claim_request(
 
 
 LANE_ISSUE_HELP = "omit for lane mode, derived from a docs/ or fix/ checkout branch"
-JSON_FLAG = "--json"
 KEEP_WORKTREE_FLAG = "--keep-worktree"
 LONG_OPTION_PREFIX = "--"
 JSON_HELP = "print the result as JSON instead of the human lines"
@@ -433,7 +431,7 @@ def _add_json_flag(container: argparse.ArgumentParser) -> None:
     calls this has no JSON mode at all, and `main` matches this same
     spelling when argparse refuses before any namespace is filled, so the
     flag needs a single owner."""
-    container.add_argument(JSON_FLAG, action="store_true", help=JSON_HELP)
+    container.add_argument(report.JSON_FLAG, action="store_true", help=JSON_HELP)
 
 
 def _add_status_parser(commands: _Subcommands) -> None:
@@ -1329,7 +1327,7 @@ def _status_json(
     claims_payload = [
         _status_claim_json(claim, claims_by_id, index, ages, observed_at) for claim in related
     ]
-    _emit_json(
+    report.emit_json(
         reason is not StatusReason.CONFLICT,
         reason,
         issue=issue,
@@ -1426,7 +1424,9 @@ def _status_path_json(
         }
         for claim in holders
     ]
-    _emit_json(True, reason, path=path, claims=claims_payload, **_lane_shared_json(lane_shared))
+    report.emit_json(
+        True, reason, path=path, claims=claims_payload, **_lane_shared_json(lane_shared)
+    )
     return 0
 
 
@@ -1450,7 +1450,7 @@ class RescopeReason(StrEnum):
 
 
 def _rescope_json(claimed: protocol.ActiveClaim) -> None:
-    _emit_json(True, RescopeReason.RESCOPED, **_claim_identity_fields(claimed))
+    report.emit_json(True, RescopeReason.RESCOPED, **_claim_identity_fields(claimed))
 
 
 @dataclass(frozen=True)
@@ -1496,7 +1496,7 @@ def _claim_json(
     touches: tuple[protocol.ActiveClaim, ...],
     checks: tuple[SliceCheck, ...],
 ) -> int:
-    _emit_json(
+    report.emit_json(
         True,
         ClaimReason.CLAIMED,
         **_claim_identity_fields(claimed),
@@ -1537,23 +1537,23 @@ def _release_reason(outcome: protocol.ReleaseOutcome) -> ReleaseReason:
     )
 
 
-def _release_json(report: ReleaseReport) -> None:
-    released, landing = report.selected, report.landing
+def _release_json(release_report: ReleaseReport) -> None:
+    released, landing = release_report.selected, release_report.landing
     payload: dict[str, object] = {
-        "outcome": report.outcome.reason,
+        "outcome": release_report.outcome.reason,
         **_identity_json(released.identity),
         "branch": released.branch,
         "claim_id": released.claim_id,
-        "agent": report.agent,
-        "role": report.role if report.role is not None else released.role,
+        "agent": release_report.agent,
+        "role": release_report.role if release_report.role is not None else released.role,
     }
     if isinstance(landing, ReleaseLanding):
         payload["freed"] = list(landing.freed)
         payload["next"] = None if landing.next_item is None else landing.next_item.number
         payload["parent_closable"] = landing.parent_closable
-    if report.worktree is not None:
-        payload["worktree"] = worktree_cleanup_outcome_text(report.worktree)
-    _emit_json(True, _release_reason(report.outcome), **payload)
+    if release_report.worktree is not None:
+        payload["worktree"] = worktree_cleanup_outcome_text(release_report.worktree)
+    report.emit_json(True, _release_reason(release_report.outcome), **payload)
 
 
 @dataclass(frozen=True)
@@ -2054,7 +2054,7 @@ def _rulings(
 ) -> None:
     rows = _rulings_rows(projected, bodies, storage=storage)
     if as_json:
-        _emit_json(
+        report.emit_json(
             True,
             RulingsReason.LISTED,
             rulings=[
@@ -2308,10 +2308,10 @@ class _NextReport:
     site: _PullSite
 
 
-def _next_json(report: _NextReport, storage: body.Storage) -> None:
+def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
     reason = (
-        _next_action_reason(report.action)
-        if report.action is not None
+        _next_action_reason(next_report.action)
+        if next_report.action is not None
         else NextReason.NOTHING_ACTIONABLE
     )
     payload: dict[str, object] = {
@@ -2321,22 +2321,22 @@ def _next_json(report: _NextReport, storage: body.Storage) -> None:
                 "title": recovery_item.title,
                 "step": board.RECOVERY_STEP,
             }
-            for recovery_item in report.recovery
+            for recovery_item in next_report.recovery
         ],
         "skipped": [
             {
                 "number": board.item_json_reference(skipped_item.number, storage),
                 "reason": skipped_item.actionable_reason,
             }
-            for skipped_item in report.skipped
+            for skipped_item in next_report.skipped
         ],
-        "parallel": _parallel_json(report.parallel, storage),
-        "close": _next_json_numbers(report.close, storage),
-        "waiting_on_operator": _next_json_numbers(report.waiting, storage),
+        "parallel": _parallel_json(next_report.parallel, storage),
+        "close": _next_json_numbers(next_report.close, storage),
+        "waiting_on_operator": _next_json_numbers(next_report.waiting, storage),
     }
-    if report.action is not None:
-        payload.update(_next_action_payload(report.action, storage, site=report.site))
-    _emit_json(report.action is not None, reason, **payload)
+    if next_report.action is not None:
+        payload.update(_next_action_payload(next_report.action, storage, site=next_report.site))
+    report.emit_json(next_report.action is not None, reason, **payload)
 
 
 def _next_action_lines(
@@ -2622,7 +2622,7 @@ def _slice_rule_checks(
 
 def _refuse_claim(as_json: bool, issue: int | None, checks: tuple[SliceCheck, ...]) -> None:
     if as_json:
-        _emit_json(
+        report.emit_json(
             False,
             ClaimReason.PRECONDITION_FAILED,
             issue=issue,
@@ -2982,7 +2982,7 @@ class CheckOutcome:
                 payload["blocked_by"] = list(self.blocked_by)
             if self.message is not None:
                 payload["message"] = self.message
-            _emit_json(self.reason is CheckReason.VALID, self.reason, **payload)
+            report.emit_json(self.reason is CheckReason.VALID, self.reason, **payload)
         else:
             print(self.line, file=sys.stderr if self.message is not None else sys.stdout)
         return self.exit_code()
@@ -3154,7 +3154,7 @@ def _body_check_report(check: body.BodyShapeCheck, *, as_json: bool) -> int:
     item here to refuse a single verdict about."""
     ok = check.verdict is body.BodyShapeVerdict.VALID
     if as_json:
-        _emit_json(ok, BodyCheckReason(check.verdict.value), defects=list(check.defects))
+        report.emit_json(ok, BodyCheckReason(check.verdict.value), defects=list(check.defects))
     elif check.defects:
         for defect in check.defects:
             print(defect, file=sys.stderr)
@@ -3178,7 +3178,7 @@ def _cmd_body(parsed: argparse.Namespace, context: RunContext) -> int:
         config = context.config
         raw_body = _read_body_check_input()
     except protocol.ClaimError as error:
-        return _refuse(BodyCheckReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(BodyCheckReason.UNAVAILABLE, error, as_json=as_json)
     check = body.body_shape_check(raw_body, storage=config.storage)
     return _body_check_report(check, as_json=as_json)
 
@@ -3514,9 +3514,9 @@ class ItemReason(StrEnum):
 
 
 def _refuse_item_body_invalid(defects: tuple[str, ...], *, as_json: bool) -> int:
-    print(f"{CLI_ERROR_PREFIX}{defects[0]}", file=sys.stderr)
+    print(f"{report.CLI_ERROR_PREFIX}{defects[0]}", file=sys.stderr)
     if as_json:
-        _emit_json(False, ItemReason.BODY_INVALID, defects=list(defects), message=defects[0])
+        report.emit_json(False, ItemReason.BODY_INVALID, defects=list(defects), message=defects[0])
     return 2
 
 
@@ -3537,7 +3537,7 @@ def _cmd_item_new(parsed: argparse.Namespace, context: RunContext) -> int:
     except _PartialWriteError as error:
         return _refuse_partial_write(error, ItemReason.PARTIAL_WRITE, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
 class _ItemBodyInvalidError(protocol.ClaimError):
@@ -3708,7 +3708,7 @@ def _item_new_on_state_ref(parsed: argparse.Namespace, context: RunContext) -> i
 
 def _print_item_new_result(item_id: str, number: int, *, as_json: bool) -> None:
     if as_json:
-        _emit_json(True, ItemReason.CREATED, item=item_id, number=number)
+        report.emit_json(True, ItemReason.CREATED, item=item_id, number=number)
     else:
         print(item_id)
 
@@ -3769,7 +3769,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
         )
         return 0
     except protocol.ClaimError as error:
-        return _refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
 def _read_item_edit_body(number: int) -> str:
@@ -3815,7 +3815,7 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
         _print_item_edit_size_result(number, parsed.size, storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
-        return _refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
 def _write_block_data(
@@ -3843,7 +3843,7 @@ def _print_item_edit_size_result(
     number: int, size: str, storage: body.Storage, outcome: ItemReason, *, as_json: bool
 ) -> None:
     if as_json:
-        _emit_json(True, outcome, item=number, size=size)
+        report.emit_json(True, outcome, item=number, size=size)
     else:
         print(f"{_narrow_edit_word(outcome)} {board.item_label(number, storage)} size={size}")
 
@@ -3877,14 +3877,14 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
         _print_item_edit_whole_result(number, reason, storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
-        return _refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
 def _print_item_edit_whole_result(
     number: int, reason: str, storage: body.Storage, outcome: ItemReason, *, as_json: bool
 ) -> None:
     if as_json:
-        _emit_json(True, outcome, item=number, whole=reason)
+        report.emit_json(True, outcome, item=number, whole=reason)
     else:
         print(f"{_narrow_edit_word(outcome)} {board.item_label(number, storage)} whole={reason}")
 
@@ -3936,7 +3936,7 @@ def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
         _print_item_edit_kind_result(number, kind, storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
-        return _refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
 def _print_item_edit_kind_result(
@@ -3944,7 +3944,7 @@ def _print_item_edit_kind_result(
 ) -> None:
     label = board.item_label(number, storage)
     if as_json:
-        _emit_json(True, outcome, item=label, number=number, kind=kind.value)
+        report.emit_json(True, outcome, item=label, number=number, kind=kind.value)
     else:
         print(f"{_narrow_edit_word(outcome)} {label} kind={kind.value}")
 
@@ -3953,7 +3953,7 @@ def _print_item_edit_result(
     item_id: str, number: int, oid: protocol.ObjectId, *, as_json: bool
 ) -> None:
     if as_json:
-        _emit_json(True, ItemReason.EDITED, item=item_id, number=number, oid=oid)
+        report.emit_json(True, ItemReason.EDITED, item=item_id, number=number, oid=oid)
     else:
         print(f"EDITED {item_id}")
 
@@ -4015,7 +4015,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
         return 0
     except protocol.ClaimError as error:
         named = _named_refusal(error, body.Storage.STATE_REF)
-        return _refuse(ItemReason.PRECONDITION_FAILED, named, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, named, as_json=as_json)
 
 
 def _refuse_an_unreadable_relative(
@@ -4082,7 +4082,7 @@ class _ItemCloseResult:
 
 def _print_item_close_result(result: _ItemCloseResult, *, as_json: bool) -> None:
     if as_json:
-        _emit_json(
+        report.emit_json(
             True,
             ItemReason.CLOSED,
             item=result.item_id,
@@ -4148,10 +4148,10 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
             raise protocol.ClaimUnavailableError(_missing_item_refusal(number, client, storage))
         parent = client.parent_number(number)
     except protocol.ClaimError as error:
-        return _refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
     body = reference.body or ""
     if as_json:
-        _emit_json(
+        report.emit_json(
             True,
             ItemReason.SHOWN,
             item=items.format_item_id(number),
@@ -4536,9 +4536,9 @@ def _cmd_check(parsed: argparse.Namespace, context: RunContext) -> int:
                 client, repository, reference.body or "", number, storage=config.storage
             )
     except RepoMeaninglessUnderStateRefError as error:
-        return _refuse(CheckReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(CheckReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(CheckReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(CheckReason.UNAVAILABLE, error, as_json=as_json)
     return outcome.report(as_json=as_json)
 
 
@@ -4749,24 +4749,6 @@ def _print_brief(composition: _BriefComposition) -> None:
         _print_brief_step_rules(composition.step_rules)
 
 
-def _emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:
-    """The one `--json` envelope owner (issue #396, `specs/output.spec.md`):
-    `ok` and `reason` always print first, in that order -- `reason` a
-    stable enum token, never an `error` object -- then the payload in the
-    order given, with an optional `message` (free prose) moved last so a
-    reader can stop before it. `ask`, `rule`, and `brief` are its first
-    callers, on success and on every refusal alike. `reason` is typed
-    `StrEnum` -- the shared base every command's own reason vocabulary
-    (`AskReason`, `RuleReason`, `BriefReason`) already subclasses -- so a
-    loose string can never reach this envelope."""
-    message = payload.pop("message", None)
-    envelope: dict[str, object] = {"ok": ok, "reason": reason}
-    envelope.update(payload)
-    if message is not None:
-        envelope["message"] = message
-    print(json.dumps(envelope))
-
-
 STATE_REF_ITEM_PAST_THE_ID_SPACE = "{number} " + board.NAMES_NO_ITEM
 
 
@@ -4784,19 +4766,6 @@ class PreDispatchReason(StrEnum):
     PRECONDITION_FAILED = "precondition_failed"
 
 
-def _refuse(reason: StrEnum, error: protocol.ClaimError, *, as_json: bool) -> int:
-    """One shared refusal report for every `--json` command (issue #396) and
-    for `_dispatch`'s own pre-start checks (issue #425): `ERROR: <sentence>`
-    on stderr exactly as `main`'s own generic sink always printed it, then
-    -- only under `--json` -- the envelope naming this call's own reason
-    instead of the dropped `error` key. Exit `2`, the one exit every refusal
-    past the parser still uses."""
-    print(f"{CLI_ERROR_PREFIX}{error}", file=sys.stderr)
-    if as_json:
-        _emit_json(False, reason, message=str(error))
-    return 2
-
-
 def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
     """The argument parser's own refusal, in the shape this invocation asked
     for (issue #432): without `--json` argparse's own usage block and
@@ -4805,7 +4774,7 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
     instead, `invalid_usage`, argparse's own sentence as `message`."""
     if not as_json:
         argparse.ArgumentParser.error(error.parser, str(error))
-    return _refuse(PreDispatchReason.INVALID_USAGE, error, as_json=True)
+    return report.refuse(PreDispatchReason.INVALID_USAGE, error, as_json=True)
 
 
 class BriefReason(StrEnum):
@@ -4857,7 +4826,7 @@ def _brief_json(composition: _BriefComposition) -> int:
     if step_rules is not None:
         payload["rules"] = list(step_rules.rules)
         payload["checks"] = list(step_rules.checks)
-    _emit_json(True, BriefReason.COMPOSED, **payload)
+    report.emit_json(True, BriefReason.COMPOSED, **payload)
     return 0
 
 
@@ -4896,15 +4865,15 @@ def _cmd_brief(parsed: argparse.Namespace, context: RunContext) -> int:
     Never a new data source, and never a write. Every refusal on this path --
     BRIEF-07, BRIEF-09's PIN-04/PIN-05, BRIEF-15, BRIEF-18's lane-tip read and
     trunk diff, BRIEF-20's trunk read, and the item read itself, which is a
-    forge call like any other (issue #432) -- reports through `_refuse` under
+    forge call like any other (issue #432) -- reports through `report.refuse` under
     this command's own vocabulary."""
     as_json = parsed.json
     try:
         return _brief_report(parsed, context)
     except RepoMeaninglessUnderStateRefError as error:
-        return _refuse(BriefReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(BriefReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(BriefReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(BriefReason.UNAVAILABLE, error, as_json=as_json)
 
 
 def _brief_report(parsed: argparse.Namespace, context: RunContext) -> int:
@@ -4947,13 +4916,13 @@ def _cmd_status(parsed: argparse.Namespace, context: RunContext) -> int:
     resolution (a cut-over repository may have no ledger issue left at all).
     It is forge-free (issue #245): `--repo` is meaningless here and unused.
     Every `protocol.ClaimError` `_status_read` can raise -- a rewritten or
-    malformed state ref -- reports through `_refuse` as `unavailable` (issue
+    malformed state ref -- reports through `report.refuse` as `unavailable` (issue
     #406): `status` names no `invalid_usage` of its own (see `StatusReason`).
     """
     try:
         return _status_read(parsed, context)
     except protocol.ClaimError as error:
-        return _refuse(StatusReason.UNAVAILABLE, error, as_json=parsed.json)
+        return report.refuse(StatusReason.UNAVAILABLE, error, as_json=parsed.json)
 
 
 def _status_read(parsed: argparse.Namespace, context: RunContext) -> int:
@@ -5084,12 +5053,12 @@ def _cmd_board(parsed: argparse.Namespace, context: RunContext) -> int:
             raise _BoardNoModeUsageError(BOARD_NO_MODE_MESSAGE)
         projected = _observed_board(context).board
     except (_BoardServeRemovedError, _BoardNoModeUsageError) as error:
-        return _refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:
-        return _refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(BoardReason.UNAVAILABLE, error, as_json=as_json)
-    _emit_json(True, BoardReason.PROJECTED, **board.board_payload(projected))
+        return report.refuse(BoardReason.UNAVAILABLE, error, as_json=as_json)
+    report.emit_json(True, BoardReason.PROJECTED, **board.board_payload(projected))
     return 0
 
 
@@ -5114,9 +5083,9 @@ def _cmd_rulings(parsed: argparse.Namespace, context: RunContext) -> int:
         bodies = {issue.number: issue.body for issue in issues}
         storage = context.config.storage
     except RepoMeaninglessUnderStateRefError as error:
-        return _refuse(RulingsReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(RulingsReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(RulingsReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(RulingsReason.UNAVAILABLE, error, as_json=as_json)
     _rulings(projected, bodies, as_json=as_json, storage=storage)
     return 0
 
@@ -5138,14 +5107,14 @@ def _cmd_next(parsed: argparse.Namespace, context: RunContext) -> int:
         action = board.next_action(projected)
         site = _pull_site(action, context)
     except RepoMeaninglessUnderStateRefError as error:
-        return _refuse(NextReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(NextReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(NextReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(NextReason.UNAVAILABLE, error, as_json=as_json)
     close = board.zero_cost_closes(projected)
     waiting = board.waiting_on_operator(projected)
     already_named = {_next_action_container_number(action), *close, *waiting}
     skipped = tuple(item for item in _unworkable(projected) if item.number not in already_named)
-    report = _NextReport(
+    next_report = _NextReport(
         action=action,
         skipped=skipped,
         recovery=projected.recovery,
@@ -5155,9 +5124,9 @@ def _cmd_next(parsed: argparse.Namespace, context: RunContext) -> int:
         site=site,
     )
     if as_json:
-        _next_json(report, storage)
+        _next_json(next_report, storage)
     else:
-        _next(report, storage)
+        _next(next_report, storage)
     return 0 if action is not None else 3
 
 
@@ -5330,11 +5299,11 @@ def _cmd_rescope(parsed: argparse.Namespace, context: RunContext) -> int:
     try:
         return _rescope_write(parsed, context)
     except _RescopeInvalidUsageError as error:
-        return _refuse(RescopeReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(RescopeReason.INVALID_USAGE, error, as_json=as_json)
     except _RescopePreconditionError as error:
-        return _refuse(RescopeReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(RescopeReason.PRECONDITION_FAILED, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(RescopeReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(RescopeReason.UNAVAILABLE, error, as_json=as_json)
 
 
 LANE_CLAIM_SCOPE_REQUIRED = "lane claim requires --scope; a lane names no item to derive it from"
@@ -5632,14 +5601,14 @@ def _refuse_claim_error(error: protocol.ClaimError, context: RunContext, *, as_j
             # claim's write (CLM-25), whether or not its push was sent; a
             # transport, git, lineage, or retry-exhaustion failure is another
             # `ClaimError` and falls to `unavailable` below (CLM-27).
-            return _refuse(
+            return report.refuse(
                 ClaimReason.CLAIM_CONFLICT,
                 _named_refusal(error, context.config.storage),
                 as_json=as_json,
             )
         case _:
             reason = ClaimReason.UNAVAILABLE
-    return _refuse(reason, error, as_json=as_json)
+    return report.refuse(reason, error, as_json=as_json)
 
 
 def _named_refusal(error: protocol.ClaimError, storage: body.Storage) -> protocol.ClaimError:
@@ -6171,7 +6140,7 @@ def _report_uncertain_start_claim(error: protocol.ClaimError, target: _StartTarg
     """A claim write whose outcome the store cannot tell after its push was
     sent: the claim may have landed, so the worktree it may name stays, and
     the next `start` resumes whichever it finds (START-25)."""
-    status = _refuse(ClaimReason.UNAVAILABLE, error, as_json=False)
+    status = report.refuse(ClaimReason.UNAVAILABLE, error, as_json=False)
     print(
         f"the claim's push was sent, its outcome unknown; worktree {target.path} and "
         f"branch '{target.branch}' kept; run start again to resume it",
@@ -6182,7 +6151,7 @@ def _report_uncertain_start_claim(error: protocol.ClaimError, target: _StartTarg
 
 def _refuse_built_start(error: protocol.ClaimError, target: _StartTarget) -> int:
     try:
-        return _refuse(ClaimReason.UNAVAILABLE, error, as_json=False)
+        return report.refuse(ClaimReason.UNAVAILABLE, error, as_json=False)
     finally:
         # A refusal that cannot be written (a closed stderr) must still
         # leave nothing behind (START-18).
@@ -6340,7 +6309,7 @@ def _release_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
     if parsed.keep_worktree:
         command.append(KEEP_WORKTREE_FLAG)
     if parsed.json:
-        command.append(JSON_FLAG)
+        command.append(report.JSON_FLAG)
     return tuple(command)
 
 
@@ -6369,7 +6338,7 @@ def _cmd_release(
     try:
         _release_transition(parsed, context, release_branch)
     except protocol.ClaimError as error:
-        return _refuse(ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
     return 0
 
 
@@ -6537,7 +6506,7 @@ def _report_nothing_left_to_release(
         _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
     )
     if parsed.json:
-        _emit_json(
+        report.emit_json(
             True,
             ReleaseReason.MERGED,
             outcome=NOTHING_LEFT_TO_RELEASE,
@@ -6768,14 +6737,14 @@ LAND_REINSTALL_LINE = "reinstall: uv tool install --force --from . agent-coordin
 # was written for (issue #405 review/gate finding): each name is truncated
 # here before that same three-then-`and N more` grammar ever sees it, and the
 # assembled sentence is capped again as a final backstop -- short enough that
-# `main`'s own `CLI_ERROR_PREFIX` still fits under the same 200-character
+# `main`'s own `report.CLI_ERROR_PREFIX` still fits under the same 200-character
 # printed-line budget (issue #405 round-4 finding) -- so several long check
 # names can never print a refusal line past 200 characters.
 LAND_CHECK_NAME_LENGTH_LIMIT = 40
 LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
 LAND_QUALITY_VERDICT_CHECK = "quality / verdict"
 LAND_REFUSAL_LINE_LENGTH_LIMIT = 200
-LAND_REFUSAL_SENTENCE_LENGTH_LIMIT = LAND_REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
+LAND_REFUSAL_SENTENCE_LENGTH_LIMIT = LAND_REFUSAL_LINE_LENGTH_LIMIT - len(report.CLI_ERROR_PREFIX)
 
 
 def _land_not_open_refusal(number: int) -> str:
@@ -7698,7 +7667,7 @@ def _print_cut_result(outcome: _CutOutcome, storage: body.Storage, *, as_json: b
     `--json`'s own `reason` (issue #425) -- `adopted` no longer needs its
     own boolean sibling once the envelope's `reason` already names it."""
     if as_json:
-        _emit_json(
+        report.emit_json(
             True,
             CutReason.ADOPTED if outcome.adopted else CutReason.CUT,
             container=outcome.container,
@@ -8093,9 +8062,9 @@ def _cut_slice(
 def _refuse_partial_write(
     error: _PartialWriteError, reason: CutReason | ItemReason, *, as_json: bool
 ) -> int:
-    print(f"{CLI_ERROR_PREFIX}{error}", file=sys.stderr)
+    print(f"{report.CLI_ERROR_PREFIX}{error}", file=sys.stderr)
     if as_json:
-        _emit_json(
+        report.emit_json(
             False,
             reason,
             written=error.written,
@@ -8130,7 +8099,7 @@ def _cmd_cut(parsed: argparse.Namespace, context: RunContext) -> int:
     except _PartialWriteError as error:
         return _refuse_partial_write(error, CutReason.PARTIAL_WRITE, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(CutReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(CutReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
 def _missing_item_refusal(number: int, client: forge.ForgeReader, storage: body.Storage) -> str:
@@ -8231,7 +8200,7 @@ def _emit_rule_result(
     ruling = cast(str, line.ruling)
     ruled_on = cast(date, line.ruled_on)
     if as_json:
-        _emit_json(
+        report.emit_json(
             True,
             RuleReason.RULED,
             item=number,
@@ -8310,11 +8279,11 @@ def _cmd_rule(parsed: argparse.Namespace, context: RunContext) -> int:
         body.ExpectationAlreadyRuledError,
         body.ExpectationOutOfRangeError,
     ) as error:
-        return _refuse(_rule_item_reason(error), error, as_json=as_json)
+        return report.refuse(_rule_item_reason(error), error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:
-        return _refuse(RuleReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(RuleReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(RuleReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(RuleReason.UNAVAILABLE, error, as_json=as_json)
 
 
 @dataclass(frozen=True)
@@ -8346,7 +8315,7 @@ class AskReason(StrEnum):
 def _emit_ask_result(asked: _AskedLine, storage: body.Storage, *, as_json: bool) -> None:
     if as_json:
         card_fields = {key: value for key, value in asdict(asked.card).items() if value is not None}
-        _emit_json(
+        report.emit_json(
             True,
             AskReason.ASKED,
             item=asked.item,
@@ -8429,15 +8398,15 @@ def _cmd_ask(parsed: argparse.Namespace, context: RunContext) -> int:
     try:
         return _append_expectation_card(parsed, context)
     except _PictureFileError as error:
-        return _refuse(AskReason.INVALID_PICTURE, error, as_json=as_json)
+        return report.refuse(AskReason.INVALID_PICTURE, error, as_json=as_json)
     except (_TargetUnavailableError, _InvalidTargetError) as error:
-        return _refuse(_ask_target_reason(error), error, as_json=as_json)
+        return report.refuse(_ask_target_reason(error), error, as_json=as_json)
     except (body.ExpectationTextError, body.ExpectationFieldError) as error:
-        return _refuse(_ask_expectation_reason(error), error, as_json=as_json)
+        return report.refuse(_ask_expectation_reason(error), error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:
-        return _refuse(AskReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(AskReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return _refuse(AskReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(AskReason.UNAVAILABLE, error, as_json=as_json)
 
 
 def _release_branch_for(parsed: argparse.Namespace) -> str | None:
@@ -8826,7 +8795,7 @@ def _dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
     try:
         release_branch = _resolved_before_the_command_starts(parsed)
     except protocol.ClaimError as error:
-        return _refuse(
+        return report.refuse(
             PreDispatchReason.PRECONDITION_FAILED,
             error,
             as_json=bool(getattr(parsed, "json", False)),
@@ -8969,8 +8938,8 @@ def _spells_json_flag(token: str, parser: _UsageErrorParser) -> bool:
     exact spelling on a parser that declares it, never an abbreviation, since
     no `aco` parser reads one (OUT-09)."""
     spelling = token.split("=", 1)[0]
-    return spelling == JSON_FLAG and any(
-        JSON_FLAG in action.option_strings for action in parser.declared_actions
+    return spelling == report.JSON_FLAG and any(
+        report.JSON_FLAG in action.option_strings for action in parser.declared_actions
     )
 
 
@@ -9052,7 +9021,9 @@ def _refuse_item_past_the_id_space(
     if past is None or not _pins_state_ref(context):
         return None
     error = protocol.ClaimUnavailableError(STATE_REF_ITEM_PAST_THE_ID_SPACE.format(number=past))
-    return _refuse(PreDispatchReason.INVALID_USAGE, error, as_json=_asked_for_json(root, given))
+    return report.refuse(
+        PreDispatchReason.INVALID_USAGE, error, as_json=_asked_for_json(root, given)
+    )
 
 
 def _pins_state_ref(context: RunContext) -> bool:
@@ -9085,7 +9056,7 @@ def main(arguments: list[str] | None = None) -> int:
     except _UsageError as error:
         return _refuse_usage(error, as_json=_asked_for_json(parser, given))
     except protocol.ClaimError as error:
-        return _refuse(
+        return report.refuse(
             PreDispatchReason.INVALID_USAGE, error, as_json=_asked_for_json(parser, given)
         )
     try:
@@ -9097,7 +9068,7 @@ def main(arguments: list[str] | None = None) -> int:
         refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
         return refusal if refusal is not None else _read_status_body_or_dispatch(parsed, context)
     except protocol.ClaimError as error:
-        print(f"{CLI_ERROR_PREFIX}{error}", file=sys.stderr)
+        print(f"{report.CLI_ERROR_PREFIX}{error}", file=sys.stderr)
         return 2
 
 
