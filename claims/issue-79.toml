@@ -1,0 +1,8 @@
+claim_id = "fcd4d0b7eb224681b0371f919ae268af"
+agent = "claude"
+role = "builder"
+base = "460c48cbaf45148a7a3c3009b2b49618e6f93821"
+branch = "claude/issue-79-s4-facts-to-owners"
+scope = ["scripts/similar_methods_exemptions.txt", "src/agent_coordination/board.py", "src/agent_coordination/cli.py", "src/agent_coordination/protocol.py", "src/agent_coordination/store.py", "tests/test_cli.py", "tests/test_state_board.py"]
+opened_commit = "157c71314a1566e032de193887877f1ae1b5781b"
+whole_reason = "Zwanzig reine Fakten ziehen aus cli.py zu drei bestehenden Ownern samt Aufrufern und Testverweisen; halb verschoben bräche der Import."
