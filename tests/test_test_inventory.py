@@ -7,16 +7,14 @@ the wrong layer.
 
 from __future__ import annotations
 
+import ast
 import subprocess
 from pathlib import Path
 
 import pytest
-from script_fixtures import load_script
-
-test_inventory = load_script("test_inventory")
-rewritten_modules = test_inventory.rewritten_modules
-family_move_modules = test_inventory.family_move_modules
-run_ci = test_inventory.run_ci
+import test_budget
+import test_inventory
+from test_inventory import family_move_modules, rewritten_modules, run_ci
 
 
 def _path(module: str) -> str:
@@ -257,3 +255,30 @@ def test_run_ci_skips_a_change_without_rewrite_or_family_move(
     exit_code = run_ci(base)
 
     assert (exit_code, "skipping" in capsys.readouterr().out) == (0, True)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected_qualname"),
+    [
+        ("def test_flat():\n    pass\n", "test_flat"),
+        ("class TestGroup:\n    def test_member(self):\n        pass\n", "TestGroup::test_member"),
+        (
+            "class TestOuter:\n    class TestInner:\n        def test_deep(self):\n            pass",
+            "TestOuter::TestInner::test_deep",
+        ),
+    ],
+)
+def test_both_gates_find_the_same_tests_at_any_class_depth(
+    tmp_path: Path, source: str, expected_qualname: str
+) -> None:
+    module = tmp_path / "tests" / "test_example.py"
+    module.parent.mkdir()
+    module.write_text(source, encoding="utf-8")
+    tree = ast.parse(source)
+
+    inventory_cases, _classes, _single = test_inventory.iter_tests(
+        tree, test_inventory.module_scope(tree)
+    )
+    budget_tests = test_budget.measure(tmp_path)["tests"].tests
+
+    assert ([case.qualname for case in inventory_cases], budget_tests) == ([expected_qualname], 1)

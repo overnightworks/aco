@@ -98,8 +98,7 @@ from dataclasses import asdict, dataclass, field
 from fractions import Fraction
 from pathlib import Path
 
-# Sibling script: ``scripts/`` is sys.path[0] when this file runs as a script.
-from test_inventory import iter_spec_citations
+from test_inventory import iter_spec_citations, iter_test_functions
 
 # --- aco configuration --------------------------------------------------------------------
 # The one place blueprint-specific names were replaced with aco's own. Everything below this block
@@ -286,17 +285,14 @@ def _pytestmark_parametrizes(module: ast.Module) -> bool:
     return False
 
 
-def _iter_tests(
-    body: list[ast.stmt], scope: str, inherited: bool
+def _scoped_tests(
+    module: ast.Module, inherited: bool
 ) -> Iterator[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef, bool]]:
-    """Yield ``(scope, function, parametrized)`` for every test in *body*, classes included."""
-    for node in body:
-        if isinstance(node, _FUNCTIONS) and node.name.startswith("test_"):
-            yield scope, node, inherited or _decorated_parametrize(node)
-        elif isinstance(node, ast.ClassDef):
-            yield from _iter_tests(
-                node.body, f"{scope}.{node.name}", inherited or _decorated_parametrize(node)
-            )
+    """Yield ``(scope, function, parametrized)`` for every test ``iter_test_functions`` finds."""
+    for owners, func in iter_test_functions(module.body):
+        scope = "".join(f".{owner.name}" for owner in owners)
+        parametrized = inherited or any(_decorated_parametrize(node) for node in (*owners, func))
+        yield scope, func, parametrized
 
 
 def wraps_setup_command(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -442,7 +438,7 @@ def _charge_clone_lines(units: list[_Unit], files: dict[str, FileMetrics]) -> No
 
 def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: list[_Unit]) -> None:
     scopes: defaultdict[str, Counter[str]] = defaultdict(Counter)
-    for scope, func, parametrized in _iter_tests(module.body, "", _pytestmark_parametrizes(module)):
+    for scope, func, parametrized in _scoped_tests(module, _pytestmark_parametrizes(module)):
         metrics.tests += 1
         metrics.parametrized += int(parametrized)
         scopes[scope][sibling_key(func.name)] += 1
@@ -452,7 +448,7 @@ def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: l
             units.append(_Unit(rel, lines, _shingles(tokens)))
     metrics.credited = frozenset(
         spec_id
-        for _scope, func, _parametrized in _iter_tests(module.body, "", False)
+        for _scope, func, _parametrized in _scoped_tests(module, False)
         for spec_id in iter_spec_citations(ast.get_docstring(func) or "")
     )
     metrics.literal_siblings = sum(

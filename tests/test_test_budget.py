@@ -9,11 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from script_fixtures import load_script
-
-# test_budget imports its sibling script by name, so that script is registered first.
-load_script("test_inventory")
-test_budget = load_script("test_budget")
+import test_budget
 
 
 def _tree_citing(root: Path, *spec_ids: str) -> Path:
