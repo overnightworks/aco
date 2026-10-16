@@ -5768,7 +5768,7 @@ def test_rule_refuses_a_non_github_canonical_remote_by_host(
     """`rule` resolves its forge (`context.forge_writer`) before its own
     typed-refusal handlers (issue #396 review finding): a resolution
     failure -- here a canonical remote on a host no adapter serves -- must
-    still reach `rule`'s own `_refuse`, not `main`'s legacy `error` object."""
+    still reach `rule`'s own `report.refuse`, not `main`'s legacy `error` object."""
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/agent-coordination.git"
     )
@@ -6069,7 +6069,7 @@ def test_ask_refuses_a_non_github_canonical_remote_by_host(
     """`ask` resolves its forge (`context.forge_writer`) before its own
     typed-refusal handlers (issue #396 review finding): a resolution
     failure -- here a canonical remote on a host no adapter serves -- must
-    still reach `ask`'s own `_refuse`, not `main`'s legacy `error` object."""
+    still reach `ask`'s own `report.refuse`, not `main`'s legacy `error` object."""
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/agent-coordination.git"
     )
