@@ -146,7 +146,11 @@ def start_board(
     bound_port = httpd.server_address[1]
     # A fragment, not a query: the browser never sends it back to the server,
     # so the shell at `PAGE_PATH` needs no token to answer it (ABRD-10).
-    url = f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}#{TOKEN_FIELD}={token}"
+    url = (
+        # S5332: loopback only, no TLS by ruled design (#620 line 4)
+        f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}"  # NOSONAR(S5332) loopback-only URL
+        f"#{TOKEN_FIELD}={token}"
+    )
     return RunningBoard(httpd=httpd, url=url)
 
 

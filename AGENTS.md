@@ -6,6 +6,7 @@ Entry points (pointers only; the facts live there): `README.md` is operator docu
 Repository facts (owners in parentheses; do not fork them here):
 - Python >= 3.11 (`pyproject.toml`).
 - Verification: `ruff check .` and `pytest`; for `frontend/`, `pnpm --dir frontend install --frozen-lockfile`, then `pnpm --dir frontend` `check`, `lint`, `knip`, `test`, and `build`, and commit the rebuilt `src/aco_board/static/` (`.github/workflows/ci.yml`).
+- Quality gate: the `quality` job in `.github/workflows/ci.yml` calls overnightworks/quality's `gate.yml`; its required check is `quality / verdict`, and `quality/config.toml` lists the mandatory jobs. Sonar and secret scans run there, not in separate jobs.
 - Package version: `src/agent_coordination/__init__.py` (`__version__`).
 - Build in a linked isolated worktree. Use live `aco status` then `claim` before the first edit. Do not use Atelier's Auto-Runner.
 
