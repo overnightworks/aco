@@ -13,7 +13,8 @@ from cli_fixtures import (
     stub_board_config_tracked,
 )
 
-STATE_REF = "refs/aco/state"
+from agent_coordination import store
+
 BOOTSTRAP_REPOSITORY = "example/agent-coordination"
 
 
@@ -30,10 +31,6 @@ def clone(monkeypatch: pytest.MonkeyPatch, worktree: Path, bare_remote: Path) ->
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return worktree
-
-
-def _remote_state_ref(bare_remote: Path) -> str:
-    return real_git(bare_remote, "rev-parse", STATE_REF).stdout.strip()
 
 
 @pytest.mark.parametrize(
@@ -53,11 +50,14 @@ def test_bootstrap_with_a_repo_prints_the_ref_commit_id_as_without_one(
     real_git(clone, "config", f"url.{bare_remote}.insteadOf", origin_url)
     real_git(clone, "remote", "set-url", "origin", origin_url)
 
-    with_repo = run_cli(["--repo", BOOTSTRAP_REPOSITORY, "bootstrap"], capsys).expect_success()
-    without_repo = run_cli(["bootstrap"], capsys).expect_success()
+    with_repo = run_cli(["--repo", BOOTSTRAP_REPOSITORY, "bootstrap"], capsys)
+    without_repo = run_cli(["bootstrap"], capsys)
 
-    assert with_repo == f"{_remote_state_ref(bare_remote)}\n"
-    assert without_repo == with_repo
+    assert with_repo.stderr == ""
+    assert without_repo.stderr == ""
+    remote_state_commit = real_git(bare_remote, "rev-parse", store.STATE_REF).stdout.strip()
+    assert with_repo.expect_success() == f"{remote_state_commit}\n"
+    assert without_repo.expect_success() == with_repo.stdout
 
 
 @pytest.mark.parametrize(
@@ -70,17 +70,19 @@ def test_bootstrap_with_a_repo_prints_the_ref_commit_id_as_without_one(
 )
 def test_bootstrap_refuses_an_argument_it_does_not_define_before_any_read(
     clone: Path,
-    bare_remote: Path,
+    tmp_path: Path,
     extra_arguments: list[str],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Spec: BOOT-02 -- an argument `bootstrap` does not define is refused."""
+    real_git(clone, "remote", "set-url", "origin", str(tmp_path / "missing.git"))
+
     refused = run_cli(["bootstrap", *extra_arguments], capsys)
 
     assert f"aco: error: unrecognized arguments: {' '.join(extra_arguments)}" in (
         refused.expect_refusal()
     )
-    assert real_git(bare_remote, "for-each-ref", "refs/aco").stdout == ""
+    assert "ERROR:" not in refused.stderr
 
 
 def test_bootstrap_refuses_an_unreachable_remote_on_stderr_alone(
@@ -95,4 +97,7 @@ def test_bootstrap_refuses_an_unreachable_remote_on_stderr_alone(
         "ERROR: cannot reach origin refs/aco/state: auth or transport failure "
         "(ls-remote exited 128)"
     )
+    assert refused.stderr.count("ERROR: ") == 1
+    assert "Traceback" not in refused.stderr
+    assert "--ledger" not in refused.stderr
     assert refused.stdout == ""
