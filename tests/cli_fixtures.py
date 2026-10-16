@@ -1,10 +1,13 @@
 """CLI-boundary test scaffolding shared by `tests/test_cli.py` and the
 owner test files split from it (`tests/test_checkout.py`,
-`tests/test_protect.py`, `tests/test_store.py`): real and faked `git`
-process helpers, agent-identity env setup, and the "this boundary must not
-be reached" forbid-helpers. All four import this module directly; pytest's
-rootless collection puts `tests/` on `sys.path`, so a plain
-`import cli_fixtures` resolves here."""
+`tests/test_protect.py`, `tests/test_store.py`, `tests/test_session.py`,
+`tests/test_state_board.py`, `tests/test_hook_input.py`,
+`tests/test_network_guard.py`, `tests/github_fixtures.py`): real and faked
+`git` process helpers, agent-identity env setup, stdin sources and pipe
+helpers, and the "this boundary must not be reached" forbid-helpers. All
+import this module directly; pytest's rootless collection puts `tests/` on
+`sys.path`, so a plain `import cli_fixtures` resolves here. `conftest.py`
+also registers it as a pytest plugin for `bare_remote` and `worktree`."""
 
 from __future__ import annotations
 
@@ -90,13 +93,13 @@ def landed_from_another_clone(tmp_path: Path, *git_step: str) -> str:
     `git_step` -- a commit or a merge -- so a checkout that has not fetched
     since stands behind the remote (issue #488)."""
     other = tmp_path / "other"
-    _real_git(tmp_path, "clone", "-q", str(tmp_path / "remote.git"), str(other))
-    _real_git(other, "config", "user.name", "Other")
-    _real_git(other, "config", "user.email", "other@example.com")
-    _real_git(other, "config", "commit.gpgsign", "false")
-    _real_git(other, *git_step)
-    _real_git(other, "push", "-q", "origin", "HEAD:main")
-    return _real_git(other, "rev-parse", "HEAD").stdout.strip()
+    real_git(tmp_path, "clone", "-q", str(tmp_path / "remote.git"), str(other))
+    real_git(other, "config", "user.name", "Other")
+    real_git(other, "config", "user.email", "other@example.com")
+    real_git(other, "config", "commit.gpgsign", "false")
+    real_git(other, *git_step)
+    real_git(other, "push", "-q", "origin", "HEAD:main")
+    return real_git(other, "rev-parse", "HEAD").stdout.strip()
 
 
 def fetched_once_then_read(calls: list[tuple[str, Path]]) -> dict[Path, bool]:
@@ -148,7 +151,7 @@ def sealed_git_environment() -> dict[str, str]:
     }
 
 
-def _real_git(
+def real_git(
     repository: Path, *arguments: str, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -162,9 +165,10 @@ def _real_git(
 
 
 def init_bare_repository(path: Path) -> Path:
-    """A real bare repository on `main` at `path`, created with its parents."""
-    path.mkdir(parents=True, exist_ok=True)
-    _real_git(path, "init", "-q", "--bare", "-b", "main")
+    """A real bare repository on `main` at `path`; a path another builder
+    already took fails loudly instead of sharing its remote."""
+    path.mkdir()
+    real_git(path, "init", "-q", "--bare", "-b", "main")
     return path
 
 
@@ -180,11 +184,11 @@ def _real_repository_with_bare_remote(
     remote = init_bare_repository(tmp_path / "remote.git")
     repo = tmp_path / "repo"
     repo.mkdir()
-    _real_git(repo, "init", "-q", "-b", "main")
-    _real_git(repo, "config", "user.name", "Test")
-    _real_git(repo, "config", "user.email", "test@example.com")
-    _real_git(repo, "config", "commit.gpgsign", "false")
-    _real_git(repo, "remote", "add", remote_name, str(remote))
+    real_git(repo, "init", "-q", "-b", "main")
+    real_git(repo, "config", "user.name", "Test")
+    real_git(repo, "config", "user.email", "test@example.com")
+    real_git(repo, "config", "commit.gpgsign", "false")
+    real_git(repo, "remote", "add", remote_name, str(remote))
     return repo, remote
 
 
@@ -193,8 +197,8 @@ def bare_remote_repository_with_one_commit(tmp_path: Path) -> Path:
     commit on `main`, pushed to `origin` with `origin/HEAD` resolved."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "base.txt")
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     return repo
 
@@ -212,7 +216,7 @@ def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def head_sha(repository: Path) -> str:
-    return _real_git(repository, "rev-parse", "HEAD").stdout.strip()
+    return real_git(repository, "rev-parse", "HEAD").stdout.strip()
 
 
 @pytest.fixture
@@ -222,7 +226,7 @@ def bare_remote(tmp_path: Path) -> Path:
     `maintenance.auto=false` keeps `receive-pack` from starting maintenance
     here, so a client-side maintenance assertion sees only its own fetch."""
     remote = init_bare_repository(tmp_path / "remote.git")
-    _real_git(remote, "config", "maintenance.auto", "false")
+    real_git(remote, "config", "maintenance.auto", "false")
     return remote
 
 
@@ -237,10 +241,10 @@ def worktree(tmp_path: Path) -> Path:
     """
     checkout = tmp_path / "worktree"
     checkout.mkdir()
-    _real_git(checkout, "init", "-b", "main")
+    real_git(checkout, "init", "-b", "main")
     (checkout / "README").write_text("placeholder\n")
-    _real_git(checkout, "add", "README")
-    _real_git(checkout, "commit", "-m", "initial")
+    real_git(checkout, "add", "README")
+    real_git(checkout, "commit", "-m", "initial")
     return checkout
 
 
@@ -248,8 +252,8 @@ def _push_repository_trunk(repo: Path, remote_name: str) -> None:
     """`repo`'s current `main` pushed to `remote_name`, with `<remote_name>/HEAD`
     resolved -- the trailing half of the skeleton every trunk-history
     fixture repeats once its own commits are built (issue #359 CI)."""
-    _real_git(repo, "push", "-q", remote_name, "main")
-    _real_git(repo, "remote", "set-head", remote_name, "main")
+    real_git(repo, "push", "-q", remote_name, "main")
+    real_git(repo, "remote", "set-head", remote_name, "main")
 
 
 def dangle_recorded_head(repo: Path, remote_name: str) -> None:
@@ -257,9 +261,9 @@ def dangle_recorded_head(repo: Path, remote_name: str) -> None:
     that branch `main` and `<remote_name>/master` is gone from `repo`
     (issue #490): the recorded `HEAD` dangles, while `<remote_name>/main`
     stands at `repo`'s `main`."""
-    _real_git(repo, "push", "-q", remote_name, "main", "main:master")
-    _real_git(repo, "remote", "set-head", remote_name, "master")
-    _real_git(repo, "push", "-q", "--delete", remote_name, "master")
+    real_git(repo, "push", "-q", remote_name, "main", "main:master")
+    real_git(repo, "remote", "set-head", remote_name, "master")
+    real_git(repo, "push", "-q", "--delete", remote_name, "master")
 
 
 def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -331,16 +335,27 @@ def _git_checkout(
     }
 
 
-def _set_agent_identity_env(
-    monkeypatch: pytest.MonkeyPatch, environ: dict[str, str] | None = None
-) -> None:
-    for name in (
-        checkout.ACO_AGENT_ENV,
-        checkout.GROK_SESSION_ID_ENV,
-        checkout.CLAUDE_CODE_SESSION_ID_ENV,
-    ):
+AGENT_IDENTITY_ENV_NAMES = (
+    checkout.ACO_AGENT_ENV,
+    checkout.GROK_SESSION_ID_ENV,
+    checkout.CLAUDE_CODE_SESSION_ID_ENV,
+)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_agent_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test inherits the session's own agent identity: run inside an agent
+    session, a test that omits `--agent` would otherwise resolve to the real
+    session's `ACO_AGENT`, `GROK_SESSION_ID` or `CLAUDE_CODE_SESSION_ID`. A
+    test that needs an identity sets it itself."""
+    for name in AGENT_IDENTITY_ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
-    for name, value in (environ or {}).items():
+
+
+def _set_agent_identity_env(monkeypatch: pytest.MonkeyPatch, environ: dict[str, str]) -> None:
+    """Set the test's agent identity; the autouse `_isolate_agent_identity`
+    above has already cleared the session's own."""
+    for name, value in environ.items():
         monkeypatch.setenv(name, value)
 
 
@@ -503,6 +518,7 @@ def fresh_observation(worktree: Path, remote: Path | str) -> store.Observation:
     )
 
 
+# Captured at import, before `_stub_trunk` replaces them (issue #488).
 LIVE_TRUNK_REF_AFTER = checkout.trunk_ref_after
 LIVE_FETCH_REMOTE = checkout.fetch_remote
 
@@ -512,11 +528,11 @@ ITEM_NEW_BODY = complete_contract("Ship it.")
 def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
     """Point `RunContext.toplevel` (`rev-parse --show-toplevel`) at a real
     repository this test built itself (issue #322), taking precedence over
-    the module's autouse `_isolate_git_toplevel` fake -- every other real
+    `conftest.py`'s autouse `_isolate_git_toplevel` fake -- every other real
     git call `start`'s own worktree creation runs still reaches real git,
     unlike a fully faked `checkout.git_output`, and the trunk is resolved
-    and fetched for real there, undoing the autouse `_stub_trunk` (issue
-    #488)."""
+    and fetched for real there, undoing `test_cli.py`'s autouse
+    `_stub_trunk` (issue #488)."""
     real_git_output = checkout.git_output
 
     def fake(arguments: list[str], *, directory: Path | None = None) -> str:
@@ -542,7 +558,7 @@ def arguments_bash_hands_aco(advice: str, tmp_path: Path) -> tuple[int, list[str
     recorder.chmod(0o755)
     repository = tmp_path / "throwaway"
     repository.mkdir(exist_ok=True)
-    _real_git(repository, "init", "--quiet")
+    real_git(repository, "init", "--quiet")
     environment = {**os.environ, "PATH": f"{shim_directory}{os.pathsep}{os.environ['PATH']}"}
     ran = subprocess.run(
         ["bash", "-c", advice], cwd=repository, env=environment, capture_output=True, check=False

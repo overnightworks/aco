@@ -30,10 +30,10 @@ from cli_fixtures import (
     _forbid_protect_git_github_and_identity,
     _patch_command,
     _push_repository_trunk,
-    _real_git,
     _real_repository_with_bare_remote,
     _set_agent_identity_env,
     init_bare_repository,
+    real_git,
     stub_board_config_tracked,
 )
 from github_fixtures import FakeForge
@@ -336,7 +336,6 @@ def test_protect_non_mutating_tools_allow_without_identity_git_or_github(
     payload: dict[str, object],
 ) -> None:
     home, work = _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, payload) == 0
@@ -497,7 +496,6 @@ def test_protect_invalid_hook_payload_denies_without_raising(
     payload: str,
 ) -> None:
     home, work = _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, payload) == 2
@@ -528,7 +526,6 @@ def test_protect_mutating_tool_without_path_denies_path_required(
     payload: dict[str, object],
 ) -> None:
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, payload) == 2
@@ -1083,7 +1080,6 @@ def test_protect_bash_allows_a_command_with_no_recognized_pattern_without_identi
     or the store for them -- the same "cannot judge what it cannot see"
     limit README documents for the read-only tools (issue #380)."""
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert (
@@ -1108,7 +1104,6 @@ def test_protect_bash_allows_a_missing_or_non_string_command(
     tool_input: dict[str, object],
 ) -> None:
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, {"toolName": "Bash", "toolInput": tool_input}) == 0
@@ -1124,7 +1119,6 @@ def test_protect_unknown_tool_name_denies_with_a_repair_sentence(
     (issue #238) instead of the old default-allow, and the refusal names the
     table to extend rather than a bare 'unknown tool'."""
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, {"toolName": "invented_tool"}) == 2
@@ -1545,22 +1539,22 @@ def _protect_real_repo_with_worktree(
     main = tmp_path / "repo"
     if not main.exists():
         main.mkdir()
-        _real_git(main, "init", "-q", "-b", "main")
-        _real_git(main, "config", "user.name", "Test")
-        _real_git(main, "config", "user.email", "test@example.com")
+        real_git(main, "init", "-q", "-b", "main")
+        real_git(main, "config", "user.name", "Test")
+        real_git(main, "config", "user.email", "test@example.com")
         (main / "README.md").write_text("hello\n")
         write_repository_config(main, board_config)
         for trunk_file in trunk_files:
             (main / trunk_file).parent.mkdir(parents=True, exist_ok=True)
             (main / trunk_file).write_text("tracked\n")
-        _real_git(main, "add", "-f", "README.md", board.CONFIG_PATH.as_posix(), *trunk_files)
-        _real_git(main, "commit", "-q", "-m", "initial")
-        _real_git(main, "remote", "add", "origin", "https://example.invalid/example/repo.git")
-        _real_git(main, "update-ref", "refs/remotes/origin/main", "HEAD")
-        _real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        real_git(main, "add", "-f", "README.md", board.CONFIG_PATH.as_posix(), *trunk_files)
+        real_git(main, "commit", "-q", "-m", "initial")
+        real_git(main, "remote", "add", "origin", "https://example.invalid/example/repo.git")
+        real_git(main, "update-ref", "refs/remotes/origin/main", "HEAD")
+        real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
     worktree = tmp_path / "repo-worktrees" / slug
     worktree.parent.mkdir(parents=True, exist_ok=True)
-    _real_git(main, "worktree", "add", "-q", str(worktree), "-b", f"codex/{slug}")
+    real_git(main, "worktree", "add", "-q", str(worktree), "-b", f"codex/{slug}")
     (worktree / "src").mkdir()
     (worktree / "docs").mkdir()
     return main, worktree
@@ -1650,19 +1644,19 @@ def _protect_real_repo_with_nested_worktree(
     that is itself a different, nested checkout's own root."""
     outer = tmp_path / "outer-repo"
     outer.mkdir()
-    _real_git(outer, "init", "-q", "-b", "main")
-    _real_git(outer, "config", "user.name", "Test")
-    _real_git(outer, "config", "user.email", "test@example.com")
+    real_git(outer, "init", "-q", "-b", "main")
+    real_git(outer, "config", "user.name", "Test")
+    real_git(outer, "config", "user.email", "test@example.com")
     (outer / "README.md").write_text("hello\n")
     write_repository_config(outer)
-    _real_git(outer, "add", "-f", "README.md", board.CONFIG_PATH.as_posix())
-    _real_git(outer, "commit", "-q", "-m", "initial")
-    _real_git(outer, "remote", "add", "origin", "https://example.invalid/example/repo.git")
-    _real_git(outer, "update-ref", "refs/remotes/origin/main", "HEAD")
-    _real_git(outer, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    real_git(outer, "add", "-f", "README.md", board.CONFIG_PATH.as_posix())
+    real_git(outer, "commit", "-q", "-m", "initial")
+    real_git(outer, "remote", "add", "origin", "https://example.invalid/example/repo.git")
+    real_git(outer, "update-ref", "refs/remotes/origin/main", "HEAD")
+    real_git(outer, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
     nested = outer / "nested-worktrees" / slug
     nested.parent.mkdir(parents=True, exist_ok=True)
-    _real_git(outer, "worktree", "add", "-q", str(nested), "-b", f"codex/{slug}")
+    real_git(outer, "worktree", "add", "-q", str(nested), "-b", f"codex/{slug}")
     return outer, nested
 
 
@@ -1732,7 +1726,7 @@ def test_protect_allows_the_same_payload_path_from_every_cwd(
     outside = tmp_path / "elsewhere"
     outside.mkdir()
     if cwd_kind == "main_other_branch":
-        _real_git(main, "checkout", "-q", "-b", "some-other-branch")
+        real_git(main, "checkout", "-q", "-b", "some-other-branch")
     cwd_by_kind = {
         "main_default_branch": main,
         "main_other_branch": main,
@@ -1882,7 +1876,6 @@ def test_protect_allows_a_path_outside_every_repository_without_identity(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    _set_agent_identity_env(monkeypatch)
     outside = tmp_path / "not-a-repository"
     outside.mkdir()
     monkeypatch.chdir(outside)
@@ -1937,7 +1930,6 @@ def test_protect_allow_is_silent_exit_zero_for_every_host(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    _set_agent_identity_env(monkeypatch)
     outside = tmp_path / "not-a-repository"
     outside.mkdir()
     monkeypatch.chdir(outside)
@@ -2182,19 +2174,19 @@ def _real_worktree_on_default_branch_target(tmp_path: Path) -> Path:
     behind."""
     main = tmp_path / "repo"
     main.mkdir()
-    _real_git(main, "init", "-q", "-b", "main")
-    _real_git(main, "config", "user.name", "Test")
-    _real_git(main, "config", "user.email", "test@example.com")
+    real_git(main, "init", "-q", "-b", "main")
+    real_git(main, "config", "user.name", "Test")
+    real_git(main, "config", "user.email", "test@example.com")
     (main / "README.md").write_text("hello\n")
-    _real_git(main, "add", "README.md")
-    _real_git(main, "commit", "-q", "-m", "initial")
-    _real_git(main, "remote", "add", "origin", "https://example.invalid/example/repo.git")
-    _real_git(main, "update-ref", "refs/remotes/origin/main", "HEAD")
-    _real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-    _real_git(main, "checkout", "-q", "-b", "codex/elsewhere")
+    real_git(main, "add", "README.md")
+    real_git(main, "commit", "-q", "-m", "initial")
+    real_git(main, "remote", "add", "origin", "https://example.invalid/example/repo.git")
+    real_git(main, "update-ref", "refs/remotes/origin/main", "HEAD")
+    real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    real_git(main, "checkout", "-q", "-b", "codex/elsewhere")
     worktree = tmp_path / "repo-worktrees" / "issue-1-on-default"
     worktree.parent.mkdir(parents=True)
-    _real_git(main, "worktree", "add", "-q", str(worktree), "main")
+    real_git(main, "worktree", "add", "-q", str(worktree), "main")
     return worktree / "README.md"
 
 
@@ -2337,7 +2329,6 @@ def test_protect_never_reads_a_git_failure_as_outside_every_repository(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    _set_agent_identity_env(monkeypatch)
     target = build_target(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -2369,7 +2360,7 @@ def test_protect_denies_a_checkout_with_no_commit_yet(
     _set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     unborn = tmp_path / "unborn"
     unborn.mkdir()
-    _real_git(unborn, "init", "-q", "-b", "codex/issue-72-widget")
+    real_git(unborn, "init", "-q", "-b", "codex/issue-72-widget")
     monkeypatch.chdir(tmp_path)
     _forbid_github_construction(monkeypatch)
     target = unborn / "widget.py"
@@ -2463,7 +2454,7 @@ def _rescope_args_add_dotdot_path_through_a_missing_directory_out_of_the_worktre
 def _rescope_args_add_path_in_an_unborn_checkout(tmp_path: Path) -> list[str]:
     unborn = tmp_path / "unborn"
     unborn.mkdir()
-    _real_git(unborn, "init", "-q", "-b", "codex/issue-72-widget")
+    real_git(unborn, "init", "-q", "-b", "codex/issue-72-widget")
     return ["rescope", "72", "--add", str(unborn / "widget.py")]
 
 
@@ -2568,8 +2559,8 @@ def _judge_worktree(tmp_path: Path, *, branch: str) -> Path:
     absolute path, never on the process's cwd."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
     (repo / "README.md").write_text("hello\n")
-    _real_git(repo, "add", "README.md")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "README.md")
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     worktree = tmp_path / "repo-worktrees" / branch.replace("/", "-")
     checkout.create_linked_worktree(
@@ -2679,12 +2670,12 @@ def _real_main_checkout_with_session_settings(tmp_path: Path) -> Path:
     `.claude/settings.local.json` -- the global excludes file switched off,
     so only this repository's own rules decide what is ignored."""
     repo, _remote = _real_repository_with_bare_remote(tmp_path)
-    _real_git(repo, "config", "core.excludesFile", "/dev/null")
+    real_git(repo, "config", "core.excludesFile", "/dev/null")
     (repo / ".claude").mkdir()
     (repo / ".claude" / "settings.json").write_text("{}\n")
     (repo / "README.md").write_text("hello\n")
-    _real_git(repo, "add", "README.md", ".claude/settings.json")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    real_git(repo, "add", "README.md", ".claude/settings.json")
+    real_git(repo, "commit", "-q", "-m", "initial")
     _push_repository_trunk(repo, "origin")
     # The sealed helper initializes from an empty template, which carries no `.git/info/`.
     (repo / ".git" / "info").mkdir(exist_ok=True)
@@ -2718,7 +2709,6 @@ def test_protect_lets_the_main_checkout_write_only_its_ignored_session_settings(
     an untracked one git does not ignore, and any other file there still
     deny `not main` (PROT-12)."""
     main_checkout = _real_main_checkout_with_session_settings(tmp_path)
-    _set_agent_identity_env(monkeypatch)
 
     assert _protect_main(monkeypatch, payload_for(main_checkout / relative)) == status
     _assert_protect_decision(capsys, decision="deny" if reason else "allow", reason=reason)
@@ -2780,7 +2770,7 @@ def _unguarded_scratchpad(tmp_path: Path) -> Path:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     throwaway = _real_main_checkout_with_session_settings(scratch)
-    _real_git(
+    real_git(
         guarded,
         "worktree",
         "add",
@@ -2789,7 +2779,7 @@ def _unguarded_scratchpad(tmp_path: Path) -> Path:
         "-b",
         "codex/issue-9-guarded",
     )
-    _real_git(throwaway, "worktree", "add", "-q", str(scratch / "lane"), "-b", "codex/issue-9-lane")
+    real_git(throwaway, "worktree", "add", "-q", str(scratch / "lane"), "-b", "codex/issue-9-lane")
     (scratch / "guarded-link").symlink_to(guarded, target_is_directory=True)
     for link in (throwaway / "into-guarded.md", scratch / "lane" / "into-guarded.md"):
         link.symlink_to(guarded / "README.md")
@@ -2940,7 +2930,8 @@ def test_protect_unguarded_directories_exempt_only_the_repositories_they_hold(
     own ignored settings. The session has an identity only where the verdict
     reads the store, so every other row proves it decides without one."""
     scratch = _unguarded_scratchpad(tmp_path)
-    _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"} if store_reads else None)
+    if store_reads:
+        _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     if unguarded is not None:
         monkeypatch.setenv(protect.PROTECT_UNGUARDED_ENV, unguarded.format(scratch=scratch))
     fetches: list[Path] = []
@@ -3099,7 +3090,8 @@ def test_protect_judges_a_write_through_a_symlink_by_the_link_and_the_target_che
     store is read, so a store-free denial in either reads no store; every
     row without an identity proves its verdict needs none."""
     _symlinks_across_checkouts(tmp_path)
-    _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent} if agent else None)
+    if agent:
+        _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent})
     claim = _protect_active_claim("Ada", scope=("src",), branch="codex/issue-72-widget")
     fetches: list[Path] = []
 
@@ -3195,7 +3187,7 @@ def test_protect_lets_the_targets_verdict_win_when_one_checkouts_board_is_untrac
     _use_real_path_is_tracked(monkeypatch)
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     claimed_worktree = tmp_path / _CLAIMED_WORKTREE
-    _real_git(claimed_worktree, "rm", "-q", "--cached", board.CONFIG_PATH.as_posix())
+    real_git(claimed_worktree, "rm", "-q", "--cached", board.CONFIG_PATH.as_posix())
     claim = _protect_active_claim("Ada", scope=("src",), branch="codex/issue-72-widget")
     fetches: list[Path] = []
 
@@ -3330,25 +3322,25 @@ def _hub_canonical_worktree_file(
     removed remote left behind (issue #492)."""
     main = tmp_path / "repo"
     main.mkdir()
-    _real_git(main, "init", "-q", "-b", "main")
-    _real_git(main, "config", "user.name", "Test")
-    _real_git(main, "config", "user.email", "test@example.com")
+    real_git(main, "init", "-q", "-b", "main")
+    real_git(main, "config", "user.name", "Test")
+    real_git(main, "config", "user.email", "test@example.com")
     write_repository_config(main, f'canonical_remote = "{canonical}"\n')
-    _real_git(main, "add", "-f", board.CONFIG_PATH.as_posix())
-    _real_git(main, "commit", "-q", "-m", "initial")
-    _real_git(main, "branch", "trunk")
+    real_git(main, "add", "-f", board.CONFIG_PATH.as_posix())
+    real_git(main, "commit", "-q", "-m", "initial")
+    real_git(main, "branch", "trunk")
     for remote in ("origin", "hub"):
-        _real_git(main, "remote", "add", remote, f"https://example.invalid/{remote}/repo.git")
-        _real_git(main, "update-ref", f"refs/remotes/{remote}/main", "HEAD")
-        _real_git(main, "update-ref", f"refs/remotes/{remote}/trunk", "HEAD")
-    _real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        real_git(main, "remote", "add", remote, f"https://example.invalid/{remote}/repo.git")
+        real_git(main, "update-ref", f"refs/remotes/{remote}/main", "HEAD")
+        real_git(main, "update-ref", f"refs/remotes/{remote}/trunk", "HEAD")
+    real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
     if canonical_head is not None:
         recorded = f"refs/remotes/{canonical}/{canonical_head}"
-        _real_git(main, "update-ref", recorded, "HEAD")
-        _real_git(main, "symbolic-ref", f"refs/remotes/{canonical}/HEAD", recorded)
+        real_git(main, "update-ref", recorded, "HEAD")
+        real_git(main, "symbolic-ref", f"refs/remotes/{canonical}/HEAD", recorded)
     worktree = tmp_path / "repo-worktrees" / "lane"
     worktree.parent.mkdir()
-    _real_git(main, "worktree", "add", "-q", str(worktree), "-B", branch)
+    real_git(main, "worktree", "add", "-q", str(worktree), "-B", branch)
     return worktree / "widget.py"
 
 
@@ -3514,7 +3506,7 @@ def test_protect_and_rescope_name_a_canonical_remote_that_has_config_lines_but_n
     path = _hub_canonical_worktree_file(
         tmp_path, canonical="upstream", canonical_head="trunk", branch="codex/issue-72-widget"
     )
-    _real_git(
+    real_git(
         path.parent, "config", "remote.upstream.fetch", "+refs/heads/*:refs/remotes/upstream/*"
     )
     monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)

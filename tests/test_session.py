@@ -15,12 +15,12 @@ import pytest
 from board_fixtures import write_repository_config
 from cli_fixtures import (
     _push_repository_trunk,
-    _real_git,
     _real_repository_with_bare_remote,
     fetched_once_then_read,
     init_bare_repository,
     landed_from_another_clone,
     main_exit_code,
+    real_git,
     stub_board_config_tracked,
     trunk_git_calls,
 )
@@ -47,8 +47,8 @@ def _checkout_configuring(tmp_path: Path, remote: str, board_config: str) -> Pat
     """A real checkout `worktree` that configures `remote`, with
     `board_config` as its board configuration."""
     worktree = tmp_path / "worktree"
-    _real_git(tmp_path, "init", "-q", str(worktree))
-    _real_git(worktree, "remote", "add", remote, "git@github.com:owner/repo.git")
+    real_git(tmp_path, "init", "-q", str(worktree))
+    real_git(worktree, "remote", "add", remote, "git@github.com:owner/repo.git")
     write_repository_config(worktree, board_config)
     return worktree
 
@@ -186,11 +186,11 @@ def _hub_canonical_repository(tmp_path: Path, *, origin_url: str | None) -> Path
     """A repository whose canonical remote `hub` names `owner/repo` on
     GitHub, with an `origin` at `origin_url` beside it when given."""
     repository = tmp_path / "repo"
-    _real_git(tmp_path, "init", "-q", str(repository))
+    real_git(tmp_path, "init", "-q", str(repository))
     write_repository_config(repository, 'canonical_remote = "hub"\n')
-    _real_git(repository, "remote", "add", "hub", "git@github.com:owner/repo.git")
+    real_git(repository, "remote", "add", "hub", "git@github.com:owner/repo.git")
     if origin_url is not None:
-        _real_git(repository, "remote", "add", "origin", origin_url)
+        real_git(repository, "remote", "add", "origin", origin_url)
     return repository
 
 
@@ -276,8 +276,8 @@ def test_a_failed_observation_is_fetched_again_and_a_successful_one_is_held(
 
 
 def _commit(repository: Path, message: str) -> str:
-    _real_git(repository, "commit", "-q", "--allow-empty", "-m", message)
-    return _real_git(repository, "rev-parse", "HEAD").stdout.strip()
+    real_git(repository, "commit", "-q", "--allow-empty", "-m", message)
+    return real_git(repository, "rev-parse", "HEAD").stdout.strip()
 
 
 def _pushed_repository(tmp_path: Path, board_config: str = "") -> Path:
@@ -285,13 +285,13 @@ def _pushed_repository(tmp_path: Path, board_config: str = "") -> Path:
     recorded for it, and `board_config` as its board configuration."""
     repository, _remote = _real_repository_with_bare_remote(tmp_path)
     _commit(repository, "initial")
-    _real_git(repository, "push", "-q", "origin", "main")
+    real_git(repository, "push", "-q", "origin", "main")
     write_repository_config(repository, board_config)
     return repository
 
 
 def _git_version() -> tuple[int, ...]:
-    version = _real_git(Path.cwd(), "--version").stdout.split()[2]
+    version = real_git(Path.cwd(), "--version").stdout.split()[2]
     return tuple(int(part) for part in version.split(".")[:2])
 
 
@@ -303,7 +303,7 @@ def test_a_fetched_trunk_is_resolved_after_the_fetch_never_from_a_trunk_held_bef
     resolves the trunk again and names the remote's tip, never the ref it
     held before the fetch."""
     repository = _pushed_repository(tmp_path)
-    _real_git(repository, "update-ref", "-d", "refs/remotes/origin/main")
+    real_git(repository, "update-ref", "-d", "refs/remotes/origin/main")
     remote_tip = landed_from_another_clone(
         tmp_path, "commit", "-q", "--allow-empty", "-m", "landed elsewhere"
     )
@@ -324,11 +324,11 @@ def test_a_default_branch_held_before_the_fetch_never_names_the_fetched_ref(
     default-branch ref and every later ask name `trunk`, and the trunk asked
     after it shares that one fetch."""
     repository = _pushed_repository(tmp_path, 'storage = "state-ref"\n')
-    _real_git(repository, "push", "-q", "origin", "main:trunk")
-    _real_git(repository, "remote", "set-head", "origin", "main")
+    real_git(repository, "push", "-q", "origin", "main:trunk")
+    real_git(repository, "remote", "set-head", "origin", "main")
     context = _context().for_directory(repository)
     held = context.default_branch
-    _real_git(repository, "remote", "set-head", "origin", "trunk")
+    real_git(repository, "remote", "set-head", "origin", "trunk")
     trunk_calls = trunk_git_calls(monkeypatch, "origin")
 
     fetched = context.fetched_default_branch_ref()
@@ -372,7 +372,7 @@ def test_every_trunk_read_names_the_canonical_remote_never_a_diverging_origin(
     repository = _pushed_repository(tmp_path, 'canonical_remote = "hub"\n')
     hub = tmp_path / "hub.git"
     init_bare_repository(hub)
-    _real_git(repository, "remote", "add", "hub", str(hub))
+    real_git(repository, "remote", "add", "hub", str(hub))
     _commit(repository, "second")
     _push_repository_trunk(repository, "hub")
     origin_reads = trunk_git_calls(monkeypatch, "origin")
@@ -399,12 +399,12 @@ def test_a_fresh_context_whose_configuration_names_another_remote_fetches_that_r
     repository = _pushed_repository(tmp_path)
     hub = tmp_path / "hub.git"
     init_bare_repository(hub)
-    _real_git(repository, "remote", "add", "hub", str(hub))
+    real_git(repository, "remote", "add", "hub", str(hub))
     stale = _commit(repository, "second")
     _push_repository_trunk(repository, "hub")
     landed = _commit(repository, "landed")
-    _real_git(repository, "push", "-q", "hub", "main")
-    _real_git(repository, "update-ref", "refs/remotes/hub/main", stale)
+    real_git(repository, "push", "-q", "hub", "main")
+    real_git(repository, "update-ref", "refs/remotes/hub/main", stale)
     context = _context().for_directory(repository)
     context.fetched_trunk_ref()
     write_repository_config(repository, 'canonical_remote = "hub"\n')
@@ -455,11 +455,11 @@ def test_a_trunk_the_fetch_pruned_fails_loud_on_every_ask_never_answered_by_the_
     local `main` or `master` -- so every later ask fails loud instead of
     answering with the ref held from before the fetch."""
     repository = _pushed_repository(tmp_path)
-    _real_git(repository, "branch", "-m", "main", "work")
-    _real_git(repository, "config", "fetch.prune", "true")
+    real_git(repository, "branch", "-m", "main", "work")
+    real_git(repository, "config", "fetch.prune", "true")
     context = _context().for_directory(repository)
     held = context.trunk_ref
-    _real_git(tmp_path / "remote.git", "update-ref", "-d", "refs/heads/main")
+    real_git(tmp_path / "remote.git", "update-ref", "-d", "refs/heads/main")
 
     with pytest.raises(ClaimError, match="cannot determine the trunk"):
         context.fetched_trunk_ref()
@@ -476,17 +476,17 @@ def _hub_never_added(_repository: Path) -> None:
 def _hub_removed_leaving_its_refs(repository: Path) -> None:
     """`hub` was added, fetched with its `HEAD` recorded, then dropped from
     the configuration: its remote-tracking refs outlive it."""
-    _real_git(repository, "remote", "add", "hub", str(repository.parent / "remote.git"))
-    _real_git(repository, "fetch", "-q", "hub")
-    _real_git(repository, "remote", "set-head", "hub", "main")
-    _real_git(repository, "config", "--remove-section", "remote.hub")
+    real_git(repository, "remote", "add", "hub", str(repository.parent / "remote.git"))
+    real_git(repository, "fetch", "-q", "hub")
+    real_git(repository, "remote", "set-head", "hub", "main")
+    real_git(repository, "config", "--remove-section", "remote.hub")
 
 
 def _hub_left_a_fetch_line_without_a_url(repository: Path) -> None:
     """A local `remote.hub.fetch` with no `remote.hub.url` makes git list
     `hub` beside the refs it left behind (issue #512)."""
     _hub_removed_leaving_its_refs(repository)
-    _real_git(repository, "config", "remote.hub.fetch", "+refs/heads/*:refs/remotes/hub/*")
+    real_git(repository, "config", "remote.hub.fetch", "+refs/heads/*:refs/remotes/hub/*")
 
 
 _UNCONFIGURED_HUBS = (
@@ -555,7 +555,7 @@ def test_a_canonical_remote_found_unconfigured_stays_refused_for_the_whole_conte
     context = _context().for_directory(repository)
     with pytest.raises(ClaimError, match="canonical remote 'hub' is not configured"):
         _ = context.trunk_ref
-    _real_git(repository, "remote", "add", "hub", str(tmp_path / "remote.git"))
+    real_git(repository, "remote", "add", "hub", str(tmp_path / "remote.git"))
 
     with pytest.raises(ClaimError, match="canonical remote 'hub' is not configured"):
         _ = context.default_branch
@@ -569,7 +569,7 @@ def test_a_configured_canonical_remote_without_branches_still_guesses_the_local_
     a fresh or offline repository -- so the trunk is still the local
     `main` (issue #492 ruling)."""
     repository = _pushed_repository(tmp_path, 'canonical_remote = "hub"\n')
-    _real_git(repository, "remote", "add", "hub", str(tmp_path / "hub.git"))
+    real_git(repository, "remote", "add", "hub", str(tmp_path / "hub.git"))
 
     assert _context().for_directory(repository).trunk_ref == "main"
 

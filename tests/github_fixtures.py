@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue
-from cli_fixtures import _real_git
+from cli_fixtures import real_git
 
 from agent_coordination import board, body, forge, github
 from agent_coordination import cli as issue_claim
@@ -43,17 +43,17 @@ def merge_on_the_forge(
     commit, or one squashed single-parent commit -- built in a clone of it
     beside `remote` so no landing checkout moves with it."""
     clone = remote.parent / "forge-merge"
-    _real_git(remote.parent, "clone", "-q", "-b", default_branch, str(remote), str(clone))
-    _real_git(clone, "config", "user.name", "Forge")
-    _real_git(clone, "config", "user.email", "forge@example.com")
-    _real_git(clone, "config", "commit.gpgsign", "false")
+    real_git(remote.parent, "clone", "-q", "-b", default_branch, str(remote), str(clone))
+    real_git(clone, "config", "user.name", "Forge")
+    real_git(clone, "config", "user.email", "forge@example.com")
+    real_git(clone, "config", "commit.gpgsign", "false")
     if method is board.MergeMethod.SQUASH:
-        _real_git(clone, "merge", "-q", "--squash", f"origin/{source_branch}")
-        _real_git(clone, "commit", "-q", "-m", message)
+        real_git(clone, "merge", "-q", "--squash", f"origin/{source_branch}")
+        real_git(clone, "commit", "-q", "-m", message)
     else:
-        _real_git(clone, "merge", "-q", "--no-ff", "-m", message, f"origin/{source_branch}")
-    _real_git(clone, "push", "-q", "origin", f"HEAD:{default_branch}")
-    return _real_git(clone, "rev-parse", "HEAD").stdout.strip()
+        real_git(clone, "merge", "-q", "--no-ff", "-m", message, f"origin/{source_branch}")
+    real_git(clone, "push", "-q", "origin", f"HEAD:{default_branch}")
+    return real_git(clone, "rev-parse", "HEAD").stdout.strip()
 
 
 @dataclass

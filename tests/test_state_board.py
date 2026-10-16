@@ -35,7 +35,6 @@ from board_fixtures import (
     write_repository_config,
 )
 from cli_fixtures import (
-    _real_git,
     arguments_bash_hands_aco,
     body_file_on_stdin,
     closed_stdin,
@@ -47,6 +46,7 @@ from cli_fixtures import (
     main_with_piped_stdin,
     piped_body_on_stdin,
     piping,
+    real_git,
     redirect_toplevel,
     set_git_identity,
     stub_board_config_tracked,
@@ -658,7 +658,7 @@ def _store_item_writer(remote: Path, worktree_path: Path) -> ItemWriter:
     def no_forge(_context: RunContext) -> forge.ForgeReader:
         raise AssertionError("an item write never builds a forge")
 
-    _real_git(worktree_path, "config", "remote.canonical.url", str(remote))
+    real_git(worktree_path, "config", "remote.canonical.url", str(remote))
     context = RunContext(None, build_forge=no_forge).for_directory(worktree_path, is_toplevel=True)
     context.config = board.BoardConfig(canonical_remote="canonical", storage=Storage.STATE_REF)
     return issue_claim._StoreItemWriter(context)
@@ -1818,9 +1818,9 @@ class TestCliStateRefForge:
         every write proof below shares (issue #283)."""
         remote_url = f"file://{bare_remote}"
         _push_item_tree(bare_remote, worktree, item_files)
-        _real_git(worktree, "remote", "add", "origin", remote_url)
-        _real_git(worktree, "push", "origin", "main")
-        _real_git(worktree, "remote", "set-head", "origin", "main")
+        real_git(worktree, "remote", "add", "origin", remote_url)
+        real_git(worktree, "push", "origin", "main")
+        real_git(worktree, "remote", "set-head", "origin", "main")
         self._enter_pinned_checkout(monkeypatch, worktree)
         monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
 
@@ -2763,9 +2763,9 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         remote_url = f"file://{bare_remote}"
-        _real_git(worktree, "remote", "add", "origin", remote_url)
-        _real_git(worktree, "push", "origin", "main")
-        _real_git(worktree, "remote", "set-head", "origin", "main")
+        real_git(worktree, "remote", "add", "origin", remote_url)
+        real_git(worktree, "push", "origin", "main")
+        real_git(worktree, "remote", "set-head", "origin", "main")
         store.bootstrap(worktree=worktree, remote=remote_url)
         self._enter_pinned_checkout(monkeypatch, worktree)
         monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
@@ -2796,7 +2796,7 @@ class TestCliStateRefForge:
                 _record(title="Trailer-landed", state="open", kind="task"),
             ).encode()
         }
-        _real_git(worktree, "commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {item_id}")
+        real_git(worktree, "commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {item_id}")
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
 
         assert issue_claim.main(["board", "--json"]) == 0
@@ -2827,9 +2827,9 @@ class TestCliStateRefForge:
             ).encode()
             for item_id, title in ((first_id, "First"), (second_id, "Second"))
         }
-        _real_git(worktree, "commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {first_id}")
+        real_git(worktree, "commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {first_id}")
         first_sha = head_sha(worktree)
-        _real_git(
+        real_git(
             worktree, "commit", "--allow-empty", "-m", f"Land it too.\n\nWork-Item: {second_id}"
         )
         second_sha = head_sha(worktree)
@@ -2860,8 +2860,8 @@ class TestCliStateRefForge:
         `_state_ref_forge` owns names that remote, worded exactly as the run
         tells the operator to fix it."""
         remote_url = f"file://{bare_remote}"
-        _real_git(worktree, "remote", "add", canonical_remote, remote_url)
-        _real_git(worktree, "push", canonical_remote, "main")
+        real_git(worktree, "remote", "add", canonical_remote, remote_url)
+        real_git(worktree, "push", canonical_remote, "main")
         store.bootstrap(worktree=worktree, remote=remote_url)
         self._enter_pinned_checkout(monkeypatch, worktree, canonical_remote=canonical_remote)
         monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
