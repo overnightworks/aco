@@ -10389,6 +10389,7 @@ def test_cli_two_session_claimants_cannot_release_without_extra_comment(
     )
     capsys.readouterr()
 
+    monkeypatch.delenv(checkout.GROK_SESSION_ID_ENV)
     _set_agent_identity_env(monkeypatch, {"CLAUDE_CODE_SESSION_ID": "session-2"})
     released = issue_claim.main(
         [

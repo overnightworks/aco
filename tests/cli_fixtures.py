@@ -342,9 +342,19 @@ AGENT_IDENTITY_ENV_NAMES = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_agent_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test inherits the session's own agent identity: run inside an agent
+    session, a test that omits `--agent` would otherwise resolve to the real
+    session's `ACO_AGENT`, `GROK_SESSION_ID` or `CLAUDE_CODE_SESSION_ID`. A
+    test that needs an identity sets it itself."""
+    for name in AGENT_IDENTITY_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+
+
 def _set_agent_identity_env(monkeypatch: pytest.MonkeyPatch, environ: dict[str, str]) -> None:
     """Set the test's agent identity; the autouse `_isolate_agent_identity`
-    in `conftest.py` has already cleared the session's own."""
+    above has already cleared the session's own."""
     for name, value in environ.items():
         monkeypatch.setenv(name, value)
 
