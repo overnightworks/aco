@@ -8962,10 +8962,7 @@ def _landing_repository(tmp_path: Path) -> Path:
     <sha|empty>`/`check <sha>` (LAND-47/LAND-48/LAND-52) to walk. `feature`
     never joins the first-parent line itself (only its merge commit does),
     giving the off-trunk refusal proof a real sha to reject."""
-    repo, _remote = _real_repository_with_bare_remote(tmp_path)
-    (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
+    repo = bare_remote_repository_with_one_commit(tmp_path)
 
     _real_git(repo, "checkout", "-q", "-b", "feature")
     (repo / "feature.txt").write_text("feature\n")
