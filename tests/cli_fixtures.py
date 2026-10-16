@@ -8,15 +8,20 @@ rootless collection puts `tests/` on `sys.path`, so a plain
 
 from __future__ import annotations
 
+import contextlib
 import os
+import socket
 import subprocess
+import sys
 from collections import Counter
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
+from typing import TextIO
 
 import pytest
-from board_fixtures import BASE
+from board_fixtures import BASE, complete_contract
 
 from agent_coordination import board, checkout, cli, forge, github, process, store
 from agent_coordination.protocol import ClaimState
@@ -496,3 +501,125 @@ def fresh_observation(worktree: Path, remote: Path | str) -> store.Observation:
     return store.Observation(
         worktree, str(remote), store.fetch_state(worktree=worktree, remote=str(remote))
     )
+
+
+LIVE_TRUNK_REF_AFTER = checkout.trunk_ref_after
+LIVE_FETCH_REMOTE = checkout.fetch_remote
+
+ITEM_NEW_BODY = complete_contract("Ship it.")
+
+
+def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
+    """Point `RunContext.toplevel` (`rev-parse --show-toplevel`) at a real
+    repository this test built itself (issue #322), taking precedence over
+    the module's autouse `_isolate_git_toplevel` fake -- every other real
+    git call `start`'s own worktree creation runs still reaches real git,
+    unlike a fully faked `checkout.git_output`, and the trunk is resolved
+    and fetched for real there, undoing the autouse `_stub_trunk` (issue
+    #488)."""
+    real_git_output = checkout.git_output
+
+    def fake(arguments: list[str], *, directory: Path | None = None) -> str:
+        if arguments == ["rev-parse", "--show-toplevel"] and directory is None:
+            return str(toplevel)
+        return real_git_output(arguments, directory=directory)
+
+    monkeypatch.setattr(checkout, "git_output", fake)
+    monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
+    monkeypatch.setattr(checkout, "fetch_remote", LIVE_FETCH_REMOTE)
+
+
+def arguments_bash_hands_aco(advice: str, tmp_path: Path) -> tuple[int, list[str]]:
+    """Bash's exit code and the argv it hands `aco` when the printed
+    `advice` command runs verbatim in a throwaway git repository, `aco`
+    standing in as a recorder of its own arguments -- so the caller runs
+    exactly those arguments through the real entry point (issue #510). A
+    scenario may run several pieces of advice in turn (issue #513)."""
+    shim_directory = tmp_path / "shell-bin"
+    shim_directory.mkdir(exist_ok=True)
+    recorder = shim_directory / "aco"
+    recorder.write_text("#!/bin/sh\nprintf '%s\\0' \"$@\"\n")
+    recorder.chmod(0o755)
+    repository = tmp_path / "throwaway"
+    repository.mkdir(exist_ok=True)
+    _real_git(repository, "init", "--quiet")
+    environment = {**os.environ, "PATH": f"{shim_directory}{os.pathsep}{os.environ['PATH']}"}
+    ran = subprocess.run(
+        ["bash", "-c", advice], cwd=repository, env=environment, capture_output=True, check=False
+    )
+    return ran.returncode, ran.stdout.decode().split("\0")[:-1]
+
+
+@contextlib.contextmanager
+def devnull_on_stdin(_tmp_path: Path) -> Iterator[TextIO]:
+    with Path(os.devnull).open() as stdin:
+        yield stdin
+
+
+@contextlib.contextmanager
+def body_file_on_stdin(tmp_path: Path) -> Iterator[TextIO]:
+    body_file = tmp_path / "body.md"
+    body_file.write_text(ITEM_NEW_BODY)
+    with body_file.open() as stdin:
+        yield stdin
+
+
+def read_end_of_a_pipe_carrying(text: str) -> TextIO:
+    """`printf ... | aco ...`: the read end of a pipe whose writer already
+    wrote `text` -- a scenario body, well inside a pipe's buffer -- and
+    closed. Read as `sys.stdin` reads a pipe: line endings untranslated."""
+    read_end, write_end = os.pipe()
+    with os.fdopen(write_end, "w") as writer:
+        writer.write(text)
+    return os.fdopen(read_end, newline="")
+
+
+def piping(text: str) -> Callable[[Path], contextlib.AbstractContextManager[TextIO]]:
+    """A stdin source piping `text`, for a family whose cases each set their
+    own stdin."""
+
+    @contextlib.contextmanager
+    def piped(_tmp_path: Path) -> Iterator[TextIO]:
+        with read_end_of_a_pipe_carrying(text) as stdin:
+            yield stdin
+
+    return piped
+
+
+piped_body_on_stdin = piping(ITEM_NEW_BODY)
+
+
+def main_with_piped_stdin(monkeypatch: pytest.MonkeyPatch, text: str, argv: list[str]) -> int:
+    """`printf ... | aco <argv>`: one run with `text` on a pipe as its
+    stdin, the pipe closed once the run returns."""
+    with read_end_of_a_pipe_carrying(text) as stdin:
+        monkeypatch.setattr(sys, "stdin", stdin)
+        return cli.main(argv)
+
+
+@contextlib.contextmanager
+def terminal_on_stdin(_tmp_path: Path) -> Iterator[TextIO]:
+    """A stdin a person types into, holding a line nobody piped."""
+    controller, terminal = os.openpty()
+    with os.fdopen(controller, "w") as typist, os.fdopen(terminal) as stdin:
+        typist.write("never read\n")
+        typist.flush()
+        yield stdin
+
+
+@contextlib.contextmanager
+def closed_stdin(_tmp_path: Path) -> Iterator[None]:
+    """`aco ... <&-`: Python leaves `sys.stdin` as `None`."""
+    yield None
+
+
+@contextlib.contextmanager
+def empty_harness_socket_on_stdin(_tmp_path: Path) -> Iterator[TextIO]:
+    """The stdin an agent harness such as Claude Code's Bash tool hands a
+    command: one end of a socket that never delivers a body."""
+    harness_end, other_end = socket.socketpair()
+    # The other end stays open, so a read would wait forever; the timeout
+    # turns a command that reads this stdin into a failure, not a hang.
+    harness_end.settimeout(1)
+    with harness_end, other_end, harness_end.makefile("r") as stdin:
+        yield stdin
