@@ -73,6 +73,7 @@ containers = ["agent_coordination"]
 exhaustive = true
 layers = [
     "cli",
+    "cmd_bootstrap | cmd_workspace",
     "report",
     "session",
     "protect",
@@ -181,6 +182,7 @@ as_packages = false
 name = "Workspace recovery does not reach repository coordination"
 type = "forbidden"
 source_modules = [
+    "agent_coordination.cmd_workspace",
     "agent_coordination.workspace",
     "agent_coordination.terminal",
     "agent_coordination.providers",
