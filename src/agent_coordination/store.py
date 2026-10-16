@@ -581,7 +581,6 @@ class ClaimLifecycle:
 def _record_claim_transition(
     transition: _RawTransition,
     accumulators: dict[str, _LifecycleAccumulator],
-    order: list[str],
 ) -> bool:
     """Opens `transition`'s `claim_id` as a new accumulator; returns whether
     it parsed. A second `claim` for a `claim_id` this walk already opened
@@ -592,7 +591,6 @@ def _record_claim_transition(
     accumulators[transition.claim_id] = _LifecycleAccumulator(
         item=transition.item, claimed_at=transition.committed_at
     )
-    order.append(transition.claim_id)
     return True
 
 
@@ -662,10 +660,9 @@ def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
     """
     transitions, unparsed = _claim_lifecycle_transitions(worktree, tip)
     accumulators: dict[str, _LifecycleAccumulator] = {}
-    order: list[str] = []
     for transition in transitions:
         if transition.intent == _CLAIM_LABEL:
-            if not _record_claim_transition(transition, accumulators, order):
+            if not _record_claim_transition(transition, accumulators):
                 unparsed += 1
             continue
         if not _record_release_or_rescope_transition(
@@ -674,15 +671,15 @@ def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
             unparsed += 1
     events = tuple(
         metrics.LaneEvent(
-            item=accumulators[claim_id].item,
+            item=accumulator.item,
             size=None,
             container=None,
-            claimed_at=accumulators[claim_id].claimed_at,
-            released_at=accumulators[claim_id].released_at,
+            claimed_at=accumulator.claimed_at,
+            released_at=accumulator.released_at,
             landed_at=None,
-            rescopes=accumulators[claim_id].rescoped,
+            rescopes=accumulator.rescoped,
         )
-        for claim_id in order
+        for accumulator in accumulators.values()
     )
     return ClaimLifecycle(events=events, unparsed=unparsed)
 
