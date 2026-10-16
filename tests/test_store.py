@@ -31,6 +31,16 @@ from cli_fixtures import (
     stub_board_config_tracked,
 )
 from github_fixtures import FakeForge
+from store_fixtures import (
+    BASE,
+    STATE_WITH_TIP,
+    TIP,
+    blob,
+    claim_intent,
+    push_raw_state_tree,
+    raw_tree,
+    state_ref_listing,
+)
 
 from agent_coordination import cli as issue_claim
 from agent_coordination import github, process, protocol, store
@@ -213,60 +223,6 @@ def _push_message_only_commit(remote: Path, worktree: Path, *, parent: str, mess
     )
     subprocess.run(
         ["git", "-C", str(worktree), "push", str(remote), f"{commit}:{store.STATE_REF}"],
-        check=True,
-        capture_output=True,
-    )
-    return commit
-
-
-def _raw_tree(worktree: Path, entries: list[tuple[str, str, str, str]]) -> str:
-    """Build a tree object directly from `(mode, kind, oid, name)` entries via
-    `git mktree`, which does not itself verify that a referenced oid exists --
-    letting tests build the dangling or wrong-kind trees `store`'s own write
-    path can never produce."""
-    mktree_input = "".join(f"{mode} {kind} {oid}\t{name}\n" for mode, kind, oid, name in entries)
-    return (
-        subprocess.run(
-            ["git", "-C", str(worktree), "mktree"],
-            input=mktree_input.encode(),
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
-    )
-
-
-def _blob(worktree: Path, content: bytes) -> str:
-    return (
-        subprocess.run(
-            ["git", "-C", str(worktree), "hash-object", "-w", "--stdin"],
-            input=content,
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
-    )
-
-
-def _push_raw_state_tree(
-    remote: Path, worktree: Path, entries: list[tuple[str, str, str, str]]
-) -> str:
-    """Push an arbitrary top-level tree (built via `_raw_tree`) onto `STATE_REF`,
-    for the malformed shapes `store`'s own write path can never produce."""
-    tree = _raw_tree(worktree, entries)
-    commit = (
-        subprocess.run(
-            ["git", "-C", str(worktree), "commit-tree", tree, "-m", "test fixture"],
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
-    )
-    subprocess.run(
-        ["git", "-C", str(worktree), "push", "--force", str(remote), f"{commit}:{store.STATE_REF}"],
         check=True,
         capture_output=True,
     )
@@ -670,8 +626,8 @@ def test_fetch_state_rejects_schema_version_one_without_stamping_its_lineage(
 
 
 def test_fetch_state_rejects_a_tree_missing_schema_toml(bare_remote: Path, worktree: Path) -> None:
-    empty_tree = _raw_tree(worktree, [])
-    _push_raw_state_tree(
+    empty_tree = raw_tree(worktree, [])
+    push_raw_state_tree(
         bare_remote, worktree, [("040000", "tree", empty_tree, store.CLAIMS_DIRECTORY)]
     )
 
@@ -682,9 +638,9 @@ def test_fetch_state_rejects_a_tree_missing_schema_toml(bare_remote: Path, workt
 def test_fetch_state_rejects_a_claims_entry_that_is_not_a_directory(
     bare_remote: Path, worktree: Path
 ) -> None:
-    schema_blob = _blob(worktree, b"version = 2\n")
-    claims_blob = _blob(worktree, b"not a tree\n")
-    _push_raw_state_tree(
+    schema_blob = blob(worktree, b"version = 2\n")
+    claims_blob = blob(worktree, b"not a tree\n")
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -717,10 +673,10 @@ def test_fetch_state_rejects_a_claims_entry_that_is_not_a_directory(
 def test_fetch_state_refuses_an_entry_whose_name_its_directory_does_not_accept(
     bare_remote: Path, worktree: Path, directory: str, name: str, refusal: str
 ) -> None:
-    schema_blob = _blob(worktree, b"version = 2\n")
-    stray_blob = _blob(worktree, b"junk\n")
-    subtree = _raw_tree(worktree, [("100644", "blob", stray_blob, name)])
-    _push_raw_state_tree(
+    schema_blob = blob(worktree, b"version = 2\n")
+    stray_blob = blob(worktree, b"junk\n")
+    subtree = raw_tree(worktree, [("100644", "blob", stray_blob, name)])
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -751,7 +707,7 @@ def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the
     replay, which a raw order mismatch used to break -- and a release by
     claim id must still succeed regardless of the stored order.
     """
-    schema_blob = _blob(worktree, b"version = 2\n")
+    schema_blob = blob(worktree, b"version = 2\n")
     sha = "c" * 40
     claim_content = (
         'claim_id = "a1"\n'
@@ -762,11 +718,11 @@ def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the
         'scope = ["scripts/issue_claim.py", "docs/COORDINATION.md"]\n'
         f'opened_commit = "{sha}"\n'
     )
-    claim_blob = _blob(worktree, claim_content.encode())
-    claims_tree = _raw_tree(worktree, [("100644", "blob", claim_blob, "issue-42.toml")])
-    id_blob = _blob(worktree, b"")
-    ids_tree = _raw_tree(worktree, [("100644", "blob", id_blob, "a1")])
-    tip = _push_raw_state_tree(
+    claim_blob = blob(worktree, claim_content.encode())
+    claims_tree = raw_tree(worktree, [("100644", "blob", claim_blob, "issue-42.toml")])
+    id_blob = blob(worktree, b"")
+    ids_tree = raw_tree(worktree, [("100644", "blob", id_blob, "a1")])
+    tip = push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -818,7 +774,7 @@ def test_fetch_state_rejects_a_stored_scope_entry_valid_scope_refuses(
     it would refuse from a fresh request (here an absolute path) fails
     loud on read too, named by the claim key, never silently passed
     through."""
-    schema_blob = _blob(worktree, b"version = 2\n")
+    schema_blob = blob(worktree, b"version = 2\n")
     sha = "c" * 40
     claim_content = (
         'claim_id = "a1"\n'
@@ -829,9 +785,9 @@ def test_fetch_state_rejects_a_stored_scope_entry_valid_scope_refuses(
         'scope = ["/etc/passwd"]\n'
         f'opened_commit = "{sha}"\n'
     )
-    claim_blob = _blob(worktree, claim_content.encode())
-    claims_tree = _raw_tree(worktree, [("100644", "blob", claim_blob, "issue-42.toml")])
-    _push_raw_state_tree(
+    claim_blob = blob(worktree, claim_content.encode())
+    claims_tree = raw_tree(worktree, [("100644", "blob", claim_blob, "issue-42.toml")])
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -864,10 +820,10 @@ def test_fetch_state_never_archives_items_content(
         return wrapped
 
     monkeypatch.setattr(store.process, "run_captured", spy(process.run_captured))
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    item_blob = _blob(worktree, b"item body\n")
-    items_tree = _raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
-    _push_raw_state_tree(
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    item_blob = blob(worktree, b"item body\n")
+    items_tree = raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -893,11 +849,11 @@ def test_read_item_files_is_empty_when_the_items_directory_is_absent(
 
 
 def test_read_item_files_reads_every_blob_under_items(bare_remote: Path, worktree: Path) -> None:
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    item_blob = _blob(worktree, b"item body\n")
-    items_tree = _raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    item_blob = blob(worktree, b"item body\n")
+    items_tree = raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
     tip = protocol.ObjectId(
-        _push_raw_state_tree(
+        push_raw_state_tree(
             bare_remote,
             worktree,
             [
@@ -926,15 +882,15 @@ def non_file_items_store(
     mode, kind, name = request.param
     match kind:
         case "tree":
-            target = _raw_tree(worktree, [])
+            target = raw_tree(worktree, [])
         case "commit":
             target = _real_git(worktree, "rev-parse", "HEAD").stdout.strip()
         case _:
-            target = _blob(worktree, b"aco-000002.md")
-    items_tree = _raw_tree(worktree, [(mode, kind, target, name)])
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
+            target = blob(worktree, b"aco-000002.md")
+    items_tree = raw_tree(worktree, [(mode, kind, target, name)])
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
     tip = protocol.ObjectId(
-        _push_raw_state_tree(
+        push_raw_state_tree(
             bare_remote,
             worktree,
             [
@@ -973,8 +929,8 @@ def test_read_state_archive_short_circuits_on_an_empty_paths_list(worktree: Path
     """An empty `paths` sequence means "nothing to fetch" (issue #248): `git
     archive -- ` with zero path arguments would otherwise archive the whole
     tree, silently defeating the exclusion `_parse_state_tree` relies on."""
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    tree = protocol.ObjectId(_raw_tree(worktree, [("100644", "blob", schema_blob, "schema.toml")]))
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    tree = protocol.ObjectId(raw_tree(worktree, [("100644", "blob", schema_blob, "schema.toml")]))
 
     assert store._read_state_archive(worktree, tree, tip=_PLACEHOLDER_TIP, paths=()) == {}
 
@@ -1458,9 +1414,9 @@ def test_read_schema_toml_fails_loud_when_schema_toml_is_not_a_blob(worktree: Pa
         .stdout.decode()
         .strip()
     )
-    inner_tree = _raw_tree(worktree, [("100644", "blob", inner_blob, "x")])
+    inner_tree = raw_tree(worktree, [("100644", "blob", inner_blob, "x")])
     outer_tree_oid = protocol.ObjectId(
-        _raw_tree(worktree, [("040000", "tree", inner_tree, "schema.toml")])
+        raw_tree(worktree, [("040000", "tree", inner_tree, "schema.toml")])
     )
     entries = store._list_tree(worktree, outer_tree_oid, tip=_PLACEHOLDER_TIP, context="state")
     top_level_entries = _top_level(entries)
@@ -1491,7 +1447,7 @@ def test_parse_state_tree_fails_loud_when_a_blob_is_missing_from_the_object_data
         .stdout.decode()
         .strip()
     )
-    tree = _raw_tree(worktree, [("100644", "blob", blob_oid, "schema.toml")])
+    tree = raw_tree(worktree, [("100644", "blob", blob_oid, "schema.toml")])
     commit = (
         subprocess.run(
             ["git", "-C", str(worktree), "commit-tree", tree, "-m", "test fixture"],
@@ -1731,7 +1687,7 @@ def test_commit_transition_writes_the_exact_trailer_block_for_a_claim_and_a_land
     )
 
     item_id = "aco-000001"
-    open_oid = protocol.ObjectId(_blob(worktree, b"open\n"))
+    open_oid = protocol.ObjectId(blob(worktree, b"open\n"))
     store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
         subject=store.TransitionSubject("create item aco-000001"),
@@ -1739,7 +1695,7 @@ def test_commit_transition_writes_the_exact_trailer_block_for_a_claim_and_a_land
             item_id=item_id, expected=None, new_oid=open_oid, operation_id="op-item-create"
         ),
     )
-    closed_oid = protocol.ObjectId(_blob(worktree, b"closed\n"))
+    closed_oid = protocol.ObjectId(blob(worktree, b"closed\n"))
 
     landing_state = store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
@@ -2341,10 +2297,10 @@ def test_commit_transition_preserves_items_across_claim_rescope_and_release(
     tree from `schema.toml` plus the claim-ledger directories alone, which
     would drop the whole board (Grok final gate, blocking 1).
     """
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    item_blob = _blob(worktree, b"item body\n")
-    items_tree = _raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
-    _push_raw_state_tree(
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    item_blob = blob(worktree, b"item body\n")
+    items_tree = raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -2417,10 +2373,10 @@ def _push_items_store(
 ) -> dict[str, str]:
     """Push a state ref whose `items/` holds `entries`, each blob its own
     name's bytes so no two entries share an oid; returns name -> blob oid."""
-    oids = {name: _blob(worktree, name.encode()) for _mode, name in entries}
-    items_tree = _raw_tree(worktree, [(mode, "blob", oids[name], name) for mode, name in entries])
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    _push_raw_state_tree(
+    oids = {name: blob(worktree, name.encode()) for _mode, name in entries}
+    items_tree = raw_tree(worktree, [(mode, "blob", oids[name], name) for mode, name in entries])
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -2431,20 +2387,8 @@ def _push_items_store(
     return oids
 
 
-def _state_ref_listing(remote: Path) -> dict[bytes, bytes]:
-    """`git ls-tree -r -z` of the state ref in `remote`, raw path -> raw
-    `mode kind oid`."""
-    listing = subprocess.run(
-        ["git", "--git-dir", str(remote), "ls-tree", "-r", "-z", store.STATE_REF],
-        check=True,
-        capture_output=True,
-    ).stdout
-    records = (record.split(b"\t", 1) for record in listing.split(b"\0") if record)
-    return {path: header for header, path in records}
-
-
 def _listing_outside_the_claim_ledger(remote: Path) -> dict[bytes, bytes]:
-    """`_state_ref_listing` without the `claims/`/`ids/`/`resources/` a
+    """`state_ref_listing` without the `claims/`/`ids/`/`resources/` a
     claim and its release are meant to write."""
     ledger = tuple(
         f"{directory}/".encode()
@@ -2452,7 +2396,7 @@ def _listing_outside_the_claim_ledger(remote: Path) -> dict[bytes, bytes]:
     )
     return {
         path: header
-        for path, header in _state_ref_listing(remote).items()
+        for path, header in state_ref_listing(remote).items()
         if not path.startswith(ledger)
     }
 
@@ -2518,9 +2462,9 @@ def test_a_claim_and_its_release_keep_every_entry_they_do_not_write_by_mode(
     """CAS-61 across the whole tree (issue #565): an executable `schema.toml`
     and `ids/` entry stay executable, same blob, through a claim and its
     release."""
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    ids_tree = _raw_tree(worktree, [("100755", "blob", _blob(worktree, b""), "earlier")])
-    _push_raw_state_tree(
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    ids_tree = raw_tree(worktree, [("100755", "blob", blob(worktree, b""), "earlier")])
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -2529,11 +2473,11 @@ def test_a_claim_and_its_release_keep_every_entry_they_do_not_write_by_mode(
         ],
     )
     untouched = (b"schema.toml", b"ids/earlier")
-    before = _state_ref_listing(bare_remote)
+    before = state_ref_listing(bare_remote)
 
     _claim_and_release_issue_42(worktree, bare_remote)
 
-    after = _state_ref_listing(bare_remote)
+    after = state_ref_listing(bare_remote)
     assert [after[path] for path in untouched] == [before[path] for path in untouched]
 
 
@@ -2542,10 +2486,10 @@ def test_an_item_write_keeps_the_empty_ledger_directories_it_does_not_write(
 ) -> None:
     """CAS-61 across the whole tree (issue #565): an empty `claims/`,
     `ids/`, and `resources/` stay through a write to one item."""
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    empty_tree = _raw_tree(worktree, [])
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    empty_tree = raw_tree(worktree, [])
     ledger = (store.CLAIMS_DIRECTORY, store.IDS_DIRECTORY, store.RESOURCES_DIRECTORY)
-    _push_raw_state_tree(
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -3084,7 +3028,7 @@ def _hashed_item_intent(
     return protocol.ItemWriteIntent(
         item_id=item_id,
         expected=expected,
-        new_oid=protocol.ObjectId(_blob(worktree, content)),
+        new_oid=protocol.ObjectId(blob(worktree, content)),
         operation_id=operation_id,
     )
 
@@ -3153,7 +3097,7 @@ def test_commit_transition_item_edit_refuses_a_stale_expected_oid_without_clobbe
         subject=store.TransitionSubject("create item aco-000001"),
         intent=_hashed_item_intent(worktree, content=b"first\n", operation_id="op-1"),
     )
-    stale_expected = protocol.ObjectId(_blob(worktree, b"never written\n"))
+    stale_expected = protocol.ObjectId(blob(worktree, b"never written\n"))
 
     stale_intent = _hashed_item_intent(
         worktree, expected=stale_expected, content=b"second\n", operation_id="op-2"
@@ -3380,25 +3324,25 @@ def _push_seeded_state(bare_remote: Path, worktree: Path, count: int) -> protoco
     parent = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
     assert parent is not None
     seeded = _seeded_claims_state(count, opened_commit=parent)
-    claims_tree = _raw_tree(
+    claims_tree = raw_tree(
         worktree,
         [
             (
                 "100644",
                 "blob",
-                _blob(worktree, protocol.serialize_claim_toml(claim).encode()),
+                blob(worktree, protocol.serialize_claim_toml(claim).encode()),
                 f"{key}.toml",
             )
             for key, claim in seeded.claims.items()
         ],
     )
-    empty_blob = _blob(worktree, b"")
-    ids_tree = _raw_tree(
+    empty_blob = blob(worktree, b"")
+    ids_tree = raw_tree(
         worktree, [("100644", "blob", empty_blob, claim_id) for claim_id in seeded.consumed_ids]
     )
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
     top_tree = protocol.ObjectId(
-        _raw_tree(
+        raw_tree(
             worktree,
             [
                 ("100644", "blob", schema_blob, store.SCHEMA_TOML_FILENAME),
@@ -3452,10 +3396,10 @@ def test_fetch_state_populates_items_from_the_one_existing_ls_tree_call(
     """`ClaimState.items` (issue #279) comes free from the same recursive
     `ls-tree` `_parse_state_tree` already pays for its structure -- no
     second `ls-tree` and no `archive` call for `items/`'s own oids."""
-    schema_blob = _blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    item_blob = _blob(worktree, b"item body\n")
-    items_tree = _raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
-    _push_raw_state_tree(
+    schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
+    item_blob = blob(worktree, b"item body\n")
+    items_tree = raw_tree(worktree, [("100644", "blob", item_blob, "aco-000001.md")])
+    push_raw_state_tree(
         bare_remote,
         worktree,
         [
@@ -3678,68 +3622,35 @@ def test_parse_state_tree_fails_loud_on_malformed_archive_framing(
 # bare repository -- the thin git-transport integration layer above stays
 # reserved for what actually needs a real repository.
 
-_TIP = protocol.ObjectId("a" * 40)
 _OTHER_TIP = protocol.ObjectId("b" * 40)
-_BASE = protocol.ObjectId("c" * 40)
-_STATE_WITH_TIP = protocol.ClaimState(tip=_TIP)
-_DEFAULT_IDENTITY = protocol.IssueIdentity(42)
-
-
-def _claim_intent(
-    *,
-    identity: protocol.ClaimIdentity = _DEFAULT_IDENTITY,
-    agent: str = "Ada",
-    role: str = "builder",
-    base: protocol.ObjectId = _BASE,
-    branch: str = "claude/issue-42-cut",
-    scope: tuple[str, ...] = ("src/agent_coordination/store.py",),
-    claim_id: str = "a1",
-    operation_id: str = "op-1",
-    whole_reason: str | None = None,
-    resource_name: str | None = None,
-    resource_value: int | None = None,
-) -> protocol.ClaimIntent:
-    return protocol.ClaimIntent(
-        identity=identity,
-        agent=agent,
-        role=role,
-        base=base,
-        branch=branch,
-        scope=scope,
-        claim_id=protocol.ClaimId(claim_id),
-        operation_id=operation_id,
-        whole_reason=whole_reason,
-        resource_name=resource_name,
-        resource_value=resource_value,
-    )
 
 
 def test_apply_claim_intent_adds_a_live_claim_and_consumes_its_id() -> None:
-    state = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    state = protocol.apply(STATE_WITH_TIP, claim_intent())
 
     claim = state.claims["issue-42"]
     assert claim.identity == protocol.IssueIdentity(42)
     assert claim.agent == "Ada"
     assert claim.role == "builder"
-    assert claim.base == _BASE
+    assert claim.base == BASE
     assert claim.branch == "claude/issue-42-cut"
     assert claim.scope == ("src/agent_coordination/store.py",)
-    assert claim.opened_commit == _TIP
+    assert claim.opened_commit == TIP
     assert claim.resource is None
     assert claim.whole_reason is None
     assert state.consumed_ids == frozenset({protocol.ClaimId("a1")})
 
 
 def test_apply_claim_intent_refuses_against_a_missing_state_ref() -> None:
-    intent = _claim_intent()
+    intent = claim_intent()
     with pytest.raises(protocol.ClaimError, match="does not exist yet"):
         protocol.apply(protocol.EMPTY_STATE, intent)
 
 
 def test_apply_claim_intent_replays_idempotently_for_the_same_claim_id_and_fields() -> None:
-    once = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    once = protocol.apply(STATE_WITH_TIP, claim_intent())
 
-    replayed = protocol.apply(once, _claim_intent(operation_id="a-different-operation-id"))
+    replayed = protocol.apply(once, claim_intent(operation_id="a-different-operation-id"))
 
     assert replayed == once
 
@@ -3749,12 +3660,12 @@ def test_apply_claim_intent_replays_idempotently_for_a_lane_identity() -> None:
     carries no field of its own (`_same_identity`'s other branch, next to
     `IssueIdentity`'s), so two independently constructed `LaneIdentity()`
     instances must still compare equal for the replay to match."""
-    lane_intent = _claim_intent(identity=protocol.LaneIdentity(), branch="docs/tidy-readme")
-    once = protocol.apply(_STATE_WITH_TIP, lane_intent)
+    lane_intent = claim_intent(identity=protocol.LaneIdentity(), branch="docs/tidy-readme")
+    once = protocol.apply(STATE_WITH_TIP, lane_intent)
 
     replayed = protocol.apply(
         once,
-        _claim_intent(
+        claim_intent(
             identity=protocol.LaneIdentity(),
             branch="docs/tidy-readme",
             operation_id="a-different-operation-id",
@@ -3765,15 +3676,15 @@ def test_apply_claim_intent_replays_idempotently_for_a_lane_identity() -> None:
 
 
 def test_apply_claim_intent_refuses_a_reused_claim_id_with_different_fields() -> None:
-    once = protocol.apply(_STATE_WITH_TIP, _claim_intent())
-    reused = _claim_intent(scope=("README.md",))
+    once = protocol.apply(STATE_WITH_TIP, claim_intent())
+    reused = claim_intent(scope=("README.md",))
 
     with pytest.raises(protocol.ClaimUnavailableError, match="already on this ledger"):
         protocol.apply(once, reused)
 
 
 def test_apply_claim_intent_refuses_a_reused_claim_id_after_release() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
@@ -3782,22 +3693,22 @@ def test_apply_claim_intent_refuses_a_reused_claim_id_after_release() -> None:
         operation_id="op-2",
     )
     released = protocol.apply(claimed, release)
-    reclaim = _claim_intent(operation_id="op-3")
+    reclaim = claim_intent(operation_id="op-3")
 
     with pytest.raises(protocol.ClaimUnavailableError, match="already on this ledger"):
         protocol.apply(released, reclaim)
 
 
 def test_apply_claim_intent_refuses_an_identity_conflict() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
-    conflicting = _claim_intent(agent="Grace", claim_id="a2", operation_id="op-2")
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
+    conflicting = claim_intent(agent="Grace", claim_id="a2", operation_id="op-2")
 
     with pytest.raises(protocol.ClaimUnavailableError, match="is claimed by Ada"):
         protocol.apply(claimed, conflicting)
 
 
 def test_apply_rescope_intent_replaces_scope_and_preserves_opened_commit() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     rescope = protocol.RescopeIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
@@ -3810,14 +3721,14 @@ def test_apply_rescope_intent_replaces_scope_and_preserves_opened_commit() -> No
 
     claim = rescoped.claims["issue-42"]
     assert claim.scope == ("README.md",)
-    assert claim.opened_commit == _TIP
+    assert claim.opened_commit == TIP
     assert rescoped.consumed_ids == claimed.consumed_ids
 
 
 def test_apply_rescope_intent_refuses_a_non_claimant() -> None:
     """The refusal names both claimants it compared -- the live claim's
     holder, and the intent's own agent and role -- not just the rule."""
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     rescope = protocol.RescopeIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Grace",
@@ -3845,11 +3756,11 @@ def test_apply_rescope_intent_refuses_rescoping_a_claim_that_does_not_exist() ->
     )
 
     with pytest.raises(protocol.ClaimUnavailableError, match="no active claim"):
-        protocol.apply(_STATE_WITH_TIP, rescope)
+        protocol.apply(STATE_WITH_TIP, rescope)
 
 
 def test_apply_rescope_intent_keeps_the_whole_reason_when_omitted() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent(whole_reason="repo-wide rename"))
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent(whole_reason="repo-wide rename"))
     rescope = protocol.RescopeIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
@@ -3871,7 +3782,7 @@ def test_apply_rescope_intent_keeps_the_whole_reason_when_omitted() -> None:
     ],
 )
 def test_apply_release_intent_removes_the_claim(outcome: protocol.ReleaseOutcome) -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
@@ -3896,12 +3807,12 @@ def test_apply_release_intent_refuses_releasing_a_claim_that_does_not_exist() ->
     )
 
     with pytest.raises(protocol.ClaimUnavailableError, match="no active claim"):
-        protocol.apply(_STATE_WITH_TIP, release)
+        protocol.apply(STATE_WITH_TIP, release)
 
 
 def test_apply_release_intent_refuses_a_non_claimant_without_override() -> None:
     """The refusal names both claimants it compared, like rescope's."""
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Grace",
@@ -3920,7 +3831,7 @@ def test_apply_release_intent_refuses_a_non_claimant_without_override() -> None:
 
 
 def test_apply_release_intent_allows_a_coordinator_override() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Coordinator",
@@ -3936,7 +3847,7 @@ def test_apply_release_intent_allows_a_coordinator_override() -> None:
 
 
 def test_apply_release_intent_refuses_a_coordinator_override_without_coordinator_role() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
@@ -3951,10 +3862,10 @@ def test_apply_release_intent_refuses_a_coordinator_override_without_coordinator
 
 
 def test_apply_claim_intent_assigns_the_least_free_auto_resource_value() -> None:
-    first = protocol.apply(_STATE_WITH_TIP, _claim_intent(claim_id="a1", resource_name="display"))
+    first = protocol.apply(STATE_WITH_TIP, claim_intent(claim_id="a1", resource_name="display"))
     second = protocol.apply(
         first,
-        _claim_intent(
+        claim_intent(
             identity=protocol.IssueIdentity(43),
             claim_id="a2",
             operation_id="op-2",
@@ -3969,11 +3880,11 @@ def test_apply_claim_intent_assigns_the_least_free_auto_resource_value() -> None
 
 def test_apply_claim_intent_refuses_an_explicit_resource_value_already_held() -> None:
     held = protocol.apply(
-        _STATE_WITH_TIP,
-        _claim_intent(claim_id="a1", resource_name="display", resource_value=2),
+        STATE_WITH_TIP,
+        claim_intent(claim_id="a1", resource_name="display", resource_value=2),
     )
 
-    conflicting = _claim_intent(
+    conflicting = claim_intent(
         identity=protocol.IssueIdentity(43),
         claim_id="a2",
         operation_id="op-2",
@@ -3989,7 +3900,7 @@ def test_apply_claim_intent_never_reuses_a_released_auto_resource_value() -> Non
     """Done-when 2: the import (and every later reader) must be able to
     derive `occupied` from this run's own history, not from active claims
     alone -- a released auto value must stay occupied forever."""
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent(claim_id="a1", resource_name="display"))
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent(claim_id="a1", resource_name="display"))
     release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
@@ -4000,7 +3911,7 @@ def test_apply_claim_intent_never_reuses_a_released_auto_resource_value() -> Non
     released = protocol.apply(claimed, release)
 
     reclaimed = protocol.apply(
-        released, _claim_intent(claim_id="a2", operation_id="op-3", resource_name="display")
+        released, claim_intent(claim_id="a2", operation_id="op-3", resource_name="display")
     )
 
     assert reclaimed.claims["issue-42"].resource == protocol.ResourceHold("display", 2)
@@ -4009,8 +3920,8 @@ def test_apply_claim_intent_never_reuses_a_released_auto_resource_value() -> Non
 
 def test_apply_claim_intent_never_reuses_a_released_explicit_resource_value() -> None:
     claimed = protocol.apply(
-        _STATE_WITH_TIP,
-        _claim_intent(claim_id="a1", resource_name="display", resource_value=1),
+        STATE_WITH_TIP,
+        claim_intent(claim_id="a1", resource_name="display", resource_value=1),
     )
     release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
@@ -4021,7 +3932,7 @@ def test_apply_claim_intent_never_reuses_a_released_explicit_resource_value() ->
     )
     released = protocol.apply(claimed, release)
 
-    reclaim = _claim_intent(
+    reclaim = claim_intent(
         claim_id="a2", operation_id="op-3", resource_name="display", resource_value=1
     )
     with pytest.raises(protocol.ClaimUnavailableError, match="already consumed"):
@@ -4031,7 +3942,7 @@ def test_apply_claim_intent_never_reuses_a_released_explicit_resource_value() ->
 def test_stale_takeover_is_release_then_claim_and_does_not_reuse_the_occupied_integer() -> None:
     """Coordinator stale-takeover: override-release then claim, two `apply`
     calls -- never a `TakeoverIntent`. The freed integer stays retired."""
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent(claim_id="a1", resource_name="display"))
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent(claim_id="a1", resource_name="display"))
     override_release = protocol.ReleaseIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Coordinator",
@@ -4044,7 +3955,7 @@ def test_stale_takeover_is_release_then_claim_and_does_not_reuse_the_occupied_in
 
     retaken = protocol.apply(
         freed,
-        _claim_intent(claim_id="a3", operation_id="op-3", agent="Grace", resource_name="display"),
+        claim_intent(claim_id="a3", operation_id="op-3", agent="Grace", resource_name="display"),
     )
 
     assert retaken.claims["issue-42"].claim_id == "a3"
@@ -4052,15 +3963,15 @@ def test_stale_takeover_is_release_then_claim_and_does_not_reuse_the_occupied_in
 
 
 def test_apply_resource_value_requires_a_resource_name() -> None:
-    intent = _claim_intent(resource_value=3)
+    intent = claim_intent(resource_value=3)
     with pytest.raises(protocol.ClaimError, match="resource value requires a resource name"):
-        protocol.apply(_STATE_WITH_TIP, intent)
+        protocol.apply(STATE_WITH_TIP, intent)
 
 
 def test_apply_resource_value_must_be_a_positive_integer() -> None:
-    intent = _claim_intent(resource_name="display", resource_value=0)
+    intent = claim_intent(resource_name="display", resource_value=0)
     with pytest.raises(protocol.ClaimError, match="positive integer"):
-        protocol.apply(_STATE_WITH_TIP, intent)
+        protocol.apply(STATE_WITH_TIP, intent)
 
 
 # --- `ItemWriteIntent`'s oid CAS (issue #279) -------------------------------
@@ -4081,7 +3992,7 @@ def _item_intent(
 
 
 def test_apply_item_write_intent_creates_a_file_and_leaves_the_claim_ledger_untouched() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
 
     created = protocol.apply(claimed, _item_intent())
 
@@ -4099,7 +4010,7 @@ def test_apply_item_write_intent_refuses_against_a_missing_state_ref() -> None:
 
 
 def test_apply_item_write_intent_edits_when_the_expected_oid_matches() -> None:
-    created = protocol.apply(_STATE_WITH_TIP, _item_intent())
+    created = protocol.apply(STATE_WITH_TIP, _item_intent())
     new_oid = protocol.ObjectId("e" * 40)
 
     edited = protocol.apply(
@@ -4119,7 +4030,7 @@ def test_apply_item_write_intent_edits_when_the_expected_oid_matches() -> None:
 def test_apply_item_write_intent_refuses_a_conflicting_expected_oid(
     write_expected: protocol.ObjectId | None, match: str
 ) -> None:
-    created = protocol.apply(_STATE_WITH_TIP, _item_intent())
+    created = protocol.apply(STATE_WITH_TIP, _item_intent())
     conflicting_intent = _item_intent(
         expected=write_expected, new_oid=protocol.ObjectId("f" * 40), operation_id="op-2"
     )
@@ -4215,10 +4126,10 @@ def _sample_claim(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
         role="builder",
-        base=_BASE,
+        base=BASE,
         branch="claude/issue-42-cut",
         scope=scope,
-        opened_commit=_TIP,
+        opened_commit=TIP,
         resource=resource,
         whole_reason=whole_reason,
     )
@@ -4276,7 +4187,7 @@ def test_parse_claim_toml_rejects_resource_value_without_resource_name() -> None
 
 
 def test_parse_claim_toml_rejects_a_malformed_commit_id() -> None:
-    content = protocol.serialize_claim_toml(_sample_claim()).replace(str(_BASE), "not-a-sha")
+    content = protocol.serialize_claim_toml(_sample_claim()).replace(str(BASE), "not-a-sha")
 
     with pytest.raises(protocol.MalformedStateTreeError, match="malformed commit id"):
         protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
@@ -4329,7 +4240,7 @@ def test_parse_claim_key_rejects_a_lane_key_whose_escape_does_not_decode_as_utf8
 
 
 def test_apply_rescope_intent_can_set_a_new_whole_reason() -> None:
-    claimed = protocol.apply(_STATE_WITH_TIP, _claim_intent())
+    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
     rescope = protocol.RescopeIntent(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
@@ -4349,10 +4260,10 @@ def _minimal_claim_toml_fields(**overrides: str) -> dict[str, str]:
         "claim_id": '"a1"',
         "agent": '"Ada"',
         "role": '"builder"',
-        "base": f'"{_BASE}"',
+        "base": f'"{BASE}"',
         "branch": '"claude/issue-42-cut"',
         "scope": '["README.md"]',
-        "opened_commit": f'"{_TIP}"',
+        "opened_commit": f'"{TIP}"',
     }
     fields.update(overrides)
     return fields
@@ -4417,7 +4328,7 @@ def test_commit_transition_refuses_a_missing_state_ref(worktree: Path, tmp_path:
     empty_remote = tmp_path / "empty.git"
     init_bare_repository(empty_remote)
 
-    intent = _claim_intent()
+    intent = claim_intent()
     subject = store.ClaimTransitionSubject("claim issue 42", item="42")
     observed = fresh_observation(worktree, empty_remote)
     with pytest.raises(protocol.ClaimError, match="does not exist yet"):
