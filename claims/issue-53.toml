@@ -1,0 +1,8 @@
+claim_id = "e7a438b4d861465bb8ff6def1f24a9a8"
+agent = "claude"
+role = "builder"
+base = "a0ddaeb0b0f91f8766b99b38be7ca572d6a26a56"
+branch = "claude/issue-53-bare-remote-helper"
+scope = ["scripts/similar_methods_exemptions.txt", "tests/cli_fixtures.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_protect.py", "tests/test_session.py", "tests/test_store.py"]
+opened_commit = "6d8cc2f3d4128c92a8c941d9002694bb82d5ea8b"
+whole_reason = "Ein gemeinsamer Bare-Remote-Helfer ersetzt dieselbe Form in sechs Testmodulen; halb umgestellt bliebe die Doppelung."
