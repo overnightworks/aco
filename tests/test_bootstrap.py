@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from cli_fixtures import (
+    count_context_reads,
     real_git,
     redirect_toplevel,
     run_cli,
@@ -13,7 +14,7 @@ from cli_fixtures import (
     stub_board_config_tracked,
 )
 
-from agent_coordination import store
+from agent_coordination import protocol, store
 
 BOOTSTRAP_REPOSITORY = "example/agent-coordination"
 
@@ -70,19 +71,19 @@ def test_bootstrap_with_a_repo_prints_the_ref_commit_id_as_without_one(
 )
 def test_bootstrap_refuses_an_argument_it_does_not_define_before_any_read(
     clone: Path,
-    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     extra_arguments: list[str],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Spec: BOOT-02 -- an argument `bootstrap` does not define is refused."""
-    real_git(clone, "remote", "set-url", "origin", str(tmp_path / "missing.git"))
+    reads = count_context_reads(monkeypatch)
 
     refused = run_cli(["bootstrap", *extra_arguments], capsys)
 
-    assert f"aco: error: unrecognized arguments: {' '.join(extra_arguments)}" in (
-        refused.expect_refusal()
+    assert refused.expect_refusal().endswith(
+        f"aco: error: unrecognized arguments: {' '.join(extra_arguments)}\n"
     )
-    assert "ERROR:" not in refused.stderr
+    assert reads.drain() == ({}, {}, {})
 
 
 def test_bootstrap_refuses_an_unreachable_remote_on_stderr_alone(
@@ -91,13 +92,10 @@ def test_bootstrap_refuses_an_unreachable_remote_on_stderr_alone(
     """Spec: BOOT-01 -- a store-level refusal prints only `ERROR: <sentence>`."""
     real_git(clone, "remote", "set-url", "origin", str(tmp_path / "missing.git"))
 
+    with pytest.raises(protocol.ClaimError) as store_refusal:
+        store.fetch_state(worktree=clone, remote="origin")
+
     refused = run_cli(["bootstrap"], capsys)
 
-    assert refused.expect_refusal().startswith(
-        "ERROR: cannot reach origin refs/aco/state: auth or transport failure "
-        "(ls-remote exited 128)"
-    )
-    assert refused.stderr.count("ERROR: ") == 1
-    assert "Traceback" not in refused.stderr
-    assert "--ledger" not in refused.stderr
+    assert refused.expect_refusal() == f"ERROR: {store_refusal.value}\n"
     assert refused.stdout == ""
