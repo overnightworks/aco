@@ -1,0 +1,8 @@
+claim_id = "336947bbd97a4d7ebfc6959dfe2bb6bc"
+agent = "claude"
+role = "builder"
+base = "2d7c079f32b7963f1e687825783df471a8ad0917"
+branch = "claude/issue-33-test-identity-bundle"
+scope = ["src/agent_coordination/github.py", "src/agent_coordination/protect.py", "src/agent_coordination/store.py", "tests/conftest.py", "tests/test_github.py"]
+opened_commit = "a591a24238ee5b74ccf2a778a3e0d49a9c1323c9"
+whole_reason = "Bündel aus vier kleinen Karten (#33 bis #36), die zusammen landen; jede Karte hat ihre eigenen Dateien."
