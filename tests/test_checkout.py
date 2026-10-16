@@ -8,6 +8,7 @@ uses -- is exercised directly. Tests that drive these through
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from collections.abc import Callable
@@ -31,6 +32,18 @@ from agent_coordination.protocol import ClaimError, ClaimRequest
 
 _LIVE_VERSIONED_PATHS = checkout.versioned_paths
 _LIVE_TRUNK_LANDINGS = checkout.trunk_landings
+
+
+@pytest.mark.parametrize(
+    "variable",
+    [
+        checkout.ACO_AGENT_ENV,
+        checkout.GROK_SESSION_ID_ENV,
+        checkout.CLAUDE_CODE_SESSION_ID_ENV,
+    ],
+)
+def test_a_test_never_inherits_the_sessions_agent_identity(variable: str) -> None:
+    assert variable not in os.environ
 
 
 @pytest.mark.parametrize("remote", ["origin", "upstream"])

@@ -22,6 +22,20 @@ def _isolate_protect_unguarded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(protect.PROTECT_UNGUARDED_ENV, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_agent_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test inherits the session's own agent identity: run inside an agent
+    session, a test that omits `--agent` would otherwise resolve to the real
+    session's `ACO_AGENT`, `GROK_SESSION_ID` or `CLAUDE_CODE_SESSION_ID`. A
+    test that needs an identity sets it itself."""
+    for name in (
+        checkout.ACO_AGENT_ENV,
+        checkout.GROK_SESSION_ID_ENV,
+        checkout.CLAUDE_CODE_SESSION_ID_ENV,
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
 _SHOW_TOPLEVEL_ARGUMENTS = ["rev-parse", "--show-toplevel"]
 
 
