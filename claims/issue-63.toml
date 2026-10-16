@@ -1,8 +1,0 @@
-claim_id = "71ba89459cc74c3394d26d084cbc6384"
-agent = "claude"
-role = "builder"
-base = "53a760016d7447e4c982bb54d6f642f2b0e4c454"
-branch = "claude/issue-63-fixture-care"
-scope = ["scripts/similar_methods_exemptions.txt", "src/agent_coordination/checkout.py", "tests/cli_fixtures.py", "tests/conftest.py", "tests/github_fixtures.py", "tests/store_fixtures.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_network_guard.py", "tests/test_protect.py", "tests/test_session.py", "tests/test_state_board.py", "tests/test_store.py"]
-opened_commit = "ad613d7e7fccf81948bb57868fc83c0b201d9a7a"
-whole_reason = "Acht kleine Pflegepunkte an den geteilten Test-Fixtures; die Umbenennung von _real_git berührt alle Nutzer zugleich, halb umbenannt bräche jeder Import."
