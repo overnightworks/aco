@@ -83,7 +83,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - [ ] [LANDCMD-32] Without `--head`, `aco land` pins whatever head preflight reads (LANDCMD-12); a rerun (LANDCMD-18) never compares `--head`, since its merge already happened.
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
-- [ ] [LANDCMD-43] Where the default branch holds `quality/config.toml`, completed checks (or none) without one named `quality / verdict` refuse `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`; a running check defers it (E-LANDCMD-43).
+- [ ] [LANDCMD-43] If `<branch>` holds `quality/config.toml`, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
@@ -203,6 +203,8 @@ $ aco land 57
 2> ERROR: pull request #57 has no quality / verdict check; main adopts the quality gate (quality/config.toml)
 exit 2
 ```
+
+The adoption read of LANDCMD-43 is one contents read of `quality/config.toml` on `<branch>`, the default branch -- never the pull request head, so a head that deletes the file is still refused and the pull request that adds it is not. Only HTTP 200 (adopted) and 404 (not adopted) decide; any other answer refuses with the forge's error and never counts as not adopted. A check still running defers the refusal, the read runs only after LANDCMD-02 (a not-open pull request never reads it), and a rerun after the merge (LANDCMD-18) never reads it. The refusal stays within the 200-character bound like every other.
 
 ### E-LANDCMD-05 — a pull request with a check still running refuses
 
