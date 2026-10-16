@@ -24,7 +24,9 @@ from cli_fixtures import (
     _real_repository_with_bare_remote,
     _set_agent_identity_env,
     _stub_one_git_call,
+    bare_remote_repository_with_one_commit,
     dangle_recorded_head,
+    init_bare_repository,
 )
 
 from agent_coordination import board, checkout, process
@@ -995,9 +997,7 @@ def _minimal_pushed_repository(tmp_path: Path) -> Path:
     """A `hub`-remote worktree with one `main`, empty of any commit -- the
     common setup every real-`git` trunk-landing test that doesn't need the
     shared five-proof history (`_trunk_history_repository`) builds on."""
-    remote = tmp_path / "remote.git"
-    remote.mkdir()
-    _real_git(remote, "init", "-q", "--bare", "-b", "main")
+    remote = init_bare_repository(tmp_path / "remote.git")
     repo = tmp_path / "repo"
     repo.mkdir()
     _real_git(repo, "init", "-q", "-b", "main")
@@ -1318,15 +1318,6 @@ def test_branch_exists_reads_real_local_refs(
     assert checkout.branch_exists("no-such-branch") is False
 
 
-def _bare_remote_repository_with_one_commit(tmp_path: Path) -> Path:
-    repo, _remote = _real_repository_with_bare_remote(tmp_path)
-    (repo / "base.txt").write_text("base\n")
-    _real_git(repo, "add", "base.txt")
-    _real_git(repo, "commit", "-q", "-m", "initial")
-    _push_repository_trunk(repo, "origin")
-    return repo
-
-
 def _build_start_worktree(worktree: Path, branch: str) -> None:
     checkout.create_linked_worktree(worktree, branch=branch, trunk="refs/remotes/origin/main")
 
@@ -1334,7 +1325,7 @@ def _build_start_worktree(worktree: Path, branch: str) -> None:
 def test_create_linked_worktree_builds_from_the_trunk_ref(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     monkeypatch.chdir(repo)
 
@@ -1347,7 +1338,7 @@ def test_create_linked_worktree_builds_from_the_trunk_ref(
 def test_existing_start_worktree_is_absent_before_the_build_and_standing_after(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     branch = "codex/issue-9-widget"
     monkeypatch.chdir(repo)
@@ -1366,7 +1357,7 @@ def test_create_linked_worktree_builds_a_repository_nested_in_an_outer_working_t
     the not-yet-created worktree path -- a home directory that is itself a
     git repository -- never turns git's "cannot change to" into a refusal."""
     _real_git(tmp_path, "init", "-q")
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     branch = "codex/issue-9-widget"
     monkeypatch.chdir(repo)
@@ -1380,7 +1371,7 @@ def test_create_linked_worktree_builds_a_repository_nested_in_an_outer_working_t
 def test_existing_start_worktree_refuses_a_dirty_resume(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     branch = "codex/issue-9-widget"
     monkeypatch.chdir(repo)
@@ -1394,7 +1385,7 @@ def test_existing_start_worktree_refuses_a_dirty_resume(
 def test_existing_start_worktree_refuses_a_branch_taken_by_no_worktree_of_this_item(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     branch = "codex/issue-9-widget"
     _real_git(repo, "branch", branch)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
@@ -1410,7 +1401,7 @@ def test_existing_start_worktree_refuses_an_existing_non_worktree_directory(
     """Issue #322 review/gate finding: an ordinary directory already sitting
     at the target path -- empty or not -- is refused outright rather than
     left for `git worktree add` to adopt."""
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     branch = "codex/issue-9-widget"
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     worktree.mkdir(parents=True)
@@ -1423,7 +1414,7 @@ def test_existing_start_worktree_refuses_an_existing_non_worktree_directory(
 def test_existing_start_worktree_refuses_a_worktree_on_a_different_branch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     worktree.parent.mkdir(parents=True)
     _real_git(repo, "worktree", "add", "-q", str(worktree), "-b", "codex/issue-9-old-slug")
@@ -1654,7 +1645,7 @@ def test_remove_linked_worktree_deletes_the_directory_and_the_branch(
 
 
 def test_branch_merged_into_default_is_true_only_after_a_real_merge(tmp_path: Path) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     _real_git(repo, "checkout", "-q", "-b", "feature")
     (repo / "feature.txt").write_text("feature\n")
     _real_git(repo, "add", "feature.txt")
@@ -1689,7 +1680,7 @@ def test_branch_exists_fails_loud_on_an_unexpected_git_exit(
 def test_create_linked_worktree_fails_loud_when_worktree_add_itself_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     monkeypatch.chdir(repo)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     branch, trunk = "codex/issue-9-widget", "refs/remotes/origin/main"
@@ -1769,7 +1760,7 @@ def test_a_merge_base_read_fails_loud_on_an_unexpected_git_exit(
     git_arguments: list[str],
     read: Callable[[Path], object],
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     _stub_one_git_call(
         monkeypatch,
         git_arguments,
@@ -1784,7 +1775,7 @@ def test_a_merge_base_read_fails_loud_on_an_unexpected_git_exit(
 def test_merge_base_names_the_shared_commit_and_none_for_unrelated_histories(
     tmp_path: Path,
 ) -> None:
-    repo = _bare_remote_repository_with_one_commit(tmp_path)
+    repo = bare_remote_repository_with_one_commit(tmp_path)
     shared = _real_git(repo, "rev-parse", "HEAD").stdout.strip()
     _real_git(repo, "checkout", "-q", "-b", "feature")
     _real_git(repo, "commit", "-q", "--allow-empty", "-m", "feature work")

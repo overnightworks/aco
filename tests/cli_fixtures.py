@@ -156,6 +156,13 @@ def _real_git(
     )
 
 
+def init_bare_repository(path: Path) -> Path:
+    """A real bare repository on `main` at `path`, created with its parents."""
+    path.mkdir(parents=True, exist_ok=True)
+    _real_git(path, "init", "-q", "--bare", "-b", "main")
+    return path
+
+
 def _real_repository_with_bare_remote(
     tmp_path: Path, *, remote_name: str = "origin"
 ) -> tuple[Path, Path]:
@@ -165,9 +172,7 @@ def _real_repository_with_bare_remote(
     fixture in this suite builds its own commits onto (`test_checkout.py`'s
     and `test_cli.py`'s own real-repository proofs, issue #359 CI), instead
     of each hand-rolling the same `init`/`config`/`remote add` sequence."""
-    remote = tmp_path / "remote.git"
-    remote.mkdir()
-    _real_git(remote, "init", "-q", "--bare", "-b", "main")
+    remote = init_bare_repository(tmp_path / "remote.git")
     repo = tmp_path / "repo"
     repo.mkdir()
     _real_git(repo, "init", "-q", "-b", "main")
@@ -176,6 +181,17 @@ def _real_repository_with_bare_remote(
     _real_git(repo, "config", "commit.gpgsign", "false")
     _real_git(repo, "remote", "add", remote_name, str(remote))
     return repo, remote
+
+
+def bare_remote_repository_with_one_commit(tmp_path: Path) -> Path:
+    """`_real_repository_with_bare_remote`'s worktree with one `base.txt`
+    commit on `main`, pushed to `origin` with `origin/HEAD` resolved."""
+    repo, _remote = _real_repository_with_bare_remote(tmp_path)
+    (repo / "base.txt").write_text("base\n")
+    _real_git(repo, "add", "base.txt")
+    _real_git(repo, "commit", "-q", "-m", "initial")
+    _push_repository_trunk(repo, "origin")
+    return repo
 
 
 def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -200,9 +216,7 @@ def bare_remote(tmp_path: Path) -> Path:
 
     `maintenance.auto=false` keeps `receive-pack` from starting maintenance
     here, so a client-side maintenance assertion sees only its own fetch."""
-    remote = tmp_path / "remote.git"
-    remote.mkdir()
-    _real_git(remote, "init", "--bare", "-b", "main")
+    remote = init_bare_repository(tmp_path / "remote.git")
     _real_git(remote, "config", "maintenance.auto", "false")
     return remote
 

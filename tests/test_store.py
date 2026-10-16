@@ -25,6 +25,7 @@ import pytest
 from cli_fixtures import (
     _real_git,
     fresh_observation,
+    init_bare_repository,
     set_git_identity,
     stub_board_config_tracked,
 )
@@ -4414,8 +4415,7 @@ def test_bootstrap_refuses_a_deleted_ref_this_worktree_has_observed(
 
 def test_commit_transition_refuses_a_missing_state_ref(worktree: Path, tmp_path: Path) -> None:
     empty_remote = tmp_path / "empty.git"
-    empty_remote.mkdir()
-    _real_git(empty_remote, "init", "--bare", "-b", "main")
+    init_bare_repository(empty_remote)
 
     intent = _claim_intent()
     subject = store.ClaimTransitionSubject("claim issue 42", item="42")
