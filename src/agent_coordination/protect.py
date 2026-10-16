@@ -3,7 +3,7 @@ distributor #389 finding 2): `judge` reads one already-parsed hook payload
 and returns a typed `Verdict` -- allow or deny, with the deny reason -- from
 the payload envelope checks (PROT-03..) through the shared Checkout/
 Default-Branch/Claim-Scope/Bash-pattern chain every mutating tool call runs.
-`cli` keeps only reading stdin, calling `judge`, and printing whatever the
+`cmd_protect` keeps only reading stdin, calling `judge`, and printing whatever the
 verdict's `stdout_text` and `stderr_text` carry -- nothing for an allow, the
 deny object on stdout and its sentence on stderr for a deny -- under one
 `except Exception` frame (PROT-17); this module never touches stdin, stdout,
@@ -272,7 +272,7 @@ class _ProtectContext:
     `canonical_remote_for` and `lane_shared_for` are always needed by the
     same callers, so bundling them keeps every chain function's own
     parameter list short instead of parallel threads of the same values.
-    `canonical_remote_for` and `lane_shared_for` are `cli`'s own
+    `canonical_remote_for` and `lane_shared_for` are `cmd_protect`'s own
     board-configuration readers: resolving `.aco/board.toml`'s
     storage pin, and the trunk's lane-shared files (PROT-46), is that
     layer's own concern, handed down here rather than re-read from this
@@ -540,7 +540,7 @@ def _unguarded_directories() -> tuple[Path, ...]:
     issue #483), symlink-resolved; unset or empty names none. Any other
     entry that is not an existing absolute directory -- an empty one
     between separators included -- fails closed (PROT-41), raised for
-    `cli`'s deny frame like a missing identity: a typo must never silently
+    `cmd_protect`'s deny frame like a missing identity: a typo must never silently
     guard nothing, nor exempt whatever a relative entry happens to meet."""
     if not _names_unguarded_directories():
         return ()
@@ -581,7 +581,7 @@ _ProtectMissDenialBuilder = Callable[[protocol.ClaimState, checkout.PathCheckout
 
 def _hook_session_agent() -> str:
     """This session's own agent, or `MISSING_HOOK_IDENTITY` raised for
-    `cli`'s deny frame (PROT-08): the hook line has no `--agent` flag, so
+    `cmd_protect`'s deny frame (PROT-08): the hook line has no `--agent` flag, so
     the sentence names only the ways a hook can be given one."""
     agent = checkout.session_agent()
     if agent is None:
@@ -671,7 +671,7 @@ _CheckoutOutcome = TypeVar("_CheckoutOutcome")
 
 def _outcome_or_failure(judge: Callable[[], _CheckoutOutcome]) -> _CheckoutOutcome | Exception:
     """`judge`'s answer for one checkout, or the failure reading that
-    checkout's board, store, or identity raised: `cli`'s denial of this
+    checkout's board, store, or identity raised: `cmd_protect`'s denial of this
     checkout alone, held back so the other checkout is still judged; which
     of the two verdicts wins follows `_protect_checkout_scope_denial`'s
     target-first order (issue #486)."""
@@ -895,13 +895,13 @@ def judge(
 ) -> Verdict:
     """`protect`'s own verdict for one already-parsed hook payload (issue
     #394): `payload` is `None` for unreadable stdin or invalid JSON (PROT-03,
-    `cli`'s own concern before this ever runs); everything else -- a
+    `cmd_protect`'s own concern before this ever runs); everything else -- a
     non-object payload reaching here as a plain `dict` already rules that
     out for its caller -- is judged here through to a `Verdict`. Raises
     exactly what `canonical_remote_for`, `lane_shared_for` or the store
     boundary itself raises
     (a board-configuration precondition failure, PROT-29; a store fetch
-    failure, PROT-15/PROT-16); `cli`'s own `except Exception` frame (PROT-17)
+    failure, PROT-15/PROT-16); `cmd_protect`'s own `except Exception` frame (PROT-17)
     is what turns any of those, or any other uncaught exception, into a deny
     with that exception's own bare text."""
     if payload is None:

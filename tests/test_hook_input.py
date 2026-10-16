@@ -147,7 +147,7 @@ def test_hook_patch_paths_accepts_an_environment_id_line_after_begin_patch() -> 
     after `Begin Patch` (issue #237 finding 28b, corrected position:
     `begin_patch environment_id? hunk+ end_patch`); without it, every patch
     Codex prefixes this way was denied outright for lacking a path
-    (`PATH_REQUIRED` in `cli._protect_write`)."""
+    (`PATH_REQUIRED` in `protect._protect_write`)."""
     text = _patch_command(
         "*** Environment ID: 11111111-1111-1111-1111-111111111111",
         "*** Update File: src/widget.py",
@@ -753,7 +753,7 @@ def test_hook_command_paths_tracks_cd_across_the_statement_list(
 def test_hook_command_paths_raises_for_a_non_string_command(command: object) -> None:
     """`hook_command_paths` is typed `str`, not `str | None`: a non-string
     caller error is a defect, not a value this pure boundary quietly
-    tolerates -- `cli._protect_bash` is the one caller, and it already
+    tolerates -- `protect._protect_bash` is the one caller, and it already
     guards this before ever calling in (head ruling, issue #380 round 4:
     the `TypeError` is correct here; the CLI boundary is the one that must
     never crash, and it is tested separately in `tests/test_protect.py`)."""

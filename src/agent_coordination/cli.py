@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import shlex
@@ -25,12 +24,12 @@ from . import (
     body,
     checkout,
     cmd_bootstrap,
+    cmd_protect,
     cmd_workspace,
     forge,
     github,
     items,
     metrics,
-    protect,
     protocol,
     providers,
     report,
@@ -42,9 +41,7 @@ from .session import (
     LaneSharedUnavailable,
     RepoMeaninglessUnderStateRefError,
     RunContext,
-    board_config,
     lane_shared_files,
-    trunk_lane_shared,
     trunk_lane_shared_reading,
 )
 
@@ -92,47 +89,6 @@ OUT_OF_ORDER_HELP = (
     "refuses a claim without a reason when a higher-priority actionable item is free or "
     "an open blocker remains; the reason is never stored, only downgrading the check"
 )
-
-
-def _resolved_identity(issue: int | None, branch: str) -> protocol.ClaimIdentity:
-    """Resolve the CLI's discriminated identity: an explicit issue, or a lane.
-
-    Omitting the positional issue number means lane mode, derived from `branch`
-    (the same checkout branch `--base`/`--branch` auto-fill and the release
-    branch-matching fallback already use). Lane mode is refused outright unless
-    `branch` follows the issueless-lane convention, so a builder who simply forgot
-    the issue number never gets a silent, unlabeled, non-projected lane claim.
-    """
-    if issue is not None:
-        return protocol.IssueIdentity(issue)
-    if not branch.startswith(protocol.ISSUELESS_LANE_BRANCH_PREFIXES):
-        prefixes = " or ".join(repr(prefix) for prefix in protocol.ISSUELESS_LANE_BRANCH_PREFIXES)
-        raise protocol.ClaimError(
-            f"branch {branch!r} is not an issueless lane; pass an issue number, or "
-            f"check out a branch prefixed {prefixes}"
-        )
-    return protocol.LaneIdentity()
-
-
-def _claim_subject(claim: protocol.ScopedClaim, storage: body.Storage) -> str:
-    return (
-        f"lane {claim.branch}"
-        if isinstance(claim.identity, protocol.LaneIdentity)
-        else f"issue {board.item_label(claim.identity.issue, storage)}"
-    )
-
-
-def _claim_age_fields(opened_at: datetime, now: datetime) -> tuple[str, bool]:
-    """The rendered age and old-ness of a claim opened at `opened_at` (a
-    commit's committer date -- issue #176, §1 -- not a ledger comment
-    timestamp)."""
-    age = now.astimezone(UTC) - opened_at.astimezone(UTC)
-    return board.format_claim_age(age), board.claim_is_old(age)
-
-
-def _claim_age_suffix(opened_at: datetime, now: datetime) -> str:
-    rendered, old = _claim_age_fields(opened_at, now)
-    return f" {rendered} old" if old else f" {rendered}"
 
 
 def _scope_cost(versioned: tuple[str, ...], scope: tuple[str, ...]) -> tuple[int, int, float]:
@@ -264,15 +220,6 @@ def _reject_ungrounded_comma_scope(
             )
 
 
-def _touch_json(claim: protocol.ScopedClaim) -> dict[str, object]:
-    return {
-        **_identity_json(claim.identity),
-        "claim_id": claim.claim_id,
-        "agent": claim.agent,
-        "scope": list(claim.scope),
-    }
-
-
 def _touch_line(
     own_scope: tuple[str, ...], claim: protocol.ScopedClaim, storage: body.Storage
 ) -> str:
@@ -280,7 +227,7 @@ def _touch_line(
     `own_scope` -- the fact a claimant needs to know they hold both scopes
     at once, not only the other item's name (issue #206)."""
     meeting = protocol.scope_overlap_paths(own_scope, claim.scope)
-    return f"{_claim_subject(claim, storage)} on {protocol.named_with_overflow_count(meeting)}"
+    return f"{board.claim_subject(claim, storage)} on {protocol.named_with_overflow_count(meeting)}"
 
 
 def _touch_summary(
@@ -357,8 +304,8 @@ def _claim_request(
     if protocol.COMMIT_PATTERN.fullmatch(base) is None:
         raise protocol.ClaimError("base must be a full lowercase commit SHA")
     branch = _resolved_claim_branch(arguments, directory=directory)
-    issue = _optional_issue_number(arguments.issue)
-    identity = _resolved_identity(issue, branch)
+    issue = protocol.optional_issue_number(arguments.issue)
+    identity = protocol.resolved_identity(issue, branch)
     claim_id = arguments.claim_id or uuid.uuid4().hex
     protocol.ClaimId(claim_id)
     whole_reason = _optional_whole_reason(arguments)
@@ -1118,17 +1065,6 @@ def _parser() -> _UsageErrorParser:
     return parser
 
 
-def _identity_json(identity: protocol.ClaimIdentity) -> dict[str, object]:
-    """`issue`/`lane` pair for one claim's discriminated identity, for JSON output.
-
-    A lane claim's name lives in the sibling `branch` field of the same JSON
-    object, so `lane` stays a bare marker instead of duplicating it.
-    """
-    if isinstance(identity, protocol.LaneIdentity):
-        return {"issue": None, "lane": True}
-    return {"issue": identity.issue, "lane": None}
-
-
 def _status_claims(
     claims: tuple[protocol.ActiveClaim, ...], issue: int | None
 ) -> tuple[tuple[protocol.ActiveClaim, ...], protocol.ClaimConflictIndex]:
@@ -1150,39 +1086,12 @@ def _status_claims(
     return related, index
 
 
-def _resource_fields(resource: protocol.ResourceHold | None) -> dict[str, object]:
-    if resource is None:
-        return {"resource": None, "resource_value": None}
-    return {"resource": resource.name, "resource_value": resource.value}
-
-
-def _claim_identity_fields(claim: protocol.ActiveClaim) -> dict[str, object]:
-    """The one claim-identity dict every `--json` view of a live claim
-    shares -- `status`, `status --path`, `claim`, and `rescope` (issue #406,
-    #390 finding 6) each spread this instead of typing the same seven
-    fields out by hand a fifth time with their own drifting order. A view
-    still projects its own remaining fields explicitly beside it: `resource`/
-    `resource_value` (every view but `rescope`, which names no `--resource`
-    flag of its own), `whole` (`status` and `status --path` alone), and
-    whatever else is that view's own (`overlaps`/`age`/`old` for `status`,
-    `versioned_files`/`touches`/`checks` for `claim`)."""
-    return {
-        **_identity_json(claim.identity),
-        "claim_id": claim.claim_id,
-        "agent": claim.agent,
-        "role": claim.role,
-        "base": claim.base,
-        "branch": claim.branch,
-        "scope": list(claim.scope),
-    }
-
-
 def _overlap_subjects(
     claims_by_id: Mapping[str, protocol.ActiveClaim], peer_ids: set[str]
 ) -> list[dict[str, object]]:
     return [
         {
-            **_identity_json(peer.identity),
+            **protocol.identity_json(peer.identity),
             "claim_id": peer.claim_id,
             "agent": peer.agent,
         }
@@ -1198,7 +1107,7 @@ def _overlap_note(
     if not peers:
         return None
     return "overlaps " + ", ".join(
-        f"{_claim_subject(claim, storage)} ({claim.claim_id})" for claim in peers
+        f"{board.claim_subject(claim, storage)} ({claim.claim_id})" for claim in peers
     )
 
 
@@ -1222,9 +1131,9 @@ def _print_claim_status_lines(
 ) -> None:
     state = "CONFLICT" if claim.claim_id in context.index.conflict_ids else "CLAIMED"
     print(
-        f"{state} {_claim_subject(claim, context.storage)}: {claim.agent} ({claim.role}) "
+        f"{state} {board.claim_subject(claim, context.storage)}: {claim.agent} ({claim.role}) "
         f"base={claim.base} branch={claim.branch} claim={claim.claim_id}"
-        f"{_claim_age_suffix(opened_at, observed_at)}"
+        f"{board.claim_age_suffix(opened_at, observed_at)}"
     )
     for path in claim.scope:
         print(f"  {path}")
@@ -1296,10 +1205,10 @@ def _status_claim_json(
     ages: Mapping[str, datetime],
     observed_at: datetime,
 ) -> dict[str, object]:
-    age, old = _claim_age_fields(ages[claim.claim_id], observed_at)
+    age, old = board.claim_age_fields(ages[claim.claim_id], observed_at)
     return {
-        **_claim_identity_fields(claim),
-        **_resource_fields(claim.resource),
+        **protocol.claim_identity_fields(claim),
+        **protocol.resource_fields(claim.resource),
         **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
         "overlaps": _overlap_subjects(claims_by_id, protocol.overlap_peer_ids(index, claim)),
         "state": "CONFLICT" if claim.claim_id in index.conflict_ids else "CLAIMED",
@@ -1363,7 +1272,7 @@ def _print_path_holders(
 ) -> None:
     for claim in holders:
         print(
-            f"CLAIMED {path} {_claim_subject(claim, storage)}: {claim.agent} ({claim.role}) "
+            f"CLAIMED {path} {board.claim_subject(claim, storage)}: {claim.agent} ({claim.role}) "
             f"claim={claim.claim_id}"
         )
         if claim.whole_reason is not None:
@@ -1371,7 +1280,9 @@ def _print_path_holders(
     if len(holders) > 1:
         print(
             "overlap: "
-            + ", ".join(f"{_claim_subject(claim, storage)} ({claim.claim_id})" for claim in holders)
+            + ", ".join(
+                f"{board.claim_subject(claim, storage)} ({claim.claim_id})" for claim in holders
+            )
         )
 
 
@@ -1417,8 +1328,8 @@ def _status_path_json(
     reason = StatusReason.UNCLAIMED if not holders else StatusReason.CLAIMED
     claims_payload = [
         {
-            **_claim_identity_fields(claim),
-            **_resource_fields(claim.resource),
+            **protocol.claim_identity_fields(claim),
+            **protocol.resource_fields(claim.resource),
             **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
             "state": "CLAIMED",
         }
@@ -1450,7 +1361,7 @@ class RescopeReason(StrEnum):
 
 
 def _rescope_json(claimed: protocol.ActiveClaim) -> None:
-    report.emit_json(True, RescopeReason.RESCOPED, **_claim_identity_fields(claimed))
+    report.emit_json(True, RescopeReason.RESCOPED, **protocol.claim_identity_fields(claimed))
 
 
 @dataclass(frozen=True)
@@ -1499,12 +1410,12 @@ def _claim_json(
     report.emit_json(
         True,
         ClaimReason.CLAIMED,
-        **_claim_identity_fields(claimed),
-        **_resource_fields(claimed.resource),
+        **protocol.claim_identity_fields(claimed),
+        **protocol.resource_fields(claimed.resource),
         versioned_files=versioning.versioned_files,
         versioned_files_total=versioning.versioned_files_total,
         share=versioning.share,
-        touches=[_touch_json(claim) for claim in touches],
+        touches=[protocol.touch_json(claim) for claim in touches],
         checks=[check.as_json() for check in checks],
     )
     return 0
@@ -1541,7 +1452,7 @@ def _release_json(release_report: ReleaseReport) -> None:
     released, landing = release_report.selected, release_report.landing
     payload: dict[str, object] = {
         "outcome": release_report.outcome.reason,
-        **_identity_json(released.identity),
+        **protocol.identity_json(released.identity),
         "branch": released.branch,
         "claim_id": released.claim_id,
         "agent": release_report.agent,
@@ -1567,42 +1478,6 @@ class ReleaseLanding:
     freed: tuple[int, ...]
     next_item: board.BoardItem | None
     parent_closable: int | None
-
-
-def _next_action_item(action: board.NextAction) -> board.BoardItem:
-    """The `BoardItem` `action` targets, whichever action kind it is -- a
-    plain claim target for `WorkItemAction`, the container itself for
-    `CutSliceAction`/`CheckContainerAction`/`CloseContainerAction` (issue #256)."""
-    return action.item if isinstance(action, board.WorkItemAction) else action.container
-
-
-def _freed_item_numbers(
-    dependencies: Mapping[int, tuple[board.IssueDependency, ...]],
-    landed: board.IssueReference,
-) -> tuple[int, ...]:
-    """Open items whose last open blocker was `landed` (issue #256): every
-    local `blocked_by` dependency of the item is now closed, `landed` was
-    one of them, and nothing else -- local or foreign -- still blocks it.
-    Reuses `board.open_dependency_blockers`/`board.dependency_freed_on`,
-    the same per-item blocker facts `_issue_check`'s own refusal already
-    reads, rather than re-deriving them from `Board`'s aggregate fields:
-    those only ever describe the *currently* open issues, so a landed
-    item's own `blocked_by` reference disappears from them the moment it
-    closes -- exactly the fact this needs to name who it freed. `dependencies`
-    is `_release_landing`'s one fetch, shared with `_board` (issue #256
-    review), rather than a second `list_board_dependencies` round trip over
-    the same candidates.
-    """
-    repository = landed.repository
-    freed: list[int] = []
-    for number, local in dependencies.items():
-        if board.dependency_freed_on(local, repository) is None:
-            continue
-        if board.open_dependency_blockers(local, repository):
-            continue
-        if landed in {dependency.reference for dependency in local}:
-            freed.append(number)
-    return tuple(sorted(freed))
 
 
 def _parent_closable_number(
@@ -1642,7 +1517,7 @@ def _release_landing(
     that transition already committed -- the caller wraps this in one broad
     `forge.ForgeError` catch, so a forge hiccup here can never undo or fail
     a release that already stood. The dependency fetch below is the one
-    round trip both `_freed_item_numbers` and `_board` need for this same
+    round trip both `board.freed_item_numbers` and `_board` need for this same
     candidate set; passing it into `_board` keeps this a single fetch rather
     than two (issue #256 review). The board walks `trunk_ref`, the ref the
     release judged its landing on (LANDCMD-21, issue #492)."""
@@ -1650,7 +1525,7 @@ def _release_landing(
     issues = client.list_open_board_issues()
     candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
     dependencies = _validated_dependencies(issues, _fetch_dependencies(client, candidates))
-    freed = () if landed is None else _freed_item_numbers(dependencies, landed)
+    freed = () if landed is None else board.freed_item_numbers(dependencies, landed)
     projected = _board(
         context,
         tuple(new_state.claims.values()),
@@ -1663,20 +1538,8 @@ def _release_landing(
         None if landed is None else _parent_closable_number(client, landed.number, storage)
     )
     return ReleaseLanding(
-        freed, None if action is None else _next_action_item(action), parent_closable
+        freed, None if action is None else board.next_action_item(action), parent_closable
     )
-
-
-def _release_freed_line(freed: tuple[int, ...], storage: body.Storage) -> str:
-    return "freed: " + (
-        ", ".join(board.item_label(number, storage) for number in freed) if freed else "none"
-    )
-
-
-def _parent_closable_line(number: int | None, storage: body.Storage) -> str | None:
-    if number is None:
-        return None
-    return f"parent {board.item_label(number, storage)}: no open children — close it"
 
 
 def _release_next_line(item: board.BoardItem | None, storage: body.Storage) -> str:
@@ -1684,24 +1547,6 @@ def _release_next_line(item: board.BoardItem | None, storage: body.Storage) -> s
         return "next: none"
     label = board.item_label(item.number, storage)
     return f"next: {label} score {item.score}: {board.terminal_text(item.title)}"
-
-
-def _merged_pull_request_floor(issues: tuple[board.Issue, ...], now: datetime) -> datetime:
-    """The earliest merge that could still matter to a currently open issue.
-
-    A pull request can only touch or close an issue that already exists, so
-    nothing merged before the oldest still-open issue was filed can ever
-    change any open item's stage. Anchoring the query here — instead of an
-    arbitrary fixed window — is what lets a slice's "Refs #N"/"Part of #N"
-    landing keep crediting its still-open epic for as long as the epic stays
-    open, rather than for a fixed number of days after which the credit
-    silently reverts. Residual: the underlying query is still capped (see
-    `GitHubForge.list_recent_merged_board_pull_requests`), so an epic
-    old enough to have more merges than that cap between its filing and now
-    can still lose credit for an early slice; this floor removes the
-    fortnight-sized version of that gap, not every version of it.
-    """
-    return board.oldest_created_at(issues) or now
 
 
 # A container's children are their own `gh list_children` subprocess call;
@@ -1814,24 +1659,12 @@ class _ClaimHistory:
 class _LandingReads:
     """What a merged release already read before its board report (issues
     #256, #492), bundled so `_board` stays under the five-argument ceiling:
-    the dependency wave `_freed_item_numbers` needed for the same candidate
+    the dependency wave `board.freed_item_numbers` needed for the same candidate
     set, and the trunk ref the release judged its landing on, which the
     board walks instead of the trunk as the last fetch left it."""
 
     dependencies: dict[int, tuple[board.IssueDependency, ...]]
     trunk_ref: str
-
-
-def _closed_item_numbers(
-    lane_events: tuple[metrics.LaneEvent, ...], open_numbers: frozenset[int]
-) -> frozenset[int]:
-    """Every numbered item `lane_events` names that is not among this board
-    build's own open issues (issue #357 R2) -- a completed lane whose item
-    has since closed, or one this walk can no longer resolve to a live
-    issue at all. A `docs/`/`fix/` lane claim's own `item` is never numeric
-    and is silently excluded, matching `board._item_number_or_none`."""
-    numbers = {int(event.item) for event in lane_events if event.item.isdigit()}
-    return frozenset(numbers - open_numbers)
 
 
 def _closed_item_sizes(
@@ -1873,7 +1706,7 @@ def _board(
     config = _load_board_config(client, context)
     if issues is None:
         issues = client.list_open_board_issues()
-    since = _merged_pull_request_floor(issues, now)
+    since = board.merged_pull_request_floor(issues, now)
     # A container whose own summary already says 0 (or carries no summary at
     # all, `children_total is None`) can never own an open child either way:
     # `_container_progress` returns no progress at all without both numbers,
@@ -1902,7 +1735,9 @@ def _board(
         closed_item_sizes_future = pool.submit(
             _closed_item_sizes,
             client,
-            _closed_item_numbers(history.lane_events, frozenset(issue.number for issue in issues)),
+            board.closed_item_numbers(
+                history.lane_events, frozenset(issue.number for issue in issues)
+            ),
             config.storage,
         )
         children = _fetch_children(client, container_numbers)
@@ -2193,7 +2028,7 @@ def _next_action_payload(
 ) -> dict[str, object]:
     """The action-specific fields `_next_json` adds beyond `recovery`/`skipped`
     -- `_next_action_reason` now carries what an `"action"` key used to."""
-    number = board.item_json_reference(_next_action_item(action).number, storage)
+    number = board.item_json_reference(board.next_action_item(action).number, storage)
     if isinstance(action, board.WorkItemAction):
         item = action.item
         payload: dict[str, object] = {
@@ -3358,21 +3193,6 @@ def _pending_landing_close(
     return None
 
 
-def _canonical_remote_name(toplevel: Path) -> str:
-    """The configured `canonical_remote` of the checkout at `toplevel`, for
-    `protect` (handed into `protect.judge` as `canonical_remote_for`), which
-    judges from its own payload's resolved checkout and never builds a
-    `RunContext` (issue #457)."""
-    return board_config(toplevel).canonical_remote
-
-
-def _checkout_trunk_lane_shared(toplevel: Path) -> tuple[str, ...]:
-    """The lane-shared files the trunk of the checkout at `toplevel` names,
-    for `protect` (handed into `protect.judge` as `lane_shared_for`, issue
-    #575), resolved over that checkout's own canonical remote."""
-    return trunk_lane_shared(_canonical_remote_name(toplevel), toplevel)
-
-
 @dataclass(frozen=True)
 class _StoreItemWriter:
     """`state_board.ItemWriter`, implemented over `store` (issue #283): the
@@ -3985,7 +3805,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
     into a hint (issue #541). Prints one line, `CLOSED aco-xxxxxx` (`--json`:
     `{"item", "number", "closed_at", "parent_closable"}`), then `release
     --merged`'s own `freed:` line -- open items whose only open local
-    blocker was this one (`_freed_item_numbers`, issue #256; nothing new) --
+    blocker was this one (`board.freed_item_numbers`, issue #256; nothing new) --
     and, when this close was its parent's last open child, `release
     --merged`'s own parent hint (issue #348). Every refusal reports through
     the shared envelope as `precondition_failed` (issue #425)."""
@@ -3995,7 +3815,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
             raise protocol.ClaimUnavailableError(ITEM_CLOSE_GITHUB_REFUSAL)
         number = parsed.item
         observed = context.observation
-        _require_state_ref(observed)
+        protocol.require_state_ref(observed)
         protocol.require_no_live_claim(observed, protocol.IssueIdentity(number))
         client = _state_ref_board(context)
         if client.item_reference(number).state is forge.ItemState.MISSING:
@@ -4014,7 +3834,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
         _print_item_close_result(result, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
-        named = _named_refusal(error, body.Storage.STATE_REF)
+        named = board.named_refusal(error, body.Storage.STATE_REF)
         return report.refuse(ItemReason.PRECONDITION_FAILED, named, as_json=as_json)
 
 
@@ -4063,7 +3883,7 @@ def _item_close_freed(client: forge.ForgeReader, number: int) -> tuple[int, ...]
     candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
     dependencies = _validated_dependencies(issues, _fetch_dependencies(client, candidates))
     landed = board.IssueReference(client.repository.path, number)
-    return _freed_item_numbers(dependencies, landed)
+    return board.freed_item_numbers(dependencies, landed)
 
 
 @dataclass(frozen=True)
@@ -4100,8 +3920,8 @@ def _print_item_close_result(result: _ItemCloseResult, *, as_json: bool) -> None
         # `item close` only ever runs under `storage = "state-ref"`
         # (`_cmd_item_close`'s own refusal otherwise), so `freed:`'s own id
         # chooser is fixed here rather than threaded as a further field.
-        print(_release_freed_line(result.freed, body.Storage.STATE_REF))
-    parent_line = _parent_closable_line(result.parent_closable, body.Storage.STATE_REF)
+        print(board.release_freed_line(result.freed, body.Storage.STATE_REF))
+    parent_line = board.parent_closable_line(result.parent_closable, body.Storage.STATE_REF)
     if parent_line is not None:
         print(parent_line)
 
@@ -4201,26 +4021,6 @@ def _claim_history(worktree: Path, state: protocol.ClaimState) -> _ClaimHistory:
     )
 
 
-def _require_state_ref(state: protocol.ClaimState) -> None:
-    if state.tip is None:
-        raise protocol.ClaimError(protocol.MISSING_STATE_REF)
-
-
-def _transition_subject(
-    action: str, identity: protocol.ClaimIdentity, branch: str
-) -> store.ClaimTransitionSubject:
-    """One claim-shaped transition's own `store.ClaimTransitionSubject` (§1
-    "Commit message"; issue #357 R2): `text` is `claim issue 42`, `rescope
-    lane docs/lane-cleanup`, and so on -- `action` plus `issue`/`lane` plus
-    `protocol.transition_item_identifier`'s own bare identifier; `item` is
-    that same identifier again, carried separately into the commit's own
-    mandatory `item:` trailer rather than reconstructed from `text` by
-    `claim_lifecycle`'s reader."""
-    kind = "lane" if isinstance(identity, protocol.LaneIdentity) else "issue"
-    item = protocol.transition_item_identifier(identity, branch)
-    return store.ClaimTransitionSubject(f"{action} {kind} {item}", item=item)
-
-
 def _claim_intent_from_request(
     request: protocol.ClaimRequest, operation_id: str, item_pin: protocol.ItemPin | None
 ) -> protocol.ClaimIntent:
@@ -4289,69 +4089,6 @@ def _matching_store_claim(
     ):
         return existing
     return None
-
-
-def _selected_store_claim(
-    observed: protocol.ClaimState,
-    identity: protocol.ClaimIdentity,
-    branch: str | None,
-    claim_id: str | None,
-    storage: body.Storage,
-) -> protocol.ActiveClaim:
-    """The one live store claim `rescope`/`release` names: at most one claim
-    is ever live per identity (the store's own invariant), so this is a
-    direct key lookup, never the ledger's filter-then-disambiguate walk.
-    `claim_id`, when given, is a safety check against that one claim, not a
-    selector among several -- there are never several. A refusal names the
-    item in `storage`'s form (issue #471).
-    """
-    if isinstance(identity, protocol.LaneIdentity) and not branch:
-        raise protocol.ClaimUnavailableError(
-            "lane release requires a non-empty current branch; check out the "
-            "docs/ or fix/ lane branch, or pass an issue number"
-        )
-    selected = observed.claims.get(protocol.claim_key(identity, branch or ""))
-    if selected is None or (claim_id is not None and selected.claim_id != claim_id):
-        raise _no_active_build_claim(identity, branch or "", storage)
-    return selected
-
-
-def _no_active_build_claim(
-    identity: protocol.ClaimIdentity, branch: str, storage: body.Storage
-) -> protocol.ClaimUnavailableError:
-    """REL-09's refusal, naming the item in `storage`'s form (issue #471)."""
-    subject = protocol.identity_summary(identity, branch, board.item_labeller(storage))
-    return protocol.ClaimUnavailableError(f"{subject} has no active build claim")
-
-
-def _hook_payload() -> dict[str, object] | None:
-    try:
-        payload = json.loads(sys.stdin.read())
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _protect() -> int:
-    # Grok fail-opens on crash or non-JSON hook output; deny instead of raising.
-    try:
-        payload = _hook_payload()
-        verdict = protect.judge(
-            payload,
-            canonical_remote_for=_canonical_remote_name,
-            lane_shared_for=_checkout_trunk_lane_shared,
-        )
-    except Exception as error:
-        verdict = protect.Verdict.deny(str(error))
-    if verdict.stdout_text is not None:
-        print(verdict.stdout_text)
-    if verdict.stderr_text is not None:
-        print(verdict.stderr_text, file=sys.stderr)
-    return verdict.exit_code
-
-
-def _optional_issue_number(value: int | None) -> int | None:
-    return None if value is None else int(value)
 
 
 @dataclass(frozen=True)
@@ -4486,7 +4223,7 @@ def _rescope_command(
         canonical_remote=checkout_context.canonical_remote,
         repair=checkout.WorktreeRepair.RETURN_TO_CLAIM,
     )
-    identity = _resolved_identity(_optional_issue_number(parsed.issue), branch)
+    identity = protocol.resolved_identity(protocol.optional_issue_number(parsed.issue), branch)
     return protocol.RescopeRequest(
         identity=identity,
         agent=parsed.agent,
@@ -4681,7 +4418,7 @@ def _print_brief_claim(
 ) -> None:
     print(
         f"{claim.agent} ({claim.role}) branch={claim.branch} base={claim.base}"
-        f"{_claim_age_suffix(opened_at, observed_at)}"
+        f"{board.claim_age_suffix(opened_at, observed_at)}"
     )
     for path in claim.scope:
         print(f"  {path}")
@@ -4800,7 +4537,7 @@ def _brief_claim_json(
         "base": claim.base,
         "scope": list(claim.scope),
         "whole": claim.whole_reason,
-        "age": _claim_age_fields(live.opened_at, observed_at)[0],
+        "age": board.claim_age_fields(live.opened_at, observed_at)[0],
         **_lane_shared_json(lane_shared),
     }
 
@@ -4939,7 +4676,7 @@ def _status_read(parsed: argparse.Namespace, context: RunContext) -> int:
         _status_path(claims, parsed.path, context.config.storage, lane_shared)
         return 0
     ages = _claim_ages(worktree, state)
-    issue = _optional_issue_number(parsed.issue)
+    issue = protocol.optional_issue_number(parsed.issue)
     if parsed.json:
         return _status_json(claims, issue, ages, state.tip, lane_shared)
     return _status(claims, issue, ages, context.config.storage, lane_shared)
@@ -5225,9 +4962,9 @@ def _rescope_write(parsed: argparse.Namespace, run_context: RunContext) -> int:
     requested = _rescope_command(parsed, paths, path_checkout, checkout_context)
     worktree = checkout_context.toplevel
     observed = checkout_context.observation
-    _require_state_ref(observed)
+    protocol.require_state_ref(observed)
     try:
-        selected = _selected_store_claim(
+        selected = board.selected_store_claim(
             observed,
             requested.identity,
             requested.branch,
@@ -5271,7 +5008,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: RunContext) -> int:
         operation_id=uuid.uuid4().hex,
         whole_reason=whole_reason,
     )
-    subject = _transition_subject(RESCOPE_COMMAND, selected.identity, selected.branch)
+    subject = store.transition_subject(RESCOPE_COMMAND, selected.identity, selected.branch)
     new_state = (
         checkout_context.transition(subject, intent)
         if item is None
@@ -5283,9 +5020,8 @@ def _rescope_write(parsed: argparse.Namespace, run_context: RunContext) -> int:
     if parsed.json:
         _rescope_json(rescoped)
         return 0
-    print(
-        f"RESCOPED {_claim_subject(rescoped, checkout_context.config.storage)}: {rescoped.claim_id}"
-    )
+    subject = board.claim_subject(rescoped, checkout_context.config.storage)
+    print(f"RESCOPED {subject}: {rescoped.claim_id}")
     return 0
 
 
@@ -5603,18 +5339,12 @@ def _refuse_claim_error(error: protocol.ClaimError, context: RunContext, *, as_j
             # `ClaimError` and falls to `unavailable` below (CLM-27).
             return report.refuse(
                 ClaimReason.CLAIM_CONFLICT,
-                _named_refusal(error, context.config.storage),
+                board.named_refusal(error, context.config.storage),
                 as_json=as_json,
             )
         case _:
             reason = ClaimReason.UNAVAILABLE
     return report.refuse(reason, error, as_json=as_json)
-
-
-def _named_refusal(error: protocol.ClaimError, storage: body.Storage) -> protocol.ClaimError:
-    """`error` as a report prints it: naming its item the way `storage`'s
-    board does (issue #471)."""
-    return protocol.ClaimError(error.named(board.item_labeller(storage)))
 
 
 def _claim_write(
@@ -5701,7 +5431,7 @@ def _checked_claim(
         )
         requested = replace(requested, whole_reason=effective_whole)
         observed = context.observation
-        _require_state_ref(observed)
+        protocol.require_state_ref(observed)
         storage = context.config.storage
     else:
         # `--scope` was omitted in issue mode: the item's own scope has to
@@ -5709,7 +5439,7 @@ def _checked_claim(
         # shape-checked -- both observed exactly once, here, so an omitted-
         # scope claim never fetches either a second time (issue #337).
         observed = context.observation
-        _require_state_ref(observed)
+        protocol.require_state_ref(observed)
         storage = context.config.storage
         requested, open_by_number = _resolved_claim_request(requested, observed, context, storage)
         versioning, effective_whole = _scope_versioning(
@@ -5760,7 +5490,7 @@ def _committed_claim(
         return plan.replayed, tuple(plan.observed.claims.values())
     requested = plan.requested
     new_state = writer.transition(
-        _transition_subject("claim", requested.identity, requested.branch), plan.intent
+        store.transition_subject("claim", requested.identity, requested.branch), plan.intent
     )
     claimed = new_state.claims[protocol.claim_key(requested.identity, requested.branch)]
     return claimed, tuple(new_state.claims.values())
@@ -5776,7 +5506,7 @@ def _report_claim(
     touches = protocol.conflicting_claims(live, claimed)
     if as_json:
         return _claim_json(claimed, versioning=plan.versioning, touches=touches, checks=plan.checks)
-    print(f"CLAIMED {_claim_subject(claimed, plan.storage)}: {claimed.claim_id}")
+    print(f"CLAIMED {board.claim_subject(claimed, plan.storage)}: {claimed.claim_id}")
     print(
         _claim_cost_line(
             plan.versioning.versioned_files,
@@ -5912,7 +5642,7 @@ def _print_start_resume(
     claim `_cmd_start` already found in the store -- the same
     `observed.claims` lookup `status`/`release` use -- rather than minting a
     second, fresh id for an item that already has one."""
-    print(f"CLAIMED {_claim_subject(live, storage)}: {live.claim_id}")
+    print(f"CLAIMED {board.claim_subject(live, storage)}: {live.claim_id}")
     touches = protocol.conflicting_claims(tuple(observed.claims.values()), live)
     print(
         _claim_cost_line(
@@ -5962,8 +5692,10 @@ def _cmd_start(parsed: argparse.Namespace, context: RunContext) -> int:
     )
     branch, slug = _start_branch_and_slug(parsed, main_context)
     observed = main_context.observation
-    _require_state_ref(observed)
-    live = observed.claims.get(protocol.claim_key(_resolved_identity(parsed.item, branch), branch))
+    protocol.require_state_ref(observed)
+    live = observed.claims.get(
+        protocol.claim_key(protocol.resolved_identity(parsed.item, branch), branch)
+    )
     if live is not None and _runs_in_lane_worktree(caller, live.branch):
         own_lane = _StartTarget(caller.toplevel, live.branch)
         return _claim_in_start_worktree(parsed, main_context, own_lane, observed, live)
@@ -6033,7 +5765,7 @@ def _claim_in_start_worktree(
     try:
         return _claim_write(_start_claim_arguments(parsed), context, worktree=target.path)
     except protocol.UncertainWriteError as error:
-        named = _named_refusal(error, context.config.storage)
+        named = board.named_refusal(error, context.config.storage)
         return _report_uncertain_start_claim(named, target)
     except protocol.ClaimError as error:
         return _refuse_claim_error(error, context, as_json=False)
@@ -6095,7 +5827,7 @@ def _check_build_and_claim(
     try:
         plan = _checked_claim(requested, check_context, revision=trunk)
     except protocol.ClaimConflictError as error:
-        raise _named_refusal(error, storage) from error
+        raise board.named_refusal(error, storage) from error
     if plan.refused:
         _refuse_claim(False, plan.target_issue, plan.checks)
         return 2
@@ -6110,9 +5842,9 @@ def _check_build_and_claim(
         # and fetch anchor start at its claim (CAS-09).
         claimed, claims = _committed_claim(plan, check_context.for_lane_worktree(target.path))
     except protocol.UncertainWriteError as error:
-        return _report_uncertain_start_claim(_named_refusal(error, storage), target)
+        return _report_uncertain_start_claim(board.named_refusal(error, storage), target)
     except protocol.ClaimError as error:
-        return _refuse_built_start(_named_refusal(error, storage), target)
+        return _refuse_built_start(board.named_refusal(error, storage), target)
     return _report_claim(plan, claimed, claims, as_json=False)
 
 
@@ -6244,7 +5976,9 @@ def _select_release_claim(
     release_branch: str | None,
     storage: body.Storage,
 ) -> protocol.ActiveClaim:
-    selected = _selected_store_claim(observed, identity, release_branch, parsed.claim_id, storage)
+    selected = board.selected_store_claim(
+        observed, identity, release_branch, parsed.claim_id, storage
+    )
     if (
         parsed.branch is not None
         and parsed.claim_id is not None
@@ -6297,7 +6031,7 @@ def _release_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
     identity flags, for `_holder_repeat_command`."""
     command = ["aco", "release"]
     if parsed.issue is not None:
-        command.append(str(_optional_issue_number(parsed.issue)))
+        command.append(str(protocol.optional_issue_number(parsed.issue)))
     if parsed.branch is not None:
         command += ["--branch", parsed.branch]
     if parsed.claim_id is not None:
@@ -6358,15 +6092,15 @@ def _release_transition(
     recorded as landed (issue #590), whether `aco land` merged it a moment
     ago, a rerun resumes it, or a standalone release follows a merge made
     elsewhere: a merged pull request's head no longer moves."""
-    issue = _optional_issue_number(parsed.issue)
-    identity = _resolved_identity(issue, release_branch or "")
+    issue = protocol.optional_issue_number(parsed.issue)
+    identity = protocol.resolved_identity(issue, release_branch or "")
     storage = context.config.storage
     if parsed.merged is not None and storage is body.Storage.STATE_REF:
         return _cmd_release_landed(parsed, context, identity, storage, release_branch)
     merged = None if parsed.merged is None else _github_pull_request_number(parsed.merged)
     outcome = _release_outcome(merged, parsed.abandoned)
     observed = context.observation
-    _require_state_ref(observed)
+    protocol.require_state_ref(observed)
     unclaimed_branch = _unclaimed_rerun_branch(parsed, observed, identity, release_branch)
     if isinstance(outcome, protocol.MergedRelease) and unclaimed_branch is not None:
         _report_merged_pull_request_left_nothing(
@@ -6388,7 +6122,7 @@ def _release_transition(
         coordinator_override=parsed.coordinator_override,
     )
     new_state = context.transition(
-        _transition_subject("release", resolved.selected.identity, resolved.selected.branch),
+        store.transition_subject("release", resolved.selected.identity, resolved.selected.branch),
         intent,
     )
     # The run already fetched the canonical remote and asked the forge's
@@ -6473,7 +6207,7 @@ def _report_merged_pull_request_left_nothing(
     storage = context.config.storage
     verified = _verify_merged_release(context, client, identity, merged)
     if isinstance(identity, protocol.LaneIdentity) and unclaimed_branch != verified.source_branch:
-        raise _no_active_build_claim(identity, unclaimed_branch, storage)
+        raise board.no_active_build_claim(identity, unclaimed_branch, storage)
     _report_nothing_left_to_release(
         parsed,
         context,
@@ -6510,7 +6244,7 @@ def _report_nothing_left_to_release(
             True,
             ReleaseReason.MERGED,
             outcome=NOTHING_LEFT_TO_RELEASE,
-            **_identity_json(lane.identity),
+            **protocol.identity_json(lane.identity),
             branch=lane.branch,
             worktree=worktree,
         )
@@ -7305,7 +7039,7 @@ def _cmd_land(parsed: argparse.Namespace, context: RunContext) -> None:
             # and stamp no lineage -- the same read-only requirement
             # `_reset_observation` already carries for `reset`.
             observed = store.peek_state(worktree=context.toplevel, remote=context.canonical_remote)
-            _require_state_ref(observed)
+            protocol.require_state_ref(observed)
             return observed
 
         check_context = _LandingCheckContext(context, repository, config.storage)
@@ -7394,7 +7128,7 @@ def _cmd_release_landed(
             _missing_item_refusal(identity.issue, client, context.config.storage)
         )
     observed = context.observation
-    _require_state_ref(observed)
+    protocol.require_state_ref(observed)
     unclaimed_branch = _unclaimed_rerun_branch(parsed, observed, identity, release_branch)
     landing_label = f"commit {commit}"
     if unclaimed_branch is not None:
@@ -7430,7 +7164,7 @@ def _cmd_release_landed(
         coordinator_override=parsed.coordinator_override,
     )
     new_state = context.transition(
-        _transition_subject("release", resolved.selected.identity, resolved.selected.branch),
+        store.transition_subject("release", resolved.selected.identity, resolved.selected.branch),
         intent,
     )
     client.mark_landed(write, new_oid)
@@ -7540,13 +7274,13 @@ def _print_release_result(report: ReleaseReport, *, as_json: bool) -> None:
         if isinstance(landing, str):
             _print_board_read_hint(landing, as_json=True)
         return
-    print(f"RELEASED {_claim_subject(selected, report.storage)}: {selected.claim_id}")
+    print(f"RELEASED {board.claim_subject(selected, report.storage)}: {selected.claim_id}")
     if isinstance(landing, str):
         _print_board_read_hint(landing, as_json=False)
     elif landing is not None:
-        print(_release_freed_line(landing.freed, report.storage))
+        print(board.release_freed_line(landing.freed, report.storage))
         print(_release_next_line(landing.next_item, report.storage))
-        parent_line = _parent_closable_line(landing.parent_closable, report.storage)
+        parent_line = board.parent_closable_line(landing.parent_closable, report.storage)
         if parent_line is not None:
             print(parent_line)
     if report.worktree is not None:
@@ -8570,7 +8304,7 @@ def _reset_live_claims_sentence(
     claims: Iterable[protocol.ActiveClaim], storage: body.Storage, running_agent: str | None
 ) -> str:
     named = [
-        f"{_claim_subject(claim, storage)} by {claim.agent} ({claim.role}) "
+        f"{board.claim_subject(claim, storage)} by {claim.agent} ({claim.role}) "
         f"branch={claim.branch} claim={claim.claim_id}, release: "
         + _abandoned_release_command(claim, storage, running_agent)
         for claim in claims
@@ -8941,7 +8675,7 @@ def main(arguments: list[str] | None = None) -> int:
         if parsed.command in {"_run-at-login", "register", "run", "login"}:
             return cmd_workspace.run(parsed)
         if parsed.command == "protect":
-            return _protect()
+            return cmd_protect.run()
         context = _run_context(parsed.repo)
         refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
         return refusal if refusal is not None else _read_status_body_or_dispatch(parsed, context)

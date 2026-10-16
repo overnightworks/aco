@@ -819,7 +819,7 @@ def default_branch_unknown_reason(
 
 
 # One owner for `protect`'s "not main" denial (issue #314 repeat gate,
-# finding 4, Sonar S1192): `_protect_not_main_denial` in `cli.py` returns
+# finding 4, Sonar S1192): `_protect_not_main_denial` in `protect.py` returns
 # this for both a shared main checkout and a linked worktree that sits on
 # the resolved default branch, so the one production spelling lives here
 # instead of twice in that function.

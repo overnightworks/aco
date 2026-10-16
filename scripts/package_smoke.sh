@@ -136,3 +136,20 @@ with urllib.request.urlopen(url, timeout=5) as response:
 kill "$serve_pid" 2>/dev/null || true
 serve_pid=""
 echo "aco-board serve answers / over HTTP"
+
+# The write gate must still answer a deny frame -- exit 2 and a deny object on
+# stdout -- when the installed tool is handed a payload it cannot read.
+hook_exit=0
+hook_stderr_file="$scratch/hook.stderr"
+hook_output="$(printf 'not a hook payload' | "$scratch/bin/aco" protect 2>"$hook_stderr_file")" || hook_exit=$?
+hook_stderr="$(cat "$hook_stderr_file"; echo x)"
+# The trailing x keeps the final newline, which command substitution strips.
+if ((hook_exit != 2)) \
+    || [[ "$hook_output" != '{"decision": "deny", "reason": "invalid hook payload"}' ]] \
+    || [[ "$hook_stderr" != $'invalid hook payload\nx' ]]; then
+    echo "ERROR: installed aco protect did not deny an invalid payload exactly (exit $hook_exit):" >&2
+    echo "stdout: $hook_output" >&2
+    echo "stderr: ${hook_stderr%x}" >&2
+    exit 1
+fi
+echo "installed aco protect denies an invalid hook payload"

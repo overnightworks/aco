@@ -1,6 +1,6 @@
 """Direct `protect` hook behavior: the pre-tool-use guard that denies a
 mutating tool call outside a covering claim. Every test here drives
-`issue_claim._protect`/`_protect_write` through `main(["protect"])` with the
+`cmd_protect.run`/`protect.judge` through `main(["protect"])` with the
 hook's JSON payload on stdin (`_protect_main`) -- `protect` is the hook entry
 point with its own doctrine, so this stays its owner file even though it
 goes through `main`, unlike ordinary CLI-command tests in
@@ -237,8 +237,12 @@ def _patch_protect_claim(
 
 
 def _protect_main(monkeypatch: pytest.MonkeyPatch, payload: object) -> int:
-    raw = payload if isinstance(payload, str) else json.dumps(payload)
-    monkeypatch.setattr(sys, "stdin", io.StringIO(raw))
+    stdin: io.TextIOBase
+    if isinstance(payload, bytes):
+        stdin = io.TextIOWrapper(io.BytesIO(payload), encoding="utf-8")
+    else:
+        stdin = io.StringIO(payload if isinstance(payload, str) else json.dumps(payload))
+    monkeypatch.setattr(sys, "stdin", stdin)
     return issue_claim.main(["--repo", "example/agent-coordination", "protect"])
 
 
@@ -487,13 +491,14 @@ def test_protect_no_matching_claim_denies_claim_first(
 
 @pytest.mark.parametrize(
     "payload",
-    ["not-json", "[]", "null", "1", '{"toolName": 1}', "{}"],
+    ["not-json", "[]", "null", "1", '{"toolName": 1}', "{}", b"\xff\xfe\x80"],
+    ids=["not-json", "list", "null", "number", "tool-name-number", "empty-object", "not-utf8"],
 )
 def test_protect_invalid_hook_payload_denies_without_raising(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    payload: str,
+    payload: str | bytes,
 ) -> None:
     home, work = _isolate_protect_home(monkeypatch, tmp_path)
     _forbid_protect_git_github_and_identity(monkeypatch)
