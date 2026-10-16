@@ -863,8 +863,9 @@ def issues_created_at(*created_ats: str) -> tuple[board.Issue, ...]:
     ],
 )
 def test_oldest_created_at_fails_loud_on_a_malformed_github_timestamp(raw_timestamp: str) -> None:
+    issues = issues_created_at(raw_timestamp)
     with pytest.raises(ClaimError, match="GitHub returned a malformed board timestamp"):
-        board.oldest_created_at(issues_created_at(raw_timestamp))
+        board.oldest_created_at(issues)
 
 
 @pytest.mark.parametrize(
