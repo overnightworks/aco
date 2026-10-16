@@ -178,6 +178,53 @@ def _real_repository_with_bare_remote(
     return repo, remote
 
 
+def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A commit identity for every git subprocess a test spawns, including
+    the ones the code under test runs (they inherit the process environment,
+    never overriding it) -- this machine may carry no git `user.name` or
+    `user.email` at all. Each caller wraps this in its own
+    `@pytest.fixture(autouse=True)`, like `stub_board_config_tracked`."""
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Test")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "test@example.com")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "Test")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "test@example.com")
+
+
+def head_sha(repository: Path) -> str:
+    return _real_git(repository, "rev-parse", "HEAD").stdout.strip()
+
+
+@pytest.fixture
+def bare_remote(tmp_path: Path) -> Path:
+    """An empty bare repository standing in for the canonical remote.
+
+    `maintenance.auto=false` keeps `receive-pack` from starting maintenance
+    here, so a client-side maintenance assertion sees only its own fetch."""
+    remote = tmp_path / "remote.git"
+    remote.mkdir()
+    _real_git(remote, "init", "--bare", "-b", "main")
+    _real_git(remote, "config", "maintenance.auto", "false")
+    return remote
+
+
+@pytest.fixture
+def worktree(tmp_path: Path) -> Path:
+    """An ordinary git checkout used as this test's client worktree, its
+    commit made under the identity `set_git_identity` set.
+
+    Independent of `bare_remote`: store operations reach the remote by path,
+    never by a configured `origin`, so this repo's own history is unrelated
+    to the state ref it reads and writes.
+    """
+    checkout = tmp_path / "worktree"
+    checkout.mkdir()
+    _real_git(checkout, "init", "-b", "main")
+    (checkout / "README").write_text("placeholder\n")
+    _real_git(checkout, "add", "README")
+    _real_git(checkout, "commit", "-m", "initial")
+    return checkout
+
+
 def _push_repository_trunk(repo: Path, remote_name: str) -> None:
     """`repo`'s current `main` pushed to `remote_name`, with `<remote_name>/HEAD`
     resolved -- the trailing half of the skeleton every trunk-history
