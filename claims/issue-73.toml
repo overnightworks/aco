@@ -1,0 +1,8 @@
+claim_id = "431439deedad45a38f466a32f7e98813"
+agent = "claude"
+role = "builder"
+base = "8fddd020d4369540b73f447f3a8dc63671da3c6e"
+branch = "claude/issue-73-cmd-protect"
+scope = ["pyproject.toml", "scripts/package_smoke.sh", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_protect.py", "src/agent_coordination/protect.py", "tests/test_cli.py", "tests/test_hook_input.py", "tests/test_protect.py"]
+opened_commit = "781c2d0b497c9b6ec3735c901a3f00be3fefd874"
+whole_reason = "Der Sicherheits-Hook zieht mit Matrix-Tests, Smoke-Zeile und Owner-Docstrings um; halb verschoben stünde der Rahmen ohne Beweis."
