@@ -10171,10 +10171,7 @@ def test_cli_claim_empty_role_fails_closed_without_posting_builder(
         ["release", "42", "--role", "builder", "--abandoned", "stopped"],
     ],
 )
-def test_claim_and_release_parse_omitted_agent(
-    monkeypatch: pytest.MonkeyPatch, arguments: list[str]
-) -> None:
-    _set_agent_identity_env(monkeypatch)
+def test_claim_and_release_parse_omitted_agent(arguments: list[str]) -> None:
     parsed = issue_claim._parser().parse_args(arguments)
     assert parsed.agent is None
 
@@ -14231,7 +14228,8 @@ def _prepare_pre_dispatch_refusal(
     """The world every pre-dispatch refusal below fires in: an identity when
     the case is not about a missing one, and a checkout branch only where the
     refusal is allowed to read one -- `None` forbids git outright."""
-    _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent} if agent else None)
+    if agent:
+        _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent})
     _forbid_github_construction(monkeypatch)
     if branch is None:
 

@@ -336,7 +336,6 @@ def test_protect_non_mutating_tools_allow_without_identity_git_or_github(
     payload: dict[str, object],
 ) -> None:
     home, work = _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, payload) == 0
@@ -497,7 +496,6 @@ def test_protect_invalid_hook_payload_denies_without_raising(
     payload: str,
 ) -> None:
     home, work = _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, payload) == 2
@@ -528,7 +526,6 @@ def test_protect_mutating_tool_without_path_denies_path_required(
     payload: dict[str, object],
 ) -> None:
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, payload) == 2
@@ -1083,7 +1080,6 @@ def test_protect_bash_allows_a_command_with_no_recognized_pattern_without_identi
     or the store for them -- the same "cannot judge what it cannot see"
     limit README documents for the read-only tools (issue #380)."""
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert (
@@ -1108,7 +1104,6 @@ def test_protect_bash_allows_a_missing_or_non_string_command(
     tool_input: dict[str, object],
 ) -> None:
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, {"toolName": "Bash", "toolInput": tool_input}) == 0
@@ -1124,7 +1119,6 @@ def test_protect_unknown_tool_name_denies_with_a_repair_sentence(
     (issue #238) instead of the old default-allow, and the refusal names the
     table to extend rather than a bare 'unknown tool'."""
     _isolate_protect_home(monkeypatch, tmp_path)
-    _set_agent_identity_env(monkeypatch)
     _forbid_protect_git_github_and_identity(monkeypatch)
 
     assert _protect_main(monkeypatch, {"toolName": "invented_tool"}) == 2
@@ -1882,7 +1876,6 @@ def test_protect_allows_a_path_outside_every_repository_without_identity(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    _set_agent_identity_env(monkeypatch)
     outside = tmp_path / "not-a-repository"
     outside.mkdir()
     monkeypatch.chdir(outside)
@@ -1937,7 +1930,6 @@ def test_protect_allow_is_silent_exit_zero_for_every_host(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    _set_agent_identity_env(monkeypatch)
     outside = tmp_path / "not-a-repository"
     outside.mkdir()
     monkeypatch.chdir(outside)
@@ -2337,7 +2329,6 @@ def test_protect_never_reads_a_git_failure_as_outside_every_repository(
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    _set_agent_identity_env(monkeypatch)
     target = build_target(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -2718,7 +2709,6 @@ def test_protect_lets_the_main_checkout_write_only_its_ignored_session_settings(
     an untracked one git does not ignore, and any other file there still
     deny `not main` (PROT-12)."""
     main_checkout = _real_main_checkout_with_session_settings(tmp_path)
-    _set_agent_identity_env(monkeypatch)
 
     assert _protect_main(monkeypatch, payload_for(main_checkout / relative)) == status
     _assert_protect_decision(capsys, decision="deny" if reason else "allow", reason=reason)
@@ -2940,7 +2930,8 @@ def test_protect_unguarded_directories_exempt_only_the_repositories_they_hold(
     own ignored settings. The session has an identity only where the verdict
     reads the store, so every other row proves it decides without one."""
     scratch = _unguarded_scratchpad(tmp_path)
-    _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"} if store_reads else None)
+    if store_reads:
+        _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     if unguarded is not None:
         monkeypatch.setenv(protect.PROTECT_UNGUARDED_ENV, unguarded.format(scratch=scratch))
     fetches: list[Path] = []
@@ -3099,7 +3090,8 @@ def test_protect_judges_a_write_through_a_symlink_by_the_link_and_the_target_che
     store is read, so a store-free denial in either reads no store; every
     row without an identity proves its verdict needs none."""
     _symlinks_across_checkouts(tmp_path)
-    _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent} if agent else None)
+    if agent:
+        _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent})
     claim = _protect_active_claim("Ada", scope=("src",), branch="codex/issue-72-widget")
     fetches: list[Path] = []
 

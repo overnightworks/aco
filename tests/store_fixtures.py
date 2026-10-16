@@ -13,7 +13,7 @@ from pathlib import Path
 from agent_coordination import protocol, store
 
 TIP = protocol.ObjectId("a" * 40)
-BASE = protocol.ObjectId("c" * 40)
+CLAIM_BASE = protocol.ObjectId("c" * 40)
 STATE_WITH_TIP = protocol.ClaimState(tip=TIP)
 DEFAULT_IDENTITY = protocol.IssueIdentity(42)
 
@@ -89,7 +89,7 @@ def claim_intent(
     identity: protocol.ClaimIdentity = DEFAULT_IDENTITY,
     agent: str = "Ada",
     role: str = "builder",
-    base: protocol.ObjectId = BASE,
+    base: protocol.ObjectId = CLAIM_BASE,
     branch: str = "claude/issue-42-cut",
     scope: tuple[str, ...] = ("src/agent_coordination/store.py",),
     claim_id: str = "a1",

@@ -2,7 +2,9 @@
 
 Only isolation fixtures live here -- the autouse ones and the isolation more
 than one module asks for by name; everything else stays local to its test
-module.
+module. The one exception is registration: `cli_fixtures` is loaded as a
+pytest plugin (`pytest_plugins` below), so its `bare_remote` and `worktree`
+fixtures resolve by name in every test module.
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from cli_fixtures import AGENT_IDENTITY_ENV_NAMES
 
 from agent_coordination import checkout, protect
 
@@ -32,11 +35,7 @@ def _isolate_agent_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     session, a test that omits `--agent` would otherwise resolve to the real
     session's `ACO_AGENT`, `GROK_SESSION_ID` or `CLAUDE_CODE_SESSION_ID`. A
     test that needs an identity sets it itself."""
-    for name in (
-        checkout.ACO_AGENT_ENV,
-        checkout.GROK_SESSION_ID_ENV,
-        checkout.CLAUDE_CODE_SESSION_ID_ENV,
-    ):
+    for name in AGENT_IDENTITY_ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
 
 

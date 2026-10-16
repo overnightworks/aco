@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import BASE, request, write_repository_config
 from cli_fixtures import (
+    AGENT_IDENTITY_ENV_NAMES,
     _git_checkout,
     _push_repository_trunk,
     _real_repository_with_bare_remote,
@@ -38,11 +39,7 @@ _LIVE_TRUNK_LANDINGS = checkout.trunk_landings
 
 @pytest.mark.parametrize(
     "variable",
-    [
-        checkout.ACO_AGENT_ENV,
-        checkout.GROK_SESSION_ID_ENV,
-        checkout.CLAUDE_CODE_SESSION_ID_ENV,
-    ],
+    AGENT_IDENTITY_ENV_NAMES,
 )
 def test_a_test_never_inherits_the_sessions_agent_identity(variable: str) -> None:
     assert variable not in os.environ

@@ -32,7 +32,7 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge
 from store_fixtures import (
-    BASE,
+    CLAIM_BASE,
     STATE_WITH_TIP,
     TIP,
     blob,
@@ -3632,7 +3632,7 @@ def test_apply_claim_intent_adds_a_live_claim_and_consumes_its_id() -> None:
     assert claim.identity == protocol.IssueIdentity(42)
     assert claim.agent == "Ada"
     assert claim.role == "builder"
-    assert claim.base == BASE
+    assert claim.base == CLAIM_BASE
     assert claim.branch == "claude/issue-42-cut"
     assert claim.scope == ("src/agent_coordination/store.py",)
     assert claim.opened_commit == TIP
@@ -4126,7 +4126,7 @@ def _sample_claim(
         claim_id=protocol.ClaimId("a1"),
         agent="Ada",
         role="builder",
-        base=BASE,
+        base=CLAIM_BASE,
         branch="claude/issue-42-cut",
         scope=scope,
         opened_commit=TIP,
@@ -4187,7 +4187,7 @@ def test_parse_claim_toml_rejects_resource_value_without_resource_name() -> None
 
 
 def test_parse_claim_toml_rejects_a_malformed_commit_id() -> None:
-    content = protocol.serialize_claim_toml(_sample_claim()).replace(str(BASE), "not-a-sha")
+    content = protocol.serialize_claim_toml(_sample_claim()).replace(str(CLAIM_BASE), "not-a-sha")
 
     with pytest.raises(protocol.MalformedStateTreeError, match="malformed commit id"):
         protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
@@ -4260,7 +4260,7 @@ def _minimal_claim_toml_fields(**overrides: str) -> dict[str, str]:
         "claim_id": '"a1"',
         "agent": '"Ada"',
         "role": '"builder"',
-        "base": f'"{BASE}"',
+        "base": f'"{CLAIM_BASE}"',
         "branch": '"claude/issue-42-cut"',
         "scope": '["README.md"]',
         "opened_commit": f'"{TIP}"',

@@ -1,10 +1,13 @@
 """CLI-boundary test scaffolding shared by `tests/test_cli.py` and the
 owner test files split from it (`tests/test_checkout.py`,
-`tests/test_protect.py`, `tests/test_store.py`): real and faked `git`
-process helpers, agent-identity env setup, and the "this boundary must not
-be reached" forbid-helpers. All four import this module directly; pytest's
-rootless collection puts `tests/` on `sys.path`, so a plain
-`import cli_fixtures` resolves here."""
+`tests/test_protect.py`, `tests/test_store.py`, `tests/test_session.py`,
+`tests/test_state_board.py`, `tests/test_hook_input.py`,
+`tests/test_network_guard.py`, `tests/github_fixtures.py`): real and faked
+`git` process helpers, agent-identity env setup, stdin sources and pipe
+helpers, and the "this boundary must not be reached" forbid-helpers. All
+import this module directly; pytest's rootless collection puts `tests/` on
+`sys.path`, so a plain `import cli_fixtures` resolves here. `conftest.py`
+also registers it as a pytest plugin for `bare_remote` and `worktree`."""
 
 from __future__ import annotations
 
@@ -162,8 +165,9 @@ def real_git(
 
 
 def init_bare_repository(path: Path) -> Path:
-    """A real bare repository on `main` at `path`, created with its parents."""
-    path.mkdir(parents=True, exist_ok=True)
+    """A real bare repository on `main` at `path`; a path another builder
+    already took fails loudly instead of sharing its remote."""
+    path.mkdir()
     real_git(path, "init", "-q", "--bare", "-b", "main")
     return path
 
@@ -331,16 +335,17 @@ def _git_checkout(
     }
 
 
-def _set_agent_identity_env(
-    monkeypatch: pytest.MonkeyPatch, environ: dict[str, str] | None = None
-) -> None:
-    for name in (
-        checkout.ACO_AGENT_ENV,
-        checkout.GROK_SESSION_ID_ENV,
-        checkout.CLAUDE_CODE_SESSION_ID_ENV,
-    ):
-        monkeypatch.delenv(name, raising=False)
-    for name, value in (environ or {}).items():
+AGENT_IDENTITY_ENV_NAMES = (
+    checkout.ACO_AGENT_ENV,
+    checkout.GROK_SESSION_ID_ENV,
+    checkout.CLAUDE_CODE_SESSION_ID_ENV,
+)
+
+
+def _set_agent_identity_env(monkeypatch: pytest.MonkeyPatch, environ: dict[str, str]) -> None:
+    """Set the test's agent identity; the autouse `_isolate_agent_identity`
+    in `conftest.py` has already cleared the session's own."""
+    for name, value in environ.items():
         monkeypatch.setenv(name, value)
 
 
@@ -503,6 +508,7 @@ def fresh_observation(worktree: Path, remote: Path | str) -> store.Observation:
     )
 
 
+# Captured at import, before `_stub_trunk` replaces them (issue #488).
 LIVE_TRUNK_REF_AFTER = checkout.trunk_ref_after
 LIVE_FETCH_REMOTE = checkout.fetch_remote
 
@@ -512,11 +518,11 @@ ITEM_NEW_BODY = complete_contract("Ship it.")
 def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
     """Point `RunContext.toplevel` (`rev-parse --show-toplevel`) at a real
     repository this test built itself (issue #322), taking precedence over
-    the module's autouse `_isolate_git_toplevel` fake -- every other real
+    `conftest.py`'s autouse `_isolate_git_toplevel` fake -- every other real
     git call `start`'s own worktree creation runs still reaches real git,
     unlike a fully faked `checkout.git_output`, and the trunk is resolved
-    and fetched for real there, undoing the autouse `_stub_trunk` (issue
-    #488)."""
+    and fetched for real there, undoing `test_cli.py`'s autouse
+    `_stub_trunk` (issue #488)."""
     real_git_output = checkout.git_output
 
     def fake(arguments: list[str], *, directory: Path | None = None) -> str:
