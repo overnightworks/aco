@@ -10035,7 +10035,7 @@ def test_selected_store_claim_refuses_a_lane_identity_without_a_branch() -> None
     identity = protocol.LaneIdentity()
     storage = body.Storage.GITHUB
     with pytest.raises(ClaimUnavailableError, match="lane release requires a non-empty"):
-        issue_claim._selected_store_claim(protocol.EMPTY_STATE, identity, "", None, storage)
+        board.selected_store_claim(protocol.EMPTY_STATE, identity, "", None, storage)
 
 
 def test_claim_scope_is_optional_at_the_argparse_layer_for_issue_mode() -> None:
@@ -15661,7 +15661,7 @@ def test_release_merged_fetches_each_candidates_dependencies_only_once(
 ) -> None:
     """The `freed` report and the projected `next` pick share one dependency
     fetch (issue #256 review): `_board`'s own board build must not re-list
-    the same blocked-by candidates `_freed_item_numbers` already read."""
+    the same blocked-by candidates `board.freed_item_numbers` already read."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)

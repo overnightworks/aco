@@ -2833,3 +2833,141 @@ def _unreadable_children_reason(
         return None
     labels = ", ".join(item_label(number, storage) for number in numbers)
     return f"container; its open children do not read: {labels}"
+
+
+def claim_subject(claim: protocol.ScopedClaim, storage: Storage) -> str:
+    return (
+        f"lane {claim.branch}"
+        if isinstance(claim.identity, protocol.LaneIdentity)
+        else f"issue {item_label(claim.identity.issue, storage)}"
+    )
+
+
+def claim_age_fields(opened_at: datetime, now: datetime) -> tuple[str, bool]:
+    """The rendered age and old-ness of a claim opened at `opened_at` (a
+    commit's committer date -- issue #176, §1 -- not a ledger comment
+    timestamp)."""
+    age = now.astimezone(UTC) - opened_at.astimezone(UTC)
+    return format_claim_age(age), claim_is_old(age)
+
+
+def claim_age_suffix(opened_at: datetime, now: datetime) -> str:
+    rendered, old = claim_age_fields(opened_at, now)
+    return f" {rendered} old" if old else f" {rendered}"
+
+
+def next_action_item(action: NextAction) -> BoardItem:
+    """The `BoardItem` `action` targets, whichever action kind it is -- a
+    plain claim target for `WorkItemAction`, the container itself for
+    `CutSliceAction`/`CheckContainerAction`/`CloseContainerAction` (issue #256)."""
+    return action.item if isinstance(action, WorkItemAction) else action.container
+
+
+def freed_item_numbers(
+    dependencies: Mapping[int, tuple[IssueDependency, ...]],
+    landed: IssueReference,
+) -> tuple[int, ...]:
+    """Open items whose last open blocker was `landed` (issue #256): every
+    local `blocked_by` dependency of the item is now closed, `landed` was
+    one of them, and nothing else -- local or foreign -- still blocks it.
+    Reuses `open_dependency_blockers`/`dependency_freed_on`,
+    the same per-item blocker facts `_issue_check`'s own refusal already
+    reads, rather than re-deriving them from `Board`'s aggregate fields:
+    those only ever describe the *currently* open issues, so a landed
+    item's own `blocked_by` reference disappears from them the moment it
+    closes -- exactly the fact this needs to name who it freed. `dependencies`
+    is `_release_landing`'s one fetch, shared with `_board` (issue #256
+    review), rather than a second `list_board_dependencies` round trip over
+    the same candidates.
+    """
+    repository = landed.repository
+    freed: list[int] = []
+    for number, local in dependencies.items():
+        if dependency_freed_on(local, repository) is None:
+            continue
+        if open_dependency_blockers(local, repository):
+            continue
+        if landed in {dependency.reference for dependency in local}:
+            freed.append(number)
+    return tuple(sorted(freed))
+
+
+def release_freed_line(freed: tuple[int, ...], storage: Storage) -> str:
+    return "freed: " + (
+        ", ".join(item_label(number, storage) for number in freed) if freed else "none"
+    )
+
+
+def parent_closable_line(number: int | None, storage: Storage) -> str | None:
+    if number is None:
+        return None
+    return f"parent {item_label(number, storage)}: no open children — close it"
+
+
+def merged_pull_request_floor(issues: tuple[Issue, ...], now: datetime) -> datetime:
+    """The earliest merge that could still matter to a currently open issue.
+
+    A pull request can only touch or close an issue that already exists, so
+    nothing merged before the oldest still-open issue was filed can ever
+    change any open item's stage. Anchoring the query here — instead of an
+    arbitrary fixed window — is what lets a slice's "Refs #N"/"Part of #N"
+    landing keep crediting its still-open epic for as long as the epic stays
+    open, rather than for a fixed number of days after which the credit
+    silently reverts. Residual: the underlying query is still capped (see
+    `GitHubForge.list_recent_merged_board_pull_requests`), so an epic
+    old enough to have more merges than that cap between its filing and now
+    can still lose credit for an early slice; this floor removes the
+    fortnight-sized version of that gap, not every version of it.
+    """
+    return oldest_created_at(issues) or now
+
+
+def closed_item_numbers(
+    lane_events: tuple[metrics.LaneEvent, ...], open_numbers: frozenset[int]
+) -> frozenset[int]:
+    """Every numbered item `lane_events` names that is not among this board
+    build's own open issues (issue #357 R2) -- a completed lane whose item
+    has since closed, or one this walk can no longer resolve to a live
+    issue at all. A `docs/`/`fix/` lane claim's own `item` is never numeric
+    and is silently excluded, matching `_item_number_or_none`."""
+    numbers = {int(event.item) for event in lane_events if event.item.isdigit()}
+    return frozenset(numbers - open_numbers)
+
+
+def selected_store_claim(
+    observed: protocol.ClaimState,
+    identity: protocol.ClaimIdentity,
+    branch: str | None,
+    claim_id: str | None,
+    storage: Storage,
+) -> protocol.ActiveClaim:
+    """The one live store claim `rescope`/`release` names: at most one claim
+    is ever live per identity (the store's own invariant), so this is a
+    direct key lookup, never the ledger's filter-then-disambiguate walk.
+    `claim_id`, when given, is a safety check against that one claim, not a
+    selector among several -- there are never several. A refusal names the
+    item in `storage`'s form (issue #471).
+    """
+    if isinstance(identity, protocol.LaneIdentity) and not branch:
+        raise protocol.ClaimUnavailableError(
+            "lane release requires a non-empty current branch; check out the "
+            "docs/ or fix/ lane branch, or pass an issue number"
+        )
+    selected = observed.claims.get(protocol.claim_key(identity, branch or ""))
+    if selected is None or (claim_id is not None and selected.claim_id != claim_id):
+        raise no_active_build_claim(identity, branch or "", storage)
+    return selected
+
+
+def no_active_build_claim(
+    identity: protocol.ClaimIdentity, branch: str, storage: Storage
+) -> protocol.ClaimUnavailableError:
+    """REL-09's refusal, naming the item in `storage`'s form (issue #471)."""
+    subject = protocol.identity_summary(identity, branch, item_labeller(storage))
+    return protocol.ClaimUnavailableError(f"{subject} has no active build claim")
+
+
+def named_refusal(error: protocol.ClaimError, storage: Storage) -> protocol.ClaimError:
+    """`error` as a report prints it: naming its item the way `storage`'s
+    board does (issue #471)."""
+    return protocol.ClaimError(error.named(item_labeller(storage)))
