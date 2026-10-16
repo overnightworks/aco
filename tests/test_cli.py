@@ -214,6 +214,7 @@ class FakeForge:
     head_board_config: str | None = ""
     file_reads: list[tuple[Path, str]] = field(default_factory=list)
     quality_config: str | None = None
+    quality_config_at_other_refs: str | None = None
     quality_config_error: forge.ForgeError | None = None
     quality_config_reads: list[str] = field(default_factory=list)
     requests: int = field(default=0, init=False)
@@ -387,7 +388,9 @@ class FakeForge:
             self.quality_config_reads.append(sha)
             if self.quality_config_error is not None:
                 raise self.quality_config_error
-            return self.quality_config
+            if sha == self.default_branch_name:
+                return self.quality_config
+            return self.quality_config_at_other_refs
         self.file_reads.append((path, sha))
         return self.head_board_config
 
@@ -17799,9 +17802,59 @@ def test_land_requires_the_quality_verdict_where_the_default_branch_adopts_the_g
     assert client.merge_calls == []
 
 
+def test_land_bounds_the_quality_refusal_for_a_long_default_branch_name(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """LANDCMD-43 within the 200-character refusal bound: a long default
+    branch name cannot push the printed line past it."""
+    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
+    client.default_branch_name = "b" * 255
+    client.quality_config = ""
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+
+    error_line = capsys.readouterr().err.rstrip("\n")
+    assert len(error_line) <= issue_claim.LAND_REFUSAL_LINE_LENGTH_LIMIT
+
+
+@pytest.mark.parametrize(
+    ("on_default_branch", "at_pull_request_head", "reason"),
+    [
+        pytest.param(
+            "", None, NO_QUALITY_VERDICT_REFUSAL, id="head-deleting-the-config-is-still-refused"
+        ),
+        pytest.param(
+            None,
+            "",
+            "pull request #12 is not mergeable (blocked)",
+            id="adoption-pull-request-adding-the-config-is-not-refused",
+        ),
+    ],
+)
+def test_land_judges_adoption_by_the_default_branch_never_by_the_pull_request_head(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    on_default_branch: str | None,
+    at_pull_request_head: str | None,
+    reason: str,
+) -> None:
+    """LANDCMD-43 contract rule 1: a head that deletes `quality/config.toml`
+    still needs the verdict, and the pull request that adds it does not."""
+    blocked = forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ())
+    client = _land_preflight_client(monkeypatch, readiness=blocked)
+    client.quality_config = on_default_branch
+    client.quality_config_at_other_refs = at_pull_request_head
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+
+    assert capsys.readouterr().err == f"ERROR: {reason}\n"
+
+
 def test_land_does_not_read_the_quality_config_for_a_closed_pull_request(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """LANDCMD-02 runs before LANDCMD-43: a pull request that is not open
+    refuses as such and the quality configuration is never read."""
     closed = forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ())
     client = _land_preflight_client(monkeypatch, readiness=closed)
     client.quality_config = ""
@@ -17815,6 +17868,8 @@ def test_land_does_not_read_the_quality_config_for_a_closed_pull_request(
 def test_land_fails_loud_when_the_quality_config_cannot_be_read(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """LANDCMD-43 contract rule 4: a contents read that is neither a file nor
+    a 404 refuses with the forge's error and never counts as not adopted."""
     client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
     client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
 
@@ -18828,11 +18883,15 @@ def test_land_reports_incomplete_follow_up_and_a_rerun_resumes_without_a_second_
     recovery line, never a second merge on rerun, and the rerun still closes
     the item and frees the claim."""
     _repo, client = _land_merged_pending_release(monkeypatch, capsys, tmp_path)
+    reads_before_the_rerun = list(client.quality_config_reads)
+    client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
 
     assert len(client.merge_calls) == 1
     assert client.closed_issues == {WORK_ITEM_ISSUE}
+    # LANDCMD-18: a rerun after the merge never reads the quality configuration.
+    assert client.quality_config_reads == reads_before_the_rerun
 
 
 def _land_mark_already_merged(client: FakeForge) -> None:
