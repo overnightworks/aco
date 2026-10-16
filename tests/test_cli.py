@@ -17815,6 +17815,8 @@ def test_land_bounds_the_quality_refusal_for_a_long_default_branch_name(
 
     error_line = capsys.readouterr().err.rstrip("\n")
     assert len(error_line) <= issue_claim.LAND_REFUSAL_LINE_LENGTH_LIMIT
+    assert error_line.startswith("ERROR: pull request #12 has no quality / verdict check; bbb")
+    assert error_line.endswith("…")
 
 
 @pytest.mark.parametrize(
@@ -17863,6 +17865,23 @@ def test_land_does_not_read_the_quality_config_for_a_closed_pull_request(
 
     assert capsys.readouterr().err == "ERROR: pull request #12 is not open; it cannot be landed\n"
     assert client.quality_config_reads == []
+
+
+def test_land_refuses_a_closed_pull_request_even_when_the_default_branch_cannot_be_read(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """LANDCMD-02 precedes the default-branch lookup LANDCMD-43 needs."""
+    closed = forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ())
+    client = _land_preflight_client(monkeypatch, readiness=closed)
+
+    def unreadable_default_branch() -> str:
+        raise forge.ForgeError("GitHub returned HTTP 500")
+
+    monkeypatch.setattr(client, "default_branch", unreadable_default_branch)
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+
+    assert capsys.readouterr().err == "ERROR: pull request #12 is not open; it cannot be landed\n"
 
 
 def test_land_fails_loud_when_the_quality_config_cannot_be_read(

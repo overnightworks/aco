@@ -6928,11 +6928,14 @@ def _land_lacks_quality_verdict(checks: tuple[forge.CheckRun, ...]) -> bool:
 
 
 def _refuse_land_missing_quality_verdict(
-    client: github.GitHubForge, readiness: forge.LandingReadiness, default_branch: str
+    client: github.GitHubForge,
+    readiness: forge.LandingReadiness,
+    resolve_default_branch: Callable[[], str],
 ) -> None:
     """LANDCMD-43: where the default branch -- never the pull request head --
     holds the quality gate's configuration, presence alone adopts the gate
     and the verdict must be among the checks."""
+    default_branch = resolve_default_branch()
     adopted = client.file_at_commit(LAND_QUALITY_CONFIG_PATH, default_branch) is not None
     if adopted and _land_lacks_quality_verdict(readiness.checks):
         raise protocol.ClaimUnavailableError(
@@ -6944,11 +6947,13 @@ def _refuse_land_missing_quality_verdict(
 
 
 def _refuse_land_readiness(
-    client: github.GitHubForge, readiness: forge.LandingReadiness, default_branch: str
+    client: github.GitHubForge,
+    readiness: forge.LandingReadiness,
+    resolve_default_branch: Callable[[], str],
 ) -> None:
     if not readiness.open:
         raise protocol.ClaimUnavailableError(_land_not_open_refusal(readiness.number))
-    _refuse_land_missing_quality_verdict(client, readiness, default_branch)
+    _refuse_land_missing_quality_verdict(client, readiness, resolve_default_branch)
     if readiness.mergeable_state != forge.MERGEABLE_STATE_CLEAN:
         raise protocol.ClaimUnavailableError(
             _land_not_mergeable_refusal(readiness.number, readiness.mergeable_state)
@@ -7049,7 +7054,7 @@ def _land_preflight(
     """
     readiness = client.landing_readiness(number)
     _refuse_unreviewed_head(readiness, parsed.head)
-    _refuse_land_readiness(client, readiness, context.run.default_branch)
+    _refuse_land_readiness(client, readiness, lambda: context.run.default_branch)
     detail = client.landing(number)
     structural = _structural_classification(context, detail)
     if isinstance(structural, board.ClassificationDefect):
