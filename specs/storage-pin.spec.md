@@ -109,13 +109,13 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 - [ ] [PIN-13] An `items/` entry whose file name is not `aco-` plus six lowercase hex characters plus `.md` makes a whole-store read refuse `items/<name> is not a valid item file name` (E-PIN-39).
 - [ ] [PIN-35] A command on one item goes past such an entry, which stays byte for byte (CAS-61): `item show`, `item edit`, `item close`, `ask`, `rule`, `brief`, `check`, and `start` up to its fresh claim (PIN-36).
-- [ ] [PIN-36] A command over the whole store refuses with PIN-13's sentence: `board` and its `--serve` ruling click, `next`, `rulings`, `cut`, `item new` (`--not-a-twin` too), a fresh `claim`, `release --merged`.
+- [ ] [PIN-36] A command over the whole store refuses with PIN-13's sentence: `board`, `next`, `rulings`, `cut`, `item new` (`--not-a-twin` too), a fresh `claim`, `release --merged`.
 - [ ] [PIN-14] A read of an `items/<id>.md` entry whose bytes are not valid UTF-8 refuses `item <id> is not valid UTF-8`, then ITEM-38's repair clause.
 - [ ] [PIN-15] A read of an `items/<id>.md` entry with no valid `aco` block and `[record]` refuses `item <id> has a malformed aco block`, then ITEM-38's repair clause (see E-PIN-07).
 - [ ] [PIN-16] An item whose own `record.parent` names an id no `items/` entry carries refuses `item <parent-id> is referenced as a parent but does not exist`.
 - [ ] [PIN-17] An item whose own `record.blocked_by` names an id no `items/` entry carries refuses `item <item-id> lists blocker <blocker-id>, which does not exist`, naming the listing item as PIN-34 does.
 - [ ] [PIN-34] An item whose own `record.blocked_by` names one id twice refuses ITEM-43's `item <item-id> lists blocker <blocker-id> more than once` (see E-PIN-38).
-- [ ] [PIN-29] While PIN-14/PIN-15 refuse an item, only the `item close` and `item edit --kind` ITEM-53 names, a child as ITEM-54 decides, and a `board --serve` click refuse, lowest id, before any write (E-PIN-07).
+- [ ] [PIN-29] While PIN-14/PIN-15 refuse an item, only the `item close` and `item edit --kind` ITEM-53 names, a child as ITEM-54 decides, refuse, lowest id, before any write (E-PIN-07).
 
 ## Writing a fresh state-ref item
 
@@ -140,7 +140,7 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 - Under `storage = "state-ref"`, `aco status`, `aco protect`, `aco bootstrap`, `aco rescope`, `aco release`, and a lane or already-observed `aco claim` never resolve the item forge, so PIN-04/PIN-05 never gate them.
 - `--repo` never selects a repository under `storage = "state-ref"`: there is no host-based target to override.
 - `aco item edit`/`close` never overwrite a concurrent writer's change: a stale expected oid refuses by name instead (`specs/ref-store-cas.spec.md`, CAS-20), and the item's stored bytes stay exactly what the last landed write left.
-- A `board --serve` ruling click never lands beside an item that turned malformed after PIN-29's check: its write commits only onto the `items/` it checked, else refuses `items/ was written since this write checked it; re-read and retry`.
+- `item edit --kind` never lands beside an item that turned malformed after PIN-29's check: its write commits only onto the `items/` it checked (`specs/ref-store-cas.spec.md` CAS-51), else refuses `items/ was written since this write checked it; re-read and retry`.
 - A replayed `aco claim` (CLM-15) and an `aco start` resuming its live claim (START-06) never read the board: a wide scope naming no `--whole` reads its own item's `whole` alone.
 - `aco item close` never deletes an item file or any of its other bytes: only `state`, `closed_at`, and `updated_at` move.
 

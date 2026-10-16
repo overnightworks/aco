@@ -834,7 +834,7 @@ def _lane(item: str, day: int, hours: int) -> metrics.LaneEvent:
     )
 
 
-def test_board_shows_measured_estimates_across_json_and_html(
+def test_board_shows_measured_estimates(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Proof 3 (issue #357), pinned through the CLI rather than only through
@@ -842,7 +842,7 @@ def test_board_shows_measured_estimates_across_json_and_html(
     estimate state -- a class with `n >= 3` measured lanes (two of them
     completed by items that have since closed, R2's own closed-item join),
     one with `n < 3` ("schwach"), and an item with no `size` at all ("keine
-    Größe") -- across `--json` and `--html`."""
+    Größe") -- through `--json`."""
     client = FakeForge()
     client.board_issues = (
         board_issue(30, "Measured M", complete_contract("Ship #30.", size="M")),
@@ -865,12 +865,7 @@ def test_board_shows_measured_estimates_across_json_and_html(
         _lane("31", 15, 2),
     )
     _patch_store_write(monkeypatch, lane_events=lane_events)
-    # The one scenario value this test's two checks (`--json`, `--html`) both
-    # read back rather than each re-typing the M class's own median/count.
     measured_size, measured_median_hours, measured_sample_count = "M", 5, 3
-    measured_estimate_cell = (
-        f"~{measured_median_hours}h ({measured_size}, n={measured_sample_count})"
-    )
     board_args = ["--repo", REPOSITORY, "board"]
 
     assert issue_claim.main([*board_args, "--json"]) == 0
@@ -894,46 +889,20 @@ def test_board_shows_measured_estimates_across_json_and_html(
     assert sorted(client.issue_reference_lookups) == [33, 34]
     assert payload["requests"] == client.requests == 4
 
-    assert issue_claim.main([*board_args, "--html"]) == 0
-    html_page = capsys.readouterr().out
-    assert "Messungen" in html_page
-    assert measured_estimate_cell in html_page
-    assert "<dt>Stand</dt>" not in html_page
-
 
 def test_board_shows_the_empty_measurements_sentence_with_nothing_measured(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """The fourth estimate/Messungen state (issue #357 proof 3): with no
-    lifecycle data read at all, `--json` and `--html` both show the board's
-    own empty-measurements sentence, never a fabricated estimate."""
+    lifecycle data read at all, `--json` shows the board's own
+    empty-measurements sentinel (`since: null`), never a fabricated
+    estimate."""
     _single_item_board_environment(monkeypatch, tmp_path)
 
     assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["measurements"]["classes"] == []
-
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--html"]) == 0
-    assert "keine Messungen seit" in capsys.readouterr().out
-
-
-def test_board_html_shows_unparsed_commits_alongside_the_empty_measurements_sentence(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Gate B1 (issue #357): `board_html._render_measurements_section` used
-    to return only `lines[0]` ("keine Messungen seit ...") whenever no size
-    class had a measured lane, silently dropping a nonzero `unparsed` (or
-    `unfinished`) trailing line `board.measurements_lines` already carries.
-    With a history that carries no measured class but two claim-shaped
-    commits this walk could not parse, the HTML page must show both the
-    empty-measurements sentence and the unparsed count."""
-    _single_item_board_environment(monkeypatch, tmp_path)
-    _patch_store_write(monkeypatch, unparsed_lifecycle_commits=2)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--html"]) == 0
-    html_page = capsys.readouterr().out
-    assert "keine Messungen seit" in html_page
-    assert f"2 {board.UNPARSED_TRAILER_SENTENCE}" in html_page
+    assert payload["measurements"]["since"] is None
 
 
 def test_board_projects_with_no_state_ref_bootstrapped_at_all(
@@ -1009,10 +978,10 @@ def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_req
 ) -> None:
     """Issue #371, Beweis 2: under `github`, a trunk-trailer landing (#10)
     and an older-style squash pull request with no trailer of its own (#11)
-    both show as one row each in `board --json`'s `landings` array and
-    `board --html`'s Landungen section -- the trailer path winning for #10
-    even though pull request #89 also plainly closes it, proving the dedup
-    rather than merely two different items landing."""
+    both show as one row each in `board --json`'s `landings` array -- the
+    trailer path winning for #10 even though pull request #89 also plainly
+    closes it, proving the dedup rather than merely two different items
+    landing."""
     client = _single_item_board_environment(monkeypatch, tmp_path)
     client.board_issues = (
         board_issue(10, "Trailer landed", complete_contract("Ship #10.")),
@@ -1052,84 +1021,50 @@ def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_req
     assert landings[11]["sha"] is None
     assert landings[11]["pull_request"] == 90
 
-    assert issue_claim.main([*board_command, "--html"]) == 0
-    rendered_html = capsys.readouterr().out
-    assert "<li>#10 2026-08-29 <code>aaaaaaa</code></li>" in rendered_html
-    assert "<li>#11 2026-08-18 PR #90</li>" in rendered_html
-
-
-def test_board_html_prints_the_page_naming_its_repository_and_checkout_to_stdout(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #431: the page `board --html` prints carries the repository it
-    was built for and the checkout the command ran in, so two boards open
-    side by side say which one an operator is ruling on."""
-    _single_item_board_environment(monkeypatch, tmp_path)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--html"]) == 0
-    rendered = capsys.readouterr().out
-    assert (
-        f"<title>example/agent-coordination &middot; {tmp_path} &middot; Board</title>" in rendered
-    )
-    assert f'<p class="eyebrow">example/agent-coordination &middot; {tmp_path}</p>' in rendered
-    assert "#10 Plain item" in rendered
-
-
-def test_board_html_path_writes_the_page_to_a_file_instead_of_stdout(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _single_item_board_environment(monkeypatch, tmp_path)
-    output_path = tmp_path / "board.html"
-
-    exit_code = issue_claim.main(["--repo", REPOSITORY, "board", "--html", str(output_path)])
-
-    assert exit_code == 0
-    assert capsys.readouterr().out == ""
-    written = output_path.read_text(encoding="utf-8")
-    assert "#10 Plain item" in written
-
-
-def test_board_html_costs_no_gh_call_beyond_board_json(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #276: `board --html` reshapes the exact reads `board --json`
-    already performs -- `_board`'s own merged-pull-request fetch, not a
-    second one -- so its request count against the same fixture never
-    exceeds `board --json`'s."""
-    client = _single_item_board_environment(monkeypatch, tmp_path)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
-    capsys.readouterr()
-    json_requests = client.requests
-
-    client.requests = 0
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--html"]) == 0
-    capsys.readouterr()
-
-    assert client.requests == json_requests
-
-
-def test_board_html_and_json_are_mutually_exclusive(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _single_item_board_environment(monkeypatch, tmp_path)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "board", "--html", "--json"])
-
-    assert status == 2
-    assert json.loads(capsys.readouterr().out)["reason"] == "invalid_usage"
-
 
 def test_board_naming_no_output_mode_refuses_before_any_read(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """BOARD-44 (issue #420): the retired text table left `board` with no
-    default mode, so a bare `aco board` must name one instead of reading a
-    forge, a pin, or a repository just to guess."""
+    default mode, so a bare `aco board` must name `--json` instead of
+    reading a forge, a pin, or a repository just to guess."""
     status = issue_claim.main(["board"])
 
     assert status == 2
-    assert capsys.readouterr().err == "ERROR: aco board requires --json, --html, or --serve\n"
+    assert capsys.readouterr().err == "ERROR: aco board requires --json\n"
+
+
+@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
+def test_board_serve_refuses_naming_aco_board_serve_instead(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], as_json: bool
+) -> None:
+    """Issue #644: `aco board --serve` is retired now that `aco-board` is
+    the one decision board -- it refuses with a usage error pointing at
+    `aco-board serve` instead of starting a loopback server, whether or not
+    `--json` is also given (BOARD-55), and before any forge, pin, or
+    state-ref repository read: each is forbidden outright below rather than
+    merely absent, so a refusal that slipped past this early check would
+    fail the test instead of silently reading real state."""
+
+    def unused(*_args: object, **_kwargs: object) -> object:
+        pytest.fail("board --serve must refuse before any pin or repository read")
+
+    _forbid_forge_resolution(monkeypatch)
+    monkeypatch.setattr(checkout, "path_is_tracked", unused)
+    monkeypatch.setattr(store, "fetch_state", unused)
+
+    status = issue_claim.main(["board", "--serve", *(["--json"] if as_json else [])])
+
+    captured = capsys.readouterr()
+    assert status == 2
+    message = "--serve was removed; run aco-board serve instead"
+    if as_json:
+        assert json.loads(captured.out) == {
+            "ok": False,
+            "reason": "invalid_usage",
+            "message": message,
+        }
+    assert captured.err == f"ERROR: {message}\n"
 
 
 def test_board_skips_the_children_list_for_a_container_with_zero_children(
@@ -19895,6 +19830,11 @@ ARGPARSE_USAGE_REFUSALS = [
         id="release-abbreviating-its-outcome",
     ),
     pytest.param(["status", "--js"], "unrecognized arguments: --js", id="status-abbreviating-json"),
+    pytest.param(
+        ["board", "--html"],
+        "unrecognized arguments: --html",
+        id="board-naming-the-retired-html-flag",
+    ),
     pytest.param(
         ["release", "42", "--merged", "--jso"],
         "unrecognized arguments: --jso",

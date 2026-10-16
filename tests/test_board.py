@@ -3575,7 +3575,6 @@ def test_build_board_reports_no_size_as_the_keine_groesse_cell() -> None:
     item = projected.items[0]
     assert item.size is None
     assert item.estimate is None
-    assert board.estimate_cell(item) == board.NO_SIZE_CELL
 
 
 @pytest.mark.parametrize("measured_lanes", [0, 2], ids=["zero-lanes", "two-lanes"])
@@ -3607,7 +3606,6 @@ def test_build_board_reports_a_weak_estimate_below_three_measured_lanes(
         assert item.estimate.weak is True
     else:
         assert item.estimate is None
-    assert board.estimate_cell(item) == board.WEAK_ESTIMATE_CELL
 
 
 def test_build_board_reports_a_measured_estimate_with_median_and_count() -> None:
@@ -3637,7 +3635,6 @@ def test_build_board_reports_a_measured_estimate_with_median_and_count() -> None
     assert item.estimate == metrics.Estimate(
         item="202", size=metrics.Size.MEDIUM, median_hours=5, n=3, weak=False
     )
-    assert board.estimate_cell(item) == "~5h (M, n=3)"
 
 
 def test_build_board_leaves_a_lane_claims_own_event_unjoined_to_any_size_class() -> None:
@@ -3746,22 +3743,6 @@ def test_build_board_measurements_section_reports_classes_dates_and_unfinished()
     assert entry.last_event_at == datetime(2026, 8, 12, 6, tzinfo=UTC)
 
 
-def test_measurements_lines_shows_no_measurements_line_when_nothing_is_measured() -> None:
-    projected = projected_board(
-        (_sized_item(205, "M"),),
-        (),
-        (),
-        (),
-        board.BoardConfig(),
-        now=datetime(2026, 8, 21, tzinfo=UTC),
-    )
-
-    lines = board.measurements_lines(projected.measurements)
-
-    assert lines[0] == "keine Messungen seit 2026-08-21"
-    assert not any(line.startswith("Messungen (Stand") for line in lines)
-
-
 @pytest.mark.parametrize(
     ("storage", "estimated_item"),
     [
@@ -3848,7 +3829,7 @@ def test_build_board_counts_a_closed_items_own_completed_lane_into_its_size_clas
     )
 
 
-def test_measurements_lines_shows_the_unparsed_lifecycle_commit_count() -> None:
+def test_measurements_counts_an_unparsed_lifecycle_commit() -> None:
     """A claim-shaped `refs/aco/state` commit `store.claim_lifecycle` could
     not read is counted, never silently dropped (issue #357 R1)."""
     projected = projected_board(
@@ -3869,16 +3850,12 @@ def test_measurements_lines_shows_the_unparsed_lifecycle_commit_count() -> None:
     )
 
     assert projected.measurements.unparsed == 2
-    assert "2 Commits ohne lesbaren Item-Trailer" in board.measurements_lines(
-        projected.measurements
-    )
 
 
-def test_measurements_lines_shows_the_unparsed_count_even_with_no_measured_class() -> None:
-    """`unparsed` never hides behind `classes` being empty (BOARD-30, issue
+def test_measurements_counts_an_unparsed_commit_even_with_no_measured_class() -> None:
+    """`unparsed` never hides behind `classes` being empty (BOARD-27, issue
     #357 R2): a board with no measured lane at all still surfaces every
-    unparsed commit, alongside the "keine Messungen" sentence rather than
-    silently instead of it."""
+    unparsed commit."""
     projected = projected_board(
         (_sized_item(224, "M"),),
         (),
@@ -3891,9 +3868,6 @@ def test_measurements_lines_shows_the_unparsed_count_even_with_no_measured_class
 
     assert projected.measurements.classes == ()
     assert projected.measurements.unparsed == 3
-    lines = board.measurements_lines(projected.measurements)
-    assert lines[0] == "keine Messungen seit 2026-08-21"
-    assert "3 Commits ohne lesbaren Item-Trailer" in lines
 
 
 def test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change() -> None:

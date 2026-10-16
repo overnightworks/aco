@@ -13,7 +13,7 @@ until the first adapter that can refuse one (the GitLab adapter, per #112)
 lands. Neither is speculative: it is the port surface issue #131 declares
 today, each with a named future caller.
 
-`_BoardRequestHandler.do_GET`/`do_POST`/`log_message` (issue #280) are
+`_BoardApiRequestHandler.do_GET`/`do_POST`/`log_message` (issue #631) are
 `http.server`'s own dispatch and logging surface: `handle_one_request` calls
 `do_GET`/`do_POST` by `getattr(self, "do_" + self.command)`, and every stdlib
 logging call reaches the override through `BaseHTTPRequestHandler`'s own
@@ -29,12 +29,20 @@ report are Lane 1b of #299, not yet landed. Each is a named future caller,
 not speculative surface; tests already exercise every one of these names.
 
 `BoardItem.priority_bucket`/`age_days` and `Board.stale` (issue #420) lost
-their one literal reader when `board.render` -- the text table `--json`/
-`--html` never needed -- was deleted: each is still part of `board_payload`'s
+their one literal reader when `board.render` -- the text table `--json`
+never needed -- was deleted: each is still part of `board_payload`'s
 own `--json` contract (`asdict` serializes every dataclass field whether or
 not any function reads it back by name), and tests already pin all three by
 name (`tests/test_board.py`'s `priority_bucket`/`stale` attribute
 assertions, `tests/test_cli.py`'s `"age_days"` envelope pin).
+`BoardItem.claim_age`, `SizeClassMeasurement.first_event_at`/`last_event_at`,
+and `Measurements.unfinished`/`as_of` (issue #644) lost their own literal
+readers the same way when the old board page module -- the last caller of the served
+and static board pages, and of the text `measurements_lines`/`estimate_cell`
+formatters deleted alongside it -- went too: each is still part of
+`board_payload`'s own `--json` contract, exercised by
+`tests/test_cli.py`'s `"claim_age"` envelope pin and
+`tests/test_board.py`'s own `measurements`/`classes` payload assertions.
 
 `MergeMethod.REBASE` (issue #578) is reached the same way as
 `NoItemKind.DOCS`: `GitHubForge.allowed_merge_methods` iterates `MergeMethod`
@@ -70,9 +78,9 @@ from agent_coordination.board import (
     Measurements,
     MergeMethod,
     NoItemKind,
+    SizeClassMeasurement,
     Stage,
 )
-from agent_coordination.board_serve import _BoardRequestHandler
 from agent_coordination.forge import Capability, ForgeUnsupportedError
 from agent_coordination.metrics import (
     ContainerSum,
@@ -98,6 +106,11 @@ _lane_measure_for_vulture = LaneMeasure(
 )
 _size_class_stats_for_vulture = SizeClassStats(
     size=Size.SMALL, n=0, median_hours=0.0, p80_hours=0.0, weak=False
+)
+_size_class_measurement_for_vulture = SizeClassMeasurement(
+    stats=_size_class_stats_for_vulture,
+    first_event_at=datetime(2000, 1, 1, tzinfo=UTC),
+    last_event_at=datetime(2000, 1, 1, tzinfo=UTC),
 )
 _container_sum_for_vulture = ContainerSum(container="", hours=0.0, n_estimated=0, n_without_size=0)
 _parallelism_for_vulture = Parallelism(day=date(2000, 1, 1), overlapping_lanes=0)
@@ -165,9 +178,9 @@ _referenced_only_for_vulture = (
     Capability.UNSUPPORTED,
     AccessJwtVerifier.verify,
     fetch_key_set_over_https,
-    _BoardRequestHandler.do_GET,
-    _BoardRequestHandler.do_POST,
-    _BoardRequestHandler.log_message,
+    _BoardApiRequestHandler.do_GET,
+    _BoardApiRequestHandler.do_POST,
+    _BoardApiRequestHandler.log_message,
     _BoardApiRequestHandler.send_error,
     _BoardApiRequestHandler.close_connection,
     _BoardApiRequestHandler.request_version,
@@ -182,6 +195,11 @@ _referenced_only_for_vulture = (
     _parallelism_for_vulture.overlapping_lanes,
     _board_item_for_vulture.priority_bucket,
     _board_item_for_vulture.age_days,
+    _board_item_for_vulture.claim_age,
     _board_item_for_vulture.freed_days,
     _board_for_vulture.stale,
+    _board_for_vulture.measurements.unfinished,
+    _board_for_vulture.measurements.as_of,
+    _size_class_measurement_for_vulture.first_event_at,
+    _size_class_measurement_for_vulture.last_event_at,
 )
