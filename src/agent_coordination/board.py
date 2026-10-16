@@ -1118,6 +1118,10 @@ def _timestamp(value: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
+def oldest_created_at(issues: tuple[Issue, ...]) -> datetime | None:
+    return min((_timestamp(issue.created_at) for issue in issues), default=None)
+
+
 def _single_concrete_next(value: str | None) -> bool:
     if value is None:
         return False

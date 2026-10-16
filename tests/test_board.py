@@ -862,6 +862,23 @@ def test_timestamp_fails_loud_on_a_malformed_github_timestamp(raw_timestamp: str
         board._timestamp(raw_timestamp)
 
 
+def test_oldest_created_at_is_the_earliest_filing_in_utc_and_none_without_issues() -> None:
+    issues = tuple(
+        replace(board_issue(number, "Item", ""), created_at=created_at)
+        for number, created_at in ((1, "2026-08-20T02:00:00+02:00"), (2, "2026-08-19T23:00:00Z"))
+    )
+
+    assert board.oldest_created_at(issues) == datetime(2026, 8, 19, 23, tzinfo=UTC)
+    assert board.oldest_created_at(()) is None
+
+
+def test_oldest_created_at_fails_loud_on_a_malformed_github_timestamp() -> None:
+    issue = replace(board_issue(1, "Item", ""), created_at="2026-13-45T00:00:00Z")
+
+    with pytest.raises(ClaimError, match="GitHub returned a malformed board timestamp"):
+        board.oldest_created_at((issue,))
+
+
 def test_a_fresh_unfilled_block_is_an_incomplete_contract_with_no_defects() -> None:
     """A fresh block with no fields written keeps every projection key
     present and empty: valid, but incomplete."""

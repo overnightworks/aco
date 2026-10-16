@@ -1674,9 +1674,7 @@ def _merged_pull_request_floor(issues: tuple[board.Issue, ...], now: datetime) -
     can still lose credit for an early slice; this floor removes the
     fortnight-sized version of that gap, not every version of it.
     """
-    if not issues:
-        return now
-    return min(datetime.fromisoformat(issue.created_at) for issue in issues)
+    return board.oldest_created_at(issues) or now
 
 
 # A container's children are their own `gh list_children` subprocess call;
