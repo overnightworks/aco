@@ -41,7 +41,7 @@ IDENTITY_ENVIRONMENT_ORDER = (
 # `path_is_tracked` into this one owner too, F1). `process.run_git` and
 # `process.git_failure_detail` (issue #372) own the argv shape and the
 # fallback reading `store.py` needs too; the `ClaimError` translation stays
-# here since `checkout`/`store` share one import-linter layer. `_git_output`,
+# here since `checkout`/`store` share one import-linter layer. `git_output`,
 # `versioned_paths`, and `path_is_tracked` each interpret a successful
 # launch's exit status their own way.
 _GIT_MISSING_EXECUTABLE_ERROR = "git is required for issue claims"
@@ -81,7 +81,7 @@ def _git_run(arguments: list[str], *, directory: Path | None = None) -> process.
         raise ClaimError(f"git failed to launch: {error}") from error
 
 
-def _git_output(arguments: list[str], *, directory: Path | None = None) -> str:
+def git_output(arguments: list[str], *, directory: Path | None = None) -> str:
     """`git arguments`'s stdout, in `directory` when given via `-C` (issue
     #314) or the calling process's own cwd otherwise; a nonzero exit fails
     closed."""
@@ -99,7 +99,7 @@ def _git_output(arguments: list[str], *, directory: Path | None = None) -> str:
 def current_branch(*, directory: Path | None = None) -> str:
     """The branch checked out in `directory` (or the calling process's own
     cwd), empty on a detached HEAD."""
-    return _git_output(["branch", "--show-current"], directory=directory)
+    return git_output(["branch", "--show-current"], directory=directory)
 
 
 DETACHED_HEAD_REFUSAL = "HEAD is detached; check out the lane branch first"
@@ -149,7 +149,7 @@ def lane_changed_paths(tip: str, *, trunk: str, directory: Path) -> tuple[str, .
     #468), read in `directory`: the lane's own change only. A diff from the
     claim's base would also list every path a trunk pull brought in from
     other lanes."""
-    diff = _git_output(["diff", "--name-only", f"{trunk}...{tip}"], directory=directory)
+    diff = git_output(["diff", "--name-only", f"{trunk}...{tip}"], directory=directory)
     return tuple(diff.splitlines())
 
 
@@ -157,7 +157,7 @@ def remote_url(remote: str, *, directory: Path | None = None) -> str:
     """One named remote's URL, read from `directory` via `-C` when given
     (issue #457: a `RunContext` for another checkout) or the calling
     process's own cwd otherwise."""
-    return _git_output(["config", "--get", f"remote.{remote}.url"], directory=directory)
+    return git_output(["config", "--get", f"remote.{remote}.url"], directory=directory)
 
 
 @dataclass(frozen=True)
@@ -253,7 +253,7 @@ def path_is_tracked(
     never has to carry the other."""
     if revision is not None:
         return bool(
-            _git_output(["ls-tree", "--name-only", revision, "--", path], directory=directory)
+            git_output(["ls-tree", "--name-only", revision, "--", path], directory=directory)
         )
     return _git_yes_or_no(["ls-files", "--error-unmatch", "--", path], directory=directory)
 
@@ -306,7 +306,7 @@ def paths_under_scope(paths: tuple[str, ...], scope: tuple[str, ...]) -> tuple[s
     )
 
 
-def _scope_directories(
+def scope_directories(
     paths: tuple[str, ...],
     *,
     directory: Path | None,
@@ -325,7 +325,7 @@ def _scope_directories(
     checkout_root = functools.cache(lambda: _toplevel_or_none(toplevel))
     for path in paths:
         try:
-            kind = _git_output(
+            kind = git_output(
                 ["cat-file", "-t", f"{revision or 'HEAD'}:{path}"], directory=directory
             )
         except ClaimError:
@@ -358,7 +358,7 @@ ISOLATED_WORKTREE_RECIPE = (
 # One owner for both worktree-isolation refusal sentences (issue #314 gate
 # B6, Sonar S1192): `claim`'s own cwd-based precondition
 # (`_validate_worktree_branch`) and `rescope`'s path-resolved one
-# (`_refuse_shared_checkout`) raise the identical two sentences, so each is
+# (`refuse_shared_checkout`) raise the identical two sentences, so each is
 # spelled once here instead of twice across the two functions.
 ISOLATED_NON_MAIN_BRANCH_REFUSAL = "build claims require an isolated non-main worktree branch; "
 LINKED_ISOLATED_WORKTREE_REFUSAL = "build claims require a linked isolated worktree checkout; "
@@ -413,7 +413,7 @@ def _validate_worktree_branch(
     is the canonical remote's recorded default branch, or `None` when none
     is recorded (issue #490). `rescope` no longer shares this (issue #314):
     it judges an already-resolved `PathCheckout` instead, via
-    `_refuse_shared_checkout` below, so a rescope invoked from a foreign cwd
+    `refuse_shared_checkout` below, so a rescope invoked from a foreign cwd
     is not silently judged by the wrong checkout.
     """
     current = attached_branch(current_branch(directory=directory))
@@ -421,9 +421,9 @@ def _validate_worktree_branch(
         raise ClaimError(
             f"{ISOLATED_NON_MAIN_BRANCH_REFUSAL}{_worktree_repair_instruction(repair, branch=None)}"
         )
-    git_directory = Path(_git_output(["rev-parse", "--git-dir"], directory=directory)).resolve()
+    git_directory = Path(git_output(["rev-parse", "--git-dir"], directory=directory)).resolve()
     common_directory = Path(
-        _git_output(["rev-parse", "--git-common-dir"], directory=directory)
+        git_output(["rev-parse", "--git-common-dir"], directory=directory)
     ).resolve()
     if current != branch:
         raise ClaimError(f"claim branch {branch!r} does not match checkout branch {current!r}")
@@ -506,7 +506,7 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
 
     Every git read runs `git -C directory`, so the result is the same
     regardless of the calling process's own cwd -- unlike the ad hoc,
-    cwd-implicit `_git_output` calls this replaces in `protect` and
+    cwd-implicit `git_output` calls this replaces in `protect` and
     `rescope`, which silently read the *process's* checkout instead of the
     one the caller actually means. `--path-format=absolute` makes the
     toplevel/git-dir/common-dir comparison below meaningful: git's default,
@@ -656,7 +656,7 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
     real -- a moved or deleted worktree directory, most often -- never a
     legitimate "nothing here"; `resolve_path_checkout` is the one caller
     that still wants that bare `None` reading)."""
-    combined = _git_output(
+    combined = git_output(
         [
             "rev-parse",
             "--path-format=absolute",
@@ -673,7 +673,7 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
     branch = current_branch(directory=directory)
     kind = CheckoutKind.MAIN if git_directory == common_directory else CheckoutKind.LINKED_WORKTREE
     try:
-        _git_output(["rev-parse", "--verify", "HEAD"], directory=directory)
+        git_output(["rev-parse", "--verify", "HEAD"], directory=directory)
         has_commit = True
     except ClaimError:
         has_commit = False
@@ -686,7 +686,7 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
     )
 
 
-def _refuse_shared_checkout(
+def refuse_shared_checkout(
     path_checkout: PathCheckout,
     *,
     default_branch: str | None,
@@ -736,7 +736,7 @@ class CheckoutBaseMismatchError(ClaimError):
     trunk that moved after its checks in its own sentence (START-26)."""
 
 
-def _validate_checkout(
+def validate_checkout(
     request: ClaimRequest,
     *,
     default_branch: Callable[[], str | None],
@@ -748,14 +748,14 @@ def _validate_checkout(
     recorded default branch `default_branch` answers as
     `_validate_worktree_branch` does -- asked only once the base matches,
     so a refusal before it reads no configuration (issue #490)."""
-    head = _git_output(["rev-parse", "HEAD"], directory=directory)
+    head = git_output(["rev-parse", "HEAD"], directory=directory)
     if head != request.base:
         raise CheckoutBaseMismatchError(
             f"claim base {request.base} does not match checkout HEAD {head}; "
             "omit --base to use checkout HEAD"
         )
     _validate_worktree_branch(request.branch, default_branch=default_branch(), directory=directory)
-    dirty = _git_output(["status", "--porcelain"], directory=directory)
+    dirty = git_output(["status", "--porcelain"], directory=directory)
     if dirty:
         named = named_with_overflow_count(_dirty_paths(dirty))
         raise ClaimError(f"claim must be acquired before the first worktree edit: {named}")
@@ -766,7 +766,7 @@ DEFAULT_BRANCH_FALLBACK = frozenset({"main", "master"})
 # `protect`'s and `rescope`'s own denial when a resolved checkout's default
 # branch cannot be determined at all (issue #314 gate G4): unlike `claim`'s
 # `is_default_branch` fallback below, they never guess -- see
-# `_refuse_shared_checkout`'s and `_protect_not_main_denial`'s own
+# `refuse_shared_checkout`'s and `_protect_not_main_denial`'s own
 # docstrings for why the callers of the same `recorded_default_branch`
 # reader accept different risk here. It names the one git command that
 # records the canonical remote's `HEAD` (issue #603), since a bare "unknown"
@@ -795,7 +795,7 @@ def unconfigured_remote_refusal(remote: str, *, directory: Path | None) -> str |
     remote has no trunk because it is not there, not because it is fresh,
     so neither a fetch nor a local branch may stand in for it."""
     url_read = ["config", "--get", "--default", "", f"remote.{remote}.url"]
-    if _git_output(url_read, directory=directory):
+    if git_output(url_read, directory=directory):
         return None
     return f"{TRUNK_UNKNOWN_REASON}: canonical remote {remote!r} is not configured"
 
@@ -841,7 +841,7 @@ def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | No
     plain, non-symbolic `HEAD` ref names itself and so no branch."""
     head = f"refs/remotes/{remote}/HEAD"
     try:
-        symbolic = _git_output(
+        symbolic = git_output(
             ["rev-parse", "--verify", "--quiet", "--symbolic-full-name", head],
             directory=directory,
         )
@@ -893,7 +893,7 @@ def refuse_unlandable_checkout(default_branch: str, *, directory: Path) -> None:
     one merged and only then failed its release (issue #578). Raises the
     ruled refusal otherwise."""
     current = current_branch(directory=directory)
-    dirty = _git_output(["status", "--porcelain"], directory=directory)
+    dirty = git_output(["status", "--porcelain"], directory=directory)
     if current != default_branch or dirty:
         raise ClaimError(
             f"land must run from a clean checkout of the default branch {default_branch!r}"
@@ -966,7 +966,7 @@ def _has_remote_tracking_branch(remote: str, *, directory: Path) -> bool:
     """Whether `directory` holds any remote-tracking ref of `remote`; git
     skips a dangling `<remote>/HEAD` here, so it never counts as one."""
     return bool(
-        _git_output(
+        git_output(
             ["for-each-ref", "--count=1", "--format=%(refname)", f"refs/remotes/{remote}/"],
             directory=directory,
         )
@@ -1063,7 +1063,7 @@ def trunk_landings(trunk: str, depth: int, *, directory: Path) -> tuple[TrunkLan
     A caller that must see a commit the forge just reported merged passes
     the trunk its context fetched first (issue #397).
     """
-    raw = _git_output(
+    raw = git_output(
         [
             "log",
             "-z",
@@ -1103,7 +1103,7 @@ def message_trailers(message: str) -> tuple[str, ...]:
     with tempfile.TemporaryDirectory(prefix="aco-trailers-") as scratch:
         message_path = Path(scratch) / "message"
         message_path.write_text(message, encoding="utf-8")
-        parsed = _git_output(["interpret-trailers", "--parse", "--no-divider", str(message_path)])
+        parsed = git_output(["interpret-trailers", "--parse", "--no-divider", str(message_path)])
     return tuple(parsed.splitlines())
 
 
@@ -1264,7 +1264,7 @@ def trunk_commit(trunk: str, *, directory: Path) -> str:
     """The commit `trunk` names now in `directory` (issue #479): `start`
     checks its claim against this one commit -- the claim's base and the
     tree its scope is measured against -- before it builds."""
-    return _git_output(["rev-parse", "--verify", f"{trunk}^{{commit}}"], directory=directory)
+    return git_output(["rev-parse", "--verify", f"{trunk}^{{commit}}"], directory=directory)
 
 
 def create_linked_worktree(
@@ -1296,7 +1296,7 @@ def _own_common_directory() -> Path:
     """The calling process's own common git directory: the one fact every
     worktree of this repository shares, whichever of them the process runs
     in."""
-    return Path(_git_output(["rev-parse", "--path-format=absolute", "--git-common-dir"])).resolve()
+    return Path(git_output(["rev-parse", "--path-format=absolute", "--git-common-dir"])).resolve()
 
 
 def main_checkout_root(*, toplevel: Path) -> Path:
@@ -1401,7 +1401,7 @@ def existing_start_worktree(path: Path, branch: str) -> bool:
             f"worktree {path} exists on branch {existing.branch!r}, not {branch!r}; "
             f"{_CHOOSE_A_DIFFERENT_WORKTREE_REPAIR}"
         )
-    dirty = _git_output(["status", "--porcelain"], directory=path)
+    dirty = git_output(["status", "--porcelain"], directory=path)
     if dirty:
         named = named_with_overflow_count(_dirty_paths(dirty))
         raise ClaimError(f"worktree {path} is dirty: {named}; commit or clean it before resuming")
@@ -1541,7 +1541,7 @@ def cleanup_landed_worktree(
     matching_checkout = resolve_path_checkout(matching)
     if matching_checkout is not None and matching_checkout.kind is CheckoutKind.MAIN:
         return worktree_cleanup_kept(WORKTREE_KEPT_ELSEWHERE_REASON)
-    dirty = _git_output(["status", "--porcelain"], directory=matching)
+    dirty = git_output(["status", "--porcelain"], directory=matching)
     if dirty:
         return worktree_cleanup_kept(WORKTREE_KEPT_DIRTY_REASON)
     return remove_linked_worktree(

@@ -228,7 +228,7 @@ def test_read_only_commands_never_write_through_a_reader_only_forge(
     client.board_issues = (board_issue(72, "Work", complete_contract("Ship it.")),)
     client.landings[12] = landing_pull_request(body="Work-Item: #72\n\nCloses #72")
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: "")
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: "")
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     for argv in (
@@ -512,7 +512,7 @@ def test_board_shows_measured_estimates(
         forge.ItemState.CLOSED, body=complete_contract("Closed.", size="M")
     )
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     lane_events = (
         _lane("30", 10, 4),
@@ -594,7 +594,7 @@ def _single_item_board_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     client = FakeForge()
     client.board_issues = (board_issue(10, "Plain item", complete_contract("Ship #10.")),)
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(monkeypatch)
     return client
@@ -756,7 +756,7 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
 
     monkeypatch.setattr(client, "list_children", spy_list_children)
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(monkeypatch)
 
@@ -795,7 +795,7 @@ def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
 
     monkeypatch.setattr(client, "list_board_dependencies", spy_list_board_dependencies)
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(monkeypatch)
 
@@ -837,7 +837,7 @@ def test_board_shows_open_and_total_instead_of_proposed(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
@@ -1153,7 +1153,7 @@ def _fake_lane_worktree_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     worktree, where `next` advises `claim`; its advice from the default
     branch's checkout is driven against real git in
     `test_next_advises_a_pull_that_runs_as_printed_where_it_stands`."""
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(
         checkout,
         "resolve_path_checkout",
@@ -1694,17 +1694,17 @@ def _redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
     repository this test built itself (issue #322), taking precedence over
     the module's autouse `_isolate_git_toplevel` fake -- every other real
     git call `start`'s own worktree creation runs still reaches real git,
-    unlike a fully faked `checkout._git_output`, and the trunk is resolved
+    unlike a fully faked `checkout.git_output`, and the trunk is resolved
     and fetched for real there, undoing the autouse `_stub_trunk` (issue
     #488)."""
-    real_git_output = checkout._git_output
+    real_git_output = checkout.git_output
 
     def fake(arguments: list[str], *, directory: Path | None = None) -> str:
         if arguments == ["rev-parse", "--show-toplevel"] and directory is None:
             return str(toplevel)
         return real_git_output(arguments, directory=directory)
 
-    monkeypatch.setattr(checkout, "_git_output", fake)
+    monkeypatch.setattr(checkout, "git_output", fake)
     monkeypatch.setattr(checkout, "trunk_ref_after", _LIVE_TRUNK_REF_AFTER)
     monkeypatch.setattr(checkout, "fetch_remote", _LIVE_FETCH_REMOTE)
 
@@ -3896,7 +3896,7 @@ def test_claim_refuses_when_the_higher_priority_item_needs_refining(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -4127,7 +4127,7 @@ def test_claim_refuses_out_of_order_without_a_reason_before_mutating(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -4170,7 +4170,7 @@ def test_claim_allows_out_of_order_with_a_reason_and_records_it(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -4224,7 +4224,7 @@ def test_claim_refuses_for_a_higher_priority_item_even_at_a_lower_score(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: (open_pull_request,))
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -6613,7 +6613,7 @@ def test_claim_does_not_warn_about_a_higher_scored_item_no_agent_can_pull(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -6668,7 +6668,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
             ),
         )
     )
-    monkeypatch.setattr(checkout, "_git_output", git_output)
+    monkeypatch.setattr(checkout, "git_output", git_output)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     projected = issue_claim._board(run_context_over(client), ())
@@ -8309,7 +8309,7 @@ def test_board_queries_merged_pull_requests_back_to_the_oldest_open_issue(
     )
     recent_issue = board_issue(71, "Recently filed work", complete_contract("Ship it."))
     client = _MinimalForgeReader(open_issues=(old_epic, recent_issue))
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     issue_claim._board(run_context_over(client), ())
@@ -8339,7 +8339,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
         open_issues=(container, plain),
         children_by_number={90: (board.ChildItem(92, board.ChildState.OPEN),)},
     )
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     projected = issue_claim._board(run_context_over(client), ())
@@ -9843,7 +9843,7 @@ def test_cli_rescope_from_the_primary_checkout_points_back_at_the_claims_worktre
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(branch="main")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
 
     status = issue_claim.main(
@@ -9870,7 +9870,7 @@ def test_cli_rescope_from_a_shared_checkout_names_the_known_branch(
         branch="codex/issue-72", git_directory="/repo/.git", common_directory="/repo/.git"
     )
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
 
     status = issue_claim.main(
@@ -9896,7 +9896,7 @@ def test_cli_claim_from_the_primary_checkout_still_names_the_create_recipe(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(branch="main")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
 
     status = issue_claim.main(
@@ -9944,7 +9944,7 @@ def _patch_release_session(
                 return "refs/remotes/origin/main"
             pytest.fail("explicit --claim-id must not inspect checkout branch")
 
-        monkeypatch.setattr(checkout, "_git_output", git)
+        monkeypatch.setattr(checkout, "git_output", git)
         return
     git_values = {
         ("branch", "--show-current"): branch or "",
@@ -9952,7 +9952,7 @@ def _patch_release_session(
         trunk_head: "refs/remotes/origin/main",
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
 
 
@@ -10023,9 +10023,9 @@ def test_claim_request_binds_omitted_base_and_branch_to_checkout(
     error: str | None,
 ) -> None:
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     parsed = _parse_claim_command(*flags)
     if "--base" not in flags:
         assert parsed.base is None
@@ -10125,8 +10125,8 @@ def test_cli_claim_omitted_role_posts_default_and_explicit_wins(
 ) -> None:
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     claimed = issue_claim.main(
         [
@@ -10159,8 +10159,8 @@ def test_cli_claim_empty_role_fails_closed_without_posting_builder(
 ) -> None:
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     argv = [
         "--repo",
         REPOSITORY,
@@ -10250,9 +10250,9 @@ def test_request_and_cli_claim_fill_agent_from_documented_else_chain(
     _set_agent_identity_env(monkeypatch, environ)
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     command = _claim_without_agent_args()
     if explicit is not None:
         command.extend(["--agent", explicit])
@@ -10350,8 +10350,8 @@ def test_cli_same_filled_agent_can_claim_and_release_without_flag(
     _set_agent_identity_env(monkeypatch, {"GROK_SESSION_ID": "session-1"})
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     claimed = issue_claim.main(
         [
@@ -10397,8 +10397,8 @@ def test_cli_two_session_claimants_cannot_release_without_extra_comment(
     _set_agent_identity_env(monkeypatch, {"GROK_SESSION_ID": "session-1"})
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     assert (
         issue_claim.main(
@@ -10594,7 +10594,7 @@ def test_cli_release_override_fails_before_git_and_github(
     def unused(arguments: list[str], **_kwargs: object) -> str:
         pytest.fail("coordinator override must fail before git")
 
-    monkeypatch.setattr(checkout, "_git_output", unused)
+    monkeypatch.setattr(checkout, "git_output", unused)
 
     released = issue_claim.main(["--repo", REPOSITORY, "release", "72", *flags])
     captured = capsys.readouterr()
@@ -10611,7 +10611,7 @@ def test_cli_release_omitted_claim_id_fails_closed_on_detached_head(
 ) -> None:
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     _forbid_github_construction(monkeypatch)
-    monkeypatch.setattr(checkout, "_git_output", lambda arguments, **_kwargs: "")
+    monkeypatch.setattr(checkout, "git_output", lambda arguments, **_kwargs: "")
 
     released = issue_claim.main(["--repo", REPOSITORY, "release", "72", "--abandoned", "stopped"])
     captured = capsys.readouterr()
@@ -10630,9 +10630,9 @@ def test_cli_claim_omitted_base_and_branch_posts_filled_checkout(
     git_values = _git_checkout()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     claimed = issue_claim.main(
         [
@@ -10665,8 +10665,8 @@ def test_cli_claim_and_release_round_trip_exit_codes(
 ) -> None:
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     claimed = issue_claim.main(
         [
@@ -11208,15 +11208,15 @@ def test_cli_lane_claim_and_release_round_trip_without_issue_number(
     _set_agent_identity_env(monkeypatch, {"ACO_AGENT": "Codex Sol"})
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     git_values = {
         ("branch", "--show-current"): "docs/lane-cleanup",
         ("rev-parse", "--show-toplevel"): "/repo",
         ("rev-parse", "HEAD"): BASE,
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
 
     assert (
@@ -11277,7 +11277,7 @@ def test_cli_lane_mode_refuses_a_non_conventional_branch(
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: "codex/issue-38-issueless-claims"
+        checkout, "git_output", lambda arguments, **_kwargs: "codex/issue-38-issueless-claims"
     )
 
     arguments = ["--repo", REPOSITORY, command]
@@ -11312,7 +11312,7 @@ def test_cli_release_requires_a_non_empty_current_branch_without_an_issue(
     _set_agent_identity_env(monkeypatch, {"ACO_AGENT": "Codex Sol"})
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_git_output", lambda arguments, **_kwargs: "")
+    monkeypatch.setattr(checkout, "git_output", lambda arguments, **_kwargs: "")
 
     status = issue_claim.main(["--repo", REPOSITORY, "release", "--abandoned", "stopped"])
 
@@ -11359,7 +11359,7 @@ def test_cli_rescope_requires_a_non_empty_current_branch(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(branch="")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
 
     status = issue_claim.main(
@@ -11684,11 +11684,11 @@ def _arranged_claim_client(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
     it different."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     _patch_store_write(monkeypatch)
     return client
@@ -11721,9 +11721,9 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
     entry that is no git tree before the claim's own toplevel refusal runs;
     that failed read must leave the refusal exactly as the claim reports it
     without the gate."""
-    scope_directories = checkout._scope_directories
+    scope_directories = checkout.scope_directories
     _arranged_claim_client(monkeypatch)
-    monkeypatch.setattr(checkout, "_scope_directories", scope_directories)
+    monkeypatch.setattr(checkout, "scope_directories", scope_directories)
     git_values = _git_checkout()
 
     def outside_a_working_tree(arguments: list[str], **_kwargs: object) -> str:
@@ -11731,7 +11731,7 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
             raise ClaimError("fatal: this operation must be run in a work tree")
         return git_values[tuple(arguments)]
 
-    monkeypatch.setattr(checkout, "_git_output", outside_a_working_tree)
+    monkeypatch.setattr(checkout, "git_output", outside_a_working_tree)
 
     assert issue_claim.main(_claim_argv("--scope", "scratch")) == 2
     assert capsys.readouterr().err == (
@@ -12073,8 +12073,8 @@ def test_cli_claim_replay_without_scope_takes_the_live_claims_own_stored_scope(
     )
     _patch_status_cli(monkeypatch, client)
     _patch_store_write(monkeypatch, _store_claim_from_request(existing))
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     claimed = issue_claim.main(
         [
@@ -12134,10 +12134,10 @@ def test_cli_lane_claim_refuses_a_missing_or_display_control_scope_by_name(
     refuses (CLAIM-20), refuses with the scope grammar's own sentence before
     any write."""
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     git_values = {("branch", "--show-current"): "docs/lane-cleanup"}
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     _forbid_forge_resolution(monkeypatch)
 
@@ -12157,8 +12157,8 @@ def test_cli_claim_replay_reports_the_matching_live_claim_after_an_interrupted_r
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
     _patch_store_write(monkeypatch, _store_claim_from_request(existing))
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     arguments = [
         "--repo",
         REPOSITORY,
@@ -12221,8 +12221,8 @@ def test_cli_claim_replay_refuses_a_live_claim_with_different_retry_fields(
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
     _patch_store_write(monkeypatch, _store_claim_from_request(existing))
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     assert (
         issue_claim.main(
@@ -12266,9 +12266,9 @@ def test_cli_claim_replay_skips_out_of_order_for_the_matching_lower_priority_ite
     client.board_dependencies = {12: (block_dependency(11),)}
     _patch_status_cli(monkeypatch, client)
     _patch_store_write(monkeypatch, _store_claim_from_request(existing))
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     assert (
@@ -12314,9 +12314,9 @@ def test_cli_claim_replay_does_not_bypass_out_of_order_for_another_agent(
     client.board_dependencies = {12: (block_dependency(11),)}
     _patch_status_cli(monkeypatch, client)
     _patch_store_write(monkeypatch, _store_claim_from_request(existing))
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     assert (
@@ -12351,8 +12351,8 @@ def test_cli_claim_replay_does_not_resurrect_a_released_claim(
 ) -> None:
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _patch_store_write(monkeypatch, consumed_ids=frozenset({protocol.ClaimId("released-claim")}))
 
     assert (
@@ -12394,8 +12394,8 @@ def test_cli_claim_scope_keeps_a_comma_inside_one_path(
     the old splitting would have claimed as its own path."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("docs/report,v2.md",))
 
     claimed = issue_claim.main(
@@ -12458,8 +12458,8 @@ def test_cli_claim_scope_comma_differs_from_repeated_scope_flags(
     the repeated form two distinct paths."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(
         checkout, "versioned_paths", lambda **_kwargs: ("docs/PRODUCT.md,src/widget.py",)
     )
@@ -12524,8 +12524,8 @@ def test_cli_claim_refuses_a_comma_scope_that_matches_nothing_in_the_checkout(
     naming the one-path-per-flag rule."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     status = issue_claim.main(
         [
@@ -12562,8 +12562,8 @@ def test_cli_claim_accepts_a_scope_path_without_a_comma_that_does_not_exist_yet(
     comma-free path git has never heard of still claims cleanly."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     status = issue_claim.main(
         [
@@ -12620,9 +12620,9 @@ def _arrange_github_rescope(monkeypatch: pytest.MonkeyPatch, client: FakeForge) 
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
 
@@ -12764,9 +12764,9 @@ def test_cli_rescope_adds_a_path_without_matching_head_or_a_clean_tree(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(head="b" * 40, dirty=" M file")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
     status = issue_claim.main(
@@ -12801,9 +12801,9 @@ def test_cli_rescope_add_keeps_a_comma_inside_one_path(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(head="b" * 40, dirty=" M file")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("reports/a,b.md",))
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
@@ -12840,9 +12840,9 @@ def test_cli_rescope_drop_matches_a_comma_path_as_one_whole_path(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(head="b" * 40, dirty=" M file")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("reports/a,b.md",))
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
@@ -12876,9 +12876,9 @@ def test_cli_rescope_add_refuses_a_comma_scope_that_matches_nothing_in_the_check
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(head="b" * 40, dirty=" M file")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
     status = issue_claim.main(
@@ -12917,9 +12917,9 @@ def test_cli_rescope_drop_of_a_value_not_in_scope_refuses_with_the_claims_own_re
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(head="b" * 40, dirty=" M file")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
     status = issue_claim.main(
@@ -12957,9 +12957,9 @@ def test_cli_rescope_drop_removes_a_comma_entry_the_claim_holds_though_no_file_m
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(head="b" * 40, dirty=" M file")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("a.py", "b.py"))
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
@@ -12995,9 +12995,9 @@ def test_cli_rescope_json_prints_updated_scope_and_same_claim_id(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
 
     status = issue_claim.main(
@@ -13047,9 +13047,9 @@ def test_cli_rescope_refuses_a_different_agent_than_the_claimant(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Grok 4.6"})
 
     status = issue_claim.main(["--repo", REPOSITORY, "rescope", "72", "--add", "/repo/src/new.py"])
@@ -13073,9 +13073,9 @@ def test_cli_rescope_json_refuses_no_active_claim_with_precondition_failed(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
 
     status = issue_claim.main(
@@ -13102,7 +13102,7 @@ def test_cli_rescope_without_add_or_drop_is_an_error(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
@@ -13129,7 +13129,7 @@ def test_cli_rescope_refuses_primary_checkout(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout(git_directory="/repo/.git", common_directory="/repo/.git")
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
 
@@ -13502,7 +13502,7 @@ def _run_scope_width_command(
         )
         git_values = _git_checkout()
         monkeypatch.setattr(
-            checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+            checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
         )
         _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
         arrange_scope_width(
@@ -13517,7 +13517,7 @@ def _run_scope_width_command(
         _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
         git_values = {("branch", "--show-current"): "docs/lane-cleanup"}
         monkeypatch.setattr(
-            checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+            checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
         )
         arrange_scope_width(monkeypatch, client, directories=directories, versioned=versioned)
         argv = [
@@ -13682,8 +13682,8 @@ def test_cli_claim_touches_stay_empty_beside_a_disjoint_standing_claim(
     standing = request("claim-a", "Ada", issue=73, scope=("LICENSE",))
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _patch_store_write(monkeypatch, _store_claim_from_request(standing))
 
     status = issue_claim.main(
@@ -13718,8 +13718,8 @@ def test_cli_claim_json_lists_an_overlapping_standing_claim_as_a_touch(
     standing = request("claim-a", "Ada", issue=73, scope=("src",))
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _patch_store_write(monkeypatch, _store_claim_from_request(standing))
 
     status = issue_claim.main(
@@ -13760,10 +13760,10 @@ def test_cli_claim_json_touch_key_set_is_unchanged_by_the_human_overlap_line(
     standing = request("claim-a", "Ada", issue=1400, scope=("tests/adapters/test_claim_cli.py",))
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(
         checkout,
-        "_scope_directories",
+        "scope_directories",
         lambda paths, **_kwargs: tuple(p for p in paths if p == "tests"),
     )
     _patch_store_write(monkeypatch, _store_claim_from_request(standing))
@@ -13892,7 +13892,7 @@ def test_board_shows_claim_age_from_the_claim_comment(
     client = FakeForge()
     client.board_issues = (board_issue(72, "Work", complete_contract("Claim #72.")),)
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(
         monkeypatch,
@@ -13915,7 +13915,7 @@ def test_board_marks_a_claim_old_after_sixty_one_minutes(
     client = FakeForge()
     client.board_issues = (board_issue(72, "Work", complete_contract("Claim #72.")),)
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(
         monkeypatch,
@@ -14036,8 +14036,8 @@ def test_cli_claim_json_prints_acquired_claim_object(
 ) -> None:
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     claimed = issue_claim.main(
         [
@@ -14269,9 +14269,9 @@ def _prepare_pre_dispatch_refusal(
         def unused(arguments: list[str], **_kwargs: object) -> str:
             pytest.fail("this refusal must fire before git is read")
 
-        monkeypatch.setattr(checkout, "_git_output", unused)
+        monkeypatch.setattr(checkout, "git_output", unused)
         return
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: branch)
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: branch)
 
 
 @pytest.mark.parametrize(
@@ -14327,8 +14327,8 @@ def test_cli_claim_json_conflict_prints_the_stdout_error_object_not_a_success_sh
     standing = request(issue=72, scope=("src",))
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _patch_store_write(monkeypatch, _store_claim_from_request(standing))
 
     claimed = issue_claim.main(
@@ -14369,8 +14369,8 @@ def test_cli_claim_json_transport_failure_reports_unavailable_not_conflict(
     does."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     _patch_store_write(monkeypatch)
 
     def failing_commit_transition(*args: object, **kwargs: object) -> protocol.ClaimState:
@@ -14448,8 +14448,8 @@ def test_cli_claim_resource_prints_the_allocated_value(
 ) -> None:
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     status = issue_claim.main(
         [
@@ -14486,10 +14486,10 @@ def test_cli_two_claims_of_the_same_directory_are_advisory(
 ) -> None:
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(
         checkout,
-        "_scope_directories",
+        "scope_directories",
         lambda paths, **_kwargs: tuple(path for path in paths if path == "src"),
     )
 
@@ -14550,10 +14550,10 @@ def test_cli_claim_on_a_directory_names_the_file_a_standing_claim_holds_under_it
     single file a standing claim already holds."""
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(
         checkout,
-        "_scope_directories",
+        "scope_directories",
         lambda paths, **_kwargs: tuple(path for path in paths if path == "tests"),
     )
 
@@ -14638,8 +14638,8 @@ def test_cli_two_claims_of_the_same_file_are_advisory(
 ) -> None:
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     first = issue_claim.main(
         [
@@ -14722,8 +14722,8 @@ def test_cli_two_resource_claims_allocate_one_then_two(
 ) -> None:
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
 
     first = issue_claim.main(
         [
@@ -14781,8 +14781,8 @@ def test_cli_resource_race_still_yields_unique_live_holds(
 ) -> None:
     client = FakeForge()
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     earlier = request(
         "earlier",
         "Grok 4.6",
@@ -15036,7 +15036,7 @@ def test_check_refuses_a_named_sentence_outside_a_checkout(
         assert arguments == ["rev-parse", "--show-toplevel"]
         raise ClaimError("fatal: not a git repository (or any of the parent directories): .git")
 
-    monkeypatch.setattr(checkout, "_git_output", outside_a_checkout)
+    monkeypatch.setattr(checkout, "git_output", outside_a_checkout)
 
     assert run_check() == 2
     assert capsys.readouterr().err == (
@@ -15058,7 +15058,7 @@ def test_check_json_reports_unavailable_outside_a_checkout(
     def outside_a_checkout(arguments: list[str], **_kwargs: object) -> str:
         raise ClaimError("fatal: not a git repository (or any of the parent directories): .git")
 
-    monkeypatch.setattr(checkout, "_git_output", outside_a_checkout)
+    monkeypatch.setattr(checkout, "git_output", outside_a_checkout)
 
     status = issue_claim.main(["--repo", REPOSITORY, "check", "12", "--json"])
 
@@ -19736,7 +19736,7 @@ def test_check_reads_the_parents_next_from_the_block_not_stale_prose(
 ) -> None:
     """The last-child rule reads a block-pinned parent's `next` through
     `parse_body` under the loaded pin, not the stale prose beside it (#150)."""
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     _write_block_pin(tmp_path)
     parent_body = (
         block_body('version = 1\nnow = "N"\nnext = "Cut the next slice."\ndone_when = "D"\n')
@@ -19758,7 +19758,7 @@ def test_check_reads_the_parents_next_from_the_block_not_stale_prose(
 def test_check_refuses_a_blockless_parent_before_the_next_check(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     _write_block_pin(tmp_path)
     parented_check_client(
         monkeypatch,
@@ -19777,7 +19777,7 @@ def test_check_refuses_a_blockless_parent_before_the_next_check(
 def test_check_refuses_a_malformed_parent_before_the_next_check(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     _write_block_pin(tmp_path)
     malformed_parent_body = block_body('version = 2\nnow = "N"\nnext = "X"\ndone_when = "D"\n')
     parented_check_client(
@@ -20690,11 +20690,11 @@ def test_cli_claim_refuses_a_missing_state_ref(
     has."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     _patch_store_write(monkeypatch, tip=None)
 
@@ -20733,11 +20733,11 @@ def test_cli_claim_refuses_canonical_remote_mismatch_and_writes_nothing(
 ) -> None:
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     fake = _patch_store_write(monkeypatch)
     monkeypatch.setattr(
@@ -20794,7 +20794,7 @@ def test_cli_bootstrap_ignores_repo_and_a_non_github_remote(
     non-GitHub, repository are no error for it -- only `status`, `protect`,
     and a lane `claim`/`rescope`/`release` share that guarantee too; an
     issue `claim` or `board` still checks Erwartung 6."""
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: "/repo")
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: "/repo")
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: "git@gitlab.com:other/repo.git"
     )
@@ -20821,7 +20821,7 @@ def test_cli_bootstrap_surfaces_a_store_failure_without_inventing_json(
     than inventing a default that would make `bootstrap` emit JSON it never
     offered -- stdout stays empty, exactly as before this command grew a
     `--json`-aware sink."""
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: "/repo")
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: "/repo")
 
     def failing_bootstrap(*, worktree: Path, remote: str) -> str:
         raise ClaimError("cannot reach refs/aco/state: auth or transport failure")
@@ -20844,7 +20844,7 @@ def test_cli_rescope_refuses_a_missing_state_ref(
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = _git_checkout()
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     _patch_store_write(monkeypatch, tip=None)
@@ -20906,8 +20906,8 @@ def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_
         ),
     )
     monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     # `rescope` fetches and commits real store state against its resolved
     # checkout's own toplevel (issue #314 delta, finding R1) -- unlike
     # `claim`'s cwd-based store observation above, still unaffected by this
@@ -20935,7 +20935,7 @@ def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_
         RECORDED_ORIGIN_HEAD_READ: "refs/remotes/origin/main",
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     _forbid_forge_resolution(monkeypatch)
 
@@ -21228,7 +21228,7 @@ def _scratch_lane_repository(
     """A repository with a base commit on `main` and a lane branch one commit
     ahead of it -- `brief`'s own real reads (`rev-parse --verify`, `diff
     --name-only`) run against real git history here, never a hand-typed
-    `_git_output` fake. It is the isolated toplevel itself (`conftest.py`'s
+    `git_output` fake. It is the isolated toplevel itself (`conftest.py`'s
     `_isolate_git_toplevel`), so the run's context resolves its trunk -- the
     local `main`, since its configured `origin` was never fetched -- in the
     lane's own repository (issues #488, #508). Given `board_config`, the
@@ -23795,7 +23795,7 @@ def _rescope_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Counte
         common_directory=str(repo / ".git"),
     )
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     claimed = request(agent="Ada", issue=72, branch="codex/issue-72", scope=("src/widget.py",))
     _patch_store_write(monkeypatch, _store_claim_from_request(claimed))

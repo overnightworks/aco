@@ -50,17 +50,17 @@ def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     `board.CONFIG_PATH` is read relative to `rev-parse --show-toplevel`, so a
     test that never overrides it would otherwise load and be governed by this
     checkout's own `board.CONFIG_PATH`. A test that needs a specific
-    toplevel keeps its own `monkeypatch.setattr(checkout, "_git_output", ...)`,
+    toplevel keeps its own `monkeypatch.setattr(checkout, "git_output", ...)`,
     which takes precedence over this default.
     """
-    real_git_output = checkout._git_output
+    real_git_output = checkout.git_output
 
     def fake_git_output(arguments: list[str], *, directory: Path | None = None) -> str:
         if arguments == _SHOW_TOPLEVEL_ARGUMENTS and directory is None:
             return str(tmp_path)
         return real_git_output(arguments, directory=directory)
 
-    monkeypatch.setattr(checkout, "_git_output", fake_git_output)
+    monkeypatch.setattr(checkout, "git_output", fake_git_output)
 
 
 @pytest.fixture

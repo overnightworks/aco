@@ -1,8 +1,8 @@
 """Direct `checkout.py` behavior: remote/worktree/branch validation, the
-`_git_output` boundary and its `directory` (issue #314), `resolve_path_checkout`
+`git_output` boundary and its `directory` (issue #314), `resolve_path_checkout`
 (the path-based checkout resolver `protect` and `rescope` share), dirty-path
 reading, `versioned_paths`, trunk landings, and remote-location parsing.
-`_validate_checkout` -- the precondition every `claim` call site in `cli.py`
+`validate_checkout` -- the precondition every `claim` call site in `cli.py`
 uses -- is exercised directly. Tests that drive these through
 `issue_claim.main([...])` stay in `tests/test_cli.py` as CLI-wiring behavior."""
 
@@ -103,9 +103,9 @@ def test_scope_directories_finds_git_trees_and_untracked_directories_under_the_h
             return tmp_path
         raise ClaimError("fatal: not a git repository")
 
-    monkeypatch.setattr(checkout, "_git_output", git)
+    monkeypatch.setattr(checkout, "git_output", git)
 
-    directories = checkout._scope_directories(
+    directories = checkout.scope_directories(
         ("scratch", "file.py", "docs"), directory=None, toplevel=toplevel
     )
 
@@ -132,10 +132,10 @@ def test_checkout_validation_binds_clean_head_and_branch(
         ("status", "--porcelain"): "",
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
 
-    checkout._validate_checkout(request(), default_branch=lambda: "main")
+    checkout.validate_checkout(request(), default_branch=lambda: "main")
 
 
 @pytest.mark.parametrize(
@@ -194,11 +194,11 @@ def test_checkout_validation_rejects_false_or_late_claims(
     message: str,
 ) -> None:
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
 
     with pytest.raises(ClaimError, match=message):
-        checkout._validate_checkout(candidate, default_branch=lambda: "main")
+        checkout.validate_checkout(candidate, default_branch=lambda: "main")
 
 
 def test_checkout_validation_names_the_base_repair(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -212,12 +212,12 @@ def test_checkout_validation_names_the_base_repair(monkeypatch: pytest.MonkeyPat
         ("status", "--porcelain"): "",
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
     candidate = request()
 
     with pytest.raises(ClaimError) as error:
-        checkout._validate_checkout(candidate, default_branch=lambda: "main")
+        checkout.validate_checkout(candidate, default_branch=lambda: "main")
 
     assert str(error.value) == (
         f"claim base {BASE} does not match checkout HEAD {'b' * 40}; "
@@ -244,12 +244,12 @@ def test_checkout_validation_names_the_isolated_worktree_recipe_for_the_default_
     `trunk` the same way)."""
     values = {("rev-parse", "HEAD"): BASE, ("branch", "--show-current"): branch}
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
     candidate = request(branch=branch)
 
     with pytest.raises(ClaimError) as error:
-        checkout._validate_checkout(candidate, default_branch=lambda: default_branch)
+        checkout.validate_checkout(candidate, default_branch=lambda: default_branch)
 
     assert str(error.value) == (
         "build claims require an isolated non-main worktree branch; "
@@ -270,12 +270,12 @@ def test_checkout_validation_names_the_isolated_worktree_recipe_for_a_shared_che
         ("status", "--porcelain"): "",
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
     candidate = request()
 
     with pytest.raises(ClaimError) as error:
-        checkout._validate_checkout(candidate, default_branch=lambda: "main")
+        checkout.validate_checkout(candidate, default_branch=lambda: "main")
 
     assert str(error.value) == (
         "build claims require a linked isolated worktree checkout; "
@@ -300,12 +300,12 @@ def test_checkout_validation_names_the_first_three_dirty_paths_and_the_rest_as_a
         ("status", "--porcelain"): porcelain,
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
     candidate = request()
 
     with pytest.raises(ClaimError) as error:
-        checkout._validate_checkout(candidate, default_branch=lambda: "main")
+        checkout.validate_checkout(candidate, default_branch=lambda: "main")
 
     assert str(error.value) == (
         "claim must be acquired before the first worktree edit: "
@@ -326,12 +326,12 @@ def test_checkout_validation_names_every_dirty_path_when_three_or_fewer(
         ("status", "--porcelain"): " M src/a.py",
     }
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
     candidate = request()
 
     with pytest.raises(ClaimError) as error:
-        checkout._validate_checkout(candidate, default_branch=lambda: "main")
+        checkout.validate_checkout(candidate, default_branch=lambda: "main")
 
     assert str(error.value) == "claim must be acquired before the first worktree edit: src/a.py"
 
@@ -339,7 +339,7 @@ def test_checkout_validation_names_every_dirty_path_when_three_or_fewer(
 def _scratch_git_repository(tmp_path: Path, *init_options: str) -> Path:
     """An initialized repository with one committed, tracked file -- for
     tests that drive `_dirty_paths` against real `git status --porcelain`
-    output instead of a fake standing in for `_git_output` itself.
+    output instead of a fake standing in for `git_output` itself.
     `init_options` shape its git directory's layout."""
     repository = tmp_path / "repo"
     repository.mkdir()
@@ -355,7 +355,7 @@ def _scratch_git_repository(tmp_path: Path, *init_options: str) -> Path:
 def test_dirty_paths_reads_a_modified_tracked_file_from_real_git_status(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Regression for the truncated-name bug (#52 follow-up): `_git_output`
+    """Regression for the truncated-name bug (#52 follow-up): `git_output`
     used to `.strip()` its whole decoded output, which ate the leading space
     of a modified file's ` M path` porcelain line before `_dirty_paths`
     sliced off the fixed three-character status prefix -- `README.md` came
@@ -366,7 +366,7 @@ def test_dirty_paths_reads_a_modified_tracked_file_from_real_git_status(
     (repository / "README.md").write_text("hello\nmodified\n")
     monkeypatch.chdir(repository)
 
-    assert checkout._dirty_paths(checkout._git_output(["status", "--porcelain"])) == ("README.md",)
+    assert checkout._dirty_paths(checkout.git_output(["status", "--porcelain"])) == ("README.md",)
 
 
 def test_dirty_paths_reads_an_untracked_file_from_real_git_status(
@@ -378,7 +378,7 @@ def test_dirty_paths_reads_an_untracked_file_from_real_git_status(
     (repository / "extra.txt").write_text("new\n")
     monkeypatch.chdir(repository)
 
-    assert checkout._dirty_paths(checkout._git_output(["status", "--porcelain"])) == ("extra.txt",)
+    assert checkout._dirty_paths(checkout.git_output(["status", "--porcelain"])) == ("extra.txt",)
 
 
 def test_dirty_paths_reads_a_rename_from_real_git_status(
@@ -391,7 +391,7 @@ def test_dirty_paths_reads_a_rename_from_real_git_status(
     _real_git(repository, "mv", "README.md", "RENAMED.md")
     monkeypatch.chdir(repository)
 
-    assert checkout._dirty_paths(checkout._git_output(["status", "--porcelain"])) == (
+    assert checkout._dirty_paths(checkout.git_output(["status", "--porcelain"])) == (
         "README.md -> RENAMED.md",
     )
 
@@ -399,10 +399,10 @@ def test_dirty_paths_reads_a_rename_from_real_git_status(
 def test_git_output_directory_runs_git_dash_c_in_that_directory(tmp_path: Path) -> None:
     """`directory` (issue #314) must reach the real `git` process as `-C`,
     not merely be accepted and ignored -- the one fact every path-based
-    resolution downstream of `_git_output` depends on."""
+    resolution downstream of `git_output` depends on."""
     repository = _scratch_git_repository(tmp_path)
 
-    assert checkout._git_output(["rev-parse", "--show-toplevel"], directory=repository) == str(
+    assert checkout.git_output(["rev-parse", "--show-toplevel"], directory=repository) == str(
         repository.resolve()
     )
 
@@ -414,7 +414,7 @@ def test_git_output_denies_loud_on_a_non_standard_os_error_launching_git(
     own typed errors, but leaves every other OS-level launch failure --
     permission denied, out of file descriptors, `-C` naming a non-directory
     -- as a raw `OSError` (issue #314 gate G's follow-up). Every
-    `_git_output` caller judges a checkout for a security decision, so this
+    `git_output` caller judges a checkout for a security decision, so this
     must fail closed with `ClaimError` too, never an uncaught traceback out
     of `protect`'s hook boundary."""
 
@@ -424,7 +424,7 @@ def test_git_output_denies_loud_on_a_non_standard_os_error_launching_git(
     monkeypatch.setattr(process, "run_captured", raises_os_error)
 
     with pytest.raises(ClaimError, match="git failed to launch: denied"):
-        checkout._git_output(["rev-parse", "--verify", "HEAD"])
+        checkout.git_output(["rev-parse", "--verify", "HEAD"])
 
 
 def _repo_with_linked_worktree(tmp_path: Path) -> tuple[Path, Path]:
@@ -580,7 +580,7 @@ def test_refuse_shared_checkout_matrix(
     repair = checkout.WorktreeRepair.RETURN_TO_CLAIM
 
     with pytest.raises(ClaimError) as error:
-        checkout._refuse_shared_checkout(
+        checkout.refuse_shared_checkout(
             path_checkout, default_branch=default_branch, canonical_remote="origin", repair=repair
         )
 
@@ -603,16 +603,16 @@ def test_claim_default_branch_fallback_denies_only_main_and_master(
     test by letting `main`/`master` through instead."""
     values = _git_checkout(branch=branch)
     monkeypatch.setattr(
-        checkout, "_git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
     candidate = request(branch=branch)
 
     if not denied:
-        checkout._validate_checkout(candidate, default_branch=lambda: None)
+        checkout.validate_checkout(candidate, default_branch=lambda: None)
         return
 
     with pytest.raises(ClaimError, match="isolated non-main worktree branch"):
-        checkout._validate_checkout(candidate, default_branch=lambda: None)
+        checkout.validate_checkout(candidate, default_branch=lambda: None)
 
 
 def test_versioned_paths_reads_nul_terminated_ls_files_without_stripping(
@@ -665,7 +665,7 @@ def test_checkout_git_calls_fail_loud_when_git_is_missing_or_times_out(
     refusal: str,
 ) -> None:
     """`versioned_paths`, `remote_url`, and `path_is_tracked` -- all
-    direct `subprocess.run` callers (`_git_output` backs `remote_url`)
+    direct `subprocess.run` callers (`git_output` backs `remote_url`)
     -- must translate a missing executable or a timeout to a `ClaimError`;
     a timeout names the git step that ran, never a purpose (issue #603)."""
     expected = refusal.format(subcommand=subcommand)
@@ -853,7 +853,7 @@ def test_trunk_landings_walk_the_trunk_ref_they_are_given_not_the_work_branch(
             "sha1", "2026-08-29T00:00:00+00:00", "", ""
         ) + _fake_trunk_log_record("sha2", "2026-08-30T00:00:00Z", "#10", "")
 
-    monkeypatch.setattr(checkout, "_git_output", git_output)
+    monkeypatch.setattr(checkout, "git_output", git_output)
     landings = _LIVE_TRUNK_LANDINGS("refs/remotes/hub/main", 20, directory=tmp_path)
 
     assert landings == (
@@ -951,7 +951,7 @@ def test_a_dangling_or_plain_recorded_head_counts_as_unrecorded_and_the_trunk_gu
 def test_trunk_landings_is_empty_when_trunk_has_no_first_parent_landings(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(checkout, "_git_output", lambda _arguments, **_kwargs: "")
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: "")
     assert _LIVE_TRUNK_LANDINGS("refs/remotes/origin/main", 20, directory=tmp_path) == ()
 
 
@@ -971,7 +971,7 @@ def test_trunk_landings_fails_loud_on_a_malformed_commit_timestamp(
 
     monkeypatch.setattr(
         checkout,
-        "_git_output",
+        "git_output",
         lambda _arguments, **_kwargs: _fake_trunk_log_record("sha1", raw_commit_time, "", ""),
     )
     with pytest.raises(ClaimError, match="git returned a malformed trunk landing timestamp"):
@@ -987,7 +987,7 @@ def test_trunk_landings_fails_loud_on_a_log_stream_that_is_not_nul_framed_record
     the fake) misbehaving, not a shape this reads silently."""
 
     monkeypatch.setattr(
-        checkout, "_git_output", lambda _arguments, **_kwargs: "sha1\x00not-nul-terminated"
+        checkout, "git_output", lambda _arguments, **_kwargs: "sha1\x00not-nul-terminated"
     )
     with pytest.raises(ClaimError, match="git returned a malformed trunk landing log"):
         _LIVE_TRUNK_LANDINGS("refs/remotes/origin/main", 20, directory=tmp_path)

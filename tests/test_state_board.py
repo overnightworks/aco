@@ -1734,8 +1734,8 @@ def _stub_claim_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
     """The checkout reads `claim` makes that no state-ref proof is about --
     the worktree's own validation, scope directories, and versioned files
     -- stubbed the one way every `claim` in `TestCliStateRefForge` needs."""
-    monkeypatch.setattr(checkout, "_validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "_scope_directories", lambda paths, **_kwargs: ())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("README",))
 
 
@@ -2029,7 +2029,7 @@ class TestCliStateRefForge:
         """Issue #283 proof 5: `aco claim` against a state-ref item runs its
         slice rules from `StateRefBoard`'s own reads alone, and `aco check`
         reads the same item back -- neither ever resolves `gh`. The
-        checkout's own cleanliness precondition (`_validate_checkout`) is
+        checkout's own cleanliness precondition (`validate_checkout`) is
         unrelated to this proof and stubbed the same way every other
         `claim` test stubs it."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
