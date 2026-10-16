@@ -9,7 +9,6 @@ import os
 import re
 import runpy
 import shlex
-import socket
 import subprocess
 import sys
 import threading
@@ -48,6 +47,8 @@ from board_fixtures import (
     write_repository_config,
 )
 from cli_fixtures import (
+    ITEM_NEW_BODY,
+    LIVE_TRUNK_REF_AFTER,
     RECORDED_ORIGIN_HEAD_READ,
     _assert_missing_identity_message,
     _forbid_forge_resolution,
@@ -60,18 +61,29 @@ from cli_fixtures import (
     _real_repository_with_bare_remote,
     _set_agent_identity_env,
     _stub_one_git_call,
+    arguments_bash_hands_aco,
     arrange_scope_width,
     bare_remote_repository_with_one_commit,
+    body_file_on_stdin,
+    closed_stdin,
     count_context_reads,
     dangle_recorded_head,
+    devnull_on_stdin,
+    empty_harness_socket_on_stdin,
     fetched_once_then_read,
     fresh_observation,
     init_bare_repository,
     landed_from_another_clone,
     main_exit_code,
+    main_with_piped_stdin,
+    piped_body_on_stdin,
+    piping,
+    read_end_of_a_pipe_carrying,
+    redirect_toplevel,
     run_context_over,
     stub_board_config_tracked,
     stub_every_remote_configured,
+    terminal_on_stdin,
     trunk_git_calls,
 )
 from github_fixtures import (
@@ -112,11 +124,9 @@ GitHubForge = github.GitHubForge
 # monkeypatches `checkout.trunk_landings` to `()`: the atomic-landing tests
 # (issue #359) need the real first-parent walk against a real repository,
 # the same way `test_checkout.py`'s own `_LIVE_TRUNK_LANDINGS` does. A test
-# on a real repository (`_redirect_toplevel`) resolves and fetches its trunk
+# on a real repository (`redirect_toplevel`) resolves and fetches its trunk
 # for real as well (issue #488).
 _LIVE_TRUNK_LANDINGS = checkout.trunk_landings
-_LIVE_TRUNK_REF_AFTER = checkout.trunk_ref_after
-_LIVE_FETCH_REMOTE = checkout.fetch_remote
 _LIVE_UNCONFIGURED_REMOTE_REFUSAL = checkout.unconfigured_remote_refusal
 _LIVE_PATH_IS_TRACKED = checkout.path_is_tracked
 _LIVE_FILE_AT_REVISION = checkout.file_at_revision
@@ -1689,26 +1699,6 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
     }
 
 
-def _redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
-    """Point `RunContext.toplevel` (`rev-parse --show-toplevel`) at a real
-    repository this test built itself (issue #322), taking precedence over
-    the module's autouse `_isolate_git_toplevel` fake -- every other real
-    git call `start`'s own worktree creation runs still reaches real git,
-    unlike a fully faked `checkout.git_output`, and the trunk is resolved
-    and fetched for real there, undoing the autouse `_stub_trunk` (issue
-    #488)."""
-    real_git_output = checkout.git_output
-
-    def fake(arguments: list[str], *, directory: Path | None = None) -> str:
-        if arguments == ["rev-parse", "--show-toplevel"] and directory is None:
-            return str(toplevel)
-        return real_git_output(arguments, directory=directory)
-
-    monkeypatch.setattr(checkout, "git_output", fake)
-    monkeypatch.setattr(checkout, "trunk_ref_after", _LIVE_TRUNK_REF_AFTER)
-    monkeypatch.setattr(checkout, "fetch_remote", _LIVE_FETCH_REMOTE)
-
-
 def _start_scenario(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, agent: str = "Codex Sol"
 ) -> Path:
@@ -1724,7 +1714,7 @@ def _start_scenario(
     _serve_start_board(monkeypatch, _start_item())
     _patch_store_write(monkeypatch)
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent})
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     return repo
 
 
@@ -1826,7 +1816,7 @@ def _stand_in_another_lane(monkeypatch: pytest.MonkeyPatch, repo: Path, tmp_path
     """Run from a linked worktree of `repo` on another item's lane."""
     other_lane = tmp_path / "other-lane"
     _real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-9-other", str(other_lane))
-    _redirect_toplevel(monkeypatch, other_lane)
+    redirect_toplevel(monkeypatch, other_lane)
     monkeypatch.chdir(other_lane)
     return other_lane
 
@@ -1839,7 +1829,7 @@ def _stand_in_the_items_released_lane(
     assert issue_claim.main(["--repo", REPOSITORY, "start", "314"]) == 0
     assert issue_claim.main(["--repo", REPOSITORY, "release", "314", "--abandoned", "paused"]) == 0
     lane = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    _redirect_toplevel(monkeypatch, lane)
+    redirect_toplevel(monkeypatch, lane)
     monkeypatch.chdir(lane)
     return lane
 
@@ -1898,7 +1888,7 @@ def test_start_inside_its_own_lane_worktree_reprints_the_live_claim(
     claim_id = _claimed_line_id(capsys.readouterr().out, "issue #314")
     worktree = repo.parent / f"{repo.name}-worktrees" / "issue-314-own-lane"
     (worktree / "work.txt").write_text("in progress\n")
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     before = _worktrees_and_branches(repo)
 
@@ -2101,7 +2091,7 @@ def test_a_detached_head_is_named_and_nothing_is_written(
     refuses by naming its own detached HEAD -- never a claim marker field
     -- and writes no claim, worktree, or branch."""
     repo, worktree, fake = _detached_start_worktree(monkeypatch, tmp_path)
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     before = _worktrees_and_branches(repo)
 
@@ -2135,7 +2125,7 @@ def test_start_names_a_runnable_command_for_a_detached_worktree(
     repo, worktree, fake = _detached_start_worktree(monkeypatch, parent_with_space)
     if branch_exists:
         _real_git(repo, "branch", _START_BRANCH)
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     before = _worktrees_and_branches(repo)
 
@@ -2527,7 +2517,7 @@ def test_start_resumes_a_wide_claim_without_repeating_whole(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     _patch_store_write(monkeypatch)
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     assert (
         issue_claim.main(["--repo", REPOSITORY, "start", "314", "--whole", "the whole thing"]) == 0
@@ -2586,7 +2576,7 @@ def test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     _patch_store_write(monkeypatch)
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     assert issue_claim.main(["--repo", REPOSITORY, "start", "72"]) == 0
     first_claim_id = _claimed_line_id(capsys.readouterr().out, "issue #72")
@@ -2767,7 +2757,7 @@ def _real_state_ref_repository(
         for number, content in item_bodies.items()
     }
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     return repo, remote, seeded
 
@@ -2811,7 +2801,7 @@ def test_state_ref_reads_answer_from_a_subdirectory_as_from_the_checkout_root(
     answers: list[tuple[int, str]] = []
     for toplevel, directory in readings:
         directory.mkdir(exist_ok=True)
-        _redirect_toplevel(monkeypatch, toplevel)
+        redirect_toplevel(monkeypatch, toplevel)
         monkeypatch.chdir(directory)
         status = issue_claim.main(command)
         answers.append((status, capsys.readouterr().out))
@@ -2872,7 +2862,7 @@ def _lane_on_a_state_ref_board_with_registries(
     _real_git(repo, "commit", "-q", "-am", "trunk configuration")
     _push_repository_trunk(repo, "origin")
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     monkeypatch.setattr(checkout, "file_at_revision", _LIVE_FILE_AT_REVISION)
     monkeypatch.setattr(checkout, "versioned_paths", _REAL_VERSIONED_PATHS)
@@ -3008,7 +2998,7 @@ def test_rescope_under_state_ref_moves_the_claim_and_the_item_body_scope_togethe
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     (worktree / "src").mkdir()
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree / "src")
     capsys.readouterr()
 
@@ -3053,7 +3043,7 @@ def test_rescope_refuses_a_relative_entry_that_climbs_out_of_the_run_checkout(
     repo, _remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     entry = os.path.relpath(target(worktree), worktree)
     state_before = store.fetch_state(worktree=worktree, remote="origin").tip
@@ -3333,7 +3323,7 @@ def _claim_in_lane_worktree(
 ) -> list[str]:
     worktree = tmp_path / "lane"
     _real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return ["claim", "314", "--scope", "src/x.py"]
 
@@ -6299,27 +6289,6 @@ def test_ask_refuses_a_missing_picture_file_before_any_write(
     assert client.item_bodies == {}
 
 
-def _arguments_bash_hands_aco(advice: str, tmp_path: Path) -> tuple[int, list[str]]:
-    """Bash's exit code and the argv it hands `aco` when the printed
-    `advice` command runs verbatim in a throwaway git repository, `aco`
-    standing in as a recorder of its own arguments -- so the caller runs
-    exactly those arguments through the real entry point (issue #510). A
-    scenario may run several pieces of advice in turn (issue #513)."""
-    shim_directory = tmp_path / "shell-bin"
-    shim_directory.mkdir(exist_ok=True)
-    recorder = shim_directory / "aco"
-    recorder.write_text("#!/bin/sh\nprintf '%s\\0' \"$@\"\n")
-    recorder.chmod(0o755)
-    repository = tmp_path / "throwaway"
-    repository.mkdir(exist_ok=True)
-    _real_git(repository, "init", "--quiet")
-    environment = {**os.environ, "PATH": f"{shim_directory}{os.pathsep}{os.environ['PATH']}"}
-    ran = subprocess.run(
-        ["bash", "-c", advice], cwd=repository, env=environment, capture_output=True, check=False
-    )
-    return ran.returncode, ran.stdout.decode().split("\0")[:-1]
-
-
 @pytest.mark.parametrize(
     "slice_title",
     [
@@ -6348,7 +6317,7 @@ def test_next_prints_a_cut_command_bash_runs_as_printed_and_cut_accepts(
 
     next_exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
     advice = capsys.readouterr().out.splitlines()[1].removeprefix("Next: ")
-    bash_exit_code, cut_arguments = _arguments_bash_hands_aco(advice, tmp_path)
+    bash_exit_code, cut_arguments = arguments_bash_hands_aco(advice, tmp_path)
     cut_exit_code = issue_claim.main(["--repo", REPOSITORY, *cut_arguments])
 
     assert (next_exit_code, bash_exit_code, cut_exit_code) == (0, 0, 0)
@@ -7052,7 +7021,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
         lambda arguments, **_kwargs: request(issue=299, scope=tuple(arguments.scope or ())),
     )
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    bash_exit_code, claim_arguments = _arguments_bash_hands_aco(run_line, tmp_path)
+    bash_exit_code, claim_arguments = arguments_bash_hands_aco(run_line, tmp_path)
     claim_exit_code = issue_claim.main(["--repo", REPOSITORY, *claim_arguments])
 
     assert (claim_advice, run_line) == (f"{expected_claim} --out-of-order <reason>", expected_claim)
@@ -7167,13 +7136,13 @@ def test_next_advises_a_pull_that_runs_as_printed_where_it_stands(
     if stands_in_lane:
         lane = tmp_path / "lane"
         _real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(lane))
-        _redirect_toplevel(monkeypatch, lane)
+        redirect_toplevel(monkeypatch, lane)
         monkeypatch.chdir(lane)
 
     next_exit_code = issue_claim.main(["next"])
     run_line = capsys.readouterr().out.split("\nRun: ", 1)[1].splitlines()[0]
     filled_line = run_line.replace("<reason>", "'One sweep over five files.'")
-    bash_exit_code, pull_arguments = _arguments_bash_hands_aco(filled_line, tmp_path)
+    bash_exit_code, pull_arguments = arguments_bash_hands_aco(filled_line, tmp_path)
     pull_exit_code = issue_claim.main(pull_arguments)
 
     assert (run_line, next_exit_code, bash_exit_code, pull_exit_code) == (expected_run, 0, 0, 0)
@@ -7237,7 +7206,7 @@ def test_state_ref_next_prints_cuts_bash_runs_as_printed_and_cut_accepts(
 
     next_exit_code = issue_claim.main(["next"])
     advice = _printed_line_after(capsys.readouterr().out, advice_marker)
-    bash_exit_code, cut_arguments = _arguments_bash_hands_aco(advice, tmp_path)
+    bash_exit_code, cut_arguments = arguments_bash_hands_aco(advice, tmp_path)
     cut_exit_code = issue_claim.main(cut_arguments)
 
     assert (next_exit_code, bash_exit_code, cut_exit_code) == (0, 0, 0), capsys.readouterr().err
@@ -7810,7 +7779,7 @@ def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item
     )
     lane = tmp_path / "repo-worktrees" / "issue-21-nested"
     _real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-21-nested")
-    _redirect_toplevel(monkeypatch, lane)
+    redirect_toplevel(monkeypatch, lane)
     monkeypatch.chdir(lane)
     nested = items.format_item_id(21)
 
@@ -7819,12 +7788,12 @@ def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item
     retype, claim = repair.removeprefix("nested container, which cut refuses; run ").split(
         " and claim it with "
     )
-    retype_bash_exit_code, retype_arguments = _arguments_bash_hands_aco(retype, tmp_path)
+    retype_bash_exit_code, retype_arguments = arguments_bash_hands_aco(retype, tmp_path)
     retype_exit_code = issue_claim.main(retype_arguments)
     filled_claim = claim.replace("<paths>", "docs/nested.md").replace(
         "<reason>", shlex.quote("the operator wants it first")
     )
-    claim_bash_exit_code, claim_arguments = _arguments_bash_hands_aco(filled_claim, tmp_path)
+    claim_bash_exit_code, claim_arguments = arguments_bash_hands_aco(filled_claim, tmp_path)
     in_order_exit_code = issue_claim.main(claim_arguments[:-2])
     in_order_refusal = capsys.readouterr().err
     claim_exit_code = issue_claim.main(claim_arguments)
@@ -7862,14 +7831,14 @@ def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_doe
     )
     lane = tmp_path / "repo-worktrees" / "issue-11-work"
     _real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-11-work")
-    _redirect_toplevel(monkeypatch, lane)
+    redirect_toplevel(monkeypatch, lane)
     monkeypatch.chdir(lane)
     waiting, pullable = items.format_item_id(10), items.format_item_id(11)
 
     next_exit_code = issue_claim.main(["next"])
     printed = capsys.readouterr().out
     claim = _printed_line_after(printed, "\nRun: ")
-    claim_bash_exit_code, claim_arguments = _arguments_bash_hands_aco(claim, tmp_path)
+    claim_bash_exit_code, claim_arguments = arguments_bash_hands_aco(claim, tmp_path)
     claim_exit_code = issue_claim.main(claim_arguments)
     claim_output = capsys.readouterr()
 
@@ -8796,7 +8765,7 @@ def _write_state_ref_pin(toplevel: Path) -> None:
     """`.aco/board.toml` pinned to `storage = "state-ref"` in
     `toplevel`: the isolated toplevel `_isolate_git_toplevel` (conftest.py)
     already redirects this process's `rev-parse --show-toplevel` to (issue
-    #248), or a repository `_redirect_toplevel` points it at."""
+    #248), or a repository `redirect_toplevel` points it at."""
     write_repository_config(toplevel, 'storage = "state-ref"\n')
 
 
@@ -9020,7 +8989,7 @@ def _landing_scenario(
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo = _landing_repository(tmp_path)
     _write_state_ref_pin(repo)
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     item_ids = {number: items.format_item_id(number) for number in _LANDING_ITEM_NUMBERS}
     item_files = {
         f"{item_id}.md": _landing_item_body(f"Item {number}").encode()
@@ -9143,7 +9112,7 @@ def test_release_merged_under_state_ref_hints_a_runnable_board_read_beside_an_un
     assert status == 0
     assert hint in (captured.err if as_json else captured.out).splitlines()
     advice = hint.split("`")[1]
-    assert _arguments_bash_hands_aco(advice, tmp_path) == (0, ["board", "--json"])
+    assert arguments_bash_hands_aco(advice, tmp_path) == (0, ["board", "--json"])
     advised = issue_claim.main(["board", "--json"])
     assert (advised, capsys.readouterr().err) == (2, f"ERROR: {refusal}\n")
 
@@ -9243,7 +9212,7 @@ def _real_landing_scenario(
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo = _landing_repository(tmp_path)
     _write_state_ref_pin(repo)
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     remote = tmp_path / "remote.git"
     store.bootstrap(worktree=repo, remote=str(remote))
     for number in numbers:
@@ -10785,7 +10754,7 @@ def _default_open_issue_reference(monkeypatch: pytest.MonkeyPatch) -> None:
 # A test's toplevel is a scratch directory with no trunk (`conftest.py`'s
 # `_isolate_git_toplevel`), so the live trunk reads would fail loud; tests of
 # the trunk itself (tests/test_checkout.py, tests/test_session.py) and the
-# real-repository scenarios here (`_redirect_toplevel`) read it live. That
+# real-repository scenarios here (`redirect_toplevel`) read it live. That
 # trunk holds no committed board configuration, so no file is lane-shared
 # (issue #575); a test of the lane-shared lines restores the live read.
 @pytest.fixture(autouse=True)
@@ -11151,7 +11120,7 @@ def test_cli_status_shows_a_live_store_claim_then_the_lane_shared_files(
     _patch_status_store(monkeypatch, claimed)
     monkeypatch.setattr(checkout, "file_at_revision", _LIVE_FILE_AT_REVISION)
     monkeypatch.setattr(checkout, "versioned_paths", _REAL_VERSIONED_PATHS)
-    monkeypatch.setattr(checkout, "trunk_ref_after", _LIVE_TRUNK_REF_AFTER)
+    monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
     _real_git(tmp_path, "init", "-q", "-b", initial_branch)
     _real_git(tmp_path, "config", "user.name", "Test")
     _real_git(tmp_path, "config", "user.email", "test@example.com")
@@ -16217,7 +16186,7 @@ def _refused_trailer_repository(
     _real_git(repo, "add", "work.txt")
     _real_git(repo, "commit", "-q", "-m", "refused landing", "-m", trailer)
     _push_repository_trunk(repo, "origin")
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     return repo
 
@@ -16432,7 +16401,7 @@ def _release_cleanup_scenario(
     )
     _patch_store_write(monkeypatch, _store_claim_from_request(standing))
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     return worktree
 
@@ -16695,7 +16664,7 @@ def _claim_in_a_linked_worktree_on_main(
     _real_git(repo, "checkout", "-q", "--detach")
     _real_git(repo, "worktree", "add", "-q", str(worktree), "main")
     _name_hub_as_the_canonical_remote(worktree)
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return ["--repo", REPOSITORY, "claim", "314", "--scope", "src/x.py"]
 
@@ -16858,7 +16827,7 @@ def test_check_never_takes_a_local_branch_for_the_trunk_of_a_remote_with_branche
     arrange_remote(repo, remote)
     _real_git(repo, "commit", "-q", "--allow-empty", "-m", "unpushed", "-m", "No-Item: docs")
     sha = _real_git(repo, "rev-parse", "HEAD").stdout.strip()
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
 
     status = issue_claim.main(["check", sha])
@@ -16971,7 +16940,7 @@ def _dirty_worktree_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
 
 def _ran_from_inside_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return worktree
 
@@ -17018,7 +16987,7 @@ def _checked_out_elsewhere_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     )
     _patch_store_write(monkeypatch, _store_claim_from_request(standing))
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    _redirect_toplevel(monkeypatch, bystander)
+    redirect_toplevel(monkeypatch, bystander)
     monkeypatch.chdir(bystander)
 
 
@@ -17222,7 +17191,7 @@ def _land_scenario(
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     _patch_store_write(monkeypatch, _store_claim_from_request(standing))
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     return repo, client
 
@@ -19125,7 +19094,7 @@ def _land_from_a_separate_clone(
     if git_identity:
         _real_git(clone, "config", "user.name", "Lander")
         _real_git(clone, "config", "user.email", "lander@example.com")
-    _redirect_toplevel(monkeypatch, clone)
+    redirect_toplevel(monkeypatch, clone)
     monkeypatch.chdir(clone)
     return repo, clone, client
 
@@ -19271,7 +19240,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
         f"worktree: kept -- no linked worktree on {LANDING_BRANCH} in this checkout; "
         f"run {rerun} in the checkout that holds it\n",
     )
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     if claimed_meanwhile:
         verified_landing = client.landing
@@ -20096,7 +20065,7 @@ def _check_sha(
     `ref -> sha` resolver over it (issue #359)."""
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo = _check_trunk_repository(tmp_path)
-    _redirect_toplevel(monkeypatch, repo)
+    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     return repo, lambda ref: _real_git(repo, "rev-parse", ref).stdout.strip()
 
@@ -21114,7 +21083,7 @@ def test_an_untrusted_board_config_refuses_every_store_command_by_name(
     _push_repository_trunk(repository, "origin")
     if config_on_disk:
         _write_untracked_board_config(repository)
-    _redirect_toplevel(monkeypatch, repository)
+    redirect_toplevel(monkeypatch, repository)
     monkeypatch.chdir(repository)
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     monkeypatch.setattr(checkout, "path_is_tracked", lambda _path, **_kwargs: False)
@@ -21249,7 +21218,7 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
         _real_git(lane, "commit", "-q", "-m", "drop the pin")
     if lane_history.trunk_moved_on:
         _advance_origin_main(repository, lane)
-    _redirect_toplevel(monkeypatch, lane)
+    redirect_toplevel(monkeypatch, lane)
     monkeypatch.chdir(lane)
     _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     monkeypatch.setattr(checkout, "path_is_tracked", _LIVE_PATH_IS_TRACKED)
@@ -21298,7 +21267,7 @@ def _scratch_lane_repository(
     local `main`, since its configured `origin` was never fetched -- in the
     lane's own repository (issues #488, #508). Given `board_config`, the
     base commit carries it as the trunk's `.aco/board.toml`."""
-    monkeypatch.setattr(checkout, "trunk_ref_after", _LIVE_TRUNK_REF_AFTER)
+    monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
     repository = tmp_path
     _real_git(repository, "init", "-q", "-b", "main")
     _real_git(repository, "remote", "add", "origin", str(tmp_path / "origin.git"))
@@ -21931,94 +21900,16 @@ def test_main_refuses_a_malformed_item_reference_before_ever_dispatching(
     assert "is not an item reference" in capsys.readouterr().err
 
 
-_ITEM_NEW_BODY = complete_contract("Ship it.")
-
-
-@contextlib.contextmanager
-def _devnull_on_stdin(_tmp_path: Path) -> Iterator[TextIO]:
-    with Path(os.devnull).open() as stdin:
-        yield stdin
-
-
-@contextlib.contextmanager
-def _body_file_on_stdin(tmp_path: Path) -> Iterator[TextIO]:
-    body_file = tmp_path / "body.md"
-    body_file.write_text(_ITEM_NEW_BODY)
-    with body_file.open() as stdin:
-        yield stdin
-
-
-def _read_end_of_a_pipe_carrying(text: str) -> TextIO:
-    """`printf ... | aco ...`: the read end of a pipe whose writer already
-    wrote `text` -- a scenario body, well inside a pipe's buffer -- and
-    closed. Read as `sys.stdin` reads a pipe: line endings untranslated."""
-    read_end, write_end = os.pipe()
-    with os.fdopen(write_end, "w") as writer:
-        writer.write(text)
-    return os.fdopen(read_end, newline="")
-
-
 @pytest.fixture
 def pipe_onto_stdin(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[str], None]]:
     """Puts a text on stdin as a pipe would; each pipe closes at teardown."""
     with contextlib.ExitStack() as readers:
 
         def pipe(text: str) -> None:
-            reader = readers.enter_context(_read_end_of_a_pipe_carrying(text))
+            reader = readers.enter_context(read_end_of_a_pipe_carrying(text))
             monkeypatch.setattr(sys, "stdin", reader)
 
         yield pipe
-
-
-def _piping(text: str) -> Callable[[Path], contextlib.AbstractContextManager[TextIO]]:
-    """A stdin source piping `text`, for a family whose cases each set their
-    own stdin."""
-
-    @contextlib.contextmanager
-    def piped(_tmp_path: Path) -> Iterator[TextIO]:
-        with _read_end_of_a_pipe_carrying(text) as stdin:
-            yield stdin
-
-    return piped
-
-
-_piped_body_on_stdin = _piping(_ITEM_NEW_BODY)
-
-
-def main_with_piped_stdin(monkeypatch: pytest.MonkeyPatch, text: str, argv: list[str]) -> int:
-    """`printf ... | aco <argv>`: one run with `text` on a pipe as its
-    stdin, the pipe closed once the run returns."""
-    with _read_end_of_a_pipe_carrying(text) as stdin:
-        monkeypatch.setattr(sys, "stdin", stdin)
-        return issue_claim.main(argv)
-
-
-@contextlib.contextmanager
-def _terminal_on_stdin(_tmp_path: Path) -> Iterator[TextIO]:
-    """A stdin a person types into, holding a line nobody piped."""
-    controller, terminal = os.openpty()
-    with os.fdopen(controller, "w") as typist, os.fdopen(terminal) as stdin:
-        typist.write("never read\n")
-        typist.flush()
-        yield stdin
-
-
-@contextlib.contextmanager
-def _closed_stdin(_tmp_path: Path) -> Iterator[None]:
-    """`aco ... <&-`: Python leaves `sys.stdin` as `None`."""
-    yield None
-
-
-@contextlib.contextmanager
-def _empty_harness_socket_on_stdin(_tmp_path: Path) -> Iterator[TextIO]:
-    """The stdin an agent harness such as Claude Code's Bash tool hands a
-    command: one end of a socket that never delivers a body."""
-    harness_end, other_end = socket.socketpair()
-    # The other end stays open, so a read would wait forever; the timeout
-    # turns a command that reads this stdin into a failure, not a hang.
-    harness_end.settimeout(1)
-    with harness_end, other_end, harness_end.makefile("r") as stdin:
-        yield stdin
 
 
 def _item_new_github_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FakeForge:
@@ -22039,7 +21930,7 @@ def _item_new_github_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
         pytest.param(
             ["item", "new", "--title", "Write the docs", "--kind", "feature"],
             "#900\n",
-            [("Write the docs", _ITEM_NEW_BODY, body.ItemKind.FEATURE)],
+            [("Write the docs", ITEM_NEW_BODY, body.ItemKind.FEATURE)],
             [],
             id="typed_issue_without_parent",
         ),
@@ -22059,14 +21950,14 @@ def _item_new_github_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
         pytest.param(
             ["item", "new", "--title", "Ship it", "--not-a-twin", "--json"],
             '{"ok": true, "reason": "created", "item": "#900", "number": 900}\n',
-            [("Ship it", _ITEM_NEW_BODY, body.ItemKind.TASK)],
+            [("Ship it", ITEM_NEW_BODY, body.ItemKind.TASK)],
             [],
             id="not_a_twin_creates_past_a_look_alike",
         ),
         pytest.param(
             ["item", "new", "--title", "Ship it now", "--not-a-twin"],
             "#900\n",
-            [("Ship it now", _ITEM_NEW_BODY, body.ItemKind.TASK)],
+            [("Ship it now", ITEM_NEW_BODY, body.ItemKind.TASK)],
             [],
             id="not_a_twin_creates_an_exact_duplicate",
         ),
@@ -22087,7 +21978,7 @@ def test_item_new_creates_a_github_issue_from_the_piped_body(
     (plus `--scope`), recorded under `--parent` when given, and prints the
     issue number the way the state-ref path prints its id."""
     client = _item_new_github_client(monkeypatch, tmp_path)
-    pipe_onto_stdin(_ITEM_NEW_BODY)
+    pipe_onto_stdin(ITEM_NEW_BODY)
 
     status = issue_claim.main(arguments)
 
@@ -22110,19 +22001,19 @@ _PIPED_BLOCK_AS_TYPED = (
     ("stdin_source", "flags", "stored"),
     [
         pytest.param(
-            _piping("Ship the importer.\n"),
+            piping("Ship the importer.\n"),
             ("--now", "Ready.", "--next", "Build it.", "--done-when", "Merged.", "--size", "S"),
             ("Write the docs", _PROSE_ABOVE_BUILT_BLOCK, body.ItemKind.TASK),
             id="prose_above_a_block_built_from_the_flags",
         ),
         pytest.param(
-            _piping(_PIPED_BLOCK_AS_TYPED),
+            piping(_PIPED_BLOCK_AS_TYPED),
             ("--now", "Ready.", "--size", "S"),
             ("Write the docs", _PIPED_BLOCK_AS_TYPED, body.ItemKind.TASK),
             id="a_piped_block_matching_the_flags_kept_byte_for_byte",
         ),
         pytest.param(
-            _piping(
+            piping(
                 f"Ship the importer.\n\n```{body.BLOCK_FENCE_INFO}\nversion = 1\n# typed by hand\n"
                 'now   = "Ready."\nnext = "Build it."\ndone_when = "Merged."\n```\n'
             ),
@@ -22131,7 +22022,7 @@ _PIPED_BLOCK_AS_TYPED = (
             id="a_piped_block_a_flag_completes_stored_in_canonical_rendering",
         ),
         pytest.param(
-            _terminal_on_stdin,
+            terminal_on_stdin,
             ("--kind", "container", "--now", "Ready.", "--next", "Cut it.", "--done-when", "Done."),
             (
                 "Write the docs",
@@ -22172,7 +22063,7 @@ def test_item_new_on_github_builds_the_block_its_piped_body_lacks(
             "#900\n",
             "retyped #484 to Container for its first child\n",
             [(484, body.ItemKind.CONTAINER)],
-            [("Write the docs", _ITEM_NEW_BODY, body.ItemKind.TASK)],
+            [("Write the docs", ITEM_NEW_BODY, body.ItemKind.TASK)],
             id="retypes_and_says_so",
         ),
         pytest.param(
@@ -22204,9 +22095,9 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
     container`; stdout still carries only the created issue. A retype the
     forge drops refuses exit 2 before anything is created (ITEM-46)."""
     client = _item_new_github_client(monkeypatch, tmp_path)
-    pipe_onto_stdin(_ITEM_NEW_BODY)
+    pipe_onto_stdin(ITEM_NEW_BODY)
     client.board_issues = (
-        board_issue(484, "Task about to hold slices", _ITEM_NEW_BODY, kind=body.ItemKind.TASK),
+        board_issue(484, "Task about to hold slices", ITEM_NEW_BODY, kind=body.ItemKind.TASK),
     )
     client.fail_set_item_kind = retype_dropped
     arguments = ["item", "new", "--title", "Write the docs", "--parent", "484"]
@@ -22224,7 +22115,7 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
         pytest.param(
             "484",
             (),
-            _devnull_on_stdin,
+            devnull_on_stdin,
             False,
             0,
             "EDITED #484 kind=container\n",
@@ -22235,7 +22126,7 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
         pytest.param(
             "484",
             ("--json",),
-            _devnull_on_stdin,
+            devnull_on_stdin,
             False,
             0,
             '{"ok": true, "reason": "edited", "item": "#484", "number": 484, '
@@ -22247,7 +22138,7 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
         pytest.param(
             "484",
             (),
-            _devnull_on_stdin,
+            devnull_on_stdin,
             True,
             2,
             "",
@@ -22258,7 +22149,7 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
         pytest.param(
             "485",
             (),
-            _devnull_on_stdin,
+            devnull_on_stdin,
             False,
             2,
             "",
@@ -22269,7 +22160,7 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
         pytest.param(
             "484",
             ("--size", "S", "--json"),
-            _devnull_on_stdin,
+            devnull_on_stdin,
             False,
             2,
             '{"ok": false, "reason": "invalid_usage", '
@@ -22281,7 +22172,7 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
         pytest.param(
             "484",
             ("--whole", "one PR", "--json"),
-            _devnull_on_stdin,
+            devnull_on_stdin,
             False,
             2,
             '{"ok": false, "reason": "invalid_usage", '
@@ -22315,7 +22206,7 @@ def test_item_edit_kind_retypes_a_github_issue_or_refuses(
     `test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one`."""
     client = _item_new_github_client(monkeypatch, tmp_path)
     client.board_issues = (
-        board_issue(484, "Task about to hold slices", _ITEM_NEW_BODY, kind=body.ItemKind.TASK),
+        board_issue(484, "Task about to hold slices", ITEM_NEW_BODY, kind=body.ItemKind.TASK),
     )
     client.fail_set_item_kind = retype_dropped
 
@@ -22339,12 +22230,12 @@ def test_item_edit_kind_retypes_a_github_issue_or_refuses(
 @pytest.mark.parametrize(
     ("stdin_source", "refused"),
     [
-        pytest.param(_body_file_on_stdin, True, id="redirected_file_refuses"),
-        pytest.param(_piped_body_on_stdin, True, id="fifo_refuses"),
-        pytest.param(_empty_harness_socket_on_stdin, False, id="harness_socket_passes"),
-        pytest.param(_devnull_on_stdin, False, id="devnull_passes"),
-        pytest.param(_closed_stdin, False, id="closed_stdin_passes"),
-        pytest.param(_terminal_on_stdin, False, id="terminal_passes"),
+        pytest.param(body_file_on_stdin, True, id="redirected_file_refuses"),
+        pytest.param(piped_body_on_stdin, True, id="fifo_refuses"),
+        pytest.param(empty_harness_socket_on_stdin, False, id="harness_socket_passes"),
+        pytest.param(devnull_on_stdin, False, id="devnull_passes"),
+        pytest.param(closed_stdin, False, id="closed_stdin_passes"),
+        pytest.param(terminal_on_stdin, False, id="terminal_passes"),
     ],
 )
 def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
@@ -22363,10 +22254,10 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
     hands over, `/dev/null` or a closed stdin carries none and the edit runs."""
     client = _item_new_github_client(monkeypatch, tmp_path)
     client.board_issues = (
-        board_issue(484, "Task about to hold slices", _ITEM_NEW_BODY, kind=body.ItemKind.TASK),
+        board_issue(484, "Task about to hold slices", ITEM_NEW_BODY, kind=body.ItemKind.TASK),
     )
     client.issue_references[484] = forge.ItemReference(
-        forge.ItemState.OPEN, "Task about to hold slices", _ITEM_NEW_BODY, False
+        forge.ItemState.OPEN, "Task about to hold slices", ITEM_NEW_BODY, False
     )
     command = ["item", "edit", "484", flag, value]
 
@@ -22410,42 +22301,42 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
             id="a_scope_contradicting_the_piped_block",
         ),
         pytest.param(
-            _ITEM_NEW_BODY,
+            ITEM_NEW_BODY,
             ("--title", "Ship it"),
             (),
             "ERROR: possible twin #951; pass --not-a-twin\n",
             id="open_twin",
         ),
         pytest.param(
-            _ITEM_NEW_BODY,
+            ITEM_NEW_BODY,
             ("--title", "Write docs"),
             (forge.ClosedIssue(952, "write the docs"),),
             "ERROR: possible twin #952; pass --not-a-twin\n",
             id="recently_closed_twin",
         ),
         pytest.param(
-            _ITEM_NEW_BODY,
+            ITEM_NEW_BODY,
             ("--title", "!!!"),
             (forge.ClosedIssue(952, "!!!"),),
             "ERROR: possible twin #952; pass --not-a-twin\n",
             id="identical_title_without_words",
         ),
         pytest.param(
-            _ITEM_NEW_BODY,
+            ITEM_NEW_BODY,
             ("--title", "Write the docs", "--parent", "951"),
             (),
             "ERROR: #951 is not a container\n",
             id="parent_is_not_a_container",
         ),
         pytest.param(
-            _ITEM_NEW_BODY,
+            ITEM_NEW_BODY,
             ("--title", "Write the docs", "--parent", "81"),
             (),
             "ERROR: #81 is not an open container\n",
             id="parent_is_not_open",
         ),
         pytest.param(
-            _ITEM_NEW_BODY,
+            ITEM_NEW_BODY,
             ("--title", "Write the docs", "--origin", "gitlab#5"),
             (),
             'ERROR: --origin needs storage = "state-ref"\n',
@@ -22453,7 +22344,7 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
         ),
         *(
             pytest.param(
-                _ITEM_NEW_BODY,
+                ITEM_NEW_BODY,
                 ("--title", title),
                 (),
                 "ERROR: --title must be a non-empty string\n",
@@ -22541,7 +22432,7 @@ def test_item_new_json_reports_a_created_issue_it_could_not_finish(
     `partial_write` naming it and what is left, never a plain refusal that
     would read as "nothing created" nor a success."""
     client = _item_new_github_client(monkeypatch, tmp_path)
-    pipe_onto_stdin(_ITEM_NEW_BODY)
+    pipe_onto_stdin(ITEM_NEW_BODY)
     setattr(client, failure, True)
     command = ["item", "new", "--title", "Write the docs", *flags, "--json"]
 
@@ -22576,7 +22467,7 @@ def test_item_new_rerun_on_github_meets_its_own_issue_as_a_twin(
     the twin search and creates nothing; `--not-a-twin` creates a second
     one anyway, as ruled."""
     client = _item_new_github_client(monkeypatch, tmp_path)
-    pipe_onto_stdin(_ITEM_NEW_BODY)
+    pipe_onto_stdin(ITEM_NEW_BODY)
     if failure is not None:
         setattr(client, failure, True)
     command = ["item", "new", "--title", "Write the docs", "--parent", "79"]
@@ -22584,7 +22475,7 @@ def test_item_new_rerun_on_github_meets_its_own_issue_as_a_twin(
     if failure is not None:
         setattr(client, failure, False)
     capsys.readouterr()
-    pipe_onto_stdin(_ITEM_NEW_BODY)
+    pipe_onto_stdin(ITEM_NEW_BODY)
 
     refused = issue_claim.main(command)
 
@@ -22593,7 +22484,7 @@ def test_item_new_rerun_on_github_meets_its_own_issue_as_a_twin(
         "ERROR: possible twin #900; pass --not-a-twin\n",
         1,
     )
-    pipe_onto_stdin(_ITEM_NEW_BODY)
+    pipe_onto_stdin(ITEM_NEW_BODY)
     assert issue_claim.main([*command, "--not-a-twin"]) == 0
     assert len(client.created_issues) == 2
 
@@ -22981,7 +22872,7 @@ def _github_item_new(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, pipe: Callable[[str], None]
 ) -> tuple[FakeForge, list[str]]:
     client = _item_new_github_client(monkeypatch, tmp_path)
-    pipe(_ITEM_NEW_BODY)
+    pipe(ITEM_NEW_BODY)
     return client, ["item", "new", "--title", "Write the docs", "--kind", "feature"]
 
 
@@ -23124,7 +23015,7 @@ def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[
     _real_git(repository, "add", "README.md")
     _real_git(repository, "commit", "-q", "-m", "initial")
     _real_git(repository, "remote", "add", "origin", str(bare_remote))
-    _redirect_toplevel(monkeypatch, repository)
+    redirect_toplevel(monkeypatch, repository)
     return repository, bare_remote
 
 
@@ -23363,7 +23254,7 @@ def test_cli_reset_refuses_naming_every_live_claim_and_touches_nothing(
     ]
     for command in printed_releases:
         filled = command.replace("<reason>", shlex.quote("a stuck state ref"))
-        bash_exit_code, arguments = _arguments_bash_hands_aco(filled, tmp_path)
+        bash_exit_code, arguments = arguments_bash_hands_aco(filled, tmp_path)
         assert (bash_exit_code, arguments[:1]) == (0, ["release"])
         assert issue_claim.main(arguments) == 0, capsys.readouterr().err
     capsys.readouterr()
@@ -23840,7 +23731,7 @@ def _claim_untracked_scope_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     repo, _remote, _oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     worktree = tmp_path / "lane"
     _real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
-    _redirect_toplevel(monkeypatch, worktree)
+    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return _read_once(["claim", "314", "--scope", "src/x.py"], toplevel=worktree)
 

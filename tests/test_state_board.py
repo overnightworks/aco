@@ -30,31 +30,29 @@ import pytest
 from board_fixtures import (
     MINIMAL_BLOCK_TOML,
     block_body,
+    projected_board,
     unfilled_block_body,
     write_repository_config,
 )
 from cli_fixtures import (
     _real_git,
+    arguments_bash_hands_aco,
+    body_file_on_stdin,
+    closed_stdin,
     count_context_reads,
+    devnull_on_stdin,
+    empty_harness_socket_on_stdin,
     fresh_observation,
     head_sha,
+    main_with_piped_stdin,
+    piped_body_on_stdin,
+    piping,
+    redirect_toplevel,
     set_git_identity,
     stub_board_config_tracked,
+    terminal_on_stdin,
 )
 from github_fixtures import FakeForge
-from test_cli import (
-    _arguments_bash_hands_aco,
-    _body_file_on_stdin,
-    _closed_stdin,
-    _devnull_on_stdin,
-    _empty_harness_socket_on_stdin,
-    _piped_body_on_stdin,
-    _piping,
-    _redirect_toplevel,
-    _terminal_on_stdin,
-    main_with_piped_stdin,
-    projected_board,
-)
 from test_store import _blob, _push_raw_state_tree, _raw_tree, _state_ref_listing
 
 from agent_coordination import board, checkout, forge, items, process, protocol, store
@@ -1803,7 +1801,7 @@ class TestCliStateRefForge:
             worktree, f'storage = "state-ref"\ncanonical_remote = "{canonical_remote}"\n'
         )
         stub_board_config_tracked(monkeypatch)
-        _redirect_toplevel(monkeypatch, worktree)
+        redirect_toplevel(monkeypatch, worktree)
         monkeypatch.chdir(worktree)
 
     def _live_state_ref_checkout(
@@ -2990,7 +2988,7 @@ class TestCliStateRefForge:
         ("stdin_source", "flags", "err", "prefix", "block"),
         [
             pytest.param(
-                _piping("Ship the importer.\n"),
+                piping("Ship the importer.\n"),
                 ("--now", "Ready.", "--next", "Build it.", "--done-when", "Merged.", "--size", "S"),
                 "",
                 "Ship the importer.\n\n```aco\n",
@@ -2998,7 +2996,7 @@ class TestCliStateRefForge:
                 id="prose_above_a_block_built_from_the_flags",
             ),
             pytest.param(
-                _piping("Ship the importer.  \r\nKeep it exact.\t\r\n"),
+                piping("Ship the importer.  \r\nKeep it exact.\t\r\n"),
                 ("--now", "Ready.", "--next", "Build it.", "--done-when", "Merged."),
                 "",
                 "Ship the importer.  \r\nKeep it exact.\t\r\n\r\n```aco\r\n",
@@ -3006,7 +3004,7 @@ class TestCliStateRefForge:
                 id="crlf_prose_kept_byte_for_byte_above_a_crlf_block",
             ),
             pytest.param(
-                _piping("Ship the importer. \n\n"),
+                piping("Ship the importer. \n\n"),
                 ("--now", "Ready.", "--next", "Build it.", "--done-when", "Merged."),
                 "",
                 "Ship the importer. \n\n\n```aco\n",
@@ -3014,7 +3012,7 @@ class TestCliStateRefForge:
                 id="trailing_whitespace_and_blank_lines_kept",
             ),
             pytest.param(
-                _piping("Ship the importer.\t"),
+                piping("Ship the importer.\t"),
                 ("--now", "Ready.", "--next", "Build it.", "--done-when", "Merged."),
                 "",
                 "Ship the importer.\t\n\n```aco\n",
@@ -3022,7 +3020,7 @@ class TestCliStateRefForge:
                 id="unended_last_line_kept_and_ended",
             ),
             pytest.param(
-                _piping(
+                piping(
                     f"Ship the importer.\n\n```{BLOCK_FENCE_INFO}\nversion = 1\n"
                     'now = "Ready."\nnext = ""\ndone_when = ""\n```\n'
                 ),
@@ -3034,7 +3032,7 @@ class TestCliStateRefForge:
                 id="a_piped_block_matching_the_flags_kept_and_its_gaps_named",
             ),
             pytest.param(
-                _piping(""),
+                piping(""),
                 (),
                 "{item} misses Now; aco item edit {item} fills it\n"
                 "{item} misses Next; aco item edit {item} fills it\n"
@@ -3044,7 +3042,7 @@ class TestCliStateRefForge:
                 id="nothing_piped_writes_the_skeleton_and_names_each_gap",
             ),
             pytest.param(
-                _empty_harness_socket_on_stdin,
+                empty_harness_socket_on_stdin,
                 (),
                 "{item} misses Now; aco item edit {item} fills it\n"
                 "{item} misses Next; aco item edit {item} fills it\n"
@@ -3103,7 +3101,7 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         command = ["item", "new", "--title", "Ship the importer", "--now", "Elsewhere."]
 
-        with _piping(_github_body(_CHILD_A_PROJECTION))(tmp_path) as stdin:
+        with piping(_github_body(_CHILD_A_PROJECTION))(tmp_path) as stdin:
             monkeypatch.setattr(sys, "stdin", stdin)
             status = issue_claim.main(command)
 
@@ -3528,7 +3526,7 @@ class TestCliStateRefForge:
         over it -- a minted id, a fresh claim -- `--not-a-twin` included."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
         _stub_claim_checkout(monkeypatch)
-        stdin_source = _closed_stdin if piped_body is None else _piping(piped_body)
+        stdin_source = closed_stdin if piped_body is None else piping(piped_body)
         remote_url = f"file://{bare_remote}"
         before = store.fetch_state(worktree=worktree, remote=remote_url)
 
@@ -3606,7 +3604,7 @@ class TestCliStateRefForge:
         foreign = {"NOTANID": b"anything", "aco-000001": b"a bare id\n"}
         item_files = {**_item_files(), **_rulable_item_files(), **foreign}
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
-        stdin_source = _closed_stdin if piped_body is None else _piping(piped_body)
+        stdin_source = closed_stdin if piped_body is None else piping(piped_body)
         foreign_paths = [f"items/{name}".encode() for name in foreign]
         before = _state_ref_listing(bare_remote)
 
@@ -4436,12 +4434,12 @@ class TestCliStateRefForge:
     @pytest.mark.parametrize(
         ("stdin_source", "edits"),
         [
-            pytest.param(_body_file_on_stdin, True, id="redirected_file_edits"),
-            pytest.param(_piped_body_on_stdin, True, id="fifo_edits"),
-            pytest.param(_empty_harness_socket_on_stdin, False, id="harness_socket_refuses"),
-            pytest.param(_terminal_on_stdin, False, id="terminal_refuses"),
-            pytest.param(_devnull_on_stdin, False, id="devnull_refuses"),
-            pytest.param(_closed_stdin, False, id="closed_stdin_refuses"),
+            pytest.param(body_file_on_stdin, True, id="redirected_file_edits"),
+            pytest.param(piped_body_on_stdin, True, id="fifo_edits"),
+            pytest.param(empty_harness_socket_on_stdin, False, id="harness_socket_refuses"),
+            pytest.param(terminal_on_stdin, False, id="terminal_refuses"),
+            pytest.param(devnull_on_stdin, False, id="devnull_refuses"),
+            pytest.param(closed_stdin, False, id="closed_stdin_refuses"),
         ],
     )
     def test_item_edit_reads_a_body_only_from_a_file_or_pipe_on_stdin(
@@ -4653,7 +4651,7 @@ class TestCliStateRefForge:
         stored = store.read_item_files(worktree, state.tip)[f"{CLOSE_BLOCKER_ID}.md"].decode()
         assert _decoded_record(stored, CLOSE_BLOCKER_ID).state is items.RecordState.CLOSED
         advice = hint.split("`")[1]
-        assert _arguments_bash_hands_aco(advice, tmp_path) == (0, ["board", "--json"])
+        assert arguments_bash_hands_aco(advice, tmp_path) == (0, ["board", "--json"])
         advised = issue_claim.main(["board", "--json"])
         assert (advised, capsys.readouterr().err) == (2, f"ERROR: {refusal}\n")
 
