@@ -17,7 +17,6 @@ import json
 import re
 import shlex
 import shutil
-import subprocess
 import sys
 import uuid
 from collections.abc import Callable, Mapping
@@ -34,9 +33,16 @@ from board_fixtures import (
     unfilled_block_body,
     write_repository_config,
 )
-from cli_fixtures import count_context_reads, fresh_observation, stub_board_config_tracked
+from cli_fixtures import (
+    _real_git,
+    count_context_reads,
+    fresh_observation,
+    head_sha,
+    set_git_identity,
+    stub_board_config_tracked,
+)
+from github_fixtures import FakeForge
 from test_cli import (
-    FakeForge,
     _arguments_bash_hands_aco,
     _body_file_on_stdin,
     _closed_stdin,
@@ -95,44 +101,7 @@ def _nothing_piped(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GIT_AUTHOR_NAME", "Test")
-    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "test@example.com")
-    monkeypatch.setenv("GIT_COMMITTER_NAME", "Test")
-    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "test@example.com")
-
-
-def _git(*arguments: str, cwd: Path) -> None:
-    subprocess.run(["git", *arguments], cwd=cwd, check=True, capture_output=True)
-
-
-def _head_sha(cwd: Path) -> str:
-    return subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=cwd, check=True, capture_output=True, text=True
-    ).stdout.strip()
-
-
-@pytest.fixture
-def bare_remote(tmp_path: Path) -> Path:
-    """An empty bare repository standing in for the canonical remote (the
-    same shape `test_store.py` builds; duplicated rather than imported so a
-    test parameter here is never mistaken by tooling for a redefinition of
-    an imported fixture of the same name)."""
-    remote = tmp_path / "remote.git"
-    remote.mkdir()
-    _git("init", "--bare", "-b", "main", cwd=remote)
-    return remote
-
-
-@pytest.fixture
-def worktree(tmp_path: Path) -> Path:
-    """An ordinary git checkout used as this test's client worktree."""
-    checkout = tmp_path / "worktree"
-    checkout.mkdir()
-    _git("init", "-b", "main", cwd=checkout)
-    (checkout / "README").write_text("placeholder\n")
-    _git("add", "README", cwd=checkout)
-    _git("commit", "-m", "initial", cwd=checkout)
-    return checkout
+    set_git_identity(monkeypatch)
 
 
 @dataclass(frozen=True)
@@ -691,7 +660,7 @@ def _store_item_writer(remote: Path, worktree_path: Path) -> ItemWriter:
     def no_forge(_context: RunContext) -> forge.ForgeReader:
         raise AssertionError("an item write never builds a forge")
 
-    _git("config", "remote.canonical.url", str(remote), cwd=worktree_path)
+    _real_git(worktree_path, "config", "remote.canonical.url", str(remote))
     context = RunContext(None, build_forge=no_forge).for_directory(worktree_path, is_toplevel=True)
     context.config = board.BoardConfig(canonical_remote="canonical", storage=Storage.STATE_REF)
     return issue_claim._StoreItemWriter(context)
@@ -1851,9 +1820,9 @@ class TestCliStateRefForge:
         every write proof below shares (issue #283)."""
         remote_url = f"file://{bare_remote}"
         _push_item_tree(bare_remote, worktree, item_files)
-        _git("remote", "add", "origin", remote_url, cwd=worktree)
-        _git("push", "origin", "main", cwd=worktree)
-        _git("remote", "set-head", "origin", "main", cwd=worktree)
+        _real_git(worktree, "remote", "add", "origin", remote_url)
+        _real_git(worktree, "push", "origin", "main")
+        _real_git(worktree, "remote", "set-head", "origin", "main")
         self._enter_pinned_checkout(monkeypatch, worktree)
         monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
 
@@ -2796,9 +2765,9 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         remote_url = f"file://{bare_remote}"
-        _git("remote", "add", "origin", remote_url, cwd=worktree)
-        _git("push", "origin", "main", cwd=worktree)
-        _git("remote", "set-head", "origin", "main", cwd=worktree)
+        _real_git(worktree, "remote", "add", "origin", remote_url)
+        _real_git(worktree, "push", "origin", "main")
+        _real_git(worktree, "remote", "set-head", "origin", "main")
         store.bootstrap(worktree=worktree, remote=remote_url)
         self._enter_pinned_checkout(monkeypatch, worktree)
         monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
@@ -2829,7 +2798,7 @@ class TestCliStateRefForge:
                 _record(title="Trailer-landed", state="open", kind="task"),
             ).encode()
         }
-        _git("commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {item_id}", cwd=worktree)
+        _real_git(worktree, "commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {item_id}")
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
 
         assert issue_claim.main(["board", "--json"]) == 0
@@ -2860,12 +2829,12 @@ class TestCliStateRefForge:
             ).encode()
             for item_id, title in ((first_id, "First"), (second_id, "Second"))
         }
-        _git("commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {first_id}", cwd=worktree)
-        first_sha = _head_sha(worktree)
-        _git(
-            "commit", "--allow-empty", "-m", f"Land it too.\n\nWork-Item: {second_id}", cwd=worktree
+        _real_git(worktree, "commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {first_id}")
+        first_sha = head_sha(worktree)
+        _real_git(
+            worktree, "commit", "--allow-empty", "-m", f"Land it too.\n\nWork-Item: {second_id}"
         )
-        second_sha = _head_sha(worktree)
+        second_sha = head_sha(worktree)
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
         board_command = ["board"]
 
@@ -2893,8 +2862,8 @@ class TestCliStateRefForge:
         `_state_ref_forge` owns names that remote, worded exactly as the run
         tells the operator to fix it."""
         remote_url = f"file://{bare_remote}"
-        _git("remote", "add", canonical_remote, remote_url, cwd=worktree)
-        _git("push", canonical_remote, "main", cwd=worktree)
+        _real_git(worktree, "remote", "add", canonical_remote, remote_url)
+        _real_git(worktree, "push", canonical_remote, "main")
         store.bootstrap(worktree=worktree, remote=remote_url)
         self._enter_pinned_checkout(monkeypatch, worktree, canonical_remote=canonical_remote)
         monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
