@@ -25,7 +25,7 @@ from cli_fixtures import (
     trunk_git_calls,
 )
 
-from agent_coordination import checkout, cli, forge, github, process, session, store
+from agent_coordination import checkout, cmd_workspace, forge, github, process, session, store
 from agent_coordination.protocol import ClaimError, ClaimState, ClaimUnavailableError
 from agent_coordination.session import RunContext
 
@@ -605,7 +605,9 @@ def test_a_command_that_needs_no_repository_reads_no_context(
     workspace dispatch, and lazily, so a parse refusal and a workspace
     command never read the repository a context would answer for."""
     _forbid_context_reads(monkeypatch)
-    monkeypatch.setattr(cli, "_workspace_config_path", lambda: tmp_path / "workspace.toml")
+    monkeypatch.setattr(
+        cmd_workspace, "_workspace_config_path", lambda: tmp_path / "workspace.toml"
+    )
     monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
 
     assert run_cli(command, capsys).status == exit_code
