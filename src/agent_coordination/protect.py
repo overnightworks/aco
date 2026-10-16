@@ -236,13 +236,18 @@ def _protect_hook_paths(tool_name: str, payload: dict[str, object]) -> tuple[str
     return (single,) if single is not None else ()
 
 
-_ProtectStateOutcome = tuple[protocol.ClaimState | None, str | None]
+@dataclass(frozen=True, slots=True)
+class _StoreDenial:
+    reason: str
+
+
+_ProtectStateOutcome = protocol.ClaimState | _StoreDenial
 _ProtectStateCache = dict[Path, _ProtectStateOutcome]
 
 
 def _protect_claim_state_or_denial(worktree: Path, canonical_remote: str) -> _ProtectStateOutcome:
     """`protect`'s live snapshot (issue #176, §1): one fetch, no positive
-    cache (D2). A non-`None` second element names a denial reason for a
+    cache (D2). A `_StoreDenial` names the denial reason for a
     store the hook cannot trust -- unreachable, auth, malformed tree,
     lineage break -- with the same named text (Erwartung 8) instead of the
     generic 'claim first', which would send the agent toward a command that
@@ -254,10 +259,10 @@ def _protect_claim_state_or_denial(worktree: Path, canonical_remote: str) -> _Pr
     try:
         state = store.fetch_state(worktree=worktree, remote=canonical_remote)
     except protocol.ClaimError as error:
-        return None, f"cannot reach {store.STATE_REF}: {error}"
+        return _StoreDenial(f"cannot reach {store.STATE_REF}: {error}")
     if state.tip is None:
-        return None, f"cannot reach {store.STATE_REF}: {protocol.MISSING_STATE_REF}"
-    return state, None
+        return _StoreDenial(f"cannot reach {store.STATE_REF}: {protocol.MISSING_STATE_REF}")
+    return state
 
 
 @dataclass(frozen=True, slots=True)
@@ -711,9 +716,9 @@ def _protect_claim_denial(
 ) -> str | None:
     """Whether a live claim of this session covers `question`'s path,
     reading the store and then the identity."""
-    state, denial = _protect_cached_claim_state_or_denial(question.path_checkout, context=context)
-    if state is None:
-        return denial
+    state = _protect_cached_claim_state_or_denial(question.path_checkout, context=context)
+    if isinstance(state, _StoreDenial):
+        return state.reason
     agent = _hook_session_agent()
     return _protect_scope_denial(
         state,
