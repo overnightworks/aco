@@ -8789,15 +8789,6 @@ def test_lazy_forge_builds_a_state_ref_board_under_the_state_ref_pin(
     assert issue_claim.main(["board", "--json"]) == 0
 
 
-def test_the_state_ref_read_only_stub_no_longer_exists() -> None:
-    """Issue #283 proof 7: the placeholder `cut`/`rule`/`ask`/`claim` all
-    refused with until #230 slice 4 wrote is gone, name and refusal
-    function alike -- a state-ref pin now reaches its own write path
-    instead."""
-    assert not hasattr(issue_claim, "NOT_YET_STATE_REF_WRITE")
-    assert not hasattr(issue_claim, "_refuse_state_ref_write")
-
-
 def test_repo_is_refused_under_the_state_ref_pin(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:

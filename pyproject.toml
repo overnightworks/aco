@@ -45,6 +45,9 @@ testpaths = ["tests"]
 pythonpath = ["tests"]
 addopts = ["-p", "network_guard"]
 
+[tool.coverage.run]
+branch = true
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
