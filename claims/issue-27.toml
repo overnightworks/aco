@@ -1,0 +1,8 @@
+claim_id = "de4a21374c19400a9865d205f1b36a17"
+agent = "Claude fe12493e-3d52-442e-b01b-4ee4336de2f0"
+role = "builder"
+base = "46d5270fc0a1e9e3905418e57d98851032b6a331"
+branch = "claude/issue-27-land-requires-quality-verdict"
+scope = ["README.md", "specs/land.spec.md", "src/agent_coordination/__init__.py", "src/agent_coordination/cli.py", "tests/test_cli.py"]
+opened_commit = "4bcfd69078e96079976e271503193f049010aedf"
+whole_reason = "LANDCMD-43 is one refusal: its spec row, its preflight code, its tests, the README sentence and the version bump land together."
