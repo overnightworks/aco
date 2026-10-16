@@ -1,8 +1,0 @@
-claim_id = "e44615be800e477c8da98e7b03ad3e04"
-agent = "claude"
-role = "builder"
-base = "7e1b2f8cdb78626d493581c3a24bf37fb846946d"
-branch = "claude/issue-5-remove-old-board-server"
-scope = ["README.md", "pyproject.toml", "scripts/test_budget_ratchet.txt", "scripts/vulture_whitelist.py", "specs/board.spec.md", "specs/landing-grammar.spec.md", "specs/output.spec.md", "specs/ref-store-cas.spec.md", "specs/rule.spec.md", "specs/storage-pin.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/board_html.py", "src/agent_coordination/board_serve.py", "src/agent_coordination/body.py", "src/agent_coordination/cli.py", "src/agent_coordination/session.py", "src/agent_coordination/state_board.py", "src/agent_coordination/workspace.py", "tests/board_html_golden.html", "tests/board_html_golden_ruled.html", "tests/cli_fixtures.py", "tests/test_board.py", "tests/test_board_html.py", "tests/test_board_serve.py", "tests/test_cli.py", "tests/test_state_board.py", "tests/test_workspace.py"]
-opened_commit = "1d4b12856d9f88ec864d1d1df8c5ff78c8e3faf0"
-whole_reason = "Das Entfernen einer öffentlichen Fläche berührt Code, Tests, Specs und Doku gemeinsam; halb entfernt wäre schlimmer."
