@@ -1,0 +1,8 @@
+claim_id = "7d09c4f03d674b4fbefc49aec1a502df"
+agent = "claude"
+role = "builder"
+base = "05950293f8991f4bed3e2942efa3751f8571b960"
+branch = "claude/issue-48-test-git-helpers-fakeforge"
+scope = ["tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/test_cli.py", "tests/test_protect.py", "tests/test_state_board.py", "tests/test_store.py"]
+opened_commit = "4482296f0bb2cb0f925a1a9bb021b902f82ec1b5"
+whole_reason = "Bündel aus #1 Zeile 1 und 2 (#48, #49); beide verschieben Test-Hilfen aus test_store.py und test_state_board.py und landen zusammen."
