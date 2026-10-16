@@ -94,6 +94,9 @@ def test_bootstrap_refuses_an_unreachable_remote_on_stderr_alone(
 
     with pytest.raises(protocol.ClaimError) as store_refusal:
         store.fetch_state(worktree=clone, remote="origin")
+    assert str(store_refusal.value).startswith(
+        "cannot reach origin refs/aco/state: auth or transport failure (ls-remote exited 128)"
+    )
 
     refused = run_cli(["bootstrap"], capsys)
 
