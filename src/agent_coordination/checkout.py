@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
 
-from . import board, process
+from . import board, body, process, protocol
 from .protocol import (
     ClaimError,
     ClaimRequest,
@@ -1676,3 +1676,159 @@ def branch_merged_into_default(branch: str, *, trunk: str, directory: Path) -> b
     if result.exit_status == 1:
         return False
     raise ClaimError(process.git_failure_detail(result))
+
+
+def _trunk_no_item_landing_defect(
+    landings: tuple[TrunkLanding, ...], sha: str, pull_request: int
+) -> str | None:
+    """Why `sha` does not authorize an issue-less lane's own `--merged`
+    release (issue #405, #397 gate follow-up): mirrors `_trunk_landing_defect`'s
+    own walk of the first-parent trunk, for the one classification shape
+    that names no work item at all -- read from the merge commit's own
+    trailer block, never the pull request's mutable `body` (issue #397,
+    Befund 41)."""
+    landing = next((entry for entry in landings if entry.sha == sha), None)
+    if landing is None:
+        return SHA_NOT_ON_TRUNK_DEFECT
+    if landing.work_item_values:
+        return _lane_work_item_trailer_defect(landing.work_item_values, pull_request)
+    classification = landing.classification
+    if classification is None:
+        return "carries no `Work-Item:` or `No-Item:` trailer"
+    if isinstance(classification, board.ClassificationDefect):
+        return classification.message
+    return None
+
+
+def _lane_work_item_trailer_defect(work_item_values: tuple[str, ...], pull_request: int) -> str:
+    """The lane rule a `Work-Item:` trailer breaks, valid or malformed alike
+    (issue #427), ending in the only way out: a landed trailer can no longer
+    change, so the lane is released as abandoned with the landing named."""
+    values = ", ".join(work_item_values)
+    return (
+        f"carries `Work-Item: {values}`; an issue-less lane needs a `No-Item: <docs|fix>` "
+        f'trailer; release it with --abandoned "landed as PR #{pull_request} '
+        'with a malformed trailer"'
+    )
+
+
+def trunk_since(landings: tuple[TrunkLanding, ...], sha: str) -> frozenset[str]:
+    """The walked first-parent trunk commits from `sha` -- one of them, the
+    trailer check already proved -- to the walk's tip (`landings` reads
+    oldest first)."""
+    shas = [landing.sha for landing in landings]
+    return frozenset(shas[shas.index(sha) :])
+
+
+def verify_landing_authority(
+    identity: protocol.ClaimIdentity,
+    landings: tuple[TrunkLanding, ...],
+    pull_request: int,
+    merge_commit: str,
+    storage: body.Storage,
+) -> None:
+    """`_verify_merged_release`'s trailer authority check on the fetched
+    trunk's `landings`."""
+    if isinstance(identity, protocol.LaneIdentity):
+        defect = _trunk_no_item_landing_defect(landings, merge_commit, pull_request)
+        if defect is not None:
+            raise protocol.ClaimUnavailableError(
+                f"merge commit {merge_commit} of pull request #{pull_request} {defect}"
+            )
+        return
+    _verify_merge_commit_authority(landings, pull_request, identity.issue, merge_commit, storage)
+
+
+def _newest_landed_commit(
+    landings: tuple[TrunkLanding, ...], number: int, storage: body.Storage
+) -> str:
+    """The most recent first-parent trunk commit whose own trailer names
+    `number` (issue #359, LAND-47): the empty-value form of `release
+    --merged`'s own sha argument under `storage = "state-ref"`."""
+    for landing in reversed(landings):
+        classification = landing.classification
+        if (
+            isinstance(classification, board.TrunkWorkItemClassification)
+            and number in classification.numbers
+        ):
+            return landing.sha
+    raise protocol.ClaimUnavailableError(
+        f"no trunk commit carries a Work-Item: trailer naming {board.item_label(number, storage)}"
+    )
+
+
+SHA_NOT_ON_TRUNK_DEFECT = "is not on the first-parent trunk"
+
+
+def _trunk_landing_defect(
+    landings: tuple[TrunkLanding, ...], number: int, sha: str, storage: body.Storage
+) -> str | None:
+    """Why `sha` does not authorize closing work item `number` from the
+    walked first-parent trunk (issue #359 LAND-52), or `None` when it does:
+    `sha` must sit on that trunk and carry a `Work-Item:` trailer naming
+    exactly `number`. One reader (`checkout.trunk_landings`) and one grammar
+    (`board.trunk_commit_classification`) for both `release --merged
+    <sha|empty>` under `storage = state-ref` and, since issue #397 (Befund
+    41), `release --merged <pr>` under `storage = github`'s own merge-commit
+    verification -- neither trusts a different notion of "landed"."""
+    landing = next((entry for entry in landings if entry.sha == sha), None)
+    if landing is None:
+        return SHA_NOT_ON_TRUNK_DEFECT
+    classification = landing.classification
+    if classification is None:
+        return "carries no `Work-Item:` trailer"
+    if isinstance(classification, board.ClassificationDefect):
+        return classification.message
+    if (
+        not isinstance(classification, board.TrunkWorkItemClassification)
+        or number not in classification.numbers
+    ):
+        return f"does not name work item {board.item_label(number, storage)}"
+    return None
+
+
+def _landed_commit_by_sha(
+    landings: tuple[TrunkLanding, ...], number: int, sha: str, storage: body.Storage
+) -> str:
+    """`sha`, verified as `number`'s own landing commit (issue #359,
+    LAND-52): refused by name before anything is written otherwise."""
+    defect = _trunk_landing_defect(landings, number, sha, storage)
+    if defect is not None:
+        raise protocol.ClaimUnavailableError(f"{sha} {defect}")
+    return sha
+
+
+def _verify_merge_commit_authority(
+    landings: tuple[TrunkLanding, ...],
+    pull_request: int,
+    number: int,
+    sha: str,
+    storage: body.Storage,
+) -> None:
+    """Refuse a github `release --merged <pr>` whose merge commit does not
+    authorize closing `number` (issue #397, Befund 41): `number` is the
+    claim's own issue, resolved before `_verify_merged_release` ever calls
+    this -- never the pull request's own mutable body -- and this merge
+    commit trailer is the actual authority, the same `_trunk_landing_defect`
+    reads for `storage = state-ref`."""
+    defect = _trunk_landing_defect(landings, number, sha, storage)
+    if defect is not None:
+        raise protocol.ClaimUnavailableError(
+            f"merge commit {sha} of pull request #{pull_request} {defect}"
+        )
+
+
+def landed_commit(
+    landings: tuple[TrunkLanding, ...],
+    number: int,
+    requested: str,
+    storage: body.Storage,
+) -> str:
+    """The trunk-landing commit `release --merged <sha|empty>` closes
+    `number` from, under `storage = "state-ref"` (issue #359, LAND-47/
+    LAND-52): `requested` empty picks the newest such commit
+    (`_newest_landed_commit`); a given sha is verified instead
+    (`_landed_commit_by_sha`)."""
+    if requested:
+        return _landed_commit_by_sha(landings, number, requested, storage)
+    return _newest_landed_commit(landings, number, storage)

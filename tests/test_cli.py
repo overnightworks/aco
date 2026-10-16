@@ -16012,7 +16012,7 @@ def test_release_merged_refuses_a_work_item_neither_open_nor_closed(
 def test_release_merged_refuses_a_non_numeric_pull_request_under_github(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """`_github_pull_request_number`'s own guard (issue #359): `--merged`
+    """`github.github_pull_request_number`'s own guard (issue #359): `--merged`
     under `storage = "github"` (the default here -- no board.toml pins
     state-ref) takes only a bare pull request number, never the sha grammar
     that pin's own `<sha|empty>` form reads; refuses before touching git,
