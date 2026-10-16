@@ -15625,7 +15625,7 @@ def test_release_merged_fetches_each_candidates_dependencies_only_once(
     )
 
     assert exit_code == 0
-    assert sorted(observed_dependency_calls) == [80, 81, 82, 83]
+    assert sorted(observed_dependency_calls) == [80, 81, 82, 83, 84]
 
 
 @pytest.mark.parametrize(
