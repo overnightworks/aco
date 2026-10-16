@@ -1,8 +1,0 @@
-claim_id = "c051ec16cc674c6db24e03732170d33c"
-agent = "Claude 3e666570-2fb5-4abd-955d-af106f942216"
-role = "builder"
-base = "e97e3091fbaccb8f4846625fa309075bd3ebd43e"
-branch = "claude/issue-29-brief-outside-claim"
-scope = ["specs/brief.spec.md", "src/agent_coordination/cli.py", "src/agent_coordination/protocol.py", "tests/test_cli.py"]
-opened_commit = "b4f63f24f8769fc2caa631026ab6de3f9a0ddf99"
-whole_reason = "One JSON key: its spec line, the brief composer in cli.py, the scope matcher in protocol.py, and the brief tests."
