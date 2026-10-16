@@ -1,0 +1,8 @@
+claim_id = "1c1a2885fb534c2287fca7d9135c7a9b"
+agent = "claude"
+role = "builder"
+base = "e8d6db746bac0d9fb8ddba25c95a2d52df978fbf"
+branch = "claude/issue-77-lane4-gates"
+scope = ["scripts/test_budget.py", "scripts/test_inventory.py", "tests/test_test_budget.py", "tests/test_test_inventory.py"]
+opened_commit = "9564d2e4db5115abf0904f07cfbece6249cff2be"
+whole_reason = "Zwei Gate-Skripte und ihre Tests messen gemeinsam das Rewrite-Protokoll; einzeln bliebe eine der beiden Regeln ungemessen."
