@@ -8,7 +8,7 @@ module already stands alone for exactly this reason, per its docstring).
 from __future__ import annotations
 
 import pytest
-from cli_fixtures import _patch_command
+from cli_fixtures import patch_command
 
 from agent_coordination import hook_input
 
@@ -139,7 +139,7 @@ from agent_coordination import hook_input
 def test_hook_patch_paths_extracts_every_file_line(
     lines: tuple[str, ...], paths: tuple[str, ...]
 ) -> None:
-    assert hook_input.hook_patch_paths(_patch_command(*lines)) == paths
+    assert hook_input.hook_patch_paths(patch_command(*lines)) == paths
 
 
 def test_hook_patch_paths_accepts_an_environment_id_line_after_begin_patch() -> None:
@@ -148,7 +148,7 @@ def test_hook_patch_paths_accepts_an_environment_id_line_after_begin_patch() -> 
     `begin_patch environment_id? hunk+ end_patch`); without it, every patch
     Codex prefixes this way was denied outright for lacking a path
     (`PATH_REQUIRED` in `protect._protect_write`)."""
-    text = _patch_command(
+    text = patch_command(
         "*** Environment ID: 11111111-1111-1111-1111-111111111111",
         "*** Update File: src/widget.py",
         "@@",
@@ -163,7 +163,7 @@ def test_hook_patch_paths_rejects_an_environment_id_line_before_begin_patch() ->
     """The wrong position fails closed rather than being silently accepted:
     Codex's own grammar never places `Environment ID` before `Begin Patch`,
     so a patch text in that shape names no path at all."""
-    text = "*** Environment ID: 11111111-1111-1111-1111-111111111111\n" + _patch_command(
+    text = "*** Environment ID: 11111111-1111-1111-1111-111111111111\n" + patch_command(
         "*** Update File: src/widget.py", "@@", "-old", "+new"
     )
 
@@ -207,13 +207,13 @@ def test_hook_patch_paths_ignores_a_trailing_carriage_return_like_codex(text: st
         "not a patch at all",
         "",
         pytest.param(
-            _patch_command("*** Add File: a.py", "+x")
+            patch_command("*** Add File: a.py", "+x")
             + "\n"
-            + _patch_command("*** Add File: b.py", "+y"),
+            + patch_command("*** Add File: b.py", "+y"),
             id="two-begin-patch-blocks",
         ),
         pytest.param(
-            _patch_command("*** Add File: a.py", "+x") + "\n*** Add File: b.py",
+            patch_command("*** Add File: a.py", "+x") + "\n*** Add File: b.py",
             id="a-file-line-after-end-patch",
         ),
         pytest.param(
@@ -221,23 +221,23 @@ def test_hook_patch_paths_ignores_a_trailing_carriage_return_like_codex(text: st
             id="a-line-the-grammar-does-not-admit-outside-any-header",
         ),
         pytest.param(
-            _patch_command("*** Update File: src/widget.py", "@@", "bad", "+new"),
+            patch_command("*** Update File: src/widget.py", "@@", "bad", "+new"),
             id="an-unrecognized-line-inside-an-update-hunk-is-refused-not-swallowed",
         ),
         pytest.param(
-            _patch_command("*** Move to: src/renamed.py"),
+            patch_command("*** Move to: src/renamed.py"),
             id="move-to-before-any-update-file-header-is-refused",
         ),
         pytest.param(
-            _patch_command("*** Add File: ", "+x"),
+            patch_command("*** Add File: ", "+x"),
             id="a-header-with-an-empty-path-is-refused",
         ),
         pytest.param(
-            _patch_command("*** Update File: src/widget.py", "*** Move to: ", "@@", "-old", "+new"),
+            patch_command("*** Update File: src/widget.py", "*** Move to: ", "@@", "-old", "+new"),
             id="a-move-to-with-an-empty-path-is-refused",
         ),
         pytest.param(
-            _patch_command(
+            patch_command(
                 "*** Update File: a.py",
                 "@@",
                 "-x",

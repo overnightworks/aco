@@ -1,9 +1,4 @@
-"""Pull-request scenario values and the fake forge shared by
-`tests/test_cli.py` (`check`/`release` CLI wiring), `tests/test_github.py`
-(the GitHub adapter's own landing-reading behavior) and the owner test files
-split from it. All import this module directly; pytest's rootless collection
-puts `tests/` on `sys.path`, so a plain `import github_fixtures` resolves
-here."""
+"""Pull-request scenario values and the fake forge."""
 
 from __future__ import annotations
 

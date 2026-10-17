@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from cli_fixtures import _real_repository_with_bare_remote, real_git, sealed_git_environment
+from cli_fixtures import real_git, real_repository_with_bare_remote, sealed_git_environment
 from network_guard import GIT_ALLOW_PROTOCOL_ENV, UNREACHABLE_GH_HOST
 
 _PROJECT_CONFIGURATION = Path(__file__).parent.parent / "pyproject.toml"
@@ -130,7 +130,7 @@ def _push_a_commit(
 ) -> subprocess.CompletedProcess[str]:
     """A first commit of the shared real-git repository pushed to
     `remote_url` of its bare remote, the push allowed to fail."""
-    repository, bare_remote = _real_repository_with_bare_remote(tmp_path)
+    repository, bare_remote = real_repository_with_bare_remote(tmp_path)
     real_git(repository, "commit", "-q", "--allow-empty", "-m", "first")
     return real_git(repository, "push", "-q", remote_url(bare_remote), "main", check=False)
 

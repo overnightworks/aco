@@ -14,12 +14,12 @@ from pathlib import Path
 import pytest
 from board_fixtures import write_repository_config
 from cli_fixtures import (
-    _push_repository_trunk,
-    _real_repository_with_bare_remote,
     fetched_once_then_read,
     init_bare_repository,
     landed_from_another_clone,
+    push_repository_trunk,
     real_git,
+    real_repository_with_bare_remote,
     run_cli,
     stub_board_config_tracked,
     trunk_git_calls,
@@ -283,7 +283,7 @@ def _commit(repository: Path, message: str) -> str:
 def _pushed_repository(tmp_path: Path, board_config: str = "") -> Path:
     """A repository with one commit pushed to its bare `origin`, no `HEAD`
     recorded for it, and `board_config` as its board configuration."""
-    repository, _remote = _real_repository_with_bare_remote(tmp_path)
+    repository, _remote = real_repository_with_bare_remote(tmp_path)
     _commit(repository, "initial")
     real_git(repository, "push", "-q", "origin", "main")
     write_repository_config(repository, board_config)
@@ -374,7 +374,7 @@ def test_every_trunk_read_names_the_canonical_remote_never_a_diverging_origin(
     init_bare_repository(hub)
     real_git(repository, "remote", "add", "hub", str(hub))
     _commit(repository, "second")
-    _push_repository_trunk(repository, "hub")
+    push_repository_trunk(repository, "hub")
     origin_reads = trunk_git_calls(monkeypatch, "origin")
     context = _context().for_directory(repository)
 
@@ -401,7 +401,7 @@ def test_a_fresh_context_whose_configuration_names_another_remote_fetches_that_r
     init_bare_repository(hub)
     real_git(repository, "remote", "add", "hub", str(hub))
     stale = _commit(repository, "second")
-    _push_repository_trunk(repository, "hub")
+    push_repository_trunk(repository, "hub")
     landed = _commit(repository, "landed")
     real_git(repository, "push", "-q", "hub", "main")
     real_git(repository, "update-ref", "refs/remotes/hub/main", stale)

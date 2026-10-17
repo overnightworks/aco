@@ -19,15 +19,15 @@ import pytest
 from board_fixtures import BASE, request, write_repository_config
 from cli_fixtures import (
     AGENT_IDENTITY_ENV_NAMES,
-    _git_checkout,
-    _push_repository_trunk,
-    _real_repository_with_bare_remote,
-    _set_agent_identity_env,
-    _stub_one_git_call,
     bare_remote_repository_with_one_commit,
     dangle_recorded_head,
+    git_checkout,
     init_bare_repository,
+    push_repository_trunk,
     real_git,
+    real_repository_with_bare_remote,
+    set_agent_identity_env,
+    stub_one_git_call,
 )
 
 from agent_coordination import board, checkout, process
@@ -62,7 +62,7 @@ def test_remote_url_reads_the_git_config_of_the_given_directory(
     """Issue #457 proof 7 at the checkout boundary: a remote's URL comes
     from the git configuration of the directory it is asked for, or of the
     calling process's cwd when none is given."""
-    repo, origin = _real_repository_with_bare_remote(tmp_path)
+    repo, origin = real_repository_with_bare_remote(tmp_path)
     remote_urls = {"origin": str(origin), "upstream": "git@github.com:owner/repository.git"}
     real_git(repo, "remote", "add", "upstream", remote_urls["upstream"])
     outside_every_repository = tmp_path / "elsewhere"
@@ -568,7 +568,7 @@ def test_refuse_shared_checkout_matrix(
     known -- it is the same branch the caller resolved its identity from --
     so `RETURN_TO_CLAIM` names it instead of leaving the sentence
     branch-less."""
-    repository, _remote = _real_repository_with_bare_remote(tmp_path)
+    repository, _remote = real_repository_with_bare_remote(tmp_path)
     path_checkout = checkout.PathCheckout(
         toplevel=repository,
         branch=branch,
@@ -600,7 +600,7 @@ def test_claim_default_branch_fallback_denies_only_main_and_master(
     guess and nothing else -- `trunk` is not treated as default without a
     recorded one, so deleting `DEFAULT_BRANCH_FALLBACK` would fail this
     test by letting `main`/`master` through instead."""
-    values = _git_checkout(branch=branch)
+    values = git_checkout(branch=branch)
     monkeypatch.setattr(
         checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
@@ -936,7 +936,7 @@ def test_a_dangling_or_plain_recorded_head_counts_as_unrecorded_and_the_trunk_gu
     """Issue #490: a remote `HEAD` that names no resolvable branch counts
     as never recorded -- no default branch, and the trunk guesses on with
     `origin/main` instead of handing git a ref it cannot resolve."""
-    repo, remote = _real_repository_with_bare_remote(tmp_path)
+    repo, remote = real_repository_with_bare_remote(tmp_path)
     real_git(repo, "commit", "-q", "--allow-empty", "-m", "initial")
     record(repo, remote)
     recorded_head = checkout.recorded_head_ref("origin", directory=repo)
@@ -1053,7 +1053,7 @@ def _trunk_history_repository(tmp_path: Path) -> Path:
     block. A `sidebranch` ref never joins that first-parent line. One
     history serves every one of the five proofs at once, since building a
     real git repository per proof would only repeat the same setup."""
-    repo, _remote = _real_repository_with_bare_remote(tmp_path, remote_name="hub")
+    repo, _remote = real_repository_with_bare_remote(tmp_path, remote_name="hub")
     (repo / "base.txt").write_text("base\n")
     real_git(repo, "add", "base.txt")
     real_git(repo, "commit", "-q", "-m", "initial")
@@ -1104,7 +1104,7 @@ def _trunk_history_repository(tmp_path: Path) -> Path:
     real_git(repo, "commit", "-q", "-m", "side change", "-m", "Work-Item: #99")
     real_git(repo, "checkout", "-q", "main")
 
-    _push_repository_trunk(repo, "hub")
+    push_repository_trunk(repo, "hub")
     return repo
 
 
@@ -1254,7 +1254,7 @@ def test_validate_slug_refuses_a_value_the_derived_rule_would_never_produce(slug
 def test_branch_prefix_for_identity_reads_the_same_precedence_as_resolved_agent(
     monkeypatch: pytest.MonkeyPatch, environ: dict[str, str], prefix: str
 ) -> None:
-    _set_agent_identity_env(monkeypatch, environ)
+    set_agent_identity_env(monkeypatch, environ)
 
     assert checkout.branch_prefix_for_identity() == prefix
 
@@ -1275,7 +1275,7 @@ def test_branch_prefix_for_identity_refuses_an_identity_claim_would_refuse(
 ) -> None:
     """START-03: `start` refuses before any worktree exists whatever the
     `claim` inside it would refuse, with the same sentence."""
-    _set_agent_identity_env(monkeypatch, environ)
+    set_agent_identity_env(monkeypatch, environ)
 
     with pytest.raises(ClaimError, match=refusal):
         checkout.branch_prefix_for_identity()
@@ -1531,7 +1531,7 @@ def _linked_to_a_git_directory_kept_elsewhere(
 
 def _core_worktree_unreadable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A conventional repository whose `core.worktree` read fails outright."""
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         ["config", "--get", "core.worktree"],
         exit_status=128,
@@ -1585,7 +1585,7 @@ def test_worktree_on_branch_surfaces_a_git_failure_resolving_a_registered_worktr
     never a silently skipped "not on this branch"."""
     main, worktree = _repo_with_linked_worktree(tmp_path)
     monkeypatch.chdir(main)
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         [
             "rev-parse",
@@ -1612,7 +1612,7 @@ def test_resolve_path_checkout_fails_loud_on_a_malformed_rev_parse_reply(
     `None`."""
     repository = _scratch_git_repository(tmp_path)
     monkeypatch.chdir(repository)
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         [
             "rev-parse",
@@ -1654,7 +1654,7 @@ def test_branch_merged_into_default_is_true_only_after_a_real_merge(tmp_path: Pa
     before = checkout.branch_merged_into_default("feature", trunk=trunk, directory=repo)
 
     real_git(repo, "merge", "-q", "--no-ff", "-m", "Merge feature", "feature")
-    _push_repository_trunk(repo, "origin")
+    push_repository_trunk(repo, "origin")
     after = checkout.branch_merged_into_default("feature", trunk=trunk, directory=repo)
 
     assert (before, after) == (False, True)
@@ -1665,7 +1665,7 @@ def test_branch_exists_fails_loud_on_an_unexpected_git_exit(
 ) -> None:
     repository = _scratch_git_repository(tmp_path)
     monkeypatch.chdir(repository)
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         ["show-ref", "--verify", "--quiet", "refs/heads/x"],
         exit_status=128,
@@ -1683,7 +1683,7 @@ def test_create_linked_worktree_fails_loud_when_worktree_add_itself_fails(
     monkeypatch.chdir(repo)
     worktree = tmp_path / "repo-worktrees" / "issue-9-widget"
     branch, trunk = "codex/issue-9-widget", "refs/remotes/origin/main"
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         ["worktree", "add", str(worktree), "-b", branch, trunk],
         exit_status=128,
@@ -1699,7 +1699,7 @@ def test_remove_linked_worktree_fails_loud_when_worktree_remove_itself_fails(
 ) -> None:
     main, worktree = _repo_with_linked_worktree(tmp_path)
     monkeypatch.chdir(main)
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         ["worktree", "remove", str(worktree)],
         exit_status=1,
@@ -1718,7 +1718,7 @@ def test_remove_linked_worktree_reports_the_worktree_removed_and_the_branch_kept
     outcome names both halves apart."""
     main, worktree = _repo_with_linked_worktree(tmp_path)
     monkeypatch.chdir(main)
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         ["branch", "-d", "codex/issue-1-widget"],
         exit_status=1,
@@ -1760,7 +1760,7 @@ def test_a_merge_base_read_fails_loud_on_an_unexpected_git_exit(
     read: Callable[[Path], object],
 ) -> None:
     repo = bare_remote_repository_with_one_commit(tmp_path)
-    _stub_one_git_call(
+    stub_one_git_call(
         monkeypatch,
         git_arguments,
         exit_status=128,
