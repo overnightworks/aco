@@ -130,7 +130,7 @@ def test_claim_branch_must_be_a_safe_git_ref(branch: object, match: str) -> None
 )
 def test_claim_scope_must_be_canonical_repository_relative_paths(scope: object, match: str) -> None:
     """`valid_scope` guards every path that reaches a claim -- `cmd_claim._request`,
-    `cli._rescope`'s add/drop, the `--path` lookup, and `claims_holding_path`
+    `cmd_rescope._rescope_scope_entries`'s add/drop, the `--path` lookup, and `claims_holding_path`
     all hand it operator-supplied text."""
     with pytest.raises(InvalidClaimMarkerError, match=match):
         protocol.valid_scope(scope)

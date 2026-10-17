@@ -2504,9 +2504,9 @@ def test_rescope_denies_before_touching_the_store(
 ) -> None:
     """`rescope`'s own new checkout-resolution paths (issue #314 delta and
     repeat gate, finding R1): a second `--add`/`--drop` path outside the
-    first path's own checkout (`_rescope_scope_entries`) refuses rather than
+    first path's own checkout (`cmd_rescope._rescope_scope_entries`) refuses rather than
     silently mis-scoping; a location outside every repository, and gate
-    G3's no-commit checkout (`_rescope_checkout`); and a relative
+    G3's no-commit checkout (`cmd_rescope._rescope_checkout`); and a relative
     `--drop` entry beside an absolute `--add` that names a real checkout,
     run from a cwd outside every repository, which has no checkout to read
     it against (RESC-01) -- all refuse before the store is ever touched."""
