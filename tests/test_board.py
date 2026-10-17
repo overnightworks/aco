@@ -4192,7 +4192,7 @@ def test_board_configuration_has_no_dependency_paths_unless_named(text: str) -> 
         pytest.param(
             "Work-Item: #5\nNo-Item: fix",
             "Work-Item: #5",
-            "\nNo-Item: deps",
+            "\n\nNo-Item: deps",
             board.ClassificationDefect("carries 3 classification lines; exactly one is required"),
             id="first-of-two",
         ),
@@ -4204,7 +4204,7 @@ def test_live_classification_line_and_composition_read_the_whole_body(
     appended: str,
     reads_as: board.Classification | board.ClassificationDefect,
 ) -> None:
-    """Spec: ADOPT-06, ADOPT-14 -- the first live line, escaped, and the body kept byte for byte."""
+    """Spec: ADOPT-05, ADOPT-11, ADOPT-12 -- first live line escaped, body kept."""
     composed = board.body_with_classification(pull_request_body, board.NoItemKind.DEPS)
 
     assert board.live_classification_line(pull_request_body) == live_line

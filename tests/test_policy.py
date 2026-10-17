@@ -1,5 +1,5 @@
 """Dependency listing and path decisions (LAND-71, LAND-73..76) and the adoption
-preflight's precedence (ADOPT-03..08, ADOPT-14, ADOPT-26)."""
+preflight's precedence (ADOPT-02..07, ADOPT-11, ADOPT-16)."""
 
 from __future__ import annotations
 
@@ -282,7 +282,7 @@ _BOB_LANE_CLAIM = standing_active_claim("Bob", lane=True, branch=ADOPTED_BRANCH)
     ],
 )
 def test_adoption_preflight_refuses_or_plans_in_precedence_order(row: PreflightRow) -> None:
-    """Spec: ADOPT-03, ADOPT-04, ADOPT-05, ADOPT-07, ADOPT-08, ADOPT-14, ADOPT-26 --
+    """Spec: ADOPT-02, ADOPT-03, ADOPT-04, ADOPT-06, ADOPT-07, ADOPT-11, ADOPT-16 --
     the first failing step wins, and the claims are read once, only past steps 5 and 6."""
     pull_request_forge = FakeForge(
         landings={ADOPTED_PULL_REQUEST: row.pull_request(dependabot_pull_request(FIRST_HEAD))},

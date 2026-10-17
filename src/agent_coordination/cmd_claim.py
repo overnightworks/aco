@@ -91,7 +91,7 @@ def _request(
 
 
 def claim_request(
-    arguments: argparse.Namespace, *, directory: Path | None = None
+    arguments: argparse.Namespace, *, directory: Path | None = None, adopted: bool = False
 ) -> protocol.ClaimRequest:
     """The `protocol.ClaimRequest` `claim` submits, `arguments.scope` bound as-is
     when given. Omitted -- issue mode only (issue #337); lane mode still
@@ -100,7 +100,9 @@ def claim_request(
     own body scope, or a live claim's stored scope on replay, before this
     request's scope ever reaches a wide-scope check or a write. With
     `--base` and `--branch` given it reads no checkout at all (issue #479:
-    `start` checks its claim before the worktree exists)."""
+    `start` checks its claim before the worktree exists). `adopted` claims a
+    pull request's own head branch, whatever its prefix, as an issue-less
+    lane (`aco adopt`); `aco claim` never passes it."""
     agent = protocol.outbound_text(checkout.resolved_agent(arguments.agent), "agent", maximum=128)
     role = protocol.outbound_text(arguments.role, "role", maximum=64)
     base = (
@@ -112,7 +114,7 @@ def claim_request(
         raise protocol.ClaimError("base must be a full lowercase commit SHA")
     branch = _resolved_claim_branch(arguments, directory=directory)
     issue = protocol.optional_issue_number(arguments.issue)
-    identity = protocol.resolved_identity(issue, branch)
+    identity = protocol.LaneIdentity() if adopted else protocol.resolved_identity(issue, branch)
     claim_id = arguments.claim_id or uuid.uuid4().hex
     protocol.ClaimId(claim_id)
     whole_reason = None if arguments.whole is None else body.bounded_whole_reason(arguments.whole)

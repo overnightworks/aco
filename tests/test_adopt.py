@@ -153,7 +153,7 @@ def test_adopt_judges_the_pull_request_before_it_reads_any_claim_state(
     refusal: str,
     reads_the_forge: bool,
 ) -> None:
-    """Spec: ADOPT-02, ADOPT-03 -- the refusals before the claim read touch no claim state."""
+    """Spec: ADOPT-01, ADOPT-02 -- the refusals before the claim read touch no claim state."""
     arrange(world)
     _fail_on_claim_state_read(monkeypatch)
     before = world.effects()
@@ -180,7 +180,7 @@ def test_adopt_judges_the_pull_request_before_it_reads_any_claim_state(
         ),
         pytest.param(
             ["45", "46", "--no-item", "deps"],
-            "aco adopt: error: unrecognized arguments: 46",
+            "aco: error: unrecognized arguments: 46",
             id="cell-4-two-pull-requests",
         ),
     ],
@@ -191,11 +191,11 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
     arguments: list[str],
     usage_error: str,
 ) -> None:
-    """Spec: ADOPT-09 -- argparse's usage block and sentence, nothing read."""
+    """Spec: ADOPT-08 -- argparse's usage block and sentence, nothing read."""
     result = run_cli(["adopt", *arguments], capsys)
 
     assert (result.status, result.stdout) == (2, "")
-    assert result.stderr.startswith("usage: aco adopt ")
+    assert result.stderr.startswith("usage: aco ")
     assert result.stderr.splitlines()[-1].startswith(usage_error)
     assert world.forge.requests == 0
 
@@ -290,7 +290,7 @@ def test_adopt_refuses_before_it_builds_anything(
     kind: str,
     refusal: str,
 ) -> None:
-    """Spec: ADOPT-06, ADOPT-07, ADOPT-08, ADOPT-10, ADOPT-11, ADOPT-20, ADOPT-23, ADOPT-27 --
+    """Spec: ADOPT-05, ADOPT-06, ADOPT-07, ADOPT-09, ADOPT-10, ADOPT-13, ADOPT-14, ADOPT-17 --
     each refusal names its cause and leaves the repository, the state ref and the body as found."""
     arrange(world)
     before = world.effects()
@@ -308,7 +308,7 @@ def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkou
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: ADOPT-24 -- START-24's sentence, with `adopt` named."""
+    """Spec: ADOPT-15 -- START-24's sentence, with `adopt` named."""
     kept_elsewhere = tmp_path / "kept-elsewhere"
     real_git(
         tmp_path,
@@ -341,7 +341,7 @@ def test_adopt_that_passes_every_check_refuses_and_writes_nothing(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec: ADOPT-23, ADOPT-31 -- all checks pass, a wide scope given its reason, and
+    """Spec: ADOPT-14, ADOPT-18 -- all checks pass, a wide scope given its reason, and
     still no worktree, branch, claim transition or body write; claim state read once."""
     _list_files_named(4)(world)
     before = world.effects()

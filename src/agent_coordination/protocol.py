@@ -1262,9 +1262,11 @@ def _live_claim_by_id(state: ClaimState, claim_id: ClaimId) -> tuple[str, Active
     )
 
 
-def _claimed_by_sentence(intent: ClaimIntent, owner: ActiveClaim, item_label: ItemLabel) -> str:
+def claimed_by_sentence(
+    identity: ClaimIdentity, branch: str, owner: ActiveClaim, item_label: ItemLabel
+) -> str:
     return (
-        f"{identity_summary(intent.identity, intent.branch, item_label)} is claimed by "
+        f"{identity_summary(identity, branch, item_label)} is claimed by "
         f"{owner.agent} ({owner.role}) on "
         f"{identity_summary(owner.identity, owner.branch, item_label)} branch {owner.branch}"
     )
@@ -1290,7 +1292,9 @@ def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
         )
     blocked_by = blocking_claims(tuple(state.claims.values()), intent)
     if blocked_by:
-        raise ClaimConflictError(naming=partial(_claimed_by_sentence, intent, blocked_by[0]))
+        raise ClaimConflictError(
+            naming=partial(claimed_by_sentence, intent.identity, intent.branch, blocked_by[0])
+        )
     resource, resource_record = _resolved_resource(state, intent)
     new_claim = ActiveClaim(
         identity=intent.identity,

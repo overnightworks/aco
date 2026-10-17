@@ -1094,6 +1094,25 @@ def parse_pull_request_classification(
     return _no_item_classification(value)
 
 
+def live_classification_line(body: str) -> str | None:
+    """The first live `Work-Item:`/`No-Item:` line of `body`, valid or not,
+    as a terminal may show it (a fenced example is no line), or `None`."""
+    first = CLASSIFICATION_LINE_PATTERN.search(_live_text(body))
+    return None if first is None else terminal_text(first.group(0))
+
+
+def body_with_classification(body: str, kind: NoItemKind) -> str:
+    """`body` byte for byte, then the blank line that sets the
+    classification apart (only what `body`'s own end lacks of it), then
+    `No-Item: <kind>` -- the body `aco adopt` would write."""
+    classification = f"No-Item: {kind}"
+    if not body:
+        return classification
+    missing_line_feeds = max(0, 2 - (len(body) - len(body.rstrip("\n"))))
+    separator = "\n" * missing_line_feeds
+    return f"{body}{separator}{classification}"
+
+
 def declared_work_items(pull_requests: tuple[PullRequest, ...], repository: str) -> frozenset[int]:
     """The issues of `repository` that these pull requests declare as their work item."""
     declared: set[int] = set()

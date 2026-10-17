@@ -16,6 +16,7 @@ from . import (
     board,
     body,
     checkout,
+    cmd_adopt,
     cmd_ask,
     cmd_board,
     cmd_body,
@@ -347,6 +348,25 @@ def _add_land_parser(commands: _Subcommands, name: str) -> None:
             "worktree whose branch is already merged is removed"
         ),
     )
+
+
+def _add_adopt_parser(commands: _Subcommands, name: str) -> None:
+    adopt = commands.add_parser(
+        name,
+        help=(
+            "check that an open pull request can become an issue-less lane; "
+            "every refusal comes before a write, and this aco builds no adoption yet"
+        ),
+    )
+    adopt.add_argument("pull_request", type=int, help="the pull request number to adopt")
+    adopt.add_argument(
+        "--no-item",
+        required=True,
+        choices=[kind.value for kind in board.NoItemKind],
+        help="the issue-less classification the pull request would declare",
+    )
+    adopt.add_argument("--agent", help=AGENT_HELP)
+    adopt.add_argument("--whole", metavar="REASON", help=WHOLE_HELP)
 
 
 REVIEWED_HEAD_PATTERN = re.compile(r"[0-9a-fA-F]{7,40}")
@@ -850,6 +870,7 @@ _COMMANDS: dict[str, _Command] = {
     "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),
     "release": _RepositoryCommand(_add_release_parser, cmd_release.run, resolves_agent=True),
     "land": _RepositoryCommand(_add_land_parser, cmd_land.run, resolves_agent=True),
+    "adopt": _RepositoryCommand(_add_adopt_parser, cmd_adopt.run, resolves_agent=True),
     "rescope": _RepositoryCommand(_add_rescope_parser, cmd_rescope.run, resolves_agent=True),
     "cut": _RepositoryCommand(_add_cut_parser, cmd_cut.run),
     "ask": _RepositoryCommand(_add_ask_parser, cmd_ask.run),

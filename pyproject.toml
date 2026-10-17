@@ -76,7 +76,7 @@ containers = ["agent_coordination"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_protect | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_start | cmd_status | cmd_workspace",
+    "cmd_adopt | cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_protect | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_start | cmd_status | cmd_workspace",
     "board_read | policy | report",
     "session",
     "protect",
@@ -98,12 +98,14 @@ layers = [
 # `body` (the body-block codec) reach `metrics.Size` for its own
 # `size`/`[[expectation]]` schema, while `items` may still import `body`,
 # never the reverse.
-# The six cmd_* -> cmd_* edges: land.spec cites the release rules (#2, section 2);
-# start.spec cites the claim rules CLM-05/06/18; brief.spec BRIEF-26 cites
+# The seven cmd_* -> cmd_* edges: land.spec cites the release rules (#2, section 2);
+# start.spec cites the claim rules CLM-05/06/18; adopt.spec ADOPT-23 cites CLM-18
+# and CLAIM-25; brief.spec BRIEF-26 cites
 # STAT-19..21 and BRIEF-10 cites STAT-22; item.spec ITEM-32/34 cite CUT-17/28
 # and ITEM-33 cites CUT-29..31; ITEM-25 cites body --check (#2, manifest S18–S21);
 # ask.spec ASK-09 cites rule.spec RULE-06..08.
 ignore_imports = [
+    "agent_coordination.cmd_adopt -> agent_coordination.cmd_claim",
     "agent_coordination.cmd_ask -> agent_coordination.cmd_rule",
     "agent_coordination.cmd_brief -> agent_coordination.cmd_status",
     "agent_coordination.cmd_item -> agent_coordination.cmd_body",
