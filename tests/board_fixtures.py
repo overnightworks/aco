@@ -21,6 +21,16 @@ from agent_coordination.body import (
 )
 from agent_coordination.protocol import ClaimRequest
 
+# Issue #538: display controls a slice title refuses beside the Cc set --
+# the bidi override and isolate and the zero-width space -- with the code
+# point BODY-63 names.
+BIDI_AND_ZERO_WIDTH_CONTROLS = (
+    ("\N{RIGHT-TO-LEFT OVERRIDE}", "U+202E"),
+    ("\N{LEFT-TO-RIGHT ISOLATE}", "U+2066"),
+    ("\N{ZERO WIDTH SPACE}", "U+200B"),
+)
+
+
 BASE = "a" * 40
 REPOSITORY = "example/agent-coordination"
 
