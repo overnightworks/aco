@@ -76,7 +76,7 @@ containers = ["agent_coordination"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_board | cmd_bootstrap | cmd_check | cmd_claim | cmd_land | cmd_protect | cmd_release | cmd_reset | cmd_rulings | cmd_workspace",
+    "cmd_board | cmd_bootstrap | cmd_check | cmd_claim | cmd_land | cmd_protect | cmd_release | cmd_reset | cmd_rulings | cmd_start | cmd_workspace",
     "board_read | policy | report",
     "session",
     "protect",
@@ -98,8 +98,12 @@ layers = [
 # `body` (the body-block codec) reach `metrics.Size` for its own
 # `size`/`[[expectation]]` schema, while `items` may still import `body`,
 # never the reverse.
-# The one cmd_* -> cmd_* edge: land.spec cites the release rules (#2, section 2).
-ignore_imports = ["agent_coordination.cmd_land -> agent_coordination.cmd_release"]
+# The two cmd_* -> cmd_* edges: land.spec cites the release rules (#2, section 2);
+# start.spec cites the claim rules CLM-05/06/18.
+ignore_imports = [
+    "agent_coordination.cmd_land -> agent_coordination.cmd_release",
+    "agent_coordination.cmd_start -> agent_coordination.cmd_claim",
+]
 
 [[tool.importlinter.contracts]]
 name = "Decision board layers"

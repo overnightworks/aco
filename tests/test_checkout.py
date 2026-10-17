@@ -1189,7 +1189,7 @@ def test_parse_remote_location_refuses_an_unrecognized_shape() -> None:
 
 # `start`'s own worktree/branch naming and git plumbing (issue #322): a
 # slug/prefix pure-function pair, plus the create/resume/remove/ancestry
-# helpers `_cmd_start`/`release --merged`'s own cleanup share, each proven
+# helpers `cmd_start.run`/`release --merged`'s own cleanup share, each proven
 # directly against real git rather than through the full CLI (that wiring
 # lives in `tests/test_cli.py`).
 

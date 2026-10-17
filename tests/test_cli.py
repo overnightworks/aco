@@ -104,6 +104,7 @@ from agent_coordination import (
     cmd_claim,
     cmd_land,
     cmd_reset,
+    cmd_start,
     forge,
     github,
     items,
@@ -2497,7 +2498,7 @@ def test_start_resume_refuses_a_scope_that_differs_from_the_live_claim(
 
     captured = capsys.readouterr()
     assert (status, captured.out) == (2, "")
-    assert captured.err == f"ERROR: {issue_claim.RESUME_SCOPE_MISMATCH}\n"
+    assert captured.err == f"ERROR: {cmd_start.RESUME_SCOPE_MISMATCH}\n"
     assert _worktrees_and_branches(repo) == before
 
 
