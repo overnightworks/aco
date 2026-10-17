@@ -1,0 +1,8 @@
+claim_id = "43779ef349c14c589bea7eec78349599"
+agent = "claude"
+role = "builder"
+base = "c0138240b828f7a4331c7fc59089243934024775"
+branch = "claude/issue-88-s7-policy"
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/policy.py", "tests/test_cli.py"]
+opened_commit = "bab9ac23e57bbcbe23cae80c74a255ca6643b7d6"
+whole_reason = "Ein neues Prüf-Modul mit seiner Layers-Zeile und den Aufrufern in cli; halb verschoben bräche der Import."
