@@ -8483,7 +8483,7 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
 class _MinimalBoardSource:
     """The smallest real `forge.BoardSource` -- every read empty, `capability`
     and the dependency fetch injectable -- for tests that exercise exactly
-    one of `board_read.load_board_config`/`_fetch_dependencies` in isolation."""
+    one of `board_read.load_board_config`/`cli._fetch_dependencies` in isolation."""
 
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0

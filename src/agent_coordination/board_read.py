@@ -1,6 +1,4 @@
-"""The board's read leaves: the issue reference fetch, the board config load,
-dependency validation, the read-after-write hint, the missing-item refusal,
-parent closability, and the trunk landing depth."""
+"""Shared board reads, their validation, and the hint after a committed write."""
 
 from __future__ import annotations
 
