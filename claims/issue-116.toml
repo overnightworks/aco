@@ -1,0 +1,8 @@
+claim_id = "be8bb85892c74f75b6b90e4a1fcc4a87"
+agent = "claude"
+role = "builder"
+base = "2135a8a0b9008bc52dc3d01308ddce71a092e333"
+branch = "claude/issue-116-s18-status-brief-body"
+scope = ["pyproject.toml", "scripts/similar_methods_exemptions.txt", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_body.py", "src/agent_coordination/cmd_brief.py", "src/agent_coordination/cmd_status.py", "src/agent_coordination/report.py", "tests/test_cli.py", "tests/test_store.py"]
+opened_commit = "857ededb9b43b3be678d2a3d664868f076d0747c"
+whole_reason = "Drei lesende Befehle ziehen mit ihrer cmd-Kante, Layers-Zeile, Uhr-Patches, Ausnahme-Schlüssel und Docstrings gemeinsam aus cli."
