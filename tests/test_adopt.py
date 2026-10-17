@@ -27,7 +27,7 @@ from cli_fixtures import (
 from github_fixtures import FakeForge, serve_forge
 from store_fixtures import claim_intent, state_ref_tip
 
-from agent_coordination import forge, protocol, store
+from agent_coordination import checkout, forge, protocol, store
 
 DEPENDENCY_PATHS_CONFIG = 'dependency_paths = ["uv.lock", "pyproject.toml"]\n'
 PASSES_EVERY_CHECK = (
@@ -425,6 +425,12 @@ def test_adopt_fetches_no_branch_into_a_local_ref_even_when_a_fetch_refspec_asks
 
     assert result.stderr == PASSES_EVERY_CHECK
     assert real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout == local_branches
+
+
+def test_a_fetch_of_a_branch_the_remote_lacks_fails_loud(world: AdoptionWorld) -> None:
+    """Spec: ADOPT-10 -- `adopt` asks the remote first; the fetch itself never passes silently."""
+    with pytest.raises(protocol.ClaimError, match="no-such-branch"):
+        checkout.fetch_remote_branches("origin", ("no-such-branch",), directory=world.clone)
 
 
 def test_adopt_judges_the_main_checkouts_pin_when_a_linked_worktree_pins_state_ref(
