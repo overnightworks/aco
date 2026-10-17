@@ -340,7 +340,7 @@ NOT_UTF8_PROBLEM = "is not valid UTF-8"
 
 
 def _malformed_block(defect: str) -> str:
-    """PIN-15's `problem`: the item's first `defect`, rendered as `body malformed: <field>: <message>`."""
+    """PIN-15's `problem` for an item whose first `defect` reads `<field>: <message>`."""
     return f"has a malformed aco block (body malformed: {defect})"
 
 
