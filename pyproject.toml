@@ -76,7 +76,7 @@ containers = ["agent_coordination"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_bootstrap | cmd_protect | cmd_workspace",
+    "cmd_bootstrap | cmd_protect | cmd_reset | cmd_workspace",
     "board_read | policy | report",
     "session",
     "protect",

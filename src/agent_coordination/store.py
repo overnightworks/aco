@@ -234,8 +234,8 @@ _FETCH_ANCHOR_REF = "refs/worktree/aco/state"
 # observes, races, or clobbers it, and nothing shared is written by an
 # export at all. `export_state_bundle` deletes it again before returning or
 # raising, in every case, so restoring a bundle reads this name back on the
-# bundle side of the fetch, not `STATE_REF`'s (`_reset_restore_command` in
-# `cli.py` builds the exact command).
+# bundle side of the fetch, not `STATE_REF`'s
+# (`cmd_reset._reset_restore_command` builds the exact command).
 EXPORT_BUNDLE_REF = "refs/worktree/aco/reset-export"
 
 
@@ -1984,8 +1984,8 @@ def export_state_bundle(*, worktree: Path, tip: ObjectId, destination: Path) -> 
     caller leased -- never whatever a shared ref happens to hold when the
     subprocess actually runs. Restoring the bundle therefore reads
     `EXPORT_BUNDLE_REF`'s name on the bundle side of the fetch, not
-    `STATE_REF`'s (`git bundle list-heads` names it, `_reset_restore_command`
-    in `cli.py` builds the command).
+    `STATE_REF`'s (`git bundle list-heads` names it,
+    `cmd_reset._reset_restore_command` builds the command).
 
     Cleanup of the temporary export ref and the temporary file is
     unconditional and the two are independent of each other (issue #298,
