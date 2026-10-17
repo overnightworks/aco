@@ -3539,9 +3539,11 @@ def test_trunk_commit_classification_lands_every_item_a_repeated_trailer_names()
     assert classification == board.TrunkWorkItemClassification((10, 11))
 
 
-def test_trunk_commit_classification_reads_a_no_item_trailer() -> None:
-    classification = board.trunk_commit_classification((), ("docs",))
-    assert classification == board.NoItemClassification(board.NoItemKind.DOCS)
+@pytest.mark.parametrize("kind", ["docs", "fix", "deps"])
+def test_trunk_commit_classification_reads_a_no_item_trailer(kind: str) -> None:
+    classification = board.trunk_commit_classification((), (kind,))
+    assert isinstance(classification, board.NoItemClassification)
+    assert classification.kind.value == kind
 
 
 @pytest.mark.parametrize(

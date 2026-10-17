@@ -15545,6 +15545,60 @@ def test_check_refuses_an_issueless_pull_request_without_its_lane_claim(
     assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
 
 
+@pytest.mark.parametrize(
+    ("body", "claimed", "reason"),
+    [
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            id="cell-11",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            False,
+            "has no active issue-less lane claim on branch 'fix/x'",
+            id="cell-27",
+        ),
+        pytest.param(
+            "No-Item: deps\nCloses #5",
+            True,
+            f"declares no work item but closes {REPOSITORY}#5; name it as the work item",
+            id="cell-28",
+        ),
+        pytest.param(
+            "No-Item: chore",
+            True,
+            "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
+            id="cell-31",
+        ),
+        pytest.param(
+            "No-Item: DEPS",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            id="cell-32",
+        ),
+    ],
+)
+def test_check_judges_a_deps_pull_request_by_its_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    body: str,
+    claimed: bool,
+    reason: str,
+) -> None:
+    check_client(
+        monkeypatch,
+        landing_pull_request(body=body, head_ref_name="fix/x"),
+        standing=(documentation_lane_claim(branch="fix/x"),) if claimed else (),
+    )
+    if not claimed:
+        _patch_store_write(monkeypatch)
+
+    assert run_check() == 2
+    assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
+
+
 def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -15564,13 +15618,18 @@ def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
     )
 
 
+@pytest.mark.parametrize(
+    "body",
+    [f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}", "No-Item: deps"],
+    ids=["work-item", "cell-33-deps"],
+)
 def test_check_refuses_a_pull_request_proposing_another_repositorys_branch(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], body: str
 ) -> None:
     check_client(
         monkeypatch,
         landing_pull_request(
-            body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
+            body=body,
             head_repository="fork/agent-coordination",
         ),
     )
@@ -15602,7 +15661,7 @@ def test_check_refuses_a_pull_request_proposing_another_repositorys_branch(
         ),
         pytest.param(
             "No-Item: chore\n\nHousekeeping.",
-            "carries `No-Item: chore`; an issue-less pull request is docs or fix",
+            "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
             id="unknown-no-item-kind",
         ),
         pytest.param(
@@ -16139,10 +16198,12 @@ def test_release_merged_json_omits_freed_and_next_when_the_board_is_unreachable(
     assert "hint:" in captured.err
 
 
+@pytest.mark.parametrize("kind", ["docs", "fix", "deps"])
 def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
     monkeypatch: pytest.MonkeyPatch,
+    kind: str,
 ) -> None:
-    merged_release_client(monkeypatch, body="No-Item: docs", lane=True)
+    merged_release_client(monkeypatch, body=f"No-Item: {kind}", lane=True)
 
     assert issue_claim.main(["--repo", REPOSITORY, "release", "--merged", "12"]) == 0
 
@@ -16348,7 +16409,7 @@ def test_release_merged_refuses_a_lane_whose_merge_commit_names_a_work_item(
     refusal = (
         f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
         f"`Work-Item: {work_item_value}`; an issue-less lane needs a "
-        '`No-Item: <docs|fix>` trailer; release it with --abandoned "landed as PR #12 '
+        '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
         'with a malformed trailer"'
     )
 
@@ -17900,20 +17961,40 @@ def test_land_fails_loud_when_the_quality_config_cannot_be_read(
     assert client.merge_calls == []
 
 
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        pytest.param(
+            "Advances #72", "carries no `Work-Item:` or `No-Item:` line", id="unclassified"
+        ),
+        pytest.param(
+            "No-Item: deps",
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            id="cell-40-deps",
+        ),
+    ],
+)
 def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    body: str,
+    reason: str,
 ) -> None:
     """Issue #405: once every check succeeds, `check <pr>`'s own
     classification rules apply unchanged -- an unclassified body refuses
     the same sentence `check` would, before any write."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), body="Advances #72")
+    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), body=body)
+    client.landings[12] = landing_pull_request(body=body, head_ref_name="fix/x")
+    standing = store_claim_from_request(documentation_lane_claim(branch="fix/x"))
+    _patch_store_write(monkeypatch, standing)
 
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 2
 
-    assert capsys.readouterr().err == (
-        "ERROR: pull request #12 carries no `Work-Item:` or `No-Item:` line\n"
-    )
+    assert capsys.readouterr().err == f"ERROR: pull request #12 {reason}\n"
     assert client.merge_calls == []
+    assert tuple(store.fetch_state(worktree=Path("."), remote="origin").claims.values()) == (
+        standing,
+    )
 
 
 def _toml_syntax_error(text: str) -> str:
@@ -20491,10 +20572,10 @@ def test_check_accepts_a_complete_unblocked_issue_in_two_requests(
 def _check_trunk_repository(tmp_path: Path) -> Path:
     """A minimal real `origin`-backed repository (issue #359, LAND-48) for
     `check <sha>`: an initial commit with no trailer, a commit trailer-
-    naming `#20`, and one trailer-classified `No-Item: docs` -- the three
+    naming `#20`, and trailers `No-Item: docs` and `No-Item: deps` -- the four
     classifications `check <sha>` reads from a commit's own trailer block,
     the same grammar `check <pr>` reads from a pull request body with. A
-    fourth commit sits on the `side` branch, classified as soundly as the
+    fifth commit sits on the `side` branch, classified as soundly as the
     trunk ones: it exists in this repository, but never on its trunk."""
     repo = bare_remote_repository_with_one_commit(tmp_path)
     (repo / "work.txt").write_text("work\n")
@@ -20503,6 +20584,9 @@ def _check_trunk_repository(tmp_path: Path) -> Path:
     (repo / "docs.txt").write_text("docs\n")
     real_git(repo, "add", "docs.txt")
     real_git(repo, "commit", "-q", "-m", "docs change", "-m", "No-Item: docs")
+    real_git(
+        repo, "commit", "-q", "--allow-empty", "-m", "dependency update", "-m", "No-Item: deps"
+    )
     push_repository_trunk(repo, "origin")
     real_git(repo, "checkout", "-q", "-b", "side")
     (repo / "side.txt").write_text("side\n")
@@ -20527,10 +20611,11 @@ def _check_sha(
 _UNWALKED_SHA = "0" * 40
 
 _TRUNK_CHECK_CASES = (
-    pytest.param("main~1", "{sha} declares Work-Item: #20", "valid", None, 0, id="work-item"),
-    pytest.param("main", "{sha} declares No-Item: docs", "valid", None, 0, id="no-item"),
+    pytest.param("main~2", "{sha} declares Work-Item: #20", "valid", None, 0, id="work-item"),
+    pytest.param("main~1", "{sha} declares No-Item: docs", "valid", None, 0, id="no-item"),
+    pytest.param("main", "{sha} declares No-Item: deps", "valid", None, 0, id="deps"),
     pytest.param(
-        "main~2",
+        "main~3",
         "REFUSED: {sha} carries no `Work-Item:` or `No-Item:` trailer",
         "invalid_classification",
         "carries no `Work-Item:` or `No-Item:` trailer",
