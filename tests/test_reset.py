@@ -907,6 +907,7 @@ def test_reset_bundle_restores_the_released_history(
     )
     before = store.fetch_state(worktree=clone, remote="origin")
     assert not before.claims
+    assert before.tip is not None
     assert protocol.ClaimId(claim_id) in before.consumed_ids
     real_git(clone, "rev-parse", f"{before.tip}~2")
     export_dir = clone.parent / "export"
