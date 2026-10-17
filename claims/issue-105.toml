@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "9e5592876d1cb1878cfd383c83eae8e146f9e177"
 branch = "claude/issue-105-whole-bound-owner"
-scope = ["specs/body-block.spec.md", "specs/claim.spec.md", "src/agent_coordination/body.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_item.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/policy.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_state_board.py"]
+scope = ["specs/body-block.spec.md", "specs/claim.spec.md", "src/agent_coordination/body.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_item.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/policy.py", "tests/cli_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_state_board.py"]
 opened_commit = "5e73e444de0a4036f5f3dd0422fd0da46454c606"
 whole_reason = "Die Grenze zieht von policy zu body und gilt dann für Flag und Body zugleich; Specs, Aufrufer und Tests ändern sich nur gemeinsam, sonst gäbe es zwei Formulierungen."
