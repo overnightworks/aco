@@ -336,6 +336,10 @@ WHOLE_DEFECT = "whole: whole reason must be one bounded non-empty line"
 MALFORMED_NUMBER = items.item_number(MALFORMED_ID)
 
 
+# PIN-43: the key's ESC and BEL shown as NEXT-37 escapes them.
+DISPLAY_CONTROL_KEY_DEFECT = (
+    "record.\\x1b]0;pwned\\x07\\x1b[2J: unknown key record.\\x1b]0;pwned\\x07\\x1b[2J"
+)
 NOT_UTF8_PROBLEM = "is not valid UTF-8"
 
 
@@ -420,7 +424,7 @@ def _plant_whole_state_item(worktree: Path, remote: str, content: bytes) -> None
 
 
 def _assert_whole_state_result(cell: int, status: int | str | None, out: str, err: str) -> None:
-    sentence = "whole reason must be one bounded non-empty line"
+    sentence = WHOLE_DEFECT.partition(": ")[2]
     defect = f"body malformed: {WHOLE_DEFECT}"
     if cell == 24:
         assert status == 0
@@ -783,6 +787,21 @@ _MALFORMED_CONTENTS = (
             _malformed_block(BLANK_TITLE_DEFECT),
             id="blank-record-title-under-a-readable-parent",
         ),
+        pytest.param(
+            b"prose, no block\n",
+            _malformed_block("aco: no aco block"),
+            id="body-without-an-aco-block",
+        ),
+        pytest.param(
+            _whole_state_item("x" * 513), _malformed_block(WHOLE_DEFECT), id="invalid-whole"
+        ),
+        pytest.param(
+            _task_item(None).replace(
+                b"[record]\n", b'[record]\n"\\u001b]0;pwned\\u0007\\u001b[2J" = 1\n'
+            ),
+            _malformed_block(DISPLAY_CONTROL_KEY_DEFECT),
+            id="display-control-key-in-the-record",
+        ),
         pytest.param(b"\xff\xfe not utf-8", NOT_UTF8_PROBLEM, id="not-utf8"),
         pytest.param(
             _container_body_with_slices(((1, "Line one|Line two"),)).replace("|", "\v").encode(),
@@ -819,28 +838,6 @@ class TestMalformedItem:
             adapter.item_reference(MALFORMED_NUMBER)
 
         assert str(refusal.value) == _malformed_item_refusal(problem)
-
-    @pytest.mark.parametrize(
-        ("content", "defect"),
-        [
-            pytest.param(b"prose, no block\n", "aco: no aco block", id="body-without-an-aco-block"),
-            pytest.param(
-                CONTAINER_BODY.encode(),
-                "record: no [record] table",
-                id="valid-block-without-record",
-            ),
-            pytest.param(_whole_state_item("x" * 513), WHOLE_DEFECT, id="invalid-whole"),
-        ],
-    )
-    def test_the_refusal_names_the_items_first_defect(self, content: bytes, defect: str) -> None:
-        """PIN-15 (issue #155): the sentence ends in the first defect, so a
-        reader is sent to the field that is wrong."""
-        adapter = _state_ref_board(_item_files_with_a_malformed_item(content))
-
-        with pytest.raises(MalformedStateTreeError) as refusal:
-            adapter.item_reference(MALFORMED_NUMBER)
-
-        assert str(refusal.value) == _malformed_item_refusal(_malformed_block(defect))
 
     @pytest.mark.parametrize(*_MALFORMED_CONTENTS)
     def test_the_open_board_lists_it_unreadable_beside_every_other_item(
@@ -4026,10 +4023,12 @@ class TestCliStateRefForge:
         assert unreadable_line in next_out
         assert f"\n{nested_id}: " in next_out
         assert f"\n{CHILD_B_ID}: blocked by {CHILD_A_ID}" in next_out
-        assert (own_show_exit_code, capsys.readouterr().err) == (
+        own_show_err = capsys.readouterr().err
+        assert (own_show_exit_code, own_show_err) == (
             2,
             f"ERROR: {_malformed_item_refusal(problem, CHILD_A_ID)}\n",
         )
+        assert "\x1b" not in own_show_err
 
     @pytest.mark.parametrize(
         ("unplaced_content", "problem"),
