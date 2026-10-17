@@ -25,6 +25,7 @@ from typing import TextIO, cast
 import pytest
 from board_fixtures import (
     BASE,
+    BIDI_AND_ZERO_WIDTH_CONTROLS,
     FROZEN_TRIGGER,
     FROZEN_UNTIL,
     MINIMAL_BLOCK_TOML,
@@ -127,7 +128,6 @@ from agent_coordination.protocol import (
     ClaimError,
     ClaimRequest,
     ClaimUnavailableError,
-    IssueIdentity,
 )
 from agent_coordination.session import RunContext
 
@@ -163,15 +163,6 @@ TWELVE_VERSIONED_FILES = (
     "docs/g.md",
     "docs/h.md",
 )
-
-
-def issue_number(identity: protocol.ClaimIdentity) -> int:
-    """The numbered-issue identity's issue number. Every call site here builds an
-    issue-scoped claim (`request(issue=...)`, never `lane=True`), so a `protocol.LaneIdentity`
-    reaching this helper is a real defect in the calling test, not a case to
-    tolerate."""
-    assert isinstance(identity, IssueIdentity)
-    return identity.issue
 
 
 def _live_store_claim() -> protocol.ActiveClaim:
@@ -4853,9 +4844,12 @@ def test_cut_fills_the_childs_block_and_keeps_an_emptied_container_body_ok(
         "Scheibe 1 is merged.",
     )
     capsys.readouterr()
-    monkeypatch.setattr(sys, "stdin", io.StringIO(client.item_bodies[CUT_CONTAINER]))
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
+    assert (
+        run_cli(
+            ["body", "--check"], capsys, stdin=client.item_bodies[CUT_CONTAINER]
+        ).expect_success()
+        == "body ok\n"
+    )
 
 
 def test_cut_refuses_a_blockless_container_before_any_write(
@@ -6951,16 +6945,6 @@ def test_next_advises_a_pull_that_runs_as_printed_where_it_stands(
     )
 
 
-# Issue #538: display controls a slice title refuses beside the Cc set --
-# the bidi override and isolate and the zero-width space -- with the code
-# point BODY-63 names.
-_BIDI_AND_ZERO_WIDTH_CONTROLS = (
-    ("\N{RIGHT-TO-LEFT OVERRIDE}", "U+202E"),
-    ("\N{LEFT-TO-RIGHT ISOLATE}", "U+2066"),
-    ("\N{ZERO WIDTH SPACE}", "U+200B"),
-)
-
-
 def _state_ref_container_body(title: str, *slice_titles: str, parent: int | None = None) -> str:
     rows = [
         {"index": index, "title": row, "done_when": "D"}
@@ -7031,7 +7015,7 @@ def test_state_ref_next_prints_cuts_bash_runs_as_printed_and_cut_accepts(
         pytest.param("title", "Rubout\x7f", id="title-DEL"),
         *(
             pytest.param("title", f"Flip{control}side", id=f"title-{codepoint}")
-            for control, codepoint in _BIDI_AND_ZERO_WIDTH_CONTROLS
+            for control, codepoint in BIDI_AND_ZERO_WIDTH_CONTROLS
         ),
         pytest.param("done_when", "Line one\vline two", id="done_when-VT"),
         pytest.param("done_when", "Flip\N{RIGHT-TO-LEFT OVERRIDE}side", id="done_when-U+202E"),
@@ -21127,278 +21111,6 @@ def test_check_json_discriminates_an_issue(
     assert json.loads(capsys.readouterr().out) == expected
 
 
-def body_check_main(*, extra: tuple[str, ...] = ()) -> int:
-    return issue_claim.main(["body", "--check", *extra])
-
-
-@pytest.mark.parametrize(
-    "toml_text",
-    [
-        pytest.param(MINIMAL_BLOCK_TOML, id="minimal"),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "Slice A"\n'
-            'done_when = "The parser reads the new key."\n',
-            id="slice-row-done-when",
-        ),
-    ],
-)
-def test_body_check_accepts_a_complete_block_with_no_defects(
-    capsys: pytest.CaptureFixture[str], toml_text: str
-) -> None:
-    body_file = io.StringIO(block_body(toml_text))
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(sys, "stdin", body_file)
-        assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-def test_body_check_accepts_a_valid_size(capsys: pytest.CaptureFixture[str]) -> None:
-    """BODY-58 (issue #357): a valid `size` is `body ok`, exit `0`."""
-    body_file = io.StringIO(block_body(f'{MINIMAL_BLOCK_TOML}size = "M"\n'))
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(sys, "stdin", body_file)
-        assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-def test_body_check_refuses_an_invalid_size(capsys: pytest.CaptureFixture[str]) -> None:
-    """BODY-59 (issue #357): an out-of-grammar `size` is `body malformed`,
-    exit `2`, the same sentence for an invalid string or a non-scalar value."""
-    body_file = io.StringIO(block_body(f'{MINIMAL_BLOCK_TOML}size = "XL"\n'))
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(sys, "stdin", body_file)
-        assert body_check_main() == 2
-    assert capsys.readouterr().err == "body malformed: size: size must be S, M, or L\n"
-
-
-@pytest.mark.parametrize("value", ["x" * 513, "a\nb", "a\u0007b", " a", "", "   ", 1])
-def test_body_check_refuses_an_invalid_whole(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], value: object
-) -> None:
-    """Spec: BODY-61, BODY-62."""
-    raw_body = block_body(f"{MINIMAL_BLOCK_TOML}whole = {json.dumps(value)}\n")
-    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == (
-        "body malformed: whole: whole reason must be one bounded non-empty line\n"
-    )
-
-
-def test_body_check_accepts_a_whole_at_the_boundary(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: BODY-61, BODY-62."""
-    raw_body = block_body(f'{MINIMAL_BLOCK_TOML}whole = "{"x" * 512}"\n')
-    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-_RECORD_TOML = (
-    '\n[record]\ntitle = "T"\nstate = "open"\nlabels = []\nblocked_by = []\n'
-    'created_at = "2026-09-10T00:00:00Z"\nupdated_at = "2026-09-15T00:00:00Z"\n'
-)
-
-
-def test_body_check_reads_the_storage_pin_for_the_record_key(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #287 proof 6: `body --check` reads the repository's own
-    storage pin -- `[record]` is a known key under `storage = "state-ref"`
-    and an unknown one under the default `storage = "github"`."""
-    body = block_body(MINIMAL_BLOCK_TOML + _RECORD_TOML)
-
-    monkeypatch.setattr(sys, "stdin", io.StringIO(body))
-    assert body_check_main() == 2
-    assert "unknown top-level key record" in capsys.readouterr().err
-
-    _write_state_ref_pin(tmp_path)
-    monkeypatch.setattr(sys, "stdin", io.StringIO(body))
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-def test_body_check_names_a_body_with_no_recognized_block_as_malformed(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO("no block\n"))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == "body malformed: aco: no aco block\n"
-
-
-@pytest.mark.parametrize(
-    ("toml_text", "reason"),
-    [
-        pytest.param(
-            'version = 1\nnow = "N"\nnext = "X"\n',
-            "done_when: done_when is required",
-            id="missing-done-when",
-        ),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}owner = "x"\n',
-            "owner: unknown top-level key owner",
-            id="unknown-key",
-        ),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}\n[[expectation]]\ntext = "x"\ndefault = "yes"\nruling = "yes"\n',
-            "expectation[0].default: expectation[0] must be proposed (default) or ruled "
-            "(ruling, ruled_on), not both",
-            id="default-and-ruling",
-        ),
-        *(
-            pytest.param(
-                f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "Flip{control}side"\n',
-                f"slice[0].title: slice[0].title of row 1 holds {codepoint}; "
-                "a slice title stays on one line",
-                id=f"slice-title-{codepoint}",
-            )
-            for control, codepoint in _BIDI_AND_ZERO_WIDTH_CONTROLS
-        ),
-        *(
-            pytest.param(
-                f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "A"\ndone_when = {value}\n',
-                "slice[0].done_when: slice[0].done_when must be a non-empty string",
-                id=f"slice-done-when-{shape}",
-            )
-            for shape, value in (("blank", '"  "'), ("not-a-string", "1"))
-        ),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "A"\n'
-            'done_when = "One\\u000bTwo"\n',
-            "slice[0].done_when: slice[0].done_when of row 1 holds U+000B; "
-            "a slice done_when stays on one line",
-            id="slice-done-when-control",
-        ),
-    ],
-)
-def test_body_check_names_defects_with_checks_own_sentences(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    toml_text: str,
-    reason: str,
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == f"body malformed: {reason}\n"
-
-
-@pytest.mark.parametrize(
-    ("toml_text", "keys"),
-    [
-        pytest.param(
-            'version = 1\nnow = ""\nnext = ""\ndone_when = ""\n',
-            "Now, Next, Done when",
-            id="every-key-empty",
-        ),
-        pytest.param(
-            'version = 1\nnow = "Cut from #90"\nnext = "Build it."\ndone_when = ""\n',
-            "Done when",
-            id="only-done-when-empty",
-        ),
-    ],
-)
-def test_body_check_names_each_empty_projection_key_as_incomplete(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    toml_text: str,
-    keys: str,
-) -> None:
-    """BODY-12 (issue #606): a defect-free block with empty projection keys
-    is incomplete, and the sentence names exactly the empty ones."""
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == f"body incomplete: {keys}\n"
-
-
-def test_body_check_prints_every_simultaneous_defect_not_just_the_first(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The one behavior that sets `body --check` apart from `check <item>`,
-    which truncates to the first malformed defect
-    (`cmd_claim._body_contract_checks`): with two simultaneous defects, both surface,
-    in order, in plain text and in `--json`'s `defects` list (Sonnet review,
-    issue #262)."""
-    toml_text = 'version = 1\nnext = "X"\n'  # missing both now and done_when
-
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == (
-        "body malformed: now: now is required\nbody malformed: done_when: done_when is required\n"
-    )
-
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main(extra=("--json",)) == 2
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": False,
-        "reason": "malformed",
-        "defects": [
-            "body malformed: now: now is required",
-            "body malformed: done_when: done_when is required",
-        ],
-    }
-
-
-def test_body_check_json_carries_the_defect_list(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO("no block\n"))
-    assert body_check_main(extra=("--json",)) == 2
-    assert capsys.readouterr().out == (
-        '{"ok": false, "reason": "malformed", "defects": ["body malformed: aco: no aco block"]}\n'
-    )
-
-
-def test_body_check_json_reports_ok_with_an_empty_defect_list(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(MINIMAL_BLOCK_TOML)))
-    assert body_check_main(extra=("--json",)) == 0
-    assert capsys.readouterr().out == '{"ok": true, "reason": "valid", "defects": []}\n'
-
-
-class _NotUtf8Stdin:
-    """A stdin stand-in for the one input `body --check` cannot decode --
-    `sys.stdin.read()` raises `UnicodeDecodeError` on invalid bytes exactly
-    like this (issue #262 Sonar S8707 follow-up)."""
-
-    def read(self) -> str:
-        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
-
-
-def test_body_check_refuses_stdin_that_is_not_valid_utf8(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", _NotUtf8Stdin())
-
-    assert body_check_main() == 2
-    assert "stdin is not valid UTF-8" in capsys.readouterr().err
-
-
-def test_body_requires_check() -> None:
-    with pytest.raises(SystemExit) as refused:
-        issue_claim.main(["body"])
-
-    assert refused.value.code == 2
-
-
-def test_body_check_never_touches_a_forge_the_store_or_gh(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`body --check` is forge-free like `status` (issue #245): it never
-    resolves a forge, reads the state ref, or shells out to `gh`."""
-
-    def unused(*args: object, **kwargs: object) -> None:
-        pytest.fail("body --check must not touch a forge, the store, or gh")
-
-    monkeypatch.setattr(github, "GitHubForge", unused)
-    monkeypatch.setattr(github, "discover_repository", unused)
-    monkeypatch.setattr(store, "fetch_state", unused)
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(MINIMAL_BLOCK_TOML)))
-
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
 @pytest.mark.parametrize(
     "argv",
     [
@@ -22995,7 +22707,7 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
                 f"{codepoint}; a slice title stays on one line\n",
                 id=f"slice_title_{codepoint}",
             )
-            for control, codepoint in _BIDI_AND_ZERO_WIDTH_CONTROLS
+            for control, codepoint in BIDI_AND_ZERO_WIDTH_CONTROLS
         ),
     ],
 )

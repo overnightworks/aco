@@ -531,12 +531,12 @@ class CliRun:
 
 
 def run_cli(
-    argv: list[str], capsys: pytest.CaptureFixture[str], *, stdin: str | None = None
+    argv: list[str], capsys: pytest.CaptureFixture[str], *, stdin: str | bytes | None = None
 ) -> CliRun:
     """Run `argv` through `main`, whether it returns its exit status or
     argparse exits with it, and drain everything printed since the last run.
 
-    A supplied string is a UTF-8 pipe; None leaves inherited stdin untouched.
+    Strings are encoded as UTF-8; bytes are piped unchanged. None inherits stdin.
     The previous stdin is restored and the pipe closed even when main raises.
     """
     previous_stdin = sys.stdin
@@ -684,13 +684,13 @@ def body_file_on_stdin(tmp_path: Path) -> Iterator[TextIO]:
         yield stdin
 
 
-def read_end_of_a_pipe_carrying(text: str) -> TextIO:
+def read_end_of_a_pipe_carrying(text: str | bytes) -> TextIO:
     """`printf ... | aco ...`: the read end of a pipe whose writer already
     wrote `text` -- a scenario body, well inside a pipe's buffer -- and
     closed. Read as `sys.stdin` reads a pipe: line endings untranslated."""
     read_end, write_end = os.pipe()
-    with os.fdopen(write_end, "w", encoding="utf-8") as writer:
-        writer.write(text)
+    with os.fdopen(write_end, "wb") as writer:
+        writer.write(text.encode("utf-8") if isinstance(text, str) else text)
     return os.fdopen(read_end, encoding="utf-8", newline="")
 
 
