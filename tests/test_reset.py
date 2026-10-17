@@ -35,6 +35,15 @@ from store_fixtures import (
 from agent_coordination import checkout, process, protocol, session, store
 
 
+def _bootstrap_output(stdout: str) -> tuple[tuple[str, ...], str | None]:
+    lines = tuple(
+        re.sub(r"(?<=bootstrapped a fresh empty state at )[0-9a-f]{40}$", "{fresh_tip}", line)
+        for line in stdout.splitlines()
+    )
+    printed = re.search(r"^bootstrapped a fresh empty state at ([0-9a-f]{40})$", stdout, re.MULTILINE)
+    return lines, printed.group(1) if printed is not None else None
+
+
 def _expected_reset_bundle(export_dir: Path, clone: Path, tip: str) -> Path:
     return export_dir / (
         f"aco-state-{clone.name}-{FROZEN_CLI_NOW.date().isoformat()}-{tip[:12]}.bundle"
@@ -365,12 +374,10 @@ def test_reset_plans_or_performs_each_state(
 
     result = run_cli(arguments, capsys)
     remote = state_ref_tip(bare_remote)
+    lines, printed = _bootstrap_output(result.stdout)
     actual: dict[str, object] = {
         "status": result.status,
-        "lines": tuple(
-            re.sub(r"(?<=bootstrapped a fresh empty state at )[0-9a-f]{40}$", "{fresh_tip}", line)
-            for line in result.stdout.splitlines()
-        ),
+        "lines": lines,
         "error": result.stderr,
         "local": store.local_state_ref_exists(clone),
         "export_changes": set(export_dir.iterdir()) - before,
@@ -383,12 +390,9 @@ def test_reset_plans_or_performs_each_state(
         "export_changes": {bundle} if case.exports_bundle else set(),
     }
     if case.executed:
-        printed = re.search(
-            r"^bootstrapped a fresh empty state at ([0-9a-f]{40})$", result.stdout, re.MULTILINE
-        )
         reader_error, reader_tip, reader_claims = _read_reset_state(clone)
         actual.update(
-            printed_tip=printed is not None and printed.group(1) == remote,
+            printed_tip=printed is not None and printed == remote,
             fresh_tip=bool(remote) and remote != tip,
             reader_error=reader_error,
             reader_tip=reader_tip is not None and reader_tip == remote,
@@ -600,17 +604,12 @@ def test_reset_ignores_repo_without_resolving_a_forge(
     capsys.readouterr()
     result = run_cli([*repo, "reset", *mode], capsys)
     remote = state_ref_tip(bare_remote)
-    printed = re.search(
-        r"^bootstrapped a fresh empty state at ([0-9a-f]{40})$", result.stdout, re.MULTILINE
-    )
+    lines, printed = _bootstrap_output(result.stdout)
     actual = {
         "status": result.status,
-        "lines": tuple(
-            re.sub(r"(?<=bootstrapped a fresh empty state at )[0-9a-f]{40}$", "{fresh_tip}", line)
-            for line in result.stdout.splitlines()
-        ),
+        "lines": lines,
         "remote": bool(remote),
-        "printed_tip": printed is not None and printed.group(1) == remote,
+        "printed_tip": printed is not None and printed == remote,
     }
     expected = {
         "status": 0,
