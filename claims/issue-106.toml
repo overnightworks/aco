@@ -1,0 +1,8 @@
+claim_id = "cbfd1d84304049cb8de6ffccf9bf64a3"
+agent = "claude"
+role = "builder"
+base = "34eac84becddd7ff0136ad7506f9bfd2dbdb1a82"
+branch = "claude/issue-106-s14-cmd-claim"
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/protocol.py", "tests/test_cli.py", "tests/test_protocol.py"]
+opened_commit = "97cdcc07a34cdef935fe1ceb21a6b3b068a0f198"
+whole_reason = "Der Claim-Kern ist ein zusammenhängender Graph (der beste Halbschnitt bräuchte drei Zwischen-Namen, Manifest S14); er zieht mit seinen Aufrufern, Testpatches und Docstrings gemeinsam."
