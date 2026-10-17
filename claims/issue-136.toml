@@ -1,0 +1,8 @@
+claim_id = "3f63d65faa1a45e095703d4b9be22052"
+agent = "claude"
+role = "builder"
+base = "531aafe8f319c43e2705d467e7358bb6b1e5f13e"
+branch = "claude/issue-136-z1-one-parametrize-decider"
+scope = ["scripts/test_budget.py", "scripts/test_inventory.py", "tests/test_test_budget.py", "tests/test_test_inventory.py"]
+opened_commit = "8fc9307f14ab01c478ebb57a66bb9996409c417a"
+whole_reason = "Ein Entscheider und sein einziger fremder Nutzer ändern sich nur gemeinsam; der Docstring liegt in derselben Testdatei."
