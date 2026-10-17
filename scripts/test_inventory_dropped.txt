@@ -34,5 +34,11 @@ tests/test_cli.py	'would: export '	#153: Moved into explicit plan-row expectatio
 tests/test_cli.py	'would: no local '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[claim-free-dry] compares the complete no-local-ref line.
 tests/test_cli.py	'would: nothing to delete on origin: '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[never-dry] compares the complete absent-ref line.
 tests/test_cli.py	'would: nothing to export: '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[never-dry] compares the complete absent-ref line.
-tests/test_cli.py	'.bundle'	#153: The expected dated filename is now owned by _expected_reset_bundle; P rows observe bundle existence and verify/list its real contents (f31a, f32, f49, f64, f66, f67).
+tests/test_cli.py	'.bundle'	#153: The expected dated filename is now owned by _expected_reset_bundle; P rows compare all new directory entries through export_changes and verify/list the bundle contents (f31a, f32, f49, f64, f66, f67).
 tests/test_cli.py	'list-heads'	#153: Real git bundle list-heads remains the reader of P bundle_heads; f32 changes the advertised ref and fails that compared result. The command moved outside the assert expression.
+tests/test_cli.py	' does not exist on origin'	#153: Embedded in complete literal expected lines for G (test_reset_ignores_repo_without_resolving_a_forge) and P never-present rows; absence wording is compared without assembling it from mode.
+tests/test_cli.py	' to delete'	#153: Embedded in complete no-local-ref expected lines for G and P; the complete line remains compared.
+tests/test_cli.py	'bootstrapped a fresh empty state at '	#153: G and executed P compare the literal bootstrap template and separately match its captured OID to the remote; the expected line never interpolates observed state.
+tests/test_cli.py	'no local '	#153: Embedded in complete no-local-ref expected lines for G and P; the complete line remains compared.
+tests/test_cli.py	'nothing to delete on origin: '	#153: Embedded in complete literal absent-ref expected lines for G and P; both dry and confirmed output remain compared.
+tests/test_cli.py	'nothing to export: '	#153: Embedded in complete literal absent-ref expected lines for G and P; both dry and confirmed output remain compared.
