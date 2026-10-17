@@ -1,0 +1,8 @@
+claim_id = "596d807ace764b7db80c10794724af29"
+agent = "claude"
+role = "builder"
+base = "403fbb5fa6489827ad199c9c1ce7cdb70886d12a"
+branch = "claude/issue-168-b2x-exclusive-claim"
+scope = ["specs/adopt.spec.md", "specs/claim-record.spec.md", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/protocol.py", "tests/store_fixtures.py", "tests/test_adopt.py", "tests/test_cli.py", "tests/test_protocol.py", "tests/test_store.py"]
+opened_commit = "7c946af5bb4920645bfd6f750362a0715513b316"
+whole_reason = "Die Exklusivität ist eine Regel in protocol._apply_claim_intent; ihr Flag läuft von ClaimRequest zu ClaimIntent, mit Specs und den Tests und Fixtures, die sie verschieben oder festhalten. Halb umgesetzt hätte das Flag oder CLAIM-71 keinen Aufrufer oder Beleg."
