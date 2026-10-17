@@ -36,7 +36,7 @@ from board_fixtures import (
     unfilled_block_body,
 )
 
-from agent_coordination import board, checkout, metrics, protocol
+from agent_coordination import board, body, checkout, metrics, protocol
 from agent_coordination.body import (
     BLOCK_FENCE_INFO,
     EXPECTATION_LINE_TEXT_MAXIMUM,
@@ -2755,6 +2755,23 @@ def test_render_block_places_size_before_expectation_and_slice_tables() -> None:
     assert 'size = "M"' in rendered
 
 
+@pytest.mark.parametrize(
+    "value", ["x" * 513, "a\nb", "a\tb", "a\u0007b", " a", "a ", "", "   ", 1, [1], None]
+)
+def test_bounded_whole_reason_refuses_invalid_values(value: object) -> None:
+    """Spec: BODY-60, BODY-61, BODY-62."""
+    with pytest.raises(
+        protocol.ClaimError, match=r"^whole reason must be one bounded non-empty line$"
+    ):
+        body.bounded_whole_reason(value)
+
+
+def test_bounded_whole_reason_accepts_the_boundary() -> None:
+    """Spec: BODY-60, BODY-61, BODY-62."""
+    reason = "x" * 512
+    assert body.bounded_whole_reason(reason) == reason
+
+
 def test_parse_body_reads_a_valid_whole() -> None:
     """Issue #399: `whole` is a plain top-level block field -- `claim`/
     `start`'s own fallback for `--whole` when the call itself names none."""
@@ -2772,21 +2789,21 @@ def test_parse_body_reads_no_whole_as_none() -> None:
     assert parsed.whole is None
 
 
-def test_parse_body_refuses_a_blank_whole() -> None:
-    parsed = parse_body(block_body(f'{MINIMAL_BLOCK_TOML}whole = "   "\n'))
+@pytest.mark.parametrize(
+    "value", ["x" * 512, "x" * 513, "a\nb", "a\tb", "a\u0007b", " a", "a ", "", "   ", 1, [1]]
+)
+def test_parse_body_applies_the_whole_bound(value: object) -> None:
+    """Spec: BODY-60, BODY-61, BODY-62."""
+    parsed = parse_body(block_body(f"{MINIMAL_BLOCK_TOML}whole = {json.dumps(value)}\n"))
 
-    assert parsed.read_state is BodyReadState.MALFORMED
-    assert parsed.contract.defects[0] == ContractDefect("whole", "whole must be a non-empty string")
-
-
-def test_parse_body_refuses_a_non_string_whole_without_crashing() -> None:
-    """A list or table `whole` value must never reach `.strip()` unchecked
-    (mirrors issue #357 G1's own `size` guard): a type check ahead of it
-    reports the same defect sentence instead of raising `AttributeError`."""
-    parsed = parse_body(block_body(f"{MINIMAL_BLOCK_TOML}whole = [1]\n"))
-
-    assert parsed.read_state is BodyReadState.MALFORMED
-    assert parsed.contract.defects[0] == ContractDefect("whole", "whole must be a non-empty string")
+    if value == "x" * 512:
+        assert parsed.read_state is BodyReadState.VALID
+        assert parsed.whole == value
+    else:
+        assert parsed.read_state is BodyReadState.MALFORMED
+        assert parsed.contract.defects == (
+            ContractDefect("whole", "whole reason must be one bounded non-empty line"),
+        )
 
 
 def test_render_block_places_whole_before_expectation_and_slice_tables() -> None:

@@ -156,6 +156,13 @@ def real_git(
     )
 
 
+def worktrees_and_branches(repository: Path) -> tuple[str, str]:
+    return (
+        real_git(repository, "worktree", "list", "--porcelain").stdout,
+        real_git(repository, "branch", "--list").stdout,
+    )
+
+
 def init_bare_repository(path: Path) -> Path:
     """A real bare repository on `main` at `path`; a path another builder
     already took fails loudly instead of sharing its remote."""

@@ -85,6 +85,7 @@ from cli_fixtures import (
     stub_one_git_call,
     terminal_on_stdin,
     trunk_git_calls,
+    worktrees_and_branches,
 )
 from github_fixtures import (
     LANDING_BRANCH,
@@ -1881,11 +1882,11 @@ def test_start_from_a_linked_worktree_checks_against_the_main_checkouts_board_co
     )
     _serve_start_board(monkeypatch, _start_item(), security)
     capsys.readouterr()
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
 
-    assert (status, _worktrees_and_branches(repo)) == (2, before)
+    assert (status, worktrees_and_branches(repo)) == (2, before)
     assert "higher-priority actionable item #500" in capsys.readouterr().err
 
 
@@ -1903,11 +1904,11 @@ def test_start_inside_its_own_lane_worktree_reprints_the_live_claim(
     (worktree / "work.txt").write_text("in progress\n")
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
 
-    assert (status, _worktrees_and_branches(repo)) == (0, before)
+    assert (status, worktrees_and_branches(repo)) == (0, before)
     assert capsys.readouterr().out.splitlines()[:3] == [
         f"worktree: {worktree}",
         "branch: codex/issue-314-own-lane",
@@ -1947,13 +1948,6 @@ def test_start_refuses_an_unsafe_identity_prefix_before_any_git_write(
     assert not (repo.parent / f"{repo.name}-worktrees").exists()
 
 
-def _worktrees_and_branches(repo: Path) -> tuple[str, str]:
-    return (
-        real_git(repo, "worktree", "list", "--porcelain").stdout,
-        real_git(repo, "branch", "--list").stdout,
-    )
-
-
 def _serve_an_item_without_scope(monkeypatch: pytest.MonkeyPatch) -> None:
     _serve_start_board(monkeypatch, _start_item(complete_contract("Build it.")))
 
@@ -1963,6 +1957,15 @@ def _serve_a_malformed_body(monkeypatch: pytest.MonkeyPatch) -> None:
     specific "item names no scope"."""
     _serve_start_board(
         monkeypatch, _start_item(block_body(f'{MINIMAL_BLOCK_TOML}owner = "someone"\n'))
+    )
+
+
+def _serve_an_invalid_whole(monkeypatch: pytest.MonkeyPatch) -> None:
+    _serve_start_board(
+        monkeypatch,
+        _start_item(
+            complete_contract("Build it.", scope=["a.py", "b.py", "c.py", "d.py"], whole="x" * 513)
+        ),
     )
 
 
@@ -2051,6 +2054,44 @@ def _hold_a_claim_on_the_item(
             "issue #314 is claimed by Codex Sol",
             id="reviewer-claim-on-the-lane-branch",
         ),
+        *(
+            pytest.param(
+                _serve_an_invalid_whole,
+                flags,
+                f"ERROR: {label}body malformed: whole: "
+                "whole reason must be one bounded non-empty line\n",
+                id=f"whole-cell13{variant}",
+            )
+            for variant, flags, label in (
+                ("a", [], "#314 "),
+                ("b", ["--scope", "a.py"], ""),
+                (
+                    "c",
+                    [
+                        part
+                        for path in ("a.py", "b.py", "c.py", "d.py")
+                        for part in ("--scope", path)
+                    ],
+                    "#314 ",
+                ),
+                (
+                    "d",
+                    [
+                        part
+                        for path in ("a.py", "b.py", "c.py", "d.py")
+                        for part in ("--scope", path)
+                    ]
+                    + ["--whole", "ok"],
+                    "",
+                ),
+            )
+        ),
+        pytest.param(
+            lambda _monkeypatch: None,
+            ["--whole", "a\nb"],
+            "ERROR: whole reason must be one bounded non-empty line\n",
+            id="whole-cell15",
+        ),
     ],
 )
 def test_a_refused_start_leaves_no_worktree_and_no_branch_behind(
@@ -2061,20 +2102,31 @@ def test_a_refused_start_leaves_no_worktree_and_no_branch_behind(
     arguments: list[str],
     refusal: str,
 ) -> None:
-    """Issue #479 proof 1: every check that can refuse the claim runs
+    """Spec: CLM-36, CLM-37, BODY-52. T5: matrix 13, 15.
+
+    Issue #479 proof 1: every check that can refuse the claim runs
     before `start` builds, so a refusal builds nothing -- no worktree, no
     branch, no `worktree:` line -- and has nothing to undo."""
     repo = _start_scenario(monkeypatch, tmp_path)
     arrange(monkeypatch)
     monkeypatch.chdir(repo)
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
 
+    client = github.GitHubForge(github.repository_id(REPOSITORY))
+    stored = tuple(client.list_open_board_issues())
+    claims_before = store.fetch_state(worktree=Path("."), remote="origin").claims
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314", *arguments])
 
     out, err = capsys.readouterr()
-    assert (status, _worktrees_and_branches(repo), out) == (2, before, "")
+    assert (status, worktrees_and_branches(repo), out) == (2, before, "")
     assert refusal in err
     assert "removed worktree" not in err
+
+    if "whole reason must be" in refusal:
+        assert err == refusal
+        assert not claims_before
+        assert not store.fetch_state(worktree=Path("."), remote="origin").claims
+        assert tuple(client.list_open_board_issues()) == stored
 
 
 _OWN_DETACHED_HEAD_REFUSAL = "HEAD is detached; check out the lane branch first"
@@ -2106,12 +2158,12 @@ def test_a_detached_head_is_named_and_nothing_is_written(
     repo, worktree, fake = _detached_start_worktree(monkeypatch, tmp_path)
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, *arguments])
 
     assert (status, capsys.readouterr().err) == (2, f"ERROR: {_OWN_DETACHED_HEAD_REFUSAL}\n")
-    assert (_worktrees_and_branches(repo), fake.transitions) == (before, [])
+    assert (worktrees_and_branches(repo), fake.transitions) == (before, [])
 
 
 @pytest.mark.parametrize(
@@ -2140,14 +2192,14 @@ def test_start_names_a_runnable_command_for_a_detached_worktree(
         real_git(repo, "branch", _START_BRANCH)
     redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
 
     advice = shlex.join(["git", "-C", str(worktree), *switch, _START_BRANCH])
     named = f"worktree {worktree} has a detached HEAD; run {advice} first"
     assert (status, capsys.readouterr().err) == (2, f"ERROR: {named}\n")
-    assert (_worktrees_and_branches(repo), fake.transitions) == (before, [])
+    assert (worktrees_and_branches(repo), fake.transitions) == (before, [])
     subprocess.run(["bash", "-c", advice], check=True, capture_output=True)
     assert real_git(worktree, "branch", "--show-current").stdout.strip() == _START_BRANCH
 
@@ -2366,13 +2418,13 @@ def test_start_removes_what_it_built_even_when_its_refusal_cannot_be_written(
     repo = _start_scenario(monkeypatch, tmp_path)
     _claim_lands_before_the_commit(monkeypatch, repo)
     monkeypatch.chdir(repo)
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
     monkeypatch.setattr(sys, "stderr", _ClosedPipe())
 
     with pytest.raises(BrokenPipeError):
         issue_claim.main(["--repo", REPOSITORY, "start", "314"])
 
-    assert _worktrees_and_branches(repo) == before
+    assert worktrees_and_branches(repo) == before
 
 
 def test_start_keeps_its_worktree_when_the_report_fails_after_the_claim(
@@ -2464,12 +2516,12 @@ def test_start_refuses_to_rebuild_a_live_claim_whose_scope_the_trunk_no_longer_g
     real_git(repo, "commit", "-q", "-m", "comma path gone")
     push_repository_trunk(repo, "origin")
     capsys.readouterr()
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
 
     captured = capsys.readouterr()
-    assert (status, captured.out, _worktrees_and_branches(repo)) == (2, "", before)
+    assert (status, captured.out, worktrees_and_branches(repo)) == (2, "", before)
     assert captured.err.startswith("ERROR: 'a,b.py' matches no versioned file")
 
 
@@ -2497,14 +2549,14 @@ def test_start_resume_refuses_a_scope_that_differs_from_the_live_claim(
     assert issue_claim.main(["--repo", REPOSITORY, "start", "314"]) == 0
     capsys.readouterr()
     arrange(repo)
-    before = _worktrees_and_branches(repo)
+    before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314", "--scope", "src/other.py"])
 
     captured = capsys.readouterr()
     assert (status, captured.out) == (2, "")
     assert captured.err == f"ERROR: {cmd_start._RESUME_SCOPE_MISMATCH}\n"
-    assert _worktrees_and_branches(repo) == before
+    assert worktrees_and_branches(repo) == before
 
 
 def test_start_resumes_a_wide_claim_without_repeating_whole(
@@ -12008,6 +12060,256 @@ def test_cli_claim_explicit_whole_overrides_the_items_own_body(
     assert _live_store_claim().whole_reason == cli_reason
 
 
+@pytest.mark.parametrize("source", ["flag", "body"])
+@pytest.mark.parametrize(
+    "value", ["x" * 513, "a\nb", " a", ""], ids=["long", "multiline", "padded", "empty"]
+)
+def test_claim_whole_flag_and_body_share_the_bound(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], source: str, value: str
+) -> None:
+    """Spec: CLM-21, CLM-36, BODY-62. T3: matrix 9, 34."""
+    client = _arranged_claim_client(monkeypatch)
+    raw_body = complete_contract(
+        "Ship it.", scope=["a.py"], whole=value if source == "body" else "ok"
+    )
+    _serve_whole_claim_body(client, raw_body)
+    flags = ("--whole", value) if source == "flag" else ()
+    assert issue_claim.main(_claim_argv(*flags)) == 2
+    assert "whole reason must be one bounded non-empty line" in capsys.readouterr().err
+    assert not store.fetch_state(worktree=Path("."), remote="origin").claims
+    _assert_whole_body_unchanged(client, raw_body)
+
+
+def _serve_whole_claim_body(client: FakeForge, raw_body: str) -> None:
+    client.board_issues = (board_issue(72, "Work", raw_body),)
+    client.issue_references[72] = forge.ItemReference(forge.ItemState.OPEN, "Work", raw_body)
+    client.item_bodies[72] = raw_body
+
+
+def _assert_whole_body_unchanged(client: FakeForge, raw_body: str) -> None:
+    assert client.board_issues[0].body == raw_body
+    assert client.issue_references[72].body == raw_body
+    assert client.item_bodies[72] == raw_body
+    assert not client.created_issues
+
+
+@pytest.mark.parametrize(
+    ("cell", "value", "scope", "flag", "reason", "field"),
+    [
+        (3, "x" * 513, (), None, "body_invalid", "whole"),
+        (4, "a\nb", ("a.py",), None, "precondition_failed", "whole"),
+        (5, " a", ("a.py", "b.py", "c.py", "d.py"), None, "body_invalid", "whole"),
+        (6, "x" * 513, ("a.py", "b.py", "c.py", "d.py"), "ok", "precondition_failed", "whole"),
+        (7, "ok", ("a.py", "b.py", "c.py", "d.py"), None, "body_invalid", "size"),
+        (8, None, ("a.py", "b.py", "c.py", "d.py"), None, "unavailable", ""),
+    ],
+    ids=["cell3", "cell4", "cell5", "cell6", "cell7", "cell8"],
+)
+def test_claim_whole_body_refusal_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    cell: int,
+    value: str | None,
+    scope: tuple[str, ...],
+    flag: str | None,
+    reason: str,
+    field: str,
+) -> None:
+    """Spec: CLM-22, CLM-37, BODY-52. T4: fresh claims never write."""
+    client = _arranged_claim_client(monkeypatch)
+    entries: dict[str, str] = {} if value is None else {"whole": value}
+    if field == "size":
+        entries["size"] = "XL"
+    raw_body = complete_contract("Ship it.", scope=["a.py", "b.py", "c.py", "d.py"], **entries)
+    _serve_whole_claim_body(client, raw_body)
+    flags = [part for path in scope for part in ("--scope", path)]
+    if flag is not None:
+        flags.extend(("--whole", flag))
+    defect = (
+        "size must be S, M, or L"
+        if field == "size"
+        else "whole reason must be one bounded non-empty line"
+    )
+    label = "#72 " if reason == "body_invalid" else ""
+    expected = f"ERROR: {label}body malformed: {field}: {defect}\n"
+    if cell == 8:
+        expected = (
+            "ERROR: scope is wide: 4 paths exceeds three; "
+            "pass --whole REASON or set whole in the body\n"
+        )
+    for json_flags in ((), ("--json",)):
+        assert issue_claim.main(_claim_argv(*flags, *json_flags)) == 2
+        captured = capsys.readouterr()
+        assert captured.err == ("" if json_flags and reason == "precondition_failed" else expected)
+        if json_flags:
+            payload = json.loads(captured.out)
+            assert payload["reason"] == reason
+            if reason == "precondition_failed":
+                assert payload["checks"]
+        assert not store.fetch_state(worktree=Path("."), remote="origin").claims
+        _assert_whole_body_unchanged(client, raw_body)
+
+
+@pytest.mark.parametrize("wide", [False, True], ids=["cell10", "cell11"])
+def test_claim_whole_replay_preserves_the_claim(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], wide: bool
+) -> None:
+    """Spec: CLM-15, CLM-37. T4: only wide replay reads the body."""
+    client = _arranged_claim_client(monkeypatch)
+    scope = ["a.py", "b.py", "c.py", "d.py"] if wide else ["a.py"]
+    _serve_whole_claim_body(client, complete_contract("Ship it.", scope=scope, whole="ok"))
+    assert issue_claim.main(_claim_argv()) == 0
+    capsys.readouterr()
+    before = _live_store_claim()
+    raw_body = complete_contract("Ship it.", scope=scope, whole="x" * 513)
+    _serve_whole_claim_body(client, raw_body)
+    assert issue_claim.main(_claim_argv()) == (2 if wide else 0)
+    captured = capsys.readouterr()
+    if wide:
+        assert (
+            captured.err
+            == "ERROR: #72 body malformed: whole: whole reason must be one bounded non-empty line\n"
+        )
+        assert issue_claim.main(_claim_argv("--json")) == 2
+        assert json.loads(capsys.readouterr().out)["reason"] == "body_invalid"
+    else:
+        assert captured.out.startswith("CLAIMED issue #72: cli-claim\n")
+    assert _live_store_claim() == before
+    _assert_whole_body_unchanged(client, raw_body)
+
+
+def test_claim_whole_accepts_the_body_boundary(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: CLM-21. T4: matrix 12."""
+    client = _arranged_claim_client(monkeypatch)
+    raw_body = complete_contract(
+        "Ship it.", scope=["a.py", "b.py", "c.py", "d.py"], whole="x" * 512
+    )
+    _serve_whole_claim_body(client, raw_body)
+    assert issue_claim.main(_claim_argv()) == 0
+    assert capsys.readouterr().out.startswith("CLAIMED issue #72: cli-claim\n")
+    assert _live_store_claim().whole_reason == "x" * 512
+    _assert_whole_body_unchanged(client, raw_body)
+
+
+@pytest.mark.parametrize(
+    "operation", ["rescope-body", "rescope-flag", "new-flag", "edit-flag", "edit-body", "new-body"]
+)
+def test_whole_github_write_refusals_preserve_state(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], operation: str
+) -> None:
+    """Spec: CLM-36, RESC-24, BODY-52. T4: matrix 16-19."""
+    client = _rescope_forge()
+    _arrange_github_rescope(monkeypatch, client)
+    before = _live_store_claim()
+    invalid = complete_contract("Ship it.", whole="x" * 513)
+    raw_body = (
+        invalid if operation in {"rescope-body", "edit-body"} else complete_contract("Ship it.")
+    )
+    _serve_whole_claim_body(client, raw_body)
+    commands = {
+        "rescope-body": ["rescope", "72", "--add", "x.py"],
+        "rescope-flag": ["rescope", "72", "--whole", " a"],
+        "new-flag": ["item", "new", "--title", "Fresh", "--whole", "x" * 513],
+        "edit-flag": ["item", "edit", "72", "--whole", ""],
+        "edit-body": ["item", "edit", "72", "--whole", "ok"],
+        "new-body": ["item", "new", "--title", "Fresh"],
+    }
+    for json_flags in ((), ("--json",)):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(invalid if operation == "new-body" else ""))
+        argv = ["--repo", REPOSITORY, *commands[operation], *json_flags]
+        status = (
+            main_with_piped_stdin(monkeypatch, invalid, argv)
+            if operation == "new-body"
+            else issue_claim.main(argv)
+        )
+        assert status == 2
+        captured = capsys.readouterr()
+        sentence = "whole reason must be one bounded non-empty line"
+        if operation in {"rescope-body", "edit-body"}:
+            command = "rescope" if operation == "rescope-body" else "item edit --whole"
+            assert (
+                captured.err == f"ERROR: #72 body malformed: whole: {sentence}; "
+                f"{command} needs a valid aco block\n"
+            )
+        elif operation == "new-body":
+            assert f"body malformed: whole: {sentence}" in captured.err
+        else:
+            assert captured.err == f"ERROR: {sentence}\n"
+        if json_flags:
+            assert json.loads(captured.out)["reason"] == (
+                "body_invalid"
+                if operation == "new-body"
+                else "unavailable"
+                if operation == "rescope-flag"
+                else "precondition_failed"
+            )
+        assert _live_store_claim() == before
+        _assert_whole_body_unchanged(client, raw_body)
+
+
+def test_whole_github_next_and_board_report_the_defect(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: BODY-52, NEXT-36. T4: matrix 30."""
+    client = _arranged_claim_client(monkeypatch)
+    raw_body = complete_contract("Ship it.", scope=["a.py"], whole="x" * 513)
+    _serve_whole_claim_body(client, raw_body)
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
+    output = capsys.readouterr().out
+    defect = "body malformed: whole: whole reason must be one bounded non-empty line"
+    assert "SKIPPED" in output
+    assert f"#72: {defect}" in output
+    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
+    row = next(row for row in json.loads(capsys.readouterr().out)["items"] if row["number"] == 72)
+    assert (row["actionable"], row["actionable_reason"]) == (False, defect)
+    _assert_whole_body_unchanged(client, raw_body)
+
+
+@pytest.mark.parametrize(
+    "mode", ["standing", "rebuild", "invalid-flag"], ids=["cell14a", "cell14b", "cell38"]
+)
+def test_start_whole_resume_preserves_the_claim(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, mode: str
+) -> None:
+    """Spec: START-06, CLM-36. T4: resumes preserve claims and stored bodies."""
+    repo = _start_scenario(monkeypatch, tmp_path)
+    valid_body = complete_contract("Build it.", scope=["a.py"])
+    _serve_start_board(monkeypatch, _start_item(valid_body))
+    monkeypatch.chdir(repo)
+    argv = ["--repo", REPOSITORY, "start", "314"]
+    assert issue_claim.main(argv) == 0
+    capsys.readouterr()
+    before_claim = _live_store_claim()
+    built = worktrees_and_branches(repo)
+    if mode != "standing":
+        _remove_the_lane_pair(repo)
+    before = worktrees_and_branches(repo)
+    raw_body = (
+        valid_body
+        if mode == "invalid-flag"
+        else complete_contract("Build it.", scope=["a.py"], whole="x" * 513)
+    )
+    client = _serve_start_board(monkeypatch, _start_item(raw_body))
+    flags = ["--whole", "a\nb"] if mode == "invalid-flag" else []
+    assert issue_claim.main([*argv, *flags]) == (2 if mode == "invalid-flag" else 0)
+    captured = capsys.readouterr()
+    if mode == "invalid-flag":
+        assert captured.err == "ERROR: whole reason must be one bounded non-empty line\n"
+        assert "worktree:" not in captured.out
+        assert worktrees_and_branches(repo) == before
+    else:
+        assert "worktree: " in captured.out
+        assert f"branch: {_START_BRANCH}\n" in captured.out
+        assert f"CLAIMED issue #314: {before_claim.claim_id}\n" in captured.out
+        assert worktrees_and_branches(repo) == built
+    assert _live_store_claim() == before_claim
+    assert client.board_issues[0].body == raw_body
+    assert client.issue_references[314].body == raw_body
+    assert not client.item_bodies
+
+
 def test_cli_claim_replay_of_a_wide_scope_without_whole_reads_only_its_own_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -13476,6 +13778,9 @@ def _run_scope_width_command(
     exit status, stdout, and stderr, for the refusal and acceptance tables
     that share every arrangement and differ only in trigger and outcome."""
     client = _rescope_forge() if command == "rescope" else FakeForge(board_issues=board_issues)
+    if command == "claim":
+        raw_body = board_issues[0].body if board_issues else complete_contract("Claim #72.")
+        client.issue_references[72] = forge.ItemReference(forge.ItemState.OPEN, "Work", raw_body)
     if command == "rescope":
         assert standing_scope is not None
         _patch_store_write(
@@ -20646,6 +20951,29 @@ def test_body_check_refuses_an_invalid_size(capsys: pytest.CaptureFixture[str]) 
         monkeypatch.setattr(sys, "stdin", body_file)
         assert body_check_main() == 2
     assert capsys.readouterr().err == "body malformed: size: size must be S, M, or L\n"
+
+
+@pytest.mark.parametrize("value", ["x" * 513, "a\nb", "a\u0007b", " a", "", "   ", 1])
+def test_body_check_refuses_an_invalid_whole(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], value: object
+) -> None:
+    """Spec: BODY-61, BODY-62."""
+    raw_body = block_body(f"{MINIMAL_BLOCK_TOML}whole = {json.dumps(value)}\n")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
+    assert body_check_main() == 2
+    assert capsys.readouterr().err == (
+        "body malformed: whole: whole reason must be one bounded non-empty line\n"
+    )
+
+
+def test_body_check_accepts_a_whole_at_the_boundary(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: BODY-61, BODY-62."""
+    raw_body = block_body(f'{MINIMAL_BLOCK_TOML}whole = "{"x" * 512}"\n')
+    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
+    assert body_check_main() == 0
+    assert capsys.readouterr().out == "body ok\n"
 
 
 _RECORD_TOML = (

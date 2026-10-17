@@ -52,6 +52,7 @@ from cli_fixtures import (
     set_git_identity,
     stub_board_config_tracked,
     terminal_on_stdin,
+    worktrees_and_branches,
 )
 from github_fixtures import FakeForge
 from store_fixtures import blob, push_raw_state_tree, raw_tree, state_ref_listing
@@ -385,6 +386,54 @@ def _malformed_item_refusal_case(
         _malformed_item_refusal(item_id=planted),
         id=case_id,
     )
+
+
+def _whole_state_item(reason: str, *, wide: bool = False) -> bytes:
+    data = {
+        **_Projection("Build it.", "Ship it.", "It ships.").block_data(),
+        "scope": ["a.py", "b.py", "c.py", "d.py"] if wide else ["a.py"],
+        "whole": reason,
+        "record": _record(title="Whole boundary", state="open", kind="task"),
+    }
+    return _prose_body(render_block(data)).encode()
+
+
+def _plant_whole_state_item(worktree: Path, remote: str, content: bytes) -> None:
+    state = store.fetch_state(worktree=worktree, remote=remote)
+    store.commit_transition(
+        observed=fresh_observation(worktree, remote),
+        subject=store.TransitionSubject("plant legacy whole defect"),
+        intent=protocol.ItemWriteIntent(
+            item_id=MALFORMED_ID,
+            expected=state.items[MALFORMED_ID],
+            new_oid=store.hash_blob(worktree, content),
+            operation_id=uuid.uuid4().hex,
+        ),
+    )
+
+
+def _assert_whole_state_result(cell: int, status: int, out: str, err: str) -> None:
+    sentence = "whole reason must be one bounded non-empty line"
+    defect = f"body malformed: whole: {sentence}"
+    if cell == 24:
+        assert status == 0
+        assert out.startswith(f"CLAIMED issue {MALFORMED_ID}: whole-proof\n")
+        return
+    assert status == 2
+    if cell in {20, 21, 23}:
+        label = f"{MALFORMED_ID} " if cell == 20 else ""
+        assert err == f"ERROR: {label}{defect}\n"
+    elif cell == 29:
+        assert defect in err
+    elif cell in {35, 36, 37, 39}:
+        assert err == f"ERROR: {sentence}\n"
+    else:
+        assert err == f"ERROR: {_malformed_item_refusal()}\n"
+    assert "worktree:" not in out
+
+
+def _run_whole_state_command(monkeypatch: pytest.MonkeyPatch, piped: str, argv: list[str]) -> int:
+    return main_with_piped_stdin(monkeypatch, piped, argv) if piped else issue_claim.main(argv)
 
 
 def _container_alone() -> dict[str, bytes]:
@@ -1815,6 +1864,212 @@ class TestCliStateRefForge:
         real_git(worktree, "remote", "set-head", "origin", "main")
         self._enter_pinned_checkout(monkeypatch, worktree)
         monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
+
+    @pytest.mark.parametrize(
+        ("cell", "operation"),
+        [
+            (20, "derived"),
+            (21, "narrow"),
+            (22, "wide"),
+            (23, "wide-flag"),
+            (24, "replay-narrow"),
+            (25, "replay-wide"),
+            (26, "start"),
+            (27, "resume-standing"),
+            (27, "resume-rebuild"),
+            (28, "rescope-body"),
+            (28, "edit-body"),
+            (29, "new-body"),
+            (29, "pipe-edit"),
+            (35, "claim-flag"),
+            (36, "start-flag"),
+            (37, "rescope-flag"),
+            (37, "new-flag"),
+            (37, "edit-flag"),
+            (39, "resume-flag"),
+        ],
+        ids=[
+            "cell20",
+            "cell21",
+            "cell22",
+            "cell23",
+            "cell24",
+            "cell25",
+            "cell26",
+            "cell27a",
+            "cell27b",
+            "cell28-rescope",
+            "cell28-edit",
+            "cell29-new",
+            "cell29-edit",
+            "cell35",
+            "cell36",
+            "cell37-rescope",
+            "cell37-new",
+            "cell37-edit",
+            "cell39",
+        ],
+    )
+    def test_whole_state_ref_paths_preserve_state(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+        cell: int,
+        operation: str,
+    ) -> None:
+        """Spec: CLM-37, PIN-15, NEXT-36, ITEM-38, ITEM-52. T6: matrix refusals."""
+        valid = _whole_state_item("ok", wide=operation == "replay-wide")
+        invalid = _whole_state_item("x" * 513, wide=operation == "replay-wide")
+        self._live_state_ref_checkout(
+            monkeypatch, tmp_path, bare_remote, worktree, {f"{MALFORMED_ID}.md": valid}
+        )
+        _stub_claim_checkout(monkeypatch)
+        monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Codex Sol")
+        remote = f"file://{bare_remote}"
+        start = ["start", MALFORMED_ID, "--slug", "whole"]
+        claim = [
+            "claim",
+            MALFORMED_ID,
+            "--agent",
+            "Codex Sol",
+            "--branch",
+            "codex/whole",
+            "--base",
+            head_sha(worktree),
+            "--claim-id",
+            "whole-proof",
+        ]
+        live = operation.startswith(("replay-", "resume-", "rescope-"))
+        if live:
+            assert (
+                issue_claim.main(start if operation.startswith(("resume-", "rescope-")) else claim)
+                == 0
+            )
+            capsys.readouterr()
+        if operation.startswith("rescope-"):
+            lane = (
+                worktree.parent / f"{worktree.name}-worktrees" / f"issue-{MALFORMED_NUMBER}-whole"
+            )
+            self._enter_pinned_checkout(monkeypatch, lane)
+        if operation in {"resume-rebuild", "resume-flag"}:
+            claimed = next(
+                iter(store.fetch_state(worktree=worktree, remote=remote).claims.values())
+            )
+            lane = (
+                worktree.parent / f"{worktree.name}-worktrees" / f"issue-{MALFORMED_NUMBER}-whole"
+            )
+            real_git(worktree, "worktree", "remove", str(lane))
+            real_git(worktree, "branch", "-D", claimed.branch)
+        stored_invalid = operation not in {
+            "new-body",
+            "pipe-edit",
+            "claim-flag",
+            "start-flag",
+            "rescope-flag",
+            "new-flag",
+            "edit-flag",
+            "resume-flag",
+        }
+        if stored_invalid:
+            _plant_whole_state_item(worktree, remote, invalid)
+        before = store.fetch_state(worktree=worktree, remote=remote)
+        checkout_before = worktrees_and_branches(worktree)
+        wide = [part for path in ("a.py", "b.py", "c.py", "d.py") for part in ("--scope", path)]
+        commands = {
+            "derived": claim,
+            "narrow": [*claim, "--scope", "a.py"],
+            "wide": [*claim, *wide],
+            "wide-flag": [*claim, *wide, "--whole", "ok"],
+            "replay-narrow": claim,
+            "replay-wide": claim,
+            "start": start,
+            "resume-standing": start,
+            "resume-rebuild": start,
+            "rescope-body": ["rescope", MALFORMED_ID, "--add", "x.py"],
+            "edit-body": ["item", "edit", MALFORMED_ID, "--whole", "ok"],
+            "new-body": ["item", "new", "--title", "Fresh"],
+            "pipe-edit": ["item", "edit", MALFORMED_ID],
+            "claim-flag": [*claim, "--whole", "x" * 513],
+            "start-flag": [*start, "--whole", "a\nb"],
+            "rescope-flag": ["rescope", MALFORMED_ID, "--whole", " a"],
+            "new-flag": ["item", "new", "--title", "Fresh", "--whole", "x" * 513],
+            "edit-flag": ["item", "edit", MALFORMED_ID, "--whole", ""],
+            "resume-flag": [*start, "--whole", "a\nb"],
+        }
+        piped = invalid.decode() if operation in {"new-body", "pipe-edit"} else ""
+        status = _run_whole_state_command(monkeypatch, piped, commands[operation])
+        captured = capsys.readouterr()
+        _assert_whole_state_result(cell, status, captured.out, captured.err)
+        if cell in {20, 21, 22, 23, 25, 28, 29}:
+            assert (
+                _run_whole_state_command(monkeypatch, piped, [*commands[operation], "--json"]) == 2
+            )
+            json_output = capsys.readouterr()
+            payload = json.loads(json_output.out)
+            if cell not in {21, 23}:
+                assert json_output.err == captured.err
+            reason = (
+                "body_invalid"
+                if cell in {20, 29}
+                else "unavailable"
+                if cell in {22, 25}
+                else "precondition_failed"
+            )
+            assert payload["reason"] == reason
+            if cell in {21, 23}:
+                assert payload["checks"]
+        after = store.fetch_state(worktree=worktree, remote=remote)
+        assert after.claims == before.claims
+        assert after.items == before.items
+        assert worktrees_and_branches(worktree) == checkout_before
+        if not live:
+            assert not after.claims
+
+    def test_whole_state_ref_board_and_repair(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+    ) -> None:
+        """Spec: CLM-37, PIN-15, NEXT-36, ITEM-38, ITEM-52. T6: matrix 31, 32."""
+        self._live_state_ref_checkout(
+            monkeypatch,
+            tmp_path,
+            bare_remote,
+            worktree,
+            {f"{MALFORMED_ID}.md": _whole_state_item("x" * 513)},
+        )
+        remote = f"file://{bare_remote}"
+        before = store.fetch_state(worktree=worktree, remote=remote)
+        assert issue_claim.main(["next"]) == 3
+        output = capsys.readouterr().out
+        defect = "body malformed: whole: whole reason must be one bounded non-empty line"
+        assert "SKIPPED" in output
+        assert f"{MALFORMED_ID}: {defect}" in output
+        assert issue_claim.main(["board", "--json"]) == 0
+        row = next(
+            row
+            for row in json.loads(capsys.readouterr().out)["items"]
+            if row["number"] == MALFORMED_NUMBER
+        )
+        assert (row["actionable"], row["actionable_reason"]) == (False, defect)
+        after = store.fetch_state(worktree=worktree, remote=remote)
+        assert after.items == before.items
+        assert after.claims == before.claims
+        assert (
+            main_with_piped_stdin(
+                monkeypatch, _whole_state_item("ok").decode(), ["item", "edit", MALFORMED_ID]
+            )
+            == 0
+        )
+        assert capsys.readouterr().out.startswith(f"EDITED {MALFORMED_ID}")
+        assert issue_claim.main(["next"]) == 0
+        assert defect not in capsys.readouterr().out
 
     def test_rule_writes_a_state_ref_item_and_a_fresh_process_reads_it_ruled(
         self,

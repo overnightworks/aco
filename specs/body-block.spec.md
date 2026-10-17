@@ -145,12 +145,17 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 ## `whole`, the item's own wide-scope justification
 
 - [ ] [BODY-60] A block with no `whole` key is valid: absence means no stored reason, never a default one, and `aco body --check` prints `body ok`, exit `0`.
-- [ ] [BODY-61] `whole = "<reason>"` with any non-blank text is valid: `aco body --check` prints `body ok`, exit `0`; `specs/claim.spec.md` (CLM-21) owns what `claim`/`start` do with it.
-- [ ] [BODY-62] A blank or non-string `whole` prints `body malformed: whole: whole must be a non-empty string`, exit `2`, the same sentence for every invalid shape.
+- [ ] [BODY-61] `whole = "<reason>"` is valid when the reason is one non-empty line of at most 512 characters, no surrounding whitespace, no control character: `aco body --check` prints `body ok`, exit `0`.
+- [ ] [BODY-62] A `whole` outside BODY-61, or not a string, prints `body malformed: whole: whole reason must be one bounded non-empty line`, exit `2`, the same sentence for every invalid shape.
 
   ```
-  whole = "   "  # blank after trimming
-  whole = 1      # not a string
+  whole = ""
+  whole = "   "
+  whole = " one lock"
+  whole = "one\nlock"
+  whole = "one\u0007lock"
+  whole = 1
+  # any reason over 512 characters
   ```
 
 ## Never
