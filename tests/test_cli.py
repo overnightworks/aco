@@ -18313,7 +18313,9 @@ def test_land_merges_an_issueless_lane_pull_request(
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
 
-    assert "RELEASED lane " + branch + ": landing" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "RELEASED lane " + branch + ": landing" in out
+    assert "reinstall:" not in out
     [(number, head_sha, _method, _title, body)] = client.merge_calls
     assert (number, head_sha) == (12, MERGE_COMMIT_SHA)
     assert body.strip().split("\n\n")[-1] == "No-Item: docs"
@@ -19817,6 +19819,7 @@ def test_release_branch_selects_a_lane_claim_without_checking_out_that_branch(
     outcome_flags: tuple[str, str],
     expected: int,
 ) -> None:
+    """An explicit branch lets release proceed even from a deleted or foreign worktree."""
     standing = request("mine", "Ada", issue=issue, branch=branch, scope=("docs",))
     client = FakeForge()
     if outcome_flags[0] == "--merged":
@@ -24360,6 +24363,8 @@ class _LaneLookupCase:
     source: str = "dependabot/x"
     as_json: bool = False
     refusal: str | None = None
+    reads_once: bool = False
+    exact: bool = True
 
 
 def _lane_lookup_refusal(branch: str) -> str:
@@ -24370,7 +24375,9 @@ def _lane_lookup_refusal(branch: str) -> str:
 
 
 _LANE_LOOKUP_CASES = (
-    _LaneLookupCase("5", holder="none", refusal=_lane_lookup_refusal("dependabot/x")),
+    _LaneLookupCase(
+        "5", holder="none", refusal=_lane_lookup_refusal("dependabot/x"), reads_once=True
+    ),
     _LaneLookupCase("6", holder="issue", refusal=_lane_lookup_refusal("dependabot/x")),
     _LaneLookupCase("8", merged=True),
     _LaneLookupCase(
@@ -24398,13 +24405,17 @@ _LANE_LOOKUP_CASES = (
         "26", command="rescope", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
     ),
     _LaneLookupCase(
-        "27", command="rescope", agent="Bob", refusal="only the original claimant may rescope"
+        "27",
+        command="rescope",
+        agent="Bob",
+        refusal="only the original claimant may rescope",
+        exact=False,
     ),
     _LaneLookupCase(
         "28", command="claim", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
     ),
     _LaneLookupCase("29", command="claim", refusal=_lane_lookup_refusal("dependabot/x")),
-    _LaneLookupCase("30", branch="docs/x"),
+    _LaneLookupCase("30", branch="docs/x", reads_once=True),
     _LaneLookupCase(
         "32",
         branch="",
@@ -24498,12 +24509,12 @@ def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     reads = count_context_reads(monkeypatch)
     status = issue_claim.main(["--repo", REPOSITORY, *_lane_lookup_arguments(case)])
     captured = capsys.readouterr()
-    if case.cell in {"5", "30"}:
+    if case.reads_once:
         assert sum(reads.observations.values()) == 1
     after = store.fetch_state(worktree=Path("."), remote="origin").claims
     assert status == (2 if case.refusal else 0)
     if case.refusal:
-        if case.cell in {"5", "6", "9", "10", "26", "28", "29", "32"}:
+        if case.exact:
             assert captured.err == f"ERROR: {case.refusal}\n"
         else:
             assert case.refusal in captured.err

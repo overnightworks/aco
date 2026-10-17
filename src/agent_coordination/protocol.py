@@ -1702,9 +1702,11 @@ def lookup_identity(
     issue: int | None, branch: str, *, holders: Callable[[], tuple[ActiveClaim, ...]]
 ) -> ClaimIdentity:
     """Resolve an existing lane without relaxing claim acquisition's prefix rule."""
-    if issue is not None or is_issueless_lane_branch(branch):
-        return resolved_identity(issue, branch)
-    if any(isinstance(claim.identity, LaneIdentity) for claim in holders()):
+    if (
+        issue is None
+        and not is_issueless_lane_branch(branch)
+        and any(isinstance(claim.identity, LaneIdentity) for claim in holders())
+    ):
         return LaneIdentity()
     return resolved_identity(issue, branch)
 
