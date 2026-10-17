@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "f01840d4160646430861c0dc18277a08706f646c"
 branch = "claude/issue-134-s26-docstring-sweep"
-scope = ["src/agent_coordination/board_read.py", "src/agent_coordination/body.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_ask.py", "src/agent_coordination/cmd_check.py", "src/agent_coordination/cmd_cut.py", "src/agent_coordination/policy.py", "src/agent_coordination/session.py", "src/agent_coordination/state_board.py", "src/agent_coordination/store.py", "tests/test_board.py", "tests/test_cli.py"]
+scope = ["src/agent_coordination/board.py", "src/agent_coordination/board_read.py", "src/agent_coordination/body.py", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_ask.py", "src/agent_coordination/cmd_check.py", "src/agent_coordination/cmd_cut.py", "src/agent_coordination/hook_input.py", "src/agent_coordination/policy.py", "src/agent_coordination/session.py", "src/agent_coordination/state_board.py", "src/agent_coordination/store.py", "tests/test_board.py", "tests/test_cli.py"]
 opened_commit = "91607d993a7742fb822303d3473298c3ea6867aa"
 whole_reason = "Die Nachträge der Scheiben-Reviews sind lauter Ein-Zeilen-Korrekturen über viele Module; einzeln geschnitten kostete jede eine eigene Landung."
