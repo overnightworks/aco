@@ -11,7 +11,7 @@ from pathlib import Path
 from . import board, board_read, body, checkout, policy, protocol, report, session, store
 
 
-class RescopeReason(StrEnum):
+class _RescopeReason(StrEnum):
     """`aco rescope`'s own `--json` `reason` vocabulary (issue #406,
     `specs/rescope.spec.md`): `rescoped` the only success. `invalid_usage`
     covers a malformed `--add`/`--drop` value (a relative entry, one outside
@@ -31,7 +31,7 @@ class RescopeReason(StrEnum):
 
 
 def _rescope_json(claimed: protocol.ActiveClaim) -> None:
-    report.emit_json(True, RescopeReason.RESCOPED, **protocol.claim_identity_fields(claimed))
+    report.emit_json(True, _RescopeReason.RESCOPED, **protocol.claim_identity_fields(claimed))
 
 
 @dataclass(frozen=True)
@@ -194,7 +194,7 @@ class _RescopePreconditionError(protocol.ClaimError):
     `precondition_failed`."""
 
 
-RESCOPE_COMMAND = "rescope"
+_RESCOPE_COMMAND = "rescope"
 
 
 @dataclass(frozen=True)
@@ -221,12 +221,12 @@ def _rescoped_item_body(
     storage = context.config.storage
     number = identity.issue
     try:
-        board_read.require_update_item_body(client, command=RESCOPE_COMMAND)
+        board_read.require_update_item_body(client, command=_RESCOPE_COMMAND)
         text = board_read.item_body_or_refuse(
-            client, number, command=RESCOPE_COMMAND, storage=storage
+            client, number, command=_RESCOPE_COMMAND, storage=storage
         )
         located = board.located_block_or_refuse(
-            number, text, command=RESCOPE_COMMAND, storage=storage
+            number, text, command=_RESCOPE_COMMAND, storage=storage
         )
     except protocol.ClaimError as error:
         raise _RescopePreconditionError(str(error)) from error
@@ -323,7 +323,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
         operation_id=uuid.uuid4().hex,
         whole_reason=whole_reason,
     )
-    subject = store.transition_subject(RESCOPE_COMMAND, selected.identity, selected.branch)
+    subject = store.transition_subject(_RESCOPE_COMMAND, selected.identity, selected.branch)
     new_state = (
         checkout_context.transition(subject, intent)
         if item is None
@@ -341,7 +341,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
 
 
 def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
-    """`rescope`'s own `--json` refusals (issue #406, `RescopeReason`):
+    """`rescope`'s own `--json` refusals (issue #406, `_RescopeReason`):
     `_rescope_write`'s two typed exceptions choose `invalid_usage`/
     `precondition_failed`; every other `protocol.ClaimError` -- an
     unresolved checkout, a missing state ref, a corrupted claim record --
@@ -350,8 +350,8 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
     try:
         return _rescope_write(parsed, context)
     except _RescopeInvalidUsageError as error:
-        return report.refuse(RescopeReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(_RescopeReason.INVALID_USAGE, error, as_json=as_json)
     except _RescopePreconditionError as error:
-        return report.refuse(RescopeReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(_RescopeReason.PRECONDITION_FAILED, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return report.refuse(RescopeReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(_RescopeReason.UNAVAILABLE, error, as_json=as_json)

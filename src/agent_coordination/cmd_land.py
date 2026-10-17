@@ -23,11 +23,11 @@ from . import (
 )
 from .session import RunContext
 
-LAND_GITHUB_ONLY_REFUSAL = (
+_LAND_GITHUB_ONLY_REFUSAL = (
     "aco land is a github command; storage = state-ref has no pull requests to land"
 )
-LAND_SELF_PACKAGE_NAME = "agent-coordination"
-LAND_REINSTALL_LINE = "reinstall: uv tool install --force --from . agent-coordination"
+_LAND_SELF_PACKAGE_NAME = "agent-coordination"
+_LAND_REINSTALL_LINE = "reinstall: uv tool install --force --from . agent-coordination"
 
 
 def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
@@ -52,11 +52,11 @@ def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
 # `cli.main`'s own `report.CLI_ERROR_PREFIX` still fits under the same 200-character
 # printed-line budget (issue #405 round-4 finding) -- so several long check
 # names can never print a refusal line past 200 characters.
-LAND_CHECK_NAME_LENGTH_LIMIT = 40
-LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
-LAND_QUALITY_VERDICT_CHECK = "quality / verdict"
-LAND_REFUSAL_LINE_LENGTH_LIMIT = 200
-LAND_REFUSAL_SENTENCE_LENGTH_LIMIT = LAND_REFUSAL_LINE_LENGTH_LIMIT - len(report.CLI_ERROR_PREFIX)
+_LAND_CHECK_NAME_LENGTH_LIMIT = 40
+_LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
+_LAND_QUALITY_VERDICT_CHECK = "quality / verdict"
+_LAND_REFUSAL_LINE_LENGTH_LIMIT = 200
+_LAND_REFUSAL_SENTENCE_LENGTH_LIMIT = _LAND_REFUSAL_LINE_LENGTH_LIMIT - len(report.CLI_ERROR_PREFIX)
 
 
 def _land_not_open_refusal(number: int) -> str:
@@ -68,9 +68,9 @@ def _land_not_mergeable_refusal(number: int, state: str) -> str:
 
 
 def _land_truncated_check_name(name: str) -> str:
-    if len(name) <= LAND_CHECK_NAME_LENGTH_LIMIT:
+    if len(name) <= _LAND_CHECK_NAME_LENGTH_LIMIT:
         return name
-    return name[: LAND_CHECK_NAME_LENGTH_LIMIT - 1] + "…"
+    return name[: _LAND_CHECK_NAME_LENGTH_LIMIT - 1] + "…"
 
 
 def _land_bounded_refusal(sentence: str) -> str:
@@ -79,9 +79,9 @@ def _land_bounded_refusal(sentence: str) -> str:
     a terminal escape, so it is shown as `next` shows foreign text (`\\n`,
     `\\x1b`) before the length cap applies (issues #505, #538)."""
     printable = board.terminal_text(sentence)
-    if len(printable) <= LAND_REFUSAL_SENTENCE_LENGTH_LIMIT:
+    if len(printable) <= _LAND_REFUSAL_SENTENCE_LENGTH_LIMIT:
         return printable
-    return printable[: LAND_REFUSAL_SENTENCE_LENGTH_LIMIT - 1] + "…"
+    return printable[: _LAND_REFUSAL_SENTENCE_LENGTH_LIMIT - 1] + "…"
 
 
 def _land_pending_check_names(checks: tuple[forge.CheckRun, ...]) -> tuple[str, ...]:
@@ -136,7 +136,7 @@ def _land_lacks_quality_verdict(checks: tuple[forge.CheckRun, ...]) -> bool:
     """Whether every check completed and none is the quality verdict: a
     check still running may yet be the verdict, so it is not missing."""
     return all(check.conclusion is not None for check in checks) and not any(
-        check.name == LAND_QUALITY_VERDICT_CHECK for check in checks
+        check.name == _LAND_QUALITY_VERDICT_CHECK for check in checks
     )
 
 
@@ -149,12 +149,12 @@ def _refuse_land_missing_quality_verdict(
     holds the quality gate's configuration, presence alone adopts the gate
     and the verdict must be among the checks."""
     default_branch = resolve_default_branch()
-    adopted = client.file_at_commit(LAND_QUALITY_CONFIG_PATH, default_branch) is not None
+    adopted = client.file_at_commit(_LAND_QUALITY_CONFIG_PATH, default_branch) is not None
     if adopted and _land_lacks_quality_verdict(readiness.checks):
         raise protocol.ClaimUnavailableError(
             _land_bounded_refusal(
-                f"pull request #{readiness.number} has no {LAND_QUALITY_VERDICT_CHECK} check; "
-                f"{default_branch} adopts the quality gate ({LAND_QUALITY_CONFIG_PATH})"
+                f"pull request #{readiness.number} has no {_LAND_QUALITY_VERDICT_CHECK} check; "
+                f"{default_branch} adopts the quality gate ({_LAND_QUALITY_CONFIG_PATH})"
             )
         )
 
@@ -523,7 +523,7 @@ def _land_is_own_repository(toplevel: Path) -> bool:
     except (OSError, tomllib.TOMLDecodeError):
         return False
     project = data.get("project")
-    return isinstance(project, dict) and project.get("name") == LAND_SELF_PACKAGE_NAME
+    return isinstance(project, dict) and project.get("name") == _LAND_SELF_PACKAGE_NAME
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> None:
@@ -543,7 +543,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> None:
     toplevel = context.toplevel
     config = context.config
     if config.storage is not body.Storage.GITHUB:
-        raise protocol.ClaimUnavailableError(LAND_GITHUB_ONLY_REFUSAL)
+        raise protocol.ClaimUnavailableError(_LAND_GITHUB_ONLY_REFUSAL)
     if parsed.coordinator_override:
         protocol.require_coordinator_override(parsed.role)
     client = cast(github.GitHubForge, context.forge)
@@ -602,4 +602,4 @@ def run(parsed: argparse.Namespace, context: RunContext) -> None:
     )
     # The run whose release succeeded already printed it (LANDCMD-38).
     if ending is cmd_release.ReleaseEnding.RELEASED and _land_is_own_repository(toplevel):
-        print(LAND_REINSTALL_LINE)
+        print(_LAND_REINSTALL_LINE)

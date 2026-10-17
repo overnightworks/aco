@@ -24,7 +24,7 @@ def _checked_classification(
     return classification if defect is None else defect
 
 
-class CheckKind(StrEnum):
+class _CheckKind(StrEnum):
     """Which subject one `check` run read -- the `--json` discriminator.
 
     The number space holds three of them, because that is what the one
@@ -41,13 +41,13 @@ class CheckKind(StrEnum):
 
 
 @dataclass(frozen=True)
-class NumberSubject:
+class _NumberSubject:
     """One run's subject in the forge's number space, printed under
     `number`. Its `kind` cannot be `TRUNK_COMMIT`: the key travels with the
     value that determines it, so no answer can name a sha under `number`
     (issue #435)."""
 
-    kind: Literal[CheckKind.PULL_REQUEST, CheckKind.ISSUE, CheckKind.MISSING]
+    kind: Literal[_CheckKind.PULL_REQUEST, _CheckKind.ISSUE, _CheckKind.MISSING]
     number: int
 
     def payload(self) -> dict[str, object]:
@@ -55,7 +55,7 @@ class NumberSubject:
 
 
 @dataclass(frozen=True)
-class TrunkSubject:
+class _TrunkSubject:
     """One run's subject in local trunk history, printed under `sha`. It
     carries no `kind` field, because a commit is never anything but
     `TRUNK_COMMIT` (issue #435)."""
@@ -63,13 +63,13 @@ class TrunkSubject:
     sha: str
 
     def payload(self) -> dict[str, object]:
-        return {"kind": CheckKind.TRUNK_COMMIT.value, "sha": self.sha}
+        return {"kind": _CheckKind.TRUNK_COMMIT.value, "sha": self.sha}
 
 
-CheckSubject = NumberSubject | TrunkSubject
+_CheckSubject = _NumberSubject | _TrunkSubject
 
 
-class CheckReason(StrEnum):
+class _CheckReason(StrEnum):
     """`aco check`'s own `--json` `reason` vocabulary (`specs/check.spec.md`,
     issue #404): `valid` the only exit `0`; `blocked` the only exit `3`
     (a valid, complete issue with an open dependency); every other member
@@ -92,24 +92,24 @@ class CheckReason(StrEnum):
 
 
 @dataclass(frozen=True)
-class CheckOutcome:
+class _CheckOutcome:
     """One `check` answer: the line a human reads, and the `--json` `reason`
     a caller acts on. `subject` is the number or the trunk commit the run
     was asked about, printing itself under its own key; `message` mirrors
     the line's own finding without its `ISSUE #<n> `/`REFUSED: #<n> `/
     `REFUSED: <sha> ` prefix; `blocked_by` is only ever set together with
-    `CheckReason.BLOCKED` (issue #404)."""
+    `_CheckReason.BLOCKED` (issue #404)."""
 
-    subject: CheckSubject
+    subject: _CheckSubject
     line: str
-    reason: CheckReason
+    reason: _CheckReason
     message: str | None = None
     blocked_by: tuple[str, ...] = ()
 
     def exit_code(self) -> int:
-        if self.reason is CheckReason.VALID:
+        if self.reason is _CheckReason.VALID:
             return 0
-        if self.reason is CheckReason.BLOCKED:
+        if self.reason is _CheckReason.BLOCKED:
             return 3
         return 2
 
@@ -120,7 +120,7 @@ class CheckOutcome:
                 payload["blocked_by"] = list(self.blocked_by)
             if self.message is not None:
                 payload["message"] = self.message
-            report.emit_json(self.reason is CheckReason.VALID, self.reason, **payload)
+            report.emit_json(self.reason is _CheckReason.VALID, self.reason, **payload)
         else:
             print(self.line, file=sys.stderr if self.message is not None else sys.stdout)
         return self.exit_code()
@@ -132,32 +132,32 @@ def _pull_request_check(
     repository: str,
     number: int,
     storage: body.Storage,
-) -> CheckOutcome:
+) -> _CheckOutcome:
     detail = run.forge.landing(number)
     context = policy.LandingCheckContext(run, repository, storage)
     checked = _checked_classification(context, claims, detail)
     if isinstance(checked, board.ClassificationDefect):
-        return CheckOutcome(
-            NumberSubject(CheckKind.PULL_REQUEST, detail.number),
+        return _CheckOutcome(
+            _NumberSubject(_CheckKind.PULL_REQUEST, detail.number),
             f"REFUSED: pull request #{detail.number} {checked.message}",
-            CheckReason.INVALID_CLASSIFICATION,
+            _CheckReason.INVALID_CLASSIFICATION,
             checked.message,
         )
-    return CheckOutcome(
-        NumberSubject(CheckKind.PULL_REQUEST, detail.number),
+    return _CheckOutcome(
+        _NumberSubject(_CheckKind.PULL_REQUEST, detail.number),
         f"PR #{detail.number} by {detail.author} declares {checked}",
-        CheckReason.VALID,
+        _CheckReason.VALID,
     )
 
 
-def _missing_number(repository: str, number: int, storage: body.Storage) -> CheckOutcome:
+def _missing_number(repository: str, number: int, storage: body.Storage) -> _CheckOutcome:
     """A number neither mode can read, named without claiming which of the
     two it would have been."""
     finding = f"does not exist in {repository}"
-    return CheckOutcome(
-        NumberSubject(CheckKind.MISSING, number),
+    return _CheckOutcome(
+        _NumberSubject(_CheckKind.MISSING, number),
         f"REFUSED: {board.item_label(number, storage)} {finding}",
-        CheckReason.MISSING,
+        _CheckReason.MISSING,
         finding,
     )
 
@@ -170,13 +170,13 @@ def _issue_line(number: int, finding: str, storage: body.Storage) -> str:
 def _refused_issue(
     number: int,
     finding: str,
-    reason: CheckReason,
+    reason: _CheckReason,
     storage: body.Storage,
     *,
     blocked_by: tuple[str, ...] = (),
-) -> CheckOutcome:
-    return CheckOutcome(
-        NumberSubject(CheckKind.ISSUE, number),
+) -> _CheckOutcome:
+    return _CheckOutcome(
+        _NumberSubject(_CheckKind.ISSUE, number),
         _issue_line(number, finding, storage),
         reason,
         finding,
@@ -191,14 +191,14 @@ def _issue_check(
     number: int,
     *,
     storage: body.Storage,
-) -> CheckOutcome:
+) -> _CheckOutcome:
     """Whether this issue's body is the contract a builder can start from:
     readable, complete, and unblocked. Its dependencies come from GitHub's
     own `blocked_by` relation, or the state-ref item's own `[record]` table
     under `storage = "state-ref"` -- a body never states them itself."""
     shape = body.body_shape_check(raw_body, storage=storage)
     if shape.defects:
-        return _refused_issue(number, shape.defects[0], CheckReason(shape.verdict.value), storage)
+        return _refused_issue(number, shape.defects[0], _CheckReason(shape.verdict.value), storage)
     blockers = board.open_dependency_blockers(client.list_board_dependencies(number), repository)
     if blockers:
         labels = tuple(
@@ -207,14 +207,14 @@ def _issue_check(
         return _refused_issue(
             number,
             f"blocked by {', '.join(labels)}",
-            CheckReason.BLOCKED,
+            _CheckReason.BLOCKED,
             storage,
             blocked_by=labels,
         )
-    return CheckOutcome(
-        NumberSubject(CheckKind.ISSUE, number),
+    return _CheckOutcome(
+        _NumberSubject(_CheckKind.ISSUE, number),
         _issue_line(number, "body ok", storage),
-        CheckReason.VALID,
+        _CheckReason.VALID,
     )
 
 
@@ -256,9 +256,9 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
                 client, repository, reference.body or "", number, storage=config.storage
             )
     except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(CheckReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(_CheckReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return report.refuse(CheckReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(_CheckReason.UNAVAILABLE, error, as_json=as_json)
     return outcome.report(as_json=as_json)
 
 
@@ -278,11 +278,11 @@ def _trunk_classification_text(
     )
 
 
-def _refused_trunk_commit(sha: str, finding: str, reason: CheckReason) -> CheckOutcome:
-    return CheckOutcome(TrunkSubject(sha), f"REFUSED: {sha} {finding}", reason, finding)
+def _refused_trunk_commit(sha: str, finding: str, reason: _CheckReason) -> _CheckOutcome:
+    return _CheckOutcome(_TrunkSubject(sha), f"REFUSED: {sha} {finding}", reason, finding)
 
 
-STATE_REF_TRAILER_PAST_THE_ID_SPACE = "carries `Work-Item:` {number}, which " + board.NAMES_NO_ITEM
+_STATE_REF_TRAILER_PAST_THE_ID_SPACE = "carries `Work-Item:` {number}, which " + board.NAMES_NO_ITEM
 
 
 def _trailer_number_past_the_id_space(
@@ -302,7 +302,7 @@ def _trailer_number_past_the_id_space(
 
 def _trunk_commit_outcome(
     sha: str, landing: checkout.TrunkLanding | None, storage: body.Storage
-) -> CheckOutcome:
+) -> _CheckOutcome:
     """`sha`'s own answer (issue #359, LAND-48): the same three answers
     `check <pr>` reads from a pull request body's classification
     (LAND-04/LAND-06), read instead from the trailer block of `landing`, the
@@ -310,30 +310,30 @@ def _trunk_commit_outcome(
     holds no such commit at all."""
     if landing is None:
         return _refused_trunk_commit(
-            sha, checkout.SHA_NOT_ON_TRUNK_DEFECT, CheckReason.NOT_ON_TRUNK
+            sha, checkout.SHA_NOT_ON_TRUNK_DEFECT, _CheckReason.NOT_ON_TRUNK
         )
     classification = landing.classification
     if classification is None:
         return _refused_trunk_commit(
             sha,
             "carries no `Work-Item:` or `No-Item:` trailer",
-            CheckReason.INVALID_CLASSIFICATION,
+            _CheckReason.INVALID_CLASSIFICATION,
         )
     if isinstance(classification, board.ClassificationDefect):
         return _refused_trunk_commit(
-            sha, classification.message, CheckReason.INVALID_CLASSIFICATION
+            sha, classification.message, _CheckReason.INVALID_CLASSIFICATION
         )
     past = _trailer_number_past_the_id_space(classification, storage)
     if past is not None:
         return _refused_trunk_commit(
             sha,
-            STATE_REF_TRAILER_PAST_THE_ID_SPACE.format(number=past),
-            CheckReason.INVALID_CLASSIFICATION,
+            _STATE_REF_TRAILER_PAST_THE_ID_SPACE.format(number=past),
+            _CheckReason.INVALID_CLASSIFICATION,
         )
-    return CheckOutcome(
-        TrunkSubject(sha),
+    return _CheckOutcome(
+        _TrunkSubject(sha),
         f"{sha} declares {_trunk_classification_text(classification, storage)}",
-        CheckReason.VALID,
+        _CheckReason.VALID,
     )
 
 

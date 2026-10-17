@@ -18,7 +18,7 @@ from .session import RunContext
 _RESET_BUNDLE_SHA_LENGTH = 12
 
 
-class ResetStep(StrEnum):
+class _ResetStep(StrEnum):
     """The five lines `reset` prints, in the one order the dry run and the
     real run share (plan review, 19.09.2026): export, delete the remote
     ref, delete the local one if present, clear every worktree's lineage
@@ -31,23 +31,23 @@ class ResetStep(StrEnum):
     BOOTSTRAP = "bootstrap"
 
 
-RESET_STEP_ORDER: tuple[ResetStep, ...] = (
-    ResetStep.EXPORT,
-    ResetStep.DELETE_REMOTE,
-    ResetStep.DELETE_LOCAL,
-    ResetStep.CLEAR_STAMPS,
-    ResetStep.BOOTSTRAP,
+_RESET_STEP_ORDER: tuple[_ResetStep, ...] = (
+    _ResetStep.EXPORT,
+    _ResetStep.DELETE_REMOTE,
+    _ResetStep.DELETE_LOCAL,
+    _ResetStep.CLEAR_STAMPS,
+    _ResetStep.BOOTSTRAP,
 )
 
 
 @dataclass(frozen=True)
-class ResetExportTarget:
+class _ResetExportTarget:
     tip: protocol.ObjectId
     destination: Path
 
 
 @dataclass(frozen=True)
-class ResetPlan:
+class _ResetPlan:
     """Every fact `reset`'s five lines are built from, read once before
     anything is exported or deleted (plan review, 19.09.2026). The dry run
     prints this verbatim with a `would: ` prefix; the real run prints the
@@ -57,7 +57,7 @@ class ResetPlan:
 
     remote: str
     remote_tip: protocol.ObjectId | None
-    export_target: ResetExportTarget | None
+    export_target: _ResetExportTarget | None
     local_ref_present: bool
     worktree_count: int
     unreadable_schema_version: int | None
@@ -78,7 +78,7 @@ def _reset_restore_command(destination: Path) -> str:
 
 
 @dataclass(frozen=True)
-class ResetExportConfig:
+class _ResetExportConfig:
     """`--no-export`/`--export-dir`, resolved once (issue #298): keeps
     `_build_reset_plan` under the five-argument ceiling without folding an
     unrelated pair of facts into `worktree` or `remote`."""
@@ -87,9 +87,9 @@ class ResetExportConfig:
     directory: Path
 
 
-def _resolved_reset_export_config(parsed: argparse.Namespace, toplevel: Path) -> ResetExportConfig:
+def _resolved_reset_export_config(parsed: argparse.Namespace, toplevel: Path) -> _ResetExportConfig:
     directory = parsed.export_dir if parsed.export_dir is not None else toplevel.parent
-    return ResetExportConfig(enabled=not parsed.no_export, directory=directory)
+    return _ResetExportConfig(enabled=not parsed.no_export, directory=directory)
 
 
 def _build_reset_plan(
@@ -97,14 +97,14 @@ def _build_reset_plan(
     worktree: Path,
     remote: str,
     state: protocol.ClaimState | protocol.UnreadableState,
-    export: ResetExportConfig,
+    export: _ResetExportConfig,
     today: date,
-) -> ResetPlan:
+) -> _ResetPlan:
     export_target = None
     if export.enabled and state.tip is not None:
         destination = export.directory / _reset_bundle_name(worktree.name, today, state.tip)
-        export_target = ResetExportTarget(tip=state.tip, destination=destination)
-    return ResetPlan(
+        export_target = _ResetExportTarget(tip=state.tip, destination=destination)
+    return _ResetPlan(
         remote=remote,
         remote_tip=state.tip,
         export_target=export_target,
@@ -166,7 +166,7 @@ def _reset_unreadable_line(schema_version: int) -> str:
     )
 
 
-def _reset_export_line(plan: ResetPlan, *, done: bool) -> str:
+def _reset_export_line(plan: _ResetPlan, *, done: bool) -> str:
     if plan.export_target is None:
         if plan.remote_tip is None:
             return f"nothing to export: {store.STATE_REF} does not exist on {plan.remote}"
@@ -179,7 +179,7 @@ def _reset_export_line(plan: ResetPlan, *, done: bool) -> str:
     )
 
 
-def _reset_delete_remote_line(plan: ResetPlan, *, done: bool) -> str:
+def _reset_delete_remote_line(plan: _ResetPlan, *, done: bool) -> str:
     if plan.remote_tip is None:
         return f"nothing to delete on {plan.remote}: {store.STATE_REF} does not exist"
     verb = "deleted" if done else "delete"
@@ -205,25 +205,25 @@ def _reset_bootstrap_line(*, tip: protocol.ObjectId | None) -> str:
     return f"bootstrapped a fresh empty state at {tip}"
 
 
-def _print_reset_dry_run(plan: ResetPlan) -> None:
-    lines: dict[ResetStep, str] = {
-        ResetStep.EXPORT: _reset_export_line(plan, done=False),
-        ResetStep.DELETE_REMOTE: _reset_delete_remote_line(plan, done=False),
-        ResetStep.DELETE_LOCAL: _reset_delete_local_line(
+def _print_reset_dry_run(plan: _ResetPlan) -> None:
+    lines: dict[_ResetStep, str] = {
+        _ResetStep.EXPORT: _reset_export_line(plan, done=False),
+        _ResetStep.DELETE_REMOTE: _reset_delete_remote_line(plan, done=False),
+        _ResetStep.DELETE_LOCAL: _reset_delete_local_line(
             present=plan.local_ref_present, done=False
         ),
-        ResetStep.CLEAR_STAMPS: _reset_clear_stamps_line(
+        _ResetStep.CLEAR_STAMPS: _reset_clear_stamps_line(
             worktree_count=plan.worktree_count, done=False
         ),
-        ResetStep.BOOTSTRAP: _reset_bootstrap_line(tip=None),
+        _ResetStep.BOOTSTRAP: _reset_bootstrap_line(tip=None),
     }
     if plan.unreadable_schema_version is not None:
         print(_reset_unreadable_line(plan.unreadable_schema_version))
-    for step in RESET_STEP_ORDER:
+    for step in _RESET_STEP_ORDER:
         print(f"would: {lines[step]}")
 
 
-def _execute_reset(*, worktree: Path, remote: str, plan: ResetPlan) -> None:
+def _execute_reset(*, worktree: Path, remote: str, plan: _ResetPlan) -> None:
     """Export -> delete remote -> delete local -> clear stamps -> bootstrap
     (issue #298), each step printed the moment it completes. An export
     failure raises before anything else runs; a remote-deletion failure

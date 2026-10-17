@@ -27,7 +27,7 @@ from .session import RunContext
 KEEP_WORKTREE_FLAG = "--keep-worktree"
 
 
-class ReleaseReason(StrEnum):
+class _ReleaseReason(StrEnum):
     """`aco release`'s own `--json` `reason` vocabulary (issue #425,
     `specs/release.spec.md`): `merged`/`abandoned` name which outcome flag
     the caller gave -- a state-ref `--merged` landing (`LandedRelease`)
@@ -46,15 +46,15 @@ class ReleaseReason(StrEnum):
     PRECONDITION_FAILED = "precondition_failed"
 
 
-def _release_reason(outcome: protocol.ReleaseOutcome) -> ReleaseReason:
+def _release_reason(outcome: protocol.ReleaseOutcome) -> _ReleaseReason:
     return (
-        ReleaseReason.ABANDONED
+        _ReleaseReason.ABANDONED
         if isinstance(outcome, protocol.AbandonedRelease)
-        else ReleaseReason.MERGED
+        else _ReleaseReason.MERGED
     )
 
 
-def _release_json(release_report: ReleaseReport) -> None:
+def _release_json(release_report: _ReleaseReport) -> None:
     released, landing = release_report.selected, release_report.landing
     payload: dict[str, object] = {
         "outcome": release_report.outcome.reason,
@@ -64,17 +64,17 @@ def _release_json(release_report: ReleaseReport) -> None:
         "agent": release_report.agent,
         "role": release_report.role if release_report.role is not None else released.role,
     }
-    if isinstance(landing, ReleaseLanding):
+    if isinstance(landing, _ReleaseLanding):
         payload["freed"] = list(landing.freed)
         payload["next"] = None if landing.next_item is None else landing.next_item.number
         payload["parent_closable"] = landing.parent_closable
     if release_report.worktree is not None:
-        payload["worktree"] = worktree_cleanup_outcome_text(release_report.worktree)
+        payload["worktree"] = _worktree_cleanup_outcome_text(release_report.worktree)
     report.emit_json(True, _release_reason(release_report.outcome), **payload)
 
 
 @dataclass(frozen=True)
-class ReleaseLanding:
+class _ReleaseLanding:
     """What a merged release's lazy board read (issue #256) adds to its
     report once the release itself has already succeeded: every open item
     this landing fully freed, the same next pick `aco next` would recommend
@@ -92,7 +92,7 @@ def _release_landing(
     landed: board.IssueReference | None,
     storage: body.Storage,
     trunk_ref: str,
-) -> ReleaseLanding:
+) -> _ReleaseLanding:
     """A merged release's own board read (issue #256) of `new_state`, the
     claims its release transition left: fetched once, lazily, only after
     that transition already committed -- the caller wraps this in one broad
@@ -122,7 +122,7 @@ def _release_landing(
         if landed is None
         else board_read.parent_closable_number(client, landed.number, storage)
     )
-    return ReleaseLanding(
+    return _ReleaseLanding(
         freed, None if action is None else board.next_action_item(action), parent_closable
     )
 
@@ -405,7 +405,7 @@ def run(parsed: argparse.Namespace, context: RunContext, release_branch: str | N
     try:
         release_transition(parsed, context, release_branch)
     except protocol.ClaimError as error:
-        return report.refuse(ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(_ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
     return 0
 
 
@@ -473,7 +473,7 @@ def release_transition(
         else _cleanup_landed_worktree(parsed, lane, context, context.fetched_default_branch_ref)
     )
     _print_release_result(
-        ReleaseReport(
+        _ReleaseReport(
             resolved.selected,
             parsed.agent,
             resolved.resolved_role,
@@ -556,7 +556,7 @@ def _report_merged_pull_request_left_nothing(
     )
 
 
-NOTHING_LEFT_TO_RELEASE = "nothing left to release"
+_NOTHING_LEFT_TO_RELEASE = "nothing left to release"
 
 
 def _report_nothing_left_to_release(
@@ -569,20 +569,20 @@ def _report_nothing_left_to_release(
     """REL-49/REL-51 (issue #605): a verified landing whose release already
     happened closes nothing and writes no claim state; it reports that, then
     its lane's cleanup, which may still be due in this checkout."""
-    worktree = worktree_cleanup_outcome_text(
+    worktree = _worktree_cleanup_outcome_text(
         _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
     )
     if parsed.json:
         report.emit_json(
             True,
-            ReleaseReason.MERGED,
-            outcome=NOTHING_LEFT_TO_RELEASE,
+            _ReleaseReason.MERGED,
+            outcome=_NOTHING_LEFT_TO_RELEASE,
             **protocol.identity_json(lane.identity),
             branch=lane.branch,
             worktree=worktree,
         )
         return
-    print(f"LANDED {landing} already; {NOTHING_LEFT_TO_RELEASE}")
+    print(f"LANDED {landing} already; {_NOTHING_LEFT_TO_RELEASE}")
     print(f"worktree: {worktree}")
 
 
@@ -601,7 +601,7 @@ def _cleanup_unless_claimed_again(
     if not parsed.keep_worktree:
         fresh = context.observed_afresh().observation
         if _unclaimed_rerun_branch(parsed, fresh, lane.identity, lane.branch) is None:
-            return checkout.worktree_cleanup_kept(WORKTREE_KEPT_CLAIMED_AGAIN_REASON)
+            return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_CLAIMED_AGAIN_REASON)
     return _cleanup_landed_worktree(parsed, lane, context, fetched_trunk_ref)
 
 
@@ -639,23 +639,23 @@ def _landed_lane(
     return _LandedLane(identity, branch, landed_head, rerun)
 
 
-WORKTREE_KEPT_FLAG_REASON = "--keep-worktree was given"
+_WORKTREE_KEPT_FLAG_REASON = "--keep-worktree was given"
 
 
-WORKTREE_KEPT_RAN_FROM_INSIDE_REASON = "release ran from inside it"
+_WORKTREE_KEPT_RAN_FROM_INSIDE_REASON = "release ran from inside it"
 
 
-WORKTREE_KEPT_CLAIMED_AGAIN_REASON = "claimed again while this release ran"
+_WORKTREE_KEPT_CLAIMED_AGAIN_REASON = "claimed again while this release ran"
 
 
 # Names the repair (issues #578, #605): a landing from a separate clone holds
 # no lane worktree, which stays where it lives for that checkout to remove.
-WORKTREE_KEPT_NO_WORKTREE_REASON = (
+_WORKTREE_KEPT_NO_WORKTREE_REASON = (
     "no linked worktree on {branch} in this checkout; run {rerun} in the checkout that holds it"
 )
 
 
-def worktree_cleanup_outcome_text(outcome: checkout.WorktreeCleanupOutcome) -> str:
+def _worktree_cleanup_outcome_text(outcome: checkout.WorktreeCleanupOutcome) -> str:
     """The tail `release` prints after `worktree: ` in text, and the exact
     `--json` value of its `worktree` field (issue #322 review/gate finding
     4): one owner, so the two shapes can never drift apart. A branch-deletion
@@ -697,17 +697,17 @@ def _cleanup_landed_worktree(
     so a failure to resolve it reads as `kept` too. The remote branch
     stays the forge merge's own business either way."""
     if parsed.keep_worktree:
-        return checkout.worktree_cleanup_kept(WORKTREE_KEPT_FLAG_REASON)
+        return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_FLAG_REASON)
     branch = lane.branch
     try:
         toplevel = context.toplevel
         others = tuple(path for path in store.list_worktrees(toplevel) if path != toplevel)
         if checkout.current_branch(directory=toplevel) == branch:
-            return checkout.worktree_cleanup_kept(WORKTREE_KEPT_RAN_FROM_INSIDE_REASON)
+            return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_RAN_FROM_INSIDE_REASON)
         matching = checkout.worktree_on_branch(others, branch)
         if matching is None:
             return checkout.worktree_cleanup_kept(
-                WORKTREE_KEPT_NO_WORKTREE_REASON.format(branch=branch, rerun=lane.rerun)
+                _WORKTREE_KEPT_NO_WORKTREE_REASON.format(branch=branch, rerun=lane.rerun)
             )
         return checkout.cleanup_landed_worktree(
             matching,
@@ -806,7 +806,7 @@ def _cmd_release_landed(
         context.fetched_trunk_ref,
     )
     _print_release_result(
-        ReleaseReport(
+        _ReleaseReport(
             resolved.selected,
             parsed.agent,
             resolved.resolved_role,
@@ -826,7 +826,7 @@ def _landing_report(
     new_state: store.ClaimState,
     storage: body.Storage,
     trunk_ref: str,
-) -> ReleaseLanding | str:
+) -> _ReleaseLanding | str:
     """The landing `run` prints once its release transition
     already committed (issue #256), or the hint that replaces it: a forge
     hiccup here, or a state-ref store the board read refuses (issue #447),
@@ -842,7 +842,7 @@ def _landing_report(
 
 
 @dataclass(frozen=True)
-class ReleaseReport:
+class _ReleaseReport:
     """Everything `_print_release_result` needs to render one `release`
     outcome (issue #256), bundled so the printer itself takes one argument
     instead of PLR0913's five-scalar ceiling: the just-released claim, the
@@ -856,12 +856,12 @@ class ReleaseReport:
     agent: str
     role: str | None
     outcome: protocol.ReleaseOutcome
-    landing: ReleaseLanding | str | None
+    landing: _ReleaseLanding | str | None
     storage: body.Storage
     worktree: checkout.WorktreeCleanupOutcome | None
 
 
-def _print_release_result(release_report: ReleaseReport, *, as_json: bool) -> None:
+def _print_release_result(release_report: _ReleaseReport, *, as_json: bool) -> None:
     selected, landing = release_report.selected, release_report.landing
     if as_json:
         _release_json(release_report)
@@ -878,7 +878,7 @@ def _print_release_result(release_report: ReleaseReport, *, as_json: bool) -> No
         if parent_line is not None:
             print(parent_line)
     if release_report.worktree is not None:
-        print(f"worktree: {worktree_cleanup_outcome_text(release_report.worktree)}")
+        print(f"worktree: {_worktree_cleanup_outcome_text(release_report.worktree)}")
 
 
 def release_branch_for(parsed: argparse.Namespace) -> str | None:

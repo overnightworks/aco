@@ -2499,7 +2499,7 @@ def test_start_resume_refuses_a_scope_that_differs_from_the_live_claim(
 
     captured = capsys.readouterr()
     assert (status, captured.out) == (2, "")
-    assert captured.err == f"ERROR: {cmd_start.RESUME_SCOPE_MISMATCH}\n"
+    assert captured.err == f"ERROR: {cmd_start._RESUME_SCOPE_MISMATCH}\n"
     assert _worktrees_and_branches(repo) == before
 
 
@@ -3577,7 +3577,7 @@ def test_start_under_state_ref_checks_the_item_as_it_stands_after_the_fetch(
     status = issue_claim.main(["start", "314", "--scope", "src/x.py"])
 
     assert status == 2
-    assert capsys.readouterr().err == f"ERROR: {cmd_claim.CLAIM_SCOPE_MISMATCH}\n"
+    assert capsys.readouterr().err == f"ERROR: {cmd_claim._CLAIM_SCOPE_MISMATCH}\n"
     live = store.fetch_state(worktree=repo, remote="origin").claims
     assert protocol.claim_key(protocol.IssueIdentity(314), _START_BRANCH) not in live
 
@@ -8350,7 +8350,7 @@ def test_body_contract_checks_names_a_blockless_container_by_its_no_block_defect
     checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
 
     assert checks == (
-        cmd_claim.SliceCheck("error", "body-contract", "body malformed: aco: no aco block"),
+        cmd_claim._SliceCheck("error", "body-contract", "body malformed: aco: no aco block"),
     )
 
 
@@ -8370,7 +8370,7 @@ def test_body_contract_checks_names_a_malformed_body_by_its_first_defect() -> No
     checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
 
     assert checks == (
-        cmd_claim.SliceCheck(
+        cmd_claim._SliceCheck(
             "error", "body-contract", "body malformed: version: version must be exactly 1"
         ),
     )
@@ -8448,7 +8448,7 @@ def test_blocked_check_reports_a_foreign_dependency_and_the_out_of_order_warning
     item = next(item for item in projected.items if item.number == 304)
 
     error_check = cmd_claim._blocked_check(item, None, REPOSITORY, body.Storage.GITHUB)
-    assert error_check == cmd_claim.SliceCheck(
+    assert error_check == cmd_claim._SliceCheck(
         "error",
         "blocked",
         "#304 is blocked by overnightworks/other-repo#9 (open); "
@@ -11734,7 +11734,7 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
             None,
             (),
             2,
-            cmd_claim.CLAIM_SCOPE_MISSING,
+            cmd_claim._CLAIM_SCOPE_MISSING,
             None,
             None,
             id="omitted-with-no-body-scope-refuses-by-name",
@@ -11743,7 +11743,7 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
             ["src/work.py"],
             ("--scope", "src/other.py"),
             2,
-            cmd_claim.CLAIM_SCOPE_MISMATCH,
+            cmd_claim._CLAIM_SCOPE_MISMATCH,
             None,
             None,
             id="a-differing-explicit-scope-refuses-by-name",
@@ -12076,7 +12076,7 @@ def test_cli_claim_replay_without_scope_takes_the_live_claims_own_stored_scope(
 @pytest.mark.parametrize(
     ("scope_arguments", "refusal"),
     [
-        pytest.param([], cmd_claim.LANE_CLAIM_SCOPE_REQUIRED, id="no-scope"),
+        pytest.param([], cmd_claim._LANE_CLAIM_SCOPE_REQUIRED, id="no-scope"),
         *(
             pytest.param(
                 ["--scope", scope_path], protocol.SCOPE_ENTRIES_MUST_BE_CANONICAL, id=control_id
@@ -17332,7 +17332,7 @@ def test_land_refuses_every_readiness_defect_before_any_write(
 
     error_line = capsys.readouterr().err
     assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= cmd_land.LAND_REFUSAL_LINE_LENGTH_LIMIT
+    assert len(error_line.rstrip("\n")) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
     assert client.merge_calls == []
     assert client.deleted_branches == []
 
@@ -17437,7 +17437,7 @@ def test_land_bounds_the_quality_refusal_for_a_long_default_branch_name(
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
 
     error_line = capsys.readouterr().err.rstrip("\n")
-    assert len(error_line) <= cmd_land.LAND_REFUSAL_LINE_LENGTH_LIMIT
+    assert len(error_line) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
     assert error_line.startswith("ERROR: pull request #12 has no quality / verdict check; bbb")
     assert error_line.endswith("…")
 
@@ -17647,7 +17647,7 @@ def test_land_refuses_a_head_that_changes_its_governing_board_config_before_any_
 
     error_line = capsys.readouterr().err
     assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= cmd_land.LAND_REFUSAL_LINE_LENGTH_LIMIT
+    assert len(error_line.rstrip("\n")) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
     assert (client.merge_calls, client.deleted_branches) == ([], [])
 
 
