@@ -145,6 +145,7 @@ def _no_item_defect(
     claims: tuple[protocol.ActiveClaim, ...],
     repository: str,
     detail: forge.Landing,
+    kind: board.NoItemKind,
 ) -> board.ClassificationDefect | None:
     """Why this repository does not accept an issue-less landing as declared.
 
@@ -155,7 +156,19 @@ def _no_item_defect(
     claim_defect = _claim_defect(claims, detail, protocol.LaneIdentity())
     if claim_defect is not None:
         return claim_defect
-    closing = board.closing_references(detail.body, repository)
+    closing_defect = closing_reference_defect(detail.body, repository)
+    if closing_defect is not None:
+        return closing_defect
+    if kind is board.NoItemKind.DEPS:
+        return board.ClassificationDefect(
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths"
+        )
+    return None
+
+
+def closing_reference_defect(body: str, repository: str) -> board.ClassificationDefect | None:
+    """Why an issue-less body cannot close the items it names."""
+    closing = board.closing_references(body, repository)
     if closing:
         named = ", ".join(str(reference) for reference in sorted(closing, key=str))
         return board.ClassificationDefect(
@@ -352,5 +365,5 @@ def classification_defect(
     preflight, which fetches store state no earlier than this) never pays
     for one just to read the pull request's own shape."""
     if isinstance(classification, board.NoItemClassification):
-        return _no_item_defect(claims, context.repository, detail)
+        return _no_item_defect(claims, context.repository, detail, classification.kind)
     return _work_item_defect(context, claims, detail, classification.item)
