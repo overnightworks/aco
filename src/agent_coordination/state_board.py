@@ -18,7 +18,7 @@ never imports `store` itself.
 
 `LANDING` and the two pull-request listings answer `Capability.UNSUPPORTED`:
 this adapter has no data for any of them. The two pull-request listings
-still return an empty tuple rather than raising: `cli._board` calls them
+still return an empty tuple rather than raising: `board_read.build_board` calls them
 unconditionally for every board read, and "no pull requests exist here" is
 this adapter's honest answer, not a refusal. `Board.recovery` -- purely
 pull-request-body-declared -- stays empty from that same emptiness.

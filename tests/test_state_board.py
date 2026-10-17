@@ -1162,9 +1162,9 @@ def _projected(
 ) -> board.Board:
     """`projected_board` fed entirely from `client`'s own read methods --
     the one assembly both parametrized cases below share, mirroring what
-    `cli._board` does at the CLI layer without that layer's filesystem and
+    `board_read.build_board` does at the CLI layer without that layer's filesystem and
     network concerns. `open_pull_requests_supported` comes from
-    `client.capability` (issue #248), the same read `cli._board` makes,
+    `client.capability` (issue #248), the same read `board_read.build_board` makes,
     never from the storage pin `config.storage` also carries."""
     issues = client.list_open_board_issues()
     children = {
