@@ -17668,7 +17668,7 @@ def test_land_refuses_every_readiness_defect_before_any_write(
 
     error_line = capsys.readouterr().err
     assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
+    assert len(error_line.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
     assert client.merge_calls == []
     assert client.deleted_branches == []
 
@@ -17773,7 +17773,7 @@ def test_land_bounds_the_quality_refusal_for_a_long_default_branch_name(
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
 
     error_line = capsys.readouterr().err.rstrip("\n")
-    assert len(error_line) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
+    assert len(error_line) <= report.REFUSAL_LINE_LENGTH_LIMIT
     assert error_line.startswith("ERROR: pull request #12 has no quality / verdict check; bbb")
     assert error_line.endswith("…")
 
@@ -18111,7 +18111,7 @@ def test_land_refuses_a_head_that_changes_its_governing_board_config_before_any_
 
     error_line = capsys.readouterr().err
     assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
+    assert len(error_line.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
     assert (client.merge_calls, client.deleted_branches) == ([], [])
 
 

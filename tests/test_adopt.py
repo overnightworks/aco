@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -80,7 +81,7 @@ class AdoptionWorld:
         return Effects(
             state_ref_tip(self.remote),
             worktrees_and_branches(self.clone),
-            self.pull_request_directory.exists(),
+            os.path.lexists(self.pull_request_directory),
             dict(self.forge.item_bodies),
         )
 
@@ -183,6 +184,16 @@ def test_adopt_judges_the_pull_request_before_it_reads_any_claim_state(
             "aco: error: unrecognized arguments: 46",
             id="cell-4-two-pull-requests",
         ),
+        pytest.param(
+            ["0", "--no-item", "deps"],
+            "aco adopt: error: argument pull_request: 0 is not a positive number",
+            id="cell-19-zero",
+        ),
+        pytest.param(
+            ["-1", "--no-item", "deps"],
+            "aco adopt: error: argument pull_request: -1 is not a positive number",
+            id="cell-20-negative",
+        ),
     ],
 )
 def test_adopt_refuses_a_malformed_command_line_at_the_parser(
@@ -191,7 +202,7 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
     arguments: list[str],
     usage_error: str,
 ) -> None:
-    """Spec: ADOPT-08 -- argparse's usage block and sentence, nothing read."""
+    """Spec: ADOPT-08 -- argparse's usage block and sentence, no forge read."""
     result = run_cli(["adopt", *arguments], capsys)
 
     assert (result.status, result.stdout) == (2, "")
@@ -200,19 +211,27 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
     assert world.forge.requests == 0
 
 
-def _claim_the_branch_as_bob(world: AdoptionWorld) -> None:
-    lane = protocol.LaneIdentity()
-    store.commit_transition(
-        observed=fresh_observation(world.clone, world.remote),
-        subject=store.transition_subject("claim", lane, ADOPTED_BRANCH),
-        intent=claim_intent(
-            identity=lane,
-            agent="Bob",
-            branch=ADOPTED_BRANCH,
-            base=protocol.ObjectId(world.head),
-            scope=("uv.lock",),
-        ),
-    )
+def _claim_the_branch_as(agent: str) -> Callable[[AdoptionWorld], None]:
+    def claim(world: AdoptionWorld) -> None:
+        lane = protocol.LaneIdentity()
+        store.commit_transition(
+            observed=fresh_observation(world.clone, world.remote),
+            subject=store.transition_subject("claim", lane, ADOPTED_BRANCH),
+            intent=claim_intent(
+                identity=lane,
+                agent=agent,
+                branch=ADOPTED_BRANCH,
+                base=protocol.ObjectId(world.head),
+                scope=("uv.lock",),
+            ),
+        )
+
+    return claim
+
+
+def _occupy_the_pull_request_path_with_a_dangling_symlink(world: AdoptionWorld) -> None:
+    world.pull_request_directory.parent.mkdir(parents=True)
+    world.pull_request_directory.symlink_to(world.clone.parent / "nowhere")
 
 
 def _list_files_named(count: int) -> Callable[[AdoptionWorld], None]:
@@ -237,11 +256,18 @@ def _list_files_named(count: int) -> Callable[[AdoptionWorld], None]:
             id="cell-7-path-outside-the-dependency-paths",
         ),
         pytest.param(
-            _claim_the_branch_as_bob,
+            _claim_the_branch_as("Bob"),
             "deps",
             f"lane '{ADOPTED_BRANCH}' is claimed by Bob (builder) "
             f"on lane '{ADOPTED_BRANCH}' branch {ADOPTED_BRANCH}",
             id="cell-8-claimed-by-bob",
+        ),
+        pytest.param(
+            _claim_the_branch_as("Bob\u202e"),
+            "deps",
+            f"lane '{ADOPTED_BRANCH}' is claimed by Bob\\u202e (builder) "
+            f"on lane '{ADOPTED_BRANCH}' branch {ADOPTED_BRANCH}",
+            id="cell-21-holder-name-with-a-display-control",
         ),
         pytest.param(
             lambda world: world.pull_request_directory.mkdir(parents=True),
@@ -249,6 +275,13 @@ def _list_files_named(count: int) -> Callable[[AdoptionWorld], None]:
             "{pull_request_directory} already exists; remove it, "
             f"then adopt pull request #{ADOPTED_PULL_REQUEST} again",
             id="cell-10-directory-in-the-way",
+        ),
+        pytest.param(
+            _occupy_the_pull_request_path_with_a_dangling_symlink,
+            "deps",
+            "{pull_request_directory} already exists; remove it, "
+            f"then adopt pull request #{ADOPTED_PULL_REQUEST} again",
+            id="cell-22-dangling-symlink-in-the-way",
         ),
         pytest.param(
             lambda world: real_git(world.clone, "branch", ADOPTED_BRANCH),
@@ -268,6 +301,12 @@ def _list_files_named(count: int) -> Callable[[AdoptionWorld], None]:
             "deps",
             f"pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again",
             id="cell-13-tip-moved",
+        ),
+        pytest.param(
+            lambda world: real_git(world.clone, "push", "-q", "origin", f":{ADOPTED_BRANCH}"),
+            "deps",
+            f"pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again",
+            id="cell-23-head-branch-gone-from-the-remote",
         ),
         pytest.param(
             _list_files_named(4),
@@ -334,6 +373,78 @@ def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkou
         result.stderr,
     )
     assert world.forge.requests == 0
+
+
+LONG_NAME = "a-very-long-file-name-" + "x" * 80
+
+
+@pytest.mark.parametrize(
+    ("arrange", "refusal_start"),
+    [
+        pytest.param(
+            lambda world: world.serve(
+                lambda landing: replace(landing, body=f"No-Item: {'x' * 400}")
+            ),
+            f"ERROR: pull request #{ADOPTED_PULL_REQUEST} already carries ",
+            id="cell-24-overlong-classification-line",
+        ),
+        pytest.param(
+            lambda world: world.list_files(*(f"src/{index}/{LONG_NAME}.py" for index in range(3))),
+            f"ERROR: pull request #{ADOPTED_PULL_REQUEST} changes src/0/",
+            id="cell-25-three-overlong-file-names",
+        ),
+    ],
+)
+def test_adopt_cuts_an_overlong_refusal_to_one_line_of_200_characters(
+    world: AdoptionWorld,
+    capsys: pytest.CaptureFixture[str],
+    arrange: Callable[[AdoptionWorld], object],
+    refusal_start: str,
+) -> None:
+    """Spec: ADOPT-19 -- the whole stderr is the refusal line, cut with an ellipsis."""
+    arrange(world)
+
+    result = adopt(capsys)
+
+    assert (result.status, result.stdout) == (2, "")
+    assert result.stderr.startswith(refusal_start)
+    assert result.stderr.endswith("…\n")
+    assert len(result.stderr) == 201
+
+
+def test_adopt_fetches_no_branch_into_a_local_ref_even_when_a_fetch_refspec_asks_to(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-18, Never -- a configured `+refs/heads/*:refs/heads/mirror/*` stays unused."""
+    real_git(
+        world.clone, "config", "--add", "remote.origin.fetch", "+refs/heads/*:refs/heads/mirror/*"
+    )
+    local_branches = real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout
+
+    result = adopt(capsys)
+
+    assert result.stderr == PASSES_EVERY_CHECK
+    assert real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout == local_branches
+
+
+def test_adopt_judges_the_main_checkouts_pin_when_a_linked_worktree_pins_state_ref(
+    world: AdoptionWorld,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: ADOPT-15, Never -- a linked worktree's own `.aco/board.toml` is never read."""
+    lane = tmp_path / "linked-lane"
+    real_git(world.clone, "worktree", "add", "-q", str(lane), "-b", "linked-lane")
+    (lane / ".aco" / "board.toml").write_text('storage = "state-ref"\n')
+    monkeypatch.chdir(lane)
+    redirect_toplevel(monkeypatch, lane)
+    before = world.effects()
+
+    result = adopt(capsys)
+
+    assert (result.status, result.stdout, result.stderr) == (2, "", PASSES_EVERY_CHECK)
+    assert world.effects() == before
 
 
 def test_adopt_that_passes_every_check_refuses_and_writes_nothing(

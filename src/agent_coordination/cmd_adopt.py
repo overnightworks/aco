@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 
-from . import board, body, checkout, cmd_claim, policy, protocol
+from . import board, body, checkout, cmd_claim, policy, protocol, report
 from .session import RunContext
 
 _ADOPT_COMMAND = "adopt"
@@ -30,18 +31,24 @@ def _refuse_head_branch_collisions(
             f"pull request #{number} head branch {branch!r} is no safe branch name"
         )
     worktree = checkout.sibling_worktree_path(context.toplevel, f"pr-{number}")
-    if worktree.exists():
+    if os.path.lexists(worktree):
         raise _collision_refusal(f"{worktree} already exists", number)
     if checkout.branch_exists(branch):
         raise _collision_refusal(f"branch {branch!r} already exists here", number)
-    context.fetched_trunk_ref()
-    fetched_tip = checkout.commit_at(
-        f"refs/remotes/{context.canonical_remote}/{branch}", directory=context.toplevel
+    remote = context.configured_canonical_remote
+    moved = protocol.ClaimUnavailableError(
+        f"pull request #{number} moved while adopt read it; run adopt again"
     )
-    if fetched_tip != head_sha:
-        raise protocol.ClaimUnavailableError(
-            f"pull request #{number} moved while adopt read it; run adopt again"
-        )
+    if not checkout.remote_branch_exists(remote, branch, directory=context.toplevel):
+        raise moved
+    checkout.fetch_remote_branches(
+        remote, (branch, context.default_branch), directory=context.toplevel
+    )
+    if (
+        checkout.commit_at(f"refs/remotes/{remote}/{branch}", directory=context.toplevel)
+        != head_sha
+    ):
+        raise moved
 
 
 def _refuse_unclaimable_scope(
@@ -64,6 +71,15 @@ def _refuse_unclaimable_scope(
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
+    """Every refusal reaches the terminal as one escaped line of at most 200
+    characters (`report.bounded_refusal`), whoever raised it."""
+    try:
+        return _judge(parsed, context)
+    except protocol.ClaimError as error:
+        raise protocol.ClaimUnavailableError(report.bounded_refusal(str(error))) from error
+
+
+def _judge(parsed: argparse.Namespace, context: RunContext) -> int:
     """Judges pull request `parsed.pull_request` from the main checkout, as
     `start` does -- a linked worktree's own copy of the board configuration is
     never read -- and refuses with the first failing step; a pull request that

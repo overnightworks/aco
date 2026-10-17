@@ -134,7 +134,8 @@ repository, aimed at the default branch, whose body carries no classification li
 closes no item, whose complete file listing stays within `dependency_paths` for `deps`, whose
 head branch no claim, local branch or worktree path stands on, and whose claim scope passes
 `claim`'s width gate. It refuses with the first failing check's sentence and, for now, also
-when every check passes: this aco builds no adoption and writes nothing.
+when every check passes: this aco builds no adoption, so a run has no adoption effects (only
+fetch bookkeeping and the state anchor may move).
 `specs/adopt.spec.md` owns the checks, their order and their refusals.
 
 ## A workflow without a forge
@@ -397,7 +398,7 @@ by exactly one file below; this table is the map, not a copy.
 | `aco rescope` | `specs/rescope.spec.md` | adds or drops paths on a live claim |
 | `aco release` | `specs/release.spec.md` | ends a claim as merged or abandoned |
 | `aco land` | `specs/land.spec.md` | merges a green pull request, then releases its claim |
-| `aco adopt` | `specs/adopt.spec.md` | checks that a foreign pull request could become an issue-less lane; refuses before any write |
+| `aco adopt` | `specs/adopt.spec.md` | checks that a foreign pull request could become an issue-less lane; refuses before any adoption effect |
 | `aco status` | `specs/status.spec.md` | reads every live claim, repository-wide or by path |
 | `aco reset` | `specs/reset.spec.md` | rebuilds a broken or rewritten state ref |
 | `aco check` | `specs/check.spec.md` | answers whether a pull request, an issue, or a trunk commit is sound |

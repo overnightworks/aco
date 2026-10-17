@@ -350,6 +350,13 @@ def _add_land_parser(commands: _Subcommands, name: str) -> None:
     )
 
 
+def positive_int(text: str) -> int:
+    number = int(text)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"{text} is not a positive number")
+    return number
+
+
 def _add_adopt_parser(commands: _Subcommands, name: str) -> None:
     adopt = commands.add_parser(
         name,
@@ -358,7 +365,9 @@ def _add_adopt_parser(commands: _Subcommands, name: str) -> None:
             "every refusal comes before a write, and this aco builds no adoption yet"
         ),
     )
-    adopt.add_argument("pull_request", type=int, help="the pull request number to adopt")
+    adopt.add_argument(
+        "pull_request", type=positive_int, help="the positive pull request number to adopt"
+    )
     adopt.add_argument(
         "--no-item",
         required=True,

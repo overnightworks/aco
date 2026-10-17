@@ -11,8 +11,9 @@ cites their IDs. This aco builds no adoption yet: a pull request that passes eve
 refused too (ADOPT-18), so no run of `aco adopt` writes a worktree, a branch, a claim or a
 body. A refusal prints `ERROR: <sentence>` on stderr, exit `2`, as
 `specs/ref-store-cas.spec.md`'s preamble documents; `aco adopt` has no `--json` mode.
-`<n>` is the pull request number, `<kind>` the `--no-item` value, `<branch>` its head
-branch, `<repo>` a `OWNER/REPO` path.
+`<n>` is the positive pull request number, `<kind>` the `--no-item` value, `<branch>` its head
+branch. `<repo>` is the pull request's `OWNER/REPO` path in ADOPT-03 and the main checkout's
+directory in ADOPT-09.
 
 ## Behavior table
 
@@ -32,17 +33,18 @@ branch, `<repo>` a `OWNER/REPO` path.
 | the head branch name is unsafe | ADOPT-17 |
 | a path stands at the lane's worktree path | ADOPT-09 |
 | a local branch has the head branch's name | ADOPT-13 |
-| the remote's head branch moved | ADOPT-10 |
+| the remote's head branch moved or is gone | ADOPT-10 |
 | the claim's scope is too wide or too long | ADOPT-14 |
 | run from a linked worktree whose git directory names no checkout | ADOPT-15 |
 | every check passes | ADOPT-18 |
+| a refusal sentence is long or carries display controls | ADOPT-19 |
 
 ## Checks, in order
 
 The first failing step wins; each reads only what it needs, so a refusal early in the
 list reads nothing after it.
 
-1. `--no-item` is one of `deps`, `fix` or `docs`, and one pull request number is given (ADOPT-08).
+1. `--no-item` is one of `deps`, `fix` or `docs`, and one positive pull request number is given (ADOPT-08; the Never line on one pull request per call).
 2. The main checkout is resolved (ADOPT-15), then its storage pin is read (ADOPT-01); a linked
    worktree's own copy of `.aco/board.toml` is never read.
 3. The pull request and its item reference are read; the pull request is open (ADOPT-02) and its
@@ -57,8 +59,8 @@ list reads nothing after it.
    LAND-73, LAND-75, LAND-76), names a file (ADOPT-16), and for `deps` every path is covered
    (ADOPT-07, LAND-71).
 7. The head branch name is safe (ADOPT-17); nothing stands at `<repo>-worktrees/pr-<n>` (ADOPT-09);
-   no local branch has its name (ADOPT-13); the remote is fetched and its tip is the head the
-   checks read (ADOPT-10).
+   no local branch has its name (ADOPT-13); the remote still has the head branch, and its fetched tip
+   is the head the checks read (ADOPT-10).
 8. The claim `adopt` would make passes `claim`'s check phase for the listing's path set
    (ADOPT-14).
 9. Every check passed (ADOPT-18).
@@ -72,9 +74,9 @@ list reads nothing after it.
 - [ ] [ADOPT-05] A live classification line, valid or malformed, refuses `pull request #<n> already carries <line>; adopt never changes a classification line`, exit `2`.
 - [ ] [ADOPT-06] A live claim on the head branch, issue or lane, refuses `lane '<branch>' is claimed by <agent> (<role>) on <subject> branch <branch>`, exit `2`.
 - [ ] [ADOPT-07] LAND-17 and LAND-73..76 apply to every kind, LAND-70..71 to `deps`, on the body adopt would write and at the head its first read named: a defect refuses `pull request #<n> <sentence>`, exit `2`.
-- [ ] [ADOPT-08] A `--no-item` other than `deps`, `fix` or `docs`, or none, is a parser refusal: argparse's usage block and sentence on stderr, exit `2` (OUT's parser shape).
+- [ ] [ADOPT-08] A `--no-item` other than `deps`, `fix` or `docs`, or none, or an `<n>` that is no positive integer, is a parser refusal: argparse's usage block and sentence on stderr, exit `2` (OUT's parser shape).
 - [ ] [ADOPT-09] With no claim on the branch, a path at `<repo>-worktrees/pr-<n>` refuses `<path> already exists; remove it, then adopt pull request #<n> again`, exit `2`.
-- [ ] [ADOPT-10] A fetched head tip other than the pull request's head refuses `pull request #<n> moved while adopt read it; run adopt again`, exit `2`.
+- [ ] [ADOPT-10] A fetched head tip other than the pull request's head, or a head branch the remote no longer has, refuses `pull request #<n> moved while adopt read it; run adopt again`, exit `2`.
 - [ ] [ADOPT-11] A body that would not read `No-Item: <kind>` once the line is added refuses `pull request #<n> body would not read No-Item: <kind> with the line added: <defect>`, exit `2`.
 - [ ] [ADOPT-12] The written body is the body last read, byte for byte, then a newline or blank line as needed, then `No-Item: <kind>`; title, labels, base, branch and commits never change.
 - [ ] [ADOPT-13] With no claim on the branch, a local branch `<branch>` refuses `branch '<branch>' already exists here; remove it, then adopt pull request #<n> again`, exit `2`.
@@ -83,10 +85,11 @@ list reads nothing after it.
 - [ ] [ADOPT-16] A pull request whose listing names no file refuses `pull request #<n> changes no file; there is nothing to adopt`, exit `2`.
 - [ ] [ADOPT-17] A head branch name the claim store refuses as unsafe refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2`, before any write.
 - [ ] [ADOPT-18] When every check passes, adopt refuses `pull request #<n> passes every adoption check; this aco does not build adoptions yet`, exit `2`: no worktree or branch, no claim transition, no body write.
+- [ ] [ADOPT-19] Every refusal is one line of at most 200 characters with `ERROR: `, foreign text (agent names, paths) shown with display controls escaped, a longer sentence cut to end in `…`.
 
 ## Never
 
-- A refusal before the build never creates a worktree or branch, makes a claim transition or writes a body. Its fetches may still move local bookkeeping: the state ref's local anchor and lineage stamp, and `refs/remotes/<remote>/*`.
+- A refusal before the build never creates a worktree or branch, makes a claim transition or writes a body. Its fetches may still move local bookkeeping: the state ref's local anchor and lineage stamp, and `refs/remotes/<remote>/<branch>` of the head branch and the default branch, never a local branch.
 - `aco adopt` never reads an author list: a bot's pull request and a person's are judged alike, by their body, branch, claims and file listing.
 - `aco adopt` never adopts more than one pull request per call.
 - `aco adopt` never reads a linked worktree's own `.aco/board.toml`: every check judges the main checkout's.
