@@ -553,8 +553,8 @@ def test_a_claim_conflict_names_its_item_in_the_state_ref_form_the_cli_asks_for(
     )
 
 
-@pytest.mark.parametrize("case", ["U1", "U2", "U3", "U4", "U5a", "U7", "U8"])
-def test_lookup_identity_resolves_a_lane_by_prefix_or_a_live_lane_claim(case: str) -> None:
+@pytest.mark.parametrize("case", ["U1", "U2", "U3", "U4", "U5", "U5a", "U6", "U7", "U8"])
+def test_lookup_identity_resolves_a_lane_by_prefix_claim_or_merged_rerun(case: str) -> None:
     branch = {"U2": "docs/x", "U3": "fix/x"}.get(case, "dependabot/x")
     issue_holder = standing_active_claim(claim_id="issue", issue=42, branch=branch)
     lane_holder = standing_active_claim(claim_id="lane", lane=True, branch=branch)
@@ -571,16 +571,25 @@ def test_lookup_identity_resolves_a_lane_by_prefix_or_a_live_lane_claim(case: st
     def holders() -> tuple[protocol.ActiveClaim, ...]:
         assert case not in {"U1", "U2", "U3"}, "issue/prefix lookup must not read holders"
         calls.append(branch)
-        return {"U4": (lane_holder,), "U5a": (issue_holder,), "U7": ()}[case]
+        return {
+            "U4": (lane_holder,),
+            "U5": (issue_holder,),
+            "U5a": (issue_holder,),
+            "U6": (),
+            "U7": (),
+        }[case]
 
-    if case in {"U5a", "U7"}:
+    merged_rerun = case in {"U5", "U6"}
+    if case in {"U5", "U5a", "U7"}:
         with pytest.raises(ClaimError) as refused:
-            protocol.lookup_identity(None, branch, holders=holders)
+            protocol.lookup_identity(None, branch, merged_rerun=merged_rerun, holders=holders)
         assert str(refused.value) == (
             "branch 'dependabot/x' is not an issueless lane; pass an issue number, or "
             "check out a branch prefixed 'docs/' or 'fix/'"
         )
     else:
-        identity = protocol.lookup_identity(42 if case == "U1" else None, branch, holders=holders)
+        identity = protocol.lookup_identity(
+            42 if case == "U1" else None, branch, merged_rerun=merged_rerun, holders=holders
+        )
         assert identity == (protocol.IssueIdentity(42) if case == "U1" else protocol.LaneIdentity())
     assert calls == ([] if case in {"U1", "U2", "U3"} else [branch])
