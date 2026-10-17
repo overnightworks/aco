@@ -26,9 +26,41 @@ def test_register_requires_the_explicit_stopped_handover() -> None:
         )
 
 
-def test_run_refuses_a_repository_target(capsys) -> None:
-    assert cli.main(["--repo", "example/repository", "run"]) == 2
-    assert "--repo" in capsys.readouterr().err
+@pytest.mark.parametrize(
+    ("arguments", "operation"),
+    [
+        (
+            [
+                "register",
+                "alpha",
+                "--path",
+                "/tmp/project",
+                "--session-id",
+                "123e4567-e89b-12d3-a456-426614174000",
+                "--agent",
+                "workspace head",
+                "--stopped",
+            ],
+            "workspace",
+        ),
+        (["run"], "workspace"),
+        (["login", "enable"], "login recovery"),
+        (["login", "disable"], "login recovery"),
+        (["login", "status"], "login recovery"),
+    ],
+)
+def test_local_commands_refuse_a_repository_before_reading_the_mapping(
+    capsys, monkeypatch, arguments: list[str], operation: str
+) -> None:
+    def mapping_must_not_be_read() -> Path:
+        pytest.fail("repository refusal must precede mapping access")
+
+    monkeypatch.setattr(cmd_workspace, "_workspace_config_path", mapping_must_not_be_read)
+
+    assert cli.main(["--repo", "example/repository", *arguments]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == f"ERROR: --repo is meaningless for {operation} operations\n"
 
 
 def test_register_writes_an_explicit_stopped_handover_through_the_cli(
@@ -258,12 +290,6 @@ def test_login_cli_enables_and_disables_the_owned_launcher(
     assert capsys.readouterr().out == "login launcher disabled\n"
     assert cli.main(["login", "disable"]) == 0
     assert capsys.readouterr().out == "login launcher already disabled\n"
-
-
-def test_login_cli_refuses_a_repository_target(capsys) -> None:
-    assert cli.main(["--repo", "example/repository", "login", "status"]) == 2
-
-    assert "--repo" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
