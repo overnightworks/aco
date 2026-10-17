@@ -30,13 +30,17 @@ def emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:
     print(json.dumps(envelope))
 
 
-def refuse(reason: StrEnum, error: protocol.ClaimError, *, as_json: bool, **payload: object) -> int:
+def refuse(
+    reason: StrEnum, error: protocol.ClaimError | str, *, as_json: bool, **payload: object
+) -> int:
     """One shared refusal report for every `--json` command (issue #396) and
     for `_dispatch`'s own pre-start checks (issue #425): `ERROR: <sentence>`
     on stderr exactly as `main`'s own generic sink always printed it, then
     -- only under `--json` -- the envelope naming this call's own reason
     instead of the dropped `error` key. Exit `2`, the one exit every refusal
-    past the parser still uses."""
+    past the parser still uses. `error` is a `ClaimError` or a plain sentence
+    (`str`); additional `payload` keys retain their given order, with
+    `message` last."""
     print(f"{CLI_ERROR_PREFIX}{error}", file=sys.stderr)
     if as_json:
         emit_json(False, reason, **payload, message=str(error))

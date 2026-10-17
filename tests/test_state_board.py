@@ -5128,7 +5128,7 @@ class TestCliStateRefForge:
         (CLAIM-11) and
         `test_cli_release_without_a_claim_names_the_github_item_by_its_forge_number`
         (REL-09). `item close` under github refuses outright
-        (`ITEM_CLOSE_GITHUB_REFUSAL`), so PIN-26's `#<n>` form is pinned only
+        (`cmd_item._ITEM_CLOSE_GITHUB_REFUSAL`), so PIN-26's `#<n>` form is pinned only
         at store level: CAS-52's
         `test_item_close_refuses_a_claim_that_lands_between_its_first_attempt_and_the_retry`."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
