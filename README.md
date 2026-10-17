@@ -122,8 +122,11 @@ line -- the one classification `release --merged` accepts for a lane with no
 issue to close. `specs/claim.spec.md` owns the exact branch-name grammar and
 its refusal when a checkout is not on a matching branch;
 `specs/landing-grammar.spec.md` owns the `No-Item:` classification and its
-refusals. A `deps` pull request currently refuses because no configuration can
-name dependency paths yet; a hand-merged `No-Item: deps` trailer can release a lane.
+refusals. A `deps` pull request may change only paths named by `dependency_paths`
+in the repository's tracked `.aco/board.toml`; a trailing `/` covers a directory's
+contents, and other entries match exactly. This bounds paths, not safety: review
+must still check workflow permissions, secret use, actions and run steps, disabled
+checks, and tool configuration. See `specs/storage-pin.spec.md` for the key's contract.
 
 ## A workflow without a forge
 
@@ -275,7 +278,7 @@ in a checkout, except the ignored `settings.local.json` that repairs it.
 
 ## Configuration
 
-`.aco/board.toml` defines exactly seven top-level keys; any other key
+`.aco/board.toml` defines exactly eight top-level keys; any other key
 is refused by name.
 
 - `storage` -- `"github"` (default) or `"state-ref"`; the pin and its
@@ -302,6 +305,10 @@ is refused by name.
 - `lane_shared` -- exact repository file paths, such as a vulture whitelist,
   that any live claim may write though its scope never names them. Only the
   trunk's committed copy counts, so a change takes effect once it lands.
+- `dependency_paths` -- the paths a `No-Item: deps` pull request may change;
+  a trailing `/` covers a directory; other entries match
+  exactly. For landing, only the trunk checkout's tracked copy counts. This
+  bounds paths and does not certify safety (`specs/storage-pin.spec.md`, PIN-44..48).
 
 ## Board
 

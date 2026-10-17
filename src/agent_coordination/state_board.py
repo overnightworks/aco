@@ -70,6 +70,7 @@ STATE_REF_CAPABILITIES: Mapping[forge.ForgeOperation, forge.Capability] = Mappin
         forge.ForgeOperation.LIST_OPEN_BOARD_ISSUES: forge.Capability.READ_ONLY,
         forge.ForgeOperation.LIST_BOARD_DEPENDENCIES: forge.Capability.READ_ONLY,
         forge.ForgeOperation.LANDING: forge.Capability.UNSUPPORTED,
+        forge.ForgeOperation.PULL_REQUEST_CHANGES: forge.Capability.UNSUPPORTED,
         forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS: forge.Capability.UNSUPPORTED,
         forge.ForgeOperation.LIST_RECENT_MERGED_BOARD_PULL_REQUESTS: forge.Capability.UNSUPPORTED,
         forge.ForgeOperation.LIST_RECENTLY_CLOSED_ISSUES: forge.Capability.READ_ONLY,
@@ -269,9 +270,13 @@ def _decode_item(item_id: str, content: bytes, oid: ObjectId) -> _DecodedItem | 
         return _MalformedItem(problem="is not valid UTF-8", defect=_NOT_UTF8, oid=oid)
     parsed = parse_body(text, storage=Storage.STATE_REF)
     if parsed.read_state is not BodyReadState.VALID or parsed.record is None:
+        defect = (parsed.contract.defects or (_NO_RECORD,))[0]
         return _MalformedItem(
-            problem=f"has a malformed {BLOCK_FENCE_INFO} block",
-            defect=(parsed.contract.defects or (_NO_RECORD,))[0],
+            problem=(
+                f"has a malformed {BLOCK_FENCE_INFO} block "
+                f"({board.terminal_text(body_defect_text(defect))})"
+            ),
+            defect=defect,
             oid=oid,
             text=text,
             title=readable_record_title(text),
@@ -484,6 +489,9 @@ class StateRefBoard:
         all (module docstring), so there is no round trip here to batch --
         `item_reference` per number costs the same as this already does."""
         return {number: self.item_reference(number) for number in numbers}
+
+    def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
+        raise forge.ForgeUnsupportedError("storage = state-ref has no pull request file listings")
 
     def landing(self, number: int) -> forge.Landing:
         raise forge.ForgeUnsupportedError(NO_LANDINGS_YET)

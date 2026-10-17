@@ -274,12 +274,20 @@ def _unclaimed_rerun_branch(
     merge time through `Closes #<n>`. For an issue-less lane the result is
     not final: its claim is keyed by its branch, so once the merge verifies,
     `_report_merged_pull_request_left_nothing` still refuses REL-09 when the
-    pull request came from another branch (REL-54). A `--claim-id` names one
+    pull request came from another branch (REL-54). On a branch outside
+    `docs/`/`fix/` the lane exists only for this rerun (REL-58), so any live
+    claim on the branch, issue or lane, ends it. A `--claim-id` names one
     claim, so its absence stays `select_release_claim`'s refusal; `None`
     hands every other release to that selection."""
     if parsed.merged is None or parsed.claim_id is not None or not release_branch:
         return None
     if protocol.claim_key(identity, release_branch) in observed.claims:
+        return None
+    if (
+        isinstance(identity, protocol.LaneIdentity)
+        and not protocol.is_issueless_lane_branch(release_branch)
+        and protocol.claims_on_branch(observed.claims, release_branch)
+    ):
         return None
     return release_branch
 
@@ -426,12 +434,15 @@ def release_transition(
     ago, a rerun resumes it, or a standalone release follows a merge made
     elsewhere: a merged pull request's head no longer moves."""
     issue = protocol.optional_issue_number(parsed.issue)
+    storage = context.config.storage
     identity = protocol.lookup_identity(
         issue,
         release_branch or "",
+        merged_rerun=(
+            parsed.merged is not None and parsed.claim_id is None and storage is body.Storage.GITHUB
+        ),
         holders=lambda: protocol.claims_on_branch(context.observation.claims, release_branch or ""),
     )
-    storage = context.config.storage
     if parsed.merged is not None and storage is body.Storage.STATE_REF:
         return _cmd_release_landed(parsed, context, identity, storage, release_branch)
     merged = None if parsed.merged is None else github.pull_request_number(parsed.merged)
@@ -599,9 +610,11 @@ def _cleanup_unless_claimed_again(
     """REL-55 (issue #605): the missing claim REL-47 acts on was read before
     the landing's verification; a claim taken meanwhile -- `start` reopening
     the lane on its clean worktree (START-11) -- would lose that worktree to
-    this cleanup, so the claim state is read afresh right before it. A claim
-    taken between that read and the removal is the accepted residual: the
-    worktree removed is clean and merged, and `start` builds it again."""
+    this cleanup, so the claim state is read afresh right before it; on a
+    foreign branch (REL-59) any claim then on the branch, issue or lane,
+    keeps both. A claim taken between that read and the removal is the
+    accepted residual: the worktree removed is clean and merged, and `start`
+    builds it again."""
     if not parsed.keep_worktree:
         fresh = context.observed_afresh().observation
         if _unclaimed_rerun_branch(parsed, fresh, lane.identity, lane.branch) is None:

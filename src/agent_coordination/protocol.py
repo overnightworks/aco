@@ -1699,15 +1699,23 @@ def claims_on_branch(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[Ac
 
 
 def lookup_identity(
-    issue: int | None, branch: str, *, holders: Callable[[], tuple[ActiveClaim, ...]]
+    issue: int | None,
+    branch: str,
+    *,
+    merged_rerun: bool,
+    holders: Callable[[], tuple[ActiveClaim, ...]],
 ) -> ClaimIdentity:
-    """Resolve an existing lane without relaxing claim acquisition's prefix rule."""
-    if (
-        issue is None
-        and not is_issueless_lane_branch(branch)
-        and any(isinstance(claim.identity, LaneIdentity) for claim in holders())
-    ):
-        return LaneIdentity()
+    """Resolve an existing lane without relaxing claim acquisition's prefix rule.
+
+    A branch outside the issue-less prefixes is a lane when a live lane claim
+    holds it, or when a github `--merged` rerun finds no claim on it at all:
+    the release that rerun resumes already removed the claim."""
+    if issue is None and not is_issueless_lane_branch(branch):
+        live = holders()
+        if any(isinstance(claim.identity, LaneIdentity) for claim in live) or (
+            merged_rerun and not live
+        ):
+            return LaneIdentity()
     return resolved_identity(issue, branch)
 
 

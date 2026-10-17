@@ -22,6 +22,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | `storage` names an unrecognized value | PIN-03 | PIN-03 | PIN-03 | PIN-03 | — |
 | a key the configuration does not define | PIN-33 | PIN-33 | PIN-33 | PIN-33 | — |
 | `lane_shared` is no list of unique files inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
+| dependency paths configured or invalid | PIN-44..48 | PIN-44..48 | PIN-44..48 | PIN-44..48 | — |
 | only the trunk's committed copy refuses | PIN-42 | PIN-42 | PIN-42 | PIN-42 | — |
 | `storage = "state-ref"` | PIN-04\*, PIN-05\*, PIN-30 | PIN-18..21 | PIN-22..28 | —\*\* | PIN-08, PIN-31 |
 | a state-ref item file itself is malformed | PIN-14..17, PIN-34, PIN-29 | ITEM-37 | ITEM-39, PIN-29 | BOARD-54 | — |
@@ -83,6 +84,14 @@ owns what a write to one is allowed.
 - [ ] [PIN-41] An entry matches exactly one file path the trunk tracks, never as a prefix: an entry naming a directory covers neither it nor any file below it; one naming an untracked file covers nothing.
 - [ ] [PIN-42] A trunk copy that refuses costs only the lane-shared answer: `status` and `brief` name its defect (STAT-21), and no file is lane-shared for `protect` (PROT-46).
 
+## Dependency paths
+
+- [ ] [PIN-44] A tracked `<path>` may name `dependency_paths = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one path; absent, none is a dependency path.
+- [ ] [PIN-48] A listed path CLAIM-19 or CLAIM-20 would refuse as a scope, or one not in normal form, is covered by no entry.
+- [ ] [PIN-45] A `dependency_paths` value that is no list of unique strings refuses `board configuration <path> dependency_paths must be a list of unique repository paths`.
+- [ ] [PIN-46] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> dependency_paths entry '<entry>' is not a canonical path inside the repository`.
+- [ ] [PIN-47] Only the run's own tracked `<path>` decides; `aco land` reads the default branch's clean checkout (LANDCMD-11), never the pull request head's copy.
+
 ## `storage = "state-ref"` is forge-free
 
 - [ ] [PIN-04] Under `storage = "state-ref"`, a command resolving the item forge refuses an OWNER/REPO `--repo` with `--repo is meaningless under storage = state-ref`; any other `--repo` refuses first (OUT-08).
@@ -111,7 +120,8 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 - [ ] [PIN-35] A command on one item goes past such an entry, which stays byte for byte (CAS-61): `item show`, `item edit`, `item close`, `ask`, `rule`, `brief`, `check`, and `start` up to its fresh claim (PIN-36).
 - [ ] [PIN-36] A command over the whole store refuses with PIN-13's sentence: `board`, `next`, `rulings`, `cut`, `item new` (`--not-a-twin` too), a fresh `claim`, `release --merged`.
 - [ ] [PIN-14] A read of an `items/<id>.md` entry whose bytes are not valid UTF-8 refuses `item <id> is not valid UTF-8`, then ITEM-38's repair clause.
-- [ ] [PIN-15] A read of an `items/<id>.md` entry with no valid `aco` block and `[record]` refuses `item <id> has a malformed aco block`, then ITEM-38's repair clause (see E-PIN-07).
+- [ ] [PIN-15] A read of an `items/<id>.md` entry with no valid `aco` block and `[record]` refuses `item <id> has a malformed aco block (<defect>)`, then ITEM-38's repair clause (see E-PIN-07).
+- [ ] [PIN-43] PIN-15's `<defect>` shows each display control escaped as NEXT-37 does, in the sentence and in `--json`'s `message`.
 - [ ] [PIN-16] An item whose own `record.parent` names an id no `items/` entry carries refuses `item <parent-id> is referenced as a parent but does not exist`.
 - [ ] [PIN-17] An item whose own `record.blocked_by` names an id no `items/` entry carries refuses `item <item-id> lists blocker <blocker-id>, which does not exist`, naming the listing item as PIN-34 does.
 - [ ] [PIN-34] An item whose own `record.blocked_by` names one id twice refuses ITEM-43's `item <item-id> lists blocker <blocker-id> more than once` (see E-PIN-38).
@@ -316,10 +326,10 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `items/aco-00
 
 ```console
 $ aco item show aco-000001
-2> ERROR: item aco-000001 has a malformed aco block; repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
 exit 2
 $ aco item close <child-id>
-2> ERROR: item aco-000001 has a malformed aco block; repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
 exit 2
 $ aco item close <item-id>
 CLOSED <item-id>

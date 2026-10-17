@@ -20,7 +20,9 @@ def _checked_classification(
     classification = policy.structural_classification(context, detail)
     if isinstance(classification, board.ClassificationDefect):
         return classification
-    defect = policy.classification_defect(context, claims, detail, classification)
+    defect = policy.classification_defect(
+        context, claims, detail, classification, expected_head=detail.head_sha
+    )
     return classification if defect is None else defect
 
 

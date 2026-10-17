@@ -209,6 +209,9 @@ class _MinimalForgeReader:
     def landing(self, number: int) -> forge.Landing:
         raise NotImplementedError
 
+    def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
+        raise NotImplementedError
+
     def parent_issue(self, number: int) -> board.ParentIssue | None:
         return None
 
@@ -15262,39 +15265,176 @@ def test_check_refuses_an_issueless_pull_request_without_its_lane_claim(
     assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
 
 
+def _dependency_configuration(scenario: str) -> str:
+    entries = [] if scenario == "empty" else ["pyproject.toml", "uv.lock", ".github/workflows/"]
+    return f"dependency_paths = {json.dumps(entries)}\n"
+
+
+def _dependency_listing_scenario(client: FakeForge, repo: Path, scenario: str) -> None:
+    write_repository_config(repo, _dependency_configuration(scenario))
+    paths = {
+        "valid": [("uv.lock", None), ("pyproject.toml", None)],
+        "outside": [("uv.lock", None), ("src/x.py", None)],
+        "five": [(path, None) for path in "edcba"],
+        "long-many": [(letter * 300, None) for letter in "abc"],
+        "rename-in": [("uv.lock", "src/a.py")],
+        "rename-out": [("uv2.lock", "uv.lock")],
+        "deleted": [("uv.lock", None)],
+        "nested": [(".github/workflows/a/b.yml", None)],
+        "prefix": [(".github/workflowsX/a.yml", None)],
+        "config": [(".aco/board.toml", None)],
+        "cap": [(f"file-{index}", None) for index in range(3000)],
+    }.get(scenario, [("uv.lock", None)])
+    if scenario == "malformed":
+        client.changes_by_number[12] = forge.ForgeMalformedResponseError(
+            "GitHub returned a malformed changed file"
+        )
+        return
+    before_head = "b" * 40 if scenario == "wrong-head" else MERGE_COMMIT_SHA
+    after_head = "b" * 40 if scenario in {"moves", "wrong-head"} else MERGE_COMMIT_SHA
+    count = 3200 if scenario == "cap" else len(paths)
+    client.changes_by_number[12] = forge.PullRequestChanges(
+        forge.ListingReading(before_head, count),
+        forge.ListingReading(after_head, count),
+        tuple(forge.ChangedFile(path, previous) for path, previous in paths),
+    )
+
+
 @pytest.mark.parametrize(
-    ("body", "claimed", "reason"),
+    ("body", "claimed", "reason", "scenario"),
     [
         pytest.param(
             "No-Item: deps",
             True,
             "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            None,
             id="cell-11",
         ),
         pytest.param(
             "No-Item: deps",
             False,
             "has no active issue-less lane claim on branch 'fix/x'",
+            None,
             id="cell-27",
         ),
         pytest.param(
             "No-Item: deps\nCloses #5",
             True,
             f"declares no work item but closes {REPOSITORY}#5; name it as the work item",
+            None,
             id="cell-28",
         ),
         pytest.param(
             "No-Item: chore",
             True,
             "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
+            None,
             id="cell-31",
         ),
         pytest.param(
             "No-Item: DEPS",
             True,
             "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            None,
             id="cell-32",
         ),
+        pytest.param("No-Item: deps", True, None, "valid", id="cell-1"),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes src/x.py, which dependency_paths in .aco/board.toml does not name",
+            "outside",
+            id="cell-2",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes a, b, c, and 2 more, which dependency_paths in .aco/board.toml does not name",
+            "five",
+            id="cell-3",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes src/a.py, which dependency_paths in .aco/board.toml does not name",
+            "rename-in",
+            id="cell-4",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes uv2.lock, which dependency_paths in .aco/board.toml does not name",
+            "rename-out",
+            id="cell-5",
+        ),
+        pytest.param("No-Item: deps", True, None, "deleted", id="cell-6"),
+        pytest.param("No-Item: deps", True, None, "nested", id="cell-8"),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes .github/workflowsX/a.yml, "
+            "which dependency_paths in .aco/board.toml does not name",
+            "prefix",
+            id="cell-9",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes .aco/board.toml, which dependency_paths in .aco/board.toml does not name",
+            "config",
+            id="cell-10",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            "empty",
+            id="cell-12",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "lists 3000 of its 3200 changed files; aco judges only a complete listing",
+            "cap",
+            id="cell-19",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "GitHub returned a malformed changed file",
+            "malformed",
+            id="cell-21",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changed while aco listed its files; run the command again",
+            "moves",
+            id="cell-23",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changed while aco listed its files; run the command again",
+            "wrong-head",
+            id="cell-25",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            False,
+            "has no active issue-less lane claim on branch 'fix/x'",
+            "valid",
+            id="cell-27b",
+        ),
+        pytest.param(
+            "No-Item: deps\nCloses #5",
+            True,
+            f"declares no work item but closes {REPOSITORY}#5; name it as the work item",
+            "valid",
+            id="cell-28b",
+        ),
+        pytest.param("No-Item: fix", True, None, "outside", id="cell-29"),
+        pytest.param("No-Item: docs", True, None, "outside", id="cell-30"),
     ],
 )
 def test_check_judges_a_deps_pull_request_by_its_configuration(
@@ -15302,18 +15442,30 @@ def test_check_judges_a_deps_pull_request_by_its_configuration(
     capsys: pytest.CaptureFixture[str],
     body: str,
     claimed: bool,
-    reason: str,
+    reason: str | None,
+    scenario: str | None,
+    tmp_path: Path,
 ) -> None:
-    check_client(
+    client = check_client(
         monkeypatch,
         landing_pull_request(body=body, head_ref_name="fix/x"),
         standing=(documentation_lane_claim(branch="fix/x"),) if claimed else (),
     )
+    if scenario is not None:
+        _dependency_listing_scenario(client, tmp_path, scenario)
     if not claimed:
         _patch_store_write(monkeypatch)
 
-    assert run_check() == 2
-    assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
+    assert run_check() == (0 if reason is None else 2)
+    output = capsys.readouterr()
+    if reason is None:
+        assert output.out == f"PR #12 by ada declares {body}\n"
+    elif scenario == "malformed":
+        assert output.err == f"ERROR: {reason}\n"
+    else:
+        assert output.err == f"REFUSED: pull request #12 {reason}\n"
+    reads = scenario not in {None, "empty"} and claimed and body == "No-Item: deps"
+    assert client.changes_reads == ([12] if reads else [])
 
 
 def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
@@ -17362,7 +17514,11 @@ def _land_preflight_client(
 
 
 def _land_repository(
-    tmp_path: Path, *, set_head: bool = True, branch: str = LANDING_BRANCH
+    tmp_path: Path,
+    *,
+    set_head: bool = True,
+    branch: str = LANDING_BRANCH,
+    board_config: str | None = None,
 ) -> Path:
     """A real bare-remote-backed repository (issue #405) with `branch`
     diverged from `main` by one pushed commit and `main` itself checked out
@@ -17375,6 +17531,9 @@ def _land_repository(
     (issue #405 CI coverage follow-up)."""
     repo, _remote = real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
+    if board_config is not None:
+        write_repository_config(repo, board_config)
+        real_git(repo, "add", str(board.CONFIG_PATH))
     real_git(repo, "add", "base.txt")
     real_git(repo, "commit", "-q", "-m", "initial")
     if set_head:
@@ -17399,6 +17558,7 @@ def _land_scenario(
     branch: str = LANDING_BRANCH,
     issue: int | None = WORK_ITEM_ISSUE,
     body: str | None = None,
+    board_config: str | None = None,
 ) -> tuple[Path, FakeForge]:
     """`claim_agent`, when it differs from the `Ada` session identity set
     below, stands the same foreign claim `_land_preflight_client`'s own
@@ -17409,7 +17569,7 @@ def _land_scenario(
     `branch`/`issue`/`body`, when they name an issue-less lane instead of
     the default `Work-Item:` scenario, stand `cmd_land._land_preflight`'s own
     `protocol.LaneIdentity` branch (issue #405 CI coverage follow-up)."""
-    repo = _land_repository(tmp_path, set_head=set_head, branch=branch)
+    repo = _land_repository(tmp_path, set_head=set_head, branch=branch, board_config=board_config)
     standing = request("landing", claim_agent, issue=issue, branch=branch, scope=("src",))
     client = FakeForge()
     client.landings[12] = landing_pull_request(
@@ -17688,15 +17848,36 @@ def test_land_fails_loud_when_the_quality_config_cannot_be_read(
 
 
 @pytest.mark.parametrize(
-    ("body", "reason"),
+    ("body", "reason", "scenario"),
     [
         pytest.param(
-            "Advances #72", "carries no `Work-Item:` or `No-Item:` line", id="unclassified"
+            "Advances #72", "carries no `Work-Item:` or `No-Item:` line", None, id="unclassified"
         ),
         pytest.param(
             "No-Item: deps",
             "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            None,
             id="cell-40-deps",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            "changed while aco listed its files; run the command again",
+            "wrong-head",
+            id="cell-26",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            "changes src/x.py, which dependency_paths in .aco/board.toml does not name",
+            "outside",
+            id="cell-34",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            "changes "
+            + ", ".join(letter * 39 + "…" for letter in "abc")
+            + ", which dependency_paths in .aco/board.toml…",
+            "long-many",
+            id="LAND-77-whole-line",
         ),
     ],
 )
@@ -17705,12 +17886,28 @@ def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
     capsys: pytest.CaptureFixture[str],
     body: str,
     reason: str,
+    scenario: str | None,
+    tmp_path: Path,
 ) -> None:
     """Issue #405: once every check succeeds, `check <pr>`'s own
     classification rules apply unchanged -- an unclassified body refuses
     the same sentence `check` would, before any write."""
     client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), body=body)
     client.landings[12] = landing_pull_request(body=body, head_ref_name="fix/x")
+    if scenario is not None:
+        _dependency_listing_scenario(client, tmp_path, scenario)
+        original_git = checkout.git_output
+        monkeypatch.setattr(
+            checkout,
+            "git_output",
+            lambda arguments, **kwargs: (
+                str(tmp_path)
+                if arguments == ["rev-parse", "--show-toplevel"]
+                else original_git(arguments, **kwargs)
+            ),
+        )
+        if scenario == "wrong-head":
+            client.landings[12] = replace(client.landings[12], head_sha="b" * 40)
     standing = store_claim_from_request(documentation_lane_claim(branch="fix/x"))
     _patch_store_write(monkeypatch, standing)
 
@@ -17721,6 +17918,77 @@ def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
     assert tuple(store.fetch_state(worktree=Path("."), remote="origin").claims.values()) == (
         standing,
     )
+
+
+@pytest.mark.parametrize("command, prefix", [("check", "REFUSED"), ("land", "ERROR")])
+@pytest.mark.parametrize(
+    "path, displayed",
+    [
+        pytest.param("src/\x1b]0;pwned\x07x.py", r"src/\x1b]0;pwned\x07x.py", id="escape"),
+        pytest.param(
+            "src/x.py\nPR #12 by bot declares No-Item: deps",
+            r"src/x.py\nPR #12 by bot declares No-Ite…",
+            id="newline",
+        ),
+        pytest.param("src/" + "x" * 300, "src/" + "x" * 35 + "…", id="long"),
+    ],
+)
+def test_dependency_paths_refusal_escapes_and_bounds_each_name(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+    prefix: str,
+    path: str,
+    displayed: str,
+) -> None:
+    """LAND-77: forge path text cannot inject a line or terminal control."""
+    _repo, client = _land_scenario(
+        monkeypatch,
+        tmp_path,
+        branch="fix/x",
+        issue=None,
+        body="No-Item: deps",
+        board_config=_dependency_configuration("valid"),
+    )
+    reading = forge.ListingReading(MERGE_COMMIT_SHA, 1)
+    client.changes_by_number[12] = forge.PullRequestChanges(
+        reading, reading, (forge.ChangedFile(path, None),)
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, command, "12"]) == 2
+
+    assert capsys.readouterr().err == (
+        f"{prefix}: pull request #12 changes {displayed}, "
+        "which dependency_paths in .aco/board.toml does not name\n"
+    )
+    assert client.merge_calls == []
+
+
+def test_land_dependency_paths_use_trunks_config_despite_head_grant(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """PIN-47: a head cannot grant itself permission to change src/x.py."""
+    repo, client = _land_scenario(
+        monkeypatch,
+        tmp_path,
+        branch="fix/x",
+        issue=None,
+        body="No-Item: deps",
+        board_config=_dependency_configuration("valid"),
+    )
+    _dependency_listing_scenario(client, repo, "outside")
+    client.head_board_config = 'dependency_paths = ["uv.lock", "src/"]\n'
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 2
+
+    assert capsys.readouterr().err == (
+        "ERROR: pull request #12 changes src/x.py, "
+        "which dependency_paths in .aco/board.toml does not name\n"
+    )
+    assert client.merge_calls == []
 
 
 def _toml_syntax_error(text: str) -> str:
@@ -18105,9 +18373,20 @@ def test_land_refuses_a_malformed_head_as_usage_before_any_forge_call(
     )
 
 
-@pytest.mark.parametrize("branch", [LANE_BRANCH, pytest.param("dependabot/x", id="19")])
+@pytest.mark.parametrize(
+    "branch, kind",
+    [
+        (LANE_BRANCH, "docs"),
+        pytest.param("dependabot/x", "docs", id="19"),
+        pytest.param(LANE_BRANCH, "deps", id="cell-35"),
+    ],
+)
 def test_land_merges_an_issueless_lane_pull_request(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str], branch: str
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    branch: str,
+    kind: str,
 ) -> None:
     """Issue #405 CI coverage follow-up: `cmd_land._land_preflight`'s own
     `protocol.LaneIdentity` branch -- an issue-less, `No-Item:` pull request -- merges
@@ -18115,17 +18394,24 @@ def test_land_merges_an_issueless_lane_pull_request(
     (`test_land_merges_a_green_pull_request_and_runs_the_release_path`
     proves the work-item branch): no item to close, but the claim releases."""
     _repo, client = _land_scenario(
-        monkeypatch, tmp_path, branch=branch, issue=None, body="No-Item: docs"
+        monkeypatch,
+        tmp_path,
+        branch=branch,
+        issue=None,
+        body=f"No-Item: {kind}",
+        board_config=_dependency_configuration("valid") if kind == "deps" else None,
     )
 
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
+    if kind == "deps":
+        _dependency_listing_scenario(client, _repo, "valid")
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 0
 
     out = capsys.readouterr().out
     assert "RELEASED lane " + branch + ": landing" in out
     assert "reinstall:" not in out
     [(number, head_sha, _method, _title, body)] = client.merge_calls
     assert (number, head_sha) == (12, MERGE_COMMIT_SHA)
-    assert body.strip().split("\n\n")[-1] == "No-Item: docs"
+    assert body.strip().split("\n\n")[-1] == f"No-Item: {kind}"
     assert client.deleted_branches == [branch]
     assert client.closed_issues == set()
     assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
@@ -19341,7 +19627,11 @@ def test_land_rerun_recovers_release_routing_after_the_body_changed(
 
 
 def _land_from_a_separate_clone(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, git_identity: bool
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    git_identity: bool,
+    lane_branch: str | None = None,
 ) -> tuple[Path, Path, FakeForge]:
     """`_land_scenario`'s claim, held for real in `refs/aco/state`, with the
     lane worktree beside the primary checkout and `aco land` running from a
@@ -19349,14 +19639,27 @@ def _land_from_a_separate_clone(
     songmaker landing clone): the primary checkout, the clone, and the
     forge. The forge closes the item through its own `Closes #<n>` on the
     merge. `git_identity=False` leaves the clone with no user.name or
-    user.email, which git may never guess."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
+    user.email, which git may never guess. `lane_branch` stands an issue-less
+    lane on that foreign branch instead: a `No-Item:` pull request whose
+    lane claim is keyed by the branch."""
+    if lane_branch is None:
+        repo, client = _land_scenario(monkeypatch, tmp_path)
+    else:
+        repo, client = _land_scenario(
+            monkeypatch, tmp_path, branch=lane_branch, issue=None, body="No-Item: fix"
+        )
     client.closes_on_merge = True
     _use_real_store(monkeypatch)
     remote = tmp_path / "remote.git"
     store.bootstrap(worktree=repo, remote=str(remote))
-    _claim_the_landing_issue(repo, remote, "landing-claim")
-    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
+    _claim_the_landing_branch(
+        repo,
+        remote,
+        "landing-claim",
+        branch=lane_branch or LANDING_BRANCH,
+        lane=lane_branch is not None,
+    )
+    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), lane_branch or LANDING_BRANCH)
     clone = tmp_path / "landing-clone"
     real_git(tmp_path, "clone", "-q", str(remote), str(clone))
     _without_git_identity(monkeypatch, clone)
@@ -19368,20 +19671,21 @@ def _land_from_a_separate_clone(
     return repo, clone, client
 
 
-def _claim_the_landing_issue(repo: Path, remote: Path, claim_id: str) -> None:
-    """Ada's claim `claim_id` on the landing issue and branch, written to
-    `refs/aco/state` from `repo`."""
+def _claim_the_landing_branch(
+    repo: Path, remote: Path, claim_id: str, *, branch: str = LANDING_BRANCH, lane: bool = False
+) -> None:
+    """Ada's claim `claim_id` on `branch`, the landing issue's own or, with
+    `lane`, an issue-less lane's, written to `refs/aco/state` from `repo`."""
+    identity = protocol.LaneIdentity() if lane else protocol.IssueIdentity(WORK_ITEM_ISSUE)
     store.commit_transition(
         observed=fresh_observation(repo, remote),
-        subject=store.ClaimTransitionSubject(
-            f"claim issue {WORK_ITEM_ISSUE}", item=str(WORK_ITEM_ISSUE)
-        ),
+        subject=store.transition_subject("claim", identity, branch),
         intent=protocol.ClaimIntent(
-            identity=protocol.IssueIdentity(WORK_ITEM_ISSUE),
+            identity=identity,
             agent="Ada",
             role="builder",
             base=protocol.ObjectId("c" * 40),
-            branch=LANDING_BRANCH,
+            branch=branch,
             scope=("src",),
             claim_id=protocol.ClaimId(claim_id),
             operation_id=f"{claim_id}-op",
@@ -19458,29 +19762,85 @@ def test_land_from_a_separate_clone_releases_or_refuses_before_the_merge(
     assert (tmp_path / "lane").exists()
 
 
+def _land_and_release_the_lane_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    branch: str,
+) -> tuple[Path, Path, FakeForge]:
+    """`aco land 12` from a separate clone released the claim on `branch`
+    (the landing issue's own, or a foreign branch's issue-less lane): the
+    repository holding the lane worktree, the clone, and the forge, set up
+    for a rerun."""
+    repo, clone, client = _land_from_a_separate_clone(
+        monkeypatch,
+        tmp_path,
+        git_identity=True,
+        lane_branch=None if branch == LANDING_BRANCH else branch,
+    )
+    client.allowed_methods = frozenset({_SQUASH})
+    recorded_head = real_git(repo, "rev-parse", branch).stdout.strip()
+    client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=recorded_head)
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
+    capsys.readouterr()
+    client.closed_issues.discard(WORK_ITEM_ISSUE)
+    client.landing_comments.clear()
+    client.issue_reference_lookups.clear()
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    return repo, clone, client
+
+
+_FOREIGN_BRANCH = "dependabot/x"
+_RERUN_ROWS = (
+    ("removes-the-lane", False, False, False, "removed"),
+    (
+        "a-claim-taken-meanwhile-keeps-the-lane",
+        False,
+        True,
+        False,
+        "kept -- claimed again while this release ran",
+    ),
+    (
+        "the-keep-worktree-flag-keeps-the-lane",
+        False,
+        False,
+        True,
+        "kept -- --keep-worktree was given",
+    ),
+)
+
+
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
-    ("claimed_meanwhile", "keep_worktree_flag", "worktree"),
+    (
+        "branch",
+        "claimed_before_the_land_rerun",
+        "claimed_meanwhile",
+        "keep_worktree_flag",
+        "worktree",
+    ),
     [
-        pytest.param(False, False, "removed", id="removes-the-lane"),
+        pytest.param(branch, *row[1:], id=f"{branch_id}-{row[0]}")
+        for branch, branch_id in ((LANDING_BRANCH, "issue"), (_FOREIGN_BRANCH, "foreign-lane"))
+        for row in _RERUN_ROWS
+    ]
+    + [
         pytest.param(
+            _FOREIGN_BRANCH,
             True,
             False,
-            "kept -- claimed again while this release ran",
-            id="a-claim-taken-meanwhile-keeps-the-lane",
-        ),
-        pytest.param(
             False,
-            True,
-            "kept -- --keep-worktree was given",
-            id="the-keep-worktree-flag-keeps-the-lane",
-        ),
+            "",
+            id="foreign-lane-an-issue-claim-taken-since-the-release-refuses",
+        )
     ],
 )
 def test_land_rerun_after_its_release_finishes_and_names_the_release_that_removes_the_lane(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
+    branch: str,
+    claimed_before_the_land_rerun: bool,
     claimed_meanwhile: bool,
     keep_worktree_flag: bool,
     worktree: str,
@@ -19492,29 +19852,33 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     printed in the checkout holding the clean lane at the recorded head,
     removes it. The trigger is the missing claim, never a closed item: a
     reopened item stays open, uncommented and unread (REL-47). A claim
-    taken while that release verifies the landing keeps the lane (REL-55)."""
-    repo, clone, client = _land_from_a_separate_clone(monkeypatch, tmp_path, git_identity=True)
-    client.allowed_methods = frozenset({_SQUASH})
-    recorded_head = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
-    client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=recorded_head)
+    taken while that release verifies the landing keeps the lane (REL-55) --
+    on a foreign branch whichever claim it is (REL-59) -- and one taken
+    before the rerun refuses REL-03 there (REL-58)."""
+    repo, clone, client = _land_and_release_the_lane_claim(monkeypatch, capsys, tmp_path, branch)
     remote = tmp_path / "remote.git"
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-    capsys.readouterr()
     state_after_release = _state_ref_tip(clone, remote)
-    client.closed_issues.discard(WORK_ITEM_ISSUE)
-    client.landing_comments.clear()
-    client.issue_reference_lookups.clear()
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    rerun = f"aco release {WORK_ITEM_ISSUE} --merged 12 --branch {LANDING_BRANCH}"
+    item = "" if branch == _FOREIGN_BRANCH else f" {WORK_ITEM_ISSUE}"
+    rerun = f"aco release{item} --merged 12 --branch {branch}"
+    if claimed_before_the_land_rerun:
+        _claim_the_landing_branch(repo, remote, "bob-claim", branch=branch)
+        state_after_release = _state_ref_tip(clone, remote)
 
     land_status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     land_output = capsys.readouterr()
+    if claimed_before_the_land_rerun:
+        assert (land_status, land_output.out) == (2, "")
+        assert _lane_lookup_refusal(branch) in land_output.err
+        assert len(client.merge_calls) == 1
+        assert _state_ref_tip(clone, remote) == state_after_release
+        assert (tmp_path / "lane").exists()
+        return
     assert (land_status, land_output.err, land_output.out) == (
         0,
         "",
         "LANDED pull request #12 already; nothing left to release\n"
-        f"worktree: kept -- no linked worktree on {LANDING_BRANCH} in this checkout; "
+        f"worktree: kept -- no linked worktree on {branch} in this checkout; "
         f"run {rerun} in the checkout that holds it\n",
     )
     redirect_toplevel(monkeypatch, repo)
@@ -19523,7 +19887,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
         verified_landing = client.landing
 
         def landing_while_start_claims_again(number: int) -> forge.Landing:
-            _claim_the_landing_issue(repo, remote, "reopened-claim")
+            _claim_the_landing_branch(repo, remote, "reopened-claim", branch=branch)
             return verified_landing(number)
 
         monkeypatch.setattr(client, "landing", landing_while_start_claims_again)
@@ -19540,7 +19904,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     )
     lane_kept = claimed_meanwhile or keep_worktree_flag
     assert (tmp_path / "lane").exists() is lane_kept
-    assert checkout.branch_exists(LANDING_BRANCH) is lane_kept
+    assert checkout.branch_exists(branch) is lane_kept
     claims = store.fetch_state(worktree=repo, remote=str(remote)).claims
     assert (len(client.merge_calls), bool(claims)) == (1, claimed_meanwhile)
     assert (
@@ -23593,6 +23957,13 @@ class _LaneLookupCase:
     refusal: str | None = None
     reads_once: bool = False
     exact: bool = True
+    claim_id: str | None = None
+    merged_ref: str = "12"
+    state_ref: bool = False
+    landing_merged: bool = True
+    issue_claim_lands_during_verification: bool = False
+    no_forge_reads: bool = False
+    nothing_left_worktree: str | None = None
 
 
 def _lane_lookup_refusal(branch: str) -> str:
@@ -23601,6 +23972,13 @@ def _lane_lookup_refusal(branch: str) -> str:
         "check out a branch prefixed 'docs/' or 'fix/'"
     )
 
+
+_WORK_ITEM_TRAILER_REFUSAL = (
+    f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
+    "`Work-Item: #42`; an issue-less lane needs a "
+    '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
+    'with a malformed trailer"'
+)
 
 _LANE_LOOKUP_CASES = (
     _LaneLookupCase(
@@ -23612,12 +23990,7 @@ _LANE_LOOKUP_CASES = (
         "9",
         merged=True,
         trailer="Work-Item: #42",
-        refusal=(
-            f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
-            "`Work-Item: #42`; an issue-less lane needs a "
-            '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
-            'with a malformed trailer"'
-        ),
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
     ),
     _LaneLookupCase(
         "10",
@@ -23627,6 +24000,59 @@ _LANE_LOOKUP_CASES = (
             "lane 'dependabot/x' is claimed on 'dependabot/x', not on pull request #12's "
             "branch 'dependabot/y'; release that claim by itself"
         ),
+    ),
+    _LaneLookupCase(
+        "11", holder="none", merged=True, nothing_left_worktree="kept -- release ran from inside it"
+    ),
+    _LaneLookupCase(
+        "12",
+        holder="none",
+        merged=True,
+        source="dependabot/y",
+        refusal="lane 'dependabot/x' has no active build claim",
+    ),
+    _LaneLookupCase(
+        "13",
+        holder="none",
+        merged=True,
+        trailer="Work-Item: #42",
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
+    ),
+    _LaneLookupCase(
+        "14",
+        holder="none",
+        merged=True,
+        landing_merged=False,
+        refusal="pull request #12 is not merged",
+    ),
+    _LaneLookupCase(
+        "15",
+        holder="none",
+        merged=True,
+        claim_id="X",
+        refusal=_lane_lookup_refusal("dependabot/x"),
+    ),
+    _LaneLookupCase(
+        "16",
+        holder="none",
+        merged=True,
+        merged_ref=MERGE_COMMIT_SHA,
+        state_ref=True,
+        refusal=_lane_lookup_refusal("dependabot/x"),
+    ),
+    _LaneLookupCase(
+        "17",
+        holder="issue",
+        merged=True,
+        refusal=_lane_lookup_refusal("dependabot/x"),
+        no_forge_reads=True,
+    ),
+    _LaneLookupCase(
+        "18",
+        holder="none",
+        merged=True,
+        issue_claim_lands_during_verification=True,
+        nothing_left_worktree="kept -- claimed again while this release ran",
     ),
     _LaneLookupCase("25", command="rescope"),
     _LaneLookupCase(
@@ -23653,14 +24079,40 @@ _LANE_LOOKUP_CASES = (
             "check out the docs/ or fix/ lane branch, or pass an issue number"
         ),
     ),
+    _LaneLookupCase(
+        "31",
+        branch="docs/x",
+        holder="none",
+        merged=True,
+        source="docs/x",
+        nothing_left_worktree="kept -- release ran from inside it",
+    ),
     _LaneLookupCase("33", as_json=True),
-    _LaneLookupCase("35a", command="release-help"),
+    _LaneLookupCase(
+        "34",
+        holder="none",
+        merged=True,
+        as_json=True,
+        nothing_left_worktree="kept -- release ran from inside it",
+    ),
+    _LaneLookupCase(
+        "38",
+        branch="ada/issue-42",
+        holder="none",
+        merged=True,
+        trailer="Work-Item: #42",
+        source="ada/issue-42",
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
+    ),
+    _LaneLookupCase("35", command="release-help"),
     _LaneLookupCase("36", command="rescope-help"),
     _LaneLookupCase("37", command="claim-help"),
 )
 
 
-def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookupCase) -> None:
+def _arrange_lane_lookup_case(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, case: _LaneLookupCase
+) -> FakeForge:
     standing = (
         ()
         if case.holder == "none"
@@ -23676,7 +24128,10 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
     )
     client = FakeForge()
     _patch_release_session(monkeypatch, client, *standing, agent=case.agent, branch=case.branch)
-    git_values = git_checkout(branch=case.branch)
+    toplevel = str(tmp_path) if case.state_ref else "/repo"
+    if case.state_ref:
+        _write_state_ref_pin(tmp_path)
+    git_values = git_checkout(toplevel=toplevel, branch=case.branch)
     monkeypatch.setattr(
         checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
@@ -23684,7 +24139,10 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
     if case.merged:
         monkeypatch.setattr(store, "list_worktrees", lambda _toplevel: (Path("/repo"),))
         client.landings[12] = landing_pull_request(
-            body=case.trailer, merged=True, head_ref_name=case.source, base_ref_name="main"
+            body=case.trailer,
+            merged=case.landing_merged,
+            head_ref_name=case.source,
+            base_ref_name="main",
         )
         work_items = ("#42",) if case.trailer == "Work-Item: #42" else ()
         classification = board.trunk_commit_classification(
@@ -23697,6 +24155,33 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
         )
     else:
         forbid_forge_resolution(monkeypatch)
+    if case.issue_claim_lands_during_verification:
+        _claim_the_branch_while_the_landing_verifies(monkeypatch, client, case.branch)
+    return client
+
+
+def _claim_the_branch_while_the_landing_verifies(
+    monkeypatch: pytest.MonkeyPatch, client: FakeForge, branch: str
+) -> None:
+    """Bob's issue claim #42 on `branch` appears in the claim state once the
+    forge was asked about the landing: after the release's first read."""
+    verified_landing = client.landing
+    fetch_state = store.fetch_state
+    verified = []
+    holder = store_claim_from_request(request("bob", "Bob", issue=42, branch=branch, scope=("a",)))
+
+    def landing_while_a_claim_lands(number: int) -> forge.Landing:
+        verified.append(number)
+        return verified_landing(number)
+
+    def state_with_the_landed_claim(*, worktree: Path, remote: str) -> protocol.ClaimState:
+        state = fetch_state(worktree=worktree, remote=remote)
+        if not verified:
+            return state
+        return replace(state, claims={protocol.claim_key(holder.identity, branch): holder})
+
+    monkeypatch.setattr(client, "landing", landing_while_a_claim_lands)
+    monkeypatch.setattr(store, "fetch_state", state_with_the_landed_claim)
 
 
 def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
@@ -23705,8 +24190,30 @@ def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
     if case.command == "rescope":
         return ["rescope", "--add", "/repo/f"]
     branch_flags = ["--branch", case.branch] if case.branch else []
-    outcome = ["--merged", "12"] if case.merged else ["--abandoned", "R"]
-    return ["release", *branch_flags, *outcome, *(["--json"] if case.as_json else [])]
+    outcome = ["--merged", case.merged_ref] if case.merged else ["--abandoned", "R"]
+    return [
+        "release",
+        *branch_flags,
+        *outcome,
+        *(["--claim-id", case.claim_id] if case.claim_id else []),
+        *(["--json"] if case.as_json else []),
+    ]
+
+
+def _nothing_left_output(case: _LaneLookupCase, output: str) -> tuple[str, str]:
+    """REL-47's report as `(outcome, worktree)`, human lines or `--json` envelope."""
+    if case.as_json:
+        envelope = json.loads(output)
+        assert (envelope["ok"], envelope["reason"], envelope["lane"], envelope["branch"]) == (
+            True,
+            "merged",
+            True,
+            case.branch,
+        )
+        return envelope["outcome"], envelope["worktree"]
+    landed, worktree = output.splitlines()
+    assert landed == "LANDED pull request #12 already; nothing left to release"
+    return "nothing left to release", worktree.removeprefix("worktree: ")
 
 
 def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixture[str]) -> None:
@@ -23715,11 +24222,14 @@ def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixtur
         issue_claim.main([command, "--help"])
     assert exited.value.code == 0
     help_text = " ".join(capsys.readouterr().out.split())
-    expected = (
-        "omit for lane mode, derived from a docs/ or fix/ checkout branch"
-        if command == "claim"
-        else "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim"
-    )
+    expected = {
+        "claim": "omit for lane mode, derived from a docs/ or fix/ checkout branch",
+        "release": (
+            "omit for lane mode: a docs/ or fix/ branch, one holding a live lane claim, or a "
+            "github --merged rerun on a branch no claim holds"
+        ),
+        "rescope": "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim",
+    }[command]
     assert expected in help_text
 
 
@@ -23727,18 +24237,21 @@ def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixtur
 def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
     case: _LaneLookupCase,
 ) -> None:
     if case.command.endswith("-help"):
         _assert_lane_lookup_help(case, capsys)
         return
-    _arrange_lane_lookup_case(monkeypatch, case)
+    client = _arrange_lane_lookup_case(monkeypatch, tmp_path, case)
     before = store.fetch_state(worktree=Path("."), remote="origin").claims
     reads = count_context_reads(monkeypatch)
     status = issue_claim.main(["--repo", REPOSITORY, *_lane_lookup_arguments(case)])
     captured = capsys.readouterr()
     if case.reads_once:
         assert sum(reads.observations.values()) == 1
+    if case.no_forge_reads:
+        assert client.requests == 0
     after = store.fetch_state(worktree=Path("."), remote="origin").claims
     assert status == (2 if case.refusal else 0)
     if case.refusal:
@@ -23750,6 +24263,12 @@ def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     elif case.command == "rescope":
         assert _live_store_claim().scope == ("a", "f")
         assert captured.out.startswith("RESCOPED lane dependabot/x: mine")
+    elif case.nothing_left_worktree:
+        assert _nothing_left_output(case, captured.out) == (
+            "nothing left to release",
+            case.nothing_left_worktree,
+        )
+        assert bool(after) is case.issue_claim_lands_during_verification
     else:
         assert after == {}
         if case.as_json:
