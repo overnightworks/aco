@@ -1,8 +1,0 @@
-claim_id = "5751a2f42e814512813ca9ce622204e2"
-agent = "claude"
-role = "builder"
-base = "851476bbb21f6b8cc14e8a60bfb9f767351c10d7"
-branch = "claude/issue-97-s11-cmd-release"
-scope = ["pyproject.toml", "src/agent_coordination/board.py", "src/agent_coordination/board_read.py", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_release.py"]
-opened_commit = "07c220916a25e1ddaee25e82a18901c4e5426ee4"
-whole_reason = "_release_transition erreicht 39 der 41 Namen; der beste Halbschnitt bräuchte sechs Zwischen-Namen (Plan #2, Abschnitt 3)."
