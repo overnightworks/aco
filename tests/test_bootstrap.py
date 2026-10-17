@@ -8,30 +8,13 @@ import pytest
 from cli_fixtures import (
     count_context_reads,
     real_git,
-    redirect_toplevel,
     run_cli,
-    set_git_identity,
-    stub_board_config_tracked,
 )
+from store_fixtures import state_ref_tip
 
 from agent_coordination import protocol, store
 
 BOOTSTRAP_REPOSITORY = "example/agent-coordination"
-
-
-@pytest.fixture(autouse=True)
-def _tracked_board_config_and_identity(monkeypatch: pytest.MonkeyPatch) -> None:
-    set_git_identity(monkeypatch)
-    stub_board_config_tracked(monkeypatch)
-
-
-@pytest.fixture
-def clone(monkeypatch: pytest.MonkeyPatch, worktree: Path, bare_remote: Path) -> Path:
-    """The `worktree` with its `origin` at the empty `bare_remote`, entered as the cwd."""
-    real_git(worktree, "remote", "add", "origin", str(bare_remote))
-    redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
-    return worktree
 
 
 @pytest.mark.parametrize(
@@ -56,7 +39,7 @@ def test_bootstrap_with_a_repo_prints_the_ref_commit_id_as_without_one(
 
     assert with_repo.stderr == ""
     assert without_repo.stderr == ""
-    remote_state_commit = real_git(bare_remote, "rev-parse", store.STATE_REF).stdout.strip()
+    remote_state_commit = state_ref_tip(bare_remote)
     assert with_repo.expect_success() == f"{remote_state_commit}\n"
     assert without_repo.expect_success() == with_repo.stdout
 

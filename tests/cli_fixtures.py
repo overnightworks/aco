@@ -206,8 +206,8 @@ def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     """A commit identity for every git subprocess a test spawns, including
     the ones the code under test runs (they inherit the process environment,
     never overriding it) -- this machine may carry no git `user.name` or
-    `user.email` at all. Each caller wraps this in its own
-    `@pytest.fixture(autouse=True)`, like `stub_board_config_tracked`."""
+    `user.email` at all. Modules may wrap this in an autouse fixture;
+    `clone` calls it directly before creating any commit."""
     monkeypatch.setenv("GIT_AUTHOR_NAME", "Test")
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "test@example.com")
     monkeypatch.setenv("GIT_COMMITTER_NAME", "Test")
@@ -227,6 +227,35 @@ def bare_remote(tmp_path: Path) -> Path:
     remote = init_bare_repository(tmp_path / "remote.git")
     real_git(remote, "config", "maintenance.auto", "false")
     return remote
+
+
+def track_board_config(repo: Path, text: str) -> None:
+    config = repo / board.CONFIG_PATH
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(text)
+    real_git(repo, "add", str(board.CONFIG_PATH))
+    real_git(repo, "commit", "-q", "-m", "track board configuration")
+
+
+@pytest.fixture
+def clone(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    bare_remote: Path,
+    isolated_global_git_config: Path,
+) -> Path:
+    """The spec world: tracked config, pushed main, and an isolated identity."""
+    set_git_identity(monkeypatch)
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
+    repo = tmp_path / "clone"
+    repo.mkdir()
+    real_git(repo, "init", "-q", "-b", "main")
+    real_git(repo, "remote", "add", "origin", str(bare_remote))
+    track_board_config(repo, "")
+    push_repository_trunk(repo, "origin")
+    redirect_toplevel(monkeypatch, repo)
+    monkeypatch.chdir(repo)
+    return repo
 
 
 @pytest.fixture

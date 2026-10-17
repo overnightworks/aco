@@ -18,6 +18,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import replace
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
@@ -40,6 +41,7 @@ from store_fixtures import (
     push_raw_state_tree,
     raw_tree,
     state_ref_listing,
+    state_ref_tip,
 )
 
 from agent_coordination import cli as issue_claim
@@ -112,18 +114,6 @@ def _has_ref(worktree: Path, ref: str) -> bool:
         capture_output=True,
     )
     return result.returncode == 0
-
-
-def _state_ref_oid(remote: Path) -> str | None:
-    result = subprocess.run(
-        ["git", "ls-remote", "--exit-code", str(remote), store.STATE_REF],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return None
-    return result.stdout.split("\t", 1)[0]
 
 
 def _tree_entries(remote: Path, tip: str) -> dict[str, str]:
@@ -304,11 +294,11 @@ class _MovesOnceThenSticksTransport:
 def test_bootstrap_creates_the_empty_state_tree_on_a_proven_empty_remote(
     bare_remote: Path, worktree: Path
 ) -> None:
-    assert _state_ref_oid(bare_remote) is None
+    assert state_ref_tip(bare_remote) is None
 
     tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
-    assert _state_ref_oid(bare_remote) == tip
+    assert state_ref_tip(bare_remote) == tip
     assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
 
 
@@ -737,7 +727,7 @@ def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the
     canonical_scope = ("docs/COORDINATION.md", "scripts/issue_claim.py")
     assert state.claims["issue-42"].scope == canonical_scope
     assert state.consumed_ids == frozenset({protocol.ClaimId("a1")})
-    assert _state_ref_oid(bare_remote) == tip
+    assert state_ref_tip(bare_remote) == tip
 
     replay = protocol.ClaimIntent(
         identity=protocol.IssueIdentity(42),
@@ -1107,50 +1097,62 @@ def test_push_retry_finds_the_operation_id_after_an_accept_then_raise_and_does_n
         text=True,
     )
     assert log.stdout.strip() == "1"
-    assert result.tip == _state_ref_oid(bare_remote)
+    assert result.tip == state_ref_tip(bare_remote)
 
 
-@pytest.mark.parametrize("state_ref_exists", [True, False], ids=["ref-exists", "from-empty"])
+def _reject_existing_state(bare_remote: Path, worktree: Path) -> Callable[[], object]:
+    """Bootstrap first so the ref-exists row's observed.tip is a real parent."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    pending = store.PendingCommit(
+        tree_oid=store._write_bootstrap_tree(worktree),
+        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
+        operation_id="never-applied",
+    )
+    return partial(
+        store.push_tree,
+        worktree=worktree,
+        remote=str(bare_remote),
+        observed=observed,
+        pending=pending,
+        transport=_AlwaysRejectingTransport(),
+    )
+
+
+def _reject_empty_state(bare_remote: Path, worktree: Path) -> Callable[[], object]:
+    return partial(
+        store.bootstrap,
+        worktree=worktree,
+        remote=str(bare_remote),
+        transport=_AlwaysRejectingTransport(),
+    )
+
+
+@pytest.mark.parametrize(
+    ("arrange_rejection", "state_ref_exists"),
+    [
+        pytest.param(_reject_existing_state, True, id="ref-exists"),
+        pytest.param(_reject_empty_state, False, id="from-empty"),
+    ],
+)
 def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
-    bare_remote: Path, worktree: Path, state_ref_exists: bool
+    bare_remote: Path,
+    worktree: Path,
+    arrange_rejection: Callable[[Path, Path], Callable[[], object]],
+    state_ref_exists: bool,
 ) -> None:
-    """Issue #237 finding 22: every attempt was rejected without the ref
-    ever advancing (`_AlwaysRejectingTransport` never touches the remote),
-    so exhaustion names a stuck lock or missing rights on `remote`, never
-    "moved N times" -- that phrase would blame a race that never happened.
+    """Issue #237 finding 22: rejection without advancement names a stuck lock.
+
+    Exhaustion must never say "moved N times": that would blame a race
+    that never happened.
     """
-    # Bootstrapping first gives `observed.tip` a real value, so every retry's
-    # `_commit_tree` builds onto a non-None parent -- the ordinary case once
-    # the ref already exists. The from-empty case drives the public bootstrap
-    # against a remote that never gets the ref.
-    transport = _AlwaysRejectingTransport()
-    if state_ref_exists:
-        store.bootstrap(worktree=worktree, remote=str(bare_remote))
-        observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-        pending = store.PendingCommit(
-            tree_oid=store._write_bootstrap_tree(worktree),
-            message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-            operation_id="never-applied",
-        )
-
-        def exhaust_the_retries() -> object:
-            return store.push_tree(
-                worktree=worktree,
-                remote=str(bare_remote),
-                observed=observed,
-                pending=pending,
-                transport=transport,
-            )
-    else:
-
-        def exhaust_the_retries() -> object:
-            return store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
+    exhaust_the_retries = arrange_rejection(bare_remote, worktree)
 
     with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes") as raised:
         exhaust_the_retries()
 
     assert "without the ref ever moving" in str(raised.value)
-    assert (_state_ref_oid(bare_remote) is not None) is state_ref_exists
+    assert (state_ref_tip(bare_remote) is not None) is state_ref_exists
 
 
 def test_push_retry_exhausts_and_names_a_race_when_the_ref_keeps_moving(
@@ -1358,7 +1360,7 @@ def test_cli_bootstrap_creates_the_empty_state_ref_without_a_ledger(
     status = issue_claim.main(["--repo", "example/agent-coordination", "bootstrap"])
 
     assert status == 0
-    assert capsys.readouterr().out.splitlines() == [_state_ref_oid(bare_remote)]
+    assert capsys.readouterr().out.splitlines() == [state_ref_tip(bare_remote)]
 
 
 def test_cli_bootstrap_is_idempotent_on_a_second_run(
@@ -4924,7 +4926,7 @@ def test_delete_state_ref_reports_whether_a_local_ref_was_deleted(
     assert deleted_local is deleted_local_expected
     assert not store.local_state_ref_exists(worktree)
     if pass_expected_remote_tip:
-        assert _state_ref_oid(bare_remote) is None
+        assert state_ref_tip(bare_remote) is None
 
 
 def test_delete_state_ref_fails_loud_when_the_local_ref_cannot_be_deleted(
@@ -4957,14 +4959,14 @@ def test_delete_state_ref_refuses_a_stale_lease_and_leaves_everything_intact(
         parent=stale_tip,
         files={store.SCHEMA_TOML_FILENAME: protocol.serialize_empty_schema_toml().encode()},
     )
-    moved_tip = _state_ref_oid(bare_remote)
+    moved_tip = state_ref_tip(bare_remote)
 
     with pytest.raises(protocol.ClaimError, match=r"cannot delete .*lease"):
         store.delete_state_ref(
             worktree=worktree, remote=str(bare_remote), expected_remote_tip=stale_tip
         )
 
-    assert _state_ref_oid(bare_remote) == moved_tip
+    assert state_ref_tip(bare_remote) == moved_tip
     assert store.local_state_ref_exists(worktree)
 
 
@@ -5007,7 +5009,7 @@ def test_delete_state_ref_treats_a_lost_leased_push_as_success_when_the_ref_is_a
     )
 
     assert deleted_local is False
-    assert _state_ref_oid(bare_remote) is None
+    assert state_ref_tip(bare_remote) is None
 
 
 @pytest.mark.parametrize("remote_moved", [True, False], ids=["remote-moved", "remote-unchanged"])
@@ -5031,7 +5033,7 @@ def test_delete_state_ref_repair_never_recommends_a_manual_lease(
             parent=stale_tip,
             files={store.SCHEMA_TOML_FILENAME: protocol.serialize_empty_schema_toml().encode()},
         )
-    current_tip = _state_ref_oid(bare_remote)
+    current_tip = state_ref_tip(bare_remote)
     assert current_tip is not None
     _fake_failed_remote_delete(monkeypatch)
 

@@ -67,6 +67,18 @@ def push_raw_state_tree(
     return commit
 
 
+def state_ref_tip(remote: Path) -> str | None:
+    result = subprocess.run(
+        ["git", "ls-remote", "--exit-code", str(remote), store.STATE_REF],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.split("\t", 1)[0]
+
+
 def state_ref_listing(remote: Path) -> dict[bytes, bytes]:
     """`git ls-tree -r -z` of the state ref in `remote`, raw path -> raw
     `mode kind oid`."""
