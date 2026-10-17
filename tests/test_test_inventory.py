@@ -308,6 +308,8 @@ def test_inventory_recognizes_parametrized_tests(source: str, expected: bool) ->
     cases, _classes, _single = test_inventory.iter_tests(tree, test_inventory.module_scope(tree))
 
     assert [case.parametrized for case in cases] == [expected]
+    if source.startswith("@"):
+        assert cases[0].param_units
     assert [
         test_inventory.is_parametrized(func, owners, tree)
         for owners, func in test_inventory.iter_test_functions(tree.body)
