@@ -498,7 +498,7 @@ def _verify_and_close_merged_release(
     or mismatched-claim release never reaches the forge at all, so it can
     neither verify, comment on, nor close a pull request's issue. `storage`
     is proven `github` here (`release_transition` returned for
-    `state-ref`), so the cast is honest: `cli._build_forge` builds exactly a
+    `state-ref`), so the cast is honest: `session._build_forge` builds exactly a
     `github.GitHubForge` for every other storage pin. The close runs before
     the release transition: a close failure -- a transient forge error,
     most often -- raises before that transition ever runs, so the claim it
@@ -751,7 +751,7 @@ def _cmd_release_landed(
         landings, identity.issue, cast(str, parsed.merged), context.config.storage
     )
     # `storage` is already proven `state-ref` by `release_transition`, so
-    # this cast is honest: `cli._build_forge` builds exactly a `StateRefBoard`.
+    # this cast is honest: `session._build_forge` builds exactly a `StateRefBoard`.
     client = cast(state_board.StateRefBoard, context.forge)
     if client.item_reference(identity.issue).state is forge.ItemState.MISSING:
         raise protocol.ClaimUnavailableError(

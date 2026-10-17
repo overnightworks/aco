@@ -1341,7 +1341,7 @@ def push_tree(
 
 def hash_blob(worktree: Path, content: bytes) -> ObjectId:
     """One blob's oid, hashed and written to the object store (issue #283):
-    the public seam `cli.py`'s item-write adapter uses to compute
+    the public seam `session._StoreItemWriter` uses to compute
     `ItemWriteIntent.new_oid` once, before `commit_transition`'s own retry
     loop -- an item write already carries finished bytes, unlike
     `claims/`/`resources/`, whose own entries are serialized from a record

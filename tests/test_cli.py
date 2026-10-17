@@ -118,6 +118,7 @@ from agent_coordination import (
     protect,
     protocol,
     report,
+    session,
     state_board,
     store,
 )
@@ -8527,7 +8528,7 @@ def test_load_board_config_refuses_a_block_pin_the_forge_cannot_support(tmp_path
     write_repository_config(tmp_path, 'body_contract = "block"\n')
 
     client = _MinimalBoardSource(capability_result=forge.Capability.UNSUPPORTED)
-    context = issue_claim._run_context(None)
+    context = session.run_context(None)
 
     with pytest.raises(ClaimError, match="list_board_dependencies"):
         board_read.load_board_config(client, context)
@@ -8791,7 +8792,7 @@ def test_lazy_forge_builds_a_state_ref_board_under_the_state_ref_pin(
     about the checkout looks unusual."""
     _write_state_ref_pin(tmp_path)
     stub = FakeForge(repository=forge.RepositoryId("file", (), str(tmp_path)))
-    monkeypatch.setattr(issue_claim, "_state_ref_forge", lambda _context: stub)
+    monkeypatch.setattr(session, "_state_ref_forge", lambda _context: stub)
 
     def unused(*_args: object, **_kwargs: object) -> None:
         pytest.fail("storage = state-ref must never build a GitHubForge")
@@ -9016,7 +9017,7 @@ def _landing_scenario(
         item_oids=item_oids,
         writer=_RefusingItemWriter(),
     )
-    monkeypatch.setattr(issue_claim, "_state_ref_forge", lambda _context: client)
+    monkeypatch.setattr(session, "_state_ref_forge", lambda _context: client)
     claims = tuple(
         _active_claim(
             "Codex Sol",
@@ -9209,7 +9210,7 @@ def _real_landing_scenario(
     """The real counterpart of `_landing_scenario`: the same real trunk
     history (`_landing_repository`), but `refs/aco/state` is real too, on
     the very same bare remote -- `store.fetch_state`/`commit_transition` run
-    unfaked, and `_state_ref_forge` is never stubbed, so `release --merged`
+    unfaked, and `session._state_ref_forge` is never stubbed, so `release --merged`
     below drives the exact git commits and CAS its own atomicity claim is
     about."""
     _use_real_store(monkeypatch)
@@ -22514,7 +22515,7 @@ def test_item_new_json_reports_ok_reason_created(
     monkeypatch.setattr(client, "compose_item", lambda **_kwargs: None, raising=False)
     monkeypatch.setattr(client, "create_item", lambda _write: item_id, raising=False)
     monkeypatch.setattr(client, "open_item_titles", tuple, raising=False)
-    monkeypatch.setattr(issue_claim, "_state_ref_forge", lambda _context: client)
+    monkeypatch.setattr(session, "_state_ref_forge", lambda _context: client)
     monkeypatch.setattr(sys, "stdin", io.StringIO(""))
 
     status = issue_claim.main(["item", "new", "--title", "Fresh Item", "--json"])
@@ -22716,7 +22717,7 @@ def test_item_close_prints_json_under_the_state_ref_pin(
     )
     monkeypatch.setattr(client, "close_item", lambda _number: "2026-09-16T12:00:00Z", raising=False)
     monkeypatch.setattr(client, "unplaced_child_numbers", lambda _number: (), raising=False)
-    monkeypatch.setattr(issue_claim, "_state_ref_forge", lambda _context: client)
+    monkeypatch.setattr(session, "_state_ref_forge", lambda _context: client)
 
     status = issue_claim.main(["item", "close", "42", "--json"])
 
@@ -22947,7 +22948,7 @@ def test_an_item_command_works_through_the_one_forge_its_run_context_builds(
         [pytest.MonkeyPatch, Path, Callable[[str], None]], tuple[FakeForge, list[str]]
     ],
 ) -> None:
-    """Issue #457 proof 7: `_build_forge`, asked through `RunContext.forge`,
+    """Issue #457 proof 7: `session._build_forge`, asked through `RunContext.forge`,
     is the one place a run's forge is constructed -- an item command never
     builds a `GitHubForge` or a state-ref board of its own beside it."""
     client, argv = arrange(monkeypatch, tmp_path, pipe_onto_stdin)
@@ -22960,9 +22961,9 @@ def test_an_item_command_works_through_the_one_forge_its_run_context_builds(
     def unused(*_args: object, **_kwargs: object) -> None:
         pytest.fail("an item command built a forge beside its run context")
 
-    monkeypatch.setattr(issue_claim, "_build_forge", build_forge)
+    monkeypatch.setattr(session, "_build_forge", build_forge)
     monkeypatch.setattr(github, "GitHubForge", unused)
-    monkeypatch.setattr(issue_claim, "_state_ref_forge", unused)
+    monkeypatch.setattr(session, "_state_ref_forge", unused)
 
     assert (issue_claim.main(argv), len(built)) == (0, 1)
 

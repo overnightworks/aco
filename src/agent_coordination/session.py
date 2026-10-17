@@ -22,15 +22,118 @@ never builds one: it judges from its own payload's path.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import uuid
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 from typing import cast
 
-from . import board, body, checkout, forge, github, protocol, store
+from . import board, body, checkout, forge, github, protocol, state_board, store
 
 ForgeBuilder = Callable[["RunContext"], forge.ForgeReader]
+
+
+@dataclass(frozen=True)
+class _StoreItemWriter:
+    """`state_board.ItemWriter`, implemented over `store` (issue #283): the
+    one place this tool hashes an item's finished bytes into a blob and
+    writes it through one CAS transition -- an `ItemWriteIntent` (issue
+    #279), or for a close an `ItemCloseIntent` (issue #459).
+    `state_board.py` itself may not import `store` (Layers contract), so
+    this class owns both git steps of a state-ref item write: `_item_write`
+    hashes the blob, `_commit` publishes it through the CAS transition.
+    """
+
+    context: RunContext
+
+    def write_item(
+        self,
+        item_id: str,
+        *,
+        expected: protocol.ObjectId | None,
+        content: bytes,
+        store_expected: Mapping[str, protocol.ObjectId] | None,
+    ) -> protocol.ObjectId:
+        return self._commit(self._item_write(item_id, expected, content, store_expected))
+
+    def close_item(
+        self,
+        item_id: str,
+        *,
+        number: int,
+        expected: protocol.ObjectId,
+        content: bytes,
+        store_expected: Mapping[str, protocol.ObjectId] | None,
+    ) -> protocol.ObjectId:
+        write = self._item_write(item_id, expected, content, store_expected)
+        return self._commit(protocol.ItemCloseIntent(write, protocol.IssueIdentity(number)))
+
+    def _item_write(
+        self,
+        item_id: str,
+        expected: protocol.ObjectId | None,
+        content: bytes,
+        store_expected: Mapping[str, protocol.ObjectId] | None,
+    ) -> protocol.ItemWriteIntent:
+        return protocol.ItemWriteIntent(
+            item_id=item_id,
+            expected=expected,
+            new_oid=store.hash_blob(self.context.toplevel, content),
+            operation_id=uuid.uuid4().hex,
+            store_expected=store_expected,
+        )
+
+    def _commit(
+        self, intent: protocol.ItemWriteIntent | protocol.ItemCloseIntent
+    ) -> protocol.ObjectId:
+        new_state = self.context.transition(
+            store.TransitionSubject(f"write item {intent.item_id}"), intent
+        )
+        return new_state.items[intent.item_id]
+
+
+def _state_ref_forge(context: RunContext) -> state_board.StateRefBoard:
+    """The `state-ref` storage pin's forge (issues #248, #283): repository
+    identity and default branch from `context` (host-neutral, the canonical
+    remote's recorded `HEAD`),
+    item content and blob oids read once through
+    `store.read_item_files`/`ClaimState.items` of `context.observation` --
+    the very snapshot the command's own checks read (issue #477) -- and a
+    write port over that same `store` (`_StoreItemWriter`) -- this is the
+    one place `state_board.StateRefBoard` is ever handed live data or a way
+    to write it, since the Layers contract keeps that module from reaching
+    `store` itself. It reads and writes through `context`'s own worktree:
+    `start` (issue #322 review finding 2) hands it a context for the freshly
+    created worktree, so the worktree-scoped claim never reads a
+    caller-checkout snapshot observed before that worktree existed."""
+    repository = context.repository_id
+    default_branch = context.default_branch
+    state = context.observation
+    item_files = {} if state.tip is None else store.read_item_files(context.toplevel, state.tip)
+    return state_board.StateRefBoard(
+        repository=repository,
+        default_branch=default_branch,
+        item_files=item_files,
+        item_oids=state.items,
+        writer=_StoreItemWriter(context),
+    )
+
+
+def _build_forge(context: RunContext) -> forge.ForgeReader:
+    """The forge adapter for `context`'s own `storage` pin (issue #248),
+    never chosen by the canonical remote's host: `github` (the default)
+    builds `github.GitHubForge`; `state-ref` builds
+    `state_board.StateRefBoard` from the state ref's own `items/` tree."""
+    if context.config.storage is body.Storage.STATE_REF:
+        return _state_ref_forge(context)
+    return github.GitHubForge(context.repository_id)
+
+
+def run_context(repo: forge.RepositoryId | None) -> RunContext:
+    """This run's root context, built once the command is known to need a
+    repository at all (after the workspace and `protect` dispatch)."""
+    return RunContext(repo, build_forge=_build_forge)
 
 
 class RepoMeaninglessUnderStateRefError(protocol.ClaimUnavailableError):

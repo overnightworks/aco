@@ -63,7 +63,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     it outside `cli._dispatch`, exactly like `status`). It still reads the
     repository's own storage pin (issue #287): `[record]` is a known key
     under `storage = "state-ref"` and an unknown one under
-    `storage = "github"`, the same gate `cli._state_ref_forge`'s own items
+    `storage = "github"`, the same gate `session._state_ref_forge`'s own items
     already read through `state_board._decode_item`."""
     as_json = parsed.json
     try:

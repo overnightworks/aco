@@ -74,7 +74,7 @@ def _refuse_a_body_on_stdin(command: str) -> None:
 def _state_ref_board(context: RunContext) -> state_board.StateRefBoard:
     """`context`'s own forge as the state-ref board, for an item command
     that has already refused every other storage pin: under `state-ref`
-    `cli._build_forge` builds exactly `cli._state_ref_forge`'s board, so the cast is
+    `session._build_forge` builds exactly `session._state_ref_forge`'s board, so the cast is
     honest, not a suppression -- the same narrowing `RunContext.forge_writer`
     performs for the generic writing surface."""
     return cast(state_board.StateRefBoard, context.forge)
@@ -321,7 +321,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
     valid `aco` block (`body --check`'s own sentences,
     `_body_shape_defects`). The CAS `expected` oid is this process's own
     already-read snapshot (`StateRefBoard.update_item_body`'s
-    `current.oid`, set once at `cli._state_ref_forge` construction): a second
+    `current.oid`, set once at `session._state_ref_forge` construction): a second
     process writing from that same snapshot refuses with issue #279's own
     sentence, never merged, never silently overwritten. `parent`, `state`,
     `origin`, `created_at`, and `closed_at` stay this item's own stored
