@@ -2871,7 +2871,7 @@ def freed_item_numbers(
     local `blocked_by` dependency of the item is now closed, `landed` was
     one of them, and nothing else -- local or foreign -- still blocks it.
     Reuses `open_dependency_blockers`/`dependency_freed_on`,
-    the same per-item blocker facts `cli._issue_check`'s own refusal already
+    the same per-item blocker facts `cmd_check._issue_check`'s own refusal already
     reads, rather than re-deriving them from `Board`'s aggregate fields:
     those only ever describe the *currently* open issues, so a landed
     item's own `blocked_by` reference disappears from them the moment it

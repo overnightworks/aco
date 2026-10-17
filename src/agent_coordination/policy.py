@@ -1,4 +1,5 @@
-"""Decide whether a pull request or trunk commit carries its landing classification correctly."""
+"""The landing check of a pull request: whether its `Work-Item:`/`No-Item:`
+classification, closing references, claim, and parent requirement hold."""
 
 from __future__ import annotations
 
@@ -240,7 +241,7 @@ def classification_defect(
     classification: board.Classification,
 ) -> board.ClassificationDefect | None:
     """Whether `classification`'s own claim, parent, and closing rules hold
-    (issue #405): the second half of `cli._checked_classification`, split out so
+    (issue #405): the second half of `cmd_check._checked_classification`, split out so
     a caller needing a live-store read only for this half (`land`'s own
     preflight, which fetches store state no earlier than this) never pays
     for one just to read the pull request's own shape."""
