@@ -1,7 +1,7 @@
 """Board and claim domain scenario builders shared by `tests/test_cli.py`
 (CLI wiring behavior), `tests/test_board.py` (pure `board.py` behavior),
 `tests/test_github.py` (the GitHub adapter's `REPOSITORY`), and
-`tests/test_protect.py` (`_active_claim`, the hook's live-claim builder). All
+`tests/test_protect.py` (`standing_active_claim`, the hook's live-claim builder). All
 import this module directly; pytest's rootless collection puts `tests/` on
 `sys.path`, so a plain `import board_fixtures` resolves here."""
 
@@ -110,7 +110,7 @@ def projected_board(
     )
 
 
-def _store_claim_from_request(
+def store_claim_from_request(
     claimed: ClaimRequest, *, opened_commit: str = BASE
 ) -> protocol.ActiveClaim:
     resource = None
@@ -130,7 +130,7 @@ def _store_claim_from_request(
     )
 
 
-def _active_claim(
+def standing_active_claim(
     agent: str = "Grok sess-1",
     *,
     claim_id: str = "cli-claim",

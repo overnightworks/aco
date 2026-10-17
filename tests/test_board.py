@@ -21,7 +21,6 @@ from board_fixtures import (
     FROZEN_UNTIL,
     MINIMAL_BLOCK_TOML,
     REPOSITORY,
-    _store_claim_from_request,
     block_body,
     block_dependency,
     blocked_issue,
@@ -33,6 +32,7 @@ from board_fixtures import (
     request,
     ruled_expectation,
     slice_entries,
+    store_claim_from_request,
     unfilled_block_body,
 )
 
@@ -994,7 +994,7 @@ def test_board_reports_each_item_actionability_reason(
         (blocker, issue),
         (),
         (),
-        tuple(_store_claim_from_request(request_value) for request_value in claims),
+        tuple(store_claim_from_request(request_value) for request_value in claims),
         board.BoardConfig(),
         dependencies={issue.number: dependencies},
         now=datetime(2026, 8, 21, tzinfo=UTC),
@@ -3183,7 +3183,7 @@ def test_a_configured_idea_keeps_freeze_claim_and_blocker_reasons(
         (blocker, idea),
         (),
         (),
-        tuple(_store_claim_from_request(claim_request) for claim_request in claims),
+        tuple(store_claim_from_request(claim_request) for claim_request in claims),
         board.BoardConfig(idea_label="idea"),
         dependencies={idea.number: dependencies},
         now=datetime(2026, 8, 21, tzinfo=UTC),

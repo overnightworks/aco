@@ -1,13 +1,5 @@
-"""CLI-boundary test scaffolding shared by `tests/test_cli.py` and the
-owner test files split from it (`tests/test_checkout.py`,
-`tests/test_protect.py`, `tests/test_store.py`, `tests/test_session.py`,
-`tests/test_state_board.py`, `tests/test_hook_input.py`,
-`tests/test_network_guard.py`, `tests/github_fixtures.py`): real and faked
-`git` process helpers, agent-identity env setup, stdin sources and pipe
-helpers, and the "this boundary must not be reached" forbid-helpers. All
-import this module directly; pytest's rootless collection puts `tests/` on
-`sys.path`, so a plain `import cli_fixtures` resolves here. `conftest.py`
-also registers it as a pytest plugin for `bare_remote` and `worktree`."""
+"""CLI-boundary scaffolding: real and faked git process helpers, agent-identity
+environment setup, stdin sources, pipe helpers, and boundary-forbid helpers."""
 
 from __future__ import annotations
 
@@ -34,7 +26,7 @@ from agent_coordination.session import RunContext
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked
 
 
-def _stub_one_git_call(
+def stub_one_git_call(
     monkeypatch: pytest.MonkeyPatch, arguments: list[str], *, exit_status: int, stderr: str
 ) -> None:
     """Force exactly one `checkout._git_run` argv to a chosen failure exit,
@@ -89,7 +81,7 @@ def trunk_git_calls(monkeypatch: pytest.MonkeyPatch, remote: str) -> list[tuple[
 
 def landed_from_another_clone(tmp_path: Path, *git_step: str) -> str:
     """The tip a second clone of `tmp_path`'s bare `remote.git`
-    (`_real_repository_with_bare_remote`) pushes to its `main` after running
+    (`real_repository_with_bare_remote`) pushes to its `main` after running
     `git_step` -- a commit or a merge -- so a checkout that has not fetched
     since stands behind the remote (issue #488)."""
     other = tmp_path / "other"
@@ -172,7 +164,7 @@ def init_bare_repository(path: Path) -> Path:
     return path
 
 
-def _real_repository_with_bare_remote(
+def real_repository_with_bare_remote(
     tmp_path: Path, *, remote_name: str = "origin"
 ) -> tuple[Path, Path]:
     """A real `git init`-ed worktree, commit identity configured, with a
@@ -193,13 +185,13 @@ def _real_repository_with_bare_remote(
 
 
 def bare_remote_repository_with_one_commit(tmp_path: Path) -> Path:
-    """`_real_repository_with_bare_remote`'s worktree with one `base.txt`
+    """`real_repository_with_bare_remote`'s worktree with one `base.txt`
     commit on `main`, pushed to `origin` with `origin/HEAD` resolved."""
-    repo, _remote = _real_repository_with_bare_remote(tmp_path)
+    repo, _remote = real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
     real_git(repo, "add", "base.txt")
     real_git(repo, "commit", "-q", "-m", "initial")
-    _push_repository_trunk(repo, "origin")
+    push_repository_trunk(repo, "origin")
     return repo
 
 
@@ -248,7 +240,7 @@ def worktree(tmp_path: Path) -> Path:
     return checkout
 
 
-def _push_repository_trunk(repo: Path, remote_name: str) -> None:
+def push_repository_trunk(repo: Path, remote_name: str) -> None:
     """`repo`'s current `main` pushed to `remote_name`, with `<remote_name>/HEAD`
     resolved -- the trailing half of the skeleton every trunk-history
     fixture repeats once its own commits are built (issue #359 CI)."""
@@ -302,7 +294,7 @@ def stub_every_remote_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(checkout, "unconfigured_remote_refusal", lambda _remote, **_kwargs: None)
 
 
-def _git_checkout(
+def git_checkout(
     *,
     toplevel: str = "/repo",
     head: str = BASE,
@@ -352,14 +344,14 @@ def _isolate_agent_identity(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def _set_agent_identity_env(monkeypatch: pytest.MonkeyPatch, environ: dict[str, str]) -> None:
+def set_agent_identity_env(monkeypatch: pytest.MonkeyPatch, environ: dict[str, str]) -> None:
     """Set the test's agent identity; the autouse `_isolate_agent_identity`
     above has already cleared the session's own."""
     for name, value in environ.items():
         monkeypatch.setenv(name, value)
 
 
-def _forbid_github_construction(monkeypatch: pytest.MonkeyPatch) -> None:
+def forbid_github_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     def unused(*args, **kwargs):
         pytest.fail("agent identity must be resolved before GitHub")
 
@@ -367,14 +359,14 @@ def _forbid_github_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(github, "discover_repository", unused)
 
 
-def _forbid_git_fill(monkeypatch: pytest.MonkeyPatch) -> None:
+def forbid_git_fill(monkeypatch: pytest.MonkeyPatch) -> None:
     def unused(arguments: list[str]) -> str:
         pytest.fail("agent identity must be resolved before git fill")
 
     monkeypatch.setattr(checkout, "git_output", unused)
 
 
-def _assert_missing_identity_message(message: str) -> None:
+def assert_missing_identity_message(message: str) -> None:
     assert "--agent" in message
     assert checkout.ACO_AGENT_ENV in message
     assert checkout.GROK_SESSION_ID_ENV in message
@@ -382,7 +374,7 @@ def _assert_missing_identity_message(message: str) -> None:
     assert "GROK_AGENT" not in message
 
 
-def _forbid_protect_git_github_and_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+def forbid_protect_git_github_and_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     def unused(*args, **kwargs):
         pytest.fail("this protect path must not use identity, git, GitHub, or the store")
 
@@ -393,7 +385,7 @@ def _forbid_protect_git_github_and_identity(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(store, "fetch_state", unused)
 
 
-def _patch_command(*lines: str) -> str:
+def patch_command(*lines: str) -> str:
     """Wrap Codex's `apply_patch` file-line grammar in its `Begin`/`End Patch`
     envelope, the way `command` actually arrives in the hook payload."""
     return "\n".join(("*** Begin Patch", *lines, "*** End Patch"))
@@ -406,8 +398,8 @@ def _forbid_remote_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(checkout, "remote_url", unused)
 
 
-def _forbid_forge_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
-    _forbid_github_construction(monkeypatch)
+def forbid_forge_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    forbid_github_construction(monkeypatch)
     _forbid_remote_url(monkeypatch)
 
 

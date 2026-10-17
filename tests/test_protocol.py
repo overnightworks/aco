@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
-from board_fixtures import _active_claim, request
+from board_fixtures import request, standing_active_claim
 from store_fixtures import STATE_WITH_TIP, claim_intent
 
 from agent_coordination import board, protocol
@@ -157,7 +157,7 @@ def test_claim_scope_is_recorded_and_serialized_in_canonical_order() -> None:
     assert scope == ("docs/COORDINATION.md", "scripts/issue_claim.py")
     assert (
         'scope = ["docs/COORDINATION.md", "scripts/issue_claim.py"]'
-        in protocol.serialize_claim_toml(_active_claim(scope=scope))
+        in protocol.serialize_claim_toml(standing_active_claim(scope=scope))
     )
 
 
@@ -176,7 +176,7 @@ def test_serialize_claim_toml_escapes_control_characters_the_reader_accepts_back
     read back with) instead of producing TOML the reader refuses to parse."""
     agent = f"Grok sess-1 before{control_character}after"
 
-    decoded = tomllib.loads(protocol.serialize_claim_toml(_active_claim(agent=agent)))
+    decoded = tomllib.loads(protocol.serialize_claim_toml(standing_active_claim(agent=agent)))
 
     assert decoded["agent"] == agent
 

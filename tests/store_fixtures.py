@@ -1,9 +1,4 @@
-"""Git-state-ref tree builders and claim-intent values shared by
-`tests/test_store.py` (the state-ref transport), `tests/test_protocol.py` (the
-pure `apply` logic) and `tests/test_state_board.py` (the board over a raw
-state tree). All import this module directly; pytest's rootless collection
-puts `tests/` on `sys.path`, so a plain `import store_fixtures` resolves
-here."""
+"""Git-state-ref tree builders and claim-intent values."""
 
 from __future__ import annotations
 
