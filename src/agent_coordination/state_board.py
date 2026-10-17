@@ -874,7 +874,7 @@ class StateRefBoard:
         writer's own `close_item`, which also refuses a live claim on every
         attempt (issue #459) -- the one place
         `state`/`closed_at` are ever composed for an immediate close;
-        `cli._cmd_item_close` delegates the whole write here rather than
+        `cmd_item._cmd_item_close` delegates the whole write here rather than
         building its own record. Returns the fresh `closed_at` for the
         CLI's own report line."""
         write = self._closing_write(number)

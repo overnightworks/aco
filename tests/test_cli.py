@@ -22981,12 +22981,13 @@ def test_item_edit_json_reports_body_invalid_with_defects(
     captured = capsys.readouterr()
     defect = "body malformed: aco: no aco block"
     assert captured.err == f"ERROR: {defect}\n"
-    assert json.loads(captured.out) == {
+    expected = {
         "ok": False,
         "reason": "body_invalid",
         "defects": [defect],
         "message": defect,
     }
+    assert captured.out == json.dumps(expected) + "\n"
 
 
 # `reset` (issue #298): real bare `file://` remotes and real checkouts

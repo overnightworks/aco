@@ -2820,7 +2820,7 @@ def test_parse_body_refuses_scope_as_an_unknown_expectation_key() -> None:
 
 
 def test_parse_body_scope_defects_surface_through_the_body_check_rendering_path() -> None:
-    """`cli._body_shape_defects` -- what `aco body --check` and `check
+    """`cmd_item._body_shape_defects` -- what `aco body --check` and `check
     <item>` both call -- is exactly `parse_body` plus
     `body_defect_text` over its defects; proven at that board.py level
     so this does not need `cli.py` at all (issue #331)."""
