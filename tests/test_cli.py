@@ -103,6 +103,7 @@ from agent_coordination import (
     cmd_check,
     cmd_claim,
     cmd_land,
+    cmd_next,
     cmd_reset,
     cmd_start,
     forge,
@@ -6845,10 +6846,10 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
         action = board.next_action(isolated)
         assert isinstance(action, board.CutSliceAction)
 
-        command_line = issue_claim._next_action_lines(
+        command_line = cmd_next._next_action_lines(
             action,
             body.Storage.GITHUB,
-            site=issue_claim._PullSite(claims_in_place=True, scope_is_wide=False),
+            site=cmd_next._PullSite(claims_in_place=True, scope_is_wide=False),
         )[1]
         cut_arguments = shlex.split(command_line.removeprefix("Next: aco "))
         client = _configured_board_client(
