@@ -2701,11 +2701,18 @@ def test_an_exclusive_claim_is_stored_byte_identical_to_an_ordinary_lane_claim(
     tmp_path: Path, bare_remote: Path, worktree: Path
 ) -> None:
     """Spec: CLAIM-72 -- exclusivity never enters the claim record."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
     other_remote = init_bare_repository(tmp_path / "other.git")
-    for remote, exclusive_branch in ((bare_remote, True), (other_remote, False)):
-        store.bootstrap(worktree=worktree, remote=str(remote))
+    real_git(worktree, "push", str(other_remote), f"{state_ref_tip(bare_remote)}:{store.STATE_REF}")
+    other_worktree = tmp_path / "other-worktree"
+    other_worktree.mkdir()
+    real_git(other_worktree, "init", "-q", "-b", "main")
+    for checkout, remote, exclusive_branch in (
+        (worktree, bare_remote, True),
+        (other_worktree, other_remote, False),
+    ):
         store.commit_transition(
-            observed=fresh_observation(worktree, remote),
+            observed=fresh_observation(checkout, remote),
             subject=store.transition_subject("claim", protocol.LaneIdentity(), "dependabot/x"),
             intent=claim_intent(
                 identity=protocol.LaneIdentity(),
