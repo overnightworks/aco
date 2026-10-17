@@ -43,7 +43,7 @@ matching line.
 | control byte inside a trailer value | — (lands nothing, LAND-42) | LAND-03 | — | — |
 | valid `Work-Item:` + closing reference | — | LAND-04 | LAND-29, LAND-49 | LAND-41 |
 | valid `No-Item:` + lane claim | — | LAND-05 | LAND-37 | — |
-| `No-Item: deps` PR with configured dependency paths | — | LAND-71..76 | — | — |
+| `No-Item: deps` PR with configured dependency paths | — | LAND-71..77 | — | — |
 | `No-Item: deps` PR without configured dependency paths | — | LAND-70 | — | — |
 | `No-Item: deps` merge commit trailer | — | LAND-48 | LAND-37, LAND-64 | — |
 | no classification / no trailer | — | LAND-06, LAND-58 | LAND-32, LAND-52, LAND-62 | — |
@@ -122,7 +122,9 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-75] A file listing is read between two reads of the pull request's head and changed-file count; it is judged only when both reads name the expected head and the same count.
 - [ ] [LAND-76] A listing failing LAND-75 refuses `changed while aco listed its files; run the command again`, exit `2`; `check` expects the head it read, `land` the readiness head `--head` verified.
 
-Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71.
+- [ ] [LAND-77] LAND-71 names escape display controls, then truncate to 40 characters with `…`; `land` also bounds the whole refusal to 200 characters including `ERROR: `, on one line.
+
+Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77.
 - [ ] [LAND-18] A `Work-Item:` body with no closing reference for that item refuses `carries no closing reference for its work item <item>`, exit `2`.
 - [ ] [LAND-19] A body closing anything besides its own work item (or an unpermitted parent, LAND-21) refuses `closes <ref> besides its work item <item>; a pull request lands one item`, exit `2`.
 - [ ] [LAND-20] `Implements #n`/`Lands #n` name work a pull request touched, but GitHub closes on neither word: a body carrying one beside its own closing reference for the declared item still passes, exit `0`.

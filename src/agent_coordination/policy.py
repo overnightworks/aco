@@ -177,7 +177,9 @@ def dependency_rule_defect(
         return board.ClassificationDefect(paths.reason)
     outside = sorted(path for path in paths if not config.covers_dependency_path(path))
     if outside:
-        named = protocol.named_with_overflow_count(tuple(outside))
+        named = protocol.named_with_overflow_count(
+            tuple(board.truncated_display_name(board.terminal_text(path)) for path in outside)
+        )
         return board.ClassificationDefect(
             f"changes {named}, which dependency_paths in "
             f"{board.CONFIG_PATH.as_posix()} does not name"

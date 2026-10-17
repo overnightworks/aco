@@ -52,7 +52,6 @@ def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
 # `report.render_error`'s `CLI_ERROR_PREFIX` still fits under the same 200-character
 # printed-line budget (issue #405 round-4 finding) -- so several long check
 # names can never print a refusal line past 200 characters.
-_LAND_CHECK_NAME_LENGTH_LIMIT = 40
 _LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
 _LAND_QUALITY_VERDICT_CHECK = "quality / verdict"
 _LAND_REFUSAL_LINE_LENGTH_LIMIT = 200
@@ -65,12 +64,6 @@ def _land_not_open_refusal(number: int) -> str:
 
 def _land_not_mergeable_refusal(number: int, state: str) -> str:
     return f"pull request #{number} is not mergeable ({state})"
-
-
-def _land_truncated_check_name(name: str) -> str:
-    if len(name) <= _LAND_CHECK_NAME_LENGTH_LIMIT:
-        return name
-    return name[: _LAND_CHECK_NAME_LENGTH_LIMIT - 1] + "…"
 
 
 def _land_bounded_refusal(sentence: str) -> str:
@@ -86,7 +79,7 @@ def _land_bounded_refusal(sentence: str) -> str:
 
 def _land_pending_check_names(checks: tuple[forge.CheckRun, ...]) -> tuple[str, ...]:
     return tuple(
-        _land_truncated_check_name(check.name) for check in checks if check.conclusion is None
+        board.truncated_display_name(check.name) for check in checks if check.conclusion is None
     )
 
 
@@ -126,7 +119,7 @@ def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str
         assert conclusion is not None  # `_land_failed_check` only returns a completed check.
         return _land_bounded_refusal(
             f"pull request #{number} has non-successful checks: "
-            f"{_land_truncated_check_name(failed.name)} ({conclusion}); "
+            f"{board.truncated_display_name(failed.name)} ({conclusion}); "
             "land only after every check succeeds"
         )
     return None
@@ -289,7 +282,9 @@ def _land_preflight(
         expected_head=readiness.head_sha,
     )
     if defect is not None:
-        raise protocol.ClaimUnavailableError(f"pull request #{number} {defect.message}")
+        raise protocol.ClaimUnavailableError(
+            _land_bounded_refusal(f"pull request #{number} {defect.message}")
+        )
     identity: protocol.ClaimIdentity = (
         protocol.IssueIdentity(structural.item.number)
         if isinstance(structural, board.WorkItemClassification)

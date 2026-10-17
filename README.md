@@ -278,7 +278,7 @@ in a checkout, except the ignored `settings.local.json` that repairs it.
 
 ## Configuration
 
-`.aco/board.toml` defines exactly seven top-level keys; any other key
+`.aco/board.toml` defines exactly eight top-level keys; any other key
 is refused by name.
 
 - `storage` -- `"github"` (default) or `"state-ref"`; the pin and its
@@ -305,6 +305,9 @@ is refused by name.
 - `lane_shared` -- exact repository file paths, such as a vulture whitelist,
   that any live claim may write though its scope never names them. Only the
   trunk's committed copy counts, so a change takes effect once it lands.
+- `dependency_paths` -- a trailing `/` covers a directory; other entries match
+  exactly. For landing, only the trunk checkout's tracked copy counts. This
+  bounds paths and does not certify safety (`specs/storage-pin.spec.md`, PIN-44..47).
 
 ## Board
 

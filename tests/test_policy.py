@@ -31,9 +31,16 @@ def test_listed_paths_judge_only_a_complete_listing(
     assert (result.reason if isinstance(result, policy.ListingDefect) else result) == expected
 
 
-def test_dependency_paths_cover_only_up_to_a_slash() -> None:
-    config = board.BoardConfig(dependency_paths=("uv.lock",))
-    defect = policy.dependency_rule_defect(config, lambda: frozenset({"uv.lock", "uv.lock.bak"}))
+@pytest.mark.parametrize(
+    "entry, path",
+    [
+        pytest.param("uv.lock", "uv.lock.bak", id="P9"),
+        pytest.param(".github/workflows/", ".github/workflows/../../src/x.py", id="P11"),
+    ],
+)
+def test_dependency_paths_cover_only_up_to_a_slash(entry: str, path: str) -> None:
+    config = board.BoardConfig(dependency_paths=(entry,))
+    defect = policy.dependency_rule_defect(config, lambda: frozenset({path}))
     assert defect == board.ClassificationDefect(
-        "changes uv.lock.bak, which dependency_paths in .aco/board.toml does not name"
+        f"changes {path}, which dependency_paths in .aco/board.toml does not name"
     )

@@ -506,6 +506,10 @@ class BoardConfig:
     dependency_paths: tuple[str, ...] = ()
 
     def covers_dependency_path(self, path: str) -> bool:
+        try:
+            protocol.valid_scope([path])
+        except protocol.InvalidClaimMarkerError:
+            return False
         return any(
             path.startswith(entry) if entry.endswith("/") else path == entry
             for entry in self.dependency_paths
@@ -761,7 +765,10 @@ def _validated_repository_paths(
     *,
     directories: bool = False,
 ) -> tuple[str, ...]:
-    """Canonical repository entries; dependency directories retain their trailing slash."""
+    """Keep the canonical form that `protect` compares as text. Judge syntax
+    only, without requiring files to exist; entries are foreign text, so
+    refusal messages escape them. Dependency directories retain their slash.
+    """
     entries = raw.get(key)
     if entries is None:
         return ()
@@ -2612,6 +2619,15 @@ def advice_command(*arguments: str | AdviceOption) -> str:
     """The `aco` command a piece of advice names, rendered by
     `shell_command`."""
     return shell_command("aco", *arguments)
+
+
+_DISPLAY_NAME_LENGTH_LIMIT = 40
+
+
+def truncated_display_name(name: str) -> str:
+    if len(name) <= _DISPLAY_NAME_LENGTH_LIMIT:
+        return name
+    return name[: _DISPLAY_NAME_LENGTH_LIMIT - 1] + "…"
 
 
 def terminal_text(text: str) -> str:

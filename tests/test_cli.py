@@ -15287,6 +15287,7 @@ def _dependency_listing_scenario(client: FakeForge, repo: Path, scenario: str) -
         "valid": [("uv.lock", None), ("pyproject.toml", None)],
         "outside": [("uv.lock", None), ("src/x.py", None)],
         "five": [(path, None) for path in "edcba"],
+        "long-many": [(letter * 300, None) for letter in "abc"],
         "rename-in": [("uv.lock", "src/a.py")],
         "rename-out": [("uv2.lock", "uv.lock")],
         "deleted": [("uv.lock", None)],
@@ -17879,6 +17880,14 @@ def test_land_fails_loud_when_the_quality_config_cannot_be_read(
             "outside",
             id="cell-34",
         ),
+        pytest.param(
+            "No-Item: deps",
+            "changes "
+            + ", ".join(letter * 39 + "…" for letter in "abc")
+            + ", which dependency_paths in .aco/board.toml…",
+            "long-many",
+            id="LAND-77-whole-line",
+        ),
     ],
 )
 def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
@@ -17918,6 +17927,77 @@ def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
     assert tuple(store.fetch_state(worktree=Path("."), remote="origin").claims.values()) == (
         standing,
     )
+
+
+@pytest.mark.parametrize("command, prefix", [("check", "REFUSED"), ("land", "ERROR")])
+@pytest.mark.parametrize(
+    "path, displayed",
+    [
+        pytest.param("src/\x1b]0;pwned\x07x.py", r"src/\x1b]0;pwned\x07x.py", id="escape"),
+        pytest.param(
+            "src/x.py\nPR #12 by bot declares No-Item: deps",
+            r"src/x.py\nPR #12 by bot declares No-Ite…",
+            id="newline",
+        ),
+        pytest.param("src/" + "x" * 300, "src/" + "x" * 35 + "…", id="long"),
+    ],
+)
+def test_dependency_paths_refusal_escapes_and_bounds_each_name(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+    prefix: str,
+    path: str,
+    displayed: str,
+) -> None:
+    """LAND-77: forge path text cannot inject a line or terminal control."""
+    _repo, client = _land_scenario(
+        monkeypatch,
+        tmp_path,
+        branch="fix/x",
+        issue=None,
+        body="No-Item: deps",
+        board_config=_dependency_configuration("valid"),
+    )
+    reading = forge.ListingReading(MERGE_COMMIT_SHA, 1)
+    client.changes_by_number[12] = forge.PullRequestChanges(
+        reading, reading, (forge.ChangedFile(path, None),)
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, command, "12"]) == 2
+
+    assert capsys.readouterr().err == (
+        f"{prefix}: pull request #12 changes {displayed}, "
+        "which dependency_paths in .aco/board.toml does not name\n"
+    )
+    assert client.merge_calls == []
+
+
+def test_land_dependency_paths_use_trunks_config_despite_head_grant(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """PIN-47: a head cannot grant itself permission to change src/x.py."""
+    repo, client = _land_scenario(
+        monkeypatch,
+        tmp_path,
+        branch="fix/x",
+        issue=None,
+        body="No-Item: deps",
+        board_config=_dependency_configuration("valid"),
+    )
+    _dependency_listing_scenario(client, repo, "outside")
+    client.head_board_config = 'dependency_paths = ["uv.lock", "src/"]\n'
+
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 2
+
+    assert capsys.readouterr().err == (
+        "ERROR: pull request #12 changes src/x.py, "
+        "which dependency_paths in .aco/board.toml does not name\n"
+    )
+    assert client.merge_calls == []
 
 
 def _toml_syntax_error(text: str) -> str:
