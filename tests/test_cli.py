@@ -100,6 +100,7 @@ from agent_coordination import (
     board_read,
     body,
     checkout,
+    cmd_reset,
     forge,
     github,
     items,
@@ -10766,6 +10767,7 @@ def _stub_trunk(monkeypatch: pytest.MonkeyPatch) -> None:
 def _freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
     monkeypatch.setattr(board_read, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_reset, "datetime", FixedDateTime)
 
 
 def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
@@ -22977,7 +22979,7 @@ def test_item_edit_json_reports_body_invalid_with_defects(
 
 
 # `reset` (issue #298): real bare `file://` remotes and real checkouts
-# throughout -- `_reset_state` orchestrates `store`'s own git chokepoint end
+# throughout -- `cmd_reset.run` orchestrates `store`'s own git chokepoint end
 # to end, so a mock of `store` would only prove this file's own fakes agree
 # with each other, never that a real lease, a real bundle, or a real
 # lineage stamp behaves as the printed line claims. Captured at import time,
@@ -23098,7 +23100,6 @@ def test_cli_reset_dry_run_prints_five_would_lines_and_changes_nothing(
     export_dir = tmp_path / "export"
     export_dir.mkdir()
     monkeypatch.chdir(repository)
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
 
     status = issue_claim.main(["reset", "--export-dir", str(export_dir)])
 
@@ -23141,7 +23142,6 @@ def test_cli_reset_confirm_exports_a_verifiable_bundle_and_bootstraps_a_fresh_re
     export_dir = tmp_path / "export"
     export_dir.mkdir()
     monkeypatch.chdir(repository)
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
     command = ["reset", "--confirm", *force_unreadable, "--export-dir", str(export_dir)]
 
     status = issue_claim.main(command)
@@ -23302,7 +23302,6 @@ def unreadable_reset(
     export_dir = tmp_path / "export"
     export_dir.mkdir()
     monkeypatch.chdir(repository)
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
     return repository, bare_remote, tip, export_dir
 
 
@@ -23542,7 +23541,7 @@ def test_cli_reset_restore_from_the_bundle_into_a_fresh_repository_recovers_stat
     init_bare_repository(restored_remote)
     # The bundle carries `EXPORT_BUNDLE_REF`'s name, not `STATE_REF`'s
     # (19.09.2026 REVISE findings 1+2) -- this is the exact command
-    # `_reset_restore_command` prints, proven end to end here.
+    # `cmd_reset._reset_restore_command` prints, proven end to end here.
     real_git(
         restored_remote,
         "fetch",
