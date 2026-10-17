@@ -2073,7 +2073,7 @@ class TestCliStateRefForge:
         before = store.fetch_state(worktree=worktree, remote=remote)
         assert issue_claim.main(["next"]) == 3
         output = capsys.readouterr().out
-        defect = "body malformed: whole: whole reason must be one bounded non-empty line"
+        defect = f"body malformed: {WHOLE_DEFECT}"
         assert "SKIPPED" in output
         assert f"{MALFORMED_ID}: {defect}" in output
         assert issue_claim.main(["board", "--json"]) == 0
@@ -4007,6 +4007,8 @@ class TestCliStateRefForge:
         other_show_exit_code = issue_claim.main(["item", "show", CHILD_B_ID])
         capsys.readouterr()
         own_show_exit_code = issue_claim.main(["item", "show", CHILD_A_ID])
+        own_show_err = capsys.readouterr().err
+        own_json_show = run_cli(["item", "show", CHILD_A_ID, "--json"], capsys)
 
         assert (
             board_exit_code,
@@ -4023,7 +4025,10 @@ class TestCliStateRefForge:
         assert unreadable_line in next_out
         assert f"\n{nested_id}: " in next_out
         assert f"\n{CHILD_B_ID}: blocked by {CHILD_A_ID}" in next_out
-        own_show_err = capsys.readouterr().err
+        assert json.loads(own_json_show.stdout)["message"] == _malformed_item_refusal(
+            problem, CHILD_A_ID
+        )
+        assert "\x1b" not in own_json_show.stdout
         assert (own_show_exit_code, own_show_err) == (
             2,
             f"ERROR: {_malformed_item_refusal(problem, CHILD_A_ID)}\n",
