@@ -2876,7 +2876,7 @@ def freed_item_numbers(
     those only ever describe the *currently* open issues, so a landed
     item's own `blocked_by` reference disappears from them the moment it
     closes -- exactly the fact this needs to name who it freed. `dependencies`
-    is `cli._release_landing`'s one fetch, shared with `cli._board` (issue #256
+    is `cli._release_landing`'s one fetch, shared with `board_read.build_board` (issue #256
     review), rather than a second `list_board_dependencies` round trip over
     the same candidates.
     """

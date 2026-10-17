@@ -11,8 +11,7 @@ import sys
 import tomllib
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
@@ -1493,23 +1492,23 @@ def _release_landing(
     that transition already committed -- the caller wraps this in one broad
     `forge.ForgeError` catch, so a forge hiccup here can never undo or fail
     a release that already stood. The dependency fetch below is the one
-    round trip both `board.freed_item_numbers` and `_board` need for this same
-    candidate set; passing it into `_board` keeps this a single fetch rather
-    than two (issue #256 review). The board walks `trunk_ref`, the ref the
+    round trip both `board.freed_item_numbers` and `board_read.build_board` need for
+    this same candidate set; passing it into `board_read.build_board` keeps this a
+    single fetch rather than two (issue #256 review). The board walks `trunk_ref`, the ref the
     release judged its landing on (LANDCMD-21, issue #492)."""
     client = context.forge
     issues = client.list_open_board_issues()
     candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
     dependencies = board_read.validated_dependencies(
-        issues, _fetch_dependencies(client, candidates)
+        issues, board_read.fetch_dependencies(client, candidates)
     )
     freed = () if landed is None else board.freed_item_numbers(dependencies, landed)
-    projected = _board(
+    projected = board_read.build_board(
         context,
         tuple(new_state.claims.values()),
         issues=issues,
-        history=_ClaimHistory(ages=_claim_ages(context.toplevel, new_state)),
-        landing=_LandingReads(dependencies, trunk_ref),
+        history=board_read.ClaimHistory(ages=board_read.claim_ages(context.toplevel, new_state)),
+        landing=board_read.LandingReads(dependencies, trunk_ref),
     )
     action = board.next_action(projected)
     parent_closable = (
@@ -1527,219 +1526,6 @@ def _release_next_line(item: board.BoardItem | None, storage: body.Storage) -> s
         return "next: none"
     label = board.item_label(item.number, storage)
     return f"next: {label} score {item.score}: {board.terminal_text(item.title)}"
-
-
-# A container's children are their own `gh list_children` subprocess call;
-# an unbounded pool would spawn one worker per container on a large board.
-# This caps that fan-out -- a stable invariant of this executor, not
-# something an operator tunes. `_fetch_children` gives it a dedicated
-# executor sized to exactly this constant, so the cap holds regardless of
-# whether the three base board reads below have already finished.
-BOARD_CHILD_FETCH_CONCURRENCY = 4
-
-
-def _fetch_children(
-    client: forge.BoardSource, container_numbers: tuple[int, ...]
-) -> dict[int, tuple[board.ChildItem, ...]]:
-    """Every container's children, at most `BOARD_CHILD_FETCH_CONCURRENCY`
-    `gh` subprocesses at a time; excess containers queue behind it."""
-    if not container_numbers:
-        return {}
-    workers = min(len(container_numbers), BOARD_CHILD_FETCH_CONCURRENCY)
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {
-            number: pool.submit(client.list_children, number) for number in container_numbers
-        }
-        return {number: future.result() for number, future in futures.items()}
-
-
-def _fetch_dependencies(
-    client: forge.BoardSource, issue_numbers: tuple[int, ...]
-) -> dict[int, tuple[board.IssueDependency, ...]]:
-    """Every named issue's `blocked_by` dependencies (#150), at most
-    `BOARD_CHILD_FETCH_CONCURRENCY` `gh` subprocesses at a time -- run only
-    after `_board`'s base reads and children wave have already finished, so
-    peak concurrent `gh` subprocesses never exceeds today's 3+4."""
-    if not issue_numbers:
-        return {}
-    workers = min(len(issue_numbers), BOARD_CHILD_FETCH_CONCURRENCY)
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {
-            number: pool.submit(client.list_board_dependencies, number) for number in issue_numbers
-        }
-        return {number: future.result() for number, future in futures.items()}
-
-
-@dataclass(frozen=True)
-class _ClaimHistory:
-    """The store's own git-history reads one board build needs (issue #357):
-    bundled into one parameter so `_board` stays under the five-argument
-    ceiling instead of growing a `claim_ages`-shaped parameter every time
-    another history read joins it. `ages`, `lane_events`, and
-    `unparsed_lifecycle_commits` are always read from the same
-    already-fetched `ClaimState` (`_claim_history` below), never from two
-    different observations."""
-
-    ages: Mapping[str, datetime] = field(default_factory=dict)
-    lane_events: tuple[metrics.LaneEvent, ...] = ()
-    # Claim-shaped `refs/aco/state` commits `store.claim_lifecycle` could not
-    # parse (issue #357 R1) -- older history predating the `item:` trailer,
-    # or a foreign commit merely shaped like one -- counted rather than
-    # silently dropped.
-    unparsed_lifecycle_commits: int = 0
-
-
-@dataclass(frozen=True)
-class _LandingReads:
-    """What a merged release already read before its board report (issues
-    #256, #492), bundled so `_board` stays under the five-argument ceiling:
-    the dependency wave `board.freed_item_numbers` needed for the same candidate
-    set, and the trunk ref the release judged its landing on, which the
-    board walks instead of the trunk as the last fetch left it."""
-
-    dependencies: dict[int, tuple[board.IssueDependency, ...]]
-    trunk_ref: str
-
-
-def _closed_item_sizes(
-    client: forge.ForgeReader, numbers: frozenset[int], storage: body.Storage
-) -> dict[int, metrics.Size | None]:
-    """Each closed (or vanished) item's own current size, read through one
-    batched forge/state fetch (issue #357 R2, issue #440): a completed lane
-    for a since-closed item still belongs in its size class's own measured
-    lanes -- most lanes close their item on landing, so without this the
-    size classes `aco board` estimates from would stay almost always empty.
-    `ItemState.MISSING` (a deleted or renumbered item) and a bodyless
-    reference both read as no size, exactly like an open item that never
-    carried a `size` key. `client.item_references` -- not one `item_
-    reference` call per number -- is what turned this from the board's own
-    dominant cost (32 serial round trips, 12.8 of an 18s build) into a
-    single round trip that stays flat as the closed-item history grows."""
-    references = client.item_references(numbers)
-    return {
-        number: (
-            None
-            if (raw_body := references[number].body) is None
-            else body.parse_body(raw_body, storage=storage).size
-        )
-        for number in numbers
-    }
-
-
-def _board(
-    context: RunContext,
-    claims: tuple[protocol.ActiveClaim, ...],
-    *,
-    issues: tuple[board.Issue, ...] | None = None,
-    history: _ClaimHistory | None = None,
-    landing: _LandingReads | None = None,
-) -> board.Board:
-    history = history or _ClaimHistory()
-    now = datetime.now(UTC)
-    client = context.forge
-    config = board_read.load_board_config(client, context)
-    if issues is None:
-        issues = client.list_open_board_issues()
-    since = board.merged_pull_request_floor(issues, now)
-    # A container whose own summary already says 0 (or carries no summary at
-    # all, `children_total is None`) can never own an open child either way:
-    # `_container_progress` returns no progress at all without both numbers,
-    # and returns an empty open-children list when they're both 0 -- exactly
-    # what an absent `children` entry already defaults to. Fetching its
-    # detail list would cost a request `board` never needed (issue #168).
-    container_numbers = tuple(
-        issue.number
-        for issue in issues
-        if issue.kind is body.ItemKind.CONTAINER and issue.children_total
-    )
-    # Open and recently-merged pull requests, the closed-item size batch
-    # (issue #440: one `item_references` round trip rather than the 32
-    # serial single-item reads this used to pay before the pool ever
-    # started), and each container's children are independent reads once
-    # `since` is known, so fetching them on separate threads instead of one
-    # after another overlaps their `gh` subprocess wait time. Children get
-    # their own executor (`_fetch_children`) so their concurrency stays
-    # capped at `BOARD_CHILD_FETCH_CONCURRENCY` even once these three base
-    # reads finish and free their own pool's workers. The dependency wave
-    # runs afterward instead (below), so peak concurrent `gh` subprocesses
-    # stays at 3+4, then at most 4.
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        open_pull_requests = pool.submit(client.list_open_board_pull_requests)
-        merged_pull_requests = pool.submit(client.list_recent_merged_board_pull_requests, since)
-        closed_item_sizes_future = pool.submit(
-            _closed_item_sizes,
-            client,
-            board.closed_item_numbers(
-                history.lane_events, frozenset(issue.number for issue in issues)
-            ),
-            config.storage,
-        )
-        children = _fetch_children(client, container_numbers)
-        pull_requests = (open_pull_requests.result(), merged_pull_requests.result())
-        closed_item_sizes = closed_item_sizes_future.result()
-    # The same forge relation `_cut_target` refuses a nested container on
-    # (issue #503), so `next` never proposes a `cut` that `cut` refuses.
-    nesting_parents = {
-        number: parent.reference
-        for number in board.childless_containers_with_uncut_rows(issues, config.storage)
-        if (parent := client.parent_issue(number)) is not None
-    }
-    if landing is None:
-        dependencies = board_read.validated_dependencies(
-            issues,
-            _fetch_dependencies(
-                client, tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
-            ),
-        )
-        trunk_ref = context.trunk_ref
-    else:
-        # A merged release already fetched and validated this exact
-        # candidate set (`_release_landing`'s own `list_board_dependencies`
-        # wave, issue #256 review) and judged its landing on its own trunk
-        # ref (issue #492), so neither is read a second time here.
-        dependencies, trunk_ref = landing.dependencies, landing.trunk_ref
-    trunk_landings = checkout.trunk_landings(
-        trunk_ref, board_read.TRUNK_LANDING_DEPTH, directory=context.toplevel
-    )
-    # One walk of `trunk_landings` feeds three views `board.py` keeps
-    # separate (issue #371): `trunk_landing_items` (sha and all) drives the
-    # Landungen view itself; `landed_at_by_item`/`trunk_landed_work_items`
-    # are its own narrower rollups for `Stage.CODE_LANDED` and the
-    # measurements' landing dates.
-    trunk_landing_items = tuple(
-        board.TrunkLandingItem(number, landing.sha, landing.committed_at)
-        for landing in trunk_landings
-        if isinstance(landing.classification, board.TrunkWorkItemClassification)
-        for number in landing.classification.numbers
-    )
-    landed_at_by_item = {entry.item: entry.committed_at for entry in trunk_landing_items}
-    return board.build_board(
-        board.BoardBuildInputs(
-            issues=issues,
-            open_pull_requests=pull_requests[0],
-            recent_merged_pull_requests=pull_requests[1],
-            claims=claims,
-            config=config,
-            repository=client.repository.path,
-            now=now,
-            trunk_landings=tuple(landing.committed_at for landing in trunk_landings),
-            trunk_landed_work_items=frozenset(entry.item for entry in trunk_landing_items),
-            trunk_landing_items=trunk_landing_items,
-            children=children,
-            nesting_parents=nesting_parents,
-            dependencies=dependencies,
-            requests=client.requests,
-            claim_ages=history.ages,
-            lane_events=history.lane_events,
-            unparsed_lifecycle_commits=history.unparsed_lifecycle_commits,
-            closed_item_sizes=closed_item_sizes,
-            landed_at_by_item=landed_at_by_item,
-            open_pull_requests_supported=(
-                client.capability(forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS)
-                is not forge.Capability.UNSUPPORTED
-            ),
-        )
-    )
 
 
 @dataclass(frozen=True)
@@ -3733,7 +3519,7 @@ def _item_close_freed(client: forge.ForgeReader, number: int) -> tuple[int, ...]
     issues = client.list_open_board_issues()
     candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
     dependencies = board_read.validated_dependencies(
-        issues, _fetch_dependencies(client, candidates)
+        issues, board_read.fetch_dependencies(client, candidates)
     )
     landed = board.IssueReference(client.repository.path, number)
     return board.freed_item_numbers(dependencies, landed)
@@ -3840,40 +3626,6 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
     print(_item_header(number, reference, parent))
     print(board.terminal_block(body), end="")
     return 0
-
-
-def _claim_ages(worktree: Path, state: protocol.ClaimState) -> dict[str, datetime]:
-    """Each live claim's age in an already-fetched state -- one batched read
-    of `state.tip`'s history (`store.claim_ages`, issue #242), never a git
-    call per claim.
-    """
-    if state.tip is None:
-        return {}
-    return store.claim_ages(worktree=worktree, tip=state.tip, claims=state.claims.values())
-
-
-def _claim_lifecycle(worktree: Path, state: protocol.ClaimState) -> store.ClaimLifecycle:
-    """Every claim's own ref-history lifecycle in an already-fetched state
-    (issue #357) -- one batched `store.claim_lifecycle` walk of `state.tip`'s
-    history, mirroring `_claim_ages`'s own no-refetch seam: a fresh fetch of
-    `refs/aco/state` never happens twice for the one board build that
-    already read it."""
-    if state.tip is None:
-        return store.ClaimLifecycle(events=(), unparsed=0)
-    return store.claim_lifecycle(worktree=worktree, tip=state.tip)
-
-
-def _claim_history(worktree: Path, state: protocol.ClaimState) -> _ClaimHistory:
-    """`_board`'s own bundle of the two store history reads a full board
-    build needs, from one already-fetched state -- `board`, `rulings`, and
-    `next` all read this rather than `_claim_ages` and `_claim_lifecycle`
-    separately."""
-    lifecycle = _claim_lifecycle(worktree, state)
-    return _ClaimHistory(
-        ages=_claim_ages(worktree, state),
-        lane_events=lifecycle.events,
-        unparsed_lifecycle_commits=lifecycle.unparsed,
-    )
 
 
 def _claim_intent_from_request(
@@ -4238,7 +3990,7 @@ def _brief_claim(
 @dataclass(frozen=True)
 class _BriefClaim:
     """`brief`'s own live-claim reading: the claim paired with the one age it
-    needs -- never every live claim's age like `_claim_ages`, so a lineage
+    needs -- never every live claim's age like `board_read.claim_ages`, so a lineage
     break in an unrelated claim can never stop this item's brief."""
 
     claim: protocol.ActiveClaim
@@ -4532,78 +4284,11 @@ def _status_read(parsed: argparse.Namespace, context: RunContext) -> int:
             return _status_path_json(claims, parsed.path, lane_shared)
         _status_path(claims, parsed.path, context.config.storage, lane_shared)
         return 0
-    ages = _claim_ages(worktree, state)
+    ages = board_read.claim_ages(worktree, state)
     issue = protocol.optional_issue_number(parsed.issue)
     if parsed.json:
         return _status_json(claims, issue, ages, state.tip, lane_shared)
     return _status(claims, issue, ages, context.config.storage, lane_shared)
-
-
-@dataclass(frozen=True)
-class _ObservedBoard:
-    """`_observed_board`'s own result: the projected board, plus every live
-    claim it was built from (issue #348) -- `next`'s own `parallel_set`
-    needs each claim's scope for its occupied-paths accounting, and this is
-    the one fetch that already read them, never a second store observation
-    for the same run."""
-
-    board: board.Board
-    live_claims: tuple[protocol.ScopedClaim, ...]
-
-
-@dataclass(frozen=True)
-class _StoreAndIssues:
-    """`_store_observation_and_issues`'s own result: the context's
-    observation of the claim state and the open-issue list, read
-    concurrently (issue #440) rather than one after the other -- neither
-    reads the other's result. Under `github` both are round trips a board
-    build pays; under `state-ref` the forge already holds the observation
-    and the item files before the threads start (issue #477), so neither
-    thread pays a round trip."""
-
-    observed: protocol.ClaimState
-    issues: tuple[board.Issue, ...]
-
-
-def _store_observation_and_issues(context: RunContext) -> _StoreAndIssues:
-    """The claim-state fetch (`ls-remote` + `fetch`) and the open-issue list
-    overlapped on separate threads (issue #440): a board build that needs
-    both -- every one that has not already been handed a pre-fetched
-    `issues` tuple -- used to pay their wait times back to back. The forge
-    is resolved first, on this thread, so its refusals keep their order and
-    the context's facts are read once, before either thread asks for them;
-    the state-ref board already reads the context's one observation there,
-    which the observing thread then finds held (issue #477)."""
-    client = context.forge
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        observation = pool.submit(lambda: context.observation)
-        issues = pool.submit(client.list_open_board_issues)
-        return _StoreAndIssues(observation.result(), issues.result())
-
-
-def _observed_board(
-    context: RunContext,
-    *,
-    issues: tuple[board.Issue, ...] | None = None,
-) -> _ObservedBoard:
-    """`board`/`rulings`/`next` share this: the store's live claims, projected
-    onto forge board data (issue #176 -- claims no longer come from the
-    ledger; the forge is still the board's own data source)."""
-    if issues is None:
-        fetched = _store_observation_and_issues(context)
-        observed, issues = fetched.observed, fetched.issues
-    else:
-        # A caller that already fetched `issues` itself (`rulings`) has
-        # nothing left to overlap the state fetch with.
-        observed = context.observation
-    live_claims = tuple(observed.claims.values())
-    projected = _board(
-        context,
-        live_claims,
-        issues=issues,
-        history=_claim_history(context.toplevel, observed),
-    )
-    return _ObservedBoard(projected, live_claims)
 
 
 class BoardReason(StrEnum):
@@ -4645,7 +4330,7 @@ def _cmd_board(parsed: argparse.Namespace, context: RunContext) -> int:
             raise _BoardServeRemovedError(BOARD_SERVE_REMOVED_MESSAGE)
         if not as_json:
             raise _BoardNoModeUsageError(BOARD_NO_MODE_MESSAGE)
-        projected = _observed_board(context).board
+        projected = board_read.observed_board(context).board
     except (_BoardServeRemovedError, _BoardNoModeUsageError) as error:
         return report.refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:
@@ -4673,7 +4358,7 @@ def _cmd_rulings(parsed: argparse.Namespace, context: RunContext) -> int:
     as_json = parsed.json
     try:
         issues = context.forge.list_open_board_issues()
-        projected = _observed_board(context, issues=issues).board
+        projected = board_read.observed_board(context, issues=issues).board
         bodies = {issue.number: issue.body for issue in issues}
         storage = context.config.storage
     except RepoMeaninglessUnderStateRefError as error:
@@ -4695,7 +4380,7 @@ def _next_action_container_number(action: board.NextAction | None) -> int | None
 def _cmd_next(parsed: argparse.Namespace, context: RunContext) -> int:
     as_json = parsed.json
     try:
-        observed = _observed_board(context)
+        observed = board_read.observed_board(context)
         storage = context.config.storage
         projected = observed.board
         action = board.next_action(projected)
@@ -5151,11 +4836,11 @@ def _claim_target_checks(
     if open_by_number is None:
         open_by_number = {issue.number: issue for issue in client.list_open_board_issues()}
     _reject_scope_mismatch(open_by_number, target_issue, requested.scope, target.storage)
-    projected = _board(
+    projected = board_read.build_board(
         context,
         tuple(observed.claims.values()),
         issues=tuple(open_by_number.values()),
-        history=_ClaimHistory(ages=_claim_ages(target.worktree, observed)),
+        history=board_read.ClaimHistory(ages=board_read.claim_ages(target.worktree, observed)),
     )
     checks = _slice_rule_checks(
         BoardReferenceLookup(client, client.repository.path, open_by_number),

@@ -270,7 +270,7 @@ class ForgeOperation(StrEnum):
 
 
 class BoardSource(Protocol):
-    """The read surface `_board` actually calls: the repository identity, its
+    """The read surface `board_read.build_board` actually calls: the repository identity, its
     capability answers, and the board list operations, not every
     `ForgeReader` operation. Every `ForgeReader` already satisfies it
     structurally; a board-only fake needs nothing more.

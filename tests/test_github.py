@@ -1,7 +1,7 @@
 """Behavior of the GitHub adapter (`agent_coordination.github`): `GitHubForge`'s
 reader/writer methods, repository discovery, and the `gh` process boundary it
 wraps. CLI wiring that merely drives a forge through `cli.py` -- including
-tests that build a `GitHubForge` only to hand it to `issue_claim._board`/
+tests that build a `GitHubForge` only to hand it to `board_read.build_board`/
 `issue_claim.main` -- stays in `tests/test_cli.py`."""
 
 from __future__ import annotations

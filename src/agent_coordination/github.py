@@ -494,7 +494,7 @@ class GitHubForge:
         never `self._gh` or an injected `run` directly, so `requests` counts
         every round trip exactly once regardless of which operation asked for
         it. Locked because `board` fans reads out across worker threads
-        (`cli._board`'s pools, and this adapter's own paginated/sharded
+        (`board_read.build_board`'s pools, and this adapter's own paginated/sharded
         fetches) that call `_run` concurrently -- an unlocked `+=` could lose
         an increment and under-count.
 
@@ -586,7 +586,7 @@ class GitHubForge:
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
         """Every one of `numbers`, batched into GraphQL blocks of
         `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE` (issue #440): the 32-call, fully
-        serial `gh api .../issues/N` walk `cli._closed_item_sizes` used to pay
+        serial `gh api .../issues/N` walk `board_read._closed_item_sizes` used to pay
         (12.8 of an 18s board build) collapses to one round trip for any
         repository whose closed-item history still fits one block, and stays
         flat as that history grows -- a repository large enough to need more

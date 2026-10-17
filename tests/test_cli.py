@@ -174,9 +174,9 @@ def _live_store_claim() -> protocol.ActiveClaim:
 @dataclass
 class _MinimalForgeReader:
     """A `forge.ForgeReader` shape narrower than `FakeForge` for tests that
-    exercise only `_board`'s own priority/child-fetch wiring: no request
+    exercise only `board_read.build_board`'s own priority/child-fetch wiring: no request
     counter, no write surface, no repository target resolution -- just the
-    open issues, children, and merged-PR floor a `_board` build reads. One
+    open issues, children, and merged-PR floor a `board_read.build_board` build reads. One
     shared shape rather than three near-identical inline classes, each
     repeating the same `ForgeReader` stub methods."""
 
@@ -578,7 +578,7 @@ def test_board_projects_with_no_state_ref_bootstrapped_at_all(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """A repository that has never bootstrapped `refs/aco/state` still boards
-    cleanly (issue #357): `_claim_ages`/`_claim_lifecycle` both read a missing
+    cleanly (issue #357): `board_read.claim_ages`/`board_read._claim_lifecycle` both read a missing
     ref as empty rather than crashing, so `measurements` shows the
     empty-measurements sentence and no claim ages are read at all."""
     _single_item_board_environment(monkeypatch, tmp_path)
@@ -6644,7 +6644,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
     monkeypatch.setattr(checkout, "git_output", git_output)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
-    projected = issue_claim._board(run_context_over(client), ())
+    projected = board_read.build_board(run_context_over(client), ())
 
     assert [item.number for item in projected.items] == [21, 20]
     assert observed == [toplevel_read, trunk_head_read]
@@ -8285,7 +8285,7 @@ def test_board_queries_merged_pull_requests_back_to_the_oldest_open_issue(
     monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
-    issue_claim._board(run_context_over(client), ())
+    board_read.build_board(run_context_over(client), ())
 
     # A fixed 14-day window (now - 14 days = 2026-08-07) would have missed
     # anything the six-month-old epic's own slices landed months ago.
@@ -8315,7 +8315,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
-    projected = issue_claim._board(run_context_over(client), ())
+    projected = board_read.build_board(run_context_over(client), ())
 
     assert client.observed_children_lookups == [90]
     container_item = next(item for item in projected.items if item.number == 90)
@@ -8483,7 +8483,7 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
 class _MinimalBoardSource:
     """The smallest real `forge.BoardSource` -- every read empty, `capability`
     and the dependency fetch injectable -- for tests that exercise exactly
-    one of `board_read.load_board_config`/`cli._fetch_dependencies` in isolation."""
+    one of `board_read.load_board_config`/`board_read.fetch_dependencies` in isolation."""
 
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
@@ -8525,7 +8525,7 @@ def test_load_board_config_refuses_a_block_pin_the_forge_cannot_support(tmp_path
 
 
 def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
-    concurrency = issue_claim.BOARD_CHILD_FETCH_CONCURRENCY
+    concurrency = board_read.BOARD_CHILD_FETCH_CONCURRENCY
     release = threading.Barrier(concurrency)
     active = 0
     peak = 0
@@ -8547,7 +8547,7 @@ def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
 
     client = _MinimalBoardSource(dependencies_fetcher=fetch)
 
-    issue_claim._fetch_dependencies(client, tuple(range(concurrency * 2)))
+    board_read.fetch_dependencies(client, tuple(range(concurrency * 2)))
 
     assert not exceeded.is_set()
     assert peak == concurrency
@@ -10765,6 +10765,7 @@ def _stub_trunk(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def _freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
+    monkeypatch.setattr(board_read, "datetime", FixedDateTime)
 
 
 def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
@@ -15661,7 +15662,7 @@ def test_release_merged_fetches_each_candidates_dependencies_only_once(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The `freed` report and the projected `next` pick share one dependency
-    fetch (issue #256 review): `_board`'s own board build must not re-list
+    fetch (issue #256 review): `board_read.build_board`'s own board build must not re-list
     the same blocked-by candidates `board.freed_item_numbers` already read."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
