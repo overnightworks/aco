@@ -1,6 +1,5 @@
-"""Shared board reads and the board build over them, the claim history a build
-needs, their validation, and the hint after a committed write. It also owns
-the gates that read an item's live body before a rewrite."""
+"""Shared board reads, builds, claim history, validation, post-write hints,
+and live-body gates before item rewrites."""
 
 from __future__ import annotations
 

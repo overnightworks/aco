@@ -59,6 +59,7 @@ from agent_coordination.body import (
     expectation_line_state,
     expectation_line_summary,
     expectation_lines,
+    has_slice_table,
     locate_block,
     missing_or_empty_sections,
     names_parent,
@@ -3987,6 +3988,22 @@ def test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change() 
         lane_events=more_m_lanes,
     )
     assert next(item for item in with_more_m.items if item.number == 207).estimate != m_estimate
+
+
+@pytest.mark.parametrize(
+    ("slice_toml", "expected"),
+    [
+        pytest.param("", False, id="missing-key"),
+        pytest.param("slice = []\n", True, id="empty-table"),
+        pytest.param('[[slice]]\nindex = 1\ntitle = "First"\n', True, id="with-rows"),
+    ],
+)
+def test_has_slice_table_distinguishes_missing_key_from_empty_table(
+    slice_toml: str, expected: bool
+) -> None:
+    raw = block_body(MINIMAL_BLOCK_TOML + slice_toml)
+
+    assert has_slice_table(locate_block(raw)) is expected
 
 
 @pytest.mark.parametrize("titles", [(), ("First", "Second")])

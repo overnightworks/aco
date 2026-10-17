@@ -9,8 +9,8 @@ Folding the two would let a worktree-local module own repository-global
 state -- exactly the linked-worktree stamp collision `_lineage_stamp_path`
 exists to avoid.
 
-`cli` (issue #176, slice C2) is this module's production caller: `bootstrap`
-and `commit_transition`. It never checks the state ref out: every read goes
+`cmd_bootstrap` and `cmd_reset` call `bootstrap`; `session` calls
+`commit_transition`. This module never checks the state ref out: every read goes
 through plumbing (`ls-remote`, a `fetch` anchored straight into its own
 per-worktree ref, one recursive `ls-tree` and one `archive`, never a
 `cat-file` per entry), and every write

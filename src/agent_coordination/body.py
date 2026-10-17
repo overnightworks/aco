@@ -1098,6 +1098,11 @@ def locate_block(body: str) -> LocatedBlock:
     return LocatedBlock(tomllib.loads(content), content_start, content_end, newline)
 
 
+def has_slice_table(located: LocatedBlock) -> bool:
+    """Whether the block carries a slice key, including an empty table."""
+    return "slice" in located.data
+
+
 def cuttable_rows(located: LocatedBlock) -> tuple[SliceRow, ...]:
     """The remaining slice rows of a schema-validated block, in stored order."""
     return _block_slices(located.data)

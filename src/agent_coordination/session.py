@@ -1,5 +1,7 @@
 """One command run's static repository facts (issue #457, slice A of #418).
 
+`session` owns the composition root: `run_context` and its forge builders.
+
 A `RunContext` answers the questions every store and forge command asks
 about the checkout it runs in -- its toplevel, its tracked board
 configuration, the canonical remote and where that remote points, the forge
