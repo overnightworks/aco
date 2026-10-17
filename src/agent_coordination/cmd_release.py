@@ -430,7 +430,7 @@ def release_transition(
     storage = context.config.storage
     if parsed.merged is not None and storage is body.Storage.STATE_REF:
         return _cmd_release_landed(parsed, context, identity, storage, release_branch)
-    merged = None if parsed.merged is None else github.github_pull_request_number(parsed.merged)
+    merged = None if parsed.merged is None else github.pull_request_number(parsed.merged)
     outcome = _release_outcome(merged, parsed.abandoned)
     observed = context.observation
     protocol.require_state_ref(observed)

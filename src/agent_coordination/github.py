@@ -128,7 +128,7 @@ GITHUB_HOST = "github.com"
 GITHUB_REMOTE_PATTERN = re.compile(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?$")
 
 
-def github_pull_request_number(value: str) -> int:
+def pull_request_number(value: str) -> int:
     """`--merged`'s value under `storage = "github"` (issue #359): a bare
     decimal pull request number -- the sha grammar and the empty "newest
     trunk landing" sentinel both belong to `storage = "state-ref"` alone,
@@ -147,7 +147,7 @@ def landing_comment(pull_request: int) -> str:
     return f"landed by PR #{pull_request}"
 
 
-def github_command_environment() -> dict[str, str]:
+def command_environment() -> dict[str, str]:
     environment = os.environ.copy()
     environment.update(GH_QUIET_ENVIRONMENT)
     return environment
@@ -188,7 +188,7 @@ def discover_repository(*, remote_url: str, directory: Path | None = None) -> fo
     try:
         result = process.run_captured(
             ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
-            env=github_command_environment(),
+            env=command_environment(),
             timeout=GH_TIMEOUT_SECONDS,
             cwd=directory,
         )
@@ -423,7 +423,7 @@ def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | No
         result = process.run_bounded(
             command,
             input_data=input_data,
-            env=github_command_environment(),
+            env=command_environment(),
             timeout=GH_TIMEOUT_SECONDS,
         )
     except process.ExecutableMissingError as error:
