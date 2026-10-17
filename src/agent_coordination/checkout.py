@@ -1727,7 +1727,7 @@ def verify_landing_authority(
     merge_commit: str,
     storage: body.Storage,
 ) -> None:
-    """`_verify_merged_release`'s trailer authority check on the fetched
+    """`cmd_release._verify_merged_release`'s trailer authority check on the fetched
     trunk's `landings`."""
     if isinstance(identity, protocol.LaneIdentity):
         defect = _trunk_no_item_landing_defect(landings, merge_commit, pull_request)
@@ -1766,7 +1766,7 @@ def _trunk_landing_defect(
     """Why `sha` does not authorize closing work item `number` from the
     walked first-parent trunk (issue #359 LAND-52), or `None` when it does:
     `sha` must sit on that trunk and carry a `Work-Item:` trailer naming
-    exactly `number`. One reader (`checkout.trunk_landings`) and one grammar
+    exactly `number`. One reader (`trunk_landings`) and one grammar
     (`board.trunk_commit_classification`) for both `release --merged
     <sha|empty>` under `storage = state-ref` and, since issue #397 (Befund
     41), `release --merged <pr>` under `storage = github`'s own merge-commit
@@ -1807,7 +1807,7 @@ def _verify_merge_commit_authority(
 ) -> None:
     """Refuse a github `release --merged <pr>` whose merge commit does not
     authorize closing `number` (issue #397, Befund 41): `number` is the
-    claim's own issue, resolved before `_verify_merged_release` ever calls
+    claim's own issue, resolved before `cmd_release._verify_merged_release` ever calls
     this -- never the pull request's own mutable body -- and this merge
     commit trailer is the actual authority, the same `_trunk_landing_defect`
     reads for `storage = state-ref`."""
