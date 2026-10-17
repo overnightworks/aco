@@ -1,8 +1,0 @@
-claim_id = "392e56e25c1f4e0496b9ce870b2831f9"
-agent = "claude"
-role = "builder"
-base = "bf4dddd3c77851ed606633a7dfe445a0c80961c0"
-branch = "claude/issue-148-b0-lane-worktree-owner"
-scope = ["src/agent_coordination/checkout.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_start.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_protect.py", "tests/test_session.py"]
-opened_commit = "c2a65368c64f40ea7e6e1bf0469ffb49dc604a16"
-whole_reason = "Die Bau-Sequenz zieht mit ihren Aufrufern und der Umbenennung trunk= zu start_point= gemeinsam um; halb umgestellt gäbe es zwei Sequenzen."
