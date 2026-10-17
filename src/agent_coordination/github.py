@@ -128,6 +128,18 @@ GITHUB_HOST = "github.com"
 GITHUB_REMOTE_PATTERN = re.compile(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?$")
 
 
+def github_pull_request_number(value: str) -> int:
+    """`--merged`'s value under `storage = "github"` (issue #359): a bare
+    decimal pull request number -- the sha grammar and the empty "newest
+    trunk landing" sentinel both belong to `storage = "state-ref"` alone,
+    since GitHub has no trunk walk to read either from."""
+    if not value or not value.isdigit():
+        raise protocol.ClaimUnavailableError(
+            "--merged requires a pull request number under storage = github"
+        )
+    return int(value)
+
+
 def landing_comment(pull_request: int) -> str:
     """The one comment body `close_landed_item` posts naming the pull
     request that landed an item (issue #359 Card 1) -- named once so a
