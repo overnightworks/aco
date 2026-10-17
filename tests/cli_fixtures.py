@@ -11,6 +11,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from typing import TextIO
@@ -18,12 +19,41 @@ from typing import TextIO
 import pytest
 from board_fixtures import BASE, REPOSITORY, complete_contract
 
-from agent_coordination import board, checkout, cli, forge, github, process, store
+from agent_coordination import (
+    board,
+    board_read,
+    checkout,
+    cli,
+    cmd_brief,
+    cmd_cut,
+    cmd_reset,
+    cmd_rule,
+    cmd_status,
+    forge,
+    github,
+    process,
+    store,
+)
 from agent_coordination.protocol import ClaimState
 from agent_coordination.session import RunContext
 
 # Captured at import, before any test's stub replaces it.
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked
+
+
+FROZEN_CLI_NOW = datetime(2026, 8, 21, tzinfo=UTC)
+
+
+class FixedDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls.fromtimestamp(FROZEN_CLI_NOW.timestamp(), tz=UTC)
+
+
+def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin CLI dates without installing a global autouse fixture."""
+    for owner in (cmd_rule, board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
+        monkeypatch.setattr(owner, "datetime", FixedDateTime)
 
 
 def stub_one_git_call(
@@ -531,12 +561,12 @@ class CliRun:
 
 
 def run_cli(
-    argv: list[str], capsys: pytest.CaptureFixture[str], *, stdin: str | None = None
+    argv: list[str], capsys: pytest.CaptureFixture[str], *, stdin: str | bytes | None = None
 ) -> CliRun:
     """Run `argv` through `main`, whether it returns its exit status or
     argparse exits with it, and drain everything printed since the last run.
 
-    A supplied string is a UTF-8 pipe; None leaves inherited stdin untouched.
+    Strings are encoded as UTF-8; bytes are piped unchanged. None inherits stdin.
     The previous stdin is restored and the pipe closed even when main raises.
     """
     previous_stdin = sys.stdin
@@ -684,13 +714,13 @@ def body_file_on_stdin(tmp_path: Path) -> Iterator[TextIO]:
         yield stdin
 
 
-def read_end_of_a_pipe_carrying(text: str) -> TextIO:
+def read_end_of_a_pipe_carrying(text: str | bytes) -> TextIO:
     """`printf ... | aco ...`: the read end of a pipe whose writer already
     wrote `text` -- a scenario body, well inside a pipe's buffer -- and
     closed. Read as `sys.stdin` reads a pipe: line endings untranslated."""
     read_end, write_end = os.pipe()
-    with os.fdopen(write_end, "w", encoding="utf-8") as writer:
-        writer.write(text)
+    with os.fdopen(write_end, "wb") as writer:
+        writer.write(text.encode("utf-8") if isinstance(text, str) else text)
     return os.fdopen(read_end, encoding="utf-8", newline="")
 
 

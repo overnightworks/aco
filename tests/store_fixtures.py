@@ -67,6 +67,16 @@ def push_raw_state_tree(
     return commit
 
 
+def lineage_observation(repository: Path) -> tuple[protocol.ObjectId | None, str | None]:
+    """This worktree's lineage stamp and fetch anchor -- the two
+    per-worktree values a reset dry run, a live-claim refusal, or a failed
+    export must leave byte-identical to whatever `fetch_state` last wrote
+    (issue #298, 19.09.2026 gate finding 2)."""
+    stamp = store._read_lineage_stamp(repository)
+    anchor = store._run_git(repository, ["rev-parse", store._FETCH_ANCHOR_REF])
+    return stamp, anchor.stdout.decode().strip() if anchor.exit_status == 0 else None
+
+
 def state_ref_tip(remote: Path) -> str | None:
     result = subprocess.run(
         ["git", "ls-remote", "--exit-code", str(remote), store.STATE_REF],

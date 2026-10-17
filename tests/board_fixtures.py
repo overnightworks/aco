@@ -1,9 +1,10 @@
-"""Board and claim domain scenario builders shared by `tests/test_cli.py`
-(CLI wiring behavior), `tests/test_board.py` (pure `board.py` behavior),
-`tests/test_github.py` (the GitHub adapter's `REPOSITORY`), and
-`tests/test_protect.py` (`standing_active_claim`, the hook's live-claim builder). All
-import this module directly; pytest's rootless collection puts `tests/` on
-`sys.path`, so a plain `import board_fixtures` resolves here."""
+"""Board and claim scenarios for test_board, test_body_cli, test_checkout,
+test_cli, test_github, test_items, test_protect, test_protocol, test_rulings,
+test_session, test_state_board, cli_fixtures, and github_fixtures.
+
+Consumers import this module directly: pytest's rootless collection puts
+tests/ on sys.path, so import board_fixtures resolves here.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +21,16 @@ from agent_coordination.body import (
     render_block,
 )
 from agent_coordination.protocol import ClaimRequest
+
+# Issue #538: display controls a slice title refuses beside the Cc set --
+# the bidi override and isolate and the zero-width space -- with the code
+# point BODY-63 names.
+BIDI_AND_ZERO_WIDTH_CONTROLS = (
+    ("\N{RIGHT-TO-LEFT OVERRIDE}", "U+202E"),
+    ("\N{LEFT-TO-RIGHT ISOLATE}", "U+2066"),
+    ("\N{ZERO WIDTH SPACE}", "U+200B"),
+)
+
 
 BASE = "a" * 40
 REPOSITORY = "example/agent-coordination"
