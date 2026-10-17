@@ -1,8 +1,0 @@
-claim_id = "67e0e5e3abd448b497b2f068ea39331d"
-agent = "claude"
-role = "builder"
-base = "f1de77eaaafa56553bf6345f9faa24b7e94f4b5a"
-branch = "claude/issue-120-s19b-cmd-item"
-scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_item.py", "src/agent_coordination/protocol.py", "src/agent_coordination/report.py", "src/agent_coordination/state_board.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_state_board.py"]
-opened_commit = "19d002a0370152b8c4c95578ade9d540f7a9d695"
-whole_reason = "Der item-Befehl zieht mit seinen zwei cmd-Kanten, der Erweiterung von report.refuse, Layers-Zeile, Testbeleg und Docstrings in cmd_item."
