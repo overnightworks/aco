@@ -1,8 +1,0 @@
-claim_id = "d8764dafd0f74d1189584a5520cb1825"
-agent = "claude"
-role = "builder"
-base = "fa2f3b842c1bd372b862925161d86db5bd66c2fc"
-branch = "claude/issue-83-scripts-pythonpath-one-walker"
-scope = ["pyproject.toml", "scripts/test_budget.py", "scripts/test_inventory.py", "tests/script_fixtures.py", "tests/test_root_layout.py", "tests/test_spec_lint.py", "tests/test_test_budget.py", "tests/test_test_inventory.py"]
-opened_commit = "a0c25f567f2518cb49f635a1c0089758d1a945bc"
-whole_reason = "Ein Lade-Weg für Skripte und ein Test-Finder ersetzen zwei parallele Mechanismen in Konfiguration, Skripten und ihren Tests zugleich."
