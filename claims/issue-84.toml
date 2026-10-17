@@ -1,0 +1,8 @@
+claim_id = "0f9418eb4c5945768340eb4ffd9c1db7"
+agent = "claude"
+role = "builder"
+base = "cedbd440945d8fa465f30cce446e4553dd4f6c37"
+branch = "claude/issue-84-s6a-board-read-leaves"
+scope = ["pyproject.toml", "src/agent_coordination/board_read.py", "src/agent_coordination/cli.py", "src/agent_coordination/forge.py", "src/agent_coordination/state_board.py", "tests/test_cli.py"]
+opened_commit = "ae6c7c28c6176be18fc418082937cbacbc3de6e3"
+whole_reason = "Ein neues Lese-Modul mit seiner Layers-Zeile, den Aufrufern in cli und den Testverweisen; halb verschoben bräche der Import oder ein Monkeypatch liefe ins Leere."
