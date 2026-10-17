@@ -696,8 +696,8 @@ def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the
     creation can still carry its paths in typed order on the real ref:
     `parse_claim_toml` must project it through `protocol.valid_scope` on
     read (REVISE finding 1) rather than expose the stored order verbatim.
-    `status`/`status --json` (`cli._print_claim_status_lines`,
-    `cli._status_json`) print straight from this same `ActiveClaim.scope`,
+    `status`/`status --json` (`cmd_status._print_claim_status_lines`,
+    `cmd_status._status_json`) print straight from this same `ActiveClaim.scope`,
     so canonicalizing it here is their canonical-order proof too -- there
     is no second scope-ordering decision downstream for them to get wrong.
 

@@ -126,7 +126,7 @@ def attached_branch(checked_out: str) -> str:
 # from `ls-files --error-unmatch` above. Any other nonzero exit (128 for a
 # broken checkout, a corrupted ref, ...) is a real git failure, not an
 # absent ref, and must fail loud with its own detail instead of being read
-# the same way `_lane_tip` used to (issue #390 finding 9b).
+# the same way `cmd_brief._lane_tip` used to (issue #390 finding 9b).
 _REV_PARSE_VERIFY_EXIT_UNRESOLVED = 1
 
 

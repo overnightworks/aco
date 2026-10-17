@@ -22,7 +22,9 @@ from . import (
     body,
     checkout,
     cmd_board,
+    cmd_body,
     cmd_bootstrap,
+    cmd_brief,
     cmd_check,
     cmd_claim,
     cmd_land,
@@ -33,6 +35,7 @@ from . import (
     cmd_reset,
     cmd_rulings,
     cmd_start,
+    cmd_status,
     cmd_workspace,
     forge,
     github,
@@ -46,12 +49,8 @@ from . import (
     store,
 )
 from .session import (
-    LaneSharedReading,
-    LaneSharedUnavailable,
     RepoMeaninglessUnderStateRefError,
     RunContext,
-    lane_shared_files,
-    trunk_lane_shared_reading,
 )
 
 NEXT_PULL_DESCRIPTION = (
@@ -837,282 +836,6 @@ def _parser() -> _UsageErrorParser:
     return parser
 
 
-def _status_claims(
-    claims: tuple[protocol.ActiveClaim, ...], issue: int | None
-) -> tuple[tuple[protocol.ActiveClaim, ...], protocol.ClaimConflictIndex]:
-    selected = tuple(
-        claim
-        for claim in claims
-        if issue is None
-        or (isinstance(claim.identity, protocol.IssueIdentity) and claim.identity.issue == issue)
-    )
-    index = protocol.claim_conflict_index(claims)
-    if not selected:
-        return (), index
-    related_ids = (
-        {claim.claim_id for claim in claims}
-        if issue is None
-        else protocol.related_claim_ids(index, selected)
-    )
-    related = tuple(claim for claim in claims if claim.claim_id in related_ids)
-    return related, index
-
-
-def _overlap_subjects(
-    claims_by_id: Mapping[str, protocol.ActiveClaim], peer_ids: set[str]
-) -> list[dict[str, object]]:
-    return [
-        {
-            **protocol.identity_json(peer.identity),
-            "claim_id": peer.claim_id,
-            "agent": peer.agent,
-        }
-        for claim_id in sorted(peer_ids)
-        if (peer := claims_by_id.get(claim_id)) is not None
-    ]
-
-
-def _overlap_note(
-    claims_by_id: Mapping[str, protocol.ActiveClaim], peer_ids: set[str], storage: body.Storage
-) -> str | None:
-    peers = [claims_by_id[claim_id] for claim_id in sorted(peer_ids) if claim_id in claims_by_id]
-    if not peers:
-        return None
-    return "overlaps " + ", ".join(
-        f"{board.claim_subject(claim, storage)} ({claim.claim_id})" for claim in peers
-    )
-
-
-@dataclass(frozen=True)
-class _ClaimReportContext:
-    """`index` and `storage` together (issue #292): the two facts every
-    claim in one `status` read shares -- bundled so adding `storage`
-    beside the pre-existing `index` never pushes a caller past PLR0913's
-    five-argument ceiling."""
-
-    index: protocol.ClaimConflictIndex
-    storage: body.Storage
-
-
-def _print_claim_status_lines(
-    claim: protocol.ActiveClaim,
-    claims_by_id: Mapping[str, protocol.ActiveClaim],
-    context: _ClaimReportContext,
-    opened_at: datetime,
-    observed_at: datetime,
-) -> None:
-    state = "CONFLICT" if claim.claim_id in context.index.conflict_ids else "CLAIMED"
-    print(
-        f"{state} {board.claim_subject(claim, context.storage)}: {claim.agent} ({claim.role}) "
-        f"base={claim.base} branch={claim.branch} claim={claim.claim_id}"
-        f"{board.claim_age_suffix(opened_at, observed_at)}"
-    )
-    for path in claim.scope:
-        print(f"  {path}")
-    if claim.resource is not None:
-        print(f"  resource {claim.resource.name}={claim.resource.value}")
-    if claim.whole_reason is not None:
-        print(f"  whole: {claim.whole_reason}")
-    note = _overlap_note(
-        claims_by_id, protocol.overlap_peer_ids(context.index, claim), context.storage
-    )
-    if note is not None:
-        print(f"  {note}")
-
-
-def _print_related_claims(
-    claims: tuple[protocol.ActiveClaim, ...],
-    related: tuple[protocol.ActiveClaim, ...],
-    context: _ClaimReportContext,
-    ages: Mapping[str, datetime],
-    observed_at: datetime,
-) -> int:
-    claims_by_id: dict[str, protocol.ActiveClaim] = {claim.claim_id: claim for claim in claims}
-    for claim in related:
-        _print_claim_status_lines(claim, claims_by_id, context, ages[claim.claim_id], observed_at)
-    return 2 if any(claim.claim_id in context.index.conflict_ids for claim in related) else 0
-
-
-def _status(
-    claims: tuple[protocol.ActiveClaim, ...],
-    issue: int | None,
-    ages: Mapping[str, datetime],
-    storage: body.Storage,
-    lane_shared: LaneSharedReading = (),
-) -> int:
-    """Every related claim's block, then the lane-shared files once (issue
-    #575), named only beside a claim that may write them."""
-    observed_at = datetime.now(UTC)
-    related, index = _status_claims(claims, issue)
-    if related:
-        context = _ClaimReportContext(index, storage)
-        exit_code = _print_related_claims(claims, related, context, ages, observed_at)
-        shared = _lane_shared_line(lane_shared)
-        if shared is not None:
-            print(shared)
-        return exit_code
-    subject = "repository" if issue is None else f"issue {board.item_label(issue, storage)}"
-    print(f"UNCLAIMED {subject}")
-    return 0
-
-
-class StatusReason(StrEnum):
-    """`aco status`'s own `--json` `reason` vocabulary (issue #406,
-    `specs/status.spec.md` STAT-03/STAT-05): `claimed`, `unclaimed`, and
-    `conflict` are its own three read states. `status` is forge-free
-    (STAT-16) and never resolves a repository target, so it names no
-    `invalid_usage` of its own -- only `unavailable`, reached when
-    `store.fetch_state` refuses a rewritten or malformed state ref."""
-
-    CLAIMED = "claimed"
-    UNCLAIMED = "unclaimed"
-    CONFLICT = "conflict"
-    UNAVAILABLE = "unavailable"
-
-
-def _status_claim_json(
-    claim: protocol.ActiveClaim,
-    claims_by_id: Mapping[str, protocol.ActiveClaim],
-    index: protocol.ClaimConflictIndex,
-    ages: Mapping[str, datetime],
-    observed_at: datetime,
-) -> dict[str, object]:
-    age, old = board.claim_age_fields(ages[claim.claim_id], observed_at)
-    return {
-        **protocol.claim_identity_fields(claim),
-        **protocol.resource_fields(claim.resource),
-        **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
-        "overlaps": _overlap_subjects(claims_by_id, protocol.overlap_peer_ids(index, claim)),
-        "state": "CONFLICT" if claim.claim_id in index.conflict_ids else "CLAIMED",
-        "age": age,
-        "old": old,
-    }
-
-
-def _status_json(
-    claims: tuple[protocol.ActiveClaim, ...],
-    issue: int | None,
-    ages: Mapping[str, datetime],
-    tip: protocol.ObjectId | None,
-    lane_shared: LaneSharedReading = (),
-) -> int:
-    observed_at = datetime.now(UTC)
-    related, index = _status_claims(claims, issue)
-    if not related:
-        reason = StatusReason.UNCLAIMED
-    elif any(claim.claim_id in index.conflict_ids for claim in related):
-        reason = StatusReason.CONFLICT
-    else:
-        reason = StatusReason.CLAIMED
-    claims_by_id: dict[str, protocol.ActiveClaim] = {claim.claim_id: claim for claim in claims}
-    claims_payload = [
-        _status_claim_json(claim, claims_by_id, index, ages, observed_at) for claim in related
-    ]
-    report.emit_json(
-        reason is not StatusReason.CONFLICT,
-        reason,
-        issue=issue,
-        tip=tip,
-        claims=claims_payload,
-        **_lane_shared_json(lane_shared),
-    )
-    return 2 if reason is StatusReason.CONFLICT else 0
-
-
-def _status_path(
-    claims: tuple[protocol.ActiveClaim, ...],
-    path: str,
-    storage: body.Storage,
-    lane_shared: LaneSharedReading,
-) -> None:
-    """`path`'s holders; with none, `LANE-SHARED` for a file the trunk's
-    `lane_shared` names, which any claim may write (issue #586), else
-    `UNCLAIMED`. A defective trunk configuration adds its own line."""
-    holders = protocol.claims_holding_path(claims, path)
-    if holders:
-        _print_path_holders(holders, path, storage)
-    elif path in lane_shared_files(lane_shared):
-        print(f"LANE-SHARED {path}")
-    else:
-        print(f"UNCLAIMED {path}")
-    if isinstance(lane_shared, LaneSharedUnavailable):
-        print(_lane_shared_unavailable_line(lane_shared))
-
-
-def _print_path_holders(
-    holders: tuple[protocol.ActiveClaim, ...], path: str, storage: body.Storage
-) -> None:
-    for claim in holders:
-        print(
-            f"CLAIMED {path} {board.claim_subject(claim, storage)}: {claim.agent} ({claim.role}) "
-            f"claim={claim.claim_id}"
-        )
-        if claim.whole_reason is not None:
-            print(f"  whole: {claim.whole_reason}")
-    if len(holders) > 1:
-        print(
-            "overlap: "
-            + ", ".join(
-                f"{board.claim_subject(claim, storage)} ({claim.claim_id})" for claim in holders
-            )
-        )
-
-
-def _lane_shared_unavailable_line(unavailable: LaneSharedUnavailable) -> str:
-    return f"lane-shared: unavailable ({unavailable.defect})"
-
-
-def _lane_shared_line(lane_shared: LaneSharedReading) -> str | None:
-    """The one line `status` and `brief` name the repository's lane-shared
-    registry files with (issue #575), so a builder comparing its changes
-    with its claim scope counts them as allowed: an entry naming no file the
-    trunk tracks is marked so, never shown as a grant, and a defective trunk
-    configuration names its defect (issue #586); `None` when none is
-    configured."""
-    if isinstance(lane_shared, LaneSharedUnavailable):
-        return _lane_shared_unavailable_line(lane_shared)
-    if not lane_shared:
-        return None
-    return "lane-shared: " + ", ".join(
-        entry.path if entry.names_a_file else f"{entry.path} (names no file)"
-        for entry in lane_shared
-    )
-
-
-def _lane_shared_json(lane_shared: LaneSharedReading) -> dict[str, object]:
-    """`lane_shared` and `lane_shared_unavailable`, the `--json` form of
-    `_lane_shared_line` (issue #586): the entries with whether each names a
-    trunk-tracked file, or `null` beside the defect that hides them."""
-    if isinstance(lane_shared, LaneSharedUnavailable):
-        return {"lane_shared": None, "lane_shared_unavailable": lane_shared.defect}
-    return {
-        "lane_shared": [
-            {"path": entry.path, "names_a_file": entry.names_a_file} for entry in lane_shared
-        ],
-        "lane_shared_unavailable": None,
-    }
-
-
-def _status_path_json(
-    claims: tuple[protocol.ActiveClaim, ...], path: str, lane_shared: LaneSharedReading
-) -> int:
-    holders = protocol.claims_holding_path(claims, path)
-    reason = StatusReason.UNCLAIMED if not holders else StatusReason.CLAIMED
-    claims_payload = [
-        {
-            **protocol.claim_identity_fields(claim),
-            **protocol.resource_fields(claim.resource),
-            **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
-            "state": "CLAIMED",
-        }
-        for claim in holders
-    ]
-    report.emit_json(
-        True, reason, path=path, claims=claims_payload, **_lane_shared_json(lane_shared)
-    )
-    return 0
-
-
 def _body_shape_defects(
     raw_body: str, *, storage: body.Storage = body.Storage.GITHUB
 ) -> tuple[str, ...]:
@@ -1127,18 +850,6 @@ BODY_TEMPLATE_KINDS = ("task", "feature", "container")
 # child and back to task once none is open (issue #503).
 ITEM_EDIT_KINDS = (body.ItemKind.TASK.value, body.ItemKind.CONTAINER.value)
 DEFAULT_BODY_TEMPLATE_KIND = "task"
-
-
-def _read_body_check_input() -> str:
-    """`body --check`'s body text, read from stdin only (issue #262 Sonar
-    S8707): an agent pipes the file in (`aco body --check < body.md`)
-    rather than naming a path the CLI would have to trust."""
-    try:
-        return sys.stdin.read()
-    except UnicodeDecodeError as error:
-        raise protocol.ClaimError(
-            f"stdin is not valid UTF-8: {error}; pipe the body as UTF-8 text"
-        ) from error
 
 
 def _stdin_file_mode() -> int | None:
@@ -1167,53 +878,6 @@ def _refuse_a_body_on_stdin(command: str) -> None:
     one (`_stdin_carries_a_body`) is a mistake the person must see."""
     if _stdin_carries_a_body():
         raise protocol.ClaimUnavailableError(f"{command} reads no stdin; drop the redirect")
-
-
-class BodyCheckReason(StrEnum):
-    """`aco body --check`'s own `--json` `reason` vocabulary
-    (`specs/body.spec.md`, issue #404): `valid`/`malformed`/`incomplete`
-    mirror `body.BodyShapeVerdict`'s own three values -- the same
-    body-shape decision `check <item>`'s own `cmd_check._CheckReason` reads."""
-
-    VALID = body.BodyShapeVerdict.VALID.value
-    MALFORMED = body.BodyShapeVerdict.MALFORMED.value
-    INCOMPLETE = body.BodyShapeVerdict.INCOMPLETE.value
-    UNAVAILABLE = "unavailable"
-
-
-def _body_check_report(check: body.BodyShapeCheck, *, as_json: bool) -> int:
-    """The one rendering of a `body --check` answer: `body.body_shape_check`'s
-    own sentences, never truncated to the first, since there is no live
-    item here to refuse a single verdict about."""
-    ok = check.verdict is body.BodyShapeVerdict.VALID
-    if as_json:
-        report.emit_json(ok, BodyCheckReason(check.verdict.value), defects=list(check.defects))
-    elif check.defects:
-        for defect in check.defects:
-            print(defect, file=sys.stderr)
-    else:
-        print("body ok")
-    return 0 if ok else 2
-
-
-def _cmd_body(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`body --check` is forge-free (issue #262), the same way `status` and
-    `bootstrap` are (issue #245): it reads stdin only, never an issue, a
-    live claim, a filesystem path, or the forge's own `blocked_by`
-    relation, so it never asks the `RunContext` for its forge (`main` dispatches
-    it outside `_dispatch`, exactly like `status`). It still reads the
-    repository's own storage pin (issue #287): `[record]` is a known key
-    under `storage = "state-ref"` and an unknown one under
-    `storage = "github"`, the same gate `_state_ref_forge`'s own items
-    already read through `_decode_item`."""
-    as_json = parsed.json
-    try:
-        config = context.config
-        raw_body = _read_body_check_input()
-    except protocol.ClaimError as error:
-        return report.refuse(BodyCheckReason.UNAVAILABLE, error, as_json=as_json)
-    check = body.body_shape_check(raw_body, storage=config.storage)
-    return _body_check_report(check, as_json=as_json)
 
 
 @dataclass(frozen=True)
@@ -1338,7 +1002,7 @@ class ItemReason(StrEnum):
     writes nothing (issue #572). `body_invalid`
     covers only `item new`'s and `item edit`'s own piped-body shape check
     (`_body_shape_defects`, the same check `body --check` runs), carrying
-    `defects` the same way (`BodyCheckReason`, issue #404); `partial_write`
+    `defects` the same way (`cmd_body._BodyCheckReason`, issue #404); `partial_write`
     only a GitHub issue `item new` created but could not type or record under
     its `--parent` (issue #444), `cut`'s own shape. Every other refusal -- a
     `storage = "github"` command, a missing item or parent, a possible twin,
@@ -1395,7 +1059,7 @@ class _ItemBodyInvalidError(protocol.ClaimError):
 def _read_item_new_input() -> str:
     """`item new`'s piped body under either storage, or `""` when stdin
     carries none (`_stdin_carries_a_body`)."""
-    return _read_body_check_input() if _stdin_carries_a_body() else ""
+    return cmd_body.read_body_check_input() if _stdin_carries_a_body() else ""
 
 
 def _item_new_block_fields(parsed: argparse.Namespace) -> dict[str, object]:
@@ -1625,7 +1289,7 @@ def _read_item_edit_body(number: int) -> str:
         raise protocol.ClaimUnavailableError(
             f"item edit {item_id} needs the new body on stdin: aco item edit {item_id} < body.md"
         )
-    return _read_body_check_input()
+    return cmd_body.read_body_check_input()
 
 
 ITEM_EDIT_SIZE_COMMAND = "item edit --size"
@@ -2014,126 +1678,6 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
     return 0
 
 
-def _brief_claim(
-    claims: tuple[protocol.ActiveClaim, ...], item: int
-) -> protocol.ActiveClaim | None:
-    """This item's own live claim -- one exclusive build claim per issue
-    before the first edit (README), so at most one is ever live; the first
-    match is it. `None` when the item carries no live claim at all."""
-    for claim in claims:
-        if isinstance(claim.identity, protocol.IssueIdentity) and claim.identity.issue == item:
-            return claim
-    return None
-
-
-@dataclass(frozen=True)
-class _BriefClaim:
-    """`brief`'s own live-claim reading: the claim paired with the one age it
-    needs -- never every live claim's age like `board_read.claim_ages`, so a lineage
-    break in an unrelated claim can never stop this item's brief."""
-
-    claim: protocol.ActiveClaim
-    opened_at: datetime
-
-
-def _brief_live_claim(worktree: Path, state: protocol.ClaimState, item: int) -> _BriefClaim | None:
-    claim = _brief_claim(tuple(state.claims.values()), item)
-    if claim is None:
-        return None
-    # A live claim cannot exist without the ref it was read from.
-    tip = cast(protocol.ObjectId, state.tip)
-    opened_at = store.claim_ages(worktree=worktree, tip=tip, claims=(claim,))[claim.claim_id]
-    return _BriefClaim(claim, opened_at)
-
-
-def _lane_tip(branch: str) -> str | None:
-    """`branch`'s current commit -- local first, then `origin/` -- or `None`
-    when neither ref resolves (a deleted or not-yet-pushed lane branch). A
-    git failure that keeps either read from answering (issue #390 finding
-    9b) raises instead of being read the same way as an absent ref."""
-    for ref in (branch, f"origin/{branch}"):
-        commit = checkout.resolved_commit(ref)
-        if commit is not None:
-            return commit
-    return None
-
-
-def _print_brief_claim(
-    claim: protocol.ActiveClaim,
-    opened_at: datetime,
-    observed_at: datetime,
-    lane_shared: LaneSharedReading,
-) -> None:
-    print(
-        f"{claim.agent} ({claim.role}) branch={claim.branch} base={claim.base}"
-        f"{board.claim_age_suffix(opened_at, observed_at)}"
-    )
-    for path in claim.scope:
-        print(f"  {path}")
-    if claim.whole_reason is not None:
-        print(f"  whole: {claim.whole_reason}")
-    shared = _lane_shared_line(lane_shared)
-    if shared is not None:
-        print(f"  {shared}")
-
-
-def _print_brief_step_rules(step_rules: board.BriefStepRules) -> None:
-    """`RULES` and `CHECKS` (issue #324): two more sections after the four
-    `_print_brief` always prints, only under `--step` -- the repository's own
-    `.aco/brief.toml` entries for that lane step, one per line,
-    each as `terminal_text` shows it so no entry can break into a forged
-    line or section (issue #548)."""
-    print()
-    print("RULES")
-    for rule in step_rules.rules:
-        print(board.terminal_text(rule))
-    print()
-    print("CHECKS")
-    for check in step_rules.checks:
-        print(board.terminal_text(check))
-
-
-@dataclass(frozen=True)
-class _BriefComposition:
-    """One `aco brief`'s full composed reads (issue #324): the four sections
-    `_print_brief` always prints, plus, only under `--step`, the repository's
-    own rules and checks -- gathered once so the text and `--json` renderers
-    print the same reads with no chance to drift apart."""
-
-    body: str
-    live: _BriefClaim | None
-    observed_at: datetime
-    tip: str | None
-    touched: tuple[str, ...]
-    step_rules: board.BriefStepRules | None
-    lane_shared: LaneSharedReading
-
-
-def _print_brief(composition: _BriefComposition) -> None:
-    print(board.terminal_block(composition.body))
-    print()
-    print("CLAIM")
-    if composition.live is None:
-        print("no active claim")
-    else:
-        _print_brief_claim(
-            composition.live.claim,
-            composition.live.opened_at,
-            composition.observed_at,
-            composition.lane_shared,
-        )
-    print()
-    print("TIP")
-    if composition.live is not None:
-        print(composition.tip if composition.tip is not None else "branch not found")
-    print()
-    print("TOUCHED")
-    for path in composition.touched:
-        print(path)
-    if composition.step_rules is not None:
-        _print_brief_step_rules(composition.step_rules)
-
-
 STATE_REF_ITEM_PAST_THE_ID_SPACE = "{number} " + board.NAMES_NO_ITEM
 
 
@@ -2160,174 +1704,6 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
     if not as_json:
         argparse.ArgumentParser.error(error.parser, str(error))
     return report.refuse(PreDispatchReason.INVALID_USAGE, error, as_json=True)
-
-
-class BriefReason(StrEnum):
-    """`aco brief`'s own `--json` `reason` vocabulary (`specs/brief.spec.md`,
-    issue #396): `composed` the only success. `invalid_item` names no
-    reachable refusal today -- brief never refuses for an item nothing
-    carries (BRIEF-08's own Never clause) -- so it stays out until a future
-    slice gives it a caller."""
-
-    COMPOSED = "composed"
-    INVALID_USAGE = "invalid_usage"
-    UNAVAILABLE = "unavailable"
-
-
-def _brief_claim_json(
-    live: _BriefClaim, observed_at: datetime, lane_shared: LaneSharedReading
-) -> dict[str, object]:
-    claim = live.claim
-    return {
-        "agent": claim.agent,
-        "role": claim.role,
-        "branch": claim.branch,
-        "base": claim.base,
-        "scope": list(claim.scope),
-        "whole": claim.whole_reason,
-        "age": board.claim_age_fields(live.opened_at, observed_at)[0],
-        **_lane_shared_json(lane_shared),
-    }
-
-
-def _brief_json(composition: _BriefComposition) -> int:
-    live = composition.live
-    payload: dict[str, object] = {
-        "body": composition.body,
-        "claim": None
-        if live is None
-        else _brief_claim_json(live, composition.observed_at, composition.lane_shared),
-        "tip": composition.tip,
-        "touched": list(composition.touched),
-        "outside_claim": None
-        if live is None
-        else [
-            path
-            for path in composition.touched
-            if not protocol.scopes_overlap(live.claim.scope, (path,))
-        ],
-    }
-    step_rules = composition.step_rules
-    if step_rules is not None:
-        payload["rules"] = list(step_rules.rules)
-        payload["checks"] = list(step_rules.checks)
-    report.emit_json(True, BriefReason.COMPOSED, **payload)
-    return 0
-
-
-def _brief_config(toplevel: Path) -> board.BriefConfig | None:
-    """`.aco/brief.toml`'s own content, read only when the file is
-    actually tracked by git (issue #324) -- the same tracked-file
-    requirement `board_config` enforces for `board.toml`'s storage pin, so
-    an ignored or not-yet-added file never quietly answers for the
-    repository. `None` either when it is untracked or when `load_brief_config`
-    finds no such file at all."""
-    if not checkout.path_is_tracked(board.BRIEF_CONFIG_PATH.as_posix(), directory=toplevel):
-        return None
-    return board.load_brief_config(toplevel / board.BRIEF_CONFIG_PATH)
-
-
-def _brief_step_rules_or_refusal(
-    step: str | None, context: RunContext
-) -> board.BriefStepRules | None:
-    """`--step`'s own rules and checks, or `None` when the brief carries no
-    `--step` at all -- the one branch that must stay untouched by
-    `.aco/brief.toml`'s presence or content (BRIEF-16)."""
-    if step is None:
-        return None
-    config = _brief_config(context.toplevel)
-    if config is None:
-        raise protocol.ClaimError(f"no {board.BRIEF_CONFIG_PATH} in the repository")
-    return config.for_step(board.BriefStep(step))
-
-
-def _cmd_brief(parsed: argparse.Namespace, context: RunContext) -> int:
-    """Compose one item's own reads into the one dispatch brief a lane step's
-    body otherwise gets assembled from by hand (AGENTS.md "the next brief
-    names the body, the lane tip ... and the commands"): the item's body from
-    the forge, its live claim from the store, the claim branch's current tip,
-    and the files the lane itself changes since its merge base with trunk.
-    Never a new data source, and never a write. Every refusal on this path --
-    BRIEF-07, BRIEF-09's PIN-04/PIN-05, BRIEF-15, BRIEF-18's lane-tip read and
-    trunk diff, BRIEF-20's trunk read, and the item read itself, which is a
-    forge call like any other (issue #432) -- reports through `report.refuse` under
-    this command's own vocabulary."""
-    as_json = parsed.json
-    try:
-        return _brief_report(parsed, context)
-    except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(BriefReason.INVALID_USAGE, error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(BriefReason.UNAVAILABLE, error, as_json=as_json)
-
-
-def _brief_report(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`brief`'s own composition and printing, every refusal raised by name
-    for `_cmd_brief` to report."""
-    step_rules = _brief_step_rules_or_refusal(parsed.step, context)
-    item = int(parsed.item)
-    client = context.forge
-    item_body = client.item_reference(item).body or ""
-    live = _brief_live_claim(context.toplevel, context.observation, item)
-    if live is None:
-        tip: str | None = None
-        touched: tuple[str, ...] = ()
-    else:
-        tip = _lane_tip(live.claim.branch)
-        touched = (
-            checkout.lane_changed_paths(tip, trunk=context.trunk_ref, directory=context.toplevel)
-            if tip is not None
-            else ()
-        )
-    observed_at = datetime.now(UTC)
-    composition = _BriefComposition(
-        item_body,
-        live,
-        observed_at,
-        tip,
-        touched,
-        step_rules,
-        trunk_lane_shared_reading(context.configured_canonical_remote, context.toplevel),
-    )
-    if parsed.json:
-        return _brief_json(composition)
-    _print_brief(composition)
-    return 0
-
-
-def _cmd_status(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`status` reads live claims from the store directly (issue #176),
-    dispatched straight from `main` -- it never needs `_dispatch`'s ledger
-    resolution (a cut-over repository may have no ledger issue left at all).
-    It is forge-free (issue #245): `--repo` is meaningless here and unused.
-    Every `protocol.ClaimError` `_status_read` can raise -- a rewritten or
-    malformed state ref -- reports through `report.refuse` as `unavailable` (issue
-    #406): `status` names no `invalid_usage` of its own (see `StatusReason`).
-    """
-    try:
-        return _status_read(parsed, context)
-    except protocol.ClaimError as error:
-        return report.refuse(StatusReason.UNAVAILABLE, error, as_json=parsed.json)
-
-
-def _status_read(parsed: argparse.Namespace, context: RunContext) -> int:
-    worktree = context.toplevel
-    state = context.observation
-    claims = tuple(state.claims.values())
-    lane_shared = trunk_lane_shared_reading(context.configured_canonical_remote, context.toplevel)
-    if parsed.path is not None:
-        # `--path` prints no age, so it never reads a claim's ancestry: a
-        # lineage break in one unrelated claim must not stop this answer
-        # (README "status --path").
-        if parsed.json:
-            return _status_path_json(claims, parsed.path, lane_shared)
-        _status_path(claims, parsed.path, context.config.storage, lane_shared)
-        return 0
-    ages = board_read.claim_ages(worktree, state)
-    issue = protocol.optional_issue_number(parsed.issue)
-    if parsed.json:
-        return _status_json(claims, issue, ages, state.tip, lane_shared)
-    return _status(claims, issue, ages, context.config.storage, lane_shared)
 
 
 CONTAINER_KINDS = frozenset({body.ItemKind.CONTAINER})
@@ -3157,7 +2533,7 @@ _COMMAND_TABLE: dict[str, _CommandEntry] = {
     "ask": _CommandEntry(_add_ask_parser, _cmd_ask),
     "rule": _CommandEntry(_add_rule_parser, _cmd_rule),
     "check": _CommandEntry(_add_check_parser, cmd_check.run),
-    "brief": _CommandEntry(_add_brief_parser, _cmd_brief),
+    "brief": _CommandEntry(_add_brief_parser, cmd_brief.run),
 }
 
 
@@ -3214,9 +2590,9 @@ def _read_status_body_or_dispatch(parsed: argparse.Namespace, context: RunContex
     resolved here, ahead of `_dispatch`, and neither ever asks the
     `RunContext` for its forge."""
     if parsed.command == "status":
-        return _cmd_status(parsed, context)
+        return cmd_status.run(parsed, context)
     if parsed.command == "body":
-        return _cmd_body(parsed, context)
+        return cmd_body.run(parsed, context)
     return _dispatch(parsed, context)
 
 
