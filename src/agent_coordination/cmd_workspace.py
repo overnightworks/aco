@@ -14,7 +14,13 @@ def _workspace_config_path() -> Path:
     return workspace.default_config_path(os.environ)
 
 
-def _register_workspace(parsed: argparse.Namespace) -> int:
+def _refuse_workspace_repository(parsed: argparse.Namespace) -> None:
+    if parsed.repo is not None:
+        raise protocol.ClaimError("--repo is meaningless for workspace operations")
+
+
+def register_workspace(parsed: argparse.Namespace) -> int:
+    _refuse_workspace_repository(parsed)
     handoff = workspace.WorkspaceRegistration(
         parsed.project,
         parsed.path,
@@ -30,7 +36,8 @@ def _register_workspace(parsed: argparse.Namespace) -> int:
     return 0
 
 
-def _run_workspace(parsed: argparse.Namespace) -> int:
+def run_workspace(parsed: argparse.Namespace) -> int:
+    _refuse_workspace_repository(parsed)
     outcomes = workspace.run_projects(_workspace_config_path(), parsed.project)
     for outcome in outcomes:
         suffix = f": {outcome.detail}" if outcome.detail else ""
@@ -61,7 +68,7 @@ def _login_summary(result: workspace.LoginRunResult) -> str:
     return summary
 
 
-def _run_at_login() -> int:
+def run_at_login() -> int:
     try:
         result = workspace.run_login_recovery(
             _workspace_config_path(), workspace.login_attempt_path(os.environ)
@@ -96,7 +103,7 @@ def _login_status() -> int:
     return 0
 
 
-def _login_operation(parsed: argparse.Namespace) -> int:
+def manage_login(parsed: argparse.Namespace) -> int:
     if parsed.repo is not None:
         raise protocol.ClaimError("--repo is meaningless for login recovery operations")
     if parsed.login_command == "enable":
@@ -108,13 +115,3 @@ def _login_operation(parsed: argparse.Namespace) -> int:
         print("login launcher disabled" if changed else "login launcher already disabled")
         return 0
     return _login_status()
-
-
-def run(parsed: argparse.Namespace) -> int:
-    if parsed.command == "_run-at-login":
-        return _run_at_login()
-    if parsed.command == "login":
-        return _login_operation(parsed)
-    if parsed.repo is not None:
-        raise protocol.ClaimError("--repo is meaningless for workspace operations")
-    return _register_workspace(parsed) if parsed.command == "register" else _run_workspace(parsed)
