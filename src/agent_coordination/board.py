@@ -303,6 +303,57 @@ class TrunkWorkItemClassification:
 TrunkClassification = TrunkWorkItemClassification | NoItemClassification
 
 
+def land_trunk_trailer(classification: Classification) -> str:
+    """`classification` rendered as a trunk commit's own trailer grammar
+    (`trunk_commit_classification`'s counterpart), never the pull
+    request body's qualified `owner/repo#n` form `WorkItemClassification.__str__`
+    prints: a git trailer is always local to the repository whose history
+    it lands on (issue #405; see `parse_item_reference`'s own
+    docstring)."""
+    if isinstance(classification, WorkItemClassification):
+        return f"Work-Item: #{classification.item.number}"
+    return f"No-Item: {classification.kind.value}"
+
+
+# Git's own blank line (`is_blank_line`): whitespace only. One run of them
+# separates two paragraphs, captured so a kept paragraph keeps its own.
+_BLANK_LINE_RUN = re.compile(r"(\n(?:[ \t]*\n)+)")
+
+
+def _without_classification_lines(paragraph: str) -> str:
+    return "\n".join(
+        line for line in paragraph.split("\n") if not CLASSIFICATION_LINE_PATTERN.fullmatch(line)
+    )
+
+
+def _narrower_separator(dropped: str | None, following: str) -> str:
+    """The fewer-line of the two separators around a dropped paragraph,
+    `following` on a tie; `following` alone when nothing was dropped."""
+    if dropped is None:
+        return following
+    return min(following, dropped, key=lambda separator: separator.count("\n"))
+
+
+def body_without_classification(body: str) -> str:
+    """`body` with its classification line removed; a paragraph the removal
+    leaves blank goes, and its neighbours keep the narrower of the two
+    separators around it, so no blank-line run stays where it stood
+    (issue #594 line 5)."""
+    pieces = _BLANK_LINE_RUN.split(body.replace("\r\n", "\n"))
+    composed = ""
+    dropped_separator: str | None = None
+    for separator, paragraph in zip(["", *pieces[1::2]], pieces[0::2], strict=True):
+        remaining = _without_classification_lines(paragraph)
+        if not remaining.strip():
+            dropped_separator = _narrower_separator(dropped_separator, separator)
+            continue
+        if composed:
+            composed += _narrower_separator(dropped_separator, separator)
+        composed += remaining
+        dropped_separator = None
+    return composed.strip()
+
+
 def trunk_commit_classification(
     work_item_values: tuple[str, ...], no_item_values: tuple[str, ...]
 ) -> TrunkClassification | ClassificationDefect | None:

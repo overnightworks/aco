@@ -92,13 +92,14 @@ layers = [
     "metrics",
     "protocol | process | hook_input",
 ]
-ignore_imports = ["agent_coordination.cmd_land -> agent_coordination.cmd_release"]
 # `metrics` moved below `body` (issue #419): it has no `agent_coordination`
 # import of its own (`metrics.py`'s own docstring), so nothing above
 # depended on its old position ahead of `items`/`body` -- moving it lets
 # `body` (the body-block codec) reach `metrics.Size` for its own
 # `size`/`[[expectation]]` schema, while `items` may still import `body`,
 # never the reverse.
+# The one cmd_* -> cmd_* edge: land.spec cites the release rules (#2, section 2).
+ignore_imports = ["agent_coordination.cmd_land -> agent_coordination.cmd_release"]
 
 [[tool.importlinter.contracts]]
 name = "Decision board layers"
