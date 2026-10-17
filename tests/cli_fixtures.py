@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TextIO
 
 import pytest
-from board_fixtures import BASE, complete_contract
+from board_fixtures import BASE, REPOSITORY, complete_contract
 
 from agent_coordination import board, checkout, cli, forge, github, process, store
 from agent_coordination.protocol import ClaimState
@@ -471,6 +471,36 @@ def arrange_scope_width(
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: versioned or ())
     if validate_checkout:
         monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+
+
+ADOPTED_PULL_REQUEST = 45
+ADOPTED_BRANCH = "dependabot/uv/x"
+
+
+def dependabot_pull_request(head_sha: str) -> forge.Landing:
+    """Open pull request #45 of `REPOSITORY` from the bot's own branch, aimed
+    at `main` and carrying no classification line, whose head is `head_sha`."""
+    return forge.Landing(
+        number=ADOPTED_PULL_REQUEST,
+        author="app/dependabot",
+        body="Bump x",
+        source_repository=github.repository_id(REPOSITORY),
+        source_branch=ADOPTED_BRANCH,
+        target_branch="main",
+        merged=False,
+        merge_commit=None,
+        title="Bump x",
+        head_sha=head_sha,
+    )
+
+
+def pull_request_listing(
+    head_sha: str, *files: forge.ChangedFile, reported: int | None = None
+) -> forge.PullRequestChanges:
+    """What the forge lists for a pull request at `head_sha`, twice the same;
+    `reported` is the file count it claims when that is not `len(files)`."""
+    reading = forge.ListingReading(head_sha, len(files) if reported is None else reported)
+    return forge.PullRequestChanges(reading, reading, files)
 
 
 def run_context_over(client: forge.ForgeReader) -> RunContext:

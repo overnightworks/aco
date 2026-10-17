@@ -3739,6 +3739,7 @@ def test_help_lists_commands_in_their_stable_registration_order() -> None:
         "claim",
         "release",
         "land",
+        "adopt",
         "rescope",
         "cut",
         "ask",
