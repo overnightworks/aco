@@ -519,22 +519,14 @@ def _item_target_body(
         raise _ClaimTargetInvalidError(str(error)) from error
 
 
-def _item_scope(
+def _read_item_body(
     client: forge.ForgeReader,
     open_by_number: Mapping[int, board.Issue],
     number: int,
     *,
     storage: body.Storage,
-) -> tuple[str, ...] | None:
-    """The item's own top-level `scope = [...]` (issue #337). A malformed
-    block refuses `_ClaimBodyInvalidError` here (issue #310 finding 43) --
-    before this function's caller ever gets to name the less specific "item
-    names no scope" -- reading `read_state`/`contract.defects` the same way
-    `body --check` and `board.located_block_or_refuse` already do, the one
-    block-defect reader every by-name body refusal in this file shares.
-    `_item_whole`'s own read stays tolerant of a malformed body instead: its
-    caller is only ever an optional width-gate fallback, never a hard
-    requirement the way a claim's own scope is."""
+) -> body.ParsedBody:
+    """Scope and whole readers refuse the target's first body defect."""
     raw_body = _item_target_body(client, open_by_number, number, storage)
     parsed = body.parse_body(raw_body, storage=storage)
     if parsed.read_state is body.BodyReadState.MALFORMED:
@@ -542,7 +534,17 @@ def _item_scope(
         raise _ClaimBodyInvalidError(
             f"{board.item_label(number, storage)} {body.body_defect_text(defect)}"
         )
-    return parsed.scope
+    return parsed
+
+
+def _item_scope(
+    client: forge.ForgeReader,
+    open_by_number: Mapping[int, board.Issue],
+    number: int,
+    *,
+    storage: body.Storage,
+) -> tuple[str, ...] | None:
+    return _read_item_body(client, open_by_number, number, storage=storage).scope
 
 
 def _item_whole(
@@ -552,14 +554,7 @@ def _item_whole(
     *,
     storage: body.Storage,
 ) -> str | None:
-    """The item's own top-level `whole = "<reason>"` (issue #399), read the
-    same way `_item_scope` reads `scope` -- except a malformed body is never
-    a hard refusal here (see `_item_scope`'s own docstring): `body.parse_body`
-    simply carries no `whole` for one, exactly as it did before issue #406,
-    so the width gate's own refusal still fires instead of an unrelated
-    defect message."""
-    raw_body = _item_target_body(client, open_by_number, number, storage)
-    return body.parse_body(raw_body, storage=storage).whole
+    return _read_item_body(client, open_by_number, number, storage=storage).whole
 
 
 def _whole_from_item_body(
@@ -568,17 +563,12 @@ def _whole_from_item_body(
     *,
     open_by_number: Mapping[int, board.Issue] | None,
 ) -> Callable[[], str | None] | None:
-    """The wide-scope gate's own fallback for `claim`/`start` (issue #399):
-    `None` for a lane claim, which names no item to read one from; otherwise
-    a lazy resolver `policy.reject_wide_scope` calls only once the scope actually
-    trips the gate and neither call names `--whole` -- so a narrow scope, or
-    an explicit `--whole`, never costs this read. Reuses `open_by_number`
-    when the caller already fetched it (a derived scope); otherwise reads
-    the one target item alone, never the whole board, so a replay (CLM-15)
-    or a live-claim resume (START-06) never reads past its own item (issue
-    #447). Resolves the repository's own storage pin
-    itself, since a trip's resolver runs before `run`'s own branch
-    has necessarily done so."""
+    """Read only the target when a wide claim has no explicit reason.
+
+    Lane claims have no body fallback. Narrow replays and live start resumes
+    avoid this read; a fallback that does read shares the scope reader's
+    malformed-body refusal. Reuse the board listing when already available.
+    """
     if not isinstance(identity, protocol.IssueIdentity):
         return None
     number = identity.issue

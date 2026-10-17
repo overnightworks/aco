@@ -49,6 +49,8 @@ sentence.
 | `--resource NAME` | CLAIM-41..46 | CLAIM-41..46 | CLAIM-41..46 |
 | wide scope (width gate) | CLM-18 | CLM-18 | CLM-18 |
 | wide scope, `--whole` omitted, the item's own body names one | CLM-21 | CLM-21 | — |
+| `--whole REASON` outside BODY-61's bound | CLM-36 | CLM-36 | CLM-36 |
+| wide scope, `--whole` omitted, the item's own body malformed | CLM-37 | CLAIM-68 (fresh), CLM-37 (replay) | — |
 | wide scope, neither `--whole` nor the item's own body names one | CLM-22 | CLM-22 | CLM-18 |
 | higher-priority item names neither `scope` nor a `[[slice]]` row | CLM-23 | CLM-23 | — |
 | the identity or claim id is already taken | CLM-25 | CLM-25 | CLM-25 |
@@ -97,10 +99,12 @@ to the clause each names below.
 - [ ] [CLM-17] With `--json`, any error-level check refuses the envelope, `reason: "precondition_failed"`, then `"issue": <n>, "checks": [...]`, exit `2` (see E-CLM-06).
 - [ ] [CLM-18] A scope tripping the width gate refuses before any write, in the wording `claim-record.spec.md` owns (CLAIM-25, CLAIM-26, CLAIM-29), exit `2`.
 - [ ] [CLM-19] A successful `--json` claim's object carries `versioned_files`, `versioned_files_total`, `share`, `touches` and `checks`, beside the fields CLAIM-* already owns.
-- [ ] [CLM-21] With `--whole` omitted, a target naming its own top-level `whole` admits a wide scope exactly as `--whole REASON` would; that sentence lands on the claim (see E-CLM-05).
+- [ ] [CLM-21] With `--whole` omitted, a target naming its own top-level `whole` admits a wide scope exactly as `--whole REASON` would, both held to BODY-61; that sentence lands on the claim (see E-CLM-05).
 - [ ] [CLM-22] Neither `--whole` nor the target's own body `whole` present, the width gate's refusal ends `; pass --whole REASON or set whole in the body`, exit `2` (see E-CLM-05).
 - [ ] [CLM-23] A higher-ranked item naming neither `scope` nor a `[[slice]]` row is skipped by CLM-08's own walk (`specs/next.spec.md` NEXT-23); claiming past it costs no `--out-of-order`.
 - [ ] [CLM-35] A higher-ranked item waiting on the operator (`specs/next.spec.md` NEXT-39) is skipped by CLM-08's own walk too: claiming past it warns of nothing.
+- [ ] [CLM-36] A `--whole` outside BODY-61's bound refuses `whole reason must be one bounded non-empty line`, exit `2`, before any write.
+- [ ] [CLM-37] An explicit wide scope, or a replayed wide one, naming no `--whole` refuses a malformed target body by its first defect as CLAIM-68, `body_invalid`; `state-ref` refuses PIN-15, `unavailable`.
 - [ ] [CLM-24] Deriving scope for a target missing or a pull request refuses by name before any slice-rule check runs, `reason: "target_invalid"` under `--json` (see E-CLM-07).
 - [ ] [CLM-25] The store's own refusal to write -- the identity or claim id already taken, or a resource conflict -- reports `reason: "claim_conflict"` under `--json`.
 - [ ] [CLM-31] A `state-ref` item closed or edited after the checks read it open refuses CAS-20's sentence (CAS-59), `reason: "unavailable"`, and writes no claim (see E-CLM-08).
@@ -111,10 +115,10 @@ to the clause each names below.
 
 | refusal | `reason` |
 |---|---|
-| CLM-01..14, CLM-18, CLM-20, CLM-22, CLM-23 and every refusal not named below | `unavailable` |
+| CLM-01..14, CLM-18, CLM-20, CLM-22, CLM-23, CLM-36, CLM-37 under `state-ref` (PIN-15) and every refusal not named below | `unavailable` |
 | CLM-17 (an error-level check) | `precondition_failed` |
 | CLM-24 (a missing or pull-request target while deriving scope) | `target_invalid` |
-| CLAIM-55 (item names no scope), CLAIM-54 (scope mismatch), CLAIM-68 (malformed body while deriving) | `body_invalid` |
+| CLAIM-55 (item names no scope), CLAIM-54 (scope mismatch), CLAIM-68 (malformed body while deriving), CLM-37 under `github` (malformed body behind a wide scope) | `body_invalid` |
 | CLM-25 (identity, claim id, or resource conflict) | `claim_conflict` |
 | CLM-26 (`--repo` under `storage = state-ref`) | `invalid_usage` |
 | a missing agent identity, before the command starts (OUT-05) | `precondition_failed` |
@@ -192,6 +196,14 @@ Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-43`, issue `#4
 ```console
 $ aco claim 43
 2> ERROR: scope is wide: 4 paths exceeds three; pass --whole REASON or set whole in the body
+exit 2
+```
+
+Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-44`, issue `#44` with `scope = ["a.py", "b.py", "c.py", "d.py"]` and a `whole` of 513 characters in its body
+
+```console
+$ aco claim 44 --scope a.py --scope b.py --scope c.py --scope d.py
+2> ERROR: #44 body malformed: whole: whole reason must be one bounded non-empty line
 exit 2
 ```
 
