@@ -2324,10 +2324,16 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
         'priority_labels = ["ux"]\nidea_label = "idea"\n'
         'body_contract = "block"\ncanonical_remote = "upstream"\n'
         'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py"]\n'
+        'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
     )
 
     assert board.load_config(config_path) == board.BoardConfig(
-        ("ux",), "idea", "upstream", Storage.STATE_REF, ("scripts/whitelist.py",)
+        ("ux",),
+        "idea",
+        "upstream",
+        Storage.STATE_REF,
+        ("scripts/whitelist.py",),
+        dependency_paths=("pyproject.toml", "uv.lock", ".github/workflows/"),
     )
 
 
@@ -4092,3 +4098,37 @@ def test_parent_line_names_the_supplied_label(label: str, expected: str) -> None
 )
 def test_names_parent_requires_an_exact_first_line(raw: str, label: str, expected: bool) -> None:
     assert names_parent(raw, label) is expected
+
+
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        pytest.param('"uv.lock"', "must be a list of unique repository paths", id="cell-13"),
+        pytest.param('["a", "a"]', "must be a list of unique repository paths", id="cell-16"),
+        pytest.param("[1]", "must be a list of unique repository paths", id="non-string"),
+        *[
+            pytest.param(
+                repr([entry]).replace("'", '"'),
+                f"entry '{entry}' is not a canonical path inside the repository",
+                id=case,
+            )
+            for case, entry in [
+                ("cell-14", "../x"),
+                ("cell-15", "/abs"),
+                ("cell-17", "src//x"),
+                ("root-slash", "/"),
+                ("double-trailing-slash", "a//"),
+                ("empty", ""),
+            ]
+        ],
+    ],
+)
+def test_board_configuration_refuses_invalid_dependency_paths(value: str, reason: str) -> None:
+    with pytest.raises(ClaimError) as refused:
+        board.parse_config(f"dependency_paths = {value}\n", board.CONFIG_PATH)
+    assert str(refused.value) == f"board configuration .aco/board.toml dependency_paths {reason}"
+
+
+@pytest.mark.parametrize("text", ["", "dependency_paths = []"])
+def test_board_configuration_has_no_dependency_paths_unless_named(text: str) -> None:
+    assert board.parse_config(text, board.CONFIG_PATH).dependency_paths == ()

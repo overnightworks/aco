@@ -503,6 +503,17 @@ class BoardConfig:
     # a forge may allow several methods while the repository keeps one, so
     # a pin here beats the forge's allowed methods; `None` asks the forge.
     merge_method: MergeMethod | None = None
+    dependency_paths: tuple[str, ...] = ()
+
+    def covers_dependency_path(self, path: str) -> bool:
+        try:
+            protocol.valid_scope([path])
+        except protocol.InvalidClaimMarkerError:
+            return False
+        return any(
+            path.startswith(entry) if entry.endswith("/") else path == entry
+            for entry in self.dependency_paths
+        )
 
 
 # The body pin (issue #150) is still a key this file defines, but no longer
@@ -747,32 +758,35 @@ def _validated_merge_method(raw: dict[str, object], path: Path) -> MergeMethod |
     )
 
 
-def _validated_lane_shared(raw: dict[str, object], path: Path) -> tuple[str, ...]:
-    """`lane_shared`'s entries (issue #575), each in the one canonical
-    repository-relative form a claim scope entry takes, so `protect` can
-    compare an entry with a payload path's own scope entry as text. An entry
-    that is absolute, climbs out with `..`, or is not canonical -- a trailing
-    `/` included -- is not a file inside the repository. Only the syntax is
-    judged, with no tree read, so `land` and every reader judge alike; an
-    entry naming a directory matches no file, since matching is exact. An
-    entry is foreign text, so a refusal names it as `terminal_text` shows it."""
-    entries = raw.get("lane_shared")
+def _validated_repository_paths(
+    raw: dict[str, object],
+    path: Path,
+    key: str,
+    *,
+    directories: bool = False,
+) -> tuple[str, ...]:
+    """Keep the canonical form that `protect` compares as text. Judge syntax
+    only, without requiring files to exist; entries are foreign text, so
+    refusal messages escape them. Dependency directories retain their slash.
+    """
+    entries = raw.get(key)
     if entries is None:
         return ()
+    path_kind = "paths" if directories else "file paths"
     if (
         not isinstance(entries, list)
         or not all(isinstance(entry, str) for entry in entries)
         or len(set(entries)) != len(entries)
     ):
         raise protocol.ClaimError(
-            f"board configuration {path} lane_shared must be a list of unique repository file paths"
+            f"board configuration {path} {key} must be a list of unique repository {path_kind}"
         )
     for entry in entries:
         try:
-            protocol.valid_scope([entry])
+            protocol.valid_scope([entry.removesuffix("/") if directories else entry])
         except protocol.InvalidClaimMarkerError as error:
             raise protocol.ClaimError(
-                f"board configuration {path} lane_shared entry '{terminal_text(entry)}' "
+                f"board configuration {path} {key} entry '{terminal_text(entry)}' "
                 "is not a canonical path inside the repository"
             ) from error
     return tuple(entries)
@@ -824,7 +838,10 @@ def parse_config(text: str, path: Path) -> BoardConfig:
         canonical_remote=_validated_canonical_remote(raw, path),
         storage=_validated_storage(raw, path),
         merge_method=_validated_merge_method(raw, path),
-        lane_shared=_validated_lane_shared(raw, path),
+        lane_shared=_validated_repository_paths(raw, path, "lane_shared"),
+        dependency_paths=_validated_repository_paths(
+            raw, path, "dependency_paths", directories=True
+        ),
     )
 
 
@@ -2602,6 +2619,16 @@ def advice_command(*arguments: str | AdviceOption) -> str:
     """The `aco` command a piece of advice names, rendered by
     `shell_command`."""
     return shell_command("aco", *arguments)
+
+
+_DISPLAY_NAME_LENGTH_LIMIT = 40
+
+
+def truncated_display_name(name: str) -> str:
+    """Cap names at 40 characters so three fit the 200-character budget (issue #405)."""
+    if len(name) <= _DISPLAY_NAME_LENGTH_LIMIT:
+        return name
+    return name[: _DISPLAY_NAME_LENGTH_LIMIT - 1] + "…"
 
 
 def terminal_text(text: str) -> str:

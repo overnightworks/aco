@@ -70,6 +70,7 @@ STATE_REF_CAPABILITIES: Mapping[forge.ForgeOperation, forge.Capability] = Mappin
         forge.ForgeOperation.LIST_OPEN_BOARD_ISSUES: forge.Capability.READ_ONLY,
         forge.ForgeOperation.LIST_BOARD_DEPENDENCIES: forge.Capability.READ_ONLY,
         forge.ForgeOperation.LANDING: forge.Capability.UNSUPPORTED,
+        forge.ForgeOperation.PULL_REQUEST_CHANGES: forge.Capability.UNSUPPORTED,
         forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS: forge.Capability.UNSUPPORTED,
         forge.ForgeOperation.LIST_RECENT_MERGED_BOARD_PULL_REQUESTS: forge.Capability.UNSUPPORTED,
         forge.ForgeOperation.LIST_RECENTLY_CLOSED_ISSUES: forge.Capability.READ_ONLY,
@@ -488,6 +489,9 @@ class StateRefBoard:
         all (module docstring), so there is no round trip here to batch --
         `item_reference` per number costs the same as this already does."""
         return {number: self.item_reference(number) for number in numbers}
+
+    def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
+        raise forge.ForgeUnsupportedError("storage = state-ref has no pull request file listings")
 
     def landing(self, number: int) -> forge.Landing:
         raise forge.ForgeUnsupportedError(NO_LANDINGS_YET)

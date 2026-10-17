@@ -22,6 +22,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | `storage` names an unrecognized value | PIN-03 | PIN-03 | PIN-03 | PIN-03 | — |
 | a key the configuration does not define | PIN-33 | PIN-33 | PIN-33 | PIN-33 | — |
 | `lane_shared` is no list of unique files inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
+| dependency paths configured or invalid | PIN-44..48 | PIN-44..48 | PIN-44..48 | PIN-44..48 | — |
 | only the trunk's committed copy refuses | PIN-42 | PIN-42 | PIN-42 | PIN-42 | — |
 | `storage = "state-ref"` | PIN-04\*, PIN-05\*, PIN-30 | PIN-18..21 | PIN-22..28 | —\*\* | PIN-08, PIN-31 |
 | a state-ref item file itself is malformed | PIN-14..17, PIN-34, PIN-29 | ITEM-37 | ITEM-39, PIN-29 | BOARD-54 | — |
@@ -82,6 +83,14 @@ owns what a write to one is allowed.
 - [ ] [PIN-40] Only the trunk's committed copy counts, as the last fetch left it, never a worktree's own; no trunk copy means no file is lane-shared, while a trunk copy git fails to read is a git failure.
 - [ ] [PIN-41] An entry matches exactly one file path the trunk tracks, never as a prefix: an entry naming a directory covers neither it nor any file below it; one naming an untracked file covers nothing.
 - [ ] [PIN-42] A trunk copy that refuses costs only the lane-shared answer: `status` and `brief` name its defect (STAT-21), and no file is lane-shared for `protect` (PROT-46).
+
+## Dependency paths
+
+- [ ] [PIN-44] A tracked `<path>` may name `dependency_paths = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one path; absent, none is a dependency path.
+- [ ] [PIN-48] A listed path CLAIM-19 or CLAIM-20 would refuse as a scope, or one not in normal form, is covered by no entry.
+- [ ] [PIN-45] A `dependency_paths` value that is no list of unique strings refuses `board configuration <path> dependency_paths must be a list of unique repository paths`.
+- [ ] [PIN-46] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> dependency_paths entry '<entry>' is not a canonical path inside the repository`.
+- [ ] [PIN-47] Only the run's own tracked `<path>` decides; `aco land` reads the default branch's clean checkout (LANDCMD-11), never the pull request head's copy.
 
 ## `storage = "state-ref"` is forge-free
 

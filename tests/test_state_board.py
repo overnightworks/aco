@@ -997,6 +997,12 @@ class TestStateRefBoardMethods:
 
     def test_capability_matches_the_state_ref_surface(self, state_ref_board: StateRefBoard) -> None:
         assert (
+            state_ref_board.capability(forge.ForgeOperation.PULL_REQUEST_CHANGES)
+            is forge.Capability.UNSUPPORTED
+        )
+        with pytest.raises(forge.ForgeUnsupportedError):
+            state_ref_board.pull_request_changes(12)
+        assert (
             state_ref_board.capability(forge.ForgeOperation.LIST_OPEN_BOARD_ISSUES)
             is forge.Capability.READ_ONLY
         )
