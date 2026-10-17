@@ -1,0 +1,8 @@
+claim_id = "9a77eab40cf64a9baeedcd5bba46b9be"
+agent = "claude"
+role = "builder"
+base = "ec389d8c780f4d0888f4b69cda732944bdd89cfe"
+branch = "claude/issue-154-f4-body-check"
+scope = ["tests/board_fixtures.py", "tests/cli_fixtures.py", "tests/test_body_cli.py", "tests/test_cli.py"]
+opened_commit = "3b85bd1ef303091a76fb5665508d9e65896a96f1"
+whole_reason = "Die Familie zieht mit dem Bytes-Pfad von run_cli und den geteilten Steuerzeichen-Daten gemeinsam um; halb umgezogen gäbe es zwei stdin-Wege."
