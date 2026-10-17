@@ -100,6 +100,7 @@ from agent_coordination import (
     board_read,
     body,
     checkout,
+    cmd_check,
     cmd_reset,
     forge,
     github,
@@ -20356,7 +20357,7 @@ def test_check_reads_blockers_from_the_forge_and_qualifies_foreign_ones(
 
 
 def test_issue_check_labels_a_local_blocker_under_the_state_ref_pin() -> None:
-    """Issue #300 (Codex Terra review): `_issue_check` reads the repository's
+    """Issue #300 (Codex Terra review): `cmd_check._issue_check` reads the repository's
     own `storage` pin for a local blocker exactly as `claim`'s
     `_blocked_check` does -- a foreign one (`other/repo#9`) is unaffected,
     since it is never local to this repository's own storage pin
@@ -20365,7 +20366,7 @@ def test_issue_check_labels_a_local_blocker_under_the_state_ref_pin() -> None:
         board_dependencies={CHECKED_ISSUE: (open_dependency(7), open_dependency(9, "other/repo"))}
     )
 
-    outcome = issue_claim._issue_check(
+    outcome = cmd_check._issue_check(
         client,
         REPOSITORY,
         block_body(MINIMAL_BLOCK_TOML),
