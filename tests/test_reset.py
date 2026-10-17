@@ -7,6 +7,7 @@ import shlex
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 
 import pytest
@@ -34,9 +35,9 @@ from store_fixtures import (
 from agent_coordination import checkout, process, protocol, session, store
 
 
-def _expected_reset_bundle(export_dir: Path, clone: Path, tip: str | None) -> Path:
+def _expected_reset_bundle(export_dir: Path, clone: Path, tip: str) -> Path:
     return export_dir / (
-        f"aco-state-{clone.name}-{FROZEN_CLI_NOW.date().isoformat()}-{str(tip)[:12]}.bundle"
+        f"aco-state-{clone.name}-{FROZEN_CLI_NOW.date().isoformat()}-{tip[:12]}.bundle"
     )
 
 
@@ -92,7 +93,7 @@ class ResetPlan:
     status: int
     lines: tuple[str, ...]
     error: str
-    bundle_exists: bool
+    exports_bundle: bool
     explicit_directory: bool = True
 
 
@@ -114,7 +115,7 @@ class ResetPlan:
                     "would: bootstrap a fresh empty state",
                 ),
                 error="",
-                bundle_exists=False,
+                exports_bundle=False,
                 explicit_directory=True,
             ),
             id="claim-free-dry",
@@ -134,7 +135,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=True,
+                exports_bundle=True,
                 explicit_directory=True,
             ),
             id="plain",
@@ -154,7 +155,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=True,
+                exports_bundle=True,
                 explicit_directory=True,
             ),
             id="forced",
@@ -176,7 +177,7 @@ class ResetPlan:
                     "would: bootstrap a fresh empty state",
                 ),
                 error="",
-                bundle_exists=False,
+                exports_bundle=False,
                 explicit_directory=True,
             ),
             id="schema1-dry",
@@ -192,7 +193,7 @@ class ResetPlan:
                     "ERROR: schema 1 not readable by this aco; live claims unknown "
                     "(--confirm needs --force-unreadable)\n"
                 ),
-                bundle_exists=False,
+                exports_bundle=False,
                 explicit_directory=True,
             ),
             id="schema1-refused",
@@ -212,7 +213,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=True,
+                exports_bundle=True,
                 explicit_directory=True,
             ),
             id="schema1-forced",
@@ -231,7 +232,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=False,
+                exports_bundle=False,
                 explicit_directory=True,
             ),
             id="no-export",
@@ -250,7 +251,7 @@ class ResetPlan:
                     "would: bootstrap a fresh empty state",
                 ),
                 error="",
-                bundle_exists=False,
+                exports_bundle=False,
                 explicit_directory=True,
             ),
             id="never-dry",
@@ -269,7 +270,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=False,
+                exports_bundle=False,
                 explicit_directory=True,
             ),
             id="never-confirm",
@@ -289,7 +290,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=True,
+                exports_bundle=True,
                 explicit_directory=True,
             ),
             id="foreign-local",
@@ -308,7 +309,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=False,
+                exports_bundle=False,
                 explicit_directory=True,
             ),
             id="deleted-observed",
@@ -328,7 +329,7 @@ class ResetPlan:
                     "bootstrapped a fresh empty state at {{fresh_tip}}",
                 ),
                 error="",
-                bundle_exists=True,
+                exports_bundle=True,
                 explicit_directory=False,
             ),
             id="default-directory",
@@ -351,7 +352,8 @@ def test_reset_plans_or_performs_each_state(
     export_dir = clone.parent / "export" if case.explicit_directory else clone.parent
     export_dir.mkdir(exist_ok=True)
     assert not list(export_dir.glob("*.bundle"))
-    bundle = _expected_reset_bundle(export_dir, clone, tip)
+    before = set(export_dir.iterdir())
+    bundle = _expected_reset_bundle(export_dir, clone, tip) if tip is not None else None
     arguments = ["reset", *case.arguments]
     if case.explicit_directory:
         arguments += ["--export-dir", str(export_dir)]
@@ -371,14 +373,14 @@ def test_reset_plans_or_performs_each_state(
         ),
         "error": result.stderr,
         "local": store.local_state_ref_exists(clone),
-        "bundle_exists": bool(list(export_dir.glob("*.bundle"))),
+        "export_changes": set(export_dir.iterdir()) - before,
     }
     expected: dict[str, object] = {
         "status": case.status,
         "lines": expected_lines,
         "error": case.error,
         "local": False,
-        "bundle_exists": case.bundle_exists,
+        "export_changes": {bundle} if case.exports_bundle else set(),
     }
     if case.executed:
         printed = re.search(
@@ -398,7 +400,7 @@ def test_reset_plans_or_performs_each_state(
     else:
         actual.update(remote=remote, lineage=lineage_observation(clone))
         expected.update(remote=tip, lineage=lineage_before)
-    if case.bundle_exists:
+    if case.exports_bundle:
         actual.update(
             bundle_verified=real_git(
                 clone, "bundle", "verify", str(bundle), check=False
@@ -551,7 +553,33 @@ def test_reset_refuses_undefined_arguments_before_any_read(
     ],
 )
 @pytest.mark.parametrize(
-    "mode", [pytest.param([], id="dry"), pytest.param(["--confirm"], id="confirm")]
+    "mode, expected_lines, executed",
+    [
+        pytest.param(
+            [],
+            (
+                "would: nothing to export: {ref} does not exist on origin",
+                "would: nothing to delete on origin: {ref} does not exist",
+                "would: no local {ref} to delete",
+                "would: clear lineage stamps and fetch anchors in 1 worktree",
+                "would: bootstrap a fresh empty state",
+            ),
+            False,
+            id="dry",
+        ),
+        pytest.param(
+            ["--confirm"],
+            (
+                "nothing to export: {ref} does not exist on origin",
+                "nothing to delete on origin: {ref} does not exist",
+                "no local {ref} to delete",
+                "cleared lineage stamps and fetch anchors in 1 worktree",
+                "bootstrapped a fresh empty state at {{fresh_tip}}",
+            ),
+            True,
+            id="confirm",
+        ),
+    ],
 )
 def test_reset_ignores_repo_without_resolving_a_forge(
     clone: Path,
@@ -560,6 +588,8 @@ def test_reset_ignores_repo_without_resolving_a_forge(
     capsys: pytest.CaptureFixture[str],
     repo: list[str],
     mode: list[str],
+    expected_lines: tuple[str, ...],
+    executed: bool,
 ) -> None:
     """Spec: RESET-11 -- repo does not affect a forge-free reset."""
 
@@ -570,27 +600,35 @@ def test_reset_ignores_repo_without_resolving_a_forge(
     capsys.readouterr()
     result = run_cli([*repo, "reset", *mode], capsys)
     remote = state_ref_tip(bare_remote)
-    expected = (
-        f"nothing to export: {store.STATE_REF} does not exist on origin",
-        f"nothing to delete on origin: {store.STATE_REF} does not exist",
-        f"no local {store.STATE_REF} to delete",
-        "cleared lineage stamps and fetch anchors in 1 worktree"
-        if mode
-        else "clear lineage stamps and fetch anchors in 1 worktree",
-        f"bootstrapped a fresh empty state at {remote}"
-        if mode
-        else "bootstrap a fresh empty state",
+    printed = re.search(
+        r"^bootstrapped a fresh empty state at ([0-9a-f]{40})$", result.stdout, re.MULTILINE
     )
-    if not mode:
-        expected = tuple(f"would: {line}" for line in expected)
-    assert (result.status, tuple(result.stdout.splitlines()), bool(remote)) == (
-        0,
-        expected,
-        bool(mode),
-    )
+    actual = {
+        "status": result.status,
+        "lines": tuple(
+            re.sub(r"(?<=bootstrapped a fresh empty state at )[0-9a-f]{40}$", "{fresh_tip}", line)
+            for line in result.stdout.splitlines()
+        ),
+        "remote": bool(remote),
+        "printed_tip": printed is not None and printed.group(1) == remote,
+    }
+    expected = {
+        "status": 0,
+        "lines": tuple(line.format(ref=store.STATE_REF) for line in expected_lines),
+        "remote": executed,
+        "printed_tip": executed,
+    }
+    assert actual == expected
 
 
-def _reject_delete(monkeypatch: pytest.MonkeyPatch, clone: Path, tip: str, mode: str) -> None:
+def _reject_delete(
+    monkeypatch: pytest.MonkeyPatch,
+    clone: Path,
+    tip: str,
+    *,
+    perform_delete: bool = False,
+    fail_probe: bool = False,
+) -> None:
     launch = process.run_captured
     deleted = False
     delete = [
@@ -608,26 +646,29 @@ def _reject_delete(monkeypatch: pytest.MonkeyPatch, clone: Path, tip: str, mode:
         nonlocal deleted
         if command == delete:
             deleted = True
-            if mode == "lost-delete-response":
+            if perform_delete:
                 launch(command, **kwargs)
             return process.CapturedResult(1, b"", b"simulated rejected delete")
-        if deleted and command == probe and mode == "lease-unknown":
+        if deleted and command == probe and fail_probe:
             return process.CapturedResult(1, b"", b"simulated network failure")
         return launch(command, **kwargs)
 
     monkeypatch.setattr(process, "run_captured", captured)
 
 
+class FreshTip(Enum):
+    REQUIRED = auto()
+
+
 @dataclass(frozen=True)
 class ResetFailure:
     status: int
     error: str
-    remote: str | None
+    remote: str | FreshTip | None
     local_tip: str
     verification: bool
     lineage: tuple[protocol.ObjectId | None, str | None] | None = None
     manual_lease: bool | None = None
-    fresh_tip: bool = False
 
 
 @contextmanager
@@ -698,7 +739,7 @@ def _unchanged_lease(
     monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
 ) -> Iterator[ResetFailure]:
     _retain_local_ref(clone, tip)
-    _reject_delete(monkeypatch, clone, tip, "lease-unchanged")
+    _reject_delete(monkeypatch, clone, tip)
     yield ResetFailure(
         status=2,
         error=re.escape(
@@ -719,7 +760,7 @@ def _unknown_lease(
     monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
 ) -> Iterator[ResetFailure]:
     _retain_local_ref(clone, tip)
-    _reject_delete(monkeypatch, clone, tip, "lease-unknown")
+    _reject_delete(monkeypatch, clone, tip, fail_probe=True)
     yield ResetFailure(
         status=2,
         error=re.escape(
@@ -740,14 +781,13 @@ def _lost_response(
     monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
 ) -> Iterator[ResetFailure]:
     assert not store.local_state_ref_exists(clone)
-    _reject_delete(monkeypatch, clone, tip, "lost-delete-response")
+    _reject_delete(monkeypatch, clone, tip, perform_delete=True)
     yield ResetFailure(
         status=0,
         error="",
-        remote=None,
+        remote=FreshTip.REQUIRED,
         local_tip="",
         verification=True,
-        fresh_tip=True,
     )
 
 
@@ -824,7 +864,7 @@ def test_reset_failure_leaves_the_state_intact(
         "local_tip": case.local_tip,
         "verification": case.verification,
     }
-    if case.fresh_tip:
+    if case.remote is FreshTip.REQUIRED:
         actual.update(fresh_tip=bool(remote) and remote != tip)
         expected.update(fresh_tip=True)
     else:
