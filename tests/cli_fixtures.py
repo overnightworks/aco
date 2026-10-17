@@ -462,13 +462,27 @@ class CliRun:
         return self.stderr
 
 
-def run_cli(argv: list[str], capsys: pytest.CaptureFixture[str]) -> CliRun:
+def run_cli(
+    argv: list[str], capsys: pytest.CaptureFixture[str], *, stdin: str | None = None
+) -> CliRun:
     """Run `argv` through `main`, whether it returns its exit status or
-    argparse exits with it, and read back what it printed."""
+    argparse exits with it, and drain everything printed since the last run.
+
+    A supplied string is a UTF-8 pipe; None leaves inherited stdin untouched.
+    The previous stdin is restored and the pipe closed even when main raises.
+    """
+    previous_stdin = sys.stdin
+    pipe = read_end_of_a_pipe_carrying(stdin) if stdin is not None else None
+    if pipe is not None:
+        sys.stdin = pipe
     try:
         status = cli.main(argv)
     except SystemExit as exit_request:
         status = exit_request.code
+    finally:
+        if pipe is not None:
+            sys.stdin = previous_stdin
+            pipe.close()
     captured = capsys.readouterr()
     return CliRun(status, captured.out, captured.err)
 
@@ -607,9 +621,9 @@ def read_end_of_a_pipe_carrying(text: str) -> TextIO:
     wrote `text` -- a scenario body, well inside a pipe's buffer -- and
     closed. Read as `sys.stdin` reads a pipe: line endings untranslated."""
     read_end, write_end = os.pipe()
-    with os.fdopen(write_end, "w") as writer:
+    with os.fdopen(write_end, "w", encoding="utf-8") as writer:
         writer.write(text)
-    return os.fdopen(read_end, newline="")
+    return os.fdopen(read_end, encoding="utf-8", newline="")
 
 
 def piping(text: str) -> Callable[[Path], contextlib.AbstractContextManager[TextIO]]:
@@ -625,14 +639,6 @@ def piping(text: str) -> Callable[[Path], contextlib.AbstractContextManager[Text
 
 
 piped_body_on_stdin = piping(ITEM_NEW_BODY)
-
-
-def main_with_piped_stdin(monkeypatch: pytest.MonkeyPatch, text: str, argv: list[str]) -> int:
-    """`printf ... | aco <argv>`: one run with `text` on a pipe as its
-    stdin, the pipe closed once the run returns."""
-    with read_end_of_a_pipe_carrying(text) as stdin:
-        monkeypatch.setattr(sys, "stdin", stdin)
-        return cli.main(argv)
 
 
 @contextlib.contextmanager
