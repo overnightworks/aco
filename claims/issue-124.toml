@@ -1,0 +1,8 @@
+claim_id = "8d6b196e09794a35ae1a94ce189c5977"
+agent = "claude"
+role = "builder"
+base = "5ea15886835d058a26db6e96635bd13b8b41fb8e"
+branch = "claude/issue-124-s20-cmd-rule-ask"
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_ask.py", "src/agent_coordination/cmd_cut.py", "src/agent_coordination/cmd_rule.py", "src/agent_coordination/report.py", "tests/test_cli.py", "tests/test_state_board.py"]
+opened_commit = "9c420925c314ea8993197c9212181cb2d6aa1f3d"
+whole_reason = "Zwei Befehle ziehen mit ihrer cmd-Kante, Layers-Zeile, Uhr-Bereinigung und Docstrings gemeinsam aus cli; ask hängt an rule."
