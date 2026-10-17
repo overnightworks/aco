@@ -14311,6 +14311,49 @@ def test_cli_identity_and_release_refusals_print_the_shared_envelope(
     _assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
 
 
+@pytest.mark.parametrize(
+    ("item", "agent", "sentence", "reason"),
+    [
+        pytest.param(
+            "16777216",
+            None,
+            "16777216 names no state-ref item; an item id ends at aco-ffffff",
+            "invalid_usage",
+            id="pin-31-before-identity",
+        ),
+        pytest.param("72", "Ada", "handler refused", None, id="handler-outside-identity-catch"),
+    ],
+)
+def test_cli_repository_refusals_preserve_pin_and_handler_error_order(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    item: str,
+    agent: str | None,
+    sentence: str,
+    reason: str | None,
+) -> None:
+    """PIN-31 precedes identity resolution; handler errors keep their plain report."""
+    _write_state_ref_pin(tmp_path)
+    _set_agent_identity_env(monkeypatch, {} if agent is None else {checkout.ACO_AGENT_ENV: agent})
+
+    def refuse_handler(parsed: argparse.Namespace, context: RunContext) -> int:
+        raise protocol.ClaimError(sentence)
+
+    command = cast(issue_claim._RepositoryCommand, issue_claim._COMMANDS["claim"])
+    monkeypatch.setitem(issue_claim._COMMANDS, "claim", replace(command, run=refuse_handler))
+
+    status = issue_claim.main(["claim", item, "--json"])
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.err == f"ERROR: {sentence}\n"
+    if reason is None:
+        assert captured.out == ""
+    else:
+        _assert_json_refusal_object(captured.err, captured.out, reason=reason)
+
+
 def test_cli_claim_json_conflict_prints_the_stdout_error_object_not_a_success_shape(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

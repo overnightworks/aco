@@ -979,6 +979,19 @@ def _pins_state_ref(context: RunContext) -> bool:
         return False
 
 
+def _run_repository_command(
+    command: _RepositoryCommand,
+    parser: _UsageErrorParser,
+    given: list[str],
+    parsed: argparse.Namespace,
+) -> int:
+    context = session.run_context(parsed.repo)
+    refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
+    if refusal is None and command.resolves_agent:
+        refusal = _resolve_agent_or_refuse(parsed)
+    return refusal if refusal is not None else command.run(parsed, context)
+
+
 def main(arguments: list[str] | None = None) -> int:
     # Every refusal the parse itself raises -- argparse's own usage errors,
     # and `board.parse_item_reference`, an argparse `type=` whose refusal is
@@ -1004,17 +1017,13 @@ def main(arguments: list[str] | None = None) -> int:
             PreDispatchReason.INVALID_USAGE, error, as_json=_asked_for_json(parser, given)
         )
     try:
-        match _COMMANDS[parsed.command]:
-            case _NoArgumentsCommand() as command:
+        command = _COMMANDS[parsed.command]
+        match command:
+            case _NoArgumentsCommand():
                 return command.run()
-            case _LocalCommand() as command:
+            case _LocalCommand():
                 return command.run(parsed)
-            case _RepositoryCommand() as command:
-                context = session.run_context(parsed.repo)
-                refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
-                if refusal is None and command.resolves_agent:
-                    refusal = _resolve_agent_or_refuse(parsed)
-                return refusal if refusal is not None else command.run(parsed, context)
+        return _run_repository_command(command, parser, given, parsed)
     except protocol.ClaimError as error:
         return report.render_error(error)
 
