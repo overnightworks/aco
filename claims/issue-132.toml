@@ -1,0 +1,8 @@
+claim_id = "06472c1beaf24d52b9ac4adbf56281ff"
+agent = "claude"
+role = "builder"
+base = "17a0f934dd8ec7fbcc79a518cdb7e601389103aa"
+branch = "claude/issue-132-s25c-one-owner-per-name"
+scope = ["src/agent_coordination/cli.py", "src/agent_coordination/cmd_workspace.py", "tests/test_cli.py", "tests/test_workspace_cli.py"]
+opened_commit = "9d96cd42166daefb820bbde48ce2e9cd3138cabb"
+whole_reason = "Die Builder-Signatur und die vier Workspace-Handler hängen an derselben Tabelle; halb umgestellt hätte ein Befehl zwei Entscheider."
