@@ -1,8 +1,0 @@
-claim_id = "da89bbdf3f394e44b1d2b7ac073f0e70"
-agent = "claude"
-role = "builder"
-base = "ff4cfec4addce40faa64cd013dcba8c6ec39e772"
-branch = "claude/issue-93-s9-cmd-check"
-scope = ["pyproject.toml", "src/agent_coordination/board.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_check.py", "src/agent_coordination/policy.py", "tests/test_cli.py"]
-opened_commit = "c10b84d542287919ee3d777a1496b84db54a3a0a"
-whole_reason = "Ein Befehl zieht mit Prüfung, Ausgabe, Layers-Zeile und Testverweis in sein Modul; halb verschoben bräche der Import."
