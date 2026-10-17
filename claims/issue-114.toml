@@ -1,8 +1,0 @@
-claim_id = "f0c3eec2aeda4be9a2d302d28902611e"
-agent = "claude"
-role = "builder"
-base = "aa7104e4c0210a56748d6f6caf6f684dbb9cfcdd"
-branch = "claude/issue-114-s17b-private-cmd-names"
-scope = ["src/agent_coordination/cli.py", "src/agent_coordination/cmd_board.py", "src/agent_coordination/cmd_check.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_land.py", "src/agent_coordination/cmd_next.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/cmd_reset.py", "src/agent_coordination/cmd_rulings.py", "src/agent_coordination/cmd_start.py", "tests/github_fixtures.py", "tests/test_cli.py"]
-opened_commit = "81b38366916250a9e5b1584f893f9a1c8902cf14"
-whole_reason = "Eine Regel (öffentlich nur, was ein anderes Modul nutzt) gilt für alle cmd_*-Module zugleich; je Modul getrennt hieße es zehn Landungen für dieselbe mechanische Umbenennung."
