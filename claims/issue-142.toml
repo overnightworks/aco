@@ -1,8 +1,0 @@
-claim_id = "c9aa7109ec1f4d47ac58d3156e64ab6a"
-agent = "claude"
-role = "builder"
-base = "33bad72ae787765fd5fd4750bf69525a9b3ce198"
-branch = "claude/issue-142-fa-clone-spec-setup"
-scope = ["tests/cli_fixtures.py", "tests/store_fixtures.py", "tests/test_bootstrap.py", "tests/test_store.py"]
-opened_commit = "2d56e16e8a7c82bb6fb253ee6f5577b8eed5e600"
-whole_reason = "Das Spec-Setup, seine einzigen beiden Nutzer und der geteilte State-Ref-Leser ändern sich nur gemeinsam; halb umgestellt gäbe es zwei clone-Fixtures."
