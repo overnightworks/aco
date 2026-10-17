@@ -174,7 +174,7 @@ def _claim_json(
     *,
     versioning: ScopeVersioning,
     touches: tuple[protocol.ActiveClaim, ...],
-    checks: tuple[SliceCheck, ...],
+    checks: tuple[_SliceCheck, ...],
 ) -> int:
     report.emit_json(
         True,
@@ -191,7 +191,7 @@ def _claim_json(
 
 
 @dataclass(frozen=True)
-class SliceCheck:
+class _SliceCheck:
     """One slice-rule finding — the `check` table `#79` rules.
 
     `slice`/`issue` carry whichever numbers the message names, so a `--json`
@@ -236,14 +236,14 @@ def _out_of_order_check(
     issue: int | None,
     out_of_order_reason: str | None,
     storage: body.Storage,
-) -> SliceCheck | None:
+) -> _SliceCheck | None:
     highest = board.highest_scored_actionable(projected)
     if highest is None or issue is None:
         return None
     claimed_item = next((item for item in projected.items if item.number == issue), None)
     if claimed_item is None or board.board_rank(highest) >= board.board_rank(claimed_item):
         return None
-    return SliceCheck(
+    return _SliceCheck(
         "warning" if out_of_order_reason is not None else "error",
         "out-of-order",
         f"higher-priority actionable item {board.item_label(highest.number, storage)} "
@@ -258,13 +258,13 @@ def _blocked_check(
     out_of_order_reason: str | None,
     repository: str,
     storage: body.Storage,
-) -> SliceCheck | None:
+) -> _SliceCheck | None:
     if item is None or not item.open_blockers:
         return None
     blockers = ", ".join(
         board.open_blocker_label(reference, repository, storage) for reference in item.open_blockers
     )
-    return SliceCheck(
+    return _SliceCheck(
         "warning" if out_of_order_reason is not None else "error",
         "blocked",
         f"{board.item_label(item.number, storage)} is blocked by {blockers} (open); "
@@ -275,7 +275,7 @@ def _blocked_check(
 
 def _parent_checks(
     client: forge.ForgeReader, repository: str, issue: int, title: str, storage: body.Storage
-) -> SliceCheck | None:
+) -> _SliceCheck | None:
     """Warn when a slice-shaped title names a parent GitHub does not record as one."""
     match = board.slice_title_match(title)
     if match is None:
@@ -287,7 +287,7 @@ def _parent_checks(
     if parent is not None and parent.reference == board.IssueReference(repository, parent_issue):
         return None
     parent_label = board.item_label(parent_issue, storage)
-    return SliceCheck(
+    return _SliceCheck(
         "warning",
         "missing-parent",
         f"looks like slice {slice_number} of {parent_label} but is no sub-issue "
@@ -297,25 +297,25 @@ def _parent_checks(
     )
 
 
-def _malformed_checks(item: board.BoardItem) -> tuple[SliceCheck, ...] | None:
+def _malformed_checks(item: board.BoardItem) -> tuple[_SliceCheck, ...] | None:
     """The one refusal a malformed block body gets (#150) -- every other
     body-contract check (blocker state, completeness) never runs, since
     neither the parsed projections nor the blocker set can be trusted once
     the body itself failed to read."""
     if item.read_state is body.BodyReadState.MALFORMED:
         return tuple(
-            SliceCheck("error", "body-contract", body.body_defect_text(defect))
+            _SliceCheck("error", "body-contract", body.body_defect_text(defect))
             for defect in item.contract.defects
         )
     return None
 
 
-def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple[SliceCheck, ...]:
+def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple[_SliceCheck, ...]:
     malformed = _malformed_checks(item)
     if malformed is not None:
         return malformed
     contract = item.contract
-    checks = [SliceCheck("error", "body-contract", defect.message) for defect in contract.defects]
+    checks = [_SliceCheck("error", "body-contract", defect.message) for defect in contract.defects]
     # Read the two atomic facts directly rather than `item.actionable_reason`:
     # that reason is the *first* one `board._actionable_reason` finds (frozen,
     # claimed, blocked, then incomplete), so an item that is both blocked and
@@ -326,7 +326,7 @@ def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple
     if not item.contract_complete and not item.projectionless_idea:
         missing = ", ".join(body.missing_or_empty_sections(contract))
         checks.append(
-            SliceCheck(
+            _SliceCheck(
                 "error",
                 "body-incomplete",
                 f"{board.item_label(item.number, storage)} body incomplete: {missing}",
@@ -337,7 +337,7 @@ def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple
 
 
 @dataclass(frozen=True)
-class BoardReferenceLookup:
+class _BoardReferenceLookup:
     """The board client, its repository, and the currently open issues it can
     resolve `#reference`s against — what every cross-issue slice/parent check
     below needs to look a referenced issue up."""
@@ -348,13 +348,13 @@ class BoardReferenceLookup:
 
 
 def _slice_rule_checks(
-    lookup: BoardReferenceLookup,
+    lookup: _BoardReferenceLookup,
     issue: int,
     projected: board.Board,
     out_of_order_reason: str | None,
     storage: body.Storage,
-) -> tuple[SliceCheck, ...]:
-    checks: list[SliceCheck] = []
+) -> tuple[_SliceCheck, ...]:
+    checks: list[_SliceCheck] = []
     out_of_order = _out_of_order_check(projected, issue, out_of_order_reason, storage)
     if out_of_order is not None:
         checks.append(out_of_order)
@@ -362,17 +362,17 @@ def _slice_rule_checks(
     item = next((item for item in projected.items if item.number == issue), None)
     if item is not None and item.kind is body.ItemKind.CONTAINER:
         checks.append(
-            SliceCheck("error", "container", f"{label} is a container; claim a child", issue=issue)
+            _SliceCheck("error", "container", f"{label} is a container; claim a child", issue=issue)
         )
     blocked = _blocked_check(item, out_of_order_reason, lookup.repository, storage)
     if blocked is not None:
         checks.append(blocked)
     state, title, _body = _issue_reference_state(lookup.client, lookup.open_by_number, issue)
     if state is forge.ItemState.CLOSED:
-        checks.append(SliceCheck("error", "closed-issue", f"issue {label} is closed", issue=issue))
+        checks.append(_SliceCheck("error", "closed-issue", f"issue {label} is closed", issue=issue))
     elif state is forge.ItemState.MISSING:
         checks.append(
-            SliceCheck("error", "missing-issue", f"issue {label} does not exist here", issue=issue)
+            _SliceCheck("error", "missing-issue", f"issue {label} does not exist here", issue=issue)
         )
     if item is not None:
         checks.extend(_body_contract_checks(item, storage))
@@ -383,7 +383,7 @@ def _slice_rule_checks(
     return tuple(checks)
 
 
-def refuse_claim(as_json: bool, issue: int | None, checks: tuple[SliceCheck, ...]) -> None:
+def refuse_claim(as_json: bool, issue: int | None, checks: tuple[_SliceCheck, ...]) -> None:
     if as_json:
         report.emit_json(
             False,
@@ -466,13 +466,13 @@ def _matching_store_claim(
     return None
 
 
-LANE_CLAIM_SCOPE_REQUIRED = "lane claim requires --scope; a lane names no item to derive it from"
+_LANE_CLAIM_SCOPE_REQUIRED = "lane claim requires --scope; a lane names no item to derive it from"
 
 
-CLAIM_SCOPE_MISSING = "item names no scope; pass --scope"
+_CLAIM_SCOPE_MISSING = "item names no scope; pass --scope"
 
 
-CLAIM_SCOPE_MISMATCH = "claim scope differs from the item's scope; correct the item first"
+_CLAIM_SCOPE_MISMATCH = "claim scope differs from the item's scope; correct the item first"
 
 
 class _ClaimTargetInvalidError(protocol.ClaimError):
@@ -621,7 +621,7 @@ def _resolved_claim_request(
     open_by_number = {issue.number: issue for issue in client.list_open_board_issues()}
     item_scope = _item_scope(client, open_by_number, identity.issue, storage=storage)
     if item_scope is None:
-        raise _ClaimBodyInvalidError(CLAIM_SCOPE_MISSING)
+        raise _ClaimBodyInvalidError(_CLAIM_SCOPE_MISSING)
     return replace(requested, scope=item_scope), open_by_number
 
 
@@ -645,7 +645,7 @@ def _reject_scope_mismatch(
         return
     item_scope = body.parse_body(issue.body, storage=storage).scope
     if item_scope is not None and item_scope != scope:
-        raise _ClaimBodyInvalidError(CLAIM_SCOPE_MISMATCH)
+        raise _ClaimBodyInvalidError(_CLAIM_SCOPE_MISMATCH)
 
 
 def scope_versioning(
@@ -700,7 +700,7 @@ def _claim_target_checks(
     requested: protocol.ClaimRequest,
     observed: protocol.ClaimState,
     target: _ClaimTargetContext,
-) -> tuple[tuple[SliceCheck, ...], int | None, protocol.ActiveClaim | None]:
+) -> tuple[tuple[_SliceCheck, ...], int | None, protocol.ActiveClaim | None]:
     """`run`'s slice-rule checks against its own target issue,
     `()`/`None`/`None` for a lane claim -- there is no target issue to
     check against. A replayed claim (`_matching_store_claim`) skips the
@@ -729,7 +729,7 @@ def _claim_target_checks(
         history=board_read.ClaimHistory(ages=board_read.claim_ages(target.worktree, observed)),
     )
     checks = _slice_rule_checks(
-        BoardReferenceLookup(client, client.repository.path, open_by_number),
+        _BoardReferenceLookup(client, client.repository.path, open_by_number),
         target_issue,
         projected,
         requested.out_of_order_reason,
@@ -819,7 +819,7 @@ class _ClaimPlan:
     observed: protocol.ClaimState
     storage: body.Storage
     versioning: ScopeVersioning
-    checks: tuple[SliceCheck, ...]
+    checks: tuple[_SliceCheck, ...]
     target_issue: int | None
     replayed: protocol.ActiveClaim | None
     intent: protocol.ClaimIntent
@@ -842,7 +842,7 @@ def checked_claim(
     trunk before its worktree exists, or the HEAD of a lane worktree that
     already stands); the session's own checkout otherwise."""
     if isinstance(requested.identity, protocol.LaneIdentity) and not requested.scope:
-        raise protocol.ClaimUnavailableError(LANE_CLAIM_SCOPE_REQUIRED)
+        raise protocol.ClaimUnavailableError(_LANE_CLAIM_SCOPE_REQUIRED)
     open_by_number: dict[int, board.Issue] | None = None
     if requested.scope or not isinstance(requested.identity, protocol.IssueIdentity):
         # Scope already final (given, or a lane's own required value): the

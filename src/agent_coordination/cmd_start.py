@@ -90,12 +90,12 @@ def _remove_refused_start_worktree(target: _StartTarget) -> None:
     )
 
 
-RESUME_SCOPE_MISMATCH = "live claim scope differs; release it first"
+_RESUME_SCOPE_MISMATCH = "live claim scope differs; release it first"
 
 
 def _refuse_resume_scope_mismatch(live: protocol.ActiveClaim, parsed: argparse.Namespace) -> None:
     if parsed.scope is not None and protocol.valid_scope(parsed.scope) != live.scope:
-        raise protocol.ClaimUnavailableError(RESUME_SCOPE_MISMATCH)
+        raise protocol.ClaimUnavailableError(_RESUME_SCOPE_MISMATCH)
 
 
 def _checked_start_resume(

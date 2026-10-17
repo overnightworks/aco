@@ -46,7 +46,7 @@ def _next_action_command(
     an item carrying its own top-level `scope` (issue #348, #337's own
     derivation); an item whose one `[[slice]]` row names paths claims
     exactly those; only an item naming neither still prints the
-    placeholder, alongside `SCOPE_UNKNOWN_NOTE`. A scope the width gate
+    placeholder, alongside `_SCOPE_UNKNOWN_NOTE`. A scope the width gate
     calls wide in this checkout, with no `whole` in the body, adds
     `--whole <reason>` (issue #566). All render through `board.advice_command`, so the line runs as
     printed (issue #510).
@@ -102,7 +102,7 @@ def _claims_in_place(context: session.RunContext) -> bool:
     )
 
 
-class NextReason(StrEnum):
+class _NextReason(StrEnum):
     """`aco next`'s own `--json` `reason` vocabulary (issue #412,
     `specs/next.spec.md`): the action type -- `work_item`, `cut_slice`,
     `check_container`, `close_container` -- names a success (`ok: true`) exactly as it did
@@ -123,14 +123,14 @@ class NextReason(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
-def _next_action_reason(action: board.NextAction) -> NextReason:
+def _next_action_reason(action: board.NextAction) -> _NextReason:
     if isinstance(action, board.WorkItemAction):
-        return NextReason.WORK_ITEM
+        return _NextReason.WORK_ITEM
     if isinstance(action, board.CutSliceAction):
-        return NextReason.CUT_SLICE
+        return _NextReason.CUT_SLICE
     if isinstance(action, board.CheckContainerAction):
-        return NextReason.CHECK_CONTAINER
-    return NextReason.CLOSE_CONTAINER
+        return _NextReason.CHECK_CONTAINER
+    return _NextReason.CLOSE_CONTAINER
 
 
 def _next_action_payload(
@@ -172,11 +172,11 @@ def _next_action_payload(
 
 # The three sentences issue #348 adds to `next`'s own text form, each named
 # once so text and JSON (`_parallel_json`) never restate them (Sonar S1192).
-SCOPE_UNKNOWN_NOTE = "scope unknown"
-PARALLEL_UNKNOWN_LINE = "parallel: unknown (first action names no scope)"
+_SCOPE_UNKNOWN_NOTE = "scope unknown"
+_PARALLEL_UNKNOWN_LINE = "parallel: unknown (first action names no scope)"
 # "Text zeigt höchstens drei Kandidaten plus 'and N more'" (issue #348 Form):
 # a stable display cap, not something an operator tunes.
-PARALLEL_TEXT_LIMIT = 3
+_PARALLEL_TEXT_LIMIT = 3
 
 
 def _parallel_candidate_label(candidate: board.ParallelCandidate, storage: body.Storage) -> str:
@@ -189,17 +189,17 @@ def _parallel_candidate_label(candidate: board.ParallelCandidate, storage: body.
 def _parallel_line(parallel: board.ParallelSet, storage: body.Storage) -> str:
     """`next`'s own `parallel:` line: the unknown sentence when the first
     action itself names no scope, `none` when the walk placed nothing,
-    otherwise every placed candidate capped at `PARALLEL_TEXT_LIMIT` --
+    otherwise every placed candidate capped at `_PARALLEL_TEXT_LIMIT` --
     reusing `protocol.named_with_overflow_count`, the one "and N more"
     owner, rather than a second overflow renderer here."""
     if parallel.first_scope_unknown:
-        return PARALLEL_UNKNOWN_LINE
+        return _PARALLEL_UNKNOWN_LINE
     if not parallel.candidates:
         return "parallel: none"
     labels = tuple(
         _parallel_candidate_label(candidate, storage) for candidate in parallel.candidates
     )
-    return f"parallel: {protocol.named_with_overflow_count(labels, limit=PARALLEL_TEXT_LIMIT)}"
+    return f"parallel: {protocol.named_with_overflow_count(labels, limit=_PARALLEL_TEXT_LIMIT)}"
 
 
 def _scope_unknown_line(parallel: board.ParallelSet, storage: body.Storage) -> str:
@@ -257,7 +257,7 @@ def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
     reason = (
         _next_action_reason(next_report.action)
         if next_report.action is not None
-        else NextReason.NOTHING_ACTIONABLE
+        else _NextReason.NOTHING_ACTIONABLE
     )
     payload: dict[str, object] = {
         "recovery": [
@@ -297,7 +297,7 @@ def _next_action_lines(
             f"Run: {_next_action_command(action, storage, site=site)}",
         ]
         if action.scope is None:
-            lines.append(SCOPE_UNKNOWN_NOTE)
+            lines.append(_SCOPE_UNKNOWN_NOTE)
         hint = _ruling_pull_hint(item)
         if hint is not None:
             lines.append(hint)
@@ -377,9 +377,9 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
         action = board.next_action(projected)
         site = _pull_site(action, context)
     except session.RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(NextReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(_NextReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return report.refuse(NextReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(_NextReason.UNAVAILABLE, error, as_json=as_json)
     close = board.zero_cost_closes(projected)
     waiting = board.waiting_on_operator(projected)
     already_named = {_next_action_container_number(action), *close, *waiting}

@@ -264,7 +264,7 @@ class FakeForge:
         unconfigured checkout does -- and `None` removes it. Each read's
         path and commit land in `file_reads`."""
         self._run()
-        if path == cmd_land.LAND_QUALITY_CONFIG_PATH:
+        if path == cmd_land._LAND_QUALITY_CONFIG_PATH:
             self.quality_config_reads.append(sha)
             if self.quality_config_error is not None:
                 raise self.quality_config_error

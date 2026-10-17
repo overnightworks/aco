@@ -9,7 +9,7 @@ from . import board, board_read, protocol, report
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
-class BoardReason(StrEnum):
+class _BoardReason(StrEnum):
     """`aco board`'s own `--json` `reason` vocabulary (issue #412,
     `specs/board.spec.md`): `projected` the only success. `invalid_usage`
     covers a bare `aco board` naming no `--json` (BOARD-44), a retired
@@ -37,23 +37,23 @@ class _BoardNoModeUsageError(protocol.ClaimError):
     `aco board` must name `--json` instead of guessing."""
 
 
-BOARD_SERVE_REMOVED_MESSAGE = "--serve was removed; run aco-board serve instead"
-BOARD_NO_MODE_MESSAGE = "aco board requires --json"
+_BOARD_SERVE_REMOVED_MESSAGE = "--serve was removed; run aco-board serve instead"
+_BOARD_NO_MODE_MESSAGE = "aco board requires --json"
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     as_json = parsed.json
     try:
         if parsed.serve:
-            raise _BoardServeRemovedError(BOARD_SERVE_REMOVED_MESSAGE)
+            raise _BoardServeRemovedError(_BOARD_SERVE_REMOVED_MESSAGE)
         if not as_json:
-            raise _BoardNoModeUsageError(BOARD_NO_MODE_MESSAGE)
+            raise _BoardNoModeUsageError(_BOARD_NO_MODE_MESSAGE)
         projected = board_read.observed_board(context).board
     except (_BoardServeRemovedError, _BoardNoModeUsageError) as error:
-        return report.refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(_BoardReason.INVALID_USAGE, error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(_BoardReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return report.refuse(BoardReason.UNAVAILABLE, error, as_json=as_json)
-    report.emit_json(True, BoardReason.PROJECTED, **board.board_payload(projected))
+        return report.refuse(_BoardReason.UNAVAILABLE, error, as_json=as_json)
+    report.emit_json(True, _BoardReason.PROJECTED, **board.board_payload(projected))
     return 0

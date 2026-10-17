@@ -94,7 +94,7 @@ def _rulings(
     if as_json:
         report.emit_json(
             True,
-            RulingsReason.LISTED,
+            _RulingsReason.LISTED,
             rulings=[
                 {
                     "number": row.item.number,
@@ -113,7 +113,7 @@ def _rulings(
     print("\n".join(_rulings_row_text(row, storage) for row in rows))
 
 
-class RulingsReason(StrEnum):
+class _RulingsReason(StrEnum):
     """`aco rulings`' own `--json` `reason` vocabulary (issue #412,
     `specs/rulings.spec.md`): `listed` the only success. `invalid_usage`
     covers `--repo` under `storage = state-ref` (PIN-04); every other
@@ -134,8 +134,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         bodies = {issue.number: issue.body for issue in issues}
         storage = context.config.storage
     except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(RulingsReason.INVALID_USAGE, error, as_json=as_json)
+        return report.refuse(_RulingsReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
-        return report.refuse(RulingsReason.UNAVAILABLE, error, as_json=as_json)
+        return report.refuse(_RulingsReason.UNAVAILABLE, error, as_json=as_json)
     _rulings(projected, bodies, as_json=as_json, storage=storage)
     return 0

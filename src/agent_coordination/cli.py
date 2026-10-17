@@ -1173,7 +1173,7 @@ class BodyCheckReason(StrEnum):
     """`aco body --check`'s own `--json` `reason` vocabulary
     (`specs/body.spec.md`, issue #404): `valid`/`malformed`/`incomplete`
     mirror `body.BodyShapeVerdict`'s own three values -- the same
-    body-shape decision `check <item>`'s own `cmd_check.CheckReason` reads."""
+    body-shape decision `check <item>`'s own `cmd_check._CheckReason` reads."""
 
     VALID = body.BodyShapeVerdict.VALID.value
     MALFORMED = body.BodyShapeVerdict.MALFORMED.value
