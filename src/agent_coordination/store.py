@@ -188,8 +188,14 @@ _LINEAGE_STAMP_FILENAME = "last-oid"
 # `--no-auto-maintenance` keeps it from starting a repack of the object store
 # every linked worktree shares: since git 2.54 that repack can `rmdir` an
 # empty `objects/xx` under another agent's concurrent `hash-object -w`
-# (issue #22).
-_STATE_FETCH_OPTIONS = ("--no-tags", "--no-write-fetch-head", "--no-auto-maintenance")
+# (issue #22). `--refmap=` sets aside the remote's configured fetch refspecs,
+# which could otherwise write a local branch or the shared `STATE_REF`.
+_STATE_FETCH_OPTIONS = (
+    "--no-tags",
+    "--no-write-fetch-head",
+    "--no-auto-maintenance",
+    "--refmap=",
+)
 
 # `fetch_state` fetches `STATE_REF` straight into this ref through the
 # fetch's own destination refspec, instead of reading the tip back from

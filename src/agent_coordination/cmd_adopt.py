@@ -41,9 +41,14 @@ def _refuse_head_branch_collisions(
     )
     if not checkout.remote_branch_exists(remote, branch, directory=context.toplevel):
         raise moved
-    checkout.fetch_remote_branches(
-        remote, (branch, context.default_branch), directory=context.toplevel
-    )
+    try:
+        checkout.fetch_remote_branches(
+            remote, (branch, context.default_branch), directory=context.toplevel
+        )
+    except protocol.ClaimError:
+        if checkout.remote_branch_exists(remote, branch, directory=context.toplevel):
+            raise
+        raise moved from None
     if (
         checkout.commit_at(f"refs/remotes/{remote}/{branch}", directory=context.toplevel)
         != head_sha

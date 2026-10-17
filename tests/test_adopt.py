@@ -412,19 +412,50 @@ def test_adopt_cuts_an_overlong_refusal_to_one_line_of_200_characters(
     assert len(result.stderr) == 201
 
 
+@pytest.mark.parametrize(
+    "configured_refspec",
+    [
+        pytest.param("+refs/heads/*:refs/heads/mirror/*", id="branches-to-a-mirror-namespace"),
+        pytest.param("+refs/aco/state:refs/heads/mirror/state", id="state-to-a-local-branch"),
+        pytest.param("+refs/*:refs/*", id="everything-to-itself"),
+    ],
+)
 def test_adopt_fetches_no_branch_into_a_local_ref_even_when_a_fetch_refspec_asks_to(
-    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str], configured_refspec: str
 ) -> None:
-    """Spec: ADOPT-18, Never -- a configured `+refs/heads/*:refs/heads/mirror/*` stays unused."""
-    real_git(
-        world.clone, "config", "--add", "remote.origin.fetch", "+refs/heads/*:refs/heads/mirror/*"
-    )
-    local_branches = real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout
+    """Spec: ADOPT-18, Never -- a configured fetch mapping stays unused."""
+    real_git(world.clone, "config", "--add", "remote.origin.fetch", configured_refspec)
+    local_refs = real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout
 
     result = adopt(capsys)
 
     assert result.stderr == PASSES_EVERY_CHECK
-    assert real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout == local_branches
+    assert real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout == local_refs
+
+
+def test_adopt_refuses_as_moved_when_the_remote_deletes_the_head_branch_during_the_fetch(
+    world: AdoptionWorld,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec: ADOPT-10 -- a branch that vanishes between the remote's answer and the fetch
+    is the same refusal, not git's own error."""
+    fetch_remote_branches = checkout.fetch_remote_branches
+
+    def fetch_after_the_branch_vanishes(
+        remote: str, branches: tuple[str, ...], *, directory: Path
+    ) -> None:
+        real_git(world.clone, "push", "-q", "origin", f":{ADOPTED_BRANCH}")
+        fetch_remote_branches(remote, branches, directory=directory)
+
+    monkeypatch.setattr(checkout, "fetch_remote_branches", fetch_after_the_branch_vanishes)
+    before = world.effects()
+
+    result = adopt(capsys)
+
+    sentence = f"pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again"
+    assert (result.status, result.stdout, result.stderr) == (2, "", f"ERROR: {sentence}\n")
+    assert world.effects() == before
 
 
 def test_a_fetch_of_a_branch_the_remote_lacks_fails_loud(world: AdoptionWorld) -> None:

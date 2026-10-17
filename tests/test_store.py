@@ -990,6 +990,41 @@ def test_first_fetch_in_a_worktree_accepts_any_tip_without_a_prior_stamp(
         pytest.param(store.peek_state, id="peek_state"),
     ],
 )
+@pytest.mark.parametrize(
+    "configured_refspec",
+    [
+        pytest.param("+refs/aco/state:refs/heads/mirror/state", id="state-to-a-local-branch"),
+        pytest.param("+refs/*:refs/*", id="everything-to-itself"),
+    ],
+)
+def test_a_state_fetch_ignores_the_remotes_configured_fetch_refspecs(
+    bare_remote: Path,
+    worktree: Path,
+    tmp_path: Path,
+    state_fetch: Callable[..., object],
+    configured_refspec: str,
+) -> None:
+    """A mapping configured on the remote must not make an observation write
+    a local branch or the shared `STATE_REF`: only the store's own anchor moves."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    reader = tmp_path / "reader"
+    reader.mkdir()
+    real_git(reader, "init", "-b", "main")
+    real_git(reader, "remote", "add", "origin", str(bare_remote))
+    real_git(reader, "config", "--add", "remote.origin.fetch", configured_refspec)
+
+    state_fetch(worktree=reader, remote="origin")
+
+    assert real_git(reader, "for-each-ref", "refs/heads", store.STATE_REF).stdout == ""
+
+
+@pytest.mark.parametrize(
+    "state_fetch",
+    [
+        pytest.param(store.fetch_state, id="fetch_state"),
+        pytest.param(store.peek_state, id="peek_state"),
+    ],
+)
 def test_a_state_fetch_starts_no_git_maintenance_on_the_shared_object_store(
     bare_remote: Path, worktree: Path, tmp_path: Path, state_fetch: Callable[..., object]
 ) -> None:
