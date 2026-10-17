@@ -1,0 +1,8 @@
+claim_id = "284a4c7cd6e14b73a40874699a4b3190"
+agent = "claude"
+role = "builder"
+base = "175584a4aaf5dfc003e734f883a52e43a6cadcc9"
+branch = "claude/issue-101-s12b-cmd-land-rest"
+scope = ["pyproject.toml", "src/agent_coordination/board.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_land.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/github.py", "tests/test_cli.py"]
+opened_commit = "f6442542042699f54299bd016d2ae69f3ecb586c"
+whole_reason = "Der Rest von land, sein Trailer-Rendering und die Umbenennung samt Test-Docstrings ändern dieselben Aufrufer und Testzeilen; getrennt bräche der Import oder ein Docstring zeigte ins Leere."
