@@ -31,7 +31,7 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 | `REASON` blank, padded, multiline, or over 512 characters | — | — | REL-02 |
 | lane mode, branch outside `docs/`/`fix/`, no live lane claim | REL-03 | REL-03, except REL-58 | REL-03 |
 | lane mode, branch holds a live lane claim | REL-57 | REL-57 | REL-57 |
-| github `--merged <pr>`, no `--claim-id`, branch outside `docs/`/`fix/` that no live claim holds (a branch such as `ada/issue-42` with no issue given reaches the Work-Item trailer check, LAND-64, not REL-03) | — | REL-58 | — |
+| github `--merged <pr>`, no `--claim-id`, branch outside `docs/`/`fix/` that no live claim holds (a branch such as `ada/issue-42` with no issue given reaches trailer validation; a `Work-Item:` trailer refuses under LAND-66/67, not REL-03) | — | REL-58 | — |
 | explicit `--branch` | REL-04 | REL-04 | REL-04 |
 | `--branch` omitted, issue + `--claim-id` both given | REL-05 | REL-05 | REL-05 |
 | `--branch` omitted, no issue, empty checkout branch | REL-06 | REL-06 | REL-06 |
