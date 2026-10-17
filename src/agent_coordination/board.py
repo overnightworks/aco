@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
-from typing import TypeGuard, TypeVar, cast
+from typing import NoReturn, TypeGuard, TypeVar, cast
 
 from . import items, metrics, protocol
 
@@ -21,17 +21,20 @@ from . import items, metrics, protocol
 # 16.09.2026, audit #370 finding 10); `board.py` itself imports only what
 # its own board-builder code below actually calls.
 from .body import (
+    BLOCK_FENCE_INFO,
     BodyReadState,
     Contract,
     ContractDefect,
     ExpectationProgress,
     ExpectationState,
     ItemKind,
+    LocatedBlock,
     ParsedBody,
     SliceRow,
     Storage,
     body_defect_text,
     closing_fence_delimiter,
+    locate_block,
     malformed_parsed_body,
     missing_or_empty_sections,
     opening_fence_delimiter,
@@ -2491,6 +2494,32 @@ def item_labeller(storage: Storage) -> protocol.ItemLabel:
     """`item_label` under `storage` -- the form a claim-ledger refusal from
     `protocol` is named in (`protocol.ClaimError.named`, issue #471)."""
     return partial(item_label, storage=storage)
+
+
+def located_block_or_refuse(
+    number: int, raw_body: str, *, command: str, storage: Storage = Storage.GITHUB
+) -> LocatedBlock:
+    """`raw_body`'s located `aco` block, or a by-name refusal before
+    any write: `cut`, `rescope`, `rule`, `ask`, and `item edit --size` /
+    `--whole` need a body `parse_body` reads as VALID before they rewrite
+    its block, and share this one gate so their refusal has one shape.
+    `storage` is forwarded to `parse_body` unchanged (issue #283): a state-ref item's own `[record]`
+    table must read as a known key, not a malformed one."""
+    parsed = parse_body(raw_body, storage=storage)
+    if parsed.read_state is BodyReadState.MALFORMED:
+        refuse_malformed_block(
+            number, body_defect_text(parsed.contract.defects[0]), command, storage
+        )
+    return locate_block(raw_body)
+
+
+def refuse_malformed_block(
+    number: int, defect_text: str, command: str, storage: Storage
+) -> NoReturn:
+    raise protocol.ClaimUnavailableError(
+        f"{item_label(number, storage)} {defect_text}; "
+        f"{command} needs a valid {BLOCK_FENCE_INFO} block"
+    )
 
 
 NAMES_NO_ITEM = "names no state-ref item; an item id ends at aco-ffffff"

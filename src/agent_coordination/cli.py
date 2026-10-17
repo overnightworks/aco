@@ -34,6 +34,7 @@ from . import (
     github,
     items,
     metrics,
+    policy,
     protocol,
     providers,
     report,
@@ -95,91 +96,6 @@ OUT_OF_ORDER_HELP = (
 )
 
 
-def _scope_cost(versioned: tuple[str, ...], scope: tuple[str, ...]) -> tuple[int, int, float]:
-    n = len(checkout.paths_under_scope(versioned, scope))
-    total = len(versioned)
-    share = 0.0 if total == 0 else n / total
-    return n, total, share
-
-
-def _optional_whole_reason(arguments: argparse.Namespace) -> str | None:
-    raw = getattr(arguments, "whole", None)
-    if raw is None:
-        return None
-    return protocol.outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
-
-
-def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
-    """The tripped condition in words, with the numbers it was judged
-    against -- what the refusal names instead of restating the whole rule."""
-    if trip.reason is protocol.WideScopeReason.PATH_COUNT:
-        return f"{trip.path_count} paths exceeds three"
-    if trip.reason is protocol.WideScopeReason.DIRECTORY:
-        noun = "directory" if len(trip.directories) == 1 else "directories"
-        return f"{len(trip.directories)} {noun} in scope ({', '.join(trip.directories)})"
-    covered, total = trip.covered_file_count, trip.versioned_file_count
-    percent = round(100 * covered / total)
-    path_word = "path" if covered == 1 else "paths"
-    return f"{covered} {path_word} of {total} versioned files ({percent} %) exceeds a quarter"
-
-
-_WHOLE_REASON_LABEL = "whole reason"
-"""`protocol.outbound_text`'s own field name for a `--whole`/body `whole` value
-(issue #399), named once here beside the width-gate refusal it justifies --
-`_optional_whole_reason`, `_cmd_item_edit_whole` and `_whole_from_item_body`
-all bound the same reason text and must refuse by the same name."""
-
-
-def _wide_scope_refusal(trip: protocol.WideScopeTrip, *, names_body_fallback: bool) -> str:
-    suffix = " or set whole in the body" if names_body_fallback else ""
-    return f"scope is wide: {_wide_scope_condition(trip)}; pass --whole REASON{suffix}"
-
-
-def _reject_wide_scope(
-    scope: tuple[str, ...],
-    versioned: tuple[str, ...],
-    whole_reason: str | None,
-    *,
-    directories: tuple[str, ...],
-    whole_from_body: Callable[[], str | None] | None = None,
-) -> tuple[int, int, float, str | None]:
-    """`scope`'s own width gate (issue #326), `whole_reason`'s own text
-    admitting a wide one exactly as before -- plus, for `claim`/`start`
-    (issue #399), the effective reason actually used: `whole_reason` itself
-    when given, else `whole_from_body()`, read only once the gate actually
-    trips and the caller named none, so a narrow scope or an explicit
-    `--whole` never costs the body read `whole_from_body` performs.
-    `rescope` judges an issue claim by the same rule (issue #554), from the
-    body it already read; a lane claim names no item, passes no
-    `whole_from_body`, and keeps the plain refusal. `directories` are
-    the scope entries that name a directory in the tree `versioned` lists
-    (`checkout.scope_directories`)."""
-    n, total, share = _scope_cost(versioned, scope)
-    trip = _wide_scope_trip(scope, versioned, directories=directories)
-    if trip is None:
-        return n, total, share, whole_reason
-    effective = whole_reason
-    if effective is None and whole_from_body is not None:
-        effective = whole_from_body()
-    if effective is None:
-        raise protocol.ClaimError(
-            _wide_scope_refusal(trip, names_body_fallback=whole_from_body is not None)
-        )
-    return n, total, share, effective
-
-
-def _wide_scope_trip(
-    scope: tuple[str, ...], versioned: tuple[str, ...], *, directories: tuple[str, ...]
-) -> protocol.WideScopeTrip | None:
-    """`scope`'s width judged against the tree `versioned` lists, whose
-    entries naming a directory are `directories` -- the one measure the
-    width gate refuses by and `next`'s advice anticipates (issue #566)."""
-    n, total, _share = _scope_cost(versioned, scope)
-    return protocol.wide_scope_trip(
-        scope, directories=directories, covered_file_count=n, versioned_file_count=total
-    )
-
-
 def _checkout_scope_is_wide(scope: tuple[str, ...], context: RunContext) -> bool:
     """Whether the width gate calls `scope` wide in `context`'s checkout,
     measured as `_scope_versioning` measures a claim there."""
@@ -187,41 +103,7 @@ def _checkout_scope_is_wide(scope: tuple[str, ...], context: RunContext) -> bool
         scope, directory=context.directory, toplevel=lambda: context.toplevel
     )
     versioned = checkout.versioned_paths(directory=context.directory)
-    return _wide_scope_trip(scope, versioned, directories=directories) is not None
-
-
-def _reject_ungrounded_comma_scope(
-    scope: tuple[str, ...], versioned: tuple[str, ...], *, flag: str
-) -> None:
-    """Refuse a scope entry that contains a comma and matches no versioned
-    file -- the shape `{flag} a.py,b.py` takes when passed as one flag from
-    habit instead of one path per flag (issue #207). Stored verbatim, that
-    single entry names a path nothing tracks, so the claim protects nothing:
-    the lane's real files stay uncovered and no overlap check can ever fire
-    for them.
-
-    Never call this over `--drop`: a value the live claim already holds is a
-    fact about the claim, not a typo about the checkout, and dropping a value
-    the claim does not hold is already refused by `combined_scope` with a
-    truer sentence naming the claim rather than the checkout -- adding this
-    check there would either block the very repair this refusal exists to
-    leave open (dropping an already-claimed ungrounded value), or never fire
-    at all (a not-yet-dropped value the claim lacks is refused first).
-
-    Splitting on the comma would be the old, wrong fix (issue #201): it made
-    a real comma-bearing filename unrepresentable. So a real comma-bearing
-    path that names a versioned file, or a directory holding one, still
-    passes here -- `paths_under_scope` matches either. So does a comma-free
-    path that does not exist yet, since a lane routinely claims files it is
-    about to create; only a comma with no match among versioned files is the
-    signature this refuses.
-    """
-    for entry in scope:
-        if "," in entry and not checkout.paths_under_scope(versioned, (entry,)):
-            raise protocol.ClaimError(
-                f"{entry!r} matches no versioned file; one {flag} path per flag, so its comma "
-                f"is read literally -- repeat {flag} for a second path"
-            )
+    return policy.wide_scope_trip(scope, versioned, directories=directories) is not None
 
 
 def _touch_line(
@@ -312,7 +194,7 @@ def _claim_request(
     identity = protocol.resolved_identity(issue, branch)
     claim_id = arguments.claim_id or uuid.uuid4().hex
     protocol.ClaimId(claim_id)
-    whole_reason = _optional_whole_reason(arguments)
+    whole_reason = policy.bounded_whole_reason(arguments.whole)
     resource = getattr(arguments, "resource", None)
     if resource is not None:
         resource = protocol.outbound_resource_name(resource)
@@ -2501,13 +2383,13 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
     try:
         _refuse_a_body_on_stdin(ITEM_EDIT_SIZE_COMMAND)
         client = context.forge_writer
-        _require_update_item_body(client, command=ITEM_EDIT_SIZE_COMMAND)
+        board_read.require_update_item_body(client, command=ITEM_EDIT_SIZE_COMMAND)
         number = parsed.item
         storage = context.config.storage
-        current_body = _item_body_or_refuse(
+        current_body = board_read.item_body_or_refuse(
             client, number, command=ITEM_EDIT_SIZE_COMMAND, storage=storage
         )
-        located = _located_block_or_refuse(
+        located = board.located_block_or_refuse(
             number, current_body, command=ITEM_EDIT_SIZE_COMMAND, storage=storage
         )
         new_data = {**located.data, "size": parsed.size}
@@ -2562,16 +2444,16 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
     try:
         _refuse_a_body_on_stdin(ITEM_EDIT_WHOLE_COMMAND)
         client = context.forge_writer
-        _require_update_item_body(client, command=ITEM_EDIT_WHOLE_COMMAND)
+        board_read.require_update_item_body(client, command=ITEM_EDIT_WHOLE_COMMAND)
         number = parsed.item
         storage = context.config.storage
-        current_body = _item_body_or_refuse(
+        current_body = board_read.item_body_or_refuse(
             client, number, command=ITEM_EDIT_WHOLE_COMMAND, storage=storage
         )
-        located = _located_block_or_refuse(
+        located = board.located_block_or_refuse(
             number, current_body, command=ITEM_EDIT_WHOLE_COMMAND, storage=storage
         )
-        reason = protocol.outbound_text(parsed.whole, _WHOLE_REASON_LABEL, maximum=512)
+        reason = cast(str, policy.bounded_whole_reason(parsed.whole))
         new_data = {**located.data, "whole": reason}
         outcome = _write_block_data(client, number, current_body, located, new_data)
         _print_item_edit_whole_result(number, reason, storage, outcome, as_json=as_json)
@@ -3081,7 +2963,7 @@ def _rescope_command(
         drop=_rescope_scope_entries(paths.drop, toplevel=path_checkout.toplevel, flag="--drop"),
         claim_id=parsed.claim_id,
         branch=branch,
-        whole_reason=_optional_whole_reason(parsed),
+        whole_reason=policy.bounded_whole_reason(parsed.whole),
     )
 
 
@@ -3484,9 +3366,13 @@ def _rescoped_item_body(
     storage = context.config.storage
     number = identity.issue
     try:
-        _require_update_item_body(client, command=RESCOPE_COMMAND)
-        text = _item_body_or_refuse(client, number, command=RESCOPE_COMMAND, storage=storage)
-        located = _located_block_or_refuse(number, text, command=RESCOPE_COMMAND, storage=storage)
+        board_read.require_update_item_body(client, command=RESCOPE_COMMAND)
+        text = board_read.item_body_or_refuse(
+            client, number, command=RESCOPE_COMMAND, storage=storage
+        )
+        located = board.located_block_or_refuse(
+            number, text, command=RESCOPE_COMMAND, storage=storage
+        )
     except protocol.ClaimError as error:
         raise _RescopePreconditionError(str(error)) from error
     whole = body.parse_body(text, storage=storage).whole
@@ -3555,13 +3441,13 @@ def _rescope_write(parsed: argparse.Namespace, run_context: RunContext) -> int:
         )
     versioned = checkout.versioned_paths(directory=worktree)
     try:
-        _reject_ungrounded_comma_scope(requested.add, versioned, flag="--add")
+        policy.reject_ungrounded_comma_scope(requested.add, versioned, flag="--add")
         combined = protocol.combined_scope(selected.scope, requested.add, requested.drop)
     except protocol.ClaimError as error:
         raise _RescopeInvalidUsageError(str(error)) from error
     item = _rescoped_item_body(checkout_context, selected.identity)
     try:
-        _n, _total, _share, whole_reason = _reject_wide_scope(
+        _n, _total, _share, whole_reason = policy.reject_wide_scope(
             combined,
             versioned,
             requested.whole_reason or selected.whole_reason,
@@ -3650,7 +3536,7 @@ def _item_target_body(
     scope costs no separate body read; a closed, missing, or pull-request
     target never appears there, and falls back to the one single-item
     lookup `_issue_reference_state` uses for the same reason (issue #245).
-    `_item_body_or_refuse`'s own `ClaimUnavailableError` -- missing or a
+    `board_read.item_body_or_refuse`'s own `ClaimUnavailableError` -- missing or a
     pull request, CLM-24's own two conditions -- becomes
     `_ClaimTargetInvalidError` by name (issue #406); a forge outage or
     malformed response (`forge.ForgeError`, raised by `client.item_reference`
@@ -3660,7 +3546,7 @@ def _item_target_body(
     if issue is not None:
         return issue.body
     try:
-        return _item_body_or_refuse(client, number, command="claim", storage=storage)
+        return board_read.item_body_or_refuse(client, number, command="claim", storage=storage)
     except protocol.ClaimUnavailableError as error:
         raise _ClaimTargetInvalidError(str(error)) from error
 
@@ -3676,7 +3562,7 @@ def _item_scope(
     block refuses `_ClaimBodyInvalidError` here (issue #310 finding 43) --
     before this function's caller ever gets to name the less specific "item
     names no scope" -- reading `read_state`/`contract.defects` the same way
-    `body --check` and `_located_block_or_refuse` already do, the one
+    `body --check` and `board.located_block_or_refuse` already do, the one
     block-defect reader every by-name body refusal in this file shares.
     `_item_whole`'s own read stays tolerant of a malformed body instead: its
     caller is only ever an optional width-gate fallback, never a hard
@@ -3716,7 +3602,7 @@ def _whole_from_item_body(
 ) -> Callable[[], str | None] | None:
     """The wide-scope gate's own fallback for `claim`/`start` (issue #399):
     `None` for a lane claim, which names no item to read one from; otherwise
-    a lazy resolver `_reject_wide_scope` calls only once the scope actually
+    a lazy resolver `policy.reject_wide_scope` calls only once the scope actually
     trips the gate and neither call names `--whole` -- so a narrow scope, or
     an explicit `--whole`, never costs this read. Reuses `open_by_number`
     when the caller already fetched it (a derived scope); otherwise reads
@@ -3816,11 +3702,11 @@ def _scope_versioning(
     against that commit's tree instead of the checkout (issue #479:
     `start`'s fetched trunk, before any worktree of it exists)."""
     versioned = checkout.versioned_paths(directory=context.directory, revision=revision)
-    _reject_ungrounded_comma_scope(scope, versioned, flag="--scope")
+    policy.reject_ungrounded_comma_scope(scope, versioned, flag="--scope")
     directories = checkout.scope_directories(
         scope, directory=context.directory, toplevel=lambda: context.toplevel, revision=revision
     )
-    n, total, share, effective_whole_reason = _reject_wide_scope(
+    n, total, share, effective_whole_reason = policy.reject_wide_scope(
         scope, versioned, whole_reason, directories=directories, whole_from_body=whole_from_body
     )
     return ScopeVersioning(n, total, share), effective_whole_reason
@@ -4625,9 +4511,9 @@ def _requested_whole_reason(raw: str | None) -> str | None:
     """A `--whole` flag's own bounded text (issue #399), or `None` when it
     was never given -- `item new`'s own entry point into the same
     `protocol.outbound_text` bound `claim`'s own `--whole` already enforces
-    (`_optional_whole_reason`), so the two never drift on what a legal
+    (`policy.bounded_whole_reason`), so the two never drift on what a legal
     reason looks like."""
-    return None if raw is None else protocol.outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
+    return policy.bounded_whole_reason(raw)
 
 
 # Fixed text naming no child number (issue #606 line 2), so the child is
@@ -4850,32 +4736,6 @@ def _child_title(label: str, link: body.SliceRow | None, title: str | None) -> s
     return link.title
 
 
-def _located_block_or_refuse(
-    number: int, raw_body: str, *, command: str, storage: body.Storage = body.Storage.GITHUB
-) -> body.LocatedBlock:
-    """`raw_body`'s located `aco` block, or a by-name refusal before
-    any write: `cut`, `rescope`, `rule`, `ask`, and `item edit --size` /
-    `--whole` need a body `parse_body` reads as VALID before they rewrite
-    its block, and share this one gate so their refusal has one shape.
-    `storage` is forwarded to `parse_body` unchanged (issue #283): a state-ref item's own `[record]`
-    table must read as a known key, not a malformed one."""
-    parsed = body.parse_body(raw_body, storage=storage)
-    if parsed.read_state is body.BodyReadState.MALFORMED:
-        _refuse_malformed_block(
-            number, body.body_defect_text(parsed.contract.defects[0]), command, storage
-        )
-    return body.locate_block(raw_body)
-
-
-def _refuse_malformed_block(
-    number: int, defect_text: str, command: str, storage: body.Storage
-) -> NoReturn:
-    raise protocol.ClaimUnavailableError(
-        f"{board.item_label(number, storage)} {defect_text}; "
-        f"{command} needs a valid {body.BLOCK_FENCE_INFO} block"
-    )
-
-
 CUT_ROW_SCOPE_ALREADY_SET = "slice {index} already names a scope; edit the container instead"
 
 
@@ -4904,7 +4764,7 @@ def _cut_row_done_when(
         return None
     defect = body.slice_done_when_defect(located, link)
     if defect is not None:
-        _refuse_malformed_block(number, defect, "cut", storage)
+        board.refuse_malformed_block(number, defect, "cut", storage)
     return link.done_when
 
 
@@ -4922,7 +4782,7 @@ def _cut_slice(
     number = target.number
     storage = config.storage
     label = board.item_label(number, storage)
-    located = _located_block_or_refuse(number, target.body, command="cut", storage=storage)
+    located = board.located_block_or_refuse(number, target.body, command="cut", storage=storage)
     link = _cut_link(label, located.data, parsed.row)
     title = _child_title(label, link, parsed.title)
     child_scope = _cut_row_scope(link, _requested_body_scope(parsed.scope))
@@ -5013,30 +4873,6 @@ def _cmd_cut(parsed: argparse.Namespace, context: RunContext) -> int:
         return report.refuse(CutReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
-def _item_body_or_refuse(
-    client: forge.ForgeReader, number: int, *, command: str, storage: body.Storage
-) -> str:
-    """The live body of issue `number`, or a by-name refusal before any
-    write: `rule` and `ask` both target one existing issue, never a pull
-    request -- a pull request exists only on a forge, so that refusal
-    keeps the forge's own `#n`."""
-    reference = client.item_reference(number)
-    if reference.state is forge.ItemState.MISSING:
-        raise protocol.ClaimUnavailableError(f"{board.item_label(number, storage)} does not exist")
-    if reference.is_landing:
-        raise protocol.ClaimUnavailableError(
-            f"#{number} is a pull request, not an issue; {command} needs an issue"
-        )
-    return reference.body or ""
-
-
-def _require_update_item_body(client: forge.ForgeWriter, *, command: str) -> None:
-    if client.capability(forge.ForgeOperation.UPDATE_ITEM_BODY) is not forge.Capability.READ_WRITE:
-        raise protocol.ClaimUnavailableError(
-            f"this forge cannot update_item_body; {command} by hand"
-        )
-
-
 class _TargetUnavailableError(protocol.ClaimError):
     """`_require_writable_target`'s own "forge cannot write" refusal (issue
     #396) -- a distinct type from `_InvalidTargetError` so `ask`/`rule` can
@@ -5060,13 +4896,15 @@ def _require_writable_target(
     commands. Returns the live body and the board configuration `ask`/
     `rule` still need for their own write."""
     try:
-        _require_update_item_body(client, command=command)
+        board_read.require_update_item_body(client, command=command)
     except protocol.ClaimError as error:
         raise _TargetUnavailableError(str(error)) from error
     config = board_read.load_board_config(client, context)
     try:
-        body = _item_body_or_refuse(client, number, command=command, storage=config.storage)
-        _located_block_or_refuse(number, body, command=command, storage=config.storage)
+        body = board_read.item_body_or_refuse(
+            client, number, command=command, storage=config.storage
+        )
+        board.located_block_or_refuse(number, body, command=command, storage=config.storage)
     except protocol.ClaimError as error:
         raise _InvalidTargetError(str(error)) from error
     return body, config
