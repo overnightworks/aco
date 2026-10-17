@@ -1,7 +1,0 @@
-claim_id = "0f2f112911e4407ebd391b9773825823"
-agent = "claude"
-role = "builder"
-base = "f1de77eaaafa56553bf6345f9faa24b7e94f4b5a"
-branch = "claude/issue-121-s19c-body-slice-rows"
-scope = ["src/agent_coordination/body.py", "src/agent_coordination/cmd_cut.py", "tests/test_board.py"]
-opened_commit = "dd6edb00c6de0d706beae24c523a8cabbd54f00a"
