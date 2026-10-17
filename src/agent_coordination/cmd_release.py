@@ -612,8 +612,9 @@ def _cleanup_unless_claimed_again(
     the lane on its clean worktree (START-11) -- would lose that worktree to
     this cleanup, so the claim state is read afresh right before it; on a
     foreign branch (REL-59) any claim then on the branch, issue or lane,
-    keeps both. A claim taken between that read and the removal is the accepted residual: the
-    worktree removed is clean and merged, and `start` builds it again."""
+    keeps both. A claim taken between that read and the removal is the
+    accepted residual: the worktree removed is clean and merged, and `start`
+    builds it again."""
     if not parsed.keep_worktree:
         fresh = context.observed_afresh().observation
         if _unclaimed_rerun_branch(parsed, fresh, lane.identity, lane.branch) is None:
