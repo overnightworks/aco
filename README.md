@@ -117,12 +117,13 @@ aco release --merged 58
 
 This lane branch must land within the session it was claimed in; it never
 appears on `board`, `rulings`, or `next` since it owns no issue. Its pull
-request carries `No-Item: docs` or `No-Item: fix` in place of a `Work-Item:`
+request carries `No-Item: docs`, `No-Item: fix` or `No-Item: deps` in place of a `Work-Item:`
 line -- the one classification `release --merged` accepts for a lane with no
 issue to close. `specs/claim.spec.md` owns the exact branch-name grammar and
 its refusal when a checkout is not on a matching branch;
 `specs/landing-grammar.spec.md` owns the `No-Item:` classification and its
-refusals.
+refusals. A `deps` pull request currently refuses because no configuration can
+name dependency paths yet; a hand-merged `No-Item: deps` trailer can release a lane.
 
 ## A workflow without a forge
 
