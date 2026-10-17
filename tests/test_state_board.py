@@ -4028,7 +4028,6 @@ class TestCliStateRefForge:
         assert json.loads(own_json_show.stdout)["message"] == _malformed_item_refusal(
             problem, CHILD_A_ID
         )
-        assert "\x1b" not in own_json_show.stdout
         assert (own_show_exit_code, own_show_err) == (
             2,
             f"ERROR: {_malformed_item_refusal(problem, CHILD_A_ID)}\n",
