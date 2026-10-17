@@ -87,7 +87,7 @@ owns what a write to one is allowed.
 ## Dependency paths
 
 - [ ] [PIN-44] A tracked `<path>` may name `dependency_paths = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one path; absent, none is a dependency path.
-- [ ] [PIN-48] A listed path the scope grammar refuses (`..`, `./`, a control byte, a backslash, past 512 characters) is covered by no entry.
+- [ ] [PIN-48] A listed path CLAIM-19 or CLAIM-20 would refuse as a scope, or one not in normal form, is covered by no entry.
 - [ ] [PIN-45] A `dependency_paths` value that is no list of unique strings refuses `board configuration <path> dependency_paths must be a list of unique repository paths`.
 - [ ] [PIN-46] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> dependency_paths entry '<entry>' is not a canonical path inside the repository`.
 - [ ] [PIN-47] Only the run's own tracked `<path>` decides; `aco land` reads the default branch's clean checkout (LANDCMD-11), never the pull request head's copy.

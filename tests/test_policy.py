@@ -55,6 +55,12 @@ def test_listed_paths_judge_only_a_complete_listing(
         ),
         pytest.param(
             "vendor/",
+            "vendor/a ",
+            "changes vendor/a , which dependency_paths in .aco/board.toml does not name",
+            id="P11-trailing-space",
+        ),
+        pytest.param(
+            "vendor/",
             "vendor/" + "a" * 506,
             "changes vendor/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…, "
             "which dependency_paths in .aco/board.toml does not name",
@@ -62,7 +68,9 @@ def test_listed_paths_judge_only_a_complete_listing(
         ),
     ],
 )
-def test_dependency_paths_cover_only_up_to_a_slash(entry: str, path: str, expected: str) -> None:
+def test_dependency_paths_cover_only_canonical_paths_up_to_a_slash(
+    entry: str, path: str, expected: str
+) -> None:
     config = board.BoardConfig(dependency_paths=(entry,))
     defect = policy.dependency_rule_defect(config, lambda: frozenset({path}))
     assert defect == board.ClassificationDefect(expected)
