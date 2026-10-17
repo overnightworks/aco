@@ -103,10 +103,11 @@ import subprocess
 import sys
 import textwrap
 import tokenize
-from collections import defaultdict
-from collections.abc import Iterable
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypeGuard
 
 # --- aco configuration --------------------------------------------------------------------
 TESTS_DIR = Path("tests")
@@ -269,10 +270,22 @@ def module_scope(tree: ast.Module) -> ModuleScope:
 # --- test discovery --------------------------------------------------------------------------
 
 
-def _is_test_function(node: ast.AST) -> bool:
+def is_test_function(node: ast.AST) -> TypeGuard[FunctionNode]:
     return isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(
         "test_"
     )
+
+
+def iter_test_functions(
+    body: list[ast.stmt], owners: tuple[ast.ClassDef, ...] = ()
+) -> Iterator[tuple[tuple[ast.ClassDef, ...], FunctionNode]]:
+    """Every ``test_*`` function in *body* with the classes enclosing it, outermost first,
+    descending into nested classes. The one decider of what a test is."""
+    for node in body:
+        if is_test_function(node):
+            yield owners, node
+        elif isinstance(node, ast.ClassDef):
+            yield from iter_test_functions(node.body, (*owners, node))
 
 
 def _is_parametrized(node: FunctionNode | ast.ClassDef) -> bool:
@@ -320,14 +333,18 @@ def _parametrize_units(node: FunctionNode | ast.ClassDef) -> list[tuple[tuple[st
     return units
 
 
-def _make_case(func: FunctionNode, owner: ast.ClassDef | None, scope: ModuleScope) -> TestCase:
-    qualname = f"{owner.name}::{func.name}" if owner is not None else func.name
+def _make_case(
+    func: FunctionNode, owners: tuple[ast.ClassDef, ...], scope: ModuleScope
+) -> TestCase:
+    qualname = "::".join([*(owner.name for owner in owners), func.name])
     parametrized = (
         _is_parametrized(func)
-        or (owner is not None and _is_parametrized(owner))
+        or any(_is_parametrized(owner) for owner in owners)
         or bool(_parameter_names(func) & scope.param_fixtures)
     )
-    param_units = _parametrize_units(func) + (_parametrize_units(owner) if owner else [])
+    param_units = _parametrize_units(func) + [
+        unit for owner in owners for unit in _parametrize_units(owner)
+    ]
     return TestCase(qualname, func, parametrized, tuple(param_units))
 
 
@@ -338,18 +355,13 @@ def iter_tests(tree: ast.Module, scope: ModuleScope) -> tuple[list[TestCase], in
     parameter record, not a test family, and is not counted.
     """
     cases: list[TestCase] = []
-    classes = single = 0
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            members = [sub for sub in node.body if _is_test_function(sub)]
-            if not members:
-                continue
-            classes += 1
-            single += len(members) == 1
-            cases.extend(_make_case(sub, node, scope) for sub in members)  # type: ignore[arg-type]
-        elif _is_test_function(node):
-            cases.append(_make_case(node, None, scope))  # type: ignore[arg-type]
-    return cases, classes, single
+    tests_per_class: Counter[ast.ClassDef] = Counter()
+    for owners, func in iter_test_functions(tree.body):
+        cases.append(_make_case(func, owners, scope))
+        if owners:
+            tests_per_class[owners[-1]] += 1
+    single = sum(count == 1 for count in tests_per_class.values())
+    return cases, len(tests_per_class), single
 
 
 # --- (b) assert literals ---------------------------------------------------------------------
