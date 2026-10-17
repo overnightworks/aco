@@ -1,9 +1,10 @@
-"""Board and claim domain scenario builders shared by `tests/test_cli.py`
-(CLI wiring behavior), `tests/test_board.py` (pure `board.py` behavior),
-`tests/test_github.py` (the GitHub adapter's `REPOSITORY`), and
-`tests/test_protect.py` (`standing_active_claim`, the hook's live-claim builder). All
-import this module directly; pytest's rootless collection puts `tests/` on
-`sys.path`, so a plain `import board_fixtures` resolves here."""
+"""Board and claim scenarios for test_board, test_body_cli, test_checkout,
+test_cli, test_github, test_items, test_protect, test_protocol, test_rulings,
+test_session, test_state_board, cli_fixtures, and github_fixtures.
+
+Consumers import this module directly: pytest's rootless collection puts
+tests/ on sys.path, so import board_fixtures resolves here.
+"""
 
 from __future__ import annotations
 

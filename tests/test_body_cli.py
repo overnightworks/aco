@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 from board_fixtures import BIDI_AND_ZERO_WIDTH_CONTROLS, MINIMAL_BLOCK_TOML, block_body
@@ -14,7 +15,7 @@ from agent_coordination import body, cmd_body, process, store
 
 @pytest.fixture
 def tracked_default_pin(clone: Path) -> Path:
-    """G1: the command starts with the real, tracked default pin."""
+    """The command starts with the real, tracked default pin."""
     assert (clone / ".aco/board.toml").read_text() == ""
     assert real_git(clone, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
     return clone
@@ -31,26 +32,97 @@ _RECORD_TOML = (
 )
 
 
-@pytest.fixture(params=[pytest.param(False, id="absent"), pytest.param(True, id="untracked")])
+@pytest.fixture(
+    params=[
+        pytest.param(
+            (
+                (),
+                False,
+                [],
+                ".aco/board.toml was removed on this branch; restore it with "
+                "git checkout origin/main -- :/.aco/board.toml",
+            ),
+            id="absent",
+        ),
+        pytest.param(
+            (
+                ("--cached",),
+                True,
+                [""],
+                ".aco/board.toml is not tracked in this checkout, "
+                "so its storage pin cannot be trusted: git add -f .aco/board.toml",
+            ),
+            id="untracked",
+        ),
+    ]
+)
 def untrusted_pin(request: pytest.FixtureRequest, tracked_default_pin: Path) -> str:
-    """G3/G4: change the real index, preserving the committed pin on main."""
+    """Change the real index, preserving the committed pin on main."""
     clone = tracked_default_pin
-    untracked = request.param
-    real_git(clone, "rm", *(["--cached"] if untracked else []), ".aco/board.toml")
+    remove_arguments, file_stays, contents, message = request.param
+    real_git(clone, "rm", *remove_arguments, ".aco/board.toml")
     assert real_git(clone, "ls-files", ".aco/board.toml").stdout == ""
     assert real_git(clone, "show", "origin/main:.aco/board.toml").stdout == ""
     assert real_git(clone, "show", "HEAD:.aco/board.toml").stdout == ""
-    assert (clone / ".aco/board.toml").exists() is untracked
-    if untracked:
-        assert (clone / ".aco/board.toml").read_text() == ""
-        return (
-            ".aco/board.toml is not tracked in this checkout, "
-            "so its storage pin cannot be trusted: git add -f .aco/board.toml"
-        )
-    return (
-        ".aco/board.toml was removed on this branch; restore it with "
-        "git checkout origin/main -- :/.aco/board.toml"
-    )
+    assert (clone / ".aco/board.toml").exists() is file_stays
+    assert [path.read_text() for path in clone.glob(".aco/board.toml")] == contents
+    return message
+
+
+class StoragePin(NamedTuple):
+    arrange: str
+    text: str
+    defects: list[str]
+    verdict: str
+    ok: bool
+    exit_code: int
+    stream: str
+    output: str
+
+
+@pytest.fixture
+def tracked_state_ref_pin(tracked_default_pin: Path) -> Path:
+    track_board_config(tracked_default_pin, 'storage = "state-ref"\n')
+    return tracked_default_pin
+
+
+@pytest.fixture(
+    params=[
+        pytest.param(
+            StoragePin(
+                "tracked_default_pin",
+                "",
+                ["body malformed: record: unknown top-level key record"],
+                "malformed",
+                False,
+                2,
+                "stderr",
+                "body malformed: record: unknown top-level key record\n",
+            ),
+            id="record-default",
+        ),
+        pytest.param(
+            StoragePin(
+                "tracked_state_ref_pin",
+                'storage = "state-ref"\n',
+                [],
+                "valid",
+                True,
+                0,
+                "stdout",
+                "body ok\n",
+            ),
+            id="record-state-ref",
+        ),
+    ]
+)
+def storage_pin(request: pytest.FixtureRequest) -> StoragePin:
+    """Each row supplies a real tracked pin and its expected command result."""
+    pin: StoragePin = request.param
+    clone: Path = request.getfixturevalue(pin.arrange)
+    assert (clone / ".aco/board.toml").read_text() == pin.text
+    assert real_git(clone, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
+    return pin
 
 
 @pytest.mark.usefixtures("clone", "tracked_default_pin")
@@ -237,22 +309,13 @@ class TestBodyCheck:
             assert result.stdout == "body ok\n"
         assert result.status == (2 if reason else 0)
 
-    @pytest.mark.parametrize(
-        "state_ref",
-        [pytest.param(False, id="record-default"), pytest.param(True, id="record-state-ref")],
-    )
     def test_body_check_uses_the_storage_pin(
         self,
-        clone: Path,
         capsys: pytest.CaptureFixture[str],
         as_json: bool,
-        state_ref: bool,
+        storage_pin: StoragePin,
     ) -> None:
-        """Spec: BDY-12, BODY-15, BODY-16; G2 verifies the supplied tracked pin."""
-        if state_ref:
-            track_board_config(clone, 'storage = "state-ref"\n')
-            assert (clone / ".aco/board.toml").read_text() == 'storage = "state-ref"\n'
-            assert real_git(clone, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
+        """Spec: BDY-12, BODY-15, BODY-16; the fixture verifies the tracked pin."""
         result = run_cli(
             ["body", "--check", *(["--json"] if as_json else [])],
             capsys,
@@ -260,16 +323,12 @@ class TestBodyCheck:
         )
         if as_json:
             payload = json.loads(result.stdout)
-            assert payload.get("defects") == (
-                [] if state_ref else ["body malformed: record: unknown top-level key record"]
-            )
-            assert payload.get("reason") == ("valid" if state_ref else "malformed")
-            assert payload.get("ok") is state_ref
-        elif state_ref:
-            assert result.stdout == "body ok\n"
+            assert payload.get("defects") == storage_pin.defects
+            assert payload.get("reason") == storage_pin.verdict
+            assert payload.get("ok") is storage_pin.ok
         else:
-            assert result.stderr == "body malformed: record: unknown top-level key record\n"
-        assert result.status == (0 if state_ref else 2)
+            assert getattr(result, storage_pin.stream) == storage_pin.output
+        assert result.status == storage_pin.exit_code
 
     @pytest.mark.parametrize("raw_body", [pytest.param(b"\xff", id="invalid-utf8")])
     def test_body_check_refuses_undecodable_input(
@@ -358,9 +417,14 @@ class TestBodyCheck:
         ],
     )
     def test_body_rejects_an_invalid_invocation(
-        self, capsys: pytest.CaptureFixture[str], argv: list[str]
+        self, capsys: pytest.CaptureFixture[str], argv: list[str], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Spec: BDY-13, Never 2; no file or live-item positional interface."""
+
+        def forbidden_run(*args: object, **kwargs: object) -> None:
+            pytest.fail("the parser must refuse before the body command runs")
+
+        monkeypatch.setattr(cmd_body, "run", forbidden_run)
         result = run_cli(argv, capsys, stdin=block_body(MINIMAL_BLOCK_TOML))
         assert result.status == 2
 
