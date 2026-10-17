@@ -141,7 +141,7 @@ class PartialWriteError(protocol.ClaimError):
     """Wraps `forge.ForgePartialCreationError` so `cut` and `item new`
     can choose `partial_write`'s own structured `--json` shape (`written`,
     `failed`) without parsing the wrapped error's prose (mirrors `ask`/
-    `rule`'s own `cli._TargetUnavailableError`/`cli._InvalidTargetError`, issue
+    `rule`'s own `cmd_rule.TargetUnavailableError`/`cmd_rule.InvalidTargetError`, issue
     #396); `recovery` is the caller's own way to finish the write."""
 
     def __init__(self, error: forge.ForgePartialCreationError, *, recovery: str) -> None:

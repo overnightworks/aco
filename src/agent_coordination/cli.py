@@ -7,18 +7,17 @@ import re
 import sys
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from dataclasses import asdict, dataclass
-from datetime import UTC, date, datetime
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, NoReturn, cast
+from typing import Any, NoReturn
 
 from . import (
     __version__,
     board,
-    board_read,
     body,
     checkout,
+    cmd_ask,
     cmd_board,
     cmd_body,
     cmd_bootstrap,
@@ -33,6 +32,7 @@ from . import (
     cmd_release,
     cmd_rescope,
     cmd_reset,
+    cmd_rule,
     cmd_rulings,
     cmd_start,
     cmd_status,
@@ -48,7 +48,6 @@ from . import (
     store,
 )
 from .session import (
-    RepoMeaninglessUnderStateRefError,
     RunContext,
 )
 
@@ -964,281 +963,6 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
     return report.refuse(PreDispatchReason.INVALID_USAGE, error, as_json=True)
 
 
-class _TargetUnavailableError(protocol.ClaimError):
-    """`_require_writable_target`'s own "forge cannot write" refusal (issue
-    #396) -- a distinct type from `_InvalidTargetError` so `ask`/`rule` can
-    each choose their own `unavailable` without parsing prose."""
-
-
-class _InvalidTargetError(protocol.ClaimError):
-    """`_require_writable_target`'s own "no such writable item" refusal
-    (issue #396) -- missing, a pull request, or a malformed body -- so
-    `ask`/`rule` can each choose their own `invalid_item` without parsing
-    prose."""
-
-
-def _require_writable_target(
-    client: forge.ForgeWriter, context: RunContext, number: int, *, command: str
-) -> tuple[str, board.BoardConfig]:
-    """`ask` and `rule`'s shared target gate (RULE-06..08, cited verbatim by
-    `specs/ask.spec.md`): the forge must accept a body write, the item must
-    exist and not be a pull request, and its body must parse -- in that
-    order, unchanged from before issue #396 factored it out of both
-    commands. Returns the live body and the board configuration `ask`/
-    `rule` still need for their own write."""
-    try:
-        board_read.require_update_item_body(client, command=command)
-    except protocol.ClaimError as error:
-        raise _TargetUnavailableError(str(error)) from error
-    config = board_read.load_board_config(client, context)
-    try:
-        body = board_read.item_body_or_refuse(
-            client, number, command=command, storage=config.storage
-        )
-        board.located_block_or_refuse(number, body, command=command, storage=config.storage)
-    except protocol.ClaimError as error:
-        raise _InvalidTargetError(str(error)) from error
-    return body, config
-
-
-def _rule_remaining_open(new_body: str, *, storage: body.Storage) -> int:
-    return sum(
-        1 for line in body.expectation_lines(new_body, storage=storage) if line.ruling is None
-    )
-
-
-class RuleReason(StrEnum):
-    """`aco rule`'s own `--json` `reason` vocabulary (`specs/rule.spec.md`,
-    issue #396): `ruled` the only success."""
-
-    RULED = "ruled"
-    ALREADY_RULED = "already_ruled"
-    LINE_OUT_OF_RANGE = "line_out_of_range"
-    INVALID_ITEM = "invalid_item"
-    INVALID_USAGE = "invalid_usage"
-    UNAVAILABLE = "unavailable"
-
-
-def _emit_rule_result(
-    number: int,
-    line: body.ExpectationLine,
-    open_remaining: int,
-    storage: body.Storage,
-    *,
-    as_json: bool,
-) -> None:
-    ruling = cast(str, line.ruling)
-    ruled_on = cast(date, line.ruled_on)
-    if as_json:
-        report.emit_json(
-            True,
-            RuleReason.RULED,
-            item=number,
-            index=line.index,
-            ruling=ruling,
-            ruled_on=ruled_on.isoformat(),
-            open=open_remaining,
-        )
-        return
-    print(
-        f"RULED {board.item_label(number, storage)} line {line.index} {ruling}; "
-        f"{open_remaining} line(s) still open"
-    )
-
-
-def rule_item(
-    context: RunContext, number: int, line: int, ruling: str, note: str | None
-) -> tuple[body.ExpectationLine, int]:
-    """`_cmd_rule`'s own write (issue #280): returns the newly ruled line and
-    how many the item still has open; raises `protocol.ClaimError` by name
-    for every refusal (already ruled, out of range, a bad outcome, a
-    malformed or missing item), which `_cmd_rule` turns into its own
-    by-name response."""
-    client = context.forge_writer
-    current_body, config = _require_writable_target(client, context, number, command="rule")
-    ruled_on = datetime.now(UTC).date()
-    new_body = body.rule_expectation(current_body, line, ruling, ruled_on, note=note)
-    client.update_item_body(number, new_body)
-    ruled_line = body.expectation_lines(new_body, storage=config.storage)[line - 1]
-    return ruled_line, _rule_remaining_open(new_body, storage=config.storage)
-
-
-_RuleItemError = (
-    _TargetUnavailableError
-    | _InvalidTargetError
-    | body.ExpectationAlreadyRuledError
-    | body.ExpectationOutOfRangeError
-)
-
-
-def _rule_item_reason(error: _RuleItemError) -> RuleReason:
-    """`_cmd_rule`'s own mapping from `rule_item`'s four refusals to their
-    `--json` `reason` (issue #396): a bad target names `unavailable`
-    (forge cannot write) or `invalid_item` (missing item, pull request);
-    a bad line names `already_ruled` or `line_out_of_range`."""
-    if isinstance(error, _TargetUnavailableError):
-        return RuleReason.UNAVAILABLE
-    if isinstance(error, _InvalidTargetError):
-        return RuleReason.INVALID_ITEM
-    if isinstance(error, body.ExpectationAlreadyRuledError):
-        return RuleReason.ALREADY_RULED
-    return RuleReason.LINE_OUT_OF_RANGE
-
-
-def _rule_expectation_line(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`rule`'s own work, every refusal raised by name for `_cmd_rule` to
-    report."""
-    number = int(parsed.item)
-    ruled_line, open_remaining = rule_item(context, number, parsed.line, parsed.ruling, parsed.note)
-    storage = context.config.storage
-    _emit_rule_result(number, ruled_line, open_remaining, storage, as_json=parsed.json)
-    return 0
-
-
-def _cmd_rule(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`rule`'s own `--json` refusals (issue #396), for the whole command and
-    not only its first steps (issue #432): the body write inside the shared
-    ruling path can fail like any other forge call, and a failure there names
-    this command's own `unavailable` rather than escaping the envelope."""
-    as_json = parsed.json
-    try:
-        return _rule_expectation_line(parsed, context)
-    except (
-        _TargetUnavailableError,
-        _InvalidTargetError,
-        body.ExpectationAlreadyRuledError,
-        body.ExpectationOutOfRangeError,
-    ) as error:
-        return report.refuse(_rule_item_reason(error), error, as_json=as_json)
-    except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(RuleReason.INVALID_USAGE, error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(RuleReason.UNAVAILABLE, error, as_json=as_json)
-
-
-@dataclass(frozen=True)
-class _AskedLine:
-    """One `aco ask` write's result (issue #295): the item, the fresh
-    line's 1-based index, its `text`/`default`, and whichever card fields
-    were given -- bundled so `_print_ask_result` takes one value instead of
-    five loose ones."""
-
-    item: int
-    index: int
-    text: str
-    default: str
-    card: body.ExpectationCardFields
-
-
-class AskReason(StrEnum):
-    """`aco ask`'s own `--json` `reason` vocabulary (`specs/ask.spec.md`,
-    issue #396): `asked` the only success."""
-
-    ASKED = "asked"
-    INVALID_ITEM = "invalid_item"
-    INVALID_EXPECTATION = "invalid_expectation"
-    INVALID_PICTURE = "invalid_picture"
-    INVALID_USAGE = "invalid_usage"
-    UNAVAILABLE = "unavailable"
-
-
-def _emit_ask_result(asked: _AskedLine, storage: body.Storage, *, as_json: bool) -> None:
-    if as_json:
-        card_fields = {key: value for key, value in asdict(asked.card).items() if value is not None}
-        report.emit_json(
-            True,
-            AskReason.ASKED,
-            item=asked.item,
-            index=asked.index,
-            text=asked.text,
-            default=asked.default,
-            **card_fields,
-        )
-        return
-    print(f"ASKED {board.item_label(asked.item, storage)} line {asked.index}: {asked.text}")
-
-
-class _PictureFileError(protocol.ClaimError):
-    """`_read_picture_file`'s own unreadable-file refusal (issue #396),
-    typed so `aco ask`'s `--json` can choose `invalid_picture` without
-    parsing prose."""
-
-
-def _read_picture_file(path: str) -> str:
-    """`--picture FILE.svg`'s own filesystem boundary (issue #295): read
-    before any forge call, so a missing file refuses before the item body
-    is even fetched. Content validation (size, `<svg>` root, no `<script>`,
-    no external `href`) is `body.append_expectation`'s -- one owner, shared
-    with the body parser's own defects."""
-    try:
-        return Path(path).read_text(encoding="utf-8")
-    except OSError as error:
-        raise _PictureFileError(f"--picture {path} could not be read: {error}") from error
-
-
-def _ask_target_reason(error: _TargetUnavailableError | _InvalidTargetError) -> AskReason:
-    """`_cmd_ask`'s own mapping from `_require_writable_target`'s two
-    target refusals to their `--json` `reason` (issue #396)."""
-    if isinstance(error, _TargetUnavailableError):
-        return AskReason.UNAVAILABLE
-    return AskReason.INVALID_ITEM
-
-
-def _ask_expectation_reason(
-    error: body.ExpectationTextError | body.ExpectationFieldError,
-) -> AskReason:
-    """`_cmd_ask`'s own mapping from `append_expectation`'s two card-content
-    refusals (issue #396) to their `--json` `reason`: a blank `--text`
-    (`ExpectationTextError`) and a `--question`/`--example` failing its own
-    rule both name `invalid_expectation`; only a refused `--picture`
-    (`ExpectationFieldError` whose `field` is `picture`) names
-    `invalid_picture`, per `specs/ask.spec.md`'s ASK-07/ASK-10 split."""
-    if isinstance(error, body.ExpectationFieldError) and error.field == "picture":
-        return AskReason.INVALID_PICTURE
-    return AskReason.INVALID_EXPECTATION
-
-
-def _append_expectation_card(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`ask`'s own work, every refusal raised by name for `_cmd_ask` to
-    report: the picture file is read before the forge is ever resolved, so a
-    missing one refuses before the item body is fetched."""
-    picture = _read_picture_file(parsed.picture) if parsed.picture else None
-    card = body.ExpectationCardFields(
-        question=parsed.question, example=parsed.example, picture=picture
-    )
-    client = context.forge_writer
-    number = int(parsed.item)
-    current_body, config = _require_writable_target(client, context, number, command="ask")
-    new_body = body.append_expectation(current_body, parsed.text, parsed.default, card=card)
-    index = len(body.expectation_lines(new_body, storage=config.storage))
-    client.update_item_body(number, new_body)
-    asked = _AskedLine(
-        item=number, index=index, text=parsed.text, default=parsed.default, card=card
-    )
-    _emit_ask_result(asked, config.storage, as_json=parsed.json)
-    return 0
-
-
-def _cmd_ask(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`ask`'s own `--json` refusals (issue #396), for the whole command and
-    not only its first steps (issue #432): the body write this command ends
-    with can fail like any other forge call, and a failure there names this
-    command's own `unavailable` rather than escaping the envelope."""
-    as_json = parsed.json
-    try:
-        return _append_expectation_card(parsed, context)
-    except _PictureFileError as error:
-        return report.refuse(AskReason.INVALID_PICTURE, error, as_json=as_json)
-    except (_TargetUnavailableError, _InvalidTargetError) as error:
-        return report.refuse(_ask_target_reason(error), error, as_json=as_json)
-    except (body.ExpectationTextError, body.ExpectationFieldError) as error:
-        return report.refuse(_ask_expectation_reason(error), error, as_json=as_json)
-    except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(AskReason.INVALID_USAGE, error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(AskReason.UNAVAILABLE, error, as_json=as_json)
-
-
 @dataclass(frozen=True)
 class _CommandEntry:
     """One command's parser builder and handler (issue #372: one table
@@ -1265,8 +989,8 @@ _COMMAND_TABLE: dict[str, _CommandEntry] = {
     "land": _CommandEntry(_add_land_parser, cmd_land.run),
     "rescope": _CommandEntry(_add_rescope_parser, cmd_rescope.run),
     "cut": _CommandEntry(_add_cut_parser, cmd_cut.run),
-    "ask": _CommandEntry(_add_ask_parser, _cmd_ask),
-    "rule": _CommandEntry(_add_rule_parser, _cmd_rule),
+    "ask": _CommandEntry(_add_ask_parser, cmd_ask.run),
+    "rule": _CommandEntry(_add_rule_parser, cmd_rule.run),
     "check": _CommandEntry(_add_check_parser, cmd_check.run),
     "brief": _CommandEntry(_add_brief_parser, cmd_brief.run),
     "item": _CommandEntry(_add_item_parser, cmd_item.run),
