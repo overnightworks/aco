@@ -1,8 +1,0 @@
-claim_id = "052e595db9214fe3bd1845ee4f78d1ef"
-agent = "claude"
-role = "builder"
-base = "0e49c6b856ddc53ab4aae6e9c76156f078123a03"
-branch = "claude/issue-128-s25a-uniform-handlers"
-scope = ["src/agent_coordination/cli.py", "src/agent_coordination/cmd_land.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/report.py", "tests/test_cli.py"]
-opened_commit = "4559087cabb585b272b9ddff612a8d487ab104ff"
-whole_reason = "Eine Signatur und ein Renderer gelten für alle Handler zugleich; release, land, report und die Verteilung in cli ändern sich nur gemeinsam."
