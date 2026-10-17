@@ -294,7 +294,7 @@ def build_board(
         children = _fetch_children(client, container_numbers)
         pull_requests = (open_pull_requests.result(), merged_pull_requests.result())
         closed_item_sizes = closed_item_sizes_future.result()
-    # The same forge relation `cli._cut_target` refuses a nested container on
+    # The same forge relation `cmd_cut._cut_target` refuses a nested container on
     # (issue #503), so `next` never proposes a `cut` that `cut` refuses.
     nesting_parents = {
         number: parent.reference

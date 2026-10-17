@@ -103,6 +103,7 @@ from agent_coordination import (
     cmd_brief,
     cmd_check,
     cmd_claim,
+    cmd_cut,
     cmd_land,
     cmd_next,
     cmd_reset,
@@ -4430,7 +4431,7 @@ def test_claim_refuses_a_freshly_cut_childs_incomplete_skeleton(
     defect-free but incomplete -- `now` and `next` filled, `done_when`
     empty -- so it is invisible to `next`, and refused here too, exactly as
     ruled: `claim` requires a complete projection."""
-    cut_child_body = issue_claim._cut_child_body(90, body.Storage.GITHUB)
+    cut_child_body = cmd_cut._cut_child_body(90, body.Storage.GITHUB)
     child = board_issue(101, "Scheibe 1", cut_child_body)
     _configured_board_client(monkeypatch, tmp_path, open_issues=(child,))
     monkeypatch.setattr(
@@ -4671,7 +4672,7 @@ def test_cut_names_the_created_child_when_the_relation_post_fails(
         (
             CUT_CONTAINER,
             "Scheibe 1",
-            issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
+            cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
             body.ItemKind.TASK,
         )
     ]
@@ -4802,7 +4803,7 @@ def test_cut_creates_a_child_and_removes_the_first_cuttable_slice(
         (
             CUT_CONTAINER,
             "Scheibe 1",
-            issue_claim._cut_child_body(
+            cmd_cut._cut_child_body(
                 CUT_CONTAINER, body.Storage.GITHUB, created_scope, done_when="D"
             ),
             body.ItemKind.TASK,
@@ -5196,7 +5197,7 @@ def test_cut_names_the_created_child_when_linking_fails(
         (
             CUT_CONTAINER,
             "Scheibe 1",
-            issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
+            cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
             body.ItemKind.TASK,
         )
     ]
@@ -5217,10 +5218,10 @@ def _forge_with_existing_child(
     `child_title` under `CUT_CONTAINER` -- the fixture every adopt-instead-of-
     duplicate test (#260) starts from. The child also carries a recorded
     parent and, when open, sits on the board with a body that would itself
-    pass `_orphan_names_container`, exactly like a real linked issue: a
-    broken `parent_issue` filter in `_adoptable_child` would then double-count
+    pass `cmd_cut._orphan_names_container`, exactly like a real linked issue: a
+    broken `parent_issue` filter in `cmd_cut._adoptable_child` would then double-count
     it as its own orphan, and the surrounding test would fail."""
-    child_body = issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D")
+    child_body = cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D")
     open_issues = (_one_slice_container(),)
     if child_state is board.ChildState.OPEN:
         open_issues = (
@@ -5308,7 +5309,7 @@ def test_cut_refuses_to_adopt_when_two_open_issues_match_the_row_title(
     orphan = board_issue(
         951,
         "Scheibe 1",
-        issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
+        cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
         kind=body.ItemKind.TASK,
     )
     monkeypatch.setattr(client, "list_open_board_issues", lambda: (_one_slice_container(), orphan))
@@ -5344,7 +5345,7 @@ def test_cut_refuses_to_adopt_when_two_open_issues_match_the_row_title(
             board_issue(
                 951,
                 "Scheibe 1",
-                issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
+                cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
                 labels=("idea",),
                 kind=body.ItemKind.TASK,
             ),
@@ -5355,7 +5356,7 @@ def test_cut_refuses_to_adopt_when_two_open_issues_match_the_row_title(
             board_issue(
                 CUT_CONTAINER,
                 "Scheibe 1",
-                issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
+                cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
                 kind=body.ItemKind.TASK,
             ),
             None,
@@ -5365,7 +5366,7 @@ def test_cut_refuses_to_adopt_when_two_open_issues_match_the_row_title(
             board_issue(
                 951,
                 "Scheibe 1",
-                issue_claim._cut_child_body(80, body.Storage.GITHUB, done_when="D"),
+                cmd_cut._cut_child_body(80, body.Storage.GITHUB, done_when="D"),
                 kind=body.ItemKind.TASK,
             ),
             None,
@@ -5403,7 +5404,7 @@ def test_cut_never_adopts_an_orphan_that_is_not_this_containers_recovery_shape(
         (
             CUT_CONTAINER,
             "Scheibe 1",
-            issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
+            cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D"),
             body.ItemKind.TASK,
         )
     ]
@@ -5564,7 +5565,7 @@ def test_cut_adopts_the_orphan_after_a_relation_partial_failure(
 
     assert first_exit_code == 2
     child = client.next_created_child_number - 1
-    expected_body = issue_claim._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D")
+    expected_body = cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D")
     assert client.created_issues == [("Scheibe 1", expected_body, body.ItemKind.TASK)]
     assert client.linked_children == [(CUT_CONTAINER, child)]
     capsys.readouterr()
@@ -6781,7 +6782,7 @@ def test_next_prints_a_cut_command_that_cut_accepts(
         (
             case.container_number,
             case.expected_created_title,
-            issue_claim._cut_child_body(case.container_number, body.Storage.GITHUB, done_when="D"),
+            cmd_cut._cut_child_body(case.container_number, body.Storage.GITHUB, done_when="D"),
             body.ItemKind.TASK,
         )
     ]
@@ -10777,6 +10778,7 @@ def _freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cmd_reset, "datetime", FixedDateTime)
     monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
     monkeypatch.setattr(cmd_brief, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_cut, "datetime", FixedDateTime)
 
 
 def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
