@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "ec389d8c780f4d0888f4b69cda732944bdd89cfe"
 branch = "claude/issue-155-pin15-first-defect"
-scope = ["specs/item.spec.md", "specs/next.spec.md", "specs/storage-pin.spec.md", "src/agent_coordination/state_board.py", "tests/test_state_board.py"]
+scope = ["scripts/test_inventory_dropped.txt", "specs/item.spec.md", "specs/next.spec.md", "specs/storage-pin.spec.md", "src/agent_coordination/state_board.py", "tests/test_state_board.py"]
 opened_commit = "0b97a5ed2f5fb5c7d16db66124ae5de84de9ad54"
 whole_reason = "Der eine Satz PIN-15 ändert sich für jeden Leser zugleich; Specs, Erzeuger und die Tabellen, die ihn festhalten, ziehen gemeinsam."
