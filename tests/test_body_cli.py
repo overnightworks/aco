@@ -42,7 +42,8 @@ def as_json(request: pytest.FixtureRequest) -> bool:
             ["body malformed: aco: no aco block"],
             "malformed",
             2,
-            '{"ok": false, "reason": "malformed", "defects": ["body malformed: aco: no aco block"]}\n',
+            '{"ok": false, "reason": "malformed", '
+            '"defects": ["body malformed: aco: no aco block"]}\n',
             id="no-block",
         ),
         pytest.param(
@@ -53,7 +54,8 @@ def as_json(request: pytest.FixtureRequest) -> bool:
             ],
             "malformed",
             2,
-            '{"ok": false, "reason": "malformed", "defects": ["body malformed: now: now is required", '
+            '{"ok": false, "reason": "malformed", '
+            '"defects": ["body malformed: now: now is required", '
             '"body malformed: done_when: done_when is required"]}\n',
             id="multiple-defects",
         ),
@@ -62,7 +64,8 @@ def as_json(request: pytest.FixtureRequest) -> bool:
             ["body incomplete: Now, Next, Done when"],
             "incomplete",
             2,
-            '{"ok": false, "reason": "incomplete", "defects": ["body incomplete: Now, Next, Done when"]}\n',
+            '{"ok": false, "reason": "incomplete", '
+            '"defects": ["body incomplete: Now, Next, Done when"]}\n',
             id="every-key-empty",
         ),
         pytest.param(
