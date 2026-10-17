@@ -100,12 +100,14 @@ from agent_coordination import (
     board_read,
     body,
     checkout,
+    cmd_brief,
     cmd_check,
     cmd_claim,
     cmd_land,
     cmd_next,
     cmd_reset,
     cmd_start,
+    cmd_status,
     forge,
     github,
     items,
@@ -118,7 +120,7 @@ from agent_coordination import (
     store,
 )
 from agent_coordination import cli as issue_claim
-from agent_coordination.cli import _status, _status_json
+from agent_coordination.cmd_status import _status, _status_json
 from agent_coordination.protocol import (
     ClaimError,
     ClaimRequest,
@@ -10773,6 +10775,8 @@ def _freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
     monkeypatch.setattr(board_read, "datetime", FixedDateTime)
     monkeypatch.setattr(cmd_reset, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_brief, "datetime", FixedDateTime)
 
 
 def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
@@ -10787,7 +10791,7 @@ def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> Non
             "src/agent_coordination/__init__.py",
         ),
     )
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
 
 
 _STATUS_NOW = datetime(2026, 8, 21, tzinfo=UTC)
@@ -10955,7 +10959,7 @@ def _patch_status_store(
         return {claim.claim_id: resolved_ages[claim.claim_id] for claim in claims}
 
     monkeypatch.setattr(store, "claim_ages", fake_claim_ages)
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
 
 
 def test_cli_status_empty_store_prints_unclaimed_repository(
@@ -10979,7 +10983,7 @@ def test_cli_status_before_bootstrap_prints_unclaimed_repository(
         checkout, "remote_url", lambda remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
     )
     monkeypatch.setattr(store, "fetch_state", lambda *, worktree, remote: protocol.EMPTY_STATE)
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
 
     assert issue_claim.main(["--repo", REPOSITORY, "status"]) == 0
     assert capsys.readouterr().out == "UNCLAIMED repository\n"
@@ -11021,7 +11025,7 @@ def test_cli_status_json_before_bootstrap_reports_a_null_tip(
         checkout, "remote_url", lambda remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
     )
     monkeypatch.setattr(store, "fetch_state", lambda *, worktree, remote: protocol.EMPTY_STATE)
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
 
     assert issue_claim.main(["--repo", REPOSITORY, "status", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)

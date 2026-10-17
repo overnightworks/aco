@@ -21,8 +21,7 @@ def emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:
     reader can stop before it. `ask`, `rule`, and `brief` are its first
     callers, on success and on every refusal alike. `reason` is typed
     `StrEnum` -- the shared base every command's own reason vocabulary
-    (`AskReason`, `RuleReason`, `BriefReason`) already subclasses -- so a
-    loose string can never reach this envelope."""
+    already subclasses -- so a loose string can never reach this envelope."""
     message = payload.pop("message", None)
     envelope: dict[str, object] = {"ok": ok, "reason": reason}
     envelope.update(payload)
