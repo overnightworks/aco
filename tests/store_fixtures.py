@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from agent_coordination import protocol, store
@@ -128,3 +129,22 @@ def claim_intent(
         resource_name=resource_name,
         resource_value=resource_value,
     )
+
+
+class RaceOnceTransport:
+    """A `store.PushTransport` that lets one other writer land on
+    `refs/aco/state` between this transition's own read and its first real
+    push attempt (issues #359 R3, #459): `race` performs that genuine second
+    `git push` -- not a monkeypatched rejection -- so the ordinary
+    `commit_transition` retry loop meets a real non-fast-forward rejection
+    and must actually refetch and reapply."""
+
+    def __init__(self, race: Callable[[], object]) -> None:
+        self._race: Callable[[], object] | None = race
+        self._real = store.GitPushTransport()
+
+    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
+        if self._race is not None:
+            race, self._race = self._race, None
+            race()
+        self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
