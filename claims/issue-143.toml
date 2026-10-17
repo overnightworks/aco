@@ -1,8 +1,0 @@
-claim_id = "afa2dc29e6f9497fb94d21c517987e94"
-agent = "claude"
-role = "builder"
-base = "33bad72ae787765fd5fd4750bf69525a9b3ce198"
-branch = "claude/issue-143-fb-run-cli-stdin"
-scope = ["tests/cli_fixtures.py", "tests/test_cli.py", "tests/test_cli_fixtures.py", "tests/test_state_board.py"]
-opened_commit = "bb4fcf726e321a9a708a02260aeae85ab6972824"
-whole_reason = "Der Runner, sein Beweis und jede Aufrufstelle des alten Helfers ändern sich nur gemeinsam; halb umgestellt gäbe es zwei stdin-Wege."
