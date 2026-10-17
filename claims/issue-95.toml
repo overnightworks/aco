@@ -1,0 +1,8 @@
+claim_id = "68131ac2607445899a810e8eaedc86ad"
+agent = "claude"
+role = "builder"
+base = "56d1877d0694c6df5650d5d9af42d339b5fff950"
+branch = "claude/issue-95-s10-cmd-board-rulings"
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_board.py", "src/agent_coordination/cmd_rulings.py", "tests/test_state_board.py"]
+opened_commit = "cd78a14888ba33aa2d49dc39a003841bb8f0f53c"
+whole_reason = "Zwei kleine Lese-Befehle ziehen mit Ausgabe, Layers-Zeile und Testverweisen in ihre Module; beide hängen an derselben Board-Beobachtung und derselben Layers-Zeile."
