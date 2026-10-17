@@ -1,8 +1,8 @@
 """Behavioral tests for the CI rewrite and family-move gates in `scripts/test_inventory.py`.
 
-Each case drives the gate against a real, freshly initialized git repository under
+The CI gate cases drive the gate against a real, freshly initialized git repository under
 `tmp_path`. Git itself is the boundary the gate queries, so faking its output would test
-the wrong layer. It also pins that `test_inventory` and `test_budget` find the same tests.
+the wrong layer. Other cases pin discovery parity with `test_budget` and the decider's mark forms.
 """
 
 from __future__ import annotations
@@ -282,3 +282,35 @@ def test_both_gates_find_the_same_tests_at_any_class_depth(
     budget_tests = test_budget.measure(tmp_path)["tests"].tests
 
     assert ([case.qualname for case in inventory_cases], budget_tests) == ([expected_qualname], 1)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("@pytest.mark.parametrize('value', [1])\ndef test_value(value): pass", True),
+        ("@parametrize('value', [1])\ndef test_value(value): pass", True),
+        (
+            "pytestmark = [pytest.mark.parametrize('value', [1])]\ndef test_value(value): pass",
+            True,
+        ),
+        (
+            "@pytest.mark.parametrize('value', [1])\n"
+            "class TestValues:\n    def test_value(self, value): pass",
+            True,
+        ),
+        ("def test_value(): pass", False),
+    ],
+    ids=["attribute", "bare", "pytestmark", "enclosing-class", "unparametrized"],
+)
+def test_inventory_recognizes_parametrized_tests(source: str, expected: bool) -> None:
+    tree = ast.parse(source)
+
+    cases, _classes, _single = test_inventory.iter_tests(tree, test_inventory.module_scope(tree))
+
+    assert [case.parametrized for case in cases] == [expected]
+    if source.startswith("@"):
+        assert cases[0].param_units
+    assert [
+        test_inventory.is_parametrized(func, owners, tree)
+        for owners, func in test_inventory.iter_test_functions(tree.body)
+    ] == [expected]

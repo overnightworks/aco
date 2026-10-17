@@ -98,7 +98,12 @@ from dataclasses import asdict, dataclass, field
 from fractions import Fraction
 from pathlib import Path
 
-from test_inventory import is_test_function, iter_spec_citations, iter_test_functions
+from test_inventory import (
+    is_parametrized,
+    is_test_function,
+    iter_spec_citations,
+    iter_test_functions,
+)
 
 # --- aco configuration --------------------------------------------------------------------
 # The one place blueprint-specific names were replaced with aco's own. Everything below this block
@@ -262,37 +267,13 @@ def _first_arg(node: ast.Call) -> object:
     return None
 
 
-def _is_parametrize(node: ast.expr) -> bool:
-    target = node.func if isinstance(node, ast.Call) else node
-    if isinstance(target, ast.Attribute):
-        return target.attr == "parametrize"
-    return isinstance(target, ast.Name) and target.id == "parametrize"
-
-
-def _decorated_parametrize(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> bool:
-    return any(_is_parametrize(decorator) for decorator in node.decorator_list)
-
-
-def _pytestmark_parametrizes(module: ast.Module) -> bool:
-    for stmt in module.body:
-        if not isinstance(stmt, ast.Assign):
-            continue
-        if not any(isinstance(t, ast.Name) and t.id == "pytestmark" for t in stmt.targets):
-            continue
-        marks = stmt.value.elts if isinstance(stmt.value, (ast.List, ast.Tuple)) else [stmt.value]
-        if any(_is_parametrize(mark) for mark in marks):
-            return True
-    return False
-
-
 def _scoped_tests(
-    module: ast.Module, inherited: bool
+    module: ast.Module,
 ) -> Iterator[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef, bool]]:
     """Yield ``(scope, function, parametrized)`` for every test ``iter_test_functions`` finds."""
     for owners, func in iter_test_functions(module.body):
         scope = "".join(f".{owner.name}" for owner in owners)
-        parametrized = inherited or any(_decorated_parametrize(node) for node in (*owners, func))
-        yield scope, func, parametrized
+        yield scope, func, is_parametrized(func, owners, module)
 
 
 def wraps_setup_command(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -438,7 +419,7 @@ def _charge_clone_lines(units: list[_Unit], files: dict[str, FileMetrics]) -> No
 
 def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: list[_Unit]) -> None:
     scopes: defaultdict[str, Counter[str]] = defaultdict(Counter)
-    for scope, func, parametrized in _scoped_tests(module, _pytestmark_parametrizes(module)):
+    for scope, func, parametrized in _scoped_tests(module):
         metrics.tests += 1
         metrics.parametrized += int(parametrized)
         scopes[scope][sibling_key(func.name)] += 1
@@ -448,7 +429,7 @@ def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: l
             units.append(_Unit(rel, lines, _shingles(tokens)))
     metrics.credited = frozenset(
         spec_id
-        for _scope, func, _parametrized in _scoped_tests(module, False)
+        for _owners, func in iter_test_functions(module.body)
         for spec_id in iter_spec_citations(ast.get_docstring(func) or "")
     )
     metrics.literal_siblings = sum(

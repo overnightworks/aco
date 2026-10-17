@@ -40,7 +40,8 @@ Three sections, each sorted so two runs over the same file are byte-identical:
 
 A metrics header precedes the sections: file lines, test count, class count (and how many hold
 a single test), parametrized tests and their share, and clone lines. A test is parametrized
-when it, its class, or a module-level fixture it requests carries ``parametrize``/``params=``.
+when it, an enclosing class, or the module's ``pytestmark`` carries ``parametrize``, or a
+module-level fixture it requests carries ``params=``.
 **Clone lines** follow the same method as the per-file inventory: each test body is tokenized,
 literals are normalised (``NUMBER``/``STRING`` tokens collapse to one placeholder each, comments
 and layout tokens are dropped), the token stream is cut into overlapping 6-token shingles, and
@@ -288,12 +289,31 @@ def iter_test_functions(
             yield from iter_test_functions(node.body, (*owners, node))
 
 
-def _is_parametrized(node: FunctionNode | ast.ClassDef) -> bool:
-    for decorator in node.decorator_list:
-        target = decorator.func if isinstance(decorator, ast.Call) else decorator
-        if isinstance(target, ast.Attribute) and target.attr == _PARAMETRIZE:
-            return True
-    return False
+def _is_parametrize_mark(expr: ast.expr) -> bool:
+    target = expr.func if isinstance(expr, ast.Call) else expr
+    return (isinstance(target, ast.Attribute) and target.attr == _PARAMETRIZE) or (
+        isinstance(target, ast.Name) and target.id == _PARAMETRIZE
+    )
+
+
+def _pytestmark_marks(module: ast.Module) -> Iterator[ast.expr]:
+    for statement in module.body:
+        if isinstance(statement, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "pytestmark"
+            for target in statement.targets
+        ):
+            value = statement.value
+            yield from value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value]
+
+
+def is_parametrized(
+    func: FunctionNode,
+    owners: tuple[ast.ClassDef, ...],
+    module: ast.Module,
+) -> bool:
+    """Whether a test, an enclosing class, or the module's pytestmark parametrizes it."""
+    decorators = [mark for node in (*owners, func) for mark in node.decorator_list]
+    return any(_is_parametrize_mark(mark) for mark in (*_pytestmark_marks(module), *decorators))
 
 
 def _parameter_names(func: FunctionNode) -> set[str]:
@@ -318,11 +338,7 @@ def _parametrize_units(node: FunctionNode | ast.ClassDef) -> list[tuple[tuple[st
     """(parameter names, argvalues expression) per ``parametrize`` decorator on *node*."""
     units: list[tuple[tuple[str, ...], ast.expr]] = []
     for decorator in node.decorator_list:
-        if not (
-            isinstance(decorator, ast.Call)
-            and isinstance(decorator.func, ast.Attribute)
-            and decorator.func.attr == _PARAMETRIZE
-        ):
+        if not (isinstance(decorator, ast.Call) and _is_parametrize_mark(decorator)):
             continue
         keywords = {keyword.arg: keyword.value for keyword in decorator.keywords}
         names_node = decorator.args[0] if decorator.args else keywords.get("argnames")
@@ -334,13 +350,11 @@ def _parametrize_units(node: FunctionNode | ast.ClassDef) -> list[tuple[tuple[st
 
 
 def _make_case(
-    func: FunctionNode, owners: tuple[ast.ClassDef, ...], scope: ModuleScope
+    func: FunctionNode, owners: tuple[ast.ClassDef, ...], scope: ModuleScope, module: ast.Module
 ) -> TestCase:
     qualname = "::".join([*(owner.name for owner in owners), func.name])
-    parametrized = (
-        _is_parametrized(func)
-        or any(_is_parametrized(owner) for owner in owners)
-        or bool(_parameter_names(func) & scope.param_fixtures)
+    parametrized = is_parametrized(func, owners, module) or bool(
+        _parameter_names(func) & scope.param_fixtures
     )
     param_units = _parametrize_units(func) + [
         unit for owner in owners for unit in _parametrize_units(owner)
@@ -357,7 +371,7 @@ def iter_tests(tree: ast.Module, scope: ModuleScope) -> tuple[list[TestCase], in
     cases: list[TestCase] = []
     tests_per_class: Counter[ast.ClassDef] = Counter()
     for owners, func in iter_test_functions(tree.body):
-        cases.append(_make_case(func, owners, scope))
+        cases.append(_make_case(func, owners, scope, tree))
         if owners:
             tests_per_class[owners[-1]] += 1
     single = sum(count == 1 for count in tests_per_class.values())
