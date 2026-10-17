@@ -559,7 +559,10 @@ def test_lookup_identity_resolves_a_lane_by_prefix_or_a_live_lane_claim(case: st
     issue_holder = standing_active_claim(claim_id="issue", issue=42, branch=branch)
     lane_holder = standing_active_claim(claim_id="lane", lane=True, branch=branch)
     other_holder = standing_active_claim(claim_id="other", lane=True, branch="dependabot/y")
-    claims = {claim.claim_id: claim for claim in (issue_holder, lane_holder, other_holder)}
+    claims = {
+        protocol.claim_key(claim.identity, claim.branch): claim
+        for claim in (issue_holder, lane_holder, other_holder)
+    }
     if case == "U8":
         assert protocol.claims_on_branch(claims, branch) == (issue_holder, lane_holder)
         return

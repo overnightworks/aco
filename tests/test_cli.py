@@ -24373,8 +24373,26 @@ _LANE_LOOKUP_CASES = (
     _LaneLookupCase("5", holder="none", refusal=_lane_lookup_refusal("dependabot/x")),
     _LaneLookupCase("6", holder="issue", refusal=_lane_lookup_refusal("dependabot/x")),
     _LaneLookupCase("8", merged=True),
-    _LaneLookupCase("9", merged=True, trailer="Work-Item: #42", refusal="Work-Item"),
-    _LaneLookupCase("10", merged=True, source="dependabot/y", refusal="dependabot/y"),
+    _LaneLookupCase(
+        "9",
+        merged=True,
+        trailer="Work-Item: #42",
+        refusal=(
+            f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
+            "`Work-Item: #42`; an issue-less lane needs a "
+            '`No-Item: <docs|fix>` trailer; release it with --abandoned "landed as PR #12 '
+            'with a malformed trailer"'
+        ),
+    ),
+    _LaneLookupCase(
+        "10",
+        merged=True,
+        source="dependabot/y",
+        refusal=(
+            "lane 'dependabot/x' is claimed on 'dependabot/x', not on pull request #12's "
+            "branch 'dependabot/y'; release that claim by itself"
+        ),
+    ),
     _LaneLookupCase("25", command="rescope"),
     _LaneLookupCase(
         "26", command="rescope", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
@@ -24403,7 +24421,7 @@ _LANE_LOOKUP_CASES = (
 )
 
 
-def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookupCase) -> FakeForge:
+def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookupCase) -> None:
     standing = (
         ()
         if case.holder == "none"
@@ -24425,6 +24443,7 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
     )
     monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     if case.merged:
+        monkeypatch.setattr(store, "list_worktrees", lambda _toplevel: (Path("/repo"),))
         client.landings[12] = landing_pull_request(
             body=case.trailer, merged=True, head_ref_name=case.source, base_ref_name="main"
         )
@@ -24439,7 +24458,6 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
         )
     else:
         forbid_forge_resolution(monkeypatch)
-    return client
 
 
 def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
@@ -24485,7 +24503,7 @@ def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     after = store.fetch_state(worktree=Path("."), remote="origin").claims
     assert status == (2 if case.refusal else 0)
     if case.refusal:
-        if case.cell in {"5", "6", "26", "28", "29", "32"}:
+        if case.cell in {"5", "6", "9", "10", "26", "28", "29", "32"}:
             assert captured.err == f"ERROR: {case.refusal}\n"
         else:
             assert case.refusal in captured.err
@@ -24498,7 +24516,9 @@ def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
         if case.as_json:
             envelope = json.loads(captured.out)
             assert envelope["ok"] is True
-            assert envelope["reason"] == "released"
+            assert envelope["reason"] == "abandoned"
             assert envelope["lane"] is True
         else:
             assert captured.out.startswith(f"RELEASED lane {case.branch}: mine\n")
+            if case.merged:
+                assert "worktree: kept -- release ran from inside it\n" in captured.out
