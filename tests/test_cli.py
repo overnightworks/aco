@@ -19636,7 +19636,11 @@ def test_land_rerun_recovers_release_routing_after_the_body_changed(
 
 
 def _land_from_a_separate_clone(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, git_identity: bool
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    git_identity: bool,
+    lane_branch: str | None = None,
 ) -> tuple[Path, Path, FakeForge]:
     """`_land_scenario`'s claim, held for real in `refs/aco/state`, with the
     lane worktree beside the primary checkout and `aco land` running from a
@@ -19644,14 +19648,27 @@ def _land_from_a_separate_clone(
     songmaker landing clone): the primary checkout, the clone, and the
     forge. The forge closes the item through its own `Closes #<n>` on the
     merge. `git_identity=False` leaves the clone with no user.name or
-    user.email, which git may never guess."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
+    user.email, which git may never guess. `lane_branch` stands an issue-less
+    lane on that foreign branch instead: a `No-Item:` pull request whose
+    lane claim is keyed by the branch."""
+    if lane_branch is None:
+        repo, client = _land_scenario(monkeypatch, tmp_path)
+    else:
+        repo, client = _land_scenario(
+            monkeypatch, tmp_path, branch=lane_branch, issue=None, body="No-Item: fix"
+        )
     client.closes_on_merge = True
     _use_real_store(monkeypatch)
     remote = tmp_path / "remote.git"
     store.bootstrap(worktree=repo, remote=str(remote))
-    _claim_the_landing_issue(repo, remote, "landing-claim")
-    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
+    _claim_the_landing_branch(
+        repo,
+        remote,
+        "landing-claim",
+        branch=lane_branch or LANDING_BRANCH,
+        lane=lane_branch is not None,
+    )
+    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), lane_branch or LANDING_BRANCH)
     clone = tmp_path / "landing-clone"
     real_git(tmp_path, "clone", "-q", str(remote), str(clone))
     _without_git_identity(monkeypatch, clone)
@@ -19663,20 +19680,21 @@ def _land_from_a_separate_clone(
     return repo, clone, client
 
 
-def _claim_the_landing_issue(repo: Path, remote: Path, claim_id: str) -> None:
-    """Ada's claim `claim_id` on the landing issue and branch, written to
-    `refs/aco/state` from `repo`."""
+def _claim_the_landing_branch(
+    repo: Path, remote: Path, claim_id: str, *, branch: str = LANDING_BRANCH, lane: bool = False
+) -> None:
+    """Ada's claim `claim_id` on `branch`, the landing issue's own or, with
+    `lane`, an issue-less lane's, written to `refs/aco/state` from `repo`."""
+    identity = protocol.LaneIdentity() if lane else protocol.IssueIdentity(WORK_ITEM_ISSUE)
     store.commit_transition(
         observed=fresh_observation(repo, remote),
-        subject=store.ClaimTransitionSubject(
-            f"claim issue {WORK_ITEM_ISSUE}", item=str(WORK_ITEM_ISSUE)
-        ),
+        subject=store.transition_subject("claim", identity, branch),
         intent=protocol.ClaimIntent(
-            identity=protocol.IssueIdentity(WORK_ITEM_ISSUE),
+            identity=identity,
             agent="Ada",
             role="builder",
             base=protocol.ObjectId("c" * 40),
-            branch=LANDING_BRANCH,
+            branch=branch,
             scope=("src",),
             claim_id=protocol.ClaimId(claim_id),
             operation_id=f"{claim_id}-op",
@@ -19753,29 +19771,85 @@ def test_land_from_a_separate_clone_releases_or_refuses_before_the_merge(
     assert (tmp_path / "lane").exists()
 
 
+def _land_and_release_the_lane_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    branch: str,
+) -> tuple[Path, Path, FakeForge]:
+    """`aco land 12` from a separate clone released the claim on `branch`
+    (the landing issue's own, or a foreign branch's issue-less lane): the
+    repository holding the lane worktree, the clone, and the forge, set up
+    for a rerun."""
+    repo, clone, client = _land_from_a_separate_clone(
+        monkeypatch,
+        tmp_path,
+        git_identity=True,
+        lane_branch=None if branch == LANDING_BRANCH else branch,
+    )
+    client.allowed_methods = frozenset({_SQUASH})
+    recorded_head = real_git(repo, "rev-parse", branch).stdout.strip()
+    client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=recorded_head)
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
+    capsys.readouterr()
+    client.closed_issues.discard(WORK_ITEM_ISSUE)
+    client.landing_comments.clear()
+    client.issue_reference_lookups.clear()
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    return repo, clone, client
+
+
+_FOREIGN_BRANCH = "dependabot/x"
+_RERUN_ROWS = (
+    ("removes-the-lane", False, False, False, "removed"),
+    (
+        "a-claim-taken-meanwhile-keeps-the-lane",
+        False,
+        True,
+        False,
+        "kept -- claimed again while this release ran",
+    ),
+    (
+        "the-keep-worktree-flag-keeps-the-lane",
+        False,
+        False,
+        True,
+        "kept -- --keep-worktree was given",
+    ),
+)
+
+
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
-    ("claimed_meanwhile", "keep_worktree_flag", "worktree"),
+    (
+        "branch",
+        "claimed_before_the_land_rerun",
+        "claimed_meanwhile",
+        "keep_worktree_flag",
+        "worktree",
+    ),
     [
-        pytest.param(False, False, "removed", id="removes-the-lane"),
+        pytest.param(branch, *row[1:], id=f"{branch_id}-{row[0]}")
+        for branch, branch_id in ((LANDING_BRANCH, "issue"), (_FOREIGN_BRANCH, "foreign-lane"))
+        for row in _RERUN_ROWS
+    ]
+    + [
         pytest.param(
+            _FOREIGN_BRANCH,
             True,
             False,
-            "kept -- claimed again while this release ran",
-            id="a-claim-taken-meanwhile-keeps-the-lane",
-        ),
-        pytest.param(
             False,
-            True,
-            "kept -- --keep-worktree was given",
-            id="the-keep-worktree-flag-keeps-the-lane",
-        ),
+            "",
+            id="foreign-lane-an-issue-claim-taken-since-the-release-refuses",
+        )
     ],
 )
 def test_land_rerun_after_its_release_finishes_and_names_the_release_that_removes_the_lane(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
+    branch: str,
+    claimed_before_the_land_rerun: bool,
     claimed_meanwhile: bool,
     keep_worktree_flag: bool,
     worktree: str,
@@ -19787,29 +19861,33 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     printed in the checkout holding the clean lane at the recorded head,
     removes it. The trigger is the missing claim, never a closed item: a
     reopened item stays open, uncommented and unread (REL-47). A claim
-    taken while that release verifies the landing keeps the lane (REL-55)."""
-    repo, clone, client = _land_from_a_separate_clone(monkeypatch, tmp_path, git_identity=True)
-    client.allowed_methods = frozenset({_SQUASH})
-    recorded_head = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
-    client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=recorded_head)
+    taken while that release verifies the landing keeps the lane (REL-55) --
+    on a foreign branch whichever claim it is (REL-59) -- and one taken
+    before the rerun refuses REL-03 there (REL-58)."""
+    repo, clone, client = _land_and_release_the_lane_claim(monkeypatch, capsys, tmp_path, branch)
     remote = tmp_path / "remote.git"
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-    capsys.readouterr()
     state_after_release = _state_ref_tip(clone, remote)
-    client.closed_issues.discard(WORK_ITEM_ISSUE)
-    client.landing_comments.clear()
-    client.issue_reference_lookups.clear()
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    rerun = f"aco release {WORK_ITEM_ISSUE} --merged 12 --branch {LANDING_BRANCH}"
+    item = "" if branch == _FOREIGN_BRANCH else f" {WORK_ITEM_ISSUE}"
+    rerun = f"aco release{item} --merged 12 --branch {branch}"
+    if claimed_before_the_land_rerun:
+        _claim_the_landing_branch(repo, remote, "bob-claim", branch=branch)
+        state_after_release = _state_ref_tip(clone, remote)
 
     land_status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     land_output = capsys.readouterr()
+    if claimed_before_the_land_rerun:
+        assert (land_status, land_output.out) == (2, "")
+        assert _lane_lookup_refusal(branch) in land_output.err
+        assert len(client.merge_calls) == 1
+        assert _state_ref_tip(clone, remote) == state_after_release
+        assert (tmp_path / "lane").exists()
+        return
     assert (land_status, land_output.err, land_output.out) == (
         0,
         "",
         "LANDED pull request #12 already; nothing left to release\n"
-        f"worktree: kept -- no linked worktree on {LANDING_BRANCH} in this checkout; "
+        f"worktree: kept -- no linked worktree on {branch} in this checkout; "
         f"run {rerun} in the checkout that holds it\n",
     )
     redirect_toplevel(monkeypatch, repo)
@@ -19818,7 +19896,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
         verified_landing = client.landing
 
         def landing_while_start_claims_again(number: int) -> forge.Landing:
-            _claim_the_landing_issue(repo, remote, "reopened-claim")
+            _claim_the_landing_branch(repo, remote, "reopened-claim", branch=branch)
             return verified_landing(number)
 
         monkeypatch.setattr(client, "landing", landing_while_start_claims_again)
@@ -19835,7 +19913,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     )
     lane_kept = claimed_meanwhile or keep_worktree_flag
     assert (tmp_path / "lane").exists() is lane_kept
-    assert checkout.branch_exists(LANDING_BRANCH) is lane_kept
+    assert checkout.branch_exists(branch) is lane_kept
     claims = store.fetch_state(worktree=repo, remote=str(remote)).claims
     assert (len(client.merge_calls), bool(claims)) == (1, claimed_meanwhile)
     assert (
@@ -24471,6 +24549,13 @@ class _LaneLookupCase:
     refusal: str | None = None
     reads_once: bool = False
     exact: bool = True
+    claim_id: str | None = None
+    merged_ref: str = "12"
+    state_ref: bool = False
+    landing_merged: bool = True
+    issue_claim_lands_during_verification: bool = False
+    no_forge_reads: bool = False
+    nothing_left_worktree: str | None = None
 
 
 def _lane_lookup_refusal(branch: str) -> str:
@@ -24479,6 +24564,13 @@ def _lane_lookup_refusal(branch: str) -> str:
         "check out a branch prefixed 'docs/' or 'fix/'"
     )
 
+
+_WORK_ITEM_TRAILER_REFUSAL = (
+    f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
+    "`Work-Item: #42`; an issue-less lane needs a "
+    '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
+    'with a malformed trailer"'
+)
 
 _LANE_LOOKUP_CASES = (
     _LaneLookupCase(
@@ -24490,12 +24582,7 @@ _LANE_LOOKUP_CASES = (
         "9",
         merged=True,
         trailer="Work-Item: #42",
-        refusal=(
-            f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
-            "`Work-Item: #42`; an issue-less lane needs a "
-            '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
-            'with a malformed trailer"'
-        ),
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
     ),
     _LaneLookupCase(
         "10",
@@ -24505,6 +24592,59 @@ _LANE_LOOKUP_CASES = (
             "lane 'dependabot/x' is claimed on 'dependabot/x', not on pull request #12's "
             "branch 'dependabot/y'; release that claim by itself"
         ),
+    ),
+    _LaneLookupCase(
+        "11", holder="none", merged=True, nothing_left_worktree="kept -- release ran from inside it"
+    ),
+    _LaneLookupCase(
+        "12",
+        holder="none",
+        merged=True,
+        source="dependabot/y",
+        refusal="lane 'dependabot/x' has no active build claim",
+    ),
+    _LaneLookupCase(
+        "13",
+        holder="none",
+        merged=True,
+        trailer="Work-Item: #42",
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
+    ),
+    _LaneLookupCase(
+        "14",
+        holder="none",
+        merged=True,
+        landing_merged=False,
+        refusal="pull request #12 is not merged",
+    ),
+    _LaneLookupCase(
+        "15",
+        holder="none",
+        merged=True,
+        claim_id="X",
+        refusal=_lane_lookup_refusal("dependabot/x"),
+    ),
+    _LaneLookupCase(
+        "16",
+        holder="none",
+        merged=True,
+        merged_ref=MERGE_COMMIT_SHA,
+        state_ref=True,
+        refusal=_lane_lookup_refusal("dependabot/x"),
+    ),
+    _LaneLookupCase(
+        "17",
+        holder="issue",
+        merged=True,
+        refusal=_lane_lookup_refusal("dependabot/x"),
+        no_forge_reads=True,
+    ),
+    _LaneLookupCase(
+        "18",
+        holder="none",
+        merged=True,
+        issue_claim_lands_during_verification=True,
+        nothing_left_worktree="kept -- claimed again while this release ran",
     ),
     _LaneLookupCase("25", command="rescope"),
     _LaneLookupCase(
@@ -24531,14 +24671,40 @@ _LANE_LOOKUP_CASES = (
             "check out the docs/ or fix/ lane branch, or pass an issue number"
         ),
     ),
+    _LaneLookupCase(
+        "31",
+        branch="docs/x",
+        holder="none",
+        merged=True,
+        source="docs/x",
+        nothing_left_worktree="kept -- release ran from inside it",
+    ),
     _LaneLookupCase("33", as_json=True),
-    _LaneLookupCase("35a", command="release-help"),
+    _LaneLookupCase(
+        "34",
+        holder="none",
+        merged=True,
+        as_json=True,
+        nothing_left_worktree="kept -- release ran from inside it",
+    ),
+    _LaneLookupCase(
+        "38",
+        branch="ada/issue-42",
+        holder="none",
+        merged=True,
+        trailer="Work-Item: #42",
+        source="ada/issue-42",
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
+    ),
+    _LaneLookupCase("35", command="release-help"),
     _LaneLookupCase("36", command="rescope-help"),
     _LaneLookupCase("37", command="claim-help"),
 )
 
 
-def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookupCase) -> None:
+def _arrange_lane_lookup_case(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, case: _LaneLookupCase
+) -> FakeForge:
     standing = (
         ()
         if case.holder == "none"
@@ -24554,7 +24720,10 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
     )
     client = FakeForge()
     _patch_release_session(monkeypatch, client, *standing, agent=case.agent, branch=case.branch)
-    git_values = git_checkout(branch=case.branch)
+    toplevel = str(tmp_path) if case.state_ref else "/repo"
+    if case.state_ref:
+        _write_state_ref_pin(tmp_path)
+    git_values = git_checkout(toplevel=toplevel, branch=case.branch)
     monkeypatch.setattr(
         checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
@@ -24562,7 +24731,10 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
     if case.merged:
         monkeypatch.setattr(store, "list_worktrees", lambda _toplevel: (Path("/repo"),))
         client.landings[12] = landing_pull_request(
-            body=case.trailer, merged=True, head_ref_name=case.source, base_ref_name="main"
+            body=case.trailer,
+            merged=case.landing_merged,
+            head_ref_name=case.source,
+            base_ref_name="main",
         )
         work_items = ("#42",) if case.trailer == "Work-Item: #42" else ()
         classification = board.trunk_commit_classification(
@@ -24575,6 +24747,33 @@ def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookup
         )
     else:
         forbid_forge_resolution(monkeypatch)
+    if case.issue_claim_lands_during_verification:
+        _claim_the_branch_while_the_landing_verifies(monkeypatch, client, case.branch)
+    return client
+
+
+def _claim_the_branch_while_the_landing_verifies(
+    monkeypatch: pytest.MonkeyPatch, client: FakeForge, branch: str
+) -> None:
+    """Bob's issue claim #42 on `branch` appears in the claim state once the
+    forge was asked about the landing: after the release's first read."""
+    verified_landing = client.landing
+    fetch_state = store.fetch_state
+    verified = []
+    holder = store_claim_from_request(request("bob", "Bob", issue=42, branch=branch, scope=("a",)))
+
+    def landing_while_a_claim_lands(number: int) -> forge.Landing:
+        verified.append(number)
+        return verified_landing(number)
+
+    def state_with_the_landed_claim(*, worktree: Path, remote: str) -> protocol.ClaimState:
+        state = fetch_state(worktree=worktree, remote=remote)
+        if not verified:
+            return state
+        return replace(state, claims={protocol.claim_key(holder.identity, branch): holder})
+
+    monkeypatch.setattr(client, "landing", landing_while_a_claim_lands)
+    monkeypatch.setattr(store, "fetch_state", state_with_the_landed_claim)
 
 
 def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
@@ -24583,8 +24782,30 @@ def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
     if case.command == "rescope":
         return ["rescope", "--add", "/repo/f"]
     branch_flags = ["--branch", case.branch] if case.branch else []
-    outcome = ["--merged", "12"] if case.merged else ["--abandoned", "R"]
-    return ["release", *branch_flags, *outcome, *(["--json"] if case.as_json else [])]
+    outcome = ["--merged", case.merged_ref] if case.merged else ["--abandoned", "R"]
+    return [
+        "release",
+        *branch_flags,
+        *outcome,
+        *(["--claim-id", case.claim_id] if case.claim_id else []),
+        *(["--json"] if case.as_json else []),
+    ]
+
+
+def _nothing_left_output(case: _LaneLookupCase, output: str) -> tuple[str, str]:
+    """REL-47's report as `(outcome, worktree)`, human lines or `--json` envelope."""
+    if case.as_json:
+        envelope = json.loads(output)
+        assert (envelope["ok"], envelope["reason"], envelope["lane"], envelope["branch"]) == (
+            True,
+            "merged",
+            True,
+            case.branch,
+        )
+        return envelope["outcome"], envelope["worktree"]
+    landed, worktree = output.splitlines()
+    assert landed == "LANDED pull request #12 already; nothing left to release"
+    return "nothing left to release", worktree.removeprefix("worktree: ")
 
 
 def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixture[str]) -> None:
@@ -24593,11 +24814,14 @@ def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixtur
         issue_claim.main([command, "--help"])
     assert exited.value.code == 0
     help_text = " ".join(capsys.readouterr().out.split())
-    expected = (
-        "omit for lane mode, derived from a docs/ or fix/ checkout branch"
-        if command == "claim"
-        else "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim"
-    )
+    expected = {
+        "claim": "omit for lane mode, derived from a docs/ or fix/ checkout branch",
+        "release": (
+            "omit for lane mode: a docs/ or fix/ branch, one holding a live lane claim, or a "
+            "github --merged rerun on a branch no claim holds"
+        ),
+        "rescope": "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim",
+    }[command]
     assert expected in help_text
 
 
@@ -24605,18 +24829,21 @@ def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixtur
 def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
     case: _LaneLookupCase,
 ) -> None:
     if case.command.endswith("-help"):
         _assert_lane_lookup_help(case, capsys)
         return
-    _arrange_lane_lookup_case(monkeypatch, case)
+    client = _arrange_lane_lookup_case(monkeypatch, tmp_path, case)
     before = store.fetch_state(worktree=Path("."), remote="origin").claims
     reads = count_context_reads(monkeypatch)
     status = issue_claim.main(["--repo", REPOSITORY, *_lane_lookup_arguments(case)])
     captured = capsys.readouterr()
     if case.reads_once:
         assert sum(reads.observations.values()) == 1
+    if case.no_forge_reads:
+        assert client.requests == 0
     after = store.fetch_state(worktree=Path("."), remote="origin").claims
     assert status == (2 if case.refusal else 0)
     if case.refusal:
@@ -24628,6 +24855,12 @@ def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     elif case.command == "rescope":
         assert _live_store_claim().scope == ("a", "f")
         assert captured.out.startswith("RESCOPED lane dependabot/x: mine")
+    elif case.nothing_left_worktree:
+        assert _nothing_left_output(case, captured.out) == (
+            "nothing left to release",
+            case.nothing_left_worktree,
+        )
+        assert bool(after) is case.issue_claim_lands_during_verification
     else:
         assert after == {}
         if case.as_json:
