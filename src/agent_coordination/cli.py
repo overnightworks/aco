@@ -834,14 +834,9 @@ STATE_REF_ITEM_PAST_THE_ID_SPACE = "{number} " + board.NAMES_NO_ITEM
 
 
 class PreDispatchReason(StrEnum):
-    """The one `reason` every refusal raised before the chosen command starts
-    reports under `--json` (issue #425): agent identity resolution, and
-    `release`'s own branch and override checks, refuse before any command
-    runs, so `_dispatch` owns their envelope here instead of each command
-    carrying a second `precondition_failed` member for a refusal it never
-    sees itself. `invalid_usage` is the parser's own refusal (issue #432),
-    raised before any command is even chosen, and PIN-31's state-ref item
-    number past the id space (issue #467), an argument no command can use."""
+    """Reasons owned before command dispatch: agent identity resolution
+    reports `precondition_failed`; parser usage and out-of-range state-ref
+    item numbers report `invalid_usage`. Release owns its branch checks."""
 
     INVALID_USAGE = "invalid_usage"
     PRECONDITION_FAILED = "precondition_failed"
@@ -863,11 +858,10 @@ class _CommandEntry:
     """One command's parser builder and handler (issue #372: one table
     instead of a `_SUBPARSER_BUILDERS`/`_READ_HANDLERS`/`_WRITE_HANDLERS`/
     `_FORGE_FREE_COMMANDS` quartet keyed by the same names). Every handler
-    takes the parsed arguments and the run's `RunContext`; `release` also
-    takes the branch `_dispatch` read before it started."""
+    takes the parsed arguments and the run's `RunContext` and returns an exit code."""
 
     add_parser: Callable[[_Subcommands], None]
-    handler: Callable[..., int | None]
+    handler: Callable[[argparse.Namespace, RunContext], int]
 
 
 _COMMAND_TABLE: dict[str, _CommandEntry] = {
@@ -892,15 +886,10 @@ _COMMAND_TABLE: dict[str, _CommandEntry] = {
 }
 
 
-def _resolved_before_the_command_starts(parsed: argparse.Namespace) -> str | None:
-    """Everything a writer needs settled before its own command starts
-    (issue #425): the agent identity it claims under, and `release`'s own
-    branch and override checks, which read the checkout rather than the
-    claim record. Returns `release`'s branch, `None` for every other
-    command."""
+def _resolved_before_the_command_starts(parsed: argparse.Namespace) -> None:
+    """Resolve the agent identity before a command uses it to identify a claim."""
     if parsed.command in {"claim", "release", "rescope", "land"}:
         parsed.agent = checkout.resolved_agent(parsed.agent)
-    return cmd_release.release_branch_for(parsed) if parsed.command == "release" else None
 
 
 def _dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
@@ -908,7 +897,7 @@ def _dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
     # #425); a refusal a command raises itself owns its own `reason`, so the
     # dispatch below stays outside this boundary.
     try:
-        release_branch = _resolved_before_the_command_starts(parsed)
+        _resolved_before_the_command_starts(parsed)
     except protocol.ClaimError as error:
         return report.refuse(
             PreDispatchReason.PRECONDITION_FAILED,
@@ -916,13 +905,7 @@ def _dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
             as_json=bool(getattr(parsed, "json", False)),
         )
     entry = _COMMAND_TABLE[parsed.command]
-    if parsed.command == "release":
-        # The release branch is dispatch data, read before the command
-        # starts, never a repository fact the context would hold (#418).
-        result = entry.handler(parsed, context, release_branch)
-    else:
-        result = entry.handler(parsed, context)
-    return 0 if result is None else result
+    return entry.handler(parsed, context)
 
 
 def _read_status_body_or_dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
@@ -1071,8 +1054,7 @@ def main(arguments: list[str] | None = None) -> int:
         refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
         return refusal if refusal is not None else _read_status_body_or_dispatch(parsed, context)
     except protocol.ClaimError as error:
-        print(f"{report.CLI_ERROR_PREFIX}{error}", file=sys.stderr)
-        return 2
+        return report.render_error(error)
 
 
 if __name__ == "__main__":

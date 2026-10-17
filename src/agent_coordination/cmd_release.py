@@ -395,7 +395,7 @@ def _release_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
     return tuple(command)
 
 
-def run(parsed: argparse.Namespace, context: RunContext, release_branch: str | None) -> int:
+def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`release`'s own `--json` envelope (issue #425): every refusal this
     function or `_cmd_release_landed` raises -- REL-01's own usage errors
     excepted, which the parser reports as `invalid_usage` before either ever
@@ -403,7 +403,7 @@ def run(parsed: argparse.Namespace, context: RunContext, release_branch: str | N
     `precondition_failed`, rather than escaping the envelope entirely."""
     as_json = parsed.json
     try:
-        release_transition(parsed, context, release_branch)
+        release_transition(parsed, context, _release_branch_for(parsed))
     except protocol.ClaimError as error:
         return report.refuse(_ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
     return 0
@@ -881,7 +881,7 @@ def _print_release_result(release_report: _ReleaseReport, *, as_json: bool) -> N
         print(f"worktree: {_worktree_cleanup_outcome_text(release_report.worktree)}")
 
 
-def release_branch_for(parsed: argparse.Namespace) -> str | None:
+def _release_branch_for(parsed: argparse.Namespace) -> str | None:
     if parsed.coordinator_override:
         protocol.require_coordinator_override(parsed.role)
     if parsed.branch is not None:

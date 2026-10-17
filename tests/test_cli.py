@@ -14253,36 +14253,50 @@ def _prepare_pre_dispatch_refusal(
 
 
 @pytest.mark.parametrize(
-    ("arguments", "agent", "branch"),
+    ("arguments", "agent", "branch", "sentence"),
     [
-        pytest.param(_claim_without_agent_args(), None, None, id="claim-without-an-identity"),
+        pytest.param(_claim_without_agent_args(), None, None, None, id="claim-without-an-identity"),
         pytest.param(
-            ["rescope", "72", "--add", "/repo/x.py"], None, None, id="rescope-without-an-identity"
+            ["rescope", "72", "--add", "/repo/x.py"],
+            None,
+            None,
+            None,
+            id="rescope-without-an-identity",
         ),
         pytest.param(
-            ["release", "--abandoned", "stopped"], "Ada", "", id="release-without-issue-or-branch"
+            ["release", "--abandoned", "stopped"],
+            "Ada",
+            "",
+            "lane release requires a non-empty current branch; "
+            "check out the docs/ or fix/ lane branch, or pass an issue number",
+            id="release-without-issue-or-branch",
         ),
         pytest.param(
-            ["release", "72", "--abandoned", "stopped"], "Ada", "", id="release-without-claim-id"
+            ["release", "72", "--abandoned", "stopped"],
+            "Ada",
+            "",
+            "release without --claim-id requires a non-empty current branch; pass --claim-id",
+            id="release-without-claim-id",
         ),
         pytest.param(
             ["release", "72", "--coordinator-override", "--abandoned", "takeover"],
             "Ada",
             None,
+            None,
             id="release-override-without-the-coordinator-role",
         ),
     ],
 )
-def test_cli_refusals_before_the_handler_print_the_shared_envelope(
+def test_cli_identity_and_release_refusals_print_the_shared_envelope(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     arguments: list[str],
     agent: str | None,
     branch: str | None,
+    sentence: str | None,
 ) -> None:
     """Issue #425 review: identity resolution and `release`'s own branch and
-    override checks (REL-06..08) refuse before the named command starts, so
-    they print the shared envelope (OUT-05); the text form keeps the bare
+    override checks (REL-06..08) print the shared envelope (OUT-05); the text form keeps the bare
     `ERROR:` sentence it always printed."""
     _prepare_pre_dispatch_refusal(monkeypatch, agent, branch)
     text_status = issue_claim.main(["--repo", REPOSITORY, *arguments])
@@ -14294,6 +14308,9 @@ def test_cli_refusals_before_the_handler_print_the_shared_envelope(
 
     assert (text_status, json_status) == (2, 2)
     assert text.out == ""
+    if sentence is not None:
+        assert text.err == f"ERROR: {sentence}\n"
+        assert json.loads(envelope.out)["message"] == sentence
     assert envelope.err == text.err
     _assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
 
