@@ -6,9 +6,11 @@ import json
 import sys
 from enum import StrEnum
 
-from . import protocol
+from . import board, protocol
 
 CLI_ERROR_PREFIX = "ERROR: "
+REFUSAL_LINE_LENGTH_LIMIT = 200
+_REFUSAL_SENTENCE_LENGTH_LIMIT = REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
 
 JSON_FLAG = "--json"
 
@@ -34,6 +36,17 @@ def render_error(error: protocol.ClaimError | str) -> int:
     """Write the CLI error line to stderr and return its refusal exit code."""
     print(f"{CLI_ERROR_PREFIX}{error}", file=sys.stderr)
     return 2
+
+
+def bounded_refusal(sentence: str) -> str:
+    """`sentence` as one bounded refusal line: a pull request's own text
+    (a check name, a head's board configuration key) may carry a newline or
+    a terminal escape, so it is shown as `next` shows foreign text (`\\n`,
+    `\\x1b`) before the length cap applies (issues #505, #538)."""
+    printable = board.terminal_text(sentence)
+    if len(printable) <= _REFUSAL_SENTENCE_LENGTH_LIMIT:
+        return printable
+    return printable[: _REFUSAL_SENTENCE_LENGTH_LIMIT - 1] + "…"
 
 
 def refuse(

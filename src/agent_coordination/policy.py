@@ -1,10 +1,11 @@
 """Pull-request landing checks for classification, closing references, claims,
-and parent requirements, plus the claim width gate."""
+and parent requirements, `aco adopt`'s preflight, plus the claim width gate."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import cache
 
 from . import board, body, checkout, forge, protocol
 from .session import RunContext
@@ -141,18 +142,15 @@ def _claim_defect(
     return None
 
 
-@dataclass(frozen=True)
-class ListingDefect:
-    reason: str
-
-
 def listed_paths(
     changes: forge.PullRequestChanges, expected_head: str
-) -> ListingDefect | frozenset[str]:
+) -> board.ClassificationDefect | frozenset[str]:
     if changes.before != changes.after or changes.before.head_sha != expected_head:
-        return ListingDefect("changed while aco listed its files; run the command again")
+        return board.ClassificationDefect(
+            "changed while aco listed its files; run the command again"
+        )
     if len(changes.files) != changes.before.changed_files:
-        return ListingDefect(
+        return board.ClassificationDefect(
             f"lists {len(changes.files)} of its {changes.before.changed_files} changed files; "
             "aco judges only a complete listing"
         )
@@ -166,15 +164,15 @@ def listed_paths(
 
 def dependency_rule_defect(
     config: board.BoardConfig,
-    listed: Callable[[], ListingDefect | frozenset[str]],
+    listed: Callable[[], board.ClassificationDefect | frozenset[str]],
 ) -> board.ClassificationDefect | None:
     if not config.dependency_paths:
         return board.ClassificationDefect(
             f"declares No-Item: deps, but {board.CONFIG_PATH.as_posix()} names no dependency_paths"
         )
     paths = listed()
-    if isinstance(paths, ListingDefect):
-        return board.ClassificationDefect(paths.reason)
+    if isinstance(paths, board.ClassificationDefect):
+        return paths
     outside = sorted(path for path in paths if not config.covers_dependency_path(path))
     if outside:
         named = protocol.named_with_overflow_count(
@@ -376,6 +374,29 @@ def _work_item_defect(
     return _closing_defect(detail, context.repository, item, requirement)
 
 
+def cross_repository_defect(
+    repository: str, detail: forge.Landing
+) -> board.ClassificationDefect | None:
+    """Why a pull request from another repository's branch is never classified (LAND-12)."""
+    if detail.source_repository.path != repository:
+        return board.ClassificationDefect(
+            f"proposes a branch of {detail.source_repository}; cross-repository pull "
+            "requests are not classified"
+        )
+    return None
+
+
+def _target_branch_defect(
+    context: LandingCheckContext, detail: forge.Landing
+) -> board.ClassificationDefect | None:
+    default_branch = context.run.default_branch
+    if detail.target_branch != default_branch:
+        return board.ClassificationDefect(
+            f"targets {detail.target_branch!r}, not the default branch {default_branch!r}"
+        )
+    return None
+
+
 def structural_classification(
     context: LandingCheckContext, detail: forge.Landing
 ) -> board.Classification | board.ClassificationDefect:
@@ -386,19 +407,15 @@ def structural_classification(
     own preflight checks the named item's live open state between this and
     `classification_defect` (LANDCMD-08 before claim validation, issue #405
     review/gate finding)."""
-    if detail.source_repository.path != context.repository:
-        return board.ClassificationDefect(
-            f"proposes a branch of {detail.source_repository}; cross-repository pull "
-            "requests are not classified"
-        )
+    cross_repository = cross_repository_defect(context.repository, detail)
+    if cross_repository is not None:
+        return cross_repository
     classification = board.parse_pull_request_classification(detail.body, context.repository)
     if isinstance(classification, board.ClassificationDefect):
         return classification
-    default_branch = context.run.default_branch
-    if detail.target_branch != default_branch:
-        return board.ClassificationDefect(
-            f"targets {detail.target_branch!r}, not the default branch {default_branch!r}"
-        )
+    target_branch = _target_branch_defect(context, detail)
+    if target_branch is not None:
+        return target_branch
     return classification
 
 
@@ -418,3 +435,120 @@ def classification_defect(
     if isinstance(classification, board.NoItemClassification):
         return _no_item_defect(context, claims, detail, classification.kind, expected_head)
     return _work_item_defect(context, claims, detail, classification.item)
+
+
+@dataclass(frozen=True)
+class AdoptionRequest:
+    number: int
+    kind: board.NoItemKind
+
+
+@dataclass(frozen=True)
+class FreshAdoption:
+    """What `adoption_preflight` proved adoptable: the claim's scope (LAND-74's
+    path set), the body to write, and the head both were judged at."""
+
+    scope: tuple[str, ...]
+    body: str
+    expected_head: str
+
+
+@dataclass(frozen=True)
+class AdoptionRefusal:
+    sentence: str
+
+
+def _adoption_refusal(number: int, defect: board.ClassificationDefect) -> AdoptionRefusal:
+    return AdoptionRefusal(f"pull request #{number} {defect.message}")
+
+
+def adoption_holder(
+    claims: Mapping[str, protocol.ActiveClaim], branch: str, storage: body.Storage
+) -> AdoptionRefusal | None:
+    """ADOPT-06: any live claim on the head branch, issue or lane, refuses."""
+    holders = protocol.claims_on_branch(claims, branch)
+    if not holders:
+        return None
+    return AdoptionRefusal(
+        protocol.claimed_by_sentence(
+            protocol.LaneIdentity(), branch, holders[0], board.item_labeller(storage)
+        )
+    )
+
+
+def adoption_body_defect(
+    context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind
+) -> board.ClassificationDefect | None:
+    """Why the body `aco adopt` would write is no issue-less landing: it
+    already carries a classification line (ADOPT-05), it would not read
+    `No-Item: <kind>` once the line is added (ADOPT-11), it targets another
+    branch than the default (ADOPT-04), or it closes an item (ADOPT-07)."""
+    live_line = board.live_classification_line(detail.body)
+    if live_line is not None:
+        return board.ClassificationDefect(
+            f"already carries {live_line}; adopt never changes a classification line"
+        )
+    prospective = board.body_with_classification(detail.body, kind)
+    classification = board.parse_pull_request_classification(prospective, context.repository)
+    if isinstance(classification, board.ClassificationDefect):
+        return board.ClassificationDefect(
+            f"body would not read No-Item: {kind} with the line added: {classification.message}"
+        )
+    return _target_branch_defect(context, detail) or closing_reference_defect(
+        prospective, context.repository
+    )
+
+
+def _adoption_scope(
+    context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind
+) -> board.ClassificationDefect | frozenset[str]:
+    """The listing's path set when the dependency rule (`deps`) and the
+    listing's own completeness (LAND-73, LAND-75, LAND-76) hold and it names
+    a file (ADOPT-16); the listing is read once, and only past the
+    configuration check."""
+
+    @cache
+    def listing() -> board.ClassificationDefect | frozenset[str]:
+        return listed_paths(context.client.pull_request_changes(detail.number), detail.head_sha)
+
+    if kind is board.NoItemKind.DEPS:
+        dependency_defect = dependency_rule_defect(context.run.config, listing)
+        if dependency_defect is not None:
+            return dependency_defect
+    listed = listing()
+    if not listed:
+        return board.ClassificationDefect("changes no file; there is nothing to adopt")
+    return listed
+
+
+def adoption_preflight(
+    context: LandingCheckContext,
+    request: AdoptionRequest,
+    detail: forge.Landing,
+    reference: forge.ItemReference,
+    claims_provider: Callable[[], protocol.ClaimState],
+) -> FreshAdoption | AdoptionRefusal:
+    """Every refusal of `aco adopt` that comes before its build, in the one
+    order of `specs/adopt.spec.md`: the first failing step wins. `detail` and
+    `reference` are the caller's reads; the claims are read once, only past
+    the pull request's own openness and repository, and the listing only past
+    the body's checks, as `cmd_land._land_preflight` orders its reads."""
+    if reference.state is not forge.ItemState.OPEN:
+        return AdoptionRefusal(f"pull request #{request.number} is not open; it cannot be adopted")
+    cross_repository = cross_repository_defect(context.repository, detail)
+    if cross_repository is not None:
+        return _adoption_refusal(request.number, cross_repository)
+    holder = adoption_holder(claims_provider().claims, detail.source_branch, context.storage)
+    if holder is not None:
+        return holder
+    body_defect = adoption_body_defect(context, detail, request.kind)
+    if body_defect is not None:
+        return _adoption_refusal(request.number, body_defect)
+    scope = _adoption_scope(context, detail, request.kind)
+    if isinstance(scope, board.ClassificationDefect):
+        return _adoption_refusal(request.number, scope)
+    return FreshAdoption(
+        tuple(sorted(scope)),
+        board.body_with_classification(detail.body, request.kind),
+        detail.head_sha,
+    )

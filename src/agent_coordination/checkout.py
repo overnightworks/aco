@@ -1260,6 +1260,26 @@ def fetch_remote(remote: str, *, directory: Path) -> None:
         raise ClaimError(process.git_failure_detail(fetch))
 
 
+def remote_branch_exists(remote: str, branch: str, *, directory: Path) -> bool:
+    """Whether `remote` has a branch `branch` right now, asked of the remote
+    itself so the answer never depends on git's localized error text."""
+    heads = git_output(
+        ["ls-remote", "--heads", remote, f"refs/heads/{branch}"], directory=directory
+    )
+    return any(line.split("\t")[-1] == f"refs/heads/{branch}" for line in heads.splitlines())
+
+
+def fetch_remote_branches(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
+    """Refresh exactly `branches` of `remote` into `refs/remotes/<remote>/<branch>`
+    in `directory`, and write no other ref: the remote's configured fetch
+    refspecs and tag following are set aside (`--refmap=`, `--no-tags`) because
+    one of them may name a local branch."""
+    refspecs = [f"+refs/heads/{name}:refs/remotes/{remote}/{name}" for name in branches]
+    fetch = _git_run(["fetch", "--no-tags", "--refmap=", remote, *refspecs], directory=directory)
+    if fetch.exit_status != 0:
+        raise ClaimError(process.git_failure_detail(fetch))
+
+
 def commit_at(ref: str, *, directory: Path) -> str:
     """The commit `ref` names now in `directory` (issue #479): `start`
     checks its claim against this one commit -- the claim's base and the

@@ -4132,3 +4132,81 @@ def test_board_configuration_refuses_invalid_dependency_paths(value: str, reason
 @pytest.mark.parametrize("text", ["", "dependency_paths = []"])
 def test_board_configuration_has_no_dependency_paths_unless_named(text: str) -> None:
     assert board.parse_config(text, board.CONFIG_PATH).dependency_paths == ()
+
+
+@pytest.mark.parametrize(
+    ("pull_request_body", "live_line", "appended", "reads_as"),
+    [
+        pytest.param(
+            "", None, "No-Item: deps", board.NoItemClassification(board.NoItemKind.DEPS), id="B1"
+        ),
+        pytest.param(
+            "Bump x",
+            None,
+            "\n\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B2",
+        ),
+        pytest.param(
+            "Bump x\n",
+            None,
+            "\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B3",
+        ),
+        pytest.param(
+            "Bump x\n\n",
+            None,
+            "No-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B4",
+        ),
+        pytest.param(
+            "Bump x\r\n",
+            None,
+            "\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B5-crlf",
+        ),
+        pytest.param(
+            "```\nNo-Item: deps\n```",
+            None,
+            "\n\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B6-fenced",
+        ),
+        pytest.param(
+            "```\nfoo",
+            None,
+            "\n\nNo-Item: deps",
+            board.ClassificationDefect("carries no `Work-Item:` or `No-Item:` line"),
+            id="B7-unclosed-fence",
+        ),
+        pytest.param(
+            f"Bump x\n\nNo-Item: dep{chr(0x202E)}s",
+            "No-Item: dep\\u202es",
+            "\n\nNo-Item: deps",
+            board.ClassificationDefect("carries 2 classification lines; exactly one is required"),
+            id="B15-display-control",
+        ),
+        pytest.param(
+            "Work-Item: #5\nNo-Item: fix",
+            "Work-Item: #5",
+            "\n\nNo-Item: deps",
+            board.ClassificationDefect("carries 3 classification lines; exactly one is required"),
+            id="first-of-two",
+        ),
+    ],
+)
+def test_live_classification_line_and_composition_read_the_whole_body(
+    pull_request_body: str,
+    live_line: str | None,
+    appended: str,
+    reads_as: board.Classification | board.ClassificationDefect,
+) -> None:
+    """Spec: ADOPT-05, ADOPT-11, ADOPT-12 -- first live line escaped, body kept."""
+    composed = board.body_with_classification(pull_request_body, board.NoItemKind.DEPS)
+
+    assert board.live_classification_line(pull_request_body) == live_line
+    assert composed == pull_request_body + appended
+    assert board.parse_pull_request_classification(composed, REPOSITORY) == reads_as
