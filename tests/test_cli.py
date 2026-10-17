@@ -101,6 +101,7 @@ from agent_coordination import (
     body,
     checkout,
     cmd_check,
+    cmd_claim,
     cmd_land,
     cmd_reset,
     forge,
@@ -2380,7 +2381,7 @@ def test_start_keeps_its_worktree_when_the_report_fails_after_the_claim(
     def closed_pipe(*_arguments: object) -> str:
         raise BrokenPipeError
 
-    monkeypatch.setattr(issue_claim, "_claim_cost_line", closed_pipe)
+    monkeypatch.setattr(cmd_claim, "claim_cost_line", closed_pipe)
 
     with pytest.raises(BrokenPipeError):
         issue_claim.main(["--repo", REPOSITORY, "start", "314"])
@@ -3574,7 +3575,7 @@ def test_start_under_state_ref_checks_the_item_as_it_stands_after_the_fetch(
     status = issue_claim.main(["start", "314", "--scope", "src/x.py"])
 
     assert status == 2
-    assert capsys.readouterr().err == f"ERROR: {issue_claim.CLAIM_SCOPE_MISMATCH}\n"
+    assert capsys.readouterr().err == f"ERROR: {cmd_claim.CLAIM_SCOPE_MISMATCH}\n"
     live = store.fetch_state(worktree=repo, remote="origin").claims
     assert protocol.claim_key(protocol.IssueIdentity(314), _START_BRANCH) not in live
 
@@ -3587,7 +3588,7 @@ def test_claim_accepts_an_item_with_no_dependencies(
     issue = board_issue(10, "Work", complete_contract("Claim #10."), labels=("security",))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,))
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
     )
@@ -3641,7 +3642,7 @@ def test_claim_refuses_an_open_dependency_before_mutation(
     issue, blocked_by = blocked_issue(10, "Work", *dependencies, labels=("security",))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,), dependencies=blocked_by)
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
     )
@@ -3680,7 +3681,7 @@ def test_claim_ignores_a_closed_dependency(
     issue, blocked_by = blocked_issue(10, "Work", closed, labels=("security",))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,), dependencies=blocked_by)
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
     )
@@ -3717,7 +3718,7 @@ def test_claim_allows_an_open_dependency_with_out_of_order_and_records_it(
         monkeypatch, tmp_path, open_issues=(issue, blocker), dependencies=blocked_by
     )
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: replace(
             request(issue=10, scope=("src/work.py",)), out_of_order_reason=reason
@@ -3754,7 +3755,7 @@ def test_claim_refuses_a_malformed_block_before_mutation(
     issue = board_issue(10, "Work", block_body(f'{MINIMAL_BLOCK_TOML}owner = "someone"\n'))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,))
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
     )
@@ -3805,7 +3806,7 @@ def test_claim_ignores_body_size_and_closed_next_references(
         lambda _client, _number: pytest.fail("claim must not inspect Next references"),
     )
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
     )
@@ -3894,7 +3895,7 @@ def test_claim_refuses_when_the_higher_priority_item_needs_refining(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
+    monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
     assert (
         issue_claim.main(
@@ -4125,7 +4126,7 @@ def test_claim_refuses_out_of_order_without_a_reason_before_mutating(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
+    monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
     arguments = [
         "--repo",
@@ -4168,7 +4169,7 @@ def test_claim_allows_out_of_order_with_a_reason_and_records_it(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
+    monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
     assert (
         issue_claim.main(
@@ -4222,7 +4223,7 @@ def test_claim_refuses_for_a_higher_priority_item_even_at_a_lower_score(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
+    monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
     assert (
         issue_claim.main(
@@ -4263,7 +4264,7 @@ def test_claim_json_refusal_reports_out_of_order_without_mutating(
         dependencies=dependent_blockers,
     )
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/lower.py",)),
     )
@@ -4306,7 +4307,7 @@ def test_claim_does_not_require_out_of_order_for_the_top_ranked_item(
     lower = board_issue(11, "Lower work", complete_contract("Claim #11."))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(top, lower))
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/top.py",)),
     )
@@ -4350,7 +4351,7 @@ def test_claim_refuses_a_closed_or_missing_target(
     _configured_board_client(monkeypatch, tmp_path)
     _stub_issue_reference(monkeypatch, {72: (state, title, "")})
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=72, scope=("src/work.py",)),
     )
@@ -4392,7 +4393,7 @@ def test_claim_refuses_a_container(
     )
     _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=72, scope=("src/work.py",)),
     )
@@ -4429,7 +4430,7 @@ def test_claim_refuses_a_freshly_cut_childs_incomplete_skeleton(
     child = board_issue(101, "Scheibe 1", cut_child_body)
     _configured_board_client(monkeypatch, tmp_path, open_issues=(child,))
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=101, scope=("src/work.py",)),
     )
@@ -4473,7 +4474,7 @@ def test_claim_names_an_incomplete_body_even_when_the_item_is_also_blocked(
         dependencies={51: (block_dependency(50),)},
     )
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=51, scope=("src/work.py",)),
     )
@@ -5816,7 +5817,7 @@ def test_cli_claim_reports_invalid_usage_when_repo_is_given_under_state_ref(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """A wide `--scope` with no `--whole` reads the item's own body for one
-    (issue #399), resolving the forge before `_cmd_claim`'s own typed-
+    (issue #399), resolving the forge before `cmd_claim.run`'s own typed-
     refusal handlers ever see it (issue #406): under `storage = state-ref`,
     `--repo` is the wrong flag for this run, reported as `invalid_usage`
     rather than the generic `unavailable` bucket -- the same distinction
@@ -6403,7 +6404,7 @@ def test_claim_json_refusal_carries_refused_issue_and_checks(
     _configured_board_client(monkeypatch, tmp_path)
     _stub_issue_reference(monkeypatch, {72: (forge.ItemState.CLOSED, "Title", "")})
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=72, scope=("src/work.py",)),
     )
@@ -6449,7 +6450,7 @@ def test_claim_does_not_corridor_on_a_slice_list(
     target = board_issue(72, "Epic", body)
     _configured_board_client(monkeypatch, tmp_path, open_issues=(target,))
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=72, scope=("src/work.py",)),
     )
@@ -6498,7 +6499,7 @@ def test_claim_checks_a_slice_shaped_title_for_its_recorded_parent(
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(target,))
     client.parents.update(parents)
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=1017, scope=("src/work.py",)),
     )
@@ -6591,7 +6592,7 @@ def test_claim_does_not_warn_about_a_higher_scored_item_no_agent_can_pull(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    monkeypatch.setattr(issue_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
+    monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
     assert (
         issue_claim.main(
@@ -7023,7 +7024,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
     retyped_out = capsys.readouterr().out
     run_line = retyped_out.split("\nRun: ", 1)[1].splitlines()[0]
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda arguments, **_kwargs: request(issue=299, scope=tuple(arguments.scope or ())),
     )
@@ -7511,7 +7512,7 @@ def _claim_past_titled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, title: s
     )
     reason = "hotfix first"
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: replace(
             request(issue=10, scope=("src/lower.py",)), out_of_order_reason=reason
@@ -8344,10 +8345,10 @@ def test_body_contract_checks_names_a_blockless_container_by_its_no_block_defect
     )
     item = next(item for item in projected.items if item.number == 201)
 
-    checks = issue_claim._body_contract_checks(item, body.Storage.GITHUB)
+    checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
 
     assert checks == (
-        issue_claim.SliceCheck("error", "body-contract", "body malformed: aco: no aco block"),
+        cmd_claim.SliceCheck("error", "body-contract", "body malformed: aco: no aco block"),
     )
 
 
@@ -8364,10 +8365,10 @@ def test_body_contract_checks_names_a_malformed_body_by_its_first_defect() -> No
     )
     item = next(item for item in projected.items if item.number == 202)
 
-    checks = issue_claim._body_contract_checks(item, body.Storage.GITHUB)
+    checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
 
     assert checks == (
-        issue_claim.SliceCheck(
+        cmd_claim.SliceCheck(
             "error", "body-contract", "body malformed: version: version must be exactly 1"
         ),
     )
@@ -8407,7 +8408,7 @@ def test_board_shows_freed_from_a_sole_closed_local_dependency_and_claim_reaches
     _write_block_pin(tmp_path)
     client.board_dependencies = {301: closed_dependency}
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=301, scope=("src/work.py",)),
     )
@@ -8444,15 +8445,15 @@ def test_blocked_check_reports_a_foreign_dependency_and_the_out_of_order_warning
     )
     item = next(item for item in projected.items if item.number == 304)
 
-    error_check = issue_claim._blocked_check(item, None, REPOSITORY, body.Storage.GITHUB)
-    assert error_check == issue_claim.SliceCheck(
+    error_check = cmd_claim._blocked_check(item, None, REPOSITORY, body.Storage.GITHUB)
+    assert error_check == cmd_claim.SliceCheck(
         "error",
         "blocked",
         "#304 is blocked by overnightworks/other-repo#9 (open); "
         "pass --out-of-order REASON to claim it anyway",
         issue=304,
     )
-    warning_check = issue_claim._blocked_check(item, "reason", REPOSITORY, body.Storage.GITHUB)
+    warning_check = cmd_claim._blocked_check(item, "reason", REPOSITORY, body.Storage.GITHUB)
     assert warning_check is not None
     assert warning_check.level == "warning"
 
@@ -8475,7 +8476,7 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
     )
     item = next(item for item in projected.items if item.number == 304)
 
-    check = issue_claim._blocked_check(item, None, REPOSITORY, body.Storage.STATE_REF)
+    check = cmd_claim._blocked_check(item, None, REPOSITORY, body.Storage.STATE_REF)
 
     assert check is not None
     assert board.item_label(9, body.Storage.STATE_REF) in check.text
@@ -8683,7 +8684,7 @@ def test_claim_treats_a_higher_ranked_configured_idea_as_out_of_order(
     )
     _configured_board_client(monkeypatch, tmp_path, open_issues=(lower, idea))
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/lower.py",)),
     )
@@ -10001,10 +10002,10 @@ def test_claim_request_binds_omitted_base_and_branch_to_checkout(
 
     if error is not None:
         with pytest.raises(ClaimError, match=error):
-            issue_claim._request(parsed, default_branch=lambda: "main")
+            cmd_claim._request(parsed, default_branch=lambda: "main")
         return
 
-    claimed = issue_claim._request(parsed, default_branch=lambda: "main")
+    claimed = cmd_claim._request(parsed, default_branch=lambda: "main")
     assert claimed.base == git_values[("rev-parse", "HEAD")]
     assert claimed.branch == git_values[("branch", "--show-current")]
 
@@ -10013,12 +10014,12 @@ def test_claim_request_refuses_a_base_that_is_not_a_full_commit_sha() -> None:
     parsed = _parse_claim_command("--base", "not-a-sha")
 
     with pytest.raises(ClaimError, match="base must be a full lowercase commit SHA"):
-        issue_claim._request(parsed, default_branch=lambda: "main")
+        cmd_claim._request(parsed, default_branch=lambda: "main")
 
 
 def test_matching_store_claim_never_replays_an_issueless_lane() -> None:
     """Issueless lanes keep the one-claim-per-branch contract: only a
-    numbered item's replay is ever detected, matching `_cmd_claim`'s own
+    numbered item's replay is ever detected, matching `cmd_claim.run`'s own
     `isinstance(requested.identity, IssueIdentity)` guard around this
     function's sole call site."""
     lane_request = request(lane=True, branch="docs/lane-claim-a")
@@ -10028,7 +10029,7 @@ def test_matching_store_claim_never_replays_an_issueless_lane() -> None:
         claims={protocol.claim_key(lane_request.identity, lane_request.branch): standing},
     )
 
-    assert issue_claim._matching_store_claim(observed, lane_request) is None
+    assert cmd_claim._matching_store_claim(observed, lane_request) is None
 
 
 def test_selected_store_claim_refuses_a_lane_identity_without_a_branch() -> None:
@@ -10045,7 +10046,7 @@ def test_selected_store_claim_refuses_a_lane_identity_without_a_branch() -> None
 def test_claim_scope_is_optional_at_the_argparse_layer_for_issue_mode() -> None:
     """Issue #337: `required=True` is gone from `--scope` -- issue mode
     derives it from the item body when omitted, so argparse itself must
-    accept the omission; `_cmd_claim`'s own runtime checks (lane mode still
+    accept the omission; `cmd_claim.run`'s own runtime checks (lane mode still
     requiring it, issue mode refusing a body with no scope) are proven
     separately, against `main`."""
     parsed = issue_claim._parser().parse_args(
@@ -10059,7 +10060,7 @@ def test_cli_claim_role_argparse_default_unchanged_and_release_omits_role() -> N
     claimed = issue_claim._parser().parse_args(["claim", "42", "--scope", "src/widget.py"])
     released = issue_claim._parser().parse_args(["release", "42", "--merged", "12"])
 
-    assert claimed.role == issue_claim.DEFAULT_CLAIM_ROLE
+    assert claimed.role == cmd_claim.DEFAULT_CLAIM_ROLE
     assert released.role is None
     assert released.merged == "12"
     assert released.abandoned is None
@@ -10080,7 +10081,7 @@ def test_release_merged_bare_flag_parses_as_the_empty_sentinel() -> None:
 @pytest.mark.parametrize(
     ("role_flags", "role"),
     [
-        ((), issue_claim.DEFAULT_CLAIM_ROLE),
+        ((), cmd_claim.DEFAULT_CLAIM_ROLE),
         (("--role", "builder"), "builder"),
         (("--role", "coordinator"), "coordinator"),
     ],
@@ -10149,7 +10150,7 @@ def test_cli_claim_empty_role_fails_closed_without_posting_builder(
 
     parsed = issue_claim._parser().parse_args(argv)
     with pytest.raises(ClaimError, match=r"role.+must be one bounded non-empty line"):
-        issue_claim._request(parsed, default_branch=lambda: "main")
+        cmd_claim._request(parsed, default_branch=lambda: "main")
 
     claimed = issue_claim.main(argv)
     captured = capsys.readouterr()
@@ -10221,7 +10222,7 @@ def test_request_and_cli_claim_fill_agent_from_documented_else_chain(
     if explicit is not None:
         command.extend(["--agent", explicit])
     parsed = issue_claim._parser().parse_args(command)
-    assert issue_claim._request(parsed, default_branch=lambda: "main").agent == agent
+    assert cmd_claim._request(parsed, default_branch=lambda: "main").agent == agent
 
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
@@ -10252,7 +10253,7 @@ def test_invalid_agent_identity_fails_before_git_and_github(
         command.extend(["--agent", explicit])
     parsed = issue_claim._parser().parse_args(command)
     with pytest.raises(ClaimError, match="agent must be one bounded non-empty line"):
-        issue_claim._request(parsed, default_branch=lambda: "main")
+        cmd_claim._request(parsed, default_branch=lambda: "main")
 
     _forbid_github_construction(monkeypatch)
     releases = [
@@ -10292,7 +10293,7 @@ def test_missing_agent_identity_fails_closed_without_github(
     command = _claim_without_agent_args()
     parsed = issue_claim._parser().parse_args(command)
     with pytest.raises(ClaimError) as raised:
-        issue_claim._request(parsed, default_branch=lambda: "main")
+        cmd_claim._request(parsed, default_branch=lambda: "main")
     _assert_missing_identity_message(str(raised.value))
 
     _forbid_github_construction(monkeypatch)
@@ -11075,7 +11076,7 @@ def test_every_output_names_a_github_item_by_its_number(
         forge.ItemState.OPEN, "Fresh work", unfilled_body
     )
     monkeypatch.setattr(
-        issue_claim,
+        cmd_claim,
         "_request",
         lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
     )
@@ -11731,7 +11732,7 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
             None,
             (),
             2,
-            issue_claim.CLAIM_SCOPE_MISSING,
+            cmd_claim.CLAIM_SCOPE_MISSING,
             None,
             None,
             id="omitted-with-no-body-scope-refuses-by-name",
@@ -11740,7 +11741,7 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
             ["src/work.py"],
             ("--scope", "src/other.py"),
             2,
-            issue_claim.CLAIM_SCOPE_MISMATCH,
+            cmd_claim.CLAIM_SCOPE_MISMATCH,
             None,
             None,
             id="a-differing-explicit-scope-refuses-by-name",
@@ -11817,7 +11818,7 @@ def test_cli_claim_scope_derivation_against_the_items_own_body(
     is always open and always in that listing.
 
     Delta review (issue #337): a derived scope routes through the same
-    `_scope_versioning` call as an explicit one (`cli.py`'s `_cmd_claim`),
+    `cmd_claim.scope_versioning` call as an explicit one (`cmd_claim.run`),
     so the comma-grounding rule proved on `--scope` by
     `test_cli_claim_scope_keeps_a_comma_inside_one_path` and
     `test_cli_claim_refuses_a_comma_scope_that_matches_nothing_in_the_checkout`
@@ -11827,7 +11828,7 @@ def test_cli_claim_scope_derivation_against_the_items_own_body(
     row also asserts the `--json` cost fields (`versioned_files`,
     `versioned_files_total`, `share`) a derived claim prints, not only its
     resolved `scope` -- the same fields an explicit `--scope` claim prints,
-    since both origins feed the one shared `_scope_versioning` call."""
+    since both origins feed the one shared `cmd_claim.scope_versioning` call."""
     client = _arranged_claim_client(monkeypatch)
     body = (
         complete_contract("Ship it.")
@@ -12073,7 +12074,7 @@ def test_cli_claim_replay_without_scope_takes_the_live_claims_own_stored_scope(
 @pytest.mark.parametrize(
     ("scope_arguments", "refusal"),
     [
-        pytest.param([], issue_claim.LANE_CLAIM_SCOPE_REQUIRED, id="no-scope"),
+        pytest.param([], cmd_claim.LANE_CLAIM_SCOPE_REQUIRED, id="no-scope"),
         *(
             pytest.param(
                 ["--scope", scope_path], protocol.SCOPE_ENTRIES_MUST_BE_CANONICAL, id=control_id
@@ -13786,13 +13787,13 @@ def test_claim_cost_lists_an_overlapping_standing_claim_as_a_touch() -> None:
 
     assert [claim.claim_id for claim in overlapping] == ["claim-a"]
     github = body.Storage.GITHUB
-    assert issue_claim._touch_summary(narrow_scope, overlapping, github) == (
+    assert cmd_claim._touch_summary(narrow_scope, overlapping, github) == (
         "overlaps issue #55 on src/widget.py"
     )
-    assert issue_claim._touch_summary(wide_scope, both, github) == (
+    assert cmd_claim._touch_summary(wide_scope, both, github) == (
         "overlaps issue #55 on src, lane docs/foo on docs"
     )
-    assert issue_claim._touch_summary(wide_scope, (), github) == "overlaps no other open claims"
+    assert cmd_claim._touch_summary(wide_scope, (), github) == "overlaps no other open claims"
 
 
 def test_claim_cost_names_a_directory_scope_meeting_a_single_file_of_a_standing_claim() -> None:
@@ -13809,7 +13810,7 @@ def test_claim_cost_names_a_directory_scope_meeting_a_single_file_of_a_standing_
         (standing,), request("challenger", issue=1401, scope=own_scope)
     )
 
-    assert issue_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
+    assert cmd_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
         "overlaps issue #1400 on tests/adapters/test_claim_cli.py"
     )
 
@@ -13828,7 +13829,7 @@ def test_claim_cost_counts_overflow_when_many_paths_collide_in_one_claim() -> No
         (standing,), request("challenger", issue=56, scope=own_scope)
     )
 
-    assert issue_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
+    assert cmd_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
         "overlaps issue #55 on docs/b.md, scripts/d.py, src/a.py, and 1 more"
     )
 
@@ -13845,7 +13846,7 @@ def test_claim_cost_lists_every_overlapping_claim_separately() -> None:
         (first, second, third), request("challenger", issue=56, scope=own_scope)
     )
 
-    assert issue_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
+    assert cmd_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
         "overlaps issue #55 on src/a.py, issue #57 on docs/b.md, lane docs/foo on tests/c.py"
     )
 
@@ -20360,7 +20361,7 @@ def test_check_reads_blockers_from_the_forge_and_qualifies_foreign_ones(
 def test_issue_check_labels_a_local_blocker_under_the_state_ref_pin() -> None:
     """Issue #300 (Codex Terra review): `cmd_check._issue_check` reads the repository's
     own `storage` pin for a local blocker exactly as `claim`'s
-    `_blocked_check` does -- a foreign one (`other/repo#9`) is unaffected,
+    `cmd_claim._blocked_check` does -- a foreign one (`other/repo#9`) is unaffected,
     since it is never local to this repository's own storage pin
     (`board.open_blocker_label`)."""
     client = FakeForge(
@@ -20686,7 +20687,7 @@ def test_body_check_prints_every_simultaneous_defect_not_just_the_first(
 ) -> None:
     """The one behavior that sets `body --check` apart from `check <item>`,
     which truncates to the first malformed defect
-    (`_body_contract_checks`): with two simultaneous defects, both surface,
+    (`cmd_claim._body_contract_checks`): with two simultaneous defects, both surface,
     in order, in plain text and in `--json`'s `defects` list (Sonnet review,
     issue #262)."""
     toml_text = 'version = 1\nnext = "X"\n'  # missing both now and done_when

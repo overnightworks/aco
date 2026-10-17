@@ -94,7 +94,7 @@ class ClaimConflictError(ClaimUnavailableError):
     value (issue #406, CLM-25) -- distinct from every other
     `ClaimUnavailableError` (a transport, git, lineage, or
     retry-exhaustion failure surfacing through `store.commit_transition`)
-    so `cli._cmd_claim` can choose `claim_conflict` over the broader
+    so `cmd_claim.run` can choose `claim_conflict` over the broader
     `unavailable` by type rather than by parsing prose."""
 
 
@@ -366,7 +366,7 @@ def _scope_list_entries(scope: object) -> list[str]:
 def valid_scope(scope: object) -> tuple[str, ...]:
     """The one canonical scope form (issue #331): sorted, deduplicated,
     every entry a validated repository-relative path. Every claim's scope
-    passes through here at creation (`cli._request`) and at rescope
+    passes through here at creation (`cmd_claim._request`) and at rescope
     (`combined_scope`), so a live claim's scope is always already this
     exact form; `board._canonical_scope` calls this same function to
     project a body's own `scope = [...]`, rather than sorting a second

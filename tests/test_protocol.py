@@ -72,7 +72,7 @@ def test_outbound_text_rejects_controlled_or_overlong_fields(invalid: str) -> No
     """`outbound_text` is the one owner of this validation since issue #176
     moved it out of the deleted ledger comment writers (`claim_comment` /
     `release_comment` / `supersede_comment`) and onto every real call site
-    that builds an intent: `cli._request`'s agent/role, and `release`'s
+    that builds an intent: `cmd_claim._request`'s agent/role, and `release`'s
     abandoned reason."""
     with pytest.raises(ClaimError, match="agent must be one bounded non-empty line"):
         protocol.outbound_text(invalid, "agent", maximum=128)
@@ -94,7 +94,7 @@ def test_outbound_text_rejects_controlled_or_overlong_fields(invalid: str) -> No
     ],
 )
 def test_claim_branch_must_be_a_safe_git_ref(branch: object, match: str) -> None:
-    """`valid_branch` guards every branch that reaches a claim -- `cli._request`
+    """`valid_branch` guards every branch that reaches a claim -- `cmd_claim._request`
     is its live caller, taking the value from `--branch` or the checked-out
     branch name, neither of which this repository controls."""
     with pytest.raises(InvalidClaimMarkerError, match=match):
@@ -129,7 +129,7 @@ def test_claim_branch_must_be_a_safe_git_ref(branch: object, match: str) -> None
     ],
 )
 def test_claim_scope_must_be_canonical_repository_relative_paths(scope: object, match: str) -> None:
-    """`valid_scope` guards every path that reaches a claim -- `cli._request`,
+    """`valid_scope` guards every path that reaches a claim -- `cmd_claim._request`,
     `cli._rescope`'s add/drop, the `--path` lookup, and `claims_holding_path`
     all hand it operator-supplied text."""
     with pytest.raises(InvalidClaimMarkerError, match=match):
@@ -146,7 +146,7 @@ def test_claim_scope_keeps_a_path_with_a_printable_space() -> None:
 
 def test_claim_scope_is_recorded_and_serialized_in_canonical_order() -> None:
     """`valid_scope` is the one place a claim's scope order is decided --
-    `cli._request` calls it at creation, `combined_scope` calls it again at
+    `cmd_claim._request` calls it at creation, `combined_scope` calls it again at
     rescope -- so a claim recorded from paths given in caller order still
     lands in `claims/<key>.toml` sorted (issue #331 R1): the body-scope
     projection `board._canonical_scope` reuses this exact function, never a
