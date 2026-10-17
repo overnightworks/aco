@@ -14233,12 +14233,12 @@ def test_cli_claim_and_release_json_errors_choose_their_own_shape(
     assert_refusal(captured.err, captured.out)
 
 
-def _prepare_pre_dispatch_refusal(
+def _prepare_identity_or_release_branch_refusal(
     monkeypatch: pytest.MonkeyPatch, agent: str | None, branch: str | None
 ) -> None:
-    """The world every pre-dispatch refusal below fires in: an identity when
-    the case is not about a missing one, and a checkout branch only where the
-    refusal is allowed to read one -- `None` forbids git outright."""
+    """Prepare identity and release refusals before forbidden git or forge reads.
+    Supply an identity unless the case is about a missing one, and a checkout
+    branch only where the refusal may read one -- `None` forbids git outright."""
     if agent:
         _set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent})
     _forbid_github_construction(monkeypatch)
@@ -14298,11 +14298,11 @@ def test_cli_identity_and_release_refusals_print_the_shared_envelope(
     """Issue #425 review: identity resolution and `release`'s own branch and
     override checks (REL-06..08) print the shared envelope (OUT-05); the text form keeps the bare
     `ERROR:` sentence it always printed."""
-    _prepare_pre_dispatch_refusal(monkeypatch, agent, branch)
+    _prepare_identity_or_release_branch_refusal(monkeypatch, agent, branch)
     text_status = issue_claim.main(["--repo", REPOSITORY, *arguments])
     text = capsys.readouterr()
 
-    _prepare_pre_dispatch_refusal(monkeypatch, agent, branch)
+    _prepare_identity_or_release_branch_refusal(monkeypatch, agent, branch)
     json_status = issue_claim.main(["--repo", REPOSITORY, *arguments, "--json"])
     envelope = capsys.readouterr()
 
