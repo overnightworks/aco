@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "a0b6b8d232f3ffe27c53313b766771ac3996f31f"
 branch = "claude/issue-126-s23-composition-root"
-scope = ["src/agent_coordination/cli.py", "src/agent_coordination/cmd_body.py", "src/agent_coordination/cmd_item.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/session.py", "src/agent_coordination/state_board.py", "tests/test_cli.py", "tests/test_state_board.py"]
+scope = ["src/agent_coordination/cli.py", "src/agent_coordination/cmd_body.py", "src/agent_coordination/cmd_item.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/session.py", "src/agent_coordination/state_board.py", "src/agent_coordination/store.py", "tests/test_cli.py", "tests/test_state_board.py"]
 opened_commit = "753d700ac1d9a231f389d60776f391310592ec8f"
 whole_reason = "Die Kompositionswurzel zieht mit ihren Testpatches und Docstrings gemeinsam nach session."
