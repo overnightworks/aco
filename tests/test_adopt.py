@@ -425,12 +425,13 @@ def test_adopt_fetches_no_branch_into_a_local_ref_even_when_a_fetch_refspec_asks
 ) -> None:
     """Spec: ADOPT-18, Never -- a configured fetch mapping stays unused."""
     real_git(world.clone, "config", "--add", "remote.origin.fetch", configured_refspec)
-    local_refs = real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout
+    watched_refs = ("refs/heads", "refs/tags", store.STATE_REF)
+    local_refs = real_git(world.clone, "for-each-ref", *watched_refs).stdout
 
     result = adopt(capsys)
 
     assert result.stderr == PASSES_EVERY_CHECK
-    assert real_git(world.clone, "for-each-ref", "refs/heads", "refs/tags").stdout == local_refs
+    assert real_git(world.clone, "for-each-ref", *watched_refs).stdout == local_refs
 
 
 def test_adopt_refuses_as_moved_when_the_remote_deletes_the_head_branch_during_the_fetch(
@@ -454,6 +455,26 @@ def test_adopt_refuses_as_moved_when_the_remote_deletes_the_head_branch_during_t
     result = adopt(capsys)
 
     sentence = f"pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again"
+    assert (result.status, result.stdout, result.stderr) == (2, "", f"ERROR: {sentence}\n")
+    assert world.effects() == before
+
+
+def test_adopt_passes_git_fetch_error_through_while_the_head_branch_remains(
+    world: AdoptionWorld,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec: ADOPT-10 -- a failed fetch of a branch the remote still has is git's own error."""
+    sentence = "the remote hung up unexpectedly"
+
+    def fail_the_fetch(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
+        raise protocol.ClaimError(sentence)
+
+    monkeypatch.setattr(checkout, "fetch_remote_branches", fail_the_fetch)
+    before = world.effects()
+
+    result = adopt(capsys)
+
     assert (result.status, result.stdout, result.stderr) == (2, "", f"ERROR: {sentence}\n")
     assert world.effects() == before
 

@@ -85,7 +85,7 @@ list reads nothing after it.
 - [ ] [ADOPT-16] A pull request whose listing names no file refuses `pull request #<n> changes no file; there is nothing to adopt`, exit `2`.
 - [ ] [ADOPT-17] A head branch name the claim store refuses as unsafe refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2`, before any write.
 - [ ] [ADOPT-18] When every check passes, adopt refuses `pull request #<n> passes every adoption check; this aco does not build adoptions yet`, exit `2`: no worktree or branch, no claim transition, no body write.
-- [ ] [ADOPT-19] Every refusal past the parser is one line of at most 200 characters with `ERROR: `, foreign text (agent names, paths) shown with display controls escaped, a longer one cut to end in `…`.
+- [ ] [ADOPT-19] Every refusal from adopt's own checks is one line of at most 200 characters with `ERROR: `, foreign text (agent names, paths) shown with display controls escaped, a longer one cut to end in `…`.
 
 ## Never
 
