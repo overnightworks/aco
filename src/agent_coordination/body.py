@@ -447,11 +447,15 @@ def _block_size_defect(data: dict[str, object]) -> ContractDefect | None:
     return ContractDefect("size", "size must be S, M, or L")
 
 
+_WHOLE_REASON_LABEL = "whole reason"
+WHOLE_REASON_TEXT_MAXIMUM = 512
+
+
 def bounded_whole_reason(value: object) -> str:
     """Validate the shared body and flag whole-reason contract."""
     if not isinstance(value, str):
-        raise protocol.ClaimError("whole reason must be one bounded non-empty line")
-    return protocol.outbound_text(value, "whole reason", maximum=512)
+        raise protocol.ClaimError(f"{_WHOLE_REASON_LABEL} must be one bounded non-empty line")
+    return protocol.outbound_text(value, _WHOLE_REASON_LABEL, maximum=WHOLE_REASON_TEXT_MAXIMUM)
 
 
 def _block_whole_defect(data: dict[str, object]) -> ContractDefect | None:

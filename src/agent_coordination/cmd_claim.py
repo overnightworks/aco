@@ -489,7 +489,8 @@ class _ClaimBodyInvalidError(protocol.ClaimError):
     #310 finding 43: named *before* "item names no scope", reusing the same
     block-defect reader `body --check` uses), no `scope` field at all, or
     one differing from an explicit `--scope` (issue #406). Named so
-    `--json` can choose `body_invalid`."""
+    `--json` can choose `body_invalid`. Also covers CLM-37: a malformed
+    body on the whole fallback for an explicit or replayed wide scope."""
 
 
 def _item_target_body(
@@ -595,8 +596,10 @@ def _resolved_claim_request(
     A live claim already on this identity and branch is a replayed,
     interrupted request even when the retry drops `--scope`: its own stored
     scope is taken outright, with no forge call and no body read at all, so
-    a retry never refuses merely because the body changed, or lost its
-    scope, since the original claim was opened -- and `_matching_store_claim`
+    scope resolution never refuses merely because the body changed, or lost
+    its scope, since the original claim was opened. CLM-37's later whole
+    fallback still refuses a malformed body for a wide replay without `--whole`.
+    `_matching_store_claim`
     is guaranteed `None` for an identity with no live claim at all, so this
     is the only place that needs to look. Otherwise the item's own body
     `scope = [...]` is the source of truth, fetched from the same open board

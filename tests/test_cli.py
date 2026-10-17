@@ -12259,7 +12259,8 @@ def test_whole_github_next_and_board_report_the_defect(
     assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
     output = capsys.readouterr().out
     defect = "body malformed: whole: whole reason must be one bounded non-empty line"
-    assert "SKIPPED" in output and f"#72: {defect}" in output
+    assert "SKIPPED" in output
+    assert f"#72: {defect}" in output
     assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
     row = next(row for row in json.loads(capsys.readouterr().out)["items"] if row["number"] == 72)
     assert (row["actionable"], row["actionable_reason"]) == (False, defect)
@@ -12272,7 +12273,7 @@ def test_whole_github_next_and_board_report_the_defect(
 def test_start_whole_resume_preserves_the_claim(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, mode: str
 ) -> None:
-    """Spec: CLM-15, CLM-36. T4: resumes preserve claims and stored bodies."""
+    """Spec: START-06, CLM-36. T4: resumes preserve claims and stored bodies."""
     repo = _start_scenario(monkeypatch, tmp_path)
     valid_body = complete_contract("Build it.", scope=["a.py"])
     _serve_start_board(monkeypatch, _start_item(valid_body))
@@ -12299,7 +12300,8 @@ def test_start_whole_resume_preserves_the_claim(
         assert "worktree:" not in captured.out
         assert worktrees_and_branches(repo) == before
     else:
-        assert "worktree: " in captured.out and f"branch: {_START_BRANCH}\n" in captured.out
+        assert "worktree: " in captured.out
+        assert f"branch: {_START_BRANCH}\n" in captured.out
         assert f"CLAIMED issue #314: {before_claim.claim_id}\n" in captured.out
         assert worktrees_and_branches(repo) == built
     assert _live_store_claim() == before_claim

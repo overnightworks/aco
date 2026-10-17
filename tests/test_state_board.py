@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import TextIO
 
 import pytest
-from _pytest.capture import CaptureResult
 from board_fixtures import (
     MINIMAL_BLOCK_TOML,
     block_body,
@@ -413,24 +412,24 @@ def _plant_whole_state_item(worktree: Path, remote: str, content: bytes) -> None
     )
 
 
-def _assert_whole_state_result(cell: int, status: int, captured: CaptureResult[str]) -> None:
+def _assert_whole_state_result(cell: int, status: int, out: str, err: str) -> None:
     sentence = "whole reason must be one bounded non-empty line"
     defect = f"body malformed: whole: {sentence}"
     if cell == 24:
         assert status == 0
-        assert captured.out.startswith(f"CLAIMED issue {MALFORMED_ID}: whole-proof\n")
+        assert out.startswith(f"CLAIMED issue {MALFORMED_ID}: whole-proof\n")
         return
     assert status == 2
     if cell in {20, 21, 23}:
         label = f"{MALFORMED_ID} " if cell == 20 else ""
-        assert captured.err == f"ERROR: {label}{defect}\n"
+        assert err == f"ERROR: {label}{defect}\n"
     elif cell == 29:
-        assert defect in captured.err
+        assert defect in err
     elif cell in {35, 36, 37, 39}:
-        assert captured.err == f"ERROR: {sentence}\n"
+        assert err == f"ERROR: {sentence}\n"
     else:
-        assert captured.err == f"ERROR: {_malformed_item_refusal()}\n"
-    assert "worktree:" not in captured.out
+        assert err == f"ERROR: {_malformed_item_refusal()}\n"
+    assert "worktree:" not in out
 
 
 def _run_whole_state_command(monkeypatch: pytest.MonkeyPatch, piped: str, argv: list[str]) -> int:
@@ -2003,7 +2002,7 @@ class TestCliStateRefForge:
         piped = invalid.decode() if operation in {"new-body", "pipe-edit"} else ""
         status = _run_whole_state_command(monkeypatch, piped, commands[operation])
         captured = capsys.readouterr()
-        _assert_whole_state_result(cell, status, captured)
+        _assert_whole_state_result(cell, status, captured.out, captured.err)
         if cell in {20, 21, 22, 23, 25, 28, 29}:
             assert (
                 _run_whole_state_command(monkeypatch, piped, [*commands[operation], "--json"]) == 2
@@ -2050,7 +2049,8 @@ class TestCliStateRefForge:
         assert issue_claim.main(["next"]) == 3
         output = capsys.readouterr().out
         defect = "body malformed: whole: whole reason must be one bounded non-empty line"
-        assert "SKIPPED" in output and f"{MALFORMED_ID}: {defect}" in output
+        assert "SKIPPED" in output
+        assert f"{MALFORMED_ID}: {defect}" in output
         assert issue_claim.main(["board", "--json"]) == 0
         row = next(
             row
