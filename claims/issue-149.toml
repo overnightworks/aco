@@ -1,8 +1,0 @@
-claim_id = "278eb33b50af41f6951c1900f01a7eef"
-agent = "claude"
-role = "builder"
-base = "bf4dddd3c77851ed606633a7dfe445a0c80961c0"
-branch = "claude/issue-149-b1a-lane-lookup"
-scope = ["scripts/test_budget_ratchet.txt", "specs/release.spec.md", "specs/rescope.spec.md", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/protocol.py", "tests/test_cli.py", "tests/test_protocol.py"]
-opened_commit = "3f9e8233d3c65f18a550de9db43be84ef560d1bf"
-whole_reason = "Die Lane-Suche ändert sich für release und rescope zugleich, mit Hilfetext und Spec-Sätzen; halb umgestellt fände release eine Lane, die rescope nicht findet."
