@@ -1101,6 +1101,7 @@ def test_push_retry_finds_the_operation_id_after_an_accept_then_raise_and_does_n
 
 
 def _reject_existing_state(bare_remote: Path, worktree: Path) -> Callable[[], object]:
+    """Bootstrap first so the ref-exists row's observed.tip is a real parent."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
     pending = store.PendingCommit(
@@ -1140,7 +1141,11 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     arrange_rejection: Callable[[Path, Path], Callable[[], object]],
     state_ref_exists: bool,
 ) -> None:
-    """Issue #237 finding 22: rejection without advancement names a stuck lock."""
+    """Issue #237 finding 22: rejection without advancement names a stuck lock.
+
+    Exhaustion must never say "moved N times": that would blame a race
+    that never happened.
+    """
     exhaust_the_retries = arrange_rejection(bare_remote, worktree)
 
     with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes") as raised:

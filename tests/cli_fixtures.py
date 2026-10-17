@@ -206,8 +206,8 @@ def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     """A commit identity for every git subprocess a test spawns, including
     the ones the code under test runs (they inherit the process environment,
     never overriding it) -- this machine may carry no git `user.name` or
-    `user.email` at all. Each caller wraps this in its own
-    `@pytest.fixture(autouse=True)`, like `stub_board_config_tracked`."""
+    `user.email` at all. Modules may wrap this in an autouse fixture;
+    `clone` calls it directly before creating any commit."""
     monkeypatch.setenv("GIT_AUTHOR_NAME", "Test")
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "test@example.com")
     monkeypatch.setenv("GIT_COMMITTER_NAME", "Test")
