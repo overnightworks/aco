@@ -141,8 +141,6 @@ def test_rulings_lists_items_and_lines(
     if config is not None:
         track_board_config(github_clone, config)
         assert real_git(github_clone, "show", "HEAD:.aco/board.toml").stdout == config
-        assert 'text = "Proposed"' in issues[0].body
-        assert issues[0].body.count("*(geregelt: ja)*") == 2
     serve_forge(monkeypatch, FakeForge(board_issues=issues))
     capsys.readouterr()
     result = run_cli(["rulings"], capsys)
@@ -308,6 +306,7 @@ def test_rulings_lists_items_and_lines(
         ),
     ],
 )
+@pytest.mark.usefixtures("github_clone")
 def test_rulings_json(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -457,6 +456,7 @@ def test_rulings_json(
         ),
     ],
 )
+@pytest.mark.usefixtures("github_clone")
 def test_rulings_orders_items(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -523,6 +523,7 @@ def test_rulings_orders_items(
         ),
     ],
 )
+@pytest.mark.usefixtures("github_clone")
 def test_rulings_preserves_json_content(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

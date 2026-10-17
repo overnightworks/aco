@@ -247,7 +247,7 @@ _LIVE_FETCH_ISSUE_REFERENCE = board_read.fetch_issue_reference
 def test_read_only_commands_never_write_through_a_reader_only_forge(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: RUL-01 -- rulings Never 1: reads without forge writes."""
+    """Spec: rulings Never 1 -- reads without forge writes."""
     client = ReaderOnlyForge()
     client.board_issues = (board_issue(72, "Work", complete_contract("Ship it.")),)
     client.landings[12] = landing_pull_request(body="Work-Item: #72\n\nCloses #72")
