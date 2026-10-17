@@ -9,6 +9,7 @@ from . import board, body, checkout, cmd_claim, forge, protocol
 from .session import RunContext
 
 _MOVED_REFUSAL = "the trunk moved after start checked it; run start again"
+_START_COMMAND = "start"
 
 
 def _start_worktree_path(main_checkout: Path, *, number: int, slug: str) -> Path:
@@ -140,7 +141,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     its `board.toml`."""
     caller = context
     main_context = caller.for_directory(
-        checkout.main_checkout_root(toplevel=caller.toplevel, command="start"), is_toplevel=True
+        checkout.main_checkout_root(toplevel=caller.toplevel, command=_START_COMMAND),
+        is_toplevel=True,
     )
     branch, slug = _start_branch_and_slug(parsed, main_context)
     observed = main_context.observation
@@ -218,7 +220,7 @@ def _claim_in_start_worktree(
         return cmd_claim.claim_write(_start_claim_arguments(parsed), context, worktree=target.path)
     except protocol.UncertainWriteError as error:
         named = board.named_refusal(error, context.config.storage)
-        return cmd_claim.report_uncertain_worktree_claim(named, target, command="start")
+        return cmd_claim.report_uncertain_worktree_claim(named, target, command=_START_COMMAND)
     except protocol.ClaimError as error:
         return cmd_claim.refuse_claim_error(error, context, as_json=False)
 
@@ -249,7 +251,7 @@ def _rebuild_and_resume(
     try:
         cmd_claim.validate_built_worktree(checked, target, context, moved_refusal=_MOVED_REFUSAL)
     except protocol.ClaimError as error:
-        return cmd_claim.refuse_built_worktree(error, target, command="start")
+        return cmd_claim.refuse_built_worktree(error, target, command=_START_COMMAND)
     _print_start_resume(resumed, observed, context.config.storage, versioning)
     return 0
 
@@ -292,7 +294,7 @@ def _check_build_and_claim(
         cmd_claim.LaneBuild(
             worktree=target,
             start_point=trunk_ref,
-            command="start",
+            command=_START_COMMAND,
             moved_refusal=_MOVED_REFUSAL,
         ),
     )
