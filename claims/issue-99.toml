@@ -1,8 +1,0 @@
-claim_id = "800fe770f45a4fb8a91f0dd45756aa45"
-agent = "claude"
-role = "builder"
-base = "17af6fa4664da8c8fd4bb1050e56530bba619049"
-branch = "claude/issue-99-s12a-cmd-land-preflight"
-scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_land.py", "tests/github_fixtures.py", "tests/test_cli.py"]
-opened_commit = "ea821aafbc067a68e3f3009f6e1ccee167ce6a30"
-whole_reason = "Die Vorprüfung von land zieht mit ihrer einen cmd-Kante, Layers-Zeile und Testverweisen in cmd_land; halb verschoben bräche der Import."
