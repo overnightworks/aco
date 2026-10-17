@@ -69,7 +69,6 @@ from cli_fixtures import (
     git_checkout,
     init_bare_repository,
     landed_from_another_clone,
-    main_with_piped_stdin,
     piped_body_on_stdin,
     piping,
     push_repository_trunk,
@@ -12219,26 +12218,21 @@ def test_whole_github_write_refusals_preserve_state(
     for json_flags in ((), ("--json",)):
         monkeypatch.setattr(sys, "stdin", io.StringIO(invalid if operation == "new-body" else ""))
         argv = ["--repo", REPOSITORY, *commands[operation], *json_flags]
-        status = (
-            main_with_piped_stdin(monkeypatch, invalid, argv)
-            if operation == "new-body"
-            else issue_claim.main(argv)
-        )
-        assert status == 2
-        captured = capsys.readouterr()
+        result = run_cli(argv, capsys, stdin=invalid if operation == "new-body" else None)
+        assert result.status == 2
         sentence = "whole reason must be one bounded non-empty line"
         if operation in {"rescope-body", "edit-body"}:
             command = "rescope" if operation == "rescope-body" else "item edit --whole"
             assert (
-                captured.err == f"ERROR: #72 body malformed: whole: {sentence}; "
+                result.stderr == f"ERROR: #72 body malformed: whole: {sentence}; "
                 f"{command} needs a valid aco block\n"
             )
         elif operation == "new-body":
-            assert f"body malformed: whole: {sentence}" in captured.err
+            assert f"body malformed: whole: {sentence}" in result.stderr
         else:
-            assert captured.err == f"ERROR: {sentence}\n"
+            assert result.stderr == f"ERROR: {sentence}\n"
         if json_flags:
-            assert json.loads(captured.out)["reason"] == (
+            assert json.loads(result.stdout)["reason"] == (
                 "body_invalid"
                 if operation == "new-body"
                 else "unavailable"
@@ -23376,19 +23370,18 @@ def test_item_edit_json_reports_body_invalid_with_defects(
     `reason: "body_invalid"`, with `body --check`'s own `defects` list as a
     structured sibling, before any forge is ever resolved."""
     _write_state_ref_pin(tmp_path)
-    status = main_with_piped_stdin(monkeypatch, "no block", ["item", "edit", "42", "--json"])
+    result = run_cli(["item", "edit", "42", "--json"], capsys, stdin="no block")
 
-    assert status == 2
-    captured = capsys.readouterr()
+    assert result.status == 2
     defect = "body malformed: aco: no aco block"
-    assert captured.err == f"ERROR: {defect}\n"
+    assert result.stderr == f"ERROR: {defect}\n"
     expected = {
         "ok": False,
         "reason": "body_invalid",
         "defects": [defect],
         "message": defect,
     }
-    assert captured.out == json.dumps(expected) + "\n"
+    assert result.stdout == json.dumps(expected) + "\n"
 
 
 # `reset` (issue #298): real bare `file://` remotes and real checkouts
