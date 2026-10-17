@@ -489,7 +489,7 @@ def relative_scope_entry(absolute_path: str, *, toplevel: Path) -> str | None:
     payload path, or a `rescope --add`/`--drop` entry given that way) as a
     canonical, repository-relative scope entry under `toplevel`, or `None`
     when it resolves outside `toplevel` or is otherwise not a valid scope
-    entry. Shared by `protect.judge` (issue #314) and `cli`'s own
+    entry. Shared by `protect.judge` (issue #314) and `cmd_rescope`'s own
     `rescope` absolute-path handling (issue #314 delta, finding R1)."""
     try:
         relative = checkout_relative(Path(absolute_path), toplevel=toplevel)
@@ -1487,7 +1487,7 @@ class BranchRemoval:
 class WorktreeCleanupOutcome:
     """`release --merged`'s own worktree/branch cleanup result, in two parts
     (issue #322 review/gate finding 4): this module owns the policy that
-    decides it, `cli` only renders it."""
+    decides it, `cmd_release` only renders it."""
 
     worktree: WorktreeRemoval
     branch: BranchRemoval

@@ -822,7 +822,8 @@ class _LocalCommand:
 
 @dataclass(frozen=True)
 class _NoArgumentsCommand:
-    """A no-argument type keeps execution independent of parsed state and repository setup."""
+    """A distinct type keeps `protect` inside its own exception boundary before
+    any setup and lets the hidden login runner execute without reading a namespace."""
 
     add_parser: Callable[[_Subcommands, str], None]
     run: Callable[[], int]

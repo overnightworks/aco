@@ -724,7 +724,7 @@ class StateRefBoard:
     def create_item(self, write: NewItemWrite) -> str:
         """`write` applied in one CAS write, then folded into this
         instance's own view -- the one write every fresh state-ref item goes
-        through, `item new`'s and `cut`'s alike, so `cli.py` never grows a
+        through, `item new`'s and `cut`'s alike, so no command grows a
         second way to create one. Returns the freshly minted item id."""
         new_oid = self._write_item(write.item_id, expected=None, body=write.body)
         self._items[write.item_id] = _DecodedItem(record=write.record, body=write.body, oid=new_oid)

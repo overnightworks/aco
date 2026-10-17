@@ -266,10 +266,10 @@ def _trunk_classification_text(
     classification: board.TrunkClassification, storage: body.Storage
 ) -> str:
     """`classification`'s own display line, the trunk-trailer counterpart of
-    `WorkItemClassification`/`NoItemClassification`'s `__str__` (issue
+    `board.WorkItemClassification`/`board.NoItemClassification`'s `__str__` (issue
     #359): a trunk `Work-Item:` trailer names bare, repository-local
-    numbers (`TrunkWorkItemClassification.numbers`), never a qualified
-    `IssueReference` -- a commit's own trailer is always local -- so this
+    numbers (`board.TrunkWorkItemClassification.numbers`), never a qualified
+    `board.IssueReference` -- a commit's own trailer is always local -- so this
     lives here rather than reusing either PR-body type's `__str__`."""
     if isinstance(classification, board.NoItemClassification):
         return f"No-Item: {classification.kind.value}"

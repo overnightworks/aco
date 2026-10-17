@@ -1,7 +1,6 @@
-"""The landing check of a pull request: whether its `Work-Item:`/`No-Item:`
-classification, closing references, claim, and parent requirement hold. It
-also owns the claim width gate and the `--whole` reason bound that `claim`,
-`start`, `rescope` and `item` share."""
+"""Pull-request landing checks for classification, closing references, claims,
+and parent requirements, plus the claim width gate and `--whole` reason bound
+shared by `claim`, `start`, `rescope` and `item`."""
 
 from __future__ import annotations
 

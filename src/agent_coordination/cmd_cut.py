@@ -342,7 +342,7 @@ def _cut_link(
     entries = body.cuttable_rows(located)
     if row_number is None:
         return entries[0] if entries else None
-    if "slice" not in located.data:
+    if not body.has_slice_table(located):
         raise protocol.ClaimUnavailableError(
             f"{label} has no slice table; --row needs one to select a row from"
         )

@@ -15,7 +15,7 @@ from .session import RepoMeaninglessUnderStateRefError, RunContext
 class _AskedLine:
     """One `aco ask` write's result (issue #295): the item, the fresh
     line's 1-based index, its `text`/`default`, and whichever card fields
-    were given -- bundled so `_print_ask_result` takes one value instead of
+    were given -- bundled so `_emit_ask_result` takes one value instead of
     five loose ones."""
 
     item: int

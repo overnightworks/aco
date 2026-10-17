@@ -2405,7 +2405,7 @@ def _tuples_to_lists(value: object) -> object:
     walks the finished payload once more here and turns every tuple into a
     list -- the one place this module guarantees its own return is
     genuinely JSON-shaped, the same way every other command's hand-built
-    `--json` payload in `cli.py` already is."""
+    `--json` payload in the `cmd_*` modules already is."""
     if isinstance(value, dict):
         return {key: _tuples_to_lists(item) for key, item in value.items()}
     if isinstance(value, tuple | list):
@@ -2478,7 +2478,7 @@ def _storage_item_name(number: int, storage: Storage, forge_name: _ForgeName) ->
     still carry one -- keeps the forge form under either pin, since no id
     names it and a dressed-up `aco-1000000` would not parse back. `board`
     is the lowest layer that may import `items` (the Layers contract), so
-    `cli` calls into it here."""
+    command modules call its item-naming helpers here."""
     if storage is Storage.STATE_REF and not names_no_item(number, storage):
         return items.format_item_id(number)
     return forge_name
