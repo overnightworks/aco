@@ -18,8 +18,7 @@ import pytest
 from board_fixtures import REPOSITORY, board_issue
 from cli_fixtures import real_git
 
-from agent_coordination import board, body, forge, github
-from agent_coordination import cli as issue_claim
+from agent_coordination import board, body, cmd_land, forge, github
 from agent_coordination.protocol import ClaimError
 
 WORK_ITEM_ISSUE = 72
@@ -265,7 +264,7 @@ class FakeForge:
         unconfigured checkout does -- and `None` removes it. Each read's
         path and commit land in `file_reads`."""
         self._run()
-        if path == issue_claim.LAND_QUALITY_CONFIG_PATH:
+        if path == cmd_land.LAND_QUALITY_CONFIG_PATH:
             self.quality_config_reads.append(sha)
             if self.quality_config_error is not None:
                 raise self.quality_config_error
