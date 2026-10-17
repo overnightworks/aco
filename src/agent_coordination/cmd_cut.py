@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -58,7 +58,7 @@ def _cut_target(
 
 @dataclass(frozen=True)
 class _SliceRowRemoval:
-    """`container`'s rewritten body, the cut row already removed from its
+    """`container`'s rewritten body, the cut row removed by `body.remove_slice_row` from its
     `aco` block, and `step`, the words naming that write."""
 
     container: int
@@ -150,14 +150,6 @@ class PartialWriteError(protocol.ClaimError):
         super().__init__(f"{error}; {recovery}")
 
 
-def _parent_line(container: int, storage: body.Storage) -> str:
-    """The `Parent: <label>` line `cut` writes as a fresh child's first line
-    -- the same wording issue bodies already use for this fact, naming
-    `container` as `board.item_label` prints it (issue #467) -- and reads
-    back to recognise its own orphan."""
-    return f"Parent: {board.item_label(container, storage)}"
-
-
 def requested_body_scope(raw: list[str] | None) -> tuple[str, ...] | None:
     """A repeated `--scope` flag's canonical value, or `None` when it was
     never given -- `item new` and `cut` (issue #337) both take an optional
@@ -177,7 +169,7 @@ def _cut_child_body(
     scope: tuple[str, ...] | None = None,
     done_when: str | None = None,
 ) -> str:
-    """The body `cut` writes for a fresh child: `_parent_line` above a fresh
+    """The body `cut` writes for a fresh child: `body.parent_line` above a fresh
     block whose `now` names the container it was cut from, whose `next` is
     `_CUT_CHILD_NEXT`, and whose `done_when` is the linked row's own (issue
     #606), plus the cut slice's own top-level `scope = [...]` (issue #337)
@@ -185,7 +177,7 @@ def _cut_child_body(
     `--scope`. With no row `done_when` to take -- the row carries none, or
     the cut is untied -- that key stays empty, never a refusal. A repeat
     `cut` after a partial failure reads the parent line back
-    (`_orphan_names_container`) to tell `container`'s own orphan apart from
+    (`body.names_parent`) to tell `container`'s own orphan apart from
     an unrelated open issue that merely shares the row's title (#260)."""
     fields: dict[str, object] = {
         "now": f"Cut from {board.item_label(container, storage)}",
@@ -195,15 +187,9 @@ def _cut_child_body(
         fields["done_when"] = done_when
     if scope is not None:
         fields["scope"] = list(scope)
-    return body.prose_above_fresh_block(_parent_line(container, storage), fields)
-
-
-def _orphan_names_container(raw_body: str, container: int, storage: body.Storage) -> bool:
-    """Whether `raw_body`'s first line is the `_parent_line`
-    `_cut_child_body` writes -- the one signal that tells `container`'s own
-    orphan apart from another open issue, another container's own failed
-    cut, or a human-filed issue that happens to share the row's title."""
-    return body.first_line(raw_body) == _parent_line(container, storage)
+    return body.prose_above_fresh_block(
+        body.parent_line(board.item_label(container, storage)), fields
+    )
 
 
 def _adoptable_child(
@@ -249,7 +235,7 @@ def _adoptable_child(
         and issue.number != container
         and issue.kind is body.ItemKind.TASK
         and not board.has_label(issue.labels, config.idea_label)
-        and _orphan_names_container(issue.body, container, config.storage)
+        and body.names_parent(issue.body, board.item_label(container, config.storage))
         and client.parent_issue(issue.number) is None
     ]
     open_matches = open_linked + orphans
@@ -344,35 +330,29 @@ def refuse_possible_twin(
         )
 
 
-def _block_slice_entries(data: Mapping[str, object]) -> list[dict[str, object]]:
-    value = data.get("slice")
-    if not isinstance(value, list):
-        return []
-    return [entry for entry in value if isinstance(entry, dict)]
-
-
 def _cut_link(
-    label: str, data: Mapping[str, object], row_number: int | None
+    label: str, located: body.LocatedBlock, row_number: int | None
 ) -> body.SliceRow | None:
     """Which `[[slice]]` entry `cut` links its fresh child to (#150 §7):
     without `--row`, the first entry when the block carries one; with `--row
     N`, the entry `N` names, refusing by name when the block has no `slice`
     key at all or no such row left (every remaining entry is cuttable: a
-    linked entry is removed from `data["slice"]` at the moment it is cut)."""
-    entries = _block_slice_entries(data)
+    linked entry is removed by `body.remove_slice_row` at the moment it is cut).
+    `body.cuttable_rows` owns decoding the validated block."""
+    entries = body.cuttable_rows(located)
     if row_number is None:
-        return body.slice_row(entries[0]) if entries else None
-    if "slice" not in data:
+        return entries[0] if entries else None
+    if "slice" not in located.data:
         raise protocol.ClaimUnavailableError(
             f"{label} has no slice table; --row needs one to select a row from"
         )
-    match = next((entry for entry in entries if entry["index"] == row_number), None)
+    match = next((entry for entry in entries if entry.index == row_number), None)
     if match is None:
-        cuttable = ", ".join(str(entry["index"]) for entry in entries) or "none"
+        cuttable = ", ".join(str(entry.index) for entry in entries) or "none"
         raise protocol.ClaimUnavailableError(
             f"{label} has no row {row_number}; cuttable rows: {cuttable}"
         )
-    return body.slice_row(match)
+    return match
 
 
 def _child_title(label: str, link: body.SliceRow | None, title: str | None) -> str:
@@ -441,7 +421,7 @@ def _cut_slice(
     storage = config.storage
     label = board.item_label(number, storage)
     located = board.located_block_or_refuse(number, target.body, command="cut", storage=storage)
-    link = _cut_link(label, located.data, parsed.row)
+    link = _cut_link(label, located, parsed.row)
     title = _child_title(label, link, parsed.title)
     child_scope = _cut_row_scope(link, requested_body_scope(parsed.scope))
     child_done_when = _cut_row_done_when(number, located, link, storage)
@@ -462,12 +442,7 @@ def _cut_slice(
             )
         )
         if link is not None:
-            remaining = [
-                entry
-                for entry in _block_slice_entries(located.data)
-                if entry["index"] != link.index
-            ]
-            new_data = {**located.data, "slice": remaining}
+            new_data = body.remove_slice_row(located, link.index)
             removal = _SliceRowRemoval(
                 container=number,
                 new_body=body.replace_block(target.body, located, new_data),

@@ -305,6 +305,16 @@ def first_line(body: str) -> str:
     return _line_without_ending(lines[0]) if lines else ""
 
 
+def parent_line(label: str) -> str:
+    """The parent provenance line for an already-rendered item label."""
+    return f"Parent: {label}"
+
+
+def names_parent(raw: str, label: str) -> bool:
+    """Whether the first line names exactly this parent, under LF or CRLF."""
+    return first_line(raw) == parent_line(label)
+
+
 def _fence_matches(body: str) -> list[tuple[int, int | None, str]]:
     """Every fence in `body` whose info string is exactly `aco`
     (issue #150 §4): `(opening line index, closing line index or None when
@@ -1086,6 +1096,21 @@ def locate_block(body: str) -> LocatedBlock:
     content_end = sum(len(line) for line in lines[:end_line])
     newline = _line_ending(lines[start_line]) or "\n"
     return LocatedBlock(tomllib.loads(content), content_start, content_end, newline)
+
+
+def cuttable_rows(located: LocatedBlock) -> tuple[SliceRow, ...]:
+    """The remaining slice rows of a schema-validated block, in stored order."""
+    return _block_slices(located.data)
+
+
+def remove_slice_row(located: LocatedBlock, index: int) -> dict[str, object]:
+    """Copy validated block data without the row whose `index` is `index`."""
+    remaining = [
+        entry
+        for entry in cast(list[dict[str, object]], located.data.get("slice", []))
+        if entry["index"] != index
+    ]
+    return {**located.data, "slice": remaining}
 
 
 # The shape one decoded JSON object takes -- one alias so `cast` names a

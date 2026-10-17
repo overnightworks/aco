@@ -55,12 +55,16 @@ from agent_coordination.body import (
     _expectation_picture_defect,
     append_expectation,
     body_defect_text,
+    cuttable_rows,
     expectation_line_state,
     expectation_line_summary,
     expectation_lines,
     locate_block,
     missing_or_empty_sections,
+    names_parent,
+    parent_line,
     parse_body,
+    remove_slice_row,
     render_block,
     replace_block,
     rule_expectation,
@@ -2820,10 +2824,9 @@ def test_parse_body_refuses_scope_as_an_unknown_expectation_key() -> None:
 
 
 def test_parse_body_scope_defects_surface_through_the_body_check_rendering_path() -> None:
-    """`cmd_item._body_shape_defects` -- what `aco body --check` and `check
-    <item>` both call -- is exactly `parse_body` plus
-    `body_defect_text` over its defects; proven at that board.py level
-    so this does not need `cli.py` at all (issue #331)."""
+    """`body.body_shape_check`, called directly by both `aco body --check`
+    and `check <item>`, renders `parse_body` defects through
+    `body_defect_text`; verify that shared codec behavior here."""
     body = block_body(f"{MINIMAL_BLOCK_TOML}scope = []\n")
 
     parsed = parse_body(body)
@@ -3984,3 +3987,72 @@ def test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change() 
         lane_events=more_m_lanes,
     )
     assert next(item for item in with_more_m.items if item.number == 207).estimate != m_estimate
+
+
+@pytest.mark.parametrize("titles", [(), ("First", "Second")])
+def test_cuttable_rows_preserves_stored_order(titles: tuple[str, ...]) -> None:
+    raw = complete_contract("Cut the next slice", slice=slice_entries(*titles, first_index=3))
+
+    rows = cuttable_rows(locate_block(raw))
+
+    assert rows == tuple(SliceRow(index, title) for index, title in enumerate(titles, 3))
+
+
+def test_cuttable_rows_preserves_validated_order_and_raw_text_with_canonical_scope() -> None:
+    raw = block_body(
+        MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 7\ntitle = " Later "\nscope = ["z", "a"]\n'
+        'done_when = " Proven "\n[[slice]]\nindex = 2\ntitle = "Earlier"\n'
+    )
+    located = board.located_block_or_refuse(121, raw, command="cut")
+
+    assert cuttable_rows(located) == (
+        SliceRow(7, " Later ", ("a", "z"), " Proven "),
+        SliceRow(2, "Earlier"),
+    )
+
+
+@pytest.mark.parametrize("index", [4, 5, 99])
+def test_remove_slice_row_preserves_remaining_raw_data_without_mutating(index: int) -> None:
+    entries = slice_entries("First", " Second ", first_index=4)
+    entries[1].update(scope=["z", "a"], done_when=" Proven ")
+    raw = block_body(
+        MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 4\ntitle = "First"\n'
+        '[[slice]]\nindex = 5\ntitle = " Second "\n'
+        'scope = ["z", "a"]\ndone_when = " Proven "\n'
+    )
+    located = locate_block(raw)
+    original = locate_block(raw).data
+
+    remaining = remove_slice_row(located, index)
+
+    expected = {4: [entries[1]], 5: [entries[0]], 99: entries}
+    assert remaining == {**original, "slice": expected[index]}
+    assert located.data == original
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("#121", "Parent: #121"),
+        ("aco-000079", "Parent: aco-000079"),
+        ("owner/repo#5", "Parent: owner/repo#5"),
+    ],
+)
+def test_parent_line_names_the_supplied_label(label: str, expected: str) -> None:
+    assert parent_line(label) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "label", "expected"),
+    [
+        ("Parent: #121", "#121", True),
+        ("Parent: #121\nBody", "#121", True),
+        ("Parent: aco-000079\r\nBody", "aco-000079", True),
+        ("Parent: #122\nBody", "#121", False),
+        ("Intro\nParent: #121", "#121", False),
+        ("Parent: #121 ", "#121", False),
+        ("", "#121", False),
+    ],
+)
+def test_names_parent_requires_an_exact_first_line(raw: str, label: str, expected: bool) -> None:
+    assert names_parent(raw, label) is expected
