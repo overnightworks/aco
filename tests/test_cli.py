@@ -128,7 +128,6 @@ from agent_coordination.protocol import (
     ClaimError,
     ClaimRequest,
     ClaimUnavailableError,
-    IssueIdentity,
 )
 from agent_coordination.session import RunContext
 
@@ -164,15 +163,6 @@ TWELVE_VERSIONED_FILES = (
     "docs/g.md",
     "docs/h.md",
 )
-
-
-def issue_number(identity: protocol.ClaimIdentity) -> int:
-    """The numbered-issue identity's issue number. Every call site here builds an
-    issue-scoped claim (`request(issue=...)`, never `lane=True`), so a `protocol.LaneIdentity`
-    reaching this helper is a real defect in the calling test, not a case to
-    tolerate."""
-    assert isinstance(identity, IssueIdentity)
-    return identity.issue
 
 
 def _live_store_claim() -> protocol.ActiveClaim:
