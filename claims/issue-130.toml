@@ -1,0 +1,8 @@
+claim_id = "79ad359df20142d89f48143349d366ae"
+agent = "claude"
+role = "builder"
+base = "39b8cdbdb2fcfa482bb22006aed3283f84fe79df"
+branch = "claude/issue-130-s25b-command-table"
+scope = ["src/agent_coordination/cli.py", "src/agent_coordination/cmd_body.py", "src/agent_coordination/cmd_item.py", "src/agent_coordination/cmd_status.py", "src/agent_coordination/report.py", "tests/test_cli.py", "tests/test_workspace_cli.py"]
+opened_commit = "291256ad3d1743c3f38f75bcc4e65451f44a17c9"
+whole_reason = "Die Befehlsliste steht heute an fünf Stellen in cli; eine Tabelle ersetzt sie nur als Ganzes, sonst gäbe es zwei Entscheider."
