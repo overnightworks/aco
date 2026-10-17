@@ -3237,7 +3237,10 @@ def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listin
         else None
     )
     calls: list[list[str]] = []
-    answers = iter([json.dumps(head), "\n".join(json.dumps(row) for row in rows), json.dumps(head)])
+    after = {"headSha": "b" * 40, "changedFiles": len(rows) + 1}
+    answers = iter(
+        [json.dumps(head), "\n".join(json.dumps(row) for row in rows), json.dumps(after)]
+    )
 
     def run(arguments: list[str], input_data: bytes | None = None) -> str:
         calls.append(arguments)
@@ -3249,7 +3252,8 @@ def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listin
             client.pull_request_changes(12)
         return
     changes = client.pull_request_changes(12)
-    assert changes.before == changes.after == forge.ListingReading(MERGE_COMMIT_SHA, len(rows))
+    assert changes.before == forge.ListingReading(MERGE_COMMIT_SHA, len(rows))
+    assert changes.after == forge.ListingReading("b" * 40, len(rows) + 1)
     assert len(changes.files) == len(rows)
     if rows:
         assert (
