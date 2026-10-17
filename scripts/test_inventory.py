@@ -40,7 +40,8 @@ Three sections, each sorted so two runs over the same file are byte-identical:
 
 A metrics header precedes the sections: file lines, test count, class count (and how many hold
 a single test), parametrized tests and their share, and clone lines. A test is parametrized
-when it, its class, or a module-level fixture it requests carries ``parametrize``/``params=``.
+when it, an enclosing class, or the module's ``pytestmark`` carries ``parametrize``, or a
+module-level fixture it requests carries ``params=``.
 **Clone lines** follow the same method as the per-file inventory: each test body is tokenized,
 literals are normalised (``NUMBER``/``STRING`` tokens collapse to one placeholder each, comments
 and layout tokens are dropped), the token stream is cut into overlapping 6-token shingles, and
@@ -288,10 +289,26 @@ def iter_test_functions(
             yield from iter_test_functions(node.body, (*owners, node))
 
 
-def _is_parametrized(node: FunctionNode | ast.ClassDef) -> bool:
-    for decorator in node.decorator_list:
-        target = decorator.func if isinstance(decorator, ast.Call) else decorator
-        if isinstance(target, ast.Attribute) and target.attr == _PARAMETRIZE:
+def is_parametrized(
+    func: FunctionNode,
+    owners: tuple[ast.ClassDef, ...] = (),
+    module: ast.Module | None = None,
+) -> bool:
+    """Whether a test, an enclosing class, or the module's pytestmark parametrizes it."""
+    marks = [mark for node in (*owners, func) for mark in node.decorator_list]
+    if module is not None:
+        for statement in module.body:
+            if isinstance(statement, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == "pytestmark"
+                for target in statement.targets
+            ):
+                value = statement.value
+                marks.extend(value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value])
+    for mark in marks:
+        target = mark.func if isinstance(mark, ast.Call) else mark
+        if (isinstance(target, ast.Attribute) and target.attr == _PARAMETRIZE) or (
+            isinstance(target, ast.Name) and target.id == _PARAMETRIZE
+        ):
             return True
     return False
 
@@ -334,13 +351,11 @@ def _parametrize_units(node: FunctionNode | ast.ClassDef) -> list[tuple[tuple[st
 
 
 def _make_case(
-    func: FunctionNode, owners: tuple[ast.ClassDef, ...], scope: ModuleScope
+    func: FunctionNode, owners: tuple[ast.ClassDef, ...], scope: ModuleScope, module: ast.Module
 ) -> TestCase:
     qualname = "::".join([*(owner.name for owner in owners), func.name])
-    parametrized = (
-        _is_parametrized(func)
-        or any(_is_parametrized(owner) for owner in owners)
-        or bool(_parameter_names(func) & scope.param_fixtures)
+    parametrized = is_parametrized(func, owners, module) or bool(
+        _parameter_names(func) & scope.param_fixtures
     )
     param_units = _parametrize_units(func) + [
         unit for owner in owners for unit in _parametrize_units(owner)
@@ -357,7 +372,7 @@ def iter_tests(tree: ast.Module, scope: ModuleScope) -> tuple[list[TestCase], in
     cases: list[TestCase] = []
     tests_per_class: Counter[ast.ClassDef] = Counter()
     for owners, func in iter_test_functions(tree.body):
-        cases.append(_make_case(func, owners, scope))
+        cases.append(_make_case(func, owners, scope, tree))
         if owners:
             tests_per_class[owners[-1]] += 1
     single = sum(count == 1 for count in tests_per_class.values())
