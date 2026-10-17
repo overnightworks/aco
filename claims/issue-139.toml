@@ -1,0 +1,8 @@
+claim_id = "cee80de0f59149d6878152f4e9867c6a"
+agent = "claude"
+role = "builder"
+base = "23de33d3fab32d82d00193f9fb0bc0b23511d27d"
+branch = "claude/issue-139-p0-public-fixture-names"
+scope = ["tests/board_fixtures.py", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/store_fixtures.py", "tests/test_board.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_hook_input.py", "tests/test_network_guard.py", "tests/test_protect.py", "tests/test_protocol.py", "tests/test_session.py"]
+opened_commit = "97cedbd3cfeeab32e21ecdcd7f8c12bb5cc7d56a"
+whole_reason = "Eine Umbenennung trifft Definition und alle Verbraucher zugleich; halb umbenannt bricht der Import."
