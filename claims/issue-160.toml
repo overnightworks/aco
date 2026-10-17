@@ -1,8 +1,0 @@
-claim_id = "4d0b87fa2c804dbb90bee56324aa23b3"
-agent = "claude"
-role = "builder"
-base = "3be6cf893a2098730e29e1b1f0edf2068c9fa8ea"
-branch = "claude/issue-160-b1b-merged-rerun"
-scope = ["specs/release.spec.md", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/protocol.py", "tests/test_cli.py", "tests/test_protocol.py"]
-opened_commit = "a635dd7dad033c94d7e4aa8f304c4cb01c1f61ff"
-whole_reason = "Ein Prädikat in protocol.py, zwei Stellen in cmd_release.py, die cmd_rescope.py über das Schlüsselwort mitzieht, ein Hilfetext in cli.py und der Spec-Owner release.spec.md ändern sich gemeinsam; halb umgestellt prüfte die Wiederholung keinen Halter."
