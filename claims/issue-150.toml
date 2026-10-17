@@ -1,0 +1,8 @@
+claim_id = "dfea5e37c9324b1fb3c1c595f5bce1fb"
+agent = "claude"
+role = "builder"
+base = "bf4dddd3c77851ed606633a7dfe445a0c80961c0"
+branch = "claude/issue-150-a1-deps-kind"
+scope = ["README.md", "scripts/vulture_whitelist.py", "specs/check.spec.md", "specs/land.spec.md", "specs/landing-grammar.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/checkout.py", "src/agent_coordination/policy.py", "tests/test_board.py", "tests/test_checkout.py", "tests/test_cli.py"]
+opened_commit = "f945e8668e38563c53e3a51628c128d3eb08d3c6"
+whole_reason = "Die neue Art und ihre eine Ablehnung gelten in check, land und release zugleich; halb umgestellt nähme eine Stelle deps an, die andere nicht."
