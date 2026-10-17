@@ -289,28 +289,31 @@ def iter_test_functions(
             yield from iter_test_functions(node.body, (*owners, node))
 
 
+def _is_parametrize_mark(expr: ast.expr) -> bool:
+    target = expr.func if isinstance(expr, ast.Call) else expr
+    return (isinstance(target, ast.Attribute) and target.attr == _PARAMETRIZE) or (
+        isinstance(target, ast.Name) and target.id == _PARAMETRIZE
+    )
+
+
+def _pytestmark_marks(module: ast.Module) -> Iterator[ast.expr]:
+    for statement in module.body:
+        if isinstance(statement, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "pytestmark"
+            for target in statement.targets
+        ):
+            value = statement.value
+            yield from value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value]
+
+
 def is_parametrized(
     func: FunctionNode,
-    owners: tuple[ast.ClassDef, ...] = (),
-    module: ast.Module | None = None,
+    owners: tuple[ast.ClassDef, ...],
+    module: ast.Module,
 ) -> bool:
     """Whether a test, an enclosing class, or the module's pytestmark parametrizes it."""
-    marks = [mark for node in (*owners, func) for mark in node.decorator_list]
-    if module is not None:
-        for statement in module.body:
-            if isinstance(statement, ast.Assign) and any(
-                isinstance(target, ast.Name) and target.id == "pytestmark"
-                for target in statement.targets
-            ):
-                value = statement.value
-                marks.extend(value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value])
-    for mark in marks:
-        target = mark.func if isinstance(mark, ast.Call) else mark
-        if (isinstance(target, ast.Attribute) and target.attr == _PARAMETRIZE) or (
-            isinstance(target, ast.Name) and target.id == _PARAMETRIZE
-        ):
-            return True
-    return False
+    decorators = [mark for node in (*owners, func) for mark in node.decorator_list]
+    return any(_is_parametrize_mark(mark) for mark in (*_pytestmark_marks(module), *decorators))
 
 
 def _parameter_names(func: FunctionNode) -> set[str]:
@@ -335,11 +338,7 @@ def _parametrize_units(node: FunctionNode | ast.ClassDef) -> list[tuple[tuple[st
     """(parameter names, argvalues expression) per ``parametrize`` decorator on *node*."""
     units: list[tuple[tuple[str, ...], ast.expr]] = []
     for decorator in node.decorator_list:
-        if not (
-            isinstance(decorator, ast.Call)
-            and isinstance(decorator.func, ast.Attribute)
-            and decorator.func.attr == _PARAMETRIZE
-        ):
+        if not (isinstance(decorator, ast.Call) and _is_parametrize_mark(decorator)):
             continue
         keywords = {keyword.arg: keyword.value for keyword in decorator.keywords}
         names_node = decorator.args[0] if decorator.args else keywords.get("argnames")

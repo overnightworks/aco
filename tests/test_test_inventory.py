@@ -2,7 +2,7 @@
 
 The CI gate cases drive the gate against a real, freshly initialized git repository under
 `tmp_path`. Git itself is the boundary the gate queries, so faking its output would test
-the wrong layer. It also pins that `test_inventory` and `test_budget` find the same tests.
+the wrong layer. Other cases pin discovery parity with `test_budget` and the decider's mark forms.
 """
 
 from __future__ import annotations

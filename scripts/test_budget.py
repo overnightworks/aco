@@ -429,7 +429,7 @@ def _measure_module(module: ast.Module, rel: str, metrics: FileMetrics, units: l
             units.append(_Unit(rel, lines, _shingles(tokens)))
     metrics.credited = frozenset(
         spec_id
-        for _scope, func, _parametrized in _scoped_tests(module)
+        for _owners, func in iter_test_functions(module.body)
         for spec_id in iter_spec_citations(ast.get_docstring(func) or "")
     )
     metrics.literal_siblings = sum(
