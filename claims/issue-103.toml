@@ -1,0 +1,8 @@
+claim_id = "16ab2704020d4677b13118e39956589d"
+agent = "claude"
+role = "builder"
+base = "7ce5467be213cc959e1231bde9311df6c3da5612"
+branch = "claude/issue-103-s13-shared-gates"
+scope = ["src/agent_coordination/board.py", "src/agent_coordination/board_read.py", "src/agent_coordination/cli.py", "src/agent_coordination/policy.py", "tests/test_state_board.py"]
+opened_commit = "c3c943ee62b4c929a42e080e5738fa5f3d162a42"
+whole_reason = "Die Gates werden von mehreren Befehlsfamilien in cli gerufen; sie ziehen mit ihren Aufrufern und Docstrings gemeinsam zu ihren Ownern, halb verschoben bräche der Import."
