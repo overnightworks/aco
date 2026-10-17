@@ -310,7 +310,7 @@ def build_board(
         trunk_ref = context.trunk_ref
     else:
         # A merged release already fetched and validated this exact
-        # candidate set (`cli._release_landing`'s own `list_board_dependencies`
+        # candidate set (`cmd_release._release_landing`'s own `list_board_dependencies`
         # wave, issue #256 review) and judged its landing on its own trunk
         # ref (issue #492), so neither is read a second time here.
         dependencies, trunk_ref = landing.dependencies, landing.trunk_ref
