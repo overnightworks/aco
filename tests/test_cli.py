@@ -16203,7 +16203,14 @@ def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
     monkeypatch: pytest.MonkeyPatch,
     kind: str,
 ) -> None:
-    merged_release_client(monkeypatch, body=f"No-Item: {kind}", lane=True)
+    merged_release_client(
+        monkeypatch,
+        body=f"No-Item: {kind}",
+        lane=True,
+        landings=(
+            _trunk_landing(MERGE_COMMIT_SHA, board.trunk_commit_classification((), (kind,))),
+        ),
+    )
 
     assert issue_claim.main(["--repo", REPOSITORY, "release", "--merged", "12"]) == 0
 
