@@ -1,8 +1,0 @@
-claim_id = "8dbd21a33d9b46db8cb80081c9317f81"
-agent = "claude"
-role = "builder"
-base = "ec389d8c780f4d0888f4b69cda732944bdd89cfe"
-branch = "claude/issue-153-f3-reset"
-scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/store_fixtures.py", "tests/test_cli.py", "tests/test_reset.py"]
-opened_commit = "4fcbd60c8d2c9ab6ae6aafd5197acf058b216242"
-whole_reason = "Die Familie zieht mit ihrer Uhr (freeze_cli_now) und ihrem Lineage-Leser gemeinsam um; halb umgezogen gäbe es zwei Owner der Familie."
