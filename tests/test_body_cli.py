@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import NamedTuple
 
@@ -10,7 +11,7 @@ import pytest
 from board_fixtures import BIDI_AND_ZERO_WIDTH_CONTROLS, MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import forbid_forge_resolution, real_git, run_cli, track_board_config
 
-from agent_coordination import body, cmd_body, process, store
+from agent_coordination import body, cli, cmd_body, process, store
 
 
 @pytest.fixture
@@ -421,10 +422,12 @@ class TestBodyCheck:
     ) -> None:
         """Spec: BDY-13, Never 2; no file or live-item positional interface."""
 
-        def forbidden_run(*args: object, **kwargs: object) -> None:
+        def forbidden_run(*args: object, **kwargs: object) -> int:
             pytest.fail("the parser must refuse before the body command runs")
 
         monkeypatch.setattr(cmd_body, "run", forbidden_run)
+        # The command table captures the callable when cli is imported.
+        monkeypatch.setitem(cli._COMMANDS, "body", replace(cli._COMMANDS["body"], run=cmd_body.run))
         result = run_cli(argv, capsys, stdin=block_body(MINIMAL_BLOCK_TOML))
         assert result.status == 2
 
