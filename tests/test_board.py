@@ -3998,7 +3998,7 @@ def test_cuttable_rows_preserves_stored_order(titles: tuple[str, ...]) -> None:
     assert rows == tuple(SliceRow(index, title) for index, title in enumerate(titles, 3))
 
 
-def test_cuttable_rows_matches_the_old_filter_on_a_validated_block() -> None:
+def test_cuttable_rows_preserves_validated_order_and_raw_text_with_canonical_scope() -> None:
     raw = block_body(
         MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 7\ntitle = " Later "\nscope = ["z", "a"]\n'
         'done_when = " Proven "\n[[slice]]\nindex = 2\ntitle = "Earlier"\n'
@@ -4011,13 +4011,13 @@ def test_cuttable_rows_matches_the_old_filter_on_a_validated_block() -> None:
     )
 
 
-@pytest.mark.parametrize("index", [1, 2, 99])
+@pytest.mark.parametrize("index", [4, 5, 99])
 def test_remove_slice_row_preserves_remaining_raw_data_without_mutating(index: int) -> None:
-    entries = slice_entries("First", " Second ")
+    entries = slice_entries("First", " Second ", first_index=4)
     entries[1].update(scope=["z", "a"], done_when=" Proven ")
     raw = block_body(
-        MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 1\ntitle = "First"\n'
-        '[[slice]]\nindex = 2\ntitle = " Second "\n'
+        MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 4\ntitle = "First"\n'
+        '[[slice]]\nindex = 5\ntitle = " Second "\n'
         'scope = ["z", "a"]\ndone_when = " Proven "\n'
     )
     located = locate_block(raw)
@@ -4025,14 +4025,21 @@ def test_remove_slice_row_preserves_remaining_raw_data_without_mutating(index: i
 
     remaining = remove_slice_row(located, index)
 
-    expected = {1: [entries[1]], 2: [entries[0]], 99: entries}
+    expected = {4: [entries[1]], 5: [entries[0]], 99: entries}
     assert remaining == {**original, "slice": expected[index]}
     assert located.data == original
 
 
-@pytest.mark.parametrize("label", ["#121", "aco-000079"])
-def test_parent_line_names_the_supplied_label(label: str) -> None:
-    assert parent_line(label) == f"Parent: {label}"
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("#121", "Parent: #121"),
+        ("aco-000079", "Parent: aco-000079"),
+        ("owner/repo#5", "Parent: owner/repo#5"),
+    ],
+)
+def test_parent_line_names_the_supplied_label(label: str, expected: str) -> None:
+    assert parent_line(label) == expected
 
 
 @pytest.mark.parametrize(

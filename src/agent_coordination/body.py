@@ -1104,7 +1104,7 @@ def cuttable_rows(located: LocatedBlock) -> tuple[SliceRow, ...]:
 
 
 def remove_slice_row(located: LocatedBlock, index: int) -> dict[str, object]:
-    """Copy validated block data without this row, preserving remaining raw entries."""
+    """Copy validated block data without the row whose `index` is `index`."""
     remaining = [
         entry
         for entry in cast(list[dict[str, object]], located.data.get("slice", []))
