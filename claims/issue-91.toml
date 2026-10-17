@@ -1,0 +1,8 @@
+claim_id = "67baa02f99a94c76bd1d12a82bdf48e1"
+agent = "claude"
+role = "builder"
+base = "9f005dfa33b92e19aa5c452bbc8c86850753a617"
+branch = "claude/issue-91-s8-cmd-reset"
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_reset.py", "src/agent_coordination/store.py", "tests/test_cli.py"]
+opened_commit = "b3bbef772121d1b769970340e819a9004152e334"
+whole_reason = "Ein Befehl zieht mit Plan, Ausgabe, Ausführung, Layers-Zeile und Uhr-Patch in sein Modul; halb verschoben bräche der Import oder die eingefrorene Uhr liefe ins Leere."
