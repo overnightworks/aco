@@ -465,7 +465,7 @@ def _adoption_refusal(number: int, defect: board.ClassificationDefect) -> Adopti
 def adoption_holder(
     claims: Mapping[str, protocol.ActiveClaim], branch: str, storage: body.Storage
 ) -> AdoptionRefusal | None:
-    """ADOPT-07: any live claim on the head branch, issue or lane, refuses."""
+    """ADOPT-06: any live claim on the head branch, issue or lane, refuses."""
     holders = protocol.claims_on_branch(claims, branch)
     if not holders:
         return None
@@ -480,9 +480,9 @@ def adoption_body_defect(
     context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind
 ) -> board.ClassificationDefect | None:
     """Why the body `aco adopt` would write is no issue-less landing: it
-    already carries a classification line (ADOPT-06), it would not read
-    `No-Item: <kind>` once the line is added (ADOPT-14), it targets another
-    branch than the default (ADOPT-05), or it closes an item (ADOPT-08)."""
+    already carries a classification line (ADOPT-05), it would not read
+    `No-Item: <kind>` once the line is added (ADOPT-11), it targets another
+    branch than the default (ADOPT-04), or it closes an item (ADOPT-07)."""
     live_line = board.live_classification_line(detail.body)
     if live_line is not None:
         return board.ClassificationDefect(
@@ -504,7 +504,7 @@ def _adoption_scope(
 ) -> board.ClassificationDefect | frozenset[str]:
     """The listing's path set when the dependency rule (`deps`) and the
     listing's own completeness (LAND-73, LAND-75, LAND-76) hold and it names
-    a file (ADOPT-26); the listing is read once, and only past the
+    a file (ADOPT-16); the listing is read once, and only past the
     configuration check."""
 
     @cache

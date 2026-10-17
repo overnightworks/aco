@@ -22,7 +22,7 @@ def _collision_refusal(standing: str, number: int) -> protocol.ClaimUnavailableE
 def _refuse_head_branch_collisions(
     context: RunContext, number: int, head_sha: str, branch: str
 ) -> None:
-    """ADOPT-27, ADOPT-10, ADOPT-20, ADOPT-11: the head branch must be a safe
+    """ADOPT-17, ADOPT-09, ADOPT-13, ADOPT-10: the head branch must be a safe
     name, nothing may stand where the lane would be built, and the remote's
     tip must still be the head the checks read."""
     if not protocol.is_safe_branch_name(branch):
@@ -47,7 +47,7 @@ def _refuse_head_branch_collisions(
 def _refuse_unclaimable_scope(
     parsed: argparse.Namespace, context: RunContext, plan: policy.FreshAdoption, branch: str
 ) -> None:
-    """ADOPT-23: the claim `adopt` would make, run through `claim`'s own check phase."""
+    """ADOPT-14: the claim `adopt` would make, run through `claim`'s own check phase."""
     arguments = argparse.Namespace(
         issue=None,
         agent=parsed.agent,
@@ -60,10 +60,7 @@ def _refuse_unclaimable_scope(
         whole=parsed.whole,
     )
     requested = cmd_claim.claim_request(arguments, adopted=True)
-    try:
-        cmd_claim.checked_claim(requested, context, revision=plan.expected_head)
-    except protocol.ClaimConflictError as error:
-        raise board.named_refusal(error, context.config.storage) from error
+    cmd_claim.checked_claim(requested, context, revision=plan.expected_head)
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
