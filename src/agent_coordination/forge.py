@@ -4,7 +4,7 @@
 (today: GitHub) implements; `ForgeOperation` names every operation on that
 contract and `Capability` answers, per operation, whether an adapter can
 perform it at all. The GitHub adapter never itself refuses an operation.
-`cli._load_board_config` is the one caller that branches on a capability
+`board_read.load_board_config` is the one caller that branches on a capability
 answer -- reading a work-item body's dependencies (#150) requires
 `LIST_BOARD_DEPENDENCIES` at `READ_ONLY` or better, so a forge without it
 cannot serve a board at all.

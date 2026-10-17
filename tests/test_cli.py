@@ -97,6 +97,7 @@ from github_fixtures import (
 from agent_coordination import (
     __version__,
     board,
+    board_read,
     body,
     checkout,
     forge,
@@ -230,7 +231,7 @@ class _MinimalForgeReader:
         return self.children_by_number.get(number, ())
 
 
-_LIVE_FETCH_ISSUE_REFERENCE = issue_claim._fetch_issue_reference
+_LIVE_FETCH_ISSUE_REFERENCE = board_read.fetch_issue_reference
 
 
 def test_read_only_commands_never_write_through_a_reader_only_forge(
@@ -1185,7 +1186,7 @@ def _stub_issue_reference(
         state, title, body = states[number]
         return forge.ItemReference(state, title, body)
 
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", fetch)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", fetch)
 
 
 _TOP_AND_BLOCKED = (
@@ -2607,7 +2608,7 @@ def test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item(
         merge_commit=merge_commit,
     )
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
 
     assert issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12"]) == 0
@@ -3796,8 +3797,8 @@ def test_claim_ignores_body_size_and_closed_next_references(
     )
     _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,))
     monkeypatch.setattr(
-        issue_claim,
-        "_fetch_issue_reference",
+        board_read,
+        "fetch_issue_reference",
         lambda _client, _number: pytest.fail("claim must not inspect Next references"),
     )
     monkeypatch.setattr(
@@ -7481,7 +7482,7 @@ def _release_freeing_titled(
     """A `--merged` release that frees one item titled `title`, its `next:`."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     freed, client.board_dependencies = blocked_issue(81, title, _landed_dependency())
     client.board_issues = (freed,)
     return ["--repo", REPOSITORY, "release", str(WORK_ITEM_ISSUE), "--merged", "12"]
@@ -8482,7 +8483,7 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
 class _MinimalBoardSource:
     """The smallest real `forge.BoardSource` -- every read empty, `capability`
     and the dependency fetch injectable -- for tests that exercise exactly
-    one of `_load_board_config`/`_fetch_dependencies` in isolation."""
+    one of `board_read.load_board_config`/`cli._fetch_dependencies` in isolation."""
 
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
@@ -8520,7 +8521,7 @@ def test_load_board_config_refuses_a_block_pin_the_forge_cannot_support(tmp_path
     context = issue_claim._run_context(None)
 
     with pytest.raises(ClaimError, match="list_board_dependencies"):
-        issue_claim._load_board_config(client, context)
+        board_read.load_board_config(client, context)
 
 
 def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
@@ -8562,7 +8563,7 @@ def test_validated_dependencies_refuses_a_length_mismatch() -> None:
         match=r"malformed board blocked-by list for #305: listing total_blocked_by=2, "
         r"detail length=1",
     ):
-        issue_claim._validated_dependencies((issue,), fetched)
+        board_read.validated_dependencies((issue,), fetched)
 
 
 def test_validated_dependencies_refuses_a_duplicate_dependency() -> None:
@@ -8571,7 +8572,7 @@ def test_validated_dependencies_refuses_a_duplicate_dependency() -> None:
     fetched = {306: (block_dependency(1), block_dependency(1))}
 
     with pytest.raises(forge.ForgeMalformedResponseError, match="malformed board blocked-by list"):
-        issue_claim._validated_dependencies((issue,), fetched)
+        board_read.validated_dependencies((issue,), fetched)
 
 
 def test_next_pulls_a_configured_projectionless_idea_with_refinement_step(
@@ -10734,11 +10735,11 @@ def _default_open_issue_reference(monkeypatch: pytest.MonkeyPatch) -> None:
     A closed or missing issue never appears in `list_open_board_issues` and
     would otherwise need a real `gh api` call; every test that isn't
     exercising that lookup relies on this default instead, and a test that
-    does exercise it overrides `issue_claim._fetch_issue_reference` directly.
+    does exercise it overrides `board_read.fetch_issue_reference` directly.
     """
     monkeypatch.setattr(
-        issue_claim,
-        "_fetch_issue_reference",
+        board_read,
+        "fetch_issue_reference",
         lambda client, number: forge.ItemReference(forge.ItemState.OPEN, "", ""),
     )
 
@@ -15389,7 +15390,7 @@ def test_release_merged_records_the_pull_request_that_landed_the_item(
 ) -> None:
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
     assert issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12"]) == 0
 
@@ -15474,7 +15475,7 @@ def test_release_merged_reports_the_json_freed_list_and_next_pick(
 ) -> None:
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client.board_issues = scenario.issues
     client.board_dependencies = scenario.dependencies
 
@@ -15495,7 +15496,7 @@ def test_release_merged_json_reports_ok_reason_merged_and_outcome(
     `merged`, distinct from `outcome`'s own prose sentence."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
     exit_code = issue_claim.main(
         ["--repo", REPOSITORY, "release", str(WORK_ITEM_ISSUE), "--merged", "12", "--json"]
@@ -15513,7 +15514,7 @@ def test_release_merged_prints_the_freed_and_next_lines(
 ) -> None:
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client.board_issues, client.board_dependencies = _two_dependants_freed_by_the_landing()
 
     exit_code = issue_claim.main(
@@ -15552,7 +15553,7 @@ def _released_last_child_client(
     the #418 shape), never closable either."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client.parents[WORK_ITEM_ISSUE] = board.ParentIssue(
         board.IssueReference(REPOSITORY, PARENT_OF_WORK_ITEM),
         complete_contract(parent_next),
@@ -15664,7 +15665,7 @@ def test_release_merged_fetches_each_candidates_dependencies_only_once(
     the same blocked-by candidates `board.freed_item_numbers` already read."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client.board_issues, client.board_dependencies = _two_dependants_freed_by_the_landing()
     observed_dependency_calls: list[int] = []
     original_list_board_dependencies = client.list_board_dependencies
@@ -15707,7 +15708,7 @@ def test_release_merged_prints_a_hint_instead_of_failing_when_the_board_is_unrea
     have produced, with one hint line standing in for `freed`/`next`."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
     def unreachable() -> tuple[board.Issue, ...]:
         raise board_error
@@ -15732,7 +15733,7 @@ def test_release_merged_json_omits_freed_and_next_when_the_board_is_unreachable(
 ) -> None:
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
     def unreachable() -> tuple[board.Issue, ...]:
         raise forge.ForgeTransientError("gh: connection reset")
@@ -16182,7 +16183,7 @@ def test_release_merged_retries_after_a_post_close_cas_failure_without_a_second_
     runs a second time -- one comment total -- and the retried transition
     releases the claim."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     close_calls: list[int] = []
     real_close_landed_item = client.close_landed_item
 
@@ -16441,7 +16442,7 @@ def _release_cleanup_scenario(
     )
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     # This module's own worktree/branch cleanup mechanics (issue #322), not
     # the merge-commit trailer authority (issue #397): every scenario below
     # but a landing elsewhere -- including one that never actually merges
@@ -17034,7 +17035,7 @@ def _checked_out_elsewhere_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     )
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     monkeypatch.setattr(
         checkout,
         "trunk_landings",
@@ -17628,7 +17629,7 @@ def test_land_refuses_a_head_that_changes_its_governing_board_config_before_any_
     in it, or carries one the validator refuses would strand `land`'s own
     release half, so it refuses before any write -- ahead of LANDCMD-08's
     item check, and within the 200-character refusal line."""
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client = _land_preflight_client(
         monkeypatch, readiness=_land_readiness(), item_closed=item_closed
     )
@@ -17648,7 +17649,7 @@ def test_land_refuses_a_closed_work_item(
     """Issue #405: a classified work item that is not open refuses by name,
     before any write -- distinct from `check`'s own rules, which never
     verify the item's live state."""
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), item_closed=True)
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
@@ -17666,7 +17667,7 @@ def test_land_refuses_a_closed_work_item_before_its_own_missing_claim(
     before claim validation -- a closed item with no live claim at all
     refuses by its own closed state, never the claim it also lacks, and
     never reads the store's claims to find out."""
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client = _land_preflight_client(
         monkeypatch, readiness=_land_readiness(), item_closed=True, claimed=False
     )
@@ -19292,7 +19293,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     client.closed_issues.discard(WORK_ITEM_ISSUE)
     client.landing_comments.clear()
     client.issue_reference_lookups.clear()
-    monkeypatch.setattr(issue_claim, "_fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     rerun = f"aco release {WORK_ITEM_ISSUE} --merged 12 --branch {LANDING_BRANCH}"
 
     land_status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])

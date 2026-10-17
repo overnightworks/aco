@@ -77,7 +77,7 @@ exhaustive = true
 layers = [
     "cli",
     "cmd_bootstrap | cmd_protect | cmd_workspace",
-    "report",
+    "board_read | report",
     "session",
     "protect",
     "workspace",
