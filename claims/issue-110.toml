@@ -1,0 +1,8 @@
+claim_id = "4199ad6304d54933931675a3ea8263be"
+agent = "claude"
+role = "builder"
+base = "814fd4f92bf66c14beab7bd5f3b5e34676774c90"
+branch = "claude/issue-110-s16-cmd-rescope"
+scope = ["pyproject.toml", "scripts/similar_methods_exemptions.txt", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_rescope.py", "tests/test_protect.py", "tests/test_protocol.py"]
+opened_commit = "b70cff9205c95accd788f64dd499d2ad6cd710fe"
+whole_reason = "Der rescope-Befehl zieht mit Layers-Zeile, Zwillings-Entscheidung und Docstrings in cmd_rescope; halb verschoben bräche der Import."
