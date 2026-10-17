@@ -492,7 +492,7 @@ def test_reset_bundle_restores_the_released_history(
     capsys: pytest.CaptureFixture[str],
     claim_id: str,
 ) -> None:
-    """Spec: RESET-03 -- the printed restore command recovers released claim history."""
+    """Spec: CAS-46, STAT-01 -- the printed restore command recovers released claim history."""
     freeze_cli_now(monkeypatch)
     store.bootstrap(worktree=clone, remote="origin")
     store.commit_transition(
