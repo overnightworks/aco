@@ -1,0 +1,8 @@
+claim_id = "f8868a6007f24d8a87544dca4c03bba0"
+agent = "claude"
+role = "builder"
+base = "3be6cf893a2098730e29e1b1f0edf2068c9fa8ea"
+branch = "claude/issue-161-a2-dependency-paths"
+scope = ["README.md", "specs/check.spec.md", "specs/land.spec.md", "specs/landing-grammar.spec.md", "specs/storage-pin.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/cmd_check.py", "src/agent_coordination/cmd_land.py", "src/agent_coordination/forge.py", "src/agent_coordination/github.py", "src/agent_coordination/policy.py", "src/agent_coordination/state_board.py", "tests/github_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_policy.py", "tests/test_state_board.py"]
+opened_commit = "0cc132b3faa6336eb68271fab85d5aee75da2d75"
+whole_reason = "Schlüssel, Forge-Lesung der Dateiliste, Pfadregel und Head-Prüfung bilden einen Vertrag; ohne eine der Teile lehnt LAND-70 weiter jeden deps-PR ab oder ließe einen ungeprüften durch."
