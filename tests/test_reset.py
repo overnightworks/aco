@@ -40,7 +40,9 @@ def _bootstrap_output(stdout: str) -> tuple[tuple[str, ...], str | None]:
         re.sub(r"(?<=bootstrapped a fresh empty state at )[0-9a-f]{40}$", "{fresh_tip}", line)
         for line in stdout.splitlines()
     )
-    printed = re.search(r"^bootstrapped a fresh empty state at ([0-9a-f]{40})$", stdout, re.MULTILINE)
+    printed = re.search(
+        r"^bootstrapped a fresh empty state at ([0-9a-f]{40})$", stdout, re.MULTILINE
+    )
     return lines, printed.group(1) if printed is not None else None
 
 
