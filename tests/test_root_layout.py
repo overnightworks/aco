@@ -10,11 +10,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from script_fixtures import load_script
-
-check_root_layout = load_script("check_root_layout")
-violations = check_root_layout.violations
-VIOLATION_MESSAGE = check_root_layout.VIOLATION_MESSAGE
+from check_root_layout import VIOLATION_MESSAGE, violations
 
 
 def _init_repository(repo_root: Path) -> None:

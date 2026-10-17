@@ -16,15 +16,10 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
-from script_fixtures import load_script
+import spec_lint
+from spec_lint import analyze, load_spec_dir, load_spec_file
 
 _REPOSITORY_SPEC_DIR = Path(__file__).parent.parent / "specs"
-
-
-spec_lint = load_script("spec_lint")
-analyze = spec_lint.analyze
-load_spec_file = spec_lint.load_spec_file
-load_spec_dir = spec_lint.load_spec_dir
 
 GREEN_SPEC = """# Sample
 
