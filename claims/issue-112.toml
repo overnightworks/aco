@@ -1,0 +1,8 @@
+claim_id = "16a84fe55736415dbfee2ac18ed1d68c"
+agent = "claude"
+role = "builder"
+base = "64d03821729787b58576f98452d68ad3a3ace8cd"
+branch = "claude/issue-112-s17-cmd-next"
+scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_next.py", "tests/test_cli.py"]
+opened_commit = "ec4577a677c939d20c03e0556fba1a90c8e2d5fb"
+whole_reason = "Der next-Befehl zieht mit Layers-Zeile, der beschlossenen Parameter-Umbenennung und zwei Testverweisen in cmd_next; halb verschoben bräche der Import."
