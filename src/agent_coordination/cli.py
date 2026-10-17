@@ -104,13 +104,13 @@ ROLE_ON_LIVE_CLAIM_HELP = (
 ITEM_REF_HELP = "an item, as aco-xxxxxx, #n, or the bare number n"
 
 
-def _add_bootstrap_parser(commands: _Subcommands) -> None:
-    commands.add_parser("bootstrap", help="create refs/aco/state if it does not exist yet")
+def _add_bootstrap_parser(commands: _Subcommands, name: str) -> None:
+    commands.add_parser(name, help="create refs/aco/state if it does not exist yet")
 
 
-def _add_reset_parser(commands: _Subcommands) -> None:
+def _add_reset_parser(commands: _Subcommands, name: str) -> None:
     reset = commands.add_parser(
-        "reset",
+        name,
         help="export refs/aco/state, delete it remotely and locally, and bootstrap fresh",
     )
     reset.add_argument(
@@ -140,8 +140,8 @@ def _add_json_flag(container: argparse.ArgumentParser) -> None:
     container.add_argument(report.JSON_FLAG, action="store_true", help=JSON_HELP)
 
 
-def _add_status_parser(commands: _Subcommands) -> None:
-    status = commands.add_parser("status", help="show repository-wide build claims")
+def _add_status_parser(commands: _Subcommands, name: str) -> None:
+    status = commands.add_parser(name, help="show repository-wide build claims")
     status.add_argument(
         "issue",
         type=board.parse_item_reference,
@@ -154,8 +154,8 @@ def _add_status_parser(commands: _Subcommands) -> None:
     _add_json_flag(status)
 
 
-def _add_board_parser(commands: _Subcommands) -> None:
-    board_command = commands.add_parser("board", help="project the open work board, read-only")
+def _add_board_parser(commands: _Subcommands, name: str) -> None:
+    board_command = commands.add_parser(name, help="project the open work board, read-only")
     _add_json_flag(board_command)
     board_command.add_argument(
         "--serve",
@@ -164,25 +164,25 @@ def _add_board_parser(commands: _Subcommands) -> None:
     )
 
 
-def _add_rulings_parser(commands: _Subcommands) -> None:
+def _add_rulings_parser(commands: _Subcommands, name: str) -> None:
     rulings_command = commands.add_parser(
-        "rulings", help="list expectation lines, open and ruled, without writes"
+        name, help="list expectation lines, open and ruled, without writes"
     )
     _add_json_flag(rulings_command)
 
 
-def _add_next_parser(commands: _Subcommands) -> None:
+def _add_next_parser(commands: _Subcommands, name: str) -> None:
     next_command = commands.add_parser(
-        "next",
+        name,
         help="name the board's top-priority item to pull",
         description=NEXT_PULL_DESCRIPTION,
     )
     _add_json_flag(next_command)
 
 
-def _add_start_parser(commands: _Subcommands) -> None:
+def _add_start_parser(commands: _Subcommands, name: str) -> None:
     start = commands.add_parser(
-        "start",
+        name,
         help="create an item's linked worktree and branch, then claim it",
         description=START_DESCRIPTION,
     )
@@ -206,9 +206,9 @@ def _add_start_parser(commands: _Subcommands) -> None:
     start.add_argument("--out-of-order", metavar="REASON", help=OUT_OF_ORDER_HELP)
 
 
-def _add_claim_parser(commands: _Subcommands) -> None:
+def _add_claim_parser(commands: _Subcommands, name: str) -> None:
     claim = commands.add_parser(
-        "claim",
+        name,
         help="claim an issue and scope before editing",
         description=CLAIM_DESCRIPTION,
     )
@@ -261,8 +261,8 @@ def _add_claim_parser(commands: _Subcommands) -> None:
     _add_json_flag(claim)
 
 
-def _add_release_parser(commands: _Subcommands) -> None:
-    release = commands.add_parser("release", help="release a landed or abandoned claim")
+def _add_release_parser(commands: _Subcommands, name: str) -> None:
+    release = commands.add_parser(name, help="release a landed or abandoned claim")
     release.add_argument(
         "issue",
         type=board.parse_item_reference,
@@ -313,9 +313,9 @@ def _add_release_parser(commands: _Subcommands) -> None:
     _add_json_flag(release)
 
 
-def _add_land_parser(commands: _Subcommands) -> None:
+def _add_land_parser(commands: _Subcommands, name: str) -> None:
     land = commands.add_parser(
-        "land",
+        name,
         help="merge a green pull request with its pinned head sha and run its release path",
     )
     land.add_argument("pull_request", type=int, help="the pull request number to land")
@@ -355,10 +355,8 @@ def _reviewed_head(value: str) -> str:
     return value.lower()
 
 
-def _add_rescope_parser(commands: _Subcommands) -> None:
-    rescope = commands.add_parser(
-        "rescope", help="add or drop paths on a live claim without releasing"
-    )
+def _add_rescope_parser(commands: _Subcommands, name: str) -> None:
+    rescope = commands.add_parser(name, help="add or drop paths on a live claim without releasing")
     rescope.add_argument(
         "issue",
         type=board.parse_item_reference,
@@ -389,8 +387,8 @@ def _add_rescope_parser(commands: _Subcommands) -> None:
     _add_json_flag(rescope)
 
 
-def _add_cut_parser(commands: _Subcommands) -> None:
-    cut = commands.add_parser("cut", help="create a container's next slice as a fresh child issue")
+def _add_cut_parser(commands: _Subcommands, name: str) -> None:
+    cut = commands.add_parser(name, help="create a container's next slice as a fresh child issue")
     cut.add_argument("issue", type=board.parse_item_reference, help="the container to cut")
     cut.add_argument(
         "--title",
@@ -418,8 +416,8 @@ def _add_cut_parser(commands: _Subcommands) -> None:
     _add_json_flag(cut)
 
 
-def _add_ask_parser(commands: _Subcommands) -> None:
-    ask = commands.add_parser("ask", help="append one proposed expectation line to an item's block")
+def _add_ask_parser(commands: _Subcommands, name: str) -> None:
+    ask = commands.add_parser(name, help="append one proposed expectation line to an item's block")
     ask.add_argument(
         "item", type=board.parse_item_reference, help="the item to append the expectation line to"
     )
@@ -449,9 +447,9 @@ def _add_ask_parser(commands: _Subcommands) -> None:
     _add_json_flag(ask)
 
 
-def _add_rule_parser(commands: _Subcommands) -> None:
+def _add_rule_parser(commands: _Subcommands, name: str) -> None:
     rule = commands.add_parser(
-        "rule", help="rule one proposed expectation line, transcribing the operator's word"
+        name, help="rule one proposed expectation line, transcribing the operator's word"
     )
     rule.add_argument(
         "item", type=board.parse_item_reference, help="the item whose expectation line is ruled"
@@ -482,9 +480,9 @@ def _parse_check_subject(value: str) -> int | str:
     return board.parse_item_reference(value)
 
 
-def _add_check_parser(commands: _Subcommands) -> None:
+def _add_check_parser(commands: _Subcommands, name: str) -> None:
     check = commands.add_parser(
-        "check",
+        name,
         help=(
             "read one number or trunk commit -- a pull request's work-item "
             "classification, a trunk commit's (LAND-48), or an issue's body "
@@ -499,9 +497,9 @@ def _add_check_parser(commands: _Subcommands) -> None:
     _add_json_flag(check)
 
 
-def _add_body_parser(commands: _Subcommands) -> None:
+def _add_body_parser(commands: _Subcommands, name: str) -> None:
     body_parser = commands.add_parser(
-        "body",
+        name,
         help=(
             f"check a piped body's fenced {body.BLOCK_FENCE_INFO} block for defects "
             "before the forge"
@@ -516,9 +514,9 @@ def _add_body_parser(commands: _Subcommands) -> None:
     _add_json_flag(body_parser)
 
 
-def _add_brief_parser(commands: _Subcommands) -> None:
+def _add_brief_parser(commands: _Subcommands, name: str) -> None:
     brief = commands.add_parser(
-        "brief",
+        name,
         help="print one item's body, live claim, lane tip and touched files for a dispatch",
     )
     brief.add_argument("item", type=board.parse_item_reference, help="the work item to brief")
@@ -540,8 +538,8 @@ def _nonblank_title(value: str) -> str:
     return value
 
 
-def _add_item_parser(commands: _Subcommands) -> None:
-    item = commands.add_parser("item", help="create, show, edit, or close one work item")
+def _add_item_parser(commands: _Subcommands, name: str) -> None:
+    item = commands.add_parser(name, help="create, show, edit, or close one work item")
     item_commands = _add_subcommands(item, "item_command")
     new = item_commands.add_parser(
         "new",
@@ -626,13 +624,13 @@ def _add_item_parser(commands: _Subcommands) -> None:
     _add_json_flag(close)
 
 
-def _add_protect_parser(commands: _Subcommands) -> None:
-    commands.add_parser("protect", help="deny PreToolUse writes without this session's live claim")
+def _add_protect_parser(commands: _Subcommands, name: str) -> None:
+    commands.add_parser(name, help="deny PreToolUse writes without this session's live claim")
 
 
-def _add_register_parser(commands: _Subcommands) -> None:
+def _add_register_parser(commands: _Subcommands, name: str) -> None:
     register = commands.add_parser(
-        "register",
+        name,
         help="record one stopped or validated live provider session for workspace recovery",
     )
     register.add_argument("project", metavar="PROJECT", help="a stable local project key")
@@ -659,15 +657,13 @@ def _add_register_parser(commands: _Subcommands) -> None:
     )
 
 
-def _add_run_parser(commands: _Subcommands) -> None:
-    run = commands.add_parser("run", help="open the registered provider workspace consoles")
+def _add_run_parser(commands: _Subcommands, name: str) -> None:
+    run = commands.add_parser(name, help="open the registered provider workspace consoles")
     run.add_argument("project", metavar="PROJECT", nargs="?", help="one registered project")
 
 
-def _add_login_parser(commands: _Subcommands) -> None:
-    login = commands.add_parser(
-        "login", help="manage configured workspace recovery at desktop login"
-    )
+def _add_login_parser(commands: _Subcommands, name: str) -> None:
+    login = commands.add_parser(name, help="manage configured workspace recovery at desktop login")
     login_commands = _add_subcommands(login, "login_command")
     login_commands.add_parser("enable", help="install the owned desktop login launcher")
     login_commands.add_parser("disable", help="remove the owned desktop login launcher")
@@ -676,8 +672,8 @@ def _add_login_parser(commands: _Subcommands) -> None:
     )
 
 
-def _add_run_at_login_parser(commands: _Subcommands) -> None:
-    commands.add_parser("_run-at-login", help=argparse.SUPPRESS)
+def _add_run_at_login_parser(commands: _Subcommands, name: str) -> None:
+    commands.add_parser(name, help=argparse.SUPPRESS)
 
 
 class _UsageError(protocol.ClaimError):
@@ -772,8 +768,8 @@ def _parser() -> _UsageErrorParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--repo", help="GitHub repository as OWNER/REPO")
     commands = _add_subcommands(parser, "command")
-    for command in _COMMANDS.values():
-        command.add_parser(commands)
+    for name, command in _COMMANDS.items():
+        command.add_parser(commands, name)
     return parser
 
 
@@ -811,7 +807,7 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
 class _RepositoryCommand:
     """A context-taking type keeps repository setup out of local and hook commands."""
 
-    add_parser: Callable[[_Subcommands], None]
+    add_parser: Callable[[_Subcommands, str], None]
     run: Callable[[argparse.Namespace, RunContext], int]
     resolves_agent: bool = False
 
@@ -820,15 +816,15 @@ class _RepositoryCommand:
 class _LocalCommand:
     """A namespace-only type makes local execution independent of repository setup."""
 
-    add_parser: Callable[[_Subcommands], None]
+    add_parser: Callable[[_Subcommands, str], None]
     run: Callable[[argparse.Namespace], int]
 
 
 @dataclass(frozen=True)
 class _NoArgumentsCommand:
-    """A no-argument type reaches the hook's own exception boundary without setup."""
+    """A no-argument type keeps execution independent of parsed state and repository setup."""
 
-    add_parser: Callable[[_Subcommands], None]
+    add_parser: Callable[[_Subcommands, str], None]
     run: Callable[[], int]
 
 
@@ -857,10 +853,10 @@ _COMMANDS: dict[str, _Command] = {
     "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),
     "item": _RepositoryCommand(_add_item_parser, cmd_item.run),
     "protect": _NoArgumentsCommand(_add_protect_parser, cmd_protect.run),
-    "register": _LocalCommand(_add_register_parser, cmd_workspace.run),
-    "run": _LocalCommand(_add_run_parser, cmd_workspace.run),
-    "login": _LocalCommand(_add_login_parser, cmd_workspace.run),
-    "_run-at-login": _LocalCommand(_add_run_at_login_parser, cmd_workspace.run),
+    "register": _LocalCommand(_add_register_parser, cmd_workspace.register_workspace),
+    "run": _LocalCommand(_add_run_parser, cmd_workspace.run_workspace),
+    "login": _LocalCommand(_add_login_parser, cmd_workspace.manage_login),
+    "_run-at-login": _NoArgumentsCommand(_add_run_at_login_parser, cmd_workspace.run_at_login),
 }
 
 

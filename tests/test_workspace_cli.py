@@ -316,12 +316,14 @@ def test_login_cli_enables_and_disables_the_owned_launcher(
         ),
     ],
 )
+@pytest.mark.parametrize("repository_arguments", [[], ["--repo", "example/repository"]])
 def test_hidden_login_runner_reports_completed_recovery(
     monkeypatch,
     tmp_path: Path,
     outcomes: tuple[workspace.RunOutcome, ...],
     expected_status: int,
     expected_notification: str,
+    repository_arguments: list[str],
 ) -> None:
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(
@@ -331,7 +333,7 @@ def test_hidden_login_runner_reports_completed_recovery(
     notifications: list[str] = []
     monkeypatch.setattr(terminal, "notify_login_recovery", notifications.append)
 
-    assert cli.main(["_run-at-login"]) == expected_status
+    assert cli.main([*repository_arguments, "_run-at-login"]) == expected_status
 
     assert notifications == [expected_notification]
 
