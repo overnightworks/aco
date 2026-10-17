@@ -56,7 +56,7 @@ from cli_fixtures import (
 from github_fixtures import FakeForge
 from store_fixtures import blob, push_raw_state_tree, raw_tree, state_ref_listing
 
-from agent_coordination import board, checkout, forge, items, process, protocol, store
+from agent_coordination import board, checkout, cmd_rulings, forge, items, process, protocol, store
 from agent_coordination import cli as issue_claim
 from agent_coordination.body import (
     BLOCK_FENCE_INFO,
@@ -1198,8 +1198,8 @@ def _rulings_lines(
     client: forge.BoardSource, built: board.Board, *, storage: Storage
 ) -> tuple[str, ...]:
     bodies = {issue.number: issue.body for issue in client.list_open_board_issues()}
-    rows = issue_claim._rulings_rows(built, bodies, storage=storage)
-    return tuple(issue_claim._rulings_row_text(row, storage) for row in rows)
+    rows = cmd_rulings._rulings_rows(built, bodies, storage=storage)
+    return tuple(cmd_rulings._rulings_row_text(row, storage) for row in rows)
 
 
 _EXPECTED_BOARD = _projected(_github_fake(), storage=Storage.GITHUB)

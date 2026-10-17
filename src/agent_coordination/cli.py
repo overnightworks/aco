@@ -23,10 +23,12 @@ from . import (
     board_read,
     body,
     checkout,
+    cmd_board,
     cmd_bootstrap,
     cmd_check,
     cmd_protect,
     cmd_reset,
+    cmd_rulings,
     cmd_workspace,
     forge,
     github,
@@ -1529,108 +1531,6 @@ def _release_next_line(item: board.BoardItem | None, storage: body.Storage) -> s
         return "next: none"
     label = board.item_label(item.number, storage)
     return f"next: {label} score {item.score}: {board.terminal_text(item.title)}"
-
-
-@dataclass(frozen=True)
-class _RulingsRow:
-    """One `rulings` row: the item, its open/total counts, and every one of
-    its `[[expectation]]` lines (open and already-ruled alike) in block
-    order -- the detail `rulings` prints beneath the item's own summary."""
-
-    item: board.BoardItem
-    progress: body.ExpectationProgress
-    lines: tuple[body.ExpectationLine, ...]
-
-
-def _rulings_rows(
-    projected: board.Board, bodies: Mapping[int, str], *, storage: body.Storage
-) -> tuple[_RulingsRow, ...]:
-    """Every open board item that carries at least one `[[expectation]]`
-    line, fully ruled ones included (issue #379) -- items with an open line
-    first, board-ranked then by fewer open lines then issue number
-    (unchanged from before #240), then the fully ruled items in that same
-    order. Each row is paired with its lines read fresh from `bodies` --
-    `projected.items` itself carries only the open/total counters. `storage`
-    is forwarded to `expectation_lines` unchanged (issue #248): a state-ref
-    body's `[record]` table must read as a known key, not a malformed one."""
-    ranked = sorted(
-        (
-            (item, item.expectation_progress)
-            for item in projected.items
-            if item.expectation_progress.total > 0
-        ),
-        key=lambda entry: (
-            0 if entry[1].open > 0 else 1,
-            *board.board_rank(entry[0])[:2],
-            entry[1].open,
-            entry[0].number,
-        ),
-    )
-    return tuple(
-        _RulingsRow(
-            item, progress, body.expectation_lines(bodies.get(item.number, ""), storage=storage)
-        )
-        for item, progress in ranked
-    )
-
-
-def _rulings_line_json(line: body.ExpectationLine) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "index": line.index,
-        "text": line.text,
-        "ruling": line.ruling,
-        "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
-        "default": line.default,
-    }
-    payload.update(
-        (key, value)
-        for key, value in (
-            ("question", line.question),
-            ("example", line.example),
-            ("picture", line.picture),
-        )
-        if value is not None
-    )
-    return payload
-
-
-def _rulings_line_text(line: body.ExpectationLine) -> str:
-    state = body.expectation_line_state(line)
-    summary = board.terminal_text(body.expectation_line_summary(line))
-    return f"  {line.index} {state}: {summary}"
-
-
-def _rulings_row_text(row: _RulingsRow, storage: body.Storage) -> str:
-    label = board.item_label(row.item.number, storage)
-    title = board.terminal_text(row.item.title)
-    header = f"{label} {row.progress.open}/{row.progress.total}: {title}"
-    return "\n".join((header, *(_rulings_line_text(line) for line in row.lines)))
-
-
-def _rulings(
-    projected: board.Board, bodies: Mapping[int, str], *, as_json: bool, storage: body.Storage
-) -> None:
-    rows = _rulings_rows(projected, bodies, storage=storage)
-    if as_json:
-        report.emit_json(
-            True,
-            RulingsReason.LISTED,
-            rulings=[
-                {
-                    "number": row.item.number,
-                    "title": row.item.title,
-                    "open": row.progress.open,
-                    "total": row.progress.total,
-                    "lines": [_rulings_line_json(line) for line in row.lines],
-                }
-                for row in rows
-            ],
-        )
-        return
-    if not rows:
-        print("No expectation lines.")
-        return
-    print("\n".join(_rulings_row_text(row, storage) for row in rows))
 
 
 def _ruling_pull_hint(item: board.BoardItem) -> str | None:
@@ -3712,84 +3612,6 @@ def _status_read(parsed: argparse.Namespace, context: RunContext) -> int:
     if parsed.json:
         return _status_json(claims, issue, ages, state.tip, lane_shared)
     return _status(claims, issue, ages, context.config.storage, lane_shared)
-
-
-class BoardReason(StrEnum):
-    """`aco board`'s own `--json` `reason` vocabulary (issue #412,
-    `specs/board.spec.md`): `projected` the only success. `invalid_usage`
-    covers a bare `aco board` naming no `--json` (BOARD-44), a retired
-    `--serve` (issue #644), and `--repo` under `storage = state-ref`
-    (PIN-04); every other refusal -- an unsupported forge host (BOARD-02),
-    a state-ref checkout with no resolvable default branch (PIN-05) --
-    falls to `unavailable`, matching `ask`/`rule`/`brief`'s own catch-all."""
-
-    PROJECTED = "projected"
-    INVALID_USAGE = "invalid_usage"
-    UNAVAILABLE = "unavailable"
-
-
-class _BoardServeRemovedError(protocol.ClaimError):
-    """`--serve` (issue #280) was removed once `aco-board` took over the
-    decision board (issue #644): named so `--json` can choose
-    `invalid_usage` over the broad `unavailable` catch-all every other
-    `board` refusal falls to."""
-
-
-class _BoardNoModeUsageError(protocol.ClaimError):
-    """No `--json` given, and `--serve` already diverted before `_cmd_board`
-    ever runs (BOARD-44): the retired text table (issue #420, #390 Befund
-    13) leaves `board` with no default mode of its own any more, so a bare
-    `aco board` must name `--json` instead of guessing."""
-
-
-BOARD_SERVE_REMOVED_MESSAGE = "--serve was removed; run aco-board serve instead"
-BOARD_NO_MODE_MESSAGE = "aco board requires --json"
-
-
-def _cmd_board(parsed: argparse.Namespace, context: RunContext) -> int:
-    as_json = parsed.json
-    try:
-        if parsed.serve:
-            raise _BoardServeRemovedError(BOARD_SERVE_REMOVED_MESSAGE)
-        if not as_json:
-            raise _BoardNoModeUsageError(BOARD_NO_MODE_MESSAGE)
-        projected = board_read.observed_board(context).board
-    except (_BoardServeRemovedError, _BoardNoModeUsageError) as error:
-        return report.refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
-    except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(BoardReason.INVALID_USAGE, error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(BoardReason.UNAVAILABLE, error, as_json=as_json)
-    report.emit_json(True, BoardReason.PROJECTED, **board.board_payload(projected))
-    return 0
-
-
-class RulingsReason(StrEnum):
-    """`aco rulings`' own `--json` `reason` vocabulary (issue #412,
-    `specs/rulings.spec.md`): `listed` the only success. `invalid_usage`
-    covers `--repo` under `storage = state-ref` (PIN-04); every other
-    refusal -- an unsupported forge host (BOARD-02), a state-ref checkout
-    with no resolvable default branch (PIN-05) -- falls to `unavailable`,
-    matching `ask`/`rule`/`brief`'s own catch-all."""
-
-    LISTED = "listed"
-    INVALID_USAGE = "invalid_usage"
-    UNAVAILABLE = "unavailable"
-
-
-def _cmd_rulings(parsed: argparse.Namespace, context: RunContext) -> int:
-    as_json = parsed.json
-    try:
-        issues = context.forge.list_open_board_issues()
-        projected = board_read.observed_board(context, issues=issues).board
-        bodies = {issue.number: issue.body for issue in issues}
-        storage = context.config.storage
-    except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(RulingsReason.INVALID_USAGE, error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(RulingsReason.UNAVAILABLE, error, as_json=as_json)
-    _rulings(projected, bodies, as_json=as_json, storage=storage)
-    return 0
 
 
 def _next_action_container_number(action: board.NextAction | None) -> int | None:
@@ -7015,8 +6837,8 @@ _COMMAND_TABLE: dict[str, _CommandEntry] = {
         _add_bootstrap_parser, lambda _parsed, context: cmd_bootstrap.run(context)
     ),
     "reset": _CommandEntry(_add_reset_parser, cmd_reset.run),
-    "board": _CommandEntry(_add_board_parser, _cmd_board),
-    "rulings": _CommandEntry(_add_rulings_parser, _cmd_rulings),
+    "board": _CommandEntry(_add_board_parser, cmd_board.run),
+    "rulings": _CommandEntry(_add_rulings_parser, cmd_rulings.run),
     "next": _CommandEntry(_add_next_parser, _cmd_next),
     "start": _CommandEntry(_add_start_parser, _cmd_start),
     "claim": _CommandEntry(_add_claim_parser, _cmd_claim),
