@@ -1,0 +1,8 @@
+claim_id = "069ec8c426674081bfe5c71dddd72b16"
+agent = "claude"
+role = "builder"
+base = "9fb75310769b698fb22553efd955c4abef84b383"
+branch = "claude/issue-118-s19a-cmd-cut"
+scope = ["pyproject.toml", "src/agent_coordination/board_read.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_cut.py", "src/agent_coordination/forge.py", "src/agent_coordination/report.py", "tests/test_cli.py", "tests/test_state_board.py"]
+opened_commit = "2cac22e7ead925296043e4f3ec583b83e6192eea"
+whole_reason = "Der cut-Befehl zieht mit Layers-Zeile, der Erweiterung von report.refuse, Uhr-Patch, Testverweisen und Docstrings in cmd_cut."
