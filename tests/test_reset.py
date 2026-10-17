@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import re
 import shlex
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from cli_fixtures import (
+    FROZEN_CLI_NOW,
     arguments_bash_hands_aco,
     count_context_reads,
     freeze_cli_now,
@@ -30,21 +34,305 @@ from store_fixtures import (
 from agent_coordination import checkout, process, protocol, session, store
 
 
+def _expected_reset_bundle(export_dir: Path, clone: Path, tip: str | None) -> Path:
+    return export_dir / (
+        f"aco-state-{clone.name}-{FROZEN_CLI_NOW.date().isoformat()}-{str(tip)[:12]}.bundle"
+    )
+
+
+def _readable_reset(clone: Path, bare_remote: Path) -> str:
+    tip = store.bootstrap(worktree=clone, remote="origin")
+    assert not store.local_state_ref_exists(clone)
+    return tip
+
+
+def _observed_reset(clone: Path, bare_remote: Path) -> str:
+    tip = _readable_reset(clone, bare_remote)
+    store.fetch_state(worktree=clone, remote="origin")
+    assert all(lineage_observation(clone))
+    return tip
+
+
+def _schema1_reset(clone: Path, bare_remote: Path) -> str:
+    tip = push_raw_state_tree(
+        bare_remote, clone, [("100644", "blob", blob(clone, b"version = 1\n"), "schema.toml")]
+    )
+    assert lineage_observation(clone) == (None, None)
+    assert not store.local_state_ref_exists(clone)
+    return tip
+
+
+def _never_reset(clone: Path, bare_remote: Path) -> None:
+    assert state_ref_tip(bare_remote) is None
+    assert not store.local_state_ref_exists(clone)
+    assert lineage_observation(clone) == (None, None)
+
+
+def _local_reset(clone: Path, bare_remote: Path) -> str:
+    tip = _readable_reset(clone, bare_remote)
+    real_git(clone, "update-ref", store.STATE_REF, tip)
+    assert state_ref_tip(clone) == tip
+    return tip
+
+
+def _deleted_reset(clone: Path, bare_remote: Path) -> None:
+    _observed_reset(clone, bare_remote)
+    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
+    with pytest.raises(protocol.StateLineageError):
+        store.fetch_state(worktree=clone, remote="origin")
+    assert state_ref_tip(bare_remote) is None
+    assert not store.local_state_ref_exists(clone)
+
+
+@dataclass(frozen=True)
+class ResetPlan:
+    arrange: Callable[[Path, Path], str | None]
+    arguments: tuple[str, ...]
+    executed: bool
+    status: int
+    lines: tuple[str, ...]
+    error: str
+    bundle_exists: bool
+    explicit_directory: bool = True
+
+
 @pytest.mark.parametrize(
-    "state, flags, explicit_directory",
+    "case",
     [
-        pytest.param("observed", [], True, id="claim-free-dry"),
-        pytest.param("readable", ["--confirm"], True, id="plain"),
-        pytest.param("readable", ["--confirm", "--force-unreadable"], True, id="forced"),
-        pytest.param("schema1", [], True, id="schema1-dry"),
-        pytest.param("schema1", ["--confirm"], True, id="schema1-refused"),
-        pytest.param("schema1", ["--confirm", "--force-unreadable"], True, id="schema1-forced"),
-        pytest.param("readable", ["--confirm", "--no-export"], True, id="no-export"),
-        pytest.param("never", [], True, id="never-dry"),
-        pytest.param("never", ["--confirm"], True, id="never-confirm"),
-        pytest.param("local", ["--confirm"], True, id="foreign-local"),
-        pytest.param("deleted", ["--confirm"], True, id="deleted-observed"),
-        pytest.param("readable", ["--confirm"], False, id="default-directory"),
+        pytest.param(
+            ResetPlan(
+                arrange=_observed_reset,
+                arguments=(),
+                executed=False,
+                status=0,
+                lines=(
+                    "would: export {ref} at {tip} to {bundle} "
+                    "(restore with: git fetch {bundle} {export_ref}:{ref})",
+                    "would: delete {ref} on origin (lease {tip})",
+                    "would: no local {ref} to delete",
+                    "would: clear lineage stamps and fetch anchors in 1 worktree",
+                    "would: bootstrap a fresh empty state",
+                ),
+                error="",
+                bundle_exists=False,
+                explicit_directory=True,
+            ),
+            id="claim-free-dry",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_readable_reset,
+                arguments=("--confirm",),
+                executed=True,
+                status=0,
+                lines=(
+                    "exported {ref} at {tip} to {bundle} "
+                    "(restore with: git fetch {bundle} {export_ref}:{ref})",
+                    "deleted {ref} on origin (lease {tip})",
+                    "no local {ref} to delete",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=True,
+                explicit_directory=True,
+            ),
+            id="plain",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_readable_reset,
+                arguments=("--confirm", "--force-unreadable"),
+                executed=True,
+                status=0,
+                lines=(
+                    "exported {ref} at {tip} to {bundle} "
+                    "(restore with: git fetch {bundle} {export_ref}:{ref})",
+                    "deleted {ref} on origin (lease {tip})",
+                    "no local {ref} to delete",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=True,
+                explicit_directory=True,
+            ),
+            id="forced",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_schema1_reset,
+                arguments=(),
+                executed=False,
+                status=0,
+                lines=(
+                    "schema 1 not readable by this aco; live claims unknown "
+                    "(--confirm needs --force-unreadable)",
+                    "would: export {ref} at {tip} to {bundle} "
+                    "(restore with: git fetch {bundle} {export_ref}:{ref})",
+                    "would: delete {ref} on origin (lease {tip})",
+                    "would: no local {ref} to delete",
+                    "would: clear lineage stamps and fetch anchors in 1 worktree",
+                    "would: bootstrap a fresh empty state",
+                ),
+                error="",
+                bundle_exists=False,
+                explicit_directory=True,
+            ),
+            id="schema1-dry",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_schema1_reset,
+                arguments=("--confirm",),
+                executed=False,
+                status=2,
+                lines=(),
+                error=(
+                    "ERROR: schema 1 not readable by this aco; live claims unknown "
+                    "(--confirm needs --force-unreadable)\n"
+                ),
+                bundle_exists=False,
+                explicit_directory=True,
+            ),
+            id="schema1-refused",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_schema1_reset,
+                arguments=("--confirm", "--force-unreadable"),
+                executed=True,
+                status=0,
+                lines=(
+                    "exported {ref} at {tip} to {bundle} "
+                    "(restore with: git fetch {bundle} {export_ref}:{ref})",
+                    "deleted {ref} on origin (lease {tip})",
+                    "no local {ref} to delete",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=True,
+                explicit_directory=True,
+            ),
+            id="schema1-forced",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_readable_reset,
+                arguments=("--confirm", "--no-export"),
+                executed=True,
+                status=0,
+                lines=(
+                    "skipped export (--no-export): {ref} at {tip} not saved",
+                    "deleted {ref} on origin (lease {tip})",
+                    "no local {ref} to delete",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=False,
+                explicit_directory=True,
+            ),
+            id="no-export",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_never_reset,
+                arguments=(),
+                executed=False,
+                status=0,
+                lines=(
+                    "would: nothing to export: {ref} does not exist on origin",
+                    "would: nothing to delete on origin: {ref} does not exist",
+                    "would: no local {ref} to delete",
+                    "would: clear lineage stamps and fetch anchors in 1 worktree",
+                    "would: bootstrap a fresh empty state",
+                ),
+                error="",
+                bundle_exists=False,
+                explicit_directory=True,
+            ),
+            id="never-dry",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_never_reset,
+                arguments=("--confirm",),
+                executed=True,
+                status=0,
+                lines=(
+                    "nothing to export: {ref} does not exist on origin",
+                    "nothing to delete on origin: {ref} does not exist",
+                    "no local {ref} to delete",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=False,
+                explicit_directory=True,
+            ),
+            id="never-confirm",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_local_reset,
+                arguments=("--confirm",),
+                executed=True,
+                status=0,
+                lines=(
+                    "exported {ref} at {tip} to {bundle} "
+                    "(restore with: git fetch {bundle} {export_ref}:{ref})",
+                    "deleted {ref} on origin (lease {tip})",
+                    "deleted local {ref}",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=True,
+                explicit_directory=True,
+            ),
+            id="foreign-local",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_deleted_reset,
+                arguments=("--confirm",),
+                executed=True,
+                status=0,
+                lines=(
+                    "nothing to export: {ref} does not exist on origin",
+                    "nothing to delete on origin: {ref} does not exist",
+                    "no local {ref} to delete",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=False,
+                explicit_directory=True,
+            ),
+            id="deleted-observed",
+        ),
+        pytest.param(
+            ResetPlan(
+                arrange=_readable_reset,
+                arguments=("--confirm",),
+                executed=True,
+                status=0,
+                lines=(
+                    "exported {ref} at {tip} to {bundle} "
+                    "(restore with: git fetch {bundle} {export_ref}:{ref})",
+                    "deleted {ref} on origin (lease {tip})",
+                    "no local {ref} to delete",
+                    "cleared lineage stamps and fetch anchors in 1 worktree",
+                    "bootstrapped a fresh empty state at {{fresh_tip}}",
+                ),
+                error="",
+                bundle_exists=True,
+                explicit_directory=False,
+            ),
+            id="default-directory",
+        ),
     ],
 )
 def test_reset_plans_or_performs_each_state(
@@ -52,101 +340,74 @@ def test_reset_plans_or_performs_each_state(
     clone: Path,
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
-    state: str,
-    flags: list[str],
-    explicit_directory: bool,
+    case: ResetPlan,
 ) -> None:
-    """Spec: RESET-01, RESET-02, RESET-03, RESET-09, RESET-12, RESET-14,
-    RESET-15, RESET-16, RESET-17 -- plan, refusal, export and fresh state.
+    """Spec: CAS-39, CAS-41, CAS-43, CAS-44, CAS-45, RESET-01, RESET-02,
+    RESET-03, RESET-09, RESET-12, RESET-14, RESET-15, RESET-16, RESET-17.
     """
     freeze_cli_now(monkeypatch)
-    tip = None
-    if state == "schema1":
-        tip = push_raw_state_tree(
-            bare_remote, clone, [("100644", "blob", blob(clone, b"version = 1\n"), "schema.toml")]
-        )
-    elif state != "never":
-        tip = store.bootstrap(worktree=clone, remote="origin")
-    if state in {"observed", "deleted"}:
-        store.fetch_state(worktree=clone, remote="origin")
-        assert all(lineage_observation(clone))
-    if state == "deleted":
-        real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
-        with pytest.raises(protocol.StateLineageError):
-            store.fetch_state(worktree=clone, remote="origin")
-        tip = None
-    if state == "local":
-        real_git(clone, "update-ref", store.STATE_REF, str(tip))
-    assert store.local_state_ref_exists(clone) == (state == "local")
+    tip = case.arrange(clone, bare_remote)
     lineage_before = lineage_observation(clone)
-    export_dir = clone.parent / "export" if explicit_directory else clone.parent
-    if explicit_directory:
-        export_dir.mkdir()
-        assert list(export_dir.iterdir()) == []
-    bundle = export_dir / f"aco-state-{clone.name}-2026-08-21-{str(tip)[:12]}.bundle"
-    arguments = ["reset", *flags]
-    if explicit_directory:
+    export_dir = clone.parent / "export" if case.explicit_directory else clone.parent
+    export_dir.mkdir(exist_ok=True)
+    assert not list(export_dir.glob("*.bundle"))
+    bundle = _expected_reset_bundle(export_dir, clone, tip)
+    arguments = ["reset", *case.arguments]
+    if case.explicit_directory:
         arguments += ["--export-dir", str(export_dir)]
-    confirmed = "--confirm" in flags
-    refused = state == "schema1" and confirmed and "--force-unreadable" not in flags
-    executed = confirmed and not refused
-    saves_bundle = executed and tip is not None and "--no-export" not in flags
+    expected_lines = tuple(
+        line.format(ref=store.STATE_REF, tip=tip, bundle=bundle, export_ref=store.EXPORT_BUNDLE_REF)
+        for line in case.lines
+    )
     capsys.readouterr()
 
     result = run_cli(arguments, capsys)
     remote = state_ref_tip(bare_remote)
-    local = store.local_state_ref_exists(clone)
-    lineage_after = lineage_observation(clone)
-    exists = bundle.exists()
-    verified = (
-        real_git(clone, "bundle", "verify", str(bundle), check=False).returncode
-        if saves_bundle
-        else None
-    )
-    heads = (
-        real_git(clone, "bundle", "list-heads", str(bundle), check=False).stdout.strip()
-        if saves_bundle
-        else None
-    )
-    reader_error, reader_tip, reader_claims = (
-        _read_reset_state(clone) if executed else (None, None, ())
-    )
-
-    actual = {
+    actual: dict[str, object] = {
         "status": result.status,
-        "lines": tuple(result.stdout.splitlines()),
+        "lines": tuple(
+            re.sub(r"(?<=bootstrapped a fresh empty state at )[0-9a-f]{40}$", "{fresh_tip}", line)
+            for line in result.stdout.splitlines()
+        ),
         "error": result.stderr,
-        "remote": remote,
-        "local": local,
-        "lineage": None if executed else lineage_after,
-        "bundle_exists": exists,
-        "bundle_verified": verified,
-        "bundle_heads": heads,
-        "reader_error": reader_error,
-        "reader_tip": reader_tip,
-        "reader_claims": reader_claims,
-        "fresh_tip": bool(remote) and remote != tip if executed else False,
+        "local": store.local_state_ref_exists(clone),
+        "bundle_exists": bool(list(export_dir.glob("*.bundle"))),
     }
-    expected = {
-        "status": 2 if refused else 0,
-        "lines": _plan_lines(state, flags, tip, bundle, remote),
-        "error": (
-            "ERROR: schema 1 not readable by this aco; live claims unknown "
-            "(--confirm needs --force-unreadable)\n"
-        )
-        if refused
-        else "",
-        "remote": remote if executed else tip,
+    expected: dict[str, object] = {
+        "status": case.status,
+        "lines": expected_lines,
+        "error": case.error,
         "local": False,
-        "lineage": None if executed else lineage_before,
-        "bundle_exists": saves_bundle,
-        "bundle_verified": 0 if saves_bundle else None,
-        "bundle_heads": f"{tip} {store.EXPORT_BUNDLE_REF}" if saves_bundle else None,
-        "reader_error": None,
-        "reader_tip": remote if executed else None,
-        "reader_claims": (),
-        "fresh_tip": executed,
+        "bundle_exists": case.bundle_exists,
     }
+    if case.executed:
+        printed = re.search(
+            r"^bootstrapped a fresh empty state at ([0-9a-f]{40})$", result.stdout, re.MULTILINE
+        )
+        reader_error, reader_tip, reader_claims = _read_reset_state(clone)
+        actual.update(
+            printed_tip=printed is not None and printed.group(1) == remote,
+            fresh_tip=bool(remote) and remote != tip,
+            reader_error=reader_error,
+            reader_tip=reader_tip is not None and reader_tip == remote,
+            reader_claims=reader_claims,
+        )
+        expected.update(
+            printed_tip=True, fresh_tip=True, reader_error=None, reader_tip=True, reader_claims=()
+        )
+    else:
+        actual.update(remote=remote, lineage=lineage_observation(clone))
+        expected.update(remote=tip, lineage=lineage_before)
+    if case.bundle_exists:
+        actual.update(
+            bundle_verified=real_git(
+                clone, "bundle", "verify", str(bundle), check=False
+            ).returncode,
+            bundle_heads=real_git(
+                clone, "bundle", "list-heads", str(bundle), check=False
+            ).stdout.strip(),
+        )
+        expected.update(bundle_verified=0, bundle_heads=f"{tip} {store.EXPORT_BUNDLE_REF}")
     assert actual == expected
 
 
@@ -357,110 +618,61 @@ def _reject_delete(monkeypatch: pytest.MonkeyPatch, clone: Path, tip: str, mode:
     monkeypatch.setattr(process, "run_captured", captured)
 
 
-@pytest.mark.parametrize(
-    "failure",
-    [
-        "export-denied",
-        "remote-moved",
-        "lease-unchanged",
-        "lease-unknown",
-        "lost-delete-response",
-        "local-delete-failed",
-    ],
-)
-def test_reset_failure_leaves_the_state_intact(
-    clone: Path,
-    bare_remote: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    failure: str,
-) -> None:
-    """Spec: RESET-04, RESET-05, RESET-06, RESET-07, RESET-08, RESET-13.
+@dataclass(frozen=True)
+class ResetFailure:
+    status: int
+    error: str
+    remote: str | None
+    local_tip: str
+    verification: bool
+    lineage: tuple[protocol.ObjectId | None, str | None] | None = None
+    manual_lease: bool | None = None
+    fresh_tip: bool = False
 
-    Stop at the failed step.
-    """
-    freeze_cli_now(monkeypatch)
-    tip = store.bootstrap(worktree=clone, remote="origin")
-    store.fetch_state(worktree=clone, remote="origin")
-    lineage_before = lineage_observation(clone)
-    assert all(lineage_before)
-    local_before = failure in {"lease-unchanged", "lease-unknown", "local-delete-failed"}
-    if local_before:
-        real_git(clone, "update-ref", store.STATE_REF, tip)
-    assert store.local_state_ref_exists(clone) == local_before
-    export_dir = clone.parent / "export"
-    export_dir.mkdir()
-    lock = clone / ".git" / f"{store.STATE_REF}.lock"
-    moved_tip = ""
+
+@contextmanager
+def _denied_export(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
+) -> Iterator[ResetFailure]:
+    assert not store.local_state_ref_exists(clone)
+    lineage = lineage_observation(clone)
+    bundle.parent.chmod(0o500)
+    try:
+        yield ResetFailure(
+            status=2,
+            error=re.escape(f"ERROR: cannot export {store.STATE_REF} at {tip} to {bundle}: ")
+            + r".+\n",
+            remote=tip,
+            local_tip="",
+            verification=False,
+            lineage=lineage,
+        )
+    finally:
+        bundle.parent.chmod(0o700)
+
+
+@contextmanager
+def _moved_remote(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
+) -> Iterator[ResetFailure]:
+    assert not store.local_state_ref_exists(clone)
+    tree = real_git(clone, "rev-parse", f"{tip}^{{tree}}").stdout.strip()
+    moved_tip = real_git(clone, "commit-tree", tree, "-p", tip, "-m", "moved").stdout.strip()
+    assert moved_tip != tip
     real_export = store.export_state_bundle
 
     def export_then_move_remote(
         *, worktree: Path, tip: protocol.ObjectId, destination: Path
     ) -> Path:
-        nonlocal moved_tip
         result = real_export(worktree=worktree, tip=tip, destination=destination)
-        tree = real_git(clone, "rev-parse", f"{tip}^{{tree}}").stdout.strip()
-        moved_tip = real_git(clone, "commit-tree", tree, "-p", tip, "-m", "moved").stdout.strip()
         real_git(clone, "push", "--force", str(bare_remote), f"{moved_tip}:{store.STATE_REF}")
         return result
 
-    if failure == "remote-moved":
-        monkeypatch.setattr(store, "export_state_bundle", export_then_move_remote)
-    if failure in {"lease-unchanged", "lease-unknown", "lost-delete-response"}:
-        _reject_delete(monkeypatch, clone, tip, failure)
-    if failure == "export-denied":
-        export_dir.chmod(0o500)
-    if failure == "local-delete-failed":
-        lock.write_text("")
-    capsys.readouterr()
-    try:
-        result = run_cli(["reset", "--confirm", "--export-dir", str(export_dir)], capsys)
-    finally:
-        export_dir.chmod(0o700)
-        lock.unlink(missing_ok=True)
-    remote = state_ref_tip(bare_remote)
-    local_tip = real_git(
-        clone, "rev-parse", "--verify", store.STATE_REF, check=False
-    ).stdout.strip()
-    bundle = export_dir / f"aco-state-{clone.name}-2026-08-21-{tip[:12]}.bundle"
-    verification = real_git(clone, "bundle", "verify", str(bundle), check=False).returncode
-    expected_error = _failure_sentence(failure, tip, moved_tip, bundle)
-    assert (
-        result.status,
-        bool(re.fullmatch(expected_error, result.stderr, flags=re.DOTALL)),
-        remote,
-        local_tip,
-        lineage_observation(clone) if failure == "export-denied" else None,
-        verification == 0,
-    ) == (
-        0 if failure == "lost-delete-response" else 2,
-        True,
-        _failure_remote(failure, tip, moved_tip, remote),
-        tip if local_before else "",
-        lineage_before if failure == "export-denied" else None,
-        failure != "export-denied",
-    ), result.stderr
-
-
-def _failure_remote(failure: str, tip: str, moved_tip: str, remote: str | None) -> str | None:
-    if failure == "remote-moved":
-        return moved_tip
-    if failure == "local-delete-failed":
-        return None
-    if failure == "lost-delete-response":
-        return remote if remote and remote != tip else "missing fresh state"
-    return tip
-
-
-def _failure_sentence(failure: str, tip: str, moved_tip: str, bundle: Path) -> str:
-    prefix = f"ERROR: cannot delete {store.STATE_REF} on origin (lease {tip}): "
-    if failure == "export-denied":
-        return re.escape(f"ERROR: cannot export {store.STATE_REF} at {tip} to {bundle}: ") + r".+\n"
-    if failure == "local-delete-failed":
-        return re.escape(f"ERROR: cannot delete local {store.STATE_REF}: ") + r".+\n"
-    if failure == "remote-moved":
-        return (
-            re.escape(prefix)
+    monkeypatch.setattr(store, "export_state_bundle", export_then_move_remote)
+    yield ResetFailure(
+        status=2,
+        error=(
+            re.escape(f"ERROR: cannot delete {store.STATE_REF} on origin (lease {tip}): ")
             + r".+"
             + re.escape(
                 f"; the remote moved to {moved_tip} -- re-run `aco reset --confirm`, which "
@@ -468,31 +680,173 @@ def _failure_sentence(failure: str, tip: str, moved_tip: str, bundle: Path) -> s
                 f"before deleting again; a manual lease against {moved_tip} "
                 "would skip both checks\n"
             )
-        )
-    if failure == "lease-unknown":
-        return re.escape(
-            prefix + "simulated rejected delete; outcome unknown -- verify with "
-            f"`git ls-remote origin {store.STATE_REF}` "
-            "before retrying `aco reset --confirm`\n"
-        )
-    if failure == "lease-unchanged":
-        return re.escape(
-            prefix + f"simulated rejected delete; {store.STATE_REF} is still present at "
+        ),
+        remote=moved_tip,
+        local_tip="",
+        verification=True,
+        manual_lease=False,
+    )
+
+
+def _retain_local_ref(clone: Path, tip: str) -> None:
+    real_git(clone, "update-ref", store.STATE_REF, tip)
+    assert state_ref_tip(clone) == tip
+
+
+@contextmanager
+def _unchanged_lease(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
+) -> Iterator[ResetFailure]:
+    _retain_local_ref(clone, tip)
+    _reject_delete(monkeypatch, clone, tip, "lease-unchanged")
+    yield ResetFailure(
+        status=2,
+        error=re.escape(
+            f"ERROR: cannot delete {store.STATE_REF} on origin (lease {tip}): "
+            f"simulated rejected delete; {store.STATE_REF} is still present at "
             f"{tip}, unchanged from the lease -- re-run "
             "`aco reset --confirm` once the cause is fixed\n"
+        ),
+        remote=tip,
+        local_tip=tip,
+        verification=True,
+        manual_lease=False,
+    )
+
+
+@contextmanager
+def _unknown_lease(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
+) -> Iterator[ResetFailure]:
+    _retain_local_ref(clone, tip)
+    _reject_delete(monkeypatch, clone, tip, "lease-unknown")
+    yield ResetFailure(
+        status=2,
+        error=re.escape(
+            f"ERROR: cannot delete {store.STATE_REF} on origin (lease {tip}): "
+            "simulated rejected delete; outcome unknown -- verify with "
+            f"`git ls-remote origin {store.STATE_REF}` "
+            "before retrying `aco reset --confirm`\n"
+        ),
+        remote=tip,
+        local_tip=tip,
+        verification=True,
+        manual_lease=False,
+    )
+
+
+@contextmanager
+def _lost_response(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
+) -> Iterator[ResetFailure]:
+    assert not store.local_state_ref_exists(clone)
+    _reject_delete(monkeypatch, clone, tip, "lost-delete-response")
+    yield ResetFailure(
+        status=0,
+        error="",
+        remote=None,
+        local_tip="",
+        verification=True,
+        fresh_tip=True,
+    )
+
+
+@contextmanager
+def _locked_local_ref(
+    monkeypatch: pytest.MonkeyPatch, clone: Path, bare_remote: Path, tip: str, bundle: Path
+) -> Iterator[ResetFailure]:
+    _retain_local_ref(clone, tip)
+    lock = clone / ".git" / f"{store.STATE_REF}.lock"
+    lock.write_text("")
+    assert lock.is_file()
+    try:
+        yield ResetFailure(
+            status=2,
+            error=re.escape(f"ERROR: cannot delete local {store.STATE_REF}: ") + r".+\n",
+            remote=None,
+            local_tip=tip,
+            verification=True,
         )
-    return ""
+    finally:
+        lock.unlink(missing_ok=True)
 
 
-@pytest.mark.parametrize("claim_id", [pytest.param("claim-42", id="released-history")])
+@pytest.mark.parametrize(
+    "arrange",
+    [
+        pytest.param(_denied_export, id="export-denied"),
+        pytest.param(_moved_remote, id="remote-moved"),
+        pytest.param(_unchanged_lease, id="lease-unchanged"),
+        pytest.param(_unknown_lease, id="lease-unknown"),
+        pytest.param(_lost_response, id="lost-delete-response"),
+        pytest.param(_locked_local_ref, id="local-delete-failed"),
+    ],
+)
+def test_reset_failure_leaves_the_state_intact(
+    clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    arrange: Callable[
+        [pytest.MonkeyPatch, Path, Path, str, Path], AbstractContextManager[ResetFailure]
+    ],
+) -> None:
+    """Spec: CAS-41, CAS-43, RESET-04, RESET-05, RESET-06, RESET-07, RESET-08, RESET-13.
+
+    Stop at the failed step.
+    """
+    freeze_cli_now(monkeypatch)
+    tip = _observed_reset(clone, bare_remote)
+    export_dir = clone.parent / "export"
+    export_dir.mkdir()
+    assert not list(export_dir.glob("*.bundle"))
+    bundle = _expected_reset_bundle(export_dir, clone, tip)
+    with arrange(monkeypatch, clone, bare_remote, tip, bundle) as case:
+        capsys.readouterr()
+        result = run_cli(["reset", "--confirm", "--export-dir", str(export_dir)], capsys)
+    remote = state_ref_tip(bare_remote)
+    actual: dict[str, object] = {
+        "status": result.status,
+        "error": (
+            bool(re.fullmatch(case.error, result.stderr, flags=re.DOTALL))
+            if case.error
+            else result.stderr
+        ),
+        "local_tip": real_git(
+            clone, "rev-parse", "--verify", store.STATE_REF, check=False
+        ).stdout.strip(),
+        "verification": real_git(clone, "bundle", "verify", str(bundle), check=False).returncode
+        == 0,
+    }
+    expected: dict[str, object] = {
+        "status": case.status,
+        "error": True if case.error else "",
+        "local_tip": case.local_tip,
+        "verification": case.verification,
+    }
+    if case.fresh_tip:
+        actual.update(fresh_tip=bool(remote) and remote != tip)
+        expected.update(fresh_tip=True)
+    else:
+        actual.update(remote=remote)
+        expected.update(remote=case.remote)
+    if case.lineage is not None:
+        actual.update(lineage=lineage_observation(clone))
+        expected.update(lineage=case.lineage)
+    if case.manual_lease is not None:
+        actual.update(manual_lease="--force-with-lease" in result.stderr)
+        expected.update(manual_lease=case.manual_lease)
+    assert actual == expected, result.stderr
+
+
 def test_reset_bundle_restores_the_released_history(
     clone: Path,
     bare_remote: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    claim_id: str,
 ) -> None:
     """Spec: CAS-46, STAT-01 -- the printed restore command recovers released claim history."""
+    claim_id = "claim-42"
     freeze_cli_now(monkeypatch)
     store.bootstrap(worktree=clone, remote="origin")
     store.commit_transition(
@@ -512,13 +866,14 @@ def test_reset_bundle_restores_the_released_history(
         ),
     )
     before = store.fetch_state(worktree=clone, remote="origin")
-    assert not before.claims and protocol.ClaimId(claim_id) in before.consumed_ids
+    assert not before.claims
+    assert protocol.ClaimId(claim_id) in before.consumed_ids
     real_git(clone, "rev-parse", f"{before.tip}~2")
     export_dir = clone.parent / "export"
     export_dir.mkdir()
     capsys.readouterr()
     reset = run_cli(["reset", "--confirm", "--export-dir", str(export_dir)], capsys)
-    bundle = export_dir / f"aco-state-{clone.name}-2026-08-21-{str(before.tip)[:12]}.bundle"
+    bundle = _expected_reset_bundle(export_dir, clone, before.tip)
     restored_remote = clone.parent / "restored-remote.git"
     init_bare_repository(restored_remote)
     restored = real_git(
@@ -529,6 +884,7 @@ def test_reset_bundle_restores_the_released_history(
         f"{store.EXPORT_BUNDLE_REF}:{store.STATE_REF}",
         check=False,
     )
+    assert restored.returncode == 0
     fresh_repository = clone.parent / "fresh"
     fresh_repository.mkdir()
     real_git(fresh_repository, "init", "-q", "-b", "main")
@@ -541,60 +897,11 @@ def test_reset_bundle_restores_the_released_history(
     state = store.fetch_state(worktree=fresh_repository, remote="origin")
     assert (
         reset.status,
-        restored.returncode,
         state.tip,
         protocol.ClaimId(claim_id) in state.consumed_ids,
         status.status,
         "UNCLAIMED repository" in status.stdout,
-    ) == (0, 0, before.tip, True, 0, True)
-
-
-def _plan_lines(
-    state: str, flags: list[str], tip: str | None, bundle: Path, remote: str | None
-) -> tuple[str, ...]:
-    confirmed = "--confirm" in flags
-    refused = state == "schema1" and confirmed and "--force-unreadable" not in flags
-    executed = confirmed and not refused
-    warning = (
-        "schema 1 not readable by this aco; live claims unknown "
-        "(--confirm needs --force-unreadable)"
-    )
-    if tip is None:
-        export_line = f"nothing to export: {store.STATE_REF} does not exist on origin"
-        delete_line = f"nothing to delete on origin: {store.STATE_REF} does not exist"
-    else:
-        verb = "exported" if executed else "export"
-        export_line = (
-            f"{verb} {store.STATE_REF} at {tip} to {bundle} "
-            f"(restore with: git fetch {bundle} {store.EXPORT_BUNDLE_REF}:{store.STATE_REF})"
-        )
-        if "--no-export" in flags:
-            export_line = f"skipped export (--no-export): {store.STATE_REF} at {tip} not saved"
-        delete_verb = "deleted" if executed else "delete"
-        delete_line = f"{delete_verb} {store.STATE_REF} on origin (lease {tip})"
-    local_line = (
-        f"deleted local {store.STATE_REF}"
-        if state == "local"
-        else f"no local {store.STATE_REF} to delete"
-    )
-    clear_line = (
-        "cleared lineage stamps and fetch anchors in 1 worktree"
-        if executed
-        else "clear lineage stamps and fetch anchors in 1 worktree"
-    )
-    bootstrap_line = (
-        f"bootstrapped a fresh empty state at {remote}"
-        if executed
-        else "bootstrap a fresh empty state"
-    )
-    expected_lines = (export_line, delete_line, local_line, clear_line, bootstrap_line)
-    if not confirmed:
-        expected_lines = tuple(f"would: {line}" for line in expected_lines)
-        if state == "schema1":
-            expected_lines = (warning, *expected_lines)
-    if refused:
-        expected_lines = ()
-    return expected_lines
+    ) == (0, before.tip, True, 0, True)
 
 
 def _read_reset_state(clone: Path) -> tuple[str | None, str | None, tuple[str, ...]]:
