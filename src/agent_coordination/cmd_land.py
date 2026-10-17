@@ -245,7 +245,8 @@ def _land_preflight(
     (issue #405): a green, open, mergeable pull request classifying exactly
     one open item, or declaring itself issue-less -- reusing `check <pr>`'s
     own classification/claim/parent/closing rules (`policy.structural_classification`/
-    `policy.classification_defect`) rather than a second copy of them.
+    `policy.classification_defect`) rather than a second copy of them. Dependency
+    listings must match the readiness head that `--head` verified and the merge pins.
 
     In order: the reviewed head `--head` names, readiness (neither a local
     git read), the pull request's own
@@ -281,7 +282,11 @@ def _land_preflight(
             )
     observed = claims_provider()
     defect = policy.classification_defect(
-        context, tuple(observed.claims.values()), detail, structural
+        context,
+        tuple(observed.claims.values()),
+        detail,
+        structural,
+        expected_head=readiness.head_sha,
     )
     if defect is not None:
         raise protocol.ClaimUnavailableError(f"pull request #{number} {defect.message}")

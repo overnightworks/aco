@@ -3222,14 +3222,20 @@ def test_github_adapter_fails_loud_on_a_malformed_parent_reference(
         pytest.param([], {"changedFiles": True}, False, id="boolean-count"),
         pytest.param([], {"changedFiles": "1"}, False, id="string-count"),
         pytest.param([], {"headSha": None}, False, id="non-string-head"),
+        pytest.param([], None, False, id="non-object-reading"),
+        pytest.param([], {}, True, id="empty-listing"),
     ],
 )
 def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listing(
     rows: list[object],
-    reading: dict[str, object],
+    reading: dict[str, object] | None,
     valid: bool,
 ) -> None:
-    head = {"headSha": MERGE_COMMIT_SHA, "changedFiles": len(rows)} | reading
+    head = (
+        {"headSha": MERGE_COMMIT_SHA, "changedFiles": len(rows)} | reading
+        if reading is not None
+        else None
+    )
     calls: list[list[str]] = []
     answers = iter([json.dumps(head), "\n".join(json.dumps(row) for row in rows), json.dumps(head)])
 
@@ -3245,12 +3251,14 @@ def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listin
     changes = client.pull_request_changes(12)
     assert changes.before == changes.after == forge.ListingReading(MERGE_COMMIT_SHA, len(rows))
     assert len(changes.files) == len(rows)
-    assert (
-        changes.files[0].path == "uv.lock"
-        if len(rows) == 1
-        else changes.files[-1].path == "file-149"
-    )
+    if rows:
+        assert (
+            changes.files[0].path == "uv.lock"
+            if len(rows) == 1
+            else changes.files[-1].path == "file-149"
+        )
     if len(rows) == 1:
+        assert isinstance(rows[0], dict)
         assert changes.files[0].previous_path == (
             "old.lock" if "previous_filename" in rows[0] else None
         )

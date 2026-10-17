@@ -141,27 +141,74 @@ def _claim_defect(
     return None
 
 
+@dataclass(frozen=True)
+class ListingDefect:
+    reason: str
+
+
+def listed_paths(
+    changes: forge.PullRequestChanges, expected_head: str
+) -> ListingDefect | frozenset[str]:
+    if changes.before != changes.after or changes.before.head_sha != expected_head:
+        return ListingDefect("changed while aco listed its files; run the command again")
+    if len(changes.files) != changes.before.changed_files:
+        return ListingDefect(
+            f"lists {len(changes.files)} of its {changes.before.changed_files} changed files; "
+            "aco judges only a complete listing"
+        )
+    return frozenset(
+        path
+        for file in changes.files
+        for path in (file.path, file.previous_path)
+        if path is not None
+    )
+
+
+def dependency_rule_defect(
+    config: board.BoardConfig,
+    listed: Callable[[], ListingDefect | frozenset[str]],
+) -> board.ClassificationDefect | None:
+    if not config.dependency_paths:
+        return board.ClassificationDefect(
+            f"declares No-Item: deps, but {board.CONFIG_PATH.as_posix()} names no dependency_paths"
+        )
+    paths = listed()
+    if isinstance(paths, ListingDefect):
+        return board.ClassificationDefect(paths.reason)
+    outside = sorted(path for path in paths if not config.covers_dependency_path(path))
+    if outside:
+        named = protocol.named_with_overflow_count(tuple(outside))
+        return board.ClassificationDefect(
+            f"changes {named}, which dependency_paths in "
+            f"{board.CONFIG_PATH.as_posix()} does not name"
+        )
+    return None
+
+
 def _no_item_defect(
+    context: LandingCheckContext,
     claims: tuple[protocol.ActiveClaim, ...],
-    repository: str,
     detail: forge.Landing,
     kind: board.NoItemKind,
+    expected_head: str,
 ) -> board.ClassificationDefect | None:
     """Why this repository does not accept an issue-less landing as declared.
 
     A `No-Item` lane owns no issue, so it needs its own lane claim and may
     retire nothing: a closing reference here would close an item no claim and
-    no `Work-Item:` line ever named.
+    no `Work-Item:` line ever named. A deps lane must also stay inside the
+    configured dependency paths, proven by a complete listing at the expected head.
     """
     claim_defect = _claim_defect(claims, detail, protocol.LaneIdentity())
     if claim_defect is not None:
         return claim_defect
-    closing_defect = closing_reference_defect(detail.body, repository)
+    closing_defect = closing_reference_defect(detail.body, context.repository)
     if closing_defect is not None:
         return closing_defect
     if kind is board.NoItemKind.DEPS:
-        return board.ClassificationDefect(
-            "declares No-Item: deps, but .aco/board.toml names no dependency_paths"
+        return dependency_rule_defect(
+            context.run.config,
+            lambda: listed_paths(context.client.pull_request_changes(detail.number), expected_head),
         )
     return None
 
@@ -358,6 +405,8 @@ def classification_defect(
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
     classification: board.Classification,
+    *,
+    expected_head: str,
 ) -> board.ClassificationDefect | None:
     """Whether `classification`'s own claim, parent, and closing rules hold
     (issue #405): the second half of `cmd_check._checked_classification`, split out so
@@ -365,5 +414,5 @@ def classification_defect(
     preflight, which fetches store state no earlier than this) never pays
     for one just to read the pull request's own shape."""
     if isinstance(classification, board.NoItemClassification):
-        return _no_item_defect(claims, context.repository, detail, classification.kind)
+        return _no_item_defect(context, claims, detail, classification.kind, expected_head)
     return _work_item_defect(context, claims, detail, classification.item)

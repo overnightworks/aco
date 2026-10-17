@@ -122,8 +122,11 @@ line -- the one classification `release --merged` accepts for a lane with no
 issue to close. `specs/claim.spec.md` owns the exact branch-name grammar and
 its refusal when a checkout is not on a matching branch;
 `specs/landing-grammar.spec.md` owns the `No-Item:` classification and its
-refusals. A `deps` pull request currently refuses because no configuration can
-name dependency paths yet; a hand-merged `No-Item: deps` trailer can release a lane.
+refusals. A `deps` pull request may change only paths named by `dependency_paths`
+in the repository's tracked `.aco/board.toml`; a trailing `/` covers a directory's
+contents, and other entries match exactly. This bounds paths, not safety: review
+must still check workflow permissions, secret use, actions and run steps, disabled
+checks, and tool configuration. See `specs/storage-pin.spec.md` for the key's contract.
 
 ## A workflow without a forge
 

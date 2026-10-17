@@ -43,6 +43,7 @@ matching line.
 | control byte inside a trailer value | — (lands nothing, LAND-42) | LAND-03 | — | — |
 | valid `Work-Item:` + closing reference | — | LAND-04 | LAND-29, LAND-49 | LAND-41 |
 | valid `No-Item:` + lane claim | — | LAND-05 | LAND-37 | — |
+| `No-Item: deps` PR with configured dependency paths | — | LAND-71..76 | — | — |
 | `No-Item: deps` PR without configured dependency paths | — | LAND-70 | — | — |
 | `No-Item: deps` merge commit trailer | — | LAND-48 | LAND-37, LAND-64 | — |
 | no classification / no trailer | — | LAND-06, LAND-58 | LAND-32, LAND-52, LAND-62 | — |
@@ -114,8 +115,14 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-16] A `No-Item:` pull request with no active issue-less lane claim on its head branch refuses `has no active issue-less lane claim on branch '<branch>'`, exit `2`.
 - [ ] [LAND-17] A `No-Item:` body that also carries a closing reference refuses `declares no work item but closes <ref>; name it as the work item`, exit `2`.
 - [ ] [LAND-70] A `deps` pull request under a configuration naming no `dependency_paths` refuses `declares No-Item: deps, but .aco/board.toml names no dependency_paths`, exit `2`.
+- [ ] [LAND-71] A `deps` pull request changing a path no `dependency_paths` entry covers refuses `changes <paths>, which dependency_paths in .aco/board.toml does not name`, exit `2`; past three, `and <k> more`.
+- [ ] [LAND-72] A `No-Item: deps` pull request passing LAND-16, LAND-17, LAND-70, LAND-71 and LAND-73..76 prints `PR #<n> by <author> declares No-Item: deps`, exit `0`.
+- [ ] [LAND-73] A file listing holding fewer or more records than the forge's own changed-file count refuses `lists <k> of its <n> changed files; aco judges only a complete listing`, exit `2`.
+- [ ] [LAND-74] A renamed file's record counts its old and new path, a deleted file's its path; the path set is taken after LAND-73 compares record counts, never before.
+- [ ] [LAND-75] A file listing is read between two reads of the pull request's head and changed-file count; it is judged only when both reads name the expected head and the same count.
+- [ ] [LAND-76] A listing failing LAND-75 refuses `changed while aco listed its files; run the command again`, exit `2`; `check` expects the head it read, `land` the readiness head `--head` verified.
 
-Issue-less refusal order: LAND-16, LAND-17, LAND-70.
+Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71.
 - [ ] [LAND-18] A `Work-Item:` body with no closing reference for that item refuses `carries no closing reference for its work item <item>`, exit `2`.
 - [ ] [LAND-19] A body closing anything besides its own work item (or an unpermitted parent, LAND-21) refuses `closes <ref> besides its work item <item>; a pull request lands one item`, exit `2`.
 - [ ] [LAND-20] `Implements #n`/`Lands #n` name work a pull request touched, but GitHub closes on neither word: a body carrying one beside its own closing reference for the declared item still passes, exit `0`.
@@ -182,6 +189,9 @@ sentence>`, not restated.
 - LAND-46 (retired 04.10.2026, issue #644, operator ruling #617 line 4): `board --html`'s Landungen rendering no longer exists; `aco-board` (issue #624) is the one decision board, and `board --json`'s own `"landings"` rows (LAND-54, `specs/board.spec.md` BOARD-12) carry the equivalent fact.
 
 ## Never
+
+- `dependency_paths` never certifies a change safe: it bounds where a `deps` pull request may write; review still judges workflow and tool-configuration changes.
+- A force-push back to the exact head preflight read, during the bracketed listing or before the pinned merge, is not detected (an accepted ABA residual).
 
 - A merge commit trailer `No-Item: deps` releases a lane as `docs`/`fix` do (LAND-37); `release --merged` never re-judges its paths: the trailer decides (LAND-64).
 

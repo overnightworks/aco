@@ -15276,9 +15276,13 @@ def test_check_refuses_an_issueless_pull_request_without_its_lane_claim(
     assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
 
 
-def _dependency_listing_scenario(client: FakeForge, repo: Path, scenario: str) -> None:
+def _dependency_configuration(scenario: str) -> str:
     entries = [] if scenario == "empty" else ["pyproject.toml", "uv.lock", ".github/workflows/"]
-    write_repository_config(repo, f"dependency_paths = {json.dumps(entries)}\n")
+    return f"dependency_paths = {json.dumps(entries)}\n"
+
+
+def _dependency_listing_scenario(client: FakeForge, repo: Path, scenario: str) -> None:
+    write_repository_config(repo, _dependency_configuration(scenario))
     paths = {
         "valid": [("uv.lock", None), ("pyproject.toml", None)],
         "outside": [("uv.lock", None), ("src/x.py", None)],
@@ -15378,7 +15382,8 @@ def _dependency_listing_scenario(client: FakeForge, repo: Path, scenario: str) -
         pytest.param(
             "No-Item: deps",
             True,
-            "changes .github/workflowsX/a.yml, which dependency_paths in .aco/board.toml does not name",
+            "changes .github/workflowsX/a.yml, "
+            "which dependency_paths in .aco/board.toml does not name",
             "prefix",
             id="cell-9",
         ),
@@ -17517,7 +17522,11 @@ def _land_preflight_client(
 
 
 def _land_repository(
-    tmp_path: Path, *, set_head: bool = True, branch: str = LANDING_BRANCH
+    tmp_path: Path,
+    *,
+    set_head: bool = True,
+    branch: str = LANDING_BRANCH,
+    board_config: str | None = None,
 ) -> Path:
     """A real bare-remote-backed repository (issue #405) with `branch`
     diverged from `main` by one pushed commit and `main` itself checked out
@@ -17530,6 +17539,9 @@ def _land_repository(
     (issue #405 CI coverage follow-up)."""
     repo, _remote = real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
+    if board_config is not None:
+        write_repository_config(repo, board_config)
+        real_git(repo, "add", str(board.CONFIG_PATH))
     real_git(repo, "add", "base.txt")
     real_git(repo, "commit", "-q", "-m", "initial")
     if set_head:
@@ -17554,6 +17566,7 @@ def _land_scenario(
     branch: str = LANDING_BRANCH,
     issue: int | None = WORK_ITEM_ISSUE,
     body: str | None = None,
+    board_config: str | None = None,
 ) -> tuple[Path, FakeForge]:
     """`claim_agent`, when it differs from the `Ada` session identity set
     below, stands the same foreign claim `_land_preflight_client`'s own
@@ -17564,7 +17577,7 @@ def _land_scenario(
     `branch`/`issue`/`body`, when they name an issue-less lane instead of
     the default `Work-Item:` scenario, stand `cmd_land._land_preflight`'s own
     `protocol.LaneIdentity` branch (issue #405 CI coverage follow-up)."""
-    repo = _land_repository(tmp_path, set_head=set_head, branch=branch)
+    repo = _land_repository(tmp_path, set_head=set_head, branch=branch, board_config=board_config)
     standing = request("landing", claim_agent, issue=issue, branch=branch, scope=("src",))
     client = FakeForge()
     client.landings[12] = landing_pull_request(
@@ -17883,6 +17896,16 @@ def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
     client.landings[12] = landing_pull_request(body=body, head_ref_name="fix/x")
     if scenario is not None:
         _dependency_listing_scenario(client, tmp_path, scenario)
+        original_git = checkout.git_output
+        monkeypatch.setattr(
+            checkout,
+            "git_output",
+            lambda arguments, **kwargs: (
+                str(tmp_path)
+                if arguments == ["rev-parse", "--show-toplevel"]
+                else original_git(arguments, **kwargs)
+            ),
+        )
         if scenario == "wrong-head":
             client.landings[12] = replace(client.landings[12], head_sha="b" * 40)
     standing = store_claim_from_request(documentation_lane_claim(branch="fix/x"))
@@ -18300,12 +18323,16 @@ def test_land_merges_an_issueless_lane_pull_request(
     (`test_land_merges_a_green_pull_request_and_runs_the_release_path`
     proves the work-item branch): no item to close, but the claim releases."""
     _repo, client = _land_scenario(
-        monkeypatch, tmp_path, branch=branch, issue=None, body=f"No-Item: {kind}"
+        monkeypatch,
+        tmp_path,
+        branch=branch,
+        issue=None,
+        body=f"No-Item: {kind}",
+        board_config=_dependency_configuration("valid") if kind == "deps" else None,
     )
 
     if kind == "deps":
         _dependency_listing_scenario(client, _repo, "valid")
-        track_board_config(_repo, (_repo / board.CONFIG_PATH).read_text())
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 0
 
     out = capsys.readouterr().out

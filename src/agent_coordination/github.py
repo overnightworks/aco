@@ -442,6 +442,7 @@ _READ_ONLY_OPERATIONS = (
     forge.ForgeOperation.ITEM_REFERENCE,
     forge.ForgeOperation.ITEM_REFERENCES,
     forge.ForgeOperation.LANDING,
+    forge.ForgeOperation.PULL_REQUEST_CHANGES,
     forge.ForgeOperation.PARENT_ISSUE,
     forge.ForgeOperation.PARENT_NUMBER,
     forge.ForgeOperation.LIST_CHILDREN,
@@ -839,6 +840,62 @@ class GitHubForge:
         if landing.number != number:
             raise ClaimError(f"GitHub answered for pull request #{landing.number}, not #{number}")
         return landing
+
+    def _listing_reading(self, number: int) -> forge.ListingReading:
+        raw = self._run(
+            [
+                "api",
+                f"repos/{self.repository}/pulls/{number}",
+                "--jq",
+                "{headSha:.head.sha,changedFiles:.changed_files}",
+            ]
+        )
+        values = self._json_lines(raw, "pull request listing reading")
+        if len(values) != 1 or not isinstance(values[0], dict):
+            raise forge.ForgeMalformedResponseError("GitHub returned a malformed listing reading")
+        head = values[0].get("headSha")
+        count = values[0].get("changedFiles")
+        if (
+            not isinstance(head, str)
+            or protocol.COMMIT_PATTERN.fullmatch(head) is None
+            or not isinstance(count, int)
+            or isinstance(count, bool)
+            or count < 0
+        ):
+            raise forge.ForgeMalformedResponseError("GitHub returned a malformed listing reading")
+        return forge.ListingReading(head, count)
+
+    def _changed_file(self, value: object) -> forge.ChangedFile:
+        if not isinstance(value, dict):
+            raise forge.ForgeMalformedResponseError("GitHub returned a malformed changed file")
+        path = value.get("filename")
+        previous = value.get("previous_filename")
+        if (
+            not isinstance(path, str)
+            or not path
+            or (previous is not None and (not isinstance(previous, str) or not previous))
+            or (value.get("status") == "renamed" and previous is None)
+        ):
+            raise forge.ForgeMalformedResponseError("GitHub returned a malformed changed file")
+        return forge.ChangedFile(path, previous)
+
+    def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
+        # The files endpoint has no revision pin: both readings belong to this listing.
+        before = self._listing_reading(number)
+        raw = self._run(
+            [
+                "api",
+                "--paginate",
+                f"repos/{self.repository}/pulls/{number}/files?per_page=100",
+                "--jq",
+                ".[] | {filename,previous_filename,status}",
+            ]
+        )
+        after = self._listing_reading(number)
+        files = tuple(self._changed_file(value) for value in self._json_lines(raw, "changed files"))
+        if len({file.path for file in files}) != len(files):
+            raise forge.ForgeMalformedResponseError("GitHub returned duplicate changed files")
+        return forge.PullRequestChanges(before, after, files)
 
     def _check_run(self, value: object) -> forge.CheckRun:
         if not isinstance(value, dict):

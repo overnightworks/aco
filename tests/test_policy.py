@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from github_fixtures import MERGE_COMMIT_SHA
+
 from agent_coordination import board, forge, policy
 
 
