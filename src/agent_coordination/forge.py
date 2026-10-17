@@ -100,7 +100,7 @@ class ForgePartialChildCreationError(ForgePartialCreationError):
     what a failed relation write leaves behind -- instead of risking a
     second one, finishing whichever `step` failed. Raised by the GitHub
     adapter when its own relation write fails, and reused by
-    `cli._cmd_cut` when the later block rewrite fails -- one type, so both
+    `cmd_cut.run` when the later block rewrite fails -- one type, so both
     failures recover the same way. `item new --parent` meets the same error
     through `create_child` but reports a by-hand recovery (ITEM-32), never
     a re-run.

@@ -56,7 +56,17 @@ from cli_fixtures import (
 from github_fixtures import FakeForge
 from store_fixtures import blob, push_raw_state_tree, raw_tree, state_ref_listing
 
-from agent_coordination import board, checkout, cmd_rulings, forge, items, process, protocol, store
+from agent_coordination import (
+    board,
+    checkout,
+    cmd_cut,
+    cmd_rulings,
+    forge,
+    items,
+    process,
+    protocol,
+    store,
+)
 from agent_coordination import cli as issue_claim
 from agent_coordination.body import (
     BLOCK_FENCE_INFO,
@@ -2475,7 +2485,7 @@ class TestCliStateRefForge:
                 "Slice C",
                 2,
                 None,
-                issue_claim.CUT_ROW_SCOPE_ALREADY_SET.format(index=1),
+                cmd_cut._CUT_ROW_SCOPE_ALREADY_SET.format(index=1),
                 id="refuses-a-row-that-already-names-one",
             ),
             pytest.param(
@@ -2576,7 +2586,7 @@ class TestCliStateRefForge:
         sentence (via `forge.ForgePartialChildCreationError`) while the
         child stays created and already carries `record.parent`. An
         identical re-run finds that child through `list_children` (typed
-        `record.parent`, never the `Parent:` prose line `_cut_child_body`
+        `record.parent`, never the `Parent:` prose line `cmd_cut._cut_child_body`
         would write for GitHub) and adopts it instead of minting a second
         one, then finishes the row removal against the now-current state."""
         item_files = _item_files_with_container_slices(((1, "Slice C"),))
@@ -2673,9 +2683,9 @@ class TestCliStateRefForge:
     ) -> None:
         """Issue #291 proof 4: `aco item new --parent` writes `record.parent`
         straight into the fresh child's `[record]` table and no `Parent:`
-        prose line at all (issue #285) -- unlike `_cut_child_body`'s own
+        prose line at all (issue #285) -- unlike `cmd_cut._cut_child_body`'s own
         skeleton. `cut`'s adoption key is `record.parent` alone
-        (`list_children`, never `_orphan_names_container`'s prose-line
+        (`list_children`, never `cmd_cut._orphan_names_container`'s prose-line
         match), so it still adopts this child instead of minting a second
         one for the same slice row."""
         item_files = _item_files_with_container_slices(((1, "Slice C"),))
