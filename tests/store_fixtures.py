@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Callable
-from dataclasses import replace
 from pathlib import Path
 
 from cli_fixtures import real_git
@@ -120,7 +119,7 @@ def claim_intent(
     resource_value: int | None = None,
     exclusive_branch: bool = False,
 ) -> protocol.ClaimIntent:
-    intent = protocol.ClaimIntent(
+    return protocol.ClaimIntent(
         identity=identity,
         agent=agent,
         role=role,
@@ -132,8 +131,8 @@ def claim_intent(
         whole_reason=whole_reason,
         resource_name=resource_name,
         resource_value=resource_value,
+        exclusive_branch=exclusive_branch,
     )
-    return replace(intent, exclusive_branch=True) if exclusive_branch else intent
 
 
 class RaceOnceTransport:
