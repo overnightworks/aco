@@ -1,6 +1,5 @@
 """Pull-request landing checks for classification, closing references, claims,
-and parent requirements, plus the claim width gate and `--whole` reason bound
-shared by `claim`, `start`, `rescope` and `item`."""
+and parent requirements, plus the claim width gate."""
 
 from __future__ import annotations
 
@@ -30,17 +29,6 @@ def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
     percent = round(100 * covered / total)
     path_word = "path" if covered == 1 else "paths"
     return f"{covered} {path_word} of {total} versioned files ({percent} %) exceeds a quarter"
-
-
-_WHOLE_REASON_LABEL = "whole reason"
-"""`protocol.outbound_text`'s own field name for a `--whole`/body `whole` value
-(issue #399), named once here beside the width-gate refusal it justifies --
-`bounded_whole_reason` is its one reader, so every `--whole` text is bounded
-and refused by the same name."""
-
-
-def bounded_whole_reason(raw: str | None) -> str | None:
-    return None if raw is None else protocol.outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
 
 
 def _wide_scope_refusal(trip: protocol.WideScopeTrip, *, names_body_fallback: bool) -> str:

@@ -174,7 +174,7 @@ def _rescope_command(
         drop=_rescope_scope_entries(paths.drop, toplevel=path_checkout.toplevel, flag="--drop"),
         claim_id=parsed.claim_id,
         branch=branch,
-        whole_reason=policy.bounded_whole_reason(parsed.whole),
+        whole_reason=None if parsed.whole is None else body.bounded_whole_reason(parsed.whole),
     )
 
 

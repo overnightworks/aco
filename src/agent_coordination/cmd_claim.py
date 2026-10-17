@@ -115,7 +115,7 @@ def claim_request(
     identity = protocol.resolved_identity(issue, branch)
     claim_id = arguments.claim_id or uuid.uuid4().hex
     protocol.ClaimId(claim_id)
-    whole_reason = policy.bounded_whole_reason(arguments.whole)
+    whole_reason = None if arguments.whole is None else body.bounded_whole_reason(arguments.whole)
     resource = getattr(arguments, "resource", None)
     if resource is not None:
         resource = protocol.outbound_resource_name(resource)

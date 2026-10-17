@@ -18,7 +18,6 @@ from . import (
     cmd_cut,
     forge,
     items,
-    policy,
     protocol,
     report,
     state_board,
@@ -158,7 +157,7 @@ def _item_new_block_fields(parsed: argparse.Namespace) -> dict[str, object]:
         **{key: getattr(parsed, key) for key, _meaning in ITEM_NEW_PROJECTION_FLAGS},
         "scope": None if scope is None else list(scope),
         "size": parsed.size,
-        "whole": _requested_whole_reason(parsed.whole),
+        "whole": None if parsed.whole is None else body.bounded_whole_reason(parsed.whole),
     }
     return {key: value for key, value in requested.items() if value is not None}
 
@@ -466,7 +465,7 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
         located = board.located_block_or_refuse(
             number, current_body, command=_ITEM_EDIT_WHOLE_COMMAND, storage=storage
         )
-        reason = cast(str, policy.bounded_whole_reason(parsed.whole))
+        reason = body.bounded_whole_reason(parsed.whole)
         new_data = {**located.data, "whole": reason}
         outcome = _write_block_data(client, number, current_body, located, new_data)
         _print_item_edit_whole_result(number, reason, storage, outcome, as_json=as_json)
@@ -769,15 +768,6 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
 # `item new --parent` also takes a Task: an item becomes a container exactly
 # when it gets its first child, so that write retypes it (issue #503).
 _ITEM_PARENT_KINDS = frozenset({body.ItemKind.CONTAINER, body.ItemKind.TASK})
-
-
-def _requested_whole_reason(raw: str | None) -> str | None:
-    """A `--whole` flag's own bounded text (issue #399), or `None` when it
-    was never given -- `item new`'s own entry point into the same
-    `protocol.outbound_text` bound `claim`'s own `--whole` already enforces
-    (`policy.bounded_whole_reason`), so the two never drift on what a legal
-    reason looks like."""
-    return policy.bounded_whole_reason(raw)
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
