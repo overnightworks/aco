@@ -95,7 +95,7 @@ from github_fixtures import (
     FakeForge,
     ReaderOnlyForge,
 )
-from store_fixtures import RaceOnceTransport, lineage_observation
+from store_fixtures import RaceOnceTransport, lineage_observation, unrelated_racer_commit
 
 from agent_coordination import (
     __version__,
@@ -9285,18 +9285,6 @@ def test_release_merged_rerun_under_state_ref_refuses_a_newer_claim_before_judgi
     assert _state_ref_tip(repo, remote) == tip_before
 
 
-def _unrelated_racer_commit(worktree: Path, remote: Path) -> str:
-    """Pushes one commit carrying the current state tree unchanged -- a
-    writer whose own change is unrelated to the transition it races."""
-    current = _state_ref_tip(worktree, remote)
-    tree = real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
-    racer = real_git(
-        worktree, "commit-tree", tree, "-p", current, "-m", "unrelated racer"
-    ).stdout.strip()
-    real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
-    return racer
-
-
 def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -9316,7 +9304,7 @@ def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
     closed_oid = store.hash_blob(worktree, b"closed\n")
     racer_commits: list[str] = []
     racer = RaceOnceTransport(
-        lambda: racer_commits.append(_unrelated_racer_commit(worktree, bare_remote))
+        lambda: racer_commits.append(unrelated_racer_commit(worktree, bare_remote))
     )
 
     new_state = store.commit_transition(
@@ -9472,7 +9460,7 @@ def test_a_pinned_claim_on_an_unchanged_open_item_lands_past_an_unrelated_racer(
     _use_real_store(monkeypatch)
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     open_oid = _land_real_item(worktree, bare_remote, issue=10, content=b"open\n")
-    racer = RaceOnceTransport(lambda: _unrelated_racer_commit(worktree, bare_remote))
+    racer = RaceOnceTransport(lambda: unrelated_racer_commit(worktree, bare_remote))
     claim = _claim_pinned_to_item(10, open_oid)
 
     new_state = store.commit_transition(

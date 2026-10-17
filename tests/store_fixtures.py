@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
+
+from cli_fixtures import real_git
 
 from agent_coordination import protocol, store
 
@@ -115,8 +118,9 @@ def claim_intent(
     whole_reason: str | None = None,
     resource_name: str | None = None,
     resource_value: int | None = None,
+    exclusive_branch: bool = False,
 ) -> protocol.ClaimIntent:
-    return protocol.ClaimIntent(
+    intent = protocol.ClaimIntent(
         identity=identity,
         agent=agent,
         role=role,
@@ -129,6 +133,7 @@ def claim_intent(
         resource_name=resource_name,
         resource_value=resource_value,
     )
+    return replace(intent, exclusive_branch=True) if exclusive_branch else intent
 
 
 class RaceOnceTransport:
@@ -148,3 +153,15 @@ class RaceOnceTransport:
             race, self._race = self._race, None
             race()
         self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+
+
+def unrelated_racer_commit(worktree: Path, remote: Path) -> str:
+    """Pushes one commit carrying the current state tree unchanged -- a
+    writer whose own change is unrelated to the transition it races."""
+    current = state_ref_tip(remote)
+    tree = real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
+    racer = real_git(
+        worktree, "commit-tree", tree, "-p", str(current), "-m", "unrelated racer"
+    ).stdout.strip()
+    real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
+    return racer
