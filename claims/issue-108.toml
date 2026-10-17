@@ -1,8 +1,0 @@
-claim_id = "9c3b54410d114582946cce6088f4fee2"
-agent = "claude"
-role = "builder"
-base = "ba7a95f0432b9746542de2c62082da233f71bb35"
-branch = "claude/issue-108-s15-cmd-start"
-scope = ["pyproject.toml", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_start.py", "tests/test_checkout.py", "tests/test_cli.py"]
-opened_commit = "e46b4b36cb8b62ed980e5f815ba9cd19c426f433"
-whole_reason = "Der start-Befehl zieht mit seiner einen cmd-Kante, Layers-Zeile, Testverweis und Docstrings in cmd_start; halb verschoben bräche der Import."
