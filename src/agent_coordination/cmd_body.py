@@ -59,8 +59,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`body --check` is forge-free (issue #262), the same way `status` and
     `bootstrap` are (issue #245): it reads stdin only, never an issue, a
     live claim, a filesystem path, or the forge's own `blocked_by`
-    relation, so it never asks the `session.RunContext` for its forge (`cli.main` dispatches
-    it outside `cli._dispatch`, exactly like `status`). It still reads the
+    relation, so it never asks the `session.RunContext` for its forge.
+    `cli._COMMANDS` routes it directly to this handler, like `status`. It still reads the
     repository's own storage pin (issue #287): `[record]` is a known key
     under `storage = "state-ref"` and an unknown one under
     `storage = "github"`, the same gate `session._state_ref_forge`'s own items

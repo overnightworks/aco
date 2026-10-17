@@ -781,9 +781,8 @@ def _requested_whole_reason(raw: str | None) -> str | None:
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`item`'s own four subcommands, pulled out of `cli._dispatch` (issue #372
-    S1) so their nesting stops counting against every other command's
-    cognitive complexity."""
+    """`item`'s own four subcommands, reached through `cli._COMMANDS`,
+    keep their routing independent of every other command."""
     if parsed.item_command == "new":
         return _cmd_item_new(parsed, context)
     if parsed.item_command == "edit":

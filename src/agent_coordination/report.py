@@ -40,7 +40,7 @@ def refuse(
     reason: StrEnum, error: protocol.ClaimError | str, *, as_json: bool, **payload: object
 ) -> int:
     """One shared refusal report for every `--json` command (issue #396) and
-    for `_dispatch`'s own pre-start checks (issue #425): `ERROR: <sentence>`
+    for `main`'s own pre-start checks (issue #425): `ERROR: <sentence>`
     on stderr through `render_error`, also used by `main`, then
     -- only under `--json` -- the envelope naming this call's own reason
     instead of the dropped `error` key. Exit `2`, the one exit every refusal

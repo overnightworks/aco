@@ -302,8 +302,8 @@ def _status_path_json(
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`status` reads live claims from the store directly (issue #176),
-    dispatched straight from `cli.main` -- it never needs `cli._dispatch`'s ledger
-    resolution (a cut-over repository may have no ledger issue left at all).
+    routed by `cli._COMMANDS` without forge resolution (a cut-over
+    repository may have no ledger issue left at all).
     It is forge-free (issue #245): `--repo` is meaningless here and unused.
     Every `protocol.ClaimError` `_status_read` can raise -- a rewritten or
     malformed state ref -- reports through `report.refuse` as `unavailable` (issue

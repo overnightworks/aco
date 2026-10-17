@@ -680,52 +680,6 @@ def _add_run_at_login_parser(commands: _Subcommands) -> None:
     commands.add_parser("_run-at-login", help=argparse.SUPPRESS)
 
 
-# `protect`, `register`, `run`, `login`, and `_run-at-login` never
-# own a `_CommandEntry` (issue #372): `protect` and the workspace
-# commands are forge-free and never reach `_dispatch` at all. `status` and
-# `body` are the same story (`_read_status_body_or_dispatch`, ahead of
-# `_dispatch`) but `aco --help` must still list all
-# seven in their original places, so `_subparser_build_order` below weaves
-# them back into position rather than appending them after every table
-# entry.
-_OTHER_SUBPARSER_BUILDERS: tuple[Callable[[_Subcommands], None], ...] = (
-    _add_protect_parser,
-    _add_register_parser,
-    _add_run_parser,
-    _add_login_parser,
-    _add_run_at_login_parser,
-)
-
-
-def _subparser_build_order() -> tuple[Callable[[_Subcommands], None], ...]:
-    """Every subcommand's parser builder, in the exact order `aco --help`
-    has always listed them (issue #372 R3): read from `_COMMAND_TABLE` only
-    here, at `_parser()`'s own call time, since that table is defined
-    further below in the file."""
-    table = _COMMAND_TABLE
-    return (
-        table["bootstrap"].add_parser,
-        table["reset"].add_parser,
-        _add_status_parser,
-        table["board"].add_parser,
-        table["rulings"].add_parser,
-        table["next"].add_parser,
-        table["start"].add_parser,
-        table["claim"].add_parser,
-        table["release"].add_parser,
-        table["land"].add_parser,
-        table["rescope"].add_parser,
-        table["cut"].add_parser,
-        table["ask"].add_parser,
-        table["rule"].add_parser,
-        table["check"].add_parser,
-        _add_body_parser,
-        table["brief"].add_parser,
-        table["item"].add_parser,
-        *_OTHER_SUBPARSER_BUILDERS,
-    )
-
-
 class _UsageError(protocol.ClaimError):
     """One refusal the argument parser itself raises -- an unknown flag, a
     missing required option, a mutually exclusive pair -- carried out of the
@@ -818,8 +772,8 @@ def _parser() -> _UsageErrorParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--repo", help="GitHub repository as OWNER/REPO")
     commands = _add_subcommands(parser, "command")
-    for add_subparser in _subparser_build_order():
-        add_subparser(commands)
+    for command in _COMMANDS.values():
+        command.add_parser(commands)
     return parser
 
 
@@ -854,69 +808,73 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
 
 
 @dataclass(frozen=True)
-class _CommandEntry:
-    """One command's parser builder and handler (issue #372: one table
-    instead of a `_SUBPARSER_BUILDERS`/`_READ_HANDLERS`/`_WRITE_HANDLERS`/
-    `_FORGE_FREE_COMMANDS` quartet keyed by the same names). Every handler
-    takes the parsed arguments and the run's `RunContext` and returns an exit code."""
+class _RepositoryCommand:
+    """A context-taking type keeps repository setup out of local and hook commands."""
 
     add_parser: Callable[[_Subcommands], None]
-    handler: Callable[[argparse.Namespace, RunContext], int]
+    run: Callable[[argparse.Namespace, RunContext], int]
+    resolves_agent: bool = False
 
 
-_COMMAND_TABLE: dict[str, _CommandEntry] = {
-    "bootstrap": _CommandEntry(
+@dataclass(frozen=True)
+class _LocalCommand:
+    """A namespace-only type makes local execution independent of repository setup."""
+
+    add_parser: Callable[[_Subcommands], None]
+    run: Callable[[argparse.Namespace], int]
+
+
+@dataclass(frozen=True)
+class _NoArgumentsCommand:
+    """A no-argument type reaches the hook's own exception boundary without setup."""
+
+    add_parser: Callable[[_Subcommands], None]
+    run: Callable[[], int]
+
+
+_Command = _RepositoryCommand | _LocalCommand | _NoArgumentsCommand
+
+
+_COMMANDS: dict[str, _Command] = {
+    "bootstrap": _RepositoryCommand(
         _add_bootstrap_parser, lambda _parsed, context: cmd_bootstrap.run(context)
     ),
-    "reset": _CommandEntry(_add_reset_parser, cmd_reset.run),
-    "board": _CommandEntry(_add_board_parser, cmd_board.run),
-    "rulings": _CommandEntry(_add_rulings_parser, cmd_rulings.run),
-    "next": _CommandEntry(_add_next_parser, cmd_next.run),
-    "start": _CommandEntry(_add_start_parser, cmd_start.run),
-    "claim": _CommandEntry(_add_claim_parser, cmd_claim.run),
-    "release": _CommandEntry(_add_release_parser, cmd_release.run),
-    "land": _CommandEntry(_add_land_parser, cmd_land.run),
-    "rescope": _CommandEntry(_add_rescope_parser, cmd_rescope.run),
-    "cut": _CommandEntry(_add_cut_parser, cmd_cut.run),
-    "ask": _CommandEntry(_add_ask_parser, cmd_ask.run),
-    "rule": _CommandEntry(_add_rule_parser, cmd_rule.run),
-    "check": _CommandEntry(_add_check_parser, cmd_check.run),
-    "brief": _CommandEntry(_add_brief_parser, cmd_brief.run),
-    "item": _CommandEntry(_add_item_parser, cmd_item.run),
+    "reset": _RepositoryCommand(_add_reset_parser, cmd_reset.run),
+    "status": _RepositoryCommand(_add_status_parser, cmd_status.run),
+    "board": _RepositoryCommand(_add_board_parser, cmd_board.run),
+    "rulings": _RepositoryCommand(_add_rulings_parser, cmd_rulings.run),
+    "next": _RepositoryCommand(_add_next_parser, cmd_next.run),
+    "start": _RepositoryCommand(_add_start_parser, cmd_start.run),
+    "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),
+    "release": _RepositoryCommand(_add_release_parser, cmd_release.run, resolves_agent=True),
+    "land": _RepositoryCommand(_add_land_parser, cmd_land.run, resolves_agent=True),
+    "rescope": _RepositoryCommand(_add_rescope_parser, cmd_rescope.run, resolves_agent=True),
+    "cut": _RepositoryCommand(_add_cut_parser, cmd_cut.run),
+    "ask": _RepositoryCommand(_add_ask_parser, cmd_ask.run),
+    "rule": _RepositoryCommand(_add_rule_parser, cmd_rule.run),
+    "check": _RepositoryCommand(_add_check_parser, cmd_check.run),
+    "body": _RepositoryCommand(_add_body_parser, cmd_body.run),
+    "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),
+    "item": _RepositoryCommand(_add_item_parser, cmd_item.run),
+    "protect": _NoArgumentsCommand(_add_protect_parser, cmd_protect.run),
+    "register": _LocalCommand(_add_register_parser, cmd_workspace.run),
+    "run": _LocalCommand(_add_run_parser, cmd_workspace.run),
+    "login": _LocalCommand(_add_login_parser, cmd_workspace.run),
+    "_run-at-login": _LocalCommand(_add_run_at_login_parser, cmd_workspace.run),
 }
 
 
-def _resolved_before_the_command_starts(parsed: argparse.Namespace) -> None:
-    """Resolve the agent identity before a command uses it to identify a claim."""
-    if parsed.command in {"claim", "release", "rescope", "land"}:
-        parsed.agent = checkout.resolved_agent(parsed.agent)
-
-
-def _dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
-    # Only the pre-start checks report through the shared envelope (issue
-    # #425); a refusal a command raises itself owns its own `reason`, so the
-    # dispatch below stays outside this boundary.
+def _resolve_agent_or_refuse(parsed: argparse.Namespace) -> int | None:
+    """Only identity failures own precondition_failed; handler failures do not."""
     try:
-        _resolved_before_the_command_starts(parsed)
+        parsed.agent = checkout.resolved_agent(parsed.agent)
     except protocol.ClaimError as error:
         return report.refuse(
             PreDispatchReason.PRECONDITION_FAILED,
             error,
             as_json=bool(getattr(parsed, "json", False)),
         )
-    entry = _COMMAND_TABLE[parsed.command]
-    return entry.handler(parsed, context)
-
-
-def _read_status_body_or_dispatch(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`status` and `body` are forge-free (issue #245, #262): both are
-    resolved here, ahead of `_dispatch`, and neither ever asks the
-    `RunContext` for its forge."""
-    if parsed.command == "status":
-        return cmd_status.run(parsed, context)
-    if parsed.command == "body":
-        return cmd_body.run(parsed, context)
-    return _dispatch(parsed, context)
+    return None
 
 
 def _spells_json_flag(token: str, parser: _UsageErrorParser) -> bool:
@@ -1046,13 +1004,17 @@ def main(arguments: list[str] | None = None) -> int:
             PreDispatchReason.INVALID_USAGE, error, as_json=_asked_for_json(parser, given)
         )
     try:
-        if parsed.command in {"_run-at-login", "register", "run", "login"}:
-            return cmd_workspace.run(parsed)
-        if parsed.command == "protect":
-            return cmd_protect.run()
-        context = session.run_context(parsed.repo)
-        refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
-        return refusal if refusal is not None else _read_status_body_or_dispatch(parsed, context)
+        match _COMMANDS[parsed.command]:
+            case _NoArgumentsCommand() as command:
+                return command.run()
+            case _LocalCommand() as command:
+                return command.run(parsed)
+            case _RepositoryCommand() as command:
+                context = session.run_context(parsed.repo)
+                refusal = _refuse_item_past_the_id_space(parser, given, parsed, context)
+                if refusal is None and command.resolves_agent:
+                    refusal = _resolve_agent_or_refuse(parsed)
+                return refusal if refusal is not None else command.run(parsed, context)
     except protocol.ClaimError as error:
         return report.render_error(error)
 

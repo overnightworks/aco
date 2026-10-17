@@ -3945,10 +3945,8 @@ def test_claim_parser_description_names_what_refuses_first() -> None:
 
 def test_help_lists_commands_in_their_stable_registration_order() -> None:
     """`aco --help`'s command order is part of the CLI's own contract (issue
-    #372 R3): `_COMMAND_TABLE`'s dispatch-backed commands keep the table's
-    own order, and `status`/`body` -- which dispatch outside that table,
-    ahead of `_dispatch` -- keep their original,
-    interleaved positions rather than trailing behind every table entry."""
+    #372 R3): `_COMMANDS` keeps every command in its original position,
+    including the forge-free and local commands."""
     parser = issue_claim._parser()
     subparsers_action = next(
         action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
@@ -10684,10 +10682,8 @@ def test_cli_dispatch_adapter_error_denies_with_exit_code_two(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """`main`'s shared `_dispatch` error handling (still the path every
-    command but `status`/`protect` takes -- issue #176): a forge
-    adapter construction failure denies loud with exit 2, never a
-    traceback."""
+    """`main`'s shared error handling: a forge adapter construction
+    failure denies loud with exit 2, never a traceback."""
     monkeypatch.setattr(
         github,
         "GitHubForge",
