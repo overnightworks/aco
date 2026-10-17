@@ -455,17 +455,14 @@ def bounded_whole_reason(value: object) -> str:
 
 
 def _block_whole_defect(data: dict[str, object]) -> ContractDefect | None:
-    """The block's own top-level `whole = "<reason>"` (issue #399), the
-    caller's own `--whole REASON` read from the item itself when a claim or
-    a start names none: absent means no stored reason, never a default;
-    present, it must be one non-blank sentence, the same bound `--whole`
-    itself already enforces at the CLI boundary."""
+    """An absent reason is valid; a present one shares the flag's bound."""
     if "whole" not in data:
         return None
-    value = data["whole"]
-    if isinstance(value, str) and value.strip():
-        return None
-    return ContractDefect("whole", "whole must be a non-empty string")
+    try:
+        bounded_whole_reason(data["whole"])
+    except protocol.ClaimError as error:
+        return ContractDefect("whole", str(error))
+    return None
 
 
 def _canonical_scope(value: object) -> tuple[str, ...]:

@@ -20648,6 +20648,29 @@ def test_body_check_refuses_an_invalid_size(capsys: pytest.CaptureFixture[str]) 
     assert capsys.readouterr().err == "body malformed: size: size must be S, M, or L\n"
 
 
+@pytest.mark.parametrize("value", ["x" * 513, "a\nb", "a\u0007b", " a", "", "   ", 1])
+def test_body_check_refuses_an_invalid_whole(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], value: object
+) -> None:
+    """Spec: BODY-61, BODY-62."""
+    raw_body = block_body(f"{MINIMAL_BLOCK_TOML}whole = {json.dumps(value)}\n")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
+    assert body_check_main() == 2
+    assert capsys.readouterr().err == (
+        "body malformed: whole: whole reason must be one bounded non-empty line\n"
+    )
+
+
+def test_body_check_accepts_a_whole_at_the_boundary(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: BODY-61, BODY-62."""
+    raw_body = block_body(f'{MINIMAL_BLOCK_TOML}whole = "{"x" * 512}"\n')
+    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
+    assert body_check_main() == 0
+    assert capsys.readouterr().out == "body ok\n"
+
+
 _RECORD_TOML = (
     '\n[record]\ntitle = "T"\nstate = "open"\nlabels = []\nblocked_by = []\n'
     'created_at = "2026-09-10T00:00:00Z"\nupdated_at = "2026-09-15T00:00:00Z"\n'
