@@ -259,6 +259,15 @@ def clone(
 
 
 @pytest.fixture
+def github_clone(clone: Path, bare_remote: Path) -> Path:
+    """Real GitHub discovery with all git transport routed to the local bare remote."""
+    remote_url = "git@github.com:example/agent-coordination.git"
+    real_git(clone, "config", f"url.{bare_remote}.insteadOf", remote_url)
+    real_git(clone, "remote", "set-url", "origin", remote_url)
+    return clone
+
+
+@pytest.fixture
 def worktree(tmp_path: Path) -> Path:
     """An ordinary git checkout used as this test's client worktree, its
     commit made under the identity `set_git_identity` set.

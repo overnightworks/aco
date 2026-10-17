@@ -249,6 +249,11 @@ class ParentIssue:
 class NoItemKind(StrEnum):
     DOCS = "docs"
     FIX = "fix"
+    DEPS = "deps"
+
+
+NO_ITEM_KINDS_TEXT = ", ".join(tuple(NoItemKind)[:-1]) + ", or " + tuple(NoItemKind)[-1]
+NO_ITEM_KINDS_TRAILER = "|".join(NoItemKind)
 
 
 def parse_item_reference(value: str) -> int:
@@ -1047,7 +1052,7 @@ def _work_item_classification(value: str, repository: str) -> Classification | C
 def _no_item_classification(value: str) -> Classification | ClassificationDefect:
     if value.lower() not in {kind.value for kind in NoItemKind}:
         return ClassificationDefect(
-            f"carries `No-Item: {value}`; an issue-less pull request is docs or fix"
+            f"carries `No-Item: {value}`; an issue-less pull request is {NO_ITEM_KINDS_TEXT}"
         )
     return NoItemClassification(NoItemKind(value.lower()))
 
@@ -1058,8 +1063,9 @@ def parse_pull_request_classification(
     """The one `Work-Item:`/`No-Item:` line a pull request body must carry.
 
     A pull request either lands one work item and closes it, or declares
-    itself issue-less documentation or a fix. Nothing else in a body names an
-    item: a dispatched slice is its own item, and its pull request closes it.
+    itself issue-less documentation, a fix, or a dependency update. Nothing else
+    in a body names an item: a dispatched slice is its own item, and its pull
+    request closes it.
     """
     matches = tuple(CLASSIFICATION_LINE_PATTERN.finditer(_live_text(body)))
     selected = _single_classification_match(matches)
