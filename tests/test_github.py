@@ -36,7 +36,7 @@ def test_forge_operation_exhaustiveness_matches_the_declared_reader_and_writer_m
         if not name.startswith("_") and name not in {"repository", "capability", "requests"}
     }
     assert {operation.value for operation in forge.ForgeOperation} == declared_methods
-    assert len(forge.ForgeOperation) == 17
+    assert len(forge.ForgeOperation) == 18
     assert set(github.GITHUB_CAPABILITIES) == set(forge.ForgeOperation)
     assert forge.Capability.UNSUPPORTED not in github.GITHUB_CAPABILITIES.values()
 
@@ -3192,3 +3192,78 @@ def test_github_adapter_fails_loud_on_a_malformed_parent_reference(
 
     with pytest.raises(ClaimError, match="malformed parent issue"):
         client.parent_issue(72)
+
+
+@pytest.mark.parametrize(
+    ("rows", "reading", "valid"),
+    [
+        pytest.param([{"filename": "uv.lock"}], {}, True, id="G1"),
+        pytest.param([{"filename": f"file-{i}"} for i in range(150)], {}, True, id="G2"),
+        pytest.param([False], {}, False, id="G3"),
+        pytest.param([{"filename": ""}], {}, False, id="G4"),
+        pytest.param([{"filename": "uv.lock", "status": "renamed"}], {}, False, id="G5"),
+        pytest.param([{"filename": "uv.lock"}] * 2, {}, False, id="G6"),
+        pytest.param([], {"changedFiles": -1}, False, id="G7"),
+        pytest.param([], {"headSha": "short"}, False, id="G8"),
+        pytest.param([{}], {}, False, id="missing-filename"),
+        pytest.param([{"filename": 1}], {}, False, id="non-string-filename"),
+        pytest.param(
+            [{"filename": "uv.lock", "previous_filename": ""}], {}, False, id="empty-previous"
+        ),
+        pytest.param(
+            [{"filename": "uv.lock", "previous_filename": 1}], {}, False, id="non-string-previous"
+        ),
+        pytest.param(
+            [{"filename": "uv.lock", "previous_filename": "old.lock", "status": "renamed"}],
+            {},
+            True,
+            id="rename",
+        ),
+        pytest.param([], {"changedFiles": True}, False, id="boolean-count"),
+        pytest.param([], {"changedFiles": "1"}, False, id="string-count"),
+        pytest.param([], {"headSha": None}, False, id="non-string-head"),
+    ],
+)
+def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listing(
+    rows: list[object],
+    reading: dict[str, object],
+    valid: bool,
+) -> None:
+    head = {"headSha": MERGE_COMMIT_SHA, "changedFiles": len(rows)} | reading
+    calls: list[list[str]] = []
+    answers = iter([json.dumps(head), "\n".join(json.dumps(row) for row in rows), json.dumps(head)])
+
+    def run(arguments: list[str], input_data: bytes | None = None) -> str:
+        calls.append(arguments)
+        return next(answers)
+
+    client = GitHubForge(github.repository_id(REPOSITORY), run=run)
+    if not valid:
+        with pytest.raises(forge.ForgeMalformedResponseError):
+            client.pull_request_changes(12)
+        return
+    changes = client.pull_request_changes(12)
+    assert changes.before == changes.after == forge.ListingReading(MERGE_COMMIT_SHA, len(rows))
+    assert len(changes.files) == len(rows)
+    assert (
+        changes.files[0].path == "uv.lock"
+        if len(rows) == 1
+        else changes.files[-1].path == "file-149"
+    )
+    if len(rows) == 1:
+        assert changes.files[0].previous_path == (
+            "old.lock" if "previous_filename" in rows[0] else None
+        )
+    endpoint = f"repos/{REPOSITORY}/pulls/12"
+    bracket = ["api", endpoint, "--jq", "{headSha:.head.sha,changedFiles:.changed_files}"]
+    assert calls == [
+        bracket,
+        [
+            "api",
+            "--paginate",
+            endpoint + "/files?per_page=100",
+            "--jq",
+            ".[] | {filename,previous_filename,status}",
+        ],
+        bracket,
+    ]
