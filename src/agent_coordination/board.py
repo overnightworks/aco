@@ -2625,6 +2625,7 @@ _DISPLAY_NAME_LENGTH_LIMIT = 40
 
 
 def truncated_display_name(name: str) -> str:
+    """Cap names at 40 characters so three fit the 200-character budget (issue #405)."""
     if len(name) <= _DISPLAY_NAME_LENGTH_LIMIT:
         return name
     return name[: _DISPLAY_NAME_LENGTH_LIMIT - 1] + "…"

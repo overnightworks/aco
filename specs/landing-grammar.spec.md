@@ -121,7 +121,6 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-74] A renamed file's record counts its old and new path, a deleted file's its path; the path set is taken after LAND-73 compares record counts, never before.
 - [ ] [LAND-75] A file listing is read between two reads of the pull request's head and changed-file count; it is judged only when both reads name the expected head and the same count.
 - [ ] [LAND-76] A listing failing LAND-75 refuses `changed while aco listed its files; run the command again`, exit `2`; `check` expects the head it read, `land` the readiness head `--head` verified.
-
 - [ ] [LAND-77] LAND-71 names escape display controls, then truncate to 40 characters with `…`; `land` also bounds the whole refusal to 200 characters including `ERROR: `, on one line.
 
 Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77.

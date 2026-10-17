@@ -305,9 +305,10 @@ is refused by name.
 - `lane_shared` -- exact repository file paths, such as a vulture whitelist,
   that any live claim may write though its scope never names them. Only the
   trunk's committed copy counts, so a change takes effect once it lands.
-- `dependency_paths` -- a trailing `/` covers a directory; other entries match
+- `dependency_paths` -- the paths a `No-Item: deps` pull request may change;
+  a trailing `/` covers a directory; other entries match
   exactly. For landing, only the trunk checkout's tracked copy counts. This
-  bounds paths and does not certify safety (`specs/storage-pin.spec.md`, PIN-44..47).
+  bounds paths and does not certify safety (`specs/storage-pin.spec.md`, PIN-44..48).
 
 ## Board
 

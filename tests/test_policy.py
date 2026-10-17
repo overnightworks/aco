@@ -32,15 +32,37 @@ def test_listed_paths_judge_only_a_complete_listing(
 
 
 @pytest.mark.parametrize(
-    "entry, path",
+    "entry, path, expected",
     [
-        pytest.param("uv.lock", "uv.lock.bak", id="P9"),
-        pytest.param(".github/workflows/", ".github/workflows/../../src/x.py", id="P11"),
+        pytest.param(
+            "uv.lock",
+            "uv.lock.bak",
+            "changes uv.lock.bak, which dependency_paths in .aco/board.toml does not name",
+            id="P9",
+        ),
+        pytest.param(
+            ".github/workflows/",
+            ".github/workflows/../../src/x.py",
+            "changes .github/workflows/../../src/x.py, "
+            "which dependency_paths in .aco/board.toml does not name",
+            id="P11",
+        ),
+        pytest.param(
+            "vendor/",
+            "vendor/a\\b",
+            "changes vendor/a\\b, which dependency_paths in .aco/board.toml does not name",
+            id="P11-backslash",
+        ),
+        pytest.param(
+            "vendor/",
+            "vendor/" + "a" * 506,
+            "changes vendor/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…, "
+            "which dependency_paths in .aco/board.toml does not name",
+            id="P11-over-512",
+        ),
     ],
 )
-def test_dependency_paths_cover_only_up_to_a_slash(entry: str, path: str) -> None:
+def test_dependency_paths_cover_only_up_to_a_slash(entry: str, path: str, expected: str) -> None:
     config = board.BoardConfig(dependency_paths=(entry,))
     defect = policy.dependency_rule_defect(config, lambda: frozenset({path}))
-    assert defect == board.ClassificationDefect(
-        f"changes {path}, which dependency_paths in .aco/board.toml does not name"
-    )
+    assert defect == board.ClassificationDefect(expected)

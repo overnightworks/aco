@@ -43,15 +43,6 @@ def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
     return tuple(command)
 
 
-# A check name is GitHub's own external vocabulary -- a workflow job or a
-# third-party status context's own title -- with no length limit this tool
-# controls, unlike the internal path names `protocol.named_with_overflow_count`
-# was written for (issue #405 review/gate finding): each name is truncated
-# here before that same three-then-`and N more` grammar ever sees it, and the
-# assembled sentence is capped again as a final backstop -- short enough that
-# `report.render_error`'s `CLI_ERROR_PREFIX` still fits under the same 200-character
-# printed-line budget (issue #405 round-4 finding) -- so several long check
-# names can never print a refusal line past 200 characters.
 _LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
 _LAND_QUALITY_VERDICT_CHECK = "quality / verdict"
 _LAND_REFUSAL_LINE_LENGTH_LIMIT = 200
