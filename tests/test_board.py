@@ -1,8 +1,8 @@
 """Behavioral tests for the pure `aco` block write path `body.py`
 owns (#240, moved from `board.py` by #419): `rule_expectation`,
 `append_expectation`, and the `expectation_lines` projection `rule --line`,
-`ask`, and `rulings` all share. CLI wiring for `rule`/`ask`/`rulings` is
-covered in `tests/test_cli.py`."""
+`ask`, and `rulings` all share. CLI wiring for `rule`/`ask` is covered in
+`tests/test_cli.py`; `tests/test_rulings.py` owns the rulings family."""
 
 from __future__ import annotations
 
