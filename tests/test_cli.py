@@ -17684,7 +17684,7 @@ def test_land_refuses_a_closed_work_item_before_its_own_missing_claim(
 def test_land_refuses_a_classification_defect_from_a_missing_claim(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Issue #405 CI coverage follow-up: `_classification_defect`'s own
+    """Issue #405 CI coverage follow-up: `policy.classification_defect`'s own
     claim-check branch inside `_land_preflight` -- distinct from
     `test_land_refuses_a_classification_defect_reusing_checks_own_rules`'s
     shape defect and `test_land_refuses_a_closed_work_item_before_its_own_
