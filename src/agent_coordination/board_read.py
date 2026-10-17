@@ -193,7 +193,7 @@ class ClaimHistory:
     ceiling instead of growing a `claim_ages`-shaped parameter every time
     another history read joins it. `ages`, `lane_events`, and
     `unparsed_lifecycle_commits` are always read from the same
-    already-fetched `ClaimState` (`claim_history` below), never from two
+    already-fetched `ClaimState` (`_claim_history` below), never from two
     different observations."""
 
     ages: Mapping[str, datetime] = field(default_factory=dict)
@@ -259,7 +259,7 @@ def build_board(
     since = board.merged_pull_request_floor(issues, now)
     # A container whose own summary already says 0 (or carries no summary at
     # all, `children_total is None`) can never own an open child either way:
-    # `_container_progress` returns no progress at all without both numbers,
+    # `board._container_progress` returns no progress at all without both numbers,
     # and returns an empty open-children list when they're both 0 -- exactly
     # what an absent `children` entry already defaults to. Fetching its
     # detail list would cost a request `board` never needed (issue #168).
@@ -293,7 +293,7 @@ def build_board(
         children = _fetch_children(client, container_numbers)
         pull_requests = (open_pull_requests.result(), merged_pull_requests.result())
         closed_item_sizes = closed_item_sizes_future.result()
-    # The same forge relation `_cut_target` refuses a nested container on
+    # The same forge relation `cli._cut_target` refuses a nested container on
     # (issue #503), so `next` never proposes a `cut` that `cut` refuses.
     nesting_parents = {
         number: parent.reference
@@ -310,7 +310,7 @@ def build_board(
         trunk_ref = context.trunk_ref
     else:
         # A merged release already fetched and validated this exact
-        # candidate set (`_release_landing`'s own `list_board_dependencies`
+        # candidate set (`cli._release_landing`'s own `list_board_dependencies`
         # wave, issue #256 review) and judged its landing on its own trunk
         # ref (issue #492), so neither is read a second time here.
         dependencies, trunk_ref = landing.dependencies, landing.trunk_ref
@@ -379,7 +379,7 @@ def _claim_lifecycle(worktree: Path, state: protocol.ClaimState) -> store.ClaimL
     return store.claim_lifecycle(worktree=worktree, tip=state.tip)
 
 
-def claim_history(worktree: Path, state: protocol.ClaimState) -> ClaimHistory:
+def _claim_history(worktree: Path, state: protocol.ClaimState) -> ClaimHistory:
     """`build_board`'s own bundle of the two store history reads a full board
     build needs, from one already-fetched state -- `board`, `rulings`, and
     `next` all read this rather than `claim_ages` and `_claim_lifecycle`
@@ -454,6 +454,6 @@ def observed_board(
         context,
         live_claims,
         issues=issues,
-        history=claim_history(context.toplevel, observed),
+        history=_claim_history(context.toplevel, observed),
     )
     return _ObservedBoard(projected, live_claims)

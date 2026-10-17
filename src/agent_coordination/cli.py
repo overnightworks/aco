@@ -1494,8 +1494,7 @@ def _release_landing(
     a release that already stood. The dependency fetch below is the one
     round trip both `board.freed_item_numbers` and `board_read.build_board` need for
     this same candidate set; passing it into `board_read.build_board` keeps this a
-    single fetch rather
-    than two (issue #256 review). The board walks `trunk_ref`, the ref the
+    single fetch rather than two (issue #256 review). The board walks `trunk_ref`, the ref the
     release judged its landing on (LANDCMD-21, issue #492)."""
     client = context.forge
     issues = client.list_open_board_issues()
