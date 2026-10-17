@@ -4944,13 +4944,22 @@ def test_cut_refuses_a_row_with_no_slice_table(
     assert client.created_children == []
 
 
+@pytest.mark.parametrize(
+    ("toml_text", "cuttable_indices"),
+    [
+        pytest.param(_cuttable_row_toml("Scheibe 1"), "1", id="missing_row"),
+        pytest.param(f"{MINIMAL_BLOCK_TOML}slice = []\n", "none", id="empty_slice_table"),
+    ],
+)
 def test_cut_refuses_a_row_with_no_cuttable_row(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    toml_text: str,
+    cuttable_indices: str,
 ) -> None:
-    """`--row 9` names no entry while row 1 is still cuttable: the refusal
-    names the requested row and the row that is actually still cuttable,
-    not the unqualified (and false) claim that none is."""
-    toml_text = _cuttable_row_toml("Scheibe 1")
+    """CUT-09 distinguishes a missing row in an existing slice table from
+    CUT-08's missing table, even when no rows remain cuttable."""
     container = _cut_container_issue(toml_text)
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
     _write_block_pin(tmp_path)
@@ -4967,7 +4976,9 @@ def test_cut_refuses_a_row_with_no_cuttable_row(
     )
 
     assert exit_code == 2
-    assert capsys.readouterr().err == f"ERROR: #{CUT_CONTAINER} has no row 9; cuttable rows: 1\n"
+    assert capsys.readouterr().err == (
+        f"ERROR: #{CUT_CONTAINER} has no row 9; cuttable rows: {cuttable_indices}\n"
+    )
     assert client.created_children == []
 
 
@@ -10716,7 +10727,7 @@ def _stub_versioned_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def _stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every CLI test reads a tracked `board.toml` by default (issue #315):
-    the untracked/ignored refusal is its own axis from `versioned_paths()`'s
+    the untracked/ignored refusal is its own axis from `checkout.versioned_paths()`'s
     scope-width listing above, so a scope-width fixture fixing one never has
     to carry the other. A test proving the refusal itself overrides this."""
     stub_board_config_tracked(monkeypatch)
@@ -14496,8 +14507,8 @@ def test_cli_module_entry_point_exits_with_mains_return_code(
     stderr: str,
 ) -> None:
     """`python -m agent_coordination.cli` and the installed console script run
-    the `if __name__ == "__main__":` guard, not `main()` as a library call --
-    exercise that guard directly rather than only ever calling `main()`.
+    the `if __name__ == "__main__":` guard, not `cli.main()` as a library call --
+    exercise that guard directly rather than only ever calling `cli.main()`.
 
     `protect` on a payload it needs no git for is the one command that answers
     without git, GitHub, or the store, so the exit code this observes is
@@ -21879,7 +21890,7 @@ def test_cli_brief_step_refuses_with_no_usable_brief_config(
     """A `.aco/brief.toml` this repository cannot actually read from
     -- absent entirely, or genuinely present on disk but never `git add`-ed
     -- refuses the same way before ever reading the item's body (the same
-    tracked-file requirement `_board_config` enforces for `board.toml`'s
+    tracked-file requirement `session.board_config` enforces for `board.toml`'s
     storage pin), proven against the real `checkout.path_is_tracked` rather than a
     hand-rolled stub."""
     repository, _base, _tip = _scratch_lane_repository(monkeypatch, tmp_path)

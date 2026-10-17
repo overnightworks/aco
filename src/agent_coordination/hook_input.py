@@ -2,7 +2,7 @@
 file path they touch: Codex's `apply_patch` patch text, and a Bash
 `command`'s own write patterns (issue #380). Pure text parsing -- no
 filesystem, process, network, or coordination knowledge -- kept out of
-`cli` (issue #252) so each grammar has one small, independently testable
+`protect` so each grammar has one small, independently testable
 owner rather than growing inside `protect`'s already large module.
 """
 
