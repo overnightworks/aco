@@ -1,8 +1,0 @@
-claim_id = "fcaa03f1d0db47ce8f3766030b9de52c"
-agent = "claude"
-role = "builder"
-base = "bf4dddd3c77851ed606633a7dfe445a0c80961c0"
-branch = "claude/issue-146-f1-rulings-pilot"
-scope = ["tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_rulings.py"]
-opened_commit = "092c87339576718e8d9285ab25fe66afa2814bb1"
-whole_reason = "Die Familie zieht mit ihrer GitHub-Welt (github_clone, serve_forge) und dem Docstring, der test_cli als Owner nennt, gemeinsam um; halb umgezogen gäbe es zwei Owner der Familie."
