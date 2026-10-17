@@ -49,7 +49,7 @@ def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
 # was written for (issue #405 review/gate finding): each name is truncated
 # here before that same three-then-`and N more` grammar ever sees it, and the
 # assembled sentence is capped again as a final backstop -- short enough that
-# `cli.main`'s own `report.CLI_ERROR_PREFIX` still fits under the same 200-character
+# `report.render_error`'s `CLI_ERROR_PREFIX` still fits under the same 200-character
 # printed-line budget (issue #405 round-4 finding) -- so several long check
 # names can never print a refusal line past 200 characters.
 _LAND_CHECK_NAME_LENGTH_LIMIT = 40
@@ -482,9 +482,8 @@ def _land_release(
     """`aco land`'s own delegated call into the existing `release --merged`
     path (issue #405): never a second copy of its close/release/report/
     cleanup -- `--branch` selects the lane by name without requiring this
-    checkout to be on it (`cmd_release.release_branch_for`'s own documented case: "the
-    release may run from the coordinator's primary checkout"), exactly
-    where `land` runs from. Calls `cmd_release.release_transition` directly, never
+    checkout to be on it: the release may run from the coordinator's primary
+    checkout, exactly where `land` runs from. Calls `cmd_release.release_transition` directly, never
     `cmd_release.run` (issue #425): `land` needs a raised `ClaimError` here so
     `_land_step` can convert it into its own ruled `MERGED ... follow-up
     incomplete: release` line, not `cmd_release.run`'s own caught-and-printed
@@ -526,7 +525,7 @@ def _land_is_own_repository(toplevel: Path) -> bool:
     return isinstance(project, dict) and project.get("name") == _LAND_SELF_PACKAGE_NAME
 
 
-def run(parsed: argparse.Namespace, context: RunContext) -> None:
+def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`aco land <pr>` (issue #405): preflight every ruled precondition
     read-only, merge with a pinned head sha and a commit message this tool
     composes itself, delete the merged branch, fast-forward this checkout's
@@ -538,7 +537,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> None:
     entry, before that fresh/rerun split and before any read (issue #405
     round-4 finding 1): a rerun skips `_land_preflight` entirely, so a
     check placed only there left a rerun free to delete the branch and
-    fast-forward -- and `cmd_release.run` free to close the item -- on a bare
+    fast-forward -- and `cmd_release.release_transition` free to close the item -- on a bare
     `--coordinator-override` with no coordinator role behind it."""
     toplevel = context.toplevel
     config = context.config
@@ -603,3 +602,4 @@ def run(parsed: argparse.Namespace, context: RunContext) -> None:
     # The run whose release succeeded already printed it (LANDCMD-38).
     if ending is cmd_release.ReleaseEnding.RELEASED and _land_is_own_repository(toplevel):
         print(_LAND_REINSTALL_LINE)
+    return 0
