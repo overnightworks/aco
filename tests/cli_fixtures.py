@@ -11,6 +11,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from typing import TextIO
@@ -18,12 +19,41 @@ from typing import TextIO
 import pytest
 from board_fixtures import BASE, complete_contract
 
-from agent_coordination import board, checkout, cli, forge, github, process, store
+from agent_coordination import (
+    board,
+    board_read,
+    checkout,
+    cli,
+    cmd_brief,
+    cmd_cut,
+    cmd_reset,
+    cmd_rule,
+    cmd_status,
+    forge,
+    github,
+    process,
+    store,
+)
 from agent_coordination.protocol import ClaimState
 from agent_coordination.session import RunContext
 
 # Captured at import, before any test's stub replaces it.
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked
+
+
+FROZEN_CLI_NOW = datetime(2026, 8, 21, tzinfo=UTC)
+
+
+class FixedDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls.fromtimestamp(FROZEN_CLI_NOW.timestamp(), tz=UTC)
+
+
+def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin CLI dates without installing a global autouse fixture."""
+    for owner in (cmd_rule, board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
+        monkeypatch.setattr(owner, "datetime", FixedDateTime)
 
 
 def stub_one_git_call(

@@ -179,6 +179,25 @@ class ClosedIssue:
 
 
 @dataclass(frozen=True)
+class ChangedFile:
+    path: str
+    previous_path: str | None
+
+
+@dataclass(frozen=True)
+class ListingReading:
+    head_sha: str
+    changed_files: int
+
+
+@dataclass(frozen=True)
+class PullRequestChanges:
+    before: ListingReading
+    after: ListingReading
+    files: tuple[ChangedFile, ...]
+
+
+@dataclass(frozen=True)
 class Landing:
     """One pull/merge request read for its own sake, not for the board's stages.
 
@@ -253,6 +272,7 @@ class ForgeOperation(StrEnum):
     ITEM_REFERENCE = "item_reference"
     ITEM_REFERENCES = "item_references"
     LANDING = "landing"
+    PULL_REQUEST_CHANGES = "pull_request_changes"
     PARENT_ISSUE = "parent_issue"
     PARENT_NUMBER = "parent_number"
     LIST_CHILDREN = "list_children"
@@ -327,6 +347,8 @@ class ForgeReader(Protocol):
         ...
 
     def landing(self, number: int) -> Landing: ...
+
+    def pull_request_changes(self, number: int) -> PullRequestChanges: ...
 
     def parent_issue(self, number: int) -> board.ParentIssue | None: ...
 

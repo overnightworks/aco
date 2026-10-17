@@ -551,3 +551,45 @@ def test_a_claim_conflict_names_its_item_in_the_state_ref_form_the_cli_asks_for(
         forge_sentence,
         named_sentence,
     )
+
+
+@pytest.mark.parametrize("case", ["U1", "U2", "U3", "U4", "U5", "U5a", "U6", "U7", "U8"])
+def test_lookup_identity_resolves_a_lane_by_prefix_claim_or_merged_rerun(case: str) -> None:
+    branch = {"U2": "docs/x", "U3": "fix/x"}.get(case, "dependabot/x")
+    issue_holder = standing_active_claim(claim_id="issue", issue=42, branch=branch)
+    lane_holder = standing_active_claim(claim_id="lane", lane=True, branch=branch)
+    other_holder = standing_active_claim(claim_id="other", lane=True, branch="dependabot/y")
+    claims = {
+        protocol.claim_key(claim.identity, claim.branch): claim
+        for claim in (issue_holder, lane_holder, other_holder)
+    }
+    if case == "U8":
+        assert protocol.claims_on_branch(claims, branch) == (issue_holder, lane_holder)
+        return
+    calls = []
+
+    def holders() -> tuple[protocol.ActiveClaim, ...]:
+        assert case not in {"U1", "U2", "U3"}, "issue/prefix lookup must not read holders"
+        calls.append(branch)
+        return {
+            "U4": (lane_holder,),
+            "U5": (issue_holder,),
+            "U5a": (issue_holder,),
+            "U6": (),
+            "U7": (),
+        }[case]
+
+    merged_rerun = case in {"U5", "U6"}
+    if case in {"U5", "U5a", "U7"}:
+        with pytest.raises(ClaimError) as refused:
+            protocol.lookup_identity(None, branch, merged_rerun=merged_rerun, holders=holders)
+        assert str(refused.value) == (
+            "branch 'dependabot/x' is not an issueless lane; pass an issue number, or "
+            "check out a branch prefixed 'docs/' or 'fix/'"
+        )
+    else:
+        identity = protocol.lookup_identity(
+            42 if case == "U1" else None, branch, merged_rerun=merged_rerun, holders=holders
+        )
+        assert identity == (protocol.IssueIdentity(42) if case == "U1" else protocol.LaneIdentity())
+    assert calls == ([] if case in {"U1", "U2", "U3"} else [branch])

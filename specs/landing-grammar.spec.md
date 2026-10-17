@@ -30,7 +30,7 @@ criterion says otherwise), `aco-xxxxxx` under `storage = "state-ref"`;
 `specs/storage-pin.spec.md` PIN-30 owns the `state-ref` form. A `--json` integer
 field never uses `<label>` -- it is always the bare number. `<sha>` is a commit id,
 `<branch>` a git branch name, `<author>` a pull request's author, `<kind>`
-`docs` or `fix`. A trailer block is read through git's own trailer parsing
+`docs`, `fix` or `deps`. A trailer block is read through git's own trailer parsing
 (`%(trailers:key=...,valueonly)`), never by scanning the message body for a
 matching line.
 
@@ -43,6 +43,9 @@ matching line.
 | control byte inside a trailer value | — (lands nothing, LAND-42) | LAND-03 | — | — |
 | valid `Work-Item:` + closing reference | — | LAND-04 | LAND-29, LAND-49 | LAND-41 |
 | valid `No-Item:` + lane claim | — | LAND-05 | LAND-37 | — |
+| `No-Item: deps` PR with configured dependency paths | — | LAND-71..77 | — | — |
+| `No-Item: deps` PR without configured dependency paths | — | LAND-70 | — | — |
+| `No-Item: deps` merge commit trailer | — | LAND-48 | LAND-37, LAND-64 | — |
 | no classification / no trailer | — | LAND-06, LAND-58 | LAND-32, LAND-52, LAND-62 | — |
 | contradictory trunk trailer (both, or repeated `No-Item:`) | — (lands nothing, LAND-42) | LAND-60 | LAND-61 | — |
 | state-ref `Work-Item:` trailer number past `aco-ffffff` | — | LAND-68 | — | — |
@@ -104,13 +107,23 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-08] A body carrying two classification lines (a `Work-Item:` and a `No-Item:`, or two `No-Item:` lines) refuses `carries <n> classification lines; exactly one is required`, exit `2`.
 - [ ] [LAND-09] A body naming two `Work-Item:` lines refuses `names two work items, #a and #b; split it`, exit `2`.
 - [ ] [LAND-10] A `Work-Item:` value that is not `OWNER/REPO#n` or `#n` refuses `carries \`Work-Item: <value>\`; a work item reads OWNER/REPO#n or #n`, exit `2`.
-- [ ] [LAND-11] A `No-Item:` value that is not `docs` or `fix` refuses `carries \`No-Item: <value>\`; an issue-less pull request is docs or fix`, exit `2`.
+- [ ] [LAND-11] A `No-Item:` value that is not `docs`, `fix` or `deps` refuses `carries \`No-Item: <value>\`; an issue-less pull request is docs, fix, or deps`, exit `2`.
 - [ ] [LAND-12] A pull request whose head branch lives in another repository refuses `proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, before the body is even read.
 - [ ] [LAND-13] A pull request that does not target the repository's default branch refuses `targets '<branch>', not the default branch '<default>'`, exit `2`.
 - [ ] [LAND-14] A `Work-Item:` naming another repository's issue refuses `names work item <ref> of another repository, which holds no claim here`, exit `2`.
 - [ ] [LAND-15] A `Work-Item:` item with no active claim on the pull request's own head branch refuses `has no active claim for #<n> on branch '<branch>'`, exit `2`.
 - [ ] [LAND-16] A `No-Item:` pull request with no active issue-less lane claim on its head branch refuses `has no active issue-less lane claim on branch '<branch>'`, exit `2`.
 - [ ] [LAND-17] A `No-Item:` body that also carries a closing reference refuses `declares no work item but closes <ref>; name it as the work item`, exit `2`.
+- [ ] [LAND-70] A `deps` pull request under a configuration naming no `dependency_paths` refuses `declares No-Item: deps, but .aco/board.toml names no dependency_paths`, exit `2`.
+- [ ] [LAND-71] A `deps` pull request changing a path no `dependency_paths` entry covers refuses `changes <paths>, which dependency_paths in .aco/board.toml does not name`, exit `2`; past three, `and <k> more`.
+- [ ] [LAND-72] A `No-Item: deps` pull request passing LAND-16, LAND-17, LAND-70, LAND-71 and LAND-73..76 prints `PR #<n> by <author> declares No-Item: deps`, exit `0`.
+- [ ] [LAND-73] A file listing holding fewer or more records than the forge's own changed-file count refuses `lists <k> of its <n> changed files; aco judges only a complete listing`, exit `2`.
+- [ ] [LAND-74] A renamed file's record counts its old and new path, a deleted file's its path; the path set is taken after LAND-73 compares record counts, never before.
+- [ ] [LAND-75] A file listing is read between two reads of the pull request's head and changed-file count; it is judged only when both reads name the expected head and the same count.
+- [ ] [LAND-76] A listing failing LAND-75 refuses `changed while aco listed its files; run the command again`, exit `2`; `check` expects the head it read, `land` the readiness head `--head` verified.
+- [ ] [LAND-77] LAND-71 names escape display controls, then truncate to 40 characters with `…`; `land` also bounds the whole refusal to 200 characters including `ERROR: `, on one line.
+
+Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77.
 - [ ] [LAND-18] A `Work-Item:` body with no closing reference for that item refuses `carries no closing reference for its work item <item>`, exit `2`.
 - [ ] [LAND-19] A body closing anything besides its own work item (or an unpermitted parent, LAND-21) refuses `closes <ref> besides its work item <item>; a pull request lands one item`, exit `2`.
 - [ ] [LAND-20] `Implements #n`/`Lands #n` name work a pull request touched, but GitHub closes on neither word: a body carrying one beside its own closing reference for the declared item still passes, exit `0`.
@@ -148,7 +161,7 @@ sentence>`, not restated.
 - [ ] [LAND-62] A merge commit off the walked trunk, with no `Work-Item:` trailer, or naming another item refuses `merge commit <sha> of pull request #<n> <that LAND-52 defect sentence>`, exit `2`, before any write.
 - [ ] [LAND-64] For a lane release, a merge commit off the trunk, with no trailer, or with a malformed `No-Item:` trailer refuses `merge commit <sha> of pull request #<n> <that defect sentence>`, exit `2`.
 - [ ] [LAND-66] For a lane release, a merge commit whose trailer carries `Work-Item:`, valid or malformed, refuses `merge commit <sha> of pull request #<n> carries \`Work-Item: <value>\`; <LAND-67>`, exit `2`.
-- [ ] [LAND-67] LAND-66's rule and way out read `an issue-less lane needs a \`No-Item: <docs|fix>\` trailer; release it with --abandoned "landed as PR #<n> with a malformed trailer"`.
+- [ ] [LAND-67] LAND-66's rule and way out read `an issue-less lane needs a \`No-Item: <docs|fix|deps>\` trailer; release it with --abandoned "landed as PR #<n> with a malformed trailer"`.
 - [ ] [LAND-55] Unless REL-47 applies, a still-open work item whose landing pull request verifies is closed by this release: a comment `landed by PR #<n>`, then the close — never a refusal (replaces retired LAND-36).
 - [ ] [LAND-63] A rerun of LAND-55's own close that finds its `landed by PR #<n>` comment already posted skips it and closes straight away, never posting it twice (issue #397).
 - LAND-36 (retired 19.09.2026, issue #359): "work item #<n> is open, not closed" no longer exists; a still-open item is closed instead (LAND-55).
@@ -177,6 +190,11 @@ sentence>`, not restated.
 - LAND-46 (retired 04.10.2026, issue #644, operator ruling #617 line 4): `board --html`'s Landungen rendering no longer exists; `aco-board` (issue #624) is the one decision board, and `board --json`'s own `"landings"` rows (LAND-54, `specs/board.spec.md` BOARD-12) carry the equivalent fact.
 
 ## Never
+
+- `dependency_paths` never certifies a change safe: it bounds where a `deps` pull request may write; review still judges workflow and tool-configuration changes.
+- A force-push back to the exact head preflight read, during the bracketed listing or before the pinned merge, is not detected (an accepted ABA residual).
+
+- A merge commit trailer `No-Item: deps` releases a lane as `docs`/`fix` do (LAND-37); `release --merged` never re-judges its paths: the trailer decides (LAND-64).
 
 - A trunk commit's own `No-Item:` trailer never marks any issue `code-landed`; only a `Work-Item:` trailer does.
 - A trunk commit's contradictory trailer block — both `Work-Item:` and `No-Item:`, or `No-Item:` repeated — is never read as a landing by the trunk trailer walk itself (LAND-42): it lands nothing there, the same as a commit that carries neither. `check <sha>` and `release --merged <sha>` (issue #359, LAND-60/LAND-61) read that same commit directly, and do refuse it by name — never letting `Work-Item:` win by ordering.
@@ -287,7 +305,7 @@ Setup: bare-remote, fake `gh`, pull request `#57` merged into `main` from a `fix
 
 ```console
 $ aco release --merged 57
-2> ERROR: merge commit <sha> of pull request #57 carries `Work-Item: fix/x`; an issue-less lane needs a `No-Item: <docs|fix>` trailer; release it with --abandoned "landed as PR #57 with a malformed trailer"
+2> ERROR: merge commit <sha> of pull request #57 carries `Work-Item: fix/x`; an issue-less lane needs a `No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #57 with a malformed trailer"
 exit 2
 ```
 

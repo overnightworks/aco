@@ -65,6 +65,10 @@ class FakeForge:
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     default_branch_name: str = "main"
     landings: dict[int, forge.Landing] = field(default_factory=dict)
+    changes_by_number: dict[int, forge.PullRequestChanges | forge.ForgeError] = field(
+        default_factory=dict
+    )
+    changes_reads: list[int] = field(default_factory=list)
     parents: dict[int, board.ParentIssue] = field(default_factory=dict)
     children: dict[int, tuple[board.ChildItem, ...]] = field(default_factory=dict)
     closed_issues: set[int] = field(default_factory=set)
@@ -285,6 +289,14 @@ class FakeForge:
         if detail is None:
             raise ClaimError(f"GitHub has no pull request #{number}")
         return detail
+
+    def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
+        self._run()
+        self.changes_reads.append(number)
+        changes = self.changes_by_number[number]
+        if isinstance(changes, forge.ForgeError):
+            raise changes
+        return changes
 
     def _item_reference_value(self, number: int) -> forge.ItemReference:
         served = self.issue_references.get(number)
