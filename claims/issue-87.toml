@@ -1,0 +1,8 @@
+claim_id = "8c1dc74a3137412f8d49e3a690b5228a"
+agent = "claude"
+role = "builder"
+base = "822b3ca525f55184f31eccaeef9d004f7fbbcc78"
+branch = "claude/issue-87-s6b-board-read-build"
+scope = ["src/agent_coordination/board.py", "src/agent_coordination/board_read.py", "src/agent_coordination/cli.py", "src/agent_coordination/forge.py", "src/agent_coordination/github.py", "src/agent_coordination/state_board.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_state_board.py"]
+opened_commit = "2c12a4d60d9e051a296400fd7237f4b67d2ade7f"
+whole_reason = "Board-Aufbau, Uhr und Claim-Historie ziehen mit ihren Aufrufern, Uhr-Patches und Docstrings gemeinsam nach board_read; halb verschoben liefe die eingefrorene Uhr ins Leere."
