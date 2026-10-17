@@ -107,6 +107,7 @@ from agent_coordination import (
     cmd_land,
     cmd_next,
     cmd_reset,
+    cmd_rule,
     cmd_start,
     cmd_status,
     forge,
@@ -384,7 +385,6 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
 
     client = GitHubForge(repository, run=run)
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
     monkeypatch.setattr(github, "datetime", FixedDateTime)
     _patch_store_write(monkeypatch, _store_claim_from_request(active))
     return observed
@@ -5218,7 +5218,7 @@ def _forge_with_existing_child(
     `child_title` under `CUT_CONTAINER` -- the fixture every adopt-instead-of-
     duplicate test (#260) starts from. The child also carries a recorded
     parent and, when open, sits on the board with a body that would itself
-    pass `cmd_cut._orphan_names_container`, exactly like a real linked issue: a
+    pass `body.names_parent`, exactly like a real linked issue: a
     broken `parent_issue` filter in `cmd_cut._adoptable_child` would then double-count
     it as its own orphan, and the surrounding test would fail."""
     child_body = cmd_cut._cut_child_body(CUT_CONTAINER, body.Storage.GITHUB, done_when="D")
@@ -10773,7 +10773,7 @@ def _stub_trunk(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
+    monkeypatch.setattr(cmd_rule, "datetime", FixedDateTime)
     monkeypatch.setattr(board_read, "datetime", FixedDateTime)
     monkeypatch.setattr(cmd_reset, "datetime", FixedDateTime)
     monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
@@ -20953,7 +20953,6 @@ def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_
             "src/agent_coordination/__init__.py",
         ),
     )
-    monkeypatch.setattr(issue_claim, "datetime", FixedDateTime)
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     # `rescope` fetches and commits real store state against its resolved

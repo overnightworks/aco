@@ -2685,7 +2685,7 @@ class TestCliStateRefForge:
         straight into the fresh child's `[record]` table and no `Parent:`
         prose line at all (issue #285) -- unlike `cmd_cut._cut_child_body`'s own
         skeleton. `cut`'s adoption key is `record.parent` alone
-        (`list_children`, never `cmd_cut._orphan_names_container`'s prose-line
+        (`list_children`, never `body.names_parent`'s prose-line
         match), so it still adopts this child instead of minting a second
         one for the same slice row."""
         item_files = _item_files_with_container_slices(((1, "Slice C"),))
