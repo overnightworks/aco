@@ -229,6 +229,35 @@ def bare_remote(tmp_path: Path) -> Path:
     return remote
 
 
+def track_board_config(repo: Path, text: str) -> None:
+    config = repo / board.CONFIG_PATH
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(text)
+    real_git(repo, "add", str(board.CONFIG_PATH))
+    real_git(repo, "commit", "-q", "-m", "track board configuration")
+
+
+@pytest.fixture
+def clone(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    bare_remote: Path,
+    isolated_global_git_config: Path,
+) -> Path:
+    """The spec world: tracked config, pushed main, and an isolated identity."""
+    set_git_identity(monkeypatch)
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
+    repo = tmp_path / "clone"
+    repo.mkdir()
+    real_git(repo, "init", "-q", "-b", "main")
+    real_git(repo, "remote", "add", "origin", str(bare_remote))
+    track_board_config(repo, "")
+    push_repository_trunk(repo, "origin")
+    redirect_toplevel(monkeypatch, repo)
+    monkeypatch.chdir(repo)
+    return repo
+
+
 @pytest.fixture
 def worktree(tmp_path: Path) -> Path:
     """An ordinary git checkout used as this test's client worktree, its
