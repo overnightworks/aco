@@ -24207,7 +24207,7 @@ _LANE_LOOKUP_CASES = (
         refusal=(
             f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
             "`Work-Item: #42`; an issue-less lane needs a "
-            '`No-Item: <docs|fix>` trailer; release it with --abandoned "landed as PR #12 '
+            '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
             'with a malformed trailer"'
         ),
     ),
