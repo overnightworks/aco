@@ -2721,7 +2721,7 @@ class TestCliStateRefForge:
     ) -> None:
         """Issue #291 proof 5: GitHub's own equivalent
         (`test_cut_refuses_a_blockless_container_before_any_write`) hits
-        `_located_block_or_refuse`'s refusal only because a fetched GitHub
+        `board.located_block_or_refuse`'s refusal only because a fetched GitHub
         issue can carry any body at all. A state-ref item cannot: every
         item's `[record]` table is validated once, at read time, by
         `StateRefBoard`'s own decode (issue #283) -- so a container without

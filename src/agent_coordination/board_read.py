@@ -1,5 +1,6 @@
 """Shared board reads and the board build over them, the claim history a build
-needs, their validation, and the hint after a committed write."""
+needs, their validation, and the hint after a committed write. It also owns
+the gates that read an item's live body before a rewrite."""
 
 from __future__ import annotations
 
@@ -457,3 +458,27 @@ def observed_board(
         history=_claim_history(context.toplevel, observed),
     )
     return _ObservedBoard(projected, live_claims)
+
+
+def item_body_or_refuse(
+    client: forge.ForgeReader, number: int, *, command: str, storage: body.Storage
+) -> str:
+    """The live body of issue `number`, or a by-name refusal before any
+    write: `rule` and `ask` both target one existing issue, never a pull
+    request -- a pull request exists only on a forge, so that refusal
+    keeps the forge's own `#n`."""
+    reference = client.item_reference(number)
+    if reference.state is forge.ItemState.MISSING:
+        raise protocol.ClaimUnavailableError(f"{board.item_label(number, storage)} does not exist")
+    if reference.is_landing:
+        raise protocol.ClaimUnavailableError(
+            f"#{number} is a pull request, not an issue; {command} needs an issue"
+        )
+    return reference.body or ""
+
+
+def require_update_item_body(client: forge.ForgeWriter, *, command: str) -> None:
+    if client.capability(forge.ForgeOperation.UPDATE_ITEM_BODY) is not forge.Capability.READ_WRITE:
+        raise protocol.ClaimUnavailableError(
+            f"this forge cannot update_item_body; {command} by hand"
+        )

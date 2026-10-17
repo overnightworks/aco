@@ -1,12 +1,131 @@
 """The landing check of a pull request: whether its `Work-Item:`/`No-Item:`
-classification, closing references, claim, and parent requirement hold."""
+classification, closing references, claim, and parent requirement hold. It
+also owns the claim width gate and the `--whole` reason bound that `claim`,
+`start`, `rescope` and `item` share."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import board, body, forge, protocol
+from . import board, body, checkout, forge, protocol
 from .session import RunContext
+
+
+def _scope_cost(versioned: tuple[str, ...], scope: tuple[str, ...]) -> tuple[int, int, float]:
+    n = len(checkout.paths_under_scope(versioned, scope))
+    total = len(versioned)
+    share = 0.0 if total == 0 else n / total
+    return n, total, share
+
+
+def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
+    """The tripped condition in words, with the numbers it was judged
+    against -- what the refusal names instead of restating the whole rule."""
+    if trip.reason is protocol.WideScopeReason.PATH_COUNT:
+        return f"{trip.path_count} paths exceeds three"
+    if trip.reason is protocol.WideScopeReason.DIRECTORY:
+        noun = "directory" if len(trip.directories) == 1 else "directories"
+        return f"{len(trip.directories)} {noun} in scope ({', '.join(trip.directories)})"
+    covered, total = trip.covered_file_count, trip.versioned_file_count
+    percent = round(100 * covered / total)
+    path_word = "path" if covered == 1 else "paths"
+    return f"{covered} {path_word} of {total} versioned files ({percent} %) exceeds a quarter"
+
+
+_WHOLE_REASON_LABEL = "whole reason"
+"""`protocol.outbound_text`'s own field name for a `--whole`/body `whole` value
+(issue #399), named once here beside the width-gate refusal it justifies --
+`bounded_whole_reason` is its one reader, so every `--whole` text is bounded
+and refused by the same name."""
+
+
+def bounded_whole_reason(raw: str | None) -> str | None:
+    return None if raw is None else protocol.outbound_text(raw, _WHOLE_REASON_LABEL, maximum=512)
+
+
+def _wide_scope_refusal(trip: protocol.WideScopeTrip, *, names_body_fallback: bool) -> str:
+    suffix = " or set whole in the body" if names_body_fallback else ""
+    return f"scope is wide: {_wide_scope_condition(trip)}; pass --whole REASON{suffix}"
+
+
+def reject_wide_scope(
+    scope: tuple[str, ...],
+    versioned: tuple[str, ...],
+    whole_reason: str | None,
+    *,
+    directories: tuple[str, ...],
+    whole_from_body: Callable[[], str | None] | None = None,
+) -> tuple[int, int, float, str | None]:
+    """`scope`'s own width gate (issue #326), `whole_reason`'s own text
+    admitting a wide one exactly as before -- plus, for `claim`/`start`
+    (issue #399), the effective reason actually used: `whole_reason` itself
+    when given, else `whole_from_body()`, read only once the gate actually
+    trips and the caller named none, so a narrow scope or an explicit
+    `--whole` never costs the body read `whole_from_body` performs.
+    `rescope` judges an issue claim by the same rule (issue #554), from the
+    body it already read; a lane claim names no item, passes no
+    `whole_from_body`, and keeps the plain refusal. `directories` are
+    the scope entries that name a directory in the tree `versioned` lists
+    (`checkout.scope_directories`)."""
+    n, total, share = _scope_cost(versioned, scope)
+    trip = wide_scope_trip(scope, versioned, directories=directories)
+    if trip is None:
+        return n, total, share, whole_reason
+    effective = whole_reason
+    if effective is None and whole_from_body is not None:
+        effective = whole_from_body()
+    if effective is None:
+        raise protocol.ClaimError(
+            _wide_scope_refusal(trip, names_body_fallback=whole_from_body is not None)
+        )
+    return n, total, share, effective
+
+
+def wide_scope_trip(
+    scope: tuple[str, ...], versioned: tuple[str, ...], *, directories: tuple[str, ...]
+) -> protocol.WideScopeTrip | None:
+    """`scope`'s width judged against the tree `versioned` lists, whose
+    entries naming a directory are `directories` -- the one measure the
+    width gate refuses by and `next`'s advice anticipates (issue #566)."""
+    n, total, _share = _scope_cost(versioned, scope)
+    return protocol.wide_scope_trip(
+        scope, directories=directories, covered_file_count=n, versioned_file_count=total
+    )
+
+
+def reject_ungrounded_comma_scope(
+    scope: tuple[str, ...], versioned: tuple[str, ...], *, flag: str
+) -> None:
+    """Refuse a scope entry that contains a comma and matches no versioned
+    file -- the shape `{flag} a.py,b.py` takes when passed as one flag from
+    habit instead of one path per flag (issue #207). Stored verbatim, that
+    single entry names a path nothing tracks, so the claim protects nothing:
+    the lane's real files stay uncovered and no overlap check can ever fire
+    for them.
+
+    Never call this over `--drop`: a value the live claim already holds is a
+    fact about the claim, not a typo about the checkout, and dropping a value
+    the claim does not hold is already refused by `combined_scope` with a
+    truer sentence naming the claim rather than the checkout -- adding this
+    check there would either block the very repair this refusal exists to
+    leave open (dropping an already-claimed ungrounded value), or never fire
+    at all (a not-yet-dropped value the claim lacks is refused first).
+
+    Splitting on the comma would be the old, wrong fix (issue #201): it made
+    a real comma-bearing filename unrepresentable. So a real comma-bearing
+    path that names a versioned file, or a directory holding one, still
+    passes here -- `paths_under_scope` matches either. So does a comma-free
+    path that does not exist yet, since a lane routinely claims files it is
+    about to create; only a comma with no match among versioned files is the
+    signature this refuses.
+    """
+    for entry in scope:
+        if "," in entry and not checkout.paths_under_scope(versioned, (entry,)):
+            raise protocol.ClaimError(
+                f"{entry!r} matches no versioned file; one {flag} path per flag, so its comma "
+                f"is read literally -- repeat {flag} for a second path"
+            )
 
 
 def _claim_defect(
