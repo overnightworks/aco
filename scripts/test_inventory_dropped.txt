@@ -5,3 +5,14 @@
 tests/test_board.py	'whole = "   "\n'	#105: The blank value is now driven through test_parse_body_applies_the_whole_bound using JSON-to-TOML serialization.
 tests/test_board.py	'whole = [1]\n'	#105: The list value is now driven through test_parse_body_applies_the_whole_bound using JSON-to-TOML serialization.
 tests/test_board.py	'whole must be a non-empty string'	#105: BODY-62 retires this sentence for the shared whole bound; test_parse_body_applies_the_whole_bound asserts its replacement for every invalid shape.
+tests/test_cli.py	'U+200B'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+200B] holds the exact refusal.
+tests/test_cli.py	'U+202E'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+202E] holds the exact refusal.
+tests/test_cli.py	'U+2066'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+2066] holds the exact refusal.
+tests/test_cli.py	'\u200b'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+200B] supplies the same control character.
+tests/test_cli.py	'\u202e'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+202E] supplies the same control character.
+tests/test_cli.py	'\u2066'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+2066] supplies the same control character.
+tests/test_cli.py	'body incomplete: '	#154: Prefix now held by complete expected sentences in tests/test_body_cli.py::test_body_check_judges_a_piped_body[text-every-key-empty] and [text-only-done-when-empty], also crossed with json.
+tests/test_cli.py	'body malformed: now: now is required\nbody malformed: done_when: done_when is required\n'	#154: Ordered lines now assembled from literal defects and compared in tests/test_body_cli.py::test_body_check_judges_a_piped_body[text-multiple-defects]; [json-multiple-defects] also pins the ordered list.
+tests/test_cli.py	'body malformed: size: size must be S, M, or L\n'	#154: Exact sentence now assembled from the literal field reason in tests/test_body_cli.py::test_body_check_judges_block_fields[size-XL].
+tests/test_cli.py	'stdin is not valid UTF-8'	#154: Substring replaced by exact complete refusal in tests/test_body_cli.py::test_body_check_refuses_undecodable_input[text-invalid-utf8] and [json-invalid-utf8].
+tests/test_cli.py	'unknown top-level key record'	#154: Substring replaced by exact complete refusal in tests/test_body_cli.py::test_body_check_uses_the_storage_pin[text-record-default] and [json-record-default].
