@@ -1,9 +1,10 @@
 name: CodeQL
 
 on:
-  # pull_request, not pull_request_target: Dependabot runs get a read-only
-  # token there, and the job-level permissions below grant what the upload needs:
-  # https://docs.github.com/en/code-security/how-tos/scan-code-for-vulnerabilities/troubleshooting/troubleshooting-analysis-errors/resource-not-accessible
+  # Dependabot-triggered runs get a read-only token, but code scanning always
+  # accepts uploads from pull_request runs, so Dependabot PRs get an analysis.
+  # Never pull_request_target: it would run untrusted code with a write token.
+  # https://docs.github.com/en/code-security/reference/code-scanning/troubleshoot-analysis-errors/resource-not-accessible
   pull_request:
     branches:
       - main
