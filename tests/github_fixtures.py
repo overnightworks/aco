@@ -25,6 +25,12 @@ LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"
 MERGE_COMMIT_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
 
 
+def serve_forge(monkeypatch: pytest.MonkeyPatch, forge: FakeForge) -> FakeForge:
+    """Install one arranged forge at the GitHub adapter boundary."""
+    monkeypatch.setattr(github, "GitHubForge", lambda repository: forge)
+    return forge
+
+
 def merge_on_the_forge(
     remote: Path,
     default_branch: str,
