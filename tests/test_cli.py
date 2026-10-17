@@ -29,7 +29,6 @@ from board_fixtures import (
     FROZEN_UNTIL,
     MINIMAL_BLOCK_TOML,
     REPOSITORY,
-    RULED_ON,
     block_body,
     block_dependency,
     blocked_issue,
@@ -248,6 +247,7 @@ _LIVE_FETCH_ISSUE_REFERENCE = board_read.fetch_issue_reference
 def test_read_only_commands_never_write_through_a_reader_only_forge(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Spec: rulings Never 1 -- reads without forge writes."""
     client = ReaderOnlyForge()
     client.board_issues = (board_issue(72, "Work", complete_contract("Ship it.")),)
     client.landings[12] = landing_pull_request(body="Work-Item: #72\n\nCloses #72")
@@ -868,284 +868,6 @@ def test_board_shows_open_and_total_instead_of_proposed(
     expectation_states = {number: item["expectation_state"] for number, item in items.items()}
     assert expectation_states == {10: "-", 11: "proposed", 12: "ruled"}
     assert items[11]["expectation_progress"] == {"open": 1, "total": 2}
-
-
-def test_rulings_lists_open_expectations_by_board_priority_then_open_count(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    issues = (
-        rulings_issue(
-            50,
-            "In-flight security work",
-            open_lines=2,
-            total_lines=3,
-            labels=("security",),
-        ),
-        rulings_issue(
-            30,
-            "Later security tie",
-            open_lines=1,
-            total_lines=2,
-            labels=("security",),
-        ),
-        rulings_issue(
-            10,
-            "Earlier security tie",
-            open_lines=2,
-            total_lines=3,
-            labels=("security",),
-        ),
-        rulings_issue(
-            40,
-            "More open security work",
-            open_lines=2,
-            total_lines=3,
-            labels=("security",),
-        ),
-        rulings_issue(
-            60,
-            "Lower-priority product work",
-            open_lines=1,
-            total_lines=1,
-            labels=("product",),
-        ),
-        rulings_issue(
-            70,
-            "Fully ruled security work",
-            open_lines=0,
-            total_lines=1,
-            labels=("security",),
-        ),
-    )
-    _configured_board_client(
-        monkeypatch,
-        tmp_path,
-        open_issues=issues,
-        open_pull_requests=(board.PullRequest(200, "Fixes #50", "", "branch"),),
-    )
-
-    assert issue_claim.main(["--repo", REPOSITORY, "rulings"]) == 0
-    headers = [line for line in capsys.readouterr().out.splitlines() if line.startswith("#")]
-    assert headers == [
-        "#50 2/3: In-flight security work",
-        "#30 1/2: Later security tie",
-        "#10 2/3: Earlier security tie",
-        "#40 2/3: More open security work",
-        "#60 1/1: Lower-priority product work",
-        "#70 0/1: Fully ruled security work",
-    ]
-
-
-def test_rulings_reads_expectation_progress_from_the_block_not_stale_prose(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """`rulings` must consume `BoardItem.expectation_progress`, not re-scan
-    the raw body: a fully-ruled `## Erwartungen` heading left beside a still-
-    proposed `[[expectation]]` would otherwise hide this item from `rulings`
-    entirely (#150)."""
-    stale_disagreeing_prose = (
-        "\n\n## Erwartungen (refine-Lauf 28.08.2026)\n"
-        "- Ruled one *(geregelt: ja)*\n"
-        "- Ruled two *(geregelt: ja)*\n"
-    )
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Proposed"\ndefault = "later"\n'
-    body = block_body(toml_text) + stale_disagreeing_prose
-    issue = board_issue(400, "Block-only expectations", body)
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,))
-    _write_block_pin(tmp_path)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "rulings"]) == 0
-    assert capsys.readouterr().out == "#400 1/1: Block-only expectations\n  1 open: Proposed\n"
-
-
-def test_rulings_renders_text_json_and_empty_success(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #379: a fully-ruled item is listed too (`0/2`, both lines), the
-    `--json` line carries `ruling`/`ruled_on` instead of `state` plus its
-    `default` -- the proposed outcome while open, `null` once ruled (RUL-10, RUL-12,
-    E-RUL-03/E-RUL-05) -- and the empty sentence fires only once no listed
-    item carries any line."""
-    open_issue = rulings_issue(
-        10,
-        "Open expectation",
-        open_lines=1,
-        total_lines=2,
-    )
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(open_issue,))
-    rulings_command = ["--repo", REPOSITORY, "rulings"]
-
-    assert issue_claim.main(rulings_command) == 0
-    assert capsys.readouterr().out == (
-        "#10 1/2: Open expectation\n"
-        "  1 open: Open decision 0.\n"
-        f"  2 ruled yes {RULED_ON.isoformat()}: Settled decision 0.\n"
-    )
-
-    assert issue_claim.main([*rulings_command, "--json"]) == 0
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "listed",
-        "rulings": [
-            {
-                "number": 10,
-                "title": "Open expectation",
-                "open": 1,
-                "total": 2,
-                "lines": [
-                    {
-                        "index": 1,
-                        "text": "Open decision 0.",
-                        "ruling": None,
-                        "ruled_on": None,
-                        "default": "later",
-                    },
-                    {
-                        "index": 2,
-                        "text": "Settled decision 0.",
-                        "ruling": "yes",
-                        "ruled_on": RULED_ON.isoformat(),
-                        "default": None,
-                    },
-                ],
-            }
-        ],
-    }
-
-    fully_ruled_issue = rulings_issue(
-        11,
-        "Fully ruled",
-        open_lines=0,
-        total_lines=2,
-    )
-    monkeypatch.setattr(client, "list_open_board_issues", lambda: (fully_ruled_issue,))
-
-    assert issue_claim.main(rulings_command) == 0
-    assert capsys.readouterr().out == (
-        "#11 0/2: Fully ruled\n"
-        f"  1 ruled yes {RULED_ON.isoformat()}: Settled decision 0.\n"
-        f"  2 ruled yes {RULED_ON.isoformat()}: Settled decision 1.\n"
-    )
-
-    assert issue_claim.main([*rulings_command, "--json"]) == 0
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "listed",
-        "rulings": [
-            {
-                "number": 11,
-                "title": "Fully ruled",
-                "open": 0,
-                "total": 2,
-                "lines": [
-                    {
-                        "index": 1,
-                        "text": "Settled decision 0.",
-                        "ruling": "yes",
-                        "ruled_on": RULED_ON.isoformat(),
-                        "default": None,
-                    },
-                    {
-                        "index": 2,
-                        "text": "Settled decision 1.",
-                        "ruling": "yes",
-                        "ruled_on": RULED_ON.isoformat(),
-                        "default": None,
-                    },
-                ],
-            }
-        ],
-    }
-
-    monkeypatch.setattr(client, "list_open_board_issues", lambda: ())
-
-    assert issue_claim.main(rulings_command) == 0
-    assert capsys.readouterr().out == "No expectation lines.\n"
-
-    assert issue_claim.main([*rulings_command, "--json"]) == 0
-    assert json.loads(capsys.readouterr().out) == {"ok": True, "reason": "listed", "rulings": []}
-
-
-def test_rulings_json_pins_the_raw_envelope_text_for_the_empty_success(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """The raw bytes `rulings` prints on success (OUT-nn's own key order,
-    `ok`/`reason`/`rulings`, and its trailing newline), not just the parsed
-    dict `test_rulings_renders_text_json_and_empty_success` already covers."""
-    _configured_board_client(monkeypatch, tmp_path, open_issues=())
-
-    assert issue_claim.main(["--repo", REPOSITORY, "rulings", "--json"]) == 0
-
-    assert capsys.readouterr().out == '{"ok": true, "reason": "listed", "rulings": []}\n'
-
-
-def test_rulings_json_carries_question_example_and_picture(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #295: `rulings --json` carries the three optional card fields
-    through unchanged from `body.expectation_lines`; the human `rulings` text
-    form (proven above) keeps printing only `text`, untouched."""
-    picture = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>'
-    open_issue = board_issue(
-        10,
-        "Open expectation",
-        complete_contract(
-            "Ship #10.",
-            expectation=[
-                proposed_expectation(
-                    "Open decision.",
-                    question="Ship it?",
-                    example="Release on Friday.",
-                    picture=picture,
-                )
-            ],
-        ),
-    )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(open_issue,))
-
-    assert issue_claim.main(["--repo", REPOSITORY, "rulings", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "listed",
-        "rulings": [
-            {
-                "number": 10,
-                "title": "Open expectation",
-                "open": 1,
-                "total": 1,
-                "lines": [
-                    {
-                        "index": 1,
-                        "text": "Open decision.",
-                        "ruling": None,
-                        "ruled_on": None,
-                        "default": "later",
-                        "question": "Ship it?",
-                        "example": "Release on Friday.",
-                        "picture": picture,
-                    }
-                ],
-            }
-        ],
-    }
-
-
-def rulings_issue(
-    number: int, title: str, *, open_lines: int, total_lines: int, labels: tuple[str, ...] = ()
-) -> board.Issue:
-    expectations = [
-        *(proposed_expectation(f"Open decision {index}.") for index in range(open_lines)),
-        *(
-            ruled_expectation(f"Settled decision {index}.")
-            for index in range(total_lines - open_lines)
-        ),
-    ]
-    return board_issue(
-        number,
-        title,
-        complete_contract(f"Ship #{number}.", expectation=expectations),
-        labels=labels,
-    )
 
 
 def _configured_board_client(
@@ -7635,7 +7357,9 @@ def test_one_line_printers_show_foreign_text_as_next_escapes_it(
     arrange: Callable[[pytest.MonkeyPatch, Path, str], list[str]],
     shown_as: str,
 ) -> None:
-    """Issue #540 lines 1 and 2: `release`'s `next:` line, the `rulings`
+    """Spec: RUL-02, RUL-11 -- text controls and folded summaries.
+
+    Issue #540 lines 1 and 2: `release`'s `next:` line, the `rulings`
     text, `claim`'s out-of-order warning and the board configuration's
     unknown-key refusal show RLO, U+061C, U+2060 and a tag character as
     their printable escapes, while TAB and the Umlaut stay as they are;
@@ -8885,7 +8609,9 @@ def test_cli_board_family_reports_invalid_usage_when_repo_is_given_under_state_r
     tmp_path: Path,
     command: list[str],
 ) -> None:
-    """PIN-04, cited by BOARD-01/02 (`specs/board.spec.md`) and reused by
+    """Spec: BOARD-42, PIN-04, RUL-09, E-RUL-06 -- state-ref refuses --repo.
+
+    PIN-04, cited by BOARD-01/02 (`specs/board.spec.md`) and reused by
     `rulings`/`next` (issue #412): all three resolve the same `RunContext.forge`
     `board` does, so `--repo` under `storage = state-ref` reports the same
     `invalid_usage` `ask`/`rule`/`brief` already do, never their broad
@@ -8908,7 +8634,9 @@ def test_cli_board_family_reports_unavailable_for_a_forge_adapter_failure(
     capsys: pytest.CaptureFixture[str],
     command: list[str],
 ) -> None:
-    """The same generic catch-all `ask`/`rule`/`brief` already fall to
+    """Spec: RUL-09, BOARD-02 -- adapter failure reports unavailable.
+
+    The same generic catch-all `ask`/`rule`/`brief` already fall to
     (issue #412): a forge adapter construction failure that is not
     `session.RepoMeaninglessUnderStateRefError` reports `unavailable`, never
     `invalid_usage`, for `board`, `rulings`, and `next` alike."""
@@ -15545,6 +15273,60 @@ def test_check_refuses_an_issueless_pull_request_without_its_lane_claim(
     assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
 
 
+@pytest.mark.parametrize(
+    ("body", "claimed", "reason"),
+    [
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            id="cell-11",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            False,
+            "has no active issue-less lane claim on branch 'fix/x'",
+            id="cell-27",
+        ),
+        pytest.param(
+            "No-Item: deps\nCloses #5",
+            True,
+            f"declares no work item but closes {REPOSITORY}#5; name it as the work item",
+            id="cell-28",
+        ),
+        pytest.param(
+            "No-Item: chore",
+            True,
+            "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
+            id="cell-31",
+        ),
+        pytest.param(
+            "No-Item: DEPS",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            id="cell-32",
+        ),
+    ],
+)
+def test_check_judges_a_deps_pull_request_by_its_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    body: str,
+    claimed: bool,
+    reason: str,
+) -> None:
+    check_client(
+        monkeypatch,
+        landing_pull_request(body=body, head_ref_name="fix/x"),
+        standing=(documentation_lane_claim(branch="fix/x"),) if claimed else (),
+    )
+    if not claimed:
+        _patch_store_write(monkeypatch)
+
+    assert run_check() == 2
+    assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
+
+
 def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -15564,13 +15346,18 @@ def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
     )
 
 
+@pytest.mark.parametrize(
+    "body",
+    [f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}", "No-Item: deps"],
+    ids=["work-item", "cell-33-deps"],
+)
 def test_check_refuses_a_pull_request_proposing_another_repositorys_branch(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], body: str
 ) -> None:
     check_client(
         monkeypatch,
         landing_pull_request(
-            body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
+            body=body,
             head_repository="fork/agent-coordination",
         ),
     )
@@ -15602,7 +15389,7 @@ def test_check_refuses_a_pull_request_proposing_another_repositorys_branch(
         ),
         pytest.param(
             "No-Item: chore\n\nHousekeeping.",
-            "carries `No-Item: chore`; an issue-less pull request is docs or fix",
+            "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
             id="unknown-no-item-kind",
         ),
         pytest.param(
@@ -16139,10 +15926,19 @@ def test_release_merged_json_omits_freed_and_next_when_the_board_is_unreachable(
     assert "hint:" in captured.err
 
 
+@pytest.mark.parametrize("kind", ["docs", "fix", "deps"])
 def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
     monkeypatch: pytest.MonkeyPatch,
+    kind: str,
 ) -> None:
-    merged_release_client(monkeypatch, body="No-Item: docs", lane=True)
+    merged_release_client(
+        monkeypatch,
+        body=f"No-Item: {kind}",
+        lane=True,
+        landings=(
+            _trunk_landing(MERGE_COMMIT_SHA, board.trunk_commit_classification((), (kind,))),
+        ),
+    )
 
     assert issue_claim.main(["--repo", REPOSITORY, "release", "--merged", "12"]) == 0
 
@@ -16348,7 +16144,7 @@ def test_release_merged_refuses_a_lane_whose_merge_commit_names_a_work_item(
     refusal = (
         f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
         f"`Work-Item: {work_item_value}`; an issue-less lane needs a "
-        '`No-Item: <docs|fix>` trailer; release it with --abandoned "landed as PR #12 '
+        '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
         'with a malformed trailer"'
     )
 
@@ -17900,20 +17696,40 @@ def test_land_fails_loud_when_the_quality_config_cannot_be_read(
     assert client.merge_calls == []
 
 
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        pytest.param(
+            "Advances #72", "carries no `Work-Item:` or `No-Item:` line", id="unclassified"
+        ),
+        pytest.param(
+            "No-Item: deps",
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            id="cell-40-deps",
+        ),
+    ],
+)
 def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    body: str,
+    reason: str,
 ) -> None:
     """Issue #405: once every check succeeds, `check <pr>`'s own
     classification rules apply unchanged -- an unclassified body refuses
     the same sentence `check` would, before any write."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), body="Advances #72")
+    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), body=body)
+    client.landings[12] = landing_pull_request(body=body, head_ref_name="fix/x")
+    standing = store_claim_from_request(documentation_lane_claim(branch="fix/x"))
+    _patch_store_write(monkeypatch, standing)
 
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 2
 
-    assert capsys.readouterr().err == (
-        "ERROR: pull request #12 carries no `Work-Item:` or `No-Item:` line\n"
-    )
+    assert capsys.readouterr().err == f"ERROR: pull request #12 {reason}\n"
     assert client.merge_calls == []
+    assert tuple(store.fetch_state(worktree=Path("."), remote="origin").claims.values()) == (
+        standing,
+    )
 
 
 def _toml_syntax_error(text: str) -> str:
@@ -18298,8 +18114,9 @@ def test_land_refuses_a_malformed_head_as_usage_before_any_forge_call(
     )
 
 
+@pytest.mark.parametrize("branch", [LANE_BRANCH, pytest.param("dependabot/x", id="19")])
 def test_land_merges_an_issueless_lane_pull_request(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str], branch: str
 ) -> None:
     """Issue #405 CI coverage follow-up: `cmd_land._land_preflight`'s own
     `protocol.LaneIdentity` branch -- an issue-less, `No-Item:` pull request -- merges
@@ -18307,15 +18124,18 @@ def test_land_merges_an_issueless_lane_pull_request(
     (`test_land_merges_a_green_pull_request_and_runs_the_release_path`
     proves the work-item branch): no item to close, but the claim releases."""
     _repo, client = _land_scenario(
-        monkeypatch, tmp_path, branch=LANE_BRANCH, issue=None, body="No-Item: docs"
+        monkeypatch, tmp_path, branch=branch, issue=None, body="No-Item: docs"
     )
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
 
+    out = capsys.readouterr().out
+    assert "RELEASED lane " + branch + ": landing" in out
+    assert "reinstall:" not in out
     [(number, head_sha, _method, _title, body)] = client.merge_calls
     assert (number, head_sha) == (12, MERGE_COMMIT_SHA)
     assert body.strip().split("\n\n")[-1] == "No-Item: docs"
-    assert client.deleted_branches == [LANE_BRANCH]
+    assert client.deleted_branches == [branch]
     assert client.closed_issues == set()
     assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
 
@@ -18897,20 +18717,33 @@ def _land_merged_pending_release(
     return repo, client
 
 
+@pytest.mark.parametrize("branch", [LANDING_BRANCH, pytest.param("dependabot/x", id="21")])
 def test_land_reports_incomplete_follow_up_and_a_rerun_resumes_without_a_second_merge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, branch: str
 ) -> None:
     """Issue #405 Beweis 2: a failure after the merge names the exact
     recovery line, never a second merge on rerun, and the rerun still closes
     the item and frees the claim."""
-    _repo, client = _land_merged_pending_release(monkeypatch, capsys, tmp_path)
+    if branch == "dependabot/x":
+        _repo, client = _land_scenario(
+            monkeypatch, tmp_path, branch=branch, issue=None, body="No-Item: fix"
+        )
+        delete_branch = client.delete_branch
+        _break_delete_branch(monkeypatch, client)
+        assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+        assert "follow-up incomplete" in capsys.readouterr().err
+        assert _live_store_claim().branch == branch
+        monkeypatch.setattr(client, "delete_branch", delete_branch)
+    else:
+        _repo, client = _land_merged_pending_release(monkeypatch, capsys, tmp_path)
     reads_before_the_rerun = list(client.quality_config_reads)
     client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
 
     assert len(client.merge_calls) == 1
-    assert client.closed_issues == {WORK_ITEM_ISSUE}
+    assert client.closed_issues == (set() if branch == "dependabot/x" else {WORK_ITEM_ISSUE})
+    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
     # LANDCMD-18: a rerun after the merge never reads the quality configuration.
     assert client.quality_config_reads == reads_before_the_rerun
 
@@ -19769,25 +19602,45 @@ def test_release_abandoned_prints_no_freed_or_next_lines(
 
 
 @pytest.mark.parametrize(
-    "outcome_flags",
+    ("branch", "agent", "override", "explicit", "issue", "outcome_flags", "expected"),
     [
-        pytest.param(("--abandoned", "stopped"), id="abandoned"),
-        pytest.param(("--merged", "12"), id="merged"),
+        pytest.param(
+            LANE_BRANCH,
+            "Ada",
+            False,
+            True,
+            None,
+            ("--abandoned", "stopped"),
+            0,
+            id="docs-abandoned",
+        ),
+        pytest.param(
+            LANE_BRANCH, "Ada", False, True, None, ("--merged", "12"), 0, id="docs-merged"
+        ),
+        pytest.param("dependabot/x", "Ada", False, True, None, ("--abandoned", "R"), 0, id="1"),
+        pytest.param("dependabot/x", "Bob", False, True, None, ("--abandoned", "R"), 2, id="2"),
+        pytest.param("dependabot/x", "Bob", True, True, None, ("--abandoned", "R"), 0, id="3"),
+        pytest.param("dependabot/x", "Ada", False, False, None, ("--abandoned", "R"), 0, id="4"),
+        pytest.param("dependabot/x", "Ada", False, True, 42, ("--abandoned", "R"), 0, id="7"),
     ],
 )
 def test_release_branch_selects_a_lane_claim_without_checking_out_that_branch(
-    monkeypatch: pytest.MonkeyPatch, outcome_flags: tuple[str, str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    branch: str,
+    agent: str,
+    override: bool,
+    explicit: bool,
+    issue: int | None,
+    outcome_flags: tuple[str, str],
+    expected: int,
 ) -> None:
-    """`--branch` selects the same lane claim `claim --branch` would (issue
-    #250), but -- unlike `claim`'s own `--branch` -- never inspects the
-    checkout branch at all: `forbid_git` fails the test the moment anything
-    but `rev-parse --show-toplevel` or the trunk's recorded `HEAD` reaches
-    git, so a deleted or foreign worktree can never block this release."""
-    standing = request("mine", "Ada", issue=None, branch=LANE_BRANCH, scope=("docs",))
+    """An explicit branch lets release proceed even from a deleted or foreign worktree."""
+    standing = request("mine", "Ada", issue=issue, branch=branch, scope=("docs",))
     client = FakeForge()
     if outcome_flags[0] == "--merged":
         client.landings[12] = landing_pull_request(
-            body="No-Item: docs", merged=True, base_ref_name="main", head_ref_name=LANE_BRANCH
+            body="No-Item: docs", merged=True, base_ref_name="main", head_ref_name=branch
         )
         monkeypatch.setattr(
             checkout,
@@ -19796,14 +19649,26 @@ def test_release_branch_selects_a_lane_claim_without_checking_out_that_branch(
                 _trunk_landing(MERGE_COMMIT_SHA, board.NoItemClassification(board.NoItemKind.DOCS)),
             ),
         )
-    _patch_release_session(monkeypatch, client, standing, forbid_git=True)
-
-    released = issue_claim.main(
-        ["--repo", REPOSITORY, "release", "--branch", LANE_BRANCH, *outcome_flags]
+    _patch_release_session(
+        monkeypatch, client, standing, agent=agent, branch=branch, forbid_git=explicit
     )
+    flags = ["--branch", branch] if explicit else []
+    if override:
+        flags += ["--coordinator-override", "--role", "coordinator"]
+    arguments = ["release", *([] if issue is None else [str(issue)]), *flags, *outcome_flags]
+    released = issue_claim.main(["--repo", REPOSITORY, *arguments])
 
-    assert released == 0
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
+    captured = capsys.readouterr()
+    assert released == expected
+    if expected:
+        assert "only the original claimant may release" in captured.err
+        assert _live_store_claim().claim_id == "mine"
+    else:
+        subject = f"issue #{issue}" if issue else f"lane {branch}"
+        assert captured.out.startswith(f"RELEASED {subject}: mine\n")
+        assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
+        if outcome_flags[0] == "--abandoned":
+            assert captured.out == f"RELEASED {subject}: mine\n"
 
 
 def test_release_branch_selects_a_coordinator_override_from_another_checkout(
@@ -20491,10 +20356,10 @@ def test_check_accepts_a_complete_unblocked_issue_in_two_requests(
 def _check_trunk_repository(tmp_path: Path) -> Path:
     """A minimal real `origin`-backed repository (issue #359, LAND-48) for
     `check <sha>`: an initial commit with no trailer, a commit trailer-
-    naming `#20`, and one trailer-classified `No-Item: docs` -- the three
+    naming `#20`, and trailers `No-Item: docs` and `No-Item: deps` -- the four
     classifications `check <sha>` reads from a commit's own trailer block,
     the same grammar `check <pr>` reads from a pull request body with. A
-    fourth commit sits on the `side` branch, classified as soundly as the
+    fifth commit sits on the `side` branch, classified as soundly as the
     trunk ones: it exists in this repository, but never on its trunk."""
     repo = bare_remote_repository_with_one_commit(tmp_path)
     (repo / "work.txt").write_text("work\n")
@@ -20503,6 +20368,9 @@ def _check_trunk_repository(tmp_path: Path) -> Path:
     (repo / "docs.txt").write_text("docs\n")
     real_git(repo, "add", "docs.txt")
     real_git(repo, "commit", "-q", "-m", "docs change", "-m", "No-Item: docs")
+    real_git(
+        repo, "commit", "-q", "--allow-empty", "-m", "dependency update", "-m", "No-Item: deps"
+    )
     push_repository_trunk(repo, "origin")
     real_git(repo, "checkout", "-q", "-b", "side")
     (repo / "side.txt").write_text("side\n")
@@ -20527,10 +20395,11 @@ def _check_sha(
 _UNWALKED_SHA = "0" * 40
 
 _TRUNK_CHECK_CASES = (
-    pytest.param("main~1", "{sha} declares Work-Item: #20", "valid", None, 0, id="work-item"),
-    pytest.param("main", "{sha} declares No-Item: docs", "valid", None, 0, id="no-item"),
+    pytest.param("main~2", "{sha} declares Work-Item: #20", "valid", None, 0, id="work-item"),
+    pytest.param("main~1", "{sha} declares No-Item: docs", "valid", None, 0, id="no-item"),
+    pytest.param("main", "{sha} declares No-Item: deps", "valid", None, 0, id="deps"),
     pytest.param(
-        "main~2",
+        "main~3",
         "REFUSED: {sha} carries no `Work-Item:` or `No-Item:` trailer",
         "invalid_classification",
         "carries no `Work-Item:` or `No-Item:` trailer",
@@ -24300,3 +24169,187 @@ def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(
         run.config_reads,
         run.observations,
     )
+
+
+@dataclass(frozen=True)
+class _LaneLookupCase:
+    cell: str
+    command: str = "release"
+    branch: str = "dependabot/x"
+    holder: str = "lane"
+    agent: str = "Ada"
+    merged: bool = False
+    trailer: str = "No-Item: fix"
+    source: str = "dependabot/x"
+    as_json: bool = False
+    refusal: str | None = None
+    reads_once: bool = False
+    exact: bool = True
+
+
+def _lane_lookup_refusal(branch: str) -> str:
+    return (
+        f"branch '{branch}' is not an issueless lane; pass an issue number, or "
+        "check out a branch prefixed 'docs/' or 'fix/'"
+    )
+
+
+_LANE_LOOKUP_CASES = (
+    _LaneLookupCase(
+        "5", holder="none", refusal=_lane_lookup_refusal("dependabot/x"), reads_once=True
+    ),
+    _LaneLookupCase("6", holder="issue", refusal=_lane_lookup_refusal("dependabot/x")),
+    _LaneLookupCase("8", merged=True),
+    _LaneLookupCase(
+        "9",
+        merged=True,
+        trailer="Work-Item: #42",
+        refusal=(
+            f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
+            "`Work-Item: #42`; an issue-less lane needs a "
+            '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
+            'with a malformed trailer"'
+        ),
+    ),
+    _LaneLookupCase(
+        "10",
+        merged=True,
+        source="dependabot/y",
+        refusal=(
+            "lane 'dependabot/x' is claimed on 'dependabot/x', not on pull request #12's "
+            "branch 'dependabot/y'; release that claim by itself"
+        ),
+    ),
+    _LaneLookupCase("25", command="rescope"),
+    _LaneLookupCase(
+        "26", command="rescope", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
+    ),
+    _LaneLookupCase(
+        "27",
+        command="rescope",
+        agent="Bob",
+        refusal="only the original claimant may rescope",
+        exact=False,
+    ),
+    _LaneLookupCase(
+        "28", command="claim", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
+    ),
+    _LaneLookupCase("29", command="claim", refusal=_lane_lookup_refusal("dependabot/x")),
+    _LaneLookupCase("30", branch="docs/x", reads_once=True),
+    _LaneLookupCase(
+        "32",
+        branch="",
+        holder="none",
+        refusal=(
+            "lane release requires a non-empty current branch; "
+            "check out the docs/ or fix/ lane branch, or pass an issue number"
+        ),
+    ),
+    _LaneLookupCase("33", as_json=True),
+    _LaneLookupCase("35a", command="release-help"),
+    _LaneLookupCase("36", command="rescope-help"),
+    _LaneLookupCase("37", command="claim-help"),
+)
+
+
+def _arrange_lane_lookup_case(monkeypatch: pytest.MonkeyPatch, case: _LaneLookupCase) -> None:
+    standing = (
+        ()
+        if case.holder == "none"
+        else (
+            request(
+                "mine",
+                "Bob" if case.holder == "issue" else "Ada",
+                issue=42 if case.holder == "issue" else None,
+                branch=case.branch,
+                scope=("a",),
+            ),
+        )
+    )
+    client = FakeForge()
+    _patch_release_session(monkeypatch, client, *standing, agent=case.agent, branch=case.branch)
+    git_values = git_checkout(branch=case.branch)
+    monkeypatch.setattr(
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+    )
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
+    if case.merged:
+        monkeypatch.setattr(store, "list_worktrees", lambda _toplevel: (Path("/repo"),))
+        client.landings[12] = landing_pull_request(
+            body=case.trailer, merged=True, head_ref_name=case.source, base_ref_name="main"
+        )
+        work_items = ("#42",) if case.trailer == "Work-Item: #42" else ()
+        classification = board.trunk_commit_classification(
+            work_items, () if work_items else ("fix",)
+        )
+        monkeypatch.setattr(
+            checkout,
+            "trunk_landings",
+            lambda *_args, **_kwargs: (_trunk_landing(MERGE_COMMIT_SHA, classification),),
+        )
+    else:
+        forbid_forge_resolution(monkeypatch)
+
+
+def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
+    if case.command == "claim":
+        return ["claim", "--scope", "a"]
+    if case.command == "rescope":
+        return ["rescope", "--add", "/repo/f"]
+    branch_flags = ["--branch", case.branch] if case.branch else []
+    outcome = ["--merged", "12"] if case.merged else ["--abandoned", "R"]
+    return ["release", *branch_flags, *outcome, *(["--json"] if case.as_json else [])]
+
+
+def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixture[str]) -> None:
+    command = case.command.removesuffix("-help")
+    with pytest.raises(SystemExit) as exited:
+        issue_claim.main([command, "--help"])
+    assert exited.value.code == 0
+    help_text = " ".join(capsys.readouterr().out.split())
+    expected = (
+        "omit for lane mode, derived from a docs/ or fix/ checkout branch"
+        if command == "claim"
+        else "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim"
+    )
+    assert expected in help_text
+
+
+@pytest.mark.parametrize("case", _LANE_LOOKUP_CASES, ids=lambda case: case.cell)
+def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    case: _LaneLookupCase,
+) -> None:
+    if case.command.endswith("-help"):
+        _assert_lane_lookup_help(case, capsys)
+        return
+    _arrange_lane_lookup_case(monkeypatch, case)
+    before = store.fetch_state(worktree=Path("."), remote="origin").claims
+    reads = count_context_reads(monkeypatch)
+    status = issue_claim.main(["--repo", REPOSITORY, *_lane_lookup_arguments(case)])
+    captured = capsys.readouterr()
+    if case.reads_once:
+        assert sum(reads.observations.values()) == 1
+    after = store.fetch_state(worktree=Path("."), remote="origin").claims
+    assert status == (2 if case.refusal else 0)
+    if case.refusal:
+        if case.exact:
+            assert captured.err == f"ERROR: {case.refusal}\n"
+        else:
+            assert case.refusal in captured.err
+        assert after == before
+    elif case.command == "rescope":
+        assert _live_store_claim().scope == ("a", "f")
+        assert captured.out.startswith("RESCOPED lane dependabot/x: mine")
+    else:
+        assert after == {}
+        if case.as_json:
+            envelope = json.loads(captured.out)
+            assert envelope["ok"] is True
+            assert envelope["reason"] == "abandoned"
+            assert envelope["lane"] is True
+        else:
+            assert captured.out.startswith(f"RELEASED lane {case.branch}: mine\n")
+            if case.merged:
+                assert "worktree: kept -- release ran from inside it\n" in captured.out

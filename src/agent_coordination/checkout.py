@@ -1709,7 +1709,8 @@ def _lane_work_item_trailer_defect(work_item_values: tuple[str, ...], pull_reque
     change, so the lane is released as abandoned with the landing named."""
     values = ", ".join(work_item_values)
     return (
-        f"carries `Work-Item: {values}`; an issue-less lane needs a `No-Item: <docs|fix>` "
+        f"carries `Work-Item: {values}`; an issue-less lane needs a "
+        f"`No-Item: <{board.NO_ITEM_KINDS_TRAILER}>` "
         f'trailer; release it with --abandoned "landed as PR #{pull_request} '
         'with a malformed trailer"'
     )
