@@ -1,0 +1,8 @@
+claim_id = "0a522c3506414250879446ebbe3fec7b"
+agent = "claude"
+role = "builder"
+base = "ed89b2706403a50723149fc4d0bed59a2cffbbf2"
+branch = "claude/issue-165-b2p-adopt-refusals"
+scope = ["README.md", "pyproject.toml", "specs/adopt.spec.md", "specs/output.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_adopt.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/policy.py", "src/agent_coordination/protocol.py", "tests/cli_fixtures.py", "tests/test_adopt.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_policy.py"]
+opened_commit = "e1b550c5e9c57e7428973275b2185f1ec75805aa"
+whole_reason = "aco adopt bringt jede Ablehnung seines Vertrags vor einem Schreibschritt als einen neuen Befehl; seine Entscheider stehen in policy, board und protocol neben ihren Zwillingen, und Repository-Prüfung, Konfliktsatz und Listing-Defekt enden je mit einem Owner."
