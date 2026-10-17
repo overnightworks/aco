@@ -4,13 +4,13 @@
 port: both talk to a different backend for the same board data, and
 neither imports the other. Unlike `GitHubForge`, this adapter performs no
 IO of its own -- the Layers contract puts `store` above this module, so
-`cli._state_ref_forge` reads `items/`'s raw bytes and blob oids through
+`session._state_ref_forge` reads `items/`'s raw bytes and blob oids through
 `store.read_item_files`/`ClaimState.items` and hands them to the
 constructor; every read method below is a pure projection over that
 already-fetched data. Every write (`create_item`, `create_child`,
 `update_item_body`, `close_item`, `link_child`) instead calls the injected `ItemWriter`
 port: one
-compare-and-swap write to `items/<id>.md`, implemented in `cli.py` over
+compare-and-swap write to `items/<id>.md`, implemented in `session._StoreItemWriter` over
 `store` (hash-object once, then one `commit_transition` with an
 `ItemWriteIntent`, issue #279; `close_item` through the port's own
 `close_item` and an `ItemCloseIntent`, issue #459) -- so this module still
@@ -90,7 +90,7 @@ class ItemWriter(Protocol):
     oid the caller's own already-read snapshot carries (`None` for "must not
     exist yet"), `content` the item's finished new bytes -- returning the
     freshly written blob's oid, so the caller can update its own in-memory
-    state without a re-fetch. Implemented in `cli.py`, over `store`
+    state without a re-fetch. Implemented in `session._StoreItemWriter`, over `store`
     (hash-object once, then one `commit_transition` with an
     `ItemWriteIntent`, issue #279, or for a close an `ItemCloseIntent`,
     issue #459): this module may not import `store` itself (Layers
@@ -372,7 +372,7 @@ class StateRefBoard:
     @property
     def requests(self) -> int:
         """Always zero: every byte this adapter reads was already fetched
-        by `cli._state_ref_forge` before construction (issue #248) -- no
+        by `session._state_ref_forge` before construction (issue #248) -- no
         method below costs a further round trip."""
         return 0
 

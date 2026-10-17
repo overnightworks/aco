@@ -65,6 +65,7 @@ from agent_coordination import (
     items,
     process,
     protocol,
+    session,
     store,
 )
 from agent_coordination import cli as issue_claim
@@ -662,7 +663,7 @@ def _fetch_state_ref_board(
 
 
 def _store_item_writer(remote: Path, worktree_path: Path) -> ItemWriter:
-    """The production `cli._StoreItemWriter`, writing from `worktree_path`
+    """The production `session._StoreItemWriter`, writing from `worktree_path`
     over `remote` -- configured there as its canonical remote -- through a
     run context that stands for that checkout."""
 
@@ -672,7 +673,7 @@ def _store_item_writer(remote: Path, worktree_path: Path) -> ItemWriter:
     real_git(worktree_path, "config", "remote.canonical.url", str(remote))
     context = RunContext(None, build_forge=no_forge).for_directory(worktree_path, is_toplevel=True)
     context.config = board.BoardConfig(canonical_remote="canonical", storage=Storage.STATE_REF)
-    return issue_claim._StoreItemWriter(context)
+    return session._StoreItemWriter(context)
 
 
 @pytest.fixture
@@ -1353,7 +1354,7 @@ class TestTwoAdapterParity:
 class TestStateRefBoardWrites:
     """`StateRefBoard`'s three mutating operations (issue #283), driven
     directly against a real bare remote through the production
-    `cli._StoreItemWriter` -- the same git plumbing `_state_ref_forge`
+    `session._StoreItemWriter` -- the same git plumbing `session._state_ref_forge`
     wires in production, never a fake CAS."""
 
     def _writer(self, remote: Path, worktree_path: Path) -> ItemWriter:
@@ -1773,7 +1774,7 @@ def _path_without_gh(tmp_path: Path) -> str:
 
 
 class TestCliStateRefForge:
-    """`cli._state_ref_forge` (issue #248, Sonnet review blocking 4) driven
+    """`session._state_ref_forge` (issue #248, Sonnet review blocking 4) driven
     through the real CLI entry point against a real bare `file://` remote
     and a real checkout -- never through a fake or a monkeypatch of the
     function itself, unlike every other CLI test, which stands in a stub for
@@ -1824,7 +1825,7 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         """Issue #283 proof 1: `aco rule` under `storage = state-ref` writes
-        straight into `items/<id>.md` through `_StoreItemWriter` -- no
+        straight into `items/<id>.md` through `session._StoreItemWriter` -- no
         `gh`, no forge -- and a second `aco rulings` invocation (its own
         fresh fetch, standing in for a second process) reads the line back
         ruled."""
@@ -1922,7 +1923,7 @@ class TestCliStateRefForge:
     ) -> None:
         """Issue #283 proof 2: `aco ask --text ...` under `storage =
         state-ref` appends the proposed line straight into `items/<id>.md`
-        through `_StoreItemWriter` -- no `gh`, no forge -- and a second `aco
+        through `session._StoreItemWriter` -- no `gh`, no forge -- and a second `aco
         rulings` invocation (its own fresh fetch, standing in for a second
         process) reads the line back open, its `--json` carrying the asked
         `--default` (RUL-12)."""
@@ -2598,10 +2599,10 @@ class TestCliStateRefForge:
         before_ids = set(before_state.items)
 
         competing_write_done = {"done": False}
-        original_write_item = issue_claim._StoreItemWriter.write_item
+        original_write_item = session._StoreItemWriter.write_item
 
         def _write_item_then_race_the_container(
-            self: issue_claim._StoreItemWriter,
+            self: session._StoreItemWriter,
             item_id: str,
             *,
             expected: protocol.ObjectId | None,
@@ -2634,7 +2635,7 @@ class TestCliStateRefForge:
             return result
 
         monkeypatch.setattr(
-            issue_claim._StoreItemWriter, "write_item", _write_item_then_race_the_container
+            session._StoreItemWriter, "write_item", _write_item_then_race_the_container
         )
 
         first_status = issue_claim.main(["cut", str(CONTAINER_NUMBER), "--title", "Slice C"])
@@ -2855,7 +2856,7 @@ class TestCliStateRefForge:
     ) -> None:
         """PIN-05 (issue #490): no `git remote set-head` ever ran here, so
         the canonical remote's `HEAD` stays unresolved -- the refusal
-        `_state_ref_forge` owns names that remote, worded exactly as the run
+        `session._state_ref_forge` owns names that remote, worded exactly as the run
         tells the operator to fix it."""
         remote_url = f"file://{bare_remote}"
         real_git(worktree, "remote", "add", canonical_remote, remote_url)
