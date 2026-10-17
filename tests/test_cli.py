@@ -19485,19 +19485,21 @@ def test_land_from_a_separate_clone_releases_or_refuses_before_the_merge(
     assert (tmp_path / "lane").exists()
 
 
-def _land_then_rerun_land_after_the_release_finished(
+def _land_and_release_the_lane_claim(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     branch: str,
-) -> tuple[Path, Path, FakeForge, str]:
+) -> tuple[Path, Path, FakeForge]:
     """`aco land 12` from a separate clone released the claim on `branch`
-    (the landing issue's own, or a foreign branch's issue-less lane), then
-    `aco land 12` rerun there: the repository, the clone, the forge, and
-    the `aco release` line the rerun prints for the checkout holding the lane."""
-    foreign = branch != LANDING_BRANCH
+    (the landing issue's own, or a foreign branch's issue-less lane): the
+    repository holding the lane worktree, the clone, and the forge, set up
+    for a rerun."""
     repo, clone, client = _land_from_a_separate_clone(
-        monkeypatch, tmp_path, git_identity=True, lane_branch=branch if foreign else None
+        monkeypatch,
+        tmp_path,
+        git_identity=True,
+        lane_branch=None if branch == LANDING_BRANCH else branch,
     )
     client.allowed_methods = frozenset({_SQUASH})
     recorded_head = real_git(repo, "rev-parse", branch).stdout.strip()
@@ -19508,41 +19510,52 @@ def _land_then_rerun_land_after_the_release_finished(
     client.landing_comments.clear()
     client.issue_reference_lookups.clear()
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    item = "" if foreign else f" {WORK_ITEM_ISSUE}"
-    rerun = f"aco release{item} --merged 12 --branch {branch}"
-    land_status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-    land_output = capsys.readouterr()
-    assert (land_status, land_output.err, land_output.out) == (
-        0,
-        "",
-        "LANDED pull request #12 already; nothing left to release\n"
-        f"worktree: kept -- no linked worktree on {branch} in this checkout; "
-        f"run {rerun} in the checkout that holds it\n",
-    )
-    return repo, clone, client, rerun
+    return repo, clone, client
 
 
 _FOREIGN_BRANCH = "dependabot/x"
+_RERUN_ROWS = (
+    ("removes-the-lane", False, False, False, "removed"),
+    (
+        "a-claim-taken-meanwhile-keeps-the-lane",
+        False,
+        True,
+        False,
+        "kept -- claimed again while this release ran",
+    ),
+    (
+        "the-keep-worktree-flag-keeps-the-lane",
+        False,
+        False,
+        True,
+        "kept -- --keep-worktree was given",
+    ),
+)
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
-@pytest.mark.parametrize("branch", [LANDING_BRANCH, _FOREIGN_BRANCH], ids=["issue", "foreign-lane"])
 @pytest.mark.parametrize(
-    ("claimed_meanwhile", "keep_worktree_flag", "worktree"),
+    (
+        "branch",
+        "claimed_before_the_land_rerun",
+        "claimed_meanwhile",
+        "keep_worktree_flag",
+        "worktree",
+    ),
     [
-        pytest.param(False, False, "removed", id="removes-the-lane"),
+        pytest.param(branch, *row[1:], id=f"{branch_id}-{row[0]}")
+        for branch, branch_id in ((LANDING_BRANCH, "issue"), (_FOREIGN_BRANCH, "foreign-lane"))
+        for row in _RERUN_ROWS
+    ]
+    + [
         pytest.param(
+            _FOREIGN_BRANCH,
             True,
             False,
-            "kept -- claimed again while this release ran",
-            id="a-claim-taken-meanwhile-keeps-the-lane",
-        ),
-        pytest.param(
             False,
-            True,
-            "kept -- --keep-worktree was given",
-            id="the-keep-worktree-flag-keeps-the-lane",
-        ),
+            "",
+            id="foreign-lane-an-issue-claim-taken-since-the-release-refuses",
+        )
     ],
 )
 def test_land_rerun_after_its_release_finishes_and_names_the_release_that_removes_the_lane(
@@ -19550,6 +19563,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     branch: str,
+    claimed_before_the_land_rerun: bool,
     claimed_meanwhile: bool,
     keep_worktree_flag: bool,
     worktree: str,
@@ -19562,12 +19576,34 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     removes it. The trigger is the missing claim, never a closed item: a
     reopened item stays open, uncommented and unread (REL-47). A claim
     taken while that release verifies the landing keeps the lane (REL-55) --
-    on a foreign branch whichever claim it is (REL-59)."""
-    repo, clone, client, rerun = _land_then_rerun_land_after_the_release_finished(
-        monkeypatch, capsys, tmp_path, branch
-    )
+    on a foreign branch whichever claim it is (REL-59) -- and one taken
+    before the rerun refuses REL-03 there (REL-58)."""
+    repo, clone, client = _land_and_release_the_lane_claim(monkeypatch, capsys, tmp_path, branch)
     remote = tmp_path / "remote.git"
     state_after_release = _state_ref_tip(clone, remote)
+    item = "" if branch == _FOREIGN_BRANCH else f" {WORK_ITEM_ISSUE}"
+    rerun = f"aco release{item} --merged 12 --branch {branch}"
+    if claimed_before_the_land_rerun:
+        _claim_the_landing_branch(repo, remote, "bob-claim", branch=branch)
+        state_after_release = _state_ref_tip(clone, remote)
+
+    land_status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
+
+    land_output = capsys.readouterr()
+    if claimed_before_the_land_rerun:
+        assert (land_status, land_output.out) == (2, "")
+        assert _lane_lookup_refusal(branch) in land_output.err
+        assert len(client.merge_calls) == 1
+        assert _state_ref_tip(clone, remote) == state_after_release
+        assert (tmp_path / "lane").exists()
+        return
+    assert (land_status, land_output.err, land_output.out) == (
+        0,
+        "",
+        "LANDED pull request #12 already; nothing left to release\n"
+        f"worktree: kept -- no linked worktree on {branch} in this checkout; "
+        f"run {rerun} in the checkout that holds it\n",
+    )
     redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     if claimed_meanwhile:
@@ -19600,30 +19636,6 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
         client.issue_reference_lookups,
     ) == (False, {}, [])
     assert (_state_ref_tip(clone, remote) == state_after_release) is not claimed_meanwhile
-
-
-@pytest.mark.usefixtures("isolated_global_git_config")
-def test_land_rerun_refuses_a_foreign_branch_an_issue_claim_holds_since_its_release(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """REL-58 (cell 24): after `aco land 12` released the lane on
-    `dependabot/x`, another agent's issue claim took that branch; the rerun's
-    delegated release refuses REL-03 instead of treating the branch as
-    unclaimed, merges nothing again, and leaves the claim and the lane."""
-    repo, clone, client, _rerun = _land_then_rerun_land_after_the_release_finished(
-        monkeypatch, capsys, tmp_path, _FOREIGN_BRANCH
-    )
-    remote = tmp_path / "remote.git"
-    _claim_the_landing_branch(repo, remote, "bob-claim", branch=_FOREIGN_BRANCH)
-    state_with_the_claim = _state_ref_tip(clone, remote)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    assert status == 2
-    assert _lane_lookup_refusal(_FOREIGN_BRANCH) in capsys.readouterr().err
-    assert len(client.merge_calls) == 1
-    assert _state_ref_tip(clone, remote) == state_with_the_claim
-    assert (tmp_path / "lane").exists()
 
 
 @pytest.mark.parametrize(
