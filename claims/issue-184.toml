@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "7b9431af87fa4f631662cceeca50cfa09f07401b"
 branch = "claude/issue-184-l1b-land-preflight-klassifikation-claim"
-scope = ["scripts/test_inventory_dropped.txt", "tests/github_fixtures.py", "tests/store_fixtures.py", "tests/test_cli.py", "tests/test_land_preflight.py", "tests/test_land_preflight_claim.py"]
+scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/store_fixtures.py", "tests/test_cli.py", "tests/test_land_preflight.py", "tests/test_land_preflight_claim.py"]
 opened_commit = "094d2e500edca4b3c4abbdbc08391a3bea052b77"
 whole_reason = "Die Preflight-Zeilen von aco land ab der Klassifikation verlassen test_cli.py in einem Schritt: ihre Zeilen stehen einmal in test_land_preflight_claim.py auf einer echten GitHub-Welt mit echtem Claim, die geteilte Welt und der Ablehnungs-Umschlag wohnen in den Fixture-Modulen, und das Ledger benennt den neuen Owner."
