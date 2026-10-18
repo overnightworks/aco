@@ -196,10 +196,9 @@ def world(
         real_git(github_clone, "branch", "--show-current").stdout,
     )
     assert checkout_before == case.checkout.value
-    assert (client.landings[12], client.readiness_by_number[12]) == (
-        case.pull_request,
-        case.readiness,
-    )
+    observed = (client.landings[12], client.readiness_by_number[12])
+    expected = (case.pull_request, case.readiness)
+    assert observed == expected
     result = ClaimWorld(
         github_clone,
         bare_remote,
