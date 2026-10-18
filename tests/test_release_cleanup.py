@@ -37,7 +37,7 @@ class Absent:
 
 @dataclass(frozen=True)
 class Unexpected:
-    exit: int
+    exit_status: int
     text: str
 
 
