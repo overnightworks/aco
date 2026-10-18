@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -72,7 +73,6 @@ class TrunkCase:
     fetch_calls: tuple[str, ...] = ("fetch",)
     origin_calls: tuple[str, ...] | None = None
     lane_exists: bool = False
-    expected_trunk: ExpectedTrunk = ExpectedTrunk.FAST_FORWARDED
 
 
 @dataclass
@@ -93,7 +93,7 @@ class PackageFile(Enum):
 @dataclass(frozen=True)
 class PackageCase:
     package: PackageFile
-    stdout: str
+    stdout: str = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
     rerun_stdout: str | None = None
     arguments: tuple[str, ...] = ("land", "12")
     status: int = 0
@@ -130,20 +130,27 @@ class KeepWorld:
     lane: Path
 
 
-@pytest.fixture
-def keep_world(
-    request: pytest.FixtureRequest,
+def landed_world(
     github_clone: Path,
-    bare_remote: Path,
+    remote: Path,
     monkeypatch: pytest.MonkeyPatch,
-) -> KeepWorld:
-    case: KeepCase = request.param
+    *,
+    extra_arrange: Callable[[FakeForge, str], None] | None = None,
+    verify: Callable[[FakeForge, str], None] | None = None,
+    default_branch: str = LANDING_DEFAULT_BRANCH,
+    head_config: str = "",
+) -> LaneLandingWorld:
     monkeypatch.setenv("LC_ALL", "C")
     monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     lane = github_clone.parent / "lane"
 
-    def arrange(client: FakeForge, _head: str) -> None:
+    def arrange(client: FakeForge, head: str) -> None:
+        if extra_arrange is not None:
+            extra_arrange(client, head)
         add_lane_worktree(github_clone, lane, "codex/issue-72-claims")
+        if verify is not None:
+            verify(client, head)
+            return
         observed = {
             "locale": os.environ["LC_ALL"],
             "discovery": os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"],
@@ -154,23 +161,35 @@ def keep_world(
         expected = {
             "locale": "C",
             "discovery": "1",
-            "checkout.branch": "main\n",
+            "checkout.branch": default_branch + "\n",
             "checkout.status": "",
             "landing.merged": False,
         }
         assert observed == expected
 
-    landing = lane_landing_world(
+    return lane_landing_world(
         github_clone,
-        bare_remote,
+        remote,
         monkeypatch,
         identity=protocol.IssueIdentity(72),
         branch="codex/issue-72-claims",
         body="Work-Item: #72\n\nCloses #72",
         methods=None,
+        default_branch=default_branch,
+        head_config=head_config,
         arrange=arrange,
     )
-    return KeepWorld(landing, case, lane)
+
+
+@pytest.fixture
+def keep_world(
+    request: pytest.FixtureRequest,
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> KeepWorld:
+    landing = landed_world(github_clone, bare_remote, monkeypatch)
+    return KeepWorld(landing, request.param, github_clone.parent / "lane")
 
 
 @pytest.fixture
@@ -181,8 +200,6 @@ def package_world(
     monkeypatch: pytest.MonkeyPatch,
 ) -> PackageWorld:
     case: PackageCase = request.param
-    monkeypatch.setenv("LC_ALL", "C")
-    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, _head: str) -> None:
@@ -191,40 +208,24 @@ def package_world(
             real_git(github_clone, "add", "pyproject.toml")
             real_git(github_clone, "commit", "-qm", "package identity")
             real_git(github_clone, "push", "-q", "origin", LANDING_DEFAULT_BRANCH)
-        add_lane_worktree(github_clone, lane, "codex/issue-72-claims")
-        package = real_git(github_clone, "show", "HEAD:pyproject.toml", check=False)
-        lane_file = lane / "pyproject.toml"
-        observed = {
-            "locale": os.environ["LC_ALL"],
-            "discovery": os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"],
-            "checkout.branch": real_git(github_clone, "branch", "--show-current").stdout,
-            "checkout.status": real_git(github_clone, "status", "--porcelain").stdout,
-            "landing.merged": client.landings[12].merged,
-            "package.trunk": package.stdout if package.returncode == 0 else None,
-            "package.lane": lane_file.read_text() if lane_file.exists() else None,
-        }
-        expected = {
-            "locale": "C",
-            "discovery": "1",
-            "checkout.branch": "main\n",
-            "checkout.status": "",
-            "landing.merged": False,
-            "package.trunk": case.package.value,
-            "package.lane": None,
-        }
-        assert observed == expected
 
-    landing = lane_landing_world(
-        github_clone,
-        bare_remote,
-        monkeypatch,
-        identity=protocol.IssueIdentity(72),
-        branch="codex/issue-72-claims",
-        body="Work-Item: #72\n\nCloses #72",
-        methods=None,
-        arrange=arrange,
-    )
+    landing = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+    package = real_git(github_clone, "show", "HEAD:pyproject.toml", check=False)
+    lane_file = lane / "pyproject.toml"
+    observed = {
+        "package.trunk": package.stdout if package.returncode == 0 else None,
+        "package.lane": lane_file.read_text() if lane_file.exists() else None,
+    }
+    expected = {"package.trunk": case.package.value, "package.lane": None}
+    assert observed == expected
     return PackageWorld(landing, case)
+
+
+def delete_recorded_head(clone: Path, remote: str) -> int:
+    real_git(clone, "remote", "set-head", remote, "--delete")
+    return real_git(
+        clone, "show-ref", "--verify", "--quiet", f"refs/remotes/{remote}/HEAD", check=False
+    ).returncode
 
 
 @pytest.fixture
@@ -239,16 +240,14 @@ def hub_remote(github_clone: Path, bare_remote: Path) -> Path:
     trunk = real_git(github_clone, "rev-parse", "trunk").stdout.strip()
     real_git(github_clone, "push", "-q", "hub", "trunk", f"{old_tip}:refs/heads/main")
     real_git(remote, "symbolic-ref", "HEAD", "refs/heads/trunk")
-    real_git(github_clone, "remote", "set-head", "hub", "--delete")
+    head_status = delete_recorded_head(github_clone, "hub")
     observed = {
         "hub.board-config": real_git(github_clone, "show", "HEAD:.aco/board.toml").stdout,
         "hub.url": real_git(github_clone, "config", "remote.hub.url").stdout,
         "hub.remote-head": real_git(remote, "symbolic-ref", "HEAD").stdout,
         "hub.trunk": real_git(remote, "rev-parse", "trunk").stdout.strip(),
         "hub.main": real_git(remote, "rev-parse", "main").stdout.strip(),
-        "hub.head-status": real_git(
-            github_clone, "show-ref", "--verify", "--quiet", "refs/remotes/hub/HEAD", check=False
-        ).returncode,
+        "hub.head-status": head_status,
     }
     expected = {
         "hub.board-config": 'canonical_remote = "hub"\n',
@@ -270,13 +269,8 @@ def trunk_world(
     monkeypatch: pytest.MonkeyPatch,
 ) -> TrunkWorld:
     case: TrunkCase = request.param
-    monkeypatch.setenv("LC_ALL", "C")
-    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     move_trunk(github_clone, bare_remote, main_state=case.main)
-    real_git(github_clone, "remote", "set-head", "origin", "--delete")
-    observed = real_git(
-        github_clone, "show-ref", "--verify", "--quiet", "refs/remotes/origin/HEAD", check=False
-    ).returncode
+    observed = delete_recorded_head(github_clone, "origin")
     expected = 1
     assert observed == expected
     remote = bare_remote
@@ -295,34 +289,14 @@ def trunk_world(
             }
             expected = {"hub.lane": head, "hub.merge-remote": remote}
             assert observed == expected
-        add_lane_worktree(github_clone, lane, "codex/issue-72-claims")
-        observed = {
-            "locale": os.environ["LC_ALL"],
-            "discovery": os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"],
-            "checkout.branch": real_git(github_clone, "branch", "--show-current").stdout,
-            "checkout.status": real_git(github_clone, "status", "--porcelain").stdout,
-            "landing.merged": client.landings[12].merged,
-        }
-        expected = {
-            "locale": "C",
-            "discovery": "1",
-            "checkout.branch": "trunk\n",
-            "checkout.status": "",
-            "landing.merged": False,
-        }
-        assert observed == expected
 
-    landing = lane_landing_world(
+    landing = landed_world(
         github_clone,
         remote,
         monkeypatch,
-        identity=protocol.IssueIdentity(72),
-        branch="codex/issue-72-claims",
-        body="Work-Item: #72\n\nCloses #72",
-        methods=None,
         default_branch="trunk",
         head_config=config,
-        arrange=arrange,
+        extra_arrange=arrange,
     )
     return TrunkWorld(landing, case, lane)
 
@@ -335,13 +309,10 @@ def world(
     monkeypatch: pytest.MonkeyPatch,
 ) -> FailureWorld:
     case: FailureCase = request.param
-    monkeypatch.setenv("LC_ALL", "C")
-    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     real_git(github_clone, "config", "advice.diverging", "false")
     lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, _head: str) -> None:
-        add_lane_worktree(github_clone, lane, "codex/issue-72-claims")
         client.closes_on_merge = False
         client.delete_error = forge.ForgeError(case.delete_error) if case.delete_error else None
         client.close_error = forge.ForgeError(case.close_error) if case.close_error else None
@@ -375,16 +346,7 @@ def world(
         }
         assert observed == expected
 
-    landing = lane_landing_world(
-        github_clone,
-        bare_remote,
-        monkeypatch,
-        identity=protocol.IssueIdentity(72),
-        branch="codex/issue-72-claims",
-        body="Work-Item: #72\n\nCloses #72",
-        methods=None,
-        arrange=arrange,
-    )
+    landing = landed_world(github_clone, bare_remote, monkeypatch, verify=arrange)
     if case.error is not None:
         stub_one_git_call(monkeypatch, ["fetch", "origin"], exit_status=1, stderr=case.error)
         probe = checkout._git_run(["fetch", "origin"], directory=github_clone)
@@ -463,31 +425,19 @@ class TestLandAfterMerge:
                 id="this-package",
             ),
             pytest.param(
-                PackageCase(
-                    PackageFile.OTHER,
-                    "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n",
-                ),
+                PackageCase(PackageFile.OTHER),
                 id="another-package",
             ),
             pytest.param(
-                PackageCase(
-                    PackageFile.ABSENT,
-                    "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n",
-                ),
+                PackageCase(PackageFile.ABSENT),
                 id="no-pyproject-toml",
             ),
             pytest.param(
-                PackageCase(
-                    PackageFile.INVALID,
-                    "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n",
-                ),
+                PackageCase(PackageFile.INVALID),
                 id="invalid-pyproject-toml",
             ),
             pytest.param(
-                PackageCase(
-                    PackageFile.PROJECT_SCALAR,
-                    "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n",
-                ),
+                PackageCase(PackageFile.PROJECT_SCALAR),
                 id="project-is-not-a-table",
             ),
         ],
@@ -563,13 +513,12 @@ class TestLandAfterMerge:
             "trunk": real_git(landing.clone, "rev-parse", "trunk").stdout.strip(),
             "lane.exists": trunk_world.lane.exists(),
         }
-        expected_trunks = {ExpectedTrunk.FAST_FORWARDED: landing.forge.landings[12].merge_commit}
         expected = {
             "exit": case.status,
             "stderr": case.stderr,
             "stdout": case.stdout,
             "fetch.calls": [(call, landing.clone.resolve()) for call in case.fetch_calls],
-            "trunk": expected_trunks[case.expected_trunk],
+            "trunk": landing.forge.landings[12].merge_commit,
             "lane.exists": case.lane_exists,
         }
         if case.origin_calls is not None:
