@@ -147,3 +147,5 @@ tests/test_cli.py	'branch.'	#186: test_land_merge.py method success rows compare
 tests/test_cli.py	'merge'	#186: test_land_merge.py method expectations use board.MergeMethod.MERGE; pin rows own complete merge_method TOML, including the merge pin.
 tests/test_cli.py	'reinstall:'	#186: test_land_merge.py lane rows retain the no-reinstall observation, computed in assert_landed rather than directly in the test assertion.
 tests/test_cli.py	'squash'	#186: test_land_merge.py method expectations use board.MergeMethod.SQUASH; the pinned-squash row owns complete merge_method TOML.
+# #186 evidence-fix owner correction: parent-count and no-reinstall observations now live in landed_observations (formerly assert_landed).
+# #186 evidence-fix owner correction: branch.<row branch>.remote is now read in TestLandMergeMethod.test_lands; upstream still compares to the empty string.
