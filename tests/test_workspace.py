@@ -652,6 +652,8 @@ def test_login_rejects_a_directory_as_an_attempt_record(tmp_path: Path) -> None:
         {**_completed_login_record(), "started_at": "invalidTtime"},
         {**_completed_login_record(), "started_at": "2026-09-09T00:00:00"},
         {**_completed_login_record(), "state": "unknown"},
+        {**_completed_login_record(), "state": []},
+        {**_completed_login_record(), "state": {}},
         {**_completed_login_record(), "outcomes": {}},
         {**_completed_login_record(), "outcomes": [{}]},
         {**_completed_login_record(), "outcomes": [{"project": "?", "outcome": "started"}]},

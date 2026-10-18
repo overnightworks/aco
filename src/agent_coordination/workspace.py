@@ -284,7 +284,7 @@ def _login_attempt_from_record(raw: object) -> LoginAttempt:
     state = raw["state"]
     _login_attempt_identifier(attempt_id)
     started = _login_timestamp(started_at)
-    if state not in {"running", "completed"}:
+    if not isinstance(state, str) or state not in {"running", "completed"}:
         raise WorkspaceError(_LOGIN_MALFORMED_RECORD)
     parsed_outcomes = _login_outcomes(raw["outcomes"])
     failure, completed_at = _login_completion(raw, state, parsed_outcomes, started)
