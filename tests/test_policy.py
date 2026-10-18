@@ -104,6 +104,7 @@ class PreflightRow:
     planned_scope: tuple[str, ...] = ()
     planned_body: str = ""
     kind: board.NoItemKind = board.NoItemKind.FIX
+    agent: str = "Ada"
     pull_request: Callable[[forge.Landing], forge.Landing] = lambda landing: landing
     reference_state: forge.ItemState = forge.ItemState.OPEN
     claims: tuple[protocol.ActiveClaim, ...] = ()
@@ -279,10 +280,21 @@ _BOB_LANE_CLAIM = standing_active_claim("Bob", lane=True, branch=ADOPTED_BRANCH)
             ),
             id="R39-claim-before-classification-line",
         ),
+        pytest.param(
+            PreflightRow(
+                _pull_request_refusal(
+                    "already carries No-Item: fix; adopt never changes a classification line"
+                ),
+                kind=board.NoItemKind.DEPS,
+                pull_request=lambda landing: replace(landing, body="No-Item: fix"),
+                claims=(standing_active_claim("Ada", lane=True, branch=ADOPTED_BRANCH),),
+            ),
+            id="R36-the-holders-claim-keeps-no-other-line",
+        ),
     ],
 )
 def test_adoption_preflight_refuses_or_plans_in_precedence_order(row: PreflightRow) -> None:
-    """Spec: ADOPT-02, ADOPT-03, ADOPT-04, ADOPT-06, ADOPT-07, ADOPT-11, ADOPT-16 --
+    """Spec: ADOPT-02, ADOPT-03, ADOPT-04, ADOPT-05, ADOPT-06, ADOPT-07, ADOPT-11, ADOPT-16 --
     the first failing step wins, and the claims are read once, only past steps 5 and 6."""
     pull_request_forge = FakeForge(
         landings={ADOPTED_PULL_REQUEST: row.pull_request(dependabot_pull_request(FIRST_HEAD))},
@@ -304,7 +316,7 @@ def test_adoption_preflight_refuses_or_plans_in_precedence_order(row: PreflightR
 
     outcome = policy.adoption_preflight(
         policy.LandingCheckContext(run, REPOSITORY, body.Storage.GITHUB),
-        policy.AdoptionRequest(ADOPTED_PULL_REQUEST, row.kind),
+        policy.AdoptionRequest(ADOPTED_PULL_REQUEST, row.kind, row.agent),
         pull_request_forge.landing(ADOPTED_PULL_REQUEST),
         pull_request_forge.item_reference(ADOPTED_PULL_REQUEST),
         claims_provider,

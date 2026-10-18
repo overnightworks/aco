@@ -4210,3 +4210,42 @@ def test_live_classification_line_and_composition_read_the_whole_body(
     assert board.live_classification_line(pull_request_body) == live_line
     assert composed == pull_request_body + appended
     assert board.parse_pull_request_classification(composed, REPOSITORY) == reads_as
+
+
+@pytest.mark.parametrize(
+    ("pull_request_body", "expected_state"),
+    [
+        pytest.param(
+            "Bump x\n\nNo-Item: fix",
+            lambda: board.OtherClassificationLine("No-Item: fix"),
+            id="B8-another-kind",
+        ),
+        pytest.param(
+            "Work-Item: #5",
+            lambda: board.OtherClassificationLine("Work-Item: #5"),
+            id="B9-a-work-item",
+        ),
+        pytest.param(
+            "No-Item: chore",
+            lambda: board.OtherClassificationLine("No-Item: chore"),
+            id="B10-an-unknown-kind",
+        ),
+        pytest.param("Bump x\n\nNo-Item: deps", lambda: board.ClassificationLine.PRESENT, id="B11"),
+        pytest.param("no-item: DEPS", lambda: board.ClassificationLine.PRESENT, id="B12-case"),
+        pytest.param(
+            "No-Item: deps\nWork-Item: #5",
+            lambda: board.MalformedClassificationLines(
+                board.ClassificationDefect("carries 2 classification lines; exactly one is required")
+            ),
+            id="B14-two-lines",
+        ),
+    ],
+)
+def test_classification_line_state_tells_the_line_a_rerun_may_keep(
+    pull_request_body: str, expected_state: Callable[[], board.ClassificationLineState]
+) -> None:
+    """Spec: ADOPT-05, ADOPT-26, ADOPT-30 -- the one live line is the kind's own (kept), another
+    line (refused), or more than one (the parser's defect, refused)."""
+    state = board.classification_line_state(pull_request_body, board.NoItemKind.DEPS)
+
+    assert state == expected_state()
