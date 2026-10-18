@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,7 @@ from cli_fixtures import (
     real_git,
     run_cli,
 )
-from store_fixtures import state_ref_tip
+from store_fixtures import claim_intent, state_ref_listing, state_ref_tip
 
 from agent_coordination import protocol, store
 
@@ -85,3 +86,66 @@ def test_bootstrap_refuses_an_unreachable_remote_on_stderr_alone(
 
     assert refused.expect_refusal() == f"ERROR: {store_refusal.value}\n"
     assert refused.stdout == ""
+
+
+def test_bootstrap_whose_creation_push_is_rejected_by_a_rival_leaves_the_rivals_state_untouched(
+    clone: Path,
+    bare_remote: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: CAS-01, CAS-65 -- a rival bootstraps and claims between this run's
+    read of an absent ref and its push; the rejected push never writes over it."""
+    rival_checkout = tmp_path / "rival"
+    real_git(tmp_path, "clone", "-q", str(bare_remote), str(rival_checkout))
+    remote = str(bare_remote)
+    real_push = store.GitPushTransport.push
+    rival_is_writing: list[bool] = []
+    rival_tips: list[str | None] = []
+
+    def push_after_the_rival_wrote(
+        transport: store.GitPushTransport,
+        *,
+        worktree: Path,
+        remote: str,
+        ref: str,
+        new_oid: protocol.ObjectId,
+    ) -> None:
+        if not rival_is_writing:
+            rival_is_writing.append(True)
+            store.bootstrap(worktree=rival_checkout, remote=remote)
+            store.commit_transition(
+                observed=store.Observation(
+                    rival_checkout,
+                    remote,
+                    store.fetch_state(worktree=rival_checkout, remote=remote),
+                ),
+                subject=store.ClaimTransitionSubject("claim issue 7", item="7"),
+                intent=claim_intent(
+                    identity=protocol.IssueIdentity(7), claim_id="rival-claim", operation_id="rival"
+                ),
+            )
+            rival_tips.append(state_ref_tip(bare_remote))
+        real_push(transport, worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+
+    monkeypatch.setattr(store.GitPushTransport, "push", push_after_the_rival_wrote)
+
+    run = run_cli(["bootstrap"], capsys)
+
+    [rival_tip] = rival_tips
+    assert run.stderr == ""
+    assert run.expect_success() == f"{rival_tip}\n"
+    assert state_ref_tip(bare_remote) == rival_tip
+    rival_state = store.fetch_state(worktree=rival_checkout, remote=remote)
+    assert str(rival_state.tip) == rival_tip
+    assert [str(claim.claim_id) for claim in rival_state.claims.values()] == ["rival-claim"]
+    assert protocol.ClaimId("rival-claim") in rival_state.consumed_ids
+    assert len(state_ref_listing(bare_remote)) > 1
+    commit_count = subprocess.run(
+        ["git", "--git-dir", remote, "rev-list", "--count", store.STATE_REF],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert commit_count == "2"
