@@ -196,7 +196,7 @@ def world(
     return result
 
 
-def refusal(world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
+def assert_refusal(world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
     case = world.case
     capsys.readouterr()
     result = run_cli(["land", "12", *case.arguments], capsys)
@@ -520,7 +520,7 @@ class TestLandClassification:
     )
     def test_refusal(self, world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-07, LANDCMD-09, LANDCMD-06 -- exact refusal and no writes."""
-        refusal(world, capsys)
+        assert_refusal(world, capsys)
 
 
 class TestLandHeadConfig:
@@ -635,7 +635,7 @@ class TestLandHeadConfig:
     )
     def test_refusal(self, world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-22, LANDCMD-23, LANDCMD-24 -- exact refusal and no writes."""
-        refusal(world, capsys)
+        assert_refusal(world, capsys)
 
 
 class TestLandItemAndClaim:
@@ -752,7 +752,7 @@ class TestLandItemAndClaim:
     )
     def test_refusal(self, world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-08, LANDCMD-10 -- exact refusal and no writes."""
-        refusal(world, capsys)
+        assert_refusal(world, capsys)
 
 
 class TestLandCheckout:
@@ -838,4 +838,4 @@ class TestLandCheckout:
     )
     def test_refusal(self, world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-11, LANDCMD-25, LANDCMD-20, LANDCMD-18 -- exact refusal and no writes."""
-        refusal(world, capsys)
+        assert_refusal(world, capsys)
