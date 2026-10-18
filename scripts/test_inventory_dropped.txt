@@ -106,3 +106,32 @@ tests/test_cli.py	'shorter-than-7'	#182: tests/test_land_preflight.py: Renamed p
 tests/test_cli.py	'unadopted-blocked-without-verdict-is-unchanged'	#182: tests/test_land_preflight.py: Renamed parameter [unadopted-blocked-without-verdict-is-unchanged] to [unadopted-blocked-without-verdict]; its mapped comparisons remain.
 tests/test_cli.py	'wrong-role'	#182: tests/test_land_preflight.py: Renamed parameter [wrong-role] to [override-wrong-role / rerun-override-wrong-role]; its mapped comparisons remain.
 tests/test_cli.py	'zero'	#182: tests/test_land_preflight.py: Renamed parameter [zero] to [number-zero]; its mapped comparisons remain.
+tests/test_cli.py	"ERROR: land must run from a clean checkout of the default branch 'main'\n"	#184: dirty-checkout, tracked-change and other-branch own the full sentence; shared refusal_observations adds ERROR and newline.
+tests/test_cli.py	"ERROR: land must run from a clean checkout of the default branch 'trunk'\n"	#184: checkout-on-main-names-trunk owns the sentence; shared refusal_observations adds ERROR and newline.
+tests/test_cli.py	"`, or use an explicit coordinator override (holder='Grok (builder)', this session='Ada (builder)')\n"	#184: foreign-claim rows own complete sentences instead of this suffix; envelope adds newline.
+tests/test_cli.py	' --keep-worktree --agent Grok'	#184: foreign-claim-keeps-the-worktree-flag and foreign-claim-keeps-the-reviewed-head compare complete repeat-command sentences.
+tests/test_cli.py	' is not open; it cannot be landed\n'	#184: closed-item and closed-before-missing-claim compare the complete sentence through the shared envelope.
+tests/test_cli.py	' on branch '	#184: missing-claim compares its complete branch-specific sentence.
+tests/test_cli.py	', '	#184: many-long-paths-bounded owns the complete expected list, without deriving it with join.
+tests/test_cli.py	', which dependency_paths in .aco/board.toml…'	#184: many-long-paths-bounded owns the complete bounded sentence.
+tests/test_cli.py	': pull request #12 changes '	#184: retained check-only path rows use REFUSED directly; moved land rows own complete sentences.
+tests/test_cli.py	'ERROR: pull request #12 '	#184: full row sentences plus the shared envelope replace this formatted prefix.
+tests/test_cli.py	'ERROR: pull request #12 changes src/x.py, which dependency_paths in .aco/board.toml does not name\n'	#184: path-outside and head-grant-ignored own the sentence; envelope adds ERROR and newline.
+tests/test_cli.py	'ERROR: pull request #12 has no active claim for #'	#184: missing-claim owns the complete claim/branch sentence.
+tests/test_cli.py	'LAND-77-whole-line'	#184: case renamed many-long-paths-bounded, with exact sentence and length obligation.
+tests/test_cli.py	'REFUSED'	#184: command/prefix parametrization removed; retained check rows assert the complete REFUSED prefix.
+tests/test_cli.py	'abc'	#184: three explicit long input paths and the independently specified complete sentence replace the expected-value generator.
+tests/test_cli.py	'aco land 12 --agent Grok'	#184: foreign-claim owns the complete sentence containing this repeat command.
+tests/test_cli.py	'aco land 12 --head '	#184: foreign-claim-keeps-the-reviewed-head owns the complete lowercase-head repeat sentence.
+tests/test_cli.py	'aco land 12 --keep-worktree --agent Grok'	#184: foreign-claim-keeps-the-worktree-flag owns the complete repeat sentence.
+tests/test_cli.py	'cell-26'	#184: case renamed listing-changed-under-us.
+tests/test_cli.py	'cell-34'	#184: case renamed path-outside.
+tests/test_cli.py	'cell-40-deps'	#184: case renamed deps-without-dependency-paths.
+tests/test_cli.py	'changes '	#184: dependency rows own complete sentences instead of interpolated fragments.
+tests/test_cli.py	'identity-releases'	#184 D12: sole retained success row is now the unparametrized separate-clone test; its success checks remain.
+tests/test_cli.py	'invalid-display-controls-escaped-as-next-shows-them'	#184: case renamed invalid-display-controls-escaped.
+tests/test_cli.py	'keeps-the-reviewed-head'	#184: case renamed foreign-claim-keeps-the-reviewed-head.
+tests/test_cli.py	'keeps-the-worktree-flag'	#184: case renamed foreign-claim-keeps-the-worktree-flag.
+tests/test_cli.py	'long-many'	#184: many-long-paths-bounded owns three explicit long paths and its full expected sentence.
+tests/test_cli.py	'plain'	#184: case renamed foreign-claim.
+tests/test_cli.py	39	#184: many-long-paths-bounded specifies the expected rendered names literally instead of generating them with the production cap arithmetic.
