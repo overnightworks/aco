@@ -1,8 +1,0 @@
-claim_id = "68a1275a679a44528d7df1c33bc10158"
-agent = "claude"
-role = "builder"
-base = "5dc18b12e8d6254495d5b7da870961b56363a4c8"
-branch = "claude/issue-173-b2w-adopt-writes"
-scope = [".aco/board.toml", ".aco/brief.toml", "README.md", "scripts/test_inventory_dropped.txt", "specs/adopt.spec.md", "specs/claim.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_adopt.py", "src/agent_coordination/cmd_check.py", "src/agent_coordination/cmd_start.py", "src/agent_coordination/github.py", "src/agent_coordination/policy.py", "src/agent_coordination/protocol.py", "src/agent_coordination/report.py", "tests/github_fixtures.py", "tests/store_fixtures.py", "tests/test_adopt.py", "tests/test_board.py", "tests/test_github.py", "tests/test_policy.py"]
-opened_commit = "945c1cdba85c00077eb01168edac1cc01a60c804"
-whole_reason = "Bau, Claim, Body-Schreiben, Rücklesen, Fortsetzen und Wiederherstellung bilden eine Übernahme; halb gebaut bliebe ein Claim ohne Body oder ein Body ohne Claim."
