@@ -35,6 +35,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | a subtree malformed | — | — | CAS-27..33 |
 | a resource file malformed | — | — | CAS-34..36 |
 | an item write's `expected` is stale or `None` | — | CAS-19, CAS-20 | — |
+| a fresh child's parent changed since the command checked it | — | CAS-70..CAS-73 | — |
 | `items/` holds an entry that is no item's file name | — | CAS-61 | — |
 | an entry a write does not change, any mode, any directory | — | CAS-61 | — |
 | an `items/` entry that is a symlink, a directory, or a submodule | — | — | CAS-32 |
@@ -96,7 +97,7 @@ attempts instead of a transition's `32`.
 - [ ] [CAS-68] Eight rejected creation pushes whose re-reads all prove absence end in CAS-15's stationary-ref sentence with `8` attempts.
 - [ ] [CAS-69] A failed re-read stops bootstrap and never permits creation: the transport, validation and lineage refusals apply, and an indeterminate push stays CAS-56.
 - [ ] [CAS-47] A retry's search for a lost response's own `operation_id` that fails to read one candidate commit refuses `cannot read commit <sha> while searching for operation_id <id>: <detail>` (see E-CAS-06).
-- [ ] [CAS-14] Two transitions on disjoint identities racing for the same tip both land (except CAS-51): the loser re-fetches, re-applies its own `operation_id`'s intent, and lands -- CLAIM-01 owns the printed line.
+- [ ] [CAS-14] Two transitions on disjoint identities racing one tip both land (except CAS-51 and CAS-70): the loser re-fetches, re-applies its `operation_id`'s intent, and lands -- CLAIM-01 owns the printed line.
 - [ ] [CAS-15] 32 stuck pushes refuse `refs/aco/state rejected 32 pushes to <remote> without the ref ever moving: a stale lock or missing push rights`, fix `refs/aco/state.lock`, then `aco reset` (see E-CAS-03).
 - [ ] [CAS-16] A transition rejected 32 times while the ref keeps moving refuses `refs/aco/state moved 32 times while retrying: another writer on <remote> keeps landing first; retry the command`.
 - [ ] [CAS-17] A moved-then-stuck ref refuses `refs/aco/state moved 1 time while retrying, then rejected 31 pushes to <remote> without the ref moving after it last moved`, fix `refs/aco/state.lock` (see E-CAS-04).
@@ -115,12 +116,19 @@ attempts instead of a transition's `32`.
 
 - [ ] [CAS-19] An item write whose `expected` is `None` (must not exist yet) against an id another writer already created refuses `item '<id>' already exists`.
 - [ ] [CAS-20] An item write whose `expected` no longer matches the item's current stored oid refuses `item '<id>' was written since it was read (expected <oid>, found <oid-or-None>); re-read and retry`.
-- [ ] [CAS-21] Two item writes on distinct ids racing for the same tip both land (except CAS-51): each attempt places its own id into the `items/` of the tip it read, so the other writer's id stays.
+- [ ] [CAS-21] Two item writes on distinct ids racing for the same tip both land (except CAS-51 and CAS-70): each attempt places its own id into the `items/` of the tip it read, so the other writer's id stays.
 - [ ] [CAS-61] A write carries every tree entry it does not write unchanged by name, mode and blob, foreign `items/` names included; `items/` stays while only such entries remain.
 - [ ] [CAS-51] An item write holding the whole `items/` it checked (`item edit --kind`) refuses `items/ was written since this write checked it; re-read and retry` once any other item changed.
 - [ ] [CAS-52] `item close` re-checks PIN-26 on every attempt: a claim that lands on the item between a rejected push and its retry refuses the close with PIN-26's sentence, the item left open.
 - [ ] [CAS-59] A `state-ref` claim re-checks on every attempt that its item is the blob its checks read open: a close or edit landed since refuses with CAS-20's sentence and writes no claim.
 - [ ] [CAS-60] Under `storage = "github"` a claim makes no such check: the forge holds the item's state and this ref no fact of it, so a close racing the claim is the forge's to judge.
+- [ ] [CAS-70] Under `storage = "state-ref"`, a fresh child from `item new --parent` or `cut` checks on every attempt that its parent still has the blob the command checked.
+
+Under `storage = "github"`, parent validation, retyping, issue creation and sub-issue linking are separate requests without a conditional parent-version write. A concurrent parent change can therefore race child creation or linking; CAS-70 to CAS-73 do not cover that storage.
+
+- [ ] [CAS-71] That blob advances only to the blob the command's own successful Task-to-Container retype wrote; another writer's parent blob never replaces it.
+- [ ] [CAS-72] A different or missing parent blob refuses with CAS-20's sentence naming the parent and writes no child.
+- [ ] [CAS-73] A write to another item that leaves the parent and the child id unchanged does not invalidate the parent check.
 
 ## `schema.toml`
 

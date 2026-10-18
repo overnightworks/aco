@@ -1002,7 +1002,8 @@ def parse_schema_toml(content: str, *, tip: ObjectId) -> ClaimState:
 
 @dataclass(frozen=True)
 class ItemPin:
-    """The item blob a claim's checks judged open (issue #496): `oid` is
+    """The item blob a write's checks judged (issue #496): a claim's item
+    judged open, an item write's parent judged a container (CAS-70). `oid` is
     `items/<item_id>.md`'s blob in the very observation those checks read."""
 
     item_id: str
@@ -1095,6 +1096,10 @@ class ItemWriteIntent:
     before writing (PIN-29, issue #447): any item written since refuses the
     write too, so that check and this write land as one CAS instead of a
     preflight another writer can slip past.
+
+    `parent_pin`, when set, must still name its item's current blob on every
+    attempt (CAS-70): a fresh child's parent changed since the command
+    checked it refuses the write, whatever else was written meanwhile.
     """
 
     item_id: str
@@ -1102,6 +1107,7 @@ class ItemWriteIntent:
     new_oid: ObjectId
     operation_id: str
     store_expected: Mapping[str, ObjectId] | None = None
+    parent_pin: ItemPin | None = None
 
 
 @dataclass(frozen=True)
@@ -1386,7 +1392,8 @@ ITEMS_WRITTEN_SINCE_CHECKED = "items/ was written since this write checked it; r
 
 def _require_item_unwritten(state: ClaimState, item_id: str, read: ObjectId) -> None:
     """Refuses unless `items/<item_id>.md` is still the blob `read` a caller
-    judged it by (CAS-20): an item write's own CAS, and a claim's item pin."""
+    judged it by (CAS-20): an item write's own CAS, a claim's item pin, and
+    an item write's parent pin (CAS-70)."""
     current = state.items.get(item_id)
     if current != read:
         raise ClaimUnavailableError(
@@ -1403,6 +1410,8 @@ def _apply_item_write_intent(state: ClaimState, intent: ItemWriteIntent) -> Clai
             raise ClaimUnavailableError(f"item {intent.item_id!r} already exists")
     else:
         _require_item_unwritten(state, intent.item_id, intent.expected)
+    if intent.parent_pin is not None:
+        _require_item_unwritten(state, intent.parent_pin.item_id, intent.parent_pin.oid)
     if intent.store_expected is not None and dict(state.items) != dict(intent.store_expected):
         raise ClaimUnavailableError(ITEMS_WRITTEN_SINCE_CHECKED)
     new_items = {**state.items, intent.item_id: intent.new_oid}

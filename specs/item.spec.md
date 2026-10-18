@@ -428,6 +428,8 @@ $ aco item new --title "Document the importer" --parent 91 < body.md
 exit 2
 ```
 
+Under `storage = "state-ref"` the retype is its own write (CAS-71), and the child is created only if the parent still has the blob that retype wrote (CAS-70).
+
 ### E-ITEM-13 — a childless container turns Task, one with an open child stays
 
 Setup: `storage = "state-ref"`, `<item-id>` a nested container with one uncut row and no open child, `<container-id>` a container with an open child
@@ -442,6 +444,8 @@ exit 2
 ```
 
 Under `storage = "state-ref"` `record.kind` and `updated_at` move and every other byte stays; under `storage = "github"` the issue's organization type moves, and a type GitHub drops refuses ITEM-46's sentence naming that type.
+
+Under `storage = "state-ref"` a child written since the parent was read is caught by CAS-51 and CAS-70.
 
 ### E-ITEM-14 — a write the read would refuse lands nothing
 

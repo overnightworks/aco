@@ -54,7 +54,12 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge
-from store_fixtures import blob, push_raw_state_tree, raw_tree, state_ref_listing
+from store_fixtures import (
+    blob,
+    push_raw_state_tree,
+    raw_tree,
+    state_ref_listing,
+)
 
 from agent_coordination import (
     board,
@@ -653,8 +658,9 @@ class _UnusedItemWriter:
         expected: protocol.ObjectId | None,
         content: bytes,
         store_expected: Mapping[str, protocol.ObjectId] | None,
+        parent_pin: protocol.ItemPin | None,
     ) -> protocol.ObjectId:
-        del expected, content, store_expected
+        del expected, content, store_expected, parent_pin
         raise AssertionError(f"unexpected write to item {item_id}")
 
     def close_item(
@@ -668,7 +674,11 @@ class _UnusedItemWriter:
     ) -> protocol.ObjectId:
         del number
         return self.write_item(
-            item_id, expected=expected, content=content, store_expected=store_expected
+            item_id,
+            expected=expected,
+            content=content,
+            store_expected=store_expected,
+            parent_pin=None,
         )
 
 
@@ -1471,6 +1481,58 @@ class TestStateRefBoardWrites:
         assert after_record.updated_at != before_record.updated_at
         assert protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(after_record.updated_at)
 
+    @pytest.mark.parametrize("closing", [False, True], ids=["write", "close"])
+    def test_a_write_whose_answer_was_lost_returns_its_own_blob_not_a_later_editors(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        bare_remote: Path,
+        worktree: Path,
+        closing: bool,
+    ) -> None:
+        """CAS-71: the push landed, another writer edited the item before the
+        store re-read it, and the writer still answers with the blob it
+        submitted -- never the later editor's -- for a write and a close."""
+        _push_item_tree(bare_remote, worktree, _item_files())
+        writer = self._writer(bare_remote, worktree)
+        read_oid = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}").items[
+            CHILD_A_ID
+        ]
+        own_content = b"own bytes\n"
+        own_oid = store.hash_blob(worktree, own_content)
+
+        def later_edit() -> None:
+            self._writer(bare_remote, worktree).write_item(
+                CHILD_A_ID,
+                expected=own_oid,
+                content=b"later bytes\n",
+                store_expected=None,
+                parent_pin=None,
+            )
+
+        script = _PushScript(after={1: later_edit}, lost_responses=frozenset({1}))
+        monkeypatch.setattr(store, "GitPushTransport", lambda: script)
+
+        if closing:
+            answered = writer.close_item(
+                CHILD_A_ID,
+                number=CHILD_A_NUMBER,
+                expected=read_oid,
+                content=own_content,
+                store_expected=None,
+            )
+        else:
+            answered = writer.write_item(
+                CHILD_A_ID,
+                expected=read_oid,
+                content=own_content,
+                store_expected=None,
+                parent_pin=None,
+            )
+
+        stored = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
+        assert answered == own_oid
+        assert stored.items[CHILD_A_ID] != own_oid
+
     def test_a_write_holding_a_well_formed_store_refuses_once_another_item_went_bad(
         self, bare_remote: Path, worktree: Path
     ) -> None:
@@ -1488,7 +1550,11 @@ class TestStateRefBoardWrites:
         adapter.update_item_body(CHILD_A_NUMBER, edited)
         landed = adapter.item_reference(CHILD_A_NUMBER).body
         writer.write_item(
-            MALFORMED_ID, expected=None, content=_blank_title_item(), store_expected=None
+            MALFORMED_ID,
+            expected=None,
+            content=_blank_title_item(),
+            store_expected=None,
+            parent_pin=None,
         )
 
         re_edited = edited.replace("Edited", "Re-edited", 1)
@@ -1858,6 +1924,81 @@ def _path_without_gh(tmp_path: Path) -> str:
         assert executable is not None, f"this test needs a real {tool} on PATH to symlink"
         (bin_directory / tool).symlink_to(executable)
     return str(bin_directory)
+
+
+class _PushScript:
+    """A `store.PushTransport` that really pushes, with scripted effects
+    around the Nth top-level push of one command (1-based): `before` runs
+    first, `after` runs once the push landed, and `lost_responses` then
+    raises the rejection a lost answer looks like. Pushes made while an
+    effect runs (a nested CLI run) pass straight through and are not counted."""
+
+    def __init__(
+        self,
+        *,
+        before: Mapping[int, Callable[[], object]] | None = None,
+        after: Mapping[int, Callable[[], object]] | None = None,
+        lost_responses: frozenset[int] = frozenset(),
+    ) -> None:
+        self._before = before or {}
+        self._after = after or {}
+        self._lost_responses = lost_responses
+        self._real = store.GitPushTransport()
+        self._count = 0
+        self._inside_effect = False
+
+    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
+        if self._inside_effect:
+            self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+            return
+        self._count += 1
+        self._run_effect(self._before.get(self._count))
+        self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+        self._run_effect(self._after.get(self._count))
+        if self._count in self._lost_responses:
+            raise protocol.PushRejectedError("the answer to this push was lost")
+
+    def _run_effect(self, effect: Callable[[], object] | None) -> None:
+        if effect is None:
+            return
+        self._inside_effect = True
+        try:
+            effect()
+        finally:
+            self._inside_effect = False
+
+
+class _CompetingRun:
+    """One more CLI run, as a `_PushScript` effect: another writer's command
+    landing in the middle of this one. `exit_codes` collects its result and
+    `outputs` its own stdout/stderr; the outer command's output so far is
+    handed back to `capsys` untouched."""
+
+    def __init__(self, capsys: pytest.CaptureFixture[str], *argv: str) -> None:
+        self._capsys = capsys
+        self._argv = list(argv)
+        self.exit_codes: list[int] = []
+        self.outputs: list[tuple[str, str]] = []
+
+    def __call__(self) -> None:
+        outer = self._capsys.readouterr()
+        self.exit_codes.append(issue_claim.main(self._argv))
+        own = self._capsys.readouterr()
+        self.outputs.append((own.out, own.err))
+        print(outer.out, end="")
+        print(outer.err, end="", file=sys.stderr)
+
+
+def _item_new_child_argv(parent_id: str) -> list[str]:
+    projection = ["--now", "Ready.", "--next", "Build it.", "--done-when", "Merged."]
+    return ["item", "new", "--title", "Fresh Child", "--parent", parent_id, *projection]
+
+
+def _childless_container(slice_titles: tuple[str, ...] = ()) -> dict[str, bytes]:
+    """`CONTAINER_ID` alone -- no child, so a Task retype of it is allowed --
+    its slice table holding one row per title."""
+    rows = tuple(enumerate(slice_titles, start=1))
+    return {f"{CONTAINER_ID}.md": _container_body_with_slices(rows).encode()}
 
 
 class TestCliStateRefForge:
@@ -2896,9 +3037,15 @@ class TestCliStateRefForge:
             expected: protocol.ObjectId | None,
             content: bytes,
             store_expected: Mapping[str, protocol.ObjectId] | None,
+            parent_pin: protocol.ItemPin | None,
         ) -> protocol.ObjectId:
             result = original_write_item(
-                self, item_id, expected=expected, content=content, store_expected=store_expected
+                self,
+                item_id,
+                expected=expected,
+                content=content,
+                store_expected=store_expected,
+                parent_pin=parent_pin,
             )
             if not competing_write_done["done"]:
                 competing_write_done["done"] = True
@@ -5629,3 +5776,218 @@ class TestCliStateRefForge:
             run_cli(["item", "show", container_id, "--json"], capsys).expect_success()
         )["state"]
         assert container_state == "open"
+
+    def _stored_records(
+        self, worktree: Path, bare_remote: Path
+    ) -> dict[str, tuple[items.ItemRecord, str]]:
+        """Every stored item as `(record, file text)`, read fresh from the remote."""
+        state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
+        assert state.tip is not None
+        texts = {
+            filename.removesuffix(".md"): content.decode()
+            for filename, content in store.read_item_files(worktree, state.tip).items()
+        }
+        return {item_id: (_decoded_record(text, item_id), text) for item_id, text in texts.items()}
+
+    @staticmethod
+    def _script_pushes(monkeypatch: pytest.MonkeyPatch, script: _PushScript) -> None:
+        monkeypatch.setattr(store, "GitPushTransport", lambda: script)
+
+    @staticmethod
+    def _written_since_read_error(item_id: str) -> re.Pattern[str]:
+        return re.compile(
+            rf"ERROR: item '{item_id}' was written since it was read "
+            r"\(expected [0-9a-f]{40}, found '[0-9a-f]{40}'\); re-read and retry\n"
+        )
+
+    @pytest.mark.parametrize(
+        ("item_files", "argv", "rows_left"),
+        [
+            pytest.param(
+                _childless_container(),
+                _item_new_child_argv(CONTAINER_ID),
+                0,
+                id="item-new",
+            ),
+            pytest.param(
+                _childless_container(("Slice C",)),
+                ["cut", str(CONTAINER_NUMBER), "--title", "Slice C"],
+                1,
+                id="cut-linked-row",
+            ),
+            pytest.param(
+                _childless_container(),
+                ["cut", str(CONTAINER_NUMBER), "--title", "Slice C"],
+                0,
+                id="cut-no-row",
+            ),
+        ],
+    )
+    def test_a_parent_retyped_to_task_first_refuses_the_child_and_writes_none(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+        item_files: dict[str, bytes],
+        argv: list[str],
+        rows_left: int,
+    ) -> None:
+        """CAS-70/72: the retype lands first, so the child is refused with
+        CAS-20's sentence naming the parent, no child exists, and a linked
+        row stays."""
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
+        retype = _CompetingRun(capsys, "item", "edit", str(CONTAINER_NUMBER), "--kind", "task")
+        self._script_pushes(monkeypatch, _PushScript(before={1: retype}))
+
+        status = issue_claim.main(argv)
+
+        stored = self._stored_records(worktree, bare_remote)
+        parent_record, parent_text = stored[CONTAINER_ID]
+        assert retype.exit_codes == [0]
+        assert set(stored) == {CONTAINER_ID}
+        assert parent_record.kind == "task"
+        rows = locate_block(parent_text).data["slice"]
+        assert isinstance(rows, list)
+        assert len(rows) == rows_left
+        assert self._written_since_read_error(CONTAINER_ID).search(capsys.readouterr().err)
+        assert status == 2
+
+    @pytest.mark.parametrize(
+        "competing_argv",
+        [
+            pytest.param(("item", "edit", str(CHILD_A_NUMBER), "--size", "L"), id="existing-q"),
+            pytest.param(
+                (
+                    "item",
+                    "new",
+                    "--title",
+                    "Other Root",
+                    "--now",
+                    "N.",
+                    "--next",
+                    "X.",
+                    "--done-when",
+                    "D.",
+                ),
+                id="unrelated-new-item",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            pytest.param(
+                _item_new_child_argv(CONTAINER_ID),
+                id="item-new",
+            ),
+            pytest.param(["cut", str(CONTAINER_NUMBER), "--title", "Slice C"], id="cut"),
+        ],
+    )
+    def test_a_write_to_another_item_leaves_the_child_landing(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+        argv: list[str],
+        competing_argv: tuple[str, ...],
+    ) -> None:
+        """CAS-73: another item written before the first push does not
+        invalidate the parent check; the child lands under the unchanged
+        parent."""
+        item_files = {**_childless_container(("Slice C",)), f"{CHILD_A_ID}.md": _task_item(None)}
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
+        competing = _CompetingRun(capsys, *competing_argv)
+        self._script_pushes(monkeypatch, _PushScript(before={1: competing}))
+
+        status = issue_claim.main(argv)
+
+        stored = self._stored_records(worktree, bare_remote)
+        [child_id] = [
+            item_id for item_id, (record, _) in stored.items() if record.parent == CONTAINER_ID
+        ]
+        assert (status, competing.exit_codes) == (0, [0])
+        assert stored[CONTAINER_ID][0].kind == "container"
+        assert stored[child_id][0].title in {"Fresh Child", "Slice C"}
+
+    def test_a_child_landing_first_refuses_an_already_observed_retype_to_task(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+    ) -> None:
+        """The opposite order: `item edit --kind task` read the parent
+        childless, then a child landed, so CAS-51 refuses the retype and the
+        parent stays a Container with its child."""
+        self._live_state_ref_checkout(
+            monkeypatch, tmp_path, bare_remote, worktree, _childless_container()
+        )
+        child = _CompetingRun(capsys, *_item_new_child_argv(CONTAINER_ID))
+        self._script_pushes(monkeypatch, _PushScript(before={1: child}))
+
+        status = issue_claim.main(["item", "edit", str(CONTAINER_NUMBER), "--kind", "task"])
+
+        stored = self._stored_records(worktree, bare_remote)
+        assert child.exit_codes == [0]
+        assert capsys.readouterr().err == f"ERROR: {protocol.ITEMS_WRITTEN_SINCE_CHECKED}\n"
+        assert status == 2
+        assert stored[CONTAINER_ID][0].kind == "container"
+        assert len(stored) == 2
+
+    @pytest.mark.parametrize(
+        ("script", "child_lands"),
+        [
+            pytest.param(lambda _edit_q, _edit_p: _PushScript(), True, id="clean"),
+            pytest.param(
+                lambda edit_q, _edit_p: _PushScript(before={1: edit_q}), True, id="unrelated-wins"
+            ),
+            pytest.param(
+                lambda _edit_q, edit_p: _PushScript(before={2: edit_p}),
+                False,
+                id="parent-changes-after-the-retype",
+            ),
+            pytest.param(
+                lambda _edit_q, edit_p: _PushScript(
+                    after={1: edit_p}, lost_responses=frozenset({1})
+                ),
+                False,
+                id="lost-retype-response-then-parent-edit",
+            ),
+        ],
+    )
+    def test_the_commands_own_retype_keeps_the_parent_check_on_its_own_blob(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+        script: Callable[[_CompetingRun, _CompetingRun], _PushScript],
+        child_lands: bool,
+    ) -> None:
+        """CAS-71: `item new --parent TASK` retypes the Task itself, then
+        pins the blob that retype wrote. An unrelated item winning a push
+        leaves it; another writer's edit of the parent after the retype
+        refuses the child -- also when the retype's answer was lost and the
+        re-read already shows that edit."""
+        item_files = {**_childless_container(), f"{CHILD_A_ID}.md": _task_item(None)}
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
+        edit_other = _CompetingRun(capsys, "item", "edit", str(CONTAINER_NUMBER), "--size", "L")
+        edit_parent = _CompetingRun(capsys, "item", "edit", str(CHILD_A_NUMBER), "--size", "L")
+        self._script_pushes(monkeypatch, script(edit_other, edit_parent))
+
+        status = issue_claim.main(_item_new_child_argv(CHILD_A_ID))
+
+        stored = self._stored_records(worktree, bare_remote)
+        children = [
+            item_id for item_id, (record, _) in stored.items() if record.parent == CHILD_A_ID
+        ]
+        assert stored[CHILD_A_ID][0].kind == "container"
+        assert (status == 0, len(children) == 1) == (child_lands, child_lands)
+        if not child_lands:
+            assert self._written_since_read_error(CHILD_A_ID).search(capsys.readouterr().err)

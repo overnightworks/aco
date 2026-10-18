@@ -139,6 +139,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - `aco cut`'s own `--json` object never uses the storage-aware `<label>` form (`specs/landing-grammar.spec.md`): `container`, `child`, and `written` are always the bare number, under either storage pin.
 - CUT-25's own body shape differs between the storage pins only in `<label>`, in its `Parent:` line and its `now`; only `storage = "state-ref"` additionally sets `[record].parent` (CUT-27) -- GitHub carries no such field, so its own retry (CUT-19) reads the `Parent:` prose line instead, while a state-ref retry reads `record.parent` alone.
 - Under `storage = "state-ref"`, a CUT-19 retry caused by a competing write names CAS-20's own "written since it was read" sentence as CUT-18's own `<cause>`.
+- Under `storage = "state-ref"`, a container whose blob changed since `cut` read it refuses with CAS-20's sentence, exit `2`, and creates no child (CAS-70), during fresh child creation. If a parent change after child creation causes the linked row-removal write to fail, CUT-18 applies.
 
 ## Examples
 

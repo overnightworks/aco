@@ -8044,6 +8044,7 @@ class _RefusingItemWriter:
         expected: protocol.ObjectId | None,
         content: bytes,
         store_expected: Mapping[str, protocol.ObjectId] | None,
+        parent_pin: protocol.ItemPin | None,
     ) -> protocol.ObjectId:
         raise AssertionError(f"unexpected write to item {item_id}")
 
