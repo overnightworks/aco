@@ -1171,13 +1171,18 @@ def _same_identity(left: ClaimIdentity, right: ClaimIdentity) -> bool:
     return isinstance(left, LaneIdentity) and isinstance(right, LaneIdentity)
 
 
+def held_by(claim: ActiveClaim, agent: str, role: str) -> bool:
+    """Whether `claim` is held by `agent` as `role`, compared as a tuple so
+    "same claimant" stays one named domain concept everywhere it is checked
+    (claim replay, rescope, release, a rerun of `adopt`)."""
+    return (claim.agent, claim.role) == (agent, role)
+
+
 def _same_claimant(
     current: ActiveClaim, intent: ClaimIntent | RescopeIntent | ReleaseIntent | LandingIntent
 ) -> bool:
-    """Whether `intent` names the same claimant as `current`: same agent and
-    role, compared as a tuple so "same claimant" stays one named domain
-    concept everywhere it is checked (claim replay, rescope, release)."""
-    return (current.agent, current.role) == (intent.agent, intent.role)
+    """Whether `intent` names the same claimant as `current`."""
+    return held_by(current, intent.agent, intent.role)
 
 
 def claimant_text(agent: str, role: str) -> str:

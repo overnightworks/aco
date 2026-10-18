@@ -1101,6 +1101,56 @@ def live_classification_line(body: str) -> str | None:
     return None if first is None else terminal_text(first.group(0))
 
 
+def pull_request_declaration(number: int, author: str, classification: Classification) -> str:
+    """The sentence `check` and `adopt` print for a pull request that declares
+    its classification (LAND-05, LAND-72)."""
+    return f"PR #{number} by {author} declares {classification}"
+
+
+class ClassificationLine(StrEnum):
+    ABSENT = "absent"
+    PRESENT = "present"
+
+
+@dataclass(frozen=True)
+class OtherClassificationLine:
+    """The one live line is not the kind's own `No-Item:` line."""
+
+    line: str
+
+
+@dataclass(frozen=True)
+class MalformedClassificationLines:
+    """More than one live line: why the parser refuses the body."""
+
+    defect: ClassificationDefect
+
+
+ClassificationLineState = (
+    ClassificationLine | OtherClassificationLine | MalformedClassificationLines
+)
+
+
+def classification_line_state(body: str, kind: NoItemKind) -> ClassificationLineState:
+    """What `aco adopt` finds of its own line in `body`: none, the kind's own
+    `No-Item: <kind>` (case-insensitive, as the parser reads it), another
+    single line as a terminal may show it, or the parser's defect for a body
+    with several."""
+    matches = tuple(CLASSIFICATION_LINE_PATTERN.finditer(_live_text(body)))
+    if not matches:
+        return ClassificationLine.ABSENT
+    selected = _single_classification_match(matches)
+    if isinstance(selected, ClassificationDefect):
+        return MalformedClassificationLines(selected)
+    is_own_line = (
+        selected.group("kind").lower() != WORK_ITEM_KIND
+        and selected.group("value").strip(" \t").lower() == kind.value
+    )
+    if is_own_line:
+        return ClassificationLine.PRESENT
+    return OtherClassificationLine(terminal_text(selected.group(0)))
+
+
 def body_with_classification(body: str, kind: NoItemKind) -> str:
     """`body` byte for byte, then the blank line that sets the
     classification apart (only what `body`'s own end lacks of it), then

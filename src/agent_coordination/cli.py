@@ -366,8 +366,8 @@ def _add_adopt_parser(commands: _Subcommands, name: str) -> None:
     adopt = commands.add_parser(
         name,
         help=(
-            "check that an open pull request can become an issue-less lane; "
-            "every refusal comes before a write, and this aco builds no adoption yet"
+            "make an open pull request an issue-less lane: build its worktree, claim its "
+            "head branch and append its No-Item line to the body"
         ),
     )
     adopt.add_argument(

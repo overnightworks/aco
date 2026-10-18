@@ -128,14 +128,20 @@ contents, and other entries match exactly. This bounds paths, not safety: review
 must still check workflow permissions, secret use, actions and run steps, disabled
 checks, and tool configuration. See `specs/storage-pin.spec.md` for the key's contract.
 
-`aco adopt <pull request> --no-item <kind>` checks whether a pull request someone else
-opened (a dependency bot's, for one) could become such a lane: an open pull request of this
+`aco adopt <pull request> --no-item <kind>` makes a pull request someone else
+opened (a dependency bot's, for one) such a lane: an open pull request of this
 repository, aimed at the default branch, whose body carries no classification line and
 closes no item, whose complete file listing stays within `dependency_paths` for `deps`, whose
 head branch no claim, local branch or worktree path stands on, and whose claim scope passes
-`claim`'s width gate. It refuses with the first failing check's sentence and, for now, also
-when every check passes: this aco builds no adoption, so a run has no adoption effects (only
-fetch bookkeeping and the state anchor may move).
+`claim`'s width gate. It refuses with the first failing check's sentence; when every check
+passes it builds `<repo>-worktrees/pr-<n>` on the head branch, claims that branch
+exclusively as this session's builder, appends `No-Item: <kind>` to the body, reads the body
+back and prints the declaration. It never pushes to the pull request's branch and never
+changes its title, labels, base or commits. Run it again after an interruption: the
+session that holds the branch's claim resumes it, adding the line only if it is missing. To
+give an adopted pull request up, run `aco release --branch <head-branch> --abandoned REASON`
+from the main checkout, then `git worktree remove <path>` and `git branch -D <branch>`; the
+line stays in the body, so a later `adopt` of that pull request refuses until it is removed.
 `specs/adopt.spec.md` owns the checks, their order and their refusals.
 
 ## A workflow without a forge
@@ -398,7 +404,7 @@ by exactly one file below; this table is the map, not a copy.
 | `aco rescope` | `specs/rescope.spec.md` | adds or drops paths on a live claim |
 | `aco release` | `specs/release.spec.md` | ends a claim as merged or abandoned |
 | `aco land` | `specs/land.spec.md` | merges a green pull request, then releases its claim |
-| `aco adopt` | `specs/adopt.spec.md` | checks that a foreign pull request could become an issue-less lane; refuses before any adoption effect |
+| `aco adopt` | `specs/adopt.spec.md` | makes a foreign pull request an issue-less lane: worktree, exclusive claim and `No-Item` line |
 | `aco status` | `specs/status.spec.md` | reads every live claim, repository-wide or by path |
 | `aco reset` | `specs/reset.spec.md` | rebuilds a broken or rewritten state ref |
 | `aco check` | `specs/check.spec.md` | answers whether a pull request, an issue, or a trunk commit is sound |

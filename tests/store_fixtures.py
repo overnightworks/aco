@@ -6,6 +6,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from cli_fixtures import real_git
 
 from agent_coordination import protocol, store
@@ -152,6 +153,28 @@ class RaceOnceTransport:
             race, self._race = self._race, None
             race()
         self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+
+
+def fail_every_state_ref_push(
+    monkeypatch: pytest.MonkeyPatch, error: protocol.ClaimError, *, lands: bool = False
+) -> None:
+    """Every push of the state ref ends in `error`, the push itself made first
+    when `lands` -- a lost answer after the remote advanced."""
+    real_push = store.GitPushTransport.push
+
+    def push_then_fail(
+        transport: store.GitPushTransport,
+        *,
+        worktree: Path,
+        remote: str,
+        ref: str,
+        new_oid: protocol.ObjectId,
+    ) -> None:
+        if lands:
+            real_push(transport, worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+        raise error
+
+    monkeypatch.setattr(store.GitPushTransport, "push", push_then_fail)
 
 
 def unrelated_racer_commit(worktree: Path, remote: Path) -> str:

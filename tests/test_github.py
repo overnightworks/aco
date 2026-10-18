@@ -3286,7 +3286,9 @@ def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listin
     [
         pytest.param(forge.ForgePermissionDeniedError("HTTP 403"), "REFUSED", id="W1-permission"),
         pytest.param(forge.ForgeNotFoundError("HTTP 404"), "REFUSED", id="W3-not-found"),
-        pytest.param(ClaimError("gh is required for issue claims"), "REFUSED", id="W4-gh-never-ran"),
+        pytest.param(
+            ClaimError("gh is required for issue claims"), "REFUSED", id="W4-gh-never-ran"
+        ),
         pytest.param(forge.ForgeTransientError("timeout"), "UNKNOWN", id="W5-transient"),
         pytest.param(
             forge.ForgeMalformedResponseError("not json"), "UNKNOWN", id="W7-malformed-response"

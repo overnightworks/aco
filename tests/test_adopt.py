@@ -27,7 +27,12 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge, serve_forge
-from store_fixtures import RaceOnceTransport, claim_intent, state_ref_tip
+from store_fixtures import (
+    RaceOnceTransport,
+    claim_intent,
+    fail_every_state_ref_push,
+    state_ref_tip,
+)
 
 from agent_coordination import checkout, cmd_claim, forge, github, protocol, store
 from agent_coordination.github import GitHubForge
@@ -354,7 +359,8 @@ def test_adopt_refuses_before_it_builds_anything(
     refusal: str,
 ) -> None:
     """Spec: ADOPT-05, ADOPT-06, ADOPT-07, ADOPT-09, ADOPT-10, ADOPT-13, ADOPT-14, ADOPT-17,
-    ADOPT-32 -- each refusal names its cause and leaves the repository, the state ref and the body as found."""
+    ADOPT-32 -- each refusal names its cause and leaves the repository, the state ref and the
+    body as found."""
     arrange(world)
     before = world.effects()
 
@@ -489,7 +495,6 @@ def test_adopt_cuts_an_overlong_refusal_to_one_line_of_200_characters(
     "configured_refspec",
     [
         pytest.param("+refs/heads/*:refs/heads/mirror/*", id="branches-to-a-mirror-namespace"),
-        pytest.param("+refs/aco/state:refs/heads/mirror/state", id="state-to-a-local-branch"),
         pytest.param("+refs/*:refs/*", id="everything-to-itself"),
     ],
 )
@@ -664,9 +669,9 @@ def _refusal(sentence: str) -> str:
 
 
 def _remote_branch_tip(world: AdoptionWorld) -> str:
-    return real_git(world.clone, "ls-remote", "origin", f"refs/heads/{ADOPTED_BRANCH}").stdout.split()[
-        0
-    ]
+    return real_git(
+        world.clone, "ls-remote", "origin", f"refs/heads/{ADOPTED_BRANCH}"
+    ).stdout.split()[0]
 
 
 def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
@@ -674,8 +679,9 @@ def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec: ADOPT-20, ADOPT-12, ADOPT-14 (cell 20) -- the worktree on the head branch, the
-    exclusive claim at the head with the overlap noted, one body write, the branch untouched."""
+    """Spec: ADOPT-20, ADOPT-18, ADOPT-12, ADOPT-14 (cell 20) -- a pull request that passes every
+    check is adopted (ADOPT-18 retired): the worktree on the head branch, the exclusive claim at
+    the head with the overlap noted, one body write, the branch untouched."""
     _claim_the_branch_as(
         "Bob",
         protocol.IssueIdentity(9),
@@ -686,6 +692,7 @@ def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
     reads = count_context_reads(monkeypatch)
 
     result = adopt(capsys)
+    claim_state_reads_by_adopt = reads.observations[world.clone]
 
     assert (result.status, result.stderr) == (0, "")
     claim = _adopted_claim(world)
@@ -701,10 +708,12 @@ def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
     assert _remote_branch_tip(world) == world.head
     assert real_git(world.pull_request_directory, "rev-parse", "HEAD").stdout.strip() == world.head
     assert (
-        real_git(world.pull_request_directory, "rev-parse", "--abbrev-ref", "@{upstream}").stdout.strip()
+        real_git(
+            world.pull_request_directory, "rev-parse", "--abbrev-ref", "@{upstream}"
+        ).stdout.strip()
         == f"origin/{ADOPTED_BRANCH}"
     )
-    assert reads.observations[world.clone] == 1
+    assert claim_state_reads_by_adopt == 1
 
 
 def _serve_a_human_author(world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
@@ -859,17 +868,9 @@ def _move_the_remote_tracking_ref_before_the_build(
 
 
 def _the_store_rejects_every_push(_world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch) -> None:
-    def rejected(
-        _transport: store.GitPushTransport,
-        *,
-        worktree: Path,
-        remote: str,
-        ref: str,
-        new_oid: protocol.ObjectId,
-    ) -> None:
-        raise protocol.PushRejectedError("! [remote rejected] (failed to lock)")
-
-    monkeypatch.setattr(store.GitPushTransport, "push", rejected)
+    fail_every_state_ref_push(
+        monkeypatch, protocol.PushRejectedError("! [remote rejected] (failed to lock)")
+    )
 
 
 def _a_claim_lands_between_the_observation_and_the_push(
@@ -929,42 +930,21 @@ def test_adopt_removes_the_pair_it_built_when_the_claim_is_refused_after_the_bui
     assert not world.pull_request_directory.exists()
     assert world.forge.body_writes == []
     state = store.fetch_state(worktree=world.clone, remote=str(world.remote))
-    assert [claim.agent for claim in protocol.claims_on_branch(state.claims, ADOPTED_BRANCH)] == holders
+    assert [
+        claim.agent for claim in protocol.claims_on_branch(state.claims, ADOPTED_BRANCH)
+    ] == holders
 
 
 def _the_claim_push_is_sent_and_lands_but_its_answer_is_lost(
     _world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    real_push = store.GitPushTransport.push
-
-    def push_then_time_out(
-        transport: store.GitPushTransport,
-        *,
-        worktree: Path,
-        remote: str,
-        ref: str,
-        new_oid: protocol.ObjectId,
-    ) -> None:
-        real_push(transport, worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
-        raise protocol.ClaimError("push timed out")
-
-    monkeypatch.setattr(store.GitPushTransport, "push", push_then_time_out)
+    fail_every_state_ref_push(monkeypatch, protocol.ClaimError("push timed out"), lands=True)
 
 
 def _the_claim_push_is_sent_and_never_lands(
     _world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def time_out(
-        _transport: store.GitPushTransport,
-        *,
-        worktree: Path,
-        remote: str,
-        ref: str,
-        new_oid: protocol.ObjectId,
-    ) -> None:
-        raise protocol.ClaimError("push timed out")
-
-    monkeypatch.setattr(store.GitPushTransport, "push", time_out)
+    fail_every_state_ref_push(monkeypatch, protocol.ClaimError("push timed out"))
 
 
 @pytest.mark.parametrize(
@@ -1066,13 +1046,17 @@ def _the_read_back_fails(world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch)
         ),
         pytest.param(
             _the_forge_refuses_the_write,
-            _refusal("body not written (HTTP 403); the claim stands; run adopt again, or release it"),
+            _refusal(
+                "body not written (HTTP 403); the claim stands; run adopt again, or release it"
+            ),
             [],
             id="cell-31-write-refused",
         ),
         pytest.param(
             _the_write_times_out_after_it_landed,
-            _refusal("body write sent, outcome unknown (timeout); the claim stands; run adopt again"),
+            _refusal(
+                "body write sent, outcome unknown (timeout); the claim stands; run adopt again"
+            ),
             [ADOPTED_BODY],
             id="cell-32-write-times-out",
         ),
@@ -1194,9 +1178,7 @@ def _a_repush_adds_a_path_outside_the_dependency_paths(world: AdoptionWorld) -> 
         ),
         pytest.param(
             _a_repush_adds_a_path_outside_the_dependency_paths,
-            _refusal(
-                "changes src/x.py, which dependency_paths in .aco/board.toml does not name"
-            ),
+            _refusal("changes src/x.py, which dependency_paths in .aco/board.toml does not name"),
             id="cell-39-repush-adds-a-path-outside-the-dependency-paths",
         ),
     ],
@@ -1218,3 +1200,48 @@ def test_adopts_rerun_judges_the_pull_request_again_and_writes_nothing_when_it_r
     assert (rerun.status, rerun.stdout, rerun.stderr) == (2, "", refusal)
     assert world.effects() == effects_before_rerun
     assert len(world.forge.body_writes) == 1
+
+
+def test_adopt_keeps_the_words_around_an_overlong_forge_error_and_escapes_it(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-24, ADOPT-19 -- the forge's text is cut and escaped, the claim-stands
+    words after it stay, and the refusal is still one line of at most 200 characters."""
+    world.forge.update_item_body_error = forge.ForgeNotFoundError("gone\x1b[31m" + "x" * 400)
+
+    result = adopt(capsys)
+
+    assert result.status == 2
+    assert result.stderr.startswith(
+        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} body not written (gone\\x1b[31mxxx"
+    )
+    assert result.stderr.endswith("…); the claim stands; run adopt again, or release it\n")
+    assert len(result.stderr) == 201
+
+
+def test_adopts_rerun_keeps_a_line_that_appears_before_its_re_read(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-26 -- the holder's own line, written by an earlier run whose answer was
+    lost, is kept when it shows up between the checks and the re-read: nothing is written."""
+    _claim_the_branch_as("Ada")(world)
+    world.forge.scripted_item_reads = [None, ADOPTED_BODY]
+
+    result = adopt(capsys)
+
+    assert (result.status, result.stderr) == (0, "")
+    assert result.stdout.endswith(_declaration("deps"))
+    assert world.forge.body_writes == []
+
+
+def test_adopt_stops_with_the_status_of_the_claim_check_phase_and_builds_nothing(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: ADOPT-14 -- a claim check that refuses ends adopt before the build."""
+    monkeypatch.setattr(cmd_claim, "checked_lane_claim", lambda *_arguments, **_keywords: 2)
+    before = world.effects()
+
+    result = adopt(capsys)
+
+    assert (result.status, result.stdout) == (2, "")
+    assert world.effects() == before

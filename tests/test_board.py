@@ -4235,7 +4235,9 @@ def test_live_classification_line_and_composition_read_the_whole_body(
         pytest.param(
             "No-Item: deps\nWork-Item: #5",
             lambda: board.MalformedClassificationLines(
-                board.ClassificationDefect("carries 2 classification lines; exactly one is required")
+                board.ClassificationDefect(
+                    "carries 2 classification lines; exactly one is required"
+                )
             ),
             id="B14-two-lines",
         ),

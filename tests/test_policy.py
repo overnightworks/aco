@@ -105,6 +105,7 @@ class PreflightRow:
     planned_body: str = ""
     kind: board.NoItemKind = board.NoItemKind.FIX
     agent: str = "Ada"
+    role: str = "builder"
     pull_request: Callable[[forge.Landing], forge.Landing] = lambda landing: landing
     reference_state: forge.ItemState = forge.ItemState.OPEN
     claims: tuple[protocol.ActiveClaim, ...] = ()
@@ -316,7 +317,7 @@ def test_adoption_preflight_refuses_or_plans_in_precedence_order(row: PreflightR
 
     outcome = policy.adoption_preflight(
         policy.LandingCheckContext(run, REPOSITORY, body.Storage.GITHUB),
-        policy.AdoptionRequest(ADOPTED_PULL_REQUEST, row.kind, row.agent),
+        policy.AdoptionRequest(ADOPTED_PULL_REQUEST, row.kind, row.agent, row.role),
         pull_request_forge.landing(ADOPTED_PULL_REQUEST),
         pull_request_forge.item_reference(ADOPTED_PULL_REQUEST),
         claims_provider,
