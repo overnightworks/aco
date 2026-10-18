@@ -17471,259 +17471,6 @@ def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
     assert observed == expected
 
 
-def _git_trailers(repository: Path, scratch: Path, message: str) -> tuple[str, ...]:
-    """The trailers git's own parsing reads in `message`, read as the
-    release's `%(trailers)` reads them: inside `repository`, so its own
-    `trailer.*` configuration applies, and `--no-divider`, so a Markdown
-    `---` rule stays prose. The message file stands in `scratch`, outside
-    the checkout."""
-    message_file = scratch / "trailer-message"
-    message_file.write_text(message)
-    parsed = real_git(
-        repository, "interpret-trailers", "--parse", "--no-divider", str(message_file)
-    )
-    return tuple(parsed.stdout.splitlines())
-
-
-_CO_AUTHOR = "Co-Authored-By: Ada <ada@example.com>"
-_WORK_ITEM_TRAILER = f"Work-Item: #{WORK_ITEM_ISSUE}"
-_CLOSES = f"Closes #{WORK_ITEM_ISSUE}"
-
-
-@pytest.mark.parametrize(
-    ("method", "pull_request_body", "message", "trailers"),
-    [
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n{_CO_AUTHOR}",
-            f"{_CLOSES}\n\n{_CO_AUTHOR}\n{_WORK_ITEM_TRAILER}\n",
-            (_CO_AUTHOR, _WORK_ITEM_TRAILER),
-            id="merge-mixed-trailer-block",
-        ),
-        pytest.param(
-            board.MergeMethod.SQUASH,
-            f"{_CLOSES}\r\n\r\n{_WORK_ITEM_TRAILER}\r\n{_CO_AUTHOR}",
-            f"{_CLOSES}\n\n{_CO_AUTHOR}\n{_WORK_ITEM_TRAILER}\n",
-            (_CO_AUTHOR, _WORK_ITEM_TRAILER),
-            id="squash-mixed-trailer-block",
-        ),
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"{_WORK_ITEM_TRAILER}\n\n{_CLOSES}",
-            f"{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n",
-            (_WORK_ITEM_TRAILER,),
-            id="prose-ending",
-        ),
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"Fixes it.\n\n{_WORK_ITEM_TRAILER}\n\n{_CLOSES}",
-            f"Fixes it.\n\n{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n",
-            (_WORK_ITEM_TRAILER,),
-            id="classification-mid-body",
-        ),
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"{_CLOSES}\n\n---\n\n{_WORK_ITEM_TRAILER}\n{_CO_AUTHOR}",
-            f"{_CLOSES}\n\n---\n\n{_CO_AUTHOR}\n{_WORK_ITEM_TRAILER}\n",
-            (_CO_AUTHOR, _WORK_ITEM_TRAILER),
-            id="markdown-rule-before-trailer-block",
-        ),
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"Fixes it.\n \n{_WORK_ITEM_TRAILER}\n\t\n{_CLOSES}",
-            f"Fixes it.\n\t\n{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n",
-            (_WORK_ITEM_TRAILER,),
-            id="classification-between-whitespace-only-lines",
-        ),
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"Fixes it.\n\n\n\n{_WORK_ITEM_TRAILER}\n\n{_CLOSES}",
-            f"Fixes it.\n\n{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n",
-            (_WORK_ITEM_TRAILER,),
-            id="classification-after-a-blank-line-run",
-        ),
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"Fixes it.\n\n{_WORK_ITEM_TRAILER}\n\n\n\n{_CLOSES}",
-            f"Fixes it.\n\n{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n",
-            (_WORK_ITEM_TRAILER,),
-            id="classification-before-a-blank-line-run",
-        ),
-        pytest.param(
-            board.MergeMethod.MERGE,
-            f"{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n{_CO_AUTHOR}\n\n# Notes",
-            f"{_CLOSES}\n\n{_CO_AUTHOR}\n\n# Notes\n\n{_WORK_ITEM_TRAILER}\n",
-            (_WORK_ITEM_TRAILER,),
-            id="comment-line-after-trailer-block",
-        ),
-    ],
-)
-def test_land_message_keeps_the_classification_inside_gits_trailer_block(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    method: board.MergeMethod,
-    pull_request_body: str,
-    message: str,
-    trailers: tuple[str, ...],
-) -> None:
-    """Issue #594 lines 1, 2, 4 and 5 (and #405 Befund 42 on #310): the
-    classification leaves wherever the body put it, without a blank-line
-    run behind, and becomes the message's last line -- inside a trailer
-    block the body already ends in, else a paragraph of its own -- so
-    `git interpret-trailers --parse` lists every trailer and the delegated
-    release's own trailer check accepts the landing, merged or squashed."""
-    repo, client = _land_scenario(monkeypatch, tmp_path, body=pull_request_body)
-    client.allowed_methods = frozenset({method})
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    [(_number, _head_sha, _method, _title, body)] = client.merge_calls
-    landed_message = real_git(repo, "log", "-1", "--format=%B", "main").stdout
-    assert (status, body, _git_trailers(repo, tmp_path, landed_message)) == (0, message, trailers)
-    assert client.closed_issues == {WORK_ITEM_ISSUE}
-
-
-@pytest.mark.parametrize(
-    "ending_trailers",
-    [
-        pytest.param("Co-authored-by:A <a@x>", id="no-space-after-colon"),
-        pytest.param("Reviewed-by : A <a@x>", id="space-before-colon"),
-        pytest.param("Co-authored-by: A\n  folded <a@x>", id="folded-continuation"),
-        pytest.param("Acked-by:", id="empty-value"),
-        pytest.param("https://x.example/a\nCo-authored-by: A <a@x>", id="url-beside-trailer"),
-        pytest.param("Signed-off-by: A <a@x>\nOne prose line.", id="quarter-trailers"),
-        pytest.param(
-            "Signed-off-by: A <a@x>\n(cherry picked from commit 0123abc)", id="cherry-picked"
-        ),
-    ],
-)
-def test_land_message_keeps_every_trailer_git_reads_at_the_body_end(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ending_trailers: str
-) -> None:
-    """Issue #594 line 1: whatever last paragraph git's own trailer parsing
-    reads as a trailer block -- not only canonical `Token: value` lines --
-    takes the classification as its last line, so every trailer git reads
-    in the body is still one in the landed message."""
-    body_after_removal = f"{_CLOSES}\n\n{ending_trailers}"
-    repo, client = _land_scenario(
-        monkeypatch, tmp_path, body=f"{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n{ending_trailers}"
-    )
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    [(_number, _head_sha, _method, title, _body)] = client.merge_calls
-    body_trailers = _git_trailers(repo, tmp_path, f"{title}\n\n{body_after_removal}\n")
-    landed_message = real_git(repo, "log", "-1", "--format=%B", "main").stdout
-    assert (status, bool(body_trailers), _git_trailers(repo, tmp_path, landed_message)) == (
-        0,
-        True,
-        (*body_trailers, _WORK_ITEM_TRAILER),
-    )
-
-
-def test_land_message_joins_the_classification_git_reads_under_a_configured_key(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Issue #594 line 1, LANDCMD-34: a repository whose `trailer.<token>.key`
-    renames the classification as git reads it still takes that
-    classification into the body's trailer block, so git keeps reading the
-    body's own trailer beside it rather than orphaning it behind a blank
-    line."""
-    repo, client = _land_scenario(
-        monkeypatch, tmp_path, body=f"{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n{_CO_AUTHOR}"
-    )
-    real_git(repo, "config", "trailer.work-item.key", "WORK-ITEM")
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    [(_number, _head_sha, _method, _title, body)] = client.merge_calls
-    landed_message = real_git(repo, "log", "-1", "--format=%B", "main").stdout
-    assert (status, body, _git_trailers(repo, tmp_path, landed_message)) == (
-        0,
-        f"{_CLOSES}\n\n{_CO_AUTHOR}\n{_WORK_ITEM_TRAILER}\n",
-        (_CO_AUTHOR, f"WORK-ITEM: #{WORK_ITEM_ISSUE}"),
-    )
-
-
-def _trace_git_to_stderr(monkeypatch: pytest.MonkeyPatch, _repo: Path) -> None:
-    monkeypatch.setenv("GIT_TRACE", "1")
-
-
-def _warn_about_the_trailer_configuration(_monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
-    real_git(repo, "config", "trailer.foo.where", "bogus")
-
-
-@pytest.mark.parametrize(
-    "make_git_noisy",
-    [
-        pytest.param(_trace_git_to_stderr, id="git-trace"),
-        pytest.param(_warn_about_the_trailer_configuration, id="trailer-configuration-warning"),
-    ],
-)
-def test_land_message_reads_no_trailer_from_what_git_writes_to_stderr(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    make_git_noisy: Callable[[pytest.MonkeyPatch, Path], None],
-) -> None:
-    """Issue #594 line 1, LANDCMD-36: git writing a trace or a warning to
-    stderr while it parses a prose ending still leaves a blank line before
-    the classification, so the landed message keeps a trailer git reads."""
-    repo, client = _land_scenario(monkeypatch, tmp_path, body=f"{_WORK_ITEM_TRAILER}\n\n{_CLOSES}")
-    make_git_noisy(monkeypatch, repo)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    [(_number, _head_sha, _method, _title, body)] = client.merge_calls
-    assert (status, body) == (0, f"{_CLOSES}\n\n{_WORK_ITEM_TRAILER}\n")
-
-
-def _refused_trailer_read(
-    result_or_failure: process.CapturedResult | Exception,
-) -> Callable[..., process.CapturedResult]:
-    run_git = process.run_git
-
-    def refuse_the_trailer_read(
-        arguments: list[str], *, directory: Path | None = None
-    ) -> process.CapturedResult:
-        if arguments[0] != "interpret-trailers":
-            return run_git(arguments, directory=directory)
-        if isinstance(result_or_failure, Exception):
-            raise result_or_failure
-        return result_or_failure
-
-    return refuse_the_trailer_read
-
-
-@pytest.mark.parametrize(
-    ("result_or_failure", "sentence"),
-    [
-        pytest.param(
-            process.CapturedResult(128, b"", b"fatal: bad trailer\n"),
-            "fatal: bad trailer",
-            id="nonzero-exit",
-        ),
-        pytest.param(
-            process.ProcessTimedOutError(), "git interpret-trailers timed out", id="launch-failure"
-        ),
-    ],
-)
-def test_land_refuses_before_the_merge_when_git_cannot_read_the_trailers(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    result_or_failure: process.CapturedResult | Exception,
-    sentence: str,
-) -> None:
-    """Issue #594: a trailer read git cannot answer refuses the landing
-    loud, before any merge, rather than guessing a join."""
-    _repo, client = _land_scenario(monkeypatch, tmp_path)
-    monkeypatch.setattr(process, "run_git", _refused_trailer_read(result_or_failure))
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    assert (status, client.merge_calls, sentence in capsys.readouterr().err) == (2, [], True)
-
-
 def test_land_release_routing_reuses_the_verified_classification_for_a_fresh_merge() -> None:
     """Issue #405 point 4: a fresh merge routes `release --merged` straight
     from the classification this same run's own preflight already verified
@@ -20997,17 +20744,30 @@ def test_item_new_json_reports_ok_reason_created(
     }
 
 
-def test_item_edit_refuses_under_github_storage(capsys: pytest.CaptureFixture[str]) -> None:
-    """Issue #287 proof 7: under `storage = "github"` (the default), `item
-    edit` refuses by name -- forge issues are edited on the forge, never
-    governed by aco -- before it ever reads stdin (no `sys.stdin` stand-in
-    is installed here, so a stray read would surface as a test failure)."""
-    status = issue_claim.main(["item", "edit", "42"])
+@pytest.mark.parametrize(
+    ("command", "sentence"),
+    [
+        pytest.param(
+            "edit",
+            "ERROR: forge issues are edited on the forge; aco never governs them\n",
+            id="edit",
+        ),
+        pytest.param(
+            "close",
+            "ERROR: the forge closes its issues; aco never governs them\n",
+            id="close",
+        ),
+    ],
+)
+def test_item_mutation_refuses_under_github_storage(
+    capsys: pytest.CaptureFixture[str], command: str, sentence: str
+) -> None:
+    """Issues #287 and #289: the forge owns whole-body edits and closing."""
+    status = issue_claim.main(["item", command, "42"])
 
-    assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: forge issues are edited on the forge; aco never governs them\n"
-    )
+    observed = (status, capsys.readouterr().err)
+    expected = (2, sentence)
+    assert observed == expected
 
 
 def test_item_edit_size_writes_the_top_level_field_under_github_storage(
@@ -21158,16 +20918,6 @@ def test_item_edit_whole_refuses_through_the_shared_precondition_failed_envelope
     _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
-def test_item_close_refuses_under_github_storage(capsys: pytest.CaptureFixture[str]) -> None:
-    """Issue #289 proof 6: under `storage = "github"` (the default), `item
-    close` refuses by name -- the forge closes its own issues, aco never
-    governs them -- before it ever resolves a forge or reads a claim."""
-    status = issue_claim.main(["item", "close", "42"])
-
-    assert status == 2
-    assert capsys.readouterr().err == "ERROR: the forge closes its issues; aco never governs them\n"
-
-
 def test_item_close_prints_json_under_the_state_ref_pin(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
@@ -21175,7 +20925,7 @@ def test_item_close_prints_json_under_the_state_ref_pin(
     prints the shared envelope, `reason: "closed"`, then `{"item", "number",
     "closed_at", "parent_closable"}`, and returns before the plain-text
     `CLOSED`/`freed:` lines, the branch
-    `test_item_close_refuses_under_github_storage`'s refusal never reaches.
+    `test_item_mutation_refuses_under_github_storage[close]`'s refusal never reaches.
     `parent_closable` (issue #348) is `null` here: `42` names no parent on
     this fake."""
     _write_state_ref_pin(tmp_path)

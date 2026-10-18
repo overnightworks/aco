@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import threading
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
@@ -12,10 +12,15 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue
-from cli_fixtures import CliRun, real_git, worktrees_and_branches
-from store_fixtures import lineage_observation, state_ref_tip
+from cli_fixtures import CliRun, push_lane_branch, real_git, worktrees_and_branches
+from store_fixtures import (
+    claim_intent,
+    lineage_observation,
+    publish_claims_from_a_second_clone,
+    state_ref_tip,
+)
 
-from agent_coordination import board, body, cmd_land, forge, github
+from agent_coordination import board, body, cmd_land, forge, github, protocol
 from agent_coordination.protocol import ClaimError
 
 WORK_ITEM_ISSUE = 72
@@ -490,6 +495,77 @@ class LandingWorld:
     remote: Path
     forge: FakeForge
     unchanged: dict[str, object]
+
+
+@dataclass
+class LaneLandingWorld(LandingWorld):
+    head: str
+    entry_lineage: list[tuple[object, object]]
+
+
+def lane_landing_world(
+    clone: Path,
+    remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    identity: protocol.ClaimIdentity,
+    branch: str,
+    body: str,
+    methods: frozenset[board.MergeMethod] | None,
+    holder: str = "Ada",
+    role: str = "builder",
+    distinct_detail: bool = False,
+    error: forge.ForgeError | None = None,
+    rules: tuple[frozenset[board.MergeMethod], ...] = (),
+    head_config: str = "",
+    arrange: Callable[[FakeForge, str], None] | None = None,
+) -> LaneLandingWorld:
+    """Publish a claimed lane and snapshot it after the caller's final arrangement."""
+    head = push_lane_branch(clone, branch)
+    intent = claim_intent(
+        identity=identity,
+        branch=branch,
+        agent=holder,
+        role=role,
+        claim_id="landing",
+        base=protocol.ObjectId(real_git(clone, "rev-parse", "main").stdout.strip()),
+    )
+    seeded = publish_claims_from_a_second_clone(clone, remote, (intent,))
+    observed = tuple(
+        (c.identity, c.branch, c.agent, c.role, str(c.claim_id)) for c in seeded.claims.values()
+    )
+    expected = ((identity, branch, holder, role, "landing"),)
+    assert observed == expected
+    detail = replace(
+        landing_pull_request(body=body, head_ref_name=branch),
+        head_sha=real_git(clone, "rev-parse", "main").stdout.strip() if distinct_detail else head,
+    )
+    client = serve_forge(
+        monkeypatch,
+        FakeForge(
+            landings={12: detail, 13: replace(detail, number=13)},
+            readiness_by_number={12: landing_readiness(head_sha=head)},
+            merge_remote=remote,
+            merge_error=error,
+            allowed_methods=methods,
+            branch_rules={"main": rules},
+            head_board_config=head_config,
+        ),
+    )
+    if arrange is not None:
+        arrange(client, head)
+    shared = landing_world(clone, remote, client, remote_tip=seeded.tip)
+    entry: list[tuple[object, object]] = []
+    merge = client.merge_landing
+
+    def observe_entry(
+        number: int, *, head_sha: str, method: board.MergeMethod, title: str, body: str
+    ) -> str:
+        entry.append(lineage_observation(clone))
+        return merge(number, head_sha=head_sha, method=method, title=title, body=body)
+
+    monkeypatch.setattr(client, "merge_landing", observe_entry)
+    return LaneLandingWorld(clone, remote, client, shared.unchanged, head, entry)
 
 
 def landing_world(

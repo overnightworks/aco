@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
@@ -10,7 +10,6 @@ import pytest
 from cli_fixtures import (
     landed_from_another_clone,
     pull_request_listing,
-    push_lane_branch,
     real_git,
     run_cli,
     track_board_config,
@@ -22,16 +21,8 @@ from github_fixtures import (
     RefusalLength,
     assert_github_world,
     landing_effects,
-    landing_pull_request,
-    landing_readiness,
-    landing_world,
+    lane_landing_world,
     refusal_observations,
-    serve_forge,
-)
-from store_fixtures import (
-    claim_intent,
-    lineage_observation,
-    publish_claims_from_a_second_clone,
 )
 
 from agent_coordination import board, forge, protocol, store
@@ -113,91 +104,77 @@ def world(
     if case.trunk_config and not case.invalid_configuration:
         track_board_config(github_clone, case.trunk_config)
         real_git(github_clone, "push", "-q", "origin", "main")
-    head = push_lane_branch(github_clone, case.branch)
-    intent = claim_intent(
+    lane = github_clone.parent / "lane"
+
+    def arrange(client: FakeForge, head: str) -> None:
+        if case.invalid_configuration:
+            track_board_config(github_clone, case.trunk_config)
+            real_git(github_clone, "push", "-q", "origin", "main")
+        if case.lane_worktree is LaneWorktree.PRESENT:
+            real_git(github_clone, "worktree", "add", "-q", str(lane), case.branch)
+            real_git(
+                github_clone, "branch", "--set-upstream-to", f"origin/{case.branch}", case.branch
+            )
+            observed = (
+                real_git(lane, "branch", "--show-current").stdout,
+                real_git(github_clone, "config", f"branch.{case.branch}.remote").stdout,
+            )
+            expected = (case.branch + "\n", "origin\n")
+            assert observed == expected
+        observed = (
+            lane.exists(),
+            real_git(github_clone, "rev-parse", case.branch).stdout.strip(),
+            real_git(bare_remote, "rev-parse", case.branch).stdout.strip(),
+            real_git(github_clone, "status", "--porcelain").stdout,
+            real_git(github_clone, "branch", "--show-current").stdout,
+            bool(real_git(github_clone, "diff", "main", case.branch).stdout),
+        )
+        expected = (case.lane_worktree.value, head, head, "", "main\n", True)
+        assert observed == expected
+        if case.dependency_listing:
+            client.changes_by_number[12] = pull_request_listing(
+                head, forge.ChangedFile("uv.lock", None)
+            )
+        if case.oversized_foreign_text:
+            oversized = "1" * 4301
+            client.board_open_pull_requests = (
+                board.PullRequest(300, "Foreign", f"Refs #{oversized}", "foreign/branch"),
+            )
+            landed_from_another_clone(
+                bare_remote.parent,
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                f"Foreign\n\nWork-Item: #{oversized}",
+            )
+
+    shared = lane_landing_world(
+        github_clone,
+        bare_remote,
+        monkeypatch,
         identity=case.identity,
         branch=case.branch,
-        agent=case.holder.value,
+        body=case.body,
+        methods=case.methods,
+        holder=case.holder.value,
         role=case.role.value,
-        claim_id="landing",
-        base=protocol.ObjectId(real_git(github_clone, "rev-parse", "main").stdout.strip()),
+        distinct_detail=case.distinct_detail,
+        error=case.error,
+        rules=case.rules,
+        head_config=case.head_config,
+        arrange=arrange,
     )
-    seeded = publish_claims_from_a_second_clone(github_clone, bare_remote, (intent,))
-    observed = tuple(
-        (c.identity, c.branch, c.agent, c.role, str(c.claim_id)) for c in seeded.claims.values()
+    return MergeWorld(
+        github_clone,
+        bare_remote,
+        shared.forge,
+        shared.unchanged,
+        case,
+        shared.head,
+        lane,
+        shared.entry_lineage,
     )
-    expected = ((case.identity, case.branch, case.holder.value, case.role.value, "landing"),)
-    assert observed == expected
-    if case.invalid_configuration:
-        track_board_config(github_clone, case.trunk_config)
-        real_git(github_clone, "push", "-q", "origin", "main")
-    lane = github_clone.parent / "lane"
-    if case.lane_worktree is LaneWorktree.PRESENT:
-        real_git(github_clone, "worktree", "add", "-q", str(lane), case.branch)
-        real_git(github_clone, "branch", "--set-upstream-to", f"origin/{case.branch}", case.branch)
-        observed = (
-            real_git(lane, "branch", "--show-current").stdout,
-            real_git(github_clone, "config", f"branch.{case.branch}.remote").stdout,
-        )
-        expected = (case.branch + "\n", "origin\n")
-        assert observed == expected
-    observed = (
-        lane.exists(),
-        real_git(github_clone, "rev-parse", case.branch).stdout.strip(),
-        real_git(bare_remote, "rev-parse", case.branch).stdout.strip(),
-        real_git(github_clone, "status", "--porcelain").stdout,
-        real_git(github_clone, "branch", "--show-current").stdout,
-        bool(real_git(github_clone, "diff", "main", case.branch).stdout),
-    )
-    expected = (case.lane_worktree.value, head, head, "", "main\n", True)
-    assert observed == expected
-    detail = replace(
-        landing_pull_request(body=case.body, head_ref_name=case.branch),
-        head_sha=real_git(github_clone, "rev-parse", "main").stdout.strip()
-        if case.distinct_detail
-        else head,
-    )
-    client = serve_forge(
-        monkeypatch,
-        FakeForge(
-            landings={12: detail, 13: replace(detail, number=13)},
-            readiness_by_number={12: landing_readiness(head_sha=head)},
-            merge_remote=bare_remote,
-            merge_error=case.error,
-            allowed_methods=case.methods,
-            branch_rules={"main": case.rules},
-            head_board_config=case.head_config,
-        ),
-    )
-    if case.dependency_listing:
-        client.changes_by_number[12] = pull_request_listing(
-            head, forge.ChangedFile("uv.lock", None)
-        )
-    if case.oversized_foreign_text:
-        oversized = "1" * 4301
-        client.board_open_pull_requests = (
-            board.PullRequest(300, "Foreign", f"Refs #{oversized}", "foreign/branch"),
-        )
-        landed_from_another_clone(
-            bare_remote.parent,
-            "commit",
-            "-q",
-            "--allow-empty",
-            "-m",
-            f"Foreign\n\nWork-Item: #{oversized}",
-        )
-    shared = landing_world(github_clone, bare_remote, client, remote_tip=seeded.tip)
-    entry: list[tuple[object, object]] = []
-    merge = client.merge_landing
-
-    def observe_entry(
-        number: int, *, head_sha: str, method: board.MergeMethod, title: str, body: str
-    ) -> str:
-        entry.append(lineage_observation(github_clone))
-        return merge(number, head_sha=head_sha, method=method, title=title, body=body)
-
-    monkeypatch.setattr(client, "merge_landing", observe_entry)
-    return MergeWorld(github_clone, bare_remote, client, shared.unchanged, case, head, lane, entry)
 
 
 def land(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
