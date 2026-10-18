@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -12,7 +13,6 @@ import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import (
     FROZEN_CLI_NOW,
-    CliRun,
     freeze_cli_now,
     real_git,
     run_cli,
@@ -27,6 +27,19 @@ from agent_coordination import board_read, body, cli, forge, github, session, st
 class RuleInput:
     arguments: tuple[str, ...]
     initial_body: str
+
+
+GIT_DIAGNOSTIC_TAIL = re.compile(r"(fatal: not a git repository)[^\"\n]*")
+
+
+def git_diagnostic_start(text: str) -> str:
+    """Keep git's own diagnostic only by its start: its tail varies with git version and mount."""
+    return GIT_DIAGNOSTIC_TAIL.sub(r"\1", text)
+
+
+def json_wire(stdout: str) -> dict[str, object]:
+    """Parse a JSON wire; empty stdout parses to nothing so the comparison shows it."""
+    return json.loads(stdout) if stdout else {}
 
 
 @pytest.fixture
@@ -48,9 +61,7 @@ class TestGithubRule:
                         '[[expectation]]\ntext = "Ship it too?"\ndefault = "later"\n'
                     ),
                 ),
-                lambda result, written: {
-                    "exit": result.status,
-                    "stdout": result.stdout,
+                lambda written: {
                     **{
                         f"e{index + 1}.{key}": value
                         for index in (0, 1)
@@ -60,6 +71,7 @@ class TestGithubRule:
                 {
                     "exit": 0,
                     "stdout": sentence,
+                    "stderr": "",
                     **{
                         f"e{index + 1}.{key}": value
                         for index, entry in enumerate(
@@ -90,9 +102,7 @@ class TestGithubRule:
                         + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
                     ),
                 ),
-                lambda result, written: {
-                    "exit": result.status,
-                    "stdout": result.stdout,
+                lambda written: {
                     "text": cast(
                         list[dict[str, object]], body.locate_block(written[90]).data["expectation"]
                     )[0]["text"],
@@ -106,6 +116,7 @@ class TestGithubRule:
                 {
                     "exit": 0,
                     "stdout": "RULED #90 line 1 yes; 0 line(s) still open\n",
+                    "stderr": "",
                     "text": "Ship it? Anmerkung: Ja, sofort.",
                     "keys": {"text", "ruling", "ruled_on"},
                 },
@@ -120,12 +131,7 @@ class TestGithubRule:
                         '[[slice]]\nindex = 1\ntitle = "Bad\\u000Btitle"\n'
                     ),
                 ),
-                lambda result, written: {
-                    "exit": result.status,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "written keys": tuple(written),
-                },
+                lambda written: {"written keys": tuple(written)},
                 {
                     "exit": 0,
                     "stdout": "RULED #90 line 1 yes; 0 line(s) still open\n",
@@ -141,8 +147,8 @@ class TestGithubRule:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
         scenario: RuleInput,
-        observe: Callable[[CliRun, dict[int, str]], object],
-        expected: object,
+        observe: Callable[[dict[int, str]], dict[str, object]],
+        expected: dict[str, object],
     ) -> None:
         """Spec: RULE-01, RULE-03, BODY-63, BODY-66 — RULED, note in text, legacy body accepted."""
         freeze_cli_now(monkeypatch)
@@ -154,7 +160,18 @@ class TestGithubRule:
         assert client.item_bodies == {}
         capsys.readouterr()
         result = run_cli(["rule", "90", "--line", "1", *scenario.arguments], capsys)
-        assert observe(result, client.item_bodies) == expected
+        written_state = (
+            observe(client.item_bodies)
+            if 90 in client.item_bodies
+            else {"written": client.item_bodies}
+        )
+        observed = {
+            "exit": result.status,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            **written_state,
+        }
+        assert observed == expected
 
     @pytest.mark.parametrize(
         "scenario,expected",
@@ -217,8 +234,9 @@ class TestGithubRule:
         assert client.item_bodies == {}
         capsys.readouterr()
         result = run_cli(["rule", "90", "--line", "1", *scenario.arguments, "--json"], capsys)
-        actual = json.loads(result.stdout)
-        assert {"exit": result.status, "wire": result.stdout, "keys": set(actual), **actual} == {
+        parsed = json_wire(result.stdout)
+        observed = {"exit": result.status, "wire": result.stdout, "keys": set(parsed), **parsed}
+        assert observed == {
             "exit": 0,
             "wire": json.dumps(expected) + "\n",
             "keys": set(expected),
@@ -372,19 +390,17 @@ class TestGithubRule:
         capsys.readouterr()
         result = run_cli(["rule", "90", *arguments, *(["--json"] if as_json else [])], capsys)
         expected = {"ok": False, "reason": reason, "message": message}
-        actual = json.loads(result.stdout) if as_json else {}
-        assert {
+        observed = {
             "exit": result.status,
             "stderr": result.stderr,
             "stdout": result.stdout,
-            "keys": set(actual),
-            **actual,
+            **(json_wire(result.stdout) if as_json else {}),
             "writes": client.item_bodies if not fails else None,
-        } == {
+        }
+        assert observed == {
             "exit": 2,
             "stderr": f"ERROR: {message}\n",
             "stdout": json.dumps(expected) + "\n" if as_json else "",
-            "keys": set(expected) if as_json else set(),
             **(expected if as_json else {}),
             "writes": {} if not fails else None,
         }
@@ -420,10 +436,11 @@ class TestGithubRule:
         run_cli(["rule", "90", "--line", "1", "--yes"], capsys)
         written = client.item_bodies[90]
         block = body.locate_block(written)
-        assert {
+        observed = {
             "prefix": written[: block.content_start],
             "suffix": written[block.content_end :],
-        } == expected
+        }
+        assert observed == expected
 
 
 @pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
@@ -463,8 +480,7 @@ class TestGithubRule:
                 (board_read, "item_body_or_refuse"),
             ),
             "this command reads the repository's body contract from .aco/board.toml and needs "
-            "a checkout (a shallow one is enough): fatal: not a git repository "
-            "(or any of the parent directories): .git",
+            "a checkout (a shallow one is enough): fatal: not a git repository",
             "unavailable",
             True,
             id="checkout",
@@ -517,18 +533,17 @@ def test_context_refusal(
     capsys.readouterr()
     result = run_cli([*arguments, *(["--json"] if as_json else [])], capsys)
     expected = {"ok": False, "reason": reason, "message": message}
-    actual = json.loads(result.stdout) if as_json else {}
-    assert {
+    stdout = git_diagnostic_start(result.stdout)
+    observed = {
         "exit": result.status,
-        "stderr": result.stderr,
-        "stdout": result.stdout,
-        "keys": set(actual),
-        **actual,
-    } == {
+        "stderr": git_diagnostic_start(result.stderr),
+        "stdout": stdout,
+        **(json_wire(stdout) if as_json else {}),
+    }
+    assert observed == {
         "exit": 2,
         "stderr": f"ERROR: {message}\n",
         "stdout": json.dumps(expected) + "\n" if as_json else "",
-        "keys": set(expected) if as_json else set(),
         **(expected if as_json else {}),
     }
 
@@ -565,9 +580,10 @@ def test_parser_refusal(
         cli.main(arguments)
     captured = capsys.readouterr()
     usage = "usage: aco rule "
-    assert {
+    observed = {
         "code": raised.value.code,
         "sentence": "".join(captured.err.splitlines()[-1:])[: len(sentence)],
         "usage": captured.err[: len(usage)],
         "stdout": captured.out,
-    } == {"code": 2, "sentence": sentence, "usage": usage, "stdout": ""}
+    }
+    assert observed == {"code": 2, "sentence": sentence, "usage": usage, "stdout": ""}
