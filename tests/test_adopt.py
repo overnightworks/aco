@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 from collections.abc import Callable
@@ -21,13 +22,14 @@ from cli_fixtures import (
     real_git,
     redirect_toplevel,
     run_cli,
+    run_context_over,
     track_board_config,
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge, serve_forge
 from store_fixtures import claim_intent, state_ref_tip
 
-from agent_coordination import checkout, forge, protocol, store
+from agent_coordination import checkout, cmd_claim, forge, protocol, store
 
 DEPENDENCY_PATHS_CONFIG = 'dependency_paths = ["uv.lock", "pyproject.toml"]\n'
 PASSES_EVERY_CHECK = (
@@ -521,3 +523,42 @@ def test_adopt_that_passes_every_check_refuses_and_writes_nothing(
     assert (result.status, result.stdout, result.stderr) == (2, "", PASSES_EVERY_CHECK)
     assert world.effects() == before
     assert sum(reads.observations.values()) == 1
+
+
+def test_adopts_dry_run_claim_refuses_a_branch_another_claim_holds(world: AdoptionWorld) -> None:
+    """Spec: CLAIM-71 -- the claim `adopt` would make, checked as `cmd_adopt` checks it,
+    refuses with CLAIM-11's sentence and writes nothing."""
+    store.commit_transition(
+        observed=fresh_observation(world.clone, world.remote),
+        subject=store.transition_subject("claim", protocol.IssueIdentity(42), ADOPTED_BRANCH),
+        intent=claim_intent(
+            identity=protocol.IssueIdentity(42),
+            agent="Bob",
+            claim_id="b1",
+            operation_id="op-b1",
+            branch=ADOPTED_BRANCH,
+        ),
+    )
+    tip_before = state_ref_tip(world.remote)
+    arguments = argparse.Namespace(
+        issue=None,
+        agent="Ada",
+        role=cmd_claim.DEFAULT_CLAIM_ROLE,
+        base=world.head,
+        branch=ADOPTED_BRANCH,
+        scope=["uv.lock", "pyproject.toml"],
+        claim_id=None,
+        out_of_order=None,
+        whole=None,
+    )
+
+    request = cmd_claim.claim_request(arguments, adopted=True)
+    context = run_context_over(world.forge)
+
+    with pytest.raises(protocol.ClaimConflictError) as refused:
+        cmd_claim.checked_claim(request, context, revision=world.head)
+
+    assert str(refused.value) == (
+        f"lane '{ADOPTED_BRANCH}' is claimed by Bob (builder) on issue #42 branch {ADOPTED_BRANCH}"
+    )
+    assert state_ref_tip(world.remote) == tip_before

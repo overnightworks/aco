@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+
+from cli_fixtures import real_git
 
 from agent_coordination import protocol, store
 
@@ -114,6 +117,7 @@ def claim_intent(
     whole_reason: str | None = None,
     resource_name: str | None = None,
     resource_value: int | None = None,
+    exclusive_branch: bool = False,
 ) -> protocol.ClaimIntent:
     return protocol.ClaimIntent(
         identity=identity,
@@ -127,4 +131,38 @@ def claim_intent(
         whole_reason=whole_reason,
         resource_name=resource_name,
         resource_value=resource_value,
+        exclusive_branch=exclusive_branch,
     )
+
+
+class RaceOnceTransport:
+    """A `store.PushTransport` that lets one other writer land on
+    `refs/aco/state` between this transition's own read and its first real
+    push attempt (issues #359 R3, #459): `race` performs that genuine second
+    `git push` -- not a monkeypatched rejection -- so the ordinary
+    `commit_transition` retry loop meets a real non-fast-forward rejection
+    and must actually refetch and reapply."""
+
+    def __init__(self, race: Callable[[], object]) -> None:
+        self._race: Callable[[], object] | None = race
+        self._real = store.GitPushTransport()
+
+    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
+        if self._race is not None:
+            race, self._race = self._race, None
+            race()
+        self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+
+
+def unrelated_racer_commit(worktree: Path, remote: Path) -> str:
+    """Pushes one commit carrying the current state tree unchanged -- a
+    writer whose own change is unrelated to the transition it races."""
+    current = state_ref_tip(remote)
+    if current is None:
+        raise AssertionError(f"no state ref to race in {remote}")
+    tree = real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
+    racer = real_git(
+        worktree, "commit-tree", tree, "-p", str(current), "-m", "unrelated racer"
+    ).stdout.strip()
+    real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
+    return racer

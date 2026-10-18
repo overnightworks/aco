@@ -36,12 +36,14 @@ from store_fixtures import (
     CLAIM_BASE,
     STATE_WITH_TIP,
     TIP,
+    RaceOnceTransport,
     blob,
     claim_intent,
     push_raw_state_tree,
     raw_tree,
     state_ref_listing,
     state_ref_tip,
+    unrelated_racer_commit,
 )
 
 from agent_coordination import cli as issue_claim
@@ -2629,6 +2631,97 @@ def test_commit_transition_same_key_second_racer_names_the_holder(
         )
 
     assert type(raised.value) is protocol.ClaimConflictError
+
+
+def _bob_claims_the_adopted_branch(worktree: Path, remote: Path) -> protocol.ClaimState:
+    return store.commit_transition(
+        observed=fresh_observation(worktree, remote),
+        subject=store.transition_subject("claim", protocol.IssueIdentity(42), "dependabot/x"),
+        intent=claim_intent(
+            identity=protocol.IssueIdentity(42),
+            agent="Bob",
+            claim_id="b1",
+            operation_id="op-b1",
+            branch="dependabot/x",
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("racer", "refusal", "claim_keys_afterwards"),
+    [
+        pytest.param(
+            _bob_claims_the_adopted_branch,
+            "lane 'dependabot/x' is claimed by Bob (builder) on issue #42 branch dependabot/x",
+            {protocol.claim_key(protocol.IssueIdentity(42), "dependabot/x")},
+            id="cell-9-a-claim-that-lands-between-the-attempts-refuses-the-retry",
+        ),
+        pytest.param(
+            unrelated_racer_commit,
+            None,
+            {protocol.claim_key(protocol.LaneIdentity(), "dependabot/x")},
+            id="cell-10-an-unrelated-commit-lets-the-retry-land",
+        ),
+    ],
+)
+def test_an_exclusive_claim_rechecks_its_branch_on_the_retry_after_a_rejected_push(
+    bare_remote: Path,
+    worktree: Path,
+    racer: Callable[[Path, Path], object],
+    refusal: str | None,
+    claim_keys_afterwards: set[str],
+) -> None:
+    """Spec: CLAIM-71 -- the real non-fast-forward rejection makes `commit_transition`
+    refetch and reapply, and the exclusive check runs again on the new state."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    exclusive = claim_intent(
+        identity=protocol.LaneIdentity(), branch="dependabot/x", exclusive_branch=True
+    )
+    transport = RaceOnceTransport(lambda: racer(worktree, bare_remote))
+    attempt = partial(
+        store.commit_transition,
+        observed=fresh_observation(worktree, bare_remote),
+        subject=store.transition_subject("claim", protocol.LaneIdentity(), "dependabot/x"),
+        intent=exclusive,
+        transport=transport,
+    )
+
+    if refusal is None:
+        attempt()
+    else:
+        with pytest.raises(protocol.ClaimConflictError) as refused:
+            attempt()
+        assert str(refused.value) == refusal
+
+    stored = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    assert set(stored.claims) == claim_keys_afterwards
+
+
+def test_an_exclusive_claim_is_stored_byte_identical_to_an_ordinary_lane_claim(
+    tmp_path: Path, bare_remote: Path, worktree: Path
+) -> None:
+    """Spec: CLAIM-72 -- exclusivity never enters the claim record."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    other_remote = init_bare_repository(tmp_path / "other.git")
+    real_git(worktree, "push", str(other_remote), f"{state_ref_tip(bare_remote)}:{store.STATE_REF}")
+    other_worktree = tmp_path / "other-worktree"
+    other_worktree.mkdir()
+    real_git(other_worktree, "init", "-q", "-b", "main")
+    for checkout, remote, exclusive_branch in (
+        (worktree, bare_remote, True),
+        (other_worktree, other_remote, False),
+    ):
+        store.commit_transition(
+            observed=fresh_observation(checkout, remote),
+            subject=store.transition_subject("claim", protocol.LaneIdentity(), "dependabot/x"),
+            intent=claim_intent(
+                identity=protocol.LaneIdentity(),
+                branch="dependabot/x",
+                exclusive_branch=exclusive_branch,
+            ),
+        )
+
+    assert state_ref_listing(bare_remote) == state_ref_listing(other_remote)
 
 
 def test_commit_transition_a_different_key_loser_that_exhausts_retries_names_a_stuck_lock(

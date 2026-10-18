@@ -23,6 +23,8 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 | same claim id, same fields | CLAIM-13 | — | — |
 | claim id active or released | CLAIM-14, CLAIM-15 | — | — |
 | lane claim beside an issue claim | CLAIM-10 | — | — |
+| `aco adopt`'s exclusive claim on a held branch | CLAIM-71 | — | — |
+| `aco adopt`'s exclusive claim replayed | CLAIM-72 | — | — |
 | scope path outside the repository | CLAIM-19 | — | — |
 | scope path not canonical | CLAIM-20, CLAIM-21 | — | — |
 | scope empty, or over 256 entries | CLAIM-22, CLAIM-23 | — | — |
@@ -49,7 +51,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-03] A lane claim's entry name percent-encodes its branch, so the lane `docs/tidy-readme` is stored as `claims/lane-docs%2Ftidy-readme.toml` (see E-CLAIM-02).
 - [ ] [CLAIM-04] The two key prefixes never collide: a lane branch literally named `issue-1` is stored as `claims/lane-issue-1.toml`, never as the entry of issue `#1`.
 - [ ] [CLAIM-05] A claim file carries `claim_id`, `agent`, `role`, `base`, `branch`, `scope`, `opened_commit`, and only then the optional `whole_reason`, `resource_name`, `resource_value`.
-- [ ] [CLAIM-10] A lane claim and an issue claim never conflict by identity, so a `docs/` lane claims cleanly beside a live issue claim and `aco status` lists both.
+- [ ] [CLAIM-10] A lane claim and an issue claim never conflict by identity, so a `docs/` lane claims cleanly beside a live issue claim and `aco status` lists both; only CLAIM-71 refuses that.
 - [ ] [CLAIM-57] A branch that is not a safe Git ref — a leading `-`, `..`, `//`, `@{`, a `.lock` suffix, a dot-segment — refuses `claim marker branch is not a safe Git ref: '<branch>'`, exit `2`.
 - [ ] [CLAIM-58] An agent or role that is blank, padded, carries a control character or exceeds its bound refuses `agent must be one bounded non-empty line`, exit `2`, before anything is written.
 
@@ -82,6 +84,8 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-15] A released claim id stays terminal: claiming with it again refuses with that same `already on this ledger, active or released` sentence, exit `2`.
 - [ ] [CLAIM-16] `aco rescope` against a claim id with no live claim on its identity/branch, including a mismatched `--claim-id`, refuses the wording `rescope.spec.md` owns (RESC-14), exit `2`.
 - [ ] [CLAIM-17] `aco release` against a claim id with no live claim on its identity/branch, including a mismatched `--claim-id`, refuses the wording `release.spec.md` owns (REL-09, REL-10), exit `2`.
+- [ ] [CLAIM-71] An exclusive claim, which only `aco adopt` requests, refuses on every write attempt while any live claim holds its branch, issue or lane, with CLAIM-11/12's sentence naming that holder.
+- [ ] [CLAIM-72] Its exact replay returns the live claim as CLAIM-13 says; exclusivity is checked at write time only and never enters the claim record, which reads as an ordinary lane claim.
 
 ## Scope grammar
 

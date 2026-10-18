@@ -132,6 +132,7 @@ def claim_request(
         out_of_order_reason=arguments.out_of_order,
         whole_reason=whole_reason,
         resource=resource,
+        exclusive_branch=adopted,
     )
 
 
@@ -423,6 +424,7 @@ def _claim_intent_from_request(
         resource_name=resource_name,
         resource_value=resource_value,
         item_pin=item_pin,
+        exclusive_branch=request.exclusive_branch,
     )
 
 

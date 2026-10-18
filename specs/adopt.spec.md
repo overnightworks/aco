@@ -62,7 +62,7 @@ list reads nothing after it.
    no local branch has its name (ADOPT-13); the remote still has the head branch, and its fetched tip
    is the head the checks read (ADOPT-10).
 8. The claim `adopt` would make passes `claim`'s check phase for the listing's path set
-   (ADOPT-14).
+   (ADOPT-14), where it is exclusive on its branch (CLAIM-71).
 9. Every check passed (ADOPT-18).
 
 ## Refusals before any write

@@ -203,6 +203,7 @@ class ClaimRequest:
     whole_reason: str | None = None
     resource: str | None = None
     resource_value: int | None = None
+    exclusive_branch: bool = False
 
 
 @dataclass(frozen=True)
@@ -1026,7 +1027,12 @@ class ClaimIntent:
     between a rejected push and its retry refuses the claim instead of
     leaving a live claim on an item nobody checked (issue #496). Only a
     state-ref item has one; under `github` the forge holds the item's state
-    and the ledger no fact of it."""
+    and the ledger no fact of it.
+
+    `exclusive_branch` (only `aco adopt` sets it) refuses the claim, on every
+    attempt, while any live claim holds its branch -- issue or lane -- which
+    CLAIM-10 otherwise lets share one. It is never stored in the claim
+    record."""
 
     identity: ClaimIdentity
     agent: str
@@ -1040,6 +1046,7 @@ class ClaimIntent:
     resource_name: str | None = None
     resource_value: int | None = None
     item_pin: ItemPin | None = None
+    exclusive_branch: bool = False
 
 
 @dataclass(frozen=True)
@@ -1291,6 +1298,8 @@ def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
             "released; release it, then claim again with a fresh claim id"
         )
     blocked_by = blocking_claims(tuple(state.claims.values()), intent)
+    if intent.exclusive_branch and not blocked_by:
+        blocked_by = claims_on_branch(state.claims, intent.branch)
     if blocked_by:
         raise ClaimConflictError(
             naming=partial(claimed_by_sentence, intent.identity, intent.branch, blocked_by[0])
