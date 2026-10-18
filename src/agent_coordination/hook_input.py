@@ -723,6 +723,17 @@ class _ParsedArguments(NamedTuple):
         return next((option for option in self.options if option.name in names), None)
 
 
+class _OptionTable(NamedTuple):
+    """One command's options by how they take a value: `value_options` a
+    required one, `optional_value_options` only an attached one, and
+    `flag_options` (long names only) none -- known so that an abbreviation is
+    as ambiguous here as it is for the tool."""
+
+    value_options: frozenset[str] = frozenset()
+    optional_value_options: frozenset[str] = frozenset()
+    flag_options: frozenset[str] = frozenset()
+
+
 def _attached_value(word: _Word, text: str) -> _Word:
     return _Word(text, is_operator=False, is_expandable=word.is_expandable, position=word.position)
 
@@ -730,9 +741,7 @@ def _attached_value(word: _Word, text: str) -> _Word:
 def _parse_short_cluster(
     word: _Word,
     following: tuple[_Word, ...],
-    *,
-    value_options: frozenset[str],
-    optional_value_options: frozenset[str],
+    table: _OptionTable,
 ) -> tuple[list[_OptionValue], int]:
     """The options of one `-abc` cluster and how many following words it
     consumed. As in GNU `getopt`, an option that takes a value consumes the
@@ -743,10 +752,10 @@ def _parse_short_cluster(
     for position, letter in enumerate(cluster):
         name = _FLAG_PREFIX + letter
         rest = cluster[position + 1 :]
-        if name in optional_value_options:
+        if name in table.optional_value_options:
             options.append(_OptionValue(name, _attached_value(word, rest) if rest else None))
             return options, 0
-        if name in value_options:
+        if name in table.value_options:
             if rest:
                 options.append(_OptionValue(name, _attached_value(word, rest)))
                 return options, 0
@@ -771,32 +780,27 @@ def _resolve_long_option(written_name: str, known_options: set[str]) -> str:
 def _parse_long_option(
     word: _Word,
     following: tuple[_Word, ...],
-    *,
-    value_options: frozenset[str],
-    optional_value_options: frozenset[str],
-    flag_options: frozenset[str],
+    table: _OptionTable,
 ) -> tuple[_OptionValue, int]:
     """One `--name[=value]` option and how many following words it consumed:
     a required value is the `=value` or else the next word, an optional one
     only the `=value`. The name is resolved through its unique abbreviation."""
     written_name, separator, attached = word.text.partition(_LONG_OPTION_VALUE_SEPARATOR)
     name = _resolve_long_option(
-        written_name, {*value_options, *optional_value_options, *flag_options}
+        written_name, {*table.value_options, *table.optional_value_options, *table.flag_options}
     )
     if separator:
-        takes_value = name in value_options | optional_value_options
+        takes_value = name in table.value_options | table.optional_value_options
         return _OptionValue(name, _attached_value(word, attached) if takes_value else None), 0
-    if name in value_options:
+    if name in table.value_options:
         return _OptionValue(name, following[0] if following else None), 1 if following else 0
     return _OptionValue(name, None), 0
 
 
 def _parse_arguments(
     words: tuple[_Word, ...],
+    table: _OptionTable,
     *,
-    value_options: frozenset[str] = frozenset(),
-    optional_value_options: frozenset[str] = frozenset(),
-    flag_options: frozenset[str] = frozenset(),
     end_of_options_markers: frozenset[str] = frozenset({_END_OF_OPTIONS}),
     options_end_at_first_operand: bool = False,
 ) -> _ParsedArguments:
@@ -806,10 +810,8 @@ def _parse_arguments(
     option consumed as its value ends the options -- every word after it is
     an operand whatever it starts with. `end_of_options_markers` is the
     command's own set: `--` for GNU tools, also `--end-of-options` for git.
-    `value_options` (`-t`, `--target-directory`) take a required value;
-    `optional_value_options` (`-i`, `--in-place`) only an attached one;
-    `flag_options` are the command's remaining long options, known so that
-    an abbreviation is as ambiguous here as it is for the tool.
+    `table` says which options take a required value (`-t`,
+    `--target-directory`), only an attached one (`-i`, `--in-place`) or none.
     Unlike `_non_flag_arguments`, which drops every word starting with `-`,
     a lone `-` stays an operand here (`git restore -`), as in GNU tools.
     `options_end_at_first_operand` is the POSIX reading (`POSIXLY_CORRECT`):
@@ -833,22 +835,11 @@ def _parse_arguments(
                 operands.extend(following)
                 break
         elif word.text.startswith(_LONG_OPTION_PREFIX):
-            option, consumed = _parse_long_option(
-                word,
-                following,
-                value_options=value_options,
-                optional_value_options=optional_value_options,
-                flag_options=flag_options,
-            )
+            option, consumed = _parse_long_option(word, following, table)
             options.append(option)
             index += consumed
         else:
-            cluster_options, consumed = _parse_short_cluster(
-                word,
-                following,
-                value_options=value_options,
-                optional_value_options=optional_value_options,
-            )
+            cluster_options, consumed = _parse_short_cluster(word, following, table)
             options.extend(cluster_options)
             index += consumed
     return _ParsedArguments(tuple(options), tuple(operands))
@@ -856,22 +847,13 @@ def _parse_arguments(
 
 def _parse_both_readings(
     words: tuple[_Word, ...],
-    *,
-    value_options: frozenset[str],
-    optional_value_options: frozenset[str] = frozenset(),
-    flag_options: frozenset[str] = frozenset(),
+    table: _OptionTable,
 ) -> tuple[_ParsedArguments, ...]:
     """`words` read the permuted way (GNU's default) and the POSIX way
     (`POSIXLY_CORRECT`). The hook reads no environment, so a tool whose
     reading it cannot know is judged by both."""
     return tuple(
-        _parse_arguments(
-            words,
-            value_options=value_options,
-            optional_value_options=optional_value_options,
-            flag_options=flag_options,
-            options_end_at_first_operand=posix,
-        )
+        _parse_arguments(words, table, options_end_at_first_operand=posix)
         for posix in (False, True)
     )
 
@@ -928,9 +910,11 @@ def _match_copy(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | Non
         destination
         for parsed in _parse_both_readings(
             words[1:],
-            value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS,
-            optional_value_options=_CP_OPTIONAL_VALUE_OPTIONS,
-            flag_options=_CP_FLAG_OPTIONS,
+            _OptionTable(
+                _CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS,
+                _CP_OPTIONAL_VALUE_OPTIONS,
+                _CP_FLAG_OPTIONS,
+            ),
         )
         for destination in (
             parsed.every_value_of(_CP_TARGET_DIRECTORY_OPTIONS) or parsed.operands[-1:]
@@ -966,9 +950,11 @@ def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...
         return None
     readings = _parse_both_readings(
         words[1:],
-        value_options=_SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
-        optional_value_options=_SED_IN_PLACE_OPTIONS,
-        flag_options=_SED_FLAG_OPTIONS,
+        _OptionTable(
+            _SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
+            _SED_IN_PLACE_OPTIONS,
+            _SED_FLAG_OPTIONS,
+        ),
     )
     paths = _unique_in_command_order(
         path for parsed in readings for path in _sed_in_place_paths(parsed)
@@ -1018,8 +1004,9 @@ def _match_git_restore(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]
         return None
     return PATTERN_GIT_RESTORE, _parse_arguments(
         words[_GIT_RESTORE_PREFIX_LENGTH:],
-        value_options=_GIT_RESTORE_VALUE_OPTIONS,
-        flag_options=_GIT_RESTORE_FLAG_OPTIONS,
+        _OptionTable(
+            value_options=_GIT_RESTORE_VALUE_OPTIONS, flag_options=_GIT_RESTORE_FLAG_OPTIONS
+        ),
         end_of_options_markers=_GIT_RESTORE_END_OF_OPTIONS,
     ).operands
 
