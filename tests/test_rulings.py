@@ -15,28 +15,15 @@ from board_fixtures import (
     proposed_expectation,
     ruled_expectation,
 )
-from cli_fixtures import real_git, run_cli, track_board_config
+from cli_fixtures import assert_github_world, real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, serve_forge
-from store_fixtures import state_ref_tip
 
 from agent_coordination import board
 
 
 @pytest.fixture(autouse=True)
 def _github_world(github_clone: Path, bare_remote: Path) -> None:
-    """Arrangement guards G1-G3; no command result or effect is inspected."""
-    assert real_git(github_clone, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
-    main = real_git(github_clone, "rev-parse", "main").stdout.strip()
-    assert real_git(github_clone, "rev-parse", "origin/HEAD").stdout.strip() == main
-    assert (
-        real_git(github_clone, "config", "--get", "remote.origin.url").stdout
-        == "git@github.com:example/agent-coordination.git\n"
-    )
-    assert (
-        real_git(github_clone, "ls-remote", "origin", "refs/heads/main").stdout
-        == f"{main}\trefs/heads/main\n"
-    )
-    assert state_ref_tip(bare_remote) is None
+    assert_github_world(github_clone, bare_remote)
 
 
 @pytest.mark.parametrize(

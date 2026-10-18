@@ -18,6 +18,7 @@ from typing import TextIO
 
 import pytest
 from board_fixtures import BASE, REPOSITORY, complete_contract
+from store_fixtures import state_ref_tip
 
 from agent_coordination import (
     board,
@@ -765,3 +766,19 @@ def empty_harness_socket_on_stdin(_tmp_path: Path) -> Iterator[TextIO]:
     harness_end.settimeout(1)
     with harness_end, other_end, harness_end.makefile("r") as stdin:
         yield stdin
+
+
+def assert_github_world(github_clone: Path, bare_remote: Path) -> None:
+    """Verify the arranged GitHub checkout before running its command."""
+    assert real_git(github_clone, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
+    main = real_git(github_clone, "rev-parse", "main").stdout.strip()
+    assert real_git(github_clone, "rev-parse", "origin/HEAD").stdout.strip() == main
+    assert (
+        real_git(github_clone, "config", "--get", "remote.origin.url").stdout
+        == "git@github.com:example/agent-coordination.git\n"
+    )
+    assert (
+        real_git(github_clone, "ls-remote", "origin", "refs/heads/main").stdout
+        == f"{main}\trefs/heads/main\n"
+    )
+    assert state_ref_tip(bare_remote) is None
