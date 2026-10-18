@@ -2,11 +2,15 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { line, row, writeRulings } from './rulingsFixture';
 import { readBoardRuntime } from './runtime';
+import { UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
 // global-setup.ts); each test overwrites the whole of rulings.json, so
 // tests stay isolated from one another despite the shared process.
 test.describe.configure({ mode: 'serial' });
+
+// Just past the app's undo window; the page clock is driven, never waited.
+const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
 function choices(page: Page) {
 	return page.getByRole('group', { name: 'Entscheidung' });
@@ -28,14 +32,15 @@ test('undoing within the 8 s window writes nothing, ever', async ({ page }) => {
 		}
 	});
 
+	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
 	await page.getByRole('button', { name: /Guests may join the call\./ }).click();
 	await choices(page).getByRole('button', { name: /Ja/ }).click();
 	await page.getByRole('button', { name: 'Rückgängig' }).click();
 
-	// Outlasting the window on purpose: the undo must have cancelled it, not
-	// merely delayed it -- the only way to prove that is to wait past it.
-	await page.waitForTimeout(8_500);
+	// The page clock runs past the window: the undo must have cancelled the
+	// write, not merely delayed it, and no real waiting is needed to prove it.
+	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 	expect(ruleRequests).toBe(0);
 	await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeEnabled();
@@ -57,11 +62,13 @@ test('once the window elapses, exactly one decision is written', async ({ page }
 		}
 	});
 
+	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
 	await page.getByRole('button', { name: /Hosts may close the room\./ }).click();
 	await choices(page).getByRole('button', { name: /Nein/ }).click();
+	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-	await expect(page.getByText('Nein · 2026-10-03')).toBeVisible({ timeout: 10_000 });
+	await expect(page.getByText('Nein · 2026-10-03')).toBeVisible();
 	expect(ruleRequests).toBe(1);
 	// Nothing else was open: the stage goes back to "all decided", not a stale card.
 	await expect(page.getByText('Alles entschieden')).toBeVisible();

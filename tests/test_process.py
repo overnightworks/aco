@@ -291,7 +291,13 @@ class _FakeBoundedProcess:
     child or depending on real OS scheduling.
     """
 
-    def __init__(self, *, already_exited: bool = False, ignores_terminate: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        already_exited: bool = False,
+        ignores_terminate: bool = False,
+        survives_kill: bool = False,
+    ) -> None:
         read_fd, write_fd = os.pipe()
         os.close(write_fd)
         self.stdout = os.fdopen(read_fd, "rb")
@@ -300,6 +306,7 @@ class _FakeBoundedProcess:
         os.close(error_write_fd)
         self.stderr = os.fdopen(error_read_fd, "rb")
         self._ignores_terminate = ignores_terminate
+        self._survives_kill = survives_kill
         self.events: list[str] = []
         self._exited = already_exited
 
@@ -313,7 +320,7 @@ class _FakeBoundedProcess:
 
     def kill(self) -> None:
         self.events.append("kill")
-        self._exited = True
+        self._exited = not self._survives_kill
 
     def wait(self, timeout: float = 0.0) -> int:
         if not self._exited:
@@ -371,6 +378,24 @@ def test_bounded_run_kills_a_child_that_ignores_termination(
     assert fake_process.events == ["terminate", "kill"]
     assert fake_process.stdout.closed is True
     assert fake_process.poll() is not None
+
+
+@bounded_runners
+def test_bounded_run_reports_a_child_that_survives_being_killed_as_not_exiting(
+    monkeypatch: pytest.MonkeyPatch, run_bounded_command: Callable[..., object]
+) -> None:
+    """A child still alive after `kill()` and its bounded wait is a typed
+    `ProcessDidNotExitError`, never the raw `subprocess.TimeoutExpired`."""
+    fake_process = _FakeBoundedProcess(ignores_terminate=True, survives_kill=True)
+
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_process)
+    monkeypatch.setattr(process.time, "monotonic", lambda: 0.0)
+
+    with pytest.raises(process.ProcessDidNotExitError):
+        run_bounded_command(["fake"], timeout=-1.0)
+
+    assert fake_process.events[:2] == ["terminate", "kill"]
+    assert fake_process.stdout.closed is True
 
 
 def test_run_bounded_treats_a_broken_input_pipe_as_fully_sent(

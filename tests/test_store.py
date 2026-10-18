@@ -11,16 +11,18 @@ from __future__ import annotations
 
 import ast
 import errno
+import os
 import re
 import subprocess
+import sys
 import threading
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import pytest
 from cli_fixtures import (
@@ -32,6 +34,7 @@ from cli_fixtures import (
     stub_board_config_tracked,
 )
 from github_fixtures import FakeForge
+from process_fixtures import UnstoppableProcess, reap
 from store_fixtures import (
     CLAIM_BASE,
     STATE_WITH_TIP,
@@ -244,6 +247,21 @@ class _AlwaysRejectingTransport:
         raise protocol.PushRejectedError("simulated permanent rejection")
 
 
+class _RejectsFirstPushesTransport:
+    """A `PushTransport` that rejects its first `rejections` pushes without
+    landing them, then pushes for real."""
+
+    def __init__(self, *, rejections: int) -> None:
+        self._rejections_left = rejections
+        self._real = store.GitPushTransport()
+
+    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
+        if self._rejections_left:
+            self._rejections_left -= 1
+            raise protocol.PushRejectedError("simulated rejection")
+        self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+
+
 class _AlwaysRacingTransport:
     """A `PushTransport` where a concurrent writer always lands first: each
     call pushes one real, distinct commit onto the ref before raising, so
@@ -345,21 +363,22 @@ def test_a_failing_hash_object_reports_the_stderr_git_wrote(
         store.hash_blob(outside_any_repository, b"claim state")
 
 
-def test_bootstrap_is_a_no_op_read_when_the_ref_already_exists(
+def test_bootstrap_is_a_no_op_read_when_the_ref_already_holds_state(
     bare_remote: Path, worktree: Path
 ) -> None:
-    first = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-
-    second = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-
-    assert second == first
-    log = subprocess.run(
-        ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
-        check=True,
-        capture_output=True,
-        text=True,
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    claimed = store.commit_transition(
+        observed=fresh_observation(worktree, bare_remote),
+        subject=store.ClaimTransitionSubject("claim issue 42", item="42"),
+        intent=_issue_claim_intent(42),
     )
-    assert log.stdout.strip() == "1"
+    listing_before = state_ref_listing(bare_remote)
+
+    again = store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+    assert again == claimed.tip == state_ref_tip(bare_remote)
+    assert state_ref_listing(bare_remote) == listing_before
+    assert store.fetch_state(worktree=worktree, remote=str(bare_remote)).claims == claimed.claims
 
 
 def test_bootstrap_fails_loud_on_an_unreachable_remote(tmp_path: Path, worktree: Path) -> None:
@@ -942,7 +961,9 @@ def test_read_item_files_refuses_an_entry_that_is_no_file(
     `items/` refuses by name, never left out of the read without a word."""
     tip, refusal = non_file_items_store
 
-    with pytest.raises(protocol.MalformedStateTreeError, match=re.escape(refusal)):
+    expected_refusal = re.escape(refusal)
+
+    with pytest.raises(protocol.MalformedStateTreeError, match=expected_refusal):
         store.read_item_files(worktree, tip)
 
 
@@ -954,7 +975,9 @@ def test_fetch_state_refuses_an_items_entry_that_is_no_file(
     refusal = non_file_items_store[1]
     remote = str(bare_remote)
 
-    with pytest.raises(protocol.MalformedStateTreeError, match=re.escape(refusal)):
+    expected_refusal = re.escape(refusal)
+
+    with pytest.raises(protocol.MalformedStateTreeError, match=expected_refusal):
         store.fetch_state(worktree=worktree, remote=remote)
 
 
@@ -1146,28 +1169,22 @@ def test_linked_worktrees_fetch_concurrently_and_write_distinct_lineage_stamps(
     assert stamp_b.read_text().strip() == tip
 
 
-def test_push_retry_finds_the_operation_id_after_an_accept_then_raise_and_does_not_apply_twice(
-    bare_remote: Path, worktree: Path
+@pytest.mark.parametrize(
+    "transport_factory",
+    [
+        pytest.param(_AcceptThenRaiseTransport, id="lost-response-after-the-push-landed"),
+        pytest.param(
+            partial(_RejectsFirstPushesTransport, rejections=1), id="rejected-while-absent"
+        ),
+    ],
+)
+def test_push_retry_leaves_bootstrap_with_the_one_root_commit_the_remote_holds(
+    bare_remote: Path, worktree: Path, transport_factory: Callable[[], store.PushTransport]
 ) -> None:
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    transport = _AcceptThenRaiseTransport()
-    operation_id = "operation-under-test"
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message=f"bootstrap empty claim state\n\noperation_id: {operation_id}\n",
-        operation_id=operation_id,
-    )
+    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport_factory())
 
-    result = store.push_tree(
-        worktree=worktree,
-        remote=str(bare_remote),
-        observed=observed,
-        pending=pending,
-        transport=transport,
-    )
-
-    assert transport.calls == 1
-    assert isinstance(result, protocol.OperationAlreadyApplied)
+    assert tip == state_ref_tip(bare_remote)
+    assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
     log = subprocess.run(
         ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
         check=True,
@@ -1175,123 +1192,264 @@ def test_push_retry_finds_the_operation_id_after_an_accept_then_raise_and_does_n
         text=True,
     )
     assert log.stdout.strip() == "1"
-    assert result.tip == state_ref_tip(bare_remote)
 
 
-def _reject_existing_state(bare_remote: Path, worktree: Path) -> Callable[[], object]:
-    """Bootstrap first so the ref-exists row's observed.tip is a real parent."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
-    return partial(
-        store.push_tree,
-        worktree=worktree,
-        remote=str(bare_remote),
-        observed=observed,
-        pending=pending,
-        transport=_AlwaysRejectingTransport(),
-    )
+class _TimedOutPushTransport:
+    """A `PushTransport` whose push gives no answer: the sent push may or may
+    not have landed."""
+
+    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
+        raise protocol.ClaimError("push timed out")
 
 
-def _reject_empty_state(bare_remote: Path, worktree: Path) -> Callable[[], object]:
-    return partial(
-        store.bootstrap,
-        worktree=worktree,
-        remote=str(bare_remote),
-        transport=_AlwaysRejectingTransport(),
-    )
+def _fail_every_read_after_the_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_fetch_state = store.fetch_state
+    reads: list[None] = []
+
+    def fetch_state_failing_after_the_first(**kwargs: Any) -> protocol.ClaimState:
+        if reads:
+            raise protocol.ClaimError("cannot reach origin refs/aco/state")
+        reads.append(None)
+        return real_fetch_state(**kwargs)
+
+    monkeypatch.setattr(store, "fetch_state", fetch_state_failing_after_the_first)
+
+
+def _fail_the_lineage_stamp(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_stamp(*_args: object, **_kwargs: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "_write_lineage_stamp", failing_stamp)
 
 
 @pytest.mark.parametrize(
-    ("arrange_rejection", "state_ref_exists"),
+    ("transport_factory", "arrange_fault"),
     [
-        pytest.param(_reject_existing_state, True, id="ref-exists"),
-        pytest.param(_reject_empty_state, False, id="from-empty"),
+        pytest.param(
+            _AcceptThenRaiseTransport, _fail_every_read_after_the_first, id="lost-response-reread"
+        ),
+        pytest.param(
+            partial(_RejectsFirstPushesTransport, rejections=1),
+            _fail_every_read_after_the_first,
+            id="rejection-reread",
+        ),
+        pytest.param(_TimedOutPushTransport, lambda _monkeypatch: None, id="push-timeout"),
+        pytest.param(store.GitPushTransport, _fail_the_lineage_stamp, id="lineage-stamp"),
     ],
 )
-def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
+def test_bootstrap_refuses_as_an_uncertain_write_once_a_sent_push_cannot_be_judged(
     bare_remote: Path,
     worktree: Path,
-    arrange_rejection: Callable[[Path, Path], Callable[[], object]],
-    state_ref_exists: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    transport_factory: Callable[[], store.PushTransport],
+    arrange_fault: Callable[[pytest.MonkeyPatch], None],
+) -> None:
+    """Spec: CAS-56, CAS-69."""
+    arrange_fault(monkeypatch)
+    transport = transport_factory()
+
+    with pytest.raises(protocol.UncertainWriteError):
+        store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
+
+
+def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
+    bare_remote: Path, worktree: Path
 ) -> None:
     """Issue #237 finding 22: rejection without advancement names a stuck lock.
 
     Exhaustion must never say "moved N times": that would blame a race
     that never happened.
     """
-    exhaust_the_retries = arrange_rejection(bare_remote, worktree)
+    transport = _AlwaysRejectingTransport()
 
     with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes") as raised:
-        exhaust_the_retries()
+        store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
 
     assert "without the ref ever moving" in str(raised.value)
-    assert (state_ref_tip(bare_remote) is not None) is state_ref_exists
+    assert state_ref_tip(bare_remote) is None
 
 
-def test_push_retry_exhausts_and_names_a_race_when_the_ref_keeps_moving(
-    bare_remote: Path, worktree: Path
+class _PushProcessProbe:
+    """Controls the process boundary of `git push` only: every other git
+    command runs for real, and `started` counts the pushes attempted from the
+    first control on. Control starts lazily because tests first bootstrap the
+    store with a real push that must neither be counted nor made to fail. The
+    real child of a push made unstoppable stays owned here and is reaped by
+    `reap()`."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.started = 0
+        self.unstoppable_children: list[subprocess.Popen[Any]] = []
+        self._start_failure: OSError | None = None
+        self._replacement_command: list[str] | None = None
+        self._stoppable = True
+        self._monkeypatch = monkeypatch
+        self._controlling = False
+
+    def _control_pushes(self) -> None:
+        if self._controlling:
+            return
+        self._controlling = True
+        real_popen = subprocess.Popen
+
+        def popen(command: list[str], *args: Any, **kwargs: Any) -> Any:
+            if "push" not in command:
+                return real_popen(command, *args, **kwargs)
+            self.started += 1
+            if self._start_failure is not None:
+                raise self._start_failure
+            if self._replacement_command is not None:
+                command = self._replacement_command
+            started = real_popen(command, *args, **kwargs)
+            if self._stoppable:
+                return started
+            self.unstoppable_children.append(started)
+            return UnstoppableProcess(started)
+
+        self._monkeypatch.setattr(subprocess, "Popen", popen)
+
+    def fails_to_start(self, failure: OSError) -> None:
+        self._control_pushes()
+        self._start_failure = failure
+
+    def runs_instead(self, command: list[str]) -> None:
+        self._control_pushes()
+        self._replacement_command = command
+
+    def expires_the_push_at_once(self) -> None:
+        run_without_limit = process.run_bounded_captured
+
+        def bounded(command: list[str], **kwargs: Any) -> Any:
+            if "push" in command:
+                kwargs["timeout"] = 0
+            return run_without_limit(command, **kwargs)
+
+        self._monkeypatch.setattr(process, "run_bounded_captured", bounded)
+
+    def cannot_stop_the_push(self) -> None:
+        self._control_pushes()
+        self._stoppable = False
+
+    def reap(self) -> None:
+        reap(self.unstoppable_children)
+
+
+@pytest.fixture
+def push_probe(monkeypatch: pytest.MonkeyPatch) -> Iterator[_PushProcessProbe]:
+    probe = _PushProcessProbe(monkeypatch)
+    yield probe
+    probe.reap()
+
+
+_PUSH_START_FAILURES = [
+    pytest.param(FileNotFoundError("git"), id="executable-missing"),
+    pytest.param(PermissionError("git"), id="permission-refused"),
+    pytest.param(OSError(errno.E2BIG, "Argument list too long"), id="argument-list-too-long"),
+    pytest.param(OSError(errno.ENOEXEC, "Exec format error"), id="exec-format-error"),
+    pytest.param(OSError(errno.EAGAIN, "Resource temporarily unavailable"), id="out-of-processes"),
+]
+
+
+def _the_push_prints_too_much(probe: _PushProcessProbe) -> None:
+    over_the_limit = process.MAX_COMMAND_OUTPUT_BYTES + 1
+    probe.runs_instead([sys.executable, "-c", f"print('x' * {over_the_limit})"])
+
+
+def _the_push_outlives_its_time_limit(probe: _PushProcessProbe) -> None:
+    probe.runs_instead([sys.executable, "-c", "import time; time.sleep(30)"])
+    probe.expires_the_push_at_once()
+
+
+def _the_push_cannot_be_stopped(probe: _PushProcessProbe) -> None:
+    _the_push_outlives_its_time_limit(probe)
+    probe.cannot_stop_the_push()
+
+
+def _the_sentence_ending_in(visible_cause: str) -> str:
+    return rf"did not finish: {re.escape(visible_cause)}$"
+
+
+_PUSH_FAILURES_AFTER_THE_START = [
+    pytest.param(_the_push_prints_too_much, "exceeded its output limit", id="output-too-large"),
+    pytest.param(_the_push_outlives_its_time_limit, "timed out", id="timed-out"),
+    pytest.param(
+        _the_push_cannot_be_stopped,
+        "did not exit",
+        id="cannot-be-stopped",
+    ),
+]
+
+
+@pytest.mark.parametrize("start_failure", _PUSH_START_FAILURES)
+def test_bootstrap_refuses_plainly_when_the_push_process_never_started(
+    bare_remote: Path,
+    worktree: Path,
+    push_probe: _PushProcessProbe,
+    start_failure: OSError,
 ) -> None:
-    """Issue #237 finding 22's other half: a concurrent writer's commit
-    genuinely lands first on every attempt (`_AlwaysRacingTransport`
-    actually advances the ref each time), so exhaustion names a real race,
-    never the stuck-lock repair sentence that would misdiagnose it.
-    """
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
-    transport = _AlwaysRacingTransport()
+    """Spec: CAS-56 covers sent writes only; a push that never started is a plain refusal."""
+    push_probe.fails_to_start(start_failure)
 
-    with pytest.raises(protocol.ClaimUnavailableError, match="moved 8 times") as raised:
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
-        )
-    assert "stuck" not in str(raised.value)
-    assert "lock" not in str(raised.value)
+    with pytest.raises(protocol.PushNotStartedError):
+        store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+    assert push_probe.started == 1
+    assert state_ref_tip(bare_remote) is None
 
 
-def test_push_retry_exhausts_and_names_the_true_mix_when_the_ref_moves_once_then_sticks(
-    bare_remote: Path, worktree: Path
+@pytest.mark.parametrize(("break_the_push", "visible_cause"), _PUSH_FAILURES_AFTER_THE_START)
+def test_bootstrap_calls_a_push_that_failed_after_starting_uncertain(
+    bare_remote: Path,
+    worktree: Path,
+    push_probe: _PushProcessProbe,
+    break_the_push: Callable[[_PushProcessProbe], None],
+    visible_cause: str,
 ) -> None:
-    """Issue #237 finding 22's mixed case: a concurrent writer's commit
-    lands first on exactly the first attempt (`_MovesOnceThenSticksTransport`),
-    then the ref sits fixed while every later push is rejected. Reporting
-    "moved 8 times" here -- the wrong count the shared builder used to
-    print whenever more than one tip was ever observed -- would blame a race
-    that stopped after one move; the true count is one move, then seven
-    pushes rejected without the ref moving again.
-    """
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
-    transport = _MovesOnceThenSticksTransport()
+    """Spec: CAS-56; once the push process ran, only the remote knows whether it
+    landed, and the refusal says in its own sentence what went wrong."""
+    break_the_push(push_probe)
+    expected_sentence = _the_sentence_ending_in(visible_cause)
 
-    with pytest.raises(protocol.ClaimUnavailableError, match="moved 1 time") as raised:
-        store.push_tree(
+    with pytest.raises(protocol.UncertainWriteError, match=expected_sentence):
+        store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+
+def test_reap_collects_the_real_child_of_a_push_that_cannot_be_stopped(
+    bare_remote: Path, worktree: Path, push_probe: _PushProcessProbe
+) -> None:
+    """Reaping the unstoppable push's real child leaves nothing for the OS to hold."""
+    _the_push_cannot_be_stopped(push_probe)
+
+    with pytest.raises(protocol.UncertainWriteError):
+        store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    push_probe.reap()
+
+    (child,) = push_probe.unstoppable_children
+    assert child.returncode is not None
+    with pytest.raises(ChildProcessError):
+        os.waitpid(child.pid, os.WNOHANG)
+
+
+def test_git_push_transport_names_the_cause_of_a_subclass_of_a_known_process_error(
+    worktree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class ProcessTimedOutLater(process.ProcessTimedOutError):
+        pass
+
+    def timing_out(command: list[str]) -> process.CapturedResult:
+        raise ProcessTimedOutLater
+
+    monkeypatch.setattr(process, "run_bounded_captured", timing_out)
+
+    transport = store.GitPushTransport()
+
+    with pytest.raises(protocol.ClaimError, match="did not finish: timed out"):
+        transport.push(
             worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
+            remote="origin",
+            ref=store.STATE_REF,
+            new_oid=_UNRESOLVABLE_OBJECT_ID,
         )
-    assert "rejected 7 pushes" in str(raised.value)
-    assert "without the ref moving after it last moved" in str(raised.value)
 
 
 def test_git_push_transport_raises_on_a_non_fast_forward_push(
@@ -1601,45 +1759,6 @@ def test_find_operation_id_fails_loud_when_the_range_is_unresolvable(worktree: P
         )
 
 
-def test_push_retry_stops_instead_of_committing_again_when_the_search_fails(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
-) -> None:
-    """A failing `operation_id` search after a rejected push must stop the
-    retry loud, never be read as "not found" -- that would commit a second
-    time on top of a lost response whose commit already landed."""
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    transport = _AcceptThenRaiseTransport()
-    operation_id = "operation-under-test"
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message=f"bootstrap empty claim state\n\noperation_id: {operation_id}\n",
-        operation_id=operation_id,
-    )
-
-    def failing_search(*_args: object, **_kwargs: object) -> None:
-        raise protocol.ClaimError("simulated search failure")
-
-    monkeypatch.setattr(store, "_find_operation_id", failing_search)
-
-    with pytest.raises(protocol.ClaimError, match="simulated search failure"):
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
-        )
-
-    assert transport.calls == 1
-    log = subprocess.run(
-        ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert log.stdout.strip() == "1"
-
-
 def _fake_run_captured_failing_candidate_log(
     real: Callable[[list[str]], process.CapturedResult],
 ) -> Callable[[list[str]], process.CapturedResult]:
@@ -1661,37 +1780,26 @@ def _fake_run_captured_failing_candidate_log(
 def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #390 finding 9a: after a lost response, `push_tree`'s retry
-    searches new history for its own `operation_id` before assuming nothing
-    landed. Reading a broken per-candidate read as "not found" would let the
-    retry build and push a second commit on top of the one that already
-    landed -- exactly the double push the search exists to prevent. Run
-    against the pre-fix `_find_operation_id` (which reads a failing
-    candidate read as "not found"), this test is red: the retry does not
-    stop, and `transport.calls` climbs past `1` as it exhausts
-    `_MAX_PUSH_ATTEMPTS` pushing repeatedly instead.
-    """
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    """Issue #390 finding 9a, CAS-47: after a lost response, a transition's
+    retry searches new history for its own `operation_id` before assuming
+    nothing landed. Reading a broken per-candidate read as "not found" would
+    let the retry build and push a second transition on top of the one that
+    already landed -- exactly the double push the search exists to prevent."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = fresh_observation(worktree, bare_remote)
     transport = _AcceptThenRaiseTransport()
-    operation_id = "operation-under-test"
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message=f"bootstrap empty claim state\n\noperation_id: {operation_id}\n",
-        operation_id=operation_id,
-    )
     monkeypatch.setattr(
         store.process,
         "run_captured",
         _fake_run_captured_failing_candidate_log(process.run_captured),
     )
 
+    subject = store.ClaimTransitionSubject("claim issue 42", item="42")
+    intent = _issue_claim_intent(42)
+
     with pytest.raises(protocol.ClaimError, match="cannot read commit"):
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
+        store.commit_transition(
+            observed=observed, subject=subject, intent=intent, transport=transport
         )
 
     assert transport.calls == 1
@@ -3121,6 +3229,59 @@ def test_commit_transition_says_whether_a_failed_write_may_have_landed(
         )
 
     assert type(raised.value) is raised_kind
+
+
+@pytest.mark.parametrize(("break_the_push", "visible_cause"), _PUSH_FAILURES_AFTER_THE_START)
+def test_commit_transition_calls_a_push_that_failed_after_starting_uncertain(
+    bare_remote: Path,
+    worktree: Path,
+    push_probe: _PushProcessProbe,
+    break_the_push: Callable[[_PushProcessProbe], None],
+    visible_cause: str,
+) -> None:
+    """Spec: CAS-56; a transition whose push process failed after starting may
+    have landed, and says in its own sentence what went wrong."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = fresh_observation(worktree, bare_remote)
+    break_the_push(push_probe)
+    expected_sentence = _the_sentence_ending_in(visible_cause)
+    subject = store.ClaimTransitionSubject("claim issue 1", item="1")
+    intent = _issue_claim_intent(1)
+
+    with pytest.raises(protocol.UncertainWriteError, match=expected_sentence):
+        store.commit_transition(
+            observed=observed,
+            subject=subject,
+            intent=intent,
+        )
+
+
+@pytest.mark.parametrize("start_failure", _PUSH_START_FAILURES)
+def test_commit_transition_refuses_plainly_when_the_push_process_never_started(
+    bare_remote: Path,
+    worktree: Path,
+    push_probe: _PushProcessProbe,
+    start_failure: OSError,
+) -> None:
+    """Spec: CAS-56; a transition whose push never started is a plain refusal:
+    no retry, no replay search, the remote tip and the state unchanged."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = fresh_observation(worktree, bare_remote)
+    tip_before = state_ref_tip(bare_remote)
+    push_probe.fails_to_start(start_failure)
+    subject = store.ClaimTransitionSubject("claim issue 1", item="1")
+    intent = _issue_claim_intent(1)
+
+    with pytest.raises(protocol.PushNotStartedError):
+        store.commit_transition(
+            observed=observed,
+            subject=subject,
+            intent=intent,
+        )
+
+    assert push_probe.started == 1
+    assert state_ref_tip(bare_remote) == tip_before
+    assert not fresh_observation(worktree, bare_remote).state.claims
 
 
 def test_commit_transition_ten_thread_contention_lands_every_distinct_key(
