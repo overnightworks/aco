@@ -18327,6 +18327,24 @@ def test_land_refuses_a_malformed_head_as_usage_before_any_forge_call(
     )
 
 
+@pytest.mark.parametrize("number", ["0", "-1"])
+def test_land_refuses_a_non_positive_pull_request_number_at_the_parser(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    number: str,
+) -> None:
+    """Spec: LANDCMD-44 -- usage error, exit 2, and the forge is never asked."""
+    client = _land_already_merged(monkeypatch, tmp_path)
+
+    result = run_cli(["land", number], capsys)
+
+    assert (result.status, result.stdout, client.requests) == (2, "", 0)
+    assert result.stderr.splitlines()[-1] == (
+        f"aco land: error: argument pull_request: {number} is not a positive number"
+    )
+
+
 @pytest.mark.parametrize(
     "branch, kind",
     [

@@ -213,18 +213,21 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
     assert world.forge.requests == 0
 
 
-def _claim_the_branch_as(agent: str) -> Callable[[AdoptionWorld], None]:
+def _claim_the_branch_as(
+    agent: str, identity: protocol.ClaimIdentity = protocol.LaneIdentity(), claim_id: str = "a1"
+) -> Callable[[AdoptionWorld], None]:
     def claim(world: AdoptionWorld) -> None:
-        lane = protocol.LaneIdentity()
         store.commit_transition(
             observed=fresh_observation(world.clone, world.remote),
-            subject=store.transition_subject("claim", lane, ADOPTED_BRANCH),
+            subject=store.transition_subject("claim", identity, ADOPTED_BRANCH),
             intent=claim_intent(
-                identity=lane,
+                identity=identity,
                 agent=agent,
                 branch=ADOPTED_BRANCH,
                 base=protocol.ObjectId(world.head),
                 scope=("uv.lock",),
+                claim_id=claim_id,
+                operation_id=f"op-{claim_id}",
             ),
         )
 
@@ -523,6 +526,35 @@ def test_adopt_that_passes_every_check_refuses_and_writes_nothing(
     assert (result.status, result.stdout, result.stderr) == (2, "", PASSES_EVERY_CHECK)
     assert world.effects() == before
     assert sum(reads.observations.values()) == 1
+
+
+def test_adopt_and_its_dry_run_claim_name_the_same_holder_of_a_twice_held_branch(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-06, CLAIM-71 -- an issue claim and a lane claim hold the branch; the
+    refusal and the claim check both name the lane holder."""
+    _claim_the_branch_as("Bob", protocol.IssueIdentity(42), "b1")(world)
+    _claim_the_branch_as("Carol", claim_id="c1")(world)
+    arguments = argparse.Namespace(
+        issue=None,
+        agent="Ada",
+        role=cmd_claim.DEFAULT_CLAIM_ROLE,
+        base=world.head,
+        branch=ADOPTED_BRANCH,
+        scope=["uv.lock"],
+        claim_id=None,
+        out_of_order=None,
+        whole=None,
+    )
+    request = cmd_claim.claim_request(arguments, adopted=True)
+
+    with pytest.raises(protocol.ClaimConflictError) as refused:
+        cmd_claim.checked_claim(request, run_context_over(world.forge), revision=world.head)
+    result = adopt(capsys, kind="deps")
+
+    holder = f"claimed by Carol (builder) on lane '{ADOPTED_BRANCH}' branch {ADOPTED_BRANCH}"
+    assert str(refused.value).endswith(holder)
+    assert result.stderr.endswith(f"{holder}\n")
 
 
 def test_adopts_dry_run_claim_refuses_a_branch_another_claim_holds(world: AdoptionWorld) -> None:
