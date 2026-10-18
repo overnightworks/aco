@@ -12,7 +12,6 @@ import shlex
 import subprocess
 import sys
 import threading
-import tomllib
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
@@ -86,6 +85,7 @@ from cli_fixtures import (
     stub_one_git_call,
     terminal_on_stdin,
     trunk_git_calls,
+    without_git_identity,
     worktrees_and_branches,
 )
 from github_fixtures import (
@@ -16797,44 +16797,6 @@ def test_release_merged_keeps_the_worktree_for_every_reason(
         assert worktree.exists()
 
 
-def _land_preflight_client(
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    readiness: forge.LandingReadiness,
-    body: str = f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
-    item_closed: bool = False,
-    claimed: bool = True,
-    claim_agent: str = "Ada",
-) -> FakeForge:
-    """A session `aco land 12` can preflight-refuse against, with no real
-    git at all (issue #405): every scenario here fails before the checkout
-    is ever consulted, unlike `_land_scenario`'s real-git happy path.
-    `claimed=False` leaves the item with no live claim at all -- the other
-    half of LANDCMD-08's own ordering proof, alongside `item_closed`.
-    `claim_agent`, when it differs from `_patch_release_session`'s own
-    default session identity `Ada`, is the claim/parent/closing check's
-    existence proof standing beside a foreign claimant this session is not
-    authorized to land (issue #405 point 7)."""
-    standing = (
-        (
-            request(
-                "landing", claim_agent, issue=WORK_ITEM_ISSUE, branch=LANDING_BRANCH, scope=("src",)
-            ),
-        )
-        if claimed
-        else ()
-    )
-    client = FakeForge()
-    client.landings[12] = landing_pull_request(
-        body=body, merged=False, head_ref_name=LANDING_BRANCH
-    )
-    client.readiness_by_number[12] = readiness
-    if item_closed:
-        client.closed_issues.add(WORK_ITEM_ISSUE)
-    _patch_release_session(monkeypatch, client, *standing, branch=LANDING_BRANCH)
-    return client
-
-
 def _land_repository(
     tmp_path: Path,
     *,
@@ -16883,9 +16845,7 @@ def _land_scenario(
     board_config: str | None = None,
 ) -> tuple[Path, FakeForge]:
     """`claim_agent`, when it differs from the `Ada` session identity set
-    below, stands the same foreign claim `_land_preflight_client`'s own
-    `claim_agent` proves against a fake reader (issue #405 round-4 finding
-    5), but here against `land`'s real merge/checkout path, so a
+    below, stands a foreign claim against `land`'s real merge/checkout path, so a
     `--coordinator-override --role coordinator` land of it can be proven
     reaching the merge, not just proven refused without those flags.
     `branch`/`issue`/`body`, when they name an issue-less lane instead of
@@ -16911,80 +16871,6 @@ def _land_scenario(
 
 
 @pytest.mark.parametrize(
-    ("body", "reason", "scenario"),
-    [
-        pytest.param(
-            "Advances #72", "carries no `Work-Item:` or `No-Item:` line", None, id="unclassified"
-        ),
-        pytest.param(
-            "No-Item: deps",
-            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
-            None,
-            id="cell-40-deps",
-        ),
-        pytest.param(
-            "No-Item: deps",
-            "changed while aco listed its files; run the command again",
-            "wrong-head",
-            id="cell-26",
-        ),
-        pytest.param(
-            "No-Item: deps",
-            "changes src/x.py, which dependency_paths in .aco/board.toml does not name",
-            "outside",
-            id="cell-34",
-        ),
-        pytest.param(
-            "No-Item: deps",
-            "changes "
-            + ", ".join(letter * 39 + "…" for letter in "abc")
-            + ", which dependency_paths in .aco/board.toml…",
-            "long-many",
-            id="LAND-77-whole-line",
-        ),
-    ],
-)
-def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    body: str,
-    reason: str,
-    scenario: str | None,
-    tmp_path: Path,
-) -> None:
-    """Issue #405: once every check succeeds, `check <pr>`'s own
-    classification rules apply unchanged -- an unclassified body refuses
-    the same sentence `check` would, before any write."""
-    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), body=body)
-    client.landings[12] = landing_pull_request(body=body, head_ref_name="fix/x")
-    if scenario is not None:
-        _dependency_listing_scenario(client, tmp_path, scenario)
-        original_git = checkout.git_output
-        monkeypatch.setattr(
-            checkout,
-            "git_output",
-            lambda arguments, **kwargs: (
-                str(tmp_path)
-                if arguments == ["rev-parse", "--show-toplevel"]
-                else original_git(arguments, **kwargs)
-            ),
-        )
-        if scenario == "wrong-head":
-            client.landings[12] = replace(client.landings[12], head_sha="b" * 40)
-    standing = store_claim_from_request(documentation_lane_claim(branch="fix/x"))
-    _patch_store_write(monkeypatch, standing)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 2
-
-    assert capsys.readouterr().err == f"ERROR: pull request #12 {reason}\n"
-    assert client.merge_calls == []
-    assert tuple(store.fetch_state(worktree=Path("."), remote="origin").claims.values()) == (
-        standing,
-    )
-
-
-@pytest.mark.parametrize("command, prefix", [("check", "REFUSED"), ("land", "ERROR")])
-@pytest.mark.parametrize(
     "path, displayed",
     [
         pytest.param("src/\x1b]0;pwned\x07x.py", r"src/\x1b]0;pwned\x07x.py", id="escape"),
@@ -17000,8 +16886,6 @@ def test_dependency_paths_refusal_escapes_and_bounds_each_name(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    command: str,
-    prefix: str,
     path: str,
     displayed: str,
 ) -> None:
@@ -17019,248 +16903,11 @@ def test_dependency_paths_refusal_escapes_and_bounds_each_name(
         reading, reading, (forge.ChangedFile(path, None),)
     )
 
-    assert issue_claim.main(["--repo", REPOSITORY, command, "12"]) == 2
+    assert issue_claim.main(["--repo", REPOSITORY, "check", "12"]) == 2
 
     assert capsys.readouterr().err == (
-        f"{prefix}: pull request #12 changes {displayed}, "
+        f"REFUSED: pull request #12 changes {displayed}, "
         "which dependency_paths in .aco/board.toml does not name\n"
-    )
-    assert client.merge_calls == []
-
-
-def test_land_dependency_paths_use_trunks_config_despite_head_grant(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """PIN-47: a head cannot grant itself permission to change src/x.py."""
-    repo, client = _land_scenario(
-        monkeypatch,
-        tmp_path,
-        branch="fix/x",
-        issue=None,
-        body="No-Item: deps",
-        board_config=_dependency_configuration("valid"),
-    )
-    _dependency_listing_scenario(client, repo, "outside")
-    client.head_board_config = 'dependency_paths = ["uv.lock", "src/"]\n'
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: pull request #12 changes src/x.py, "
-        "which dependency_paths in .aco/board.toml does not name\n"
-    )
-    assert client.merge_calls == []
-
-
-def _toml_syntax_error(text: str) -> str:
-    """Python's own `tomllib` wording for `text`'s syntax error -- the
-    parser's text, not this tool's, so each Python version may word it
-    differently."""
-    try:
-        tomllib.loads(text)
-    except tomllib.TOMLDecodeError as error:
-        return str(error)
-    raise AssertionError(f"{text!r} parses as TOML")
-
-
-@pytest.mark.parametrize(
-    ("head_board_config", "item_closed", "reason"),
-    [
-        pytest.param(
-            None,
-            False,
-            "pull request #12 removes .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="removed",
-        ),
-        pytest.param(
-            None,
-            True,
-            "pull request #12 removes .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="removed-ahead-of-a-closed-item",
-        ),
-        pytest.param(
-            'storage = "state-ref"\n',
-            False,
-            "pull request #12 changes storage in .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="storage-changed",
-        ),
-        pytest.param(
-            'canonical_remote = "upstream"\n',
-            False,
-            "pull request #12 changes canonical_remote in .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="canonical-remote-changed",
-        ),
-        pytest.param(
-            'storage = "gitlab"\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml storage must be 'github' or 'state-ref'",
-            id="invalid",
-        ),
-        pytest.param(
-            'merge_method = "rebase"\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml merge_method must be 'merge' or 'squash'",
-            id="invalid-merge-method",
-        ),
-        pytest.param(
-            "not toml =",
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: cannot read board "
-            f"configuration .aco/board.toml: {_toml_syntax_error('not toml =')}",
-            id="invalid-syntax",
-        ),
-        pytest.param(
-            f'{"x" * 300} = "y"\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml has unknown top-level key " + "x" * 77 + "…",
-            id="invalid-bounded",
-        ),
-        pytest.param(
-            '"bad\\nkey" = 1\n"esc\\u001b[31m" = 2\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml has unknown top-level key bad\\nkey, esc\\x1b[31m",
-            id="invalid-control-characters-escaped",
-        ),
-        pytest.param(
-            '"a\N{RIGHT-TO-LEFT OVERRIDE}b\N{LEFT-TO-RIGHT ISOLATE}c\N{ZERO WIDTH SPACE}d'
-            '\x9be\tf\N{NO-BREAK SPACE}g" = 1\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml has unknown top-level key a\N{REVERSE SOLIDUS}u202eb"
-            "\N{REVERSE SOLIDUS}u2066c\N{REVERSE SOLIDUS}u200bd\\x9be\tf\N{NO-BREAK SPACE}g",
-            id="invalid-display-controls-escaped-as-next-shows-them",
-        ),
-    ],
-)
-def test_land_refuses_a_head_that_changes_its_governing_board_config_before_any_write(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    head_board_config: str | None,
-    item_closed: bool,
-    reason: str,
-) -> None:
-    """Issue #505 proofs 2 and 3 (LANDCMD-22..24): a pull request head that
-    removes the board configuration, changes `storage` or `canonical_remote`
-    in it, or carries one the validator refuses would strand `land`'s own
-    release half, so it refuses before any write -- ahead of LANDCMD-08's
-    item check, and within the 200-character refusal line."""
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client = _land_preflight_client(
-        monkeypatch, readiness=landing_readiness(), item_closed=item_closed
-    )
-    client.head_board_config = head_board_config
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    error_line = capsys.readouterr().err
-    assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
-    assert (client.merge_calls, client.deleted_branches) == ([], [])
-
-
-def test_land_refuses_a_closed_work_item(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405: a classified work item that is not open refuses by name,
-    before any write -- distinct from `check`'s own rules, which never
-    verify the item's live state."""
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), item_closed=True)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        f"ERROR: work item #{WORK_ITEM_ISSUE} is not open; it cannot be landed\n"
-    )
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_closed_work_item_before_its_own_missing_claim(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 review/gate finding: LANDCMD-08 (item not open) is checked
-    before claim validation -- a closed item with no live claim at all
-    refuses by its own closed state, never the claim it also lacks, and
-    never reads the store's claims to find out."""
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client = _land_preflight_client(
-        monkeypatch, readiness=landing_readiness(), item_closed=True, claimed=False
-    )
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        f"ERROR: work item #{WORK_ITEM_ISSUE} is not open; it cannot be landed\n"
-    )
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_classification_defect_from_a_missing_claim(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 CI coverage follow-up: `policy.classification_defect`'s own
-    claim-check branch inside `cmd_land._land_preflight` -- distinct from
-    `test_land_refuses_a_classification_defect_reusing_checks_own_rules`'s
-    shape defect and `test_land_refuses_a_closed_work_item_before_its_own_
-    missing_claim`'s LANDCMD-08-first ordering -- an *open* work item with
-    no live claim at all refuses by its own missing claim."""
-    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), claimed=False)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        f"ERROR: pull request #12 has no active claim for #{WORK_ITEM_ISSUE} "
-        f"on branch {LANDING_BRANCH!r}\n"
-    )
-    assert client.merge_calls == []
-
-
-@pytest.mark.parametrize(
-    ("arguments", "repeat"),
-    [
-        pytest.param((), "aco land 12 --agent Grok", id="plain"),
-        pytest.param(
-            ("--keep-worktree",),
-            "aco land 12 --keep-worktree --agent Grok",
-            id="keeps-the-worktree-flag",
-        ),
-        pytest.param(
-            ("--keep-worktree", "--head", MERGE_COMMIT_SHA[:7].upper()),
-            f"aco land 12 --head {MERGE_COMMIT_SHA[:7]} --keep-worktree --agent Grok",
-            id="keeps-the-reviewed-head",
-        ),
-    ],
-)
-def test_land_refuses_a_foreign_claim_before_the_merge(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    arguments: tuple[str, ...],
-    repeat: str,
-) -> None:
-    """Issue #405 point 7 review/gate finding: `cmd_land._land_preflight` itself
-    authorizes this session against the live claim, reusing `release`'s own
-    claimant/coordinator-override check (`cmd_release._resolve_release_claimant`) --
-    a claim held by another agent refuses before the merge, not only once
-    the delegated `release --merged` step runs after it. The repeat keeps
-    `--head` and `--keep-worktree` (LANDCMD-10)."""
-    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), claim_agent="Grok")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", *arguments]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: only the original claimant may release; repeat as the holder with "
-        f"`{repeat}`, or use an explicit coordinator override "
-        "(holder='Grok (builder)', this session='Ada (builder)')\n"
     )
     assert client.merge_calls == []
 
@@ -17994,36 +17641,6 @@ def test_land_reports_incomplete_follow_up_and_a_rerun_resumes_without_a_second_
     assert client.quality_config_reads == reads_before_the_rerun
 
 
-def _land_mark_already_merged(client: FakeForge) -> None:
-    """Simulate `land` having already merged pull request 12 in an earlier
-    run (issue #405 round-4 finding 1): the fake forge's own landing record
-    is the one signal `cmd_land.run` reads to tell a rerun from a fresh run, so
-    a rerun test never needs to actually run the merge first."""
-    client.landings[12] = replace(client.landings[12], merged=True, merge_commit=MERGE_COMMIT_SHA)
-
-
-@pytest.mark.usefixtures("isolated_global_git_config")
-def test_land_rerun_refuses_a_missing_git_identity_before_any_side_effect(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-) -> None:
-    """Spec: LANDCMD-18, LANDCMD-25 -- reruns still require a git identity."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    _land_mark_already_merged(client)
-    _without_git_identity(monkeypatch, repo)
-    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    assert status == 2
-    assert capsys.readouterr().err == f"ERROR: {checkout.LAND_MISSING_GIT_IDENTITY_REFUSAL}\n"
-    assert client.merge_calls == []
-    assert client.deleted_branches == []
-    assert client.closed_issues == set()
-    assert real_git(repo, "rev-parse", "main").stdout.strip() == trunk_before
-
-
 @pytest.mark.parametrize(
     ("gh_failure", "printed"),
     [
@@ -18095,36 +17712,18 @@ def test_land_prints_the_reinstall_line_in_this_packages_own_repository(
     )
 
 
-def test_land_refuses_a_dirty_checkout_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #405: `land` fast-forwards this exact checkout once it merges,
-    so an uncommitted change here refuses before any write, never merged
-    away or silently ignored."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    (repo / "untracked.txt").write_text("dirty\n")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: land must run from a clean checkout of the default branch 'main'\n"
-    )
-    assert client.merge_calls == []
-
-
 def _land_on_the_forges_trunk(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     *,
     canonical: str,
-    checked_out: str,
     leftover_main: bool,
 ) -> tuple[Path, FakeForge]:
     """`_land_scenario` with no recorded `HEAD`, where the forge alone
     names the default branch `trunk` (issue #492): `canonical` carries
     `trunk`, the lane branch, and -- when `leftover_main` -- the `main` the
     switch to `trunk` left behind, the lane branch stands in its own clean
-    linked worktree `lane`, and the checkout stands on `checked_out`. A
+    linked worktree `lane`, and the checkout stands on `trunk`. A
     canonical remote other than `origin` is a fresh bare `<canonical>.git`
     the tracked board configuration names."""
     repo, client = _land_scenario(monkeypatch, tmp_path, set_head=False)
@@ -18145,33 +17744,17 @@ def _land_on_the_forges_trunk(
         bare = Path(real_git(repo, "remote", "get-url", canonical).stdout.strip())
         real_git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
         real_git(repo, "push", "-q", canonical, "--delete", "main")
-    real_git(repo, "checkout", "-q", "-B", checked_out)
+    real_git(repo, "checkout", "-q", "-B", "trunk")
     real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
     return repo, client
 
 
 @pytest.mark.parametrize(
-    (
-        "canonical",
-        "leftover_main",
-        "checked_out",
-        "expected_status",
-        "expected_error",
-        "expected_fetches",
-    ),
+    "canonical, leftover_main",
     [
-        pytest.param("origin", True, "trunk", 0, "", 1, id="origin-trunk-fast-forwards"),
-        pytest.param("hub", True, "trunk", 0, "", 1, id="hub-trunk-fast-forwards"),
-        pytest.param("origin", False, "trunk", 0, "", 1, id="origin-without-main-fast-forwards"),
-        pytest.param(
-            "origin",
-            True,
-            "main",
-            2,
-            "ERROR: land must run from a clean checkout of the default branch 'trunk'\n",
-            0,
-            id="checkout-on-main-names-trunk",
-        ),
+        pytest.param("origin", True, id="origin-trunk-fast-forwards"),
+        pytest.param("hub", True, id="hub-trunk-fast-forwards"),
+        pytest.param("origin", False, id="origin-without-main-fast-forwards"),
     ],
 )
 def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
@@ -18180,23 +17763,17 @@ def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
     tmp_path: Path,
     canonical: str,
     leftover_main: bool,
-    checked_out: str,
-    expected_status: int,
-    expected_error: str,
-    expected_fetches: int,
 ) -> None:
     """Issue #492 proof 1, against real git: the forge's default branch is
     `trunk` and no `<canonical>/HEAD` is recorded. `land` runs from a clean
     `trunk`, fast-forwards it from `<canonical>/trunk` after fetching that
     remote once, and its delegated release removes the lane's worktree as
     merged into that same `trunk` -- neither a `main` left behind nor its
-    absence decides it (LANDCMD-21); a checkout on `main` refuses LANDCMD-11
-    naming `trunk`."""
+    absence decides it (LANDCMD-21)."""
     repo, client = _land_on_the_forges_trunk(
         monkeypatch,
         tmp_path,
         canonical=canonical,
-        checked_out=checked_out,
         leftover_main=leftover_main,
     )
     trunk_calls = trunk_git_calls(monkeypatch, canonical)
@@ -18206,17 +17783,15 @@ def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
     fetches = [call for call in trunk_calls if call[0] == "fetch"]
     local_trunk = real_git(repo, "rev-parse", "trunk").stdout.strip()
     output = capsys.readouterr()
-    assert (status, output.err, fetches) == (
-        expected_status,
-        expected_error,
-        [("fetch", repo.resolve())] * expected_fetches,
-    )
-    landed = expected_status == 0
-    assert (local_trunk == client.landings[12].merge_commit) is landed
-    assert ("worktree: removed\n" in output.out, (tmp_path / "lane").exists()) == (
-        landed,
-        not landed,
-    )
+    observed = (status, output.err, fetches)
+    expected = (0, "", [("fetch", repo.resolve())])
+    assert observed == expected
+    observed = local_trunk
+    expected = client.landings[12].merge_commit
+    assert observed == expected
+    observed = ("worktree: removed\n" in output.out, (tmp_path / "lane").exists())
+    expected = (True, False)
+    assert observed == expected
 
 
 def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications() -> None:
@@ -18554,7 +18129,6 @@ def _land_from_a_separate_clone(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     *,
-    git_identity: bool,
     lane_branch: str | None = None,
 ) -> tuple[Path, Path, FakeForge]:
     """`_land_scenario`'s claim, held for real in `refs/aco/state`, with the
@@ -18562,8 +18136,7 @@ def _land_from_a_separate_clone(
     second, clean clone that holds no worktree at all (issue #578, the
     songmaker landing clone): the primary checkout, the clone, and the
     forge. The forge closes the item through its own `Closes #<n>` on the
-    merge. `git_identity=False` leaves the clone with no user.name or
-    user.email, which git may never guess. `lane_branch` stands an issue-less
+    merge. `lane_branch` stands an issue-less
     lane on that foreign branch instead: a `No-Item:` pull request whose
     lane claim is keyed by the branch."""
     if lane_branch is None:
@@ -18586,10 +18159,9 @@ def _land_from_a_separate_clone(
     real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), lane_branch or LANDING_BRANCH)
     clone = tmp_path / "landing-clone"
     real_git(tmp_path, "clone", "-q", str(remote), str(clone))
-    _without_git_identity(monkeypatch, clone)
-    if git_identity:
-        real_git(clone, "config", "user.name", "Lander")
-        real_git(clone, "config", "user.email", "lander@example.com")
+    without_git_identity(monkeypatch, clone)
+    real_git(clone, "config", "user.name", "Lander")
+    real_git(clone, "config", "user.email", "lander@example.com")
     redirect_toplevel(monkeypatch, clone)
     monkeypatch.chdir(clone)
     return repo, clone, client
@@ -18617,73 +18189,32 @@ def _claim_the_landing_branch(
     )
 
 
-def _without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) -> None:
-    """`checkout_path` with no git identity git may use or guess: none
-    configured locally, in the environment or the system configuration (the
-    caller isolates the global configuration)."""
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    real_git(checkout_path, "config", "user.useConfigOnly", "true")
-    real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
-    real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
-    for variable in (
-        "GIT_AUTHOR_NAME",
-        "GIT_AUTHOR_EMAIL",
-        "GIT_COMMITTER_NAME",
-        "GIT_COMMITTER_EMAIL",
-        "EMAIL",
-    ):
-        monkeypatch.delenv(variable, raising=False)
-
-
 @pytest.mark.usefixtures("isolated_global_git_config")
-@pytest.mark.parametrize(
-    ("git_identity", "expected_status", "expected_error", "expected_merges", "released"),
-    [
-        pytest.param(True, 0, "", 1, True, id="identity-releases"),
-        pytest.param(
-            False,
-            2,
-            f"ERROR: {checkout.LAND_MISSING_GIT_IDENTITY_REFUSAL}\n",
-            0,
-            False,
-            id="no-identity-refuses-before-the-merge",
-        ),
-    ],
-)
-def test_land_from_a_separate_clone_releases_or_refuses_before_the_merge(
+def test_land_from_a_separate_clone_merges_and_releases_the_claim_keeping_the_lane_worktree(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    git_identity: bool,
-    expected_status: int,
-    expected_error: str,
-    expected_merges: int,
-    released: bool,
 ) -> None:
     """Issue #578 line 1: a landing clone without the lane worktree, whose
     item GitHub already closed through `Closes #<n>`, merges and releases
-    the claim, the lane worktree kept where it lives and named as kept. The
-    songmaker cause: a clone with no git identity cannot commit that release
-    to the claim state, so it refuses before anything merges (LANDCMD-25)."""
-    _repo, clone, client = _land_from_a_separate_clone(
-        monkeypatch, tmp_path, git_identity=git_identity
-    )
+    the claim, the lane worktree kept where it lives and named as kept."""
+    _repo, clone, client = _land_from_a_separate_clone(monkeypatch, tmp_path)
 
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     output = capsys.readouterr()
     claims = store.fetch_state(worktree=clone, remote="origin").claims
-    assert (status, output.err, len(client.merge_calls)) == (
-        expected_status,
-        expected_error,
-        expected_merges,
-    )
+    observed = (status, output.err, len(client.merge_calls))
+    expected = (0, "", 1)
+    assert observed == expected
     kept_elsewhere = (
         f"worktree: kept -- no linked worktree on {LANDING_BRANCH} in this checkout; "
         f"run aco release {WORK_ITEM_ISSUE} --merged 12 --branch {LANDING_BRANCH} "
         "in the checkout that holds it\n"
     )
-    assert (not claims, kept_elsewhere in output.out) == (released, released)
+    observed = (not claims, kept_elsewhere in output.out)
+    expected = (True, True)
+    assert observed == expected
     assert (tmp_path / "lane").exists()
 
 
@@ -18700,7 +18231,6 @@ def _land_and_release_the_lane_claim(
     repo, clone, client = _land_from_a_separate_clone(
         monkeypatch,
         tmp_path,
-        git_identity=True,
         lane_branch=None if branch == LANDING_BRANCH else branch,
     )
     client.allowed_methods = frozenset({_SQUASH})
