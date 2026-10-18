@@ -1479,7 +1479,7 @@ class TestStateRefBoardWrites:
         after_record = _decoded_record(after.body, CHILD_A_ID)
         assert replace(after_record, updated_at=before_record.updated_at) == before_record
         assert after_record.updated_at != before_record.updated_at
-        assert protocol.RFC3339_TIMESTAMP_PATTERN.search(after_record.updated_at)
+        assert protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(after_record.updated_at)
 
     @pytest.mark.parametrize("closing", [False, True], ids=["write", "close"])
     def test_a_write_whose_answer_was_lost_returns_its_own_blob_not_a_later_editors(
@@ -3320,7 +3320,7 @@ class TestCliStateRefForge:
 
         assert status == 0
         printed = capsys.readouterr().out.strip()
-        assert items.ITEM_ID_PATTERN.search(printed)
+        assert items.ITEM_ID_PATTERN.fullmatch(printed)
 
         remote_url = f"file://{bare_remote}"
         state = store.fetch_state(worktree=worktree, remote=remote_url)
@@ -3724,7 +3724,7 @@ class TestCliStateRefForge:
 
         assert status == 0
         printed = capsys.readouterr().out.strip()
-        assert items.ITEM_ID_PATTERN.search(printed)
+        assert items.ITEM_ID_PATTERN.fullmatch(printed)
 
         remote_url = f"file://{bare_remote}"
         state = store.fetch_state(worktree=worktree, remote=remote_url)
@@ -5630,7 +5630,7 @@ class TestCliStateRefForge:
         _stub_claim_checkout(monkeypatch)
 
         bootstrap_out = run_cli(["bootstrap"], capsys).expect_success().strip()
-        assert protocol.COMMIT_PATTERN.search(bootstrap_out)
+        assert protocol.COMMIT_PATTERN.fullmatch(bootstrap_out)
 
         container_id = (
             run_cli(
@@ -5639,7 +5639,7 @@ class TestCliStateRefForge:
             .expect_success()
             .strip()
         )
-        assert items.ITEM_ID_PATTERN.search(container_id)
+        assert items.ITEM_ID_PATTERN.fullmatch(container_id)
 
         container_body = _filled_body(
             unfilled_block_body(CONTAINER_SKELETON_PROSE),
@@ -5661,7 +5661,7 @@ class TestCliStateRefForge:
             .expect_success()
             .strip()
         )
-        assert items.ITEM_ID_PATTERN.search(child_id)
+        assert items.ITEM_ID_PATTERN.fullmatch(child_id)
         child_number = items.item_number(child_id)
 
         child_body = _filled_body(
