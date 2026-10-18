@@ -5841,7 +5841,9 @@ class TestCliStateRefForge:
         assert retype.exit_codes == [0]
         assert set(stored) == {CONTAINER_ID}
         assert parent_record.kind == "task"
-        assert len(locate_block(parent_text).data["slice"]) == rows_left
+        rows = locate_block(parent_text).data["slice"]
+        assert isinstance(rows, list)
+        assert len(rows) == rows_left
         assert self._written_since_read_error(CONTAINER_ID).search(capsys.readouterr().err)
         assert status == 2
 
