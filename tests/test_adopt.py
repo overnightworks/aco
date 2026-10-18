@@ -1571,7 +1571,7 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
 ) -> None:
     """Spec: ADOPT-34, LANDCMD-31, LANDCMD-12, LANDCMD-13, REL-57, REL-29 (#47 lines 1, 6) --
     `aco land` lands an adopted lane like any lane, but only at the head it is told to
-    review; the trailer is the adopted line, the worktree goes only when it holds the merged head."""
+    review; the trailer is the adopted line, the worktree goes only at the merged head."""
     adopt(capsys).expect_success()
     claim = _adopted_claim(world)
     reviewed, current = arrange(world)
