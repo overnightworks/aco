@@ -62,8 +62,10 @@ matching line.
 | `No-Item:` PR carrying a closing reference | — | LAND-17 | — | — |
 | missing/extra closing reference | — | LAND-18, LAND-19 | — | — |
 | non-closing landing keyword (`Implements #n`) | — | LAND-20 | — | — |
-| last open child, parent `Next` says none | — | LAND-21, LAND-23 | — | — |
-| last open child, parent `Next` still has work | — | LAND-22 | — | — |
+| last open child, no uncut row, parent `Next` says none | — | LAND-21, LAND-23 | — | — |
+| last open child, no uncut row, parent `Next` still has work | — | LAND-22, LAND-23 | — | — |
+| last open child, an uncut row remains | — | LAND-22, LAND-79 | — | — |
+| other open children, parent also named for closing | — | LAND-19, LAND-79 | — | — |
 | other open children, no `Next` line | — | LAND-24 | — | — |
 | other open children, `Next` names work | — | LAND-25 | — | — |
 | malformed/wrong-kind/foreign parent | — | LAND-26, LAND-27, LAND-28 | — | — |
@@ -126,22 +128,26 @@ is read (`parse_pull_request_classification`).
 
 Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77.
 - [ ] [LAND-18] A `Work-Item:` body with no closing reference for that item refuses `carries no closing reference for its work item <item>`, exit `2`.
-- [ ] [LAND-19] A body closing anything besides its own work item (or an unpermitted parent, LAND-21) refuses `closes <ref> besides its work item <item>; a pull request lands one item`, exit `2`.
+- [ ] [LAND-19] Other closing references refuse `closes <ref> besides its work item <item>; a pull request lands one item`, exit `2`; LAND-23 permits a parent, LAND-79 takes precedence.
 - [ ] [LAND-20] `Implements #n`/`Lands #n` name work a pull request touched, but GitHub closes on neither word: a body carrying one beside its own closing reference for the declared item still passes, exit `0`.
 
 ## Parent closing at the last open child
 
 Parentage is GitHub's own sub-issue relation, read fresh for every `check`;
-nothing in a body names a parent to this grammar. "No further work" means the
+nothing in a body names a parent to this grammar. The "parent" is the one
+recorded for the declared work item, and the acceptance criteria below assume
+the other classification checks pass. An uncut `[[slice]]` row is work left in
+the parent. "No further work" means the
 parent's own `Next` line reads `keiner`, `keine`, `nichts`, `none`, `-`, or
 is empty, case-insensitively (`_NO_FURTHER_WORK_VALUES`, which a fresh
 skeleton's `next = ""` also matches). A malformed body's own defect sentence
 is `specs/body-block.spec.md`'s own fact, cited here as `<body defect
 sentence>`, not restated.
 
-- [ ] [LAND-21] Closing a parent's last open child, its `Next` naming no further work, must also close the parent; not doing so refuses `closes the last open child of parent <ref>; close the parent too`, exit `2`.
-- [ ] [LAND-22] The same last-child landing, when the parent's `Next` line still names work, may pass without closing the parent: exit `0`.
-- [ ] [LAND-23] The same last-child landing may also close the completed parent in the same pull request: a body closing both the item and that parent passes, exit `0`.
+- [ ] [LAND-21] With no uncut row and no `Next` work, a last-child landing omitting its parent refuses `closes the last open child of parent <ref>; close the parent too`, exit `2`.
+- [ ] [LAND-22] The same landing, when the parent still holds an uncut `[[slice]]` row or its `Next` still names work, may pass without closing the parent: exit `0`.
+- [ ] [LAND-23] A last-child landing with no uncut `[[slice]]` row may close both child and parent, even if the parent's `Next` names work: exit `0`.
+- [ ] [LAND-79] A landing closing a parent that still holds an uncut `[[slice]]` row refuses `closes parent <ref> although its body still holds an uncut slice row; cut it or delete the row first`, exit `2`.
 - [ ] [LAND-24] A landing leaving other open children behind, with no parent `Next` line, refuses `leaves parent <ref> open with <n> other open child/children, whose body carries no Next line`, exit `2`.
 - [ ] [LAND-25] The same landing, when the parent's `Next` line names work, passes without closing the parent: exit `0`.
 - [ ] [LAND-26] A parent whose own body reads as malformed refuses `has parent <ref> with a <body defect sentence>`, exit `2`, before the last-child rule runs; a valid but incomplete parent proceeds to it.
@@ -202,7 +208,7 @@ sentence>`, not restated.
 - A `Work-Item:` reference sitting in a commit's ordinary message prose, outside its own trailer block, is never read as a landing.
 - The trunk walk never follows a side branch: only the first-parent line a merge or squash commit sits on counts, and it never reads a hardcoded `origin` — only the repository's own configured canonical remote.
 - `check`/`release --merged` never read a body's `Advances #n` line as a declaration or a closing reference: a dispatched slice is its own item, and only its own pull request closes it.
-- The last-child rule never reads a parent's stale `## Next` prose beside the block; only the block's own `next` field decides whether closing is required.
+- The last-child rule reads the parent's block-owned `next` and `[[slice]]` entries, never stale prose beside the block.
 - `release --abandoned` never verifies a pull request, never closes an item, and never reports `freed`/`next`.
 - Under `storage = github`, a numbered item's own `release --merged <pr>` never trusts the pull request's own `body` for which item it closes (issue #397, Befund 41): only its merge commit's own trailer, read after the fact, decides -- a body edited after the merge changes nothing this release verifies.
 - Under `storage = github`, an issue-less lane's own `release --merged <pr>` never trusts the pull request's own `body` for whether it declares `No-Item:` either (issue #405, #397 gate follow-up): only its merge commit's own trailer decides (LAND-64).
@@ -260,11 +266,21 @@ exit 0
 
 ### E-LAND-05 — a last-child landing that must also close its parent
 
-Setup: bare-remote, fake `gh`, parent `#5` a container with one open child `#42` and `Next` line `keiner`, pull request `#57` merged, body `Work-Item: #42\n\nCloses #42`
+Setup: bare-remote, fake `gh`, parent `#5` a container with one open child `#42`, no uncut row and `Next` line `keiner`, pull request `#57` merged, body `Work-Item: #42\n\nCloses #42`
 
 ```console
 $ aco check 57
 2> REFUSED: pull request #57 closes the last open child of parent <owner>/<repo>#5; close the parent too
+exit 2
+```
+
+### E-LAND-79 — closing a parent that still holds an uncut slice row
+
+Setup: bare-remote, fake `gh`, parent `#5` a container with one open child `#42`, one uncut `[[slice]]` row and `Next` line `keiner`, pull request `#57` merged, body `Work-Item: #42\n\nCloses #42\nCloses #5`
+
+```console
+$ aco check 57
+2> REFUSED: pull request #57 closes parent <owner>/<repo>#5 although its body still holds an uncut slice row; cut it or delete the row first
 exit 2
 ```
 
