@@ -1,8 +1,0 @@
-claim_id = "540cfb994ab244d8b6142f4f8e159fa0"
-agent = "claude"
-role = "builder"
-base = "a7f3aca9c61fde7a063898db165d9b19fa0b70d4"
-branch = "claude/issue-214-ein-parent-mit-ungeschnittener-slice-zei"
-scope = ["specs/check.spec.md", "specs/land.spec.md", "specs/landing-grammar.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/policy.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_land_preflight_claim.py", "tests/test_state_board.py"]
-opened_commit = "43567ac2ab85873d2e07e7fad13c4f9465c4b30c"
-whole_reason = "Ein Owner für das Schließen eines Parents beim letzten Kind: board.py entscheidet, policy.py fragt, die Sätze in drei Specs ziehen im selben Schritt mit, und der Hinweis von item close über State-ref wird mit belegt; halb umgestellt widersprächen sich Code und Spec weiter."
