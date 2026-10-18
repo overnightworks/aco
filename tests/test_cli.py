@@ -10821,9 +10821,12 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
     _arranged_claim_client(monkeypatch)
     monkeypatch.setattr(checkout, "scope_directories", scope_directories)
     git_values = git_checkout()
+    stub_one_git_call(
+        monkeypatch, ["rev-parse", "--verify", "--quiet", "HEAD:scratch"], exit_status=1, stderr=""
+    )
 
     def outside_a_working_tree(arguments: list[str], **_kwargs: object) -> str:
-        if arguments[0] in {"cat-file", "rev-parse"}:
+        if arguments[0] == "rev-parse":
             raise ClaimError("fatal: this operation must be run in a work tree")
         return git_values[tuple(arguments)]
 
@@ -12430,6 +12433,33 @@ def test_cli_rescope_json_refuses_no_active_claim_with_precondition_failed(
     assert status == 2
     assert captured.err == "ERROR: issue #72 has no active build claim\n"
     _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+
+
+def test_cli_rescope_json_reports_a_git_failure_reading_the_scope_as_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """RESC-17: a git failure while the width gate reads the scope is not a
+    scope that is too wide, so it is `unavailable`, never
+    `precondition_failed`."""
+    scope_directories = checkout.scope_directories
+    _arrange_github_rescope(monkeypatch, _rescope_forge())
+    monkeypatch.setattr(checkout, "scope_directories", scope_directories)
+    stub_one_git_call(
+        monkeypatch,
+        ["rev-parse", "--verify", "--quiet", "HEAD:src/new.py"],
+        exit_status=128,
+        stderr="fatal: object database unreadable",
+    )
+
+    status = issue_claim.main(
+        ["--repo", REPOSITORY, "rescope", "72", "--add", "/repo/src/new.py", "--json"]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.err == "ERROR: fatal: object database unreadable\n"
+    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 def test_cli_rescope_without_add_or_drop_is_an_error(

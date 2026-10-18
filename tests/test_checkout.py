@@ -21,6 +21,7 @@ from cli_fixtures import (
     AGENT_IDENTITY_ENV_NAMES,
     bare_remote_repository_with_one_commit,
     dangle_recorded_head,
+    fail_git_launch,
     git_checkout,
     init_bare_repository,
     push_repository_trunk,
@@ -90,23 +91,79 @@ def test_scope_directories_finds_git_trees_and_untracked_directories_under_the_h
     (tmp_path / "scratch").mkdir()
     (tmp_path / "file.py").write_text("x\n")
 
-    def git(arguments: list[str], **_kwargs: object) -> str:
-        if arguments == ["cat-file", "-t", "HEAD:docs"]:
-            return "tree"
-        raise ClaimError("not in HEAD")
-
     def toplevel() -> Path:
         if toplevel_readable:
             return tmp_path
         raise ClaimError("fatal: not a git repository")
 
-    monkeypatch.setattr(checkout, "git_output", git)
+    def entry_exists(arguments: list[str], **_kwargs: object) -> process.CapturedResult:
+        absent = arguments[-1] in {"HEAD:scratch", "HEAD:file.py"}
+        return process.CapturedResult(1 if absent else 0, b"", b"")
+
+    monkeypatch.setattr(checkout, "_git_run", entry_exists)
+    monkeypatch.setattr(
+        checkout,
+        "git_output",
+        lambda arguments, **_kwargs: "blob" if arguments[-1] == "HEAD:notes.txt" else "tree",
+    )
 
     directories = checkout.scope_directories(
-        ("scratch", "file.py", "docs"), directory=None, toplevel=toplevel
+        ("scratch", "file.py", "notes.txt", "docs"), directory=None, toplevel=toplevel
     )
 
     assert directories == expected
+
+
+@pytest.mark.parametrize(
+    ("revision", "existence_exit", "tree_read_fails", "launch_failure", "expected_error"),
+    [
+        pytest.param(None, 128, False, None, "fatal: boom", id="existence-read-exits-128"),
+        pytest.param(None, 0, True, None, "fatal: unreadable", id="tree-read-exits-128"),
+        pytest.param(
+            None, 0, False, OSError("no git"), "no git", id="existence-read-fails-to-launch"
+        ),
+        pytest.param(
+            None,
+            0,
+            False,
+            process.ProcessTimedOutError("timed out"),
+            "git rev-parse timed out",
+            id="existence-read-times-out",
+        ),
+        pytest.param(BASE, 128, False, None, "fatal: boom", id="start-reads-a-revision"),
+    ],
+)
+def test_scope_directories_refuses_a_scope_read_that_git_fails_never_dropping_the_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    revision: str | None,
+    existence_exit: int,
+    tree_read_fails: bool,
+    launch_failure: Exception | None,
+    expected_error: str,
+) -> None:
+    """The width gate never reads a git failure as a path that is no
+    directory: only exit 1 of the existence read means absent."""
+    existence_read = ["rev-parse", "--verify", "--quiet"]
+    if launch_failure is not None:
+        fail_git_launch(monkeypatch, existence_read, launch_failure)
+    else:
+        stub_one_git_call(
+            monkeypatch,
+            [*existence_read, f"{revision or 'HEAD'}:docs"],
+            exit_status=existence_exit,
+            stderr="fatal: boom",
+        )
+    if tree_read_fails:
+
+        def unreadable(_arguments: list[str], **_kwargs: object) -> str:
+            raise ClaimError("fatal: unreadable")
+
+        monkeypatch.setattr(checkout, "git_output", unreadable)
+
+    with pytest.raises(ClaimError, match=re.escape(expected_error)):
+        checkout.scope_directories(
+            ("docs",), directory=None, toplevel=lambda: Path("/unused"), revision=revision
+        )
 
 
 def test_paths_under_scope_matches_prefix_or_exact_entry() -> None:

@@ -63,7 +63,7 @@ def _lane_tip(branch: str) -> str | None:
     git failure that keeps either read from answering (issue #390 finding
     9b) raises instead of being read the same way as an absent ref."""
     for ref in (branch, f"origin/{branch}"):
-        commit = checkout.resolved_commit(ref)
+        commit = checkout.resolved_object(ref)
         if commit is not None:
             return commit
     return None

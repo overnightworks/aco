@@ -130,13 +130,14 @@ def attached_branch(checked_out: str) -> str:
 _REV_PARSE_VERIFY_EXIT_UNRESOLVED = 1
 
 
-def resolved_commit(ref: str, *, directory: Path | None = None) -> str | None:
-    """`ref`'s current commit in `directory` (or the calling process's own
-    cwd), or `None` when it does not resolve to a
-    single object. A git failure that keeps the read from answering either
-    way -- a missing executable, a timeout, or any exit but the documented
-    "unresolved" one -- raises `ClaimError` with git's own detail instead."""
-    result = _git_run(["rev-parse", "--verify", "--quiet", ref], directory=directory)
+def resolved_object(name: str, *, directory: Path | None = None) -> str | None:
+    """The object id `name` (any git object name: a commit, `<rev>:<path>`
+    entry, ...) resolves to in `directory` (or the calling process's own
+    cwd), or `None` when it does not resolve to a single object. A git
+    failure that keeps the read from answering either way -- a missing
+    executable, a timeout, or any exit but the documented "unresolved" one --
+    raises `ClaimError` with git's own detail instead."""
+    result = _git_run(["rev-parse", "--verify", "--quiet", name], directory=directory)
     if result.exit_status == _REV_PARSE_VERIFY_EXIT_UNRESOLVED:
         return None
     if result.exit_status != 0:
@@ -320,18 +321,16 @@ def scope_directories(
     unaffected by #314). `toplevel` is the caller's own held toplevel
     (issue #472: its run context's, never a second git read), asked once
     and only for an entry that is no git tree. Given `revision`, only that
-    commit's own trees count (issue #479): it has no checkout on disk yet."""
+    commit's own trees count (issue #479): it has no checkout on disk yet.
+    An entry `<rev>` does not know counts no tree; a git failure reading it
+    raises `ClaimError` with git's own detail, never dropping the entry."""
     directories: list[str] = []
     checkout_root = functools.cache(lambda: _toplevel_or_none(toplevel))
     for path in paths:
-        try:
-            kind = git_output(
-                ["cat-file", "-t", f"{revision or 'HEAD'}:{path}"], directory=directory
-            )
-        except ClaimError:
-            kind = ""
-        if kind == "tree":
-            directories.append(path)
+        entry = f"{revision or 'HEAD'}:{path}"
+        if resolved_object(entry, directory=directory) is not None:
+            if git_output(["cat-file", "-t", entry], directory=directory) == "tree":
+                directories.append(path)
             continue
         if revision is not None:
             continue
@@ -957,7 +956,7 @@ def _first_resolving_ref(candidates: tuple[str, ...], *, directory: Path) -> str
         (
             candidate
             for candidate in candidates
-            if resolved_commit(candidate, directory=directory) is not None
+            if resolved_object(candidate, directory=directory) is not None
         ),
         None,
     )
@@ -1564,7 +1563,7 @@ def cleanup_landed_worktree(
     squash_landed = (
         not merged
         and landed_head is not None
-        and resolved_commit(f"refs/heads/{branch}", directory=directory) == landed_head
+        and resolved_object(f"refs/heads/{branch}", directory=directory) == landed_head
     )
     if not merged and not squash_landed:
         return worktree_cleanup_kept(WORKTREE_KEPT_NOT_MERGED_REASON)
