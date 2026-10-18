@@ -41,6 +41,8 @@ from agent_coordination.github import GitHubForge
 
 DEPENDENCY_PATHS_CONFIG = 'dependency_paths = ["uv.lock", "pyproject.toml"]\n'
 ADOPTED_BODY = "Bump x\n\nNo-Item: deps"
+# One digit past the 4300 Python refuses to turn into an int.
+OVERLONG_ISSUE_NUMBER = "1" * 4301
 
 
 def _publish_branch_tip(clone: Path, message: str) -> str:
@@ -223,20 +225,67 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
     assert world.forge.requests == 0
 
 
-def test_adopt_refuses_without_an_agent_identity_before_it_reads_the_pull_request(
+def _no_agent_identity(world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(checkout.ACO_AGENT_ENV)
+
+
+def _no_agent_identity_and_a_state_ref_pin(
+    world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _no_agent_identity(world, monkeypatch)
+    track_board_config(world.clone, 'storage = "state-ref"\n')
+
+
+def _assert_invalid_agent_message(message: str) -> None:
+    assert message == "ERROR: agent must be one bounded non-empty line\n"
+
+
+@pytest.mark.parametrize(
+    ("arrange", "arguments", "assert_message"),
+    [
+        pytest.param(_no_agent_identity, (), assert_missing_identity_message, id="missing"),
+        pytest.param(
+            _no_agent_identity_and_a_state_ref_pin,
+            (),
+            assert_missing_identity_message,
+            id="missing-beside-a-state-ref-pin",
+        ),
+        pytest.param(
+            lambda _world, _monkeypatch: None,
+            ("--agent", " Ada"),
+            _assert_invalid_agent_message,
+            id="invalid-agent-option",
+        ),
+        pytest.param(
+            lambda world, monkeypatch: (
+                monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Ada\x1b"),
+                track_board_config(world.clone, 'storage = "state-ref"\n'),
+            ),
+            (),
+            _assert_invalid_agent_message,
+            id="invalid-environment-identity-beside-a-state-ref-pin",
+        ),
+    ],
+)
+def test_adopt_refuses_an_unusable_agent_identity_before_it_reads_the_pin_or_the_pull_request(
     world: AdoptionWorld,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
+    arrange: Callable[[AdoptionWorld, pytest.MonkeyPatch], object],
+    arguments: tuple[str, ...],
+    assert_message: Callable[[str], None],
 ) -> None:
-    """Spec: OUT-05 (checks, in order) -- no identity from `--agent` or the environment
-    refuses before any forge read, and writes nothing."""
-    monkeypatch.delenv(checkout.ACO_AGENT_ENV)
+    """Spec: OUT-05 (checks, in order) -- a missing or invalid identity from `--agent` or the
+    environment refuses first, before the storage pin and before any forge read, and writes
+    nothing."""
+    arrange(world, monkeypatch)
     before = world.effects()
 
-    result = adopt(capsys)
+    result = adopt(capsys, *arguments)
 
     assert (result.status, result.stdout) == (2, "")
-    assert_missing_identity_message(result.stderr)
+    assert_message(result.stderr)
+    assert world.forge.requests == 0
     assert world.forge.issue_reference_lookups == []
     assert world.effects() == before
 
@@ -493,6 +542,13 @@ LONG_NAME = "a-very-long-file-name-" + "x" * 80
             ),
             f"ERROR: pull request #{ADOPTED_PULL_REQUEST} already carries ",
             id="cell-24-overlong-classification-line",
+        ),
+        pytest.param(
+            lambda world: world.serve(
+                lambda landing: replace(landing, body=f"Work-Item: #{OVERLONG_ISSUE_NUMBER}")
+            ),
+            f"ERROR: pull request #{ADOPTED_PULL_REQUEST} already carries Work-Item: #1111",
+            id="cell-40-work-item-number-beyond-any-issue",
         ),
         pytest.param(
             lambda world: world.list_files(*(f"src/{index}/{LONG_NAME}.py" for index in range(3))),
@@ -1325,6 +1381,25 @@ def test_adopt_keeps_the_words_around_an_overlong_forge_error_and_escapes_it(
     )
     assert result.stderr.endswith("…); the claim stands; run adopt again, or release it\n")
     assert len(result.stderr) == 201
+
+
+def test_adopt_refuses_a_work_item_number_beyond_any_issue_that_appears_before_the_re_read(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-05, ADOPT-23, ADOPT-19 -- a number no issue has is a line adopt never
+    changes, refused as one cut line with the claim kept, never a crash after the claim."""
+    world.forge.scripted_item_reads = [None, f"Bump x\n\nWork-Item: #{OVERLONG_ISSUE_NUMBER}"]
+
+    result = adopt(capsys)
+
+    assert result.status == 2
+    assert result.stderr.startswith(
+        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} already carries Work-Item: #1111"
+    )
+    assert result.stderr.endswith("…\n")
+    assert len(result.stderr) == 201
+    _adopted_claim(world)
+    assert world.forge.body_writes == []
 
 
 def test_adopts_rerun_keeps_a_line_that_appears_before_its_re_read(

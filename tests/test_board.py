@@ -3508,6 +3508,19 @@ def test_a_non_ascii_digit_in_a_hash_reference_is_not_an_issue_number() -> None:
     assert isinstance(work_item, board.ClassificationDefect)
 
 
+def test_an_issue_number_past_the_int_digit_limit_is_no_issue_number() -> None:
+    number = "1" * 4301
+    line = f"Work-Item: #{number}"
+
+    assert board.closing_references(f"Closes #{number}", REPOSITORY) == frozenset()
+    assert isinstance(
+        board.parse_pull_request_classification(line, REPOSITORY), board.ClassificationDefect
+    )
+    assert board.classification_line_state(
+        line, board.NoItemKind.DEPS, REPOSITORY
+    ) == board.OtherClassificationLine(line)
+
+
 def test_body_defect_text_is_the_shared_renderer() -> None:
     defect = ContractDefect("now", "missing")
     assert body_defect_text(defect) == "body malformed: now: missing"
