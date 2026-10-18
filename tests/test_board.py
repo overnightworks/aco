@@ -4308,3 +4308,25 @@ def test_classification_line_state_tells_the_line_a_rerun_may_keep(
     state = board.classification_line_state(pull_request_body, board.NoItemKind.DEPS, REPOSITORY)
 
     assert state == expected_state()
+
+
+@pytest.mark.parametrize(
+    ("classification", "expected"),
+    [
+        pytest.param(
+            board.WorkItemClassification(board.IssueReference(REPOSITORY, 72)),
+            "Work-Item: #72",
+            id="work-item",
+        ),
+        pytest.param(
+            board.NoItemClassification(board.NoItemKind.DOCS), "No-Item: docs", id="no-item"
+        ),
+    ],
+)
+def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications(
+    classification: board.Classification,
+    expected: str,
+) -> None:
+    """Spec: LANDCMD-13. Trunk trailers use local issue references or the no-item kind."""
+    observed = board.land_trunk_trailer(classification)
+    assert observed == expected
