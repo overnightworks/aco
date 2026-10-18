@@ -25,6 +25,9 @@ _PROCESS_EXIT_POLL_SECONDS = 1
 _MAX_PROC_COMMAND_LINE_BYTES = 16 * 1024
 _MAX_NATIVE_PROCESS_SCAN = 1024
 _STAT_START_TIME_INDEX = 19
+_STDIN_KEY = "stdin"
+_STDOUT_KEY = "stdout"
+_STDERR_KEY = "stderr"
 
 # Fallback when a failed git invocation left nothing readable on either
 # stream (issue #372: one owner instead of a `checkout.py`/`store.py` copy).
@@ -138,14 +141,18 @@ def _close_process_streams(process_handle: subprocess.Popen[bytes]) -> None:
 
 
 def _start_bounded_process(
-    command: list[str], *, env: dict[str, str] | None, input_data: bytes | None
+    command: list[str],
+    *,
+    env: dict[str, str] | None,
+    input_data: bytes | None,
+    separate_stderr: bool,
 ) -> subprocess.Popen[bytes]:
     try:
         return subprocess.Popen(
             command,
             stdin=subprocess.PIPE if input_data is not None else None,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE if separate_stderr else subprocess.STDOUT,
             env=env,
         )
     except FileNotFoundError as error:
@@ -160,12 +167,14 @@ def _register_process_streams(
     input_data: bytes | None,
 ) -> memoryview | None:
     assert process_handle.stdout is not None
-    selector.register(process_handle.stdout, selectors.EVENT_READ, "stdout")
+    selector.register(process_handle.stdout, selectors.EVENT_READ, _STDOUT_KEY)
+    if process_handle.stderr is not None:
+        selector.register(process_handle.stderr, selectors.EVENT_READ, _STDERR_KEY)
     if input_data is None:
         return None
     assert process_handle.stdin is not None
     os.set_blocking(process_handle.stdin.fileno(), False)
-    selector.register(process_handle.stdin, selectors.EVENT_WRITE, "stdin")
+    selector.register(process_handle.stdin, selectors.EVENT_WRITE, _STDIN_KEY)
     return memoryview(input_data)
 
 
@@ -217,10 +226,10 @@ def _write_process_input(
 def _read_process_output(
     key: selectors.SelectorKey,
     selector: selectors.BaseSelector,
-    output: bytearray,
+    output: dict[str, bytearray],
     process_handle: subprocess.Popen[bytes],
 ) -> None:
-    stream = process_handle.stdout
+    stream = process_handle.stdout if key.data == _STDOUT_KEY else process_handle.stderr
     assert stream is not None
     try:
         chunk = os.read(stream.fileno(), _OUTPUT_CHUNK_BYTES)
@@ -229,8 +238,8 @@ def _read_process_output(
     if not chunk:
         selector.unregister(key.fileobj)
         return
-    output.extend(chunk)
-    if len(output) > MAX_COMMAND_OUTPUT_BYTES:
+    output[key.data].extend(chunk)
+    if sum(len(captured) for captured in output.values()) > MAX_COMMAND_OUTPUT_BYTES:
         _stop_process(process_handle)
         raise ProcessOutputTooLargeError
 
@@ -260,24 +269,25 @@ def _reap_bounded_process(
 
 def _exchange_bounded_io(
     process_handle: subprocess.Popen[bytes], *, timeout: float, input_data: bytes | None
-) -> tuple[bytes, int]:
+) -> CapturedResult:
     selector: selectors.BaseSelector | None = None
     try:
         deadline = time.monotonic() + timeout
-        output = bytearray()
+        output = {_STDOUT_KEY: bytearray(), _STDERR_KEY: bytearray()}
         selector = selectors.DefaultSelector()
         pending_input = _register_process_streams(selector, process_handle, input_data)
         while selector.get_map():
             events = _await_process_io_events(selector, process_handle, deadline)
             for key, _ in events:
-                if key.data == "stdin":
+                if key.data == _STDIN_KEY:
                     assert pending_input is not None
                     pending_input = _write_process_input(
                         key, pending_input, selector, process_handle
                     )
                     continue
                 _read_process_output(key, selector, output, process_handle)
-        return bytes(output), _wait_for_process_exit(process_handle)
+        exit_status = _wait_for_process_exit(process_handle)
+        return CapturedResult(exit_status, bytes(output[_STDOUT_KEY]), bytes(output[_STDERR_KEY]))
     except OSError as error:
         raise ProcessIoFailedError(IoStage.COORDINATING, str(error)) from error
     finally:
@@ -299,11 +309,40 @@ def run_bounded(
     back as an ordinary `BoundedResult` for the caller to interpret, since only
     the caller knows what a nonzero exit from this particular command means.
     """
-    process_handle = _start_bounded_process(command, env=env, input_data=input_data)
-    output, exit_status = _exchange_bounded_io(
-        process_handle, timeout=timeout, input_data=input_data
+    merged = _run_bounded_process(
+        command, input_data=input_data, env=env, timeout=timeout, separate_stderr=False
     )
-    return BoundedResult(exit_status, output)
+    return BoundedResult(merged.exit_status, merged.stdout)
+
+
+def run_bounded_captured(
+    command: list[str],
+    *,
+    input_data: bytes | None = None,
+    env: dict[str, str] | None = None,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+) -> CapturedResult:
+    """`run_bounded` with stdout and stderr kept separate, for a caller that
+    parses stdout as data (a git object id) and must not find stderr noise in
+    it. The one bound `MAX_COMMAND_OUTPUT_BYTES` covers both streams together;
+    errors and the nonzero-exit contract are `run_bounded`'s."""
+    return _run_bounded_process(
+        command, input_data=input_data, env=env, timeout=timeout, separate_stderr=True
+    )
+
+
+def _run_bounded_process(
+    command: list[str],
+    *,
+    input_data: bytes | None,
+    env: dict[str, str] | None,
+    timeout: float,
+    separate_stderr: bool,
+) -> CapturedResult:
+    process_handle = _start_bounded_process(
+        command, env=env, input_data=input_data, separate_stderr=separate_stderr
+    )
+    return _exchange_bounded_io(process_handle, timeout=timeout, input_data=input_data)
 
 
 def run_captured(
@@ -363,7 +402,7 @@ def _git_failure_detail(stderr: bytes, stdout: bytes, *, errors: str = "strict")
     replacing it, since `store._delete_export_ref` (issue #298) relies on
     that raise reaching its own `(ClaimError, OSError, ValueError)` catch
     and carrying the decode failure itself into the leftover description it
-    returns. `git_failure_detail_from_bounded` opts into `errors="replace"`
+    returns. `git_failure_detail_lossy` opts into `errors="replace"`
     instead, preserving its own pre-existing lenient behaviour."""
     return (
         stderr.decode(errors=errors).strip()
@@ -394,13 +433,12 @@ def git_failure_detail_from_stderr(result: CapturedResult) -> str:
     return _git_failure_detail(result.stderr, b"")
 
 
-def git_failure_detail_from_bounded(result: BoundedResult) -> str:
-    """A finished `run_bounded` git invocation's merged stdout+stderr,
-    falling back to `UNKNOWN_GIT_FAILURE` when it carried nothing (issue
-    #390 finding 7): the one detail reader for a command run with piped
-    stdin (`hash-object`, `mktree`), whose separate-stream `CapturedResult`
-    siblings above cannot read it since `run_captured` takes no input."""
-    return _git_failure_detail(b"", result.output, errors="replace")
+def git_failure_detail_lossy(result: CapturedResult) -> str:
+    """`git_failure_detail` for a command run with piped stdin (`hash-object`,
+    `mktree`), decoding with replacement instead of raising: the claim store
+    surfaces such a failure as a `ClaimError`, never as a decode error (issue
+    #390 finding 7)."""
+    return _git_failure_detail(result.stderr, result.stdout, errors="replace")
 
 
 def inspect_native_process(pid: int, proc_root: Path = Path("/proc")) -> NativeProcess:

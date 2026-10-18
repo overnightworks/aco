@@ -443,7 +443,7 @@ class TestBodyCheck:
             pytest.fail("body --check must not fetch the store")
 
         monkeypatch.setattr(store, "fetch_state", forbidden_store)
-        for name in ("run_captured", "run_bounded"):
+        for name in ("run_captured", "run_bounded", "run_bounded_captured"):
             launch = getattr(process, name)
 
             def without_gh(arguments, *, _launch=launch, **kwargs):
