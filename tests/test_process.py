@@ -467,7 +467,15 @@ def test_run_bounded_captured_refuses_output_past_the_bound_on_either_stream(
         process.run_bounded_captured([sys.executable, "-c", program])
 
 
-def test_lossy_git_failure_detail_replaces_undecodable_stderr_instead_of_raising() -> None:
-    result = process.CapturedResult(1, b"", b"fatal: \xff name")
-
-    assert process.git_failure_detail_lossy(result) == "fatal: � name"
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "expected"),
+    [
+        pytest.param(b"", b"fatal: \xff name", "fatal: \ufffd name", id="undecodable-stderr"),
+        pytest.param(b"left over", b"", "left over", id="stdout-when-stderr-is-empty"),
+        pytest.param(b"", b"", process.UNKNOWN_GIT_FAILURE, id="neither-stream"),
+    ],
+)
+def test_lossy_git_failure_detail_never_raises_on_undecodable_bytes(
+    stdout: bytes, stderr: bytes, expected: str
+) -> None:
+    assert process.git_failure_detail_lossy(process.CapturedResult(1, stdout, stderr)) == expected

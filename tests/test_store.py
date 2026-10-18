@@ -105,9 +105,7 @@ def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
         return wrapped
 
     monkeypatch.setattr(store.process, "run_captured", spy(process.run_captured))
-    monkeypatch.setattr(
-        store.process, "run_bounded_captured", spy(process.run_bounded_captured)
-    )
+    monkeypatch.setattr(store.process, "run_bounded_captured", spy(process.run_bounded_captured))
     return counts
 
 
@@ -321,12 +319,16 @@ def test_hash_blob_returns_the_object_id_git_prints_on_stdout_while_tracing(
     worktree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     content = b"claim state"
-    expected = subprocess.run(
-        ["git", "-C", str(worktree), "hash-object", "--stdin"],
-        input=content,
-        check=True,
-        capture_output=True,
-    ).stdout.decode().strip()
+    expected = (
+        subprocess.run(
+            ["git", "-C", str(worktree), "hash-object", "--stdin"],
+            input=content,
+            check=True,
+            capture_output=True,
+        )
+        .stdout.decode()
+        .strip()
+    )
     monkeypatch.setenv("GIT_TRACE", "1")
 
     assert store.hash_blob(worktree, content) == expected
