@@ -622,9 +622,9 @@ def test_board_marks_an_item_landed_by_a_trailer_carrying_trunk_commit_without_a
     """Issue #304 review finding B2's "lane 2": a trunk commit's own
     `Work-Item:` trailer lands an item even when no merged pull request body
     names it -- `landed_references` unions the trunk-derived set
-    (`board.trunk_landing_items`) with the PR-derived one, so the union
-    still holds an item a merge/squash commit landed without a matching
-    pull request body."""
+    (`entry.item` of each `BoardBuildInputs.trunk_landing_items` entry)
+    with the PR-derived one, so the union still holds an item a merge/squash
+    commit landed without a matching pull request body."""
     _single_item_board_environment(monkeypatch, tmp_path)
     monkeypatch.setattr(
         checkout,
