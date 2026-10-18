@@ -843,9 +843,7 @@ def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...
         value_options=_SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
         optional_value_options=_SED_IN_PLACE_OPTIONS,
     )
-    paths = _unique_in_order(
-        path for parsed in readings for path in _sed_in_place_paths(parsed)
-    )
+    paths = _unique_in_order(path for parsed in readings for path in _sed_in_place_paths(parsed))
     return (PATTERN_SED_IN_PLACE, paths) if paths else None
 
 
