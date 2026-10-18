@@ -1,8 +1,0 @@
-claim_id = "54d0c237813249c5a9b14b21a6e6273f"
-agent = "claude"
-role = "builder"
-base = "62a13aad067243433aa8f6ffa2b8a0656daf27b2"
-branch = "claude/issue-228-start-whole-login-state"
-scope = ["src/agent_coordination/cmd_start.py", "src/agent_coordination/workspace.py", "tests/test_cli.py", "tests/test_workspace.py"]
-opened_commit = "1aee47222c233f2ba5f1cf14b4718b3f8ff1ffa5"
-whole_reason = "Lane-Bündel aus #222: Befund 5 (start, dieses Item) und Befund 7 (#229, login); zwei kleine Karten mit getrennten Dateien, ein Claim, ein PR."
