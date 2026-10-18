@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -295,7 +296,9 @@ class _FakeBoundedProcess:
         os.close(write_fd)
         self.stdout = os.fdopen(read_fd, "rb")
         self.stdin = None
-        self.stderr = None
+        error_read_fd, error_write_fd = os.pipe()
+        os.close(error_write_fd)
+        self.stderr = os.fdopen(error_read_fd, "rb")
         self._ignores_terminate = ignores_terminate
         self.events: list[str] = []
         self._exited = already_exited
@@ -318,8 +321,16 @@ class _FakeBoundedProcess:
         return 0
 
 
-def test_run_bounded_times_out_even_when_the_child_already_exited(
-    monkeypatch: pytest.MonkeyPatch,
+bounded_runners = pytest.mark.parametrize(
+    "run_bounded_command",
+    [process.run_bounded, process.run_bounded_captured],
+    ids=["merged", "separated"],
+)
+
+
+@bounded_runners
+def test_bounded_run_times_out_even_when_the_child_already_exited(
+    monkeypatch: pytest.MonkeyPatch, run_bounded_command: Callable[..., object]
 ) -> None:
     """A deadline already passed by the time I/O is awaited must fail loud even
     when the child happened to finish first -- stopping an already-exited
@@ -335,15 +346,16 @@ def test_run_bounded_times_out_even_when_the_child_already_exited(
     monkeypatch.setattr(process.time, "monotonic", already_past_deadline)
 
     with pytest.raises(process.ProcessTimedOutError):
-        process.run_bounded(["fake"], timeout=5.0)
+        run_bounded_command(["fake"], timeout=5.0)
 
     assert fake_process.events == []
     assert fake_process.stdout.closed is True
     assert fake_process.poll() is not None
 
 
-def test_run_bounded_kills_a_child_that_ignores_termination(
-    monkeypatch: pytest.MonkeyPatch,
+@bounded_runners
+def test_bounded_run_kills_a_child_that_ignores_termination(
+    monkeypatch: pytest.MonkeyPatch, run_bounded_command: Callable[..., object]
 ) -> None:
     """A child that survives `terminate()` (ignoring the request to stop) must
     be `kill()`ed -- proven with a deterministic process fake controlling
@@ -354,7 +366,7 @@ def test_run_bounded_kills_a_child_that_ignores_termination(
     monkeypatch.setattr(process.time, "monotonic", lambda: 0.0)
 
     with pytest.raises(process.ProcessTimedOutError):
-        process.run_bounded(["fake"], timeout=-1.0)
+        run_bounded_command(["fake"], timeout=-1.0)
 
     assert fake_process.events == ["terminate", "kill"]
     assert fake_process.stdout.closed is True
@@ -430,3 +442,43 @@ def test_run_bounded_reaps_the_child_when_the_selector_fails_to_close(
 
     observed = process.run_bounded([sys.executable, "-c", "print('ok')"])
     assert observed.output == b"ok\n"
+
+
+def test_run_bounded_captured_keeps_stdout_and_stderr_apart_and_sends_input() -> None:
+    program = (
+        "import sys; data = sys.stdin.buffer.read();"
+        " sys.stdout.buffer.write(b'out:' + data); sys.stderr.buffer.write(b'err');"
+        " sys.exit(3)"
+    )
+
+    observed = process.run_bounded_captured([sys.executable, "-c", program], input_data=b"payload")
+
+    assert observed == process.CapturedResult(3, b"out:payload", b"err")
+
+
+@pytest.mark.parametrize("noisy_stream", ["stdout", "stderr"])
+def test_run_bounded_captured_refuses_output_past_the_bound_on_either_stream(
+    monkeypatch: pytest.MonkeyPatch, noisy_stream: str
+) -> None:
+    monkeypatch.setattr(process, "MAX_COMMAND_OUTPUT_BYTES", 8)
+    program = f"import sys; sys.{noisy_stream}.write('x' * 100)"
+
+    with pytest.raises(process.ProcessOutputTooLargeError):
+        process.run_bounded_captured([sys.executable, "-c", program])
+
+
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "expected"),
+    [
+        pytest.param(b"", b"fatal: \xff name", "fatal: \ufffd name", id="undecodable-stderr"),
+        pytest.param(b"left over", b"", "left over", id="stdout-when-stderr-is-empty"),
+        pytest.param(
+            b"left over", b"fatal: \xff name", "fatal: \ufffd name", id="stderr-wins-over-stdout"
+        ),
+        pytest.param(b"", b"", process.UNKNOWN_GIT_FAILURE, id="neither-stream"),
+    ],
+)
+def test_lossy_git_failure_detail_reads_stderr_then_stdout_then_the_fixed_sentence_without_raising(
+    stdout: bytes, stderr: bytes, expected: str
+) -> None:
+    assert process.git_failure_detail_lossy(process.CapturedResult(1, stdout, stderr)) == expected

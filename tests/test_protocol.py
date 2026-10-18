@@ -12,6 +12,7 @@ from __future__ import annotations
 import tomllib
 from collections.abc import Callable
 from dataclasses import replace
+from functools import partial
 
 import pytest
 from board_fixtures import request, standing_active_claim
@@ -551,3 +552,229 @@ def test_a_claim_conflict_names_its_item_in_the_state_ref_form_the_cli_asks_for(
         forge_sentence,
         named_sentence,
     )
+
+
+@pytest.mark.parametrize("case", ["U1", "U2", "U3", "U4", "U5", "U5a", "U6", "U7", "U8"])
+def test_lookup_identity_resolves_a_lane_by_prefix_claim_or_merged_rerun(case: str) -> None:
+    branch = {"U2": "docs/x", "U3": "fix/x"}.get(case, "dependabot/x")
+    issue_holder = standing_active_claim(claim_id="issue", issue=42, branch=branch)
+    lane_holder = standing_active_claim(claim_id="lane", lane=True, branch=branch)
+    other_holder = standing_active_claim(claim_id="other", lane=True, branch="dependabot/y")
+    claims = {
+        protocol.claim_key(claim.identity, claim.branch): claim
+        for claim in (issue_holder, lane_holder, other_holder)
+    }
+    if case == "U8":
+        assert protocol.claims_on_branch(claims, branch) == (issue_holder, lane_holder)
+        return
+    calls = []
+
+    def holders() -> tuple[protocol.ActiveClaim, ...]:
+        assert case not in {"U1", "U2", "U3"}, "issue/prefix lookup must not read holders"
+        calls.append(branch)
+        return {
+            "U4": (lane_holder,),
+            "U5": (issue_holder,),
+            "U5a": (issue_holder,),
+            "U6": (),
+            "U7": (),
+        }[case]
+
+    merged_rerun = case in {"U5", "U6"}
+    if case in {"U5", "U5a", "U7"}:
+        with pytest.raises(ClaimError) as refused:
+            protocol.lookup_identity(None, branch, merged_rerun=merged_rerun, holders=holders)
+        assert str(refused.value) == (
+            "branch 'dependabot/x' is not an issueless lane; pass an issue number, or "
+            "check out a branch prefixed 'docs/' or 'fix/'"
+        )
+    else:
+        identity = protocol.lookup_identity(
+            42 if case == "U1" else None, branch, merged_rerun=merged_rerun, holders=holders
+        )
+        assert identity == (protocol.IssueIdentity(42) if case == "U1" else protocol.LaneIdentity())
+    assert calls == ([] if case in {"U1", "U2", "U3"} else [branch])
+
+
+_LANE = protocol.LaneIdentity()
+_ISSUE_42 = protocol.IssueIdentity(42)
+_CLAIM_14_SENTENCE = (
+    "claim id 'a1' is already on this ledger, active or released; "
+    "release it, then claim again with a fresh claim id"
+)
+
+
+def _claimed_by(holder: str, holds: str) -> str:
+    return f"lane 'dependabot/x' is claimed by {holder} (builder) on {holds} branch dependabot/x"
+
+
+@pytest.mark.parametrize(
+    ("earlier_claims", "attempt", "refusal", "replays"),
+    [
+        pytest.param(
+            (
+                partial(
+                    claim_intent,
+                    identity=_ISSUE_42,
+                    agent="Bob",
+                    claim_id="b1",
+                    branch="dependabot/x",
+                ),
+            ),
+            partial(claim_intent, identity=_LANE, branch="dependabot/x", exclusive_branch=True),
+            _claimed_by("Bob", "issue #42"),
+            False,
+            id="cell-1-an-issue-claim-holds-the-branch",
+        ),
+        pytest.param(
+            (
+                partial(
+                    claim_intent,
+                    identity=_LANE,
+                    agent="Bob",
+                    claim_id="b1",
+                    branch="dependabot/x",
+                ),
+            ),
+            partial(claim_intent, identity=_LANE, branch="dependabot/x", exclusive_branch=True),
+            _claimed_by("Bob", "lane 'dependabot/x'"),
+            False,
+            id="cell-2-a-lane-claim-holds-the-branch",
+        ),
+        pytest.param(
+            (
+                partial(
+                    claim_intent,
+                    identity=_ISSUE_42,
+                    claim_id="c1",
+                    branch="dependabot/x",
+                ),
+            ),
+            partial(claim_intent, identity=_LANE, branch="dependabot/x", exclusive_branch=True),
+            _claimed_by("Ada", "issue #42"),
+            False,
+            id="cell-3-the-claimant-itself-holds-the-branch",
+        ),
+        pytest.param(
+            (
+                partial(
+                    claim_intent,
+                    identity=_ISSUE_42,
+                    agent="Bob",
+                    claim_id="b1",
+                    branch="other/a",
+                ),
+                partial(
+                    claim_intent,
+                    identity=_LANE,
+                    agent="Bob",
+                    claim_id="b2",
+                    branch="other/b",
+                ),
+            ),
+            partial(claim_intent, identity=_LANE, branch="dependabot/x", exclusive_branch=True),
+            None,
+            False,
+            id="cell-4-an-overlapping-scope-on-other-branches-never-refuses",
+        ),
+        pytest.param(
+            (
+                partial(
+                    claim_intent,
+                    identity=_ISSUE_42,
+                    agent="Bob",
+                    claim_id="b1",
+                    branch="docs/x",
+                ),
+            ),
+            partial(claim_intent, identity=_LANE, branch="docs/x"),
+            None,
+            False,
+            id="cell-5-a-default-lane-claim-still-sits-beside-an-issue-claim",
+        ),
+        pytest.param(
+            (
+                partial(
+                    claim_intent,
+                    identity=_LANE,
+                    claim_id="a1",
+                    branch="dependabot/x",
+                    exclusive_branch=True,
+                ),
+            ),
+            partial(
+                claim_intent,
+                identity=protocol.IssueIdentity(43),
+                claim_id="a2",
+                branch="dependabot/x",
+            ),
+            None,
+            False,
+            id="cell-6-an-adopted-lane-does-not-block-a-later-issue-claim",
+        ),
+        pytest.param(
+            (
+                partial(
+                    claim_intent,
+                    identity=_LANE,
+                    claim_id="a1",
+                    branch="dependabot/x",
+                    exclusive_branch=True,
+                ),
+                partial(
+                    claim_intent,
+                    identity=_ISSUE_42,
+                    agent="Bob",
+                    claim_id="b1",
+                    branch="dependabot/x",
+                ),
+            ),
+            partial(
+                claim_intent,
+                identity=_LANE,
+                claim_id="a1",
+                branch="dependabot/x",
+                exclusive_branch=True,
+            ),
+            None,
+            True,
+            id="cell-7-the-exact-replay-returns-the-live-claim-past-a-later-holder",
+        ),
+        pytest.param(
+            (partial(claim_intent, identity=_LANE, claim_id="a1", branch="dependabot/x"),),
+            partial(
+                claim_intent,
+                identity=_LANE,
+                claim_id="a1",
+                branch="dependabot/x",
+                scope=("docs",),
+                exclusive_branch=True,
+            ),
+            _CLAIM_14_SENTENCE,
+            False,
+            id="cell-8-a-consumed-claim-id-keeps-claim-14s-sentence",
+        ),
+    ],
+)
+def test_an_exclusive_claim_refuses_any_holder_of_its_branch_and_replays_unchanged(
+    earlier_claims: tuple[partial[protocol.ClaimIntent], ...],
+    attempt: partial[protocol.ClaimIntent],
+    refusal: str | None,
+    replays: bool,
+) -> None:
+    """Spec: CLAIM-71, CLAIM-72, CLAIM-10, CLAIM-14."""
+    state = STATE_WITH_TIP
+    for earlier in earlier_claims:
+        state = protocol.apply(state, earlier())
+    intent = attempt()
+
+    if refusal is not None:
+        with pytest.raises(protocol.ClaimConflictError) as refused:
+            protocol.apply(state, intent)
+        assert str(refused.value) == refusal
+        return
+
+    claimed = protocol.apply(state, intent)
+
+    assert (claimed == state) is replays
+    assert protocol.claim_key(intent.identity, intent.branch) in claimed.claims

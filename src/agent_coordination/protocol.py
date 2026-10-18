@@ -20,8 +20,8 @@ MISSING_STATE_REF = (
     "the claim state ref does not exist yet; run bootstrap before claim, rescope, "
     "release, or item write"
 )
-# Coordination-contract convention: the only branch prefixes an issueless lane claim
-# may use, so a builder that forgot its issue number never gets a silent, unlabeled,
+# Coordination-contract convention: the branch prefixes `claim` accepts for an issue-less
+# lane, so a builder that forgot its issue number never gets a silent, unlabeled,
 # non-projected claim instead of a loud refusal.
 ISSUELESS_LANE_BRANCH_PREFIXES = ("docs/", "fix/")
 CLAIM_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
@@ -115,7 +115,7 @@ class IssueIdentity:
 
 @dataclass(frozen=True)
 class LaneIdentity:
-    """A claim scoped to one issueless `docs/`/`fix/` lane.
+    """A claim scoped to one issue-less lane.
 
     Carries no branch of its own: the lane name is owned entirely by the enclosing
     claim record's `branch`, which every lane claim already has. A second
@@ -203,6 +203,7 @@ class ClaimRequest:
     whole_reason: str | None = None
     resource: str | None = None
     resource_value: int | None = None
+    exclusive_branch: bool = False
 
 
 @dataclass(frozen=True)
@@ -1026,7 +1027,12 @@ class ClaimIntent:
     between a rejected push and its retry refuses the claim instead of
     leaving a live claim on an item nobody checked (issue #496). Only a
     state-ref item has one; under `github` the forge holds the item's state
-    and the ledger no fact of it."""
+    and the ledger no fact of it.
+
+    `exclusive_branch` (only `aco adopt` sets it) refuses the claim, on every
+    attempt, while any live claim holds its branch -- issue or lane -- which
+    CLAIM-10 otherwise lets share one. It is never stored in the claim
+    record."""
 
     identity: ClaimIdentity
     agent: str
@@ -1040,6 +1046,7 @@ class ClaimIntent:
     resource_name: str | None = None
     resource_value: int | None = None
     item_pin: ItemPin | None = None
+    exclusive_branch: bool = False
 
 
 @dataclass(frozen=True)
@@ -1164,13 +1171,18 @@ def _same_identity(left: ClaimIdentity, right: ClaimIdentity) -> bool:
     return isinstance(left, LaneIdentity) and isinstance(right, LaneIdentity)
 
 
+def held_by(claim: ActiveClaim, agent: str, role: str) -> bool:
+    """Whether `claim` is held by `agent` as `role`, compared as a tuple so
+    "same claimant" stays one named domain concept everywhere it is checked
+    (claim replay, rescope, release, a rerun of `adopt`)."""
+    return (claim.agent, claim.role) == (agent, role)
+
+
 def _same_claimant(
     current: ActiveClaim, intent: ClaimIntent | RescopeIntent | ReleaseIntent | LandingIntent
 ) -> bool:
-    """Whether `intent` names the same claimant as `current`: same agent and
-    role, compared as a tuple so "same claimant" stays one named domain
-    concept everywhere it is checked (claim replay, rescope, release)."""
-    return (current.agent, current.role) == (intent.agent, intent.role)
+    """Whether `intent` names the same claimant as `current`."""
+    return held_by(current, intent.agent, intent.role)
 
 
 def claimant_text(agent: str, role: str) -> str:
@@ -1262,9 +1274,11 @@ def _live_claim_by_id(state: ClaimState, claim_id: ClaimId) -> tuple[str, Active
     )
 
 
-def _claimed_by_sentence(intent: ClaimIntent, owner: ActiveClaim, item_label: ItemLabel) -> str:
+def claimed_by_sentence(
+    identity: ClaimIdentity, branch: str, owner: ActiveClaim, item_label: ItemLabel
+) -> str:
     return (
-        f"{identity_summary(intent.identity, intent.branch, item_label)} is claimed by "
+        f"{identity_summary(identity, branch, item_label)} is claimed by "
         f"{owner.agent} ({owner.role}) on "
         f"{identity_summary(owner.identity, owner.branch, item_label)} branch {owner.branch}"
     )
@@ -1289,8 +1303,12 @@ def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
             "released; release it, then claim again with a fresh claim id"
         )
     blocked_by = blocking_claims(tuple(state.claims.values()), intent)
+    if intent.exclusive_branch:
+        blocked_by = branch_holders(state.claims, intent.branch)
     if blocked_by:
-        raise ClaimConflictError(naming=partial(_claimed_by_sentence, intent, blocked_by[0]))
+        raise ClaimConflictError(
+            naming=partial(claimed_by_sentence, intent.identity, intent.branch, blocked_by[0])
+        )
     resource, resource_record = _resolved_resource(state, intent)
     new_claim = ActiveClaim(
         identity=intent.identity,
@@ -1690,6 +1708,51 @@ def parse_resource_toml(content: str, *, name: str, tip: ObjectId) -> ResourceRe
     return ResourceRecord(name=name, occupied=tuple(occupied))
 
 
+def is_issueless_lane_branch(branch: str) -> bool:
+    return branch.startswith(ISSUELESS_LANE_BRANCH_PREFIXES)
+
+
+def claims_on_branch(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[ActiveClaim, ...]:
+    return tuple(claim for claim in claims.values() if claim.branch == branch)
+
+
+def branch_holders(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[ActiveClaim, ...]:
+    """The live claims on `branch`, lane claims before issue claims: the first
+    is the holder CLAIM-71 names, and ADOPT-06 names the first that is not the
+    asking holder's own."""
+    holders = claims_on_branch(claims, branch)
+    return tuple(sorted(holders, key=lambda claim: not isinstance(claim.identity, LaneIdentity)))
+
+
+def lookup_identity(
+    issue: int | None,
+    branch: str,
+    *,
+    merged_rerun: bool,
+    holders: Callable[[], tuple[ActiveClaim, ...]],
+) -> ClaimIdentity:
+    """Resolve an existing lane without relaxing claim acquisition's prefix rule.
+
+    A branch outside the issue-less prefixes is a lane when a live lane claim
+    holds it, or when a github `--merged` rerun finds no claim on it at all:
+    the release that rerun resumes already removed the claim."""
+    if issue is None and not is_issueless_lane_branch(branch):
+        live = holders()
+        if any(isinstance(claim.identity, LaneIdentity) for claim in live) or (
+            merged_rerun and not live
+        ):
+            return LaneIdentity()
+    return resolved_identity(issue, branch)
+
+
+def _issueless_lane_refusal(branch: str) -> str:
+    prefixes = " or ".join(repr(prefix) for prefix in ISSUELESS_LANE_BRANCH_PREFIXES)
+    return (
+        f"branch {branch!r} is not an issueless lane; pass an issue number, or "
+        f"check out a branch prefixed {prefixes}"
+    )
+
+
 def resolved_identity(issue: int | None, branch: str) -> ClaimIdentity:
     """Resolve the CLI's discriminated identity: an explicit issue, or a lane.
 
@@ -1701,12 +1764,8 @@ def resolved_identity(issue: int | None, branch: str) -> ClaimIdentity:
     """
     if issue is not None:
         return IssueIdentity(issue)
-    if not branch.startswith(ISSUELESS_LANE_BRANCH_PREFIXES):
-        prefixes = " or ".join(repr(prefix) for prefix in ISSUELESS_LANE_BRANCH_PREFIXES)
-        raise ClaimError(
-            f"branch {branch!r} is not an issueless lane; pass an issue number, or "
-            f"check out a branch prefixed {prefixes}"
-        )
+    if not is_issueless_lane_branch(branch):
+        raise ClaimError(_issueless_lane_refusal(branch))
     return LaneIdentity()
 
 

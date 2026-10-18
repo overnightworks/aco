@@ -53,13 +53,23 @@ NEEDS_OPERATOR_LABEL = "needs-operator"
 WAITING_ON_OPERATOR = "waiting on operator"
 RULING_OLD_AFTER_LANDINGS = 10
 STALE_IDLE_DAYS = 7
-REFERENCE_PATTERN = re.compile(r"(?<!\w)#([1-9]\d*)", re.ASCII)
+# The number is bounded so `int()` of a match can never meet Python's digit
+# limit: a longer one is no reference, whether a pattern below or
+# `parse_item_reference` reads it. The lookahead keeps an in-bound prefix of a
+# longer number from matching.
+MAXIMUM_ISSUE_NUMBER_DIGITS = 18
+ISSUE_NUMBER = rf"[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}}(?!\d)"
+REFERENCE_PATTERN = re.compile(rf"(?<!\w)#({ISSUE_NUMBER})", re.ASCII)
+# What `parse_item_reference` accepts as a number: the same bound, but a bare
+# `0` and leading zeros stay readable, as they were before the bound.
+ITEM_NUMBER_PATTERN = re.compile(rf"\d{{1,{MAXIMUM_ISSUE_NUMBER_DIGITS}}}", re.ASCII)
 # One issue named the way GitHub names it across repositories: `OWNER/REPO#n`,
 # or `#n` for the repository the text itself lives in. Every typed line below
 # embeds this one grammar, so a shorthand and its qualified spelling always
 # parse to the same reference.
 QUALIFIED_REFERENCE = (
-    rf"(?:(?P<repository>{protocol.REPOSITORY_PATTERN.pattern}))?#(?P<number>[1-9]\d*)"
+    rf"(?:(?P<repository>{protocol.REPOSITORY_PATTERN.pattern}))?"
+    rf"#(?P<number>{ISSUE_NUMBER})"
 )
 # GitHub links a keyword to a reference only on one line, separated by
 # horizontal space and ending at the reference: `Closes#7`, a keyword whose
@@ -108,11 +118,11 @@ CLAIM_OLD_AFTER = timedelta(hours=1)
 # after the real title (`(#962 Scheibe 4)`, `(#962 slice 4)`) or a leading
 # German phrase (`Scheibe 4 von #962`).
 _SLICE_TITLE_PARENTHETICAL_PATTERN = re.compile(
-    r"\(#(?P<parent>[1-9]\d*)[ \t]+(?:Scheibe|slice)[ \t]+(?P<slice>[1-9]\d*)\)",
+    rf"\(#(?P<parent>{ISSUE_NUMBER})[ \t]+(?:Scheibe|slice)[ \t]+(?P<slice>{ISSUE_NUMBER})\)",
     re.IGNORECASE | re.ASCII,
 )
 _SLICE_TITLE_VON_PATTERN = re.compile(
-    r"Scheibe[ \t]+(?P<slice>[1-9]\d*)[ \t]+von[ \t]+#(?P<parent>[1-9]\d*)",
+    rf"Scheibe[ \t]+(?P<slice>{ISSUE_NUMBER})[ \t]+von[ \t]+#(?P<parent>{ISSUE_NUMBER})",
     re.IGNORECASE | re.ASCII,
 )
 
@@ -249,6 +259,11 @@ class ParentIssue:
 class NoItemKind(StrEnum):
     DOCS = "docs"
     FIX = "fix"
+    DEPS = "deps"
+
+
+NO_ITEM_KINDS_TEXT = ", ".join(tuple(NoItemKind)[:-1]) + ", or " + tuple(NoItemKind)[-1]
+NO_ITEM_KINDS_TRAILER = "|".join(NoItemKind)
 
 
 def parse_item_reference(value: str) -> int:
@@ -265,7 +280,7 @@ def parse_item_reference(value: str) -> int:
     if protocol.ITEM_ID_PATTERN.fullmatch(value) is not None:
         return items.item_number(value)
     digits = value.removeprefix("#")
-    if digits.isdigit():
+    if ITEM_NUMBER_PATTERN.fullmatch(digits) is not None:
         return int(digits)
     raise protocol.ClaimUnavailableError(
         f"{value!r} is not an item reference; use aco-xxxxxx, #n, or the bare number n"
@@ -498,6 +513,17 @@ class BoardConfig:
     # a forge may allow several methods while the repository keeps one, so
     # a pin here beats the forge's allowed methods; `None` asks the forge.
     merge_method: MergeMethod | None = None
+    dependency_paths: tuple[str, ...] = ()
+
+    def covers_dependency_path(self, path: str) -> bool:
+        try:
+            protocol.valid_scope([path])
+        except protocol.InvalidClaimMarkerError:
+            return False
+        return any(
+            path.startswith(entry) if entry.endswith("/") else path == entry
+            for entry in self.dependency_paths
+        )
 
 
 # The body pin (issue #150) is still a key this file defines, but no longer
@@ -742,32 +768,35 @@ def _validated_merge_method(raw: dict[str, object], path: Path) -> MergeMethod |
     )
 
 
-def _validated_lane_shared(raw: dict[str, object], path: Path) -> tuple[str, ...]:
-    """`lane_shared`'s entries (issue #575), each in the one canonical
-    repository-relative form a claim scope entry takes, so `protect` can
-    compare an entry with a payload path's own scope entry as text. An entry
-    that is absolute, climbs out with `..`, or is not canonical -- a trailing
-    `/` included -- is not a file inside the repository. Only the syntax is
-    judged, with no tree read, so `land` and every reader judge alike; an
-    entry naming a directory matches no file, since matching is exact. An
-    entry is foreign text, so a refusal names it as `terminal_text` shows it."""
-    entries = raw.get("lane_shared")
+def _validated_repository_paths(
+    raw: dict[str, object],
+    path: Path,
+    key: str,
+    *,
+    directories: bool = False,
+) -> tuple[str, ...]:
+    """Keep the canonical form that `protect` compares as text. Judge syntax
+    only, without requiring files to exist; entries are foreign text, so
+    refusal messages escape them. Dependency directories retain their slash.
+    """
+    entries = raw.get(key)
     if entries is None:
         return ()
+    path_kind = "paths" if directories else "file paths"
     if (
         not isinstance(entries, list)
         or not all(isinstance(entry, str) for entry in entries)
         or len(set(entries)) != len(entries)
     ):
         raise protocol.ClaimError(
-            f"board configuration {path} lane_shared must be a list of unique repository file paths"
+            f"board configuration {path} {key} must be a list of unique repository {path_kind}"
         )
     for entry in entries:
         try:
-            protocol.valid_scope([entry])
+            protocol.valid_scope([entry.removesuffix("/") if directories else entry])
         except protocol.InvalidClaimMarkerError as error:
             raise protocol.ClaimError(
-                f"board configuration {path} lane_shared entry '{terminal_text(entry)}' "
+                f"board configuration {path} {key} entry '{terminal_text(entry)}' "
                 "is not a canonical path inside the repository"
             ) from error
     return tuple(entries)
@@ -819,7 +848,10 @@ def parse_config(text: str, path: Path) -> BoardConfig:
         canonical_remote=_validated_canonical_remote(raw, path),
         storage=_validated_storage(raw, path),
         merge_method=_validated_merge_method(raw, path),
-        lane_shared=_validated_lane_shared(raw, path),
+        lane_shared=_validated_repository_paths(raw, path, "lane_shared"),
+        dependency_paths=_validated_repository_paths(
+            raw, path, "dependency_paths", directories=True
+        ),
     )
 
 
@@ -1047,9 +1079,18 @@ def _work_item_classification(value: str, repository: str) -> Classification | C
 def _no_item_classification(value: str) -> Classification | ClassificationDefect:
     if value.lower() not in {kind.value for kind in NoItemKind}:
         return ClassificationDefect(
-            f"carries `No-Item: {value}`; an issue-less pull request is docs or fix"
+            f"carries `No-Item: {value}`; an issue-less pull request is {NO_ITEM_KINDS_TEXT}"
         )
     return NoItemClassification(NoItemKind(value.lower()))
+
+
+def _selected_classification(
+    selected: re.Match[str], repository: str
+) -> Classification | ClassificationDefect:
+    value = selected.group("value").strip(" \t")
+    if selected.group("kind").lower() == WORK_ITEM_KIND:
+        return _work_item_classification(value, repository)
+    return _no_item_classification(value)
 
 
 def parse_pull_request_classification(
@@ -1058,17 +1099,83 @@ def parse_pull_request_classification(
     """The one `Work-Item:`/`No-Item:` line a pull request body must carry.
 
     A pull request either lands one work item and closes it, or declares
-    itself issue-less documentation or a fix. Nothing else in a body names an
-    item: a dispatched slice is its own item, and its pull request closes it.
+    itself issue-less documentation, a fix, or a dependency update. Nothing else
+    in a body names an item: a dispatched slice is its own item, and its pull
+    request closes it.
     """
     matches = tuple(CLASSIFICATION_LINE_PATTERN.finditer(_live_text(body)))
     selected = _single_classification_match(matches)
     if isinstance(selected, ClassificationDefect):
         return selected
-    value = selected.group("value").strip(" \t")
-    if selected.group("kind").lower() == WORK_ITEM_KIND:
-        return _work_item_classification(value, repository)
-    return _no_item_classification(value)
+    return _selected_classification(selected, repository)
+
+
+def live_classification_line(body: str) -> str | None:
+    """The first live `Work-Item:`/`No-Item:` line of `body`, valid or not,
+    as a terminal may show it (a fenced example is no line), or `None`."""
+    first = CLASSIFICATION_LINE_PATTERN.search(_live_text(body))
+    return None if first is None else terminal_text(first.group(0))
+
+
+def pull_request_declaration(number: int, author: str, classification: Classification) -> str:
+    """The sentence `check` and `adopt` print for a pull request that declares
+    its classification (LAND-05, LAND-72)."""
+    return f"PR #{number} by {author} declares {classification}"
+
+
+class ClassificationLine(StrEnum):
+    ABSENT = "absent"
+    PRESENT = "present"
+
+
+@dataclass(frozen=True)
+class OtherClassificationLine:
+    """The one live line is not the kind's own `No-Item:` line."""
+
+    line: str
+
+
+@dataclass(frozen=True)
+class MalformedClassificationLines:
+    """More than one live line: why the parser refuses the body."""
+
+    defect: ClassificationDefect
+
+
+ClassificationLineState = (
+    ClassificationLine | OtherClassificationLine | MalformedClassificationLines
+)
+
+
+def classification_line_state(
+    body: str, kind: NoItemKind, repository: str
+) -> ClassificationLineState:
+    """What `aco adopt` finds of its own line in `body`: none, the kind's own
+    `No-Item: <kind>` (as `parse_pull_request_classification` reads it), another
+    single line as a terminal may show it, or the parser's defect for a body
+    with several."""
+    matches = tuple(CLASSIFICATION_LINE_PATTERN.finditer(_live_text(body)))
+    if not matches:
+        return ClassificationLine.ABSENT
+    selected = _single_classification_match(matches)
+    if isinstance(selected, ClassificationDefect):
+        return MalformedClassificationLines(selected)
+    classification = _selected_classification(selected, repository)
+    if isinstance(classification, NoItemClassification) and classification.kind is kind:
+        return ClassificationLine.PRESENT
+    return OtherClassificationLine(terminal_text(selected.group(0)))
+
+
+def body_with_classification(body: str, kind: NoItemKind) -> str:
+    """`body` byte for byte, then the blank line that sets the
+    classification apart (only what `body`'s own end lacks of it), then
+    `No-Item: <kind>` -- the body `aco adopt` would write."""
+    classification = f"No-Item: {kind}"
+    if not body:
+        return classification
+    missing_line_feeds = max(0, 2 - (len(body) - len(body.rstrip("\n"))))
+    separator = "\n" * missing_line_feeds
+    return f"{body}{separator}{classification}"
 
 
 def declared_work_items(pull_requests: tuple[PullRequest, ...], repository: str) -> frozenset[int]:
@@ -2596,6 +2703,16 @@ def advice_command(*arguments: str | AdviceOption) -> str:
     """The `aco` command a piece of advice names, rendered by
     `shell_command`."""
     return shell_command("aco", *arguments)
+
+
+_DISPLAY_NAME_LENGTH_LIMIT = 40
+
+
+def truncated_display_name(name: str) -> str:
+    """Cap names at 40 characters so three fit the 200-character budget (issue #405)."""
+    if len(name) <= _DISPLAY_NAME_LENGTH_LIMIT:
+        return name
+    return name[: _DISPLAY_NAME_LENGTH_LIMIT - 1] + "…"
 
 
 def terminal_text(text: str) -> str:

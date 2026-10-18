@@ -3,24 +3,18 @@
 from __future__ import annotations
 
 import argparse
-import sys
-from dataclasses import dataclass
+from dataclasses import asdict
 from pathlib import Path
 
-from . import board, body, checkout, cmd_claim, forge, protocol, report
+from . import board, body, checkout, cmd_claim, forge, protocol
 from .session import RunContext
+
+_MOVED_REFUSAL = "the trunk moved after start checked it; run start again"
+_START_COMMAND = "start"
 
 
 def _start_worktree_path(main_checkout: Path, *, number: int, slug: str) -> Path:
-    return main_checkout.parent / f"{main_checkout.name}-worktrees" / f"issue-{number}-{slug}"
-
-
-@dataclass(frozen=True)
-class _StartTarget:
-    """The worktree `start` claims in and the branch it stands on."""
-
-    path: Path
-    branch: str
+    return checkout.sibling_worktree_path(main_checkout, f"issue-{number}-{slug}")
 
 
 def _runs_in_lane_worktree(context: RunContext, lane_branch: str) -> bool:
@@ -50,44 +44,11 @@ def _resumable_start_claim(
     with the store's own "is claimed by ..." conflict."""
     if (
         live is not None
-        and live.agent == checkout.resolved_agent(None)
-        and live.role == cmd_claim.DEFAULT_CLAIM_ROLE
+        and protocol.held_by(live, checkout.resolved_agent(None), cmd_claim.DEFAULT_CLAIM_ROLE)
         and live.branch == branch
     ):
         return live
     return None
-
-
-def _print_start_target(target: _StartTarget) -> None:
-    print(f"worktree: {target.path}")
-    print(f"branch: {target.branch}")
-
-
-def _remove_refused_start_worktree(target: _StartTarget) -> None:
-    """Undo the build of a `start` whose claim was refused after the check
-    phase passed (issue #479), saying so: a refusal must leave no worktree
-    or branch behind. When git will not remove the worktree, that is said
-    too, beside the refusal rather than in its place."""
-    try:
-        outcome = checkout.remove_linked_worktree(target.path, branch=target.branch)
-    except protocol.ClaimError as error:
-        print(
-            f"worktree {target.path} and branch '{target.branch}' this start created "
-            f"kept: git failure: {error}",
-            file=sys.stderr,
-        )
-        return
-    if outcome.branch.fate is checkout.BranchFate.REMOVED:
-        print(
-            f"removed worktree {target.path} and branch '{target.branch}' this start created",
-            file=sys.stderr,
-        )
-        return
-    print(
-        f"removed worktree {target.path} this start created; "
-        f"branch '{target.branch}' {outcome.branch.fate}: {outcome.branch.reason}",
-        file=sys.stderr,
-    )
 
 
 _RESUME_SCOPE_MISMATCH = "live claim scope differs; release it first"
@@ -180,7 +141,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     its `board.toml`."""
     caller = context
     main_context = caller.for_directory(
-        checkout.main_checkout_root(toplevel=caller.toplevel), is_toplevel=True
+        checkout.main_checkout_root(toplevel=caller.toplevel, command=_START_COMMAND),
+        is_toplevel=True,
     )
     branch, slug = _start_branch_and_slug(parsed, main_context)
     observed = main_context.observation
@@ -189,9 +151,9 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         protocol.claim_key(protocol.resolved_identity(parsed.item, branch), branch)
     )
     if live is not None and _runs_in_lane_worktree(caller, live.branch):
-        own_lane = _StartTarget(caller.toplevel, live.branch)
+        own_lane = cmd_claim.LaneWorktree(caller.toplevel, live.branch)
         return _claim_in_start_worktree(parsed, main_context, own_lane, observed, live)
-    target = _StartTarget(
+    target = cmd_claim.LaneWorktree(
         _start_worktree_path(main_context.toplevel, number=parsed.item, slug=slug), branch
     )
     if checkout.existing_start_worktree(target.path, branch):
@@ -208,7 +170,7 @@ def _start_claim_arguments(
     base: str | None = None,
     branch: str | None = None,
     claim_id: str | None = None,
-) -> argparse.Namespace:
+) -> cmd_claim.ClaimArguments:
     """The `aco claim` arguments `start` claims with: this session's own
     agent as the builder, and a fresh id, exactly as a bare `aco claim`
     mints one (issue #322 review finding 1) -- `start` resumes a live claim
@@ -216,25 +178,21 @@ def _start_claim_arguments(
     logic never needs to recognize a `start`-minted id as special. A
     resume passes its live claim's own `claim_id`, so it never computes a
     second one."""
-    return argparse.Namespace(
+    return cmd_claim.ClaimArguments(
         issue=parsed.item,
-        agent=None,
-        role=cmd_claim.DEFAULT_CLAIM_ROLE,
         base=base,
         branch=branch,
         scope=parsed.scope,
         claim_id=claim_id,
         out_of_order=parsed.out_of_order,
         whole=parsed.whole,
-        resource=None,
-        json=False,
     )
 
 
 def _claim_in_start_worktree(
     parsed: argparse.Namespace,
     context: RunContext,
-    target: _StartTarget,
+    target: cmd_claim.LaneWorktree,
     observed: protocol.ClaimState,
     live: protocol.ActiveClaim | None,
 ) -> int:
@@ -248,17 +206,18 @@ def _claim_in_start_worktree(
         versioning = _checked_start_resume(
             resumed, parsed, context=context.for_directory(target.path)
         )
-        _print_start_target(target)
+        cmd_claim.print_lane_worktree(target)
         _print_start_resume(resumed, observed, context.config.storage, versioning)
         return 0
-    _print_start_target(target)
+    cmd_claim.print_lane_worktree(target)
     # The main checkout's one observation, the same snapshot the lookup above
     # read (CAS-53): nothing fetched since.
     try:
-        return cmd_claim.claim_write(_start_claim_arguments(parsed), context, worktree=target.path)
+        claim_command = argparse.Namespace(**asdict(_start_claim_arguments(parsed)), json=False)
+        return cmd_claim.claim_write(claim_command, context, worktree=target.path)
     except protocol.UncertainWriteError as error:
         named = board.named_refusal(error, context.config.storage)
-        return _report_uncertain_start_claim(named, target)
+        return cmd_claim.report_uncertain_worktree_claim(named, target, command=_START_COMMAND)
     except protocol.ClaimError as error:
         return cmd_claim.refuse_claim_error(error, context, as_json=False)
 
@@ -266,7 +225,7 @@ def _claim_in_start_worktree(
 def _rebuild_and_resume(
     parsed: argparse.Namespace,
     context: RunContext,
-    target: _StartTarget,
+    target: cmd_claim.LaneWorktree,
     observed: protocol.ClaimState,
     resumed: protocol.ActiveClaim,
 ) -> int:
@@ -277,25 +236,25 @@ def _rebuild_and_resume(
     the trunk after the checks -- is removed again, as a fresh build's is
     (START-18)."""
     trunk_ref = context.fetched_trunk_ref()
-    trunk = checkout.trunk_commit(trunk_ref, directory=context.toplevel)
+    trunk = checkout.commit_at(trunk_ref, directory=context.toplevel)
     versioning = _checked_start_resume(resumed, parsed, context=context, revision=trunk)
     checked = cmd_claim.claim_request(
         _start_claim_arguments(parsed, base=trunk, branch=target.branch, claim_id=resumed.claim_id)
     )
     checkout.create_linked_worktree(
-        target.path, branch=target.branch, trunk=trunk_ref, directory=context.toplevel
+        target.path, branch=target.branch, start_point=trunk_ref, directory=context.toplevel
     )
-    _print_start_target(target)
+    cmd_claim.print_lane_worktree(target)
     try:
-        _validate_built_worktree(checked, target, context)
+        cmd_claim.validate_built_worktree(checked, target, context, moved_refusal=_MOVED_REFUSAL)
     except protocol.ClaimError as error:
-        return _refuse_built_start(error, target)
+        return cmd_claim.refuse_built_worktree(error, target, command=_START_COMMAND)
     _print_start_resume(resumed, observed, context.config.storage, versioning)
     return 0
 
 
 def _check_build_and_claim(
-    parsed: argparse.Namespace, context: RunContext, target: _StartTarget
+    parsed: argparse.Namespace, context: RunContext, target: cmd_claim.LaneWorktree
 ) -> int:
     """Fetch the trunk, run `claim`'s check phase against that one commit,
     then build the worktree from the trunk and run the commit phase (issue
@@ -308,7 +267,7 @@ def _check_build_and_claim(
     tell keeps the worktree and says so (START-25). An interrupt or an
     unexpected error is no refusal."""
     trunk_ref = context.fetched_trunk_ref()
-    trunk = checkout.trunk_commit(trunk_ref, directory=context.toplevel)
+    trunk = checkout.commit_at(trunk_ref, directory=context.toplevel)
     # The main checkout observed afresh, never the observation the
     # item-existence read already holds: the fetch above may take a while,
     # and the claim must read the item as it stands once the fetch is done,
@@ -317,70 +276,21 @@ def _check_build_and_claim(
     requested = cmd_claim.claim_request(
         _start_claim_arguments(parsed, base=trunk, branch=target.branch)
     )
-    storage = check_context.config.storage
-    try:
-        plan = cmd_claim.checked_claim(requested, check_context, revision=trunk)
-    except protocol.ClaimConflictError as error:
-        raise board.named_refusal(error, storage) from error
-    if plan.refused:
-        cmd_claim.refuse_claim(False, plan.target_issue, plan.checks)
-        return 2
-    checkout.create_linked_worktree(
-        target.path, branch=target.branch, trunk=trunk_ref, directory=context.toplevel
+    plan = cmd_claim.checked_lane_claim(requested, check_context, revision=trunk)
+    if isinstance(plan, int):
+        return plan
+    result = cmd_claim.claim_in_new_worktree(
+        plan,
+        requested,
+        check_context,
+        cmd_claim.LaneBuild(
+            worktree=target,
+            start_point=trunk_ref,
+            command=_START_COMMAND,
+            moved_refusal=_MOVED_REFUSAL,
+        ),
     )
-    _print_start_target(target)
-    cmd_claim.print_claim_checks(plan, as_json=False)
-    try:
-        _validate_built_worktree(requested, target, check_context)
-        # Written from the built worktree, so the lane's own lineage stamp
-        # and fetch anchor start at its claim (CAS-09).
-        claimed, claims = cmd_claim.committed_claim(
-            plan, check_context.for_lane_worktree(target.path)
-        )
-    except protocol.UncertainWriteError as error:
-        return _report_uncertain_start_claim(board.named_refusal(error, storage), target)
-    except protocol.ClaimError as error:
-        return _refuse_built_start(board.named_refusal(error, storage), target)
+    if isinstance(result, int):
+        return result
+    claimed, claims = result
     return cmd_claim.report_claim(plan, claimed, claims, as_json=False)
-
-
-def _validate_built_worktree(
-    request: protocol.ClaimRequest, target: _StartTarget, context: RunContext
-) -> None:
-    """`claim`'s own checkout preconditions against the worktree `start`
-    built, judged against the main checkout `context`'s recorded default
-    branch. Its base is the trunk `start` checked, so a base mismatch means
-    another fetch moved the trunk between the checks and the build, and
-    rerunning `start` checks the trunk as it stands now (START-26)."""
-    try:
-        checkout.validate_checkout(
-            request,
-            default_branch=lambda: context.recorded_default_branch,
-            directory=target.path,
-        )
-    except checkout.CheckoutBaseMismatchError as error:
-        raise protocol.ClaimUnavailableError(
-            "the trunk moved after start checked it; run start again"
-        ) from error
-
-
-def _report_uncertain_start_claim(error: protocol.ClaimError, target: _StartTarget) -> int:
-    """A claim write whose outcome the store cannot tell after its push was
-    sent: the claim may have landed, so the worktree it may name stays, and
-    the next `start` resumes whichever it finds (START-25)."""
-    status = report.refuse(cmd_claim.ClaimReason.UNAVAILABLE, error, as_json=False)
-    print(
-        f"the claim's push was sent, its outcome unknown; worktree {target.path} and "
-        f"branch '{target.branch}' kept; run start again to resume it",
-        file=sys.stderr,
-    )
-    return status
-
-
-def _refuse_built_start(error: protocol.ClaimError, target: _StartTarget) -> int:
-    try:
-        return report.refuse(cmd_claim.ClaimReason.UNAVAILABLE, error, as_json=False)
-    finally:
-        # A refusal that cannot be written (a closed stderr) must still
-        # leave nothing behind (START-18).
-        _remove_refused_start_worktree(target)

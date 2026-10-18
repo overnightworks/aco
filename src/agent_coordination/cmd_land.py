@@ -43,20 +43,8 @@ def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
     return tuple(command)
 
 
-# A check name is GitHub's own external vocabulary -- a workflow job or a
-# third-party status context's own title -- with no length limit this tool
-# controls, unlike the internal path names `protocol.named_with_overflow_count`
-# was written for (issue #405 review/gate finding): each name is truncated
-# here before that same three-then-`and N more` grammar ever sees it, and the
-# assembled sentence is capped again as a final backstop -- short enough that
-# `report.render_error`'s `CLI_ERROR_PREFIX` still fits under the same 200-character
-# printed-line budget (issue #405 round-4 finding) -- so several long check
-# names can never print a refusal line past 200 characters.
-_LAND_CHECK_NAME_LENGTH_LIMIT = 40
 _LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
 _LAND_QUALITY_VERDICT_CHECK = "quality / verdict"
-_LAND_REFUSAL_LINE_LENGTH_LIMIT = 200
-_LAND_REFUSAL_SENTENCE_LENGTH_LIMIT = _LAND_REFUSAL_LINE_LENGTH_LIMIT - len(report.CLI_ERROR_PREFIX)
 
 
 def _land_not_open_refusal(number: int) -> str:
@@ -67,26 +55,9 @@ def _land_not_mergeable_refusal(number: int, state: str) -> str:
     return f"pull request #{number} is not mergeable ({state})"
 
 
-def _land_truncated_check_name(name: str) -> str:
-    if len(name) <= _LAND_CHECK_NAME_LENGTH_LIMIT:
-        return name
-    return name[: _LAND_CHECK_NAME_LENGTH_LIMIT - 1] + "…"
-
-
-def _land_bounded_refusal(sentence: str) -> str:
-    """`sentence` as one bounded refusal line: a pull request's own text
-    (a check name, a head's board configuration key) may carry a newline or
-    a terminal escape, so it is shown as `next` shows foreign text (`\\n`,
-    `\\x1b`) before the length cap applies (issues #505, #538)."""
-    printable = board.terminal_text(sentence)
-    if len(printable) <= _LAND_REFUSAL_SENTENCE_LENGTH_LIMIT:
-        return printable
-    return printable[: _LAND_REFUSAL_SENTENCE_LENGTH_LIMIT - 1] + "…"
-
-
 def _land_pending_check_names(checks: tuple[forge.CheckRun, ...]) -> tuple[str, ...]:
     return tuple(
-        _land_truncated_check_name(check.name) for check in checks if check.conclusion is None
+        board.truncated_display_name(check.name) for check in checks if check.conclusion is None
     )
 
 
@@ -115,8 +86,8 @@ def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str
         # still-running checks must never print a refusal past 200
         # characters (issue #405 review/gate finding) -- each name already
         # truncated by `_land_pending_check_names` before this grammar sees
-        # it, `_land_bounded_refusal` a final backstop on the whole line.
-        return _land_bounded_refusal(
+        # it, `report.bounded_refusal` a final backstop on the whole line.
+        return report.bounded_refusal(
             f"pull request #{number} has checks still running: "
             f"{protocol.named_with_overflow_count(pending)}; wait for every check to succeed"
         )
@@ -124,9 +95,9 @@ def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str
     if failed is not None:
         conclusion = failed.conclusion
         assert conclusion is not None  # `_land_failed_check` only returns a completed check.
-        return _land_bounded_refusal(
+        return report.bounded_refusal(
             f"pull request #{number} has non-successful checks: "
-            f"{_land_truncated_check_name(failed.name)} ({conclusion}); "
+            f"{board.truncated_display_name(failed.name)} ({conclusion}); "
             "land only after every check succeeds"
         )
     return None
@@ -152,7 +123,7 @@ def _refuse_land_missing_quality_verdict(
     adopted = client.file_at_commit(_LAND_QUALITY_CONFIG_PATH, default_branch) is not None
     if adopted and _land_lacks_quality_verdict(readiness.checks):
         raise protocol.ClaimUnavailableError(
-            _land_bounded_refusal(
+            report.bounded_refusal(
                 f"pull request #{readiness.number} has no {_LAND_QUALITY_VERDICT_CHECK} check; "
                 f"{default_branch} adopts the quality gate ({_LAND_QUALITY_CONFIG_PATH})"
             )
@@ -210,7 +181,7 @@ def _land_head_config_refusal(
     try:
         head = board.parse_config(head_text, path)
     except protocol.ClaimError as error:
-        return _land_bounded_refusal(f"pull request #{number} carries an invalid {path}: {error}")
+        return report.bounded_refusal(f"pull request #{number} carries an invalid {path}: {error}")
     landed_settings = _land_governing_settings(landed)
     changed = next(
         (
@@ -245,7 +216,8 @@ def _land_preflight(
     (issue #405): a green, open, mergeable pull request classifying exactly
     one open item, or declaring itself issue-less -- reusing `check <pr>`'s
     own classification/claim/parent/closing rules (`policy.structural_classification`/
-    `policy.classification_defect`) rather than a second copy of them.
+    `policy.classification_defect`) rather than a second copy of them. Dependency
+    listings must match the readiness head that `--head` verified and the merge pins.
 
     In order: the reviewed head `--head` names, readiness (neither a local
     git read), the pull request's own
@@ -281,10 +253,16 @@ def _land_preflight(
             )
     observed = claims_provider()
     defect = policy.classification_defect(
-        context, tuple(observed.claims.values()), detail, structural
+        context,
+        tuple(observed.claims.values()),
+        detail,
+        structural,
+        expected_head=readiness.head_sha,
     )
     if defect is not None:
-        raise protocol.ClaimUnavailableError(f"pull request #{number} {defect.message}")
+        raise protocol.ClaimUnavailableError(
+            report.bounded_refusal(f"pull request #{number} {defect.message}")
+        )
     identity: protocol.ClaimIdentity = (
         protocol.IssueIdentity(structural.item.number)
         if isinstance(structural, board.WorkItemClassification)

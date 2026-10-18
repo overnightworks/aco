@@ -11,19 +11,49 @@ import sys
 from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from typing import TextIO
 
 import pytest
-from board_fixtures import BASE, complete_contract
+from board_fixtures import BASE, REPOSITORY, complete_contract
 
-from agent_coordination import board, checkout, cli, forge, github, process, store
+from agent_coordination import (
+    board,
+    board_read,
+    checkout,
+    cli,
+    cmd_brief,
+    cmd_cut,
+    cmd_reset,
+    cmd_rule,
+    cmd_status,
+    forge,
+    github,
+    process,
+    store,
+)
 from agent_coordination.protocol import ClaimState
 from agent_coordination.session import RunContext
 
 # Captured at import, before any test's stub replaces it.
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked
+
+
+FROZEN_CLI_NOW = datetime(2026, 8, 21, tzinfo=UTC)
+
+
+class FixedDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls.fromtimestamp(FROZEN_CLI_NOW.timestamp(), tz=UTC)
+
+
+def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin CLI dates without installing a global autouse fixture."""
+    for owner in (cmd_rule, board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
+        monkeypatch.setattr(owner, "datetime", FixedDateTime)
 
 
 def stub_one_git_call(
@@ -214,6 +244,24 @@ def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GIT_COMMITTER_EMAIL", "test@example.com")
 
 
+def without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) -> None:
+    """`checkout_path` with no git identity git may use or guess: none
+    configured locally, in the environment or the system configuration (the
+    caller isolates the global configuration)."""
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    real_git(checkout_path, "config", "user.useConfigOnly", "true")
+    real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
+    real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
+    for variable in (
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "EMAIL",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+
+
 def head_sha(repository: Path) -> str:
     return real_git(repository, "rev-parse", "HEAD").stdout.strip()
 
@@ -291,6 +339,18 @@ def push_repository_trunk(repo: Path, remote_name: str) -> None:
     fixture repeats once its own commits are built (issue #359 CI)."""
     real_git(repo, "push", "-q", remote_name, "main")
     real_git(repo, "remote", "set-head", remote_name, "main")
+
+
+def push_lane_branch(clone: Path, branch: str) -> str:
+    """Publish a nonempty lane commit and return to the trunk checkout."""
+    real_git(clone, "checkout", "-q", "-b", branch)
+    (clone / "feature.txt").write_text("lane feature\n")
+    real_git(clone, "add", "feature.txt")
+    real_git(clone, "commit", "-q", "-m", "lane feature")
+    head = real_git(clone, "rev-parse", "HEAD").stdout.strip()
+    real_git(clone, "push", "-q", "origin", branch)
+    real_git(clone, "checkout", "-q", "main")
+    return head
 
 
 def dangle_recorded_head(repo: Path, remote_name: str) -> None:
@@ -473,6 +533,36 @@ def arrange_scope_width(
         monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
 
 
+ADOPTED_PULL_REQUEST = 45
+ADOPTED_BRANCH = "dependabot/uv/x"
+
+
+def dependabot_pull_request(head_sha: str) -> forge.Landing:
+    """Open pull request #45 of `REPOSITORY` from the bot's own branch, aimed
+    at `main` and carrying no classification line, whose head is `head_sha`."""
+    return forge.Landing(
+        number=ADOPTED_PULL_REQUEST,
+        author="app/dependabot",
+        body="Bump x",
+        source_repository=github.repository_id(REPOSITORY),
+        source_branch=ADOPTED_BRANCH,
+        target_branch="main",
+        merged=False,
+        merge_commit=None,
+        title="Bump x",
+        head_sha=head_sha,
+    )
+
+
+def pull_request_listing(
+    head_sha: str, *files: forge.ChangedFile, reported: int | None = None
+) -> forge.PullRequestChanges:
+    """What the forge lists for a pull request at `head_sha`, twice the same;
+    `reported` is the file count it claims when that is not `len(files)`."""
+    reading = forge.ListingReading(head_sha, len(files) if reported is None else reported)
+    return forge.PullRequestChanges(reading, reading, files)
+
+
 def run_context_over(client: forge.ForgeReader) -> RunContext:
     """A cwd-rooted `RunContext` whose forge is `client`: a test driving a
     helper that takes a context reads the same toplevel and tracked
@@ -501,12 +591,12 @@ class CliRun:
 
 
 def run_cli(
-    argv: list[str], capsys: pytest.CaptureFixture[str], *, stdin: str | None = None
+    argv: list[str], capsys: pytest.CaptureFixture[str], *, stdin: str | bytes | None = None
 ) -> CliRun:
     """Run `argv` through `main`, whether it returns its exit status or
     argparse exits with it, and drain everything printed since the last run.
 
-    A supplied string is a UTF-8 pipe; None leaves inherited stdin untouched.
+    Strings are encoded as UTF-8; bytes are piped unchanged. None inherits stdin.
     The previous stdin is restored and the pipe closed even when main raises.
     """
     previous_stdin = sys.stdin
@@ -654,13 +744,13 @@ def body_file_on_stdin(tmp_path: Path) -> Iterator[TextIO]:
         yield stdin
 
 
-def read_end_of_a_pipe_carrying(text: str) -> TextIO:
+def read_end_of_a_pipe_carrying(text: str | bytes) -> TextIO:
     """`printf ... | aco ...`: the read end of a pipe whose writer already
     wrote `text` -- a scenario body, well inside a pipe's buffer -- and
     closed. Read as `sys.stdin` reads a pipe: line endings untranslated."""
     read_end, write_end = os.pipe()
-    with os.fdopen(write_end, "w", encoding="utf-8") as writer:
-        writer.write(text)
+    with os.fdopen(write_end, "wb") as writer:
+        writer.write(text.encode("utf-8") if isinstance(text, str) else text)
     return os.fdopen(read_end, encoding="utf-8", newline="")
 
 

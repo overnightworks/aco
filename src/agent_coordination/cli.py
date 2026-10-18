@@ -16,6 +16,7 @@ from . import (
     board,
     body,
     checkout,
+    cmd_adopt,
     cmd_ask,
     cmd_board,
     cmd_body,
@@ -87,6 +88,11 @@ OUT_OF_ORDER_HELP = (
 
 
 LANE_ISSUE_HELP = "omit for lane mode, derived from a docs/ or fix/ checkout branch"
+LANE_LOOKUP_HELP = "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim"
+LANE_RELEASE_HELP = (
+    "omit for lane mode: a docs/ or fix/ branch, one holding a live lane claim, "
+    "or a github --merged rerun on a branch no claim holds"
+)
 LONG_OPTION_PREFIX = "--"
 JSON_HELP = "print the result as JSON instead of the human lines"
 AGENT_HELP = (
@@ -267,7 +273,7 @@ def _add_release_parser(commands: _Subcommands, name: str) -> None:
         "issue",
         type=board.parse_item_reference,
         nargs="?",
-        help=LANE_ISSUE_HELP,
+        help=LANE_RELEASE_HELP,
     )
     release.add_argument("--agent", help=AGENT_HELP)
     release.add_argument("--role", help=ROLE_ON_LIVE_CLAIM_HELP)
@@ -318,7 +324,9 @@ def _add_land_parser(commands: _Subcommands, name: str) -> None:
         name,
         help="merge a green pull request with its pinned head sha and run its release path",
     )
-    land.add_argument("pull_request", type=int, help="the pull request number to land")
+    land.add_argument(
+        "pull_request", type=positive_int, help="the positive pull request number to land"
+    )
     land.add_argument(
         "--head",
         type=_reviewed_head,
@@ -344,6 +352,37 @@ def _add_land_parser(commands: _Subcommands, name: str) -> None:
     )
 
 
+def positive_int(text: str) -> int:
+    try:
+        number = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {text!r}") from None
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"{text} is not a positive number")
+    return number
+
+
+def _add_adopt_parser(commands: _Subcommands, name: str) -> None:
+    adopt = commands.add_parser(
+        name,
+        help=(
+            "make an open pull request an issue-less lane: build its worktree, claim its "
+            "head branch and append its No-Item line to the body"
+        ),
+    )
+    adopt.add_argument(
+        "pull_request", type=positive_int, help="the positive pull request number to adopt"
+    )
+    adopt.add_argument(
+        "--no-item",
+        required=True,
+        choices=[kind.value for kind in board.NoItemKind],
+        help="the issue-less classification the pull request would declare",
+    )
+    adopt.add_argument("--agent", help=AGENT_HELP)
+    adopt.add_argument("--whole", metavar="REASON", help=WHOLE_HELP)
+
+
 REVIEWED_HEAD_PATTERN = re.compile(r"[0-9a-fA-F]{7,40}")
 
 
@@ -361,7 +400,7 @@ def _add_rescope_parser(commands: _Subcommands, name: str) -> None:
         "issue",
         type=board.parse_item_reference,
         nargs="?",
-        help=LANE_ISSUE_HELP,
+        help=LANE_LOOKUP_HELP,
     )
     rescope.add_argument("--agent", help=AGENT_HELP)
     rescope.add_argument(
@@ -845,6 +884,7 @@ _COMMANDS: dict[str, _Command] = {
     "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),
     "release": _RepositoryCommand(_add_release_parser, cmd_release.run, resolves_agent=True),
     "land": _RepositoryCommand(_add_land_parser, cmd_land.run, resolves_agent=True),
+    "adopt": _RepositoryCommand(_add_adopt_parser, cmd_adopt.run, resolves_agent=True),
     "rescope": _RepositoryCommand(_add_rescope_parser, cmd_rescope.run, resolves_agent=True),
     "cut": _RepositoryCommand(_add_cut_parser, cmd_cut.run),
     "ask": _RepositoryCommand(_add_ask_parser, cmd_ask.run),

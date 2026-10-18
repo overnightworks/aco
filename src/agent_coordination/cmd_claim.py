@@ -59,7 +59,40 @@ def claim_cost_line(
     )
 
 
-def _resolved_claim_branch(arguments: argparse.Namespace, *, directory: Path | None = None) -> str:
+@dataclass(frozen=True)
+class ClaimArguments:
+    """What `claim_request` reads of a claim command: `aco claim`'s parsed
+    arguments (`from_parsed`), or `start`'s and `adopt`'s own, which build
+    the same request without a command line."""
+
+    issue: int | None = None
+    agent: str | None = None
+    role: str = DEFAULT_CLAIM_ROLE
+    base: str | None = None
+    branch: str | None = None
+    scope: list[str] | None = None
+    claim_id: str | None = None
+    out_of_order: str | None = None
+    whole: str | None = None
+    resource: str | None = None
+
+    @classmethod
+    def from_parsed(cls, parsed: argparse.Namespace) -> ClaimArguments:
+        return cls(
+            issue=parsed.issue,
+            agent=parsed.agent,
+            role=parsed.role,
+            base=parsed.base,
+            branch=parsed.branch,
+            scope=parsed.scope,
+            claim_id=parsed.claim_id,
+            out_of_order=parsed.out_of_order,
+            whole=parsed.whole,
+            resource=parsed.resource,
+        )
+
+
+def _resolved_claim_branch(arguments: ClaimArguments, *, directory: Path | None = None) -> str:
     """`claim`'s own branch: `--branch` when given, else `directory`'s
     checked-out branch, read via `-C` when given (issue #322: `start`'s own
     resolved worktree, never a process-wide `os.chdir`) or the calling
@@ -85,13 +118,13 @@ def _request(
     `claim` stands in the worktree it claims, judged against the canonical
     remote's recorded default branch `default_branch` answers (issue
     #490)."""
-    request = claim_request(arguments, directory=directory)
+    request = claim_request(ClaimArguments.from_parsed(arguments), directory=directory)
     checkout.validate_checkout(request, default_branch=default_branch, directory=directory)
     return request
 
 
 def claim_request(
-    arguments: argparse.Namespace, *, directory: Path | None = None
+    arguments: ClaimArguments, *, directory: Path | None = None, adopted: bool = False
 ) -> protocol.ClaimRequest:
     """The `protocol.ClaimRequest` `claim` submits, `arguments.scope` bound as-is
     when given. Omitted -- issue mode only (issue #337); lane mode still
@@ -100,7 +133,9 @@ def claim_request(
     own body scope, or a live claim's stored scope on replay, before this
     request's scope ever reaches a wide-scope check or a write. With
     `--base` and `--branch` given it reads no checkout at all (issue #479:
-    `start` checks its claim before the worktree exists)."""
+    `start` checks its claim before the worktree exists). `adopted` claims a
+    pull request's own head branch, whatever its prefix, as an issue-less
+    lane (`aco adopt`); `aco claim` never passes it."""
     agent = protocol.outbound_text(checkout.resolved_agent(arguments.agent), "agent", maximum=128)
     role = protocol.outbound_text(arguments.role, "role", maximum=64)
     base = (
@@ -112,13 +147,13 @@ def claim_request(
         raise protocol.ClaimError("base must be a full lowercase commit SHA")
     branch = _resolved_claim_branch(arguments, directory=directory)
     issue = protocol.optional_issue_number(arguments.issue)
-    identity = protocol.resolved_identity(issue, branch)
+    identity = protocol.LaneIdentity() if adopted else protocol.resolved_identity(issue, branch)
     claim_id = arguments.claim_id or uuid.uuid4().hex
     protocol.ClaimId(claim_id)
     whole_reason = None if arguments.whole is None else body.bounded_whole_reason(arguments.whole)
-    resource = getattr(arguments, "resource", None)
-    if resource is not None:
-        resource = protocol.outbound_resource_name(resource)
+    resource = (
+        None if arguments.resource is None else protocol.outbound_resource_name(arguments.resource)
+    )
     return protocol.ClaimRequest(
         identity=identity,
         agent=agent,
@@ -130,6 +165,7 @@ def claim_request(
         out_of_order_reason=arguments.out_of_order,
         whole_reason=whole_reason,
         resource=resource,
+        exclusive_branch=adopted,
     )
 
 
@@ -421,6 +457,7 @@ def _claim_intent_from_request(
         resource_name=resource_name,
         resource_value=resource_value,
         item_pin=item_pin,
+        exclusive_branch=request.exclusive_branch,
     )
 
 
@@ -898,6 +935,23 @@ def checked_claim(
     return plan
 
 
+def checked_lane_claim(
+    requested: protocol.ClaimRequest, context: session.RunContext, *, revision: str
+) -> _ClaimPlan | int:
+    """`checked_claim` for a lane claim whose worktree is not built yet
+    (`start`, `adopt`): the ledger's conflict is named as the user's own
+    storage names it, and a refusing check is reported -- the exit status
+    `2` comes back instead of a plan."""
+    try:
+        plan = checked_claim(requested, context, revision=revision)
+    except protocol.ClaimConflictError as error:
+        raise board.named_refusal(error, context.config.storage) from error
+    if plan.refused:
+        refuse_claim(False, plan.target_issue, plan.checks)
+        return 2
+    return plan
+
+
 def print_claim_checks(plan: _ClaimPlan, *, as_json: bool) -> None:
     for check in plan.checks:
         print(check.render(), file=sys.stderr if as_json else sys.stdout)
@@ -940,3 +994,127 @@ def report_claim(
         )
     )
     return 0
+
+
+@dataclass(frozen=True)
+class LaneWorktree:
+    """The lane worktree and its branch."""
+
+    path: Path
+    branch: str
+
+
+@dataclass(frozen=True)
+class LaneBuild:
+    """The worktree build and its caller-owned refusal wording."""
+
+    worktree: LaneWorktree
+    start_point: str
+    command: str
+    moved_refusal: str
+
+
+def print_lane_worktree(target: LaneWorktree) -> None:
+    print(f"worktree: {target.path}")
+    print(f"branch: {target.branch}")
+
+
+def _remove_refused_worktree(target: LaneWorktree, *, command: str) -> None:
+    """Undo a build whose claim was refused after the check
+    phase passed (issue #479), saying so: a refusal must leave no worktree
+    or branch behind. When git will not remove the worktree, that is said
+    too, beside the refusal rather than in its place."""
+    try:
+        outcome = checkout.remove_linked_worktree(target.path, branch=target.branch)
+    except protocol.ClaimError as error:
+        print(
+            f"worktree {target.path} and branch '{target.branch}' this {command} created "
+            f"kept: git failure: {error}",
+            file=sys.stderr,
+        )
+        return
+    if outcome.branch.fate is checkout.BranchFate.REMOVED:
+        print(
+            f"removed worktree {target.path} and branch '{target.branch}' this {command} created",
+            file=sys.stderr,
+        )
+        return
+    print(
+        f"removed worktree {target.path} this {command} created; "
+        f"branch '{target.branch}' {outcome.branch.fate}: {outcome.branch.reason}",
+        file=sys.stderr,
+    )
+
+
+def validate_built_worktree(
+    request: protocol.ClaimRequest,
+    target: LaneWorktree,
+    context: session.RunContext,
+    *,
+    moved_refusal: str,
+) -> None:
+    """Validate the built checkout against the checked request and the main
+    checkout's recorded default branch. The caller owns the repair message
+    when the start point moved between checking and building (START-26)."""
+    try:
+        checkout.validate_checkout(
+            request,
+            default_branch=lambda: context.recorded_default_branch,
+            directory=target.path,
+        )
+    except checkout.CheckoutBaseMismatchError as error:
+        raise protocol.ClaimUnavailableError(moved_refusal) from error
+
+
+def report_uncertain_worktree_claim(
+    error: protocol.ClaimError, target: LaneWorktree, *, command: str
+) -> int:
+    """A claim write whose outcome the store cannot tell after its push was
+    sent: the claim may have landed, so the worktree it may name stays, and
+    the next invocation resumes whichever it finds (START-25)."""
+    status = report.refuse(ClaimReason.UNAVAILABLE, error, as_json=False)
+    print(
+        f"the claim's push was sent, its outcome unknown; worktree {target.path} and "
+        f"branch '{target.branch}' kept; run {command} again to resume it",
+        file=sys.stderr,
+    )
+    return status
+
+
+def refuse_built_worktree(error: protocol.ClaimError, target: LaneWorktree, *, command: str) -> int:
+    try:
+        return report.refuse(ClaimReason.UNAVAILABLE, error, as_json=False)
+    finally:
+        # A refusal that cannot be written (a closed stderr) must still
+        # leave nothing behind (START-18).
+        _remove_refused_worktree(target, command=command)
+
+
+def claim_in_new_worktree(
+    plan: _ClaimPlan,
+    requested: protocol.ClaimRequest,
+    context: session.RunContext,
+    build: LaneBuild,
+) -> tuple[protocol.ActiveClaim, tuple[protocol.ActiveClaim, ...]] | int:
+    """Build around a checked claim, retaining the pair only for an uncertain write."""
+    worktree = build.worktree
+    checkout.create_linked_worktree(
+        worktree.path,
+        branch=worktree.branch,
+        start_point=build.start_point,
+        directory=context.toplevel,
+    )
+    print_lane_worktree(worktree)
+    print_claim_checks(plan, as_json=False)
+    try:
+        validate_built_worktree(requested, worktree, context, moved_refusal=build.moved_refusal)
+        # The lane's own lineage stamp and fetch anchor start at its claim (CAS-09).
+        return committed_claim(plan, context.for_lane_worktree(worktree.path))
+    except protocol.UncertainWriteError as error:
+        return report_uncertain_worktree_claim(
+            board.named_refusal(error, context.config.storage), worktree, command=build.command
+        )
+    except protocol.ClaimError as error:
+        return refuse_built_worktree(
+            board.named_refusal(error, context.config.storage), worktree, command=build.command
+        )

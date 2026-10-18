@@ -166,7 +166,12 @@ def _rescope_command(
         canonical_remote=checkout_context.canonical_remote,
         repair=checkout.WorktreeRepair.RETURN_TO_CLAIM,
     )
-    identity = protocol.resolved_identity(protocol.optional_issue_number(parsed.issue), branch)
+    identity = protocol.lookup_identity(
+        protocol.optional_issue_number(parsed.issue),
+        branch,
+        merged_rerun=False,
+        holders=lambda: protocol.claims_on_branch(checkout_context.observation.claims, branch),
+    )
     return protocol.RescopeRequest(
         identity=identity,
         agent=parsed.agent,

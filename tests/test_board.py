@@ -1,8 +1,8 @@
 """Behavioral tests for the pure `aco` block write path `body.py`
 owns (#240, moved from `board.py` by #419): `rule_expectation`,
 `append_expectation`, and the `expectation_lines` projection `rule --line`,
-`ask`, and `rulings` all share. CLI wiring for `rule`/`ask` is covered in
-`tests/test_cli.py`; `tests/test_rulings.py` owns the rulings family."""
+`ask`, and `rulings` all share. CLI wiring lives in `tests/test_ask.py` for `ask`,
+`tests/test_rule.py` for `rule`, and `tests/test_rulings.py` for `rulings`."""
 
 from __future__ import annotations
 
@@ -2324,10 +2324,16 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
         'priority_labels = ["ux"]\nidea_label = "idea"\n'
         'body_contract = "block"\ncanonical_remote = "upstream"\n'
         'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py"]\n'
+        'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
     )
 
     assert board.load_config(config_path) == board.BoardConfig(
-        ("ux",), "idea", "upstream", Storage.STATE_REF, ("scripts/whitelist.py",)
+        ("ux",),
+        "idea",
+        "upstream",
+        Storage.STATE_REF,
+        ("scripts/whitelist.py",),
+        dependency_paths=("pyproject.toml", "uv.lock", ".github/workflows/"),
     )
 
 
@@ -3502,6 +3508,63 @@ def test_a_non_ascii_digit_in_a_hash_reference_is_not_an_issue_number() -> None:
     assert isinstance(work_item, board.ClassificationDefect)
 
 
+def test_an_issue_number_past_the_int_digit_limit_is_no_issue_number() -> None:
+    number = "1" * 4301
+    line = f"Work-Item: #{number}"
+
+    assert board.closing_references(f"Closes #{number}", REPOSITORY) == frozenset()
+    assert isinstance(
+        board.parse_pull_request_classification(line, REPOSITORY), board.ClassificationDefect
+    )
+    assert board.classification_line_state(
+        line, board.NoItemKind.DEPS, REPOSITORY
+    ) == board.OtherClassificationLine(line)
+
+
+@pytest.mark.parametrize(
+    ("digits", "is_reference"),
+    [
+        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS, True, id="at-the-bound"),
+        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS + 1, False, id="one-past-the-bound"),
+        pytest.param(4301, False, id="past-the-int-digit-limit"),
+    ],
+)
+def test_a_number_past_the_digit_bound_is_no_slice_title_number_on_either_side(
+    digits: int, is_reference: bool
+) -> None:
+    number = "7" * digits
+    parent_side = (4, int(number)) if is_reference else None
+    slice_side = (int(number), 5) if is_reference else None
+
+    assert board.slice_title_match(f"Title (#{number} Scheibe 4)") == parent_side
+    assert board.slice_title_match(f"Scheibe 4 von #{number}") == parent_side
+    assert board.slice_title_match(f"Title (#5 Scheibe {number})") == slice_side
+    assert board.slice_title_match(f"Scheibe {number} von #5") == slice_side
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param("#" + "7" * (board.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="one-past-the-bound"),
+        pytest.param("#" + "7" * 4301, id="past-the-int-digit-limit"),
+        pytest.param("#²", id="superscript-digit"),
+        pytest.param("#٣", id="non-ascii-digit"),
+    ],
+)
+def test_a_trunk_trailer_number_past_the_digit_bound_is_a_classification_defect(
+    value: str,
+) -> None:
+    assert isinstance(board.trunk_commit_classification((value,), ()), board.ClassificationDefect)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["#" + "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS, "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS],
+)
+def test_parse_item_reference_accepts_a_number_at_the_digit_bound(value: str) -> None:
+    assert board.parse_item_reference(value) == int("7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS)
+
+
 def test_body_defect_text_is_the_shared_renderer() -> None:
     defect = ContractDefect("now", "missing")
     assert body_defect_text(defect) == "body malformed: now: missing"
@@ -3539,9 +3602,11 @@ def test_trunk_commit_classification_lands_every_item_a_repeated_trailer_names()
     assert classification == board.TrunkWorkItemClassification((10, 11))
 
 
-def test_trunk_commit_classification_reads_a_no_item_trailer() -> None:
-    classification = board.trunk_commit_classification((), ("docs",))
-    assert classification == board.NoItemClassification(board.NoItemKind.DOCS)
+@pytest.mark.parametrize("kind", ["docs", "fix", "deps"])
+def test_trunk_commit_classification_reads_a_no_item_trailer(kind: str) -> None:
+    classification = board.trunk_commit_classification((), (kind,))
+    assert isinstance(classification, board.NoItemClassification)
+    assert classification.kind.value == kind
 
 
 @pytest.mark.parametrize(
@@ -4090,3 +4155,178 @@ def test_parent_line_names_the_supplied_label(label: str, expected: str) -> None
 )
 def test_names_parent_requires_an_exact_first_line(raw: str, label: str, expected: bool) -> None:
     assert names_parent(raw, label) is expected
+
+
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        pytest.param('"uv.lock"', "must be a list of unique repository paths", id="cell-13"),
+        pytest.param('["a", "a"]', "must be a list of unique repository paths", id="cell-16"),
+        pytest.param("[1]", "must be a list of unique repository paths", id="non-string"),
+        *[
+            pytest.param(
+                repr([entry]).replace("'", '"'),
+                f"entry '{entry}' is not a canonical path inside the repository",
+                id=case,
+            )
+            for case, entry in [
+                ("cell-14", "../x"),
+                ("cell-15", "/abs"),
+                ("cell-17", "src//x"),
+                ("root-slash", "/"),
+                ("double-trailing-slash", "a//"),
+                ("empty", ""),
+            ]
+        ],
+    ],
+)
+def test_board_configuration_refuses_invalid_dependency_paths(value: str, reason: str) -> None:
+    with pytest.raises(ClaimError) as refused:
+        board.parse_config(f"dependency_paths = {value}\n", board.CONFIG_PATH)
+    assert str(refused.value) == f"board configuration .aco/board.toml dependency_paths {reason}"
+
+
+@pytest.mark.parametrize("text", ["", "dependency_paths = []"])
+def test_board_configuration_has_no_dependency_paths_unless_named(text: str) -> None:
+    assert board.parse_config(text, board.CONFIG_PATH).dependency_paths == ()
+
+
+@pytest.mark.parametrize(
+    ("pull_request_body", "live_line", "appended", "reads_as"),
+    [
+        pytest.param(
+            "", None, "No-Item: deps", board.NoItemClassification(board.NoItemKind.DEPS), id="B1"
+        ),
+        pytest.param(
+            "Bump x",
+            None,
+            "\n\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B2",
+        ),
+        pytest.param(
+            "Bump x\n",
+            None,
+            "\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B3",
+        ),
+        pytest.param(
+            "Bump x\n\n",
+            None,
+            "No-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B4",
+        ),
+        pytest.param(
+            "Bump x\r\n",
+            None,
+            "\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B5-crlf",
+        ),
+        pytest.param(
+            "```\nNo-Item: deps\n```",
+            None,
+            "\n\nNo-Item: deps",
+            board.NoItemClassification(board.NoItemKind.DEPS),
+            id="B6-fenced",
+        ),
+        pytest.param(
+            "```\nfoo",
+            None,
+            "\n\nNo-Item: deps",
+            board.ClassificationDefect("carries no `Work-Item:` or `No-Item:` line"),
+            id="B7-unclosed-fence",
+        ),
+        pytest.param(
+            f"Bump x\n\nNo-Item: dep{chr(0x202E)}s",
+            "No-Item: dep\\u202es",
+            "\n\nNo-Item: deps",
+            board.ClassificationDefect("carries 2 classification lines; exactly one is required"),
+            id="B15-display-control",
+        ),
+        pytest.param(
+            "Work-Item: #5\nNo-Item: fix",
+            "Work-Item: #5",
+            "\n\nNo-Item: deps",
+            board.ClassificationDefect("carries 3 classification lines; exactly one is required"),
+            id="first-of-two",
+        ),
+    ],
+)
+def test_live_classification_line_and_composition_read_the_whole_body(
+    pull_request_body: str,
+    live_line: str | None,
+    appended: str,
+    reads_as: board.Classification | board.ClassificationDefect,
+) -> None:
+    """Spec: ADOPT-05, ADOPT-11, ADOPT-12 -- first live line escaped, body kept."""
+    composed = board.body_with_classification(pull_request_body, board.NoItemKind.DEPS)
+
+    assert board.live_classification_line(pull_request_body) == live_line
+    assert composed == pull_request_body + appended
+    assert board.parse_pull_request_classification(composed, REPOSITORY) == reads_as
+
+
+@pytest.mark.parametrize(
+    ("pull_request_body", "expected_state"),
+    [
+        pytest.param(
+            "Bump x\n\nNo-Item: fix",
+            lambda: board.OtherClassificationLine("No-Item: fix"),
+            id="B8-another-kind",
+        ),
+        pytest.param(
+            "Work-Item: #5",
+            lambda: board.OtherClassificationLine("Work-Item: #5"),
+            id="B9-a-work-item",
+        ),
+        pytest.param(
+            "No-Item: chore",
+            lambda: board.OtherClassificationLine("No-Item: chore"),
+            id="B10-an-unknown-kind",
+        ),
+        pytest.param("Bump x\n\nNo-Item: deps", lambda: board.ClassificationLine.PRESENT, id="B11"),
+        pytest.param("no-item: DEPS", lambda: board.ClassificationLine.PRESENT, id="B12-case"),
+        pytest.param(
+            "No-Item: deps\nWork-Item: #5",
+            lambda: board.MalformedClassificationLines(
+                board.ClassificationDefect(
+                    "carries 2 classification lines; exactly one is required"
+                )
+            ),
+            id="B14-two-lines",
+        ),
+    ],
+)
+def test_classification_line_state_tells_the_line_a_rerun_may_keep(
+    pull_request_body: str, expected_state: Callable[[], board.ClassificationLineState]
+) -> None:
+    """Spec: ADOPT-05, ADOPT-26, ADOPT-30 -- the one live line is the kind's own (kept), another
+    line (refused), or more than one (the parser's defect, refused)."""
+    state = board.classification_line_state(pull_request_body, board.NoItemKind.DEPS, REPOSITORY)
+
+    assert state == expected_state()
+
+
+@pytest.mark.parametrize(
+    ("classification", "expected"),
+    [
+        pytest.param(
+            board.WorkItemClassification(board.IssueReference(REPOSITORY, 72)),
+            "Work-Item: #72",
+            id="work-item",
+        ),
+        pytest.param(
+            board.NoItemClassification(board.NoItemKind.DOCS), "No-Item: docs", id="no-item"
+        ),
+    ],
+)
+def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications(
+    classification: board.Classification,
+    expected: str,
+) -> None:
+    """Spec: LANDCMD-13. Trunk trailers use local issue references or the no-item kind."""
+    observed = board.land_trunk_trailer(classification)
+    assert observed == expected

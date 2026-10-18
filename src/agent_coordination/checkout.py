@@ -839,7 +839,7 @@ def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | No
 
     One git read resolves the symbolic ref and proves its target exists; a
     plain, non-symbolic `HEAD` ref names itself and so no branch."""
-    head = f"refs/remotes/{remote}/HEAD"
+    head = remote_tracking_ref(remote, "HEAD")
     try:
         symbolic = git_output(
             ["rev-parse", "--verify", "--quiet", "--symbolic-full-name", head],
@@ -933,7 +933,8 @@ def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) 
     if recorded_head is not None:
         return recorded_head
     remote_trunk = _first_resolving_ref(
-        (f"refs/remotes/{remote}/main", f"refs/remotes/{remote}/master"), directory=directory
+        (remote_tracking_ref(remote, "main"), remote_tracking_ref(remote, "master")),
+        directory=directory,
     )
     if remote_trunk is not None:
         return remote_trunk
@@ -1260,28 +1261,52 @@ def fetch_remote(remote: str, *, directory: Path) -> None:
         raise ClaimError(process.git_failure_detail(fetch))
 
 
-def trunk_commit(trunk: str, *, directory: Path) -> str:
-    """The commit `trunk` names now in `directory` (issue #479): `start`
+def remote_tracking_ref(remote: str, branch: str) -> str:
+    return f"refs/remotes/{remote}/{branch}"
+
+
+def remote_branch_tip(remote: str, branch: str, *, directory: Path) -> str | None:
+    """The commit `remote` has on `branch` right now, or `None` when it has no
+    such branch, asked of the remote itself so the answer never depends on
+    git's localized error text."""
+    heads = git_output(
+        ["ls-remote", "--heads", remote, f"refs/heads/{branch}"], directory=directory
+    )
+    listed = (line.split("\t") for line in heads.splitlines())
+    return next((tip for tip, name in listed if name == f"refs/heads/{branch}"), None)
+
+
+def fetch_remote_branches(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
+    """Refresh exactly `branches` of `remote` into `refs/remotes/<remote>/<branch>`
+    in `directory`, and write no other ref: the remote's configured fetch
+    refspecs and tag following are set aside (`--refmap=`, `--no-tags`) because
+    one of them may name a local branch."""
+    refspecs = [f"+refs/heads/{name}:{remote_tracking_ref(remote, name)}" for name in branches]
+    fetch = _git_run(["fetch", "--no-tags", "--refmap=", remote, *refspecs], directory=directory)
+    if fetch.exit_status != 0:
+        raise ClaimError(process.git_failure_detail(fetch))
+
+
+def commit_at(ref: str, *, directory: Path) -> str:
+    """The commit `ref` names now in `directory` (issue #479): `start`
     checks its claim against this one commit -- the claim's base and the
     tree its scope is measured against -- before it builds."""
-    return git_output(["rev-parse", "--verify", f"{trunk}^{{commit}}"], directory=directory)
+    return git_output(["rev-parse", "--verify", f"{ref}^{{commit}}"], directory=directory)
 
 
 def create_linked_worktree(
-    path: Path, *, branch: str, trunk: str, directory: Path | None = None
+    path: Path, *, branch: str, start_point: str, directory: Path | None = None
 ) -> None:
-    """Create a linked worktree at `path` on a fresh `branch` from `trunk`,
-    the canonical remote's trunk ref as the caller's fetch left it (issue
-    #322; issue #479): the `git worktree add` step
-    `ISOLATED_WORKTREE_RECIPE` used to spell out for a person to type by
-    hand, run through this module's own `_git_run` chokepoint so `start`
-    opens no new subprocess call site. Built from the trunk's ref, so the
-    branch tracks it wherever git's own `branch.autoSetupMerge` says so.
+    """Create a linked worktree at `path` on a fresh `branch` from `start_point`,
+    a ref or commit selected by the caller. Git's own `branch.autoSetupMerge`
+    determines whether the new branch tracks that start point.
     Reads and writes `directory`'s own checkout via `-C` when given (issue
     #394: `protect.judge`'s own direct tests build a worktree fixture from
     an explicit repository path, never the test process's cwd) or the
     calling process's own checkout otherwise."""
-    result = _git_run(["worktree", "add", str(path), "-b", branch, trunk], directory=directory)
+    result = _git_run(
+        ["worktree", "add", str(path), "-b", branch, start_point], directory=directory
+    )
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
 
@@ -1299,7 +1324,12 @@ def _own_common_directory() -> Path:
     return Path(git_output(["rev-parse", "--path-format=absolute", "--git-common-dir"])).resolve()
 
 
-def main_checkout_root(*, toplevel: Path) -> Path:
+def sibling_worktree_path(main_checkout: Path, name: str) -> Path:
+    """Place a named lane beside the repository's main checkout."""
+    return main_checkout.parent / f"{main_checkout.name}-worktrees" / name
+
+
+def main_checkout_root(*, toplevel: Path, command: str) -> Path:
     """The repository's main checkout, whichever of its worktrees the
     caller stands in (issue #479): `start` places a lane's worktree beside
     it, so a call from inside a linked worktree never nests the new one
@@ -1323,7 +1353,7 @@ def main_checkout_root(*, toplevel: Path) -> Path:
         return common_directory.parent
     raise ClaimError(
         f"main checkout unknown: git directory {common_directory} names no checkout; "
-        "run start from the main checkout"
+        f"run {command} from the main checkout"
     )
 
 
@@ -1706,7 +1736,8 @@ def _lane_work_item_trailer_defect(work_item_values: tuple[str, ...], pull_reque
     change, so the lane is released as abandoned with the landing named."""
     values = ", ".join(work_item_values)
     return (
-        f"carries `Work-Item: {values}`; an issue-less lane needs a `No-Item: <docs|fix>` "
+        f"carries `Work-Item: {values}`; an issue-less lane needs a "
+        f"`No-Item: <{board.NO_ITEM_KINDS_TRAILER}>` "
         f'trailer; release it with --abandoned "landed as PR #{pull_request} '
         'with a malformed trailer"'
     )

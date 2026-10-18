@@ -7,11 +7,13 @@ import threading
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue
-from cli_fixtures import real_git
+from cli_fixtures import CliRun, real_git, worktrees_and_branches
+from store_fixtures import lineage_observation, state_ref_tip
 
 from agent_coordination import board, body, cmd_land, forge, github
 from agent_coordination.protocol import ClaimError
@@ -23,6 +25,46 @@ LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"
 # anything beyond "a plausible sha", so every scenario that just needs one
 # shares this instead of inventing a fresh, equally arbitrary string.
 MERGE_COMMIT_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+
+def landing_pull_request(
+    *,
+    body: str,
+    number: int = 12,
+    base_ref_name: str = "main",
+    head_ref_name: str = LANDING_BRANCH,
+    head_repository: str = REPOSITORY,
+    author: str = "ada",
+    merged: bool = False,
+    merge_commit: str | None = None,
+    title: str = "feat: land the lane",
+) -> forge.Landing:
+    """`merge_commit` defaults to a shared, well-formed sha once `merged` is
+    true (a real merged pull request always carries one) and to `None`
+    otherwise; a test proving the merge commit's own authority
+    (issue #397) passes its own sha instead."""
+    return forge.Landing(
+        number,
+        author,
+        body,
+        github.repository_id(head_repository),
+        head_ref_name,
+        base_ref_name,
+        merged,
+        merge_commit if merge_commit is not None else (MERGE_COMMIT_SHA if merged else None),
+        title,
+        MERGE_COMMIT_SHA,
+    )
+
+
+def landing_readiness(
+    number: int = 12,
+    *,
+    head_sha: str = MERGE_COMMIT_SHA,
+    mergeable_state: str = forge.MERGEABLE_STATE_CLEAN,
+    checks: tuple[forge.CheckRun, ...] = (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+) -> forge.LandingReadiness:
+    return forge.LandingReadiness(number, True, head_sha, mergeable_state, checks)
 
 
 def serve_forge(monkeypatch: pytest.MonkeyPatch, forge: FakeForge) -> FakeForge:
@@ -64,7 +106,12 @@ class FakeForge:
     board_dependencies: dict[int, tuple[board.IssueDependency, ...]] = field(default_factory=dict)
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     default_branch_name: str = "main"
+    default_branch_error: forge.ForgeError | None = None
     landings: dict[int, forge.Landing] = field(default_factory=dict)
+    changes_by_number: dict[int, forge.PullRequestChanges | forge.ForgeError] = field(
+        default_factory=dict
+    )
+    changes_reads: list[int] = field(default_factory=list)
     parents: dict[int, board.ParentIssue] = field(default_factory=dict)
     children: dict[int, tuple[board.ChildItem, ...]] = field(default_factory=dict)
     closed_issues: set[int] = field(default_factory=set)
@@ -80,12 +127,18 @@ class FakeForge:
     next_created_child_number: int = 900
     item_bodies: dict[int, str] = field(default_factory=dict)
     fail_update_item_body: bool = False
+    update_item_body_error: ClaimError | None = None
+    update_item_body_lands_before_error: bool = False
+    body_writes: list[tuple[int, str]] = field(default_factory=list)
+    scripted_item_reads: list[str | forge.ForgeError | None] = field(default_factory=list)
     fail_create_child_relation: bool = False
     fail_set_item_kind: bool = False
     drop_created_issue_type: bool = False
     capability_overrides: dict[forge.ForgeOperation, forge.Capability] = field(default_factory=dict)
     readiness_by_number: dict[int, forge.LandingReadiness] = field(default_factory=dict)
     merge_calls: list[tuple[int, str, board.MergeMethod, str, str]] = field(default_factory=list)
+    merge_requests: list[tuple[str, board.MergeMethod]] = field(default_factory=list)
+    merge_error: forge.ForgeError | None = None
     merge_sha: str = MERGE_COMMIT_SHA
     merge_remote: Path | None = None
     closes_on_merge: bool = False
@@ -174,9 +227,18 @@ class FakeForge:
         return number
 
     def update_item_body(self, number: int, body: str) -> None:
+        """`update_item_body_error` is the forge's answer instead of a write,
+        unless `update_item_body_lands_before_error` says the write happened
+        and only its answer failed. A pull request's body is its landing's."""
         if self.fail_update_item_body:
             raise ClaimError("update item body failed (simulated)")
-        self.item_bodies[number] = body
+        if self.update_item_body_error is None or self.update_item_body_lands_before_error:
+            self.body_writes.append((number, body))
+            self.item_bodies[number] = body
+            if number in self.landings:
+                self.landings[number] = replace(self.landings[number], body=body)
+        if self.update_item_body_error is not None:
+            raise self.update_item_body_error
 
     def set_item_kind(self, number: int, kind: body.ItemKind) -> None:
         """`fail_set_item_kind` simulates GitHub dropping the new type
@@ -236,6 +298,9 @@ class FakeForge:
         merged pull request keeps `head_sha` as its recorded head, as
         GitHub does (issue #590)."""
         self._run()
+        self.merge_requests.append((head_sha, method))
+        if self.merge_error is not None:
+            raise self.merge_error
         self.merge_calls.append((number, head_sha, method, title, body))
         sha = self.merge_sha
         landing = self.landings[number]
@@ -286,19 +351,37 @@ class FakeForge:
             raise ClaimError(f"GitHub has no pull request #{number}")
         return detail
 
+    def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
+        self._run()
+        self.changes_reads.append(number)
+        changes = self.changes_by_number[number]
+        if isinstance(changes, forge.ForgeError):
+            raise changes
+        return changes
+
     def _item_reference_value(self, number: int) -> forge.ItemReference:
         served = self.issue_references.get(number)
         if served is not None:
             return served
         state = forge.ItemState.CLOSED if number in self.closed_issues else forge.ItemState.OPEN
         # `landings` is this fake's set of pull requests, so the one flag that
-        # distributes `check` is derived from it rather than set twice.
-        return forge.ItemReference(state, "", "", number in self.landings)
+        # distributes `check` is derived from it rather than set twice, and
+        # a pull request's body is its landing's.
+        landing = self.landings.get(number)
+        return forge.ItemReference(
+            state, "", "" if landing is None else landing.body, landing is not None
+        )
 
     def item_reference(self, number: int) -> forge.ItemReference:
+        """`scripted_item_reads` answers the next reads in order -- a body, a
+        failure, or `None` for the served reference -- before the served one."""
         self._run()
         self.issue_reference_lookups.append(number)
-        return self._item_reference_value(number)
+        served = self._item_reference_value(number)
+        scripted = self.scripted_item_reads.pop(0) if self.scripted_item_reads else None
+        if isinstance(scripted, forge.ForgeError):
+            raise scripted
+        return served if scripted is None else replace(served, body=scripted)
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
         """This fake's mirror of `GitHubForge.item_references` (issue #440):
@@ -315,6 +398,8 @@ class FakeForge:
 
     def default_branch(self) -> str:
         self._run()
+        if self.default_branch_error is not None:
+            raise self.default_branch_error
         return self.default_branch_name
 
     def parent_issue(self, number: int) -> board.ParentIssue | None:
@@ -381,3 +466,111 @@ class ReaderOnlyForge(FakeForge):
 
     def delete_branch(self, branch: str) -> None:
         pytest.fail("a read-only command must never delete a branch")
+
+
+def assert_github_world(github_clone: Path, bare_remote: Path) -> None:
+    """Verify the arranged GitHub checkout before running its command."""
+    assert real_git(github_clone, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
+    main = real_git(github_clone, "rev-parse", "main").stdout.strip()
+    assert real_git(github_clone, "rev-parse", "origin/HEAD").stdout.strip() == main
+    assert (
+        real_git(github_clone, "config", "--get", "remote.origin.url").stdout
+        == "git@github.com:example/agent-coordination.git\n"
+    )
+    assert (
+        real_git(github_clone, "ls-remote", "origin", "refs/heads/main").stdout
+        == f"{main}\trefs/heads/main\n"
+    )
+    assert state_ref_tip(bare_remote) is None
+
+
+@dataclass
+class LandingWorld:
+    clone: Path
+    remote: Path
+    forge: FakeForge
+    unchanged: dict[str, object]
+
+
+def landing_world(
+    clone: Path, remote: Path, forge: FakeForge, *, remote_tip: str | None = None
+) -> LandingWorld:
+    """Snapshot the fully arranged checkout before invoking land."""
+    worktrees, branches = worktrees_and_branches(clone)
+    unchanged = {
+        "merge": [],
+        "delete": [],
+        "close": set(forge.closed_issues),
+        "body": [],
+        "remote": remote_tip,
+        "local": None,
+        "worktrees": worktrees,
+        "branches": branches,
+        "trunk": real_git(clone, "rev-parse", "main").stdout,
+        "stamp": None,
+        "anchor": None,
+    }
+    world = LandingWorld(clone, remote, forge, unchanged)
+    observed = landing_effects(world)
+    assert observed == unchanged
+    return world
+
+
+def landing_effects(world: LandingWorld) -> dict[str, object]:
+    worktrees, branches = worktrees_and_branches(world.clone)
+    stamp, anchor = lineage_observation(world.clone)
+    return {
+        "merge": list(world.forge.merge_calls),
+        "delete": list(world.forge.deleted_branches),
+        "close": set(world.forge.closed_issues),
+        "body": list(world.forge.body_writes),
+        "remote": state_ref_tip(world.remote),
+        "local": state_ref_tip(world.clone),
+        "worktrees": worktrees,
+        "branches": branches,
+        "trunk": real_git(world.clone, "rev-parse", "main").stdout,
+        "stamp": stamp,
+        "anchor": anchor,
+    }
+
+
+@dataclass(frozen=True)
+class ParserExit:
+    exited: bool
+    usage_prefix: str
+
+
+class RefusalLength(Enum):
+    UNCHECKED = "unchecked"
+    WITHIN_LIMIT = "within-limit"
+    EXACTLY_LIMIT = "exactly-limit"
+
+
+def refusal_observations(
+    world: LandingWorld,
+    result: CliRun,
+    sentence: str,
+    *,
+    length: RefusalLength = RefusalLength.UNCHECKED,
+    parser_exit: ParserExit | None = None,
+) -> tuple[dict[str, object], dict[str, object]]:
+    observed = {"exit": result.status, "out": result.stdout, **landing_effects(world)}
+    expected = {"exit": 2, "out": "", **world.unchanged}
+    if parser_exit is not None:
+        observed.update(
+            {
+                "exception": parser_exit.exited,
+                "usage": result.stderr.startswith(parser_exit.usage_prefix),
+                "last": result.stderr.splitlines()[-1] if result.stderr else "",
+            }
+        )
+        expected.update({"exception": True, "usage": True, "last": sentence})
+    else:
+        observed["err"] = result.stderr
+        expected["err"] = "ERROR: " + sentence + "\n"
+    if length is not RefusalLength.UNCHECKED:
+        actual_length = len(result.stderr.rstrip("\n"))
+        exact = length is RefusalLength.EXACTLY_LIMIT
+        observed["length"] = actual_length if exact else actual_length <= 200
+        expected["length"] = 200 if exact else True
+    return observed, expected

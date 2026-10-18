@@ -39,6 +39,7 @@ order `merge`, `squash`, `rebase`.
 
 | state \ trigger | `aco land <n>` |
 |---|---|
+| `<n>` below 1 | LANDCMD-44 |
 | `--head` not 7 to 40 hex digits | LANDCMD-33 |
 | `<path>` absent from this checkout | PIN-32 (cited) |
 | `<path>` present but untracked or ignored | PIN-01 (cited) |
@@ -55,7 +56,7 @@ order `merge`, `squash`, `rebase`.
 | pull request's own shape (classification line, cross-repository head, target branch) invalid | LANDCMD-07 (LAND-06..13, 32, cited) |
 | the head removes `<path>`, changes `storage` or `canonical_remote` in it, or carries an invalid one | LANDCMD-22, LANDCMD-23, LANDCMD-24 |
 | named work item not open | LANDCMD-08 |
-| classification's own claim/parent/closing defect | LANDCMD-09 (LAND-14..28, cited) |
+| classification's own claim/parent/closing defect | LANDCMD-09 (LAND-14..28, LAND-70..77, cited) |
 | claim held by another agent or role | LANDCMD-10 |
 | checkout unclean or off the default branch | LANDCMD-11 |
 | checkout without a git identity | LANDCMD-25 |
@@ -78,6 +79,7 @@ this worktree's own fetch anchor and lineage stamp stay untouched by a
 preflight, refused or not, exactly as `reset`'s own read does.
 
 - [ ] [LANDCMD-33] A `--head` that is not 7 to 40 hex digits refuses `--head must be 7 to 40 hex digits`, exit `2`, at the argument parse: before any read, PIN-32, or LANDCMD-01, on a rerun too (E-LANDCMD-33).
+- [ ] [LANDCMD-44] An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
 - [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
 - [ ] [LANDCMD-19] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
@@ -93,7 +95,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-23] A head changing `storage` or `canonical_remote` in `<path>` refuses `pull request #<n> changes <setting> in <path>; aco land cannot release its claim across that change`, exit `2`.
 - [ ] [LANDCMD-24] A head `<path>` the pin's own validator refuses prints `pull request #<n> carries an invalid <path>: <detail>`, exit `2`.
 - [ ] [LANDCMD-08] A classified work item that is not open refuses `work item #<n> is not open; it cannot be landed`, exit `2`; an issue-less pull request skips this check.
-- [ ] [LANDCMD-09] The classification's own claim, parent, and closing rules then apply (LAND-14..28): a defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
+- [ ] [LANDCMD-09] The classification's own claim, parent, and closing rules then apply (LAND-14..28, LAND-70..77): a defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
 - [ ] [LANDCMD-10] A claim held by another agent or role, no coordinator override, refuses (REL-12's sentence), exit `2`, before the merge; `<repeat>`: `aco land <n>`, any `--head`/`--keep-worktree`, REL-41's identity.
 - [ ] [LANDCMD-11] This checkout must sit on the forge's default branch with nothing uncommitted, or `aco land` refuses `land must run from a clean checkout of the default branch '<branch>'`, exit `2`.
 - [ ] [LANDCMD-25] A checkout without a git identity refuses `land must run from a checkout with a git identity; set user.name and user.email there so its release can commit to the claim state`, exit `2`.

@@ -565,7 +565,7 @@ class RunContext:
         `default_branch` their pull request checks compare against, so the
         forge's default branch counts even where the remote records no `HEAD`."""
         self._fetch_canonical_remote_once()
-        return f"refs/remotes/{self.canonical_remote}/{self.default_branch}"
+        return checkout.remote_tracking_ref(self.canonical_remote, self.default_branch)
 
     def _fetch_canonical_remote_once(self) -> None:
         remote = self.configured_canonical_remote

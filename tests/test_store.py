@@ -36,12 +36,14 @@ from store_fixtures import (
     CLAIM_BASE,
     STATE_WITH_TIP,
     TIP,
+    RaceOnceTransport,
     blob,
     claim_intent,
     push_raw_state_tree,
     raw_tree,
     state_ref_listing,
     state_ref_tip,
+    unrelated_racer_commit,
 )
 
 from agent_coordination import cli as issue_claim
@@ -85,7 +87,7 @@ def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
     """Counts real git subprocess invocations by subcommand, patched at the
     `process` chokepoint both of `store`'s call shapes go through --
     `_run_git` (`process.run_captured`) and `_run_git_with_input`
-    (`process.run_bounded`) -- the proof that a transition's or a read's
+    (`process.run_bounded_captured`) -- the proof that a transition's or a read's
     git-invocation count is independent of how many claims the state tree
     holds (issue #241).
     """
@@ -103,7 +105,7 @@ def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
         return wrapped
 
     monkeypatch.setattr(store.process, "run_captured", spy(process.run_captured))
-    monkeypatch.setattr(store.process, "run_bounded", spy(process.run_bounded))
+    monkeypatch.setattr(store.process, "run_bounded_captured", spy(process.run_bounded_captured))
     return counts
 
 
@@ -300,6 +302,47 @@ def test_bootstrap_creates_the_empty_state_tree_on_a_proven_empty_remote(
 
     assert state_ref_tip(bare_remote) == tip
     assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
+
+
+def test_bootstrap_writes_the_same_tree_while_git_traces_to_stderr(
+    bare_remote: Path, worktree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GIT_TRACE", "1")
+
+    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+    assert state_ref_tip(bare_remote) == tip
+    assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
+
+
+def test_hash_blob_returns_the_object_id_git_prints_on_stdout_while_tracing(
+    worktree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    content = b"claim state"
+    expected = (
+        subprocess.run(
+            ["git", "-C", str(worktree), "hash-object", "--stdin"],
+            input=content,
+            check=True,
+            capture_output=True,
+        )
+        .stdout.decode()
+        .strip()
+    )
+    monkeypatch.setenv("GIT_TRACE", "1")
+
+    assert store.hash_blob(worktree, content) == expected
+
+
+def test_a_failing_hash_object_reports_the_stderr_git_wrote(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LC_ALL", "C")
+    outside_any_repository = tmp_path / "plain"
+    outside_any_repository.mkdir()
+
+    with pytest.raises(protocol.ClaimError, match="not a git repository"):
+        store.hash_blob(outside_any_repository, b"claim state")
 
 
 def test_bootstrap_is_a_no_op_read_when_the_ref_already_exists(
@@ -990,6 +1033,41 @@ def test_first_fetch_in_a_worktree_accepts_any_tip_without_a_prior_stamp(
         pytest.param(store.peek_state, id="peek_state"),
     ],
 )
+@pytest.mark.parametrize(
+    "configured_refspec",
+    [
+        pytest.param("+refs/aco/state:refs/heads/mirror/state", id="state-to-a-local-branch"),
+        pytest.param("+refs/*:refs/*", id="everything-to-itself"),
+    ],
+)
+def test_a_state_fetch_ignores_the_remotes_configured_fetch_refspecs(
+    bare_remote: Path,
+    worktree: Path,
+    tmp_path: Path,
+    state_fetch: Callable[..., object],
+    configured_refspec: str,
+) -> None:
+    """A mapping configured on the remote must not make an observation write
+    a local branch or the shared `STATE_REF`: only the store's own anchor moves."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    reader = tmp_path / "reader"
+    reader.mkdir()
+    real_git(reader, "init", "-b", "main")
+    real_git(reader, "remote", "add", "origin", str(bare_remote))
+    real_git(reader, "config", "--add", "remote.origin.fetch", configured_refspec)
+
+    state_fetch(worktree=reader, remote="origin")
+
+    assert real_git(reader, "for-each-ref", "refs/heads", store.STATE_REF).stdout == ""
+
+
+@pytest.mark.parametrize(
+    "state_fetch",
+    [
+        pytest.param(store.fetch_state, id="fetch_state"),
+        pytest.param(store.peek_state, id="peek_state"),
+    ],
+)
 def test_a_state_fetch_starts_no_git_maintenance_on_the_shared_object_store(
     bare_remote: Path, worktree: Path, tmp_path: Path, state_fetch: Callable[..., object]
 ) -> None:
@@ -1504,10 +1582,10 @@ def test_write_lineage_stamp_cleans_up_its_temp_file_on_failure(
 def test_run_git_with_input_translates_process_failures_to_claim_error(
     monkeypatch: pytest.MonkeyPatch, worktree: Path, raised: Exception
 ) -> None:
-    def fake_run_bounded(*_args: object, **_kwargs: object) -> None:
+    def fake_run_bounded_captured(*_args: object, **_kwargs: object) -> None:
         raise raised
 
-    monkeypatch.setattr(store.process, "run_bounded", fake_run_bounded)
+    monkeypatch.setattr(store.process, "run_bounded_captured", fake_run_bounded_captured)
 
     with pytest.raises(protocol.ClaimError):
         store._run_git_with_input(worktree, ["mktree"], input_data=b"")
@@ -2594,6 +2672,97 @@ def test_commit_transition_same_key_second_racer_names_the_holder(
         )
 
     assert type(raised.value) is protocol.ClaimConflictError
+
+
+def _bob_claims_the_adopted_branch(worktree: Path, remote: Path) -> protocol.ClaimState:
+    return store.commit_transition(
+        observed=fresh_observation(worktree, remote),
+        subject=store.transition_subject("claim", protocol.IssueIdentity(42), "dependabot/x"),
+        intent=claim_intent(
+            identity=protocol.IssueIdentity(42),
+            agent="Bob",
+            claim_id="b1",
+            operation_id="op-b1",
+            branch="dependabot/x",
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("racer", "refusal", "claim_keys_afterwards"),
+    [
+        pytest.param(
+            _bob_claims_the_adopted_branch,
+            "lane 'dependabot/x' is claimed by Bob (builder) on issue #42 branch dependabot/x",
+            {protocol.claim_key(protocol.IssueIdentity(42), "dependabot/x")},
+            id="cell-9-a-claim-that-lands-between-the-attempts-refuses-the-retry",
+        ),
+        pytest.param(
+            unrelated_racer_commit,
+            None,
+            {protocol.claim_key(protocol.LaneIdentity(), "dependabot/x")},
+            id="cell-10-an-unrelated-commit-lets-the-retry-land",
+        ),
+    ],
+)
+def test_an_exclusive_claim_rechecks_its_branch_on_the_retry_after_a_rejected_push(
+    bare_remote: Path,
+    worktree: Path,
+    racer: Callable[[Path, Path], object],
+    refusal: str | None,
+    claim_keys_afterwards: set[str],
+) -> None:
+    """Spec: CLAIM-71 -- the real non-fast-forward rejection makes `commit_transition`
+    refetch and reapply, and the exclusive check runs again on the new state."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    exclusive = claim_intent(
+        identity=protocol.LaneIdentity(), branch="dependabot/x", exclusive_branch=True
+    )
+    transport = RaceOnceTransport(lambda: racer(worktree, bare_remote))
+    attempt = partial(
+        store.commit_transition,
+        observed=fresh_observation(worktree, bare_remote),
+        subject=store.transition_subject("claim", protocol.LaneIdentity(), "dependabot/x"),
+        intent=exclusive,
+        transport=transport,
+    )
+
+    if refusal is None:
+        attempt()
+    else:
+        with pytest.raises(protocol.ClaimConflictError) as refused:
+            attempt()
+        assert str(refused.value) == refusal
+
+    stored = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    assert set(stored.claims) == claim_keys_afterwards
+
+
+def test_an_exclusive_claim_is_stored_byte_identical_to_an_ordinary_lane_claim(
+    tmp_path: Path, bare_remote: Path, worktree: Path
+) -> None:
+    """Spec: CLAIM-72 -- exclusivity never enters the claim record."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    other_remote = init_bare_repository(tmp_path / "other.git")
+    real_git(worktree, "push", str(other_remote), f"{state_ref_tip(bare_remote)}:{store.STATE_REF}")
+    other_worktree = tmp_path / "other-worktree"
+    other_worktree.mkdir()
+    real_git(other_worktree, "init", "-q", "-b", "main")
+    for checkout, remote, exclusive_branch in (
+        (worktree, bare_remote, True),
+        (other_worktree, other_remote, False),
+    ):
+        store.commit_transition(
+            observed=fresh_observation(checkout, remote),
+            subject=store.transition_subject("claim", protocol.LaneIdentity(), "dependabot/x"),
+            intent=claim_intent(
+                identity=protocol.LaneIdentity(),
+                branch="dependabot/x",
+                exclusive_branch=exclusive_branch,
+            ),
+        )
+
+    assert state_ref_listing(bare_remote) == state_ref_listing(other_remote)
 
 
 def test_commit_transition_a_different_key_loser_that_exhausts_retries_names_a_stuck_lock(

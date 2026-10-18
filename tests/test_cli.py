@@ -12,7 +12,6 @@ import shlex
 import subprocess
 import sys
 import threading
-import tomllib
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
@@ -25,6 +24,7 @@ from typing import TextIO, cast
 import pytest
 from board_fixtures import (
     BASE,
+    BIDI_AND_ZERO_WIDTH_CONTROLS,
     FROZEN_TRIGGER,
     FROZEN_UNTIL,
     MINIMAL_BLOCK_TOML,
@@ -49,6 +49,7 @@ from cli_fixtures import (
     ITEM_NEW_BODY,
     LIVE_TRUNK_REF_AFTER,
     RECORDED_ORIGIN_HEAD_READ,
+    FixedDateTime,
     arguments_bash_hands_aco,
     arrange_scope_width,
     assert_missing_identity_message,
@@ -64,6 +65,7 @@ from cli_fixtures import (
     forbid_git_fill,
     forbid_github_construction,
     forbid_protect_git_github_and_identity,
+    freeze_cli_now,
     fresh_observation,
     git_checkout,
     init_bare_repository,
@@ -83,6 +85,7 @@ from cli_fixtures import (
     stub_one_git_call,
     terminal_on_stdin,
     trunk_git_calls,
+    without_git_identity,
     worktrees_and_branches,
 )
 from github_fixtures import (
@@ -91,7 +94,10 @@ from github_fixtures import (
     WORK_ITEM_ISSUE,
     FakeForge,
     ReaderOnlyForge,
+    landing_pull_request,
+    landing_readiness,
 )
+from store_fixtures import RaceOnceTransport, lineage_observation, unrelated_racer_commit
 
 from agent_coordination import (
     __version__,
@@ -99,14 +105,11 @@ from agent_coordination import (
     board_read,
     body,
     checkout,
-    cmd_brief,
     cmd_check,
     cmd_claim,
     cmd_cut,
     cmd_land,
     cmd_next,
-    cmd_reset,
-    cmd_rule,
     cmd_start,
     cmd_status,
     forge,
@@ -127,7 +130,6 @@ from agent_coordination.protocol import (
     ClaimError,
     ClaimRequest,
     ClaimUnavailableError,
-    IssueIdentity,
 )
 from agent_coordination.session import RunContext
 
@@ -165,15 +167,6 @@ TWELVE_VERSIONED_FILES = (
 )
 
 
-def issue_number(identity: protocol.ClaimIdentity) -> int:
-    """The numbered-issue identity's issue number. Every call site here builds an
-    issue-scoped claim (`request(issue=...)`, never `lane=True`), so a `protocol.LaneIdentity`
-    reaching this helper is a real defect in the calling test, not a case to
-    tolerate."""
-    assert isinstance(identity, IssueIdentity)
-    return identity.issue
-
-
 def _live_store_claim() -> protocol.ActiveClaim:
     """The single live claim on the in-memory store fake."""
     state = store.fetch_state(worktree=Path("."), remote="origin")
@@ -207,6 +200,9 @@ class _MinimalForgeReader:
         return dict.fromkeys(numbers, forge.ItemReference(state=forge.ItemState.MISSING))
 
     def landing(self, number: int) -> forge.Landing:
+        raise NotImplementedError
+
+    def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
         raise NotImplementedError
 
     def parent_issue(self, number: int) -> board.ParentIssue | None:
@@ -1992,15 +1988,15 @@ def _the_store_cannot_be_reached(monkeypatch: pytest.MonkeyPatch, _repo: Path) -
 def _trunk_moves_after_the_fetch(monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
     """Another push moves the trunk after `start` fetched and checked it,
     so the worktree it builds stands on a commit it never checked."""
-    real_trunk_commit = checkout.trunk_commit
+    real_commit_at = checkout.commit_at
 
     def check_then_the_trunk_moves(trunk: str, *, directory: Path) -> str:
-        checked = real_trunk_commit(trunk, directory=directory)
+        checked = real_commit_at(trunk, directory=directory)
         real_git(repo, "commit", "-q", "--allow-empty", "-m", "moved")
         real_git(repo, "push", "-q", "origin", "HEAD:main")
         return checked
 
-    monkeypatch.setattr(checkout, "trunk_commit", check_then_the_trunk_moves)
+    monkeypatch.setattr(checkout, "commit_at", check_then_the_trunk_moves)
 
 
 def _trunk_moves_while_a_gone_worktree_is_rebuilt(
@@ -2617,7 +2613,7 @@ def test_start_under_state_ref_claims_the_worktree_it_builds(
     assert status == 0
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     state_tip = real_git(repo, "ls-remote", "origin", store.STATE_REF).stdout.split()[0]
-    assert _lineage_observation(worktree)[0] == state_tip
+    assert lineage_observation(worktree)[0] == state_tip
     claim_id = _claimed_line_id(capsys.readouterr().out, f"issue {item_id}")
     live = store.fetch_state(worktree=worktree, remote="origin").claims
     claim = live[protocol.claim_key(protocol.IssueIdentity(314), _START_BRANCH)]
@@ -3167,9 +3163,9 @@ def _close_after_starts_build(monkeypatch: pytest.MonkeyPatch, close: Callable[[
     real_build = checkout.create_linked_worktree
 
     def build_then_close(
-        path: Path, *, branch: str, trunk: str, directory: Path | None = None
+        path: Path, *, branch: str, start_point: str, directory: Path | None = None
     ) -> None:
-        real_build(path, branch=branch, trunk=trunk, directory=directory)
+        real_build(path, branch=branch, start_point=start_point, directory=directory)
         close()
 
     monkeypatch.setattr(checkout, "create_linked_worktree", build_then_close)
@@ -3736,6 +3732,7 @@ def test_help_lists_commands_in_their_stable_registration_order() -> None:
         "claim",
         "release",
         "land",
+        "adopt",
         "rescope",
         "cut",
         "ask",
@@ -4850,9 +4847,12 @@ def test_cut_fills_the_childs_block_and_keeps_an_emptied_container_body_ok(
         "Scheibe 1 is merged.",
     )
     capsys.readouterr()
-    monkeypatch.setattr(sys, "stdin", io.StringIO(client.item_bodies[CUT_CONTAINER]))
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
+    assert (
+        run_cli(
+            ["body", "--check"], capsys, stdin=client.item_bodies[CUT_CONTAINER]
+        ).expect_success()
+        == "body ok\n"
+    )
 
 
 def test_cut_refuses_a_blockless_container_before_any_write(
@@ -5407,7 +5407,6 @@ def test_cut_retry_meets_its_untyped_child_as_a_twin_until_its_type_is_set_then_
 
 
 RULE_ITEM = 90
-RULE_TODAY = date(2026, 8, 21)  # `_freeze_cli_now` (autouse) pins `datetime.now(UTC)` here.
 
 
 def _client_with_item(
@@ -5424,181 +5423,6 @@ def _client_with_item(
     state = forge.ItemState.CLOSED if closed else forge.ItemState.OPEN
     client.issue_references[number] = forge.ItemReference(state, title, body, is_landing)
     return client
-
-
-@pytest.mark.parametrize("flag,ruling", [("--yes", "yes"), ("--no", "no"), ("--later", "later")])
-def test_rule_writes_a_ruling_and_reports_remaining_open_lines(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    flag: str,
-    ruling: str,
-) -> None:
-    toml_text = (
-        f"{MINIMAL_BLOCK_TOML}"
-        '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-        '[[expectation]]\ntext = "Ship it too?"\ndefault = "later"\n'
-    )
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "1", flag]
-    )
-
-    assert exit_code == 0
-    assert capsys.readouterr().out == f"RULED #{RULE_ITEM} line 1 {ruling}; 1 line(s) still open\n"
-    lines = body.expectation_lines(client.item_bodies[RULE_ITEM])
-    assert lines[0] == body.ExpectationLine(1, "Ship it?", ruling, RULE_TODAY)
-    assert lines[1] == body.ExpectationLine(2, "Ship it too?", None, None, default="later")
-
-
-def test_rule_json_reports_item_index_ruling_date_and_open(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "1", "--yes", "--json"]
-    )
-
-    assert exit_code == 0
-    output = capsys.readouterr().out
-    expected = {
-        "ok": True,
-        "reason": "ruled",
-        "item": RULE_ITEM,
-        "index": 1,
-        "ruling": "yes",
-        "ruled_on": RULE_TODAY.isoformat(),
-        "open": 0,
-    }
-    assert output == json.dumps(expected) + "\n"
-    assert json.loads(output) == expected
-
-
-def test_rule_appends_a_note_to_the_ruled_line_via_cli(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "rule",
-            str(RULE_ITEM),
-            "--line",
-            "1",
-            "--yes",
-            "--note",
-            "Ja, sofort.",
-        ]
-    )
-
-    assert exit_code == 0
-    lines = body.expectation_lines(client.item_bodies[RULE_ITEM])
-    assert lines[0].text == "Ship it? Anmerkung: Ja, sofort."
-
-
-def test_rule_refuses_an_already_ruled_line_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = (
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\n'
-        'ruling = "yes"\nruled_on = 2026-08-01\n'
-    )
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "1", "--no", "--json"]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "line 1 is already ruled" in captured.err
-    assert client.item_bodies == {}
-    _assert_json_refusal_object(captured.err, captured.out, reason="already_ruled")
-
-
-def test_rule_refuses_an_out_of_range_line_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "2", "--yes", "--json"]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "out of range" in captured.err
-    assert client.item_bodies == {}
-    _assert_json_refusal_object(captured.err, captured.out, reason="line_out_of_range")
-
-
-def test_rule_refuses_when_the_forge_cannot_update_item_body(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-    client.capability_overrides[forge.ForgeOperation.UPDATE_ITEM_BODY] = forge.Capability.READ_ONLY
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "1", "--yes", "--json"]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert client.item_bodies == {}
-    assert "ERROR: this forge cannot update_item_body; rule by hand" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-
-
-def test_rule_refuses_a_non_github_canonical_remote_by_host(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`rule` resolves its forge (`context.forge_writer`) before its own
-    typed-refusal handlers (issue #396 review finding): a resolution
-    failure -- here a canonical remote on a host no adapter serves -- must
-    still reach `rule`'s own `report.refuse`, not `cli.main`'s legacy `error` object."""
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/agent-coordination.git"
-    )
-
-    def unused(*_args: object, **_kwargs: object) -> forge.RepositoryId:
-        pytest.fail("rule must refuse the host before ever calling discover_repository")
-
-    monkeypatch.setattr(github, "discover_repository", unused)
-
-    status = issue_claim.main(["rule", "258", "--line", "1", "--yes", "--json"])
-
-    captured = capsys.readouterr()
-    assert status == 2
-    assert captured.err == "ERROR: no forge adapter for host file\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-
-
-def test_rule_reports_invalid_usage_when_repo_is_given_under_state_ref(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """A new `RULE-10` cites `specs/storage-pin.spec.md`'s PIN-04: under
-    `storage = state-ref`, `--repo` is the wrong flag for this run,
-    reported through `--json` as `invalid_usage` -- `rule`'s forge
-    resolution must tell this apart from its generic `unavailable`
-    bucket, the same distinction `brief` already draws."""
-    _write_state_ref_pin(tmp_path)
-
-    status = issue_claim.main(
-        ["--repo", "acme/items", "rule", "258", "--line", "1", "--yes", "--json"]
-    )
-
-    captured = capsys.readouterr()
-    assert status == 2
-    assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 def test_cli_claim_reports_invalid_usage_when_repo_is_given_under_state_ref(
@@ -5642,447 +5466,6 @@ def test_cli_claim_reports_invalid_usage_when_repo_is_given_under_state_ref(
     assert status == 2
     assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
     _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
-
-
-def test_rule_refuses_a_missing_item_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    client = _configured_board_client(monkeypatch, tmp_path)
-    client.issue_references[RULE_ITEM] = forge.ItemReference(forge.ItemState.MISSING)
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "1", "--yes", "--json"]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert client.item_bodies == {}
-    assert f"#{RULE_ITEM} does not exist" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_item")
-
-
-def test_rule_refuses_a_pull_request_target_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    client = _client_with_item(
-        monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text), is_landing=True
-    )
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "1", "--yes", "--json"]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert client.item_bodies == {}
-    assert f"#{RULE_ITEM} is a pull request, not an issue; rule needs an issue" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_item")
-
-
-def test_ask_appends_a_proposed_line_and_rulings_shows_it_as_open(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = (
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\n'
-        'ruling = "yes"\nruled_on = 2026-08-01\n'
-    )
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "ask", str(RULE_ITEM), "--text", "New question?"]
-    )
-
-    assert exit_code == 0
-    assert capsys.readouterr().out == f"ASKED #{RULE_ITEM} line 2: New question?\n"
-
-    new_body = client.item_bodies[RULE_ITEM]
-    monkeypatch.setattr(
-        client,
-        "list_open_board_issues",
-        lambda: (board_issue(RULE_ITEM, "Decide something", new_body),),
-    )
-
-    assert issue_claim.main(["--repo", REPOSITORY, "rulings"]) == 0
-    assert capsys.readouterr().out == (
-        f"#{RULE_ITEM} 1/2: Decide something\n"
-        "  1 ruled yes 2026-08-01: Ship it?\n"
-        "  2 open: New question?\n"
-    )
-
-
-FAILING_BODY_WRITES = [
-    pytest.param(["ask", str(RULE_ITEM), "--text", "New question?"], id="ask"),
-    pytest.param(["rule", str(RULE_ITEM), "--line", "1", "--yes"], id="rule"),
-]
-
-
-@pytest.mark.parametrize("arguments", FAILING_BODY_WRITES)
-def test_a_failing_body_write_names_the_command_own_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    arguments: list[str],
-) -> None:
-    """ASK-12 and RULE-11 (issue #432): the write both commands end with can
-    fail like any other forge call, and used to escape the handler with the
-    bare sentence alone, leaving a `--json` caller nothing on stdout."""
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-    client.fail_update_item_body = True
-    refusal = "update item body failed (simulated)"
-
-    status = issue_claim.main(["--repo", REPOSITORY, *arguments, "--json"])
-
-    captured = capsys.readouterr()
-    assert status == 2
-    assert captured.err == f"ERROR: {refusal}\n"
-    assert json.loads(captured.out) == {
-        "ok": False,
-        "reason": "unavailable",
-        "message": refusal,
-    }
-
-
-def test_ask_json_reports_item_index_text_and_default(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--default",
-            "later",
-            "--json",
-        ]
-    )
-
-    assert exit_code == 0
-    output = capsys.readouterr().out
-    expected = {
-        "ok": True,
-        "reason": "asked",
-        "item": RULE_ITEM,
-        "index": 1,
-        "text": "New question?",
-        "default": "later",
-    }
-    assert output == json.dumps(expected) + "\n"
-    assert json.loads(output) == expected
-
-
-def test_ask_refuses_a_blockless_item_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, "## Now\nOld prose.\n")
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--json",
-        ]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "body malformed: aco: no aco block; ask needs a valid aco block" in captured.err
-    assert client.item_bodies == {}
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_item")
-
-
-@pytest.mark.parametrize(
-    "command_arguments,written",
-    [
-        pytest.param(["ask", "--text", "New question?"], "ASKED", id="ask"),
-        pytest.param(["rule", "--line", "1", "--yes"], "RULED", id="rule"),
-    ],
-)
-def test_ask_and_rule_accept_a_stored_body_whose_slice_title_holds_a_display_control(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    command_arguments: list[str],
-    written: str,
-) -> None:
-    """ASK-05 and RULE keep `body.parse_body`'s gate (issue #606 line 3): BODY-63/
-    BODY-66 refuse at `body --check` and the item writers, so a body stored
-    before that rule still takes a question or a ruling."""
-    toml_text = (
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-        '[[slice]]\nindex = 1\ntitle = "Bad\\u000Btitle"\n'
-    )
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-    command, *options = command_arguments
-
-    exit_code = issue_claim.main(["--repo", REPOSITORY, command, str(RULE_ITEM), *options])
-
-    captured = capsys.readouterr()
-    assert (exit_code, captured.err) == (0, "")
-    assert captured.out.startswith(f"{written} #{RULE_ITEM} line ")
-    assert list(client.item_bodies) == [RULE_ITEM]
-
-
-def test_ask_refuses_when_the_forge_cannot_update_item_body(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    client.capability_overrides[forge.ForgeOperation.UPDATE_ITEM_BODY] = forge.Capability.READ_ONLY
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--json",
-        ]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert client.item_bodies == {}
-    assert "ERROR: this forge cannot update_item_body; ask by hand" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-
-
-def test_ask_refuses_a_non_github_canonical_remote_by_host(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`ask` resolves its forge (`context.forge_writer`) before its own
-    typed-refusal handlers (issue #396 review finding): a resolution
-    failure -- here a canonical remote on a host no adapter serves -- must
-    still reach `ask`'s own `report.refuse`, not `cli.main`'s legacy `error` object."""
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/agent-coordination.git"
-    )
-
-    def unused(*_args: object, **_kwargs: object) -> forge.RepositoryId:
-        pytest.fail("ask must refuse the host before ever calling discover_repository")
-
-    monkeypatch.setattr(github, "discover_repository", unused)
-
-    status = issue_claim.main(["ask", "258", "--text", "New question?", "--json"])
-
-    captured = capsys.readouterr()
-    assert status == 2
-    assert captured.err == "ERROR: no forge adapter for host file\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-
-
-def test_ask_reports_invalid_usage_when_repo_is_given_under_state_ref(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """A new `ASK-11` cites `specs/storage-pin.spec.md`'s PIN-04: under
-    `storage = state-ref`, `--repo` is the wrong flag for this run,
-    reported through `--json` as `invalid_usage` -- `ask`'s forge
-    resolution must tell this apart from its generic `unavailable`
-    bucket, the same distinction `brief` already draws."""
-    _write_state_ref_pin(tmp_path)
-
-    status = issue_claim.main(
-        ["--repo", "acme/items", "ask", "258", "--text", "New question?", "--json"]
-    )
-
-    captured = capsys.readouterr()
-    assert status == 2
-    assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
-
-
-def test_ask_refuses_blank_text_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "ask", str(RULE_ITEM), "--text", "   ", "--json"]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "expectation text must be a non-empty string" in captured.err
-    assert client.item_bodies == {}
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_expectation")
-
-
-ASK_PICTURE_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>'
-
-
-def test_ask_writes_question_example_and_picture(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #295: `--question`/`--example`/`--picture FILE.svg` land on the
-    appended line -- the same `body.expectation_lines` projection `rulings`
-    reads. The human `ASKED` line stays exactly what it was before."""
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    picture_file = tmp_path / "sketch.svg"
-    picture_file.write_text(ASK_PICTURE_SVG, encoding="utf-8")
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--question",
-            "Ship it?",
-            "--example",
-            "Release on Friday.",
-            "--picture",
-            str(picture_file),
-        ]
-    )
-
-    assert exit_code == 0
-    assert capsys.readouterr().out == f"ASKED #{RULE_ITEM} line 1: New question?\n"
-    assert body.expectation_lines(client.item_bodies[RULE_ITEM]) == (
-        body.ExpectationLine(
-            1,
-            "New question?",
-            None,
-            None,
-            default="yes",
-            question="Ship it?",
-            example="Release on Friday.",
-            picture=ASK_PICTURE_SVG,
-        ),
-    )
-
-
-def test_ask_json_reports_question_example_and_picture_when_given(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    picture_file = tmp_path / "sketch.svg"
-    picture_file.write_text(ASK_PICTURE_SVG, encoding="utf-8")
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--question",
-            "Ship it?",
-            "--example",
-            "Release on Friday.",
-            "--picture",
-            str(picture_file),
-            "--json",
-        ]
-    )
-
-    assert exit_code == 0
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "asked",
-        "item": RULE_ITEM,
-        "index": 1,
-        "text": "New question?",
-        "default": "yes",
-        "question": "Ship it?",
-        "example": "Release on Friday.",
-        "picture": ASK_PICTURE_SVG,
-    }
-
-
-def test_ask_refuses_an_invalid_picture_file_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    picture_file = tmp_path / "sketch.svg"
-    picture_file.write_text("<div>not an svg</div>", encoding="utf-8")
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--picture",
-            str(picture_file),
-            "--json",
-        ]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "picture must be inline SVG rooted at <svg>" in captured.err
-    assert client.item_bodies == {}
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_picture")
-
-
-def test_ask_refuses_a_blank_question_with_invalid_expectation_not_invalid_picture(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """`body.ExpectationFieldError` covers `question`, `example`, and `picture`
-    alike (issue #396 review finding): only a refused `picture` names
-    `invalid_picture`, per `specs/ask.spec.md`'s ASK-10 -- a refused
-    `--question`/`--example` names `invalid_expectation` instead."""
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--question",
-            "   ",
-            "--json",
-        ]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "question must be a non-empty string" in captured.err
-    assert client.item_bodies == {}
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_expectation")
-
-
-def test_ask_refuses_a_missing_picture_file_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    missing_file = tmp_path / "missing.svg"
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "ask",
-            str(RULE_ITEM),
-            "--text",
-            "New question?",
-            "--picture",
-            str(missing_file),
-        ]
-    )
-
-    assert exit_code == 2
-    assert f"--picture {missing_file} could not be read" in capsys.readouterr().err
-    assert client.item_bodies == {}
 
 
 @pytest.mark.parametrize(
@@ -6264,26 +5647,29 @@ def test_claim_does_not_corridor_on_a_slice_list(
 
 
 @pytest.mark.parametrize(
-    ("parents", "expect_warning"),
+    ("title", "parents", "expect_warning"),
     [
-        pytest.param({}, True, id="without_sub_issue_relation"),
         pytest.param(
+            "Schema traegt den Titel (#79 Scheibe 21)", {}, True, id="without_sub_issue_relation"
+        ),
+        pytest.param(
+            "Schema traegt den Titel (#79 Scheibe 21)",
             {1017: board.ParentIssue(board.IssueReference(REPOSITORY, 79), "## Now\nCut.")},
             False,
             id="with_sub_issue_relation",
         ),
+        pytest.param(f"Schema (#{'9' * 4301} Scheibe 21)", {}, False, id="parent_past_the_bound"),
     ],
 )
 def test_claim_checks_a_slice_shaped_title_for_its_recorded_parent(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
+    title: str,
     parents: dict[int, board.ParentIssue],
     expect_warning: bool,
 ) -> None:
-    target = board_issue(
-        1017, "Schema traegt den Titel (#79 Scheibe 21)", complete_contract("Claim #1017.")
-    )
+    target = board_issue(1017, title, complete_contract("Claim #1017."))
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(target,))
     client.parents.update(parents)
     monkeypatch.setattr(
@@ -6948,16 +6334,6 @@ def test_next_advises_a_pull_that_runs_as_printed_where_it_stands(
     )
 
 
-# Issue #538: display controls a slice title refuses beside the Cc set --
-# the bidi override and isolate and the zero-width space -- with the code
-# point BODY-63 names.
-_BIDI_AND_ZERO_WIDTH_CONTROLS = (
-    ("\N{RIGHT-TO-LEFT OVERRIDE}", "U+202E"),
-    ("\N{LEFT-TO-RIGHT ISOLATE}", "U+2066"),
-    ("\N{ZERO WIDTH SPACE}", "U+200B"),
-)
-
-
 def _state_ref_container_body(title: str, *slice_titles: str, parent: int | None = None) -> str:
     rows = [
         {"index": index, "title": row, "done_when": "D"}
@@ -7028,7 +6404,7 @@ def test_state_ref_next_prints_cuts_bash_runs_as_printed_and_cut_accepts(
         pytest.param("title", "Rubout\x7f", id="title-DEL"),
         *(
             pytest.param("title", f"Flip{control}side", id=f"title-{codepoint}")
-            for control, codepoint in _BIDI_AND_ZERO_WIDTH_CONTROLS
+            for control, codepoint in BIDI_AND_ZERO_WIDTH_CONTROLS
         ),
         pytest.param("done_when", "Line one\vline two", id="done_when-VT"),
         pytest.param("done_when", "Flip\N{RIGHT-TO-LEFT OVERRIDE}side", id="done_when-U+202E"),
@@ -9297,37 +8673,6 @@ def test_release_merged_rerun_under_state_ref_refuses_a_newer_claim_before_judgi
     assert _state_ref_tip(repo, remote) == tip_before
 
 
-class _RaceOnceTransport:
-    """A `store.PushTransport` that lets one other writer land on
-    `refs/aco/state` between this transition's own read and its first real
-    push attempt (issues #359 R3, #459): `race` performs that genuine second
-    `git push` -- not a monkeypatched rejection -- so the ordinary
-    `commit_transition` retry loop meets a real non-fast-forward rejection
-    and must actually refetch and reapply."""
-
-    def __init__(self, race: Callable[[], object]) -> None:
-        self._race: Callable[[], object] | None = race
-        self._real = store.GitPushTransport()
-
-    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
-        if self._race is not None:
-            race, self._race = self._race, None
-            race()
-        self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
-
-
-def _unrelated_racer_commit(worktree: Path, remote: Path) -> str:
-    """Pushes one commit carrying the current state tree unchanged -- a
-    writer whose own change is unrelated to the transition it races."""
-    current = _state_ref_tip(worktree, remote)
-    tree = real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
-    racer = real_git(
-        worktree, "commit-tree", tree, "-p", current, "-m", "unrelated racer"
-    ).stdout.strip()
-    real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
-    return racer
-
-
 def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -9346,8 +8691,8 @@ def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
     item_id = items.format_item_id(10)
     closed_oid = store.hash_blob(worktree, b"closed\n")
     racer_commits: list[str] = []
-    racer = _RaceOnceTransport(
-        lambda: racer_commits.append(_unrelated_racer_commit(worktree, bare_remote))
+    racer = RaceOnceTransport(
+        lambda: racer_commits.append(unrelated_racer_commit(worktree, bare_remote))
     )
 
     new_state = store.commit_transition(
@@ -9411,7 +8756,7 @@ def test_item_close_refuses_a_claim_that_lands_between_its_first_attempt_and_the
         ),
         protocol.IssueIdentity(10),
     )
-    racer = _RaceOnceTransport(
+    racer = RaceOnceTransport(
         lambda: _land_real_claim(worktree, bare_remote, issue=10, claim_id="claim-10")
     )
     subject = store.TransitionSubject(f"write item {item_id}")
@@ -9467,7 +8812,7 @@ def test_a_pinned_claim_refuses_once_its_item_closes_between_its_rejection_and_r
         ),
         protocol.IssueIdentity(10),
     )
-    racer = _RaceOnceTransport(
+    racer = RaceOnceTransport(
         lambda: store.commit_transition(
             observed=fresh_observation(worktree, bare_remote),
             subject=store.TransitionSubject(f"write item {item_id}"),
@@ -9503,7 +8848,7 @@ def test_a_pinned_claim_on_an_unchanged_open_item_lands_past_an_unrelated_racer(
     _use_real_store(monkeypatch)
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     open_oid = _land_real_item(worktree, bare_remote, issue=10, content=b"open\n")
-    racer = _RaceOnceTransport(lambda: _unrelated_racer_commit(worktree, bare_remote))
+    racer = RaceOnceTransport(lambda: unrelated_racer_commit(worktree, bare_remote))
     claim = _claim_pinned_to_item(10, open_oid)
 
     new_state = store.commit_transition(
@@ -10483,12 +9828,6 @@ def test_cli_dispatch_adapter_error_denies_with_exit_code_two(
     assert "ERROR: adapter failed" in capsys.readouterr().err
 
 
-class FixedDateTime(datetime):
-    @classmethod
-    def now(cls, tz=None):
-        return cls(2026, 8, 21, tzinfo=UTC)
-
-
 @pytest.fixture(autouse=True)
 def _stub_versioned_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
@@ -10560,12 +9899,7 @@ def _stub_trunk(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cmd_rule, "datetime", FixedDateTime)
-    monkeypatch.setattr(board_read, "datetime", FixedDateTime)
-    monkeypatch.setattr(cmd_reset, "datetime", FixedDateTime)
-    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
-    monkeypatch.setattr(cmd_brief, "datetime", FixedDateTime)
-    monkeypatch.setattr(cmd_cut, "datetime", FixedDateTime)
+    freeze_cli_now(monkeypatch)
 
 
 def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
@@ -15060,36 +14394,6 @@ def test_no_path_class_list_is_read_or_written() -> None:
 DOCUMENTATION_LANE_BRANCH = "docs/tidy-readme"
 
 
-def landing_pull_request(
-    *,
-    body: str,
-    number: int = 12,
-    base_ref_name: str = "main",
-    head_ref_name: str = LANDING_BRANCH,
-    head_repository: str = REPOSITORY,
-    author: str = "ada",
-    merged: bool = False,
-    merge_commit: str | None = None,
-    title: str = "feat: land the lane",
-) -> forge.Landing:
-    """`merge_commit` defaults to a shared, well-formed sha once `merged` is
-    true (a real merged pull request always carries one) and to `None`
-    otherwise; a test proving the merge commit's own authority
-    (issue #397) passes its own sha instead."""
-    return forge.Landing(
-        number,
-        author,
-        body,
-        github.repository_id(head_repository),
-        head_ref_name,
-        base_ref_name,
-        merged,
-        merge_commit if merge_commit is not None else (MERGE_COMMIT_SHA if merged else None),
-        title,
-        MERGE_COMMIT_SHA,
-    )
-
-
 def documentation_lane_claim(
     claim_id: str = "tidy", branch: str = DOCUMENTATION_LANE_BRANCH
 ) -> ClaimRequest:
@@ -15273,6 +14577,209 @@ def test_check_refuses_an_issueless_pull_request_without_its_lane_claim(
     assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
 
 
+def _dependency_configuration(scenario: str) -> str:
+    entries = [] if scenario == "empty" else ["pyproject.toml", "uv.lock", ".github/workflows/"]
+    return f"dependency_paths = {json.dumps(entries)}\n"
+
+
+def _dependency_listing_scenario(client: FakeForge, repo: Path, scenario: str) -> None:
+    write_repository_config(repo, _dependency_configuration(scenario))
+    paths = {
+        "valid": [("uv.lock", None), ("pyproject.toml", None)],
+        "outside": [("uv.lock", None), ("src/x.py", None)],
+        "five": [(path, None) for path in "edcba"],
+        "long-many": [(letter * 300, None) for letter in "abc"],
+        "rename-in": [("uv.lock", "src/a.py")],
+        "rename-out": [("uv2.lock", "uv.lock")],
+        "deleted": [("uv.lock", None)],
+        "nested": [(".github/workflows/a/b.yml", None)],
+        "prefix": [(".github/workflowsX/a.yml", None)],
+        "config": [(".aco/board.toml", None)],
+        "cap": [(f"file-{index}", None) for index in range(3000)],
+    }.get(scenario, [("uv.lock", None)])
+    if scenario == "malformed":
+        client.changes_by_number[12] = forge.ForgeMalformedResponseError(
+            "GitHub returned a malformed changed file"
+        )
+        return
+    before_head = "b" * 40 if scenario == "wrong-head" else MERGE_COMMIT_SHA
+    after_head = "b" * 40 if scenario in {"moves", "wrong-head"} else MERGE_COMMIT_SHA
+    count = 3200 if scenario == "cap" else len(paths)
+    client.changes_by_number[12] = forge.PullRequestChanges(
+        forge.ListingReading(before_head, count),
+        forge.ListingReading(after_head, count),
+        tuple(forge.ChangedFile(path, previous) for path, previous in paths),
+    )
+
+
+@pytest.mark.parametrize(
+    ("body", "claimed", "reason", "scenario"),
+    [
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            None,
+            id="cell-11",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            False,
+            "has no active issue-less lane claim on branch 'fix/x'",
+            None,
+            id="cell-27",
+        ),
+        pytest.param(
+            "No-Item: deps\nCloses #5",
+            True,
+            f"declares no work item but closes {REPOSITORY}#5; name it as the work item",
+            None,
+            id="cell-28",
+        ),
+        pytest.param(
+            "No-Item: chore",
+            True,
+            "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
+            None,
+            id="cell-31",
+        ),
+        pytest.param(
+            "No-Item: DEPS",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            None,
+            id="cell-32",
+        ),
+        pytest.param("No-Item: deps", True, None, "valid", id="cell-1"),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes src/x.py, which dependency_paths in .aco/board.toml does not name",
+            "outside",
+            id="cell-2",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes a, b, c, and 2 more, which dependency_paths in .aco/board.toml does not name",
+            "five",
+            id="cell-3",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes src/a.py, which dependency_paths in .aco/board.toml does not name",
+            "rename-in",
+            id="cell-4",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes uv2.lock, which dependency_paths in .aco/board.toml does not name",
+            "rename-out",
+            id="cell-5",
+        ),
+        pytest.param("No-Item: deps", True, None, "deleted", id="cell-6"),
+        pytest.param("No-Item: deps", True, None, "nested", id="cell-8"),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes .github/workflowsX/a.yml, "
+            "which dependency_paths in .aco/board.toml does not name",
+            "prefix",
+            id="cell-9",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changes .aco/board.toml, which dependency_paths in .aco/board.toml does not name",
+            "config",
+            id="cell-10",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "declares No-Item: deps, but .aco/board.toml names no dependency_paths",
+            "empty",
+            id="cell-12",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "lists 3000 of its 3200 changed files; aco judges only a complete listing",
+            "cap",
+            id="cell-19",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "GitHub returned a malformed changed file",
+            "malformed",
+            id="cell-21",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changed while aco listed its files; run the command again",
+            "moves",
+            id="cell-23",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            True,
+            "changed while aco listed its files; run the command again",
+            "wrong-head",
+            id="cell-25",
+        ),
+        pytest.param(
+            "No-Item: deps",
+            False,
+            "has no active issue-less lane claim on branch 'fix/x'",
+            "valid",
+            id="cell-27b",
+        ),
+        pytest.param(
+            "No-Item: deps\nCloses #5",
+            True,
+            f"declares no work item but closes {REPOSITORY}#5; name it as the work item",
+            "valid",
+            id="cell-28b",
+        ),
+        pytest.param("No-Item: fix", True, None, "outside", id="cell-29"),
+        pytest.param("No-Item: docs", True, None, "outside", id="cell-30"),
+    ],
+)
+def test_check_judges_a_deps_pull_request_by_its_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    body: str,
+    claimed: bool,
+    reason: str | None,
+    scenario: str | None,
+    tmp_path: Path,
+) -> None:
+    client = check_client(
+        monkeypatch,
+        landing_pull_request(body=body, head_ref_name="fix/x"),
+        standing=(documentation_lane_claim(branch="fix/x"),) if claimed else (),
+    )
+    if scenario is not None:
+        _dependency_listing_scenario(client, tmp_path, scenario)
+    if not claimed:
+        _patch_store_write(monkeypatch)
+
+    assert run_check() == (0 if reason is None else 2)
+    output = capsys.readouterr()
+    if reason is None:
+        assert output.out == f"PR #12 by ada declares {body}\n"
+    elif scenario == "malformed":
+        assert output.err == f"ERROR: {reason}\n"
+    else:
+        assert output.err == f"REFUSED: pull request #12 {reason}\n"
+    reads = scenario not in {None, "empty"} and claimed and body == "No-Item: deps"
+    assert client.changes_reads == ([12] if reads else [])
+
+
 def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -15292,13 +14799,18 @@ def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
     )
 
 
+@pytest.mark.parametrize(
+    "body",
+    [f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}", "No-Item: deps"],
+    ids=["work-item", "cell-33-deps"],
+)
 def test_check_refuses_a_pull_request_proposing_another_repositorys_branch(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], body: str
 ) -> None:
     check_client(
         monkeypatch,
         landing_pull_request(
-            body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
+            body=body,
             head_repository="fork/agent-coordination",
         ),
     )
@@ -15330,7 +14842,7 @@ def test_check_refuses_a_pull_request_proposing_another_repositorys_branch(
         ),
         pytest.param(
             "No-Item: chore\n\nHousekeeping.",
-            "carries `No-Item: chore`; an issue-less pull request is docs or fix",
+            "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
             id="unknown-no-item-kind",
         ),
         pytest.param(
@@ -15867,10 +15379,19 @@ def test_release_merged_json_omits_freed_and_next_when_the_board_is_unreachable(
     assert "hint:" in captured.err
 
 
+@pytest.mark.parametrize("kind", ["docs", "fix", "deps"])
 def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
     monkeypatch: pytest.MonkeyPatch,
+    kind: str,
 ) -> None:
-    merged_release_client(monkeypatch, body="No-Item: docs", lane=True)
+    merged_release_client(
+        monkeypatch,
+        body=f"No-Item: {kind}",
+        lane=True,
+        landings=(
+            _trunk_landing(MERGE_COMMIT_SHA, board.trunk_commit_classification((), (kind,))),
+        ),
+    )
 
     assert issue_claim.main(["--repo", REPOSITORY, "release", "--merged", "12"]) == 0
 
@@ -16076,7 +15597,7 @@ def test_release_merged_refuses_a_lane_whose_merge_commit_names_a_work_item(
     refusal = (
         f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
         f"`Work-Item: {work_item_value}`; an issue-less lane needs a "
-        '`No-Item: <docs|fix>` trailer; release it with --abandoned "landed as PR #12 '
+        '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
         'with a malformed trailer"'
     )
 
@@ -16591,6 +16112,26 @@ def test_release_merged_removes_a_clean_merged_lane_worktree_and_branch(
     assert "worktree: removed\n" in capsys.readouterr().out
 
 
+def test_release_merged_survives_an_open_pull_request_with_a_reference_past_the_digit_bound(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
+    number = "1" * 4301
+    cast(
+        FakeForge, github.GitHubForge(github.repository_id(REPOSITORY))
+    ).board_open_pull_requests = (
+        board.PullRequest(300, "Foreign", f"Refs #{number}\n\nsee #{number}", "foreign/branch"),
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12"]) == 0
+
+    output = capsys.readouterr().out
+    assert output.startswith("RELEASED ")
+    assert "\nfreed: " in output
+    assert "worktree: removed\n" in output
+    assert not worktree.exists()
+
+
 def _start_from_a_stale_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> object:
     """`start` once the remote's `main` moved on from another clone: the
     exit code, and whether its worktree stands on that remote tip."""
@@ -16898,7 +16439,9 @@ def test_every_command_names_a_canonical_remote_with_no_url_configured(
     expected_out: str,
     unconfigure_hub: Callable[[pytest.MonkeyPatch, Path, Path], None],
 ) -> None:
-    """Issue #508 proof 1, against real git: the board names `hub`, which
+    """Spec: BOARD-53, BOOT-04, CHECK-15, CLM-32, REL-39, RESET-18, START-28.
+
+    Issue #508 proof 1, against real git: the board names `hub`, which
     this clone never added, so `start`, `release --merged`, `board`,
     `check` and `claim` refuse by naming it rather than fetching nothing or
     reading the local `main` as its trunk -- before any write: no ref
@@ -17254,56 +16797,12 @@ def test_release_merged_keeps_the_worktree_for_every_reason(
         assert worktree.exists()
 
 
-def _land_readiness(
-    number: int = 12,
-    *,
-    checks: tuple[forge.CheckRun, ...] = (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
-) -> forge.LandingReadiness:
-    return forge.LandingReadiness(
-        number, True, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, checks
-    )
-
-
-def _land_preflight_client(
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    readiness: forge.LandingReadiness,
-    body: str = f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
-    item_closed: bool = False,
-    claimed: bool = True,
-    claim_agent: str = "Ada",
-) -> FakeForge:
-    """A session `aco land 12` can preflight-refuse against, with no real
-    git at all (issue #405): every scenario here fails before the checkout
-    is ever consulted, unlike `_land_scenario`'s real-git happy path.
-    `claimed=False` leaves the item with no live claim at all -- the other
-    half of LANDCMD-08's own ordering proof, alongside `item_closed`.
-    `claim_agent`, when it differs from `_patch_release_session`'s own
-    default session identity `Ada`, is the claim/parent/closing check's
-    existence proof standing beside a foreign claimant this session is not
-    authorized to land (issue #405 point 7)."""
-    standing = (
-        (
-            request(
-                "landing", claim_agent, issue=WORK_ITEM_ISSUE, branch=LANDING_BRANCH, scope=("src",)
-            ),
-        )
-        if claimed
-        else ()
-    )
-    client = FakeForge()
-    client.landings[12] = landing_pull_request(
-        body=body, merged=False, head_ref_name=LANDING_BRANCH
-    )
-    client.readiness_by_number[12] = readiness
-    if item_closed:
-        client.closed_issues.add(WORK_ITEM_ISSUE)
-    _patch_release_session(monkeypatch, client, *standing, branch=LANDING_BRANCH)
-    return client
-
-
 def _land_repository(
-    tmp_path: Path, *, set_head: bool = True, branch: str = LANDING_BRANCH
+    tmp_path: Path,
+    *,
+    set_head: bool = True,
+    branch: str = LANDING_BRANCH,
+    board_config: str | None = None,
 ) -> Path:
     """A real bare-remote-backed repository (issue #405) with `branch`
     diverged from `main` by one pushed commit and `main` itself checked out
@@ -17316,6 +16815,9 @@ def _land_repository(
     (issue #405 CI coverage follow-up)."""
     repo, _remote = real_repository_with_bare_remote(tmp_path)
     (repo / "base.txt").write_text("base\n")
+    if board_config is not None:
+        write_repository_config(repo, board_config)
+        real_git(repo, "add", str(board.CONFIG_PATH))
     real_git(repo, "add", "base.txt")
     real_git(repo, "commit", "-q", "-m", "initial")
     if set_head:
@@ -17340,17 +16842,16 @@ def _land_scenario(
     branch: str = LANDING_BRANCH,
     issue: int | None = WORK_ITEM_ISSUE,
     body: str | None = None,
+    board_config: str | None = None,
 ) -> tuple[Path, FakeForge]:
     """`claim_agent`, when it differs from the `Ada` session identity set
-    below, stands the same foreign claim `_land_preflight_client`'s own
-    `claim_agent` proves against a fake reader (issue #405 round-4 finding
-    5), but here against `land`'s real merge/checkout path, so a
+    below, stands a foreign claim against `land`'s real merge/checkout path, so a
     `--coordinator-override --role coordinator` land of it can be proven
     reaching the merge, not just proven refused without those flags.
     `branch`/`issue`/`body`, when they name an issue-less lane instead of
     the default `Work-Item:` scenario, stand `cmd_land._land_preflight`'s own
     `protocol.LaneIdentity` branch (issue #405 CI coverage follow-up)."""
-    repo = _land_repository(tmp_path, set_head=set_head, branch=branch)
+    repo = _land_repository(tmp_path, set_head=set_head, branch=branch, board_config=board_config)
     standing = request("landing", claim_agent, issue=issue, branch=branch, scope=("src",))
     client = FakeForge()
     client.landings[12] = landing_pull_request(
@@ -17358,7 +16859,7 @@ def _land_scenario(
         merged=False,
         head_ref_name=branch,
     )
-    client.readiness_by_number[12] = _land_readiness()
+    client.readiness_by_number[12] = landing_readiness()
     client.merge_remote = tmp_path / "remote.git"
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
@@ -17370,821 +16871,48 @@ def _land_scenario(
 
 
 @pytest.mark.parametrize(
-    ("readiness", "reason"),
+    "path, displayed",
     [
+        pytest.param("src/\x1b]0;pwned\x07x.py", r"src/\x1b]0;pwned\x07x.py", id="escape"),
         pytest.param(
-            forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ()),
-            "pull request #12 is not open; it cannot be landed",
-            id="not-open",
+            "src/x.py\nPR #12 by bot declares No-Item: deps",
+            r"src/x.py\nPR #12 by bot declares No-Ite…",
+            id="newline",
         ),
-        pytest.param(
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "dirty", ()),
-            "pull request #12 is not mergeable (dirty)",
-            id="not-mergeable",
-        ),
-        pytest.param(
-            _land_readiness(checks=()),
-            "pull request #12 exposes no CI checks; cannot verify green CI",
-            id="no-checks",
-        ),
-        pytest.param(
-            _land_readiness(checks=(forge.CheckRun("build", None),)),
-            "pull request #12 has checks still running: build; wait for every check to succeed",
-            id="check-running",
-        ),
-        pytest.param(
-            _land_readiness(checks=(forge.CheckRun("build", "failure"),)),
-            "pull request #12 has non-successful checks: build (failure); "
-            "land only after every check succeeds",
-            id="check-failed",
-        ),
-        pytest.param(
-            _land_readiness(
-                checks=tuple(forge.CheckRun(f"check-{index}", None) for index in range(5))
-            ),
-            "pull request #12 has checks still running: check-0, check-1, check-2, and 2 more; "
-            "wait for every check to succeed",
-            id="check-running-name-list-capped",
-        ),
-        pytest.param(
-            _land_readiness(checks=(forge.CheckRun("x" * 300, None),)),
-            "pull request #12 has checks still running: "
-            + ("x" * 39 + "…")
-            + "; wait for every check to succeed",
-            id="check-running-name-truncated",
-        ),
-        pytest.param(
-            _land_readiness(checks=tuple(forge.CheckRun("x" * 300, None) for _ in range(5))),
-            "pull request #12 has checks still running: "
-            + ", ".join([("x" * 39 + "…")] * 3)
-            + ", and 2 more; wait for ev…",
-            id="check-running-many-long-names-bounded-with-error-prefix",
-        ),
+        pytest.param("src/" + "x" * 300, "src/" + "x" * 35 + "…", id="long"),
     ],
 )
-def test_land_refuses_every_readiness_defect_before_any_write(
+def test_dependency_paths_refusal_escapes_and_bounds_each_name(
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    readiness: forge.LandingReadiness,
-    reason: str,
-) -> None:
-    """Issue #405 Beweis 1: every readiness-based preflight refusal merges
-    nothing, deletes no branch, and reaches no store write -- `aco land`'s
-    own read-only order. The printed line (issue #405 round-4 finding) never
-    exceeds 200 characters including `cli.main`'s own `ERROR: ` prefix, not just
-    the sentence the refusal builds before that prefix is added."""
-    client = _land_preflight_client(monkeypatch, readiness=readiness)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    error_line = capsys.readouterr().err
-    assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
-    assert client.merge_calls == []
-    assert client.deleted_branches == []
-
-
-QUALITY_VERDICT = forge.CheckRun("quality / verdict", forge.CHECK_CONCLUSION_SUCCESS)
-NO_QUALITY_VERDICT_REFUSAL = (
-    "pull request #12 has no quality / verdict check; main adopts the quality gate "
-    "(quality/config.toml)"
-)
-
-
-@pytest.mark.parametrize(
-    ("quality_config", "readiness", "reason"),
-    [
-        pytest.param(
-            "",
-            _land_readiness(),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-without-verdict",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=()),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-without-any-check",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(forge.CheckRun("quality / verdict (push)", "success"),)),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-with-a-differently-named-verdict",
-        ),
-        pytest.param(
-            "",
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ()),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-blocked-without-verdict-names-the-cause",
-        ),
-        pytest.param(
-            "",
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", (QUALITY_VERDICT,)),
-            "pull request #12 is not mergeable (blocked)",
-            id="adopted-blocked-with-verdict",
-        ),
-        pytest.param(
-            None,
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ()),
-            "pull request #12 is not mergeable (blocked)",
-            id="unadopted-blocked-without-verdict-is-unchanged",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(forge.CheckRun("build", None),)),
-            "pull request #12 has checks still running: build; wait for every check to succeed",
-            id="adopted-running-check-defers-the-verdict",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(forge.CheckRun("quality / verdict", "failure"),)),
-            "pull request #12 has non-successful checks: quality / verdict (failure); "
-            "land only after every check succeeds",
-            id="adopted-red-verdict-keeps-the-existing-refusal",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(QUALITY_VERDICT,)),
-            "pull request #12 carries no `Work-Item:` or `No-Item:` line",
-            id="adopted-with-verdict-passes-on-to-the-next-check",
-        ),
-    ],
-)
-def test_land_requires_the_quality_verdict_where_the_default_branch_adopts_the_gate(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    quality_config: str | None,
-    readiness: forge.LandingReadiness,
-    reason: str,
-) -> None:
-    """LANDCMD-43: presence of `quality/config.toml` on the default branch --
-    read once, from that branch, never the pull request head -- makes the
-    completed checks need `quality / verdict`; a running check defers it and
-    a repository without the file lands as before."""
-    client = _land_preflight_client(monkeypatch, readiness=readiness, body="Advances #72")
-    client.quality_config = quality_config
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == f"ERROR: {reason}\n"
-    assert client.quality_config_reads == ["main"]
-    assert client.merge_calls == []
-
-
-def test_land_bounds_the_quality_refusal_for_a_long_default_branch_name(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-43 within the 200-character refusal bound: a long default
-    branch name cannot push the printed line past it."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-    client.default_branch_name = "b" * 255
-    client.quality_config = ""
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    error_line = capsys.readouterr().err.rstrip("\n")
-    assert len(error_line) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
-    assert error_line.startswith("ERROR: pull request #12 has no quality / verdict check; bbb")
-    assert error_line.endswith("…")
-
-
-@pytest.mark.parametrize(
-    ("on_default_branch", "at_pull_request_head", "reason"),
-    [
-        pytest.param(
-            "", None, NO_QUALITY_VERDICT_REFUSAL, id="head-deleting-the-config-is-still-refused"
-        ),
-        pytest.param(
-            None,
-            "",
-            "pull request #12 is not mergeable (blocked)",
-            id="adoption-pull-request-adding-the-config-is-not-refused",
-        ),
-    ],
-)
-def test_land_judges_adoption_by_the_default_branch_never_by_the_pull_request_head(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    on_default_branch: str | None,
-    at_pull_request_head: str | None,
-    reason: str,
-) -> None:
-    """LANDCMD-43 contract rule 1: a head that deletes `quality/config.toml`
-    still needs the verdict, and the pull request that adds it does not."""
-    blocked = forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ())
-    client = _land_preflight_client(monkeypatch, readiness=blocked)
-    client.quality_config = on_default_branch
-    client.quality_config_at_other_refs = at_pull_request_head
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == f"ERROR: {reason}\n"
-
-
-def test_land_does_not_read_the_quality_config_for_a_closed_pull_request(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-02 runs before LANDCMD-43: a pull request that is not open
-    refuses as such and the quality configuration is never read."""
-    closed = forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ())
-    client = _land_preflight_client(monkeypatch, readiness=closed)
-    client.quality_config = ""
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == "ERROR: pull request #12 is not open; it cannot be landed\n"
-    assert client.quality_config_reads == []
-
-
-def test_land_refuses_a_closed_pull_request_even_when_the_default_branch_cannot_be_read(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-02 precedes the default-branch lookup LANDCMD-43 needs."""
-    closed = forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ())
-    client = _land_preflight_client(monkeypatch, readiness=closed)
-
-    def unreadable_default_branch() -> str:
-        raise forge.ForgeError("GitHub returned HTTP 500")
-
-    monkeypatch.setattr(client, "default_branch", unreadable_default_branch)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == "ERROR: pull request #12 is not open; it cannot be landed\n"
-
-
-def test_land_fails_loud_when_the_quality_config_cannot_be_read(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-43 contract rule 4: a contents read that is neither a file nor
-    a 404 refuses with the forge's error and never counts as not adopted."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-    client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) != 0
-
-    assert "HTTP 500" in capsys.readouterr().err
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405: once every check succeeds, `check <pr>`'s own
-    classification rules apply unchanged -- an unclassified body refuses
-    the same sentence `check` would, before any write."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), body="Advances #72")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: pull request #12 carries no `Work-Item:` or `No-Item:` line\n"
-    )
-    assert client.merge_calls == []
-
-
-def _toml_syntax_error(text: str) -> str:
-    """Python's own `tomllib` wording for `text`'s syntax error -- the
-    parser's text, not this tool's, so each Python version may word it
-    differently."""
-    try:
-        tomllib.loads(text)
-    except tomllib.TOMLDecodeError as error:
-        return str(error)
-    raise AssertionError(f"{text!r} parses as TOML")
-
-
-@pytest.mark.parametrize(
-    ("head_board_config", "item_closed", "reason"),
-    [
-        pytest.param(
-            None,
-            False,
-            "pull request #12 removes .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="removed",
-        ),
-        pytest.param(
-            None,
-            True,
-            "pull request #12 removes .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="removed-ahead-of-a-closed-item",
-        ),
-        pytest.param(
-            'storage = "state-ref"\n',
-            False,
-            "pull request #12 changes storage in .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="storage-changed",
-        ),
-        pytest.param(
-            'canonical_remote = "upstream"\n',
-            False,
-            "pull request #12 changes canonical_remote in .aco/board.toml; "
-            "aco land cannot release its claim across that change",
-            id="canonical-remote-changed",
-        ),
-        pytest.param(
-            'storage = "gitlab"\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml storage must be 'github' or 'state-ref'",
-            id="invalid",
-        ),
-        pytest.param(
-            'merge_method = "rebase"\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml merge_method must be 'merge' or 'squash'",
-            id="invalid-merge-method",
-        ),
-        pytest.param(
-            "not toml =",
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: cannot read board "
-            f"configuration .aco/board.toml: {_toml_syntax_error('not toml =')}",
-            id="invalid-syntax",
-        ),
-        pytest.param(
-            f'{"x" * 300} = "y"\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml has unknown top-level key " + "x" * 77 + "…",
-            id="invalid-bounded",
-        ),
-        pytest.param(
-            '"bad\\nkey" = 1\n"esc\\u001b[31m" = 2\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml has unknown top-level key bad\\nkey, esc\\x1b[31m",
-            id="invalid-control-characters-escaped",
-        ),
-        pytest.param(
-            '"a\N{RIGHT-TO-LEFT OVERRIDE}b\N{LEFT-TO-RIGHT ISOLATE}c\N{ZERO WIDTH SPACE}d'
-            '\x9be\tf\N{NO-BREAK SPACE}g" = 1\n',
-            False,
-            "pull request #12 carries an invalid .aco/board.toml: board configuration "
-            ".aco/board.toml has unknown top-level key a\N{REVERSE SOLIDUS}u202eb"
-            "\N{REVERSE SOLIDUS}u2066c\N{REVERSE SOLIDUS}u200bd\\x9be\tf\N{NO-BREAK SPACE}g",
-            id="invalid-display-controls-escaped-as-next-shows-them",
-        ),
-    ],
-)
-def test_land_refuses_a_head_that_changes_its_governing_board_config_before_any_write(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    head_board_config: str | None,
-    item_closed: bool,
-    reason: str,
-) -> None:
-    """Issue #505 proofs 2 and 3 (LANDCMD-22..24): a pull request head that
-    removes the board configuration, changes `storage` or `canonical_remote`
-    in it, or carries one the validator refuses would strand `land`'s own
-    release half, so it refuses before any write -- ahead of LANDCMD-08's
-    item check, and within the 200-character refusal line."""
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client = _land_preflight_client(
-        monkeypatch, readiness=_land_readiness(), item_closed=item_closed
-    )
-    client.head_board_config = head_board_config
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    error_line = capsys.readouterr().err
-    assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= cmd_land._LAND_REFUSAL_LINE_LENGTH_LIMIT
-    assert (client.merge_calls, client.deleted_branches) == ([], [])
-
-
-def test_land_refuses_a_closed_work_item(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405: a classified work item that is not open refuses by name,
-    before any write -- distinct from `check`'s own rules, which never
-    verify the item's live state."""
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), item_closed=True)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        f"ERROR: work item #{WORK_ITEM_ISSUE} is not open; it cannot be landed\n"
-    )
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_closed_work_item_before_its_own_missing_claim(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 review/gate finding: LANDCMD-08 (item not open) is checked
-    before claim validation -- a closed item with no live claim at all
-    refuses by its own closed state, never the claim it also lacks, and
-    never reads the store's claims to find out."""
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client = _land_preflight_client(
-        monkeypatch, readiness=_land_readiness(), item_closed=True, claimed=False
-    )
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        f"ERROR: work item #{WORK_ITEM_ISSUE} is not open; it cannot be landed\n"
-    )
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_classification_defect_from_a_missing_claim(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 CI coverage follow-up: `policy.classification_defect`'s own
-    claim-check branch inside `cmd_land._land_preflight` -- distinct from
-    `test_land_refuses_a_classification_defect_reusing_checks_own_rules`'s
-    shape defect and `test_land_refuses_a_closed_work_item_before_its_own_
-    missing_claim`'s LANDCMD-08-first ordering -- an *open* work item with
-    no live claim at all refuses by its own missing claim."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), claimed=False)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        f"ERROR: pull request #12 has no active claim for #{WORK_ITEM_ISSUE} "
-        f"on branch {LANDING_BRANCH!r}\n"
-    )
-    assert client.merge_calls == []
-
-
-@pytest.mark.parametrize(
-    ("arguments", "repeat"),
-    [
-        pytest.param((), "aco land 12 --agent Grok", id="plain"),
-        pytest.param(
-            ("--keep-worktree",),
-            "aco land 12 --keep-worktree --agent Grok",
-            id="keeps-the-worktree-flag",
-        ),
-        pytest.param(
-            ("--keep-worktree", "--head", MERGE_COMMIT_SHA[:7].upper()),
-            f"aco land 12 --head {MERGE_COMMIT_SHA[:7]} --keep-worktree --agent Grok",
-            id="keeps-the-reviewed-head",
-        ),
-    ],
-)
-def test_land_refuses_a_foreign_claim_before_the_merge(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    arguments: tuple[str, ...],
-    repeat: str,
-) -> None:
-    """Issue #405 point 7 review/gate finding: `cmd_land._land_preflight` itself
-    authorizes this session against the live claim, reusing `release`'s own
-    claimant/coordinator-override check (`cmd_release._resolve_release_claimant`) --
-    a claim held by another agent refuses before the merge, not only once
-    the delegated `release --merged` step runs after it. The repeat keeps
-    `--head` and `--keep-worktree` (LANDCMD-10)."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), claim_agent="Grok")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", *arguments]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: only the original claimant may release; repeat as the holder with "
-        f"`{repeat}`, or use an explicit coordinator override "
-        "(holder='Grok (builder)', this session='Ada (builder)')\n"
-    )
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_coordinator_override_with_no_role_before_the_merge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 point 8 review finding (LANDCMD-19): `--coordinator-override`
-    with no `--role` refuses via `cmd_land._land_preflight`'s own call to `release`'s
-    `protocol.require_coordinator_override`, before any merge."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--coordinator-override"]) == 2
-
-    assert capsys.readouterr().err == "ERROR: a coordinator override requires --role coordinator\n"
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_coordinator_override_with_the_wrong_role_before_the_merge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 point 8 review finding (LANDCMD-19): `--coordinator-override
-    --role builder` refuses the same way as an omitted `--role` -- only
-    `--role coordinator` behind the override authorizes it."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-
-    assert (
-        issue_claim.main(
-            ["--repo", REPOSITORY, "land", "12", "--coordinator-override", "--role", "builder"]
-        )
-        == 2
-    )
-
-    assert capsys.readouterr().err == "ERROR: a coordinator override requires --role coordinator\n"
-    assert client.merge_calls == []
-
-
-@pytest.mark.parametrize(
-    "head_board_config",
-    [
-        pytest.param("", id="config-unchanged"),
-        pytest.param(
-            'priority_labels = ["ux"]\nidea_label = "idea"\nbody_contract = "block"\n',
-            id="only-non-governing-settings-changed",
-        ),
-    ],
-)
-def test_land_merges_a_green_pull_request_and_runs_the_release_path(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    head_board_config: str,
-) -> None:
-    """Issue #405 Beweis 1: a green pull request merges with a pinned head
-    sha and a self-composed commit message whose classification trailer is
-    its own last paragraph, the remote branch delete request is made, this
-    checkout's own `main` fast-forwards to the fresh merge commit, and the
-    existing `release --merged` path closes the item and frees the claim.
-    Issue #505 proof 4: a head changing only settings that never decide
-    where the release writes (LANDCMD-23) lands the same way, its board
-    configuration read at the very head sha the merge is pinned to."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    client.head_board_config = head_board_config
-    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-
-    [(number, head_sha, _method, _title, body)] = client.merge_calls
-    assert (number, head_sha) == (12, MERGE_COMMIT_SHA)
-    assert client.file_reads == [(board.CONFIG_PATH, head_sha)]
-    paragraphs = body.strip().split("\n\n")
-    assert paragraphs[-1] == f"Work-Item: #{WORK_ITEM_ISSUE}"
-    assert client.deleted_branches == [LANDING_BRANCH]
-    assert client.closed_issues == {WORK_ITEM_ISSUE}
-    trunk_after = real_git(repo, "rev-parse", "main").stdout.strip()
-    assert trunk_after != trunk_before
-    assert client.landings[12].merge_commit == trunk_after
-    out = capsys.readouterr().out
-    assert "freed:" in out
-    assert "next:" in out
-
-
-_HEAD_USAGE_REFUSAL = "--head must be 7 to 40 hex digits"
-
-
-@pytest.mark.parametrize(
-    ("reviewed_head", "refusal", "forge_read"),
-    [
-        pytest.param(MERGE_COMMIT_SHA, None, True, id="full-sha-matches"),
-        pytest.param(MERGE_COMMIT_SHA[:7].upper(), None, True, id="uppercase-prefix-matches"),
-        pytest.param(
-            "0000000",
-            f"pull request #12 head is {MERGE_COMMIT_SHA}, not the reviewed 0000000; "
-            "review the new head before landing",
-            True,
-            id="head-moved",
-        ),
-        pytest.param("main", _HEAD_USAGE_REFUSAL, False, id="not-hex"),
-        pytest.param(MERGE_COMMIT_SHA[:6], _HEAD_USAGE_REFUSAL, False, id="shorter-than-7"),
-        pytest.param(MERGE_COMMIT_SHA + "0", _HEAD_USAGE_REFUSAL, False, id="longer-than-40"),
-    ],
-)
-def test_land_merges_only_the_head_its_reviewers_saw(
-    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    reviewed_head: str,
-    refusal: str | None,
-    forge_read: bool,
+    path: str,
+    displayed: str,
 ) -> None:
-    """Issue #590 lines 1-3: `--head` lands the pull request only while the
-    head preflight reads -- the one the merge pins -- starts with the
-    reviewed sha; a moved head refuses before any write, and a value that
-    is no 7-40 hex digit sha refuses before the forge is read at all."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", reviewed_head])
-
-    error = capsys.readouterr().err
-    pinned = [head_sha for _number, head_sha, *_rest in client.merge_calls]
-    if refusal is None:
-        assert (status, error, pinned) == (0, "", [MERGE_COMMIT_SHA])
-        return
-    trunk_after = real_git(repo, "rev-parse", "main").stdout.strip()
-    assert (status, error, pinned, trunk_after, client.requests > 0) == (
-        2,
-        f"ERROR: {refusal}\n",
-        [],
-        trunk_before,
-        forge_read,
-    )
-
-
-def _land_already_merged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FakeForge:
-    _repo, client = _land_scenario(monkeypatch, tmp_path)
-    _land_mark_already_merged(client)
-    return client
-
-
-def _land_under_the_state_ref_pin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FakeForge:
-    _write_state_ref_pin(tmp_path)
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    return client
-
-
-@pytest.mark.parametrize(
-    "arrange",
-    [
-        pytest.param(_land_already_merged, id="already-merged"),
-        pytest.param(_land_under_the_state_ref_pin, id="state-ref"),
-    ],
-)
-def test_land_refuses_a_malformed_head_as_usage_before_any_forge_call(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    arrange: Callable[[pytest.MonkeyPatch, Path], FakeForge],
-) -> None:
-    """Issue #592 line 4, LANDCMD-33's order: a malformed `--head` refuses
-    at the argument parse, so neither a rerun's skipped preflight nor the
-    state-ref refusal (LANDCMD-01) answers first, and the forge is never asked."""
-    client = arrange(monkeypatch, tmp_path)
-
-    status = issue_claim.main(["land", "12", "--head", "main"])
-
-    assert (status, capsys.readouterr().err, client.requests) == (
-        2,
-        f"ERROR: {_HEAD_USAGE_REFUSAL}\n",
-        0,
-    )
-
-
-def test_land_merges_an_issueless_lane_pull_request(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Issue #405 CI coverage follow-up: `cmd_land._land_preflight`'s own
-    `protocol.LaneIdentity` branch -- an issue-less, `No-Item:` pull request -- merges
-    through `land`'s real path exactly as a `Work-Item:` one does
-    (`test_land_merges_a_green_pull_request_and_runs_the_release_path`
-    proves the work-item branch): no item to close, but the claim releases."""
+    """LAND-77: forge path text cannot inject a line or terminal control."""
     _repo, client = _land_scenario(
-        monkeypatch, tmp_path, branch=LANE_BRANCH, issue=None, body="No-Item: docs"
+        monkeypatch,
+        tmp_path,
+        branch="fix/x",
+        issue=None,
+        body="No-Item: deps",
+        board_config=_dependency_configuration("valid"),
+    )
+    reading = forge.ListingReading(MERGE_COMMIT_SHA, 1)
+    client.changes_by_number[12] = forge.PullRequestChanges(
+        reading, reading, (forge.ChangedFile(path, None),)
     )
 
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
+    assert issue_claim.main(["--repo", REPOSITORY, "check", "12"]) == 2
 
-    [(number, head_sha, _method, _title, body)] = client.merge_calls
-    assert (number, head_sha) == (12, MERGE_COMMIT_SHA)
-    assert body.strip().split("\n\n")[-1] == "No-Item: docs"
-    assert client.deleted_branches == [LANE_BRANCH]
-    assert client.closed_issues == set()
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
+    assert capsys.readouterr().err == (
+        f"REFUSED: pull request #12 changes {displayed}, "
+        "which dependency_paths in .aco/board.toml does not name\n"
+    )
+    assert client.merge_calls == []
 
 
-_MERGE = board.MergeMethod.MERGE
 _SQUASH = board.MergeMethod.SQUASH
-_REBASE = board.MergeMethod.REBASE
-
-
-_MERGE_COMMIT = (_MERGE, "Merge pull request #12", 2)
-_SQUASH_COMMIT = (_SQUASH, "feat: land the lane (#12)", 1)
-_SQUASH_OR_REBASE_RULE = (frozenset({_SQUASH, _REBASE}),)
-
-
-@pytest.mark.parametrize(
-    ("pinned", "allowed", "rules", "outcome"),
-    [
-        pytest.param(None, None, (), _MERGE_COMMIT, id="settings-withheld"),
-        pytest.param(None, frozenset({_MERGE, _SQUASH}), (), _MERGE_COMMIT, id="both"),
-        pytest.param(
-            None,
-            frozenset({_SQUASH, _REBASE}),
-            (),
-            _SQUASH_COMMIT,
-            id="squash-and-rebase-without-a-merge-commit",
-        ),
-        pytest.param(
-            "squash",
-            frozenset({_MERGE, _SQUASH}),
-            (),
-            _SQUASH_COMMIT,
-            id="pinned-squash-beats-the-default",
-        ),
-        pytest.param(
-            None,
-            frozenset({_REBASE}),
-            (),
-            "pull request #12 cannot land: this repository allows neither a merge commit nor "
-            "a squash merge",
-            id="only-rebase-refuses-before-the-merge",
-        ),
-        pytest.param(
-            None,
-            frozenset(board.MergeMethod),
-            _SQUASH_OR_REBASE_RULE,
-            _SQUASH_COMMIT,
-            id="ruleset-narrows-all-three-settings-to-a-squash",
-        ),
-        pytest.param(
-            None,
-            None,
-            (*_SQUASH_OR_REBASE_RULE, frozenset({_MERGE, _SQUASH})),
-            _SQUASH_COMMIT,
-            id="withheld-settings-narrowed-by-every-ruleset",
-        ),
-        pytest.param(
-            "merge",
-            None,
-            _SQUASH_OR_REBASE_RULE,
-            "board.toml merge_method merge is not allowed on main: GitHub allows squash, rebase",
-            id="pinned-merge-a-ruleset-excludes-refuses-before-the-merge",
-        ),
-        pytest.param(
-            "merge",
-            frozenset({_SQUASH}),
-            (),
-            "board.toml merge_method merge is not allowed on main: GitHub allows squash",
-            id="pinned-merge-the-settings-exclude-refuses-before-the-merge",
-        ),
-        pytest.param(
-            "merge",
-            frozenset(board.MergeMethod),
-            (frozenset({_REBASE}),),
-            "board.toml merge_method merge is not allowed on main: GitHub allows rebase",
-            id="pinned-merge-a-rebase-only-ruleset-excludes-refuses-before-the-merge",
-        ),
-        pytest.param(
-            None,
-            frozenset({_MERGE}),
-            _SQUASH_OR_REBASE_RULE,
-            "GitHub allows no merge method aco can use on main",
-            id="ruleset-leaving-no-usable-method-refuses-before-the-merge",
-        ),
-        pytest.param(
-            "squash",
-            frozenset({_MERGE}),
-            _SQUASH_OR_REBASE_RULE,
-            "GitHub allows no merge method aco can use on main",
-            id="pinned-squash-a-ruleset-leaving-no-method-refuses-before-the-merge",
-        ),
-    ],
-)
-def test_land_merges_with_the_method_the_repository_allows(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    pinned: str | None,
-    allowed: frozenset[board.MergeMethod] | None,
-    rules: tuple[frozenset[board.MergeMethod], ...],
-    outcome: tuple[board.MergeMethod, str, int] | str,
-) -> None:
-    """Issues #578 line 2 and #615 lines 1-3: `land` merges with the board
-    configuration's own `merge_method` pin, else the method the forge allows
-    -- its settings narrowed by every `pull_request` rule on the default
-    branch, a squash commit titled `<pull request title> (#<n>)` where only
-    squash remains -- and refuses before any merge a pin the forge excludes
-    or a forge leaving no method it can use. The delegated
-    `release --merged` accepts a single-parent commit's own trailer exactly
-    as it accepts a merge commit's, and removes the clean lane worktree
-    whose tip is the head the merge pinned, squashed or not."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    client.allowed_methods = allowed
-    client.branch_rules = {"main": rules}
-    lane = tmp_path / "lane"
-    real_git(repo, "worktree", "add", "-q", str(lane), LANDING_BRANCH)
-    real_git(repo, "branch", "-q", "--set-upstream-to", f"origin/{LANDING_BRANCH}", LANDING_BRANCH)
-    lane_tip = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
-    client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=lane_tip)
-    if pinned is not None:
-        write_repository_config(repo, f'merge_method = "{pinned}"\n')
-        real_git(repo, "add", "-f", str(board.CONFIG_PATH))
-        real_git(repo, "commit", "-q", "-m", "pin the merge method")
-        real_git(repo, "push", "-q", "origin", "main")
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    output = capsys.readouterr()
-    error = output.err
-    if isinstance(outcome, str):
-        assert (status, error, client.merge_calls) == (2, f"ERROR: {outcome}\n", [])
-        return
-    [(_number, _head_sha, method, title, body)] = client.merge_calls
-    trunk = real_git(repo, "rev-parse", "main").stdout.strip()
-    parents = real_git(repo, "rev-list", "--parents", "-n", "1", trunk).stdout.split()[1:]
-    assert (status, error, method, title, len(parents)) == (0, "", *outcome)
-    assert body.strip().split("\n\n")[-1] == f"Work-Item: #{WORK_ITEM_ISSUE}"
-    assert client.closed_issues == {WORK_ITEM_ISSUE}
-    assert "worktree: removed\n" in output.out
-    assert (lane.exists(), checkout.branch_exists(LANDING_BRANCH)) == (False, False)
-    upstream = real_git(repo, "config", f"branch.{LANDING_BRANCH}.remote", check=False)
-    assert upstream.stdout == ""
 
 
 _LAND_AGAIN = ("land", "12")
@@ -18484,26 +17212,6 @@ def test_land_cleans_up_a_squashed_lane_branch_by_compare_and_delete(
     assert _branch_configuration(repo) == expected
 
 
-def test_land_merges_a_foreign_claim_under_a_coordinator_override(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Issue #405 round-4 finding 5: `--coordinator-override --role
-    coordinator` against a claim held by another agent (`Grok`, not this
-    session's own `Ada`) reaches the merge and completes exactly like an
-    ordinary land -- `test_land_refuses_a_foreign_claim_before_the_merge`
-    proves the same claim refused without those flags."""
-    repo, client = _land_scenario(monkeypatch, tmp_path, claim_agent="Grok")
-
-    status = issue_claim.main(
-        ["--repo", REPOSITORY, "land", "12", "--coordinator-override", "--role", "coordinator"]
-    )
-
-    assert status == 0
-    [(number, head_sha, _method, _title, _body)] = client.merge_calls
-    assert (number, head_sha) == (12, MERGE_COMMIT_SHA)
-    assert client.landings[12].merge_commit == real_git(repo, "rev-parse", "main").stdout.strip()
-
-
 def _break_delete_branch(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
     def failing(branch: str) -> None:
         raise ClaimError("delete branch failed (simulated)")
@@ -18625,143 +17333,35 @@ def _land_merged_pending_release(
     return repo, client
 
 
+@pytest.mark.parametrize("branch", [LANDING_BRANCH, pytest.param("dependabot/x", id="21")])
 def test_land_reports_incomplete_follow_up_and_a_rerun_resumes_without_a_second_merge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, branch: str
 ) -> None:
     """Issue #405 Beweis 2: a failure after the merge names the exact
     recovery line, never a second merge on rerun, and the rerun still closes
     the item and frees the claim."""
-    _repo, client = _land_merged_pending_release(monkeypatch, capsys, tmp_path)
+    if branch == "dependabot/x":
+        _repo, client = _land_scenario(
+            monkeypatch, tmp_path, branch=branch, issue=None, body="No-Item: fix"
+        )
+        delete_branch = client.delete_branch
+        _break_delete_branch(monkeypatch, client)
+        assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
+        assert "follow-up incomplete" in capsys.readouterr().err
+        assert _live_store_claim().branch == branch
+        monkeypatch.setattr(client, "delete_branch", delete_branch)
+    else:
+        _repo, client = _land_merged_pending_release(monkeypatch, capsys, tmp_path)
     reads_before_the_rerun = list(client.quality_config_reads)
     client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
 
     assert len(client.merge_calls) == 1
-    assert client.closed_issues == {WORK_ITEM_ISSUE}
+    assert client.closed_issues == (set() if branch == "dependabot/x" else {WORK_ITEM_ISSUE})
+    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
     # LANDCMD-18: a rerun after the merge never reads the quality configuration.
     assert client.quality_config_reads == reads_before_the_rerun
-
-
-def _land_mark_already_merged(client: FakeForge) -> None:
-    """Simulate `land` having already merged pull request 12 in an earlier
-    run (issue #405 round-4 finding 1): the fake forge's own landing record
-    is the one signal `cmd_land.run` reads to tell a rerun from a fresh run, so
-    a rerun test never needs to actually run the merge first."""
-    client.landings[12] = replace(client.landings[12], merged=True, merge_commit=MERGE_COMMIT_SHA)
-
-
-_OVERRIDE_WITHOUT_COORDINATOR_ROLE = "a coordinator override requires --role coordinator"
-
-
-@pytest.mark.usefixtures("isolated_global_git_config")
-@pytest.mark.parametrize(
-    ("override_arguments", "git_identity", "refusal"),
-    [
-        pytest.param(
-            ["--coordinator-override"], True, _OVERRIDE_WITHOUT_COORDINATOR_ROLE, id="omitted-role"
-        ),
-        pytest.param(
-            ["--coordinator-override", "--role", "builder"],
-            True,
-            _OVERRIDE_WITHOUT_COORDINATOR_ROLE,
-            id="wrong-role",
-        ),
-        pytest.param([], False, checkout.LAND_MISSING_GIT_IDENTITY_REFUSAL, id="no-git-identity"),
-    ],
-)
-def test_land_rerun_refuses_a_bad_override_or_a_missing_git_identity_before_any_side_effect(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    override_arguments: list[str],
-    git_identity: bool,
-    refusal: str,
-) -> None:
-    """Issue #405 round-4 finding 1: an already-merged rerun skips
-    `cmd_land._land_preflight` entirely, so a coordinator-override role check placed
-    only there would leave a rerun free to delete the branch, fast-forward,
-    and let the delegated `release --merged` step close the item on a bare
-    `--coordinator-override` with no coordinator role behind it.
-    `cmd_land.run`'s own entry validates this before the fresh/rerun split, so
-    none of that runs. A rerun from a checkout without a git identity
-    refuses the same way (LANDCMD-18 keeps LANDCMD-25)."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    _land_mark_already_merged(client)
-    if not git_identity:
-        _without_git_identity(monkeypatch, repo)
-    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12", *override_arguments])
-
-    assert status == 2
-    assert capsys.readouterr().err == f"ERROR: {refusal}\n"
-    assert client.merge_calls == []
-    assert client.deleted_branches == []
-    assert client.closed_issues == set()
-    assert real_git(repo, "rev-parse", "main").stdout.strip() == trunk_before
-
-
-def test_land_refuses_under_the_state_ref_pin(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #405: `aco land` is a github-only command; a repository pinned
-    to `storage = state-ref` has no pull requests to land, refused before
-    any forge or store read."""
-    _write_state_ref_pin(tmp_path)
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-
-    assert issue_claim.main(["land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: aco land is a github command; storage = state-ref has no pull requests to land\n"
-    )
-
-
-@pytest.mark.parametrize(
-    ("gh_failure", "printed"),
-    [
-        pytest.param(
-            "gh: Head branch was modified. Review and try the merge again. (HTTP 409)",
-            "ERROR: pull request #12 changed while it was checked; re-run land\n",
-            id="head-moved-409",
-        ),
-        pytest.param(
-            "gh: Repository rule violations found (HTTP 405)",
-            "ERROR: GitHub refused the merge of pull request #12: "
-            "gh: Repository rule violations found (HTTP 405)\n",
-            id="refused-405",
-        ),
-    ],
-)
-def test_land_names_the_forges_merge_refusal(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    gh_failure: str,
-    printed: str,
-) -> None:
-    """Issue #405: a 409 from the merge endpoint means the pull request's
-    head moved since preflight read it -- refused by name, before any
-    follow-up step, with its one recovery: re-run. A 405 is GitHub refusing
-    to perform the merge at all, which no re-run repairs, so it names the
-    forge's own reason instead (issue #603). The merge runs through the real
-    GitHub adapter, so its status mapping is proven at `land`'s entry point."""
-    merge_requests: list[list[str]] = []
-
-    def gh_answers_the_merge(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        merge_requests.append(arguments)
-        raise forge.ForgeError(gh_failure)
-
-    github_merge = github.GitHubForge(github.repository_id(REPOSITORY), run=gh_answers_the_merge)
-    _repo, client = _land_scenario(monkeypatch, tmp_path)
-    monkeypatch.setattr(client, "merge_landing", github_merge.merge_landing)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == printed
-    assert len(merge_requests) == 1
-    assert client.deleted_branches == []
 
 
 def test_land_prints_the_reinstall_line_in_this_packages_own_repository(
@@ -18789,36 +17389,18 @@ def test_land_prints_the_reinstall_line_in_this_packages_own_repository(
     )
 
 
-def test_land_refuses_a_dirty_checkout_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #405: `land` fast-forwards this exact checkout once it merges,
-    so an uncommitted change here refuses before any write, never merged
-    away or silently ignored."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    (repo / "untracked.txt").write_text("dirty\n")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: land must run from a clean checkout of the default branch 'main'\n"
-    )
-    assert client.merge_calls == []
-
-
 def _land_on_the_forges_trunk(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     *,
     canonical: str,
-    checked_out: str,
     leftover_main: bool,
 ) -> tuple[Path, FakeForge]:
     """`_land_scenario` with no recorded `HEAD`, where the forge alone
     names the default branch `trunk` (issue #492): `canonical` carries
     `trunk`, the lane branch, and -- when `leftover_main` -- the `main` the
     switch to `trunk` left behind, the lane branch stands in its own clean
-    linked worktree `lane`, and the checkout stands on `checked_out`. A
+    linked worktree `lane`, and the checkout stands on `trunk`. A
     canonical remote other than `origin` is a fresh bare `<canonical>.git`
     the tracked board configuration names."""
     repo, client = _land_scenario(monkeypatch, tmp_path, set_head=False)
@@ -18839,33 +17421,17 @@ def _land_on_the_forges_trunk(
         bare = Path(real_git(repo, "remote", "get-url", canonical).stdout.strip())
         real_git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
         real_git(repo, "push", "-q", canonical, "--delete", "main")
-    real_git(repo, "checkout", "-q", "-B", checked_out)
+    real_git(repo, "checkout", "-q", "-B", "trunk")
     real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
     return repo, client
 
 
 @pytest.mark.parametrize(
-    (
-        "canonical",
-        "leftover_main",
-        "checked_out",
-        "expected_status",
-        "expected_error",
-        "expected_fetches",
-    ),
+    "canonical, leftover_main",
     [
-        pytest.param("origin", True, "trunk", 0, "", 1, id="origin-trunk-fast-forwards"),
-        pytest.param("hub", True, "trunk", 0, "", 1, id="hub-trunk-fast-forwards"),
-        pytest.param("origin", False, "trunk", 0, "", 1, id="origin-without-main-fast-forwards"),
-        pytest.param(
-            "origin",
-            True,
-            "main",
-            2,
-            "ERROR: land must run from a clean checkout of the default branch 'trunk'\n",
-            0,
-            id="checkout-on-main-names-trunk",
-        ),
+        pytest.param("origin", True, id="origin-trunk-fast-forwards"),
+        pytest.param("hub", True, id="hub-trunk-fast-forwards"),
+        pytest.param("origin", False, id="origin-without-main-fast-forwards"),
     ],
 )
 def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
@@ -18874,23 +17440,17 @@ def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
     tmp_path: Path,
     canonical: str,
     leftover_main: bool,
-    checked_out: str,
-    expected_status: int,
-    expected_error: str,
-    expected_fetches: int,
 ) -> None:
     """Issue #492 proof 1, against real git: the forge's default branch is
     `trunk` and no `<canonical>/HEAD` is recorded. `land` runs from a clean
     `trunk`, fast-forwards it from `<canonical>/trunk` after fetching that
     remote once, and its delegated release removes the lane's worktree as
     merged into that same `trunk` -- neither a `main` left behind nor its
-    absence decides it (LANDCMD-21); a checkout on `main` refuses LANDCMD-11
-    naming `trunk`."""
+    absence decides it (LANDCMD-21)."""
     repo, client = _land_on_the_forges_trunk(
         monkeypatch,
         tmp_path,
         canonical=canonical,
-        checked_out=checked_out,
         leftover_main=leftover_main,
     )
     trunk_calls = trunk_git_calls(monkeypatch, canonical)
@@ -18900,28 +17460,15 @@ def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
     fetches = [call for call in trunk_calls if call[0] == "fetch"]
     local_trunk = real_git(repo, "rev-parse", "trunk").stdout.strip()
     output = capsys.readouterr()
-    assert (status, output.err, fetches) == (
-        expected_status,
-        expected_error,
-        [("fetch", repo.resolve())] * expected_fetches,
-    )
-    landed = expected_status == 0
-    assert (local_trunk == client.landings[12].merge_commit) is landed
-    assert ("worktree: removed\n" in output.out, (tmp_path / "lane").exists()) == (
-        landed,
-        not landed,
-    )
-
-
-def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications() -> None:
-    """Issue #405: a trunk trailer is always local (`Work-Item: #<n>`,
-    never the pull request body's qualified `owner/repo#n` form); a
-    `No-Item:` classification renders unchanged either way."""
-    work_item = board.WorkItemClassification(board.IssueReference(REPOSITORY, 72))
-    no_item = board.NoItemClassification(board.NoItemKind.DOCS)
-
-    assert board.land_trunk_trailer(work_item) == "Work-Item: #72"
-    assert board.land_trunk_trailer(no_item) == "No-Item: docs"
+    observed = (status, output.err, fetches)
+    expected = (0, "", [("fetch", repo.resolve())])
+    assert observed == expected
+    observed = local_trunk
+    expected = client.landings[12].merge_commit
+    assert observed == expected
+    observed = ("worktree: removed\n" in output.out, (tmp_path / "lane").exists())
+    expected = (True, False)
+    assert observed == expected
 
 
 def _git_trailers(repository: Path, scratch: Path, message: str) -> tuple[str, ...]:
@@ -19245,47 +17792,62 @@ def test_land_rerun_recovers_release_routing_after_the_body_changed(
 
 
 def _land_from_a_separate_clone(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, git_identity: bool
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    lane_branch: str | None = None,
 ) -> tuple[Path, Path, FakeForge]:
     """`_land_scenario`'s claim, held for real in `refs/aco/state`, with the
     lane worktree beside the primary checkout and `aco land` running from a
     second, clean clone that holds no worktree at all (issue #578, the
     songmaker landing clone): the primary checkout, the clone, and the
     forge. The forge closes the item through its own `Closes #<n>` on the
-    merge. `git_identity=False` leaves the clone with no user.name or
-    user.email, which git may never guess."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
+    merge. `lane_branch` stands an issue-less
+    lane on that foreign branch instead: a `No-Item:` pull request whose
+    lane claim is keyed by the branch."""
+    if lane_branch is None:
+        repo, client = _land_scenario(monkeypatch, tmp_path)
+    else:
+        repo, client = _land_scenario(
+            monkeypatch, tmp_path, branch=lane_branch, issue=None, body="No-Item: fix"
+        )
     client.closes_on_merge = True
     _use_real_store(monkeypatch)
     remote = tmp_path / "remote.git"
     store.bootstrap(worktree=repo, remote=str(remote))
-    _claim_the_landing_issue(repo, remote, "landing-claim")
-    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
+    _claim_the_landing_branch(
+        repo,
+        remote,
+        "landing-claim",
+        branch=lane_branch or LANDING_BRANCH,
+        lane=lane_branch is not None,
+    )
+    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), lane_branch or LANDING_BRANCH)
     clone = tmp_path / "landing-clone"
     real_git(tmp_path, "clone", "-q", str(remote), str(clone))
-    _without_git_identity(monkeypatch, clone)
-    if git_identity:
-        real_git(clone, "config", "user.name", "Lander")
-        real_git(clone, "config", "user.email", "lander@example.com")
+    without_git_identity(monkeypatch, clone)
+    real_git(clone, "config", "user.name", "Lander")
+    real_git(clone, "config", "user.email", "lander@example.com")
     redirect_toplevel(monkeypatch, clone)
     monkeypatch.chdir(clone)
     return repo, clone, client
 
 
-def _claim_the_landing_issue(repo: Path, remote: Path, claim_id: str) -> None:
-    """Ada's claim `claim_id` on the landing issue and branch, written to
-    `refs/aco/state` from `repo`."""
+def _claim_the_landing_branch(
+    repo: Path, remote: Path, claim_id: str, *, branch: str = LANDING_BRANCH, lane: bool = False
+) -> None:
+    """Ada's claim `claim_id` on `branch`, the landing issue's own or, with
+    `lane`, an issue-less lane's, written to `refs/aco/state` from `repo`."""
+    identity = protocol.LaneIdentity() if lane else protocol.IssueIdentity(WORK_ITEM_ISSUE)
     store.commit_transition(
         observed=fresh_observation(repo, remote),
-        subject=store.ClaimTransitionSubject(
-            f"claim issue {WORK_ITEM_ISSUE}", item=str(WORK_ITEM_ISSUE)
-        ),
+        subject=store.transition_subject("claim", identity, branch),
         intent=protocol.ClaimIntent(
-            identity=protocol.IssueIdentity(WORK_ITEM_ISSUE),
+            identity=identity,
             agent="Ada",
             role="builder",
             base=protocol.ObjectId("c" * 40),
-            branch=LANDING_BRANCH,
+            branch=branch,
             scope=("src",),
             claim_id=protocol.ClaimId(claim_id),
             operation_id=f"{claim_id}-op",
@@ -19293,98 +17855,113 @@ def _claim_the_landing_issue(repo: Path, remote: Path, claim_id: str) -> None:
     )
 
 
-def _without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) -> None:
-    """`checkout_path` with no git identity git may use or guess: none
-    configured locally or in the environment (the caller isolates the global
-    configuration)."""
-    real_git(checkout_path, "config", "user.useConfigOnly", "true")
-    real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
-    real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
-    for variable in (
-        "GIT_AUTHOR_NAME",
-        "GIT_AUTHOR_EMAIL",
-        "GIT_COMMITTER_NAME",
-        "GIT_COMMITTER_EMAIL",
-        "EMAIL",
-    ):
-        monkeypatch.delenv(variable, raising=False)
-
-
 @pytest.mark.usefixtures("isolated_global_git_config")
-@pytest.mark.parametrize(
-    ("git_identity", "expected_status", "expected_error", "expected_merges", "released"),
-    [
-        pytest.param(True, 0, "", 1, True, id="identity-releases"),
-        pytest.param(
-            False,
-            2,
-            f"ERROR: {checkout.LAND_MISSING_GIT_IDENTITY_REFUSAL}\n",
-            0,
-            False,
-            id="no-identity-refuses-before-the-merge",
-        ),
-    ],
-)
-def test_land_from_a_separate_clone_releases_or_refuses_before_the_merge(
+def test_land_from_a_separate_clone_merges_and_releases_the_claim_keeping_the_lane_worktree(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    git_identity: bool,
-    expected_status: int,
-    expected_error: str,
-    expected_merges: int,
-    released: bool,
 ) -> None:
     """Issue #578 line 1: a landing clone without the lane worktree, whose
     item GitHub already closed through `Closes #<n>`, merges and releases
-    the claim, the lane worktree kept where it lives and named as kept. The
-    songmaker cause: a clone with no git identity cannot commit that release
-    to the claim state, so it refuses before anything merges (LANDCMD-25)."""
-    _repo, clone, client = _land_from_a_separate_clone(
-        monkeypatch, tmp_path, git_identity=git_identity
-    )
+    the claim, the lane worktree kept where it lives and named as kept."""
+    _repo, clone, client = _land_from_a_separate_clone(monkeypatch, tmp_path)
 
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     output = capsys.readouterr()
     claims = store.fetch_state(worktree=clone, remote="origin").claims
-    assert (status, output.err, len(client.merge_calls)) == (
-        expected_status,
-        expected_error,
-        expected_merges,
-    )
+    observed = (status, output.err, len(client.merge_calls))
+    expected = (0, "", 1)
+    assert observed == expected
     kept_elsewhere = (
         f"worktree: kept -- no linked worktree on {LANDING_BRANCH} in this checkout; "
         f"run aco release {WORK_ITEM_ISSUE} --merged 12 --branch {LANDING_BRANCH} "
         "in the checkout that holds it\n"
     )
-    assert (not claims, kept_elsewhere in output.out) == (released, released)
+    observed = (not claims, kept_elsewhere in output.out)
+    expected = (True, True)
+    assert observed == expected
     assert (tmp_path / "lane").exists()
+
+
+def _land_and_release_the_lane_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    branch: str,
+) -> tuple[Path, Path, FakeForge]:
+    """`aco land 12` from a separate clone released the claim on `branch`
+    (the landing issue's own, or a foreign branch's issue-less lane): the
+    repository holding the lane worktree, the clone, and the forge, set up
+    for a rerun."""
+    repo, clone, client = _land_from_a_separate_clone(
+        monkeypatch,
+        tmp_path,
+        lane_branch=None if branch == LANDING_BRANCH else branch,
+    )
+    client.allowed_methods = frozenset({_SQUASH})
+    recorded_head = real_git(repo, "rev-parse", branch).stdout.strip()
+    client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=recorded_head)
+    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
+    capsys.readouterr()
+    client.closed_issues.discard(WORK_ITEM_ISSUE)
+    client.landing_comments.clear()
+    client.issue_reference_lookups.clear()
+    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
+    return repo, clone, client
+
+
+_FOREIGN_BRANCH = "dependabot/x"
+_RERUN_ROWS = (
+    ("removes-the-lane", False, False, False, "removed"),
+    (
+        "a-claim-taken-meanwhile-keeps-the-lane",
+        False,
+        True,
+        False,
+        "kept -- claimed again while this release ran",
+    ),
+    (
+        "the-keep-worktree-flag-keeps-the-lane",
+        False,
+        False,
+        True,
+        "kept -- --keep-worktree was given",
+    ),
+)
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
-    ("claimed_meanwhile", "keep_worktree_flag", "worktree"),
+    (
+        "branch",
+        "claimed_before_the_land_rerun",
+        "claimed_meanwhile",
+        "keep_worktree_flag",
+        "worktree",
+    ),
     [
-        pytest.param(False, False, "removed", id="removes-the-lane"),
+        pytest.param(branch, *row[1:], id=f"{branch_id}-{row[0]}")
+        for branch, branch_id in ((LANDING_BRANCH, "issue"), (_FOREIGN_BRANCH, "foreign-lane"))
+        for row in _RERUN_ROWS
+    ]
+    + [
         pytest.param(
+            _FOREIGN_BRANCH,
             True,
             False,
-            "kept -- claimed again while this release ran",
-            id="a-claim-taken-meanwhile-keeps-the-lane",
-        ),
-        pytest.param(
             False,
-            True,
-            "kept -- --keep-worktree was given",
-            id="the-keep-worktree-flag-keeps-the-lane",
-        ),
+            "",
+            id="foreign-lane-an-issue-claim-taken-since-the-release-refuses",
+        )
     ],
 )
 def test_land_rerun_after_its_release_finishes_and_names_the_release_that_removes_the_lane(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
+    branch: str,
+    claimed_before_the_land_rerun: bool,
     claimed_meanwhile: bool,
     keep_worktree_flag: bool,
     worktree: str,
@@ -19396,29 +17973,33 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     printed in the checkout holding the clean lane at the recorded head,
     removes it. The trigger is the missing claim, never a closed item: a
     reopened item stays open, uncommented and unread (REL-47). A claim
-    taken while that release verifies the landing keeps the lane (REL-55)."""
-    repo, clone, client = _land_from_a_separate_clone(monkeypatch, tmp_path, git_identity=True)
-    client.allowed_methods = frozenset({_SQUASH})
-    recorded_head = real_git(repo, "rev-parse", LANDING_BRANCH).stdout.strip()
-    client.readiness_by_number[12] = replace(client.readiness_by_number[12], head_sha=recorded_head)
+    taken while that release verifies the landing keeps the lane (REL-55) --
+    on a foreign branch whichever claim it is (REL-59) -- and one taken
+    before the rerun refuses REL-03 there (REL-58)."""
+    repo, clone, client = _land_and_release_the_lane_claim(monkeypatch, capsys, tmp_path, branch)
     remote = tmp_path / "remote.git"
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-    capsys.readouterr()
     state_after_release = _state_ref_tip(clone, remote)
-    client.closed_issues.discard(WORK_ITEM_ISSUE)
-    client.landing_comments.clear()
-    client.issue_reference_lookups.clear()
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    rerun = f"aco release {WORK_ITEM_ISSUE} --merged 12 --branch {LANDING_BRANCH}"
+    item = "" if branch == _FOREIGN_BRANCH else f" {WORK_ITEM_ISSUE}"
+    rerun = f"aco release{item} --merged 12 --branch {branch}"
+    if claimed_before_the_land_rerun:
+        _claim_the_landing_branch(repo, remote, "bob-claim", branch=branch)
+        state_after_release = _state_ref_tip(clone, remote)
 
     land_status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     land_output = capsys.readouterr()
+    if claimed_before_the_land_rerun:
+        assert (land_status, land_output.out) == (2, "")
+        assert _lane_lookup_refusal(branch) in land_output.err
+        assert len(client.merge_calls) == 1
+        assert _state_ref_tip(clone, remote) == state_after_release
+        assert (tmp_path / "lane").exists()
+        return
     assert (land_status, land_output.err, land_output.out) == (
         0,
         "",
         "LANDED pull request #12 already; nothing left to release\n"
-        f"worktree: kept -- no linked worktree on {LANDING_BRANCH} in this checkout; "
+        f"worktree: kept -- no linked worktree on {branch} in this checkout; "
         f"run {rerun} in the checkout that holds it\n",
     )
     redirect_toplevel(monkeypatch, repo)
@@ -19427,7 +18008,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
         verified_landing = client.landing
 
         def landing_while_start_claims_again(number: int) -> forge.Landing:
-            _claim_the_landing_issue(repo, remote, "reopened-claim")
+            _claim_the_landing_branch(repo, remote, "reopened-claim", branch=branch)
             return verified_landing(number)
 
         monkeypatch.setattr(client, "landing", landing_while_start_claims_again)
@@ -19444,7 +18025,7 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
     )
     lane_kept = claimed_meanwhile or keep_worktree_flag
     assert (tmp_path / "lane").exists() is lane_kept
-    assert checkout.branch_exists(LANDING_BRANCH) is lane_kept
+    assert checkout.branch_exists(branch) is lane_kept
     claims = store.fetch_state(worktree=repo, remote=str(remote)).claims
     assert (len(client.merge_calls), bool(claims)) == (1, claimed_meanwhile)
     assert (
@@ -19497,25 +18078,45 @@ def test_release_abandoned_prints_no_freed_or_next_lines(
 
 
 @pytest.mark.parametrize(
-    "outcome_flags",
+    ("branch", "agent", "override", "explicit", "issue", "outcome_flags", "expected"),
     [
-        pytest.param(("--abandoned", "stopped"), id="abandoned"),
-        pytest.param(("--merged", "12"), id="merged"),
+        pytest.param(
+            LANE_BRANCH,
+            "Ada",
+            False,
+            True,
+            None,
+            ("--abandoned", "stopped"),
+            0,
+            id="docs-abandoned",
+        ),
+        pytest.param(
+            LANE_BRANCH, "Ada", False, True, None, ("--merged", "12"), 0, id="docs-merged"
+        ),
+        pytest.param("dependabot/x", "Ada", False, True, None, ("--abandoned", "R"), 0, id="1"),
+        pytest.param("dependabot/x", "Bob", False, True, None, ("--abandoned", "R"), 2, id="2"),
+        pytest.param("dependabot/x", "Bob", True, True, None, ("--abandoned", "R"), 0, id="3"),
+        pytest.param("dependabot/x", "Ada", False, False, None, ("--abandoned", "R"), 0, id="4"),
+        pytest.param("dependabot/x", "Ada", False, True, 42, ("--abandoned", "R"), 0, id="7"),
     ],
 )
 def test_release_branch_selects_a_lane_claim_without_checking_out_that_branch(
-    monkeypatch: pytest.MonkeyPatch, outcome_flags: tuple[str, str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    branch: str,
+    agent: str,
+    override: bool,
+    explicit: bool,
+    issue: int | None,
+    outcome_flags: tuple[str, str],
+    expected: int,
 ) -> None:
-    """`--branch` selects the same lane claim `claim --branch` would (issue
-    #250), but -- unlike `claim`'s own `--branch` -- never inspects the
-    checkout branch at all: `forbid_git` fails the test the moment anything
-    but `rev-parse --show-toplevel` or the trunk's recorded `HEAD` reaches
-    git, so a deleted or foreign worktree can never block this release."""
-    standing = request("mine", "Ada", issue=None, branch=LANE_BRANCH, scope=("docs",))
+    """An explicit branch lets release proceed even from a deleted or foreign worktree."""
+    standing = request("mine", "Ada", issue=issue, branch=branch, scope=("docs",))
     client = FakeForge()
     if outcome_flags[0] == "--merged":
         client.landings[12] = landing_pull_request(
-            body="No-Item: docs", merged=True, base_ref_name="main", head_ref_name=LANE_BRANCH
+            body="No-Item: docs", merged=True, base_ref_name="main", head_ref_name=branch
         )
         monkeypatch.setattr(
             checkout,
@@ -19524,14 +18125,26 @@ def test_release_branch_selects_a_lane_claim_without_checking_out_that_branch(
                 _trunk_landing(MERGE_COMMIT_SHA, board.NoItemClassification(board.NoItemKind.DOCS)),
             ),
         )
-    _patch_release_session(monkeypatch, client, standing, forbid_git=True)
-
-    released = issue_claim.main(
-        ["--repo", REPOSITORY, "release", "--branch", LANE_BRANCH, *outcome_flags]
+    _patch_release_session(
+        monkeypatch, client, standing, agent=agent, branch=branch, forbid_git=explicit
     )
+    flags = ["--branch", branch] if explicit else []
+    if override:
+        flags += ["--coordinator-override", "--role", "coordinator"]
+    arguments = ["release", *([] if issue is None else [str(issue)]), *flags, *outcome_flags]
+    released = issue_claim.main(["--repo", REPOSITORY, *arguments])
 
-    assert released == 0
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
+    captured = capsys.readouterr()
+    assert released == expected
+    if expected:
+        assert "only the original claimant may release" in captured.err
+        assert _live_store_claim().claim_id == "mine"
+    else:
+        subject = f"issue #{issue}" if issue else f"lane {branch}"
+        assert captured.out.startswith(f"RELEASED {subject}: mine\n")
+        assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
+        if outcome_flags[0] == "--abandoned":
+            assert captured.out == f"RELEASED {subject}: mine\n"
 
 
 def test_release_branch_selects_a_coordinator_override_from_another_checkout(
@@ -20219,10 +18832,10 @@ def test_check_accepts_a_complete_unblocked_issue_in_two_requests(
 def _check_trunk_repository(tmp_path: Path) -> Path:
     """A minimal real `origin`-backed repository (issue #359, LAND-48) for
     `check <sha>`: an initial commit with no trailer, a commit trailer-
-    naming `#20`, and one trailer-classified `No-Item: docs` -- the three
+    naming `#20`, and trailers `No-Item: docs` and `No-Item: deps` -- the four
     classifications `check <sha>` reads from a commit's own trailer block,
     the same grammar `check <pr>` reads from a pull request body with. A
-    fourth commit sits on the `side` branch, classified as soundly as the
+    fifth commit sits on the `side` branch, classified as soundly as the
     trunk ones: it exists in this repository, but never on its trunk."""
     repo = bare_remote_repository_with_one_commit(tmp_path)
     (repo / "work.txt").write_text("work\n")
@@ -20231,6 +18844,9 @@ def _check_trunk_repository(tmp_path: Path) -> Path:
     (repo / "docs.txt").write_text("docs\n")
     real_git(repo, "add", "docs.txt")
     real_git(repo, "commit", "-q", "-m", "docs change", "-m", "No-Item: docs")
+    real_git(
+        repo, "commit", "-q", "--allow-empty", "-m", "dependency update", "-m", "No-Item: deps"
+    )
     push_repository_trunk(repo, "origin")
     real_git(repo, "checkout", "-q", "-b", "side")
     (repo / "side.txt").write_text("side\n")
@@ -20255,10 +18871,11 @@ def _check_sha(
 _UNWALKED_SHA = "0" * 40
 
 _TRUNK_CHECK_CASES = (
-    pytest.param("main~1", "{sha} declares Work-Item: #20", "valid", None, 0, id="work-item"),
-    pytest.param("main", "{sha} declares No-Item: docs", "valid", None, 0, id="no-item"),
+    pytest.param("main~2", "{sha} declares Work-Item: #20", "valid", None, 0, id="work-item"),
+    pytest.param("main~1", "{sha} declares No-Item: docs", "valid", None, 0, id="no-item"),
+    pytest.param("main", "{sha} declares No-Item: deps", "valid", None, 0, id="deps"),
     pytest.param(
-        "main~2",
+        "main~3",
         "REFUSED: {sha} carries no `Work-Item:` or `No-Item:` trailer",
         "invalid_classification",
         "carries no `Work-Item:` or `No-Item:` trailer",
@@ -20629,278 +19246,6 @@ def test_check_json_discriminates_an_issue(
 
     assert status == exit_code
     assert json.loads(capsys.readouterr().out) == expected
-
-
-def body_check_main(*, extra: tuple[str, ...] = ()) -> int:
-    return issue_claim.main(["body", "--check", *extra])
-
-
-@pytest.mark.parametrize(
-    "toml_text",
-    [
-        pytest.param(MINIMAL_BLOCK_TOML, id="minimal"),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "Slice A"\n'
-            'done_when = "The parser reads the new key."\n',
-            id="slice-row-done-when",
-        ),
-    ],
-)
-def test_body_check_accepts_a_complete_block_with_no_defects(
-    capsys: pytest.CaptureFixture[str], toml_text: str
-) -> None:
-    body_file = io.StringIO(block_body(toml_text))
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(sys, "stdin", body_file)
-        assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-def test_body_check_accepts_a_valid_size(capsys: pytest.CaptureFixture[str]) -> None:
-    """BODY-58 (issue #357): a valid `size` is `body ok`, exit `0`."""
-    body_file = io.StringIO(block_body(f'{MINIMAL_BLOCK_TOML}size = "M"\n'))
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(sys, "stdin", body_file)
-        assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-def test_body_check_refuses_an_invalid_size(capsys: pytest.CaptureFixture[str]) -> None:
-    """BODY-59 (issue #357): an out-of-grammar `size` is `body malformed`,
-    exit `2`, the same sentence for an invalid string or a non-scalar value."""
-    body_file = io.StringIO(block_body(f'{MINIMAL_BLOCK_TOML}size = "XL"\n'))
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(sys, "stdin", body_file)
-        assert body_check_main() == 2
-    assert capsys.readouterr().err == "body malformed: size: size must be S, M, or L\n"
-
-
-@pytest.mark.parametrize("value", ["x" * 513, "a\nb", "a\u0007b", " a", "", "   ", 1])
-def test_body_check_refuses_an_invalid_whole(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], value: object
-) -> None:
-    """Spec: BODY-61, BODY-62."""
-    raw_body = block_body(f"{MINIMAL_BLOCK_TOML}whole = {json.dumps(value)}\n")
-    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == (
-        "body malformed: whole: whole reason must be one bounded non-empty line\n"
-    )
-
-
-def test_body_check_accepts_a_whole_at_the_boundary(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: BODY-61, BODY-62."""
-    raw_body = block_body(f'{MINIMAL_BLOCK_TOML}whole = "{"x" * 512}"\n')
-    monkeypatch.setattr(sys, "stdin", io.StringIO(raw_body))
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-_RECORD_TOML = (
-    '\n[record]\ntitle = "T"\nstate = "open"\nlabels = []\nblocked_by = []\n'
-    'created_at = "2026-09-10T00:00:00Z"\nupdated_at = "2026-09-15T00:00:00Z"\n'
-)
-
-
-def test_body_check_reads_the_storage_pin_for_the_record_key(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #287 proof 6: `body --check` reads the repository's own
-    storage pin -- `[record]` is a known key under `storage = "state-ref"`
-    and an unknown one under the default `storage = "github"`."""
-    body = block_body(MINIMAL_BLOCK_TOML + _RECORD_TOML)
-
-    monkeypatch.setattr(sys, "stdin", io.StringIO(body))
-    assert body_check_main() == 2
-    assert "unknown top-level key record" in capsys.readouterr().err
-
-    _write_state_ref_pin(tmp_path)
-    monkeypatch.setattr(sys, "stdin", io.StringIO(body))
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
-
-
-def test_body_check_names_a_body_with_no_recognized_block_as_malformed(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO("no block\n"))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == "body malformed: aco: no aco block\n"
-
-
-@pytest.mark.parametrize(
-    ("toml_text", "reason"),
-    [
-        pytest.param(
-            'version = 1\nnow = "N"\nnext = "X"\n',
-            "done_when: done_when is required",
-            id="missing-done-when",
-        ),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}owner = "x"\n',
-            "owner: unknown top-level key owner",
-            id="unknown-key",
-        ),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}\n[[expectation]]\ntext = "x"\ndefault = "yes"\nruling = "yes"\n',
-            "expectation[0].default: expectation[0] must be proposed (default) or ruled "
-            "(ruling, ruled_on), not both",
-            id="default-and-ruling",
-        ),
-        *(
-            pytest.param(
-                f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "Flip{control}side"\n',
-                f"slice[0].title: slice[0].title of row 1 holds {codepoint}; "
-                "a slice title stays on one line",
-                id=f"slice-title-{codepoint}",
-            )
-            for control, codepoint in _BIDI_AND_ZERO_WIDTH_CONTROLS
-        ),
-        *(
-            pytest.param(
-                f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "A"\ndone_when = {value}\n',
-                "slice[0].done_when: slice[0].done_when must be a non-empty string",
-                id=f"slice-done-when-{shape}",
-            )
-            for shape, value in (("blank", '"  "'), ("not-a-string", "1"))
-        ),
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "A"\n'
-            'done_when = "One\\u000bTwo"\n',
-            "slice[0].done_when: slice[0].done_when of row 1 holds U+000B; "
-            "a slice done_when stays on one line",
-            id="slice-done-when-control",
-        ),
-    ],
-)
-def test_body_check_names_defects_with_checks_own_sentences(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    toml_text: str,
-    reason: str,
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == f"body malformed: {reason}\n"
-
-
-@pytest.mark.parametrize(
-    ("toml_text", "keys"),
-    [
-        pytest.param(
-            'version = 1\nnow = ""\nnext = ""\ndone_when = ""\n',
-            "Now, Next, Done when",
-            id="every-key-empty",
-        ),
-        pytest.param(
-            'version = 1\nnow = "Cut from #90"\nnext = "Build it."\ndone_when = ""\n',
-            "Done when",
-            id="only-done-when-empty",
-        ),
-    ],
-)
-def test_body_check_names_each_empty_projection_key_as_incomplete(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    toml_text: str,
-    keys: str,
-) -> None:
-    """BODY-12 (issue #606): a defect-free block with empty projection keys
-    is incomplete, and the sentence names exactly the empty ones."""
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == f"body incomplete: {keys}\n"
-
-
-def test_body_check_prints_every_simultaneous_defect_not_just_the_first(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The one behavior that sets `body --check` apart from `check <item>`,
-    which truncates to the first malformed defect
-    (`cmd_claim._body_contract_checks`): with two simultaneous defects, both surface,
-    in order, in plain text and in `--json`'s `defects` list (Sonnet review,
-    issue #262)."""
-    toml_text = 'version = 1\nnext = "X"\n'  # missing both now and done_when
-
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main() == 2
-    assert capsys.readouterr().err == (
-        "body malformed: now: now is required\nbody malformed: done_when: done_when is required\n"
-    )
-
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(toml_text)))
-    assert body_check_main(extra=("--json",)) == 2
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": False,
-        "reason": "malformed",
-        "defects": [
-            "body malformed: now: now is required",
-            "body malformed: done_when: done_when is required",
-        ],
-    }
-
-
-def test_body_check_json_carries_the_defect_list(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO("no block\n"))
-    assert body_check_main(extra=("--json",)) == 2
-    assert capsys.readouterr().out == (
-        '{"ok": false, "reason": "malformed", "defects": ["body malformed: aco: no aco block"]}\n'
-    )
-
-
-def test_body_check_json_reports_ok_with_an_empty_defect_list(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(MINIMAL_BLOCK_TOML)))
-    assert body_check_main(extra=("--json",)) == 0
-    assert capsys.readouterr().out == '{"ok": true, "reason": "valid", "defects": []}\n'
-
-
-class _NotUtf8Stdin:
-    """A stdin stand-in for the one input `body --check` cannot decode --
-    `sys.stdin.read()` raises `UnicodeDecodeError` on invalid bytes exactly
-    like this (issue #262 Sonar S8707 follow-up)."""
-
-    def read(self) -> str:
-        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
-
-
-def test_body_check_refuses_stdin_that_is_not_valid_utf8(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "stdin", _NotUtf8Stdin())
-
-    assert body_check_main() == 2
-    assert "stdin is not valid UTF-8" in capsys.readouterr().err
-
-
-def test_body_requires_check() -> None:
-    with pytest.raises(SystemExit) as refused:
-        issue_claim.main(["body"])
-
-    assert refused.value.code == 2
-
-
-def test_body_check_never_touches_a_forge_the_store_or_gh(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`body --check` is forge-free like `status` (issue #245): it never
-    resolves a forge, reads the state ref, or shells out to `gh`."""
-
-    def unused(*args: object, **kwargs: object) -> None:
-        pytest.fail("body --check must not touch a forge, the store, or gh")
-
-    monkeypatch.setattr(github, "GitHubForge", unused)
-    monkeypatch.setattr(github, "discover_repository", unused)
-    monkeypatch.setattr(store, "fetch_state", unused)
-    monkeypatch.setattr(sys, "stdin", io.StringIO(block_body(MINIMAL_BLOCK_TOML)))
-
-    assert body_check_main() == 0
-    assert capsys.readouterr().out == "body ok\n"
 
 
 @pytest.mark.parametrize(
@@ -22499,7 +20844,7 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
                 f"{codepoint}; a slice title stays on one line\n",
                 id=f"slice_title_{codepoint}",
             )
-            for control, codepoint in _BIDI_AND_ZERO_WIDTH_CONTROLS
+            for control, codepoint in BIDI_AND_ZERO_WIDTH_CONTROLS
         ),
     ],
 )
@@ -23112,13 +21457,7 @@ def test_item_edit_json_reports_body_invalid_with_defects(
     assert result.stdout == json.dumps(expected) + "\n"
 
 
-# `reset` (issue #298): real bare `file://` remotes and real checkouts
-# throughout -- `cmd_reset.run` orchestrates `store`'s own git chokepoint end
-# to end, so a mock of `store` would only prove this file's own fakes agree
-# with each other, never that a real lease, a real bundle, or a real
-# lineage stamp behaves as the printed line claims. Captured at import time,
-# before the file's own autouse `_stub_store_write` ever runs, so each
-# `reset` test can hand the real functions straight back to `store`.
+# Capture real store functions before the module-local fake replaces them.
 _REAL_STORE_FETCH_STATE = store.fetch_state
 _REAL_STORE_PEEK_STATE = store.peek_state
 _REAL_STORE_COMMIT_TRANSITION = store.commit_transition
@@ -23127,9 +21466,7 @@ _REAL_STORE_CLAIM_LIFECYCLE = store.claim_lifecycle
 
 
 def _use_real_store(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Undo this file's autouse in-memory `store` fake for one `reset` test:
-    `reset` proves real git behaviour end to end, never the fake's own
-    agreement with itself."""
+    """Restore real store operations for the remaining CAS and item tests."""
     monkeypatch.setattr(store, "fetch_state", _REAL_STORE_FETCH_STATE)
     monkeypatch.setattr(store, "peek_state", _REAL_STORE_PEEK_STATE)
     monkeypatch.setattr(store, "commit_transition", _REAL_STORE_COMMIT_TRANSITION)
@@ -23155,581 +21492,6 @@ def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[
     real_git(repository, "remote", "add", "origin", str(bare_remote))
     redirect_toplevel(monkeypatch, repository)
     return repository, bare_remote
-
-
-def _reset_repository_with_live_claims(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, Path]:
-    """`_reset_repository` bootstrapped with three live claims a reset
-    refuses over (issue #582): issue 42 held by the running agent, issue 43
-    and the issueless lane `fix/reset-docs` held by another agent."""
-    _use_real_store(monkeypatch)
-    monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Codex Sol")
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    store.bootstrap(worktree=repository, remote=str(bare_remote))
-    other_agents_issue = replace(_real_claim_intent(43), agent="Grok Ada")
-    other_agents_lane = replace(
-        other_agents_issue,
-        identity=protocol.LaneIdentity(),
-        branch="fix/reset-docs",
-        claim_id=protocol.ClaimId("claim-lane"),
-        operation_id="op-lane",
-    )
-    for subject, intent in (
-        (store.ClaimTransitionSubject("claim issue 42", item="42"), _real_claim_intent(42)),
-        (store.ClaimTransitionSubject("claim issue 43", item="43"), other_agents_issue),
-        (
-            store.ClaimTransitionSubject("claim lane fix/reset-docs", item="fix/reset-docs"),
-            other_agents_lane,
-        ),
-    ):
-        store.commit_transition(
-            observed=fresh_observation(repository, bare_remote), subject=subject, intent=intent
-        )
-    return repository, bare_remote
-
-
-def _real_claim_intent(issue: int) -> protocol.ClaimIntent:
-    return protocol.ClaimIntent(
-        identity=protocol.IssueIdentity(issue),
-        agent="Codex Sol",
-        role="builder",
-        base=protocol.ObjectId("c" * 40),
-        branch=f"codex/issue-{issue}-reset",
-        scope=(f"src/issue-{issue}.py",),
-        claim_id=protocol.ClaimId(f"claim-{issue}"),
-        operation_id=f"op-{issue}",
-    )
-
-
-def _force_advance_state_ref(repository: Path, bare_remote: Path, tip: str) -> str:
-    """Simulate someone else's push landing on `store.STATE_REF` between reset's
-    own read of `tip` and its lease-guarded delete -- the exact race
-    `--force-with-lease` exists to catch."""
-    tree = real_git(repository, "rev-parse", f"{tip}^{{tree}}").stdout.strip()
-    new_commit = real_git(repository, "commit-tree", tree, "-p", tip, "-m", "moved").stdout.strip()
-    real_git(repository, "push", "--force", str(bare_remote), f"{new_commit}:{store.STATE_REF}")
-    return new_commit
-
-
-def _lineage_observation(repository: Path) -> tuple[protocol.ObjectId | None, str | None]:
-    """This worktree's lineage stamp and fetch anchor -- the two
-    per-worktree values a reset dry run, a live-claim refusal, or a failed
-    export must leave byte-identical to whatever `fetch_state` last wrote
-    (issue #298, 19.09.2026 gate finding 2)."""
-    stamp = store._read_lineage_stamp(repository)
-    anchor = store._run_git(repository, ["rev-parse", store._FETCH_ANCHOR_REF])
-    return stamp, anchor.stdout.decode().strip() if anchor.exit_status == 0 else None
-
-
-def test_cli_reset_dry_run_prints_five_would_lines_and_changes_nothing(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    tip = store.bootstrap(worktree=repository, remote=str(bare_remote))
-    store.fetch_state(worktree=repository, remote=str(bare_remote))
-    lineage_before = _lineage_observation(repository)
-    assert lineage_before != (None, None)
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-
-    status = issue_claim.main(["reset", "--export-dir", str(export_dir)])
-
-    assert status == 0
-    bundle_path = export_dir / f"aco-state-repo-2026-08-21-{tip[:12]}.bundle"
-    assert capsys.readouterr().out.splitlines() == [
-        f"would: export {store.STATE_REF} at {tip} to {bundle_path} "
-        f"(restore with: git fetch {bundle_path} {store.EXPORT_BUNDLE_REF}:{store.STATE_REF})",
-        f"would: delete {store.STATE_REF} on origin (lease {tip})",
-        f"would: no local {store.STATE_REF} to delete",
-        "would: clear lineage stamps and fetch anchors in 1 worktree",
-        "would: bootstrap a fresh empty state",
-    ]
-    assert not bundle_path.exists()
-    assert (
-        real_git(
-            repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF
-        ).stdout.split("\t")[0]
-        == tip
-    )
-    assert not store.local_state_ref_exists(repository)
-    assert _lineage_observation(repository) == lineage_before
-
-
-@pytest.mark.parametrize(
-    "force_unreadable",
-    [pytest.param([], id="plain"), pytest.param(["--force-unreadable"], id="forced")],
-)
-def test_cli_reset_confirm_exports_a_verifiable_bundle_and_bootstraps_a_fresh_ref(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    force_unreadable: list[str],
-) -> None:
-    """A readable claim-free state resets the same with or without
-    `--force-unreadable` (RESET-17)."""
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    tip = store.bootstrap(worktree=repository, remote=str(bare_remote))
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-    command = ["reset", "--confirm", *force_unreadable, "--export-dir", str(export_dir)]
-
-    status = issue_claim.main(command)
-
-    assert status == 0
-    lines = capsys.readouterr().out.splitlines()
-    bundle_path = export_dir / f"aco-state-repo-2026-08-21-{tip[:12]}.bundle"
-    assert lines[0] == (
-        f"exported {store.STATE_REF} at {tip} to {bundle_path} "
-        f"(restore with: git fetch {bundle_path} {store.EXPORT_BUNDLE_REF}:{store.STATE_REF})"
-    )
-    assert lines[1] == f"deleted {store.STATE_REF} on origin (lease {tip})"
-    # `export_state_bundle` no longer touches the shared `STATE_REF` at all
-    # (19.09.2026 REVISE findings 1+2), so there is never a local one left
-    # for this step to delete.
-    assert lines[2] == f"no local {store.STATE_REF} to delete"
-    assert lines[3] == "cleared lineage stamps and fetch anchors in 1 worktree"
-    assert lines[4].startswith("bootstrapped a fresh empty state at ")
-    fresh_tip = lines[4].removeprefix("bootstrapped a fresh empty state at ")
-    assert fresh_tip != tip
-    real_git(repository, "bundle", "verify", str(bundle_path))
-    heads = real_git(repository, "bundle", "list-heads", str(bundle_path)).stdout
-    assert heads.strip() == f"{tip} {store.EXPORT_BUNDLE_REF}"
-    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
-    assert probe.stdout.split("\t")[0] == fresh_tip
-    assert not store.local_state_ref_exists(repository)
-
-
-_RELEASES_AS_THE_HOLDER_OF_ISSUE_42 = (
-    "aco release 42 --claim-id claim-42 --abandoned <reason>",
-    "aco release 43 --claim-id claim-43 --role coordinator --coordinator-override "
-    "--abandoned <reason>",
-    "aco release --branch fix/reset-docs --role coordinator --coordinator-override "
-    "--abandoned <reason>",
-)
-_RELEASES_WITHOUT_A_SESSION_IDENTITY = (
-    "aco release 42 --claim-id claim-42 --agent 'Codex Sol' --abandoned <reason>",
-    "aco release 43 --claim-id claim-43 --agent 'Grok Ada' --abandoned <reason>",
-    "aco release --branch fix/reset-docs --agent 'Grok Ada' --abandoned <reason>",
-)
-
-
-@pytest.mark.parametrize(
-    ("mode", "identified", "releases"),
-    [
-        pytest.param([], True, _RELEASES_AS_THE_HOLDER_OF_ISSUE_42, id="dry-run"),
-        pytest.param(["--confirm"], True, _RELEASES_AS_THE_HOLDER_OF_ISSUE_42, id="confirm"),
-        pytest.param(
-            ["--confirm", "--force-unreadable"],
-            True,
-            _RELEASES_AS_THE_HOLDER_OF_ISSUE_42,
-            id="forced",
-        ),
-        pytest.param([], False, _RELEASES_WITHOUT_A_SESSION_IDENTITY, id="no-identity"),
-    ],
-)
-def test_cli_reset_refuses_naming_every_live_claim_and_touches_nothing(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    mode: list[str],
-    identified: bool,
-    releases: tuple[str, str, str],
-) -> None:
-    """CAS-40/CAS-62..64 (issue #582): confirmed or not, a live claim
-    refuses with one sentence on stderr naming why and every claim to
-    release; `--force-unreadable` (issue #341) only lifts the refusal over
-    a schema this aco cannot read. Every release command it prints, its
-    `<reason>` filled in, runs through bash into `release`, which accepts
-    it, after which `reset` no longer refuses. Without a session identity
-    every release names its holder with `--agent`, so it still runs."""
-    repository, bare_remote = _reset_repository_with_live_claims(monkeypatch, tmp_path)
-    if not identified:
-        for variable in (
-            checkout.ACO_AGENT_ENV,
-            checkout.GROK_SESSION_ID_ENV,
-            checkout.CLAUDE_CODE_SESSION_ID_ENV,
-        ):
-            monkeypatch.delenv(variable, raising=False)
-    tip_before = _remote_state_tip(repository, bare_remote)
-    lineage_before = _lineage_observation(repository)
-    assert lineage_before != (None, None)
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-
-    status = issue_claim.main(["reset", *mode, "--export-dir", str(export_dir)])
-
-    assert status == 2
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == (
-        "ERROR: refs/aco/state holds 3 live claim(s); release them first, "
-        "or reset after they are gone: "
-        "issue #42 by Codex Sol (builder) branch=codex/issue-42-reset claim=claim-42, "
-        f"release: {releases[0]}; "
-        "issue #43 by Grok Ada (builder) branch=codex/issue-43-reset claim=claim-43, "
-        f"release: {releases[1]}; "
-        "lane fix/reset-docs by Grok Ada (builder) branch=fix/reset-docs claim=claim-lane, "
-        f"release: {releases[2]}\n"
-    )
-    assert _remote_state_tip(repository, bare_remote) == tip_before
-    assert list(export_dir.iterdir()) == []
-    assert not store.local_state_ref_exists(repository)
-    assert _lineage_observation(repository) == lineage_before
-
-    # Reset needs no attached branch, so neither may the advice it prints.
-    real_git(repository, "checkout", "-q", "--detach")
-    printed_releases = [
-        claim.split(", release: ", 1)[1]
-        for claim in captured.err.rstrip("\n").split("gone: ", 1)[1].split("; ")
-    ]
-    for command in printed_releases:
-        filled = command.replace("<reason>", shlex.quote("a stuck state ref"))
-        bash_exit_code, arguments = arguments_bash_hands_aco(filled, tmp_path)
-        assert (bash_exit_code, arguments[:1]) == (0, ["release"])
-        assert issue_claim.main(arguments) == 0, capsys.readouterr().err
-    capsys.readouterr()
-    assert issue_claim.main(["reset"]) == 0
-
-
-_UNREADABLE_SCHEMA_ONE_LINE = (
-    "schema 1 not readable by this aco; live claims unknown (--confirm needs --force-unreadable)"
-)
-
-
-def _push_schema_one_state(tmp_path: Path, bare_remote: Path) -> str:
-    """A `refs/aco/state` whose tree is the pre-`items/` `version = 1`
-    ledger (issue #341: songmaker, marketplace), built in a scratch
-    repository so the work repository never holds its objects locally."""
-    legacy = tmp_path / "legacy"
-    legacy.mkdir()
-    real_git(legacy, "init", "-q", "-b", "main")
-    real_git(legacy, "config", "user.email", "test@example.com")
-    real_git(legacy, "config", "user.name", "Test")
-    (legacy / "schema.toml").write_text("version = 1\n")
-    real_git(legacy, "add", "schema.toml")
-    real_git(legacy, "commit", "-q", "-m", "schema 1 ledger")
-    real_git(legacy, "push", "-q", str(bare_remote), f"HEAD:{store.STATE_REF}")
-    return real_git(legacy, "rev-parse", "HEAD").stdout.strip()
-
-
-def _remote_state_tip(repository: Path, bare_remote: Path) -> str:
-    return real_git(repository, "ls-remote", str(bare_remote), store.STATE_REF).stdout.split("\t")[
-        0
-    ]
-
-
-@pytest.fixture
-def unreadable_reset(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, Path, str, Path]:
-    """A checkout whose remote carries a schema-1 state, cwd inside it, the
-    date fixed, and an empty export directory: repository, remote, tip, export."""
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    tip = _push_schema_one_state(tmp_path, bare_remote)
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-    return repository, bare_remote, tip, export_dir
-
-
-def test_cli_reset_dry_run_over_an_unreadable_schema_names_it_and_prints_the_plan(
-    capsys: pytest.CaptureFixture[str], unreadable_reset: tuple[Path, Path, str, Path]
-) -> None:
-    repository, bare_remote, tip, export_dir = unreadable_reset
-    command = ["reset", "--export-dir", str(export_dir)]
-
-    status = issue_claim.main(command)
-
-    assert status == 0
-    bundle_path = export_dir / f"aco-state-repo-2026-08-21-{tip[:12]}.bundle"
-    assert capsys.readouterr().out.splitlines() == [
-        _UNREADABLE_SCHEMA_ONE_LINE,
-        f"would: export {store.STATE_REF} at {tip} to {bundle_path} "
-        f"(restore with: git fetch {bundle_path} {store.EXPORT_BUNDLE_REF}:{store.STATE_REF})",
-        f"would: delete {store.STATE_REF} on origin (lease {tip})",
-        f"would: no local {store.STATE_REF} to delete",
-        "would: clear lineage stamps and fetch anchors in 1 worktree",
-        "would: bootstrap a fresh empty state",
-    ]
-    assert _remote_state_tip(repository, bare_remote) == tip
-    assert list(export_dir.iterdir()) == []
-
-
-def test_cli_reset_confirm_over_an_unreadable_schema_refuses_without_the_flag(
-    capsys: pytest.CaptureFixture[str], unreadable_reset: tuple[Path, Path, str, Path]
-) -> None:
-    repository, bare_remote, tip, export_dir = unreadable_reset
-    command = ["reset", "--confirm", "--export-dir", str(export_dir)]
-
-    status = issue_claim.main(command)
-
-    assert status == 2
-    assert capsys.readouterr().err == f"ERROR: {_UNREADABLE_SCHEMA_ONE_LINE}\n"
-    assert _remote_state_tip(repository, bare_remote) == tip
-    assert list(export_dir.iterdir()) == []
-    assert _lineage_observation(repository) == (None, None)
-
-
-def test_cli_reset_force_unreadable_exports_deletes_and_bootstraps_a_fresh_state(
-    capsys: pytest.CaptureFixture[str], unreadable_reset: tuple[Path, Path, str, Path]
-) -> None:
-    repository, bare_remote, tip, export_dir = unreadable_reset
-    command = ["reset", "--confirm", "--force-unreadable", "--export-dir", str(export_dir)]
-
-    status = issue_claim.main(command)
-
-    assert status == 0
-    lines = capsys.readouterr().out.splitlines()
-    bundle_path = export_dir / f"aco-state-repo-2026-08-21-{tip[:12]}.bundle"
-    assert lines[:4] == [
-        f"exported {store.STATE_REF} at {tip} to {bundle_path} "
-        f"(restore with: git fetch {bundle_path} {store.EXPORT_BUNDLE_REF}:{store.STATE_REF})",
-        f"deleted {store.STATE_REF} on origin (lease {tip})",
-        f"no local {store.STATE_REF} to delete",
-        "cleared lineage stamps and fetch anchors in 1 worktree",
-    ]
-    fresh_tip = lines[4].removeprefix("bootstrapped a fresh empty state at ")
-    heads = real_git(repository, "bundle", "list-heads", str(bundle_path)).stdout
-    assert heads.strip() == f"{tip} {store.EXPORT_BUNDLE_REF}"
-    fresh_state = store.fetch_state(worktree=repository, remote=str(bare_remote))
-    assert (fresh_state.tip, fresh_state.claims) == (fresh_tip, {})
-
-
-def test_cli_reset_no_export_skips_the_bundle_but_still_resets(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    tip = store.bootstrap(worktree=repository, remote=str(bare_remote))
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-
-    status = issue_claim.main(
-        ["reset", "--confirm", "--no-export", "--export-dir", str(export_dir)]
-    )
-
-    assert status == 0
-    lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == f"skipped export (--no-export): {store.STATE_REF} at {tip} not saved"
-    assert list(export_dir.iterdir()) == []
-
-
-def test_cli_reset_dry_run_reports_nothing_to_export_or_delete_when_the_ref_never_existed(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _use_real_store(monkeypatch)
-    repository, _bare_remote = _reset_repository(monkeypatch, tmp_path)
-    monkeypatch.chdir(repository)
-
-    status = issue_claim.main(["reset"])
-
-    assert status == 0
-    lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == f"would: nothing to export: {store.STATE_REF} does not exist on origin"
-    assert lines[1] == f"would: nothing to delete on origin: {store.STATE_REF} does not exist"
-
-
-def test_cli_reset_confirm_deletes_a_local_ref_a_foreign_tool_left_behind(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    tip = store.bootstrap(worktree=repository, remote=str(bare_remote))
-    real_git(repository, "update-ref", store.STATE_REF, tip)
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-
-    status = issue_claim.main(["reset", "--confirm", "--export-dir", str(export_dir)])
-
-    assert status == 0
-    lines = capsys.readouterr().out.splitlines()
-    assert lines[2] == f"deleted local {store.STATE_REF}"
-    assert not store.local_state_ref_exists(repository)
-    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
-    assert probe.stdout.split("\t")[0] != tip
-
-
-def test_cli_reset_export_failure_leaves_the_ref_untouched(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    tip = store.bootstrap(worktree=repository, remote=str(bare_remote))
-    store.fetch_state(worktree=repository, remote=str(bare_remote))
-    lineage_before = _lineage_observation(repository)
-    assert lineage_before != (None, None)
-    readonly_export_dir = tmp_path / "readonly"
-    readonly_export_dir.mkdir()
-    readonly_export_dir.chmod(0o500)
-    monkeypatch.chdir(repository)
-
-    try:
-        status = issue_claim.main(["reset", "--confirm", "--export-dir", str(readonly_export_dir)])
-    finally:
-        readonly_export_dir.chmod(0o700)
-
-    assert status == 2
-    assert "cannot export" in capsys.readouterr().err
-    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
-    assert probe.stdout.split("\t")[0] == tip
-    assert not store.local_state_ref_exists(repository)
-    assert _lineage_observation(repository) == lineage_before
-
-
-def test_cli_reset_a_moved_remote_tip_leaves_the_bundle_intact_and_names_the_repair(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    tip = store.bootstrap(worktree=repository, remote=str(bare_remote))
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-    real_export = store.export_state_bundle
-    moved_tip = ""
-
-    def export_then_move_remote(
-        *, worktree: Path, tip: protocol.ObjectId, destination: Path
-    ) -> Path:
-        nonlocal moved_tip
-        result = real_export(worktree=worktree, tip=tip, destination=destination)
-        moved_tip = _force_advance_state_ref(repository, bare_remote, tip)
-        return result
-
-    monkeypatch.setattr(store, "export_state_bundle", export_then_move_remote)
-
-    status = issue_claim.main(["reset", "--confirm", "--export-dir", str(export_dir)])
-
-    assert status == 2
-    err = capsys.readouterr().err
-    assert "cannot delete" in err
-    assert "lease" in err
-    # The repair line names the remote's *current* tip -- the one
-    # re-probed after the failed push, never the stale tip that push
-    # itself carried -- but never a manual lease command against it
-    # (19.09.2026 REVISE finding 3): that tip was never validated against a
-    # live claim, nor exported, so the only repair named is re-running
-    # `aco reset --confirm` itself, which repeats both checks.
-    assert f"the remote moved to {moved_tip}" in err
-    assert "re-run `aco reset --confirm`" in err
-    assert "--force-with-lease" not in err
-    bundle_path = next(export_dir.iterdir())
-    real_git(repository, "bundle", "verify", str(bundle_path))
-    # `export_state_bundle` never touches the shared `STATE_REF` at all
-    # (19.09.2026 REVISE findings 1+2), so the remote-deletion failure
-    # leaves nothing local to have been left behind either.
-    assert not store.local_state_ref_exists(repository)
-    probe = real_git(repository, "ls-remote", "--exit-code", str(bare_remote), store.STATE_REF)
-    assert probe.stdout.split("\t")[0] != tip
-
-
-def test_cli_reset_restore_from_the_bundle_into_a_fresh_repository_recovers_status(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """`reset` always refuses over a live claim, so the "old state" it can
-    ever legitimately reset past is one whose claims have all already been
-    released -- this claims, then releases, one issue before resetting, and
-    proves the restored bundle carries that exact history forward (its
-    `tip`, not just a same-shaped fresh one) rather than only an
-    equally-empty `aco status` a plain bootstrap would print too.
-    """
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    store.bootstrap(worktree=repository, remote=str(bare_remote))
-    store.commit_transition(
-        observed=fresh_observation(repository, bare_remote),
-        subject=store.ClaimTransitionSubject("claim issue 42", item="42"),
-        intent=_real_claim_intent(42),
-    )
-    store.commit_transition(
-        observed=fresh_observation(repository, bare_remote),
-        subject=store.ClaimTransitionSubject("release issue 42", item="42"),
-        intent=protocol.ReleaseIntent(
-            claim_id=protocol.ClaimId("claim-42"),
-            agent="Codex Sol",
-            role="builder",
-            outcome=protocol.AbandonedRelease("test cleanup"),
-            operation_id="op-42-release",
-        ),
-    )
-    pre_reset_tip = store.fetch_state(worktree=repository, remote=str(bare_remote)).tip
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-
-    status = issue_claim.main(["reset", "--confirm", "--export-dir", str(export_dir)])
-    assert status == 0
-    capsys.readouterr()
-    bundle_path = next(export_dir.iterdir())
-
-    restored_remote = tmp_path / "restored-remote.git"
-    init_bare_repository(restored_remote)
-    # The bundle carries `EXPORT_BUNDLE_REF`'s name, not `STATE_REF`'s
-    # (19.09.2026 REVISE findings 1+2) -- this is the exact command
-    # `cmd_reset._reset_restore_command` prints, proven end to end here.
-    real_git(
-        restored_remote,
-        "fetch",
-        "-q",
-        str(bundle_path),
-        f"{store.EXPORT_BUNDLE_REF}:{store.STATE_REF}",
-    )
-    fresh_repository = tmp_path / "fresh"
-    fresh_repository.mkdir()
-    real_git(fresh_repository, "init", "-q", "-b", "main")
-    real_git(fresh_repository, "remote", "add", "origin", str(restored_remote))
-    monkeypatch.chdir(fresh_repository)
-
-    status = issue_claim.main(["status"])
-
-    assert status == 0
-    assert "UNCLAIMED repository" in capsys.readouterr().out
-    restored_state = store.fetch_state(worktree=fresh_repository, remote=str(restored_remote))
-    assert restored_state.tip == pre_reset_tip
-    assert protocol.ClaimId("claim-42") in restored_state.consumed_ids
-
-
-def test_cli_reset_recovers_from_a_deleted_ref_this_worktree_had_already_observed(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """The one scenario reset exists to unblock (issue #298, 19.09.2026 gate
-    finding 1): this worktree fetched `store.STATE_REF` once and stamped it, then
-    the ref was deleted directly on the remote -- exactly what an ordinary
-    `fetch_state`'s own `store._check_lineage`/absent-ref guard refuses on the
-    next read. `reset` must still recover, and must clear the stale stamp
-    so an ordinary read works again afterward."""
-    _use_real_store(monkeypatch)
-    repository, bare_remote = _reset_repository(monkeypatch, tmp_path)
-    store.bootstrap(worktree=repository, remote=str(bare_remote))
-    store.fetch_state(worktree=repository, remote=str(bare_remote))
-    assert store._read_lineage_stamp(repository) is not None
-    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
-    with pytest.raises(protocol.StateLineageError):
-        store.fetch_state(worktree=repository, remote=str(bare_remote))
-    export_dir = tmp_path / "export"
-    export_dir.mkdir()
-    monkeypatch.chdir(repository)
-
-    status = issue_claim.main(["reset", "--confirm", "--export-dir", str(export_dir)])
-
-    assert status == 0
-    lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == f"nothing to export: {store.STATE_REF} does not exist on origin"
-    assert lines[1] == f"nothing to delete on origin: {store.STATE_REF} does not exist"
-    assert lines[2] == f"no local {store.STATE_REF} to delete"
-    assert lines[3] == "cleared lineage stamps and fetch anchors in 1 worktree"
-    assert lines[4].startswith("bootstrapped a fresh empty state at ")
-    fresh_state = store.fetch_state(worktree=repository, remote=str(bare_remote))
-    assert fresh_state.tip is not None
 
 
 @dataclass(frozen=True)
@@ -24028,3 +21790,342 @@ def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(
         run.config_reads,
         run.observations,
     )
+
+
+@dataclass(frozen=True)
+class _LaneLookupCase:
+    cell: str
+    command: str = "release"
+    branch: str = "dependabot/x"
+    holder: str = "lane"
+    agent: str = "Ada"
+    merged: bool = False
+    trailer: str = "No-Item: fix"
+    source: str = "dependabot/x"
+    as_json: bool = False
+    refusal: str | None = None
+    reads_once: bool = False
+    exact: bool = True
+    claim_id: str | None = None
+    merged_ref: str = "12"
+    state_ref: bool = False
+    landing_merged: bool = True
+    issue_claim_lands_during_verification: bool = False
+    no_forge_reads: bool = False
+    nothing_left_worktree: str | None = None
+
+
+def _lane_lookup_refusal(branch: str) -> str:
+    return (
+        f"branch '{branch}' is not an issueless lane; pass an issue number, or "
+        "check out a branch prefixed 'docs/' or 'fix/'"
+    )
+
+
+_WORK_ITEM_TRAILER_REFUSAL = (
+    f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries "
+    "`Work-Item: #42`; an issue-less lane needs a "
+    '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
+    'with a malformed trailer"'
+)
+
+_LANE_LOOKUP_CASES = (
+    _LaneLookupCase(
+        "5", holder="none", refusal=_lane_lookup_refusal("dependabot/x"), reads_once=True
+    ),
+    _LaneLookupCase("6", holder="issue", refusal=_lane_lookup_refusal("dependabot/x")),
+    _LaneLookupCase("8", merged=True),
+    _LaneLookupCase(
+        "9",
+        merged=True,
+        trailer="Work-Item: #42",
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
+    ),
+    _LaneLookupCase(
+        "10",
+        merged=True,
+        source="dependabot/y",
+        refusal=(
+            "lane 'dependabot/x' is claimed on 'dependabot/x', not on pull request #12's "
+            "branch 'dependabot/y'; release that claim by itself"
+        ),
+    ),
+    _LaneLookupCase(
+        "11", holder="none", merged=True, nothing_left_worktree="kept -- release ran from inside it"
+    ),
+    _LaneLookupCase(
+        "12",
+        holder="none",
+        merged=True,
+        source="dependabot/y",
+        refusal="lane 'dependabot/x' has no active build claim",
+    ),
+    _LaneLookupCase(
+        "13",
+        holder="none",
+        merged=True,
+        trailer="Work-Item: #42",
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
+    ),
+    _LaneLookupCase(
+        "14",
+        holder="none",
+        merged=True,
+        landing_merged=False,
+        refusal="pull request #12 is not merged",
+    ),
+    _LaneLookupCase(
+        "15",
+        holder="none",
+        merged=True,
+        claim_id="X",
+        refusal=_lane_lookup_refusal("dependabot/x"),
+    ),
+    _LaneLookupCase(
+        "16",
+        holder="none",
+        merged=True,
+        merged_ref=MERGE_COMMIT_SHA,
+        state_ref=True,
+        refusal=_lane_lookup_refusal("dependabot/x"),
+    ),
+    _LaneLookupCase(
+        "17",
+        holder="issue",
+        merged=True,
+        refusal=_lane_lookup_refusal("dependabot/x"),
+        no_forge_reads=True,
+    ),
+    _LaneLookupCase(
+        "18",
+        holder="none",
+        merged=True,
+        issue_claim_lands_during_verification=True,
+        nothing_left_worktree="kept -- claimed again while this release ran",
+    ),
+    _LaneLookupCase("25", command="rescope"),
+    _LaneLookupCase(
+        "26", command="rescope", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
+    ),
+    _LaneLookupCase(
+        "27",
+        command="rescope",
+        agent="Bob",
+        refusal="only the original claimant may rescope",
+        exact=False,
+    ),
+    _LaneLookupCase(
+        "28", command="claim", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
+    ),
+    _LaneLookupCase("29", command="claim", refusal=_lane_lookup_refusal("dependabot/x")),
+    _LaneLookupCase("30", branch="docs/x", reads_once=True),
+    _LaneLookupCase(
+        "32",
+        branch="",
+        holder="none",
+        refusal=(
+            "lane release requires a non-empty current branch; "
+            "check out the docs/ or fix/ lane branch, or pass an issue number"
+        ),
+    ),
+    _LaneLookupCase(
+        "31",
+        branch="docs/x",
+        holder="none",
+        merged=True,
+        source="docs/x",
+        nothing_left_worktree="kept -- release ran from inside it",
+    ),
+    _LaneLookupCase("33", as_json=True),
+    _LaneLookupCase(
+        "34",
+        holder="none",
+        merged=True,
+        as_json=True,
+        nothing_left_worktree="kept -- release ran from inside it",
+    ),
+    _LaneLookupCase(
+        "38",
+        branch="ada/issue-42",
+        holder="none",
+        merged=True,
+        trailer="Work-Item: #42",
+        source="ada/issue-42",
+        refusal=_WORK_ITEM_TRAILER_REFUSAL,
+    ),
+    _LaneLookupCase("35", command="release-help"),
+    _LaneLookupCase("36", command="rescope-help"),
+    _LaneLookupCase("37", command="claim-help"),
+)
+
+
+def _arrange_lane_lookup_case(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, case: _LaneLookupCase
+) -> FakeForge:
+    standing = (
+        ()
+        if case.holder == "none"
+        else (
+            request(
+                "mine",
+                "Bob" if case.holder == "issue" else "Ada",
+                issue=42 if case.holder == "issue" else None,
+                branch=case.branch,
+                scope=("a",),
+            ),
+        )
+    )
+    client = FakeForge()
+    _patch_release_session(monkeypatch, client, *standing, agent=case.agent, branch=case.branch)
+    toplevel = str(tmp_path) if case.state_ref else "/repo"
+    if case.state_ref:
+        _write_state_ref_pin(tmp_path)
+    git_values = git_checkout(toplevel=toplevel, branch=case.branch)
+    monkeypatch.setattr(
+        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+    )
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
+    if case.merged:
+        monkeypatch.setattr(store, "list_worktrees", lambda _toplevel: (Path("/repo"),))
+        client.landings[12] = landing_pull_request(
+            body=case.trailer,
+            merged=case.landing_merged,
+            head_ref_name=case.source,
+            base_ref_name="main",
+        )
+        work_items = ("#42",) if case.trailer == "Work-Item: #42" else ()
+        classification = board.trunk_commit_classification(
+            work_items, () if work_items else ("fix",)
+        )
+        monkeypatch.setattr(
+            checkout,
+            "trunk_landings",
+            lambda *_args, **_kwargs: (_trunk_landing(MERGE_COMMIT_SHA, classification),),
+        )
+    else:
+        forbid_forge_resolution(monkeypatch)
+    if case.issue_claim_lands_during_verification:
+        _claim_the_branch_while_the_landing_verifies(monkeypatch, client, case.branch)
+    return client
+
+
+def _claim_the_branch_while_the_landing_verifies(
+    monkeypatch: pytest.MonkeyPatch, client: FakeForge, branch: str
+) -> None:
+    """Bob's issue claim #42 on `branch` appears in the claim state once the
+    forge was asked about the landing: after the release's first read."""
+    verified_landing = client.landing
+    fetch_state = store.fetch_state
+    verified = []
+    holder = store_claim_from_request(request("bob", "Bob", issue=42, branch=branch, scope=("a",)))
+
+    def landing_while_a_claim_lands(number: int) -> forge.Landing:
+        verified.append(number)
+        return verified_landing(number)
+
+    def state_with_the_landed_claim(*, worktree: Path, remote: str) -> protocol.ClaimState:
+        state = fetch_state(worktree=worktree, remote=remote)
+        if not verified:
+            return state
+        return replace(state, claims={protocol.claim_key(holder.identity, branch): holder})
+
+    monkeypatch.setattr(client, "landing", landing_while_a_claim_lands)
+    monkeypatch.setattr(store, "fetch_state", state_with_the_landed_claim)
+
+
+def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
+    if case.command == "claim":
+        return ["claim", "--scope", "a"]
+    if case.command == "rescope":
+        return ["rescope", "--add", "/repo/f"]
+    branch_flags = ["--branch", case.branch] if case.branch else []
+    outcome = ["--merged", case.merged_ref] if case.merged else ["--abandoned", "R"]
+    return [
+        "release",
+        *branch_flags,
+        *outcome,
+        *(["--claim-id", case.claim_id] if case.claim_id else []),
+        *(["--json"] if case.as_json else []),
+    ]
+
+
+def _nothing_left_output(case: _LaneLookupCase, output: str) -> tuple[str, str]:
+    """REL-47's report as `(outcome, worktree)`, human lines or `--json` envelope."""
+    if case.as_json:
+        envelope = json.loads(output)
+        assert (envelope["ok"], envelope["reason"], envelope["lane"], envelope["branch"]) == (
+            True,
+            "merged",
+            True,
+            case.branch,
+        )
+        return envelope["outcome"], envelope["worktree"]
+    landed, worktree = output.splitlines()
+    assert landed == "LANDED pull request #12 already; nothing left to release"
+    return "nothing left to release", worktree.removeprefix("worktree: ")
+
+
+def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixture[str]) -> None:
+    command = case.command.removesuffix("-help")
+    with pytest.raises(SystemExit) as exited:
+        issue_claim.main([command, "--help"])
+    assert exited.value.code == 0
+    help_text = " ".join(capsys.readouterr().out.split())
+    expected = {
+        "claim": "omit for lane mode, derived from a docs/ or fix/ checkout branch",
+        "release": (
+            "omit for lane mode: a docs/ or fix/ branch, one holding a live lane claim, or a "
+            "github --merged rerun on a branch no claim holds"
+        ),
+        "rescope": "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim",
+    }[command]
+    assert expected in help_text
+
+
+@pytest.mark.parametrize("case", _LANE_LOOKUP_CASES, ids=lambda case: case.cell)
+def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    case: _LaneLookupCase,
+) -> None:
+    if case.command.endswith("-help"):
+        _assert_lane_lookup_help(case, capsys)
+        return
+    client = _arrange_lane_lookup_case(monkeypatch, tmp_path, case)
+    before = store.fetch_state(worktree=Path("."), remote="origin").claims
+    reads = count_context_reads(monkeypatch)
+    status = issue_claim.main(["--repo", REPOSITORY, *_lane_lookup_arguments(case)])
+    captured = capsys.readouterr()
+    if case.reads_once:
+        assert sum(reads.observations.values()) == 1
+    if case.no_forge_reads:
+        assert client.requests == 0
+    after = store.fetch_state(worktree=Path("."), remote="origin").claims
+    assert status == (2 if case.refusal else 0)
+    if case.refusal:
+        if case.exact:
+            assert captured.err == f"ERROR: {case.refusal}\n"
+        else:
+            assert case.refusal in captured.err
+        assert after == before
+    elif case.command == "rescope":
+        assert _live_store_claim().scope == ("a", "f")
+        assert captured.out.startswith("RESCOPED lane dependabot/x: mine")
+    elif case.nothing_left_worktree:
+        assert _nothing_left_output(case, captured.out) == (
+            "nothing left to release",
+            case.nothing_left_worktree,
+        )
+        assert bool(after) is case.issue_claim_lands_during_verification
+    else:
+        assert after == {}
+        if case.as_json:
+            envelope = json.loads(captured.out)
+            assert envelope["ok"] is True
+            assert envelope["reason"] == "abandoned"
+            assert envelope["lane"] is True
+        else:
+            assert captured.out.startswith(f"RELEASED lane {case.branch}: mine\n")
+            if case.merged:
+                assert "worktree: kept -- release ran from inside it\n" in captured.out

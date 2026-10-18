@@ -117,12 +117,35 @@ aco release --merged 58
 
 This lane branch must land within the session it was claimed in; it never
 appears on `board`, `rulings`, or `next` since it owns no issue. Its pull
-request carries `No-Item: docs` or `No-Item: fix` in place of a `Work-Item:`
+request carries `No-Item: docs`, `No-Item: fix` or `No-Item: deps` in place of a `Work-Item:`
 line -- the one classification `release --merged` accepts for a lane with no
 issue to close. `specs/claim.spec.md` owns the exact branch-name grammar and
 its refusal when a checkout is not on a matching branch;
 `specs/landing-grammar.spec.md` owns the `No-Item:` classification and its
-refusals.
+refusals. A `deps` pull request may change only paths named by `dependency_paths`
+in the repository's tracked `.aco/board.toml`; a trailing `/` covers a directory's
+contents, and other entries match exactly. This bounds paths, not safety: review
+must still check workflow permissions, secret use, actions and run steps, disabled
+checks, and tool configuration. See `specs/storage-pin.spec.md` for the key's contract.
+
+`aco adopt <pull request> --no-item <kind>` makes a pull request someone else
+opened (a dependency bot's, for one) such a lane: an open pull request of this
+repository, aimed at the default branch, whose body carries no classification line and
+closes no item, whose complete file listing stays within `dependency_paths` for `deps`, whose
+head branch no claim, local branch or worktree path stands on, and whose claim scope passes
+`claim`'s width gate. It refuses with the first failing check's sentence; when every check
+passes it builds `<repo>-worktrees/pr-<n>` on the head branch, claims that branch
+exclusively as this session's builder, appends `No-Item: <kind>` to the body, reads the body
+back and prints the declaration. It never pushes to the pull request's branch and never
+changes its title, labels, base or commits. Run it again after an interruption: the
+session that holds the branch's claim resumes it, adding the line only if it is missing. To
+give an adopted pull request up, run `aco release --branch <head-branch> --abandoned REASON`
+from the main checkout, then `git worktree remove <path>` and `git branch -D <branch>`; the
+line stays in the body, so a later `adopt` of that pull request refuses until it is removed.
+A bot's re-push ends no claim, and `aco land --head` demands the new head; a re-push that
+rewrote the branch leaves the worktree behind: pull it to the new head by hand first, or
+`land` reports `worktree: kept -- not merged into the default branch` (REL-29).
+`specs/adopt.spec.md` owns the checks, their order and their refusals.
 
 ## A workflow without a forge
 
@@ -274,7 +297,7 @@ in a checkout, except the ignored `settings.local.json` that repairs it.
 
 ## Configuration
 
-`.aco/board.toml` defines exactly seven top-level keys; any other key
+`.aco/board.toml` defines exactly eight top-level keys; any other key
 is refused by name.
 
 - `storage` -- `"github"` (default) or `"state-ref"`; the pin and its
@@ -301,6 +324,10 @@ is refused by name.
 - `lane_shared` -- exact repository file paths, such as a vulture whitelist,
   that any live claim may write though its scope never names them. Only the
   trunk's committed copy counts, so a change takes effect once it lands.
+- `dependency_paths` -- the paths a `No-Item: deps` pull request may change;
+  a trailing `/` covers a directory; other entries match
+  exactly. For landing, only the trunk checkout's tracked copy counts. This
+  bounds paths and does not certify safety (`specs/storage-pin.spec.md`, PIN-44..48).
 
 ## Board
 
@@ -380,6 +407,7 @@ by exactly one file below; this table is the map, not a copy.
 | `aco rescope` | `specs/rescope.spec.md` | adds or drops paths on a live claim |
 | `aco release` | `specs/release.spec.md` | ends a claim as merged or abandoned |
 | `aco land` | `specs/land.spec.md` | merges a green pull request, then releases its claim |
+| `aco adopt` | `specs/adopt.spec.md` | makes a foreign pull request an issue-less lane: worktree, exclusive claim and `No-Item` line |
 | `aco status` | `specs/status.spec.md` | reads every live claim, repository-wide or by path |
 | `aco reset` | `specs/reset.spec.md` | rebuilds a broken or rewritten state ref |
 | `aco check` | `specs/check.spec.md` | answers whether a pull request, an issue, or a trunk commit is sound |

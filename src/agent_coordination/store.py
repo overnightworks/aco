@@ -188,8 +188,14 @@ _LINEAGE_STAMP_FILENAME = "last-oid"
 # `--no-auto-maintenance` keeps it from starting a repack of the object store
 # every linked worktree shares: since git 2.54 that repack can `rmdir` an
 # empty `objects/xx` under another agent's concurrent `hash-object -w`
-# (issue #22).
-_STATE_FETCH_OPTIONS = ("--no-tags", "--no-write-fetch-head", "--no-auto-maintenance")
+# (issue #22). `--refmap=` sets aside the remote's configured fetch refspecs,
+# which could otherwise write a local branch or the shared `STATE_REF`.
+_STATE_FETCH_OPTIONS = (
+    "--no-tags",
+    "--no-write-fetch-head",
+    "--no-auto-maintenance",
+    "--refmap=",
+)
 
 # `fetch_state` fetches `STATE_REF` straight into this ref through the
 # fetch's own destination refspec, instead of reading the tip back from
@@ -278,14 +284,14 @@ def _run_git(worktree: Path, arguments: list[str]) -> process.CapturedResult:
 def _run_git_with_input(worktree: Path, arguments: list[str], *, input_data: bytes) -> str:
     command = process.git_command(arguments, directory=worktree)
     try:
-        result = process.run_bounded(command, input_data=input_data)
+        result = process.run_bounded_captured(command, input_data=input_data)
     except process.ExecutableMissingError as error:
         raise ClaimError("git is required for the claim state store") from error
     except process.ProcessTimedOutError as error:
         raise ClaimError("git timed out while writing to the claim state store") from error
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail_from_bounded(result))
-    return result.output.decode().strip()
+        raise ClaimError(process.git_failure_detail_lossy(result))
+    return result.stdout.decode().strip()
 
 
 def _git_dir(worktree: Path) -> Path:
