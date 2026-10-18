@@ -1312,15 +1312,18 @@ def _bob_claims_the_branch_for_issue_9(world: AdoptionWorld) -> None:
     _claim_the_branch_as("Bob", protocol.IssueIdentity(9), "b9")(world)
 
 
-def _a_repush_adds_a_path_outside_the_dependency_paths(world: AdoptionWorld) -> None:
+def _repush_the_branch(world: AdoptionWorld, *paths: str) -> str:
+    """The bot's force-push: the pull request's head, its listing and the list of files all
+    move to a commit that is no descendant of the old head."""
     repushed = _publish_branch_tip(world.clone, "re-push")
     world.serve(lambda landing: replace(landing, head_sha=repushed))
-    world.forge.changes_by_number[ADOPTED_PULL_REQUEST] = pull_request_listing(
-        repushed,
-        forge.ChangedFile("uv.lock", None),
-        forge.ChangedFile("pyproject.toml", None),
-        forge.ChangedFile("src/x.py", None),
-    )
+    world.head = repushed
+    world.list_files(*paths)
+    return repushed
+
+
+def _a_repush_adds_a_path_outside_the_dependency_paths(world: AdoptionWorld) -> None:
+    _repush_the_branch(world, "uv.lock", "pyproject.toml", "src/x.py")
 
 
 @pytest.mark.parametrize(
@@ -1428,3 +1431,273 @@ def test_adopt_stops_with_the_status_of_the_claim_check_phase_and_builds_nothing
 
     assert (result.status, result.stdout) == (2, "")
     assert world.effects() == before
+
+
+def test_adopts_rerun_after_a_re_push_and_a_rewritten_body_restores_the_line_under_the_same_claim(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-34, ADOPT-26, ADOPT-31 (#47 line 6) -- the bot's force-push and body
+    rewrite end no claim: the holder's rerun writes the lost line again, builds nothing."""
+    first_head = world.head
+    adopt(capsys).expect_success()
+    claim = _adopted_claim(world)
+    tip_before_rerun = state_ref_tip(world.remote)
+    worktrees_before_rerun = worktrees_and_branches(world.clone)
+    _repush_the_branch(world, "uv.lock", "pyproject.toml")
+    world.serve(lambda landing: replace(landing, body="Bump x"))
+
+    rerun = adopt(capsys)
+
+    assert (rerun.status, rerun.stdout, rerun.stderr) == (
+        0,
+        _claimed_line(claim) + _declaration("deps"),
+        "",
+    )
+    assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, ADOPTED_BODY)] * 2
+    assert _adopted_claim(world) == claim
+    assert claim.base == first_head
+    assert state_ref_tip(world.remote) == tip_before_rerun
+    assert worktrees_and_branches(world.clone) == worktrees_before_rerun
+
+
+def _the_first_head_is_reviewed(world: AdoptionWorld) -> tuple[str, str]:
+    world.forge.merge_remote = world.remote
+    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
+        ADOPTED_PULL_REQUEST,
+        True,
+        world.head,
+        forge.MERGEABLE_STATE_CLEAN,
+        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+    )
+    return world.head, world.head
+
+
+def _a_re_push_follows_the_review(world: AdoptionWorld) -> tuple[str, str]:
+    reviewed = world.head
+    world.forge.merge_remote = world.remote
+    repushed = _repush_the_branch(world, "uv.lock", "pyproject.toml")
+    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
+        ADOPTED_PULL_REQUEST,
+        True,
+        repushed,
+        forge.MERGEABLE_STATE_CLEAN,
+        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+    )
+    return reviewed, repushed
+
+
+def _the_worktree_follows_the_re_push(world: AdoptionWorld) -> tuple[str, str]:
+    world.forge.merge_remote = world.remote
+    repushed = _repush_the_branch(world, "uv.lock", "pyproject.toml")
+    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
+        ADOPTED_PULL_REQUEST,
+        True,
+        repushed,
+        forge.MERGEABLE_STATE_CLEAN,
+        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+    )
+    real_git(world.pull_request_directory, "fetch", "-q", "origin")
+    real_git(world.pull_request_directory, "reset", "-q", "--hard", repushed)
+    return repushed, repushed
+
+
+def _the_worktree_stays_on_the_first_head(world: AdoptionWorld) -> tuple[str, str]:
+    world.forge.merge_remote = world.remote
+    repushed = _repush_the_branch(world, "uv.lock", "pyproject.toml")
+    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
+        ADOPTED_PULL_REQUEST,
+        True,
+        repushed,
+        forge.MERGEABLE_STATE_CLEAN,
+        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+    )
+    return repushed, repushed
+
+
+LANE_RELEASED = "RELEASED lane {branch}: {claim_id}\nfreed: none\nnext: none\n"
+
+
+@pytest.mark.parametrize(
+    ("arrange", "status", "stdout", "stderr", "merged", "worktree_removed"),
+    [
+        pytest.param(
+            _the_first_head_is_reviewed,
+            0,
+            LANE_RELEASED + "worktree: removed\n",
+            "",
+            True,
+            True,
+            id="landing-the-head-adopted-releases-the-lane-and-removes-the-pair",
+        ),
+        pytest.param(
+            _a_re_push_follows_the_review,
+            2,
+            "",
+            "ERROR: pull request #{number} head is {current}, not the reviewed {reviewed}; "
+            "review the new head before landing\n",
+            False,
+            False,
+            id="landing-the-reviewed-head-after-a-re-push-refuses-and-keeps-the-claim",
+        ),
+        pytest.param(
+            _the_worktree_follows_the_re_push,
+            0,
+            LANE_RELEASED + "worktree: removed\n",
+            "",
+            True,
+            True,
+            id="landing-the-new-head-with-the-worktree-pulled-removes-the-pair",
+        ),
+        pytest.param(
+            _the_worktree_stays_on_the_first_head,
+            0,
+            LANE_RELEASED + "worktree: kept -- not merged into the default branch\n",
+            "",
+            True,
+            False,
+            id="landing-the-new-head-with-the-worktree-behind-keeps-the-pair",
+        ),
+    ],
+)
+def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
+    world: AdoptionWorld,
+    capsys: pytest.CaptureFixture[str],
+    arrange: Callable[[AdoptionWorld], tuple[str, str]],
+    status: int,
+    stdout: str,
+    stderr: str,
+    merged: bool,
+    worktree_removed: bool,
+) -> None:
+    """Spec: ADOPT-34, LANDCMD-31, LANDCMD-12, LANDCMD-13, REL-57, REL-29 (#47 lines 1, 6) --
+    `aco land` lands an adopted lane like any lane, but only at the head it is told to
+    review; the trailer is the adopted line, the worktree goes only when it holds the merged head."""
+    adopt(capsys).expect_success()
+    claim = _adopted_claim(world)
+    reviewed, current = arrange(world)
+    trunk_before = _remote_trunk_tip(world)
+
+    landed = run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", reviewed], capsys)
+
+    values = {
+        "number": ADOPTED_PULL_REQUEST,
+        "reviewed": reviewed,
+        "current": current,
+        "branch": ADOPTED_BRANCH,
+        "claim_id": claim.claim_id,
+    }
+    assert (landed.status, landed.stdout, landed.stderr) == (
+        status,
+        stdout.format(**values),
+        stderr.format(**values),
+    )
+    assert [call[1] for call in world.forge.merge_calls] == ([current] if merged else [])
+    assert (_remote_trunk_tip(world) != trunk_before) is merged
+    assert (not world.pull_request_directory.exists()) is worktree_removed
+    assert (ADOPTED_BRANCH in real_git(world.clone, "branch", "--list").stdout) is (
+        not worktree_removed
+    )
+    assert (
+        protocol.claims_on_branch(
+            store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
+            ADOPTED_BRANCH,
+        )
+        == ()
+    ) is merged
+    if merged:
+        [(_number, _head, _method, _title, merge_body)] = world.forge.merge_calls
+        assert merge_body.splitlines()[-1] == "No-Item: deps"
+
+
+def _remote_trunk_tip(world: AdoptionWorld) -> str:
+    return real_git(world.clone, "ls-remote", "origin", "refs/heads/main").stdout.split()[0]
+
+
+def _abandon_the_adoption(capsys: pytest.CaptureFixture[str]) -> CliRun:
+    return run_cli(["release", "--branch", ADOPTED_BRANCH, "--abandoned", "R"], capsys)
+
+
+def test_abandoning_an_adopted_lane_frees_the_claim_and_keeps_the_pair_and_the_line(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-35, REL-33, REL-57 (#47 line 10) -- giving the lane up frees the claim and
+    touches neither worktree, branch nor the line, and reads nothing from the forge."""
+    adopt(capsys).expect_success()
+    claim = _adopted_claim(world)
+    effects_before = world.effects()
+    forge_requests_before = world.forge.requests
+
+    abandoned = _abandon_the_adoption(capsys)
+
+    assert (abandoned.status, abandoned.stdout, abandoned.stderr) == (
+        0,
+        f"RELEASED lane {ADOPTED_BRANCH}: {claim.claim_id}\n",
+        "",
+    )
+    assert replace(world.effects(), state_ref_tip=None) == replace(
+        effects_before, state_ref_tip=None
+    )
+    assert world.pull_request_directory.is_dir()
+    assert world.forge.landings[ADOPTED_PULL_REQUEST].body == ADOPTED_BODY
+    assert world.forge.requests == forge_requests_before
+    assert (
+        protocol.claims_on_branch(
+            store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
+            ADOPTED_BRANCH,
+        )
+        == ()
+    )
+
+
+def _land_the_abandoned_pull_request(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> CliRun:
+    world.forge.merge_remote = world.remote
+    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
+        ADOPTED_PULL_REQUEST,
+        True,
+        world.head,
+        forge.MERGEABLE_STATE_CLEAN,
+        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+    )
+    return run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", world.head], capsys)
+
+
+def _adopt_the_abandoned_pull_request(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> CliRun:
+    return adopt(capsys)
+
+
+@pytest.mark.parametrize(
+    ("attempt", "refusal"),
+    [
+        pytest.param(
+            _land_the_abandoned_pull_request,
+            _refusal(f"has no active issue-less lane claim on branch '{ADOPTED_BRANCH}'"),
+            id="land-refuses-the-lane-without-a-claim",
+        ),
+        pytest.param(
+            _adopt_the_abandoned_pull_request,
+            _refusal("already carries No-Item: deps; adopt never changes a classification line"),
+            id="adopt-refuses-the-line-that-stayed",
+        ),
+    ],
+)
+def test_an_abandoned_adoption_is_refused_by_land_and_by_adopt(
+    world: AdoptionWorld,
+    capsys: pytest.CaptureFixture[str],
+    attempt: Callable[[AdoptionWorld, pytest.CaptureFixture[str]], CliRun],
+    refusal: str,
+) -> None:
+    """Spec: ADOPT-35, LAND-16, ADOPT-05 (#47 line 10) -- after the lane is given up, the line
+    that stayed in the body keeps `aco land` and a second `aco adopt` from acting on it."""
+    adopt(capsys).expect_success()
+    _abandon_the_adoption(capsys).expect_success()
+    effects_before = world.effects()
+
+    refused = attempt(world, capsys)
+
+    assert (refused.status, refused.stdout, refused.stderr) == (2, "", refusal)
+    assert world.effects() == effects_before
+    assert world.forge.merge_calls == []
