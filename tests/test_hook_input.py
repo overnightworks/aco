@@ -735,6 +735,7 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             (
                 (hook_input.PATTERN_SED_IN_PLACE, "-e"),
                 (hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),
+                (hook_input.PATTERN_SED_IN_PLACE, "--"),
             ),
             id="sed-dash-e-after-double-dash-is-a-file-and-the-script-is-not",
         ),
@@ -814,13 +815,37 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
         ),
         pytest.param(
             "cp src /repo/x --no-preserve mode",
-            ((hook_input.PATTERN_COPY, "/repo/x"),),
+            (
+                (hook_input.PATTERN_COPY, "/repo/x"),
+                (hook_input.PATTERN_COPY, "mode"),
+            ),
             id="cp-no-preserve-flag-consumes-the-next-word",
         ),
         pytest.param(
-            "cp src /repo/x --sparse always",
-            ((hook_input.PATTERN_COPY, "/repo/x"),),
-            id="cp-sparse-flag-consumes-the-next-word",
+            "cp src/a src/b --suffix docs",
+            (
+                (hook_input.PATTERN_COPY, "src/b"),
+                (hook_input.PATTERN_COPY, "docs"),
+            ),
+            id="cp-option-after-an-operand-is-judged-as-an-operand-too",
+        ),
+        pytest.param(
+            "cp src/a /repo/x --sparse always",
+            (
+                (hook_input.PATTERN_COPY, "/repo/x"),
+                (hook_input.PATTERN_COPY, "always"),
+            ),
+            id="cp-sparse-flag-consumes-the-next-word-and-judges-it-too",
+        ),
+        pytest.param(
+            "sed 's/a/b/' -i /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-flag-after-the-script-edits-in-place",
+        ),
+        pytest.param(
+            "sed -ni.bak /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-suffix-cluster-with-one-operand-judges-it",
         ),
         pytest.param(
             "git restore -Ws HEAD f",

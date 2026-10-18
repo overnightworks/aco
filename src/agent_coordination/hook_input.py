@@ -9,6 +9,7 @@ owner rather than growing inside `protect`'s already large module.
 from __future__ import annotations
 
 import posixpath
+from collections.abc import Iterable
 from enum import Enum, auto
 from typing import NamedTuple
 
@@ -689,6 +690,7 @@ def _parse_arguments(
     *,
     value_options: frozenset[str] = frozenset(),
     optional_value_options: frozenset[str] = frozenset(),
+    options_end_at_first_operand: bool = False,
 ) -> _ParsedArguments:
     """The one walk that decides what is an option, an option's value and an
     operand, the way GNU `getopt` does: options and operands may interleave,
@@ -697,7 +699,9 @@ def _parse_arguments(
     starts with. `value_options` (`-t`, `--target-directory`) take a required
     value; `optional_value_options` (`-i`, `--in-place`) only an attached one.
     Unlike `_non_flag_arguments`, which drops every word starting with `-`,
-    a lone `-` stays an operand here (`git restore -`), as in GNU tools."""
+    a lone `-` stays an operand here (`git restore -`), as in GNU tools.
+    `options_end_at_first_operand` is the POSIX reading (`POSIXLY_CORRECT`):
+    from the first operand on, every word is an operand, `--` included."""
     options: list[_OptionValue] = []
     operands: list[_Word] = []
     index = 0
@@ -710,6 +714,9 @@ def _parse_arguments(
             break
         if len(word.text) < len(_FLAG_PREFIX) + 1 or not _is_flag(word):
             operands.append(word)
+            if options_end_at_first_operand:
+                operands.extend(following)
+                break
         elif word.text.startswith(_LONG_OPTION_PREFIX):
             option, consumed = _parse_long_option(
                 word,
@@ -729,6 +736,30 @@ def _parse_arguments(
             options.extend(cluster_options)
             index += consumed
     return _ParsedArguments(tuple(options), tuple(operands))
+
+
+def _parse_both_readings(
+    words: tuple[_Word, ...],
+    *,
+    value_options: frozenset[str],
+    optional_value_options: frozenset[str] = frozenset(),
+) -> tuple[_ParsedArguments, ...]:
+    """`words` read the permuted way (GNU's default) and the POSIX way
+    (`POSIXLY_CORRECT`). The hook reads no environment, so a tool whose
+    reading it cannot know is judged by both."""
+    return tuple(
+        _parse_arguments(
+            words,
+            value_options=value_options,
+            optional_value_options=optional_value_options,
+            options_end_at_first_operand=posix,
+        )
+        for posix in (False, True)
+    )
+
+
+def _unique_in_order(words: Iterable[_Word]) -> tuple[_Word, ...]:
+    return tuple(dict.fromkeys(words))
 
 
 def _match_redirect(tokens: tuple[_Word, ...], index: int) -> tuple[str, _Word, int] | None:
@@ -770,13 +801,16 @@ def _match_copy(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | Non
     untouched `README.md`)."""
     if words[0].text != PATTERN_COPY:
         return None
-    parsed = _parse_arguments(
-        words[1:], value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS
+    destinations = _unique_in_order(
+        destination
+        for parsed in _parse_both_readings(
+            words[1:], value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS
+        )
+        for destination in (
+            parsed.every_value_of(_CP_TARGET_DIRECTORY_OPTIONS) or parsed.operands[-1:]
+        )
     )
-    target_directories = parsed.every_value_of(_CP_TARGET_DIRECTORY_OPTIONS)
-    if target_directories:
-        return PATTERN_COPY, target_directories
-    return (PATTERN_COPY, parsed.operands[-1:]) if parsed.operands else None
+    return (PATTERN_COPY, destinations) if destinations else None
 
 
 def _match_remove(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | None:
@@ -804,21 +838,29 @@ def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...
     stdout), so it names no pattern at all."""
     if words[0].text != "sed":
         return None
-    parsed = _parse_arguments(
+    readings = _parse_both_readings(
         words[1:],
         value_options=_SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
         optional_value_options=_SED_IN_PLACE_OPTIONS,
     )
+    paths = _unique_in_order(
+        path for parsed in readings for path in _sed_in_place_paths(parsed)
+    )
+    return (PATTERN_SED_IN_PLACE, paths) if paths else None
+
+
+def _sed_in_place_paths(parsed: _ParsedArguments) -> tuple[_Word, ...]:
+    """The files one reading of a `sed` command edits in place, none when
+    that reading sees no `-i`/`--in-place`."""
     in_place = parsed.first_option(_SED_IN_PLACE_OPTIONS)
     if in_place is None:
-        return None
-    operands = parsed.operands
+        return ()
     has_in_place_suffix = in_place.value is not None
-    if parsed.has_option(_SED_SCRIPT_OPTIONS) or (has_in_place_suffix and len(operands) == 1):
-        paths = operands
-    else:
-        paths = operands[1:]
-    return (PATTERN_SED_IN_PLACE, paths) if paths else None
+    if parsed.has_option(_SED_SCRIPT_OPTIONS) or (
+        has_in_place_suffix and len(parsed.operands) == 1
+    ):
+        return parsed.operands
+    return parsed.operands[1:]
 
 
 _GIT_RESTORE_PREFIX_LENGTH = 2  # `git`, `restore`

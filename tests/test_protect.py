@@ -945,6 +945,7 @@ def _bash_scope_case(
             _bash_scope_case(template, pattern, path=_BASH_INSIDE_SCOPE_PATH, denied=False)
             for template, pattern in _BASH_WRITE_COMMAND_TEMPLATES
         ),
+        ("cp src/a src/b --suffix docs", 2, "cp docs outside claim scope"),
     ],
 )
 def test_protect_bash_judges_a_recognized_pattern_path_by_claim_scope(
