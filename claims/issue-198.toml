@@ -1,8 +1,0 @@
-claim_id = "0920ef84d6c847588faf5566c9199105"
-agent = "claude"
-role = "builder"
-base = "bcadeba95c5f27a12d1ffad702c790d187850b9d"
-branch = "claude/issue-198-sonar-zeigt-auf-main-0-befunde-s5886-mar"
-scope = [".gitignore", "sonar-project.properties", "src/aco_board/server.py", "src/agent_coordination/process.py", "src/agent_coordination/protocol.py", "src/agent_coordination/store.py", "src/agent_coordination/workspace.py"]
-opened_commit = "e6cdced97af968ffa388e132be2b950f12c83010"
-whole_reason = "Die zehn Marker und die Bereinigung der Properties ergeben zusammen eine saubere Sonar-Analyse von main; einzeln gelandet bliebe main rot oder die Konfiguration falsch."
