@@ -2975,6 +2975,16 @@ def test_next_action_skips_a_malformed_childless_container() -> None:
 
 
 PARENT_ISSUE_REFERENCE = board.IssueReference(REPOSITORY, 79)
+STATE_REF_RECORD: dict[str, object] = {
+    "title": "Parent",
+    "state": "open",
+    "kind": "container",
+    "labels": [],
+    "blocked_by": [],
+    "parent": None,
+    "created_at": "2026-09-10T00:00:00Z",
+    "updated_at": "2026-09-15T00:00:00Z",
+}
 
 
 @pytest.mark.parametrize(
@@ -3038,6 +3048,40 @@ def test_closable_container_number_decides_by_kind_children_uncut_rows_next_line
 
 
 @pytest.mark.parametrize(
+    ("storage", "body", "expected"),
+    [
+        pytest.param(
+            Storage.GITHUB,
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            None,
+            id="github-with-an-uncut-row",
+        ),
+        pytest.param(Storage.GITHUB, complete_contract("keiner"), 79, id="github-without-a-row"),
+        pytest.param(
+            Storage.STATE_REF,
+            complete_contract("keiner", slice=slice_entries("Scheibe 1"), record=STATE_REF_RECORD),
+            None,
+            id="state-ref-with-an-uncut-row",
+        ),
+        pytest.param(
+            Storage.STATE_REF,
+            complete_contract("keiner", record=STATE_REF_RECORD),
+            79,
+            id="state-ref-without-a-row",
+        ),
+    ],
+)
+def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_every_storage(
+    storage: Storage, body: str, expected: int | None
+) -> None:
+    """Issue #214: with `Next` naming no work, only the uncut row decides."""
+    parent = board.ParentIssue(PARENT_ISSUE_REFERENCE, body, ItemKind.CONTAINER)
+    children = (board.ChildItem(80, board.ChildState.CLOSED),)
+
+    assert board.closable_container_number(parent, children, storage) == expected
+
+
+@pytest.mark.parametrize(
     ("parent_body", "expected"),
     [
         pytest.param(
@@ -3078,18 +3122,6 @@ def test_parent_completion_reads_uncut_rows_before_the_next_line(
     parsed = parse_body(parent_body, storage=Storage.GITHUB)
 
     assert board.parent_completion(parsed) is expected
-
-
-def test_deleting_the_uncut_row_turns_forbidden_into_required() -> None:
-    with_row = parse_body(
-        complete_contract("keiner", slice=slice_entries("Scheibe 1")), storage=Storage.GITHUB
-    )
-    without_row = parse_body(complete_contract("keiner"), storage=Storage.GITHUB)
-
-    assert (board.parent_completion(with_row), board.parent_completion(without_row)) == (
-        board.ParentCompletion.FORBIDDEN,
-        board.ParentCompletion.REQUIRED,
-    )
 
 
 def test_a_complete_block_item_is_body_complete_with_no_dependency_projection() -> None:
