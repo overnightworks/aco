@@ -7,6 +7,7 @@ import threading
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
 import pytest
@@ -510,13 +511,18 @@ class ParserExit:
     usage_prefix: str
 
 
+class RefusalLength(Enum):
+    UNCHECKED = "unchecked"
+    WITHIN_LIMIT = "within-limit"
+    EXACTLY_LIMIT = "exactly-limit"
+
+
 def refusal_observations(
     world: LandingWorld,
     result: CliRun,
     sentence: str,
     *,
-    bounded: bool = False,
-    exact_length: bool = False,
+    length: RefusalLength = RefusalLength.UNCHECKED,
     parser_exit: ParserExit | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
     observed = {"exit": result.status, "out": result.stdout, **landing_effects(world)}
@@ -533,8 +539,9 @@ def refusal_observations(
     else:
         observed["err"] = result.stderr
         expected["err"] = "ERROR: " + sentence + "\n"
-    if bounded:
-        length = len(result.stderr.rstrip("\n"))
-        observed["length"] = length if exact_length else length <= 200
-        expected["length"] = 200 if exact_length else True
+    if length is not RefusalLength.UNCHECKED:
+        actual_length = len(result.stderr.rstrip("\n"))
+        exact = length is RefusalLength.EXACTLY_LIMIT
+        observed["length"] = actual_length if exact else actual_length <= 200
+        expected["length"] = 200 if exact else True
     return observed, expected

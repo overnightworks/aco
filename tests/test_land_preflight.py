@@ -12,6 +12,7 @@ from github_fixtures import (
     FakeForge,
     LandingWorld,
     ParserExit,
+    RefusalLength,
     assert_github_world,
     landing_effects,
     landing_pull_request,
@@ -36,8 +37,7 @@ class LandingCase:
     default_branch: str = "main"
     default_branch_error: forge.ForgeError | None = None
     quality_config_error: forge.ForgeError | None = None
-    bounded: bool = False
-    exact_length: bool = False
+    length: RefusalLength = RefusalLength.UNCHECKED
     requests: int | None = None
     requests_positive: bool = False
     quality_reads: tuple[str, ...] | None = None
@@ -107,7 +107,7 @@ class TestLandReadiness:
                 LandingCase(
                     replace(landing_readiness(checks=()), open=False),
                     "pull request #12 is not open; it cannot be landed",
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="not-open",
             ),
@@ -115,7 +115,7 @@ class TestLandReadiness:
                 LandingCase(
                     landing_readiness(mergeable_state="dirty", checks=()),
                     "pull request #12 is not mergeable (dirty)",
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="not-mergeable-dirty",
             ),
@@ -123,7 +123,7 @@ class TestLandReadiness:
                 LandingCase(
                     landing_readiness(checks=()),
                     "pull request #12 exposes no CI checks; cannot verify green CI",
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="no-checks",
             ),
@@ -132,7 +132,7 @@ class TestLandReadiness:
                     landing_readiness(checks=(forge.CheckRun("build", None),)),
                     "pull request #12 has checks still running: build; wait for every check to "
                     "succeed",
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="check-running",
             ),
@@ -141,7 +141,7 @@ class TestLandReadiness:
                     landing_readiness(checks=(forge.CheckRun("build", "failure"),)),
                     "pull request #12 has non-successful checks: build (failure); land only "
                     "after every check succeeds",
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="check-failed",
             ),
@@ -152,7 +152,7 @@ class TestLandReadiness:
                     ),
                     "pull request #12 has checks still running: check-0, check-1, check-2, and "
                     "2 more; wait for every check to succeed",
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="running-list-capped",
             ),
@@ -162,7 +162,7 @@ class TestLandReadiness:
                     "pull request #12 has checks still running: "
                     + "x" * 39
                     + "…; wait for every check to succeed",
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="running-name-truncated",
             ),
@@ -174,8 +174,7 @@ class TestLandReadiness:
                     "pull request #12 has checks still running: "
                     + ", ".join(["x" * 39 + "…"] * 3)
                     + ", and 2 more; wait for ev…",
-                    bounded=True,
-                    exact_length=True,
+                    length=RefusalLength.EXACTLY_LIMIT,
                 ),
                 id="running-many-long-names-bounded",
             ),
@@ -230,8 +229,7 @@ class TestLandReadiness:
             world,
             land(world, capsys),
             world.case.sentence,
-            bounded=world.case.bounded,
-            exact_length=world.case.exact_length,
+            length=world.case.length,
         )
         assert observed == expected
 
@@ -347,8 +345,7 @@ class TestLandQualityGate:
                     "pull request #12 has no quality / verdict check; " + "b" * 143 + "…",
                     quality_config="",
                     default_branch="b" * 255,
-                    bounded=True,
-                    exact_length=True,
+                    length=RefusalLength.EXACTLY_LIMIT,
                     quality_reads=("b" * 255,),
                 ),
                 id="long-default-branch-name",
@@ -411,8 +408,7 @@ class TestLandQualityGate:
             world,
             land(world, capsys),
             world.case.sentence,
-            bounded=world.case.bounded,
-            exact_length=world.case.exact_length,
+            length=world.case.length,
         )
         observed["quality reads"] = tuple(world.forge.quality_config_reads)
         expected["quality reads"] = world.case.quality_reads
@@ -532,8 +528,7 @@ class TestLandEntry:
             world,
             land(world, capsys),
             world.case.sentence,
-            bounded=world.case.bounded,
-            exact_length=world.case.exact_length,
+            length=world.case.length,
         )
         if world.case.requests is not None:
             observed["requests"] = world.forge.requests

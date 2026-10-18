@@ -22,6 +22,7 @@ from github_fixtures import (
     MERGE_COMMIT_SHA,
     FakeForge,
     LandingWorld,
+    RefusalLength,
     assert_github_world,
     landing_effects,
     landing_pull_request,
@@ -82,8 +83,7 @@ class ClaimCase:
     file_reads: tuple[tuple[str, str], ...] = ((".aco/board.toml", MERGE_COMMIT_SHA),)
     check_claims: bool = False
     claims_present: bool = False
-    bounded: bool = False
-    exact_length: bool = False
+    length: RefusalLength = RefusalLength.UNCHECKED
 
 
 @dataclass
@@ -219,9 +219,7 @@ def assert_refusal(world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> Non
     case = world.case
     capsys.readouterr()
     result = run_cli(["land", "12", *case.arguments], capsys)
-    observed, expected = refusal_observations(
-        world, result, case.sentence, bounded=case.bounded, exact_length=case.exact_length
-    )
+    observed, expected = refusal_observations(world, result, case.sentence, length=case.length)
     observed.update(
         {
             "status": real_git(world.clone, "status", "--porcelain").stdout,
@@ -416,8 +414,7 @@ class TestLandClassification:
                     ),
                     arguments=("--head", MERGE_COMMIT_SHA),
                     check_claims=True,
-                    bounded=True,
-                    exact_length=True,
+                    length=RefusalLength.EXACTLY_LIMIT,
                 ),
                 id="many-long-paths-bounded",
             ),
@@ -549,7 +546,7 @@ class TestLandHeadConfig:
                     "aco land cannot release its claim across that change",
                     head_config=None,
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="head-without-config",
             ),
@@ -560,7 +557,7 @@ class TestLandHeadConfig:
                     head_config=None,
                     closed_items=frozenset({72}),
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="removed-ahead-of-a-closed-item",
             ),
@@ -570,7 +567,7 @@ class TestLandHeadConfig:
                     "aco land cannot release its claim across that change",
                     head_config='storage = "state-ref"\n',
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="storage-changed",
             ),
@@ -580,7 +577,7 @@ class TestLandHeadConfig:
                     "aco land cannot release its claim across that change",
                     head_config='canonical_remote = "upstream"\n',
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="canonical-remote-changed",
             ),
@@ -590,7 +587,7 @@ class TestLandHeadConfig:
                     ".aco/board.toml storage must be 'github' or 'state-ref'",
                     head_config='storage = "gitlab"\n',
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="invalid",
             ),
@@ -600,7 +597,7 @@ class TestLandHeadConfig:
                     ".aco/board.toml merge_method must be 'merge' or 'squash'",
                     head_config='merge_method = "rebase"\n',
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="invalid-merge-method",
             ),
@@ -610,7 +607,7 @@ class TestLandHeadConfig:
                     f"configuration .aco/board.toml: {toml_error('not toml =')}",
                     head_config="not toml =",
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="invalid-syntax",
             ),
@@ -620,8 +617,7 @@ class TestLandHeadConfig:
                     ".aco/board.toml has unknown top-level key " + "x" * 77 + "…",
                     head_config=f'{"x" * 300} = "y"\n',
                     item_reads=(),
-                    bounded=True,
-                    exact_length=True,
+                    length=RefusalLength.EXACTLY_LIMIT,
                 ),
                 id="invalid-bounded",
             ),
@@ -631,7 +627,7 @@ class TestLandHeadConfig:
                     ".aco/board.toml has unknown top-level key bad\\nkey, esc\\x1b[31m",
                     head_config='"bad\\nkey" = 1\n"esc\\u001b[31m" = 2\n',
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="invalid-control-characters-escaped",
             ),
@@ -642,7 +638,7 @@ class TestLandHeadConfig:
                     "\\u2066c\\u200bd\\x9be\tf\xa0g",
                     head_config=('"a\u202eb\u2066c\u200bd\x9be\tf\N{NO-BREAK SPACE}g" = 1\n'),
                     item_reads=(),
-                    bounded=True,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="invalid-display-controls-escaped",
             ),
