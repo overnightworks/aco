@@ -1102,6 +1102,10 @@ class ItemWriteIntent:
     before writing (PIN-29, issue #447): any item written since refuses the
     write too, so that check and this write land as one CAS instead of a
     preflight another writer can slip past.
+
+    `parent_pin`, when set, must still name its item's current blob on every
+    attempt (CAS-70): a fresh child's parent changed since the command
+    checked it refuses the write, whatever else was written meanwhile.
     """
 
     item_id: str
@@ -1109,6 +1113,7 @@ class ItemWriteIntent:
     new_oid: ObjectId
     operation_id: str
     store_expected: Mapping[str, ObjectId] | None = None
+    parent_pin: ItemPin | None = None
 
 
 @dataclass(frozen=True)
@@ -1410,6 +1415,8 @@ def _apply_item_write_intent(state: ClaimState, intent: ItemWriteIntent) -> Clai
             raise ClaimUnavailableError(f"item {intent.item_id!r} already exists")
     else:
         _require_item_unwritten(state, intent.item_id, intent.expected)
+    if intent.parent_pin is not None:
+        _require_item_unwritten(state, intent.parent_pin.item_id, intent.parent_pin.oid)
     if intent.store_expected is not None and dict(state.items) != dict(intent.store_expected):
         raise ClaimUnavailableError(ITEMS_WRITTEN_SINCE_CHECKED)
     new_items = {**state.items, intent.item_id: intent.new_oid}

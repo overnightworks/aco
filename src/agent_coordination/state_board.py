@@ -54,6 +54,7 @@ from .body import (
 )
 from .protocol import (
     ClaimUnavailableError,
+    ItemPin,
     MalformedStateTreeError,
     ObjectId,
     item_id_of_filename,
@@ -106,6 +107,7 @@ class ItemWriter(Protocol):
         expected: ObjectId | None,
         content: bytes,
         store_expected: Mapping[str, ObjectId] | None,
+        parent_pin: ItemPin | None,
     ) -> ObjectId: ...
 
     def close_item(
@@ -406,13 +408,30 @@ class StateRefBoard:
         beside it."""
         self._holds_items = True
 
-    def _write_item(self, item_id: str, *, expected: ObjectId | None, body: str) -> ObjectId:
+    def _write_item(
+        self,
+        item_id: str,
+        *,
+        expected: ObjectId | None,
+        body: str,
+        parent_pin: ItemPin | None = None,
+    ) -> ObjectId:
         return self._writer.write_item(
             item_id,
             expected=expected,
             content=_readable_content(body),
             store_expected=self._store_expected(),
+            parent_pin=parent_pin,
         )
+
+    def _parent_pin(self, record: items.ItemRecord) -> ItemPin | None:
+        """The blob of `record`'s parent as this instance last saw it -- its
+        own retype's blob once `set_item_kind` wrote one (CAS-70/71) -- else
+        `None` for a parentless item."""
+        if record.parent is None:
+            return None
+        parent = self._items.get(record.parent) or self._malformed[record.parent]
+        return ItemPin(record.parent, parent.oid)
 
     def _store_expected(self) -> Mapping[str, ObjectId] | None:
         """The whole `items/` map every write of a `hold_items`
@@ -734,7 +753,12 @@ class StateRefBoard:
         instance's own view -- the one write every fresh state-ref item goes
         through, `item new`'s and `cut`'s alike, so no command grows a
         second way to create one. Returns the freshly minted item id."""
-        new_oid = self._write_item(write.item_id, expected=None, body=write.body)
+        new_oid = self._write_item(
+            write.item_id,
+            expected=None,
+            body=write.body,
+            parent_pin=self._parent_pin(write.record),
+        )
         self._items[write.item_id] = _DecodedItem(record=write.record, body=write.body, oid=new_oid)
         self._by_number[write.record.number] = write.item_id
         return write.item_id

@@ -659,8 +659,9 @@ class _UnusedItemWriter:
         expected: protocol.ObjectId | None,
         content: bytes,
         store_expected: Mapping[str, protocol.ObjectId] | None,
+        parent_pin: protocol.ItemPin | None,
     ) -> protocol.ObjectId:
-        del expected, content, store_expected
+        del expected, content, store_expected, parent_pin
         raise AssertionError(f"unexpected write to item {item_id}")
 
     def close_item(
@@ -674,7 +675,11 @@ class _UnusedItemWriter:
     ) -> protocol.ObjectId:
         del number
         return self.write_item(
-            item_id, expected=expected, content=content, store_expected=store_expected
+            item_id,
+            expected=expected,
+            content=content,
+            store_expected=store_expected,
+            parent_pin=None,
         )
 
 
@@ -1494,7 +1499,11 @@ class TestStateRefBoardWrites:
         adapter.update_item_body(CHILD_A_NUMBER, edited)
         landed = adapter.item_reference(CHILD_A_NUMBER).body
         writer.write_item(
-            MALFORMED_ID, expected=None, content=_blank_title_item(), store_expected=None
+            MALFORMED_ID,
+            expected=None,
+            content=_blank_title_item(),
+            store_expected=None,
+            parent_pin=None,
         )
 
         re_edited = edited.replace("Edited", "Re-edited", 1)
@@ -2909,9 +2918,15 @@ class TestCliStateRefForge:
             expected: protocol.ObjectId | None,
             content: bytes,
             store_expected: Mapping[str, protocol.ObjectId] | None,
+            parent_pin: protocol.ItemPin | None,
         ) -> protocol.ObjectId:
             result = original_write_item(
-                self, item_id, expected=expected, content=content, store_expected=store_expected
+                self,
+                item_id,
+                expected=expected,
+                content=content,
+                store_expected=store_expected,
+                parent_pin=parent_pin,
             )
             if not competing_write_done["done"]:
                 competing_write_done["done"] = True

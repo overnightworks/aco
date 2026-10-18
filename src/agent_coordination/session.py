@@ -56,8 +56,11 @@ class _StoreItemWriter:
         expected: protocol.ObjectId | None,
         content: bytes,
         store_expected: Mapping[str, protocol.ObjectId] | None,
+        parent_pin: protocol.ItemPin | None,
     ) -> protocol.ObjectId:
-        return self._commit(self._item_write(item_id, expected, content, store_expected))
+        return self._commit(
+            self._item_write(item_id, expected, content, store_expected, parent_pin)
+        )
 
     def close_item(
         self,
@@ -68,7 +71,7 @@ class _StoreItemWriter:
         content: bytes,
         store_expected: Mapping[str, protocol.ObjectId] | None,
     ) -> protocol.ObjectId:
-        write = self._item_write(item_id, expected, content, store_expected)
+        write = self._item_write(item_id, expected, content, store_expected, None)
         return self._commit(protocol.ItemCloseIntent(write, protocol.IssueIdentity(number)))
 
     def _item_write(
@@ -77,6 +80,7 @@ class _StoreItemWriter:
         expected: protocol.ObjectId | None,
         content: bytes,
         store_expected: Mapping[str, protocol.ObjectId] | None,
+        parent_pin: protocol.ItemPin | None,
     ) -> protocol.ItemWriteIntent:
         return protocol.ItemWriteIntent(
             item_id=item_id,
@@ -84,15 +88,18 @@ class _StoreItemWriter:
             new_oid=store.hash_blob(self.context.toplevel, content),
             operation_id=uuid.uuid4().hex,
             store_expected=store_expected,
+            parent_pin=parent_pin,
         )
 
     def _commit(
         self, intent: protocol.ItemWriteIntent | protocol.ItemCloseIntent
     ) -> protocol.ObjectId:
-        new_state = self.context.transition(
-            store.TransitionSubject(f"write item {intent.item_id}"), intent
-        )
-        return new_state.items[intent.item_id]
+        """Publishes `intent`, then returns the blob this write itself
+        submitted: after a lost response the confirmed state may already carry
+        another writer's later blob for the item, which is not this write's."""
+        self.context.transition(store.TransitionSubject(f"write item {intent.item_id}"), intent)
+        written = intent.write if isinstance(intent, protocol.ItemCloseIntent) else intent
+        return written.new_oid
 
 
 def _state_ref_forge(context: RunContext) -> state_board.StateRefBoard:
