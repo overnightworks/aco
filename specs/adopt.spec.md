@@ -124,7 +124,7 @@ list reads nothing after it.
 - [ ] [ADOPT-31] ADOPT-26's rerun judges ADOPT-02..07 and ADOPT-16 again on the body it would leave, at the head it read; it never builds, fetches, rescopes or checks ADOPT-09, ADOPT-10, ADOPT-13 or ADOPT-17.
 - [ ] [ADOPT-32] A same-agent lane claim under another role, or any claim beside the holder's on the branch, is no such rerun: ADOPT-06 refuses, naming that claim, and nothing is written.
 - [ ] [ADOPT-33] A failed re-read before the write prints `pull request #<n> body could not be read before writing (<error>); the claim stands; run adopt again`, exit `2`.
-- [ ] [ADOPT-34] A re-push of an adopted branch ends no claim: `aco land` demands the new head (LANDCMD-31) and releases the lane like any lane (REL-57); the holder's rerun restores a lost line (ADOPT-26).
+- [ ] [ADOPT-34] A re-push of an adopted branch ends no claim: `aco land --head` demands the new head (LANDCMD-31) and releases the lane like any lane (REL-57); the holder's rerun restores a lost line (ADOPT-26).
 - [ ] [ADOPT-35] `aco release --branch <branch> --abandoned` frees an adopted lane and keeps worktree, branch and `No-Item:` line (REL-33); then `aco land` refuses (LAND-16) and `aco adopt` refuses (ADOPT-05).
 
 ## Never

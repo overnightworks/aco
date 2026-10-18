@@ -785,6 +785,10 @@ def _claimed_line(claim: protocol.ActiveClaim) -> str:
     return f"CLAIMED lane {ADOPTED_BRANCH}: {claim.claim_id}\n"
 
 
+def _released_line(claim: protocol.ActiveClaim) -> str:
+    return f"RELEASED lane {ADOPTED_BRANCH}: {claim.claim_id}\nfreed: none\nnext: none\n"
+
+
 def _removed_pair(world: AdoptionWorld) -> str:
     return (
         f"removed worktree {world.pull_request_directory} and branch "
@@ -796,10 +800,8 @@ def _refusal(sentence: str) -> str:
     return f"ERROR: pull request #{ADOPTED_PULL_REQUEST} {sentence}\n"
 
 
-def _remote_branch_tip(world: AdoptionWorld) -> str:
-    return real_git(
-        world.clone, "ls-remote", "origin", f"refs/heads/{ADOPTED_BRANCH}"
-    ).stdout.split()[0]
+def _remote_tip(world: AdoptionWorld, branch: str) -> str:
+    return real_git(world.clone, "ls-remote", "origin", f"refs/heads/{branch}").stdout.split()[0]
 
 
 def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
@@ -833,7 +835,7 @@ def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
     assert (claim.agent, claim.role, claim.base) == ("Ada", "builder", world.head)
     assert (claim.identity, claim.scope) == (protocol.LaneIdentity(), ("pyproject.toml", "uv.lock"))
     assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, ADOPTED_BODY)]
-    assert _remote_branch_tip(world) == world.head
+    assert _remote_tip(world, ADOPTED_BRANCH) == world.head
     assert real_git(world.pull_request_directory, "rev-parse", "HEAD").stdout.strip() == world.head
     assert (
         real_git(
@@ -1460,8 +1462,7 @@ def test_adopts_rerun_after_a_re_push_and_a_rewritten_body_restores_the_line_und
     assert worktrees_and_branches(world.clone) == worktrees_before_rerun
 
 
-def _the_first_head_is_reviewed(world: AdoptionWorld) -> tuple[str, str]:
-    world.forge.merge_remote = world.remote
+def _the_forge_reads_the_branch_ready(world: AdoptionWorld) -> None:
     world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
         ADOPTED_PULL_REQUEST,
         True,
@@ -1469,92 +1470,56 @@ def _the_first_head_is_reviewed(world: AdoptionWorld) -> tuple[str, str]:
         forge.MERGEABLE_STATE_CLEAN,
         (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
     )
-    return world.head, world.head
 
 
-def _a_re_push_follows_the_review(world: AdoptionWorld) -> tuple[str, str]:
-    reviewed = world.head
-    world.forge.merge_remote = world.remote
-    repushed = _repush_the_branch(world, "uv.lock", "pyproject.toml")
-    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
-        ADOPTED_PULL_REQUEST,
-        True,
-        repushed,
-        forge.MERGEABLE_STATE_CLEAN,
-        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
-    )
-    return reviewed, repushed
+def _the_first_head_is_reviewed(world: AdoptionWorld) -> None:
+    _the_forge_reads_the_branch_ready(world)
 
 
-def _the_worktree_follows_the_re_push(world: AdoptionWorld) -> tuple[str, str]:
-    world.forge.merge_remote = world.remote
-    repushed = _repush_the_branch(world, "uv.lock", "pyproject.toml")
-    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
-        ADOPTED_PULL_REQUEST,
-        True,
-        repushed,
-        forge.MERGEABLE_STATE_CLEAN,
-        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
-    )
+def _the_branch_is_re_pushed(world: AdoptionWorld) -> None:
+    _repush_the_branch(world, "uv.lock", "pyproject.toml")
+    _the_forge_reads_the_branch_ready(world)
+
+
+def _the_worktree_follows_the_re_push(world: AdoptionWorld) -> None:
+    _the_branch_is_re_pushed(world)
     real_git(world.pull_request_directory, "fetch", "-q", "origin")
-    real_git(world.pull_request_directory, "reset", "-q", "--hard", repushed)
-    return repushed, repushed
-
-
-def _the_worktree_stays_on_the_first_head(world: AdoptionWorld) -> tuple[str, str]:
-    world.forge.merge_remote = world.remote
-    repushed = _repush_the_branch(world, "uv.lock", "pyproject.toml")
-    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
-        ADOPTED_PULL_REQUEST,
-        True,
-        repushed,
-        forge.MERGEABLE_STATE_CLEAN,
-        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
-    )
-    return repushed, repushed
-
-
-LANE_RELEASED = "RELEASED lane {branch}: {claim_id}\nfreed: none\nnext: none\n"
+    real_git(world.pull_request_directory, "reset", "-q", "--hard", world.head)
 
 
 @pytest.mark.parametrize(
-    ("arrange", "status", "stdout", "stderr", "merged", "worktree_removed"),
+    ("arrange", "reviews_the_first_head", "status", "worktree_outcome", "merged"),
     [
         pytest.param(
             _the_first_head_is_reviewed,
-            0,
-            LANE_RELEASED + "worktree: removed\n",
-            "",
             True,
+            0,
+            "removed",
             True,
             id="landing-the-head-adopted-releases-the-lane-and-removes-the-pair",
         ),
         pytest.param(
-            _a_re_push_follows_the_review,
+            _the_branch_is_re_pushed,
+            True,
             2,
             "",
-            "ERROR: pull request #{number} head is {current}, not the reviewed {reviewed}; "
-            "review the new head before landing\n",
-            False,
             False,
             id="landing-the-reviewed-head-after-a-re-push-refuses-and-keeps-the-claim",
         ),
         pytest.param(
             _the_worktree_follows_the_re_push,
+            False,
             0,
-            LANE_RELEASED + "worktree: removed\n",
-            "",
-            True,
+            "removed",
             True,
             id="landing-the-new-head-with-the-worktree-pulled-removes-the-pair",
         ),
         pytest.param(
-            _the_worktree_stays_on_the_first_head,
-            0,
-            LANE_RELEASED + "worktree: kept -- not merged into the default branch\n",
-            "",
-            True,
+            _the_branch_is_re_pushed,
             False,
+            0,
+            "kept -- not merged into the default branch",
+            True,
             id="landing-the-new-head-with-the-worktree-behind-keeps-the-pair",
         ),
     ],
@@ -1562,55 +1527,50 @@ LANE_RELEASED = "RELEASED lane {branch}: {claim_id}\nfreed: none\nnext: none\n"
 def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
     world: AdoptionWorld,
     capsys: pytest.CaptureFixture[str],
-    arrange: Callable[[AdoptionWorld], tuple[str, str]],
+    arrange: Callable[[AdoptionWorld], None],
+    reviews_the_first_head: bool,
     status: int,
-    stdout: str,
-    stderr: str,
+    worktree_outcome: str,
     merged: bool,
-    worktree_removed: bool,
 ) -> None:
     """Spec: ADOPT-34, LANDCMD-31, LANDCMD-12, LANDCMD-13, REL-57, REL-29 (#47 lines 1, 6) --
-    `aco land` lands an adopted lane like any lane, but only at the head it is told to
+    `aco land --head` lands an adopted lane like any lane, but only at the head it is told to
     review; the trailer is the adopted line, the worktree goes only at the merged head."""
+    world.forge.merge_remote = world.remote
     adopt(capsys).expect_success()
     claim = _adopted_claim(world)
-    reviewed, current = arrange(world)
-    trunk_before = _remote_trunk_tip(world)
+    first_head = world.head
+    arrange(world)
+    current_head = world.head
+    reviewed_head = first_head if reviews_the_first_head else current_head
+    trunk_before = _remote_tip(world, "main")
+    state_before = state_ref_tip(world.remote)
 
-    landed = run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", reviewed], capsys)
+    landed = run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", reviewed_head], capsys)
 
-    values = {
-        "number": ADOPTED_PULL_REQUEST,
-        "reviewed": reviewed,
-        "current": current,
-        "branch": ADOPTED_BRANCH,
-        "claim_id": claim.claim_id,
-    }
+    refusal = (
+        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} head is {current_head}, "
+        f"not the reviewed {reviewed_head}; review the new head before landing\n"
+    )
     assert (landed.status, landed.stdout, landed.stderr) == (
-        status,
-        stdout.format(**values),
-        stderr.format(**values),
+        (status, _released_line(claim) + f"worktree: {worktree_outcome}\n", "")
+        if merged
+        else (status, "", refusal)
     )
-    assert [call[1] for call in world.forge.merge_calls] == ([current] if merged else [])
-    assert (_remote_trunk_tip(world) != trunk_before) is merged
-    assert (not world.pull_request_directory.exists()) is worktree_removed
+    assert [call[1] for call in world.forge.merge_calls] == ([current_head] if merged else [])
+    assert (_remote_tip(world, "main") != trunk_before) is merged
+    assert (state_ref_tip(world.remote) != state_before) is merged
+    assert (not world.pull_request_directory.exists()) is (worktree_outcome == "removed")
     assert (ADOPTED_BRANCH in real_git(world.clone, "branch", "--list").stdout) is (
-        not worktree_removed
+        worktree_outcome != "removed"
     )
-    assert (
-        protocol.claims_on_branch(
-            store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
-            ADOPTED_BRANCH,
-        )
-        == ()
-    ) is merged
+    assert protocol.claims_on_branch(
+        store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
+        ADOPTED_BRANCH,
+    ) == (() if merged else (claim,))
     if merged:
         [(_number, _head, _method, _title, merge_body)] = world.forge.merge_calls
         assert merge_body.splitlines()[-1] == "No-Item: deps"
-
-
-def _remote_trunk_tip(world: AdoptionWorld) -> str:
-    return real_git(world.clone, "ls-remote", "origin", "refs/heads/main").stdout.split()[0]
 
 
 def _abandon_the_adoption(capsys: pytest.CaptureFixture[str]) -> CliRun:
