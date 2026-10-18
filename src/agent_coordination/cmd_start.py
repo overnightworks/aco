@@ -44,8 +44,7 @@ def _resumable_start_claim(
     with the store's own "is claimed by ..." conflict."""
     if (
         live is not None
-        and live.agent == checkout.resolved_agent(None)
-        and live.role == cmd_claim.DEFAULT_CLAIM_ROLE
+        and protocol.held_by(live, checkout.resolved_agent(None), cmd_claim.DEFAULT_CLAIM_ROLE)
         and live.branch == branch
     ):
         return live

@@ -1,7 +1,7 @@
 [build]
 rules = [
   "Work only in the worktree and branch the brief names; never edit the main checkout or another worktree.",
-  "Never run aco claim, release, rescope, rule, or item edit; never scan the board or start follow-up work.",
+  "Never run aco claim, adopt, release, rescope, rule, or item edit; never scan the board or start follow-up work.",
   "Do not touch README.md unless the brief explicitly says so; another lane may hold it.",
   "Before every commit, compare `git status --porcelain` with the claim scope and the lane-shared files `aco brief <n>` prints; restore or remove any path outside both and report it instead of committing. Write repository files with Edit, Write or apply_patch, or with a checked tool such as ruff or uv; never with an interpreter script or `python -c`.",
   "Treat the issue body read with gh issue view <n> --json body --jq .body as the contract.",

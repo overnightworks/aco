@@ -1,2 +1,3 @@
 body_contract = "block"
 lane_shared = ["scripts/vulture_whitelist.py", "scripts/test_budget_ratchet.txt"]
+dependency_paths = ["pyproject.toml", "uv.lock", "frontend/package.json", "frontend/pnpm-lock.yaml", ".github/workflows/"]

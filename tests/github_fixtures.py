@@ -85,6 +85,10 @@ class FakeForge:
     next_created_child_number: int = 900
     item_bodies: dict[int, str] = field(default_factory=dict)
     fail_update_item_body: bool = False
+    update_item_body_error: ClaimError | None = None
+    update_item_body_lands_before_error: bool = False
+    body_writes: list[tuple[int, str]] = field(default_factory=list)
+    scripted_item_reads: list[str | forge.ForgeError | None] = field(default_factory=list)
     fail_create_child_relation: bool = False
     fail_set_item_kind: bool = False
     drop_created_issue_type: bool = False
@@ -179,9 +183,18 @@ class FakeForge:
         return number
 
     def update_item_body(self, number: int, body: str) -> None:
+        """`update_item_body_error` is the forge's answer instead of a write,
+        unless `update_item_body_lands_before_error` says the write happened
+        and only its answer failed. A pull request's body is its landing's."""
         if self.fail_update_item_body:
             raise ClaimError("update item body failed (simulated)")
-        self.item_bodies[number] = body
+        if self.update_item_body_error is None or self.update_item_body_lands_before_error:
+            self.body_writes.append((number, body))
+            self.item_bodies[number] = body
+            if number in self.landings:
+                self.landings[number] = replace(self.landings[number], body=body)
+        if self.update_item_body_error is not None:
+            raise self.update_item_body_error
 
     def set_item_kind(self, number: int, kind: body.ItemKind) -> None:
         """`fail_set_item_kind` simulates GitHub dropping the new type
@@ -305,13 +318,23 @@ class FakeForge:
             return served
         state = forge.ItemState.CLOSED if number in self.closed_issues else forge.ItemState.OPEN
         # `landings` is this fake's set of pull requests, so the one flag that
-        # distributes `check` is derived from it rather than set twice.
-        return forge.ItemReference(state, "", "", number in self.landings)
+        # distributes `check` is derived from it rather than set twice, and
+        # a pull request's body is its landing's.
+        landing = self.landings.get(number)
+        return forge.ItemReference(
+            state, "", "" if landing is None else landing.body, landing is not None
+        )
 
     def item_reference(self, number: int) -> forge.ItemReference:
+        """`scripted_item_reads` answers the next reads in order -- a body, a
+        failure, or `None` for the served reference -- before the served one."""
         self._run()
         self.issue_reference_lookups.append(number)
-        return self._item_reference_value(number)
+        served = self._item_reference_value(number)
+        scripted = self.scripted_item_reads.pop(0) if self.scripted_item_reads else None
+        if isinstance(scripted, forge.ForgeError):
+            raise scripted
+        return served if scripted is None else replace(served, body=scripted)
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
         """This fake's mirror of `GitHubForge.item_references` (issue #440):

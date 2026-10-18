@@ -147,7 +147,7 @@ def _pull_request_check(
         )
     return _CheckOutcome(
         _NumberSubject(_CheckKind.PULL_REQUEST, detail.number),
-        f"PR #{detail.number} by {detail.author} declares {checked}",
+        board.pull_request_declaration(detail.number, detail.author, checked),
         _CheckReason.VALID,
     )
 
