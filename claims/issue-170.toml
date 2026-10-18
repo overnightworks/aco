@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "04a8cfaa93cf71c71361b8571d82334f9324c4e6"
 branch = "claude/issue-170-b2w0-adopt-prelude"
-scope = ["specs/land.spec.md", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_adopt.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_start.py", "src/agent_coordination/policy.py", "src/agent_coordination/protocol.py", "tests/test_adopt.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_protocol.py"]
+scope = ["specs/land.spec.md", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_adopt.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_start.py", "src/agent_coordination/policy.py", "src/agent_coordination/protocol.py", "src/agent_coordination/session.py", "tests/test_adopt.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_protocol.py"]
 opened_commit = "358a2e5907ccbf1ee40b6d7bcd2d3417fee2cb47"
 whole_reason = "Die Folge-Befunde berühren dieselben Owner der Bau- und Prüfsequenz (cmd_claim, cmd_start, cmd_adopt, checkout, protocol, policy, cli); halb umgesetzt gäbe es zwei Wege, eine Claim-Anfrage zu bauen."
