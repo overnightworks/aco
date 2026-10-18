@@ -1,4 +1,4 @@
-"""Squashed lanes in release's own worktree/branch cleanup section."""
+"""Release's own worktree/branch cleanup after a squashed or merged landing."""
 
 from __future__ import annotations
 
@@ -15,10 +15,33 @@ from github_fixtures import FakeForge, LandedWorld, landed_world
 from agent_coordination import board, checkout, process
 
 
-class Tip(Enum):
-    NONE = auto()
-    RECORDED_HEAD = auto()
-    INTERVENTION_COMMIT = auto()
+@dataclass(frozen=True)
+class Present:
+    value: str | tuple[str, ...] | bool
+
+    def format(self, **values: str) -> Present:
+        match self.value:
+            case str(template):
+                return Present(template.format(**values))
+            case tuple(templates):
+                return Present(tuple(template.format(**values) for template in templates))
+            case _:
+                return self
+
+
+@dataclass(frozen=True)
+class Absent:
+    def format(self, **values: str) -> Absent:
+        return self
+
+
+@dataclass(frozen=True)
+class Unexpected:
+    exit: int
+    text: str
+
+
+Observation = Present | Absent | Unexpected
 
 
 class Intervention(Enum):
@@ -27,13 +50,44 @@ class Intervention(Enum):
     COMMIT_WINDOW = auto()
     LIST_REFUSED = auto()
     LOCK = auto()
-    DELETE_LAUNCH = auto()
-    DELETE_TIMEOUT = auto()
-    LIST_TIMEOUT = auto()
-    SECTION_TIMEOUT = auto()
+    DELETE_REFUSED = auto()
     RECREATE = auto()
     DOTTED = auto()
     LATIN1 = auto()
+
+    def install(self, target: CleanupIntervention) -> None:
+        actions = {
+            Intervention.NONE: (target.before, target.nothing),
+            Intervention.COMMIT_BEFORE: (target.before, target.commit),
+            Intervention.COMMIT_WINDOW: (target.window, target.commit),
+            Intervention.LIST_REFUSED: (target.before, target.refuse_listing),
+            Intervention.DELETE_REFUSED: (target.before, target.refuse_deletion),
+            Intervention.LOCK: (target.window, target.lock),
+            Intervention.RECREATE: (target.recreation, target.recreate),
+            Intervention.DOTTED: (target.window, target.dotted),
+            Intervention.LATIN1: (target.window, target.latin1),
+        }
+        timing, action = actions[self]
+        timing(action)
+
+
+class LaunchFailure(Enum):
+    LAUNCH_FAILS = auto()
+    TIMES_OUT = auto()
+
+
+@dataclass(frozen=True)
+class LaunchIntervention:
+    failure: LaunchFailure
+    git_call: tuple[str, ...]
+
+    def install(self, target: CleanupIntervention) -> None:
+        failure = {
+            LaunchFailure.LAUNCH_FAILS: PermissionError("permission denied"),
+            LaunchFailure.TIMES_OUT: process.ProcessTimedOutError(),
+        }[self.failure]
+        arguments = [argument.format(lane=target.branch) for argument in self.git_call]
+        target.before(partial(target.fail_launch, arguments, failure))
 
 
 class Phase(Enum):
@@ -42,29 +96,30 @@ class Phase(Enum):
     BRANCH_EXISTS = auto()
 
 
+PREFIX = "RELEASED issue #72: landing\nfreed: none\nnext: none\n"
+OWN_KEYS = ("branch.{lane}.remote", "branch.{lane}.merge")
+LISTING_ARGUMENTS = ("config", "--local", "--null", "--name-only", "--get-regexp", r"^branch\.")
+
+
 @dataclass(frozen=True)
 class CleanupCase:
-    intervention: Intervention = Intervention.NONE
+    intervention: Intervention | LaunchIntervention = Intervention.NONE
     command: tuple[str, ...] = ("land", "12")
-    squashed_before_run: bool = False
-    stdout: str = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+    premerge: board.MergeMethod | None = None
+    stdout: str = PREFIX + "worktree: removed\n"
     stderr: str = ""
     status: int = 0
     worktree_exists: bool = False
-    branch_exists: bool = False
-    tip: Tip = Tip.NONE
-    keys: tuple[str, ...] = ()
-    own_section: bool = False
+    branch: Present | Absent = Absent()
+    keys: Present | Absent = Absent()
+    own_section: Present | Absent = Absent()
     launches: tuple[tuple[str, ...], ...] = ()
-    allowed_methods: frozenset[board.MergeMethod] = frozenset({board.MergeMethod.SQUASH})
-    initial_keys: tuple[str, ...] = ("branch.{lane}.remote", "branch.{lane}.merge")
-    applications: int = 1
     phase: Phase = Phase.BEFORE
-    existed_before: bool = True
-    intervention_tip: str = "{head}"
-    intervention_parent: str = "{parent}"
+    existed_before: Present | Absent = Present("{head}")
+    intervention_tip: Present | Absent = Present("{head}")
+    intervention_parent: Present | Absent = Present("{parent}")
     locked: bool = False
-    intervention_keys: tuple[str, ...] = ("branch.{lane}.remote", "branch.{lane}.merge")
+    intervention_keys: Present | Absent = Present(OWN_KEYS)
     latin1: bool = False
 
 
@@ -76,28 +131,19 @@ class InterventionRecord:
     snapshot: dict[str, object] = field(default_factory=dict)
 
 
-def branch_tip(clone: Path, branch: str) -> str | tuple[int, str] | None:
+def branch_tip(clone: Path, branch: str) -> Observation:
     result = real_git(
         clone, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False
     )
-    return {0: result.stdout.strip(), 1: None}.get(
-        result.returncode, (result.returncode, result.stderr)
+    return {0: Present(result.stdout.strip()), 1: Absent()}.get(
+        result.returncode, Unexpected(result.returncode, result.stderr)
     )
 
 
-def configuration_keys(clone: Path) -> tuple[str, ...] | tuple[int, str]:
-    result = real_git(
-        clone,
-        "config",
-        "--local",
-        "--null",
-        "--name-only",
-        "--get-regexp",
-        r"^branch\.",
-        check=False,
-    )
-    return {0: tuple(result.stdout.rstrip("\0").split("\0")), 1: ()}.get(
-        result.returncode, (result.returncode, result.stderr)
+def configuration_keys(clone: Path) -> Observation:
+    result = real_git(clone, *LISTING_ARGUMENTS, check=False)
+    return {0: Present(tuple(result.stdout.rstrip("\0").split("\0"))), 1: Absent()}.get(
+        result.returncode, Unexpected(result.returncode, result.stderr)
     )
 
 
@@ -116,12 +162,11 @@ class CleanupIntervention:
         self.record.applications += 1
         before = branch_tip(self.clone, self.branch)
         action()
-        parent = real_git(self.clone, "rev-parse", f"refs/heads/{self.branch}^", check=False)
         self.record.snapshot = {
             "intervention.phase": phase,
-            "intervention.branch.existed-before": before is not None,
+            "intervention.branch.existed-before": before,
             "intervention.branch.tip-after": branch_tip(self.clone, self.branch),
-            "intervention.branch.parent-after": parent.stdout.strip(),
+            "intervention.branch.parent-after": branch_tip(self.clone, f"{self.branch}^"),
             "intervention.config-lock.exists": (self.clone / ".git/config.lock").exists(),
             "intervention.configuration.keys": configuration_keys(self.clone),
             "intervention.latin1-description.present": (
@@ -163,9 +208,17 @@ class CleanupIntervention:
     def refuse_listing(self) -> None:
         stub_one_git_call(
             self.monkeypatch,
-            ["config", "--local", "--null", "--name-only", "--get-regexp", r"^branch\."],
+            list(LISTING_ARGUMENTS),
             exit_status=3,
             stderr="fatal: the listing failed\n",
+        )
+
+    def refuse_deletion(self) -> None:
+        stub_one_git_call(
+            self.monkeypatch,
+            ["branch", "-d", self.branch],
+            exit_status=1,
+            stderr="error: branch not fully merged",
         )
 
     def lock(self) -> None:
@@ -186,39 +239,6 @@ class CleanupIntervention:
         with (self.clone / ".git/config").open("ab") as configuration:
             configuration.write(b'[branch "other"]\n\tdescription = caf\xe9\n')
 
-    def install(self, intervention: Intervention) -> None:
-        deletion = ["update-ref", "-d"]
-        listing = ["config", "--local", "--null", "--name-only", "--get-regexp", r"^branch\."]
-        section = ["config", "--local", "--remove-section", f"branch.{self.branch}"]
-        actions = {
-            Intervention.NONE: (self.before, self.nothing),
-            Intervention.COMMIT_BEFORE: (self.before, self.commit),
-            Intervention.COMMIT_WINDOW: (self.window, self.commit),
-            Intervention.LIST_REFUSED: (self.before, self.refuse_listing),
-            Intervention.LOCK: (self.window, self.lock),
-            Intervention.DELETE_LAUNCH: (
-                self.before,
-                partial(self.fail_launch, deletion, PermissionError("permission denied")),
-            ),
-            Intervention.DELETE_TIMEOUT: (
-                self.before,
-                partial(self.fail_launch, deletion, process.ProcessTimedOutError()),
-            ),
-            Intervention.LIST_TIMEOUT: (
-                self.before,
-                partial(self.fail_launch, listing, process.ProcessTimedOutError()),
-            ),
-            Intervention.SECTION_TIMEOUT: (
-                self.before,
-                partial(self.fail_launch, section, process.ProcessTimedOutError()),
-            ),
-            Intervention.RECREATE: (self.recreation, self.recreate),
-            Intervention.DOTTED: (self.window, self.dotted),
-            Intervention.LATIN1: (self.window, self.latin1),
-        }
-        timing, action = actions[intervention]
-        timing(action)
-
 
 def allow_squash(client: FakeForge, _head: str) -> None:
     client.allowed_methods = frozenset({board.MergeMethod.SQUASH})
@@ -228,30 +248,27 @@ def no_premerge(_world: LandedWorld) -> None:
     pass
 
 
-def squash_before_run(world: LandedWorld) -> None:
+def merge_before_run(world: LandedWorld, *, method: board.MergeMethod) -> None:
     world.landing.forge.merge_landing(
         12,
         head_sha=world.landing.head,
-        method=board.MergeMethod.SQUASH,
+        method=method,
         title="feat: land the lane (#12)",
         body="Work-Item: #72",
     )
 
 
-PREFIX = "RELEASED issue #72: landing\nfreed: none\nnext: none\n"
-OWN_KEYS = ("branch.{lane}.remote", "branch.{lane}.merge")
 PAST_HEAD = CleanupCase(
     intervention=Intervention.COMMIT_BEFORE,
     stdout=PREFIX + "worktree: kept -- not merged into the default branch\n",
     worktree_exists=True,
-    branch_exists=True,
-    tip=Tip.INTERVENTION_COMMIT,
-    keys=OWN_KEYS,
-    own_section=True,
-    intervention_tip="{raced}",
-    intervention_parent="{head}",
+    branch=Present("{raced}"),
+    keys=Present(OWN_KEYS),
+    own_section=Present(True),
+    intervention_tip=Present("{raced}"),
+    intervention_parent=Present("{head}"),
 )
-SECTION_KEPT = CleanupCase(keys=OWN_KEYS, own_section=True)
+SECTION_KEPT = CleanupCase(keys=Present(OWN_KEYS), own_section=Present(True))
 CONFIG_TIMEOUT = replace(
     SECTION_KEPT,
     stdout=PREFIX
@@ -283,11 +300,11 @@ def cleanup_check(
     [
         pytest.param(PAST_HEAD, id="land-with-the-lane-past-the-pinned-head"),
         pytest.param(
-            CleanupCase(command=RELEASE_COMMAND, squashed_before_run=True),
+            CleanupCase(command=RELEASE_COMMAND, premerge=board.MergeMethod.SQUASH),
             id="release-rerun-on-the-recorded-head",
         ),
         pytest.param(
-            replace(PAST_HEAD, command=RELEASE_COMMAND, squashed_before_run=True),
+            replace(PAST_HEAD, command=RELEASE_COMMAND, premerge=board.MergeMethod.SQUASH),
             id="release-rerun-past-the-recorded-head",
         ),
     ],
@@ -341,9 +358,8 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
         pytest.param(
             replace(
                 SECTION_KEPT,
-                intervention=Intervention.DELETE_LAUNCH,
-                branch_exists=True,
-                tip=Tip.RECORDED_HEAD,
+                intervention=LaunchIntervention(LaunchFailure.LAUNCH_FAILS, ("update-ref", "-d")),
+                branch=Present("{head}"),
                 launches=DELETE_ARGV,
                 stdout=PREFIX + "worktree: removed; branch kept -- git failure: "
                 "git failed to launch: permission denied\n",
@@ -353,9 +369,8 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
         pytest.param(
             replace(
                 SECTION_KEPT,
-                intervention=Intervention.DELETE_TIMEOUT,
-                branch_exists=True,
-                tip=Tip.RECORDED_HEAD,
+                intervention=LaunchIntervention(LaunchFailure.TIMES_OUT, ("update-ref", "-d")),
+                branch=Present("{head}"),
                 launches=DELETE_ARGV,
                 stdout=PREFIX + "worktree: removed; branch unknown -- git update-ref timed out; "
                 "check git branch --list {lane}\n",
@@ -365,7 +380,7 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
         pytest.param(
             replace(
                 CONFIG_TIMEOUT,
-                intervention=Intervention.LIST_TIMEOUT,
+                intervention=LaunchIntervention(LaunchFailure.TIMES_OUT, LISTING_ARGUMENTS),
                 launches=(
                     ("config", "--local", "--null", "--name-only", "--get-regexp", r"^branch\."),
                 ),
@@ -375,7 +390,10 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
         pytest.param(
             replace(
                 CONFIG_TIMEOUT,
-                intervention=Intervention.SECTION_TIMEOUT,
+                intervention=LaunchIntervention(
+                    LaunchFailure.TIMES_OUT,
+                    ("config", "--local", "--remove-section", "branch.{lane}"),
+                ),
                 launches=(("config", "--local", "--remove-section", "branch.{lane}"),),
             ),
             id="section-removal-timed-out",
@@ -385,9 +403,8 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
                 SECTION_KEPT,
                 intervention=Intervention.RECREATE,
                 phase=Phase.BRANCH_EXISTS,
-                existed_before=False,
-                branch_exists=True,
-                tip=Tip.RECORDED_HEAD,
+                existed_before=Absent(),
+                branch=Present("{head}"),
             ),
             id="same-name-branch-recreated",
         ),
@@ -395,8 +412,8 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
             CleanupCase(
                 intervention=Intervention.DOTTED,
                 phase=Phase.WINDOW,
-                keys=("branch.{lane}.x.remote",),
-                intervention_keys=("branch.{lane}.x.remote",),
+                keys=Present(("branch.{lane}.x.remote",)),
+                intervention_keys=Present(("branch.{lane}.x.remote",)),
             ),
             id="dotted-sibling-without-an-own-section",
         ),
@@ -404,8 +421,8 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
             CleanupCase(
                 intervention=Intervention.LATIN1,
                 phase=Phase.WINDOW,
-                keys=("branch.other.description",),
-                intervention_keys=(*OWN_KEYS, "branch.other.description"),
+                keys=Present(("branch.other.description",)),
+                intervention_keys=Present((*OWN_KEYS, "branch.other.description")),
                 latin1=True,
             ),
             id="another-branch-value-not-utf-8",
@@ -422,6 +439,83 @@ def test_a_squashed_lane_branch_goes_by_compare_and_delete(
     cleanup_check(case)
 
 
+MERGED = CleanupCase(command=RELEASE_COMMAND, premerge=board.MergeMethod.MERGE)
+MERGED_BRANCH_KEPT = replace(
+    MERGED, branch=Present("{head}"), keys=Present(OWN_KEYS), own_section=Present(True)
+)
+JSON_OUTPUT = (
+    '{{"ok": true, "reason": "merged", "outcome": "merged #12", "issue": 72, '
+    '"lane": null, "branch": "{lane}", "claim_id": "landing", "agent": "Ada", '
+    '"role": "builder", "freed": [], "next": null, "parent_closable": null, '
+    '"worktree": "{worktree}"}}\n'
+)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        pytest.param(MERGED, id="clean"),
+        pytest.param(
+            replace(
+                MERGED,
+                command=(*RELEASE_COMMAND, "--json"),
+                stdout=JSON_OUTPUT.replace("{worktree}", "removed"),
+            ),
+            id="clean-json",
+        ),
+        pytest.param(
+            replace(
+                MERGED_BRANCH_KEPT,
+                intervention=Intervention.DELETE_REFUSED,
+                stdout=PREFIX + "worktree: removed; branch kept -- git failure: "
+                "error: branch not fully merged\n",
+            ),
+            id="branch-deletion-refused",
+        ),
+        pytest.param(
+            replace(
+                MERGED_BRANCH_KEPT,
+                intervention=Intervention.DELETE_REFUSED,
+                command=(*RELEASE_COMMAND, "--json"),
+                stdout=JSON_OUTPUT.replace(
+                    "{worktree}",
+                    "removed; branch kept -- git failure: error: branch not fully merged",
+                ),
+            ),
+            id="branch-deletion-refused-json",
+        ),
+        pytest.param(
+            replace(
+                MERGED_BRANCH_KEPT,
+                intervention=LaunchIntervention(LaunchFailure.LAUNCH_FAILS, ("branch", "-d")),
+                launches=(("branch", "-d", "{lane}"),),
+                stdout=PREFIX + "worktree: removed; branch kept -- git failure: "
+                "git failed to launch: permission denied\n",
+            ),
+            id="branch-deletion-failed-to-start",
+        ),
+        pytest.param(
+            replace(
+                MERGED_BRANCH_KEPT,
+                intervention=LaunchIntervention(LaunchFailure.TIMES_OUT, ("branch", "-d")),
+                launches=(("branch", "-d", "{lane}"),),
+                stdout=PREFIX + "worktree: removed; branch unknown -- git branch timed out; "
+                "check git branch --list {lane}\n",
+            ),
+            id="branch-deletion-timed-out",
+        ),
+    ],
+)
+def test_a_merged_lane_branch_goes_by_branch_delete(
+    case: CleanupCase, cleanup_check: CleanupCheck
+) -> None:
+    """Remove a merged worktree and report the branch deletion's result.
+
+    Spec: REL-25, REL-34, REL-35, REL-45, E-REL-08, E-REL-16, E-REL-17, E-REL-22.
+    """
+    cleanup_check(case)
+
+
 def verify_cleanup(
     case: CleanupCase,
     github_clone: Path,
@@ -434,45 +528,48 @@ def verify_cleanup(
     lane = "codex/issue-72-claims"
     parent = real_git(github_clone, "rev-parse", f"{head}^").stdout.strip()
     observed_initial = {
-        "squash.allowed-methods": world.landing.forge.allowed_methods,
+        "forge.allowed-methods": world.landing.forge.allowed_methods,
         "initial.lane.head": real_git(world.lane, "rev-parse", "HEAD").stdout.strip(),
         "initial.own-section.keys": configuration_keys(github_clone),
     }
     expected_initial = {
-        "squash.allowed-methods": case.allowed_methods,
+        "forge.allowed-methods": frozenset({board.MergeMethod.SQUASH}),
         "initial.lane.head": head,
-        "initial.own-section.keys": tuple(key.format(lane=lane) for key in case.initial_keys),
+        "initial.own-section.keys": Present(OWN_KEYS).format(lane=lane),
     }
     assert observed_initial == expected_initial
-    {False: no_premerge, True: squash_before_run}[case.squashed_before_run](world)
-    observed_prepared = {"prepared.landing.merged": world.landing.forge.landings[12].merged}
-    expected_prepared = {"prepared.landing.merged": case.squashed_before_run}
+    {
+        None: no_premerge,
+        board.MergeMethod.SQUASH: partial(merge_before_run, method=board.MergeMethod.SQUASH),
+        board.MergeMethod.MERGE: partial(merge_before_run, method=board.MergeMethod.MERGE),
+    }[case.premerge](world)
+    observed_prepared = {
+        "prepared.landing.merged": world.landing.forge.landings[12].merged,
+        "prepared.merge.methods": tuple(call[2] for call in world.landing.forge.merge_calls),
+    }
+    expected_prepared = {
+        "prepared.landing.merged": case.premerge is not None,
+        "prepared.merge.methods": () if case.premerge is None else (case.premerge,),
+    }
     assert observed_prepared == expected_prepared
     record = InterventionRecord()
     intervention = CleanupIntervention(world, monkeypatch, lane, record)
-    intervention.install(case.intervention)
+    case.intervention.install(intervention)
     capsys.readouterr()
     result = run_cli(list(case.command), capsys)
     values = {"head": head, "raced": record.raced, "lane": lane, "parent": parent}
     observed_guard = {"intervention.applications": record.applications, **record.snapshot}
     expected_guard = {
-        "intervention.applications": case.applications,
+        "intervention.applications": 1,
         "intervention.phase": case.phase,
-        "intervention.branch.existed-before": case.existed_before,
+        "intervention.branch.existed-before": case.existed_before.format(**values),
         "intervention.branch.tip-after": case.intervention_tip.format(**values),
         "intervention.branch.parent-after": case.intervention_parent.format(**values),
         "intervention.config-lock.exists": case.locked,
-        "intervention.configuration.keys": tuple(
-            key.format(**values) for key in case.intervention_keys
-        ),
+        "intervention.configuration.keys": case.intervention_keys.format(**values),
         "intervention.latin1-description.present": case.latin1,
     }
     assert observed_guard == expected_guard
-    tips = {
-        Tip.NONE: None,
-        Tip.RECORDED_HEAD: head,
-        Tip.INTERVENTION_COMMIT: record.raced,
-    }
     actual_tip = branch_tip(github_clone, lane)
     keys = configuration_keys(github_clone)
     own_section = real_git(
@@ -489,11 +586,10 @@ def verify_cleanup(
         "stdout": result.stdout,
         "stderr": result.stderr,
         "lane.worktree.exists": world.lane.exists(),
-        "lane.branch.exists": actual_tip is not None,
-        "lane.branch.tip": actual_tip,
+        "lane.branch": actual_tip,
         "configuration.keys": keys,
-        "configuration.own-section.exists": {0: True, 1: False}.get(
-            own_section.returncode, (own_section.returncode, own_section.stderr)
+        "configuration.own-section.exists": {0: Present(True), 1: Absent()}.get(
+            own_section.returncode, Unexpected(own_section.returncode, own_section.stderr)
         ),
         "launch.argv": record.launches,
     }
@@ -502,9 +598,8 @@ def verify_cleanup(
         "stdout": case.stdout.format(**values),
         "stderr": case.stderr.format(**values),
         "lane.worktree.exists": case.worktree_exists,
-        "lane.branch.exists": case.branch_exists,
-        "lane.branch.tip": tips[case.tip],
-        "configuration.keys": tuple(key.format(**values) for key in case.keys),
+        "lane.branch": case.branch.format(**values),
+        "configuration.keys": case.keys.format(**values),
         "configuration.own-section.exists": case.own_section,
         "launch.argv": [[argument.format(**values) for argument in call] for call in case.launches],
     }
