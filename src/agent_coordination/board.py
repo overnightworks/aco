@@ -55,7 +55,8 @@ RULING_OLD_AFTER_LANDINGS = 10
 STALE_IDLE_DAYS = 7
 # The number is bounded so `int()` of a match can never meet Python's digit
 # limit: a longer one is no reference, whether a pattern below or
-# `parse_item_reference` reads it. The lookahead keeps an in-bound prefix of a longer number from matching.
+# `parse_item_reference` reads it. The lookahead keeps an in-bound prefix of a
+# longer number from matching.
 MAXIMUM_ISSUE_NUMBER_DIGITS = 18
 ISSUE_NUMBER = rf"[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}}(?!\d)"
 REFERENCE_PATTERN = re.compile(rf"(?<!\w)#({ISSUE_NUMBER})", re.ASCII)

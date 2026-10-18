@@ -3558,7 +3558,8 @@ def test_a_trunk_trailer_number_past_the_digit_bound_is_a_classification_defect(
 
 
 @pytest.mark.parametrize(
-    "value", ["#" + "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS, "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS]
+    "value",
+    ["#" + "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS, "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS],
 )
 def test_parse_item_reference_accepts_a_number_at_the_digit_bound(value: str) -> None:
     assert board.parse_item_reference(value) == int("7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS)
