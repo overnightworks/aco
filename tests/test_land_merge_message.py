@@ -15,12 +15,12 @@ from github_fixtures import (
     LaneLandingWorld,
     RefusalLength,
     assert_github_world,
-    landing_effects,
+    landed_observations,
     lane_landing_world,
     refusal_observations,
 )
 
-from agent_coordination import board, forge, process, protocol, store
+from agent_coordination import board, forge, process, protocol
 
 
 class TrailerKey(Enum):
@@ -233,6 +233,7 @@ def world(
         shared.head,
         shared.entry_lineage,
         case,
+        default_branch=shared.default_branch,
     )
 
 
@@ -546,83 +547,31 @@ class TestLandMessage:
         result = run_cli(["land", "12"], capsys)
         message = real_git(world.clone, "log", "-1", "--format=%B", "main").stdout
         keys = trailer_keys(world.clone, message)
-        effects = landing_effects(world)
+        observed, expected = landed_observations(
+            world,
+            result,
+            branch=world.case.branch,
+            method=outcome.method,
+            title=outcome.title,
+            parents=outcome.parents,
+            closed=outcome.closed,
+            release=outcome.release,
+            remaining_branches=frozenset({world.default_branch, world.case.branch}),
+        )
         calls = world.forge.merge_calls
-        merge = calls[0] if calls else (None, None, None, None, "")
-        entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
-        trunk = real_git(world.clone, "rev-parse", "main").stdout.strip()
-        topology = tuple(
-            line
-            for line in real_git(world.clone, "worktree", "list", "--porcelain").stdout.splitlines()
-            if line.startswith(("worktree ", "branch "))
+        observed.update(
+            {"message": calls[0][4] if calls else "", "trunk.message": message, "keys": keys}
         )
-        branches = set(
-            real_git(
-                world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
-            ).stdout.splitlines()
-        )
-        observed = {
-            "exit": result.status,
-            "stderr": result.stderr,
-            "stdout.release": outcome.release in result.stdout,
-            "merge.count": len(calls),
-            "merge.number": merge[0],
-            "merge.head": merge[1],
-            "merge.method": merge[2],
-            "merge.title": merge[3],
-            "message": merge[4],
-            "trunk.message": message,
-            "trunk.parents": len(
-                real_git(world.clone, "rev-list", "--parents", "-n", "1", trunk).stdout.split()
-            )
-            - 1,
-            "keys": keys,
-            "delete": effects["delete"],
-            "close": effects["close"],
-            "body writes": effects["body"],
-            "remote.moved": effects["remote"] != world.unchanged["remote"],
-            "claims": store.peek_state(worktree=world.clone, remote=str(world.remote)).claims,
-            "local": effects["local"],
-            "worktrees": topology,
-            "branches": branches,
-            "trunk.changed": trunk + "\n" != world.unchanged["trunk"],
-            "trunk.same": trunk == world.forge.landings[12].merge_commit,
-            "stamp": effects["stamp"] is not None,
-            "anchor": effects["anchor"] is not None,
-            "entry.stamp": entry[0],
-            "entry.anchor": entry[1],
-        }
         committed = (
             outcome.message.body if outcome.message.committed is None else outcome.message.committed
         )
-        expected = {
-            "exit": 0,
-            "stderr": "",
-            "stdout.release": True,
-            "merge.count": 1,
-            "merge.number": 12,
-            "merge.head": world.head,
-            "merge.method": outcome.method,
-            "merge.title": outcome.title,
-            "message": outcome.message.body,
-            "trunk.message": outcome.title + "\n\n" + committed + "\n",
-            "trunk.parents": outcome.parents,
-            "keys": outcome.message.keys,
-            "delete": [world.case.branch],
-            "close": set(outcome.closed),
-            "body writes": [],
-            "remote.moved": True,
-            "claims": {},
-            "local": None,
-            "worktrees": (f"worktree {world.clone}", "branch refs/heads/main"),
-            "branches": {"main", world.case.branch},
-            "trunk.changed": True,
-            "trunk.same": True,
-            "stamp": True,
-            "anchor": True,
-            "entry.stamp": None,
-            "entry.anchor": None,
-        }
+        expected.update(
+            {
+                "message": outcome.message.body,
+                "trunk.message": outcome.title + "\n\n" + committed + "\n",
+                "keys": outcome.message.keys,
+            }
+        )
         assert observed == expected
 
     @pytest.mark.parametrize(
