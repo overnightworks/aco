@@ -6347,7 +6347,7 @@ def test_next_refuses_a_scope_read_git_fails_instead_of_advising_a_command(
     )
     stub_one_git_call(
         monkeypatch,
-        ["ls-tree", "HEAD", "--", ":(literal)src"],
+        ["ls-tree", "--full-tree", "HEAD", "--", ":(literal)src"],
         exit_status=128,
         stderr=SCOPE_READ_FAILURE,
     )

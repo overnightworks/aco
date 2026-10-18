@@ -430,11 +430,15 @@ class RunContext:
         working directory, so a read from a subdirectory would see an empty
         tree (#460). Without a working tree there is no configuration to
         read, so the command refuses rather than running on guessed
-        defaults (#178)."""
+        defaults (#178). A read that timed out or never launched names
+        itself and rises unwrapped: it answered nothing about a working
+        tree, so the width gate must not read it as "none"."""
         try:
             return Path(
                 checkout.git_output(["rev-parse", "--show-toplevel"], directory=self.directory)
             )
+        except (checkout.GitTimedOutError, checkout.GitLaunchError):
+            raise
         except protocol.ClaimError as error:
             raise protocol.ClaimUnavailableError(
                 "this command reads the repository's body contract from "

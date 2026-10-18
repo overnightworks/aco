@@ -354,9 +354,13 @@ def _tree_entry_kind(path: str, *, revision: str, directory: Path | None) -> str
     """The kind (`tree`, `commit`, `blob`) of `path` in `revision`'s tree, or
     `None` when the tree holds no such entry. One `ls-tree` answers it:
     exit 0 with no output is the only absence, and a tree git cannot read
-    exits non-zero, so corruption never reads as absence. `:(literal)` keeps
+    exits non-zero, so corruption never reads as absence. `--full-tree` reads
+    `path` from the repository root, not from the process's cwd, as a scope
+    entry always is. `:(literal)` keeps
     glob characters and a leading `:` in `path` plain name characters."""
-    entry = git_output(["ls-tree", revision, "--", f":(literal){path}"], directory=directory)
+    entry = git_output(
+        ["ls-tree", "--full-tree", revision, "--", f":(literal){path}"], directory=directory
+    )
     return entry.split(maxsplit=2)[1] if entry else None
 
 

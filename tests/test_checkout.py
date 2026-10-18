@@ -96,6 +96,7 @@ def test_scope_directories_finds_git_trees_and_untracked_directories_under_the_h
         raise ClaimError("fatal: this operation must be run in a work tree")
 
     def tree_entry_of_docs(arguments: list[str], **_kwargs: object) -> str:
+        assert arguments[0] == "ls-tree", "the held toplevel is never re-read through git"
         return "040000 tree 0123\tdocs" if arguments[-1].endswith("docs") else ""
 
     monkeypatch.setattr(checkout, "git_output", tree_entry_of_docs)
@@ -222,6 +223,32 @@ def test_scope_directories_refuses_a_scope_read_that_git_fails_never_dropping_th
         checkout.scope_directories(
             ("docs",), directory=None, toplevel=lambda: Path("/unused"), revision=revision
         )
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        pytest.param("docs", ("docs",), id="root-tree-seen-from-below"),
+        pytest.param("inner", (), id="tree-under-the-cwd-is-no-root-path"),
+    ],
+)
+def test_scope_directories_reads_every_entry_from_the_repository_root_wherever_the_process_stands(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, path: str, expected: tuple[str, ...]
+) -> None:
+    """A scope entry is a repository-root path: `src/inner` under the cwd
+    is not the root path `inner`, and a root `docs` is found from `src`."""
+    repository = _scope_repository(tmp_path)
+    (repository / "src" / "inner").mkdir(parents=True)
+    (repository / "src" / "inner" / "a.py").write_text("x\n")
+    real_git(repository, "add", "-A")
+    real_git(repository, "commit", "-q", "-m", "nested")
+    monkeypatch.chdir(repository / "src")
+
+    directories = checkout.scope_directories(
+        (path,), directory=None, toplevel=lambda: repository, revision="HEAD"
+    )
+
+    assert directories == expected
 
 
 @pytest.mark.parametrize(

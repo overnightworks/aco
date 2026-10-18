@@ -25,7 +25,16 @@ from cli_fixtures import (
     trunk_git_calls,
 )
 
-from agent_coordination import checkout, cmd_workspace, forge, github, process, session, store
+from agent_coordination import (
+    checkout,
+    cmd_claim,
+    cmd_workspace,
+    forge,
+    github,
+    process,
+    session,
+    store,
+)
 from agent_coordination.protocol import ClaimError, ClaimState, ClaimUnavailableError
 from agent_coordination.session import RunContext
 
@@ -669,3 +678,65 @@ def test_protect_judges_its_payload_without_ever_building_a_run_context(
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
 
     assert run_cli(["protect"], capsys).status == 0
+
+
+@pytest.mark.parametrize(
+    ("first_toplevel_read", "width_gate_outcome"),
+    [
+        pytest.param(
+            process.ProcessTimedOutError("slow"), "git rev-parse timed out", id="times-out"
+        ),
+        pytest.param(process.ExecutableMissingError("git"), "git is required", id="not-installed"),
+        pytest.param(OSError("denied"), "git failed to launch: denied", id="fails-to-launch"),
+        pytest.param(
+            process.CapturedResult(128, b"", b"fatal: not a work tree"),
+            None,
+            id="exit-status-stays-the-toplevel-refusal",
+        ),
+    ],
+)
+def test_the_width_gate_refuses_when_the_first_toplevel_read_never_answered(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    first_toplevel_read: process.CapturedResult | Exception,
+    width_gate_outcome: str | None,
+) -> None:
+    """Through the real context: a toplevel read that timed out or never
+    launched must not let an existing, unversioned directory past the width
+    gate (a retry would read it); only an exit status is the #472 trap that
+    the command's own toplevel refusal reports."""
+    repository = _checkout_configuring(tmp_path, "origin", "")
+    (repository / "scratch").mkdir()
+    real_git(
+        repository,
+        "-c",
+        "user.name=T",
+        "-c",
+        "user.email=t@e",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "initial",
+    )
+    real_run_git = process.run_git
+    reads: list[list[str]] = []
+
+    def failing_first_toplevel_read(
+        arguments: list[str], *, directory: Path | None = None
+    ) -> process.CapturedResult:
+        if arguments == ["rev-parse", "--show-toplevel"] and not reads:
+            reads.append(arguments)
+            if isinstance(first_toplevel_read, Exception):
+                raise first_toplevel_read
+            return first_toplevel_read
+        return real_run_git(arguments, directory=directory)
+
+    monkeypatch.setattr(process, "run_git", failing_first_toplevel_read)
+    context = RunContext(None, build_forge=_forge_never_built, directory=repository)
+
+    if width_gate_outcome is None:
+        cmd_claim.scope_versioning(("scratch",), None, context=context)
+        return
+    with pytest.raises(ClaimError, match=width_gate_outcome):
+        cmd_claim.scope_versioning(("scratch",), None, context=context)
