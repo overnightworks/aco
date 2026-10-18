@@ -54,7 +54,13 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge
-from store_fixtures import blob, push_raw_state_tree, raw_tree, state_ref_listing
+from store_fixtures import (
+    RaceOnceTransport,
+    blob,
+    push_raw_state_tree,
+    raw_tree,
+    state_ref_listing,
+)
 
 from agent_coordination import (
     board,
@@ -1858,6 +1864,13 @@ def _path_without_gh(tmp_path: Path) -> str:
         assert executable is not None, f"this test needs a real {tool} on PATH to symlink"
         (bin_directory / tool).symlink_to(executable)
     return str(bin_directory)
+
+
+def _childless_container(slice_titles: tuple[str, ...] = ()) -> dict[str, bytes]:
+    """`CONTAINER_ID` alone -- no child, so a Task retype of it is allowed --
+    its slice table holding one row per title."""
+    rows = tuple(enumerate(slice_titles, start=1))
+    return {f"{CONTAINER_ID}.md": _container_body_with_slices(rows).encode()}
 
 
 class TestCliStateRefForge:
@@ -5629,3 +5642,86 @@ class TestCliStateRefForge:
             run_cli(["item", "show", container_id, "--json"], capsys).expect_success()
         )["state"]
         assert container_state == "open"
+
+    def _retype_the_parent_before_the_first_push(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
+    ) -> list[int]:
+        """CAS-70 (issue #196): arms `item edit CONTAINER --kind <kind>` to
+        run once as a genuine second CLI run, just before the next state-ref
+        push; the list collects that edit's exit code."""
+        exits: list[int] = []
+
+        def retype() -> None:
+            exits.append(issue_claim.main(["item", "edit", str(CONTAINER_NUMBER), "--kind", kind]))
+            capsys.readouterr()
+
+        racer = RaceOnceTransport(retype)
+        monkeypatch.setattr(store, "GitPushTransport", lambda: racer)
+        return exits
+
+    @pytest.mark.parametrize(
+        ("item_files", "argv"),
+        [
+            pytest.param(
+                _childless_container(),
+                [
+                    "item",
+                    "new",
+                    "--title",
+                    "Fresh Child",
+                    "--parent",
+                    CONTAINER_ID,
+                    "--now",
+                    "Ready.",
+                    "--next",
+                    "Build it.",
+                    "--done-when",
+                    "Merged.",
+                ],
+                id="item-new",
+            ),
+            pytest.param(
+                _childless_container(("Slice C",)),
+                ["cut", str(CONTAINER_NUMBER), "--title", "Slice C"],
+                id="cut-linked-row",
+            ),
+            pytest.param(
+                _childless_container(),
+                ["cut", str(CONTAINER_NUMBER), "--title", "Slice C"],
+                id="cut-no-row",
+            ),
+        ],
+    )
+    def test_a_parent_retyped_to_task_first_refuses_the_child_and_writes_none(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+        item_files: dict[str, bytes],
+        argv: list[str],
+    ) -> None:
+        """CAS-70/72: the retype lands first, so the child is refused with
+        CAS-20's sentence naming the parent and no child exists."""
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
+        remote_url = f"file://{bare_remote}"
+        before = store.fetch_state(worktree=worktree, remote=remote_url)
+        retyped = self._retype_the_parent_before_the_first_push(monkeypatch, capsys, "task")
+
+        status = issue_claim.main(argv)
+
+        after = store.fetch_state(worktree=worktree, remote=remote_url)
+        assert after.tip is not None
+        parent = _decoded_record(
+            store.read_item_files(worktree, after.tip)[f"{CONTAINER_ID}.md"].decode(), CONTAINER_ID
+        )
+        assert retyped == [0]
+        assert set(after.items) == {CONTAINER_ID}
+        assert parent.kind == "task"
+        assert capsys.readouterr().err == (
+            f"ERROR: item {CONTAINER_ID!r} was written since it was read "
+            f"(expected {before.items[CONTAINER_ID]}, found {after.items[CONTAINER_ID]!r}); "
+            "re-read and retry\n"
+        )
+        assert status == 2
