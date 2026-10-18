@@ -466,7 +466,7 @@ def adoption_holder(
     claims: Mapping[str, protocol.ActiveClaim], branch: str, storage: body.Storage
 ) -> AdoptionRefusal | None:
     """ADOPT-06: any live claim on the head branch, issue or lane, refuses."""
-    holders = protocol.claims_on_branch(claims, branch)
+    holders = protocol.branch_holders(claims, branch)
     if not holders:
         return None
     return AdoptionRefusal(

@@ -18328,6 +18328,32 @@ def test_land_refuses_a_malformed_head_as_usage_before_any_forge_call(
 
 
 @pytest.mark.parametrize(
+    ("number", "complaint"),
+    [
+        pytest.param("0", "0 is not a positive number", id="zero"),
+        pytest.param("-1", "-1 is not a positive number", id="negative"),
+        pytest.param("abc", "invalid int value: 'abc'", id="text"),
+        pytest.param("1.5", "invalid int value: '1.5'", id="fraction"),
+    ],
+)
+def test_land_refuses_a_malformed_pull_request_number_at_the_parser(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    number: str,
+    complaint: str,
+) -> None:
+    """Spec: LANDCMD-44 -- usage error, exit 2, and the forge is never asked; a
+    non-integer keeps argparse's own wording."""
+    client = _land_already_merged(monkeypatch, tmp_path)
+
+    result = run_cli(["land", number], capsys)
+
+    assert (result.status, result.stdout, client.requests) == (2, "", 0)
+    assert result.stderr.splitlines()[-1] == f"aco land: error: argument pull_request: {complaint}"
+
+
+@pytest.mark.parametrize(
     "branch, kind",
     [
         (LANE_BRANCH, "docs"),

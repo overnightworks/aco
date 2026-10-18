@@ -59,7 +59,40 @@ def claim_cost_line(
     )
 
 
-def _resolved_claim_branch(arguments: argparse.Namespace, *, directory: Path | None = None) -> str:
+@dataclass(frozen=True)
+class ClaimArguments:
+    """What `claim_request` reads of a claim command: `aco claim`'s parsed
+    arguments (`from_parsed`), or `start`'s and `adopt`'s own, which build
+    the same request without a command line."""
+
+    issue: int | None = None
+    agent: str | None = None
+    role: str = DEFAULT_CLAIM_ROLE
+    base: str | None = None
+    branch: str | None = None
+    scope: list[str] | None = None
+    claim_id: str | None = None
+    out_of_order: str | None = None
+    whole: str | None = None
+    resource: str | None = None
+
+    @classmethod
+    def from_parsed(cls, parsed: argparse.Namespace) -> ClaimArguments:
+        return cls(
+            issue=parsed.issue,
+            agent=parsed.agent,
+            role=parsed.role,
+            base=parsed.base,
+            branch=parsed.branch,
+            scope=parsed.scope,
+            claim_id=parsed.claim_id,
+            out_of_order=parsed.out_of_order,
+            whole=parsed.whole,
+            resource=parsed.resource,
+        )
+
+
+def _resolved_claim_branch(arguments: ClaimArguments, *, directory: Path | None = None) -> str:
     """`claim`'s own branch: `--branch` when given, else `directory`'s
     checked-out branch, read via `-C` when given (issue #322: `start`'s own
     resolved worktree, never a process-wide `os.chdir`) or the calling
@@ -85,13 +118,13 @@ def _request(
     `claim` stands in the worktree it claims, judged against the canonical
     remote's recorded default branch `default_branch` answers (issue
     #490)."""
-    request = claim_request(arguments, directory=directory)
+    request = claim_request(ClaimArguments.from_parsed(arguments), directory=directory)
     checkout.validate_checkout(request, default_branch=default_branch, directory=directory)
     return request
 
 
 def claim_request(
-    arguments: argparse.Namespace, *, directory: Path | None = None, adopted: bool = False
+    arguments: ClaimArguments, *, directory: Path | None = None, adopted: bool = False
 ) -> protocol.ClaimRequest:
     """The `protocol.ClaimRequest` `claim` submits, `arguments.scope` bound as-is
     when given. Omitted -- issue mode only (issue #337); lane mode still
@@ -118,9 +151,9 @@ def claim_request(
     claim_id = arguments.claim_id or uuid.uuid4().hex
     protocol.ClaimId(claim_id)
     whole_reason = None if arguments.whole is None else body.bounded_whole_reason(arguments.whole)
-    resource = getattr(arguments, "resource", None)
-    if resource is not None:
-        resource = protocol.outbound_resource_name(resource)
+    resource = (
+        None if arguments.resource is None else protocol.outbound_resource_name(arguments.resource)
+    )
     return protocol.ClaimRequest(
         identity=identity,
         agent=agent,
@@ -899,6 +932,23 @@ def checked_claim(
     )
     if replayed is None and not plan.refused:
         protocol.apply(observed, plan.intent)
+    return plan
+
+
+def checked_lane_claim(
+    requested: protocol.ClaimRequest, context: session.RunContext, *, revision: str
+) -> _ClaimPlan | int:
+    """`checked_claim` for a lane claim whose worktree is not built yet
+    (`start`, `adopt`): the ledger's conflict is named as the user's own
+    storage names it, and a refusing check is reported -- the exit status
+    `2` comes back instead of a plan."""
+    try:
+        plan = checked_claim(requested, context, revision=revision)
+    except protocol.ClaimConflictError as error:
+        raise board.named_refusal(error, context.config.storage) from error
+    if plan.refused:
+        refuse_claim(False, plan.target_issue, plan.checks)
+        return 2
     return plan
 
 
