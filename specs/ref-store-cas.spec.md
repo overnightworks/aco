@@ -31,14 +31,14 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | a rejected push re-read without its `operation_id`, then refused | — | CAS-57 | — |
 | worktree stamp not an ancestor of the fetched tip | — | — | CAS-11 |
 | ref previously observed, now absent | CAS-12 | CAS-12 | CAS-12 |
-| `schema.toml` malformed or unsupported | — | — | CAS-22..26 |
+| `schema.toml` malformed or unsupported | — | — | CAS-22..26, CAS-74 |
 | a subtree malformed | — | — | CAS-27..33 |
 | a resource file malformed | — | — | CAS-34..36 |
 | an item write's `expected` is stale or `None` | — | CAS-19, CAS-20 | — |
 | a fresh child's parent changed since the command checked it | — | CAS-70..CAS-73 | — |
 | `items/` holds an entry that is no item's file name | — | CAS-61 | — |
 | an entry a write does not change, any mode, any directory | — | CAS-61 | — |
-| an `items/` entry that is a symlink, a directory, or a submodule | — | — | CAS-32 |
+| a `claims/`, `resources/`, or `items/` entry that is a symlink, a directory, or a submodule | — | — | CAS-29, CAS-31, CAS-32 |
 | a claim lands on the item an `item close` retries | — | CAS-52 | — |
 | a close or edit lands on the item a claim retries | — | CAS-59, CAS-60 | — |
 
@@ -141,6 +141,7 @@ version field from the work-item body block's own `version = 1`
 - [ ] [CAS-24] A `schema.toml` whose `version` is not an integer refuses `schema.toml version must be an integer, got '1'`.
 - [ ] [CAS-25] A `schema.toml` whose integer `version` is not `2` refuses `unsupported state schema version <n>`, a distinct error from every other malformed-tree refusal here.
 - [ ] [CAS-26] A `schema.toml` that is not valid TOML refuses `malformed schema.toml at <tip>: <reason>`.
+- [ ] [CAS-74] A `schema.toml` that is not a file (mode `100644` or `100755`), a symlink included, refuses `schema.toml at <tip> is not a file`; a directory or submodule, `... is not a blob`.
 
 ## The four subtrees' own shape
 
@@ -150,9 +151,9 @@ tree's structural shape before that content is ever parsed.
 
 - [ ] [CAS-27] A fetched tree carrying a top-level entry outside `schema.toml`, `claims`, `ids`, `resources`, `items` refuses `state tree at <tip> has unknown entries: ['extra.txt']`.
 - [ ] [CAS-28] A `claims`/`ids`/`resources`/`items` top-level entry that is not a directory refuses `<name> at <tip> is not a directory`.
-- [ ] [CAS-29] A `claims/` entry that is not a `.toml` blob refuses `claims/<name> at <tip> is not a claim file`.
+- [ ] [CAS-29] A `claims/` entry that is not a `.toml` file (mode `100644` or `100755`), a symlink included, refuses `claims/<name> at <tip> is not a claim file`.
 - [ ] [CAS-30] An `ids/` entry that is not a bare, claim-id-shaped blob refuses `ids/<name> at <tip> is not a claim id`.
-- [ ] [CAS-31] A `resources/` entry that is not a `.toml` blob refuses `resources/<name> at <tip> is not a resource file`.
+- [ ] [CAS-31] A `resources/` entry that is not a `.toml` file (mode `100644` or `100755`), a symlink included, refuses `resources/<name> at <tip> is not a resource file`.
 - [ ] [CAS-32] An `items/` entry that is not a file (mode `100644` or `100755`), a symlink included, refuses `items/<name> at <tip> is not a file`.
 - [ ] [CAS-33] A state-tree content read whose own `git archive` invocation fails refuses `cannot read the state tree at <tip>: <detail>`.
 
