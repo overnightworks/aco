@@ -670,6 +670,100 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             ((hook_input.PATTERN_TEE, "f"),),
             id="tee-honors-a-literal-end-of-options-marker",
         ),
+        pytest.param(
+            "cp -- -tfoo /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-dash-t-after-double-dash-is-an-operand-not-a-target-flag",
+        ),
+        pytest.param(
+            "cp -- -t foo bar",
+            ((hook_input.PATTERN_COPY, "bar"),),
+            id="cp-separate-dash-t-after-double-dash-is-an-operand",
+        ),
+        pytest.param(
+            "cp -- a --target-directory=foo /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-long-target-after-double-dash-is-an-operand",
+        ),
+        pytest.param(
+            "cp -t foo -- a",
+            ((hook_input.PATTERN_COPY, "foo"),),
+            id="cp-target-before-double-dash-still-wins",
+        ),
+        pytest.param(
+            "cp -rt /repo/target a",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-target-flag-inside-a-short-cluster-takes-the-next-word",
+        ),
+        pytest.param(
+            "cp -rt/repo/target a",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-target-flag-inside-a-short-cluster-takes-the-attached-rest",
+        ),
+        pytest.param(
+            "cp -rS.t a /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-suffix-value-in-a-cluster-is-not-a-target-flag",
+        ),
+        pytest.param(
+            "cp -S -t /in-claim /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-suffix-flag-consumes-the-following-dash-t-word",
+        ),
+        pytest.param(
+            "cp --suffix -t /in-claim /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-long-suffix-flag-consumes-the-following-dash-t-word",
+        ),
+        pytest.param(
+            "cp -S.bak -t /repo/target a",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-attached-suffix-leaves-a-later-target-flag-in-force",
+        ),
+        pytest.param(
+            "cp -t -- dest src",
+            ((hook_input.PATTERN_COPY, "--"),),
+            id="cp-target-flag-consumes-a-double-dash-as-its-value",
+        ),
+        pytest.param(
+            "cp --target-directory -- dest src",
+            ((hook_input.PATTERN_COPY, "--"),),
+            id="cp-long-target-flag-consumes-a-double-dash-as-its-value",
+        ),
+        pytest.param(
+            "sed -i 's/a/b/' -- -e /repo/target",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "-e"),
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),
+            ),
+            id="sed-dash-e-after-double-dash-is-a-file-and-the-script-is-not",
+        ),
+        pytest.param(
+            "sed -i -- 's/a/b/' -f /repo/target",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "-f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),
+            ),
+            id="sed-dash-f-after-double-dash-is-a-file-behind-the-inline-script",
+        ),
+        pytest.param(
+            "sed -- 's/a/b/' -i /repo/target",
+            (),
+            id="sed-dash-i-after-double-dash-is-a-file-name-so-nothing-is-written",
+        ),
+        pytest.param(
+            "sed -i -e p -- -f t",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "-f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "t"),
+            ),
+            id="sed-explicit-script-keeps-every-operand-after-double-dash",
+        ),
+        pytest.param(
+            "sed -l -- -i -e p /repo/target",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),),
+            id="sed-line-length-flag-consumes-a-double-dash-as-its-value",
+        ),
     ],
 )
 def test_hook_command_paths_recognizes_every_write_pattern(
