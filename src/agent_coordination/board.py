@@ -53,17 +53,23 @@ NEEDS_OPERATOR_LABEL = "needs-operator"
 WAITING_ON_OPERATOR = "waiting on operator"
 RULING_OLD_AFTER_LANDINGS = 10
 STALE_IDLE_DAYS = 7
-REFERENCE_PATTERN = re.compile(r"(?<!\w)#([1-9]\d*)", re.ASCII)
 # The number is bounded so `int()` of a match can never meet Python's digit
-# limit: a longer one is no reference, whichever line or keyword carries it.
+# limit: a longer one is no reference, whether a pattern below or
+# `parse_item_reference` reads it. The lookahead keeps an in-bound prefix of a
+# longer number from matching.
 MAXIMUM_ISSUE_NUMBER_DIGITS = 18
+ISSUE_NUMBER = rf"[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}}(?!\d)"
+REFERENCE_PATTERN = re.compile(rf"(?<!\w)#({ISSUE_NUMBER})", re.ASCII)
+# What `parse_item_reference` accepts as a number: the same bound, but a bare
+# `0` and leading zeros stay readable, as they were before the bound.
+ITEM_NUMBER_PATTERN = re.compile(rf"\d{{1,{MAXIMUM_ISSUE_NUMBER_DIGITS}}}", re.ASCII)
 # One issue named the way GitHub names it across repositories: `OWNER/REPO#n`,
 # or `#n` for the repository the text itself lives in. Every typed line below
 # embeds this one grammar, so a shorthand and its qualified spelling always
 # parse to the same reference.
 QUALIFIED_REFERENCE = (
     rf"(?:(?P<repository>{protocol.REPOSITORY_PATTERN.pattern}))?"
-    rf"#(?P<number>[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}})"
+    rf"#(?P<number>{ISSUE_NUMBER})"
 )
 # GitHub links a keyword to a reference only on one line, separated by
 # horizontal space and ending at the reference: `Closes#7`, a keyword whose
@@ -112,11 +118,11 @@ CLAIM_OLD_AFTER = timedelta(hours=1)
 # after the real title (`(#962 Scheibe 4)`, `(#962 slice 4)`) or a leading
 # German phrase (`Scheibe 4 von #962`).
 _SLICE_TITLE_PARENTHETICAL_PATTERN = re.compile(
-    r"\(#(?P<parent>[1-9]\d*)[ \t]+(?:Scheibe|slice)[ \t]+(?P<slice>[1-9]\d*)\)",
+    rf"\(#(?P<parent>{ISSUE_NUMBER})[ \t]+(?:Scheibe|slice)[ \t]+(?P<slice>{ISSUE_NUMBER})\)",
     re.IGNORECASE | re.ASCII,
 )
 _SLICE_TITLE_VON_PATTERN = re.compile(
-    r"Scheibe[ \t]+(?P<slice>[1-9]\d*)[ \t]+von[ \t]+#(?P<parent>[1-9]\d*)",
+    rf"Scheibe[ \t]+(?P<slice>{ISSUE_NUMBER})[ \t]+von[ \t]+#(?P<parent>{ISSUE_NUMBER})",
     re.IGNORECASE | re.ASCII,
 )
 
@@ -274,7 +280,7 @@ def parse_item_reference(value: str) -> int:
     if protocol.ITEM_ID_PATTERN.fullmatch(value) is not None:
         return items.item_number(value)
     digits = value.removeprefix("#")
-    if digits.isdigit():
+    if ITEM_NUMBER_PATTERN.fullmatch(digits) is not None:
         return int(digits)
     raise protocol.ClaimUnavailableError(
         f"{value!r} is not an item reference; use aco-xxxxxx, #n, or the bare number n"
