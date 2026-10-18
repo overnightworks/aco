@@ -1,7 +1,0 @@
-claim_id = "9cc1f14cf6de490fb1629b0d0b6532e3"
-agent = "claude"
-role = "builder"
-base = "1f9a124548c5af5a320fa76bc8d4158f3316e9a7"
-branch = "claude/issue-204-codeql-zeigt-0-offene-alerts-tls-mindest"
-scope = ["scripts/test_inventory_dropped.txt", "tests/aco_board/test_access_jwt.py"]
-opened_commit = "48dc9d876ae84c4811b1dabf6d7beef012863aba"
