@@ -961,7 +961,9 @@ def test_read_item_files_refuses_an_entry_that_is_no_file(
     `items/` refuses by name, never left out of the read without a word."""
     tip, refusal = non_file_items_store
 
-    with pytest.raises(protocol.MalformedStateTreeError, match=re.escape(refusal)):
+    expected_refusal = re.escape(refusal)
+
+    with pytest.raises(protocol.MalformedStateTreeError, match=expected_refusal):
         store.read_item_files(worktree, tip)
 
 
@@ -973,7 +975,9 @@ def test_fetch_state_refuses_an_items_entry_that_is_no_file(
     refusal = non_file_items_store[1]
     remote = str(bare_remote)
 
-    with pytest.raises(protocol.MalformedStateTreeError, match=re.escape(refusal)):
+    expected_refusal = re.escape(refusal)
+
+    with pytest.raises(protocol.MalformedStateTreeError, match=expected_refusal):
         store.fetch_state(worktree=worktree, remote=remote)
 
 
@@ -1404,8 +1408,9 @@ def test_bootstrap_calls_a_push_that_failed_after_starting_uncertain(
     """Spec: CAS-56; once the push process ran, only the remote knows whether it
     landed, and the refusal says in its own sentence what went wrong."""
     break_the_push(push_probe)
+    expected_sentence = _the_sentence_ending_in(visible_cause)
 
-    with pytest.raises(protocol.UncertainWriteError, match=_the_sentence_ending_in(visible_cause)):
+    with pytest.raises(protocol.UncertainWriteError, match=expected_sentence):
         store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
 
@@ -1436,8 +1441,10 @@ def test_git_push_transport_names_the_cause_of_a_subclass_of_a_known_process_err
 
     monkeypatch.setattr(process, "run_bounded_captured", timing_out)
 
+    transport = store.GitPushTransport()
+
     with pytest.raises(protocol.ClaimError, match="did not finish: timed out"):
-        store.GitPushTransport().push(
+        transport.push(
             worktree=worktree,
             remote="origin",
             ref=store.STATE_REF,
@@ -3237,12 +3244,15 @@ def test_commit_transition_calls_a_push_that_failed_after_starting_uncertain(
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     observed = fresh_observation(worktree, bare_remote)
     break_the_push(push_probe)
+    expected_sentence = _the_sentence_ending_in(visible_cause)
+    subject = store.ClaimTransitionSubject("claim issue 1", item="1")
+    intent = _issue_claim_intent(1)
 
-    with pytest.raises(protocol.UncertainWriteError, match=_the_sentence_ending_in(visible_cause)):
+    with pytest.raises(protocol.UncertainWriteError, match=expected_sentence):
         store.commit_transition(
             observed=observed,
-            subject=store.ClaimTransitionSubject("claim issue 1", item="1"),
-            intent=_issue_claim_intent(1),
+            subject=subject,
+            intent=intent,
         )
 
 
@@ -3259,12 +3269,14 @@ def test_commit_transition_refuses_plainly_when_the_push_process_never_started(
     observed = fresh_observation(worktree, bare_remote)
     tip_before = state_ref_tip(bare_remote)
     push_probe.fails_to_start(start_failure)
+    subject = store.ClaimTransitionSubject("claim issue 1", item="1")
+    intent = _issue_claim_intent(1)
 
     with pytest.raises(protocol.PushNotStartedError):
         store.commit_transition(
             observed=observed,
-            subject=store.ClaimTransitionSubject("claim issue 1", item="1"),
-            intent=_issue_claim_intent(1),
+            subject=subject,
+            intent=intent,
         )
 
     assert push_probe.started == 1
