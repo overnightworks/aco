@@ -270,3 +270,16 @@ tests/test_cli.py	'follow-up incomplete'	#216: no-item-resumes-delete guards the
 tests/test_cli.py	'land-rerun-on-the-recorded-head'	#216: squash-rerun-on-recorded-head compares complete stdout, lane.exists and lane.head in the real shared world.
 tests/test_land_after_merge.py	'ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: release (forge unreachable); re-run aco land 12\n'	#216: release_failure_case retains the complete stderr literal shared by test_reports_incomplete_follow_up and test_release_reports_the_same_close_failure.
 tests/test_land_after_merge.py	'forge unreachable'	#216: release_failure_case retains the close_error literal shared by test_reports_incomplete_follow_up and test_release_reports_the_same_close_failure.
+tests/test_cli.py	' --merged 12 --branch '	#220: Full literal release commands now belong to SeparateCase rows.
+tests/test_cli.py	' in this checkout; run aco release '	#220: Full land.stdout sentences retain the checkout and executable release advice.
+tests/test_cli.py	'LANDED pull request #12 already; nothing left to release\nworktree: '	#220: Complete row-owned release.stdout replaces the rendered suffix.
+tests/test_cli.py	'LANDED pull request #12 already; nothing left to release\nworktree: kept -- no linked worktree on '	#220: Complete row-owned land.stdout replaces branch interpolation.
+tests/test_cli.py	'a-claim-taken-meanwhile-keeps-the-lane'	#220: Both explicit branch-specific parameter IDs retain the race case.
+tests/test_cli.py	'aco release'	#220: Complete row-owned commands run through shlex and the real CLI.
+tests/test_cli.py	'foreign-lane'	#220: Explicit foreign-lane parameter IDs retain the branch distinction.
+tests/test_cli.py	'kept -- --keep-worktree was given'	#220: The keep rows compare the complete release.stdout sentence.
+tests/test_cli.py	'kept -- claimed again while this release ran'	#220: The race rows compare the complete release.stdout sentence.
+tests/test_cli.py	'remote.git'	#220: The shared bare_remote fixture owns the remote path.
+tests/test_cli.py	'removes-the-lane'	#220: Both explicit branch-specific parameter IDs retain removal.
+tests/test_cli.py	'the-keep-worktree-flag-keeps-the-lane'	#220: Both explicit branch-specific parameter IDs retain the keep flag.
+tests/test_cli.py	'worktree: kept -- no linked worktree on '	#220: Complete row-owned land.stdout sentences retain the kept advice.

@@ -62,6 +62,8 @@ class SeparateCase:
     lane_exists: bool = False
     branch_exists: bool = False
     publications: int = 0
+    author_name: str = "Lander"
+    author_email: str = "lander@example.com"
 
 
 @dataclass(frozen=True)
@@ -466,13 +468,28 @@ def world(
 
 class TestLandAfterMergeRerun:
     @pytest.mark.parametrize(
-        "separate_world", [pytest.param(SeparateCase(), id="local-identity")], indirect=True
+        "separate_world",
+        [
+            pytest.param(
+                SeparateCase(
+                    land_stdout="RELEASED issue #72: landing\nfreed: none\nnext: none\n"
+                    "worktree: kept -- no linked worktree on codex/issue-72-claims in this checkout; "
+                    "run aco release 72 --merged 12 --branch codex/issue-72-claims "
+                    "in the checkout that holds it\n",
+                    lane_exists=True,
+                    branch_exists=True,
+                ),
+                id="local-identity",
+            )
+        ],
+        indirect=True,
     )
     def test_lands_from_a_separate_clone(
         self, separate_world: SeparateWorld, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: LANDCMD-25, E-LANDCMD-18a. Local identity releases; the original lane stays."""
         world = separate_world
+        case = world.case
         capsys.readouterr()
         result = run_cli(["land", "12"], capsys)
         observed = {
@@ -491,18 +508,15 @@ class TestLandAfterMergeRerun:
             ).stdout.strip(),
         }
         expected = {
-            "land.exit": 0,
-            "land.stdout": "RELEASED issue #72: landing\nfreed: none\nnext: none\n"
-            "worktree: kept -- no linked worktree on codex/issue-72-claims in this checkout; "
-            "run aco release 72 --merged 12 --branch codex/issue-72-claims "
-            "in the checkout that holds it\n",
-            "land.stderr": "",
-            "merge.calls": 1,
-            "claims": (),
-            "lane.exists": True,
-            "lane.branch.exists": True,
-            "release.author.name": "Lander",
-            "release.author.email": "lander@example.com",
+            "land.exit": case.land_status,
+            "land.stdout": case.land_stdout,
+            "land.stderr": case.land_stderr,
+            "merge.calls": case.merge_calls,
+            "claims": case.claims,
+            "lane.exists": case.lane_exists,
+            "lane.branch.exists": case.branch_exists,
+            "release.author.name": case.author_name,
+            "release.author.email": case.author_email,
         }
         assert observed == expected
 
