@@ -1,8 +1,0 @@
-claim_id = "0f989939cb934fe7a677b832efa2e8c6"
-agent = "claude"
-role = "builder"
-base = "1f9a124548c5af5a320fa76bc8d4158f3316e9a7"
-branch = "claude/issue-196-ein-kind-landet-nie-unter-einem-parent-d"
-scope = ["specs/cut.spec.md", "specs/item.spec.md", "specs/ref-store-cas.spec.md", "src/agent_coordination/protocol.py", "src/agent_coordination/session.py", "src/agent_coordination/state_board.py", "tests/test_cli.py", "tests/test_state_board.py", "tests/test_store.py"]
-opened_commit = "c8f673bf7a6e7f10cd224a8b7ed4684643d828ba"
-whole_reason = "Der Pin auf den Parent wird vom Board über session bis zur Anwendung jedes Versuchs in protocol durchgereicht, und seine Sätze CAS-70 bis CAS-73 stehen im selben Schritt in den Specs; halb durchgereicht bliebe der Wettlauf offen."
