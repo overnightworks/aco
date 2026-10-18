@@ -1,0 +1,8 @@
+claim_id = "41c8acf4d4de4e60ad285defffb8cf40"
+agent = "claude"
+role = "builder"
+base = "78f826b97553cbd8ca5d29f8fdc5155f54f4cb2d"
+branch = "claude/issue-188-l2b-land-merge-nachricht-trailer-block-s"
+scope = ["scripts/test_inventory_dropped.txt", "tests/github_fixtures.py", "tests/test_cli.py", "tests/test_land_merge.py", "tests/test_land_merge_message.py"]
+opened_commit = "99cbd482dc0d48f7b8fd0aa61ec4ef848ac86fcb"
+whole_reason = "Der Nachrichtenaufbau von aco land (Klassifikationszeile im Trailer-Block, Trailer am Body-Ende, konfigurierter Schlüssel, stderr-Rauschen, git-Lesefehler) verlässt test_cli.py in einem Schritt: seine Zeilen stehen einmal in test_land_merge_message.py auf einer echten GitHub-Welt mit echtem Claim und echtem Forge-Merge, und das Ledger benennt den neuen Owner."
