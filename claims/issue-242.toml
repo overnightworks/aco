@@ -1,0 +1,7 @@
+claim_id = "b2dc1dbd9bf5459f9fbd4afbd58f2f8b"
+agent = "claude"
+role = "builder"
+base = "365f2b9fb5222bae0a8038132f77e71ac703c606"
+branch = "claude/issue-242-r2b2-kept-rest"
+scope = ["scripts/test_budget_ratchet.txt", "tests/test_cli.py", "tests/test_release_cleanup.py"]
+opened_commit = "bfc160b9b86ec1082af22f212f37228794307e41"
