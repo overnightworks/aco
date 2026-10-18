@@ -659,13 +659,11 @@ def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
     the last reset" is excluded for free by this first-parent walk, never a
     date compared against here.
 
-    Its `events` carry `metrics.LaneEvent`s with `size` and `landed_at` both
-    `None`: this module reads no item content and no trunk landings at all
-    (the "claim-state store is git transport only" contract; `checkout` and
-    `store` are sibling layers, neither importing the other) -- joining an
-    item's current size and its trunk-landing date onto these is
-    `board.py`'s own composition, the one place both are already read for
-    the same board build. A claim still open when this walk ends keeps
+    Its `events` carry `metrics.LaneEvent`s with `size` `None`: this module
+    reads no item content at all (the "claim-state store is git transport
+    only" contract) -- joining an item's current size onto these is
+    `board.py`'s own composition, the one place it is already read for the
+    same board build. A claim still open when this walk ends keeps
     `released_at=None`, uncounted as measured but not discarded: the
     caller's own `metrics.measure` already reports it through
     `MetricsReport.incomplete`.
@@ -703,10 +701,8 @@ def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
         metrics.LaneEvent(
             item=accumulator.item,
             size=None,
-            container=None,
             claimed_at=accumulator.claimed_at,
             released_at=accumulator.released_at,
-            landed_at=None,
             rescopes=accumulator.rescoped,
         )
         for accumulator in accumulators.values()

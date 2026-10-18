@@ -3768,17 +3768,15 @@ def _lane_event(
     released_at: datetime | None,
     rescopes: int = 0,
 ) -> metrics.LaneEvent:
-    """A raw `store.claim_lifecycle`-shaped event: `size`/`landed_at` start
-    `None`, exactly as that reader leaves them -- `build_board`'s own join
+    """A raw `store.claim_lifecycle`-shaped event: `size` starts `None`,
+    exactly as that reader leaves it -- `build_board`'s own join
     (`_joined_lane_event`) fills `size` from the matching open item's own
     current size, never from this fixture."""
     return metrics.LaneEvent(
         item=item,
         size=None,
-        container=None,
         claimed_at=claimed_at,
         released_at=released_at,
-        landed_at=None,
         rescopes=rescopes,
     )
 
@@ -3866,10 +3864,10 @@ def test_build_board_reports_a_measured_estimate_with_median_and_count() -> None
 def test_build_board_leaves_a_lane_claims_own_event_unjoined_to_any_size_class() -> None:
     """A `docs/`/`fix/` lane claim's own lifecycle event carries no issue
     number at all (issue #357 R2): `_joined_lane_event` returns it
-    unchanged rather than joining it against `size_by_number`/
-    `landed_at_by_item`, so it can never be sorted into a size class --
-    mixing one into an otherwise-clean `M` measurement leaves that class's
-    own `n` exactly at the number of real issue-shaped events."""
+    unchanged rather than joining it against `size_by_number`, so it can
+    never be sorted into a size class -- mixing one into an otherwise-clean
+    `M` measurement leaves that class's own `n` exactly at the number of
+    real issue-shaped events."""
     lane_events = (
         *(
             _lane_event(

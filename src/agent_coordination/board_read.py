@@ -317,18 +317,15 @@ def build_board(
     trunk_landings = checkout.trunk_landings(
         trunk_ref, TRUNK_LANDING_DEPTH, directory=context.toplevel
     )
-    # One walk of `trunk_landings` feeds three views `board.py` keeps
-    # separate (issue #371): `trunk_landing_items` (sha and all) drives the
-    # Landungen view itself; `landed_at_by_item`/`trunk_landed_work_items`
-    # are its own narrower rollups for `Stage.CODE_LANDED` and the
-    # measurements' landing dates.
+    # `trunk_landing_items` (sha and all) drives the Landungen view and
+    # `Stage.CODE_LANDED`; `trunk_landings` below keeps only the timestamps,
+    # also of commits that classify no work item.
     trunk_landing_items = tuple(
         board.TrunkLandingItem(number, landing.sha, landing.committed_at)
         for landing in trunk_landings
         if isinstance(landing.classification, board.TrunkWorkItemClassification)
         for number in landing.classification.numbers
     )
-    landed_at_by_item = {entry.item: entry.committed_at for entry in trunk_landing_items}
     return board.build_board(
         board.BoardBuildInputs(
             issues=issues,
@@ -339,7 +336,6 @@ def build_board(
             repository=client.repository.path,
             now=now,
             trunk_landings=tuple(landing.committed_at for landing in trunk_landings),
-            trunk_landed_work_items=frozenset(entry.item for entry in trunk_landing_items),
             trunk_landing_items=trunk_landing_items,
             children=children,
             nesting_parents=nesting_parents,
@@ -349,7 +345,6 @@ def build_board(
             lane_events=history.lane_events,
             unparsed_lifecycle_commits=history.unparsed_lifecycle_commits,
             closed_item_sizes=closed_item_sizes,
-            landed_at_by_item=landed_at_by_item,
             open_pull_requests_supported=(
                 client.capability(forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS)
                 is not forge.Capability.UNSUPPORTED
