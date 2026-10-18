@@ -2,74 +2,36 @@
 # per line (tab separated), naming an assert literal a test-module rewrite dropped on purpose
 # (issue #319). Written by hand in the same
 # change as the rewrite that drops the literal.
-tests/test_cli.py	' 1/2: Decide something\n  1 ruled yes 2026-08-01: Ship it?\n  2 open: New question?\n'	#171: test_ask.py::TestGithubAsk::test_persistence[rulings] compares the complete literal including #90 instead of an interpolated item-number prefix.
-tests/test_cli.py	' could not be read'	#171: test_ask.py refusal rows missing-picture-text/json compare the complete missing-file sentence including its OS reason.
-tests/test_cli.py	' line 1: New question?\n'	#171: test_ask.py::TestGithubAsk::test_text[card] compares the complete ASKED #90 line, not an f-string fragment.
-tests/test_cli.py	' line 2: New question?\n'	#171: test_ask.py text[append/display-control] and persistence[duplicate] compare complete ASKED #90 lines.
-tests/test_cli.py	'--picture '	#171: test_ask.py missing-picture refusals compare the full literal sentence with missing.svg, not an interpolated path fragment.
-tests/test_cli.py	'ASKED #'	#171: test_ask.py text rows compare complete ASKED #90 output; the fragment is no longer a standalone oracle.
-tests/test_cli.py	'ASKED'	#171: test_ask.py::TestGithubAsk::test_text[display-control] replaces the old startswith verb check with the complete line.
-tests/test_cli.py	'ERROR: this forge cannot update_item_body; ask by hand'	#171: test_ask.py::TestGithubAsk::test_refusal[read-only] compares ERROR prefix plus the row-owned complete message and newline, alongside the same literal JSON message.
-tests/test_cli.py	'body malformed: aco: no aco block; ask needs a valid aco block'	#171: test_ask.py::TestGithubAsk::test_refusal[blockless] compares the full row-owned message beginning #90 in stderr and JSON.
-tests/test_board.py	'whole = "   "\n'	#105: The blank value is now driven through test_parse_body_applies_the_whole_bound using JSON-to-TOML serialization.
-tests/test_board.py	'whole = [1]\n'	#105: The list value is now driven through test_parse_body_applies_the_whole_bound using JSON-to-TOML serialization.
-tests/test_board.py	'whole must be a non-empty string'	#105: BODY-62 retires this sentence for the shared whole bound; test_parse_body_applies_the_whole_bound asserts its replacement for every invalid shape.
-tests/test_cli.py	'U+200B'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+200B] holds the exact refusal.
-tests/test_cli.py	'U+202E'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+202E] holds the exact refusal.
-tests/test_cli.py	'U+2066'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+2066] holds the exact refusal.
-tests/test_cli.py	'\u200b'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+200B] supplies the same control character.
-tests/test_cli.py	'\u202e'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+202E] supplies the same control character.
-tests/test_cli.py	'\u2066'	#154: Moved unchanged to board_fixtures.BIDI_AND_ZERO_WIDTH_CONTROLS; tests/test_body_cli.py::test_body_check_judges_block_fields[slice-title-U+2066] supplies the same control character.
-tests/test_cli.py	'body incomplete: '	#154: Prefix now held by complete expected sentences in tests/test_body_cli.py::test_body_check_judges_a_piped_body[text-every-key-empty] and [text-only-done-when-empty], also crossed with json.
-tests/test_cli.py	'body malformed: now: now is required\nbody malformed: done_when: done_when is required\n'	#154: Ordered lines now assembled from literal defects and compared in tests/test_body_cli.py::test_body_check_judges_a_piped_body[text-multiple-defects]; [json-multiple-defects] also pins the ordered list.
-tests/test_cli.py	'body malformed: size: size must be S, M, or L\n'	#154: Exact sentence now assembled from the literal field reason in tests/test_body_cli.py::test_body_check_judges_block_fields[size-XL].
-tests/test_cli.py	'stdin is not valid UTF-8'	#154: Substring replaced by exact complete refusal in tests/test_body_cli.py::test_body_check_refuses_undecodable_input[text-invalid-utf8] and [json-invalid-utf8].
-tests/test_cli.py	'unknown top-level key record'	#154: Substring replaced by exact complete refusal in tests/test_body_cli.py::test_body_check_uses_the_storage_pin[text-record-default] and [json-record-default].
-tests/test_cli.py	' (restore with: git fetch '	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[plain] compares the complete export line including the restore command.
-tests/test_cli.py	' at '	#153: Moved into explicit plan-row and failure-arrangement expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[plain] compares the complete tip-bearing export line.
-tests/test_cli.py	' not saved'	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[no-export] compares the complete skip sentence.
-tests/test_cli.py	' on origin (lease '	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[plain] compares the complete leased-delete sentence.
-tests/test_cli.py	' to '	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[plain] compares the complete export destination sentence.
-tests/test_cli.py	', release: '	#153: Replaced fragment checks with the complete refusal and execution of extracted advice in tests/test_reset.py::test_reset_refuses_live_claims_and_touches_nothing[confirm].
-tests/test_cli.py	'--exit-code'	#153: Moved process argv into store_fixtures.state_ref_tip and _reject_delete; tests/test_reset.py::test_reset_failure_leaves_the_state_intact[lease-unknown] holds the failed re-probe behavior. This argv is not reset output.
-tests/test_cli.py	'--force-with-lease'	#153: Moved the explicit no-manual-lease stderr check to tests/test_reset.py::test_reset_failure_leaves_the_state_intact[remote-moved], [lease-unchanged] and [lease-unknown]; each compares '--force-with-lease' membership with False. R3 addendum fault f62 supplies the prediction; the complete repair template alone does not exclude the token.
-tests/test_cli.py	'a stuck state ref'	#153: Retained as shell-quoted advice input in tests/test_reset.py::test_reset_refuses_live_claims_and_touches_nothing[confirm], which checks the actual release outcome rather than argv internals.
-tests/test_cli.py	'aco-state-repo-2026-08-21-'	#153: Replaced the old repo basename by clone.name; tests/test_reset.py::test_reset_plans_or_performs_each_state[plain] checks the independently constructed dated bundle path, existence, verification and head.
-tests/test_cli.py	'cannot delete'	#153: Moved into explicit failure-arrangement expectations; tests/test_reset.py::test_reset_failure_leaves_the_state_intact[remote-moved] checks the complete refusal.
-tests/test_cli.py	'cannot export'	#153: Moved into explicit failure-arrangement expectations; tests/test_reset.py::test_reset_failure_leaves_the_state_intact[export-denied] checks the complete refusal.
-tests/test_cli.py	'deleted '	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[plain] compares the complete leased-delete line.
-tests/test_cli.py	'deleted local '	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[foreign-local] compares the complete local-delete line and absent local ref.
-tests/test_cli.py	'exported '	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[plain] compares the complete export line.
-tests/test_cli.py	'gone: '	#153: Replaced fragment assertion with the complete live-claim refusal in tests/test_reset.py::test_reset_refuses_live_claims_and_touches_nothing[dry-run].
-tests/test_cli.py	'lease'	#153: Replaced fragment assertion with the complete leased-delete repair in tests/test_reset.py::test_reset_failure_leaves_the_state_intact[remote-moved].
-tests/test_cli.py	're-run `aco reset --confirm`'	#153: Moved into explicit failure-arrangement expectations; tests/test_reset.py::test_reset_failure_leaves_the_state_intact[remote-moved] checks the complete repair instruction.
-tests/test_cli.py	'readonly'	#153: Dropped incidental export-directory basename; tests/test_reset.py::test_reset_failure_leaves_the_state_intact[export-denied] makes export unwritable with chmod and checks the actual destination in the refusal and unchanged state.
-tests/test_cli.py	'schema 1 not readable by this aco; live claims unknown (--confirm needs --force-unreadable)'	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[schema1-dry] checks the full warning and [schema1-refused] checks its full ERROR form.
-tests/test_cli.py	'skipped export (--no-export): '	#153: Moved into explicit plan-row expectations; tests/test_reset.py::test_reset_plans_or_performs_each_state[no-export] compares the complete skip sentence.
-tests/test_cli.py	'the remote moved to '	#153: Moved into explicit failure-arrangement expectations; tests/test_reset.py::test_reset_failure_leaves_the_state_intact[remote-moved] checks the complete repair sentence and exact raced tip.
-tests/test_cli.py	'would: bootstrap a fresh empty state'	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[claim-free-dry] compares all five complete lines.
-tests/test_cli.py	'would: clear lineage stamps and fetch anchors in 1 worktree'	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[claim-free-dry] compares all five complete lines.
-tests/test_cli.py	'would: delete '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[claim-free-dry] compares the complete leased-delete line.
-tests/test_cli.py	'would: export '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[claim-free-dry] compares the complete export line.
-tests/test_cli.py	'would: no local '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[claim-free-dry] compares the complete no-local-ref line.
-tests/test_cli.py	'would: nothing to delete on origin: '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[never-dry] compares the complete absent-ref line.
-tests/test_cli.py	'would: nothing to export: '	#153: Moved into explicit plan-row expectations with the common would prefix; tests/test_reset.py::test_reset_plans_or_performs_each_state[never-dry] compares the complete absent-ref line.
-tests/test_cli.py	'.bundle'	#153: The expected dated filename is now owned by _expected_reset_bundle; P rows compare all new directory entries through export_changes and verify/list the bundle contents (f31a, f32, f49, f64, f66, f67).
-tests/test_cli.py	'list-heads'	#153: Real git bundle list-heads remains the reader of P bundle_heads; f32 changes the advertised ref and fails that compared result. The command moved outside the assert expression.
-tests/test_cli.py	' does not exist on origin'	#153: Embedded in complete literal expected lines for G (test_reset_ignores_repo_without_resolving_a_forge) and P never-present rows; absence wording is compared without assembling it from mode.
-tests/test_cli.py	' to delete'	#153: Embedded in complete no-local-ref expected lines for G and P; the complete line remains compared.
-tests/test_cli.py	'bootstrapped a fresh empty state at '	#153: G and executed P compare the literal bootstrap template and separately match its captured OID to the remote; the expected line never interpolates observed state.
-tests/test_cli.py	'no local '	#153: Embedded in complete no-local-ref expected lines for G and P; the complete line remains compared.
-tests/test_cli.py	'nothing to delete on origin: '	#153: Embedded in complete literal absent-ref expected lines for G and P; both dry and confirmed output remain compared.
-tests/test_cli.py	'nothing to export: '	#153: Embedded in complete literal absent-ref expected lines for G and P; both dry and confirmed output remain compared.
-tests/test_cli.py	' #'	#176: test_rule.test_text compares the complete RULED sentence and target, replacing this interpolation fragment.
-tests/test_cli.py	' does not exist'	#176: test_rule.test_refusal[missing-item] compares the complete #90 refusal sentence in both formats.
-tests/test_cli.py	' is a pull request, not an issue; rule needs an issue'	#176: test_rule.test_refusal[pull-request] compares the complete #90 refusal sentence in both formats.
-tests/test_cli.py	' line '	#176: test_rule.test_text[display-control] compares the complete RULED sentence rather than its prefix.
-tests/test_cli.py	' line 1 '	#176: test_rule.test_text compares complete row-owned RULED sentences for all outcomes.
-tests/test_cli.py	'; 1 line(s) still open\n'	#176: test_rule.test_text compares complete row-owned RULED sentences including the remaining count.
-tests/test_cli.py	'ERROR: this forge cannot update_item_body; rule by hand'	#176: test_rule.test_refusal[read-only] retains the full sentence and compares ERROR plus that row-owned message and newline.
-tests/test_cli.py	'RULED #'	#176: test_rule.test_text compares complete row-owned RULED sentences rather than interpolation fragments.
-tests/test_cli.py	'RULED'	#176: test_rule.test_text[display-control] compares the complete RULED sentence rather than its prefix.
-tests/test_cli.py	'line 1 is already ruled'	#176: test_rule.test_refusal[already-ruled] compares the complete refusal including the new-line remedy.
-tests/test_cli.py	'out of range'	#176: test_rule.test_refusal[out-of-range/out-of-range-zero] compares the complete indexed refusal sentence.
+tests/test_cli.py	"invalid int value: '1.5'"	#182: tests/test_land_preflight.py: test_parser_refusal[number-fraction] compares the complete final parser line.
+tests/test_cli.py	"invalid int value: 'abc'"	#182: tests/test_land_preflight.py: test_parser_refusal[number-text] compares the complete final parser line.
+tests/test_cli.py	'-1 is not a positive number'	#182: tests/test_land_preflight.py: test_parser_refusal[number-negative] compares the complete final parser line.
+tests/test_cli.py	'0 is not a positive number'	#182: tests/test_land_preflight.py: test_parser_refusal[number-zero] compares the complete final parser line.
+tests/test_cli.py	'; wait for every check to succeed'	#182: tests/test_land_preflight.py: TestLandReadiness compares complete running-check sentences instead of this standalone suffix.
+tests/test_cli.py	'ERROR: a coordinator override requires --role coordinator\n'	#182: tests/test_land_preflight.py: TestLandEntry compares ERROR prefix plus the row-owned exact role sentence and newline.
+tests/test_cli.py	'ERROR: aco land is a github command; storage = state-ref has no pull requests to land\n'	#182: tests/test_land_preflight.py: TestLandEntry[state-ref/state-ref-and-override] compares ERROR prefix plus the row-owned exact storage sentence and newline.
+tests/test_cli.py	'ERROR: pull request #12 has no quality / verdict check; bbb'	#182: tests/test_land_preflight.py: TestLandQualityGate[long-default-branch-name] compares the complete 200-character refusal, replacing the prefix match.
+tests/test_cli.py	'ERROR: pull request #12 is not open; it cannot be landed\n'	#182: tests/test_land_preflight.py: Closed readiness and quality rows compare ERROR prefix plus the row-owned exact closed sentence and newline.
+tests/test_cli.py	'HTTP 500'	#182: tests/test_land_preflight.py: TestLandQualityGate[config-unreadable] compares the complete GitHub returned HTTP 500 sentence, replacing containment.
+tests/test_cli.py	'aco land: error: argument pull_request: '	#182: tests/test_land_preflight.py: test_parser_refusal[number-*] compares complete final lines instead of an interpolated prefix.
+tests/test_cli.py	'adopted-blocked-without-verdict-names-the-cause'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-blocked-without-verdict-names-the-cause] to [adopted-blocked-without-verdict]; its mapped comparisons remain.
+tests/test_cli.py	'adopted-red-verdict-keeps-the-existing-refusal'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-red-verdict-keeps-the-existing-refusal] to [red-verdict]; its mapped comparisons remain.
+tests/test_cli.py	'adopted-running-check-defers-the-verdict'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-running-check-defers-the-verdict] to [running-defers]; its mapped comparisons remain.
+tests/test_cli.py	'adopted-with-verdict-passes-on-to-the-next-check'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-with-verdict-passes-on-to-the-next-check] to [verdict-passes-to-classification]; its mapped comparisons remain.
+tests/test_cli.py	'adoption-pull-request-adding-the-config-is-not-refused'	#182: tests/test_land_preflight.py: Renamed parameter [adoption-pull-request-adding-the-config-is-not-refused] to [adoption-pull-request-adding-the-config]; its mapped comparisons remain.
+tests/test_cli.py	'already-merged'	#182: tests/test_land_preflight.py: Renamed parameter [already-merged] to [head-on-a-rerun]; its mapped comparisons remain.
+tests/test_cli.py	'check-running-many-long-names-bounded-with-error-prefix'	#182: tests/test_land_preflight.py: Renamed parameter [check-running-many-long-names-bounded-with-error-prefix] to [running-many-long-names-bounded]; its mapped comparisons remain.
+tests/test_cli.py	'check-running-name-list-capped'	#182: tests/test_land_preflight.py: Renamed parameter [check-running-name-list-capped] to [running-list-capped]; its mapped comparisons remain.
+tests/test_cli.py	'check-running-name-truncated'	#182: tests/test_land_preflight.py: Renamed parameter [check-running-name-truncated] to [running-name-truncated]; its mapped comparisons remain.
+tests/test_cli.py	'fraction'	#182: tests/test_land_preflight.py: Renamed parameter [fraction] to [number-fraction]; its mapped comparisons remain.
+tests/test_cli.py	'head-deleting-the-config-is-still-refused'	#182: tests/test_land_preflight.py: Renamed parameter [head-deleting-the-config-is-still-refused] to [head-deleting-the-config]; its mapped comparisons remain.
+tests/test_cli.py	'head-moved'	#182: tests/test_land_preflight.py: Renamed parameter [head-moved] to [moved-head]; its mapped comparisons remain.
+tests/test_cli.py	'longer-than-40'	#182: tests/test_land_preflight.py: Renamed parameter [longer-than-40] to [head-longer-than-40]; its mapped comparisons remain.
+tests/test_cli.py	'negative'	#182: tests/test_land_preflight.py: Renamed parameter [negative] to [number-negative]; its mapped comparisons remain.
+tests/test_cli.py	'no-git-identity'	#182: tests/test_land_preflight.py: The sole retained rerun identity case remains in test_cli.py without its obsolete three-row parametrization.
+tests/test_cli.py	'not-hex'	#182: tests/test_land_preflight.py: Renamed parameter [not-hex] to [head-not-hex]; its mapped comparisons remain.
+tests/test_cli.py	'not-mergeable'	#182: tests/test_land_preflight.py: Renamed parameter [not-mergeable] to [not-mergeable-dirty]; its mapped comparisons remain.
+tests/test_cli.py	'omitted-role'	#182: tests/test_land_preflight.py: Renamed parameter [omitted-role] to [override-omitted-role / rerun-override-omitted-role]; its mapped comparisons remain.
+tests/test_cli.py	'shorter-than-7'	#182: tests/test_land_preflight.py: Renamed parameter [shorter-than-7] to [head-shorter-than-7]; its mapped comparisons remain.
+tests/test_cli.py	'unadopted-blocked-without-verdict-is-unchanged'	#182: tests/test_land_preflight.py: Renamed parameter [unadopted-blocked-without-verdict-is-unchanged] to [unadopted-blocked-without-verdict]; its mapped comparisons remain.
+tests/test_cli.py	'wrong-role'	#182: tests/test_land_preflight.py: Renamed parameter [wrong-role] to [override-wrong-role / rerun-override-wrong-role]; its mapped comparisons remain.
+tests/test_cli.py	'zero'	#182: tests/test_land_preflight.py: Renamed parameter [zero] to [number-zero]; its mapped comparisons remain.
