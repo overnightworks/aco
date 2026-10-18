@@ -353,7 +353,10 @@ def _add_land_parser(commands: _Subcommands, name: str) -> None:
 
 
 def positive_int(text: str) -> int:
-    number = int(text)
+    try:
+        number = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {text!r}") from None
     if number < 1:
         raise argparse.ArgumentTypeError(f"{text} is not a positive number")
     return number

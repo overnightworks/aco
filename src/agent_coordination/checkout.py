@@ -839,7 +839,7 @@ def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | No
 
     One git read resolves the symbolic ref and proves its target exists; a
     plain, non-symbolic `HEAD` ref names itself and so no branch."""
-    head = f"refs/remotes/{remote}/HEAD"
+    head = remote_tracking_ref(remote, "HEAD")
     try:
         symbolic = git_output(
             ["rev-parse", "--verify", "--quiet", "--symbolic-full-name", head],

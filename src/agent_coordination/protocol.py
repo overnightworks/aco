@@ -1299,7 +1299,7 @@ def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
         )
     blocked_by = blocking_claims(tuple(state.claims.values()), intent)
     if intent.exclusive_branch:
-        blocked_by = branch_holders(state.claims, intent.branch) or blocked_by
+        blocked_by = branch_holders(state.claims, intent.branch)
     if blocked_by:
         raise ClaimConflictError(
             naming=partial(claimed_by_sentence, intent.identity, intent.branch, blocked_by[0])

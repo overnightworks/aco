@@ -195,6 +195,11 @@ def test_adopt_judges_the_pull_request_before_it_reads_any_claim_state(
             "aco adopt: error: argument pull_request: -1 is not a positive number",
             id="cell-20-negative",
         ),
+        pytest.param(
+            ["abc", "--no-item", "deps"],
+            "aco adopt: error: argument pull_request: invalid int value: 'abc'",
+            id="cell-26-text",
+        ),
     ],
 )
 def test_adopt_refuses_a_malformed_command_line_at_the_parser(
@@ -345,6 +350,50 @@ def test_adopt_refuses_before_it_builds_anything(
     sentence = refusal.format(pull_request_directory=world.pull_request_directory)
     assert (result.status, result.stdout, result.stderr) == (2, "", f"ERROR: {sentence}\n")
     assert world.effects() == before
+
+
+def test_adopt_refuses_a_moved_head_branch_before_fetching_it(
+    world: AdoptionWorld,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: ADOPT-10 -- a head branch that already moved is refused from the
+    remote's tip, so its commits are never fetched."""
+    _publish_branch_tip(world.clone, "moved")
+
+    def refuse_fetch(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
+        raise AssertionError("adopt fetched a head branch that had moved")
+
+    monkeypatch.setattr(checkout, "fetch_remote_branches", refuse_fetch)
+
+    result = adopt(capsys, kind="deps")
+
+    assert result.stderr == (
+        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again\n"
+    )
+
+
+def test_adopt_refuses_a_head_branch_that_moves_while_it_is_fetched(
+    world: AdoptionWorld,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: ADOPT-10 -- the fetched tip is the head the checks read."""
+    fetch = checkout.fetch_remote_branches
+
+    def fetch_after_the_branch_moves(
+        remote: str, branches: tuple[str, ...], *, directory: Path
+    ) -> None:
+        _publish_branch_tip(world.clone, "moved")
+        fetch(remote, branches, directory=directory)
+
+    monkeypatch.setattr(checkout, "fetch_remote_branches", fetch_after_the_branch_moves)
+
+    result = adopt(capsys, kind="deps")
+
+    assert result.stderr == (
+        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again\n"
+    )
 
 
 def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkout(
@@ -540,9 +589,10 @@ def test_adopt_and_its_dry_run_claim_name_the_same_holder_of_a_twice_held_branch
         agent="Ada", base=world.head, branch=ADOPTED_BRANCH, scope=["uv.lock"]
     )
     request = cmd_claim.claim_request(arguments, adopted=True)
+    context = run_context_over(world.forge)
 
     with pytest.raises(protocol.ClaimConflictError) as refused:
-        cmd_claim.checked_claim(request, run_context_over(world.forge), revision=world.head)
+        cmd_claim.checked_claim(request, context, revision=world.head)
     result = adopt(capsys, kind="deps")
 
     holder = f"claimed by Carol (builder) on lane '{ADOPTED_BRANCH}' branch {ADOPTED_BRANCH}"
