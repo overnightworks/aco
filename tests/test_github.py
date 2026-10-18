@@ -2667,8 +2667,53 @@ def test_bounded_command_stops_a_child_that_hangs_after_closing_output(
             ],
             purpose="hang probe",
         )
-    assert str(excinfo.value) == "hang probe did not exit after closing its output"
+    assert str(excinfo.value) == "hang probe did not exit"
     assert recorded["process"].poll() is not None
+
+
+def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The same sentence holds when the child is still running while its output is open."""
+    real_popen = subprocess.Popen
+    started: list[subprocess.Popen[bytes]] = []
+
+    class UnstoppableProcess:
+        def __init__(self, child: subprocess.Popen[bytes]) -> None:
+            self._child = child
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(self._child, name)
+
+        def poll(self) -> None:
+            return None
+
+        def wait(self, timeout: float | None = None) -> int:
+            raise subprocess.TimeoutExpired(cmd="hang probe", timeout=timeout or 0)
+
+    def start(
+        command: list[str],
+        *,
+        stdin: int | None = None,
+        stdout: int | None = None,
+        stderr: int | None = None,
+        env: dict[str, str] | None = None,
+    ) -> UnstoppableProcess:
+        started.append(real_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env))
+        return UnstoppableProcess(started[-1])
+
+    monkeypatch.setattr(subprocess, "Popen", start)
+    monkeypatch.setattr(github, "GH_TIMEOUT_SECONDS", 0.05)
+    try:
+        with pytest.raises(ClaimError) as excinfo:
+            github._bounded_command(
+                [sys.executable, "-c", "import time; time.sleep(30)"], purpose="hang probe"
+            )
+    finally:
+        for child in started:
+            child.kill()
+            child.wait()
+    assert str(excinfo.value) == "hang probe did not exit"
 
 
 def test_bounded_command_uses_combined_output_as_nonzero_exit_message() -> None:
@@ -2786,7 +2831,7 @@ def test_bounded_command_rejects_non_utf8_output() -> None:
         pytest.param(
             process.ProcessDidNotExitError(),
             forge.ForgeTransientError,
-            "GitHub issue coordination did not exit after closing its output",
+            "GitHub issue coordination did not exit",
             id="did-not-exit",
         ),
         pytest.param(

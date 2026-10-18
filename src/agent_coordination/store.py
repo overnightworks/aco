@@ -266,7 +266,7 @@ class PushTransport(Protocol):
 _PUSH_STOP_CAUSES: dict[type[process.ProcessError], str] = {
     process.ProcessTimedOutError: "timed out",
     process.ProcessOutputTooLargeError: "exceeded its output limit",
-    process.ProcessDidNotExitError: "did not exit after being stopped",
+    process.ProcessDidNotExitError: "did not exit",
 }
 
 

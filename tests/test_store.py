@@ -1355,7 +1355,7 @@ _PUSH_FAILURES_AFTER_THE_START = [
     pytest.param(_the_push_outlives_its_time_limit, "timed out", id="timed-out"),
     pytest.param(
         _the_push_cannot_be_stopped,
-        "did not exit after being stopped",
+        "did not exit",
         id="cannot-be-stopped",
     ),
 ]
