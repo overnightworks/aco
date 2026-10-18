@@ -775,6 +775,39 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             id="sed-line-length-flag-consumes-a-double-dash-as-its-value",
         ),
         pytest.param(
+            'options=v; cp -"$options" src/a docs/file',
+            ((hook_input.PATTERN_COPY, "docs/file"),),
+            id="cp-variable-letters-in-an-option-word-create-no-target-flag",
+        ),
+        pytest.param(
+            'flags=W; git restore -"$flags" docs/file',
+            ((hook_input.PATTERN_GIT_RESTORE, "docs/file"),),
+            id="git-restore-variable-letters-in-an-option-word-consume-no-source-value",
+        ),
+        pytest.param(
+            'flags=n; sed -i -"$flags" p src/file',
+            ((hook_input.PATTERN_SED_IN_PLACE, "src/file"),),
+            id="sed-variable-letters-in-an-option-word-create-no-script-file-flag",
+        ),
+        pytest.param(
+            'cp -t"$directory" src/a',
+            (),
+            id="cp-literal-target-flag-with-an-expandable-value-keeps-the-source-unjudged",
+        ),
+        pytest.param(
+            'sed -i --file"$suffix" p src/file',
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "p"),
+                (hook_input.PATTERN_SED_IN_PLACE, "src/file"),
+            ),
+            id="sed-literal-long-name-with-an-expandable-tail-keeps-the-script-file-flag",
+        ),
+        pytest.param(
+            'cp --target-directory"$suffix" src/a',
+            (),
+            id="cp-literal-long-target-with-an-expandable-tail-keeps-the-source-unjudged",
+        ),
+        pytest.param(
             "sed -ni 's/a/b/' /repo/f",
             ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
             id="sed-in-place-flag-inside-a-short-cluster-edits-in-place",

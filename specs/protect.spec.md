@@ -200,7 +200,10 @@ own coreutils do: every operand after it is a path regardless of a leading
 `-` (`rm -- -f` judges `-f`). An option after an operand is judged both as
 an option and as an operand of `cp` and `sed`, because `POSIXLY_CORRECT` makes
 coreutils read it as an operand (`cp src/a src/b --suffix docs` judges `src/b`
-and `docs`). A quoted or backslash-escaped occurrence of a
+and `docs`). An option word is read only up to its first shell expansion: a
+variable name in it (`cp -"$options" src/a docs/file`) creates no option and
+consumes no following word, while a literal option with an expandable value
+(`cp -t"$dir" src/a`) keeps its unknown value. A quoted or backslash-escaped occurrence of a
 character that would otherwise be an operator (`echo '>' > f`) is data,
 never the operator it merely reads like -- but a quoted or backslash-escaped
 *command name* (`'rm' f`, `r\m f`) still executes exactly as Bash runs it

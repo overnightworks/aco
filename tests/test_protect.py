@@ -947,6 +947,16 @@ def _bash_scope_case(
         ),
         ("cp src/a src/b --suffix docs", 2, "cp docs outside claim scope"),
         (
+            'options=v; cp -"$options" src/a docs/file',
+            2,
+            "cp docs/file outside claim scope",
+        ),
+        (
+            'flags=W; git restore -"$flags" docs/file',
+            2,
+            "git restore docs/file outside claim scope",
+        ),
+        (
             "git restore --end-of-options -Ws docs/file",
             2,
             "git restore -Ws outside claim scope",

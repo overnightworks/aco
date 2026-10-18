@@ -228,12 +228,20 @@ class _Word(NamedTuple):
     resolve without executing the command (issue #380 delta, decision 3).
     `position` is the index of the argument a word was read from, set only by
     `_parse_arguments`; it orders the words of several readings of one
-    command, and is `0` everywhere else."""
+    command, and is `0` everywhere else. `expansion_start` is the index in
+    `text` of the first expanding character, `None` when nothing expands:
+    `text` before it is what the shell runs as written, so `literal_text` is
+    all a caller may read as option letters or a long option's name."""
 
     text: str
     is_operator: bool
     is_expandable: bool
     position: int = 0
+    expansion_start: int | None = None
+
+    @property
+    def literal_text(self) -> str:
+        return self.text if self.expansion_start is None else self.text[: self.expansion_start]
 
 
 class _UnbalancedQuotingError(Exception):
@@ -409,6 +417,7 @@ class _CommandScanner:
     def _read_word(self) -> _Word:
         characters: list[str] = []
         expandable = False
+        expansion_start: int | None = None
         quote: str | None = None
         while self._position < self._length:
             if quote is None and self._skip_line_continuation():
@@ -418,15 +427,22 @@ class _CommandScanner:
                 ended = self._read_unquoted_word_character(character, characters)
                 if ended is None:
                     break
-                expandable = expandable or ended
+                became_expandable = ended
                 if character in (_SINGLE_QUOTE, _DOUBLE_QUOTE):
                     quote = character
-                continue
-            quote, became_expandable = self._read_quoted_character(character, quote, characters)
-            expandable = expandable or became_expandable
+            else:
+                quote, became_expandable = self._read_quoted_character(character, quote, characters)
+            if became_expandable and not expandable:
+                expandable = True
+                expansion_start = len(characters) - 1
         if quote is not None:
             raise _UnbalancedQuotingError
-        return _Word("".join(characters), is_operator=False, is_expandable=expandable)
+        return _Word(
+            "".join(characters),
+            is_operator=False,
+            is_expandable=expandable,
+            expansion_start=expansion_start,
+        )
 
     def _read_quoted_character(
         self, character: str, quote: str, characters: list[str]
@@ -746,10 +762,12 @@ def _parse_short_cluster(
     """The options of one `-abc` cluster and how many following words it
     consumed. As in GNU `getopt`, an option that takes a value consumes the
     rest of its cluster, or the next word when that rest is empty -- even a
-    literal `--`; an optional value (`sed -i.bak`) is only ever attached."""
+    literal `--`; an optional value (`sed -i.bak`) is only ever attached.
+    Only the literal letters are options: from the first expansion on, the
+    word creates none and consumes no following word, like an unknown flag."""
     options: list[_OptionValue] = []
     cluster = word.text[len(_FLAG_PREFIX) :]
-    for position, letter in enumerate(cluster):
+    for position, letter in enumerate(word.literal_text[len(_FLAG_PREFIX) :]):
         name = _FLAG_PREFIX + letter
         rest = cluster[position + 1 :]
         if name in table.optional_value_options:
@@ -784,12 +802,17 @@ def _parse_long_option(
 ) -> tuple[_OptionValue, int]:
     """One `--name[=value]` option and how many following words it consumed:
     a required value is the `=value` or else the next word, an optional one
-    only the `=value`. The name is resolved through its unique abbreviation."""
-    written_name, separator, attached = word.text.partition(_LONG_OPTION_VALUE_SEPARATOR)
+    only the `=value`. The name is resolved through its unique abbreviation,
+    and only from its literal part: an expansion that follows it may be the
+    rest of the value, so it is read as an attached one that never consumes
+    the next word."""
+    written_name, separator, _ = word.literal_text.partition(_LONG_OPTION_VALUE_SEPARATOR)
+    has_attached_value = bool(separator) or word.is_expandable
+    attached = word.text[len(written_name) + len(separator) :]
     name = _resolve_long_option(
         written_name, {*table.value_options, *table.optional_value_options, *table.flag_options}
     )
-    if separator:
+    if has_attached_value:
         takes_value = name in table.value_options | table.optional_value_options
         return _OptionValue(name, _attached_value(word, attached) if takes_value else None), 0
     if name in table.value_options:
