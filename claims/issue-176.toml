@@ -1,0 +1,8 @@
+claim_id = "958958b24f3d4226bf682981c6dd3f98"
+agent = "claude"
+role = "builder"
+base = "5966afd350e7229ae04164ac58a49adb5c1895fc"
+branch = "claude/issue-176-f2b-rule-zieht-nach-tests-test-rule-py"
+scope = ["scripts/test_inventory_dropped.txt", "tests/test_board.py", "tests/test_cli.py", "tests/test_rule.py"]
+opened_commit = "5c2b5e81862928b7850b29a41b26e503334e706c"
+whole_reason = "Die Familie rule verlässt test_cli.py in einem Schritt: ihre Zeilen stehen einmal in test_rule.py, test_cli.py behält nur RULE_ITEM und _client_with_item für die querschneidenden Nutzer, und das Ledger und der Docstring in test_board.py benennen den neuen Owner."
