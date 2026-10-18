@@ -352,13 +352,8 @@ def test_adopt_refuses_before_it_builds_anything(
     assert world.effects() == before
 
 
-def test_adopt_refuses_a_moved_head_branch_before_fetching_it(
-    world: AdoptionWorld,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Spec: ADOPT-10 -- a head branch that already moved is refused from the
-    remote's tip, so its commits are never fetched."""
+def _refuse_any_fetch(world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The head branch has already moved; adopt must not fetch it."""
     _publish_branch_tip(world.clone, "moved")
 
     def refuse_fetch(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
@@ -366,19 +361,11 @@ def test_adopt_refuses_a_moved_head_branch_before_fetching_it(
 
     monkeypatch.setattr(checkout, "fetch_remote_branches", refuse_fetch)
 
-    result = adopt(capsys, kind="deps")
 
-    assert result.stderr == (
-        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again\n"
-    )
-
-
-def test_adopt_refuses_a_head_branch_that_moves_while_it_is_fetched(
-    world: AdoptionWorld,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+def _move_the_branch_during_the_fetch(
+    world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: ADOPT-10 -- the fetched tip is the head the checks read."""
+    """The head branch moves after adopt compared its tip, as the fetch starts."""
     fetch = checkout.fetch_remote_branches
 
     def fetch_after_the_branch_moves(
@@ -388,6 +375,24 @@ def test_adopt_refuses_a_head_branch_that_moves_while_it_is_fetched(
         fetch(remote, branches, directory=directory)
 
     monkeypatch.setattr(checkout, "fetch_remote_branches", fetch_after_the_branch_moves)
+
+
+@pytest.mark.parametrize(
+    "arrange",
+    [
+        pytest.param(_refuse_any_fetch, id="moved-before-the-fetch"),
+        pytest.param(_move_the_branch_during_the_fetch, id="moved-during-the-fetch"),
+    ],
+)
+def test_adopt_refuses_a_head_branch_that_moved_around_its_fetch(
+    world: AdoptionWorld,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    arrange: Callable[[AdoptionWorld, pytest.MonkeyPatch], None],
+) -> None:
+    """Spec: ADOPT-10 -- a head branch already moved is refused from the remote's tip
+    without a fetch, and one that moves during the fetch is refused from the fetched tip."""
+    arrange(world, monkeypatch)
 
     result = adopt(capsys, kind="deps")
 
