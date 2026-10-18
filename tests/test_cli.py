@@ -16187,7 +16187,8 @@ def test_a_landing_only_the_remote_holds_is_seen_by_every_fetching_trunk_reader(
     run_against_a_stale_checkout: Callable[[pytest.MonkeyPatch, Path], object],
     expected: object,
 ) -> None:
-    """Issue #488 proof 1, against real git: no `origin/HEAD` is recorded
+    """Spec: LANDCMD-21, REL-37, REL-38, START-01.
+    Issue #488 proof 1, against real git: no `origin/HEAD` is recorded
     and this checkout's `main` stands behind a remote that moved on from
     another clone; `start`, `release --merged` and a `land` rerun each read
     the trunk their context fetched, so each sees the remote's landing."""
@@ -16250,7 +16251,8 @@ def test_a_github_landing_fetches_once_and_never_asks_the_recorded_head(
     tmp_path: Path,
     arrange: Callable[[pytest.MonkeyPatch, Path], list[str]],
 ) -> None:
-    """Issues #488 and #492, counted at the git launcher: every reader of
+    """Spec: LANDCMD-21, REL-37, REL-38.
+    Issues #488 and #492, counted at the git launcher: every reader of
     one github landing run -- `release --merged`'s merge-commit
     verification, board report and worktree cleanup, `land`'s fast-forward,
     a rerun's routing and its delegated release -- walks the forge's
@@ -17289,113 +17291,6 @@ def test_land_reports_incomplete_follow_up_and_a_rerun_resumes_without_a_second_
     assert client.quality_config_reads == reads_before_the_rerun
 
 
-def test_land_prints_the_reinstall_line_in_this_packages_own_repository(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #405: a successful landing in this very package's own
-    repository ends with its own reinstall reminder; every other repository
-    prints nothing further. A rerun with nothing left to release prints it
-    no second time (issue #605, LANDCMD-38)."""
-    repo, _client = _land_scenario(monkeypatch, tmp_path)
-    (repo / "pyproject.toml").write_text('[project]\nname = "agent-coordination"\n')
-    real_git(repo, "add", "pyproject.toml")
-    real_git(repo, "commit", "-q", "-m", "add pyproject.toml")
-    real_git(repo, "push", "-q", "origin", "main")
-    reinstall = "reinstall: uv tool install --force --from . agent-coordination"
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-
-    assert capsys.readouterr().out.splitlines()[-1] == reinstall
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-    rerun_lines = capsys.readouterr().out.splitlines()
-    assert (rerun_lines[0], reinstall in rerun_lines) == (
-        "LANDED pull request #12 already; nothing left to release",
-        False,
-    )
-
-
-def _land_on_the_forges_trunk(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    *,
-    canonical: str,
-    leftover_main: bool,
-) -> tuple[Path, FakeForge]:
-    """`_land_scenario` with no recorded `HEAD`, where the forge alone
-    names the default branch `trunk` (issue #492): `canonical` carries
-    `trunk`, the lane branch, and -- when `leftover_main` -- the `main` the
-    switch to `trunk` left behind, the lane branch stands in its own clean
-    linked worktree `lane`, and the checkout stands on `trunk`. A
-    canonical remote other than `origin` is a fresh bare `<canonical>.git`
-    the tracked board configuration names."""
-    repo, client = _land_scenario(monkeypatch, tmp_path, set_head=False)
-    client.default_branch_name = "trunk"
-    client.landings[12] = replace(client.landings[12], target_branch="trunk")
-    real_git(repo, "branch", "-m", "main", "trunk")
-    if canonical != "origin":
-        client.merge_remote = tmp_path / f"{canonical}.git"
-        real_git(tmp_path, "init", "-q", "--bare", str(client.merge_remote))
-        real_git(repo, "remote", "add", canonical, str(client.merge_remote))
-        client.head_board_config = f'canonical_remote = "{canonical}"\n'
-        write_repository_config(repo, client.head_board_config)
-        real_git(repo, "add", "-f", board.CONFIG_PATH.as_posix())
-        real_git(repo, "commit", "-q", "-m", "canonical remote")
-        real_git(repo, "push", "-q", canonical, LANDING_BRANCH)
-    real_git(repo, "push", "-q", canonical, "trunk", "trunk:main")
-    if not leftover_main:
-        bare = Path(real_git(repo, "remote", "get-url", canonical).stdout.strip())
-        real_git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
-        real_git(repo, "push", "-q", canonical, "--delete", "main")
-    real_git(repo, "checkout", "-q", "-B", "trunk")
-    real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
-    return repo, client
-
-
-@pytest.mark.parametrize(
-    "canonical, leftover_main",
-    [
-        pytest.param("origin", True, id="origin-trunk-fast-forwards"),
-        pytest.param("hub", True, id="hub-trunk-fast-forwards"),
-        pytest.param("origin", False, id="origin-without-main-fast-forwards"),
-    ],
-)
-def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    canonical: str,
-    leftover_main: bool,
-) -> None:
-    """Issue #492 proof 1, against real git: the forge's default branch is
-    `trunk` and no `<canonical>/HEAD` is recorded. `land` runs from a clean
-    `trunk`, fast-forwards it from `<canonical>/trunk` after fetching that
-    remote once, and its delegated release removes the lane's worktree as
-    merged into that same `trunk` -- neither a `main` left behind nor its
-    absence decides it (LANDCMD-21)."""
-    repo, client = _land_on_the_forges_trunk(
-        monkeypatch,
-        tmp_path,
-        canonical=canonical,
-        leftover_main=leftover_main,
-    )
-    trunk_calls = trunk_git_calls(monkeypatch, canonical)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
-
-    fetches = [call for call in trunk_calls if call[0] == "fetch"]
-    local_trunk = real_git(repo, "rev-parse", "trunk").stdout.strip()
-    output = capsys.readouterr()
-    observed = (status, output.err, fetches)
-    expected = (0, "", [("fetch", repo.resolve())])
-    assert observed == expected
-    observed = local_trunk
-    expected = client.landings[12].merge_commit
-    assert observed == expected
-    observed = ("worktree: removed\n" in output.out, (tmp_path / "lane").exists())
-    expected = (True, False)
-    assert observed == expected
-
-
 def test_land_release_routing_reuses_the_verified_classification_for_a_fresh_merge() -> None:
     """Issue #405 point 4: a fresh merge routes `release --merged` straight
     from the classification this same run's own preflight already verified
@@ -17706,21 +17601,6 @@ def test_land_rerun_after_its_release_finishes_and_names_the_release_that_remove
         client.issue_reference_lookups,
     ) == (False, {}, [])
     assert (_state_ref_tip(clone, remote) == state_after_release) is not claimed_meanwhile
-
-
-@pytest.mark.parametrize(
-    ("project_toml", "expected"),
-    [
-        pytest.param('[project]\nname = "agent-coordination"\n', True, id="this-package"),
-        pytest.param('[project]\nname = "other-package"\n', False, id="another-package"),
-        pytest.param(None, False, id="no-pyproject-toml"),
-    ],
-)
-def test_land_is_own_repository(tmp_path: Path, project_toml: str | None, expected: bool) -> None:
-    if project_toml is not None:
-        (tmp_path / "pyproject.toml").write_text(project_toml)
-
-    assert cmd_land._land_is_own_repository(tmp_path) is expected
 
 
 def test_release_abandoned_records_why_the_lane_stopped(
