@@ -54,11 +54,14 @@ WAITING_ON_OPERATOR = "waiting on operator"
 RULING_OLD_AFTER_LANDINGS = 10
 STALE_IDLE_DAYS = 7
 # The number is bounded so `int()` of a match can never meet Python's digit
-# limit: a longer one is no reference, whichever pattern reads it. The
-# lookahead keeps an in-bound prefix of a longer number from matching.
+# limit: a longer one is no reference, whether a pattern below or
+# `parse_item_reference` reads it. The lookahead keeps an in-bound prefix of a longer number from matching.
 MAXIMUM_ISSUE_NUMBER_DIGITS = 18
 ISSUE_NUMBER = rf"[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}}(?!\d)"
 REFERENCE_PATTERN = re.compile(rf"(?<!\w)#({ISSUE_NUMBER})", re.ASCII)
+# What `parse_item_reference` accepts as a number: the same bound, but a bare
+# `0` and leading zeros stay readable, as they were before the bound.
+ITEM_NUMBER_PATTERN = re.compile(rf"\d{{1,{MAXIMUM_ISSUE_NUMBER_DIGITS}}}", re.ASCII)
 # One issue named the way GitHub names it across repositories: `OWNER/REPO#n`,
 # or `#n` for the repository the text itself lives in. Every typed line below
 # embeds this one grammar, so a shorthand and its qualified spelling always
@@ -276,7 +279,7 @@ def parse_item_reference(value: str) -> int:
     if protocol.ITEM_ID_PATTERN.fullmatch(value) is not None:
         return items.item_number(value)
     digits = value.removeprefix("#")
-    if digits.isdigit():
+    if ITEM_NUMBER_PATTERN.fullmatch(digits) is not None:
         return int(digits)
     raise protocol.ClaimUnavailableError(
         f"{value!r} is not an item reference; use aco-xxxxxx, #n, or the bare number n"

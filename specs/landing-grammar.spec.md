@@ -122,7 +122,7 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-75] A file listing is read between two reads of the pull request's head and changed-file count; it is judged only when both reads name the expected head and the same count.
 - [ ] [LAND-76] A listing failing LAND-75 refuses `changed while aco listed its files; run the command again`, exit `2`; `check` expects the head it read, `land` the readiness head `--head` verified.
 - [ ] [LAND-77] LAND-71 names escape display controls, then truncate to 40 characters with `…`; `land` also bounds the whole refusal to 200 characters including `ERROR: `, on one line.
-- [ ] [LAND-78] `n` in a `#n` pattern has at most 18 digits; a longer number is no reference and no slice-title number, and is never truncated.
+- [ ] [LAND-78] `n` in a `#n` pattern, a slice-title number, and a trunk `Work-Item:` trailer value has at most 18 ASCII digits; a longer or non-ASCII number is no reference and no slice-title number, never truncated, and a trailer carrying one is a classification defect that lands nothing.
 
 Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77.
 - [ ] [LAND-18] A `Work-Item:` body with no closing reference for that item refuses `carries no closing reference for its work item <item>`, exit `2`.
