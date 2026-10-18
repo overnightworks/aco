@@ -4308,3 +4308,14 @@ def test_classification_line_state_tells_the_line_a_rerun_may_keep(
     state = board.classification_line_state(pull_request_body, board.NoItemKind.DEPS, REPOSITORY)
 
     assert state == expected_state()
+
+
+def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications() -> None:
+    """Issue #405: a trunk trailer is always local (`Work-Item: #<n>`,
+    never the pull request body's qualified `owner/repo#n` form); a
+    `No-Item:` classification renders unchanged either way."""
+    work_item = board.WorkItemClassification(board.IssueReference(REPOSITORY, 72))
+    no_item = board.NoItemClassification(board.NoItemKind.DOCS)
+
+    assert board.land_trunk_trailer(work_item) == "Work-Item: #72"
+    assert board.land_trunk_trailer(no_item) == "No-Item: docs"

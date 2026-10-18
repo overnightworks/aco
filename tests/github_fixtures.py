@@ -137,6 +137,8 @@ class FakeForge:
     capability_overrides: dict[forge.ForgeOperation, forge.Capability] = field(default_factory=dict)
     readiness_by_number: dict[int, forge.LandingReadiness] = field(default_factory=dict)
     merge_calls: list[tuple[int, str, board.MergeMethod, str, str]] = field(default_factory=list)
+    merge_requests: list[tuple[str, board.MergeMethod]] = field(default_factory=list)
+    merge_error: forge.ForgeError | None = None
     merge_sha: str = MERGE_COMMIT_SHA
     merge_remote: Path | None = None
     closes_on_merge: bool = False
@@ -296,6 +298,9 @@ class FakeForge:
         merged pull request keeps `head_sha` as its recorded head, as
         GitHub does (issue #590)."""
         self._run()
+        self.merge_requests.append((head_sha, method))
+        if self.merge_error is not None:
+            raise self.merge_error
         self.merge_calls.append((number, head_sha, method, title, body))
         sha = self.merge_sha
         landing = self.landings[number]
@@ -485,6 +490,30 @@ class LandingWorld:
     remote: Path
     forge: FakeForge
     unchanged: dict[str, object]
+
+
+def landing_world(
+    clone: Path, remote: Path, forge: FakeForge, *, remote_tip: str | None = None
+) -> LandingWorld:
+    """Snapshot the fully arranged checkout before invoking land."""
+    worktrees, branches = worktrees_and_branches(clone)
+    unchanged = {
+        "merge": [],
+        "delete": [],
+        "close": set(forge.closed_issues),
+        "body": [],
+        "remote": remote_tip,
+        "local": None,
+        "worktrees": worktrees,
+        "branches": branches,
+        "trunk": real_git(clone, "rev-parse", "main").stdout,
+        "stamp": None,
+        "anchor": None,
+    }
+    world = LandingWorld(clone, remote, forge, unchanged)
+    observed = landing_effects(world)
+    assert observed == unchanged
+    return world
 
 
 def landing_effects(world: LandingWorld) -> dict[str, object]:

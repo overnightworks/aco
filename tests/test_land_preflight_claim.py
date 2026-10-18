@@ -15,7 +15,6 @@ from cli_fixtures import (
     track_board_config,
     trunk_git_calls,
     without_git_identity,
-    worktrees_and_branches,
 )
 from github_fixtures import (
     LANDING_BRANCH,
@@ -24,9 +23,9 @@ from github_fixtures import (
     LandingWorld,
     RefusalLength,
     assert_github_world,
-    landing_effects,
     landing_pull_request,
     landing_readiness,
+    landing_world,
     refusal_observations,
     serve_forge,
 )
@@ -177,20 +176,8 @@ def world(
             default_branch_name=case.default_branch,
         ),
     )
-    worktrees, branches = worktrees_and_branches(github_clone)
-    unchanged = {
-        "merge": [],
-        "delete": [],
-        "close": set(case.closed_items),
-        "body": [],
-        "remote": seeded.tip,
-        "local": None,
-        "worktrees": worktrees,
-        "branches": branches,
-        "trunk": real_git(github_clone, "rev-parse", "main").stdout,
-        "stamp": None,
-        "anchor": None,
-    }
+    shared = landing_world(github_clone, bare_remote, client, remote_tip=seeded.tip)
+    unchanged = shared.unchanged
     checkout_before = (
         real_git(github_clone, "status", "--porcelain").stdout,
         real_git(github_clone, "branch", "--show-current").stdout,
@@ -210,8 +197,6 @@ def world(
         if case.default_branch == "trunk"
         else None,
     )
-    observed = landing_effects(result)
-    assert observed == unchanged
     return result
 
 

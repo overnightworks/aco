@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
-from cli_fixtures import CliRun, real_git, run_cli, track_board_config, worktrees_and_branches
+from cli_fixtures import CliRun, run_cli, track_board_config
 from github_fixtures import (
     MERGE_COMMIT_SHA,
     FakeForge,
@@ -14,9 +14,9 @@ from github_fixtures import (
     ParserExit,
     RefusalLength,
     assert_github_world,
-    landing_effects,
     landing_pull_request,
     landing_readiness,
+    landing_world,
     refusal_observations,
     serve_forge,
 )
@@ -75,23 +75,9 @@ def world(
             quality_config_error=case.quality_config_error,
         ),
     )
-    worktrees, branches = worktrees_and_branches(github_clone)
-    unchanged = {
-        "merge": [],
-        "delete": [],
-        "close": set(),
-        "body": [],
-        "remote": None,
-        "local": None,
-        "worktrees": worktrees,
-        "branches": branches,
-        "trunk": real_git(github_clone, "rev-parse", "main").stdout,
-        "stamp": None,
-        "anchor": None,
-    }
+    shared = landing_world(github_clone, bare_remote, client)
+    unchanged = shared.unchanged
     result = LandingScenario(github_clone, bare_remote, client, unchanged, case)
-    observed = landing_effects(result)
-    assert observed == unchanged
     return result
 
 

@@ -341,6 +341,18 @@ def push_repository_trunk(repo: Path, remote_name: str) -> None:
     real_git(repo, "remote", "set-head", remote_name, "main")
 
 
+def push_lane_branch(clone: Path, branch: str) -> str:
+    """Publish a nonempty lane commit and return to the trunk checkout."""
+    real_git(clone, "checkout", "-q", "-b", branch)
+    (clone / "feature.txt").write_text("lane feature\n")
+    real_git(clone, "add", "feature.txt")
+    real_git(clone, "commit", "-q", "-m", "lane feature")
+    head = real_git(clone, "rev-parse", "HEAD").stdout.strip()
+    real_git(clone, "push", "-q", "origin", branch)
+    real_git(clone, "checkout", "-q", "main")
+    return head
+
+
 def dangle_recorded_head(repo: Path, remote_name: str) -> None:
     """`<remote_name>/HEAD` left naming `master` once the remote renamed
     that branch `main` and `<remote_name>/master` is gone from `repo`
