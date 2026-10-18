@@ -684,7 +684,7 @@ def test_parser_refusal(
     captured = capsys.readouterr()
     assert (
         raised.value.code,
-        captured.err.splitlines(keepends=True)[-1],
+        captured.err.splitlines(keepends=True)[-1:],
         captured.err[: len(usage)],
         captured.out,
-    ) == (code, sentence, usage, stdout)
+    ) == (code, [sentence], usage, stdout)
