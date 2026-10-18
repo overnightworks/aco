@@ -62,7 +62,7 @@ def stub_one_git_call(
 ) -> None:
     """Force exactly one `checkout._git_run` argv to a chosen failure exit,
     every other call reaching the real launcher -- shared by
-    `test_checkout.py` and `test_cli.py` (issue #322): a git-level failure
+    checkout and CLI test families (issue #322): a git-level failure
     (an unreachable remote, a colliding worktree path, an unmerged branch
     `git branch -d` itself refuses, ...) is cheaper to force this way than
     to reproduce with real git state."""
@@ -184,6 +184,14 @@ def real_git(
         check=check,
         capture_output=True,
         text=True,
+    )
+
+
+def local_branches(clone: Path) -> frozenset[str]:
+    return frozenset(
+        real_git(
+            clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
+        ).stdout.splitlines()
     )
 
 
@@ -353,6 +361,18 @@ def push_lane_branch(clone: Path, branch: str) -> str:
     real_git(clone, "push", "-q", "origin", branch)
     real_git(clone, "checkout", "-q", default_branch)
     return head
+
+
+def add_lane_worktree(clone: Path, lane: Path, branch: str) -> None:
+    """Add the lane checkout and verify its branch and upstream remote."""
+    real_git(clone, "worktree", "add", "-q", str(lane), branch)
+    real_git(clone, "branch", "--set-upstream-to", f"origin/{branch}", branch)
+    observed = (
+        real_git(lane, "branch", "--show-current").stdout,
+        real_git(clone, "config", f"branch.{branch}.remote").stdout,
+    )
+    expected = (branch + "\n", "origin\n")
+    assert observed == expected
 
 
 class MainBranchState(Enum):
