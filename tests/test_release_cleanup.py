@@ -265,6 +265,33 @@ RELEASE_COMMAND = ("release", "72", "--merged", "12")
     "case",
     [
         pytest.param(PAST_HEAD, id="land-with-the-lane-past-the-pinned-head"),
+        pytest.param(
+            CleanupCase(command=RELEASE_COMMAND, squashed_before_run=True),
+            id="release-rerun-on-the-recorded-head",
+        ),
+        pytest.param(
+            replace(PAST_HEAD, command=RELEASE_COMMAND, squashed_before_run=True),
+            id="release-rerun-past-the-recorded-head",
+        ),
+    ],
+)
+def test_a_squashed_lane_goes_only_on_its_recorded_head(
+    case: CleanupCase,
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Keep land's Accepted residual; reruns use the recorded squash head.
+
+    Spec: REL-43, E-REL-20, LANDCMD-18.
+    """
+    verify_cleanup(case, github_clone, bare_remote, monkeypatch, capsys)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
         pytest.param(CleanupCase(), id="clean"),
         pytest.param(
             replace(
@@ -370,28 +397,29 @@ RELEASE_COMMAND = ("release", "72", "--merged", "12")
             ),
             id="another-branch-value-not-utf-8",
         ),
-        pytest.param(
-            CleanupCase(command=RELEASE_COMMAND, squashed_before_run=True),
-            id="release-rerun-on-the-recorded-head",
-        ),
-        pytest.param(
-            replace(PAST_HEAD, command=RELEASE_COMMAND, squashed_before_run=True),
-            id="release-rerun-past-the-recorded-head",
-        ),
     ],
 )
-def test_squashed_lane_cleanup(
+def test_a_squashed_lane_branch_goes_by_compare_and_delete(
     case: CleanupCase,
     github_clone: Path,
     bare_remote: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The recorded squash head owns cleanup, including land's Accepted residual.
+    """Delete only the pinned branch and its own configuration section.
 
-    Spec: REL-34, REL-42, REL-43, REL-44, REL-45, REL-46,
-    E-REL-20, E-REL-21, E-REL-22, E-REL-23, LANDCMD-18.
+    Spec: REL-34, REL-42, REL-44, REL-45, REL-46, E-REL-21, E-REL-22, E-REL-23.
     """
+    verify_cleanup(case, github_clone, bare_remote, monkeypatch, capsys)
+
+
+def verify_cleanup(
+    case: CleanupCase,
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     world = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=allow_squash)
     head = world.landing.head
     lane = "codex/issue-72-claims"
