@@ -473,7 +473,8 @@ class TestLandAfterMergeRerun:
             pytest.param(
                 SeparateCase(
                     land_stdout="RELEASED issue #72: landing\nfreed: none\nnext: none\n"
-                    "worktree: kept -- no linked worktree on codex/issue-72-claims in this checkout; "
+                    "worktree: kept -- no linked worktree on codex/issue-72-claims "
+                    "in this checkout; "
                     "run aco release 72 --merged 12 --branch codex/issue-72-claims "
                     "in the checkout that holds it\n",
                     lane_exists=True,
