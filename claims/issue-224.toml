@@ -1,8 +1,0 @@
-claim_id = "9a45c12151b340dbb6aba7b54a3255d0"
-agent = "claude"
-role = "builder"
-base = "ab94d85957a186fd6faa3adde9b55d784a24ae08"
-branch = "claude/issue-224-metrics-dead-code"
-scope = ["scripts/vulture_whitelist.py", "src/agent_coordination/board.py", "src/agent_coordination/board_read.py", "src/agent_coordination/metrics.py", "src/agent_coordination/store.py", "tests/board_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_metrics.py", "tests/test_store.py"]
-opened_commit = "dc7982275bd63530a538c6d7411b8b9c33599036"
-whole_reason = "Die Löschung in metrics.py, die Kette landed_at und die Whitelist müssen zusammen landen: einzeln stünden Felder ohne Leser oder Whitelist-Einträge ohne Grund da, und vulture schlüge fehl."
