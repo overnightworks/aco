@@ -3521,6 +3521,50 @@ def test_an_issue_number_past_the_int_digit_limit_is_no_issue_number() -> None:
     ) == board.OtherClassificationLine(line)
 
 
+@pytest.mark.parametrize(
+    ("digits", "is_reference"),
+    [
+        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS, True, id="at-the-bound"),
+        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS + 1, False, id="one-past-the-bound"),
+        pytest.param(4301, False, id="past-the-int-digit-limit"),
+    ],
+)
+def test_a_number_past_the_digit_bound_is_no_slice_title_number_on_either_side(
+    digits: int, is_reference: bool
+) -> None:
+    number = "7" * digits
+    parent_side = (4, int(number)) if is_reference else None
+    slice_side = (int(number), 5) if is_reference else None
+
+    assert board.slice_title_match(f"Title (#{number} Scheibe 4)") == parent_side
+    assert board.slice_title_match(f"Scheibe 4 von #{number}") == parent_side
+    assert board.slice_title_match(f"Title (#5 Scheibe {number})") == slice_side
+    assert board.slice_title_match(f"Scheibe {number} von #5") == slice_side
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param("#" + "7" * (board.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="one-past-the-bound"),
+        pytest.param("#" + "7" * 4301, id="past-the-int-digit-limit"),
+        pytest.param("#²", id="superscript-digit"),
+        pytest.param("#٣", id="non-ascii-digit"),
+    ],
+)
+def test_a_trunk_trailer_number_past_the_digit_bound_is_a_classification_defect(
+    value: str,
+) -> None:
+    assert isinstance(board.trunk_commit_classification((value,), ()), board.ClassificationDefect)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["#" + "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS, "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS],
+)
+def test_parse_item_reference_accepts_a_number_at_the_digit_bound(value: str) -> None:
+    assert board.parse_item_reference(value) == int("7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS)
+
+
 def test_body_defect_text_is_the_shared_renderer() -> None:
     defect = ContractDefect("now", "missing")
     assert body_defect_text(defect) == "body malformed: now: missing"
