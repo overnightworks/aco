@@ -2,3 +2,4 @@
 # by hand only when a finding is deliberately accepted (issue #385). Empty today:
 # the calibration pass over all 23 specs/*.spec.md files needed none. A line missing
 # its " — reason" tail fails the run as its own malformed_exemption finding.
+ref-store-cas.spec.md:93:criterion_length — CAS-65 is the operator-ruled wording of issue #195, adopted verbatim; splitting it would put its one decision (a present ref ends bootstrap) into several criteria.
