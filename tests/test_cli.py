@@ -15166,6 +15166,7 @@ def _released_last_child_client(
     sibling_open: bool,
     parent_closed: bool = False,
     parent_next: str = "keiner",
+    parent_slices: tuple[str, ...] = (),
 ) -> FakeForge:
     """`merged_release_client` plus a recorded parent relation (issue #348,
     Beweis 4): `WORK_ITEM_ISSUE` is `PARENT_OF_WORK_ITEM`'s only child when
@@ -15178,13 +15179,14 @@ def _released_last_child_client(
     parent that is not open must never be named closable, since a second
     close would only refuse. `parent_next` is the parent's own `Next` line:
     one still naming work is a container between two slices (issue #503,
-    the #418 shape), never closable either."""
+    the #418 shape), never closable either; so is one still holding an
+    uncut `[[slice]]` row (`parent_slices`, #214)."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client.parents[WORK_ITEM_ISSUE] = board.ParentIssue(
         board.IssueReference(REPOSITORY, PARENT_OF_WORK_ITEM),
-        complete_contract(parent_next),
+        complete_contract(parent_next, slice=slice_entries(*parent_slices)),
         body.ItemKind.CONTAINER,
     )
     children = [board.ChildItem(WORK_ITEM_ISSUE, board.ChildState.CLOSED)]
@@ -15197,13 +15199,28 @@ def _released_last_child_client(
 
 
 @pytest.mark.parametrize(
-    ("sibling_open", "parent_closed", "parent_next", "hint_expected"),
+    ("sibling_open", "parent_closed", "parent_next", "parent_slices", "hint_expected"),
     [
-        pytest.param(False, False, "keiner", True, id="last_open_child_names_the_parent"),
-        pytest.param(True, False, "keiner", False, id="a_sibling_still_open_omits_the_hint"),
-        pytest.param(False, True, "keiner", False, id="an_already_closed_parent_omits_the_hint"),
+        pytest.param(False, False, "keiner", (), True, id="last_open_child_names_the_parent"),
+        pytest.param(True, False, "keiner", (), False, id="a_sibling_still_open_omits_the_hint"),
         pytest.param(
-            False, False, "Cut slice 3.", False, id="a_parent_naming_further_work_omits_the_hint"
+            False, True, "keiner", (), False, id="an_already_closed_parent_omits_the_hint"
+        ),
+        pytest.param(
+            False,
+            False,
+            "Cut slice 3.",
+            (),
+            False,
+            id="a_parent_naming_further_work_omits_the_hint",
+        ),
+        pytest.param(
+            False,
+            False,
+            "keiner",
+            ("Scheibe 1",),
+            False,
+            id="a_parent_holding_an_uncut_row_omits_the_hint",
         ),
     ],
 )
@@ -15213,6 +15230,7 @@ def test_release_merged_names_the_parent_hint_only_for_the_last_open_child(
     sibling_open: bool,
     parent_closed: bool,
     parent_next: str,
+    parent_slices: tuple[str, ...],
     hint_expected: bool,
 ) -> None:
     """issue #348, Beweis 4: releasing a container's last open child names
@@ -15225,6 +15243,7 @@ def test_release_merged_names_the_parent_hint_only_for_the_last_open_child(
         sibling_open=sibling_open,
         parent_closed=parent_closed,
         parent_next=parent_next,
+        parent_slices=parent_slices,
     )
 
     exit_code = issue_claim.main(
@@ -18280,6 +18299,124 @@ def test_check_refuses_to_close_a_parent_that_keeps_other_children(
         f"REFUSED: pull request #12 closes {REPOSITORY}#{PARENT_ISSUE} besides its work "
         f"item {REPOSITORY}#{WORK_ITEM_ISSUE}; a pull request lands one item\n"
     )
+
+
+UNCUT_ROW_REFUSAL = (
+    f"REFUSED: pull request #12 closes parent {REPOSITORY}#{PARENT_ISSUE} although its body "
+    "still holds an uncut slice row; cut it or delete the row first\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("pull_request_body", "parent_body", "other_children", "expected_exit", "expected_error"),
+    [
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72\nCloses #79",
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            (),
+            2,
+            UNCUT_ROW_REFUSAL,
+            id="closing_the_parent_with_an_uncut_row_refuses_although_next_names_no_work",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72\nCloses #79",
+            complete_contract("keiner", slice=slice_entries("Scheibe\nzwei")),
+            (),
+            2,
+            UNCUT_ROW_REFUSAL,
+            id="closing_the_parent_with_an_unprintable_uncut_row_refuses",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72\nCloses #79",
+            complete_contract("Dispatch slice 4.", slice=slice_entries("Scheibe 1")),
+            (73,),
+            2,
+            UNCUT_ROW_REFUSAL,
+            id="the_uncut_row_refusal_takes_precedence_over_one_item_per_landing",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72\nCloses #79",
+            complete_contract("", slice=slice_entries("Scheibe 1")),
+            (73,),
+            2,
+            f"REFUSED: pull request #12 leaves parent {REPOSITORY}#{PARENT_ISSUE} open with 1 "
+            "other open child, whose body carries no Next line\n",
+            id="the_missing_next_line_refusal_takes_precedence_over_the_uncut_row_refusal",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #79",
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            (),
+            2,
+            f"REFUSED: pull request #12 carries no closing reference for its work item "
+            f"{REPOSITORY}#{WORK_ITEM_ISSUE}\n",
+            id="a_missing_closing_reference_for_the_item_still_refuses_first",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72",
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            (),
+            0,
+            "",
+            id="landing_the_last_child_without_closing_the_parent_passes_with_an_uncut_row",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72",
+            complete_contract("keiner"),
+            (),
+            2,
+            f"REFUSED: pull request #12 closes the last open child of parent "
+            f"{REPOSITORY}#{PARENT_ISSUE}; close the parent too\n",
+            id="deleting_the_row_turns_the_refusal_into_the_last_child_rule",
+        ),
+    ],
+)
+def test_check_treats_an_uncut_slice_row_as_work_left_in_the_parent(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    pull_request_body: str,
+    parent_body: str,
+    other_children: tuple[int, ...],
+    expected_exit: int,
+    expected_error: str,
+) -> None:
+    parented_check_client(
+        monkeypatch,
+        body=pull_request_body,
+        parent_body=parent_body,
+        open_children=(
+            board.IssueReference(REPOSITORY, WORK_ITEM_ISSUE),
+            *(board.IssueReference(REPOSITORY, number) for number in other_children),
+        ),
+    )
+
+    assert run_check() == expected_exit
+    assert capsys.readouterr().err == expected_error
+
+
+def test_check_json_reports_closing_a_parent_with_an_uncut_row_as_invalid_classification(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    parented_check_client(
+        monkeypatch,
+        body="Work-Item: #72\n\nCloses #72\nCloses #79",
+        parent_body=complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+        open_children=(board.IssueReference(REPOSITORY, WORK_ITEM_ISSUE),),
+    )
+
+    status = issue_claim.main(["--repo", REPOSITORY, "check", "12", "--json"])
+
+    assert status == 2
+    assert json.loads(capsys.readouterr().out) == {
+        "ok": False,
+        "reason": "invalid_classification",
+        "kind": "pull_request",
+        "number": 12,
+        "message": (
+            f"closes parent {REPOSITORY}#{PARENT_ISSUE} although its body still holds "
+            "an uncut slice row; cut it or delete the row first"
+        ),
+    }
 
 
 def test_check_refuses_a_parent_recorded_in_another_repository(

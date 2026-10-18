@@ -129,6 +129,7 @@ class _Projection:
     next_step: str
     done_when: str
     expectations: tuple[dict[str, object], ...] = ()
+    slices: tuple[dict[str, object], ...] = ()
 
     def block_data(self) -> dict[str, object]:
         data: dict[str, object] = {
@@ -139,6 +140,8 @@ class _Projection:
         }
         if self.expectations:
             data["expectation"] = list(self.expectations)
+        if self.slices:
+            data["slice"] = list(self.slices)
         return data
 
 
@@ -5113,6 +5116,35 @@ class TestCliStateRefForge:
             f"CLOSED {CLOSE_CHILD_ID}",
             "freed: none",
             f"parent {CLOSE_PARENT_ID}: no open children — close it",
+        ]
+
+    def test_item_close_omits_the_parent_hint_for_a_parent_holding_an_uncut_row(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+    ) -> None:
+        """Issue #214: an uncut `[[slice]]` row is work left in the parent,
+        even with `Next` naming none -- closing its last child names no
+        parent as closable."""
+        parent_with_uncut_row = _state_ref_body(
+            replace(_CLOSE_PARENT_PROJECTION, slices=({"index": 1, "title": "Scheibe 1"},)),
+            _record(title="Parent", state="open", kind="container"),
+        )
+        item_files = {
+            **_close_parent_scenario_item_files(),
+            f"{CLOSE_PARENT_ID}.md": parent_with_uncut_row.encode(),
+        }
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
+
+        status = issue_claim.main(["item", "close", str(CLOSE_CHILD_NUMBER)])
+
+        assert status == 0
+        assert capsys.readouterr().out.splitlines() == [
+            f"CLOSED {CLOSE_CHILD_ID}",
+            "freed: none",
         ]
 
     def test_item_close_omits_the_parent_hint_for_an_already_closed_parent(

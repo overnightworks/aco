@@ -2975,6 +2975,16 @@ def test_next_action_skips_a_malformed_childless_container() -> None:
 
 
 PARENT_ISSUE_REFERENCE = board.IssueReference(REPOSITORY, 79)
+STATE_REF_RECORD: dict[str, object] = {
+    "title": "Parent",
+    "state": "open",
+    "kind": "container",
+    "labels": [],
+    "blocked_by": [],
+    "parent": None,
+    "created_at": "2026-09-10T00:00:00Z",
+    "updated_at": "2026-09-15T00:00:00Z",
+}
 
 
 @pytest.mark.parametrize(
@@ -3035,6 +3045,83 @@ def test_closable_container_number_decides_by_kind_children_uncut_rows_next_line
     parent = board.ParentIssue(PARENT_ISSUE_REFERENCE, body, kind)
 
     assert board.closable_container_number(parent, children, Storage.GITHUB) == expected
+
+
+@pytest.mark.parametrize(
+    ("storage", "body", "expected"),
+    [
+        pytest.param(
+            Storage.GITHUB,
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            None,
+            id="github-with-an-uncut-row",
+        ),
+        pytest.param(Storage.GITHUB, complete_contract("keiner"), 79, id="github-without-a-row"),
+        pytest.param(
+            Storage.STATE_REF,
+            complete_contract("keiner", slice=slice_entries("Scheibe 1"), record=STATE_REF_RECORD),
+            None,
+            id="state-ref-with-an-uncut-row",
+        ),
+        pytest.param(
+            Storage.STATE_REF,
+            complete_contract("keiner", record=STATE_REF_RECORD),
+            79,
+            id="state-ref-without-a-row",
+        ),
+    ],
+)
+def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_every_storage(
+    storage: Storage, body: str, expected: int | None
+) -> None:
+    """Issue #214: with `Next` naming no work, only the uncut row decides."""
+    parent = board.ParentIssue(PARENT_ISSUE_REFERENCE, body, ItemKind.CONTAINER)
+    children = (board.ChildItem(80, board.ChildState.CLOSED),)
+
+    assert board.closable_container_number(parent, children, storage) == expected
+
+
+@pytest.mark.parametrize(
+    ("parent_body", "expected"),
+    [
+        pytest.param(
+            complete_contract("keiner"),
+            board.ParentCompletion.REQUIRED,
+            id="no_row_and_no_next_work_requires_closing",
+        ),
+        pytest.param(
+            complete_contract(""),
+            board.ParentCompletion.REQUIRED,
+            id="no_row_and_an_empty_next_line_requires_closing",
+        ),
+        pytest.param(
+            complete_contract("Cut slice 2."),
+            board.ParentCompletion.PERMITTED,
+            id="no_row_and_next_work_permits_closing",
+        ),
+        pytest.param(
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            board.ParentCompletion.FORBIDDEN,
+            id="an_uncut_row_forbids_closing_although_next_names_no_work",
+        ),
+        pytest.param(
+            complete_contract("Cut slice 2.", slice=slice_entries("Scheibe 1")),
+            board.ParentCompletion.FORBIDDEN,
+            id="an_uncut_row_forbids_closing_with_next_work",
+        ),
+        pytest.param(
+            complete_contract("keiner", slice=slice_entries("Scheibe\nzwei")),
+            board.ParentCompletion.FORBIDDEN,
+            id="an_unprintable_uncut_row_forbids_closing",
+        ),
+    ],
+)
+def test_parent_completion_reads_uncut_rows_before_the_next_line(
+    parent_body: str, expected: board.ParentCompletion
+) -> None:
+    parsed = parse_body(parent_body, storage=Storage.GITHUB)
+
+    assert board.parent_completion(parsed) is expected
 
 
 def test_a_complete_block_item_is_body_complete_with_no_dependency_projection() -> None:

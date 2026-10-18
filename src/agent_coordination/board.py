@@ -2420,8 +2420,8 @@ def closable_container_number(
         return None
     # Nesting only ever splits a cut from a nested repair and never reaches
     # a close, so this close test needs no read of `parent`'s own parent.
-    verdict = _childless_container_verdict(parsed.slices, parsed.contract.next, nesting_parent=None)
-    return parent.reference.number if isinstance(verdict, CloseVerdict) else None
+    required = parent_completion(parsed) is ParentCompletion.REQUIRED
+    return parent.reference.number if required else None
 
 
 def _container_next_action(item: BoardItem, container: ContainerProgress) -> NextAction | None:
@@ -2869,6 +2869,28 @@ def _childless_container_verdict(
     if has_further_work(next_line):
         return CheckVerdict(next_line)
     return CloseVerdict()
+
+
+class ParentCompletion(StrEnum):
+    """What a parent's own body says about closing it together with its last
+    open child (LAND-21..23, LAND-79): an uncut `[[slice]]` row forbids it,
+    a `Next` line still naming work permits it, and neither requires it."""
+
+    REQUIRED = "required"
+    PERMITTED = "permitted"
+    FORBIDDEN = "forbidden"
+
+
+def parent_completion(parsed: ParsedBody) -> ParentCompletion:
+    """The completion of a parent whose last open child just landed, read off
+    `_childless_container_verdict` so a landing and `next` agree on what
+    still counts as work."""
+    verdict = _childless_container_verdict(parsed.slices, parsed.contract.next, nesting_parent=None)
+    if isinstance(verdict, CloseVerdict):
+        return ParentCompletion.REQUIRED
+    if isinstance(verdict, CheckVerdict):
+        return ParentCompletion.PERMITTED
+    return ParentCompletion.FORBIDDEN
 
 
 def childless_containers_with_uncut_rows(

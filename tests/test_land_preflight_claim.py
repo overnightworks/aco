@@ -8,6 +8,7 @@ from enum import Enum
 from pathlib import Path
 
 import pytest
+from board_fixtures import REPOSITORY, complete_contract, slice_entries
 from cli_fixtures import (
     pull_request_listing,
     real_git,
@@ -36,7 +37,7 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import forge, protocol, store
+from agent_coordination import board, body, forge, protocol, store
 
 
 class CheckoutState(Enum):
@@ -82,6 +83,7 @@ class ClaimCase:
     file_reads: tuple[tuple[str, str], ...] = ((".aco/board.toml", MERGE_COMMIT_SHA),)
     check_claims: bool = False
     claims_present: bool = False
+    parent: board.ParentIssue | None = None
     length: RefusalLength = RefusalLength.UNCHECKED
 
 
@@ -174,6 +176,8 @@ def world(
             closed_issues=set(case.closed_items),
             changes_by_number={12: case.listing},
             default_branch_name=case.default_branch,
+            parents={72: case.parent} if case.parent is not None else {},
+            children={case.parent.reference.number: ()} if case.parent is not None else {},
         ),
     )
     shared = landing_world(github_clone, bare_remote, client, remote_tip=seeded.tip)
@@ -652,6 +656,22 @@ class TestLandItemAndClaim:
                     intents=(),
                 ),
                 id="closed-before-missing-claim",
+            ),
+            pytest.param(
+                ClaimCase(
+                    f"pull request #12 closes parent {REPOSITORY}#79 although its body "
+                    "still holds an uncut slice row; cut it or delete the row first",
+                    pull_request=landing_pull_request(
+                        body="Work-Item: #72\n\nCloses #72\nCloses #79"
+                    ),
+                    parent=board.ParentIssue(
+                        board.IssueReference(REPOSITORY, 79),
+                        complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+                        body.ItemKind.CONTAINER,
+                    ),
+                    check_claims=True,
+                ),
+                id="closing-a-parent-with-an-uncut-row",
             ),
             pytest.param(
                 ClaimCase(
