@@ -1,7 +1,0 @@
-claim_id = "6effefb8b6704baeb7ecd5416f728ebf"
-agent = "claude"
-role = "builder"
-base = "ec389d8c780f4d0888f4b69cda732944bdd89cfe"
-branch = "claude/issue-138-codeql-advanced-setup"
-scope = [".github/workflows/codeql.yml"]
-opened_commit = "180834e9defef59c3276bd1de039036313d43cb9"
