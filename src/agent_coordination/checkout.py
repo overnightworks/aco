@@ -1272,11 +1272,8 @@ def remote_branch_tip(remote: str, branch: str, *, directory: Path) -> str | Non
     heads = git_output(
         ["ls-remote", "--heads", remote, f"refs/heads/{branch}"], directory=directory
     )
-    for line in heads.splitlines():
-        tip, _, name = line.partition("\t")
-        if name == f"refs/heads/{branch}":
-            return tip
-    return None
+    listed = (line.split("\t") for line in heads.splitlines())
+    return next((tip for tip, name in listed if name == f"refs/heads/{branch}"), None)
 
 
 def fetch_remote_branches(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
