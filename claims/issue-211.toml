@@ -1,0 +1,8 @@
+claim_id = "3d8195cf7bc14d74b5fcc66b54b2a112"
+agent = "claude"
+role = "builder"
+base = "4e804f604a1a50828e61b08937571c2519012a36"
+branch = "claude/issue-211-l3a2-land-nach-dem-merge-trunk-ohne-aufg"
+scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/test_cli.py", "tests/test_land_after_merge.py"]
+opened_commit = "6ce07c9f198ad46e4ebe42d7dc676bb9106ff016"
+whole_reason = "Die neuen Familien im Modul und das Löschen ihrer alten Zeilen in test_cli.py müssen zusammen landen; halb umgezogen stünde derselbe Satz doppelt oder gar nicht."
