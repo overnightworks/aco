@@ -1,7 +1,8 @@
-"""Release's own worktree/branch cleanup after a squashed or merged landing."""
+"""Remove landed lanes safely and report why a merged lane must stay."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from enum import Enum, auto
@@ -9,15 +10,21 @@ from functools import partial
 from pathlib import Path
 
 import pytest
-from cli_fixtures import fail_git_launch, real_git, run_cli, stub_one_git_call
-from github_fixtures import FakeForge, LandedWorld, landed_world
+from cli_fixtures import (
+    fail_git_launch,
+    real_git,
+    redirect_toplevel,
+    run_cli,
+    stub_one_git_call,
+)
+from github_fixtures import LANDING_DEFAULT_BRANCH, FakeForge, LandedWorld, landed_world
 
 from agent_coordination import board, checkout, process
 
 
 @dataclass(frozen=True)
 class Present:
-    value: str | tuple[str, ...] | bool
+    value: str | tuple[str, ...]
 
     def format(self, **values: str) -> Present:
         match self.value:
@@ -25,8 +32,6 @@ class Present:
                 return Present(template.format(**values))
             case tuple(templates):
                 return Present(tuple(template.format(**values) for template in templates))
-            case _:
-                return self
 
 
 @dataclass(frozen=True)
@@ -44,6 +49,29 @@ class Unexpected:
 Observation = Present | Absent | Unexpected
 
 
+@dataclass(frozen=True)
+class JsonOutput:
+    worktree_text: str
+
+    def format(self, **values: str) -> str:
+        envelope = {
+            "ok": True,
+            "reason": "merged",
+            "outcome": "merged #12",
+            "issue": 72,
+            "lane": None,
+            "branch": values["lane"],
+            "claim_id": "landing",
+            "agent": "Ada",
+            "role": "builder",
+            "freed": [],
+            "next": None,
+            "parent_closable": None,
+            "worktree": self.worktree_text.format(**values),
+        }
+        return json.dumps(envelope) + "\n"
+
+
 class Intervention(Enum):
     NONE = auto()
     COMMIT_BEFORE = auto()
@@ -54,6 +82,9 @@ class Intervention(Enum):
     RECREATE = auto()
     DOTTED = auto()
     LATIN1 = auto()
+    DIRTY = auto()
+    CHECKED_ELSEWHERE = auto()
+    GIT_FAILURE = auto()
 
     def install(self, target: CleanupIntervention) -> None:
         actions = {
@@ -66,6 +97,9 @@ class Intervention(Enum):
             Intervention.RECREATE: (target.recreation, target.recreate),
             Intervention.DOTTED: (target.window, target.dotted),
             Intervention.LATIN1: (target.window, target.latin1),
+            Intervention.DIRTY: (target.before, target.dirty),
+            Intervention.CHECKED_ELSEWHERE: (target.before, target.check_out_elsewhere),
+            Intervention.GIT_FAILURE: (target.before, target.fail_worktree_resolution),
         }
         timing, action = actions[self]
         timing(action)
@@ -106,7 +140,7 @@ class CleanupCase:
     intervention: Intervention | LaunchIntervention = Intervention.NONE
     command: tuple[str, ...] = ("land", "12")
     premerge: board.MergeMethod | None = None
-    stdout: str = PREFIX + "worktree: removed\n"
+    stdout: str | JsonOutput = PREFIX + "worktree: removed\n"
     stderr: str = ""
     status: int = 0
     worktree_exists: bool = False
@@ -121,12 +155,16 @@ class CleanupCase:
     locked: bool = False
     intervention_keys: Present | Absent = Present(OWN_KEYS)
     latin1: bool = False
+    lane_status: Present | Absent = Present("")
+    landing_branch: str = LANDING_DEFAULT_BRANCH
+    workplace: str = "{clone}"
 
 
 @dataclass
 class InterventionRecord:
     launches: list[list[str]] = field(default_factory=list)
     raced: str = ""
+    bystander: str = ""
     applications: int = 0
     snapshot: dict[str, object] = field(default_factory=dict)
 
@@ -140,11 +178,27 @@ def branch_tip(clone: Path, branch: str) -> Observation:
     )
 
 
-def configuration_keys(clone: Path) -> Observation:
-    result = real_git(clone, *LISTING_ARGUMENTS, check=False)
+def listed_keys(clone: Path, pattern: str) -> Observation:
+    result = real_git(
+        clone, "config", "--local", "--null", "--name-only", "--get-regexp", pattern, check=False
+    )
     return {0: Present(tuple(result.stdout.rstrip("\0").split("\0"))), 1: Absent()}.get(
         result.returncode, Unexpected(result.returncode, result.stderr)
     )
+
+
+def configuration_keys(clone: Path) -> Observation:
+    return listed_keys(clone, r"^branch\.")
+
+
+def own_section_keys(clone: Path, lane: str) -> Observation:
+    return listed_keys(clone, rf"^branch\.{lane}\.[^.]+$")
+
+
+def lane_status(lane: Path) -> Observation:
+    if not lane.exists():
+        return Absent()
+    return Present(real_git(lane, "status", "--porcelain").stdout)
 
 
 @dataclass
@@ -172,6 +226,14 @@ class CleanupIntervention:
             "intervention.latin1-description.present": (
                 b'[branch "other"]\n\tdescription = caf\xe9\n'
                 in (self.clone / ".git/config").read_bytes()
+            ),
+            "intervention.lane.status": lane_status(self.world.lane),
+            "intervention.landing.branch": real_git(
+                self.clone, "branch", "--show-current"
+            ).stdout.strip(),
+            "intervention.workplace": (
+                str(Path.cwd()),
+                checkout.git_output(["rev-parse", "--show-toplevel"]),
             ),
         }
 
@@ -204,6 +266,34 @@ class CleanupIntervention:
     def commit(self) -> None:
         real_git(self.world.lane, "commit", "-q", "--allow-empty", "-m", "after the pinned head")
         self.record.raced = real_git(self.world.lane, "rev-parse", "HEAD").stdout.strip()
+
+    def dirty(self) -> None:
+        (self.world.lane / "scratch.txt").write_text("uncommitted\n")
+
+    def check_out_elsewhere(self) -> None:
+        real_git(self.clone, "worktree", "remove", str(self.world.lane))
+        real_git(self.clone, "checkout", "-q", self.branch)
+        bystander = self.clone.parent / "bystander"
+        real_git(
+            self.clone, "worktree", "add", "-q", str(bystander), "-b", "codex/issue-1-bystander"
+        )
+        redirect_toplevel(self.monkeypatch, bystander)
+        self.monkeypatch.chdir(bystander)
+        self.record.bystander = str(bystander)
+
+    def fail_worktree_resolution(self) -> None:
+        stub_one_git_call(
+            self.monkeypatch,
+            [
+                "rev-parse",
+                "--path-format=absolute",
+                "--show-toplevel",
+                "--git-dir",
+                "--git-common-dir",
+            ],
+            exit_status=128,
+            stderr="fatal: cannot change to 'gone': No such file or directory",
+        )
 
     def refuse_listing(self) -> None:
         stub_one_git_call(
@@ -264,11 +354,11 @@ PAST_HEAD = CleanupCase(
     worktree_exists=True,
     branch=Present("{raced}"),
     keys=Present(OWN_KEYS),
-    own_section=Present(True),
+    own_section=Present(OWN_KEYS),
     intervention_tip=Present("{raced}"),
     intervention_parent=Present("{head}"),
 )
-SECTION_KEPT = CleanupCase(keys=Present(OWN_KEYS), own_section=Present(True))
+SECTION_KEPT = CleanupCase(keys=Present(OWN_KEYS), own_section=Present(OWN_KEYS))
 CONFIG_TIMEOUT = replace(
     SECTION_KEPT,
     stdout=PREFIX
@@ -404,6 +494,7 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
                 intervention=Intervention.RECREATE,
                 phase=Phase.BRANCH_EXISTS,
                 existed_before=Absent(),
+                lane_status=Absent(),
                 branch=Present("{head}"),
             ),
             id="same-name-branch-recreated",
@@ -441,48 +532,28 @@ def test_a_squashed_lane_branch_goes_by_compare_and_delete(
 
 MERGED = CleanupCase(command=RELEASE_COMMAND, premerge=board.MergeMethod.MERGE)
 MERGED_BRANCH_KEPT = replace(
-    MERGED, branch=Present("{head}"), keys=Present(OWN_KEYS), own_section=Present(True)
+    MERGED, branch=Present("{head}"), keys=Present(OWN_KEYS), own_section=Present(OWN_KEYS)
 )
-JSON_OUTPUT = (
-    '{{"ok": true, "reason": "merged", "outcome": "merged #12", "issue": 72, '
-    '"lane": null, "branch": "{lane}", "claim_id": "landing", "agent": "Ada", '
-    '"role": "builder", "freed": [], "next": null, "parent_closable": null, '
-    '"worktree": "{worktree}"}}\n'
-)
+
+
+def rendered(identifier: str, worktree_text: str, case: CleanupCase) -> tuple[object, ...]:
+    return (
+        pytest.param(replace(case, stdout=PREFIX + f"worktree: {worktree_text}\n"), id=identifier),
+        pytest.param(
+            replace(case, command=(*case.command, "--json"), stdout=JsonOutput(worktree_text)),
+            id=f"{identifier}-json",
+        ),
+    )
 
 
 @pytest.mark.parametrize(
     "case",
     [
-        pytest.param(MERGED, id="clean"),
-        pytest.param(
-            replace(
-                MERGED,
-                command=(*RELEASE_COMMAND, "--json"),
-                stdout=JSON_OUTPUT.replace("{worktree}", "removed"),
-            ),
-            id="clean-json",
-        ),
-        pytest.param(
-            replace(
-                MERGED_BRANCH_KEPT,
-                intervention=Intervention.DELETE_REFUSED,
-                stdout=PREFIX + "worktree: removed; branch kept -- git failure: "
-                "error: branch not fully merged\n",
-            ),
-            id="branch-deletion-refused",
-        ),
-        pytest.param(
-            replace(
-                MERGED_BRANCH_KEPT,
-                intervention=Intervention.DELETE_REFUSED,
-                command=(*RELEASE_COMMAND, "--json"),
-                stdout=JSON_OUTPUT.replace(
-                    "{worktree}",
-                    "removed; branch kept -- git failure: error: branch not fully merged",
-                ),
-            ),
-            id="branch-deletion-refused-json",
+        *rendered("clean", "removed", MERGED),
+        *rendered(
+            "branch-deletion-refused",
+            "removed; branch kept -- git failure: error: branch not fully merged",
+            replace(MERGED_BRANCH_KEPT, intervention=Intervention.DELETE_REFUSED),
         ),
         pytest.param(
             replace(
@@ -512,6 +583,56 @@ def test_a_merged_lane_branch_goes_by_branch_delete(
     """Remove a merged worktree and report the branch deletion's result.
 
     Spec: REL-25, REL-34, REL-35, REL-45, E-REL-08, E-REL-16, E-REL-17, E-REL-22.
+    """
+    cleanup_check(case)
+
+
+KEPT = replace(
+    MERGED,
+    worktree_exists=True,
+    branch=Present("{head}"),
+    keys=Present(OWN_KEYS),
+    own_section=Present(OWN_KEYS),
+)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        *rendered(
+            "dirty",
+            "kept -- dirty",
+            replace(
+                KEPT,
+                intervention=Intervention.DIRTY,
+                lane_status=Present("?? scratch.txt\n"),
+            ),
+        ),
+        *rendered(
+            "checked-out-elsewhere",
+            "kept -- branch checked out elsewhere",
+            replace(
+                KEPT,
+                intervention=Intervention.CHECKED_ELSEWHERE,
+                worktree_exists=False,
+                lane_status=Absent(),
+                landing_branch="{lane}",
+                workplace="{bystander}",
+            ),
+        ),
+        *rendered(
+            "git-failure",
+            "kept -- git failure: fatal: cannot change to 'gone': No such file or directory",
+            replace(KEPT, intervention=Intervention.GIT_FAILURE),
+        ),
+    ],
+)
+def test_a_merged_lane_is_kept_for_the_reason_it_cannot_go(
+    case: CleanupCase, cleanup_check: CleanupCheck
+) -> None:
+    """Keep a merged lane's worktree and branch when cleanup must not remove them.
+
+    Spec: REL-28, REL-31, REL-32, REL-35, E-REL-11, E-REL-14, E-REL-15, E-REL-17.
     """
     cleanup_check(case)
 
@@ -557,7 +678,14 @@ def verify_cleanup(
     case.intervention.install(intervention)
     capsys.readouterr()
     result = run_cli(list(case.command), capsys)
-    values = {"head": head, "raced": record.raced, "lane": lane, "parent": parent}
+    values = {
+        "head": head,
+        "raced": record.raced,
+        "lane": lane,
+        "parent": parent,
+        "clone": str(github_clone),
+        "bystander": record.bystander,
+    }
     observed_guard = {"intervention.applications": record.applications, **record.snapshot}
     expected_guard = {
         "intervention.applications": 1,
@@ -568,19 +696,13 @@ def verify_cleanup(
         "intervention.config-lock.exists": case.locked,
         "intervention.configuration.keys": case.intervention_keys.format(**values),
         "intervention.latin1-description.present": case.latin1,
+        "intervention.lane.status": case.lane_status,
+        "intervention.landing.branch": case.landing_branch.format(**values),
+        "intervention.workplace": (case.workplace.format(**values),) * 2,
     }
     assert observed_guard == expected_guard
     actual_tip = branch_tip(github_clone, lane)
     keys = configuration_keys(github_clone)
-    own_section = real_git(
-        github_clone,
-        "config",
-        "--local",
-        "--name-only",
-        "--get-regexp",
-        rf"^branch\.{lane}\.[^.]+$",
-        check=False,
-    )
     observed = {
         "exit": result.status,
         "stdout": result.stdout,
@@ -588,9 +710,7 @@ def verify_cleanup(
         "lane.worktree.exists": world.lane.exists(),
         "lane.branch": actual_tip,
         "configuration.keys": keys,
-        "configuration.own-section.exists": {0: Present(True), 1: Absent()}.get(
-            own_section.returncode, Unexpected(own_section.returncode, own_section.stderr)
-        ),
+        "configuration.own-section.keys": own_section_keys(github_clone, lane),
         "launch.argv": record.launches,
     }
     expected = {
@@ -600,7 +720,7 @@ def verify_cleanup(
         "lane.worktree.exists": case.worktree_exists,
         "lane.branch": case.branch.format(**values),
         "configuration.keys": case.keys.format(**values),
-        "configuration.own-section.exists": case.own_section,
+        "configuration.own-section.keys": case.own_section.format(**values),
         "launch.argv": [[argument.format(**values) for argument in call] for call in case.launches],
     }
     assert observed == expected
