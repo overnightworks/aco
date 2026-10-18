@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
+from process_fixtures import UnstoppableProcess, reap
 
 from agent_coordination import board, forge, github, process
 from agent_coordination.body import ItemKind
@@ -2667,8 +2668,38 @@ def test_bounded_command_stops_a_child_that_hangs_after_closing_output(
             ],
             purpose="hang probe",
         )
-    assert str(excinfo.value) == "hang probe did not exit after closing its output"
+    assert str(excinfo.value) == "hang probe did not exit"
     assert recorded["process"].poll() is not None
+
+
+def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The same sentence holds when the child is still running while its output is open."""
+    real_popen = subprocess.Popen
+    started: list[subprocess.Popen[bytes]] = []
+
+    def start(
+        command: list[str],
+        *,
+        stdin: int | None = None,
+        stdout: int | None = None,
+        stderr: int | None = None,
+        env: dict[str, str] | None = None,
+    ) -> UnstoppableProcess:
+        started.append(real_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env))
+        return UnstoppableProcess(started[-1])
+
+    monkeypatch.setattr(subprocess, "Popen", start)
+    monkeypatch.setattr(github, "GH_TIMEOUT_SECONDS", 0.05)
+    try:
+        with pytest.raises(ClaimError) as excinfo:
+            github._bounded_command(
+                [sys.executable, "-c", "import time; time.sleep(30)"], purpose="hang probe"
+            )
+    finally:
+        reap(started)
+    assert str(excinfo.value) == "hang probe did not exit"
 
 
 def test_bounded_command_uses_combined_output_as_nonzero_exit_message() -> None:
@@ -2786,7 +2817,7 @@ def test_bounded_command_rejects_non_utf8_output() -> None:
         pytest.param(
             process.ProcessDidNotExitError(),
             forge.ForgeTransientError,
-            "GitHub issue coordination did not exit after closing its output",
+            "GitHub issue coordination did not exit",
             id="did-not-exit",
         ),
         pytest.param(

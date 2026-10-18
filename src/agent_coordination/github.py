@@ -389,7 +389,7 @@ def _forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeErro
             f"{purpose} failed while {error.stage.value}: {error.detail}"
         )
     if isinstance(error, process.ProcessDidNotExitError):
-        return forge.ForgeTransientError(f"{purpose} did not exit after closing its output")
+        return forge.ForgeTransientError(f"{purpose} did not exit")
     if isinstance(error, process.ProcessOutputTooLargeError):
         return forge.ForgeMalformedResponseError(f"{purpose} exceeded its output limit")
     raise AssertionError(f"unhandled process failure type: {type(error).__name__}")
