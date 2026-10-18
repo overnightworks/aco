@@ -39,18 +39,18 @@ def _refuse_head_branch_collisions(
     moved = protocol.ClaimUnavailableError(
         f"pull request #{number} moved while adopt read it; run adopt again"
     )
-    if not checkout.remote_branch_exists(remote, branch, directory=context.toplevel):
+    if checkout.remote_branch_tip(remote, branch, directory=context.toplevel) != head_sha:
         raise moved
     try:
         checkout.fetch_remote_branches(
             remote, (branch, context.default_branch), directory=context.toplevel
         )
     except protocol.ClaimError:
-        if checkout.remote_branch_exists(remote, branch, directory=context.toplevel):
+        if checkout.remote_branch_tip(remote, branch, directory=context.toplevel) is not None:
             raise
         raise moved from None
     if (
-        checkout.commit_at(f"refs/remotes/{remote}/{branch}", directory=context.toplevel)
+        checkout.commit_at(checkout.remote_tracking_ref(remote, branch), directory=context.toplevel)
         != head_sha
     ):
         raise moved
@@ -60,19 +60,15 @@ def _refuse_unclaimable_scope(
     parsed: argparse.Namespace, context: RunContext, plan: policy.FreshAdoption, branch: str
 ) -> None:
     """ADOPT-14: the claim `adopt` would make, run through `claim`'s own check phase."""
-    arguments = argparse.Namespace(
-        issue=None,
+    arguments = cmd_claim.ClaimArguments(
         agent=parsed.agent,
-        role=cmd_claim.DEFAULT_CLAIM_ROLE,
         base=plan.expected_head,
         branch=branch,
         scope=list(plan.scope),
-        claim_id=None,
-        out_of_order=None,
         whole=parsed.whole,
     )
     requested = cmd_claim.claim_request(arguments, adopted=True)
-    cmd_claim.checked_claim(requested, context, revision=plan.expected_head)
+    cmd_claim.checked_lane_claim(requested, context, revision=plan.expected_head)
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 import re
 from collections.abc import Callable
@@ -196,6 +195,11 @@ def test_adopt_judges_the_pull_request_before_it_reads_any_claim_state(
             "aco adopt: error: argument pull_request: -1 is not a positive number",
             id="cell-20-negative",
         ),
+        pytest.param(
+            ["abc", "--no-item", "deps"],
+            "aco adopt: error: argument pull_request: invalid int value: 'abc'",
+            id="cell-26-text",
+        ),
     ],
 )
 def test_adopt_refuses_a_malformed_command_line_at_the_parser(
@@ -213,18 +217,23 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
     assert world.forge.requests == 0
 
 
-def _claim_the_branch_as(agent: str) -> Callable[[AdoptionWorld], None]:
+def _claim_the_branch_as(
+    agent: str, identity: protocol.ClaimIdentity | None = None, claim_id: str = "a1"
+) -> Callable[[AdoptionWorld], None]:
+    claimed_identity = protocol.LaneIdentity() if identity is None else identity
+
     def claim(world: AdoptionWorld) -> None:
-        lane = protocol.LaneIdentity()
         store.commit_transition(
             observed=fresh_observation(world.clone, world.remote),
-            subject=store.transition_subject("claim", lane, ADOPTED_BRANCH),
+            subject=store.transition_subject("claim", claimed_identity, ADOPTED_BRANCH),
             intent=claim_intent(
-                identity=lane,
+                identity=claimed_identity,
                 agent=agent,
                 branch=ADOPTED_BRANCH,
                 base=protocol.ObjectId(world.head),
                 scope=("uv.lock",),
+                claim_id=claim_id,
+                operation_id=f"op-{claim_id}",
             ),
         )
 
@@ -341,6 +350,55 @@ def test_adopt_refuses_before_it_builds_anything(
     sentence = refusal.format(pull_request_directory=world.pull_request_directory)
     assert (result.status, result.stdout, result.stderr) == (2, "", f"ERROR: {sentence}\n")
     assert world.effects() == before
+
+
+def _refuse_any_fetch(world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The head branch has already moved; adopt must not fetch it."""
+    _publish_branch_tip(world.clone, "moved")
+
+    def refuse_fetch(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
+        raise AssertionError("adopt fetched a head branch that had moved")
+
+    monkeypatch.setattr(checkout, "fetch_remote_branches", refuse_fetch)
+
+
+def _move_the_branch_during_the_fetch(
+    world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The head branch moves after adopt compared its tip, as the fetch starts."""
+    fetch = checkout.fetch_remote_branches
+
+    def fetch_after_the_branch_moves(
+        remote: str, branches: tuple[str, ...], *, directory: Path
+    ) -> None:
+        _publish_branch_tip(world.clone, "moved")
+        fetch(remote, branches, directory=directory)
+
+    monkeypatch.setattr(checkout, "fetch_remote_branches", fetch_after_the_branch_moves)
+
+
+@pytest.mark.parametrize(
+    "arrange",
+    [
+        pytest.param(_refuse_any_fetch, id="moved-before-the-fetch"),
+        pytest.param(_move_the_branch_during_the_fetch, id="moved-during-the-fetch"),
+    ],
+)
+def test_adopt_refuses_a_head_branch_that_moved_around_its_fetch(
+    world: AdoptionWorld,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    arrange: Callable[[AdoptionWorld, pytest.MonkeyPatch], None],
+) -> None:
+    """Spec: ADOPT-10 -- a head branch already moved is refused from the remote's tip
+    without a fetch, and one that moves during the fetch is refused from the fetched tip."""
+    arrange(world, monkeypatch)
+
+    result = adopt(capsys, kind="deps")
+
+    assert result.stderr == (
+        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again\n"
+    )
 
 
 def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkout(
@@ -525,6 +583,28 @@ def test_adopt_that_passes_every_check_refuses_and_writes_nothing(
     assert sum(reads.observations.values()) == 1
 
 
+def test_adopt_and_its_dry_run_claim_name_the_same_holder_of_a_twice_held_branch(
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ADOPT-06, CLAIM-71 -- an issue claim and a lane claim hold the branch; the
+    refusal and the claim check both name the lane holder."""
+    _claim_the_branch_as("Bob", protocol.IssueIdentity(42), "b1")(world)
+    _claim_the_branch_as("Carol", claim_id="c1")(world)
+    arguments = cmd_claim.ClaimArguments(
+        agent="Ada", base=world.head, branch=ADOPTED_BRANCH, scope=["uv.lock"]
+    )
+    request = cmd_claim.claim_request(arguments, adopted=True)
+    context = run_context_over(world.forge)
+
+    with pytest.raises(protocol.ClaimConflictError) as refused:
+        cmd_claim.checked_claim(request, context, revision=world.head)
+    result = adopt(capsys, kind="deps")
+
+    holder = f"claimed by Carol (builder) on lane '{ADOPTED_BRANCH}' branch {ADOPTED_BRANCH}"
+    assert str(refused.value).endswith(holder)
+    assert result.stderr.endswith(f"{holder}\n")
+
+
 def test_adopts_dry_run_claim_refuses_a_branch_another_claim_holds(world: AdoptionWorld) -> None:
     """Spec: CLAIM-71 -- the claim `adopt` would make, checked as `cmd_adopt` checks it,
     refuses with CLAIM-11's sentence and writes nothing."""
@@ -540,16 +620,8 @@ def test_adopts_dry_run_claim_refuses_a_branch_another_claim_holds(world: Adopti
         ),
     )
     tip_before = state_ref_tip(world.remote)
-    arguments = argparse.Namespace(
-        issue=None,
-        agent="Ada",
-        role=cmd_claim.DEFAULT_CLAIM_ROLE,
-        base=world.head,
-        branch=ADOPTED_BRANCH,
-        scope=["uv.lock", "pyproject.toml"],
-        claim_id=None,
-        out_of_order=None,
-        whole=None,
+    arguments = cmd_claim.ClaimArguments(
+        agent="Ada", base=world.head, branch=ADOPTED_BRANCH, scope=["uv.lock", "pyproject.toml"]
     )
 
     request = cmd_claim.claim_request(arguments, adopted=True)
