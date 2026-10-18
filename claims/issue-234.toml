@@ -1,0 +1,7 @@
+claim_id = "959b2a0a50ba4fb78a3a854dcc855144"
+agent = "claude"
+role = "builder"
+base = "908470e3e62af972796f01cfb99a0856d93c2963"
+branch = "claude/issue-234-r2a-branch-delete"
+scope = ["scripts/test_inventory_dropped.txt", "tests/test_cli.py", "tests/test_release_cleanup.py"]
+opened_commit = "f138e349fd5b16a9bf27386710ac8e8658663996"
