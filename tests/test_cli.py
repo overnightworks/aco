@@ -5919,15 +5919,14 @@ def test_claim_does_not_corridor_on_a_slice_list(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims
 
 
-_SLICE_TITLE_OF_79 = "Schema traegt den Titel (#79 Scheibe 21)"
-
-
 @pytest.mark.parametrize(
     ("title", "parents", "expect_warning"),
     [
-        pytest.param(_SLICE_TITLE_OF_79, {}, True, id="without_sub_issue_relation"),
         pytest.param(
-            _SLICE_TITLE_OF_79,
+            "Schema traegt den Titel (#79 Scheibe 21)", {}, True, id="without_sub_issue_relation"
+        ),
+        pytest.param(
+            "Schema traegt den Titel (#79 Scheibe 21)",
             {1017: board.ParentIssue(board.IssueReference(REPOSITORY, 79), "## Now\nCut.")},
             False,
             id="with_sub_issue_relation",
@@ -17894,9 +17893,19 @@ def test_land_merges_a_green_pull_request_and_runs_the_release_path(
     existing `release --merged` path closes the item and frees the claim.
     Issue #505 proof 4: a head changing only settings that never decide
     where the release writes (LANDCMD-23) lands the same way, its board
-    configuration read at the very head sha the merge is pinned to."""
+    configuration read at the very head sha the merge is pinned to.
+    Issue #178: foreign text with a `#n` past the digit bound -- an open
+    pull request's `Refs` line and a trunk commit's `Work-Item:` trailer --
+    crashes neither the preflight nor the release path."""
     repo, client = _land_scenario(monkeypatch, tmp_path)
     client.head_board_config = head_board_config
+    oversized = "1" * 4301
+    client.board_open_pull_requests = (
+        board.PullRequest(300, "Foreign", f"Refs #{oversized}", "foreign/branch"),
+    )
+    landed_from_another_clone(
+        tmp_path, "commit", "-q", "--allow-empty", "-m", f"Foreign\n\nWork-Item: #{oversized}"
+    )
     trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
