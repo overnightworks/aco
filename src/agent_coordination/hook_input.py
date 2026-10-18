@@ -704,8 +704,9 @@ def _parse_arguments(
     a lone `-` is an operand, and only an end-of-options marker that no
     option consumed as its value ends the options -- every word after it is
     an operand whatever it starts with. `end_of_options_markers` is the
-    command's own set: `--` for GNU tools, also `--end-of-options` for git. `value_options` (`-t`, `--target-directory`) take a required
-    value; `optional_value_options` (`-i`, `--in-place`) only an attached one.
+    command's own set: `--` for GNU tools, also `--end-of-options` for git.
+    `value_options` (`-t`, `--target-directory`) take a required value;
+    `optional_value_options` (`-i`, `--in-place`) only an attached one.
     Unlike `_non_flag_arguments`, which drops every word starting with `-`,
     a lone `-` stays an operand here (`git restore -`), as in GNU tools.
     `options_end_at_first_operand` is the POSIX reading (`POSIXLY_CORRECT`):
