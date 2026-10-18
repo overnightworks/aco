@@ -75,9 +75,12 @@ def _checked_start_resume(
     live scope is wide, since the stored claim's own `whole_reason` already
     justified it once."""
     _refuse_resume_scope_mismatch(live, parsed)
+    whole_reason = (
+        live.whole_reason if parsed.whole is None else body.bounded_whole_reason(parsed.whole)
+    )
     versioning, _effective_whole = cmd_claim.scope_versioning(
         live.scope,
-        parsed.whole if parsed.whole is not None else live.whole_reason,
+        whole_reason,
         context=context,
         revision=revision,
     )

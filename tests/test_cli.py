@@ -11322,7 +11322,9 @@ def test_whole_github_next_and_board_report_the_defect(
 
 
 @pytest.mark.parametrize(
-    "mode", ["standing", "rebuild", "invalid-flag"], ids=["cell14a", "cell14b", "cell38"]
+    "mode",
+    ["standing", "rebuild", "invalid-flag", "invalid-flag-standing"],
+    ids=["cell14a", "cell14b", "cell38", "cell38a"],
 )
 def test_start_whole_resume_preserves_the_claim(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, mode: str
@@ -11337,19 +11339,20 @@ def test_start_whole_resume_preserves_the_claim(
     capsys.readouterr()
     before_claim = _live_store_claim()
     built = worktrees_and_branches(repo)
-    if mode != "standing":
+    if mode not in {"standing", "invalid-flag-standing"}:
         _remove_the_lane_pair(repo)
     before = worktrees_and_branches(repo)
+    refuses_flag = mode.startswith("invalid-flag")
     raw_body = (
         valid_body
-        if mode == "invalid-flag"
+        if refuses_flag
         else complete_contract("Build it.", scope=["a.py"], whole="x" * 513)
     )
     client = _serve_start_board(monkeypatch, _start_item(raw_body))
-    flags = ["--whole", "a\nb"] if mode == "invalid-flag" else []
-    assert issue_claim.main([*argv, *flags]) == (2 if mode == "invalid-flag" else 0)
+    flags = ["--whole", "a\nb"] if refuses_flag else []
+    assert issue_claim.main([*argv, *flags]) == (2 if refuses_flag else 0)
     captured = capsys.readouterr()
-    if mode == "invalid-flag":
+    if refuses_flag:
         assert captured.err == "ERROR: whole reason must be one bounded non-empty line\n"
         assert "worktree:" not in captured.out
         assert worktrees_and_branches(repo) == before
