@@ -4310,12 +4310,23 @@ def test_classification_line_state_tells_the_line_a_rerun_may_keep(
     assert state == expected_state()
 
 
-def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications() -> None:
-    """Issue #405: a trunk trailer is always local (`Work-Item: #<n>`,
-    never the pull request body's qualified `owner/repo#n` form); a
-    `No-Item:` classification renders unchanged either way."""
-    work_item = board.WorkItemClassification(board.IssueReference(REPOSITORY, 72))
-    no_item = board.NoItemClassification(board.NoItemKind.DOCS)
-
-    assert board.land_trunk_trailer(work_item) == "Work-Item: #72"
-    assert board.land_trunk_trailer(no_item) == "No-Item: docs"
+@pytest.mark.parametrize(
+    ("classification", "expected"),
+    [
+        pytest.param(
+            board.WorkItemClassification(board.IssueReference(REPOSITORY, 72)),
+            "Work-Item: #72",
+            id="work-item",
+        ),
+        pytest.param(
+            board.NoItemClassification(board.NoItemKind.DOCS), "No-Item: docs", id="no-item"
+        ),
+    ],
+)
+def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications(
+    classification: board.Classification,
+    expected: str,
+) -> None:
+    """Spec: LANDCMD-13. Trunk trailers use local issue references or the no-item kind."""
+    observed = board.land_trunk_trailer(classification)
+    assert observed == expected

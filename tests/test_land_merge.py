@@ -230,7 +230,7 @@ def land(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
     return run_cli(arguments, capsys)
 
 
-def assert_landed(world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> None:
+def landed_observations(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
     case = world.case
     outcome = case.outcome
     assert isinstance(outcome, Landed)
@@ -332,24 +332,10 @@ def assert_landed(world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> None
     if isinstance(case.identity, protocol.LaneIdentity):
         observed["no-reinstall"] = "reinstall:" not in result.stdout
         expected["no-reinstall"] = True
-    if case.lane_worktree is LaneWorktree.PRESENT:
-        observed.update(
-            {
-                "removed-line": "worktree: removed\n" in result.stdout,
-                "lane.absent": not world.lane.exists(),
-                "branch.absent": case.branch not in branches,
-                "upstream": real_git(
-                    world.clone, "config", f"branch.{case.branch}.remote", check=False
-                ).stdout,
-            }
-        )
-        expected.update(
-            {"removed-line": True, "lane.absent": True, "branch.absent": True, "upstream": ""}
-        )
-    assert observed == expected
+    return observed, expected, result, branches
 
 
-def assert_refused(world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> None:
+def refused_observations(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
     sentence = world.case.outcome
     assert isinstance(sentence, str)
     if world.case.invalid_configuration:
@@ -360,29 +346,7 @@ def assert_refused(world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> Non
     if world.case.invalid_configuration:
         observed["requests.zero"] = world.forge.requests
         expected["requests.zero"] = 0
-    if world.case.error is not None:
-        requests = world.forge.merge_requests
-        request = requests[0] if requests else ("missing", None)
-        entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
-        observed.update(
-            {
-                "request.count": len(requests),
-                "request.head": request[0],
-                "request.method": request[1],
-                "entry.stamp": entry[0],
-                "entry.anchor": entry[1],
-            }
-        )
-        expected.update(
-            {
-                "request.count": 1,
-                "request.head": world.head,
-                "request.method": board.MergeMethod.MERGE,
-                "entry.stamp": None,
-                "entry.anchor": None,
-            }
-        )
-    assert observed == expected
+    return observed, expected
 
 
 class TestLandMerge:
@@ -474,7 +438,8 @@ class TestLandMerge:
         """Spec: LANDCMD-09, LANDCMD-10, LANDCMD-12, LANDCMD-13, LANDCMD-23, LANDCMD-29, LANDCMD-32.
         The reviewed head lands, releases the real claim and retains the classification trailer.
         """
-        assert_landed(world, capsys)
+        observed, expected, _, _ = landed_observations(world, capsys)
+        assert observed == expected
 
 
 class TestLandMergeMethod:
@@ -554,7 +519,21 @@ class TestLandMergeMethod:
         """Spec: LANDCMD-27, LANDCMD-29, LANDCMD-39, LANDCMD-42.
         Every rule narrows the methods; successful landings remove their lane and upstream.
         """
-        assert_landed(world, capsys)
+        observed, expected, result, branches = landed_observations(world, capsys)
+        observed.update(
+            {
+                "removed-line": "worktree: removed\n" in result.stdout,
+                "lane.absent": not world.lane.exists(),
+                "branch.absent": world.case.branch not in branches,
+                "upstream": real_git(
+                    world.clone, "config", f"branch.{world.case.branch}.remote", check=False
+                ).stdout,
+            }
+        )
+        expected.update(
+            {"removed-line": True, "lane.absent": True, "branch.absent": True, "upstream": ""}
+        )
+        assert observed == expected
 
     @pytest.mark.parametrize(
         "world",
@@ -652,7 +631,8 @@ class TestLandMergeMethod:
         """Spec: LANDCMD-28, LANDCMD-30, LANDCMD-40, LANDCMD-41.
         Invalid pins and unavailable methods refuse without changing the landing world.
         """
-        assert_refused(world, capsys)
+        observed, expected = refused_observations(world, capsys)
+        assert observed == expected
 
 
 class TestLandMergeForgeAnswer:
@@ -692,4 +672,26 @@ class TestLandMergeForgeAnswer:
         """Spec: LANDCMD-14, LANDCMD-37.
         A rejected pinned request names its reason and leaves every durable effect unchanged.
         """
-        assert_refused(world, capsys)
+        observed, expected = refused_observations(world, capsys)
+        requests = world.forge.merge_requests
+        request = requests[0] if requests else ("missing", None)
+        entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
+        observed.update(
+            {
+                "request.count": len(requests),
+                "request.head": request[0],
+                "request.method": request[1],
+                "entry.stamp": entry[0],
+                "entry.anchor": entry[1],
+            }
+        )
+        expected.update(
+            {
+                "request.count": 1,
+                "request.head": world.head,
+                "request.method": board.MergeMethod.MERGE,
+                "entry.stamp": None,
+                "entry.anchor": None,
+            }
+        )
+        assert observed == expected

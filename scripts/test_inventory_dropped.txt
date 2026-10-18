@@ -135,3 +135,15 @@ tests/test_cli.py	'keeps-the-worktree-flag'	#184: case renamed foreign-claim-kee
 tests/test_cli.py	'long-many'	#184: many-long-paths-bounded owns three explicit long paths and its full expected sentence.
 tests/test_cli.py	'plain'	#184: case renamed foreign-claim.
 tests/test_cli.py	39	#184: many-long-paths-bounded specifies the expected rendered names literally instead of generating them with the production cap arithmetic.
+tests/test_cli.py	'--parents'	#186: test_land_merge.py assert_landed reads real trunk parents with rev-list --parents and compares trunk.parents for every success row; the option moved outside an assertion expression.
+tests/test_cli.py	'-n'	#186: test_land_merge.py assert_landed reads one real trunk commit with rev-list -n 1; trunk.parents retains each method row's parent-count comparison.
+tests/test_cli.py	'.remote'	#186: test_land_merge.py method success rows compare upstream == empty using branch.<row branch>.remote; the key fragments moved into the observation helper.
+tests/test_cli.py	': landing'	#186: test_land_merge.py lane rows own complete RELEASED lane fix/x or dependabot/x: landing newline expectations through release-line.
+tests/test_cli.py	'ERROR: GitHub refused the merge of pull request #12: gh: Repository rule violations found (HTTP 405)\n'	#186: test_land_merge.py refused-405 owns the complete sentence; refusal_observations adds ERROR prefix and newline and compares exact stderr.
+tests/test_cli.py	'ERROR: pull request #12 changed while it was checked; re-run land\n'	#186: test_land_merge.py head-moved-409 owns the complete sentence; refusal_observations adds ERROR prefix and newline and compares exact stderr.
+tests/test_cli.py	'Grok'	#186: test_land_merge.py ClaimHolder.FOREIGN owns Grok; coordinator-override-lands-a-foreign-claim seeds and guards that holder before invoking land.
+tests/test_cli.py	'No-Item: '	#186: test_land_merge.py lane rows own complete No-Item: docs and No-Item: deps trailer expectations instead of interpolating a fragment.
+tests/test_cli.py	'branch.'	#186: test_land_merge.py method success rows compare upstream == empty using branch.<row branch>.remote; the key fragments moved into the observation helper.
+tests/test_cli.py	'merge'	#186: test_land_merge.py method expectations use board.MergeMethod.MERGE; pin rows own complete merge_method TOML, including the merge pin.
+tests/test_cli.py	'reinstall:'	#186: test_land_merge.py lane rows retain the no-reinstall observation, computed in assert_landed rather than directly in the test assertion.
+tests/test_cli.py	'squash'	#186: test_land_merge.py method expectations use board.MergeMethod.SQUASH; the pinned-squash row owns complete merge_method TOML.
