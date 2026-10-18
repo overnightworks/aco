@@ -17,8 +17,8 @@ directory in ADOPT-09.
 
 | state \ trigger | `aco adopt <n> --no-item <kind>` |
 |---|---|
+| no agent identity resolves, or it is no bounded line | OUT-05 |
 | `storage = "state-ref"` | ADOPT-01 |
-| no agent identity resolves | OUT-05 |
 | the pull request is not open | ADOPT-02 |
 | the head branch lives in another repository | ADOPT-03 |
 | the pull request targets another branch than the default | ADOPT-04 |
@@ -56,11 +56,13 @@ The first failing step wins; each reads only what it needs, so a refusal early i
 list reads nothing after it.
 
 1. `--no-item` is one of `deps`, `fix` or `docs`, and one positive pull request number is given (ADOPT-08; the Never line on one pull request per call).
-2. The main checkout is resolved (ADOPT-15), then its storage pin is read (ADOPT-01); a linked
+2. The agent identity is resolved from `--agent` or the environment, by the command dispatcher
+   before the command starts (OUT-05), so before the main checkout, the storage pin and any
+   forge read: none refuses `agent identity is required: pass --agent or set ACO_AGENT,
+   GROK_SESSION_ID, or CLAUDE_CODE_SESSION_ID`, and one that is not a bounded non-empty line
+   refuses `agent must be one bounded non-empty line`.
+3. The main checkout is resolved (ADOPT-15), then its storage pin is read (ADOPT-01); a linked
    worktree's own copy of `.aco/board.toml` is never read.
-3. The agent identity is resolved from `--agent` or the environment; none refuses `agent identity
-   is required: pass --agent or set ACO_AGENT, GROK_SESSION_ID, or CLAUDE_CODE_SESSION_ID`
-   (OUT-05), before any forge read.
 4. The pull request and its item reference are read; the pull request is open (ADOPT-02) and its
    head branch is of this repository (ADOPT-03).
 5. The claim state is read once; no claim but this session's own builder lane claim stands on the

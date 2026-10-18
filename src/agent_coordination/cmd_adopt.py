@@ -160,7 +160,7 @@ def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
 def _adopt_afresh(
     adoption: _Adoption, plan: policy.FreshAdoption, parsed: argparse.Namespace, agent: str
 ) -> int:
-    """Steps 17 to 27: builds the lane on the head branch, claims it exclusively
+    """Steps 8 to 11: builds the lane on the head branch, claims it exclusively
     (CLAIM-71) for the listing's path set, then writes the line."""
     context, branch = adoption.run, adoption.detail.source_branch
     _refuse_head_branch_collisions(adoption)
@@ -221,7 +221,7 @@ def _judge(parsed: argparse.Namespace, context: RunContext) -> int:
     if storage is not body.Storage.GITHUB:
         raise protocol.ClaimUnavailableError(_GITHUB_ONLY_REFUSAL)
     number = parsed.pull_request
-    agent = checkout.resolved_agent(parsed.agent)
+    agent = parsed.agent
     kind = board.NoItemKind(parsed.no_item)
     adoption = _Adoption(
         policy.LandingCheckContext(main, main.forge.repository.path, storage),

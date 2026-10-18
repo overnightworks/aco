@@ -312,7 +312,7 @@ _ADA_LANE_CLAIM = standing_active_claim("Ada", lane=True, branch=ADOPTED_BRANCH)
 )
 def test_adoption_preflight_refuses_or_plans_in_precedence_order(row: PreflightRow) -> None:
     """Spec: ADOPT-02, ADOPT-03, ADOPT-04, ADOPT-05, ADOPT-06, ADOPT-07, ADOPT-11, ADOPT-16 --
-    the first failing step wins, and the claims are read once, only past steps 5 and 6."""
+    the first failing step wins, and the claims are read once, only past step 4's openness and repository checks."""
     pull_request_forge = FakeForge(
         landings={ADOPTED_PULL_REQUEST: row.pull_request(dependabot_pull_request(FIRST_HEAD))},
         changes_by_number={ADOPTED_PULL_REQUEST: row.changes},

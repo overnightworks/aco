@@ -54,12 +54,16 @@ WAITING_ON_OPERATOR = "waiting on operator"
 RULING_OLD_AFTER_LANDINGS = 10
 STALE_IDLE_DAYS = 7
 REFERENCE_PATTERN = re.compile(r"(?<!\w)#([1-9]\d*)", re.ASCII)
+# The number is bounded so `int()` of a match can never meet Python's digit
+# limit: a longer one is no reference, whichever line or keyword carries it.
+MAXIMUM_ISSUE_NUMBER_DIGITS = 18
 # One issue named the way GitHub names it across repositories: `OWNER/REPO#n`,
 # or `#n` for the repository the text itself lives in. Every typed line below
 # embeds this one grammar, so a shorthand and its qualified spelling always
 # parse to the same reference.
 QUALIFIED_REFERENCE = (
-    rf"(?:(?P<repository>{protocol.REPOSITORY_PATTERN.pattern}))?#(?P<number>[1-9]\d*)"
+    rf"(?:(?P<repository>{protocol.REPOSITORY_PATTERN.pattern}))?"
+    rf"#(?P<number>[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}})"
 )
 # GitHub links a keyword to a reference only on one line, separated by
 # horizontal space and ending at the reference: `Closes#7`, a keyword whose
@@ -1150,7 +1154,8 @@ def classification_line_state(
     selected = _single_classification_match(matches)
     if isinstance(selected, ClassificationDefect):
         return MalformedClassificationLines(selected)
-    if _selected_classification(selected, repository) == NoItemClassification(kind):
+    classification = _selected_classification(selected, repository)
+    if isinstance(classification, NoItemClassification) and classification.kind is kind:
         return ClassificationLine.PRESENT
     return OtherClassificationLine(terminal_text(selected.group(0)))
 
