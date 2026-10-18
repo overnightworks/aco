@@ -1215,10 +1215,14 @@ class TestStateRefBoardAgainstARealStateTree:
 
         monkeypatch.setattr(store.process, "run_captured", spy(process.run_captured))
         monkeypatch.setattr(store.process, "run_bounded", spy(process.run_bounded))
+        monkeypatch.setattr(
+            store.process, "run_bounded_captured", spy(process.run_bounded_captured)
+        )
         _push_item_tree(bare_remote, worktree, _item_files())
 
         adapter = _fetch_state_ref_board(bare_remote, worktree)
         adapter.list_open_board_issues()
+        store.hash_blob(worktree, b"drives the store's input-fed git runner")
 
         assert commands, "the fixture itself must have run at least one git command"
         assert all(command[0] == "git" for command in commands)

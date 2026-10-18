@@ -284,14 +284,14 @@ def _run_git(worktree: Path, arguments: list[str]) -> process.CapturedResult:
 def _run_git_with_input(worktree: Path, arguments: list[str], *, input_data: bytes) -> str:
     command = process.git_command(arguments, directory=worktree)
     try:
-        result = process.run_bounded(command, input_data=input_data)
+        result = process.run_bounded_captured(command, input_data=input_data)
     except process.ExecutableMissingError as error:
         raise ClaimError("git is required for the claim state store") from error
     except process.ProcessTimedOutError as error:
         raise ClaimError("git timed out while writing to the claim state store") from error
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail_from_bounded(result))
-    return result.output.decode().strip()
+        raise ClaimError(process.git_failure_detail_lossy(result))
+    return result.stdout.decode().strip()
 
 
 def _git_dir(worktree: Path) -> Path:
