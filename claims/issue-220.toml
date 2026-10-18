@@ -1,0 +1,8 @@
+claim_id = "469a2257b85b436397d428556939546b"
+agent = "claude"
+role = "builder"
+base = "14fffe5734ab5f4d357cd61a532ddf83a032a8de"
+branch = "claude/issue-220-l3b2-der-rerun-aus-einem-getrennten-land"
+scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/test_cli.py", "tests/test_land_after_merge.py", "tests/test_land_after_merge_rerun.py"]
+opened_commit = "c17d78e12c2c7b8f2514d26a49d62cc9689f8a10"
+whole_reason = "Die neuen Zeilen im Modul und das Löschen ihrer alten Tests in test_cli.py müssen zusammen landen; halb umgezogen stünde derselbe Satz doppelt oder gar nicht. Der gemeinsame GitHub-Remote-Helfer und der Umbau von arrange_follow_up_failures gehören dazu, weil die Welt sie braucht."
