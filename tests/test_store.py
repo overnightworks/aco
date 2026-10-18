@@ -20,7 +20,7 @@ from dataclasses import replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import pytest
 from cli_fixtures import (
@@ -1185,6 +1185,63 @@ def test_push_retry_leaves_bootstrap_with_the_one_root_commit_the_remote_holds(
         text=True,
     )
     assert log.stdout.strip() == "1"
+
+
+class _TimedOutPushTransport:
+    """A `PushTransport` whose push gives no answer: the sent push may or may
+    not have landed."""
+
+    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
+        raise protocol.ClaimError("push timed out")
+
+
+def _fail_every_read_after_the_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_fetch_state = store.fetch_state
+    reads: list[None] = []
+
+    def fetch_state_failing_after_the_first(**kwargs: Any) -> protocol.ClaimState:
+        if reads:
+            raise protocol.ClaimError("cannot reach origin refs/aco/state")
+        reads.append(None)
+        return real_fetch_state(**kwargs)
+
+    monkeypatch.setattr(store, "fetch_state", fetch_state_failing_after_the_first)
+
+
+def _fail_the_lineage_stamp(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_stamp(*_args: object, **_kwargs: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "_write_lineage_stamp", failing_stamp)
+
+
+@pytest.mark.parametrize(
+    ("transport_factory", "arrange_fault"),
+    [
+        pytest.param(
+            _AcceptThenRaiseTransport, _fail_every_read_after_the_first, id="lost-response-reread"
+        ),
+        pytest.param(
+            partial(_RejectsFirstPushesTransport, rejections=1),
+            _fail_every_read_after_the_first,
+            id="rejection-reread",
+        ),
+        pytest.param(_TimedOutPushTransport, lambda _monkeypatch: None, id="push-timeout"),
+        pytest.param(store.GitPushTransport, _fail_the_lineage_stamp, id="lineage-stamp"),
+    ],
+)
+def test_bootstrap_refuses_as_an_uncertain_write_once_a_sent_push_cannot_be_judged(
+    bare_remote: Path,
+    worktree: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    transport_factory: Callable[[], store.PushTransport],
+    arrange_fault: Callable[[pytest.MonkeyPatch], None],
+) -> None:
+    """Spec: CAS-56, CAS-69."""
+    arrange_fault(monkeypatch)
+
+    with pytest.raises(protocol.UncertainWriteError):
+        store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport_factory())
 
 
 def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(

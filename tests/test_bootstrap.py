@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from cli_fixtures import (
@@ -146,3 +148,74 @@ def test_bootstrap_whose_creation_push_is_rejected_by_a_rival_leaves_the_rivals_
         text=True,
     ).stdout.strip()
     assert commit_count == "2"
+
+
+def _lose_the_response_of_the_first_push(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_push = store.GitPushTransport.push
+
+    def push_landing_then_failing(transport: store.GitPushTransport, **push: Any) -> None:
+        real_push(transport, **push)
+        raise protocol.PushRejectedError("simulated lost response")
+
+    monkeypatch.setattr(store.GitPushTransport, "push", push_landing_then_failing)
+
+
+def _reject_the_first_push(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_push = store.GitPushTransport.push
+    rejections: list[None] = []
+
+    def push_rejected_once(transport: store.GitPushTransport, **push: Any) -> None:
+        if rejections:
+            real_push(transport, **push)
+            return
+        rejections.append(None)
+        raise protocol.PushRejectedError("simulated rejection")
+
+    monkeypatch.setattr(store.GitPushTransport, "push", push_rejected_once)
+
+
+@pytest.mark.parametrize(
+    "arrange_fault",
+    [
+        pytest.param(_lose_the_response_of_the_first_push, id="lost-response"),
+        pytest.param(_reject_the_first_push, id="rejected-while-absent"),
+    ],
+)
+def test_bootstrap_prints_the_one_root_commit_after_a_push_retry(
+    clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    arrange_fault: Callable[[pytest.MonkeyPatch], None],
+) -> None:
+    """Spec: CAS-66 -- a rejected creation push still leaves exactly one root."""
+    arrange_fault(monkeypatch)
+
+    run = run_cli(["bootstrap"], capsys)
+
+    landed_tip = state_ref_tip(bare_remote)
+    assert run.stderr == ""
+    assert run.expect_success() == f"{landed_tip}\n"
+    commit_count = subprocess.run(
+        ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert commit_count == "1"
+
+
+def test_bootstrap_refuses_on_stderr_alone_when_its_lineage_stamp_cannot_be_written(
+    clone: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: CAS-56 -- an accepted creation whose bookkeeping fails is uncertain."""
+
+    def failing_stamp(*_args: object, **_kwargs: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "_write_lineage_stamp", failing_stamp)
+
+    refused = run_cli(["bootstrap"], capsys)
+
+    assert refused.expect_refusal() == "ERROR: disk full\n"
+    assert refused.stdout == ""
