@@ -28,7 +28,7 @@ from cli_fixtures import (
     track_board_config,
     worktrees_and_branches,
 )
-from github_fixtures import FakeForge, serve_forge
+from github_fixtures import FakeForge, landing_readiness, serve_forge
 from store_fixtures import (
     RaceOnceTransport,
     claim_intent,
@@ -1463,17 +1463,9 @@ def test_adopts_rerun_after_a_re_push_and_a_rewritten_body_restores_the_line_und
 
 
 def _the_forge_reads_the_branch_ready(world: AdoptionWorld) -> None:
-    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
-        ADOPTED_PULL_REQUEST,
-        True,
-        world.head,
-        forge.MERGEABLE_STATE_CLEAN,
-        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = landing_readiness(
+        ADOPTED_PULL_REQUEST, head_sha=world.head
     )
-
-
-def _the_first_head_is_reviewed(world: AdoptionWorld) -> None:
-    _the_forge_reads_the_branch_ready(world)
 
 
 def _the_branch_is_re_pushed(world: AdoptionWorld) -> None:
@@ -1491,7 +1483,7 @@ def _the_worktree_follows_the_re_push(world: AdoptionWorld) -> None:
     ("arrange", "reviews_the_first_head", "status", "worktree_outcome", "merged"),
     [
         pytest.param(
-            _the_first_head_is_reviewed,
+            _the_forge_reads_the_branch_ready,
             True,
             0,
             "removed",

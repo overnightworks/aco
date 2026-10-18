@@ -94,6 +94,8 @@ from github_fixtures import (
     WORK_ITEM_ISSUE,
     FakeForge,
     ReaderOnlyForge,
+    landing_pull_request,
+    landing_readiness,
 )
 from store_fixtures import RaceOnceTransport, lineage_observation, unrelated_racer_commit
 
@@ -14392,36 +14394,6 @@ def test_no_path_class_list_is_read_or_written() -> None:
 DOCUMENTATION_LANE_BRANCH = "docs/tidy-readme"
 
 
-def landing_pull_request(
-    *,
-    body: str,
-    number: int = 12,
-    base_ref_name: str = "main",
-    head_ref_name: str = LANDING_BRANCH,
-    head_repository: str = REPOSITORY,
-    author: str = "ada",
-    merged: bool = False,
-    merge_commit: str | None = None,
-    title: str = "feat: land the lane",
-) -> forge.Landing:
-    """`merge_commit` defaults to a shared, well-formed sha once `merged` is
-    true (a real merged pull request always carries one) and to `None`
-    otherwise; a test proving the merge commit's own authority
-    (issue #397) passes its own sha instead."""
-    return forge.Landing(
-        number,
-        author,
-        body,
-        github.repository_id(head_repository),
-        head_ref_name,
-        base_ref_name,
-        merged,
-        merge_commit if merge_commit is not None else (MERGE_COMMIT_SHA if merged else None),
-        title,
-        MERGE_COMMIT_SHA,
-    )
-
-
 def documentation_lane_claim(
     claim_id: str = "tidy", branch: str = DOCUMENTATION_LANE_BRANCH
 ) -> ClaimRequest:
@@ -16825,16 +16797,6 @@ def test_release_merged_keeps_the_worktree_for_every_reason(
         assert worktree.exists()
 
 
-def _land_readiness(
-    number: int = 12,
-    *,
-    checks: tuple[forge.CheckRun, ...] = (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
-) -> forge.LandingReadiness:
-    return forge.LandingReadiness(
-        number, True, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, checks
-    )
-
-
 def _land_preflight_client(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -16937,7 +16899,7 @@ def _land_scenario(
         merged=False,
         head_ref_name=branch,
     )
-    client.readiness_by_number[12] = _land_readiness()
+    client.readiness_by_number[12] = landing_readiness()
     client.merge_remote = tmp_path / "remote.git"
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
@@ -16946,265 +16908,6 @@ def _land_scenario(
     redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     return repo, client
-
-
-@pytest.mark.parametrize(
-    ("readiness", "reason"),
-    [
-        pytest.param(
-            forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ()),
-            "pull request #12 is not open; it cannot be landed",
-            id="not-open",
-        ),
-        pytest.param(
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "dirty", ()),
-            "pull request #12 is not mergeable (dirty)",
-            id="not-mergeable",
-        ),
-        pytest.param(
-            _land_readiness(checks=()),
-            "pull request #12 exposes no CI checks; cannot verify green CI",
-            id="no-checks",
-        ),
-        pytest.param(
-            _land_readiness(checks=(forge.CheckRun("build", None),)),
-            "pull request #12 has checks still running: build; wait for every check to succeed",
-            id="check-running",
-        ),
-        pytest.param(
-            _land_readiness(checks=(forge.CheckRun("build", "failure"),)),
-            "pull request #12 has non-successful checks: build (failure); "
-            "land only after every check succeeds",
-            id="check-failed",
-        ),
-        pytest.param(
-            _land_readiness(
-                checks=tuple(forge.CheckRun(f"check-{index}", None) for index in range(5))
-            ),
-            "pull request #12 has checks still running: check-0, check-1, check-2, and 2 more; "
-            "wait for every check to succeed",
-            id="check-running-name-list-capped",
-        ),
-        pytest.param(
-            _land_readiness(checks=(forge.CheckRun("x" * 300, None),)),
-            "pull request #12 has checks still running: "
-            + ("x" * 39 + "…")
-            + "; wait for every check to succeed",
-            id="check-running-name-truncated",
-        ),
-        pytest.param(
-            _land_readiness(checks=tuple(forge.CheckRun("x" * 300, None) for _ in range(5))),
-            "pull request #12 has checks still running: "
-            + ", ".join([("x" * 39 + "…")] * 3)
-            + ", and 2 more; wait for ev…",
-            id="check-running-many-long-names-bounded-with-error-prefix",
-        ),
-    ],
-)
-def test_land_refuses_every_readiness_defect_before_any_write(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    readiness: forge.LandingReadiness,
-    reason: str,
-) -> None:
-    """Issue #405 Beweis 1: every readiness-based preflight refusal merges
-    nothing, deletes no branch, and reaches no store write -- `aco land`'s
-    own read-only order. The printed line (issue #405 round-4 finding) never
-    exceeds 200 characters including `cli.main`'s own `ERROR: ` prefix, not just
-    the sentence the refusal builds before that prefix is added."""
-    client = _land_preflight_client(monkeypatch, readiness=readiness)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    error_line = capsys.readouterr().err
-    assert error_line == f"ERROR: {reason}\n"
-    assert len(error_line.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
-    assert client.merge_calls == []
-    assert client.deleted_branches == []
-
-
-QUALITY_VERDICT = forge.CheckRun("quality / verdict", forge.CHECK_CONCLUSION_SUCCESS)
-NO_QUALITY_VERDICT_REFUSAL = (
-    "pull request #12 has no quality / verdict check; main adopts the quality gate "
-    "(quality/config.toml)"
-)
-
-
-@pytest.mark.parametrize(
-    ("quality_config", "readiness", "reason"),
-    [
-        pytest.param(
-            "",
-            _land_readiness(),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-without-verdict",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=()),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-without-any-check",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(forge.CheckRun("quality / verdict (push)", "success"),)),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-with-a-differently-named-verdict",
-        ),
-        pytest.param(
-            "",
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ()),
-            NO_QUALITY_VERDICT_REFUSAL,
-            id="adopted-blocked-without-verdict-names-the-cause",
-        ),
-        pytest.param(
-            "",
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", (QUALITY_VERDICT,)),
-            "pull request #12 is not mergeable (blocked)",
-            id="adopted-blocked-with-verdict",
-        ),
-        pytest.param(
-            None,
-            forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ()),
-            "pull request #12 is not mergeable (blocked)",
-            id="unadopted-blocked-without-verdict-is-unchanged",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(forge.CheckRun("build", None),)),
-            "pull request #12 has checks still running: build; wait for every check to succeed",
-            id="adopted-running-check-defers-the-verdict",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(forge.CheckRun("quality / verdict", "failure"),)),
-            "pull request #12 has non-successful checks: quality / verdict (failure); "
-            "land only after every check succeeds",
-            id="adopted-red-verdict-keeps-the-existing-refusal",
-        ),
-        pytest.param(
-            "",
-            _land_readiness(checks=(QUALITY_VERDICT,)),
-            "pull request #12 carries no `Work-Item:` or `No-Item:` line",
-            id="adopted-with-verdict-passes-on-to-the-next-check",
-        ),
-    ],
-)
-def test_land_requires_the_quality_verdict_where_the_default_branch_adopts_the_gate(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    quality_config: str | None,
-    readiness: forge.LandingReadiness,
-    reason: str,
-) -> None:
-    """LANDCMD-43: presence of `quality/config.toml` on the default branch --
-    read once, from that branch, never the pull request head -- makes the
-    completed checks need `quality / verdict`; a running check defers it and
-    a repository without the file lands as before."""
-    client = _land_preflight_client(monkeypatch, readiness=readiness, body="Advances #72")
-    client.quality_config = quality_config
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == f"ERROR: {reason}\n"
-    assert client.quality_config_reads == ["main"]
-    assert client.merge_calls == []
-
-
-def test_land_bounds_the_quality_refusal_for_a_long_default_branch_name(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-43 within the 200-character refusal bound: a long default
-    branch name cannot push the printed line past it."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-    client.default_branch_name = "b" * 255
-    client.quality_config = ""
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    error_line = capsys.readouterr().err.rstrip("\n")
-    assert len(error_line) <= report.REFUSAL_LINE_LENGTH_LIMIT
-    assert error_line.startswith("ERROR: pull request #12 has no quality / verdict check; bbb")
-    assert error_line.endswith("…")
-
-
-@pytest.mark.parametrize(
-    ("on_default_branch", "at_pull_request_head", "reason"),
-    [
-        pytest.param(
-            "", None, NO_QUALITY_VERDICT_REFUSAL, id="head-deleting-the-config-is-still-refused"
-        ),
-        pytest.param(
-            None,
-            "",
-            "pull request #12 is not mergeable (blocked)",
-            id="adoption-pull-request-adding-the-config-is-not-refused",
-        ),
-    ],
-)
-def test_land_judges_adoption_by_the_default_branch_never_by_the_pull_request_head(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    on_default_branch: str | None,
-    at_pull_request_head: str | None,
-    reason: str,
-) -> None:
-    """LANDCMD-43 contract rule 1: a head that deletes `quality/config.toml`
-    still needs the verdict, and the pull request that adds it does not."""
-    blocked = forge.LandingReadiness(12, True, MERGE_COMMIT_SHA, "blocked", ())
-    client = _land_preflight_client(monkeypatch, readiness=blocked)
-    client.quality_config = on_default_branch
-    client.quality_config_at_other_refs = at_pull_request_head
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == f"ERROR: {reason}\n"
-
-
-def test_land_does_not_read_the_quality_config_for_a_closed_pull_request(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-02 runs before LANDCMD-43: a pull request that is not open
-    refuses as such and the quality configuration is never read."""
-    closed = forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ())
-    client = _land_preflight_client(monkeypatch, readiness=closed)
-    client.quality_config = ""
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == "ERROR: pull request #12 is not open; it cannot be landed\n"
-    assert client.quality_config_reads == []
-
-
-def test_land_refuses_a_closed_pull_request_even_when_the_default_branch_cannot_be_read(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-02 precedes the default-branch lookup LANDCMD-43 needs."""
-    closed = forge.LandingReadiness(12, False, MERGE_COMMIT_SHA, forge.MERGEABLE_STATE_CLEAN, ())
-    client = _land_preflight_client(monkeypatch, readiness=closed)
-
-    def unreadable_default_branch() -> str:
-        raise forge.ForgeError("GitHub returned HTTP 500")
-
-    monkeypatch.setattr(client, "default_branch", unreadable_default_branch)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-
-    assert capsys.readouterr().err == "ERROR: pull request #12 is not open; it cannot be landed\n"
-
-
-def test_land_fails_loud_when_the_quality_config_cannot_be_read(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """LANDCMD-43 contract rule 4: a contents read that is neither a file nor
-    a 404 refuses with the forge's error and never counts as not adopted."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-    client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) != 0
-
-    assert "HTTP 500" in capsys.readouterr().err
-    assert client.merge_calls == []
 
 
 @pytest.mark.parametrize(
@@ -17252,7 +16955,7 @@ def test_land_refuses_a_classification_defect_reusing_checks_own_rules(
     """Issue #405: once every check succeeds, `check <pr>`'s own
     classification rules apply unchanged -- an unclassified body refuses
     the same sentence `check` would, before any write."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), body=body)
+    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), body=body)
     client.landings[12] = landing_pull_request(body=body, head_ref_name="fix/x")
     if scenario is not None:
         _dependency_listing_scenario(client, tmp_path, scenario)
@@ -17453,7 +17156,7 @@ def test_land_refuses_a_head_that_changes_its_governing_board_config_before_any_
     item check, and within the 200-character refusal line."""
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client = _land_preflight_client(
-        monkeypatch, readiness=_land_readiness(), item_closed=item_closed
+        monkeypatch, readiness=landing_readiness(), item_closed=item_closed
     )
     client.head_board_config = head_board_config
 
@@ -17472,7 +17175,7 @@ def test_land_refuses_a_closed_work_item(
     before any write -- distinct from `check`'s own rules, which never
     verify the item's live state."""
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), item_closed=True)
+    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), item_closed=True)
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
 
@@ -17491,7 +17194,7 @@ def test_land_refuses_a_closed_work_item_before_its_own_missing_claim(
     never reads the store's claims to find out."""
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
     client = _land_preflight_client(
-        monkeypatch, readiness=_land_readiness(), item_closed=True, claimed=False
+        monkeypatch, readiness=landing_readiness(), item_closed=True, claimed=False
     )
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
@@ -17511,7 +17214,7 @@ def test_land_refuses_a_classification_defect_from_a_missing_claim(
     shape defect and `test_land_refuses_a_closed_work_item_before_its_own_
     missing_claim`'s LANDCMD-08-first ordering -- an *open* work item with
     no live claim at all refuses by its own missing claim."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), claimed=False)
+    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), claimed=False)
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
 
@@ -17550,7 +17253,7 @@ def test_land_refuses_a_foreign_claim_before_the_merge(
     a claim held by another agent refuses before the merge, not only once
     the delegated `release --merged` step runs after it. The repeat keeps
     `--head` and `--keep-worktree` (LANDCMD-10)."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness(), claim_agent="Grok")
+    client = _land_preflight_client(monkeypatch, readiness=landing_readiness(), claim_agent="Grok")
 
     assert issue_claim.main(["--repo", REPOSITORY, "land", "12", *arguments]) == 2
 
@@ -17559,39 +17262,6 @@ def test_land_refuses_a_foreign_claim_before_the_merge(
         f"`{repeat}`, or use an explicit coordinator override "
         "(holder='Grok (builder)', this session='Ada (builder)')\n"
     )
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_coordinator_override_with_no_role_before_the_merge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 point 8 review finding (LANDCMD-19): `--coordinator-override`
-    with no `--role` refuses via `cmd_land._land_preflight`'s own call to `release`'s
-    `protocol.require_coordinator_override`, before any merge."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12", "--coordinator-override"]) == 2
-
-    assert capsys.readouterr().err == "ERROR: a coordinator override requires --role coordinator\n"
-    assert client.merge_calls == []
-
-
-def test_land_refuses_a_coordinator_override_with_the_wrong_role_before_the_merge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #405 point 8 review finding (LANDCMD-19): `--coordinator-override
-    --role builder` refuses the same way as an omitted `--role` -- only
-    `--role coordinator` behind the override authorizes it."""
-    client = _land_preflight_client(monkeypatch, readiness=_land_readiness())
-
-    assert (
-        issue_claim.main(
-            ["--repo", REPOSITORY, "land", "12", "--coordinator-override", "--role", "builder"]
-        )
-        == 2
-    )
-
-    assert capsys.readouterr().err == "ERROR: a coordinator override requires --role coordinator\n"
     assert client.merge_calls == []
 
 
@@ -17650,24 +17320,11 @@ def test_land_merges_a_green_pull_request_and_runs_the_release_path(
     assert "next:" in out
 
 
-_HEAD_USAGE_REFUSAL = "--head must be 7 to 40 hex digits"
-
-
 @pytest.mark.parametrize(
-    ("reviewed_head", "refusal", "forge_read"),
+    "reviewed_head",
     [
-        pytest.param(MERGE_COMMIT_SHA, None, True, id="full-sha-matches"),
-        pytest.param(MERGE_COMMIT_SHA[:7].upper(), None, True, id="uppercase-prefix-matches"),
-        pytest.param(
-            "0000000",
-            f"pull request #12 head is {MERGE_COMMIT_SHA}, not the reviewed 0000000; "
-            "review the new head before landing",
-            True,
-            id="head-moved",
-        ),
-        pytest.param("main", _HEAD_USAGE_REFUSAL, False, id="not-hex"),
-        pytest.param(MERGE_COMMIT_SHA[:6], _HEAD_USAGE_REFUSAL, False, id="shorter-than-7"),
-        pytest.param(MERGE_COMMIT_SHA + "0", _HEAD_USAGE_REFUSAL, False, id="longer-than-40"),
+        pytest.param(MERGE_COMMIT_SHA, id="full-sha-matches"),
+        pytest.param(MERGE_COMMIT_SHA[:7].upper(), id="uppercase-prefix-matches"),
     ],
 )
 def test_land_merges_only_the_head_its_reviewers_saw(
@@ -17675,98 +17332,14 @@ def test_land_merges_only_the_head_its_reviewers_saw(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     reviewed_head: str,
-    refusal: str | None,
-    forge_read: bool,
 ) -> None:
-    """Issue #590 lines 1-3: `--head` lands the pull request only while the
-    head preflight reads -- the one the merge pins -- starts with the
-    reviewed sha; a moved head refuses before any write, and a value that
-    is no 7-40 hex digit sha refuses before the forge is read at all."""
-    repo, client = _land_scenario(monkeypatch, tmp_path)
-    trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
-
+    """Spec: LANDCMD-12, LANDCMD-32 -- full SHA and uppercase prefix pin the merge."""
+    _repo, client = _land_scenario(monkeypatch, tmp_path)
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", reviewed_head])
-
     error = capsys.readouterr().err
     pinned = [head_sha for _number, head_sha, *_rest in client.merge_calls]
-    if refusal is None:
-        assert (status, error, pinned) == (0, "", [MERGE_COMMIT_SHA])
-        return
-    trunk_after = real_git(repo, "rev-parse", "main").stdout.strip()
-    assert (status, error, pinned, trunk_after, client.requests > 0) == (
-        2,
-        f"ERROR: {refusal}\n",
-        [],
-        trunk_before,
-        forge_read,
-    )
-
-
-def _land_already_merged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FakeForge:
-    _repo, client = _land_scenario(monkeypatch, tmp_path)
-    _land_mark_already_merged(client)
-    return client
-
-
-def _land_under_the_state_ref_pin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FakeForge:
-    _write_state_ref_pin(tmp_path)
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    return client
-
-
-@pytest.mark.parametrize(
-    "arrange",
-    [
-        pytest.param(_land_already_merged, id="already-merged"),
-        pytest.param(_land_under_the_state_ref_pin, id="state-ref"),
-    ],
-)
-def test_land_refuses_a_malformed_head_as_usage_before_any_forge_call(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    arrange: Callable[[pytest.MonkeyPatch, Path], FakeForge],
-) -> None:
-    """Issue #592 line 4, LANDCMD-33's order: a malformed `--head` refuses
-    at the argument parse, so neither a rerun's skipped preflight nor the
-    state-ref refusal (LANDCMD-01) answers first, and the forge is never asked."""
-    client = arrange(monkeypatch, tmp_path)
-
-    status = issue_claim.main(["land", "12", "--head", "main"])
-
-    assert (status, capsys.readouterr().err, client.requests) == (
-        2,
-        f"ERROR: {_HEAD_USAGE_REFUSAL}\n",
-        0,
-    )
-
-
-@pytest.mark.parametrize(
-    ("number", "complaint"),
-    [
-        pytest.param("0", "0 is not a positive number", id="zero"),
-        pytest.param("-1", "-1 is not a positive number", id="negative"),
-        pytest.param("abc", "invalid int value: 'abc'", id="text"),
-        pytest.param("1.5", "invalid int value: '1.5'", id="fraction"),
-    ],
-)
-def test_land_refuses_a_malformed_pull_request_number_at_the_parser(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    number: str,
-    complaint: str,
-) -> None:
-    """Spec: LANDCMD-44 -- usage error, exit 2, and the forge is never asked; a
-    non-integer keeps argparse's own wording."""
-    client = _land_already_merged(monkeypatch, tmp_path)
-
-    result = run_cli(["land", number], capsys)
-
-    assert (result.status, result.stdout, client.requests) == (2, "", 0)
-    assert result.stderr.splitlines()[-1] == f"aco land: error: argument pull_request: {complaint}"
+    observed = status, error, pinned
+    assert observed == (0, "", [MERGE_COMMIT_SHA])
 
 
 @pytest.mark.parametrize(
@@ -18429,71 +18002,26 @@ def _land_mark_already_merged(client: FakeForge) -> None:
     client.landings[12] = replace(client.landings[12], merged=True, merge_commit=MERGE_COMMIT_SHA)
 
 
-_OVERRIDE_WITHOUT_COORDINATOR_ROLE = "a coordinator override requires --role coordinator"
-
-
 @pytest.mark.usefixtures("isolated_global_git_config")
-@pytest.mark.parametrize(
-    ("override_arguments", "git_identity", "refusal"),
-    [
-        pytest.param(
-            ["--coordinator-override"], True, _OVERRIDE_WITHOUT_COORDINATOR_ROLE, id="omitted-role"
-        ),
-        pytest.param(
-            ["--coordinator-override", "--role", "builder"],
-            True,
-            _OVERRIDE_WITHOUT_COORDINATOR_ROLE,
-            id="wrong-role",
-        ),
-        pytest.param([], False, checkout.LAND_MISSING_GIT_IDENTITY_REFUSAL, id="no-git-identity"),
-    ],
-)
-def test_land_rerun_refuses_a_bad_override_or_a_missing_git_identity_before_any_side_effect(
+def test_land_rerun_refuses_a_missing_git_identity_before_any_side_effect(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    override_arguments: list[str],
-    git_identity: bool,
-    refusal: str,
 ) -> None:
-    """Issue #405 round-4 finding 1: an already-merged rerun skips
-    `cmd_land._land_preflight` entirely, so a coordinator-override role check placed
-    only there would leave a rerun free to delete the branch, fast-forward,
-    and let the delegated `release --merged` step close the item on a bare
-    `--coordinator-override` with no coordinator role behind it.
-    `cmd_land.run`'s own entry validates this before the fresh/rerun split, so
-    none of that runs. A rerun from a checkout without a git identity
-    refuses the same way (LANDCMD-18 keeps LANDCMD-25)."""
+    """Spec: LANDCMD-18, LANDCMD-25 -- reruns still require a git identity."""
     repo, client = _land_scenario(monkeypatch, tmp_path)
     _land_mark_already_merged(client)
-    if not git_identity:
-        _without_git_identity(monkeypatch, repo)
+    _without_git_identity(monkeypatch, repo)
     trunk_before = real_git(repo, "rev-parse", "main").stdout.strip()
 
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12", *override_arguments])
+    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
 
     assert status == 2
-    assert capsys.readouterr().err == f"ERROR: {refusal}\n"
+    assert capsys.readouterr().err == f"ERROR: {checkout.LAND_MISSING_GIT_IDENTITY_REFUSAL}\n"
     assert client.merge_calls == []
     assert client.deleted_branches == []
     assert client.closed_issues == set()
     assert real_git(repo, "rev-parse", "main").stdout.strip() == trunk_before
-
-
-def test_land_refuses_under_the_state_ref_pin(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #405: `aco land` is a github-only command; a repository pinned
-    to `storage = state-ref` has no pull requests to land, refused before
-    any forge or store read."""
-    _write_state_ref_pin(tmp_path)
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-
-    assert issue_claim.main(["land", "12"]) == 2
-
-    assert capsys.readouterr().err == (
-        "ERROR: aco land is a github command; storage = state-ref has no pull requests to land\n"
-    )
 
 
 @pytest.mark.parametrize(
@@ -19091,8 +18619,9 @@ def _claim_the_landing_branch(
 
 def _without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) -> None:
     """`checkout_path` with no git identity git may use or guess: none
-    configured locally or in the environment (the caller isolates the global
-    configuration)."""
+    configured locally, in the environment or the system configuration (the
+    caller isolates the global configuration)."""
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     real_git(checkout_path, "config", "user.useConfigOnly", "true")
     real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
     real_git(checkout_path, "config", "--unset-all", "user.email", check=False)

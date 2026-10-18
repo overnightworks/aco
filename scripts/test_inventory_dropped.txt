@@ -73,3 +73,36 @@ tests/test_cli.py	'RULED #'	#176: test_rule.test_text compares complete row-owne
 tests/test_cli.py	'RULED'	#176: test_rule.test_text[display-control] compares the complete RULED sentence rather than its prefix.
 tests/test_cli.py	'line 1 is already ruled'	#176: test_rule.test_refusal[already-ruled] compares the complete refusal including the new-line remedy.
 tests/test_cli.py	'out of range'	#176: test_rule.test_refusal[out-of-range/out-of-range-zero] compares the complete indexed refusal sentence.
+tests/test_cli.py	"invalid int value: '1.5'"	#182: tests/test_land_preflight.py: test_parser_refusal[number-fraction] compares the complete final parser line.
+tests/test_cli.py	"invalid int value: 'abc'"	#182: tests/test_land_preflight.py: test_parser_refusal[number-text] compares the complete final parser line.
+tests/test_cli.py	'-1 is not a positive number'	#182: tests/test_land_preflight.py: test_parser_refusal[number-negative] compares the complete final parser line.
+tests/test_cli.py	'0 is not a positive number'	#182: tests/test_land_preflight.py: test_parser_refusal[number-zero] compares the complete final parser line.
+tests/test_cli.py	'; wait for every check to succeed'	#182: tests/test_land_preflight.py: TestLandReadiness compares complete running-check sentences instead of this standalone suffix.
+tests/test_cli.py	'ERROR: a coordinator override requires --role coordinator\n'	#182: tests/test_land_preflight.py: TestLandEntry compares ERROR prefix plus the row-owned exact role sentence and newline.
+tests/test_cli.py	'ERROR: aco land is a github command; storage = state-ref has no pull requests to land\n'	#182: tests/test_land_preflight.py: TestLandEntry[state-ref/state-ref-and-override] compares ERROR prefix plus the row-owned exact storage sentence and newline.
+tests/test_cli.py	'ERROR: pull request #12 has no quality / verdict check; bbb'	#182: tests/test_land_preflight.py: TestLandQualityGate[long-default-branch-name] compares the complete 200-character refusal, replacing the prefix match.
+tests/test_cli.py	'ERROR: pull request #12 is not open; it cannot be landed\n'	#182: tests/test_land_preflight.py: Closed readiness and quality rows compare ERROR prefix plus the row-owned exact closed sentence and newline.
+tests/test_cli.py	'HTTP 500'	#182: tests/test_land_preflight.py: TestLandQualityGate[config-unreadable] compares the complete GitHub returned HTTP 500 sentence, replacing containment.
+tests/test_cli.py	'aco land: error: argument pull_request: '	#182: tests/test_land_preflight.py: test_parser_refusal[number-*] compares complete final lines instead of an interpolated prefix.
+tests/test_cli.py	'adopted-blocked-without-verdict-names-the-cause'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-blocked-without-verdict-names-the-cause] to [adopted-blocked-without-verdict]; its mapped comparisons remain.
+tests/test_cli.py	'adopted-red-verdict-keeps-the-existing-refusal'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-red-verdict-keeps-the-existing-refusal] to [red-verdict]; its mapped comparisons remain.
+tests/test_cli.py	'adopted-running-check-defers-the-verdict'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-running-check-defers-the-verdict] to [running-defers]; its mapped comparisons remain.
+tests/test_cli.py	'adopted-with-verdict-passes-on-to-the-next-check'	#182: tests/test_land_preflight.py: Renamed parameter [adopted-with-verdict-passes-on-to-the-next-check] to [verdict-passes-to-classification]; its mapped comparisons remain.
+tests/test_cli.py	'adoption-pull-request-adding-the-config-is-not-refused'	#182: tests/test_land_preflight.py: Renamed parameter [adoption-pull-request-adding-the-config-is-not-refused] to [adoption-pull-request-adding-the-config]; its mapped comparisons remain.
+tests/test_cli.py	'already-merged'	#182: tests/test_land_preflight.py: Renamed parameter [already-merged] to [head-on-a-rerun]; its mapped comparisons remain.
+tests/test_cli.py	'check-running-many-long-names-bounded-with-error-prefix'	#182: tests/test_land_preflight.py: Renamed parameter [check-running-many-long-names-bounded-with-error-prefix] to [running-many-long-names-bounded]; its mapped comparisons remain.
+tests/test_cli.py	'check-running-name-list-capped'	#182: tests/test_land_preflight.py: Renamed parameter [check-running-name-list-capped] to [running-list-capped]; its mapped comparisons remain.
+tests/test_cli.py	'check-running-name-truncated'	#182: tests/test_land_preflight.py: Renamed parameter [check-running-name-truncated] to [running-name-truncated]; its mapped comparisons remain.
+tests/test_cli.py	'fraction'	#182: tests/test_land_preflight.py: Renamed parameter [fraction] to [number-fraction]; its mapped comparisons remain.
+tests/test_cli.py	'head-deleting-the-config-is-still-refused'	#182: tests/test_land_preflight.py: Renamed parameter [head-deleting-the-config-is-still-refused] to [head-deleting-the-config]; its mapped comparisons remain.
+tests/test_cli.py	'head-moved'	#182: tests/test_land_preflight.py: Renamed parameter [head-moved] to [moved-head]; its mapped comparisons remain.
+tests/test_cli.py	'longer-than-40'	#182: tests/test_land_preflight.py: Renamed parameter [longer-than-40] to [head-longer-than-40]; its mapped comparisons remain.
+tests/test_cli.py	'negative'	#182: tests/test_land_preflight.py: Renamed parameter [negative] to [number-negative]; its mapped comparisons remain.
+tests/test_cli.py	'no-git-identity'	#182: tests/test_cli.py::test_land_rerun_refuses_a_missing_git_identity_before_any_side_effect keeps the sole rerun identity case without its obsolete three-row parametrization.
+tests/test_cli.py	'not-hex'	#182: tests/test_land_preflight.py: Renamed parameter [not-hex] to [head-not-hex]; its mapped comparisons remain.
+tests/test_cli.py	'not-mergeable'	#182: tests/test_land_preflight.py: Renamed parameter [not-mergeable] to [not-mergeable-dirty]; its mapped comparisons remain.
+tests/test_cli.py	'omitted-role'	#182: tests/test_land_preflight.py: Renamed parameter [omitted-role] to [override-omitted-role / rerun-override-omitted-role]; its mapped comparisons remain.
+tests/test_cli.py	'shorter-than-7'	#182: tests/test_land_preflight.py: Renamed parameter [shorter-than-7] to [head-shorter-than-7]; its mapped comparisons remain.
+tests/test_cli.py	'unadopted-blocked-without-verdict-is-unchanged'	#182: tests/test_land_preflight.py: Renamed parameter [unadopted-blocked-without-verdict-is-unchanged] to [unadopted-blocked-without-verdict]; its mapped comparisons remain.
+tests/test_cli.py	'wrong-role'	#182: tests/test_land_preflight.py: Renamed parameter [wrong-role] to [override-wrong-role / rerun-override-wrong-role]; its mapped comparisons remain.
+tests/test_cli.py	'zero'	#182: tests/test_land_preflight.py: Renamed parameter [zero] to [number-zero]; its mapped comparisons remain.

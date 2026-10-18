@@ -26,6 +26,46 @@ LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"
 MERGE_COMMIT_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
 
 
+def landing_pull_request(
+    *,
+    body: str,
+    number: int = 12,
+    base_ref_name: str = "main",
+    head_ref_name: str = LANDING_BRANCH,
+    head_repository: str = REPOSITORY,
+    author: str = "ada",
+    merged: bool = False,
+    merge_commit: str | None = None,
+    title: str = "feat: land the lane",
+) -> forge.Landing:
+    """`merge_commit` defaults to a shared, well-formed sha once `merged` is
+    true (a real merged pull request always carries one) and to `None`
+    otherwise; a test proving the merge commit's own authority
+    (issue #397) passes its own sha instead."""
+    return forge.Landing(
+        number,
+        author,
+        body,
+        github.repository_id(head_repository),
+        head_ref_name,
+        base_ref_name,
+        merged,
+        merge_commit if merge_commit is not None else (MERGE_COMMIT_SHA if merged else None),
+        title,
+        MERGE_COMMIT_SHA,
+    )
+
+
+def landing_readiness(
+    number: int = 12,
+    *,
+    head_sha: str = MERGE_COMMIT_SHA,
+    mergeable_state: str = forge.MERGEABLE_STATE_CLEAN,
+    checks: tuple[forge.CheckRun, ...] = (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
+) -> forge.LandingReadiness:
+    return forge.LandingReadiness(number, True, head_sha, mergeable_state, checks)
+
+
 def serve_forge(monkeypatch: pytest.MonkeyPatch, forge: FakeForge) -> FakeForge:
     """Install one arranged forge at the GitHub adapter boundary."""
     monkeypatch.setattr(github, "GitHubForge", lambda repository: forge)
@@ -65,6 +105,7 @@ class FakeForge:
     board_dependencies: dict[int, tuple[board.IssueDependency, ...]] = field(default_factory=dict)
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     default_branch_name: str = "main"
+    default_branch_error: forge.ForgeError | None = None
     landings: dict[int, forge.Landing] = field(default_factory=dict)
     changes_by_number: dict[int, forge.PullRequestChanges | forge.ForgeError] = field(
         default_factory=dict
@@ -351,6 +392,8 @@ class FakeForge:
 
     def default_branch(self) -> str:
         self._run()
+        if self.default_branch_error is not None:
+            raise self.default_branch_error
         return self.default_branch_name
 
     def parent_issue(self, number: int) -> board.ParentIssue | None:
