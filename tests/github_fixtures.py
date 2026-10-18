@@ -20,7 +20,7 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import board, body, cmd_land, forge, github, protocol
+from agent_coordination import board, body, cmd_land, forge, github, protocol, store
 from agent_coordination.protocol import ClaimError
 
 WORK_ITEM_ISSUE = 72
@@ -495,6 +495,7 @@ class LandingWorld:
     remote: Path
     forge: FakeForge
     unchanged: dict[str, object]
+    default_branch: str = field(default="main", kw_only=True)
 
 
 @dataclass
@@ -512,6 +513,7 @@ def lane_landing_world(
     branch: str,
     body: str,
     methods: frozenset[board.MergeMethod] | None,
+    default_branch: str = "main",
     holder: str = "Ada",
     role: str = "builder",
     distinct_detail: bool = False,
@@ -528,7 +530,7 @@ def lane_landing_world(
         agent=holder,
         role=role,
         claim_id="landing",
-        base=protocol.ObjectId(real_git(clone, "rev-parse", "main").stdout.strip()),
+        base=protocol.ObjectId(real_git(clone, "rev-parse", default_branch).stdout.strip()),
     )
     seeded = publish_claims_from_a_second_clone(clone, remote, (intent,))
     observed = tuple(
@@ -537,8 +539,10 @@ def lane_landing_world(
     expected = ((identity, branch, holder, role, "landing"),)
     assert observed == expected
     detail = replace(
-        landing_pull_request(body=body, head_ref_name=branch),
-        head_sha=real_git(clone, "rev-parse", "main").stdout.strip() if distinct_detail else head,
+        landing_pull_request(body=body, head_ref_name=branch, base_ref_name=default_branch),
+        head_sha=real_git(clone, "rev-parse", default_branch).stdout.strip()
+        if distinct_detail
+        else head,
     )
     client = serve_forge(
         monkeypatch,
@@ -548,13 +552,16 @@ def lane_landing_world(
             merge_remote=remote,
             merge_error=error,
             allowed_methods=methods,
-            branch_rules={"main": rules},
+            branch_rules={default_branch: rules},
+            default_branch_name=default_branch,
             head_board_config=head_config,
         ),
     )
     if arrange is not None:
         arrange(client, head)
-    shared = landing_world(clone, remote, client, remote_tip=seeded.tip)
+    shared = landing_world(
+        clone, remote, client, remote_tip=seeded.tip, default_branch=default_branch
+    )
     entry: list[tuple[object, object]] = []
     merge = client.merge_landing
 
@@ -565,14 +572,22 @@ def lane_landing_world(
         return merge(number, head_sha=head_sha, method=method, title=title, body=body)
 
     monkeypatch.setattr(client, "merge_landing", observe_entry)
-    return LaneLandingWorld(clone, remote, client, shared.unchanged, head, entry)
+    return LaneLandingWorld(
+        clone, remote, client, shared.unchanged, head, entry, default_branch=shared.default_branch
+    )
 
 
 def landing_world(
-    clone: Path, remote: Path, forge: FakeForge, *, remote_tip: str | None = None
+    clone: Path,
+    remote: Path,
+    forge: FakeForge,
+    *,
+    remote_tip: str | None = None,
+    default_branch: str = "main",
 ) -> LandingWorld:
     """Snapshot the fully arranged checkout before invoking land."""
     worktrees, branches = worktrees_and_branches(clone)
+    world = LandingWorld(clone, remote, forge, {}, default_branch=default_branch)
     unchanged = {
         "merge": [],
         "delete": [],
@@ -582,11 +597,11 @@ def landing_world(
         "local": None,
         "worktrees": worktrees,
         "branches": branches,
-        "trunk": real_git(clone, "rev-parse", "main").stdout,
+        "trunk": real_git(clone, "rev-parse", world.default_branch).stdout,
         "stamp": None,
         "anchor": None,
     }
-    world = LandingWorld(clone, remote, forge, unchanged)
+    world.unchanged = unchanged
     observed = landing_effects(world)
     assert observed == unchanged
     return world
@@ -604,10 +619,77 @@ def landing_effects(world: LandingWorld) -> dict[str, object]:
         "local": state_ref_tip(world.clone),
         "worktrees": worktrees,
         "branches": branches,
-        "trunk": real_git(world.clone, "rev-parse", "main").stdout,
+        "trunk": real_git(world.clone, "rev-parse", world.default_branch).stdout,
         "stamp": stamp,
         "anchor": anchor,
     }
+
+
+def landed_observations(
+    world: LaneLandingWorld,
+    result: CliRun,
+    *,
+    branch: str,
+    method: board.MergeMethod,
+    title: str,
+    parents: int,
+    closed: frozenset[int],
+    release: str,
+    remaining_branches: frozenset[str],
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Observe a completed landing against caller-owned outcomes without invoking land."""
+    effects = landing_effects(world)
+    calls = world.forge.merge_calls
+    trunk = real_git(world.clone, "rev-parse", world.default_branch).stdout.strip()
+    remote_claims = store.peek_state(worktree=world.clone, remote=str(world.remote)).claims
+    topology = tuple(
+        line
+        for line in real_git(world.clone, "worktree", "list", "--porcelain").stdout.splitlines()
+        if line.startswith(("worktree ", "branch "))
+    )
+    branches = frozenset(
+        real_git(
+            world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
+        ).stdout.splitlines()
+    )
+    entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
+    merge = calls[0] if calls else (None, None, None, None, "")
+    comparisons: dict[str, tuple[object, object]] = {
+        "exit": (result.status, 0),
+        "stderr": (result.stderr, ""),
+        "stdout.release": (release in result.stdout, True),
+        "merge.count": (len(calls), 1),
+        "merge.number": (merge[0], 12),
+        "merge.head": (merge[1], world.head),
+        "merge.method": (merge[2], method),
+        "merge.title": (merge[3], title),
+        "delete": (effects["delete"], [branch]),
+        "close": (effects["close"], set(closed)),
+        "body": (effects["body"], []),
+        "remote.moved": (effects["remote"] != world.unchanged["remote"], True),
+        "claims": (remote_claims, {}),
+        "local": (effects["local"], None),
+        "worktrees": (
+            topology,
+            (f"worktree {world.clone}", f"branch refs/heads/{world.default_branch}"),
+        ),
+        "branches": (branches, remaining_branches),
+        "trunk.changed": (trunk + "\n" != world.unchanged["trunk"], True),
+        "trunk.same": (trunk == world.forge.landings[12].merge_commit, True),
+        "trunk.parents": (
+            len(real_git(world.clone, "rev-list", "--parents", "-n", "1", trunk).stdout.split())
+            - 1,
+            parents,
+        ),
+        "stamp": (effects["stamp"] is not None, True),
+        "anchor": (effects["anchor"] is not None, True),
+        "entry.stamp": (entry[0], None),
+        "entry.anchor": (entry[1], None),
+    }
+    return (
+        {key: actual for key, (actual, _) in comparisons.items()},
+        {key: wanted for key, (_, wanted) in comparisons.items()},
+    )
 
 
 @dataclass(frozen=True)
