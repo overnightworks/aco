@@ -62,3 +62,14 @@ tests/test_cli.py	'bootstrapped a fresh empty state at '	#153: G and executed P 
 tests/test_cli.py	'no local '	#153: Embedded in complete no-local-ref expected lines for G and P; the complete line remains compared.
 tests/test_cli.py	'nothing to delete on origin: '	#153: Embedded in complete literal absent-ref expected lines for G and P; both dry and confirmed output remain compared.
 tests/test_cli.py	'nothing to export: '	#153: Embedded in complete literal absent-ref expected lines for G and P; both dry and confirmed output remain compared.
+tests/test_cli.py	' #'	#176: test_rule.test_text compares the complete RULED sentence and target, replacing this interpolation fragment.
+tests/test_cli.py	' does not exist'	#176: test_rule.test_refusal[missing-item] compares the complete #90 refusal sentence in both formats.
+tests/test_cli.py	' is a pull request, not an issue; rule needs an issue'	#176: test_rule.test_refusal[pull-request] compares the complete #90 refusal sentence in both formats.
+tests/test_cli.py	' line '	#176: test_rule.test_text[display-control] compares the complete RULED sentence rather than its prefix.
+tests/test_cli.py	' line 1 '	#176: test_rule.test_text compares complete row-owned RULED sentences for all outcomes.
+tests/test_cli.py	'; 1 line(s) still open\n'	#176: test_rule.test_text compares complete row-owned RULED sentences including the remaining count.
+tests/test_cli.py	'ERROR: this forge cannot update_item_body; rule by hand'	#176: test_rule.test_refusal[read-only] retains the full sentence and compares ERROR plus that row-owned message and newline.
+tests/test_cli.py	'RULED #'	#176: test_rule.test_text compares complete row-owned RULED sentences rather than interpolation fragments.
+tests/test_cli.py	'RULED'	#176: test_rule.test_text[display-control] compares the complete RULED sentence rather than its prefix.
+tests/test_cli.py	'line 1 is already ruled'	#176: test_rule.test_refusal[already-ruled] compares the complete refusal including the new-line remedy.
+tests/test_cli.py	'out of range'	#176: test_rule.test_refusal[out-of-range/out-of-range-zero] compares the complete indexed refusal sentence.
