@@ -18,17 +18,21 @@ _GITHUB_ONLY_REFUSAL = (
 _BODY_CHANGED = (
     "pull request #{number} body changed after adopt wrote it; the claim stands; run adopt again"
 )
+_RE_READ_FAILED = (
+    "pull request #{number} body could not be read before writing ({foreign}); "
+    "the claim stands; run adopt again"
+)
 _READ_BACK_FAILED = (
-    "pull request #{number} body written, but reading it back failed ({error}); "
+    "pull request #{number} body written, but reading it back failed ({foreign}); "
     "the claim stands; run adopt again"
 )
 _BODY_WRITE_FAILED = {
     github.BodyWriteOutcome.REFUSED: (
-        "pull request #{number} body not written ({error}); "
+        "pull request #{number} body not written ({foreign}); "
         "the claim stands; run adopt again, or release it"
     ),
     github.BodyWriteOutcome.UNKNOWN: (
-        "pull request #{number} body write sent, outcome unknown ({error}); "
+        "pull request #{number} body write sent, outcome unknown ({foreign}); "
         "the claim stands; run adopt again"
     ),
 }
@@ -100,18 +104,12 @@ def _refuse_head_branch_collisions(adoption: _Adoption) -> None:
         raise moved
 
 
-def _failure_sentence(template: str, number: int, error: protocol.ClaimError) -> str:
-    """`template` with the forge's `error` shown as `report.bounded_refusal`
-    shows foreign text, cut so that the words around it always survive."""
-    room = (
-        report.REFUSAL_LINE_LENGTH_LIMIT
-        - len(report.CLI_ERROR_PREFIX)
-        - len(template.format(number=number, error=""))
+def _refusal_around_forge_error(
+    template: str, number: int, error: protocol.ClaimError
+) -> protocol.ClaimUnavailableError:
+    return protocol.ClaimUnavailableError(
+        report.refusal_around_foreign_text(template, str(error), number=number)
     )
-    shown = board.terminal_text(str(error))
-    if len(shown) > room:
-        shown = shown[: room - 1] + "…"
-    return template.format(number=number, error=shown)
 
 
 def _write_and_read_back(adoption: _Adoption, left_body: str) -> None:
@@ -122,13 +120,11 @@ def _write_and_read_back(adoption: _Adoption, left_body: str) -> None:
         adoption.run.forge_writer.update_item_body(number, left_body)
     except protocol.ClaimError as error:
         template = _BODY_WRITE_FAILED[github.body_write_outcome(error)]
-        raise protocol.ClaimUnavailableError(_failure_sentence(template, number, error)) from error
+        raise _refusal_around_forge_error(template, number, error) from error
     try:
         written = adoption.run.forge.item_reference(number).body
     except protocol.ClaimError as error:
-        raise protocol.ClaimUnavailableError(
-            _failure_sentence(_READ_BACK_FAILED, number, error)
-        ) from error
+        raise _refusal_around_forge_error(_READ_BACK_FAILED, number, error) from error
     if written != left_body:
         raise protocol.ClaimUnavailableError(_BODY_CHANGED.format(number=number))
 
@@ -140,10 +136,14 @@ def _print_declaration(adoption: _Adoption) -> None:
 
 
 def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
-    """ADOPT-23: the body is read again right before it is written, and judged
-    and composed from that copy; a body that already reads as left is not
-    written again."""
-    reread = adoption.run.forge.item_reference(adoption.number).body
+    """ADOPT-23, ADOPT-33: the body is read again right before it is written, and judged
+    and composed from that copy by `policy.adoption_body`, which names the
+    body to write or none when the line already stands."""
+    number = adoption.number
+    try:
+        reread = adoption.run.forge.item_reference(number).body
+    except protocol.ClaimError as error:
+        raise _refusal_around_forge_error(_RE_READ_FAILED, number, error) from error
     left_body = policy.adoption_body(
         adoption.context,
         replace(adoption.detail, body=reread),
@@ -151,8 +151,8 @@ def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
         resumed=resumed,
     )
     if isinstance(left_body, board.ClassificationDefect):
-        raise protocol.ClaimUnavailableError(f"pull request #{adoption.number} {left_body.message}")
-    if left_body != reread:
+        raise protocol.ClaimUnavailableError(f"pull request #{number} {left_body.message}")
+    if left_body is not None:
         _write_and_read_back(adoption, left_body)
     _print_declaration(adoption)
 
@@ -191,15 +191,12 @@ def _adopt_afresh(
     return 0
 
 
-def _resume(adoption: _Adoption, outcome: policy.ResumeWrite | policy.ResumeKeep) -> int:
+def _resume(adoption: _Adoption, holder: policy.HolderResume) -> int:
     """ADOPT-26: the holder's rerun builds and claims nothing; it writes the
     line only when it is missing."""
-    claim = outcome.claim
+    claim = holder.claim
     print(f"CLAIMED {board.claim_subject(claim, adoption.context.storage)}: {claim.claim_id}")
-    if isinstance(outcome, policy.ResumeWrite):
-        _leave_the_line(adoption, resumed=True)
-    else:
-        _print_declaration(adoption)
+    _leave_the_line(adoption, resumed=True)
     return 0
 
 

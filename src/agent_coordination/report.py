@@ -43,10 +43,22 @@ def bounded_refusal(sentence: str) -> str:
     (a check name, a head's board configuration key) may carry a newline or
     a terminal escape, so it is shown as `next` shows foreign text (`\\n`,
     `\\x1b`) before the length cap applies (issues #505, #538)."""
-    printable = board.terminal_text(sentence)
-    if len(printable) <= _REFUSAL_SENTENCE_LENGTH_LIMIT:
+    return _cut_to(board.terminal_text(sentence), _REFUSAL_SENTENCE_LENGTH_LIMIT)
+
+
+def refusal_around_foreign_text(template: str, foreign_text: str, **words: object) -> str:
+    """`template` with `{foreign}` replaced by `foreign_text` (a forge's error)
+    shown as `bounded_refusal` shows foreign text, and cut alone so that the
+    words around it always survive."""
+    room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
+    shown = _cut_to(board.terminal_text(foreign_text), room)
+    return template.format(foreign=shown, **words)
+
+
+def _cut_to(printable: str, limit: int) -> str:
+    if len(printable) <= limit:
         return printable
-    return printable[: _REFUSAL_SENTENCE_LENGTH_LIMIT - 1] + "…"
+    return printable[: limit - 1] + "…"
 
 
 def refuse(

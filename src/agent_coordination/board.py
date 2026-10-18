@@ -1074,6 +1074,15 @@ def _no_item_classification(value: str) -> Classification | ClassificationDefect
     return NoItemClassification(NoItemKind(value.lower()))
 
 
+def _selected_classification(
+    selected: re.Match[str], repository: str
+) -> Classification | ClassificationDefect:
+    value = selected.group("value").strip(" \t")
+    if selected.group("kind").lower() == WORK_ITEM_KIND:
+        return _work_item_classification(value, repository)
+    return _no_item_classification(value)
+
+
 def parse_pull_request_classification(
     body: str, repository: str
 ) -> Classification | ClassificationDefect:
@@ -1088,10 +1097,7 @@ def parse_pull_request_classification(
     selected = _single_classification_match(matches)
     if isinstance(selected, ClassificationDefect):
         return selected
-    value = selected.group("value").strip(" \t")
-    if selected.group("kind").lower() == WORK_ITEM_KIND:
-        return _work_item_classification(value, repository)
-    return _no_item_classification(value)
+    return _selected_classification(selected, repository)
 
 
 def live_classification_line(body: str) -> str | None:
@@ -1131,9 +1137,11 @@ ClassificationLineState = (
 )
 
 
-def classification_line_state(body: str, kind: NoItemKind) -> ClassificationLineState:
+def classification_line_state(
+    body: str, kind: NoItemKind, repository: str
+) -> ClassificationLineState:
     """What `aco adopt` finds of its own line in `body`: none, the kind's own
-    `No-Item: <kind>` (case-insensitive, as the parser reads it), another
+    `No-Item: <kind>` (as `parse_pull_request_classification` reads it), another
     single line as a terminal may show it, or the parser's defect for a body
     with several."""
     matches = tuple(CLASSIFICATION_LINE_PATTERN.finditer(_live_text(body)))
@@ -1142,11 +1150,7 @@ def classification_line_state(body: str, kind: NoItemKind) -> ClassificationLine
     selected = _single_classification_match(matches)
     if isinstance(selected, ClassificationDefect):
         return MalformedClassificationLines(selected)
-    is_own_line = (
-        selected.group("kind").lower() != WORK_ITEM_KIND
-        and selected.group("value").strip(" \t").lower() == kind.value
-    )
-    if is_own_line:
+    if _selected_classification(selected, repository) == NoItemClassification(kind):
         return ClassificationLine.PRESENT
     return OtherClassificationLine(terminal_text(selected.group(0)))
 

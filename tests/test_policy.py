@@ -102,7 +102,7 @@ class PreflightRow:
 
     refusal: str = ""
     planned_scope: tuple[str, ...] = ()
-    planned_body: str = ""
+    resumed_claim: protocol.ActiveClaim | None = None
     kind: board.NoItemKind = board.NoItemKind.FIX
     agent: str = "Ada"
     role: str = "builder"
@@ -124,6 +124,7 @@ def _pull_request_refusal(sentence: str) -> str:
 
 
 _BOB_LANE_CLAIM = standing_active_claim("Bob", lane=True, branch=ADOPTED_BRANCH)
+_ADA_LANE_CLAIM = standing_active_claim("Ada", lane=True, branch=ADOPTED_BRANCH)
 
 
 @pytest.mark.usefixtures("github_clone")
@@ -234,7 +235,6 @@ _BOB_LANE_CLAIM = standing_active_claim("Bob", lane=True, branch=ADOPTED_BRANCH)
         pytest.param(
             PreflightRow(
                 planned_scope=("README.md", "src/a.py", "src/b.py"),
-                planned_body="Bump x\n\nNo-Item: fix",
                 changes=pull_request_listing(
                     FIRST_HEAD,
                     forge.ChangedFile("README.md", None),
@@ -247,7 +247,6 @@ _BOB_LANE_CLAIM = standing_active_claim("Bob", lane=True, branch=ADOPTED_BRANCH)
         pytest.param(
             PreflightRow(
                 planned_scope=("uv.lock",),
-                planned_body="Bump x\n\nNo-Item: deps",
                 kind=board.NoItemKind.DEPS,
                 changes=pull_request_listing(FIRST_HEAD, forge.ChangedFile("uv.lock", None)),
                 dependency_paths=("uv.lock",),
@@ -288,9 +287,26 @@ _BOB_LANE_CLAIM = standing_active_claim("Bob", lane=True, branch=ADOPTED_BRANCH)
                 ),
                 kind=board.NoItemKind.DEPS,
                 pull_request=lambda landing: replace(landing, body="No-Item: fix"),
-                claims=(standing_active_claim("Ada", lane=True, branch=ADOPTED_BRANCH),),
+                claims=(_ADA_LANE_CLAIM,),
             ),
             id="R36-the-holders-claim-keeps-no-other-line",
+        ),
+        pytest.param(
+            PreflightRow(
+                resumed_claim=_ADA_LANE_CLAIM,
+                claims=(_ADA_LANE_CLAIM,),
+                listing_reads=1,
+            ),
+            id="R40-the-holders-rerun-resumes-its-claim",
+        ),
+        pytest.param(
+            PreflightRow(
+                resumed_claim=_ADA_LANE_CLAIM,
+                pull_request=lambda landing: replace(landing, body="Bump x\n\nNo-Item: fix"),
+                claims=(_ADA_LANE_CLAIM,),
+                listing_reads=1,
+            ),
+            id="R41-the-holders-rerun-resumes-past-its-own-line",
         ),
     ],
 )
@@ -323,11 +339,13 @@ def test_adoption_preflight_refuses_or_plans_in_precedence_order(row: PreflightR
         claims_provider,
     )
 
-    expected = (
-        policy.AdoptionRefusal(row.refusal)
-        if row.refusal
-        else policy.FreshAdoption(row.planned_scope, row.planned_body, FIRST_HEAD)
-    )
+    expected: policy.FreshAdoption | policy.HolderResume | policy.AdoptionRefusal
+    if row.refusal:
+        expected = policy.AdoptionRefusal(row.refusal)
+    elif row.resumed_claim is not None:
+        expected = policy.HolderResume(row.resumed_claim)
+    else:
+        expected = policy.FreshAdoption(row.planned_scope, FIRST_HEAD)
     assert outcome == expected
     assert len(claim_reads) == row.claim_reads
     assert len(pull_request_forge.changes_reads) == row.listing_reads

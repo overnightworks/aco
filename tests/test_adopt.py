@@ -15,6 +15,7 @@ from cli_fixtures import (
     ADOPTED_BRANCH,
     ADOPTED_PULL_REQUEST,
     CliRun,
+    assert_missing_identity_message,
     count_context_reads,
     dependabot_pull_request,
     fresh_observation,
@@ -220,6 +221,24 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
     assert result.stderr.startswith("usage: aco ")
     assert result.stderr.splitlines()[-1].startswith(usage_error)
     assert world.forge.requests == 0
+
+
+def test_adopt_refuses_without_an_agent_identity_before_it_reads_the_pull_request(
+    world: AdoptionWorld,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec: OUT-05 (checks, in order) -- no identity from `--agent` or the environment
+    refuses before any forge read, and writes nothing."""
+    monkeypatch.delenv(checkout.ACO_AGENT_ENV)
+    before = world.effects()
+
+    result = adopt(capsys)
+
+    assert (result.status, result.stdout) == (2, "")
+    assert_missing_identity_message(result.stderr)
+    assert world.forge.issue_reference_lookups == []
+    assert world.effects() == before
 
 
 def _claim_the_branch_as(

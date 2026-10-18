@@ -4248,6 +4248,6 @@ def test_classification_line_state_tells_the_line_a_rerun_may_keep(
 ) -> None:
     """Spec: ADOPT-05, ADOPT-26, ADOPT-30 -- the one live line is the kind's own (kept), another
     line (refused), or more than one (the parser's defect, refused)."""
-    state = board.classification_line_state(pull_request_body, board.NoItemKind.DEPS)
+    state = board.classification_line_state(pull_request_body, board.NoItemKind.DEPS, REPOSITORY)
 
     assert state == expected_state()

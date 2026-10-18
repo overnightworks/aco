@@ -448,10 +448,9 @@ class AdoptionRequest:
 @dataclass(frozen=True)
 class FreshAdoption:
     """What `adoption_preflight` proved adoptable: the claim's scope (LAND-74's
-    path set), the body to write, and the head both were judged at."""
+    path set) and the head it was judged at."""
 
     scope: tuple[str, ...]
-    body: str
     expected_head: str
 
 
@@ -459,20 +458,6 @@ class FreshAdoption:
 class HolderResume:
     """The branch's one live claim is the asking session's own builder lane
     claim: its rerun resumes it (ADOPT-26)."""
-
-    claim: protocol.ActiveClaim
-
-
-@dataclass(frozen=True)
-class ResumeWrite:
-    """A rerun whose body still lacks the line; the claim stands."""
-
-    claim: protocol.ActiveClaim
-
-
-@dataclass(frozen=True)
-class ResumeKeep:
-    """A rerun whose body already reads as the adoption leaves it."""
 
     claim: protocol.ActiveClaim
 
@@ -546,13 +531,15 @@ def adoption_body(
     kind: board.NoItemKind,
     *,
     resumed: bool,
-) -> board.ClassificationDefect | str:
-    """The body `aco adopt` leaves on the pull request, or why it is no
-    issue-less landing: it already carries a classification line (ADOPT-05;
-    a resumed rerun keeps its own, ADOPT-26), it would not read
-    `No-Item: <kind>` once the line is added (ADOPT-11), it targets another
-    branch than the default (ADOPT-04), or it closes an item (ADOPT-07)."""
-    state = board.classification_line_state(detail.body, kind)
+) -> board.ClassificationDefect | str | None:
+    """The one decider of what `aco adopt` writes: the body it leaves on the
+    pull request, `None` when `detail.body` already reads as adopt leaves it
+    (a resumed rerun keeps its own line, ADOPT-26), or why it is no issue-less
+    landing: it already carries a classification line (ADOPT-05), it would not
+    read `No-Item: <kind>` once the line is added (ADOPT-11), it targets
+    another branch than the default (ADOPT-04), or it closes an item
+    (ADOPT-07)."""
+    state = board.classification_line_state(detail.body, kind, context.repository)
     line_defect = _line_defect(detail.body, state, resumed=resumed)
     if line_defect is not None:
         return line_defect
@@ -566,11 +553,12 @@ def adoption_body(
         return board.ClassificationDefect(
             f"body would not read No-Item: {kind} with the line added: {classification.message}"
         )
-    return (
-        _target_branch_defect(context, detail)
-        or closing_reference_defect(prospective, context.repository)
-        or prospective
+    defect = _target_branch_defect(context, detail) or closing_reference_defect(
+        prospective, context.repository
     )
+    if defect is not None:
+        return defect
+    return None if state is board.ClassificationLine.PRESENT else prospective
 
 
 def _adoption_scope(
@@ -595,14 +583,15 @@ def _adoption_scope(
     return listed
 
 
-def _adoption_plan(
-    holder: HolderResume | None, scope: frozenset[str], left_body: str, detail: forge.Landing
-) -> FreshAdoption | ResumeWrite | ResumeKeep:
-    if holder is None:
-        return FreshAdoption(tuple(sorted(scope)), left_body, detail.head_sha)
-    if left_body == detail.body:
-        return ResumeKeep(holder.claim)
-    return ResumeWrite(holder.claim)
+def _judged_scope(
+    context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind, *, resumed: bool
+) -> board.ClassificationDefect | frozenset[str]:
+    """The listing's path set, once the body adopt would leave passes its own
+    checks: the listing is read only past them."""
+    left_body = adoption_body(context, detail, kind, resumed=resumed)
+    if isinstance(left_body, board.ClassificationDefect):
+        return left_body
+    return _adoption_scope(context, detail, kind)
 
 
 def adoption_preflight(
@@ -611,7 +600,7 @@ def adoption_preflight(
     detail: forge.Landing,
     reference: forge.ItemReference,
     claims_provider: Callable[[], protocol.ClaimState],
-) -> FreshAdoption | ResumeWrite | ResumeKeep | AdoptionRefusal:
+) -> FreshAdoption | HolderResume | AdoptionRefusal:
     """Every refusal of `aco adopt` that comes before its build, in the one
     order of `specs/adopt.spec.md`: the first failing step wins. `detail` and
     `reference` are the caller's reads; the claims are read once, only past
@@ -629,10 +618,9 @@ def adoption_preflight(
     )
     if isinstance(holder, AdoptionRefusal):
         return holder
-    left_body = adoption_body(context, detail, request.kind, resumed=holder is not None)
-    if isinstance(left_body, board.ClassificationDefect):
-        return _adoption_refusal(request.number, left_body)
-    scope = _adoption_scope(context, detail, request.kind)
+    scope = _judged_scope(context, detail, request.kind, resumed=holder is not None)
     if isinstance(scope, board.ClassificationDefect):
         return _adoption_refusal(request.number, scope)
-    return _adoption_plan(holder, scope, left_body, detail)
+    if holder is not None:
+        return holder
+    return FreshAdoption(tuple(sorted(scope)), detail.head_sha)

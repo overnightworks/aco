@@ -1718,7 +1718,8 @@ def claims_on_branch(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[Ac
 
 def branch_holders(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[ActiveClaim, ...]:
     """The live claims on `branch`, lane claims before issue claims: the first
-    is the holder ADOPT-06 and CLAIM-71 both name."""
+    is the holder CLAIM-71 names, and ADOPT-06 names the first that is not the
+    asking holder's own."""
     holders = claims_on_branch(claims, branch)
     return tuple(sorted(holders, key=lambda claim: not isinstance(claim.identity, LaneIdentity)))
 

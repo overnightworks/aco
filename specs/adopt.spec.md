@@ -18,6 +18,7 @@ directory in ADOPT-09.
 | state \ trigger | `aco adopt <n> --no-item <kind>` |
 |---|---|
 | `storage = "state-ref"` | ADOPT-01 |
+| no agent identity resolves | OUT-05 |
 | the pull request is not open | ADOPT-02 |
 | the head branch lives in another repository | ADOPT-03 |
 | the pull request targets another branch than the default | ADOPT-04 |
@@ -43,6 +44,7 @@ directory in ADOPT-09.
 | this session's builder lane claim stands alone on the branch | ADOPT-26, ADOPT-31 |
 | the body reads back unlike the body written | ADOPT-27 |
 | the body cannot be read back | ADOPT-28 |
+| the body cannot be read before it is written | ADOPT-33 |
 | a claim lands on the branch after the checks | ADOPT-29 |
 | the rerun's body carries more than one classification line | ADOPT-30 |
 | another role's claim, or a second claim, stands on the branch | ADOPT-32 |
@@ -56,28 +58,31 @@ list reads nothing after it.
 1. `--no-item` is one of `deps`, `fix` or `docs`, and one positive pull request number is given (ADOPT-08; the Never line on one pull request per call).
 2. The main checkout is resolved (ADOPT-15), then its storage pin is read (ADOPT-01); a linked
    worktree's own copy of `.aco/board.toml` is never read.
-3. The pull request and its item reference are read; the pull request is open (ADOPT-02) and its
+3. The agent identity is resolved from `--agent` or the environment; none refuses `agent identity
+   is required: pass --agent or set ACO_AGENT, GROK_SESSION_ID, or CLAUDE_CODE_SESSION_ID`
+   (OUT-05), before any forge read.
+4. The pull request and its item reference are read; the pull request is open (ADOPT-02) and its
    head branch is of this repository (ADOPT-03).
-4. The claim state is read once; no claim but this session's own builder lane claim stands on the
+5. The claim state is read once; no claim but this session's own builder lane claim stands on the
    head branch (ADOPT-06, ADOPT-32). That claim, alone there, makes the run a resume (ADOPT-26). Steps
-   1 to 3 read no claim state.
-5. The body carries no classification line, except the resume's own (ADOPT-05, ADOPT-30); with the
+   1 to 4 read no claim state.
+6. The body carries no classification line, except the resume's own (ADOPT-05, ADOPT-30); with the
    line added it reads `No-Item: <kind>` (ADOPT-11, ADOPT-12), the pull request targets the default
    branch (ADOPT-04), and it closes no item (ADOPT-07, LAND-17).
-6. For `deps`, the configuration names `dependency_paths` (ADOPT-07, LAND-70). The file listing
+7. For `deps`, the configuration names `dependency_paths` (ADOPT-07, LAND-70). The file listing
    is read once, at the head the first read named, and is complete and consistent (ADOPT-07,
    LAND-73, LAND-75, LAND-76), names a file (ADOPT-16), and for `deps` every path is covered
    (ADOPT-07, LAND-71). A resume ends its checks here (ADOPT-31): it never builds, fetches,
-   rescopes or runs steps 7 and 8.
-7. The head branch name is safe (ADOPT-17); nothing stands at `<repo>-worktrees/pr-<n>` (ADOPT-09);
+   rescopes or runs steps 8 and 9.
+8. The head branch name is safe (ADOPT-17); nothing stands at `<repo>-worktrees/pr-<n>` (ADOPT-09);
    no local branch has its name (ADOPT-13); the remote still has the head branch, and its fetched tip
    is the head the checks read (ADOPT-10).
-8. The claim `adopt` would make passes `claim`'s check phase for the listing's path set
+9. The claim `adopt` would make passes `claim`'s check phase for the listing's path set
    (ADOPT-14), where it is exclusive on its branch (CLAIM-71).
-9. The worktree is built on the head branch from the fetched tip, and its HEAD is the head
+10. The worktree is built on the head branch from the fetched tip, and its HEAD is the head
    the checks read (ADOPT-10); the claim is written for the listing's path set (ADOPT-21,
    ADOPT-22, ADOPT-29).
-10. The body is read again and judged once more on that copy (ADOPT-23), written (ADOPT-24,
+11. The body is read again (ADOPT-33) and judged once more on that copy (ADOPT-23), written (ADOPT-24,
    ADOPT-25), read back (ADOPT-27, ADOPT-28), and the declaration printed (ADOPT-20).
 
 ## Checks, refusals and writes
@@ -114,11 +119,12 @@ list reads nothing after it.
 - [ ] [ADOPT-30] On ADOPT-26's rerun a body with more than one live classification line refuses `pull request #<n> <the parser's defect>; adopt never changes a classification line`, exit `2`.
 - [ ] [ADOPT-31] ADOPT-26's rerun judges ADOPT-02..07 and ADOPT-16 again on the body it would leave, at the head it read; it never builds, fetches, rescopes or checks ADOPT-09, ADOPT-10, ADOPT-13 or ADOPT-17.
 - [ ] [ADOPT-32] A same-agent lane claim under another role, or any claim beside the holder's on the branch, is no such rerun: ADOPT-06 refuses, naming that claim, and nothing is written.
+- [ ] [ADOPT-33] A failed re-read before the write prints `pull request #<n> body could not be read before writing (<error>); the claim stands; run adopt again`, exit `2`.
 
 ## Never
 
 - A refusal before the build never creates a worktree or branch, makes a claim transition or writes a body. Its fetches may still move local bookkeeping: the state ref's local anchor and lineage stamp, and `refs/remotes/<remote>/<branch>` of the head branch and the default branch, never a local branch.
-- `aco adopt` never pushes, and never touches the pull request's title, labels, base, branch or commits. This keeps the pull request's code; it does not certify the code safe.
+- `aco adopt` never pushes to the pull request's branch, and never touches the pull request's title, labels, base, branch or commits. This keeps the pull request's code; it does not certify the code safe.
 - `aco adopt` never reads an author list: a bot's pull request and a person's are judged alike, by their body, branch, claims and file listing.
 - `aco adopt` never changes a line of the body it last read; it only appends one.
 - `aco adopt` never takes a claim another holder or an issue holds, and never resumes a claim under another role or beside another holder (ADOPT-32).
