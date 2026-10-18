@@ -20744,17 +20744,32 @@ def test_item_new_json_reports_ok_reason_created(
     }
 
 
-def test_item_edit_refuses_under_github_storage(capsys: pytest.CaptureFixture[str]) -> None:
-    """Issue #287 proof 7: under `storage = "github"` (the default), `item
-    edit` refuses by name -- forge issues are edited on the forge, never
-    governed by aco -- before it ever reads stdin (no `sys.stdin` stand-in
-    is installed here, so a stray read would surface as a test failure)."""
-    status = issue_claim.main(["item", "edit", "42"])
+@pytest.mark.parametrize(
+    ("command", "sentence"),
+    [
+        pytest.param(
+            "edit",
+            "ERROR: forge issues are edited on the forge; aco never governs them\n",
+            id="edit",
+        ),
+        pytest.param(
+            "close",
+            "ERROR: the forge closes its issues; aco never governs them\n",
+            id="close",
+        ),
+    ],
+)
+def test_item_mutation_refuses_under_github_storage(
+    capsys: pytest.CaptureFixture[str], command: str, sentence: str
+) -> None:
+    """Issues #287 and #289: the forge owns whole-body edits and closing.
+    Refuse before reading stdin, resolving a forge, or reading claims.
+    """
+    status = issue_claim.main(["item", command, "42"])
 
-    assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: forge issues are edited on the forge; aco never governs them\n"
-    )
+    observed = (status, capsys.readouterr().err)
+    expected = (2, sentence)
+    assert observed == expected
 
 
 def test_item_edit_size_writes_the_top_level_field_under_github_storage(
@@ -20903,16 +20918,6 @@ def test_item_edit_whole_refuses_through_the_shared_precondition_failed_envelope
     captured = capsys.readouterr()
     assert "this forge cannot update_item_body; item edit --whole by hand" in captured.err
     _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
-
-
-def test_item_close_refuses_under_github_storage(capsys: pytest.CaptureFixture[str]) -> None:
-    """Issue #289 proof 6: under `storage = "github"` (the default), `item
-    close` refuses by name -- the forge closes its own issues, aco never
-    governs them -- before it ever resolves a forge or reads a claim."""
-    status = issue_claim.main(["item", "close", "42"])
-
-    assert status == 2
-    assert capsys.readouterr().err == "ERROR: the forge closes its issues; aco never governs them\n"
 
 
 def test_item_close_prints_json_under_the_state_ref_pin(

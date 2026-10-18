@@ -236,93 +236,6 @@ def world(
     )
 
 
-def landed_observations(world: MessageWorld, capsys: pytest.CaptureFixture[str]):
-    outcome = world.case.outcome
-    assert isinstance(outcome, Landed)
-    capsys.readouterr()
-    result = run_cli(["land", "12"], capsys)
-    effects = landing_effects(world)
-    calls = world.forge.merge_calls
-    merge = calls[0] if calls else (None, None, None, None, "")
-    entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
-    trunk = real_git(world.clone, "rev-parse", "main").stdout.strip()
-    message = real_git(world.clone, "log", "-1", "--format=%B", "main").stdout
-    keys = trailer_keys(world.clone, message)
-    topology = tuple(
-        line
-        for line in real_git(world.clone, "worktree", "list", "--porcelain").stdout.splitlines()
-        if line.startswith(("worktree ", "branch "))
-    )
-    branches = set(
-        real_git(
-            world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
-        ).stdout.splitlines()
-    )
-    observed = {
-        "exit": result.status,
-        "stderr": result.stderr,
-        "stdout.release": outcome.release in result.stdout,
-        "merge.count": len(calls),
-        "merge.number": merge[0],
-        "merge.head": merge[1],
-        "merge.method": merge[2],
-        "merge.title": merge[3],
-        "message": merge[4],
-        "trunk.message": message,
-        "trunk.parents": len(
-            real_git(world.clone, "rev-list", "--parents", "-n", "1", trunk).stdout.split()
-        )
-        - 1,
-        "keys": keys,
-        "delete": effects["delete"],
-        "close": effects["close"],
-        "body writes": effects["body"],
-        "remote.moved": effects["remote"] != world.unchanged["remote"],
-        "claims": store.peek_state(worktree=world.clone, remote=str(world.remote)).claims,
-        "local": effects["local"],
-        "worktrees": topology,
-        "branches": branches,
-        "trunk.changed": trunk + "\n" != world.unchanged["trunk"],
-        "trunk.same": trunk == world.forge.landings[12].merge_commit,
-        "stamp": effects["stamp"] is not None,
-        "anchor": effects["anchor"] is not None,
-        "entry.stamp": entry[0],
-        "entry.anchor": entry[1],
-    }
-    committed = (
-        outcome.message.body if outcome.message.committed is None else outcome.message.committed
-    )
-    expected = {
-        "exit": 0,
-        "stderr": "",
-        "stdout.release": True,
-        "merge.count": 1,
-        "merge.number": 12,
-        "merge.head": world.head,
-        "merge.method": outcome.method,
-        "merge.title": outcome.title,
-        "message": outcome.message.body,
-        "trunk.message": outcome.title + "\n\n" + committed + "\n",
-        "trunk.parents": outcome.parents,
-        "keys": outcome.message.keys,
-        "delete": [world.case.branch],
-        "close": set(outcome.closed),
-        "body writes": [],
-        "remote.moved": True,
-        "claims": {},
-        "local": None,
-        "worktrees": (f"worktree {world.clone}", "branch refs/heads/main"),
-        "branches": {"main", world.case.branch},
-        "trunk.changed": True,
-        "trunk.same": True,
-        "stamp": True,
-        "anchor": True,
-        "entry.stamp": None,
-        "entry.anchor": None,
-    }
-    return observed, expected
-
-
 class TestLandMessage:
     @pytest.mark.parametrize(
         "world",
@@ -548,7 +461,16 @@ class TestLandMessage:
                 id="trailer-configuration-warning",
             ),
             pytest.param(
-                MessageCase("Work-Item: #72", Landed(Message("Work-Item: #72\n", ["Work-Item"]))),
+                MessageCase(
+                    "No-Item: fix",
+                    Landed(
+                        Message("No-Item: fix\n", ["No-Item"]),
+                        closed=frozenset(),
+                        release="RELEASED lane fix/x: landing\n",
+                    ),
+                    branch="fix/x",
+                    identity=protocol.LaneIdentity(),
+                ),
                 id="classification-only-body",
             ),
             pytest.param(
@@ -605,7 +527,89 @@ class TestLandMessage:
         Spec: LANDCMD-35, removing classification leaves no blank-line run.
         Spec: LANDCMD-36, any other body has a blank line before classification.
         """
-        observed, expected = landed_observations(world, capsys)
+        outcome = world.case.outcome
+        assert isinstance(outcome, Landed)
+        capsys.readouterr()
+        result = run_cli(["land", "12"], capsys)
+        effects = landing_effects(world)
+        calls = world.forge.merge_calls
+        merge = calls[0] if calls else (None, None, None, None, "")
+        entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
+        trunk = real_git(world.clone, "rev-parse", "main").stdout.strip()
+        message = real_git(world.clone, "log", "-1", "--format=%B", "main").stdout
+        keys = trailer_keys(world.clone, message)
+        topology = tuple(
+            line
+            for line in real_git(world.clone, "worktree", "list", "--porcelain").stdout.splitlines()
+            if line.startswith(("worktree ", "branch "))
+        )
+        branches = set(
+            real_git(
+                world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
+            ).stdout.splitlines()
+        )
+        observed = {
+            "exit": result.status,
+            "stderr": result.stderr,
+            "stdout.release": outcome.release in result.stdout,
+            "merge.count": len(calls),
+            "merge.number": merge[0],
+            "merge.head": merge[1],
+            "merge.method": merge[2],
+            "merge.title": merge[3],
+            "message": merge[4],
+            "trunk.message": message,
+            "trunk.parents": len(
+                real_git(world.clone, "rev-list", "--parents", "-n", "1", trunk).stdout.split()
+            )
+            - 1,
+            "keys": keys,
+            "delete": effects["delete"],
+            "close": effects["close"],
+            "body writes": effects["body"],
+            "remote.moved": effects["remote"] != world.unchanged["remote"],
+            "claims": store.peek_state(worktree=world.clone, remote=str(world.remote)).claims,
+            "local": effects["local"],
+            "worktrees": topology,
+            "branches": branches,
+            "trunk.changed": trunk + "\n" != world.unchanged["trunk"],
+            "trunk.same": trunk == world.forge.landings[12].merge_commit,
+            "stamp": effects["stamp"] is not None,
+            "anchor": effects["anchor"] is not None,
+            "entry.stamp": entry[0],
+            "entry.anchor": entry[1],
+        }
+        committed = (
+            outcome.message.body if outcome.message.committed is None else outcome.message.committed
+        )
+        expected = {
+            "exit": 0,
+            "stderr": "",
+            "stdout.release": True,
+            "merge.count": 1,
+            "merge.number": 12,
+            "merge.head": world.head,
+            "merge.method": outcome.method,
+            "merge.title": outcome.title,
+            "message": outcome.message.body,
+            "trunk.message": outcome.title + "\n\n" + committed + "\n",
+            "trunk.parents": outcome.parents,
+            "keys": outcome.message.keys,
+            "delete": [world.case.branch],
+            "close": set(outcome.closed),
+            "body writes": [],
+            "remote.moved": True,
+            "claims": {},
+            "local": None,
+            "worktrees": (f"worktree {world.clone}", "branch refs/heads/main"),
+            "branches": {"main", world.case.branch},
+            "trunk.changed": True,
+            "trunk.same": True,
+            "stamp": True,
+            "anchor": True,
+            "entry.stamp": None,
+            "entry.anchor": None,
+        }
         assert observed == expected
 
     @pytest.mark.parametrize(
