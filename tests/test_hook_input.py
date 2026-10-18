@@ -880,6 +880,41 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             id="git-restore-end-of-options-marker-taken-as-a-value-ends-nothing",
         ),
         pytest.param(
+            "cp --target=docs -S -tdocs src/a",
+            ((hook_input.PATTERN_COPY, "docs"),),
+            id="cp-abbreviated-target-directory-wins-over-a-suffix-consumed-dash-t",
+        ),
+        pytest.param(
+            "cp --tar docs src/a",
+            ((hook_input.PATTERN_COPY, "docs"),),
+            id="cp-unique-prefix-of-target-directory-takes-the-next-word",
+        ),
+        pytest.param(
+            "cp --s x src/a /repo/x",
+            ((hook_input.PATTERN_COPY, "/repo/x"),),
+            id="cp-ambiguous-long-option-prefix-is-a-plain-flag",
+        ),
+        pytest.param(
+            "sed --in-pl -f -i docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-abbreviated-in-place-edits-with-dash-i-as-the-script-file",
+        ),
+        pytest.param(
+            "sed -i -nep docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-clustered-expression-takes-its-attached-script",
+        ),
+        pytest.param(
+            "sed -i -nfscript docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-clustered-file-option-takes-its-attached-script-file",
+        ),
+        pytest.param(
+            "git restore --sour HEAD f",
+            ((hook_input.PATTERN_GIT_RESTORE, "f"),),
+            id="git-restore-unique-prefix-of-source-takes-the-next-word",
+        ),
+        pytest.param(
             "sed -i p /repo/f /repo/f",
             ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
             id="sed-names-a-file-given-twice-once",

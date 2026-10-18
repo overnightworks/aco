@@ -951,6 +951,8 @@ def _bash_scope_case(
             2,
             "git restore -Ws outside claim scope",
         ),
+        ("cp --target=docs -S -tdocs src/a", 2, "cp docs outside claim scope"),
+        ("sed --in-pl -f -i docs/file", 2, "sed -i docs/file outside claim scope"),
     ],
 )
 def test_protect_bash_judges_a_recognized_pattern_path_by_claim_scope(

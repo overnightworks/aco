@@ -530,6 +530,11 @@ _SED_SCRIPT_OPTIONS = frozenset({"-e", "--expression", "-f", "--file"})
 _SED_LINE_LENGTH_OPTIONS = frozenset({"-l", "--line-length"})
 _CP_TARGET_DIRECTORY_OPTIONS = frozenset({"-t", "--target-directory"})
 _CP_OTHER_VALUE_OPTIONS = frozenset({"-S", "--suffix", "--no-preserve", "--sparse"})
+# Long options that take only an attached `=value`; listed so that an
+# abbreviation is ambiguous exactly where the tool finds it ambiguous.
+_CP_OPTIONAL_VALUE_OPTIONS = frozenset(
+    {"--backup", "--preserve", "--reflink", "--update", "--context"}
+)
 _GIT_CHECKOUT_SKIPPED_FLAGS = frozenset({"-f", "--ours", "--theirs"})
 _GIT_RESTORE_VALUE_OPTIONS = frozenset({"--source", "-s", "--conflict", "--pathspec-from-file"})
 _GIT_RESTORE_END_OF_OPTIONS = frozenset({_END_OF_OPTIONS, _GIT_END_OF_OPTIONS})
@@ -672,6 +677,18 @@ def _parse_short_cluster(
     return options, 0
 
 
+def _resolve_long_option(written_name: str, known_options: set[str]) -> str:
+    """The option `written_name` stands for, as `getopt_long` and git resolve
+    it: an exact name, else the one long option of the command's own table
+    it is a prefix of. A prefix of several or of none stays as written -- a
+    plain flag -- since the tool then refuses (several) or knows an option
+    that takes no value (none), and the table lists every option that does."""
+    if written_name in known_options or written_name == _LONG_OPTION_PREFIX:
+        return written_name
+    candidates = [name for name in known_options if name.startswith(written_name)]
+    return candidates[0] if len(candidates) == 1 else written_name
+
+
 def _parse_long_option(
     word: _Word,
     following: tuple[_Word, ...],
@@ -681,8 +698,9 @@ def _parse_long_option(
 ) -> tuple[_OptionValue, int]:
     """One `--name[=value]` option and how many following words it consumed:
     a required value is the `=value` or else the next word, an optional one
-    only the `=value`."""
-    name, separator, attached = word.text.partition(_LONG_OPTION_VALUE_SEPARATOR)
+    only the `=value`. The name is resolved through its unique abbreviation."""
+    written_name, separator, attached = word.text.partition(_LONG_OPTION_VALUE_SEPARATOR)
+    name = _resolve_long_option(written_name, {*value_options, *optional_value_options})
     if separator:
         takes_value = name in value_options | optional_value_options
         return _OptionValue(name, _attached_value(word, attached) if takes_value else None), 0
@@ -821,7 +839,9 @@ def _match_copy(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | Non
     destinations = _unique_in_command_order(
         destination
         for parsed in _parse_both_readings(
-            words[1:], value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS
+            words[1:],
+            value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS,
+            optional_value_options=_CP_OPTIONAL_VALUE_OPTIONS,
         )
         for destination in (
             parsed.every_value_of(_CP_TARGET_DIRECTORY_OPTIONS) or parsed.operands[-1:]
