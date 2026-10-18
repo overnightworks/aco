@@ -142,6 +142,9 @@ session that holds the branch's claim resumes it, adding the line only if it is 
 give an adopted pull request up, run `aco release --branch <head-branch> --abandoned REASON`
 from the main checkout, then `git worktree remove <path>` and `git branch -D <branch>`; the
 line stays in the body, so a later `adopt` of that pull request refuses until it is removed.
+A bot's re-push ends no claim, and `aco land --head` demands the new head; a re-push that
+rewrote the branch leaves the worktree behind: pull it to the new head by hand first, or
+`land` reports `worktree: kept -- not merged into the default branch` (REL-29).
 `specs/adopt.spec.md` owns the checks, their order and their refusals.
 
 ## A workflow without a forge
