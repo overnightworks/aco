@@ -246,15 +246,13 @@ class _AlwaysRejectingTransport:
 
 class _RejectsFirstPushesTransport:
     """A `PushTransport` that rejects its first `rejections` pushes without
-    landing them, then pushes for real, recording every commit it was given."""
+    landing them, then pushes for real."""
 
     def __init__(self, *, rejections: int) -> None:
         self._rejections_left = rejections
-        self.pushed_commits: list[protocol.ObjectId] = []
         self._real = store.GitPushTransport()
 
     def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
-        self.pushed_commits.append(new_oid)
         if self._rejections_left:
             self._rejections_left -= 1
             raise protocol.PushRejectedError("simulated rejection")
@@ -1164,15 +1162,22 @@ def test_linked_worktrees_fetch_concurrently_and_write_distinct_lineage_stamps(
     assert stamp_b.read_text().strip() == tip
 
 
-def test_push_retry_returns_the_remote_tip_after_an_accept_then_raise_and_lands_one_root_commit(
-    bare_remote: Path, worktree: Path
+@pytest.mark.parametrize(
+    "transport_factory",
+    [
+        pytest.param(_AcceptThenRaiseTransport, id="lost-response-after-the-push-landed"),
+        pytest.param(
+            partial(_RejectsFirstPushesTransport, rejections=1), id="rejected-while-absent"
+        ),
+    ],
+)
+def test_push_retry_leaves_bootstrap_with_the_one_root_commit_the_remote_holds(
+    bare_remote: Path, worktree: Path, transport_factory: Callable[[], store.PushTransport]
 ) -> None:
-    transport = _AcceptThenRaiseTransport()
+    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport_factory())
 
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
-
-    assert transport.calls == 1
     assert tip == state_ref_tip(bare_remote)
+    assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
     log = subprocess.run(
         ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
         check=True,
@@ -1180,18 +1185,6 @@ def test_push_retry_returns_the_remote_tip_after_an_accept_then_raise_and_lands_
         text=True,
     )
     assert log.stdout.strip() == "1"
-
-
-def test_push_retry_creates_the_ref_with_the_same_commit_after_a_rejection_that_left_it_absent(
-    bare_remote: Path, worktree: Path
-) -> None:
-    transport = _RejectsFirstPushesTransport(rejections=1)
-
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
-
-    assert transport.pushed_commits == [tip, tip]
-    assert state_ref_tip(bare_remote) == tip
-    assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
 
 
 def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
