@@ -109,17 +109,17 @@ def arrange_trailer_read(
     monkeypatch.setattr(process, "run_git", read)
     if case.trailer_read is GitTrailerRead.TIMES_OUT:
         with pytest.raises(process.ProcessTimedOutError):
-            read(arguments, directory=github_clone)
+            process.run_git(arguments, directory=github_clone)
     elif case.trailer_read is GitTrailerRead.EXITS_NONZERO:
-        observed = read(arguments, directory=github_clone)
+        observed = process.run_git(arguments, directory=github_clone)
         expected = process.CapturedResult(128, b"", b"fatal: bad trailer\n")
         assert observed == expected
     else:
-        captured = read(arguments, directory=github_clone)
+        captured = process.run_git(arguments, directory=github_clone)
         observed = (captured.exit_status, captured.stdout, bool(captured.stderr))
         expected = (0, b"Probe: value\n", case.noise is not GitNoise.NONE)
         assert observed == expected
-    observed = read(["rev-parse", "HEAD"], directory=github_clone).stdout.decode()
+    observed = process.run_git(["rev-parse", "HEAD"], directory=github_clone).stdout.decode()
     expected = real_git(github_clone, "rev-parse", "main").stdout
     assert observed == expected
 
@@ -459,6 +459,19 @@ class TestLandMessage:
                     noise=GitNoise.CONFIGURATION_WARNING,
                 ),
                 id="trailer-configuration-warning",
+            ),
+            pytest.param(
+                MessageCase(
+                    "Closes #72\n\nWork-Item: #72\nCo-Authored-By: Ada <ada@example.com>",
+                    Landed(
+                        Message(
+                            "Closes #72\n\nCo-Authored-By: Ada <ada@example.com>\nWork-Item: #72\n",
+                            ["Co-Authored-By", "Work-Item"],
+                        )
+                    ),
+                    noise=GitNoise.CONFIGURATION_WARNING,
+                ),
+                id="trailer-block-under-noise",
             ),
             pytest.param(
                 MessageCase(

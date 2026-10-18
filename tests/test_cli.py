@@ -20762,9 +20762,7 @@ def test_item_new_json_reports_ok_reason_created(
 def test_item_mutation_refuses_under_github_storage(
     capsys: pytest.CaptureFixture[str], command: str, sentence: str
 ) -> None:
-    """Issues #287 and #289: the forge owns whole-body edits and closing.
-    Refuse before reading stdin, resolving a forge, or reading claims.
-    """
+    """Issues #287 and #289: the forge owns whole-body edits and closing."""
     status = issue_claim.main(["item", command, "42"])
 
     observed = (status, capsys.readouterr().err)
@@ -20927,7 +20925,7 @@ def test_item_close_prints_json_under_the_state_ref_pin(
     prints the shared envelope, `reason: "closed"`, then `{"item", "number",
     "closed_at", "parent_closable"}`, and returns before the plain-text
     `CLOSED`/`freed:` lines, the branch
-    `test_item_close_refuses_under_github_storage`'s refusal never reaches.
+    `test_item_mutation_refuses_under_github_storage[close]`'s refusal never reaches.
     `parent_closable` (issue #348) is `null` here: `42` names no parent on
     this fake."""
     _write_state_ref_pin(tmp_path)
