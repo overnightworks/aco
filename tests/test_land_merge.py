@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import cast
 
 import pytest
 from cli_fixtures import (
     CliRun,
     MainBranchState,
+    add_lane_worktree,
     landed_from_another_clone,
     move_trunk,
     pull_request_listing,
@@ -126,16 +126,7 @@ def world(
             track_board_config(github_clone, case.trunk_config)
             real_git(github_clone, "push", "-q", "origin", default_branch)
         if case.lane_worktree is LaneWorktree.PRESENT:
-            real_git(github_clone, "worktree", "add", "-q", str(lane), case.branch)
-            real_git(
-                github_clone, "branch", "--set-upstream-to", f"origin/{case.branch}", case.branch
-            )
-            observed = (
-                real_git(lane, "branch", "--show-current").stdout,
-                real_git(github_clone, "config", f"branch.{case.branch}.remote").stdout,
-            )
-            expected = (case.branch + "\n", "origin\n")
-            assert observed == expected
+            add_lane_worktree(github_clone, lane, case.branch)
         observed = (
             lane.exists(),
             real_git(github_clone, "rev-parse", case.branch).stdout.strip(),
@@ -474,12 +465,16 @@ class TestLandMergeMethod:
         """
         result = land(world, capsys)
         observed, expected = merge_observations(world, result)
+        branches = frozenset(
+            real_git(
+                world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
+            ).stdout.splitlines()
+        )
         observed.update(
             {
                 "removed-line": "worktree: removed\n" in result.stdout,
                 "lane.absent": not world.lane.exists(),
-                "branch.absent": world.case.branch
-                not in cast(frozenset[str], observed["branches"]),
+                "branch.absent": world.case.branch not in branches,
                 "upstream": real_git(
                     world.clone, "config", f"branch.{world.case.branch}.remote", check=False
                 ).stdout,

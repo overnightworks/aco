@@ -234,3 +234,14 @@ tests/test_land_merge_message.py	2	#200: The shared observer retains the merge t
 tests/test_land_merge_message.py	3	#200: The shared observer retains the merge tuple title field at index 3.
 tests/test_land_merge_message.py	4	#200: The caller retains the submitted message at merge tuple index 4.
 tests/test_land_merge_message.py	True	#200: Shared presence and equality predicates retain their True expectations; no predicate is narrowed.
+tests/test_land_merge.py	'exit+'	#207, PR #206 follow-up: landed_observations owns the renamed exit comparison.
+tests/test_land_merge.py	'err+'	#207, PR #206 follow-up: landed_observations owns the renamed stderr comparison.
+tests/test_land_merge.py	'release-line'	#207, PR #206 follow-up: landed_observations owns stdout.release; full release-line membership remains.
+tests/test_land_merge.py	'delete+'	#207, PR #206 follow-up: landed_observations owns delete; exact records remain.
+tests/test_land_merge.py	'close+'	#207, PR #206 follow-up: landed_observations owns close; exact closed-item set remains.
+tests/test_land_merge.py	'claims.empty'	#207, PR #206 follow-up: landed_observations owns claims; empty state remains.
+tests/test_land_merge.py	'worktrees+'	#207, PR #206 follow-up: landed_observations owns worktrees; topology remains.
+tests/test_land_merge.py	'branches+'	#207, PR #206 follow-up: landed_observations owns branches; branch-set comparison remains.
+tests/test_land_merge.py	'trunk.is-merge'	#207, PR #206 follow-up: landed_observations owns trunk.same; trunk/merge identity remains.
+tests/test_land_merge.py	'stamp+'	#207, PR #206 follow-up: landed_observations owns stamp; presence comparison remains.
+tests/test_land_merge.py	'anchor+'	#207, PR #206 follow-up: landed_observations owns anchor; presence comparison remains.

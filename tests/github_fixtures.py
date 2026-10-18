@@ -144,6 +144,8 @@ class FakeForge:
     merge_calls: list[tuple[int, str, board.MergeMethod, str, str]] = field(default_factory=list)
     merge_requests: list[tuple[str, board.MergeMethod]] = field(default_factory=list)
     merge_error: forge.ForgeError | None = None
+    delete_error: forge.ForgeError | None = None
+    close_error: forge.ForgeError | None = None
     merge_sha: str = MERGE_COMMIT_SHA
     merge_remote: Path | None = None
     closes_on_merge: bool = False
@@ -257,6 +259,8 @@ class FakeForge:
         #359 Card 1): records the comment and the close as state, the same
         two facts a test asserts against the real adapter's own two `_run`
         calls."""
+        if self.close_error is not None:
+            raise self.close_error
         self.landing_comments[number] = github.landing_comment(pull_request)
         self.closed_issues.add(number)
 
@@ -325,6 +329,8 @@ class FakeForge:
         return sha
 
     def delete_branch(self, branch: str) -> None:
+        if self.delete_error is not None:
+            raise self.delete_error
         self._run()
         self.deleted_branches.append(branch)
 
@@ -489,13 +495,16 @@ def assert_github_world(github_clone: Path, bare_remote: Path) -> None:
     assert state_ref_tip(bare_remote) is None
 
 
+LANDING_DEFAULT_BRANCH = "main"
+
+
 @dataclass
 class LandingWorld:
     clone: Path
     remote: Path
     forge: FakeForge
     unchanged: dict[str, object]
-    default_branch: str = field(default="main", kw_only=True)
+    default_branch: str = field(default=LANDING_DEFAULT_BRANCH, kw_only=True)
 
 
 @dataclass
@@ -513,7 +522,7 @@ def lane_landing_world(
     branch: str,
     body: str,
     methods: frozenset[board.MergeMethod] | None,
-    default_branch: str = "main",
+    default_branch: str = LANDING_DEFAULT_BRANCH,
     holder: str = "Ada",
     role: str = "builder",
     distinct_detail: bool = False,
@@ -583,7 +592,7 @@ def landing_world(
     forge: FakeForge,
     *,
     remote_tip: str | None = None,
-    default_branch: str = "main",
+    default_branch: str = LANDING_DEFAULT_BRANCH,
 ) -> LandingWorld:
     """Snapshot the fully arranged checkout before invoking land."""
     worktrees, branches = worktrees_and_branches(clone)
