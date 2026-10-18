@@ -1,0 +1,7 @@
+claim_id = "eb99923b48bb4972abcdafac11ea50d7"
+agent = "claude"
+role = "builder"
+base = "ad7a22806b2c39abeed3a64395bb03a1832fdd8a"
+branch = "claude/issue-231-store-symlink-refusal"
+scope = ["specs/ref-store-cas.spec.md", "src/agent_coordination/store.py", "tests/test_store.py"]
+opened_commit = "dc71a12ff7ed4016a4cce44bf6996b2fc4b38307"
