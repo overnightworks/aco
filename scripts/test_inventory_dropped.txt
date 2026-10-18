@@ -252,3 +252,7 @@ tests/test_cli.py	'delete branch failed (simulated)'	#207: The delete-error case
 tests/test_cli.py	'fast-forward'	#207: Fetch and divergence cases compare the complete step, error and recovery sentence.
 tests/test_cli.py	'fatal: Not possible to fast-forward, aborting.'	#207: The real divergence case compares the complete git error within stderr.
 tests/test_cli.py	'fatal: unreachable\\n\\x1b[2Jhint: \\u202eretry'	#207: The escaped-fetch case compares the complete stderr line; injecting raw terminal controls rejects both old and new comparisons.
+tests/test_cli.py	'LANDED pull request #12 already; nothing left to release'	#211: The repository reminder family compares the complete rerun stdout, including this first line and the cleanup advice.
+tests/test_cli.py	'[project]\nname = "agent-coordination"\n'	#211: The package-file scenario owns this trunk content; the CLI reminder replaces the private package predicate.
+tests/test_cli.py	'[project]\nname = "other-package"\n'	#211: The foreign-package scenario owns this trunk content; complete CLI stdout proves no reinstall reminder follows.
+tests/test_cli.py	'reinstall: uv tool install --force --from . agent-coordination'	#211: The repository reminder family compares the complete fresh stdout, including the final reinstall line and newline.
