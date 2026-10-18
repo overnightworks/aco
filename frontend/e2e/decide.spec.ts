@@ -2,14 +2,15 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { line, row, writeRulings } from './rulingsFixture';
 import { readBoardRuntime } from './runtime';
+import { UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
 // global-setup.ts); each test overwrites the whole of rulings.json, so
 // tests stay isolated from one another despite the shared process.
 test.describe.configure({ mode: 'serial' });
 
-// Just past the app's 8 s undo window; the page clock is driven, never waited.
-const PAST_UNDO_WINDOW_MS = 8_500;
+// Just past the app's undo window; the page clock is driven, never waited.
+const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
 function choices(page: Page) {
 	return page.getByRole('group', { name: 'Entscheidung' });
