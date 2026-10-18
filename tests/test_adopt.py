@@ -30,6 +30,7 @@ from github_fixtures import FakeForge, serve_forge
 from store_fixtures import RaceOnceTransport, claim_intent, state_ref_tip
 
 from agent_coordination import checkout, cmd_claim, forge, github, protocol, store
+from agent_coordination.github import GitHubForge
 
 DEPENDENCY_PATHS_CONFIG = 'dependency_paths = ["uv.lock", "pyproject.toml"]\n'
 ADOPTED_BODY = "Bump x\n\nNo-Item: deps"
@@ -686,8 +687,8 @@ def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
 
     result = adopt(capsys)
 
-    claim = _adopted_claim(world)
     assert (result.status, result.stderr) == (0, "")
+    claim = _adopted_claim(world)
     assert re.fullmatch(
         re.escape(_build_lines(world) + _claimed_line(claim))
         + r"\d+ of \d+ versioned files \(\d+%\); overlaps issue #9 on pyproject\.toml\n"
@@ -794,8 +795,8 @@ def test_adopt_writes_the_line_onto_the_body_it_read_last(
 
     result = adopt(capsys, *arguments, kind=kind)
 
-    claim = _adopted_claim(world)
     assert (result.status, result.stderr) == (0, "")
+    claim = _adopted_claim(world)
     assert result.stdout.startswith(_build_lines(world) + _claimed_line(claim))
     assert result.stdout.endswith(declaration)
     assert (claim.agent, claim.role) == ("Ada", "builder")
@@ -822,7 +823,7 @@ def test_adopt_writes_the_line_alone_when_github_answers_a_null_body(
             {"state": "open", "title": "Bump x", "body": current["body"], "is_landing": True}
         )
 
-    over_gh = github.GitHubForge(world.forge.repository, run=gh)
+    over_gh = GitHubForge(world.forge.repository, run=gh)
 
     class ForgeWhoseBodiesAreGitHubs:
         def __getattr__(self, name: str) -> object:
@@ -857,7 +858,7 @@ def _move_the_remote_tracking_ref_before_the_build(
     monkeypatch.setattr(checkout, "create_linked_worktree", build_after_the_head_ref_moves)
 
 
-def _the_store_rejects_every_push(world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch) -> None:
+def _the_store_rejects_every_push(_world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch) -> None:
     def rejected(
         _transport: store.GitPushTransport,
         *,
@@ -1107,8 +1108,8 @@ def test_adopt_keeps_the_claim_and_the_pair_when_the_body_step_goes_wrong(
 
     result = adopt(capsys)
 
-    claim = _adopted_claim(world)
     assert (result.status, result.stderr) == (2, refusal)
+    claim = _adopted_claim(world)
     assert result.stdout.startswith(_build_lines(world) + _claimed_line(claim))
     assert world.pull_request_directory.is_dir()
     assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, body) for body in written_bodies]
@@ -1133,7 +1134,8 @@ def test_adopts_rerun_after_an_interrupted_write_completes_it_under_the_same_cla
     """Spec: ADOPT-26 (cells 35-36) -- the holder's rerun builds and claims nothing, writes
     the line only when it is missing, and prints the declaration with the claim's own id."""
     interrupt(world, monkeypatch)
-    adopt(capsys).expect_refusal()
+    first = adopt(capsys)
+    assert (first.status, "the claim stands" in first.stderr) == (2, True)
     claim = _adopted_claim(world)
     tip_before_rerun = state_ref_tip(world.remote)
     writes_before_rerun = len(world.forge.body_writes)
