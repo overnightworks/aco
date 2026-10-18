@@ -1,8 +1,0 @@
-claim_id = "6a1d8210002d46b5bbedcb3d72f06a3f"
-agent = "claude"
-role = "builder"
-base = "4172ba6cc01505c32c61ca7a31c6c4b6be42c1c9"
-branch = "claude/issue-216-l3b1-der-rerun-in-der-welt-von-l3a-bersp"
-scope = ["scripts/test_inventory_dropped.txt", "tests/github_fixtures.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_land_after_merge.py", "tests/test_land_after_merge_rerun.py"]
-opened_commit = "f172d993a1ef02e1706178cf05b9d57ef1d08e91"
-whole_reason = "Die neuen Zeilen im Modul und das Löschen ihrer alten Tests in test_cli.py müssen zusammen landen; halb umgezogen stünde derselbe Satz doppelt oder gar nicht. Die Verschiebung von landed_world und die Änderung seiner Wächter gehören dazu, weil das neue Modul sie braucht."
