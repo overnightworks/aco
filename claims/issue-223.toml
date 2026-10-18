@@ -1,8 +1,0 @@
-claim_id = "6a5049163e08463f9beb6755e50e3aaf"
-agent = "claude"
-role = "builder"
-base = "ab94d85957a186fd6faa3adde9b55d784a24ae08"
-branch = "claude/issue-223-r1-squash-cleanup"
-scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/test_cli.py", "tests/test_release_cleanup.py"]
-opened_commit = "3882620ed07f4122888c5a6074c962877ff00f3f"
-whole_reason = "Das neue Modul und das Löschen der zwei alten Tests samt Helfern in test_cli.py müssen zusammen landen; halb umgezogen stünde derselbe Satz doppelt oder gar nicht, und die Squash-Zweige hätten keinen Beweis. Der Helfer fail_git_launch gehört dazu, weil er _fail_the_git_launch an einem Ort ersetzt."
