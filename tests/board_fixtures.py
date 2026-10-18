@@ -92,7 +92,6 @@ def projected_board(
     dependencies: Mapping[int, tuple[board.IssueDependency, ...]] = MappingProxyType({}),
     open_pull_requests_supported: bool = True,
     lane_events: tuple[metrics.LaneEvent, ...] = (),
-    landed_at_by_item: Mapping[int, datetime] = MappingProxyType({}),
     closed_item_sizes: Mapping[int, metrics.Size | None] = MappingProxyType({}),
     unparsed_lifecycle_commits: int = 0,
 ) -> board.Board:
@@ -114,7 +113,6 @@ def projected_board(
             claim_ages={claim.claim_id: observed_at for claim in claims},
             open_pull_requests_supported=open_pull_requests_supported,
             lane_events=lane_events,
-            landed_at_by_item=landed_at_by_item,
             closed_item_sizes=closed_item_sizes,
             unparsed_lifecycle_commits=unparsed_lifecycle_commits,
         )

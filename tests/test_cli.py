@@ -500,10 +500,8 @@ def _lane(item: str, day: int, hours: int) -> metrics.LaneEvent:
     return metrics.LaneEvent(
         item=item,
         size=None,
-        container=None,
         claimed_at=datetime(2026, 8, day, tzinfo=UTC),
         released_at=datetime(2026, 8, day, hours, tzinfo=UTC),
-        landed_at=None,
         rescopes=0,
     )
 
@@ -624,7 +622,7 @@ def test_board_marks_an_item_landed_by_a_trailer_carrying_trunk_commit_without_a
     """Issue #304 review finding B2's "lane 2": a trunk commit's own
     `Work-Item:` trailer lands an item even when no merged pull request body
     names it -- `landed_references` unions the trunk-derived set
-    (`board.trunk_landed_work_items`) with the PR-derived one, so the union
+    (`board.trunk_landing_items`) with the PR-derived one, so the union
     still holds an item a merge/squash commit landed without a matching
     pull request body."""
     _single_item_board_environment(monkeypatch, tmp_path)
