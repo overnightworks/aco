@@ -259,6 +259,23 @@ CONFIG_TIMEOUT = replace(
 )
 DELETE_ARGV = (("update-ref", "-d", "refs/heads/{lane}", "{head}"),)
 RELEASE_COMMAND = ("release", "72", "--merged", "12")
+CleanupCheck = Callable[[CleanupCase], None]
+
+
+@pytest.fixture
+def cleanup_check(
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> CleanupCheck:
+    return partial(
+        verify_cleanup,
+        github_clone=github_clone,
+        bare_remote=bare_remote,
+        monkeypatch=monkeypatch,
+        capsys=capsys,
+    )
 
 
 @pytest.mark.parametrize(
@@ -276,17 +293,13 @@ RELEASE_COMMAND = ("release", "72", "--merged", "12")
     ],
 )
 def test_a_squashed_lane_goes_only_on_its_recorded_head(
-    case: CleanupCase,
-    github_clone: Path,
-    bare_remote: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    case: CleanupCase, cleanup_check: CleanupCheck
 ) -> None:
     """Keep land's Accepted residual; reruns use the recorded squash head.
 
     Spec: REL-43, E-REL-20, LANDCMD-18.
     """
-    verify_cleanup(case, github_clone, bare_remote, monkeypatch, capsys)
+    cleanup_check(case)
 
 
 @pytest.mark.parametrize(
@@ -400,17 +413,13 @@ def test_a_squashed_lane_goes_only_on_its_recorded_head(
     ],
 )
 def test_a_squashed_lane_branch_goes_by_compare_and_delete(
-    case: CleanupCase,
-    github_clone: Path,
-    bare_remote: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    case: CleanupCase, cleanup_check: CleanupCheck
 ) -> None:
     """Delete only the pinned branch and its own configuration section.
 
     Spec: REL-34, REL-42, REL-44, REL-45, REL-46, E-REL-21, E-REL-22, E-REL-23.
     """
-    verify_cleanup(case, github_clone, bare_remote, monkeypatch, capsys)
+    cleanup_check(case)
 
 
 def verify_cleanup(
