@@ -423,15 +423,10 @@ class _CommandScanner:
             if quote is None and self._skip_line_continuation():
                 continue
             character = self._command[self._position]
-            if quote is None:
-                ended = self._read_unquoted_word_character(character, characters)
-                if ended is None:
-                    break
-                became_expandable = ended
-                if character in (_SINGLE_QUOTE, _DOUBLE_QUOTE):
-                    quote = character
-            else:
-                quote, became_expandable = self._read_quoted_character(character, quote, characters)
+            step = self._read_word_character(character, quote, characters)
+            if step is None:
+                break
+            quote, became_expandable = step
             if became_expandable and not expandable:
                 expandable = True
                 expansion_start = len(characters) - 1
@@ -443,6 +438,20 @@ class _CommandScanner:
             is_expandable=expandable,
             expansion_start=expansion_start,
         )
+
+    def _read_word_character(
+        self, character: str, quote: str | None, characters: list[str]
+    ) -> tuple[str | None, bool] | None:
+        """One character of a word: `None` when it ends the word, otherwise
+        the quote still open afterwards and whether the character made the
+        word expandable."""
+        if quote is not None:
+            return self._read_quoted_character(character, quote, characters)
+        became_expandable = self._read_unquoted_word_character(character, characters)
+        if became_expandable is None:
+            return None
+        opened_quote = character if character in (_SINGLE_QUOTE, _DOUBLE_QUOTE) else None
+        return opened_quote, became_expandable
 
     def _read_quoted_character(
         self, character: str, quote: str, characters: list[str]
@@ -754,6 +763,18 @@ def _attached_value(word: _Word, text: str) -> _Word:
     return _Word(text, is_operator=False, is_expandable=word.is_expandable, position=word.position)
 
 
+def _next_word_value(following: tuple[_Word, ...]) -> tuple[_Word | None, int]:
+    return (following[0], 1) if following else (None, 0)
+
+
+def _rest_or_next_word_value(
+    word: _Word, rest: str, following: tuple[_Word, ...]
+) -> tuple[_Word | None, int]:
+    if rest:
+        return _attached_value(word, rest), 0
+    return _next_word_value(following)
+
+
 def _parse_short_cluster(
     word: _Word,
     following: tuple[_Word, ...],
@@ -774,11 +795,9 @@ def _parse_short_cluster(
             options.append(_OptionValue(name, _attached_value(word, rest) if rest else None))
             return options, 0
         if name in table.value_options:
-            if rest:
-                options.append(_OptionValue(name, _attached_value(word, rest)))
-                return options, 0
-            options.append(_OptionValue(name, following[0] if following else None))
-            return options, 1 if following else 0
+            value, consumed = _rest_or_next_word_value(word, rest, following)
+            options.append(_OptionValue(name, value))
+            return options, consumed
         options.append(_OptionValue(name, None))
     return options, 0
 
@@ -816,7 +835,8 @@ def _parse_long_option(
         takes_value = name in table.value_options | table.optional_value_options
         return _OptionValue(name, _attached_value(word, attached) if takes_value else None), 0
     if name in table.value_options:
-        return _OptionValue(name, following[0] if following else None), 1 if following else 0
+        value, consumed = _next_word_value(following)
+        return _OptionValue(name, value), consumed
     return _OptionValue(name, None), 0
 
 
