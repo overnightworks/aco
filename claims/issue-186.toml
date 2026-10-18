@@ -1,0 +1,8 @@
+claim_id = "c6b9ce6809b342a3a68a55a9a3ceeafb"
+agent = "claude"
+role = "builder"
+base = "dd9bb67909644a3a87287009d0cd1922196f95bd"
+branch = "claude/issue-186-l2a-land-merge-entscheidung-methoden-for"
+scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_land_merge.py", "tests/test_land_preflight.py", "tests/test_land_preflight_claim.py"]
+opened_commit = "bcafc9ce230b85ffd65f35532eb25578ccbab285"
+whole_reason = "Die Merge-Entscheidung von aco land (Methoden, Forge-Antworten, Erfolgskontrollen) verlässt test_cli.py in einem Schritt: ihre Zeilen stehen einmal in test_land_merge.py auf einer echten GitHub-Welt mit echtem Claim und echtem Forge-Merge, die geteilte Welt und die Länge des Ablehnungs-Umschlags wohnen als Typ in den Fixture-Modulen, und das Ledger benennt den neuen Owner."
