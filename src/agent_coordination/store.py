@@ -909,8 +909,10 @@ def _read_schema_toml(
 ) -> str:
     if SCHEMA_TOML_FILENAME not in top_level:
         raise MalformedStateTreeError(f"state tree at {tip} is missing {SCHEMA_TOML_FILENAME}")
-    if top_level[SCHEMA_TOML_FILENAME].kind != "blob":
+    schema_entry = top_level[SCHEMA_TOML_FILENAME]
+    if schema_entry.kind != "blob":
         raise MalformedStateTreeError(f"{SCHEMA_TOML_FILENAME} at {tip} is not a blob")
+    _require_file_entry(SCHEMA_TOML_FILENAME, schema_entry, tip, "is not a file")
     return archive[SCHEMA_TOML_FILENAME].decode()
 
 
@@ -932,10 +934,10 @@ def _parse_claims_subtree(
         return MappingProxyType({})
     claims: dict[str, ActiveClaim] = {}
     for name, entry in _direct_children(entries, CLAIMS_DIRECTORY).items():
-        if entry.kind != "blob" or not name.endswith(TOML_SUFFIX):
-            raise MalformedStateTreeError(f"{CLAIMS_DIRECTORY}/{name} at {tip} is not a claim file")
+        claim_path = f"{CLAIMS_DIRECTORY}/{name}"
+        _require_file_entry(claim_path, entry, tip, "is not a claim file", suffix=TOML_SUFFIX)
         key = name.removesuffix(TOML_SUFFIX)
-        content = archive[f"{CLAIMS_DIRECTORY}/{name}"].decode()
+        content = archive[claim_path].decode()
         claims[key] = parse_claim_toml(content, key=key, tip=tip)
     return MappingProxyType(claims)
 
@@ -960,22 +962,26 @@ def _parse_resources_subtree(
         return MappingProxyType({})
     resources: dict[str, ResourceRecord] = {}
     for name, entry in _direct_children(entries, RESOURCES_DIRECTORY).items():
-        if entry.kind != "blob" or not name.endswith(TOML_SUFFIX):
-            raise MalformedStateTreeError(
-                f"{RESOURCES_DIRECTORY}/{name} at {tip} is not a resource file"
-            )
+        resource_path = f"{RESOURCES_DIRECTORY}/{name}"
+        _require_file_entry(resource_path, entry, tip, "is not a resource file", suffix=TOML_SUFFIX)
         resource_name = name.removesuffix(TOML_SUFFIX)
-        content = archive[f"{RESOURCES_DIRECTORY}/{name}"].decode()
+        content = archive[resource_path].decode()
         resources[resource_name] = parse_resource_toml(content, name=resource_name, tip=tip)
     return MappingProxyType(resources)
 
 
+def _require_file_entry(
+    path: str, entry: _ListedEntry, tip: ObjectId, sentence: str, *, suffix: str = ""
+) -> None:
+    """CAS-29, CAS-31, CAS-32, CAS-74: an entry the read opens is a file --
+    never a directory, a submodule, or a symlink, which the archive would
+    otherwise leave out without a word (issue #565) -- and ends in `suffix`."""
+    if entry.mode not in _FILE_MODES or not path.endswith(suffix):
+        raise MalformedStateTreeError(f"{path} at {tip} {sentence}")
+
+
 def _require_item_file(name: str, entry: _ListedEntry, *, tip: ObjectId) -> None:
-    """CAS-32: every `items/` entry is a file -- never a directory, a
-    submodule, or a symlink, which a read would otherwise leave out without
-    a word (issue #565)."""
-    if entry.mode not in _FILE_MODES:
-        raise MalformedStateTreeError(f"{ITEMS_DIRECTORY}/{name} at {tip} is not a file")
+    _require_file_entry(f"{ITEMS_DIRECTORY}/{name}", entry, tip, "is not a file")
 
 
 def _parse_items_subtree(

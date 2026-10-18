@@ -705,29 +705,105 @@ def test_fetch_state_rejects_a_claims_entry_that_is_not_a_directory(
         store.fetch_state(worktree=worktree, remote=str(bare_remote))
 
 
+_OBJECT_KIND_BY_MODE = {"040000": "tree", "160000": "commit"}
+
+
+def _entry_object(worktree: Path, mode: str) -> str:
+    """An object of the kind a tree entry of `mode` points at."""
+    kind = _OBJECT_KIND_BY_MODE.get(mode, "blob")
+    if kind == "tree":
+        return raw_tree(worktree, [("100644", "blob", blob(worktree, b"junk\n"), "x")])
+    if kind == "commit":
+        return subprocess.run(
+            ["git", "-C", str(worktree), "commit-tree", raw_tree(worktree, []), "-m", "submodule"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    return blob(worktree, b"junk\n")
+
+
 @pytest.mark.parametrize(
-    ("directory", "name", "refusal"),
+    ("directory", "name", "refusal", "mode"),
     [
-        pytest.param(store.CLAIMS_DIRECTORY, "issue-42.txt", "is not a claim file", id="claims"),
-        pytest.param(store.IDS_DIRECTORY, "not valid!", "is not a claim id", id="ids"),
         pytest.param(
-            store.RESOURCES_DIRECTORY, "display.txt", "is not a resource file", id="resources"
+            store.CLAIMS_DIRECTORY, "issue-42.txt", "is not a claim file", "100644", id="claims"
+        ),
+        pytest.param(store.IDS_DIRECTORY, "not valid!", "is not a claim id", "100644", id="ids"),
+        pytest.param(
+            store.RESOURCES_DIRECTORY,
+            "display.txt",
+            "is not a resource file",
+            "100644",
+            id="resources",
         ),
         # A name git would quote (non-ASCII) used to vanish from every read
         # instead of refusing (issue #558).
-        pytest.param(store.CLAIMS_DIRECTORY, "ä", "is not a claim file", id="claims-quoted"),
-        pytest.param(store.IDS_DIRECTORY, "ä", "is not a claim id", id="ids-quoted"),
         pytest.param(
-            store.RESOURCES_DIRECTORY, "ä", "is not a resource file", id="resources-quoted"
+            store.CLAIMS_DIRECTORY, "ä", "is not a claim file", "100644", id="claims-quoted"
+        ),
+        pytest.param(store.IDS_DIRECTORY, "ä", "is not a claim id", "100644", id="ids-quoted"),
+        pytest.param(
+            store.RESOURCES_DIRECTORY,
+            "ä",
+            "is not a resource file",
+            "100644",
+            id="resources-quoted",
+        ),
+        # A symlink is a blob to git, but the archive read leaves it out (CAS-29, CAS-31).
+        pytest.param(
+            store.CLAIMS_DIRECTORY,
+            "issue-42.toml",
+            "is not a claim file",
+            "120000",
+            id="claims-symlink",
+        ),
+        pytest.param(
+            store.RESOURCES_DIRECTORY,
+            "display.toml",
+            "is not a resource file",
+            "120000",
+            id="resources-symlink",
+        ),
+        # The mode check alone covers a tree and a submodule: no separate kind check remains.
+        pytest.param(
+            store.CLAIMS_DIRECTORY,
+            "issue-42.toml",
+            "is not a claim file",
+            "040000",
+            id="claims-tree",
+        ),
+        pytest.param(
+            store.CLAIMS_DIRECTORY,
+            "issue-42.toml",
+            "is not a claim file",
+            "160000",
+            id="claims-submodule",
+        ),
+        pytest.param(
+            store.RESOURCES_DIRECTORY,
+            "display.toml",
+            "is not a resource file",
+            "040000",
+            id="resources-tree",
+        ),
+        pytest.param(
+            store.RESOURCES_DIRECTORY,
+            "display.toml",
+            "is not a resource file",
+            "160000",
+            id="resources-submodule",
         ),
     ],
 )
 def test_fetch_state_refuses_an_entry_whose_name_its_directory_does_not_accept(
-    bare_remote: Path, worktree: Path, directory: str, name: str, refusal: str
+    bare_remote: Path, worktree: Path, directory: str, name: str, refusal: str, mode: str
 ) -> None:
     schema_blob = blob(worktree, b"version = 2\n")
-    stray_blob = blob(worktree, b"junk\n")
-    subtree = raw_tree(worktree, [("100644", "blob", stray_blob, name)])
+    stray_object = _entry_object(worktree, mode)
+    subtree = raw_tree(
+        worktree, [(mode, _OBJECT_KIND_BY_MODE.get(mode, "blob"), stray_object, name)]
+    )
     push_raw_state_tree(
         bare_remote,
         worktree,
@@ -1652,25 +1728,26 @@ def _top_level(entries: dict[str, store._ListedEntry]) -> dict[str, store._Liste
     return {name: value for name, value in entries.items() if "/" not in name}
 
 
-def test_read_schema_toml_fails_loud_when_schema_toml_is_not_a_blob(worktree: Path) -> None:
-    inner_blob = (
-        subprocess.run(
-            ["git", "-C", str(worktree), "hash-object", "-w", "--stdin"],
-            input=b"x\n",
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
+@pytest.mark.parametrize(
+    ("mode", "refusal"),
+    [
+        pytest.param("040000", "is not a blob", id="directory"),
+        pytest.param("160000", "is not a blob", id="submodule"),
+        pytest.param("120000", "is not a file", id="symlink"),
+    ],
+)
+def test_read_schema_toml_fails_loud_when_schema_toml_is_not_a_file(
+    worktree: Path, mode: str, refusal: str
+) -> None:
+    kind = _OBJECT_KIND_BY_MODE.get(mode, "blob")
+    tree_oid = protocol.ObjectId(
+        raw_tree(worktree, [(mode, kind, _entry_object(worktree, mode), "schema.toml")])
     )
-    inner_tree = raw_tree(worktree, [("100644", "blob", inner_blob, "x")])
-    outer_tree_oid = protocol.ObjectId(
-        raw_tree(worktree, [("040000", "tree", inner_tree, "schema.toml")])
+    top_level_entries = _top_level(
+        store._list_tree(worktree, tree_oid, tip=_PLACEHOLDER_TIP, context="state")
     )
-    entries = store._list_tree(worktree, outer_tree_oid, tip=_PLACEHOLDER_TIP, context="state")
-    top_level_entries = _top_level(entries)
 
-    with pytest.raises(protocol.MalformedStateTreeError, match="is not a blob"):
+    with pytest.raises(protocol.MalformedStateTreeError, match=refusal):
         store._read_schema_toml(top_level_entries, {}, tip=_PLACEHOLDER_TIP)
 
 
