@@ -3037,6 +3037,61 @@ def test_closable_container_number_decides_by_kind_children_uncut_rows_next_line
     assert board.closable_container_number(parent, children, Storage.GITHUB) == expected
 
 
+@pytest.mark.parametrize(
+    ("parent_body", "expected"),
+    [
+        pytest.param(
+            complete_contract("keiner"),
+            board.ParentCompletion.REQUIRED,
+            id="no_row_and_no_next_work_requires_closing",
+        ),
+        pytest.param(
+            complete_contract(""),
+            board.ParentCompletion.REQUIRED,
+            id="no_row_and_an_empty_next_line_requires_closing",
+        ),
+        pytest.param(
+            complete_contract("Cut slice 2."),
+            board.ParentCompletion.PERMITTED,
+            id="no_row_and_next_work_permits_closing",
+        ),
+        pytest.param(
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            board.ParentCompletion.FORBIDDEN,
+            id="an_uncut_row_forbids_closing_although_next_names_no_work",
+        ),
+        pytest.param(
+            complete_contract("Cut slice 2.", slice=slice_entries("Scheibe 1")),
+            board.ParentCompletion.FORBIDDEN,
+            id="an_uncut_row_forbids_closing_with_next_work",
+        ),
+        pytest.param(
+            complete_contract("keiner", slice=slice_entries("Scheibe\nzwei")),
+            board.ParentCompletion.FORBIDDEN,
+            id="an_unprintable_uncut_row_forbids_closing",
+        ),
+    ],
+)
+def test_parent_completion_reads_uncut_rows_before_the_next_line(
+    parent_body: str, expected: board.ParentCompletion
+) -> None:
+    parsed = parse_body(parent_body, storage=Storage.GITHUB)
+
+    assert board.parent_completion(parsed) is expected
+
+
+def test_deleting_the_uncut_row_turns_forbidden_into_required() -> None:
+    with_row = parse_body(
+        complete_contract("keiner", slice=slice_entries("Scheibe 1")), storage=Storage.GITHUB
+    )
+    without_row = parse_body(complete_contract("keiner"), storage=Storage.GITHUB)
+
+    assert (board.parent_completion(with_row), board.parent_completion(without_row)) == (
+        board.ParentCompletion.FORBIDDEN,
+        board.ParentCompletion.REQUIRED,
+    )
+
+
 def test_a_complete_block_item_is_body_complete_with_no_dependency_projection() -> None:
     issue = board_issue(230, "Complete block item", block_body(MINIMAL_BLOCK_TOML))
     projected = projected_board(

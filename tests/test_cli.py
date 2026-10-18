@@ -18402,6 +18402,90 @@ def test_check_refuses_to_close_a_parent_that_keeps_other_children(
     )
 
 
+UNCUT_ROW_REFUSAL = (
+    f"REFUSED: pull request #12 closes parent {REPOSITORY}#{PARENT_ISSUE} although its body "
+    "still holds an uncut slice row; cut it or delete the row first\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("pull_request_body", "parent_body", "other_children", "expected_exit", "expected_error"),
+    [
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72\nCloses #79",
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            (),
+            2,
+            UNCUT_ROW_REFUSAL,
+            id="closing_the_parent_with_an_uncut_row_refuses_although_next_names_no_work",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72\nCloses #79",
+            complete_contract("keiner", slice=slice_entries("Scheibe\nzwei")),
+            (),
+            2,
+            UNCUT_ROW_REFUSAL,
+            id="closing_the_parent_with_an_unprintable_uncut_row_refuses",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72\nCloses #79",
+            complete_contract("Dispatch slice 4.", slice=slice_entries("Scheibe 1")),
+            (73,),
+            2,
+            UNCUT_ROW_REFUSAL,
+            id="the_uncut_row_refusal_takes_precedence_over_one_item_per_landing",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #79",
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            (),
+            2,
+            f"REFUSED: pull request #12 carries no closing reference for its work item "
+            f"{REPOSITORY}#{WORK_ITEM_ISSUE}\n",
+            id="a_missing_closing_reference_for_the_item_still_refuses_first",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72",
+            complete_contract("keiner", slice=slice_entries("Scheibe 1")),
+            (),
+            0,
+            "",
+            id="landing_the_last_child_without_closing_the_parent_passes_with_an_uncut_row",
+        ),
+        pytest.param(
+            "Work-Item: #72\n\nCloses #72",
+            complete_contract("keiner"),
+            (),
+            2,
+            f"REFUSED: pull request #12 closes the last open child of parent "
+            f"{REPOSITORY}#{PARENT_ISSUE}; close the parent too\n",
+            id="deleting_the_row_turns_the_refusal_into_the_last_child_rule",
+        ),
+    ],
+)
+def test_check_treats_an_uncut_slice_row_as_work_left_in_the_parent(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    pull_request_body: str,
+    parent_body: str,
+    other_children: tuple[int, ...],
+    expected_exit: int,
+    expected_error: str,
+) -> None:
+    parented_check_client(
+        monkeypatch,
+        body=pull_request_body,
+        parent_body=parent_body,
+        open_children=(
+            board.IssueReference(REPOSITORY, WORK_ITEM_ISSUE),
+            *(board.IssueReference(REPOSITORY, number) for number in other_children),
+        ),
+    )
+
+    assert run_check() == expected_exit
+    assert capsys.readouterr().err == expected_error
+
+
 def test_check_refuses_a_parent_recorded_in_another_repository(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
