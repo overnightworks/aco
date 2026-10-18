@@ -531,13 +531,13 @@ class TestLandMessage:
         assert isinstance(outcome, Landed)
         capsys.readouterr()
         result = run_cli(["land", "12"], capsys)
+        message = real_git(world.clone, "log", "-1", "--format=%B", "main").stdout
+        keys = trailer_keys(world.clone, message)
         effects = landing_effects(world)
         calls = world.forge.merge_calls
         merge = calls[0] if calls else (None, None, None, None, "")
         entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
         trunk = real_git(world.clone, "rev-parse", "main").stdout.strip()
-        message = real_git(world.clone, "log", "-1", "--format=%B", "main").stdout
-        keys = trailer_keys(world.clone, message)
         topology = tuple(
             line
             for line in real_git(world.clone, "worktree", "list", "--porcelain").stdout.splitlines()
