@@ -1239,9 +1239,10 @@ def test_bootstrap_refuses_as_an_uncertain_write_once_a_sent_push_cannot_be_judg
 ) -> None:
     """Spec: CAS-56, CAS-69."""
     arrange_fault(monkeypatch)
+    transport = transport_factory()
 
     with pytest.raises(protocol.UncertainWriteError):
-        store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport_factory())
+        store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
 
 
 def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
@@ -1252,10 +1253,10 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     Exhaustion must never say "moved N times": that would blame a race
     that never happened.
     """
+    transport = _AlwaysRejectingTransport()
+
     with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes") as raised:
-        store.bootstrap(
-            worktree=worktree, remote=str(bare_remote), transport=_AlwaysRejectingTransport()
-        )
+        store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
 
     assert "without the ref ever moving" in str(raised.value)
     assert state_ref_tip(bare_remote) is None
@@ -1603,12 +1604,12 @@ def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
         _fake_run_captured_failing_candidate_log(process.run_captured),
     )
 
+    subject = store.ClaimTransitionSubject("claim issue 42", item="42")
+    intent = _issue_claim_intent(42)
+
     with pytest.raises(protocol.ClaimError, match="cannot read commit"):
         store.commit_transition(
-            observed=observed,
-            subject=store.ClaimTransitionSubject("claim issue 42", item="42"),
-            intent=_issue_claim_intent(42),
-            transport=transport,
+            observed=observed, subject=subject, intent=intent, transport=transport
         )
 
     assert transport.calls == 1
