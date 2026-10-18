@@ -684,7 +684,7 @@ def _project_from_config_record(key: object, record: object) -> WorkspaceProject
     receipt = _external_process_from_record(record.get("external_process"), key)
     if receipt is None:
         return project
-    return replace(project, external_process=receipt)
+    return replace(project, external_process=receipt)  # NOSONAR(S5886) pyright types replace()
 
 
 def _external_process_from_record(value: object, key: object) -> ExternalProcessReceipt | None:
