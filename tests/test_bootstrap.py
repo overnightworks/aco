@@ -96,7 +96,7 @@ def test_bootstrap_whose_creation_push_is_rejected_by_a_rival_leaves_the_rivals_
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: CAS-01, CAS-65 -- a rival bootstraps and claims between this run's
+    """Spec: CAS-01, CAS-66 -- a rival bootstraps and claims between this run's
     read of an absent ref and its push; the rejected push never writes over it."""
     rival_checkout = tmp_path / "rival"
     real_git(tmp_path, "clone", "-q", str(bare_remote), str(rival_checkout))

@@ -167,7 +167,7 @@ _LS_REMOTE_EXIT_NO_MATCH = 2
 # loud with its own detail instead (issue #390 finding 10).
 _MERGE_BASE_EXIT_NOT_ANCESTOR = 1
 
-# Bound on `bootstrap`'s creation pushes (CAS-65). Distinct from
+# Bound on `bootstrap`'s creation pushes (CAS-68). Distinct from
 # `_MAX_TRANSITION_ATTEMPTS`: it only retries while the ref is proven absent,
 # a narrower race than a live claim.
 _MAX_BOOTSTRAP_ATTEMPTS = 8
@@ -251,7 +251,7 @@ class PushTransport(Protocol):
     can additionally advance the observed remote state and *then* raise, to
     reproduce a lost response after the remote actually accepted the push --
     every caller treats every raise identically: re-read the ref before
-    assuming nothing landed -- `bootstrap` by its tip alone (CAS-65),
+    assuming nothing landed -- `bootstrap` by its tip alone (CAS-66),
     `commit_transition` by its own `operation_id` (CAS-13).
     """
 
@@ -1713,7 +1713,7 @@ def bootstrap(
     transport: PushTransport | None = None,
 ) -> ObjectId:
     """Create `refs/aco/state` at an empty state tree if it is proven absent;
-    otherwise report the existing tip untouched (CAS-01, CAS-65).
+    otherwise report the existing tip untouched (CAS-01, CAS-66).
 
     A present ref is a pure read (no write); an absent ref (`ls-remote` exit
     2) gets one parentless commit holding only `schema.toml`; an unreachable
