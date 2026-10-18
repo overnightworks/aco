@@ -4167,9 +4167,14 @@ def _item_intent(
     expected: protocol.ObjectId | None = None,
     new_oid: protocol.ObjectId = _ITEM_OID,
     operation_id: str = "op-1",
+    parent_pin: protocol.ItemPin | None = None,
 ) -> protocol.ItemWriteIntent:
     return protocol.ItemWriteIntent(
-        item_id=item_id, expected=expected, new_oid=new_oid, operation_id=operation_id
+        item_id=item_id,
+        expected=expected,
+        new_oid=new_oid,
+        operation_id=operation_id,
+        parent_pin=parent_pin,
     )
 
 
@@ -4219,6 +4224,40 @@ def test_apply_item_write_intent_refuses_a_conflicting_expected_oid(
 
     with pytest.raises(protocol.ClaimUnavailableError, match=match):
         protocol.apply(created, conflicting_intent)
+
+
+@pytest.mark.parametrize(
+    ("items_before", "pinned_oid", "refusal"),
+    [
+        pytest.param({"aco-p": "a", "aco-q": "b"}, "a", None, id="unchanged-parent-lands"),
+        pytest.param({"aco-p": "c", "aco-q": "b"}, "a", "aco-p", id="changed-parent-refuses"),
+        pytest.param({"aco-q": "b"}, "a", "aco-p", id="missing-parent-refuses"),
+    ],
+)
+def test_apply_item_write_intent_checks_its_parent_pin_alone(
+    items_before: dict[str, str], pinned_oid: str, refusal: str | None
+) -> None:
+    """CAS-70/72/73: only the pinned parent's own blob decides, not whatever
+    else was written to `items/` since the command read it."""
+    state = replace(
+        STATE_WITH_TIP, items={k: protocol.ObjectId(v * 40) for k, v in items_before.items()}
+    )
+    pin = protocol.ItemPin("aco-p", protocol.ObjectId(pinned_oid * 40))
+
+    if refusal is None:
+        landed = protocol.apply(state, _item_intent(item_id="aco-child", parent_pin=pin))
+        assert landed.items["aco-child"] == _ITEM_OID
+        return
+    with pytest.raises(protocol.ClaimUnavailableError, match=f"item '{refusal}' was written"):
+        protocol.apply(state, _item_intent(item_id="aco-child", parent_pin=pin))
+
+
+def test_apply_item_write_intent_without_a_parent_pin_ignores_every_other_item() -> None:
+    state = replace(STATE_WITH_TIP, items={"aco-p": protocol.ObjectId("c" * 40)})
+
+    landed = protocol.apply(state, _item_intent(item_id="aco-child"))
+
+    assert set(landed.items) == {"aco-p", "aco-child"}
 
 
 # --- Claim key codec (criterion 10) ----------------------------------------
