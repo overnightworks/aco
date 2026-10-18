@@ -1,0 +1,7 @@
+claim_id = "14c419c0b764460b99e1eaf865fd5ac8"
+agent = "claude"
+role = "builder"
+base = "ab94d85957a186fd6faa3adde9b55d784a24ae08"
+branch = "claude/issue-226-hook-getopt"
+scope = ["src/agent_coordination/hook_input.py", "tests/test_hook_input.py"]
+opened_commit = "ad7e27ce09fe23cb12b65de70e42f13958001027"
