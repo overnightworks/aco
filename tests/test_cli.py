@@ -16421,7 +16421,9 @@ def test_release_merged_survives_an_open_pull_request_with_a_reference_past_the_
 ) -> None:
     worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
     number = "1" * 4301
-    cast(FakeForge, github.GitHubForge(REPOSITORY)).board_open_pull_requests = (
+    cast(
+        FakeForge, github.GitHubForge(github.repository_id(REPOSITORY))
+    ).board_open_pull_requests = (
         board.PullRequest(300, "Foreign", f"Refs #{number}\n\nsee #{number}", "foreign/branch"),
     )
 
