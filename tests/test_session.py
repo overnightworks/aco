@@ -25,7 +25,16 @@ from cli_fixtures import (
     trunk_git_calls,
 )
 
-from agent_coordination import checkout, cmd_workspace, forge, github, process, session, store
+from agent_coordination import (
+    checkout,
+    cmd_claim,
+    cmd_workspace,
+    forge,
+    github,
+    process,
+    session,
+    store,
+)
 from agent_coordination.protocol import ClaimError, ClaimState, ClaimUnavailableError
 from agent_coordination.session import RunContext
 
@@ -429,13 +438,13 @@ def test_a_failed_trunk_fetch_fails_loud_and_is_fetched_again_on_the_next_ask(
     fetched_from: list[str] = []
 
     def failing_first_fetch(
-        arguments: list[str], *, directory: Path | None = None
+        arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> process.CapturedResult:
         if arguments[0] == "fetch":
             fetched_from.append(arguments[1])
             if len(fetched_from) == 1:
                 return process.CapturedResult(1, b"", b"fatal: could not read from remote")
-        return launch(arguments, directory=directory)
+        return launch(arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "_git_run", failing_first_fetch)
     context = _context().for_directory(repository)
@@ -669,3 +678,78 @@ def test_protect_judges_its_payload_without_ever_building_a_run_context(
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
 
     assert run_cli(["protect"], capsys).status == 0
+
+
+@pytest.mark.parametrize(
+    ("first_toplevel_read", "width_gate_refusal"),
+    [
+        pytest.param(
+            process.ProcessTimedOutError("slow"),
+            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "checkout (a shallow one is enough): git rev-parse timed out",
+            id="times-out",
+        ),
+        pytest.param(
+            process.ExecutableMissingError("git"),
+            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "checkout (a shallow one is enough): git is required for issue claims",
+            id="not-installed",
+        ),
+        pytest.param(
+            OSError("denied"),
+            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "checkout (a shallow one is enough): git failed to launch: denied",
+            id="fails-to-launch",
+        ),
+        pytest.param(
+            process.CapturedResult(128, b"", b"fatal: not a work tree"),
+            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "checkout (a shallow one is enough): fatal: not a work tree",
+            id="exit-status-is-the-toplevel-refusal",
+        ),
+    ],
+)
+def test_the_width_gate_refuses_when_the_first_toplevel_read_never_answered(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    first_toplevel_read: process.CapturedResult | Exception,
+    width_gate_refusal: str,
+) -> None:
+    """Through the real context: a toplevel read that timed out or never
+    launched must not let an existing, unversioned directory past the width
+    gate (a retry would read it), and neither may an exit status: the width
+    gate refuses with the same toplevel sentence the command reports."""
+    repository = _checkout_configuring(tmp_path, "origin", "")
+    (repository / "scratch").mkdir()
+    real_git(
+        repository,
+        "-c",
+        "user.name=T",
+        "-c",
+        "user.email=t@e",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "initial",
+    )
+    real_run_git = process.run_git
+    reads: list[list[str]] = []
+
+    def failing_first_toplevel_read(
+        arguments: list[str], *, directory: Path | None = None, **options: bool
+    ) -> process.CapturedResult:
+        if arguments == ["rev-parse", "--show-toplevel"] and not reads:
+            reads.append(arguments)
+            if isinstance(first_toplevel_read, Exception):
+                raise first_toplevel_read
+            return first_toplevel_read
+        return real_run_git(arguments, directory=directory, **options)
+
+    monkeypatch.setattr(process, "run_git", failing_first_toplevel_read)
+    context = RunContext(None, build_forge=_forge_never_built, directory=repository)
+
+    with pytest.raises(ClaimError) as refusal:
+        cmd_claim.scope_versioning(("scratch",), None, context=context)
+
+    assert str(refusal.value) == width_gate_refusal

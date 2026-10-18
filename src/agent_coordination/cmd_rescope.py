@@ -306,16 +306,17 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
     except protocol.ClaimError as error:
         raise _RescopeInvalidUsageError(str(error)) from error
     item = _rescoped_item_body(checkout_context, selected.identity)
+    directories = checkout.scope_directories(
+        combined,
+        directory=checkout_context.directory,
+        toplevel=lambda: checkout_context.toplevel,
+    )
     try:
         _n, _total, _share, whole_reason = policy.reject_wide_scope(
             combined,
             versioned,
             requested.whole_reason or selected.whole_reason,
-            directories=checkout.scope_directories(
-                combined,
-                directory=checkout_context.directory,
-                toplevel=lambda: checkout_context.toplevel,
-            ),
+            directories=directories,
             whole_from_body=None if item is None else lambda: item.whole,
         )
     except protocol.ClaimError as error:
