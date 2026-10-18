@@ -866,6 +866,32 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             ((hook_input.PATTERN_GIT_RESTORE, "-"),),
             id="git-restore-lone-dash-is-a-path-operand",
         ),
+        pytest.param(
+            "git restore --end-of-options -Ws docs/file",
+            (
+                (hook_input.PATTERN_GIT_RESTORE, "-Ws"),
+                (hook_input.PATTERN_GIT_RESTORE, "docs/file"),
+            ),
+            id="git-restore-end-of-options-marker-makes-a-cluster-lookalike-a-path",
+        ),
+        pytest.param(
+            "git restore -s --end-of-options f",
+            ((hook_input.PATTERN_GIT_RESTORE, "f"),),
+            id="git-restore-end-of-options-marker-taken-as-a-value-ends-nothing",
+        ),
+        pytest.param(
+            "sed -i p /repo/f /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-names-a-file-given-twice-once",
+        ),
+        pytest.param(
+            "cp -t y a -t/x",
+            (
+                (hook_input.PATTERN_COPY, "y"),
+                (hook_input.PATTERN_COPY, "/x"),
+            ),
+            id="cp-attached-target-value-is-ordered-by-its-option-word",
+        ),
     ],
 )
 def test_hook_command_paths_recognizes_every_write_pattern(

@@ -189,7 +189,8 @@ way, the only one it actually writes; `-S`/`--suffix`, `--no-preserve` and
 `--sparse` take a value of their own), `rm`, `git checkout`
 (`-f`/`--ours`/`--theirs` before a literal `--`, then its path operands),
 and `git restore` (skipping `-s`/`--source`, `--conflict`, and
-`--pathspec-from-file` and their own values, and a literal `--`) -- each
+`--pathspec-from-file` and their own values, and a literal `--` or
+`--end-of-options`) -- each
 occurrence naming a `(pattern, path)` pair, in the order the command names
 them (issue #380). A literal `--` ends option parsing the same way Bash's
 own coreutils do: every operand after it is a path regardless of a leading

@@ -946,6 +946,11 @@ def _bash_scope_case(
             for template, pattern in _BASH_WRITE_COMMAND_TEMPLATES
         ),
         ("cp src/a src/b --suffix docs", 2, "cp docs outside claim scope"),
+        (
+            "git restore --end-of-options -Ws docs/file",
+            2,
+            "git restore -Ws outside claim scope",
+        ),
     ],
 )
 def test_protect_bash_judges_a_recognized_pattern_path_by_claim_scope(

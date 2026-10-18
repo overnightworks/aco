@@ -513,6 +513,7 @@ _GROUP_OPEN = "("
 _GROUP_CLOSE = ")"
 _FLAG_PREFIX = "-"
 _END_OF_OPTIONS = "--"
+_GIT_END_OF_OPTIONS = "--end-of-options"
 _CD_COMMAND = "cd"
 _CD_PREVIOUS_DIRECTORY = "-"
 _DEV_NULL = "/dev/null"
@@ -531,6 +532,7 @@ _CP_TARGET_DIRECTORY_OPTIONS = frozenset({"-t", "--target-directory"})
 _CP_OTHER_VALUE_OPTIONS = frozenset({"-S", "--suffix", "--no-preserve", "--sparse"})
 _GIT_CHECKOUT_SKIPPED_FLAGS = frozenset({"-f", "--ours", "--theirs"})
 _GIT_RESTORE_VALUE_OPTIONS = frozenset({"--source", "-s", "--conflict", "--pathspec-from-file"})
+_GIT_RESTORE_END_OF_OPTIONS = frozenset({_END_OF_OPTIONS, _GIT_END_OF_OPTIONS})
 
 
 def _is_command_separator(word: _Word) -> bool:
@@ -694,13 +696,15 @@ def _parse_arguments(
     *,
     value_options: frozenset[str] = frozenset(),
     optional_value_options: frozenset[str] = frozenset(),
+    end_of_options_markers: frozenset[str] = frozenset({_END_OF_OPTIONS}),
     options_end_at_first_operand: bool = False,
 ) -> _ParsedArguments:
     """The one walk that decides what is an option, an option's value and an
     operand, the way GNU `getopt` does: options and operands may interleave,
-    a lone `-` is an operand, and only a `--` that no option consumed as its
-    value ends the options -- every word after it is an operand whatever it
-    starts with. `value_options` (`-t`, `--target-directory`) take a required
+    a lone `-` is an operand, and only an end-of-options marker that no
+    option consumed as its value ends the options -- every word after it is
+    an operand whatever it starts with. `end_of_options_markers` is the
+    command's own set: `--` for GNU tools, also `--end-of-options` for git. `value_options` (`-t`, `--target-directory`) take a required
     value; `optional_value_options` (`-i`, `--in-place`) only an attached one.
     Unlike `_non_flag_arguments`, which drops every word starting with `-`,
     a lone `-` stays an operand here (`git restore -`), as in GNU tools.
@@ -716,7 +720,7 @@ def _parse_arguments(
         word = words[index]
         following = words[index + 1 :]
         index += 1
-        if word.text == _END_OF_OPTIONS:
+        if word.text in end_of_options_markers:
             operands.extend(following)
             break
         if len(word.text) < len(_FLAG_PREFIX) + 1 or not _is_flag(word):
@@ -902,7 +906,9 @@ def _match_git_restore(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]
     if len(words) < _GIT_RESTORE_PREFIX_LENGTH or prefix != ("git", "restore"):
         return None
     return PATTERN_GIT_RESTORE, _parse_arguments(
-        words[_GIT_RESTORE_PREFIX_LENGTH:], value_options=_GIT_RESTORE_VALUE_OPTIONS
+        words[_GIT_RESTORE_PREFIX_LENGTH:],
+        value_options=_GIT_RESTORE_VALUE_OPTIONS,
+        end_of_options_markers=_GIT_RESTORE_END_OF_OPTIONS,
     ).operands
 
 
