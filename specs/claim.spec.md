@@ -131,6 +131,7 @@ to the clause each names below.
 - `aco claim` never re-derives a replayed claim's scope from the item's body: it takes the live claim's own stored scope outright (CLAIM-53).
 - Lane mode never reads a body `whole` field either: a lane names no item to read one from, so its width gate keeps CLM-18's own wording, never CLM-21/22's.
 - `aco claim` never takes a lane on a branch outside `docs/`/`fix/`; only `aco adopt` does, on a pull request's own head branch (`specs/adopt.spec.md`).
+- `aco claim` never lets a git failure while reading its scope drop a directory from the width gate (`specs/claim-record.spec.md`, Never): it reports `unavailable` with git's detail.
 
 ## Examples
 

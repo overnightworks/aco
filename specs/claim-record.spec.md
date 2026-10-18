@@ -155,6 +155,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 ## Never
 
 - A claim never refuses on overlapping scope: two lanes may hold the same file, and the overlap is a printed note, never a gate.
+- The width gate never reads a git failure as a path that is no directory: it counts every directory git or the checkout names, or the command refuses with git's own detail.
 - No claim, rescope or release ever writes a file outside the repository's own git directory, and none of them creates the state ref: only `aco bootstrap` does.
 - A released or rewritten claim record is never reused: neither its claim id nor a resource integer it held ever returns to a later claim.
 - A record never carries the item's title, body, blockers or parent: the board owns those, and the claim owns only who works where.

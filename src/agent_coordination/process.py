@@ -385,13 +385,45 @@ def git_command(arguments: list[str], *, directory: Path | None = None) -> list[
     return ["git", *(["-C", str(directory)] if directory is not None else []), *arguments]
 
 
-def run_git(arguments: list[str], *, directory: Path | None = None) -> CapturedResult:
+# Git reads a pathspec by what these variables inherited from the caller
+# say. Only `GIT_LITERAL_PATHSPECS` is set for a read that names a path
+# literally; the others contradict it (git refuses the combination) or
+# make a command refuse an ordinary path.
+_LITERAL_PATHSPEC_VARIABLE = "GIT_LITERAL_PATHSPECS"
+_CONTRADICTING_PATHSPEC_VARIABLES = (
+    "GIT_ICASE_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+)
+
+
+def _literal_pathspec_environment() -> dict[str, str]:
+    """This process's environment with every path read literally by git,
+    whatever pathspec settings the caller inherited."""
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if name not in _CONTRADICTING_PATHSPEC_VARIABLES
+    }
+    environment[_LITERAL_PATHSPEC_VARIABLE] = "1"
+    return environment
+
+
+def run_git(
+    arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+) -> CapturedResult:
     """Launch `git arguments`, in `directory` when given via `-C`, capturing
-    stdout and stderr separately. Raises `ExecutableMissingError` or
+    stdout and stderr separately. `literal_pathspecs` makes git read every
+    path argument as plain name characters, whatever pathspec environment
+    this process inherited -- for a caller that passes a path without magic.
+    Raises `ExecutableMissingError` or
     `ProcessTimedOutError`; whether an unlisted `OSError` should also fail
     closed is each caller's own call to make around this one, since callers
     disagree (issue #372)."""
-    return run_captured(git_command(arguments, directory=directory))
+    command = git_command(arguments, directory=directory)
+    if literal_pathspecs:
+        return run_captured(command, env=_literal_pathspec_environment())
+    return run_captured(command)
 
 
 def _git_failure_detail(stderr: bytes, stdout: bytes, *, errors: str = "strict") -> str:

@@ -44,10 +44,12 @@ def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     """
     real_git_output = checkout.git_output
 
-    def fake_git_output(arguments: list[str], *, directory: Path | None = None) -> str:
+    def fake_git_output(
+        arguments: list[str], *, directory: Path | None = None, **options: bool
+    ) -> str:
         if arguments == _SHOW_TOPLEVEL_ARGUMENTS and directory is None:
             return str(tmp_path)
-        return real_git_output(arguments, directory=directory)
+        return real_git_output(arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "git_output", fake_git_output)
 
