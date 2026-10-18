@@ -684,14 +684,23 @@ def test_protect_judges_its_payload_without_ever_building_a_run_context(
     ("first_toplevel_read", "width_gate_refusal"),
     [
         pytest.param(
-            process.ProcessTimedOutError("slow"), "git rev-parse timed out", id="times-out"
+            process.ProcessTimedOutError("slow"),
+            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "checkout (a shallow one is enough): git rev-parse timed out",
+            id="times-out",
         ),
         pytest.param(
             process.ExecutableMissingError("git"),
-            "git is required for issue claims",
+            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "checkout (a shallow one is enough): git is required for issue claims",
             id="not-installed",
         ),
-        pytest.param(OSError("denied"), "git failed to launch: denied", id="fails-to-launch"),
+        pytest.param(
+            OSError("denied"),
+            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "checkout (a shallow one is enough): git failed to launch: denied",
+            id="fails-to-launch",
+        ),
         pytest.param(
             process.CapturedResult(128, b"", b"fatal: not a work tree"),
             "this command reads the repository's body contract from .aco/board.toml and needs a "
@@ -728,14 +737,14 @@ def test_the_width_gate_refuses_when_the_first_toplevel_read_never_answered(
     reads: list[list[str]] = []
 
     def failing_first_toplevel_read(
-        arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+        arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> process.CapturedResult:
         if arguments == ["rev-parse", "--show-toplevel"] and not reads:
             reads.append(arguments)
             if isinstance(first_toplevel_read, Exception):
                 raise first_toplevel_read
             return first_toplevel_read
-        return real_run_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
+        return real_run_git(arguments, directory=directory, **options)
 
     monkeypatch.setattr(process, "run_git", failing_first_toplevel_read)
     context = RunContext(None, build_forge=_forge_never_built, directory=repository)

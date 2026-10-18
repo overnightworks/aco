@@ -2334,11 +2334,11 @@ def test_start_resume_refuses_when_the_worktree_toplevel_read_exits_nonzero(
     real_run_git = process.run_git
 
     def toplevel_read_exits_nonzero(
-        arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+        arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> process.CapturedResult:
         if arguments == ["rev-parse", "--show-toplevel"] and directory == worktree:
             return process.CapturedResult(128, b"", b"fatal: not a work tree")
-        return real_run_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
+        return real_run_git(arguments, directory=directory, **options)
 
     monkeypatch.setattr(process, "run_git", toplevel_read_exits_nonzero)
 

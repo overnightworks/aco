@@ -69,13 +69,11 @@ def stub_one_git_call(
     real_git_run = checkout._git_run
 
     def fake(
-        call_arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+        call_arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> process.CapturedResult:
         if call_arguments == arguments:
             return process.CapturedResult(exit_status, b"", stderr.encode())
-        return real_git_run(
-            call_arguments, directory=directory, literal_pathspecs=literal_pathspecs
-        )
+        return real_git_run(call_arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "_git_run", fake)
 
@@ -88,12 +86,12 @@ def fail_git_launch(
     matched: list[list[str]] = []
 
     def fail(
-        arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+        arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> process.CapturedResult:
         if arguments[: len(leading_arguments)] == leading_arguments:
             matched.append(list(arguments))
             raise failure
-        return run_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
+        return run_git(arguments, directory=directory, **options)
 
     monkeypatch.setattr(process, "run_git", fail)
     return matched

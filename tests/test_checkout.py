@@ -298,27 +298,17 @@ def test_scope_directories_reads_every_entry_from_the_repository_root_wherever_t
     assert directories == expected
 
 
-@pytest.mark.parametrize(
-    "toplevel_failure",
-    [
-        checkout.GitTimedOutError("rev-parse"),
-        checkout.GitLaunchError("git is required for issue claims"),
-        ClaimError("fatal: this operation must be run in a work tree"),
-    ],
-    ids=["times-out", "fails-to-launch", "exit-status"],
-)
-def test_scope_directories_refuses_a_toplevel_read_that_failed(
-    tmp_path: Path, toplevel_failure: ClaimError
-) -> None:
-    """A toplevel read that failed, by exit status, timeout or launch, refuses
-    with its own text: the width gate never counts no untracked directory
-    for it, so a retry cannot admit a wide claim."""
+def test_scope_directories_refuses_a_toplevel_read_that_failed(tmp_path: Path) -> None:
+    """A toplevel read that failed refuses with its own text: the width gate
+    never counts no untracked directory for it, so a retry cannot admit a
+    wide claim. Timeouts and launch failures through the real context are
+    pinned in `test_session`."""
     repository = _scope_repository(tmp_path)
 
     def toplevel() -> Path:
-        raise toplevel_failure
+        raise ClaimError("fatal: this operation must be run in a work tree")
 
-    with pytest.raises(ClaimError, match=re.escape(str(toplevel_failure))):
+    with pytest.raises(ClaimError, match="must be run in a work tree"):
         checkout.scope_directories(("missing",), directory=repository, toplevel=toplevel)
 
 

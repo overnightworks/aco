@@ -420,10 +420,10 @@ def run_git(
     `ProcessTimedOutError`; whether an unlisted `OSError` should also fail
     closed is each caller's own call to make around this one, since callers
     disagree (issue #372)."""
-    return run_captured(
-        git_command(arguments, directory=directory),
-        env=_literal_pathspec_environment() if literal_pathspecs else None,
-    )
+    command = git_command(arguments, directory=directory)
+    if literal_pathspecs:
+        return run_captured(command, env=_literal_pathspec_environment())
+    return run_captured(command)
 
 
 def _git_failure_detail(stderr: bytes, stdout: bytes, *, errors: str = "strict") -> str:

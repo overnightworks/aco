@@ -47,11 +47,6 @@ IDENTITY_ENVIRONMENT_ORDER = (
 _GIT_MISSING_EXECUTABLE_ERROR = "git is required for issue claims"
 
 
-class GitLaunchError(ClaimError):
-    """A git step that never started: a missing executable or any other
-    OS-level launch failure."""
-
-
 class GitTimedOutError(ClaimError):
     """A git step that ran past its timeout (issue #603), named by its own
     subcommand, never by a purpose it may not serve. Typed apart from every
@@ -79,13 +74,15 @@ def _git_run(
     raises `GitTimedOutError`, naming `arguments`' own subcommand.
     """
     try:
-        return process.run_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
+        if literal_pathspecs:
+            return process.run_git(arguments, directory=directory, literal_pathspecs=True)
+        return process.run_git(arguments, directory=directory)
     except process.ExecutableMissingError as error:
-        raise GitLaunchError(_GIT_MISSING_EXECUTABLE_ERROR) from error
+        raise ClaimError(_GIT_MISSING_EXECUTABLE_ERROR) from error
     except process.ProcessTimedOutError as error:
         raise GitTimedOutError(arguments[0]) from error
     except OSError as error:
-        raise GitLaunchError(f"git failed to launch: {error}") from error
+        raise ClaimError(f"git failed to launch: {error}") from error
 
 
 def git_output(
@@ -95,7 +92,10 @@ def git_output(
     #314) or the calling process's own cwd otherwise; a nonzero exit fails
     closed. `literal_pathspecs` reads every path argument literally (see
     `process.run_git`)."""
-    result = _git_run(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
+    if literal_pathspecs:
+        result = _git_run(arguments, directory=directory, literal_pathspecs=True)
+    else:
+        result = _git_run(arguments, directory=directory)
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     # Trailing-only: every caller wants the one newline `git` appends after its
