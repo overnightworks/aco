@@ -764,6 +764,74 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             ((hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),),
             id="sed-line-length-flag-consumes-a-double-dash-as-its-value",
         ),
+        pytest.param(
+            "sed -ni 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-flag-inside-a-short-cluster-edits-in-place",
+        ),
+        pytest.param(
+            "sed -Ei 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-flag-after-another-cluster-letter-edits-in-place",
+        ),
+        pytest.param(
+            "sed -ni.bak 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-suffix-inside-a-short-cluster-edits-in-place",
+        ),
+        pytest.param(
+            "sed -i -nl 80 -e p /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-line-length-inside-a-cluster-takes-the-next-word",
+        ),
+        pytest.param(
+            "sed --in-placeX 's/a/b/' /repo/f",
+            (),
+            id="sed-in-place-long-flag-is-not-a-prefix-match",
+        ),
+        pytest.param(
+            "sed --in-place= 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-long-flag-with-an-empty-suffix-edits-in-place",
+        ),
+        pytest.param(
+            "cp a -",
+            ((hook_input.PATTERN_COPY, "-"),),
+            id="cp-lone-dash-is-the-destination-operand",
+        ),
+        pytest.param(
+            "cp -t /in -t /repo/d x",
+            (
+                (hook_input.PATTERN_COPY, "/in"),
+                (hook_input.PATTERN_COPY, "/repo/d"),
+            ),
+            id="cp-repeated-target-flag-judges-every-value",
+        ),
+        pytest.param(
+            "cp -t",
+            (),
+            id="cp-target-flag-without-a-value-names-nothing",
+        ),
+        pytest.param(
+            "cp src /repo/x --no-preserve mode",
+            ((hook_input.PATTERN_COPY, "/repo/x"),),
+            id="cp-no-preserve-flag-consumes-the-next-word",
+        ),
+        pytest.param(
+            "cp src /repo/x --sparse always",
+            ((hook_input.PATTERN_COPY, "/repo/x"),),
+            id="cp-sparse-flag-consumes-the-next-word",
+        ),
+        pytest.param(
+            "git restore -Ws HEAD f",
+            ((hook_input.PATTERN_GIT_RESTORE, "f"),),
+            id="git-restore-source-flag-inside-a-cluster-takes-the-next-word",
+        ),
+        pytest.param(
+            "git restore -",
+            ((hook_input.PATTERN_GIT_RESTORE, "-"),),
+            id="git-restore-lone-dash-is-a-path-operand",
+        ),
     ],
 )
 def test_hook_command_paths_recognizes_every_write_pattern(

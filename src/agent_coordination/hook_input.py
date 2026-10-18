@@ -523,7 +523,7 @@ _SED_SCRIPT_OPTIONS = frozenset({"-e", "--expression", "-f", "--file"})
 # never the fictitious path `80`).
 _SED_LINE_LENGTH_OPTIONS = frozenset({"-l", "--line-length"})
 _CP_TARGET_DIRECTORY_OPTIONS = frozenset({"-t", "--target-directory"})
-_CP_SUFFIX_OPTIONS = frozenset({"-S", "--suffix"})
+_CP_OTHER_VALUE_OPTIONS = frozenset({"-S", "--suffix", "--no-preserve", "--sparse"})
 _GIT_CHECKOUT_SKIPPED_FLAGS = frozenset({"-f", "--ours", "--theirs"})
 _GIT_RESTORE_VALUE_OPTIONS = frozenset({"--source", "-s", "--conflict", "--pathspec-from-file"})
 
@@ -615,11 +615,15 @@ class _ParsedArguments(NamedTuple):
     options: tuple[_OptionValue, ...]
     operands: tuple[_Word, ...]
 
-    def last_value_of(self, names: frozenset[str]) -> _Word | None:
-        """The value of the last option in `names` that took one -- the one
-        GNU tools act on when an option repeats."""
-        values = [option.value for option in self.options if option.name in names]
-        return values[-1] if values and values[-1] is not None else None
+    def every_value_of(self, names: frozenset[str]) -> tuple[_Word, ...]:
+        """The value of every option in `names` that took one. A repeated
+        option is judged at each of its values, a safe superset of the one
+        a tool would act on (GNU `cp` refuses a repeated `-t` outright)."""
+        return tuple(
+            option.value
+            for option in self.options
+            if option.name in names and option.value is not None
+        )
 
     def has_option(self, names: frozenset[str]) -> bool:
         return any(option.name in names for option in self.options)
@@ -656,7 +660,7 @@ def _parse_short_cluster(
                 options.append(_OptionValue(name, _attached_value(word, rest)))
                 return options, 0
             options.append(_OptionValue(name, following[0] if following else None))
-            return options, len(following[:1])
+            return options, 1 if following else 0
         options.append(_OptionValue(name, None))
     return options, 0
 
@@ -676,7 +680,7 @@ def _parse_long_option(
         takes_value = name in value_options | optional_value_options
         return _OptionValue(name, _attached_value(word, attached) if takes_value else None), 0
     if name in value_options:
-        return _OptionValue(name, following[0] if following else None), len(following[:1])
+        return _OptionValue(name, following[0] if following else None), 1 if following else 0
     return _OptionValue(name, None), 0
 
 
@@ -692,8 +696,8 @@ def _parse_arguments(
     value ends the options -- every word after it is an operand whatever it
     starts with. `value_options` (`-t`, `--target-directory`) take a required
     value; `optional_value_options` (`-i`, `--in-place`) only an attached one.
-    For a command whose options never take a value, `_non_flag_arguments`
-    reads the same operands."""
+    Unlike `_non_flag_arguments`, which drops every word starting with `-`,
+    a lone `-` stays an operand here (`git restore -`), as in GNU tools."""
     options: list[_OptionValue] = []
     operands: list[_Word] = []
     index = 0
@@ -767,11 +771,11 @@ def _match_copy(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | Non
     if words[0].text != PATTERN_COPY:
         return None
     parsed = _parse_arguments(
-        words[1:], value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_SUFFIX_OPTIONS
+        words[1:], value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS
     )
-    target_directory = parsed.last_value_of(_CP_TARGET_DIRECTORY_OPTIONS)
-    if target_directory is not None:
-        return PATTERN_COPY, (target_directory,)
+    target_directories = parsed.every_value_of(_CP_TARGET_DIRECTORY_OPTIONS)
+    if target_directories:
+        return PATTERN_COPY, target_directories
     return (PATTERN_COPY, parsed.operands[-1:]) if parsed.operands else None
 
 

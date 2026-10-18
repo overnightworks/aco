@@ -177,7 +177,8 @@ fail-closed rather than guessing which paths it touches.
 path key at all: its `command` text is scanned for a
 short, fixed list of write patterns -- a real, unquoted `>`/`>>` redirection
 (a heredoc target such as `cat > path <<EOF` included), `tee`'s own file
-operands, `sed -i` (or `-i<suffix>`/`--in-place[=suffix]`, skipping
+operands, `sed -i` (or `-i<suffix>`/`--in-place[=suffix]`, where `-i` also counts inside a short-option cluster
+such as `-ni`, skipping
 `-e`/`--expression`/`-f`/`--file`, `-l`/`--line-length`, and their own
 values -- a lone remaining operand after a spelled-out suffix is judged as
 the file it edits, since sed cannot otherwise write anywhere), `mv` (every
