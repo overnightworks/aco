@@ -1262,6 +1262,36 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     assert state_ref_tip(bare_remote) is None
 
 
+@pytest.mark.parametrize(
+    "start_failure",
+    [
+        pytest.param(FileNotFoundError("git"), id="executable-missing"),
+        pytest.param(PermissionError("git"), id="process-start-refused"),
+    ],
+)
+def test_bootstrap_refuses_plainly_when_the_push_process_never_started(
+    bare_remote: Path,
+    worktree: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    start_failure: OSError,
+) -> None:
+    """Spec: CAS-56 covers sent writes only; a push that never started is a plain refusal."""
+    real_run = subprocess.run
+
+    def run_failing_to_start_a_push(command: list[str], *args: Any, **kwargs: Any) -> Any:
+        if "push" in command:
+            raise start_failure
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", run_failing_to_start_a_push)
+
+    with pytest.raises(protocol.ClaimError) as raised:
+        store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+    assert not isinstance(raised.value, protocol.UncertainWriteError)
+    assert state_ref_tip(bare_remote) is None
+
+
 def test_git_push_transport_raises_on_a_non_fast_forward_push(
     bare_remote: Path, worktree: Path
 ) -> None:

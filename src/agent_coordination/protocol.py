@@ -752,6 +752,11 @@ class PushRejectedError(ClaimError):
     """
 
 
+class PushNotStartedError(ClaimError):
+    """The push process provably never started (git missing, or the start
+    refused), so nothing was sent and the write is no CAS-56 case."""
+
+
 class UncertainWriteError(ClaimUnavailableError):
     """A sent write whose outcome the store cannot tell (issues #494, #498,
     CAS-56): the push's answer, or the re-read after its rejection, was

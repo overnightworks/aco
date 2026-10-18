@@ -56,6 +56,7 @@ from .protocol import (
     LaneIdentity,
     MalformedStateTreeError,
     ObjectId,
+    PushNotStartedError,
     PushRejectedError,
     ReleaseIntent,
     RescopeIntent,
@@ -267,7 +268,12 @@ class GitPushTransport:
     history; only the documented recovery procedure forces)."""
 
     def push(self, *, worktree: Path, remote: str, ref: str, new_oid: ObjectId) -> None:
-        result = _run_git(worktree, ["push", remote, f"{new_oid}:{ref}"])
+        try:
+            result = process.run_git(["push", remote, f"{new_oid}:{ref}"], directory=worktree)
+        except (process.ExecutableMissingError, PermissionError) as error:
+            raise PushNotStartedError(f"git push could not start: {error}") from error
+        except process.ProcessTimedOutError as error:
+            raise ClaimError("git timed out while pushing to the claim state store") from error
         if result.exit_status != 0:
             raise PushRejectedError(process.git_failure_detail(result))
 
@@ -1605,6 +1611,8 @@ def _uncertain_once_sent() -> Iterator[None]:
     the lineage stamp's own filesystem failure alike."""
     try:
         yield
+    except PushNotStartedError:
+        raise
     except (ClaimError, OSError) as error:
         raise UncertainWriteError(str(error)) from error
 
