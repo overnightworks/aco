@@ -177,21 +177,33 @@ fail-closed rather than guessing which paths it touches.
 path key at all: its `command` text is scanned for a
 short, fixed list of write patterns -- a real, unquoted `>`/`>>` redirection
 (a heredoc target such as `cat > path <<EOF` included), `tee`'s own file
-operands, `sed -i` (or `-i<suffix>`/`--in-place[=suffix]`, skipping
+operands, `sed -i` (or `-i<suffix>`/`--in-place[=suffix]`, where `-i` also counts inside a short-option cluster
+such as `-ni`, skipping
 `-e`/`--expression`/`-f`/`--file`, `-l`/`--line-length`, and their own
 values -- a lone remaining operand after a spelled-out suffix is judged as
 the file it edits, since sed cannot otherwise write anywhere), `mv` (every
 operand -- a source vanishes exactly like its destination is written), `cp`
-(a `-t`/`--target-directory` value when given, attached or separate, e.g.
+(every `-t`/`--target-directory` value when given, attached or separate, e.g.
 `-t/tmp`/`--target-directory=/tmp`, otherwise its last operand -- either
-way, the only one it actually writes), `rm`, `git checkout`
+way, the only one it actually writes; `-S`/`--suffix`, `--no-preserve` and
+`--sparse` take a value of their own), `rm`, `git checkout`
 (`-f`/`--ours`/`--theirs` before a literal `--`, then its path operands),
 and `git restore` (skipping `-s`/`--source`, `--conflict`, and
-`--pathspec-from-file` and their own values, and a literal `--`) -- each
+`--pathspec-from-file` and their own values, and a literal `--` or
+`--end-of-options`) -- a long option is read as `getopt_long` and git read it, by
+its exact name or its one unambiguous abbreviation among all the command's long
+options, flags included (`--target`, `--in-pl`; `sed --f` is ambiguous) --
+each
 occurrence naming a `(pattern, path)` pair, in the order the command names
 them (issue #380). A literal `--` ends option parsing the same way Bash's
 own coreutils do: every operand after it is a path regardless of a leading
-`-` (`rm -- -f` judges `-f`). A quoted or backslash-escaped occurrence of a
+`-` (`rm -- -f` judges `-f`). An option after an operand is judged both as
+an option and as an operand of `cp` and `sed`, because `POSIXLY_CORRECT` makes
+coreutils read it as an operand (`cp src/a src/b --suffix docs` judges `src/b`
+and `docs`). An option word is read only up to its first shell expansion: a
+variable name in it (`cp -"$options" src/a docs/file`) creates no option and
+consumes no following word, while a literal option with an expandable value
+(`cp -t"$dir" src/a`) keeps its unknown value. A quoted or backslash-escaped occurrence of a
 character that would otherwise be an operator (`echo '>' > f`) is data,
 never the operator it merely reads like -- but a quoted or backslash-escaped
 *command name* (`'rm' f`, `r\m f`) still executes exactly as Bash runs it

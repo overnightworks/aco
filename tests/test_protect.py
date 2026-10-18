@@ -945,6 +945,29 @@ def _bash_scope_case(
             _bash_scope_case(template, pattern, path=_BASH_INSIDE_SCOPE_PATH, denied=False)
             for template, pattern in _BASH_WRITE_COMMAND_TEMPLATES
         ),
+        ("cp src/a src/b --suffix docs", 2, "cp docs outside claim scope"),
+        (
+            'options=v; cp -"$options" src/a docs/file',
+            2,
+            "cp docs/file outside claim scope",
+        ),
+        (
+            'flags=W; git restore -"$flags" docs/file',
+            2,
+            "git restore docs/file outside claim scope",
+        ),
+        (
+            "git restore --end-of-options -Ws docs/file",
+            2,
+            "git restore -Ws outside claim scope",
+        ),
+        ("cp --target=docs -S -tdocs src/a", 2, "cp docs outside claim scope"),
+        ("sed --in-pl -f -i docs/file", 2, "sed -i docs/file outside claim scope"),
+        (
+            "sed -i -e 'w docs/file' --f docs/file",
+            2,
+            "sed -i docs/file outside claim scope",
+        ),
     ],
 )
 def test_protect_bash_judges_a_recognized_pattern_path_by_claim_scope(

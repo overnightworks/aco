@@ -670,6 +670,311 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             ((hook_input.PATTERN_TEE, "f"),),
             id="tee-honors-a-literal-end-of-options-marker",
         ),
+        pytest.param(
+            "cp -- -tfoo /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-dash-t-after-double-dash-is-an-operand-not-a-target-flag",
+        ),
+        pytest.param(
+            "cp -- -t foo bar",
+            ((hook_input.PATTERN_COPY, "bar"),),
+            id="cp-separate-dash-t-after-double-dash-is-an-operand",
+        ),
+        pytest.param(
+            "cp -- a --target-directory=foo /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-long-target-after-double-dash-is-an-operand",
+        ),
+        pytest.param(
+            "cp -t foo -- a",
+            ((hook_input.PATTERN_COPY, "foo"),),
+            id="cp-target-before-double-dash-still-wins",
+        ),
+        pytest.param(
+            "cp -rt /repo/target a",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-target-flag-inside-a-short-cluster-takes-the-next-word",
+        ),
+        pytest.param(
+            "cp -rt/repo/target a",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-target-flag-inside-a-short-cluster-takes-the-attached-rest",
+        ),
+        pytest.param(
+            "cp -rS.t a /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-suffix-value-in-a-cluster-is-not-a-target-flag",
+        ),
+        pytest.param(
+            "cp -S -t /in-claim /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-suffix-flag-consumes-the-following-dash-t-word",
+        ),
+        pytest.param(
+            "cp --suffix -t /in-claim /repo/target",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-long-suffix-flag-consumes-the-following-dash-t-word",
+        ),
+        pytest.param(
+            "cp -S.bak -t /repo/target a",
+            ((hook_input.PATTERN_COPY, "/repo/target"),),
+            id="cp-attached-suffix-leaves-a-later-target-flag-in-force",
+        ),
+        pytest.param(
+            "cp -t -- dest src",
+            ((hook_input.PATTERN_COPY, "--"),),
+            id="cp-target-flag-consumes-a-double-dash-as-its-value",
+        ),
+        pytest.param(
+            "cp --target-directory -- dest src",
+            ((hook_input.PATTERN_COPY, "--"),),
+            id="cp-long-target-flag-consumes-a-double-dash-as-its-value",
+        ),
+        pytest.param(
+            "sed -i 's/a/b/' -- -e /repo/target",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "--"),
+                (hook_input.PATTERN_SED_IN_PLACE, "-e"),
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),
+            ),
+            id="sed-dash-e-after-double-dash-is-a-file-and-the-script-is-not",
+        ),
+        pytest.param(
+            "sed -i p /repo/a -n /repo/b",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/a"),
+                (hook_input.PATTERN_SED_IN_PLACE, "-n"),
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/b"),
+            ),
+            id="sed-readings-are-named-in-the-order-the-command-names-them",
+        ),
+        pytest.param(
+            "sed -i -- 's/a/b/' -f /repo/target",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "-f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),
+            ),
+            id="sed-dash-f-after-double-dash-is-a-file-behind-the-inline-script",
+        ),
+        pytest.param(
+            "sed -- 's/a/b/' -i /repo/target",
+            (),
+            id="sed-dash-i-after-double-dash-is-a-file-name-so-nothing-is-written",
+        ),
+        pytest.param(
+            "sed -i -e p -- -f t",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "-f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "t"),
+            ),
+            id="sed-explicit-script-keeps-every-operand-after-double-dash",
+        ),
+        pytest.param(
+            "sed -l -- -i -e p /repo/target",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),),
+            id="sed-line-length-flag-consumes-a-double-dash-as-its-value",
+        ),
+        pytest.param(
+            'options=v; cp -"$options" src/a docs/file',
+            ((hook_input.PATTERN_COPY, "docs/file"),),
+            id="cp-variable-letters-in-an-option-word-create-no-target-flag",
+        ),
+        pytest.param(
+            'flags=W; git restore -"$flags" docs/file',
+            ((hook_input.PATTERN_GIT_RESTORE, "docs/file"),),
+            id="git-restore-variable-letters-in-an-option-word-consume-no-source-value",
+        ),
+        pytest.param(
+            'flags=n; sed -i -"$flags" p src/file',
+            ((hook_input.PATTERN_SED_IN_PLACE, "src/file"),),
+            id="sed-variable-letters-in-an-option-word-create-no-script-file-flag",
+        ),
+        pytest.param(
+            'cp -t"$directory" src/a',
+            (),
+            id="cp-literal-target-flag-with-an-expandable-value-keeps-the-source-unjudged",
+        ),
+        pytest.param(
+            'sed -i --file"$suffix" p src/file',
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "p"),
+                (hook_input.PATTERN_SED_IN_PLACE, "src/file"),
+            ),
+            id="sed-literal-long-name-with-an-expandable-tail-keeps-the-script-file-flag",
+        ),
+        pytest.param(
+            'cp --target-directory"$suffix" src/a',
+            (),
+            id="cp-literal-long-target-with-an-expandable-tail-keeps-the-source-unjudged",
+        ),
+        pytest.param(
+            "sed -ni 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-flag-inside-a-short-cluster-edits-in-place",
+        ),
+        pytest.param(
+            "sed -Ei 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-flag-after-another-cluster-letter-edits-in-place",
+        ),
+        pytest.param(
+            "sed -ni.bak 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-suffix-inside-a-short-cluster-edits-in-place",
+        ),
+        pytest.param(
+            "sed -i -nl 80 -e p /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-line-length-inside-a-cluster-takes-the-next-word",
+        ),
+        pytest.param(
+            "sed --in-placeX 's/a/b/' /repo/f",
+            (),
+            id="sed-in-place-long-flag-is-not-a-prefix-match",
+        ),
+        pytest.param(
+            "sed --in-place= 's/a/b/' /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-long-flag-with-an-empty-suffix-edits-in-place",
+        ),
+        pytest.param(
+            "cp a -",
+            ((hook_input.PATTERN_COPY, "-"),),
+            id="cp-lone-dash-is-the-destination-operand",
+        ),
+        pytest.param(
+            "cp -t /in -t /repo/d x",
+            (
+                (hook_input.PATTERN_COPY, "/in"),
+                (hook_input.PATTERN_COPY, "/repo/d"),
+            ),
+            id="cp-repeated-target-flag-judges-every-value",
+        ),
+        pytest.param(
+            "cp -t",
+            (),
+            id="cp-target-flag-without-a-value-names-nothing",
+        ),
+        pytest.param(
+            "cp src /repo/x --no-preserve mode",
+            (
+                (hook_input.PATTERN_COPY, "/repo/x"),
+                (hook_input.PATTERN_COPY, "mode"),
+            ),
+            id="cp-no-preserve-flag-consumes-the-next-word",
+        ),
+        pytest.param(
+            "cp src/a src/b --suffix docs",
+            (
+                (hook_input.PATTERN_COPY, "src/b"),
+                (hook_input.PATTERN_COPY, "docs"),
+            ),
+            id="cp-option-after-an-operand-is-judged-as-an-operand-too",
+        ),
+        pytest.param(
+            "cp src/a /repo/x --sparse always",
+            (
+                (hook_input.PATTERN_COPY, "/repo/x"),
+                (hook_input.PATTERN_COPY, "always"),
+            ),
+            id="cp-sparse-flag-consumes-the-next-word-and-judges-it-too",
+        ),
+        pytest.param(
+            "sed 's/a/b/' -i /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-flag-after-the-script-edits-in-place",
+        ),
+        pytest.param(
+            "sed -ni.bak /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-in-place-suffix-cluster-with-one-operand-judges-it",
+        ),
+        pytest.param(
+            "git restore -Ws HEAD f",
+            ((hook_input.PATTERN_GIT_RESTORE, "f"),),
+            id="git-restore-source-flag-inside-a-cluster-takes-the-next-word",
+        ),
+        pytest.param(
+            "git restore -",
+            ((hook_input.PATTERN_GIT_RESTORE, "-"),),
+            id="git-restore-lone-dash-is-a-path-operand",
+        ),
+        pytest.param(
+            "git restore --end-of-options -Ws docs/file",
+            (
+                (hook_input.PATTERN_GIT_RESTORE, "-Ws"),
+                (hook_input.PATTERN_GIT_RESTORE, "docs/file"),
+            ),
+            id="git-restore-end-of-options-marker-makes-a-cluster-lookalike-a-path",
+        ),
+        pytest.param(
+            "git restore -s --end-of-options f",
+            ((hook_input.PATTERN_GIT_RESTORE, "f"),),
+            id="git-restore-end-of-options-marker-taken-as-a-value-ends-nothing",
+        ),
+        pytest.param(
+            "cp --target=docs -S -tdocs src/a",
+            ((hook_input.PATTERN_COPY, "docs"),),
+            id="cp-abbreviated-target-directory-wins-over-a-suffix-consumed-dash-t",
+        ),
+        pytest.param(
+            "cp --tar docs src/a",
+            ((hook_input.PATTERN_COPY, "docs"),),
+            id="cp-unique-prefix-of-target-directory-takes-the-next-word",
+        ),
+        pytest.param(
+            "cp --s x src/a /repo/x",
+            ((hook_input.PATTERN_COPY, "/repo/x"),),
+            id="cp-ambiguous-long-option-prefix-is-a-plain-flag",
+        ),
+        pytest.param(
+            "sed --in-pl -f -i docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-abbreviated-in-place-edits-with-dash-i-as-the-script-file",
+        ),
+        pytest.param(
+            "sed -i -e 'w docs/file' --f docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-prefix-shared-by-a-value-option-and-a-flag-is-a-plain-flag",
+        ),
+        pytest.param(
+            "cp --no- docs",
+            ((hook_input.PATTERN_COPY, "docs"),),
+            id="cp-prefix-shared-by-a-value-option-and-flags-is-a-plain-flag",
+        ),
+        pytest.param(
+            "git restore --pathspec-f docs/file",
+            ((hook_input.PATTERN_GIT_RESTORE, "docs/file"),),
+            id="git-restore-prefix-shared-by-a-value-option-and-a-flag-is-a-plain-flag",
+        ),
+        pytest.param(
+            "sed -i -nep docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-clustered-expression-takes-its-attached-script",
+        ),
+        pytest.param(
+            "sed -i -nfscript docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-clustered-file-option-takes-its-attached-script-file",
+        ),
+        pytest.param(
+            "git restore --sour HEAD f",
+            ((hook_input.PATTERN_GIT_RESTORE, "f"),),
+            id="git-restore-unique-prefix-of-source-takes-the-next-word",
+        ),
+        pytest.param(
+            "sed -i p /repo/f /repo/f",
+            ((hook_input.PATTERN_SED_IN_PLACE, "/repo/f"),),
+            id="sed-names-a-file-given-twice-once",
+        ),
+        pytest.param(
+            "cp -t y a -t/x",
+            (
+                (hook_input.PATTERN_COPY, "y"),
+                (hook_input.PATTERN_COPY, "/x"),
+            ),
+            id="cp-attached-target-value-is-ordered-by-its-option-word",
+        ),
     ],
 )
 def test_hook_command_paths_recognizes_every_write_pattern(

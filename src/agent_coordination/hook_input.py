@@ -9,6 +9,7 @@ owner rather than growing inside `protect`'s already large module.
 from __future__ import annotations
 
 import posixpath
+from collections.abc import Iterable
 from enum import Enum, auto
 from typing import NamedTuple
 
@@ -224,11 +225,23 @@ class _Word(NamedTuple):
     when an unquoted (or, inside double quotes, still-substituting) `$`,
     backtick, `~`, `*`, `?`, or `[` appears in the word -- something the
     shell would expand before running it, which this grammar can never
-    resolve without executing the command (issue #380 delta, decision 3)."""
+    resolve without executing the command (issue #380 delta, decision 3).
+    `position` is the index of the argument a word was read from, set only by
+    `_parse_arguments`; it orders the words of several readings of one
+    command, and is `0` everywhere else. `expansion_start` is the index in
+    `text` of the first expanding character, `None` when nothing expands:
+    `text` before it is what the shell runs as written, so `literal_text` is
+    all a caller may read as option letters or a long option's name."""
 
     text: str
     is_operator: bool
     is_expandable: bool
+    position: int = 0
+    expansion_start: int | None = None
+
+    @property
+    def literal_text(self) -> str:
+        return self.text if self.expansion_start is None else self.text[: self.expansion_start]
 
 
 class _UnbalancedQuotingError(Exception):
@@ -404,24 +417,41 @@ class _CommandScanner:
     def _read_word(self) -> _Word:
         characters: list[str] = []
         expandable = False
+        expansion_start: int | None = None
         quote: str | None = None
         while self._position < self._length:
             if quote is None and self._skip_line_continuation():
                 continue
             character = self._command[self._position]
-            if quote is None:
-                ended = self._read_unquoted_word_character(character, characters)
-                if ended is None:
-                    break
-                expandable = expandable or ended
-                if character in (_SINGLE_QUOTE, _DOUBLE_QUOTE):
-                    quote = character
-                continue
-            quote, became_expandable = self._read_quoted_character(character, quote, characters)
-            expandable = expandable or became_expandable
+            step = self._read_word_character(character, quote, characters)
+            if step is None:
+                break
+            quote, became_expandable = step
+            if became_expandable and not expandable:
+                expandable = True
+                expansion_start = len(characters) - 1
         if quote is not None:
             raise _UnbalancedQuotingError
-        return _Word("".join(characters), is_operator=False, is_expandable=expandable)
+        return _Word(
+            "".join(characters),
+            is_operator=False,
+            is_expandable=expandable,
+            expansion_start=expansion_start,
+        )
+
+    def _read_word_character(
+        self, character: str, quote: str | None, characters: list[str]
+    ) -> tuple[str | None, bool] | None:
+        """One character of a word: `None` when it ends the word, otherwise
+        the quote still open afterwards and whether the character made the
+        word expandable."""
+        if quote is not None:
+            return self._read_quoted_character(character, quote, characters)
+        became_expandable = self._read_unquoted_word_character(character, characters)
+        if became_expandable is None:
+            return None
+        opened_quote = character if character in (_SINGLE_QUOTE, _DOUBLE_QUOTE) else None
+        return opened_quote, became_expandable
 
     def _read_quoted_character(
         self, character: str, quote: str, characters: list[str]
@@ -508,25 +538,110 @@ _GROUP_OPEN = "("
 _GROUP_CLOSE = ")"
 _FLAG_PREFIX = "-"
 _END_OF_OPTIONS = "--"
+_GIT_END_OF_OPTIONS = "--end-of-options"
 _CD_COMMAND = "cd"
 _CD_PREVIOUS_DIRECTORY = "-"
 _DEV_NULL = "/dev/null"
-_GIT_RESTORE_VALUE_OPTIONS = frozenset({"--source", "-s", "--conflict", "--pathspec-from-file"})
-_SED_IN_PLACE_PREFIXES = ("-i", "--in-place")
-_SED_IN_PLACE_BARE_FLAGS = frozenset({"-i", "--in-place"})
-_SED_SCRIPT_VALUE_OPTIONS = frozenset({"-e", "--expression", "-f", "--file"})
+_LONG_OPTION_PREFIX = "--"
+_LONG_OPTION_VALUE_SEPARATOR = "="
+_SED_IN_PLACE_OPTIONS = frozenset({"-i", "--in-place"})
+_SED_SCRIPT_OPTIONS = frozenset({"-e", "--expression", "-f", "--file"})
 # `-l`/`--line-length` takes a required numeric value of its own (GNU sed's
-# wrap width) that names no path at all -- without skipping it as a value
+# wrap width) that names no path at all -- without consuming it as a value
 # option too, its separate-argument form (`-l 80`) left the width itself
 # behind as if it were one of sed's own file operands (issue #380 delta,
 # gate finding: `sed -i -l 80 -e p /tmp/file` must judge `/tmp/file` alone,
 # never the fictitious path `80`).
 _SED_LINE_LENGTH_OPTIONS = frozenset({"-l", "--line-length"})
-_SED_SCRIPT_VALUE_PREFIXES = ("-e", "--expression", "-f", "--file")
+# GNU sed 4.9 long options that take no value at all.
+_SED_FLAG_OPTIONS = frozenset(
+    {
+        "--binary",
+        "--debug",
+        "--follow-symlinks",
+        "--help",
+        "--null-data",
+        "--posix",
+        "--quiet",
+        "--regexp-extended",
+        "--sandbox",
+        "--separate",
+        "--silent",
+        "--unbuffered",
+        "--version",
+        "--zero-terminated",
+    }
+)
 _CP_TARGET_DIRECTORY_OPTIONS = frozenset({"-t", "--target-directory"})
-_CP_TARGET_DIRECTORY_SHORT_FLAG = "-t"
-_CP_TARGET_DIRECTORY_LONG_PREFIX = "--target-directory="
+_CP_OTHER_VALUE_OPTIONS = frozenset({"-S", "--suffix", "--no-preserve", "--sparse"})
+# Long options that take only an attached `=value`; listed so that an
+# abbreviation is ambiguous exactly where the tool finds it ambiguous.
+_CP_OPTIONAL_VALUE_OPTIONS = frozenset(
+    {"--backup", "--preserve", "--reflink", "--update", "--context"}
+)
+# GNU coreutils 9.4 `cp` long options that take no value at all; with the
+# value tables above they make the complete list an abbreviation is
+# resolved against.
+_CP_FLAG_OPTIONS = frozenset(
+    {
+        "--archive",
+        "--attributes-only",
+        "--copy-contents",
+        "--debug",
+        "--dereference",
+        "--force",
+        "--help",
+        "--interactive",
+        "--link",
+        "--no-clobber",
+        "--no-dereference",
+        "--no-target-directory",
+        "--one-file-system",
+        "--parents",
+        "--recursive",
+        "--remove-destination",
+        "--strip-trailing-slashes",
+        "--symbolic-link",
+        "--verbose",
+        "--version",
+    }
+)
 _GIT_CHECKOUT_SKIPPED_FLAGS = frozenset({"-f", "--ours", "--theirs"})
+_GIT_RESTORE_VALUE_OPTIONS = frozenset({"--source", "-s", "--conflict", "--pathspec-from-file"})
+# git 2.43 `restore` long options that take no value, each with the
+# `--no-<name>` form git's option parser also accepts (and abbreviates).
+_GIT_RESTORE_FLAG_OPTIONS = frozenset(
+    {
+        "--staged",
+        "--worktree",
+        "--ignore-unmerged",
+        "--overlay",
+        "--quiet",
+        "--recurse-submodules",
+        "--progress",
+        "--merge",
+        "--ours",
+        "--theirs",
+        "--patch",
+        "--ignore-skip-worktree-bits",
+        "--pathspec-file-nul",
+        "--no-source",
+        "--no-staged",
+        "--no-worktree",
+        "--no-ignore-unmerged",
+        "--no-overlay",
+        "--no-quiet",
+        "--no-recurse-submodules",
+        "--no-progress",
+        "--no-merge",
+        "--no-conflict",
+        "--no-patch",
+        "--no-ignore-skip-worktree-bits",
+        "--no-pathspec-from-file",
+        "--no-pathspec-file-nul",
+    }
+)
+_GIT_RESTORE_END_OF_OPTIONS = frozenset({_END_OF_OPTIONS, _GIT_END_OF_OPTIONS})
 
 
 def _is_command_separator(word: _Word) -> bool:
@@ -604,30 +719,195 @@ def _non_flag_arguments(words: tuple[_Word, ...]) -> tuple[_Word, ...]:
     return tuple(result)
 
 
-def _skip_option_values(
-    words: tuple[_Word, ...], *, value_options: frozenset[str]
-) -> tuple[_Word, ...]:
-    """`_non_flag_arguments`, extended to also drop the separate argument a
-    `value_options` flag takes (`--source HEAD`) rather than only the flag
-    token itself (`--source=HEAD` is already one token `_is_flag` drops
-    whole) -- issue #380 delta, review finding: `git restore --source HEAD
-    --staged f` must judge `f` alone, never `HEAD`. Honors the same `--`
-    end-of-options marker as `_non_flag_arguments`."""
-    result: list[_Word] = []
-    skip_next = False
-    past_options = False
-    for word in words:
-        if past_options:
-            result.append(word)
-        elif skip_next:
-            skip_next = False
-        elif word.text == _END_OF_OPTIONS:
-            past_options = True
-        elif _is_flag(word):
-            skip_next = word.text in value_options
+class _OptionValue(NamedTuple):
+    """One option the walk met: its name (`-t`, `--target-directory`) and the
+    value it took, or `None` when it took none."""
+
+    name: str
+    value: _Word | None
+
+
+class _ParsedArguments(NamedTuple):
+    options: tuple[_OptionValue, ...]
+    operands: tuple[_Word, ...]
+
+    def every_value_of(self, names: frozenset[str]) -> tuple[_Word, ...]:
+        """The value of every option in `names` that took one. A repeated
+        option is judged at each of its values, a safe superset of the one
+        a tool would act on (GNU `cp` refuses a repeated `-t` outright)."""
+        return tuple(
+            option.value
+            for option in self.options
+            if option.name in names and option.value is not None
+        )
+
+    def has_option(self, names: frozenset[str]) -> bool:
+        return any(option.name in names for option in self.options)
+
+    def first_option(self, names: frozenset[str]) -> _OptionValue | None:
+        return next((option for option in self.options if option.name in names), None)
+
+
+class _OptionTable(NamedTuple):
+    """One command's options by how they take a value: `value_options` a
+    required one, `optional_value_options` only an attached one, and
+    `flag_options` (long names only) none -- known so that an abbreviation is
+    as ambiguous here as it is for the tool."""
+
+    value_options: frozenset[str] = frozenset()
+    optional_value_options: frozenset[str] = frozenset()
+    flag_options: frozenset[str] = frozenset()
+
+
+def _attached_value(word: _Word, text: str) -> _Word:
+    return _Word(text, is_operator=False, is_expandable=word.is_expandable, position=word.position)
+
+
+def _next_word_value(following: tuple[_Word, ...]) -> tuple[_Word | None, int]:
+    return (following[0], 1) if following else (None, 0)
+
+
+def _rest_or_next_word_value(
+    word: _Word, rest: str, following: tuple[_Word, ...]
+) -> tuple[_Word | None, int]:
+    if rest:
+        return _attached_value(word, rest), 0
+    return _next_word_value(following)
+
+
+def _parse_short_cluster(
+    word: _Word,
+    following: tuple[_Word, ...],
+    table: _OptionTable,
+) -> tuple[list[_OptionValue], int]:
+    """The options of one `-abc` cluster and how many following words it
+    consumed. As in GNU `getopt`, an option that takes a value consumes the
+    rest of its cluster, or the next word when that rest is empty -- even a
+    literal `--`; an optional value (`sed -i.bak`) is only ever attached.
+    Only the literal letters are options: from the first expansion on, the
+    word creates none and consumes no following word, like an unknown flag."""
+    options: list[_OptionValue] = []
+    cluster = word.text[len(_FLAG_PREFIX) :]
+    for position, letter in enumerate(word.literal_text[len(_FLAG_PREFIX) :]):
+        name = _FLAG_PREFIX + letter
+        rest = cluster[position + 1 :]
+        if name in table.optional_value_options:
+            options.append(_OptionValue(name, _attached_value(word, rest) if rest else None))
+            return options, 0
+        if name in table.value_options:
+            value, consumed = _rest_or_next_word_value(word, rest, following)
+            options.append(_OptionValue(name, value))
+            return options, consumed
+        options.append(_OptionValue(name, None))
+    return options, 0
+
+
+def _resolve_long_option(written_name: str, known_options: set[str]) -> str:
+    """The option `written_name` stands for, as `getopt_long` and git resolve
+    it: an exact name, else the one long option of the command's own table
+    it is a prefix of among all the command's long options, flags included.
+    A prefix of several or of none stays as written -- a plain flag -- since
+    the tool then refuses (several) or knows no such option."""
+    if written_name in known_options or written_name == _LONG_OPTION_PREFIX:
+        return written_name
+    candidates = [name for name in known_options if name.startswith(written_name)]
+    return candidates[0] if len(candidates) == 1 else written_name
+
+
+def _parse_long_option(
+    word: _Word,
+    following: tuple[_Word, ...],
+    table: _OptionTable,
+) -> tuple[_OptionValue, int]:
+    """One `--name[=value]` option and how many following words it consumed:
+    a required value is the `=value` or else the next word, an optional one
+    only the `=value`. The name is resolved through its unique abbreviation,
+    and only from its literal part: an expansion that follows it may be the
+    rest of the value, so it is read as an attached one that never consumes
+    the next word."""
+    written_name, separator, _ = word.literal_text.partition(_LONG_OPTION_VALUE_SEPARATOR)
+    has_attached_value = bool(separator) or word.is_expandable
+    attached = word.text[len(written_name) + len(separator) :]
+    name = _resolve_long_option(
+        written_name, {*table.value_options, *table.optional_value_options, *table.flag_options}
+    )
+    if has_attached_value:
+        takes_value = name in table.value_options | table.optional_value_options
+        return _OptionValue(name, _attached_value(word, attached) if takes_value else None), 0
+    if name in table.value_options:
+        value, consumed = _next_word_value(following)
+        return _OptionValue(name, value), consumed
+    return _OptionValue(name, None), 0
+
+
+def _parse_arguments(
+    words: tuple[_Word, ...],
+    table: _OptionTable,
+    *,
+    end_of_options_markers: frozenset[str] = frozenset({_END_OF_OPTIONS}),
+    options_end_at_first_operand: bool = False,
+) -> _ParsedArguments:
+    """The one walk that decides what is an option, an option's value and an
+    operand, the way GNU `getopt` does: options and operands may interleave,
+    a lone `-` is an operand, and only an end-of-options marker that no
+    option consumed as its value ends the options -- every word after it is
+    an operand whatever it starts with. `end_of_options_markers` is the
+    command's own set: `--` for GNU tools, also `--end-of-options` for git.
+    `table` says which options take a required value (`-t`,
+    `--target-directory`), only an attached one (`-i`, `--in-place`) or none.
+    Unlike `_non_flag_arguments`, which drops every word starting with `-`,
+    a lone `-` stays an operand here (`git restore -`), as in GNU tools.
+    `options_end_at_first_operand` is the POSIX reading (`POSIXLY_CORRECT`):
+    from the first operand on, every word is an operand, `--` included. Every
+    word it returns carries its `position` in `words`; an attached value
+    keeps the position of its option word."""
+    words = tuple(word._replace(position=index) for index, word in enumerate(words))
+    options: list[_OptionValue] = []
+    operands: list[_Word] = []
+    index = 0
+    while index < len(words):
+        word = words[index]
+        following = words[index + 1 :]
+        index += 1
+        if word.text in end_of_options_markers:
+            operands.extend(following)
+            break
+        if len(word.text) < len(_FLAG_PREFIX) + 1 or not _is_flag(word):
+            operands.append(word)
+            if options_end_at_first_operand:
+                operands.extend(following)
+                break
+        elif word.text.startswith(_LONG_OPTION_PREFIX):
+            option, consumed = _parse_long_option(word, following, table)
+            options.append(option)
+            index += consumed
         else:
-            result.append(word)
-    return tuple(result)
+            cluster_options, consumed = _parse_short_cluster(word, following, table)
+            options.extend(cluster_options)
+            index += consumed
+    return _ParsedArguments(tuple(options), tuple(operands))
+
+
+def _parse_both_readings(
+    words: tuple[_Word, ...],
+    table: _OptionTable,
+) -> tuple[_ParsedArguments, ...]:
+    """`words` read the permuted way (GNU's default) and the POSIX way
+    (`POSIXLY_CORRECT`). The hook reads no environment, so a tool whose
+    reading it cannot know is judged by both."""
+    return tuple(
+        _parse_arguments(words, table, options_end_at_first_operand=posix)
+        for posix in (False, True)
+    )
+
+
+def _unique_in_command_order(words: Iterable[_Word]) -> tuple[_Word, ...]:
+    """`words` of one or more readings of the same command, in the order the
+    command names them, each distinct word once."""
+    first_named: dict[_Word, _Word] = {}
+    for word in sorted(words, key=lambda word: word.position):
+        first_named.setdefault(word._replace(position=0), word)
+    return tuple(first_named.values())
 
 
 def _match_redirect(tokens: tuple[_Word, ...], index: int) -> tuple[str, _Word, int] | None:
@@ -658,42 +938,32 @@ def _match_move(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | Non
     return PATTERN_MOVE, _non_flag_arguments(words[1:])
 
 
-def _cp_target_directory(arguments: tuple[_Word, ...]) -> _Word | None:
-    """The value right after a `-t`/`--target-directory` flag, or the value
-    GNU `cp` accepts attached to the flag itself with no separating space
-    (`-t/tmp`, `--target-directory=/tmp`) -- `cp`'s own destination even
-    though it comes before its sources on the command line (issue #380
-    delta, gate finding: `cp -t /tmp README.md`, `cp -t/tmp README.md`, and
-    `cp --target-directory=/tmp README.md` must all judge `/tmp`, never the
-    untouched `README.md`)."""
-    for index, word in enumerate(arguments):
-        if word.text in _CP_TARGET_DIRECTORY_OPTIONS and index + 1 < len(arguments):
-            return arguments[index + 1]
-        if word.text.startswith(_CP_TARGET_DIRECTORY_LONG_PREFIX):
-            value = word.text[len(_CP_TARGET_DIRECTORY_LONG_PREFIX) :]
-            return _Word(value, is_operator=False, is_expandable=word.is_expandable)
-        if word.text.startswith(_CP_TARGET_DIRECTORY_SHORT_FLAG) and len(word.text) > len(
-            _CP_TARGET_DIRECTORY_SHORT_FLAG
-        ):
-            value = word.text[len(_CP_TARGET_DIRECTORY_SHORT_FLAG) :]
-            return _Word(value, is_operator=False, is_expandable=word.is_expandable)
-    return None
-
-
 def _match_copy(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | None:
-    """`cp`'s own destination: a `-t`/`--target-directory` value when given,
-    otherwise its last non-flag operand -- the only one it actually writes;
-    every earlier operand is a source it only reads (issue #380 delta,
-    review finding: `cp README.md /tmp/x` must judge `/tmp/x` alone, never
-    the untouched `README.md`)."""
+    """`cp`'s own destination: a `-t`/`--target-directory` value when given
+    (it comes before the sources on the command line, attached or not --
+    issue #380 delta, gate finding: `cp -t /tmp README.md`, `cp -t/tmp
+    README.md` and `cp --target-directory=/tmp README.md` all judge `/tmp`),
+    otherwise its last operand -- the only one it actually writes; every
+    earlier operand is a source it only reads (issue #380 delta, review
+    finding: `cp README.md /tmp/x` must judge `/tmp/x` alone, never the
+    untouched `README.md`)."""
     if words[0].text != PATTERN_COPY:
         return None
-    arguments = words[1:]
-    target_directory = _cp_target_directory(arguments)
-    if target_directory is not None:
-        return PATTERN_COPY, (target_directory,)
-    operands = _non_flag_arguments(arguments)
-    return (PATTERN_COPY, operands[-1:]) if operands else None
+    destinations = _unique_in_command_order(
+        destination
+        for parsed in _parse_both_readings(
+            words[1:],
+            _OptionTable(
+                _CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS,
+                _CP_OPTIONAL_VALUE_OPTIONS,
+                _CP_FLAG_OPTIONS,
+            ),
+        )
+        for destination in (
+            parsed.every_value_of(_CP_TARGET_DIRECTORY_OPTIONS) or parsed.operands[-1:]
+        )
+    )
+    return (PATTERN_COPY, destinations) if destinations else None
 
 
 def _match_remove(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | None:
@@ -721,29 +991,32 @@ def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...
     stdout), so it names no pattern at all."""
     if words[0].text != "sed":
         return None
-    arguments = words[1:]
-    in_place_flag = next(
-        (
-            word
-            for word in arguments
-            if _is_flag(word) and word.text.startswith(_SED_IN_PLACE_PREFIXES)
+    readings = _parse_both_readings(
+        words[1:],
+        _OptionTable(
+            _SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
+            _SED_IN_PLACE_OPTIONS,
+            _SED_FLAG_OPTIONS,
         ),
-        None,
     )
-    if in_place_flag is None:
-        return None
-    operands = _skip_option_values(
-        arguments, value_options=_SED_SCRIPT_VALUE_OPTIONS | _SED_LINE_LENGTH_OPTIONS
+    paths = _unique_in_command_order(
+        path for parsed in readings for path in _sed_in_place_paths(parsed)
     )
-    has_explicit_script = any(
-        _is_flag(word) and word.text.startswith(_SED_SCRIPT_VALUE_PREFIXES) for word in arguments
-    )
-    has_in_place_suffix = in_place_flag.text not in _SED_IN_PLACE_BARE_FLAGS
-    if has_explicit_script or (has_in_place_suffix and len(operands) == 1):
-        paths = operands
-    else:
-        paths = operands[1:]
     return (PATTERN_SED_IN_PLACE, paths) if paths else None
+
+
+def _sed_in_place_paths(parsed: _ParsedArguments) -> tuple[_Word, ...]:
+    """The files one reading of a `sed` command edits in place, none when
+    that reading sees no `-i`/`--in-place`."""
+    in_place = parsed.first_option(_SED_IN_PLACE_OPTIONS)
+    if in_place is None:
+        return ()
+    has_in_place_suffix = in_place.value is not None
+    if parsed.has_option(_SED_SCRIPT_OPTIONS) or (
+        has_in_place_suffix and len(parsed.operands) == 1
+    ):
+        return parsed.operands
+    return parsed.operands[1:]
 
 
 _GIT_RESTORE_PREFIX_LENGTH = 2  # `git`, `restore`
@@ -772,9 +1045,13 @@ def _match_git_restore(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]
     prefix = tuple(word.text for word in words[:_GIT_RESTORE_PREFIX_LENGTH])
     if len(words) < _GIT_RESTORE_PREFIX_LENGTH or prefix != ("git", "restore"):
         return None
-    return PATTERN_GIT_RESTORE, _skip_option_values(
-        words[_GIT_RESTORE_PREFIX_LENGTH:], value_options=_GIT_RESTORE_VALUE_OPTIONS
-    )
+    return PATTERN_GIT_RESTORE, _parse_arguments(
+        words[_GIT_RESTORE_PREFIX_LENGTH:],
+        _OptionTable(
+            value_options=_GIT_RESTORE_VALUE_OPTIONS, flag_options=_GIT_RESTORE_FLAG_OPTIONS
+        ),
+        end_of_options_markers=_GIT_RESTORE_END_OF_OPTIONS,
+    ).operands
 
 
 _COMMAND_MATCHERS = (
