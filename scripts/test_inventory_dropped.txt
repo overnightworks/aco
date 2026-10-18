@@ -176,3 +176,61 @@ tests/test_cli.py	'log'	#188: tests/test_land_merge_message.py::TestLandMessage:
 tests/test_cli.py	128	#188: tests/test_land_merge_message.py::TestLandMessage::test_refusal[nonzero-exit]: Exit 128 remains in the process seam and guard; the test compares the full ERROR: fatal: bad trailer sentence and unchanged effects.
 tests/test_cli.py	b''	#188: tests/test_land_merge_message.py::TestLandMessage::test_refusal[nonzero-exit]: Empty process stdout remains in the seam and guard; the test compares the full refusal and empty command stdout.
 tests/test_cli.py	b'fatal: bad trailer\n'	#188: tests/test_land_merge_message.py::TestLandMessage::test_refusal[nonzero-exit]: The process stderr bytes remain in the seam and guard; the test compares the complete ERROR: fatal: bad trailer sentence.
+# #200: landed_observations now belongs to github_fixtures; merge_observations retains merge.end and no-reinstall.
+tests/test_land_merge_message.py	''	#200: Shared stderr remains exactly empty; the caller retains the missing-merge message sentinel.
+tests/test_land_merge_message.py	'--format=%(refname:short)'	#200: Shared landed_observations retains the complete local branch-set reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'--format=%B'	#200: The caller retains the exact committed-message git log reader before the shared observation.
+tests/test_land_merge_message.py	'--parents'	#200: Shared landed_observations retains the real merge-parent reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'--porcelain'	#200: Shared landed_observations retains the complete worktree topology reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'-1'	#200: The caller retains the single committed-message git log reader before the shared observation.
+tests/test_land_merge_message.py	'-n'	#200: Shared landed_observations retains the single-commit parent-count reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'1'	#200: Shared landed_observations retains the single-commit parent-count reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'\n'	#200: The caller retains the exact title/body/final-newline committed-message expectation; shared trunk.changed retains the tip newline comparison.
+tests/test_land_merge_message.py	'\n\n'	#200: The caller retains the exact title/body blank separator in the committed-message expectation.
+tests/test_land_merge_message.py	'anchor'	#200: Shared landed_observations retains the exact anchor comparison for every message row.
+tests/test_land_merge_message.py	'body writes'	#200: Shared key body replaces body writes and retains exact empty-list equality.
+tests/test_land_merge_message.py	'body'	#200: Shared landed_observations retains the exact body comparison for every message row.
+tests/test_land_merge_message.py	'branch '	#200: Shared landed_observations retains the branch-line topology projection; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'branch refs/heads/main'	#200: Shared worktrees expectation uses the arranged world.default_branch; every message row still arranges main.
+tests/test_land_merge_message.py	'branches'	#200: Shared landed_observations retains the exact branches comparison for every message row.
+tests/test_land_merge_message.py	'claims'	#200: Shared landed_observations retains the exact claims comparison for every message row.
+tests/test_land_merge_message.py	'close'	#200: Shared landed_observations retains the exact close comparison for every message row.
+tests/test_land_merge_message.py	'delete'	#200: Shared landed_observations retains the exact delete comparison for every message row.
+tests/test_land_merge_message.py	'entry.anchor'	#200: Shared landed_observations retains the exact entry.anchor comparison for every message row.
+tests/test_land_merge_message.py	'entry.stamp'	#200: Shared landed_observations retains the exact entry.stamp comparison for every message row.
+tests/test_land_merge_message.py	'exit'	#200: Shared landed_observations retains the exact exit comparison for every message row.
+tests/test_land_merge_message.py	'for-each-ref'	#200: Shared landed_observations retains the complete local branch-set reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'keys'	#200: The caller retains the exact keys comparison in observed.update/expected.update; inventory does not follow those mutations.
+tests/test_land_merge_message.py	'list'	#200: Shared landed_observations retains the complete worktree topology reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'local'	#200: Shared landed_observations retains the exact local comparison for every message row.
+tests/test_land_merge_message.py	'log'	#200: The caller retains the exact committed-message git log reader before the shared observation.
+tests/test_land_merge_message.py	'main'	#200: The committed-message reader still names main; shared branch expectations now use the arranged world.default_branch, main for all message rows.
+tests/test_land_merge_message.py	'merge.count'	#200: Shared landed_observations retains the exact merge.count comparison for every message row.
+tests/test_land_merge_message.py	'merge.head'	#200: Shared landed_observations retains the exact merge.head comparison for every message row.
+tests/test_land_merge_message.py	'merge.method'	#200: Shared landed_observations retains the exact merge.method comparison for every message row.
+tests/test_land_merge_message.py	'merge.number'	#200: Shared landed_observations retains the exact merge.number comparison for every message row.
+tests/test_land_merge_message.py	'merge.title'	#200: Shared landed_observations retains the exact merge.title comparison for every message row.
+tests/test_land_merge_message.py	'message'	#200: The caller retains the exact message comparison in observed.update/expected.update; inventory does not follow those mutations.
+tests/test_land_merge_message.py	'missing'	#200: Shared landed_observations retains the absent merge-entry sentinel; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'refs/heads'	#200: Shared landed_observations retains the complete local branch-set reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'remote'	#200: Shared landed_observations retains the pre-command remote-tip comparison; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'remote.moved'	#200: Shared landed_observations retains the exact remote.moved comparison for every message row.
+tests/test_land_merge_message.py	'rev-list'	#200: Shared landed_observations retains the real merge-parent reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'rev-parse'	#200: Shared landed_observations retains the real default-branch tip reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'stamp'	#200: Shared landed_observations retains the exact stamp comparison for every message row.
+tests/test_land_merge_message.py	'stderr'	#200: Shared landed_observations retains the exact stderr comparison for every message row.
+tests/test_land_merge_message.py	'stdout.release'	#200: Shared landed_observations retains the exact stdout.release comparison for every message row.
+tests/test_land_merge_message.py	'trunk'	#200: Shared landed_observations retains the pre-command trunk-tip comparison; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'trunk.changed'	#200: Shared landed_observations retains the exact trunk.changed comparison for every message row.
+tests/test_land_merge_message.py	'trunk.message'	#200: The caller retains the exact trunk.message comparison in observed.update/expected.update; inventory does not follow those mutations.
+tests/test_land_merge_message.py	'trunk.parents'	#200: Shared landed_observations retains the exact trunk.parents comparison for every message row.
+tests/test_land_merge_message.py	'trunk.same'	#200: Shared landed_observations retains the exact trunk.same comparison for every message row.
+tests/test_land_merge_message.py	'worktree '	#200: Shared landed_observations retains the worktree-line topology projection; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'worktree'	#200: Shared landed_observations retains the complete worktree topology reader; the corresponding full comparison remains.
+tests/test_land_merge_message.py	'worktrees'	#200: Shared landed_observations retains the exact worktrees comparison for every message row.
+tests/test_land_merge_message.py	0	#200: Shared exit remains zero; the caller and observer retain first-merge indexing with a missing-call sentinel.
+tests/test_land_merge_message.py	12	#200: Shared merge.number still expects 12 and trunk.same still reads the recorded PR 12 merge commit.
+tests/test_land_merge_message.py	2	#200: The shared observer retains the merge tuple method field at index 2; parent counts remain row-owned.
+tests/test_land_merge_message.py	3	#200: The shared observer retains the merge tuple title field at index 3.
+tests/test_land_merge_message.py	4	#200: The caller retains the submitted message at merge tuple index 4.
+tests/test_land_merge_message.py	True	#200: Shared presence and equality predicates retain their True expectations; no predicate is narrowed.
