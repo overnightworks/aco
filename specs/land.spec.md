@@ -95,7 +95,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-23] A head changing `storage` or `canonical_remote` in `<path>` refuses `pull request #<n> changes <setting> in <path>; aco land cannot release its claim across that change`, exit `2`.
 - [ ] [LANDCMD-24] A head `<path>` the pin's own validator refuses prints `pull request #<n> carries an invalid <path>: <detail>`, exit `2`.
 - [ ] [LANDCMD-08] A classified work item that is not open refuses `work item #<n> is not open; it cannot be landed`, exit `2`; an issue-less pull request skips this check.
-- [ ] [LANDCMD-09] The classification's own claim, parent, and closing rules then apply (LAND-14..28, LAND-70..77, LAND-79): defects refuse `pull request #<n> <that same defect sentence>`, exit `2`.
+- [ ] [LANDCMD-09] The classification's claim, parent and closing rules apply (LAND-14..28, LAND-70..77, LAND-79): defects refuse `pull request #<n> <that same defect sentence>`, exit `2`.
 - [ ] [LANDCMD-10] A claim held by another agent or role, no coordinator override, refuses (REL-12's sentence), exit `2`, before the merge; `<repeat>`: `aco land <n>`, any `--head`/`--keep-worktree`, REL-41's identity.
 - [ ] [LANDCMD-11] This checkout must sit on the forge's default branch with nothing uncommitted, or `aco land` refuses `land must run from a clean checkout of the default branch '<branch>'`, exit `2`.
 - [ ] [LANDCMD-25] A checkout without a git identity refuses `land must run from a checkout with a git identity; set user.name and user.email there so its release can commit to the claim state`, exit `2`.

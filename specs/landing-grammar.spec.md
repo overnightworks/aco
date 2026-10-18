@@ -65,7 +65,7 @@ matching line.
 | last open child, no uncut row, parent `Next` says none | — | LAND-21, LAND-23 | — | — |
 | last open child, no uncut row, parent `Next` still has work | — | LAND-22, LAND-23 | — | — |
 | last open child, an uncut row remains | — | LAND-22, LAND-79 | — | — |
-| other open children, parent also named for closing | — | LAND-19, LAND-79 | — | — |
+| other open children, parent `Next` non-empty, parent also named for closing | — | LAND-19, LAND-79 | — | — |
 | other open children, no `Next` line | — | LAND-24 | — | — |
 | other open children, `Next` names work | — | LAND-25 | — | — |
 | malformed/wrong-kind/foreign parent | — | LAND-26, LAND-27, LAND-28 | — | — |
@@ -143,6 +143,10 @@ is empty, case-insensitively (`_NO_FURTHER_WORK_VALUES`, which a fresh
 skeleton's `next = ""` also matches). A malformed body's own defect sentence
 is `specs/body-block.spec.md`'s own fact, cited here as `<body defect
 sentence>`, not restated.
+
+The refusals apply in this order, the first match winning: the parent's own
+defects (LAND-26..28), then LAND-24 (also when `next` is empty), then LAND-18,
+then LAND-79 and LAND-21, and only then LAND-19.
 
 - [ ] [LAND-21] With no uncut row and no `Next` work, a last-child landing omitting its parent refuses `closes the last open child of parent <ref>; close the parent too`, exit `2`.
 - [ ] [LAND-22] The same landing, when the parent still holds an uncut `[[slice]]` row or its `Next` still names work, may pass without closing the parent: exit `0`.
