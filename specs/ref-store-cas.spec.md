@@ -141,7 +141,7 @@ version field from the work-item body block's own `version = 1`
 - [ ] [CAS-24] A `schema.toml` whose `version` is not an integer refuses `schema.toml version must be an integer, got '1'`.
 - [ ] [CAS-25] A `schema.toml` whose integer `version` is not `2` refuses `unsupported state schema version <n>`, a distinct error from every other malformed-tree refusal here.
 - [ ] [CAS-26] A `schema.toml` that is not valid TOML refuses `malformed schema.toml at <tip>: <reason>`.
-- [ ] [CAS-74] A `schema.toml` that is not a file (mode `100644` or `100755`), a symlink included, refuses `schema.toml at <tip> is not a file`; a directory or submodule, `... is not a blob`.
+- [ ] [CAS-74] A `schema.toml` that is not a file (mode `100644` or `100755`), a symlink included, refuses `schema.toml at <tip> is not a file`; a directory or submodule, `schema.toml at <tip> is not a blob`.
 
 ## The four subtrees' own shape
 
