@@ -427,10 +427,11 @@ class StateRefBoard:
     def _parent_pin(self, record: items.ItemRecord) -> ItemPin | None:
         """The blob of `record`'s parent as this instance last saw it -- its
         own retype's blob once `set_item_kind` wrote one (CAS-70/71) -- else
-        `None` for a parentless item."""
+        `None` for a parentless item. A parent outside `_items` was never judged
+        a container, so it raises `KeyError` rather than pin its blob."""
         if record.parent is None:
             return None
-        parent = self._items.get(record.parent) or self._malformed[record.parent]
+        parent = self._items[record.parent]
         return ItemPin(record.parent, parent.oid)
 
     def _store_expected(self) -> Mapping[str, ObjectId] | None:

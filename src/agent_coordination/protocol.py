@@ -1009,7 +1009,8 @@ def parse_schema_toml(content: str, *, tip: ObjectId) -> ClaimState:
 
 @dataclass(frozen=True)
 class ItemPin:
-    """The item blob a claim's checks judged open (issue #496): `oid` is
+    """The item blob a write's checks judged (issue #496): a claim's item
+    judged open, an item write's parent judged a container (CAS-70). `oid` is
     `items/<item_id>.md`'s blob in the very observation those checks read."""
 
     item_id: str
@@ -1398,7 +1399,8 @@ ITEMS_WRITTEN_SINCE_CHECKED = "items/ was written since this write checked it; r
 
 def _require_item_unwritten(state: ClaimState, item_id: str, read: ObjectId) -> None:
     """Refuses unless `items/<item_id>.md` is still the blob `read` a caller
-    judged it by (CAS-20): an item write's own CAS, and a claim's item pin."""
+    judged it by (CAS-20): an item write's own CAS, a claim's item pin, and
+    an item write's parent pin (CAS-70)."""
     current = state.items.get(item_id)
     if current != read:
         raise ClaimUnavailableError(
