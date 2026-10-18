@@ -1,8 +1,0 @@
-claim_id = "dc892ed2820f47ac867221f7c31a5eb0"
-agent = "claude"
-role = "builder"
-base = "aaf6b6c4c1df03922db12a74978d519782cc27f4"
-branch = "claude/issue-207-l3a1-die-folgeschritte-einer-frischen-la"
-scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/test_cli.py", "tests/test_land_after_merge.py", "tests/test_land_merge.py"]
-opened_commit = "ae4bdc417f7cbfd82a43052ebf5621e0e0866ab9"
-whole_reason = "Das neue Modul, seine Fehler-Nähte in den Fixtures und das Löschen der alten Familie in test_cli.py müssen zusammen landen; halb umgezogen stünde derselbe Satz doppelt oder gar nicht."
