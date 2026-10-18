@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "908470e3e62af972796f01cfb99a0856d93c2963"
 branch = "claude/issue-233-width-gate-git-failure"
-scope = ["specs/claim-record.spec.md", "specs/claim.spec.md", "specs/next.spec.md", "src/agent_coordination/checkout.py", "src/agent_coordination/cmd_brief.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/session.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_session.py"]
+scope = ["specs/claim-record.spec.md", "specs/claim.spec.md", "specs/next.spec.md", "src/agent_coordination/checkout.py", "src/agent_coordination/cmd_brief.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/process.py", "src/agent_coordination/session.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_session.py"]
 opened_commit = "ed1d084194629ccfa529f3ff2fff4935ac80e2e8"
 whole_reason = "Eine Entscheidung (Git-Fehler im Scope-Lesen ist nie Abwesenheit) mit ihrem Owner, dem Toplevel-Leser, dem Aufrufer, der den Fehler falsch einordnete, drei Never-Sätzen und ihren Tests."
