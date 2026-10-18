@@ -1462,7 +1462,7 @@ def test_adopts_rerun_after_a_re_push_and_a_rewritten_body_restores_the_line_und
     assert worktrees_and_branches(world.clone) == worktrees_before_rerun
 
 
-def _the_first_head_is_reviewed(world: AdoptionWorld) -> None:
+def _the_forge_reads_the_branch_ready(world: AdoptionWorld) -> None:
     world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = landing_readiness(
         ADOPTED_PULL_REQUEST, head_sha=world.head
     )
@@ -1470,9 +1470,7 @@ def _the_first_head_is_reviewed(world: AdoptionWorld) -> None:
 
 def _the_branch_is_re_pushed(world: AdoptionWorld) -> None:
     _repush_the_branch(world, "uv.lock", "pyproject.toml")
-    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = landing_readiness(
-        ADOPTED_PULL_REQUEST, head_sha=world.head
-    )
+    _the_forge_reads_the_branch_ready(world)
 
 
 def _the_worktree_follows_the_re_push(world: AdoptionWorld) -> None:
@@ -1485,7 +1483,7 @@ def _the_worktree_follows_the_re_push(world: AdoptionWorld) -> None:
     ("arrange", "reviews_the_first_head", "status", "worktree_outcome", "merged"),
     [
         pytest.param(
-            _the_first_head_is_reviewed,
+            _the_forge_reads_the_branch_ready,
             True,
             0,
             "removed",
@@ -1608,9 +1606,7 @@ def _land_the_abandoned_pull_request(
     world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
 ) -> CliRun:
     world.forge.merge_remote = world.remote
-    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = landing_readiness(
-        ADOPTED_PULL_REQUEST, head_sha=world.head
-    )
+    _the_forge_reads_the_branch_ready(world)
     return run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", world.head], capsys)
 
 

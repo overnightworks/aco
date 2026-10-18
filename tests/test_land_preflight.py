@@ -102,11 +102,11 @@ def world(
         "body": [],
         "remote": None,
         "local": None,
-        "stamp": None,
-        "anchor": None,
         "worktrees": worktrees,
         "branches": branches,
         "trunk": real_git(github_clone, "rev-parse", "main").stdout,
+        "stamp": None,
+        "anchor": None,
     }
     result = LandingWorld(github_clone, bare_remote, client, case, unchanged)
     observed = effects(result)

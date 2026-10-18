@@ -18003,7 +18003,7 @@ def _land_mark_already_merged(client: FakeForge) -> None:
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
-def test_land_rerun_refuses_a_bad_override_or_a_missing_git_identity_before_any_side_effect(
+def test_land_rerun_refuses_a_missing_git_identity_before_any_side_effect(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
@@ -18619,8 +18619,9 @@ def _claim_the_landing_branch(
 
 def _without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) -> None:
     """`checkout_path` with no git identity git may use or guess: none
-    configured locally or in the environment (the caller isolates the global
-    configuration)."""
+    configured locally, in the environment or the system configuration (the
+    caller isolates the global configuration)."""
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     real_git(checkout_path, "config", "user.useConfigOnly", "true")
     real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
     real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
