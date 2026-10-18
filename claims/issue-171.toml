@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "04a8cfaa93cf71c71361b8571d82334f9324c4e6"
 branch = "claude/issue-171-f2a-ask"
-scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/test_ask.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_rulings.py"]
+scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/store_fixtures.py", "tests/test_ask.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_rulings.py"]
 opened_commit = "d48e4db0020b3112c98e5f261ce498b35f9a5acd"
 whole_reason = "Die Familie ask zieht mit dem Guard, den sie mit rulings teilt; halb umgezogen gäbe es zwei Kopien des Guards."
