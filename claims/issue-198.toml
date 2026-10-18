@@ -1,7 +1,0 @@
-claim_id = "32f17674de49471a8fa8a2a405f97c9a"
-agent = "claude"
-role = "builder"
-base = "1f9a124548c5af5a320fa76bc8d4158f3316e9a7"
-branch = "claude/issue-198-sonar-zeigt-auf-main-0-befunde-s5886-mar"
-scope = ["frontend/e2e/decide.spec.ts"]
-opened_commit = "c8bbfea40c79c77e0155ecf6d8cf21562ba8475e"
