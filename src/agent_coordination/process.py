@@ -462,8 +462,11 @@ def _process_identity(pid: int, proc_root: Path) -> NativeProcess:
     except FileNotFoundError:
         return NativeProcess(pid, NativeProcessState.ABSENT)
     except (OSError, ValueError):
-        return replace(identity, state=NativeProcessState.UNKNOWN)
-    return replace(identity, uid=uid)
+        return replace(  # NOSONAR(S5886) pyright types replace()
+            identity,
+            state=NativeProcessState.UNKNOWN,
+        )
+    return replace(identity, uid=uid)  # NOSONAR(S5886) pyright types replace()
 
 
 def _stat_identity(pid: int, proc_root: Path) -> NativeProcess:
@@ -501,7 +504,10 @@ def _live_process_snapshot(
             identity.comm,
         )
     except FileNotFoundError:
-        return replace(identity, state=NativeProcessState.UNKNOWN)
+        return replace(  # NOSONAR(S5886) pyright types replace()
+            identity,
+            state=NativeProcessState.UNKNOWN,
+        )
     except (OSError, UnicodeDecodeError):
         return NativeProcess(
             identity.pid,

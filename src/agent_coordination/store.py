@@ -1688,7 +1688,7 @@ def commit_transition(
         )
         rejection = _pushed(observed, transport, new_commit, intent.operation_id)
         if rejection is None:
-            return replace(new_state, tip=new_commit)
+            return replace(new_state, tip=new_commit)  # NOSONAR(S5886) pyright types replace()
         if rejection.already_applied:
             return rejection.refreshed
         moves, stationary_since_last_move = _advance_tip_retry(

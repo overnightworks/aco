@@ -217,14 +217,13 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Frontend (frontend/): installed packages, and the coverage report CI hands
-# to the Sonar job at reports/frontend-coverage/lcov.info
+# Frontend (frontend/): installed packages, and the coverage report CI uploads
+# from reports/frontend-coverage/lcov.info
 frontend/node_modules/
 /reports/
 
 # Playwright's own run artifacts and the E2E launcher's discovered server
-# details (frontend/e2e/global-setup.ts); sonar-project.properties excludes
-# the same two directories.
+# details (frontend/e2e/global-setup.ts).
 frontend/test-results/
 frontend/playwright-report/
 frontend/e2e/.runtime.json
