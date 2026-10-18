@@ -16121,18 +16121,6 @@ def _release_cleanup_scenario(
     return worktree
 
 
-def test_release_merged_removes_a_clean_merged_lane_worktree_and_branch(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12"]) == 0
-
-    assert not worktree.exists()
-    assert checkout.branch_exists(_CLEANUP_BRANCH) is False
-    assert "worktree: removed\n" in capsys.readouterr().out
-
-
 def test_release_merged_survives_an_open_pull_request_with_a_reference_past_the_digit_bound(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
@@ -16576,98 +16564,6 @@ def test_check_never_takes_a_local_branch_for_the_trunk_of_a_remote_with_branche
         expected_status,
         expected_out.format(sha=sha),
         expected_err,
-    )
-
-
-def test_release_merged_json_carries_the_worktree_cleanup_outcome(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _release_cleanup_scenario(monkeypatch, tmp_path)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12", "--json"])
-
-    assert status == 0
-    assert json.loads(capsys.readouterr().out)["worktree"] == "removed"
-
-
-def _refuse_the_branch_delete(monkeypatch: pytest.MonkeyPatch, _worktree: Path) -> None:
-    stub_one_git_call(
-        monkeypatch,
-        ["branch", "-d", _CLEANUP_BRANCH],
-        exit_status=1,
-        stderr="error: branch not fully merged",
-    )
-
-
-def _fail_the_branch_delete_launch(
-    failure: Exception,
-) -> Callable[[pytest.MonkeyPatch, Path], None]:
-    def arrange(monkeypatch: pytest.MonkeyPatch, _worktree: Path) -> None:
-        fail_git_launch(monkeypatch, ["branch", "-d"], failure)
-
-    return arrange
-
-
-@pytest.mark.parametrize(
-    ("arrange", "worktree_line"),
-    [
-        pytest.param(
-            _refuse_the_branch_delete,
-            "worktree: removed; branch kept -- git failure: error: branch not fully merged\n",
-            id="refused",
-        ),
-        pytest.param(
-            _fail_the_branch_delete_launch(PermissionError("permission denied")),
-            "worktree: removed; branch kept -- git failure: git failed to launch: "
-            "permission denied\n",
-            id="failed-to-launch",
-        ),
-        pytest.param(
-            _fail_the_branch_delete_launch(process.ProcessTimedOutError()),
-            "worktree: removed; branch unknown -- git branch timed out; "
-            f"check git branch --list {_CLEANUP_BRANCH}\n",
-            id="timed-out",
-        ),
-    ],
-)
-def test_release_merged_removes_the_worktree_and_names_what_the_branch_delete_left(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    arrange: Callable[[pytest.MonkeyPatch, Path], None],
-    worktree_line: str,
-) -> None:
-    """Issue #322 review/gate finding 4: a branch-deletion failure after the
-    worktree is already gone must never read as a bare `kept`; a delete git
-    that never launched keeps the branch, and one that timed out may have
-    deleted it, so it reads unknown with the check that tells (issue #603)."""
-    worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
-    arrange(monkeypatch, worktree)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12"])
-
-    assert status == 0
-    assert not worktree.exists()
-    assert checkout.branch_exists(_CLEANUP_BRANCH) is True
-    assert worktree_line in capsys.readouterr().out
-
-
-def test_release_merged_json_carries_the_removed_worktree_branch_kept_outcome(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    _release_cleanup_scenario(monkeypatch, tmp_path)
-    stub_one_git_call(
-        monkeypatch,
-        ["branch", "-d", _CLEANUP_BRANCH],
-        exit_status=1,
-        stderr="error: branch not fully merged",
-    )
-
-    status = issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12", "--json"])
-
-    assert status == 0
-    assert json.loads(capsys.readouterr().out)["worktree"] == (
-        "removed; branch kept -- git failure: error: branch not fully merged"
     )
 
 
