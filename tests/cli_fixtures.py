@@ -315,12 +315,19 @@ def clone(
     return repo
 
 
+GITHUB_REMOTE_URL = "git@github.com:example/agent-coordination.git"
+
+
+def configure_github_remote(clone: Path, bare_remote: Path) -> None:
+    """Route GitHub discovery's remote through the scenario's local bare repository."""
+    real_git(clone, "config", f"url.{bare_remote}.insteadOf", GITHUB_REMOTE_URL)
+    real_git(clone, "remote", "set-url", "origin", GITHUB_REMOTE_URL)
+
+
 @pytest.fixture
 def github_clone(clone: Path, bare_remote: Path) -> Path:
     """Real GitHub discovery with all git transport routed to the local bare remote."""
-    remote_url = "git@github.com:example/agent-coordination.git"
-    real_git(clone, "config", f"url.{bare_remote}.insteadOf", remote_url)
-    real_git(clone, "remote", "set-url", "origin", remote_url)
+    configure_github_remote(clone, bare_remote)
     return clone
 
 

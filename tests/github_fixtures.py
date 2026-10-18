@@ -607,27 +607,11 @@ def arrange_follow_up_failures(
     client: FakeForge,
     close_error: str | None,
     delete_error: str | None,
-    *,
-    item: int,
-    item_state: forge.ItemState,
 ) -> None:
     """Keep the item open until release and install the requested follow-up failures."""
     client.closes_on_merge = False
     client.close_error = forge.ForgeError(close_error) if close_error else None
     client.delete_error = forge.ForgeError(delete_error) if delete_error else None
-    observed = {
-        "item": client.item_reference(item).state,
-        "auto-close": client.closes_on_merge,
-        "close-error": str(client.close_error) if client.close_error else None,
-        "delete-error": str(client.delete_error) if client.delete_error else None,
-    }
-    expected = {
-        "item": item_state,
-        "auto-close": False,
-        "close-error": close_error,
-        "delete-error": delete_error,
-    }
-    assert observed == expected
 
 
 def landed_world(

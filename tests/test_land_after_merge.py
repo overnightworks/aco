@@ -26,7 +26,7 @@ from github_fixtures import (
     landed_world,
 )
 
-from agent_coordination import checkout, forge, store
+from agent_coordination import checkout, store
 
 
 class TrunkState(Enum):
@@ -276,9 +276,7 @@ def world(
     real_git(github_clone, "config", "advice.diverging", "false")
 
     def arrange(client: FakeForge, _head: str) -> None:
-        arrange_follow_up_failures(
-            client, case.close_error, case.delete_error, item=72, item_state=forge.ItemState.OPEN
-        )
+        arrange_follow_up_failures(client, case.close_error, case.delete_error)
         if case.trunk is TrunkState.DIVERGED:
             real_git(github_clone, "commit", "--allow-empty", "-qm", "local trunk change")
         observed = {
