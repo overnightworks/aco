@@ -1,0 +1,7 @@
+claim_id = "85df8f7ec0844507b48e10c9ac2a46e1"
+agent = "claude"
+role = "builder"
+base = "ad7a22806b2c39abeed3a64395bb03a1832fdd8a"
+branch = "claude/issue-239-r2b1-keep-reasons"
+scope = ["tests/test_cli.py", "tests/test_release_cleanup.py"]
+opened_commit = "637f5f138a88338873937b4f7fb1da45814aa30a"
