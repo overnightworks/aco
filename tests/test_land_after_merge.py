@@ -65,6 +65,7 @@ class CanonicalRemote(Enum):
 class TrunkCase:
     canonical: CanonicalRemote
     main: MainBranchState
+    arguments: tuple[str, ...] = ("land", "12")
     stdout: str = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
     status: int = 0
     stderr: str = ""
@@ -94,6 +95,7 @@ class PackageCase:
     package: PackageFile
     stdout: str
     rerun_stdout: str | None = None
+    arguments: tuple[str, ...] = ("land", "12")
     status: int = 0
     stderr: str = ""
     rerun_status: int = 0
@@ -499,11 +501,11 @@ class TestLandAfterMerge:
         """
         case = package_world.case
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(list(case.arguments), capsys)
         observed = {"exit": result.status, "stdout": result.stdout, "stderr": result.stderr}
         expected = {"exit": case.status, "stdout": case.stdout, "stderr": case.stderr}
         if case.rerun_stdout is not None:
-            rerun = run_cli(["land", "12"], capsys)
+            rerun = run_cli(list(case.arguments), capsys)
             observed.update(
                 {
                     "rerun.exit": rerun.status,
@@ -550,7 +552,7 @@ class TestLandAfterMerge:
         calls = trunk_git_calls(monkeypatch, case.canonical.value)
         origin_calls = trunk_git_calls(monkeypatch, "origin")
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(list(case.arguments), capsys)
         land_calls = list(calls)
         origin_land_calls = list(origin_calls)
         observed = {
