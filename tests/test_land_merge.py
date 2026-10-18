@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 from cli_fixtures import (
+    CliRun,
+    MainBranchState,
+    add_lane_worktree,
     landed_from_another_clone,
+    local_branches,
+    move_trunk,
     pull_request_listing,
     real_git,
     run_cli,
@@ -17,15 +22,15 @@ from cli_fixtures import (
 from github_fixtures import (
     LANDING_BRANCH,
     FakeForge,
-    LandingWorld,
+    LaneLandingWorld,
     RefusalLength,
     assert_github_world,
-    landing_effects,
+    landed_observations,
     lane_landing_world,
     refusal_observations,
 )
 
-from agent_coordination import board, forge, protocol, store
+from agent_coordination import board, forge, protocol
 
 
 class ClaimHolder(Enum):
@@ -47,6 +52,12 @@ class ReviewedHead(Enum):
     OMITTED = "omitted"
     FULL = "full"
     UPPERCASE_PREFIX = "uppercase-prefix"
+
+
+class DefaultBranch(Enum):
+    MAIN = ("main", None)
+    TRUNK_WITHOUT_MAIN = ("trunk", MainBranchState.ABSENT)
+    TRUNK_WITH_REMOTE_MAIN = ("trunk", MainBranchState.REMOTE_LEFTOVER)
 
 
 @dataclass(frozen=True)
@@ -79,15 +90,15 @@ class MergeCase:
     distinct_detail: bool = False
     dependency_listing: bool = False
     invalid_configuration: bool = False
+    default_branch: DefaultBranch = DefaultBranch.MAIN
+    decoy_rules: tuple[frozenset[board.MergeMethod], ...] = ()
     length: RefusalLength = RefusalLength.WITHIN_LIMIT
 
 
 @dataclass
-class MergeWorld(LandingWorld):
+class MergeWorld(LaneLandingWorld):
     case: MergeCase
-    head: str
     lane: Path
-    entry_lineage: list[tuple[object, object]]
 
 
 @pytest.fixture
@@ -101,35 +112,31 @@ def world(
     monkeypatch.setenv("LC_ALL", "C")
     monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     assert_github_world(github_clone, bare_remote)
+    default_branch, main_state = case.default_branch.value
+    if main_state is not None:
+        move_trunk(github_clone, bare_remote, main_state=main_state)
     if case.trunk_config and not case.invalid_configuration:
         track_board_config(github_clone, case.trunk_config)
-        real_git(github_clone, "push", "-q", "origin", "main")
+        real_git(github_clone, "push", "-q", "origin", default_branch)
     lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, head: str) -> None:
+        if case.decoy_rules:
+            client.branch_rules = {"main": case.decoy_rules}
         if case.invalid_configuration:
             track_board_config(github_clone, case.trunk_config)
-            real_git(github_clone, "push", "-q", "origin", "main")
+            real_git(github_clone, "push", "-q", "origin", default_branch)
         if case.lane_worktree is LaneWorktree.PRESENT:
-            real_git(github_clone, "worktree", "add", "-q", str(lane), case.branch)
-            real_git(
-                github_clone, "branch", "--set-upstream-to", f"origin/{case.branch}", case.branch
-            )
-            observed = (
-                real_git(lane, "branch", "--show-current").stdout,
-                real_git(github_clone, "config", f"branch.{case.branch}.remote").stdout,
-            )
-            expected = (case.branch + "\n", "origin\n")
-            assert observed == expected
+            add_lane_worktree(github_clone, lane, case.branch)
         observed = (
             lane.exists(),
             real_git(github_clone, "rev-parse", case.branch).stdout.strip(),
             real_git(bare_remote, "rev-parse", case.branch).stdout.strip(),
             real_git(github_clone, "status", "--porcelain").stdout,
             real_git(github_clone, "branch", "--show-current").stdout,
-            bool(real_git(github_clone, "diff", "main", case.branch).stdout),
+            bool(real_git(github_clone, "diff", default_branch, case.branch).stdout),
         )
-        expected = (case.lane_worktree.value, head, head, "", "main\n", True)
+        expected = (case.lane_worktree.value, head, head, "", default_branch + "\n", True)
         assert observed == expected
         if case.dependency_listing:
             client.changes_by_number[12] = pull_request_listing(
@@ -153,6 +160,7 @@ def world(
         github_clone,
         bare_remote,
         monkeypatch,
+        default_branch=default_branch,
         identity=case.identity,
         branch=case.branch,
         body=case.body,
@@ -165,15 +173,30 @@ def world(
         head_config=case.head_config,
         arrange=arrange,
     )
+    if main_state is not None:
+        observed = (
+            shared.default_branch,
+            shared.forge.default_branch_name,
+            shared.forge.landings[12].target_branch,
+            shared.forge.branch_rules,
+        )
+        expected = (
+            "trunk",
+            "trunk",
+            "trunk",
+            {"main": case.decoy_rules} if case.decoy_rules else {"trunk": case.rules},
+        )
+        assert observed == expected
     return MergeWorld(
         github_clone,
         bare_remote,
         shared.forge,
         shared.unchanged,
-        case,
         shared.head,
-        lane,
         shared.entry_lineage,
+        case,
+        lane,
+        default_branch=shared.default_branch,
     )
 
 
@@ -190,84 +213,26 @@ def land(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
     return run_cli(arguments, capsys)
 
 
-def landed_observations(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
+def merge_observations(world: MergeWorld, result: CliRun):
     case = world.case
     outcome = case.outcome
     assert isinstance(outcome, Landed)
-    result = land(world, capsys)
-    effects = landing_effects(world)
-    calls = world.forge.merge_calls
-    trunk = real_git(world.clone, "rev-parse", "main").stdout.strip()
-    remote_claims = store.peek_state(worktree=world.clone, remote=str(world.remote)).claims
-    topology = tuple(
-        line
-        for line in real_git(world.clone, "worktree", "list", "--porcelain").stdout.splitlines()
-        if line.startswith(("worktree ", "branch "))
-    )
-    branches = frozenset(
-        real_git(
-            world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
-        ).stdout.splitlines()
-    )
-    entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
-    merge = calls[0] if calls else (None, None, None, None, "")
-    observed = {
-        "exit+": result.status,
-        "err+": result.stderr,
-        "release-line": (outcome.release in result.stdout),
-        "merge.count": len(calls),
-        "merge.number": merge[0],
-        "merge.head": merge[1],
-        "merge.method": merge[2],
-        "merge.title": merge[3],
-        "merge.end": merge[4].strip().split("\n\n")[-1],
-        "delete+": effects["delete"],
-        "close+": effects["close"],
-        "body": effects["body"],
-        "remote.moved": effects["remote"] != world.unchanged["remote"],
-        "claims.empty": remote_claims,
-        "local": effects["local"],
-        "worktrees+": topology,
-        "branches+": branches,
-        "trunk.changed": trunk + "\n" != world.unchanged["trunk"],
-        "trunk.is-merge": trunk == world.forge.landings[12].merge_commit,
-        "trunk.parents": len(
-            real_git(world.clone, "rev-list", "--parents", "-n", "1", trunk).stdout.split()
-        )
-        - 1,
-        "stamp+": effects["stamp"] is not None,
-        "anchor+": effects["anchor"] is not None,
-        "entry.stamp": entry[0],
-        "entry.anchor": entry[1],
-    }
-    expected = {
-        "exit+": 0,
-        "err+": "",
-        "release-line": True,
-        "merge.count": 1,
-        "merge.number": 12,
-        "merge.head": world.head,
-        "merge.method": outcome.method,
-        "merge.title": outcome.title,
-        "merge.end": outcome.trailer,
-        "delete+": [case.branch],
-        "close+": set(outcome.closed),
-        "body": [],
-        "remote.moved": True,
-        "claims.empty": {},
-        "local": None,
-        "worktrees+": (f"worktree {world.clone}", "branch refs/heads/main"),
-        "branches+": frozenset({"main"})
+    observed, expected = landed_observations(
+        world,
+        result,
+        branch=case.branch,
+        method=outcome.method,
+        title=outcome.title,
+        parents=outcome.parents,
+        closed=outcome.closed,
+        release=outcome.release,
+        remaining_branches=frozenset({world.default_branch})
         if case.lane_worktree is LaneWorktree.PRESENT
-        else frozenset({"main", case.branch}),
-        "trunk.changed": True,
-        "trunk.is-merge": True,
-        "trunk.parents": outcome.parents,
-        "stamp+": True,
-        "anchor+": True,
-        "entry.stamp": None,
-        "entry.anchor": None,
-    }
+        else frozenset({world.default_branch, case.branch}),
+    )
+    calls = world.forge.merge_calls
+    observed["merge.end"] = calls[0][4].strip().split("\n\n")[-1] if calls else ""
+    expected["merge.end"] = outcome.trailer
     if case.oversized_foreign_text:
         reads = world.forge.file_reads
         read = reads[0] if reads else (Path("missing"), "missing")
@@ -292,7 +257,7 @@ def landed_observations(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
     if isinstance(case.identity, protocol.LaneIdentity):
         observed["no-reinstall"] = "reinstall:" not in result.stdout
         expected["no-reinstall"] = True
-    return observed, expected, result, branches
+    return observed, expected
 
 
 def refused_observations(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
@@ -398,7 +363,7 @@ class TestLandMerge:
         """Spec: LANDCMD-09, LANDCMD-10, LANDCMD-12, LANDCMD-13, LANDCMD-23, LANDCMD-29, LANDCMD-32.
         The reviewed head lands, releases the real claim and retains the classification trailer.
         """
-        observed, expected, _, _ = landed_observations(world, capsys)
+        observed, expected = merge_observations(world, land(world, capsys))
         assert observed == expected
 
 
@@ -472,6 +437,26 @@ class TestLandMergeMethod:
                 ),
                 id="all-three-settings-and-no-rule-pick-a-merge-commit",
             ),
+            pytest.param(
+                MergeCase(
+                    Landed(board.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    lane_worktree=LaneWorktree.PRESENT,
+                    default_branch=DefaultBranch.TRUNK_WITHOUT_MAIN,
+                    methods=frozenset(board.MergeMethod),
+                    rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                ),
+                id="trunk-rule-narrows-the-method",
+            ),
+            pytest.param(
+                MergeCase(
+                    Landed(),
+                    lane_worktree=LaneWorktree.PRESENT,
+                    default_branch=DefaultBranch.TRUNK_WITH_REMOTE_MAIN,
+                    methods=frozenset(board.MergeMethod),
+                    decoy_rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                ),
+                id="decoy-main-rule-is-ignored",
+            ),
         ],
         indirect=True,
     )
@@ -479,7 +464,9 @@ class TestLandMergeMethod:
         """Spec: LANDCMD-27, LANDCMD-29, LANDCMD-39, LANDCMD-42.
         Every rule narrows the methods; successful landings remove their lane and upstream.
         """
-        observed, expected, result, branches = landed_observations(world, capsys)
+        result = land(world, capsys)
+        observed, expected = merge_observations(world, result)
+        branches = local_branches(world.clone)
         observed.update(
             {
                 "removed-line": "worktree: removed\n" in result.stdout,

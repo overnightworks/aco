@@ -12,6 +12,7 @@ from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import Enum
 from functools import cache
 from pathlib import Path
 from typing import TextIO
@@ -61,7 +62,7 @@ def stub_one_git_call(
 ) -> None:
     """Force exactly one `checkout._git_run` argv to a chosen failure exit,
     every other call reaching the real launcher -- shared by
-    `test_checkout.py` and `test_cli.py` (issue #322): a git-level failure
+    checkout and CLI test families (issue #322): a git-level failure
     (an unreachable remote, a colliding worktree path, an unmerged branch
     `git branch -d` itself refuses, ...) is cheaper to force this way than
     to reproduce with real git state."""
@@ -183,6 +184,14 @@ def real_git(
         check=check,
         capture_output=True,
         text=True,
+    )
+
+
+def local_branches(clone: Path) -> frozenset[str]:
+    return frozenset(
+        real_git(
+            clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
+        ).stdout.splitlines()
     )
 
 
@@ -343,14 +352,69 @@ def push_repository_trunk(repo: Path, remote_name: str) -> None:
 
 def push_lane_branch(clone: Path, branch: str) -> str:
     """Publish a nonempty lane commit and return to the trunk checkout."""
+    default_branch = real_git(clone, "branch", "--show-current").stdout.strip()
     real_git(clone, "checkout", "-q", "-b", branch)
     (clone / "feature.txt").write_text("lane feature\n")
     real_git(clone, "add", "feature.txt")
     real_git(clone, "commit", "-q", "-m", "lane feature")
     head = real_git(clone, "rev-parse", "HEAD").stdout.strip()
     real_git(clone, "push", "-q", "origin", branch)
-    real_git(clone, "checkout", "-q", "main")
+    real_git(clone, "checkout", "-q", default_branch)
     return head
+
+
+def add_lane_worktree(clone: Path, lane: Path, branch: str) -> None:
+    """Add the lane checkout and verify its branch and upstream remote."""
+    real_git(clone, "worktree", "add", "-q", str(lane), branch)
+    real_git(clone, "branch", "--set-upstream-to", f"origin/{branch}", branch)
+    observed = (
+        real_git(lane, "branch", "--show-current").stdout,
+        real_git(clone, "config", f"branch.{branch}.remote").stdout,
+    )
+    expected = (branch + "\n", "origin\n")
+    assert observed == expected
+
+
+class MainBranchState(Enum):
+    ABSENT = "absent"
+    REMOTE_LEFTOVER = "remote-leftover"
+
+
+def move_trunk(clone: Path, remote: Path, *, main_state: MainBranchState) -> None:
+    """Rename the default branch, retaining main remotely only for a deliberate decoy."""
+    tip = real_git(clone, "rev-parse", "main").stdout
+    real_git(clone, "branch", "-m", "main", "trunk")
+    real_git(clone, "push", "-q", "origin", "trunk")
+    real_git(remote, "symbolic-ref", "HEAD", "refs/heads/trunk")
+    real_git(clone, "remote", "set-head", "origin", "trunk")
+    if main_state is MainBranchState.ABSENT:
+        real_git(clone, "push", "-q", "origin", "--delete", "main")
+    observed = (
+        real_git(remote, "symbolic-ref", "HEAD").stdout,
+        real_git(clone, "symbolic-ref", "refs/remotes/origin/HEAD").stdout,
+        real_git(clone, "branch", "--show-current").stdout,
+        real_git(
+            clone, "show-ref", "--verify", "--quiet", "refs/heads/main", check=False
+        ).returncode,
+        real_git(
+            remote, "show-ref", "--verify", "--quiet", "refs/heads/main", check=False
+        ).returncode,
+    )
+    expected = (
+        "refs/heads/trunk\n",
+        "refs/remotes/origin/trunk\n",
+        "trunk\n",
+        1,
+        1 if main_state is MainBranchState.ABSENT else 0,
+    )
+    assert observed == expected
+    if main_state is MainBranchState.REMOTE_LEFTOVER:
+        observed = (
+            real_git(remote, "rev-parse", "main").stdout,
+            real_git(remote, "rev-parse", "trunk").stdout,
+        )
+        expected = (tip, tip)
+        assert observed == expected
 
 
 def dangle_recorded_head(repo: Path, remote_name: str) -> None:
