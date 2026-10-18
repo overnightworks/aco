@@ -18,7 +18,13 @@ from cli_fixtures import (
     track_board_config,
     trunk_git_calls,
 )
-from github_fixtures import LANDING_DEFAULT_BRANCH, FakeForge, LaneLandingWorld, landed_world
+from github_fixtures import (
+    LANDING_DEFAULT_BRANCH,
+    FakeForge,
+    LaneLandingWorld,
+    arrange_follow_up_failures,
+    landed_world,
+)
 
 from agent_coordination import checkout, forge, store
 
@@ -43,6 +49,15 @@ class FailureCase:
     deleted_branches: tuple[str, ...] = ("codex/issue-72-claims",)
     fetch_calls: tuple[str, ...] = ("fetch",)
     expected_trunk: ExpectedTrunk = ExpectedTrunk.UNCHANGED
+
+
+def release_failure_case() -> FailureCase:
+    return FailureCase(
+        "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
+        "release (forge unreachable); re-run aco land 12\n",
+        close_error="forge unreachable",
+        expected_trunk=ExpectedTrunk.FAST_FORWARDED,
+    )
 
 
 @dataclass
@@ -139,8 +154,8 @@ def keep_world(
     bare_remote: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> KeepWorld:
-    landing = landed_world(github_clone, bare_remote, monkeypatch)
-    return KeepWorld(landing.landing, request.param, landing.lane)
+    landed = landed_world(github_clone, bare_remote, monkeypatch)
+    return KeepWorld(landed.landing, request.param, landed.lane)
 
 
 @pytest.fixture
@@ -159,16 +174,16 @@ def package_world(
             real_git(github_clone, "commit", "-qm", "package identity")
             real_git(github_clone, "push", "-q", "origin", LANDING_DEFAULT_BRANCH)
 
-    landing = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+    landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
     package = real_git(github_clone, "show", "HEAD:pyproject.toml", check=False)
-    lane_file = landing.lane / "pyproject.toml"
+    lane_file = landed.lane / "pyproject.toml"
     observed = {
         "package.trunk": package.stdout if package.returncode == 0 else None,
         "package.lane": lane_file.read_text() if lane_file.exists() else None,
     }
     expected = {"package.trunk": case.package.value, "package.lane": None}
     assert observed == expected
-    return PackageWorld(landing.landing, case)
+    return PackageWorld(landed.landing, case)
 
 
 def delete_recorded_head(clone: Path, remote: str) -> int:
@@ -239,7 +254,7 @@ def trunk_world(
             expected = {"hub.lane": head, "hub.merge-remote": remote}
             assert observed == expected
 
-    landing = landed_world(
+    landed = landed_world(
         github_clone,
         remote,
         monkeypatch,
@@ -247,7 +262,7 @@ def trunk_world(
         head_config=config,
         extra_arrange=arrange,
     )
-    return TrunkWorld(landing.landing, case, landing.lane)
+    return TrunkWorld(landed.landing, case, landed.lane)
 
 
 @pytest.fixture
@@ -261,32 +276,24 @@ def world(
     real_git(github_clone, "config", "advice.diverging", "false")
 
     def arrange(client: FakeForge, _head: str) -> None:
-        client.closes_on_merge = False
-        client.delete_error = forge.ForgeError(case.delete_error) if case.delete_error else None
-        client.close_error = forge.ForgeError(case.close_error) if case.close_error else None
+        arrange_follow_up_failures(
+            client, case.close_error, case.delete_error, item=72, item_state=forge.ItemState.OPEN
+        )
         if case.trunk is TrunkState.DIVERGED:
             real_git(github_clone, "commit", "--allow-empty", "-qm", "local trunk change")
         observed = {
-            "item": client.item_reference(72).state,
-            "auto-close": client.closes_on_merge,
-            "delete-error": str(client.delete_error) if client.delete_error else None,
-            "close-error": str(client.close_error) if client.close_error else None,
             "topology": real_git(
                 github_clone, "rev-list", "--left-right", "--count", "main...codex/issue-72-claims"
             ).stdout,
             "advice": real_git(github_clone, "config", "advice.diverging").stdout,
         }
         expected = {
-            "item": forge.ItemState.OPEN,
-            "auto-close": False,
-            "delete-error": case.delete_error,
-            "close-error": case.close_error,
             "topology": case.trunk.value,
             "advice": "false\n",
         }
         assert observed == expected
 
-    landing = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+    landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
     if case.error is not None:
         stub_one_git_call(monkeypatch, ["fetch", "origin"], exit_status=1, stderr=case.error)
         probe = checkout._git_run(["fetch", "origin"], directory=github_clone)
@@ -294,9 +301,9 @@ def world(
         expected = (1, case.error.encode())
         assert observed == expected
     return FailureWorld(
-        landing.landing,
+        landed.landing,
         case,
-        landing.lane,
+        landed.lane,
         real_git(github_clone, "rev-parse", LANDING_DEFAULT_BRANCH).stdout.strip(),
         real_git(bare_remote, "rev-parse", LANDING_DEFAULT_BRANCH).stdout.strip(),
     )
@@ -499,12 +506,7 @@ class TestLandAfterMerge:
                 id="ff-only-fails",
             ),
             pytest.param(
-                FailureCase(
-                    "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
-                    "release (forge unreachable); re-run aco land 12\n",
-                    close_error="forge unreachable",
-                    expected_trunk=ExpectedTrunk.FAST_FORWARDED,
-                ),
+                release_failure_case(),
                 id="release-fails",
             ),
         ],
@@ -570,12 +572,7 @@ class TestLandAfterMerge:
         "world",
         [
             pytest.param(
-                FailureCase(
-                    "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
-                    "release (forge unreachable); re-run aco land 12\n",
-                    close_error="forge unreachable",
-                    expected_trunk=ExpectedTrunk.FAST_FORWARDED,
-                ),
+                release_failure_case(),
                 id="release-fails",
             )
         ],

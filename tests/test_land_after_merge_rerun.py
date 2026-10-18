@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 
 import pytest
 from cli_fixtures import real_git, run_cli
-from github_fixtures import FakeForge, LandedWorld, landed_world
+from github_fixtures import FakeForge, LandedWorld, arrange_follow_up_failures, landed_world
 
 from agent_coordination import board, forge, protocol, store
 
@@ -28,7 +27,13 @@ class RerunCase:
     method: board.MergeMethod = board.MergeMethod.MERGE
     title: str = "feat: land the lane (#12)"
     merge_body: str = "Work-Item: #72"
-    trailer: str | None = "Work-Item: #72\n"
+    merge_trailers: str = "Work-Item: #72\n"
+    merge_message: str = "feat: land the lane (#12)\n\nWork-Item: #72\n"
+    merge_parents: int = 2
+    lane_ancestor: int = 0
+    item: int = 72
+    item_state: forge.ItemState = forge.ItemState.OPEN
+    off_trunk: bool = False
     close_error: str | None = None
     delete_error: str | None = None
     initial_stderr: str = ""
@@ -85,9 +90,6 @@ def arrange_rerun(world: LandedWorld, case: RerunCase) -> None:
     client.delete_error = None
     if case.changed_body is not None:
         client.landings[12] = replace(client.landings[12], body=case.changed_body)
-        observed = client.landings[12].body
-        expected = case.changed_body
-        assert observed == expected
     if case.mergeable_state is not None:
         client.readiness_by_number[12] = replace(
             client.readiness_by_number[12],
@@ -108,13 +110,8 @@ def arrange_rerun(world: LandedWorld, case: RerunCase) -> None:
         assert observed == expected
     if case.quality_error is not None:
         client.quality_config_error = forge.ForgeError(case.quality_error)
-        observed = str(client.quality_config_error)
-        expected = case.quality_error
-        assert observed == expected
     client.quality_config_reads.clear()
     client.file_reads.clear()
-    # The fake's disposable merge clone must permit a second merge fault to reach the oracle.
-    shutil.rmtree(world.landing.remote.parent / "forge-merge")
 
 
 def verify_merge(world: LandedWorld, case: RerunCase, merge: str) -> None:
@@ -134,7 +131,19 @@ def verify_merge(world: LandedWorld, case: RerunCase, merge: str) -> None:
         "lane.head": real_git(world.lane, "rev-parse", "HEAD").stdout.strip(),
         "quality.reads": tuple(client.quality_config_reads),
         "head-config.reads": tuple(client.file_reads),
-        "merge-clone.exists": (landing.remote.parent / "forge-merge").exists(),
+        "merge.trailers": real_git(
+            landing.remote, "show", "-s", "--format=%(trailers:only,unfold)", merge
+        ).stdout.removesuffix("\n"),
+        "merge.message": real_git(
+            landing.remote, "show", "-s", "--format=%B", merge
+        ).stdout.removesuffix("\n"),
+        "merge.parents": len(
+            real_git(landing.remote, "show", "-s", "--format=%P", merge).stdout.split()
+        ),
+        "recorded.head": client.landings[12].head_sha,
+        "lane.ancestor": real_git(
+            landing.remote, "merge-base", "--is-ancestor", landing.head, merge, check=False
+        ).returncode,
     }
     expected = {
         "landing.merged": True,
@@ -147,41 +156,13 @@ def verify_merge(world: LandedWorld, case: RerunCase, merge: str) -> None:
         "lane.head": landing.head,
         "quality.reads": (),
         "head-config.reads": (),
-        "merge-clone.exists": False,
+        "merge.trailers": case.merge_trailers,
+        "merge.message": case.merge_message,
+        "merge.parents": case.merge_parents,
+        "recorded.head": landing.head,
+        "lane.ancestor": case.lane_ancestor,
     }
     assert observed == expected
-    if case.trailer is not None:
-        observed = real_git(
-            landing.remote, "show", "-s", "--format=%(trailers:only,unfold)", merge
-        ).stdout.removesuffix("\n")
-        expected = case.trailer
-        assert observed == expected
-    else:
-        observed = {
-            "merge.message": real_git(
-                landing.remote, "show", "-s", "--format=%B", merge
-            ).stdout.removesuffix("\n"),
-            "merge.parents": len(
-                real_git(landing.remote, "show", "-s", "--format=%P", merge).stdout.split()
-            ),
-        }
-        expected = {
-            "merge.message": "Merge pull request #12\n\nordinary merge without classification\n",
-            "merge.parents": 2,
-        }
-        assert observed == expected
-    if case.method is board.MergeMethod.SQUASH:
-        observed = {
-            "recorded.head": client.landings[12].head_sha,
-            "lane.ancestor": real_git(
-                landing.remote, "merge-base", "--is-ancestor", landing.head, merge, check=False
-            ).returncode,
-            "merge.parents": len(
-                real_git(landing.remote, "show", "-s", "--format=%P", merge).stdout.split()
-            ),
-        }
-        expected = {"recorded.head": landing.head, "lane.ancestor": 1, "merge.parents": 1}
-        assert observed == expected
 
 
 @pytest.fixture
@@ -195,23 +176,9 @@ def world(
     case: RerunCase = request.param
 
     def arrange(client: FakeForge, _head: str) -> None:
-        client.closes_on_merge = False
-        client.close_error = forge.ForgeError(case.close_error) if case.close_error else None
-        client.delete_error = forge.ForgeError(case.delete_error) if case.delete_error else None
-        observed = {
-            "auto-close": client.closes_on_merge,
-            "close-error": str(client.close_error) if client.close_error else None,
-            "delete-error": str(client.delete_error) if client.delete_error else None,
-        }
-        expected = {
-            "auto-close": False,
-            "close-error": case.close_error,
-            "delete-error": case.delete_error,
-        }
-        if isinstance(case.identity, protocol.IssueIdentity):
-            observed["item"] = client.item_reference(case.identity.issue).state
-            expected["item"] = forge.ItemState.OPEN
-        assert observed == expected
+        arrange_follow_up_failures(
+            client, case.close_error, case.delete_error, item=case.item, item_state=case.item_state
+        )
 
     shared = landed_world(
         github_clone,
@@ -225,6 +192,20 @@ def world(
     merge = prepare_merge(shared, case, capsys)
     arrange_rerun(shared, case)
     verify_merge(shared, case, merge)
+    if case.off_trunk:
+        landing = shared.landing
+        client = landing.forge
+        client.landings[12] = replace(client.landings[12], merge_commit=landing.head)
+        observed = {
+            "trunk.trailers": real_git(
+                landing.remote, "show", "-s", "--format=%(trailers:only,unfold)", merge
+            ).stdout.removesuffix("\n"),
+            "recorded.on-first-parent": client.landings[12].merge_commit
+            in real_git(landing.remote, "rev-list", "--first-parent", merge).stdout.splitlines(),
+        }
+        expected = {"trunk.trailers": case.merge_trailers, "recorded.on-first-parent": False}
+        assert observed == expected
+        merge = landing.head
     return RerunWorld(shared, case, merge)
 
 
@@ -245,6 +226,7 @@ class TestLandAfterMergeRerun:
                 RerunCase(
                     preparation=RerunPreparation.FAILED_LAND,
                     close_error="forge unreachable (simulated)",
+                    merge_message="Merge pull request #12\n\nCloses #72\n\nWork-Item: #72\n",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
                     "release (forge unreachable (simulated)); re-run aco land 12\n",
@@ -259,7 +241,8 @@ class TestLandAfterMergeRerun:
                     branch="dependabot/x",
                     body="No-Item: fix",
                     merge_body="No-Item: fix",
-                    trailer="No-Item: fix\n",
+                    merge_trailers="No-Item: fix\n",
+                    merge_message="Merge pull request #12\n\nNo-Item: fix\n",
                     delete_error="delete branch failed (simulated)",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
@@ -279,12 +262,16 @@ class TestLandAfterMergeRerun:
                     "follow-up incomplete: "
                     "release (forge unreachable (simulated)); re-run aco land 12\n",
                     changed_body="Advances #72",
+                    merge_message="Merge pull request #12\n\nCloses #72\n\nWork-Item: #72\n",
                 ),
                 id="merge-trailer-survives-body-edit",
             ),
             pytest.param(
                 RerunCase(
-                    method=board.MergeMethod.SQUASH, arguments=("land", "12", "--head", "0000000")
+                    method=board.MergeMethod.SQUASH,
+                    merge_parents=1,
+                    lane_ancestor=1,
+                    arguments=("land", "12", "--head", "0000000"),
                 ),
                 id="squash-rerun-on-recorded-head",
             ),
@@ -341,7 +328,10 @@ class TestLandAfterMergeRerun:
                 RerunCase(
                     title="Merge pull request #12",
                     merge_body="ordinary merge without classification",
-                    trailer=None,
+                    merge_trailers="",
+                    merge_message=(
+                        "Merge pull request #12\n\nordinary merge without classification\n"
+                    ),
                     status=2,
                     stdout="",
                     stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
@@ -349,7 +339,18 @@ class TestLandAfterMergeRerun:
                     "re-run aco land 12\n",
                 ),
                 id="missing-trailer-gap-17",
-            )
+            ),
+            pytest.param(
+                RerunCase(
+                    off_trunk=True,
+                    status=2,
+                    stdout="",
+                    stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
+                    "release (merge commit {merge} carries no `Work-Item:` or `No-Item:` trailer); "
+                    "re-run aco land 12\n",
+                ),
+                id="off-trunk-merge-commit-gap-17",
+            ),
         ],
         indirect=True,
     )
