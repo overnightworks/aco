@@ -1554,6 +1554,7 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
     )
     released_line = _released_line(claim) + f"worktree: {worktree_outcome}\n"
     expected_run = (status, released_line, "") if merged else (status, "", refusal)
+    observed_run = (landed.status, landed.stdout, landed.stderr)
     merged_heads = [call[1] for call in world.forge.merge_calls]
     trunk_moved = _remote_tip(world, "main") != trunk_before
     state_moved = state_ref_tip(world.remote) != state_before
@@ -1563,7 +1564,7 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
         store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
         ADOPTED_BRANCH,
     )
-    assert (landed.status, landed.stdout, landed.stderr) == expected_run
+    assert observed_run == expected_run
     assert merged_heads == ([current_head] if merged else [])
     assert trunk_moved == merged
     assert state_moved == merged
