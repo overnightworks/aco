@@ -1,7 +1,0 @@
-claim_id = "e54321fe43f24c64bb82be1379ab2a71"
-agent = "claude"
-role = "builder"
-base = "b5e63feeede2b881f44eb297d0f7cd5648c44ade"
-branch = "dependabot/uv/build-1.6.1"
-scope = ["uv.lock"]
-opened_commit = "183be20acf6f22db91950373a7faa3374bd9bccc"
