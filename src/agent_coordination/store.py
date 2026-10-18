@@ -262,6 +262,14 @@ class PushTransport(Protocol):
         ...
 
 
+# The process errors that carry no message of their own; any other carries its own.
+_PUSH_STOP_CAUSES: dict[type[process.ProcessError], str] = {
+    process.ProcessTimedOutError: "timed out",
+    process.ProcessOutputTooLargeError: "exceeded its output limit",
+    process.ProcessDidNotExitError: "did not exit after being stopped",
+}
+
+
 class GitPushTransport:
     """Production push boundary: a plain fast-forward `git push`, never
     `--force`/`--force-with-lease` (a matching lease can still replace
@@ -274,8 +282,9 @@ class GitPushTransport:
         except (process.ExecutableMissingError, process.ProcessStartFailedError) as error:
             raise PushNotStartedError(f"git push could not start: {error}") from error
         except process.ProcessError as error:
+            cause = _PUSH_STOP_CAUSES.get(type(error), str(error))
             raise ClaimError(
-                f"git push to the claim state store did not finish: {error}"
+                f"git push to the claim state store did not finish: {cause}"
             ) from error
         if result.exit_status != 0:
             raise PushRejectedError(process.git_failure_detail(result))

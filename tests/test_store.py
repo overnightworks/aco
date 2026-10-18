@@ -1291,13 +1291,39 @@ class _PushProcessProbe:
     def runs_instead(self, command: list[str]) -> None:
         self._replacement_command = command
 
-    def time_limit(self, seconds: float) -> None:
+    def expires_the_push_at_once(self) -> None:
         run_without_limit = process.run_bounded_captured
 
         def bounded(command: list[str], **kwargs: Any) -> Any:
-            return run_without_limit(command, **{**kwargs, "timeout": seconds})
+            if "push" in command:
+                kwargs["timeout"] = 0
+            return run_without_limit(command, **kwargs)
 
         self._monkeypatch.setattr(process, "run_bounded_captured", bounded)
+
+    def cannot_stop_the_push(self) -> None:
+        real_popen = subprocess.Popen
+
+        class UnstoppableProcess:
+            """A started push that dies on `kill()` yet never reports its exit."""
+
+            def __init__(self, started: Any) -> None:
+                self._started = started
+
+            def __getattr__(self, name: str) -> Any:
+                return getattr(self._started, name)
+
+            def poll(self) -> None:
+                return None
+
+            def wait(self, timeout: float | None = None) -> int:
+                raise subprocess.TimeoutExpired(cmd="git push", timeout=timeout or 0)
+
+        def popen(command: list[str], *args: Any, **kwargs: Any) -> Any:
+            started = real_popen(command, *args, **kwargs)
+            return UnstoppableProcess(started) if "push" in command else started
+
+        self._monkeypatch.setattr(subprocess, "Popen", popen)
 
 
 _PUSH_START_FAILURES = [
@@ -1316,12 +1342,22 @@ def _the_push_prints_too_much(probe: _PushProcessProbe) -> None:
 
 def _the_push_outlives_its_time_limit(probe: _PushProcessProbe) -> None:
     probe.runs_instead([sys.executable, "-c", "import time; time.sleep(30)"])
-    probe.time_limit(0.2)
+    probe.expires_the_push_at_once()
+
+
+def _the_push_cannot_be_stopped(probe: _PushProcessProbe) -> None:
+    _the_push_outlives_its_time_limit(probe)
+    probe.cannot_stop_the_push()
 
 
 _PUSH_FAILURES_AFTER_THE_START = [
-    pytest.param(_the_push_prints_too_much, id="output-too-large"),
-    pytest.param(_the_push_outlives_its_time_limit, id="timed-out"),
+    pytest.param(_the_push_prints_too_much, "exceeded its output limit", id="output-too-large"),
+    pytest.param(_the_push_outlives_its_time_limit, "timed out", id="timed-out"),
+    pytest.param(
+        _the_push_cannot_be_stopped,
+        "did not exit after being stopped",
+        id="cannot-be-stopped",
+    ),
 ]
 
 
@@ -1343,17 +1379,19 @@ def test_bootstrap_refuses_plainly_when_the_push_process_never_started(
     assert state_ref_tip(bare_remote) is None
 
 
-@pytest.mark.parametrize("break_the_push", _PUSH_FAILURES_AFTER_THE_START)
+@pytest.mark.parametrize(("break_the_push", "visible_cause"), _PUSH_FAILURES_AFTER_THE_START)
 def test_bootstrap_calls_a_push_that_failed_after_starting_uncertain(
     bare_remote: Path,
     worktree: Path,
     monkeypatch: pytest.MonkeyPatch,
     break_the_push: Callable[[_PushProcessProbe], None],
+    visible_cause: str,
 ) -> None:
-    """Spec: CAS-56; once the push process ran, only the remote knows whether it landed."""
+    """Spec: CAS-56; once the push process ran, only the remote knows whether it
+    landed, and the refusal says in its own sentence what went wrong."""
     break_the_push(_PushProcessProbe(monkeypatch))
 
-    with pytest.raises(protocol.UncertainWriteError):
+    with pytest.raises(protocol.UncertainWriteError, match=visible_cause):
         store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
 
@@ -3084,32 +3122,10 @@ def _another_writer_claims_issue_1(
     )
 
 
-def _the_push_process_outlives_its_time_limit(
-    monkeypatch: pytest.MonkeyPatch, _bare_remote: Path, _worktree: Path
-) -> None:
-    _the_push_outlives_its_time_limit(_PushProcessProbe(monkeypatch))
-
-
-def _the_push_process_prints_too_much(
-    monkeypatch: pytest.MonkeyPatch, _bare_remote: Path, _worktree: Path
-) -> None:
-    _the_push_prints_too_much(_PushProcessProbe(monkeypatch))
-
-
 @pytest.mark.parametrize(
     ("arrange", "raised_kind"),
     [
         pytest.param(_the_push_times_out, protocol.UncertainWriteError, id="push-times-out"),
-        pytest.param(
-            _the_push_process_outlives_its_time_limit,
-            protocol.UncertainWriteError,
-            id="push-process-times-out",
-        ),
-        pytest.param(
-            _the_push_process_prints_too_much,
-            protocol.UncertainWriteError,
-            id="push-process-fails-after-starting",
-        ),
         pytest.param(
             _the_answer_and_its_re_read_are_lost,
             protocol.UncertainWriteError,
@@ -3156,6 +3172,28 @@ def test_commit_transition_says_whether_a_failed_write_may_have_landed(
         )
 
     assert type(raised.value) is raised_kind
+
+
+@pytest.mark.parametrize(("break_the_push", "visible_cause"), _PUSH_FAILURES_AFTER_THE_START)
+def test_commit_transition_calls_a_push_that_failed_after_starting_uncertain(
+    bare_remote: Path,
+    worktree: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    break_the_push: Callable[[_PushProcessProbe], None],
+    visible_cause: str,
+) -> None:
+    """Spec: CAS-56; a transition whose push process failed after starting may
+    have landed, and says in its own sentence what went wrong."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = fresh_observation(worktree, bare_remote)
+    break_the_push(_PushProcessProbe(monkeypatch))
+
+    with pytest.raises(protocol.UncertainWriteError, match=visible_cause):
+        store.commit_transition(
+            observed=observed,
+            subject=store.ClaimTransitionSubject("claim issue 1", item="1"),
+            intent=_issue_claim_intent(1),
+        )
 
 
 @pytest.mark.parametrize("start_failure", _PUSH_START_FAILURES)
