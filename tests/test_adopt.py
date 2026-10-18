@@ -1100,11 +1100,13 @@ def test_adopt_keeps_the_claim_and_the_pair_when_the_body_step_goes_wrong(
 
 
 @pytest.mark.parametrize(
-    ("interrupt", "rerun_writes"),
+    ("interrupt", "rerun_writes", "rerun_reads_of_the_body"),
     [
-        pytest.param(_the_forge_refuses_the_write, 1, id="cell-35-rerun-writes-the-missing-line"),
         pytest.param(
-            _the_write_times_out_after_it_landed, 0, id="cell-36-rerun-keeps-the-landed-line"
+            _the_forge_refuses_the_write, 1, 3, id="cell-35-rerun-writes-the-missing-line"
+        ),
+        pytest.param(
+            _the_write_times_out_after_it_landed, 0, 1, id="cell-36-rerun-keeps-the-landed-line"
         ),
     ],
 )
@@ -1114,6 +1116,7 @@ def test_adopts_rerun_after_an_interrupted_write_completes_it_under_the_same_cla
     monkeypatch: pytest.MonkeyPatch,
     interrupt: Callable[[AdoptionWorld, pytest.MonkeyPatch], None],
     rerun_writes: int,
+    rerun_reads_of_the_body: int,
 ) -> None:
     """Spec: ADOPT-26 (cells 35-36) -- the holder's rerun builds and claims nothing, writes
     the line only when it is missing, and prints the declaration with the claim's own id."""
@@ -1123,6 +1126,7 @@ def test_adopts_rerun_after_an_interrupted_write_completes_it_under_the_same_cla
     claim = _adopted_claim(world)
     tip_before_rerun = state_ref_tip(world.remote)
     writes_before_rerun = len(world.forge.body_writes)
+    reads_before_rerun = len(world.forge.issue_reference_lookups)
     world.forge.update_item_body_error = None
 
     rerun = adopt(capsys)
@@ -1135,6 +1139,7 @@ def test_adopts_rerun_after_an_interrupted_write_completes_it_under_the_same_cla
     assert world.forge.body_writes[writes_before_rerun:] == (
         [(ADOPTED_PULL_REQUEST, ADOPTED_BODY)] * rerun_writes
     )
+    assert len(world.forge.issue_reference_lookups) - reads_before_rerun == rerun_reads_of_the_body
     assert world.forge.body_writes[0] == (ADOPTED_PULL_REQUEST, ADOPTED_BODY)
     assert state_ref_tip(world.remote) == tip_before_rerun
     assert _adopted_claim(world) == claim
