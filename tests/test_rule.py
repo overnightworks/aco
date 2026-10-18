@@ -226,10 +226,17 @@ class TestGithubRule:
         capsys.readouterr()
         result = run_cli(["rule", "90", "--line", "1", *scenario.arguments, "--json"], capsys)
         parsed = json_wire(result.stdout)
-        observed = {"exit": result.status, "wire": result.stdout, "keys": set(parsed), **parsed}
+        observed = {
+            "exit": result.status,
+            "wire": result.stdout,
+            "stderr": result.stderr,
+            "keys": set(parsed),
+            **parsed,
+        }
         assert observed == {
             "exit": 0,
             "wire": json.dumps(expected) + "\n",
+            "stderr": "",
             "keys": set(expected),
             **expected,
         }
