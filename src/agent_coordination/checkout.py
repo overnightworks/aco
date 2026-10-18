@@ -62,7 +62,9 @@ class GitTimedOutError(ClaimError):
         super().__init__(f"git {subcommand} timed out")
 
 
-def _git_run(arguments: list[str], *, directory: Path | None = None) -> process.CapturedResult:
+def _git_run(
+    arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+) -> process.CapturedResult:
     """Launch `git arguments`, in `directory` when given via `-C` (issue
     #314) -- every caller that must judge a specific checkout rather than
     the calling process's own cwd names `directory` explicitly, so the
@@ -77,7 +79,7 @@ def _git_run(arguments: list[str], *, directory: Path | None = None) -> process.
     raises `GitTimedOutError`, naming `arguments`' own subcommand.
     """
     try:
-        return process.run_git(arguments, directory=directory)
+        return process.run_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
     except process.ExecutableMissingError as error:
         raise GitLaunchError(_GIT_MISSING_EXECUTABLE_ERROR) from error
     except process.ProcessTimedOutError as error:
@@ -86,11 +88,14 @@ def _git_run(arguments: list[str], *, directory: Path | None = None) -> process.
         raise GitLaunchError(f"git failed to launch: {error}") from error
 
 
-def git_output(arguments: list[str], *, directory: Path | None = None) -> str:
+def git_output(
+    arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+) -> str:
     """`git arguments`'s stdout, in `directory` when given via `-C` (issue
     #314) or the calling process's own cwd otherwise; a nonzero exit fails
-    closed."""
-    result = _git_run(arguments, directory=directory)
+    closed. `literal_pathspecs` reads every path argument literally (see
+    `process.run_git`)."""
+    result = _git_run(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     # Trailing-only: every caller wants the one newline `git` appends after its
@@ -327,10 +332,10 @@ def scope_directories(
     and only for an entry that is no git tree. Given `revision`, only that
     commit's own trees count (issue #479): it has no checkout on disk yet.
     A path `<rev>` does not know falls through to the checkout like any
-    entry that is no tree; a git failure reading it raises `ClaimError` with
-    git's own detail, never dropping the entry."""
+    entry that is no tree; a git failure reading it, or the toplevel, raises
+    `ClaimError` with git's own detail, never dropping the entry."""
     directories: list[str] = []
-    checkout_root = functools.cache(lambda: _toplevel_or_none(toplevel))
+    checkout_root = functools.cache(toplevel)
     for path in paths:
         if _tree_entry_kind(path, revision=revision or "HEAD", directory=directory) in (
             _DIRECTORY_ENTRY_KINDS
@@ -339,8 +344,7 @@ def scope_directories(
             continue
         if revision is not None:
             continue
-        root = checkout_root()
-        if root is not None and (root / path).is_dir():
+        if (checkout_root() / path).is_dir():
             directories.append(path)
     return tuple(directories)
 
@@ -350,31 +354,29 @@ def scope_directories(
 _DIRECTORY_ENTRY_KINDS = frozenset({"tree", "commit"})
 
 
+_TREE_ENTRY_LINE = re.compile(r"\d+ (?P<kind>\w+) [0-9a-f]+\t.+")
+
+
 def _tree_entry_kind(path: str, *, revision: str, directory: Path | None) -> str | None:
     """The kind (`tree`, `commit`, `blob`) of `path` in `revision`'s tree, or
     `None` when the tree holds no such entry. One `ls-tree` answers it:
-    exit 0 with no output is the only absence, and a tree git cannot read
-    exits non-zero, so corruption never reads as absence. `--full-tree` reads
-    `path` from the repository root, not from the process's cwd, as a scope
-    entry always is. `:(literal)` keeps
+    exit 0 with no output is the only absence, a tree git cannot read exits
+    non-zero, so corruption never reads as absence, and a line that is no
+    `<mode> <type> <oid>\\t<path>` entry is refused with git's output.
+    `--full-tree` reads `path` from the repository root, not from the
+    process's cwd, as a scope entry always is; `literal_pathspecs` keeps
     glob characters and a leading `:` in `path` plain name characters."""
     entry = git_output(
-        ["ls-tree", "--full-tree", revision, "--", f":(literal){path}"], directory=directory
+        ["ls-tree", "--full-tree", revision, "--", path],
+        directory=directory,
+        literal_pathspecs=True,
     )
-    return entry.split(maxsplit=2)[1] if entry else None
-
-
-def _toplevel_or_none(toplevel: Callable[[], Path]) -> Path | None:
-    """`toplevel()`, or `None` when git ran and said it has none: the width
-    gate then counts no untracked directory, and the command's own toplevel
-    refusal, which runs after it, reports the failure (issue #472). A read
-    that timed out or never launched answered nothing, so it raises."""
-    try:
-        return toplevel()
-    except (GitTimedOutError, GitLaunchError):
-        raise
-    except ClaimError:
+    if not entry:
         return None
+    listed = _TREE_ENTRY_LINE.fullmatch(entry.splitlines()[0])
+    if listed is None:
+        raise ClaimError(f"git ls-tree printed an unexpected line: {entry}")
+    return listed["kind"]
 
 
 ISOLATED_WORKTREE_RECIPE = (

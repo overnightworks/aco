@@ -68,10 +68,14 @@ def stub_one_git_call(
     to reproduce with real git state."""
     real_git_run = checkout._git_run
 
-    def fake(call_arguments: list[str], *, directory: Path | None = None) -> process.CapturedResult:
+    def fake(
+        call_arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+    ) -> process.CapturedResult:
         if call_arguments == arguments:
             return process.CapturedResult(exit_status, b"", stderr.encode())
-        return real_git_run(call_arguments, directory=directory)
+        return real_git_run(
+            call_arguments, directory=directory, literal_pathspecs=literal_pathspecs
+        )
 
     monkeypatch.setattr(checkout, "_git_run", fake)
 
@@ -83,11 +87,13 @@ def fail_git_launch(
     run_git = process.run_git
     matched: list[list[str]] = []
 
-    def fail(arguments: list[str], *, directory: Path | None = None) -> process.CapturedResult:
+    def fail(
+        arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+    ) -> process.CapturedResult:
         if arguments[: len(leading_arguments)] == leading_arguments:
             matched.append(list(arguments))
             raise failure
-        return run_git(arguments, directory=directory)
+        return run_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
 
     monkeypatch.setattr(process, "run_git", fail)
     return matched
@@ -117,11 +123,13 @@ def trunk_git_calls(monkeypatch: pytest.MonkeyPatch, remote: str) -> list[tuple[
     calls: list[tuple[str, Path]] = []
     launch = checkout._git_run
 
-    def counting(arguments: list[str], *, directory: Path | None = None) -> process.CapturedResult:
+    def counting(
+        arguments: list[str], *, directory: Path | None = None, **options: bool
+    ) -> process.CapturedResult:
         kind = watched.get(tuple(arguments))
         if kind is not None:
             calls.append((kind, (directory or Path.cwd()).resolve()))
-        return launch(arguments, directory=directory)
+        return launch(arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "_git_run", counting)
     return calls
@@ -744,10 +752,12 @@ def count_context_reads(monkeypatch: pytest.MonkeyPatch) -> ContextReads:
         reads.observations[worktree] += 1
         return fetch_state(worktree=worktree, remote=remote)
 
-    def counting_git_output(arguments: list[str], *, directory: Path | None = None) -> str:
+    def counting_git_output(
+        arguments: list[str], *, directory: Path | None = None, **options: bool
+    ) -> str:
         if arguments[0] == "rev-parse" and "--show-toplevel" in arguments:
             reads.toplevels[directory] += 1
-        return git_output(arguments, directory=directory)
+        return git_output(arguments, directory=directory, **options)
 
     def counting_path_is_tracked(
         path: str, *, directory: Path | None = None, revision: str | None = None
@@ -787,10 +797,10 @@ def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
     `_stub_trunk` (issue #488)."""
     real_git_output = checkout.git_output
 
-    def fake(arguments: list[str], *, directory: Path | None = None) -> str:
+    def fake(arguments: list[str], *, directory: Path | None = None, **options: bool) -> str:
         if arguments == ["rev-parse", "--show-toplevel"] and directory is None:
             return str(toplevel)
-        return real_git_output(arguments, directory=directory)
+        return real_git_output(arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "git_output", fake)
     monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)

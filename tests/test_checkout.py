@@ -73,27 +73,13 @@ def test_remote_url_reads_the_git_config_of_the_given_directory(
     assert checkout.remote_url(remote, **where) == remote_urls[remote]
 
 
-@pytest.mark.parametrize(
-    ("toplevel_readable", "expected"),
-    [(True, ("scratch", "docs")), (False, ("docs",))],
-    ids=["held-toplevel", "failed-toplevel-read"],
-)
 def test_scope_directories_finds_git_trees_and_untracked_directories_under_the_held_toplevel(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    toplevel_readable: bool,
-    expected: tuple[str, ...],
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Issue #472: an entry that is no git tree is looked up under the
-    caller's own held toplevel, never a second `rev-parse`; a failed read of
-    it counts no untracked directory, and a later git tree still counts."""
+    caller's own held toplevel, never a second `rev-parse`."""
     (tmp_path / "scratch").mkdir()
     (tmp_path / "file.py").write_text("x\n")
-
-    def toplevel() -> Path:
-        if toplevel_readable:
-            return tmp_path
-        raise ClaimError("fatal: this operation must be run in a work tree")
 
     def tree_entry_of_docs(arguments: list[str], **_kwargs: object) -> str:
         assert arguments[0] == "ls-tree", "the held toplevel is never re-read through git"
@@ -102,10 +88,10 @@ def test_scope_directories_finds_git_trees_and_untracked_directories_under_the_h
     monkeypatch.setattr(checkout, "git_output", tree_entry_of_docs)
 
     directories = checkout.scope_directories(
-        ("scratch", "file.py", "docs"), directory=None, toplevel=toplevel
+        ("scratch", "file.py", "docs"), directory=None, toplevel=lambda: tmp_path
     )
 
-    assert directories == expected
+    assert directories == ("scratch", "docs")
 
 
 def _scope_repository(tmp_path: Path) -> Path:
@@ -211,7 +197,7 @@ def test_scope_directories_refuses_a_scope_read_that_git_fails_never_dropping_th
     directory: only an empty successful `ls-tree` means absent."""
 
     def failing_read(
-        _arguments: list[str], *, directory: Path | None = None
+        _arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
     ) -> process.CapturedResult:
         if isinstance(read_failure, Exception):
             raise read_failure
@@ -223,6 +209,67 @@ def test_scope_directories_refuses_a_scope_read_that_git_fails_never_dropping_th
         checkout.scope_directories(
             ("docs",), directory=None, toplevel=lambda: Path("/unused"), revision=revision
         )
+
+
+@pytest.mark.parametrize(
+    "inherited_environment",
+    [
+        pytest.param({"GIT_LITERAL_PATHSPECS": "1"}, id="literal"),
+        pytest.param({"GIT_ICASE_PATHSPECS": "1"}, id="icase"),
+        pytest.param({"GIT_GLOB_PATHSPECS": "1"}, id="glob"),
+        pytest.param({"GIT_NOGLOB_PATHSPECS": "1"}, id="noglob"),
+        pytest.param(
+            {"GIT_LITERAL_PATHSPECS": "1", "GIT_ICASE_PATHSPECS": "1"}, id="literal-and-icase"
+        ),
+        pytest.param(
+            {"GIT_GLOB_PATHSPECS": "1", "GIT_NOGLOB_PATHSPECS": "1"}, id="glob-and-noglob"
+        ),
+    ],
+)
+@pytest.mark.parametrize("use_revision", [False, True], ids=["head-and-working-tree", "revision"])
+def test_scope_directories_reads_the_same_whatever_pathspec_environment_it_inherits(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    inherited_environment: dict[str, str],
+    use_revision: bool,
+) -> None:
+    """The scope read fixes how git reads a path: an inherited pathspec
+    setting neither hides a directory from the width gate nor refuses an
+    ordinary file entry."""
+    repository = _scope_repository(tmp_path)
+    for name, value in inherited_environment.items():
+        monkeypatch.setenv(name, value)
+
+    directories = checkout.scope_directories(
+        ("docs", "g*b dir", "notes.txt", "missing"),
+        directory=repository,
+        toplevel=lambda: repository,
+        revision="HEAD" if use_revision else None,
+    )
+
+    assert directories == ("docs", "g*b dir")
+
+
+@pytest.mark.parametrize(
+    "tree_line",
+    [
+        pytest.param("docs", id="bare-path"),
+        pytest.param("040000 tree docs", id="no-tab-before-the-path"),
+        pytest.param("040000 tree\tdocs", id="no-object-id"),
+        pytest.param("040000 tree 0123\t", id="no-path"),
+    ],
+)
+def test_scope_directories_refuses_a_tree_line_that_is_no_tree_entry(
+    monkeypatch: pytest.MonkeyPatch, tree_line: str
+) -> None:
+    """An `ls-tree` answer other than `<mode> <type> <oid>\\t<path>` is
+    refused with git's own output, never read as an entry of some kind."""
+    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: tree_line)
+
+    with pytest.raises(ClaimError) as refusal:
+        checkout.scope_directories(("docs",), directory=None, toplevel=lambda: Path("/unused"))
+
+    assert str(refusal.value) == f"git ls-tree printed an unexpected line: {tree_line}"
 
 
 @pytest.mark.parametrize(
@@ -256,15 +303,16 @@ def test_scope_directories_reads_every_entry_from_the_repository_root_wherever_t
     [
         checkout.GitTimedOutError("rev-parse"),
         checkout.GitLaunchError("git is required for issue claims"),
+        ClaimError("fatal: this operation must be run in a work tree"),
     ],
-    ids=["times-out", "fails-to-launch"],
+    ids=["times-out", "fails-to-launch", "exit-status"],
 )
-def test_scope_directories_refuses_a_toplevel_read_that_never_answered(
+def test_scope_directories_refuses_a_toplevel_read_that_failed(
     tmp_path: Path, toplevel_failure: ClaimError
 ) -> None:
-    """Only git saying "no working tree" lets the width gate count no
-    untracked directory; a toplevel read that timed out or never launched
-    refuses with its own text, so a retry cannot admit a wide claim."""
+    """A toplevel read that failed, by exit status, timeout or launch, refuses
+    with its own text: the width gate never counts no untracked directory
+    for it, so a retry cannot admit a wide claim."""
     repository = _scope_repository(tmp_path)
 
     def toplevel() -> Path:

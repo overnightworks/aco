@@ -529,7 +529,7 @@ def test_board_shows_measured_estimates(
         forge.ItemState.CLOSED, body=complete_contract("Closed.", size="M")
     )
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     lane_events = (
         _lane("30", 10, 4),
@@ -611,7 +611,7 @@ def _single_item_board_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     client = FakeForge()
     client.board_issues = (board_issue(10, "Plain item", complete_contract("Ship #10.")),)
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(monkeypatch)
     return client
@@ -773,7 +773,7 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
 
     monkeypatch.setattr(client, "list_children", spy_list_children)
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(monkeypatch)
 
@@ -812,7 +812,7 @@ def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
 
     monkeypatch.setattr(client, "list_board_dependencies", spy_list_board_dependencies)
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(monkeypatch)
 
@@ -854,7 +854,7 @@ def test_board_shows_open_and_total_instead_of_proposed(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
@@ -887,16 +887,22 @@ def _configured_board_client(
     return client
 
 
-def _fake_lane_worktree_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Every git read answers `tmp_path`, and the run stands in a linked lane
-    worktree, where `next` advises `claim`; its advice from the default
-    branch's checkout is driven against real git in
-    `test_next_advises_a_pull_that_runs_as_printed_where_it_stands`."""
+def _fake_every_git_read_as_tmp_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Every git read answers `tmp_path`, except the width gate's `ls-tree`
+    read of a scope entry, which finds no entry."""
     monkeypatch.setattr(
         checkout,
         "git_output",
         lambda arguments, **_kwargs: "" if arguments[0] == "ls-tree" else str(tmp_path),
     )
+
+
+def _fake_lane_worktree_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Every git read answers `tmp_path`, and the run stands in a linked lane
+    worktree, where `next` advises `claim`; its advice from the default
+    branch's checkout is driven against real git in
+    `test_next_advises_a_pull_that_runs_as_printed_where_it_stands`."""
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(
         checkout,
         "resolve_path_checkout",
@@ -2314,6 +2320,38 @@ def test_start_resumes_a_wide_claim_without_repeating_whole(
     assert "CLAIMED issue #314" in capsys.readouterr().out
 
 
+def test_start_resume_refuses_when_the_worktree_toplevel_read_exits_nonzero(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The width gate of a resumed claim never reads a failed toplevel read
+    as "no untracked directory": `start` refuses with the toplevel sentence
+    and prints no `CLAIMED` line."""
+    repo = _start_scenario(monkeypatch, tmp_path)
+    monkeypatch.chdir(repo)
+    assert issue_claim.main(["--repo", REPOSITORY, "start", "314"]) == 0
+    capsys.readouterr()
+    worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
+    real_run_git = process.run_git
+
+    def toplevel_read_exits_nonzero(
+        arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+    ) -> process.CapturedResult:
+        if arguments == ["rev-parse", "--show-toplevel"] and directory == worktree:
+            return process.CapturedResult(128, b"", b"fatal: not a work tree")
+        return real_run_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
+
+    monkeypatch.setattr(process, "run_git", toplevel_read_exits_nonzero)
+
+    status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
+
+    captured = capsys.readouterr()
+    assert (status, captured.out) == (2, "")
+    assert captured.err == (
+        "ERROR: this command reads the repository's body contract from .aco/board.toml "
+        "and needs a checkout (a shallow one is enough): fatal: not a work tree\n"
+    )
+
+
 def test_start_mints_a_fresh_id_after_an_abandoned_release(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
@@ -3670,7 +3708,7 @@ def test_claim_refuses_when_the_higher_priority_item_needs_refining(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -3900,7 +3938,7 @@ def test_claim_refuses_out_of_order_without_a_reason_before_mutating(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -3943,7 +3981,7 @@ def test_claim_allows_out_of_order_with_a_reason_and_records_it(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -3997,7 +4035,7 @@ def test_claim_refuses_for_a_higher_priority_item_even_at_a_lower_score(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: (open_pull_request,))
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -5766,7 +5804,7 @@ def test_claim_does_not_warn_about_a_higher_scored_item_no_agent_can_pull(
     monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
     monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(cmd_claim, "_request", lambda _arguments, **_kwargs: claimed_request)
 
@@ -6347,7 +6385,7 @@ def test_next_refuses_a_scope_read_git_fails_instead_of_advising_a_command(
     )
     stub_one_git_call(
         monkeypatch,
-        ["ls-tree", "--full-tree", "HEAD", "--", ":(literal)src"],
+        ["ls-tree", "--full-tree", "HEAD", "--", "src"],
         exit_status=128,
         stderr=SCOPE_READ_FAILURE,
     )
@@ -7478,7 +7516,7 @@ def test_board_queries_merged_pull_requests_back_to_the_oldest_open_issue(
     )
     recent_issue = board_issue(71, "Recently filed work", complete_contract("Ship it."))
     client = _MinimalForgeReader(open_issues=(old_epic, recent_issue))
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     board_read.build_board(run_context_over(client), ())
@@ -7508,7 +7546,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
         open_issues=(container, plain),
         children_by_number={90: (board.ChildItem(92, board.ChildState.OPEN),)},
     )
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     projected = board_read.build_board(run_context_over(client), ())
@@ -11661,7 +11699,7 @@ def test_cli_claim_replay_skips_out_of_order_for_the_matching_lower_priority_ite
     _patch_store_write(monkeypatch, store_claim_from_request(existing))
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     assert (
@@ -11709,7 +11747,7 @@ def test_cli_claim_replay_does_not_bypass_out_of_order_for_another_agent(
     _patch_store_write(monkeypatch, store_claim_from_request(existing))
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
 
     assert (
@@ -12491,7 +12529,7 @@ def _fail_scope_reads(monkeypatch: pytest.MonkeyPatch) -> None:
     answers = git_checkout()
 
     def read(arguments: list[str], **_kwargs: object) -> str:
-        if arguments[0] == "ls-tree" and arguments[-1].startswith(":(literal)"):
+        if arguments[0] == "ls-tree":
             raise ClaimError(SCOPE_READ_FAILURE)
         return answers[tuple(arguments)]
 
@@ -13329,7 +13367,7 @@ def test_board_shows_claim_age_from_the_claim_comment(
     client = FakeForge()
     client.board_issues = (board_issue(72, "Work", complete_contract("Claim #72.")),)
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(
         monkeypatch,
@@ -13352,7 +13390,7 @@ def test_board_marks_a_claim_old_after_sixty_one_minutes(
     client = FakeForge()
     client.board_issues = (board_issue(72, "Work", complete_contract("Claim #72.")),)
     _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
     _patch_store_write(
         monkeypatch,
@@ -17451,7 +17489,7 @@ def test_check_reads_the_parents_next_from_the_block_not_stale_prose(
 ) -> None:
     """The last-child rule reads a block-pinned parent's `next` through
     `body.parse_body` under the loaded pin, not the stale prose beside it (#150)."""
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     _write_block_pin(tmp_path)
     parent_body = (
         block_body('version = 1\nnow = "N"\nnext = "Cut the next slice."\ndone_when = "D"\n')
@@ -17473,7 +17511,7 @@ def test_check_reads_the_parents_next_from_the_block_not_stale_prose(
 def test_check_refuses_a_blockless_parent_before_the_next_check(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     _write_block_pin(tmp_path)
     parented_check_client(
         monkeypatch,
@@ -17492,7 +17530,7 @@ def test_check_refuses_a_blockless_parent_before_the_next_check(
 def test_check_refuses_a_malformed_parent_before_the_next_check(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     _write_block_pin(tmp_path)
     malformed_parent_body = block_body('version = 2\nnow = "N"\nnext = "X"\ndone_when = "D"\n')
     parented_check_client(
