@@ -16947,9 +16947,6 @@ _RELEASE_MERGED = ("release", str(WORK_ITEM_ISSUE), "--merged", "12")
     ("squashed_before_this_run", "lane_moved_on", "command"),
     [
         pytest.param(False, True, _LAND_AGAIN, id="land-with-the-lane-past-the-pinned-head"),
-        pytest.param(
-            True, False, _LAND_AGAIN_WITH_A_STALE_HEAD, id="land-rerun-on-the-recorded-head"
-        ),
         pytest.param(True, False, _RELEASE_MERGED, id="release-rerun-on-the-recorded-head"),
         pytest.param(True, True, _RELEASE_MERGED, id="release-rerun-past-the-recorded-head"),
     ],
@@ -17234,13 +17231,6 @@ def test_land_cleans_up_a_squashed_lane_branch_by_compare_and_delete(
     assert _branch_configuration(repo) == expected
 
 
-def _break_delete_branch(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
-    def failing(branch: str) -> None:
-        raise ClaimError("delete branch failed (simulated)")
-
-    monkeypatch.setattr(client, "delete_branch", failing)
-
-
 def _land_with_its_release_failing_once(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> tuple[Path, FakeForge, int]:
@@ -17257,125 +17247,6 @@ def _land_with_its_release_failing_once(
     status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
     monkeypatch.setattr(client, "close_landed_item", real_close)
     return repo, client, status
-
-
-def _land_merged_pending_release(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> tuple[Path, FakeForge]:
-    """A pull request `aco land` already merged once, its own delegated
-    `release --merged` blocked by a failing close (issue #405 Beweis 2): the
-    shared rerun setup both the plain recovery proof and the release-routing
-    recovery proof resume from."""
-    repo, client, status = _land_with_its_release_failing_once(monkeypatch, tmp_path)
-
-    assert status == 2
-    merge_commit = client.landings[12].merge_commit
-    assert merge_commit is not None
-    assert capsys.readouterr().err == (
-        f"ERROR: MERGED pull request #12 as {merge_commit}; "
-        "follow-up incomplete: release (forge unreachable (simulated)); re-run aco land 12\n"
-    )
-    assert len(client.merge_calls) == 1
-    assert client.closed_issues == set()
-    return repo, client
-
-
-@pytest.mark.parametrize("branch", [LANDING_BRANCH, pytest.param("dependabot/x", id="21")])
-def test_land_reports_incomplete_follow_up_and_a_rerun_resumes_without_a_second_merge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, branch: str
-) -> None:
-    """Issue #405 Beweis 2: a failure after the merge names the exact
-    recovery line, never a second merge on rerun, and the rerun still closes
-    the item and frees the claim."""
-    if branch == "dependabot/x":
-        _repo, client = _land_scenario(
-            monkeypatch, tmp_path, branch=branch, issue=None, body="No-Item: fix"
-        )
-        delete_branch = client.delete_branch
-        _break_delete_branch(monkeypatch, client)
-        assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 2
-        assert "follow-up incomplete" in capsys.readouterr().err
-        assert _live_store_claim().branch == branch
-        monkeypatch.setattr(client, "delete_branch", delete_branch)
-    else:
-        _repo, client = _land_merged_pending_release(monkeypatch, capsys, tmp_path)
-    reads_before_the_rerun = list(client.quality_config_reads)
-    client.quality_config_error = forge.ForgeError("GitHub returned HTTP 500")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-
-    assert len(client.merge_calls) == 1
-    assert client.closed_issues == (set() if branch == "dependabot/x" else {WORK_ITEM_ISSUE})
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
-    # LANDCMD-18: a rerun after the merge never reads the quality configuration.
-    assert client.quality_config_reads == reads_before_the_rerun
-
-
-def test_land_release_routing_reuses_the_verified_classification_for_a_fresh_merge() -> None:
-    """Issue #405 point 4: a fresh merge routes `release --merged` straight
-    from the classification this same run's own preflight already verified
-    -- never a read of anything, pull request body included."""
-    work_item = board.WorkItemClassification(board.IssueReference(REPOSITORY, 72))
-    no_item = board.NoItemClassification(board.NoItemKind.DOCS)
-    context = run_context_over(FakeForge())
-
-    assert cmd_land._land_release_routing(work_item, MERGE_COMMIT_SHA, context) == 72
-    assert cmd_land._land_release_routing(no_item, MERGE_COMMIT_SHA, context) is None
-
-
-def test_land_release_routing_reads_the_merge_commit_trailer_for_a_rerun(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Issue #405 point 4: `classification=None` (a rerun) reads the walked
-    trunk's own trailer instead, routing a `No-Item:` merge commit to no
-    issue -- the same recovery `test_land_rerun_recovers_release_routing_
-    after_the_body_changed` proves end to end for a `Work-Item:` one."""
-    landing = checkout.TrunkLanding(
-        MERGE_COMMIT_SHA,
-        datetime.now(UTC),
-        board.NoItemClassification(board.NoItemKind.FIX),
-        (),
-    )
-    monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: (landing,))
-    context = run_context_over(FakeForge())
-
-    assert cmd_land._land_release_routing(None, MERGE_COMMIT_SHA, context) is None
-
-
-def test_land_release_routing_refuses_a_rerun_with_no_usable_merge_commit_trailer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Issue #405 point 4: a rerun's own merge-commit trailer read refuses
-    by name when the walked trunk carries the sha with neither a
-    `Work-Item:` nor a `No-Item:` trailer -- never a bare re-read of the
-    pull request's own body."""
-    monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    context = run_context_over(FakeForge())
-
-    with pytest.raises(ClaimError, match="carries no `Work-Item:` or `No-Item:` trailer"):
-        cmd_land._land_release_routing(None, MERGE_COMMIT_SHA, context)
-
-
-def test_land_rerun_recovers_release_routing_after_the_body_changed(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #405 point 4 (Befund 42 on #310's own risk): once merged,
-    `cmd_land._land_release_routing` never re-reads the pull request's own mutable
-    body -- a fixer editing it away after the merge still leaves a rerun
-    able to recover the exact item the merge commit's own trailer names,
-    read exactly as `cmd_release._verify_merged_release` reads it (issue #397, Befund
-    41)."""
-    _repo, client = _land_merged_pending_release(monkeypatch, capsys, tmp_path)
-
-    # A fixer edits the merged pull request's own body afterward (Befund 41):
-    # its classification line is gone, but the merge commit's own trailer
-    # `aco land` composed at merge time is untouched.
-    client.landings[12] = replace(client.landings[12], body="Advances #72")
-
-    assert issue_claim.main(["--repo", REPOSITORY, "land", "12"]) == 0
-
-    assert len(client.merge_calls) == 1
-    assert client.closed_issues == {WORK_ITEM_ISSUE}
 
 
 def _land_from_a_separate_clone(

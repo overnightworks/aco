@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -11,7 +9,6 @@ from pathlib import Path
 import pytest
 from cli_fixtures import (
     MainBranchState,
-    add_lane_worktree,
     init_bare_repository,
     local_branches,
     move_trunk,
@@ -21,9 +18,9 @@ from cli_fixtures import (
     track_board_config,
     trunk_git_calls,
 )
-from github_fixtures import LANDING_DEFAULT_BRANCH, FakeForge, LaneLandingWorld, lane_landing_world
+from github_fixtures import LANDING_DEFAULT_BRANCH, FakeForge, LaneLandingWorld, landed_world
 
-from agent_coordination import checkout, forge, protocol, store
+from agent_coordination import checkout, forge, store
 
 
 class TrunkState(Enum):
@@ -71,7 +68,7 @@ class TrunkCase:
     status: int = 0
     stderr: str = ""
     fetch_calls: tuple[str, ...] = ("fetch",)
-    origin_calls: tuple[str, ...] | None = None
+    origin_calls: tuple[str, ...] = ("fetch",)
     lane_exists: bool = False
 
 
@@ -94,7 +91,12 @@ class PackageFile(Enum):
 class PackageCase:
     package: PackageFile
     stdout: str = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
-    rerun_stdout: str | None = None
+    rerun_stdout: str = (
+        "LANDED pull request #12 already; nothing left to release\n"
+        "worktree: kept -- no linked worktree on codex/issue-72-claims in this checkout; "
+        "run aco release 72 --merged 12 --branch codex/issue-72-claims "
+        "in the checkout that holds it\n"
+    )
     arguments: tuple[str, ...] = ("land", "12")
     status: int = 0
     stderr: str = ""
@@ -130,57 +132,6 @@ class KeepWorld:
     lane: Path
 
 
-def landed_world(
-    github_clone: Path,
-    remote: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    extra_arrange: Callable[[FakeForge, str], None] | None = None,
-    verify: Callable[[FakeForge, str], None] | None = None,
-    default_branch: str = LANDING_DEFAULT_BRANCH,
-    head_config: str = "",
-) -> LaneLandingWorld:
-    monkeypatch.setenv("LC_ALL", "C")
-    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
-    lane = github_clone.parent / "lane"
-
-    def arrange(client: FakeForge, head: str) -> None:
-        if extra_arrange is not None:
-            extra_arrange(client, head)
-        add_lane_worktree(github_clone, lane, "codex/issue-72-claims")
-        if verify is not None:
-            verify(client, head)
-            return
-        observed = {
-            "locale": os.environ["LC_ALL"],
-            "discovery": os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"],
-            "checkout.branch": real_git(github_clone, "branch", "--show-current").stdout,
-            "checkout.status": real_git(github_clone, "status", "--porcelain").stdout,
-            "landing.merged": client.landings[12].merged,
-        }
-        expected = {
-            "locale": "C",
-            "discovery": "1",
-            "checkout.branch": default_branch + "\n",
-            "checkout.status": "",
-            "landing.merged": False,
-        }
-        assert observed == expected
-
-    return lane_landing_world(
-        github_clone,
-        remote,
-        monkeypatch,
-        identity=protocol.IssueIdentity(72),
-        branch="codex/issue-72-claims",
-        body="Work-Item: #72\n\nCloses #72",
-        methods=None,
-        default_branch=default_branch,
-        head_config=head_config,
-        arrange=arrange,
-    )
-
-
 @pytest.fixture
 def keep_world(
     request: pytest.FixtureRequest,
@@ -189,7 +140,7 @@ def keep_world(
     monkeypatch: pytest.MonkeyPatch,
 ) -> KeepWorld:
     landing = landed_world(github_clone, bare_remote, monkeypatch)
-    return KeepWorld(landing, request.param, github_clone.parent / "lane")
+    return KeepWorld(landing.landing, request.param, landing.lane)
 
 
 @pytest.fixture
@@ -200,7 +151,6 @@ def package_world(
     monkeypatch: pytest.MonkeyPatch,
 ) -> PackageWorld:
     case: PackageCase = request.param
-    lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, _head: str) -> None:
         if case.package.value is not None:
@@ -211,14 +161,14 @@ def package_world(
 
     landing = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
     package = real_git(github_clone, "show", "HEAD:pyproject.toml", check=False)
-    lane_file = lane / "pyproject.toml"
+    lane_file = landing.lane / "pyproject.toml"
     observed = {
         "package.trunk": package.stdout if package.returncode == 0 else None,
         "package.lane": lane_file.read_text() if lane_file.exists() else None,
     }
     expected = {"package.trunk": case.package.value, "package.lane": None}
     assert observed == expected
-    return PackageWorld(landing, case)
+    return PackageWorld(landing.landing, case)
 
 
 def delete_recorded_head(clone: Path, remote: str) -> int:
@@ -278,7 +228,6 @@ def trunk_world(
     if case.canonical is CanonicalRemote.HUB:
         remote = request.getfixturevalue("hub_remote")
         config = 'canonical_remote = "hub"\n'
-    lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, head: str) -> None:
         if case.canonical is CanonicalRemote.HUB:
@@ -298,7 +247,7 @@ def trunk_world(
         head_config=config,
         extra_arrange=arrange,
     )
-    return TrunkWorld(landing, case, lane)
+    return TrunkWorld(landing.landing, case, landing.lane)
 
 
 @pytest.fixture
@@ -310,7 +259,6 @@ def world(
 ) -> FailureWorld:
     case: FailureCase = request.param
     real_git(github_clone, "config", "advice.diverging", "false")
-    lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, _head: str) -> None:
         client.closes_on_merge = False
@@ -319,9 +267,6 @@ def world(
         if case.trunk is TrunkState.DIVERGED:
             real_git(github_clone, "commit", "--allow-empty", "-qm", "local trunk change")
         observed = {
-            "locale": os.environ["LC_ALL"],
-            "branch": real_git(github_clone, "branch", "--show-current").stdout,
-            "status": real_git(github_clone, "status", "--porcelain").stdout,
             "item": client.item_reference(72).state,
             "auto-close": client.closes_on_merge,
             "delete-error": str(client.delete_error) if client.delete_error else None,
@@ -330,23 +275,18 @@ def world(
                 github_clone, "rev-list", "--left-right", "--count", "main...codex/issue-72-claims"
             ).stdout,
             "advice": real_git(github_clone, "config", "advice.diverging").stdout,
-            "merged": client.landings[12].merged,
         }
         expected = {
-            "locale": "C",
-            "branch": "main\n",
-            "status": "",
             "item": forge.ItemState.OPEN,
             "auto-close": False,
             "delete-error": case.delete_error,
             "close-error": case.close_error,
             "topology": case.trunk.value,
             "advice": "false\n",
-            "merged": False,
         }
         assert observed == expected
 
-    landing = landed_world(github_clone, bare_remote, monkeypatch, verify=arrange)
+    landing = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
     if case.error is not None:
         stub_one_git_call(monkeypatch, ["fetch", "origin"], exit_status=1, stderr=case.error)
         probe = checkout._git_run(["fetch", "origin"], directory=github_clone)
@@ -354,9 +294,9 @@ def world(
         expected = (1, case.error.encode())
         assert observed == expected
     return FailureWorld(
-        landing,
+        landing.landing,
         case,
-        lane,
+        landing.lane,
         real_git(github_clone, "rev-parse", LANDING_DEFAULT_BRANCH).stdout.strip(),
         real_git(bare_remote, "rev-parse", LANDING_DEFAULT_BRANCH).stdout.strip(),
     )
@@ -416,11 +356,6 @@ class TestLandAfterMerge:
                     PackageFile.OWN,
                     "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
                     "reinstall: uv tool install --force --from . agent-coordination\n",
-                    "LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- no linked worktree on codex/issue-72-claims "
-                    "in this checkout; "
-                    "run aco release 72 --merged 12 --branch codex/issue-72-claims "
-                    "in the checkout that holds it\n",
                 ),
                 id="this-package",
             ),
@@ -452,24 +387,23 @@ class TestLandAfterMerge:
         case = package_world.case
         capsys.readouterr()
         result = run_cli(list(case.arguments), capsys)
-        observed = {"exit": result.status, "stdout": result.stdout, "stderr": result.stderr}
-        expected = {"exit": case.status, "stdout": case.stdout, "stderr": case.stderr}
-        if case.rerun_stdout is not None:
-            rerun = run_cli(list(case.arguments), capsys)
-            observed.update(
-                {
-                    "rerun.exit": rerun.status,
-                    "rerun.stdout": rerun.stdout,
-                    "rerun.stderr": rerun.stderr,
-                }
-            )
-            expected.update(
-                {
-                    "rerun.exit": case.rerun_status,
-                    "rerun.stdout": case.rerun_stdout,
-                    "rerun.stderr": case.rerun_stderr,
-                }
-            )
+        rerun = run_cli(list(case.arguments), capsys)
+        observed = {
+            "exit": result.status,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "rerun.exit": rerun.status,
+            "rerun.stdout": rerun.stdout,
+            "rerun.stderr": rerun.stderr,
+        }
+        expected = {
+            "exit": case.status,
+            "stdout": case.stdout,
+            "stderr": case.stderr,
+            "rerun.exit": case.rerun_status,
+            "rerun.stdout": case.rerun_stdout,
+            "rerun.stderr": case.rerun_stderr,
+        }
         assert observed == expected
 
     @pytest.mark.parametrize(
@@ -510,6 +444,7 @@ class TestLandAfterMerge:
             "stderr": result.stderr,
             "stdout": result.stdout,
             "fetch.calls": land_calls,
+            "origin.calls": origin_land_calls,
             "trunk": real_git(landing.clone, "rev-parse", "trunk").stdout.strip(),
             "lane.exists": trunk_world.lane.exists(),
         }
@@ -518,14 +453,10 @@ class TestLandAfterMerge:
             "stderr": case.stderr,
             "stdout": case.stdout,
             "fetch.calls": [(call, landing.clone.resolve()) for call in case.fetch_calls],
+            "origin.calls": [(call, landing.clone.resolve()) for call in case.origin_calls],
             "trunk": landing.forge.landings[12].merge_commit,
             "lane.exists": case.lane_exists,
         }
-        if case.origin_calls is not None:
-            observed["origin.calls"] = origin_land_calls
-            expected["origin.calls"] = [
-                (call, landing.clone.resolve()) for call in case.origin_calls
-            ]
         assert observed == expected
 
     @pytest.mark.parametrize(
@@ -633,32 +564,50 @@ class TestLandAfterMerge:
             "fetch.calls": [(call, landing.clone.resolve()) for call in world.case.fetch_calls],
             "remote.moved": True,
         }
-        if world.case.close_error is not None:
-            release = run_cli(
-                ["release", "72", "--merged", "12", "--branch", "codex/issue-72-claims"], capsys
+        assert observed == expected
+
+    @pytest.mark.parametrize(
+        "world",
+        [
+            pytest.param(
+                FailureCase(
+                    "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
+                    "release (forge unreachable); re-run aco land 12\n",
+                    close_error="forge unreachable",
+                    expected_trunk=ExpectedTrunk.FAST_FORWARDED,
+                ),
+                id="release-fails",
             )
-            land_sentence = result.stderr.partition("release (")[2].rpartition(
-                "); re-run aco land 12\n"
-            )[0]
-            release_sentence = release.stderr.removeprefix("ERROR: ").removesuffix("\n")
-            observed.update(
-                {
-                    "release.exit": release.status,
-                    "release.stdout": release.stdout,
-                    "release.stderr": release.stderr,
-                    "land.release-sentence": land_sentence,
-                    "release.sentence": release_sentence,
-                    "release.sentence-equal": land_sentence == release_sentence,
-                }
-            )
-            expected.update(
-                {
-                    "release.exit": 2,
-                    "release.stdout": "",
-                    "release.stderr": f"ERROR: {world.case.close_error}\n",
-                    "land.release-sentence": world.case.close_error,
-                    "release.sentence": world.case.close_error,
-                    "release.sentence-equal": True,
-                }
-            )
+        ],
+        indirect=True,
+    )
+    def test_release_reports_the_same_close_failure(
+        self, world: FailureWorld, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: LANDCMD-26. Land preserves standalone release's failure sentence."""
+        capsys.readouterr()
+        result = run_cli(["land", "12"], capsys)
+        release = run_cli(
+            ["release", "72", "--merged", "12", "--branch", "codex/issue-72-claims"], capsys
+        )
+        land_sentence = result.stderr.partition("release (")[2].rpartition(
+            "); re-run aco land 12\n"
+        )[0]
+        release_sentence = release.stderr.removeprefix("ERROR: ").removesuffix("\n")
+        observed = {
+            "release.exit": release.status,
+            "release.stdout": release.stdout,
+            "release.stderr": release.stderr,
+            "land.release-sentence": land_sentence,
+            "release.sentence": release_sentence,
+            "release.sentence-equal": land_sentence == release_sentence,
+        }
+        expected = {
+            "release.exit": 2,
+            "release.stdout": "",
+            "release.stderr": f"ERROR: {world.case.close_error}\n",
+            "land.release-sentence": world.case.close_error,
+            "release.sentence": world.case.close_error,
+            "release.sentence-equal": True,
+        }
         assert observed == expected
