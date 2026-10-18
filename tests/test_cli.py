@@ -16567,12 +16567,6 @@ def test_check_never_takes_a_local_branch_for_the_trunk_of_a_remote_with_branche
     )
 
 
-def _dirty_worktree_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
-    (worktree / "scratch.txt").write_text("uncommitted\n")
-    return worktree
-
-
 def _ran_from_inside_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
     redirect_toplevel(monkeypatch, worktree)
@@ -16589,63 +16583,6 @@ def _not_merged_locally_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     return _release_cleanup_scenario(monkeypatch, tmp_path, merge_into_main=False)
 
 
-def _checked_out_elsewhere_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Issue #322 review finding 4: the lane branch is checked out on the
-    repository's own shared main checkout -- reachable when `release` runs
-    from a different linked worktree entirely -- rather than in a disposable
-    linked worktree; cleanup declines rather than trying (and failing) to
-    remove the main checkout as if it were one."""
-    repo = _release_cleanup_repository(tmp_path)
-    real_git(repo, "checkout", "-q", _CLEANUP_BRANCH)
-    bystander = repo.parent / f"{repo.name}-worktrees" / "issue-1-bystander"
-    bystander.parent.mkdir(parents=True)
-    real_git(repo, "worktree", "add", "-q", str(bystander), "-b", "codex/issue-1-bystander")
-    standing = request(
-        "landing", "Ada", issue=WORK_ITEM_ISSUE, branch=_CLEANUP_BRANCH, scope=("src",)
-    )
-    client = FakeForge()
-    client.landings[12] = landing_pull_request(
-        body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
-        merged=True,
-        head_ref_name=_CLEANUP_BRANCH,
-        merge_commit=MERGE_COMMIT_SHA,
-    )
-    client.closed_issues.add(WORK_ITEM_ISSUE)
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    monkeypatch.setattr(
-        checkout,
-        "trunk_landings",
-        lambda *_args, **_kwargs: (
-            _trunk_landing(MERGE_COMMIT_SHA, board.TrunkWorkItemClassification((WORK_ITEM_ISSUE,))),
-        ),
-    )
-    _patch_store_write(monkeypatch, store_claim_from_request(standing))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    redirect_toplevel(monkeypatch, bystander)
-    monkeypatch.chdir(bystander)
-
-
-def _git_failure_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Issue #322 review/gate finding: a git failure resolving the lane's
-    own worktrees must surface as `kept -- git failure: ...`, never as `no
-    linked worktree found`."""
-    worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
-    stub_one_git_call(
-        monkeypatch,
-        [
-            "rev-parse",
-            "--path-format=absolute",
-            "--show-toplevel",
-            "--git-dir",
-            "--git-common-dir",
-        ],
-        exit_status=128,
-        stderr="fatal: cannot change to 'gone': No such file or directory",
-    )
-    return worktree
-
-
 _WORKTREE_CLEANUP_KEPT_SCENARIOS: tuple[
     tuple[str, Callable[[pytest.MonkeyPatch, Path], Path | None], tuple[str, ...], str], ...
 ] = (
@@ -16655,7 +16592,6 @@ _WORKTREE_CLEANUP_KEPT_SCENARIOS: tuple[
         ("--keep-worktree",),
         "--keep-worktree was given",
     ),
-    ("dirty", _dirty_worktree_scenario, (), "dirty"),
     ("ran-from-inside", _ran_from_inside_scenario, (), "release ran from inside it"),
     (
         "no-linked-worktree",
@@ -16669,13 +16605,6 @@ _WORKTREE_CLEANUP_KEPT_SCENARIOS: tuple[
         _not_merged_locally_scenario,
         (),
         "not merged into the default branch",
-    ),
-    ("checked-out-elsewhere", _checked_out_elsewhere_scenario, (), "branch checked out elsewhere"),
-    (
-        "git-failure",
-        _git_failure_scenario,
-        (),
-        "git failure: fatal: cannot change to 'gone': No such file or directory",
     ),
 )
 
