@@ -118,6 +118,23 @@ def land(world: LandingWorld, capsys: pytest.CaptureFixture[str]) -> CliRun:
     return run_cli(["land", "12", *world.case.arguments], capsys)
 
 
+def refusal_observations(
+    world: LandingWorld, result: CliRun
+) -> tuple[dict[str, object], dict[str, object]]:
+    observed = {"exit": result.status, "out": result.stdout, "err": result.stderr, **effects(world)}
+    expected = {
+        "exit": 2,
+        "out": "",
+        "err": "ERROR: " + world.case.sentence + "\n",
+        **world.unchanged,
+    }
+    if world.case.bounded:
+        length = len(result.stderr.rstrip("\n"))
+        observed["length"] = length if world.case.exact_length else length <= 200
+        expected["length"] = 200 if world.case.exact_length else True
+    return observed, expected
+
+
 class TestLandReadiness:
     @pytest.mark.parametrize(
         "world",
@@ -245,26 +262,7 @@ class TestLandReadiness:
         Exact refusal and no writes.
         """
         capsys.readouterr()
-        result = land(world, capsys)
-        observed = {
-            "exit": result.status,
-            "out": result.stdout,
-            "err": result.stderr,
-            **effects(world),
-        }
-        expected = {
-            "exit": 2,
-            "out": "",
-            "err": "ERROR: " + world.case.sentence + "\n",
-            **world.unchanged,
-        }
-        if world.case.bounded:
-            observed["length"] = (
-                len(result.stderr.rstrip("\n"))
-                if world.case.exact_length
-                else len(result.stderr.rstrip("\n")) <= 200
-            )
-            expected["length"] = 200 if world.case.exact_length else True
+        observed, expected = refusal_observations(world, land(world, capsys))
         assert observed == expected
 
 
@@ -439,26 +437,7 @@ class TestLandQualityGate:
     def test_refusal(self, world: LandingWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-02, LANDCMD-43 -- exact refusal and no writes."""
         capsys.readouterr()
-        result = land(world, capsys)
-        observed = {
-            "exit": result.status,
-            "out": result.stdout,
-            "err": result.stderr,
-            **effects(world),
-        }
-        expected = {
-            "exit": 2,
-            "out": "",
-            "err": "ERROR: " + world.case.sentence + "\n",
-            **world.unchanged,
-        }
-        if world.case.bounded:
-            observed["length"] = (
-                len(result.stderr.rstrip("\n"))
-                if world.case.exact_length
-                else len(result.stderr.rstrip("\n")) <= 200
-            )
-            expected["length"] = 200 if world.case.exact_length else True
+        observed, expected = refusal_observations(world, land(world, capsys))
         observed["quality reads"] = tuple(world.forge.quality_config_reads)
         expected["quality reads"] = world.case.quality_reads
         assert observed == expected
@@ -573,19 +552,7 @@ class TestLandEntry:
     def test_refusal(self, world: LandingWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-01, LANDCMD-19, LANDCMD-31 -- exact refusal and no writes."""
         capsys.readouterr()
-        result = land(world, capsys)
-        observed = {
-            "exit": result.status,
-            "out": result.stdout,
-            "err": result.stderr,
-            **effects(world),
-        }
-        expected = {
-            "exit": 2,
-            "out": "",
-            "err": "ERROR: " + world.case.sentence + "\n",
-            **world.unchanged,
-        }
+        observed, expected = refusal_observations(world, land(world, capsys))
         if world.case.requests is not None:
             observed["requests"] = world.forge.requests
             expected["requests"] = world.case.requests
