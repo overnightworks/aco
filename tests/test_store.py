@@ -87,7 +87,7 @@ def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
     """Counts real git subprocess invocations by subcommand, patched at the
     `process` chokepoint both of `store`'s call shapes go through --
     `_run_git` (`process.run_captured`) and `_run_git_with_input`
-    (`process.run_bounded`) -- the proof that a transition's or a read's
+    (`process.run_bounded_captured`) -- the proof that a transition's or a read's
     git-invocation count is independent of how many claims the state tree
     holds (issue #241).
     """
@@ -105,7 +105,9 @@ def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
         return wrapped
 
     monkeypatch.setattr(store.process, "run_captured", spy(process.run_captured))
-    monkeypatch.setattr(store.process, "run_bounded", spy(process.run_bounded))
+    monkeypatch.setattr(
+        store.process, "run_bounded_captured", spy(process.run_bounded_captured)
+    )
     return counts
 
 
@@ -302,6 +304,43 @@ def test_bootstrap_creates_the_empty_state_tree_on_a_proven_empty_remote(
 
     assert state_ref_tip(bare_remote) == tip
     assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
+
+
+def test_bootstrap_writes_the_same_tree_while_git_traces_to_stderr(
+    bare_remote: Path, worktree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GIT_TRACE", "1")
+
+    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+    assert state_ref_tip(bare_remote) == tip
+    assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
+
+
+def test_hash_blob_returns_the_object_id_git_prints_on_stdout_while_tracing(
+    worktree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    content = b"claim state"
+    expected = subprocess.run(
+        ["git", "-C", str(worktree), "hash-object", "--stdin"],
+        input=content,
+        check=True,
+        capture_output=True,
+    ).stdout.decode().strip()
+    monkeypatch.setenv("GIT_TRACE", "1")
+
+    assert store.hash_blob(worktree, content) == expected
+
+
+def test_a_failing_hash_object_reports_the_stderr_git_wrote(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LC_ALL", "C")
+    outside_any_repository = tmp_path / "plain"
+    outside_any_repository.mkdir()
+
+    with pytest.raises(protocol.ClaimError, match="not a git repository"):
+        store.hash_blob(outside_any_repository, b"claim state")
 
 
 def test_bootstrap_is_a_no_op_read_when_the_ref_already_exists(
@@ -1541,10 +1580,10 @@ def test_write_lineage_stamp_cleans_up_its_temp_file_on_failure(
 def test_run_git_with_input_translates_process_failures_to_claim_error(
     monkeypatch: pytest.MonkeyPatch, worktree: Path, raised: Exception
 ) -> None:
-    def fake_run_bounded(*_args: object, **_kwargs: object) -> None:
+    def fake_run_bounded_captured(*_args: object, **_kwargs: object) -> None:
         raise raised
 
-    monkeypatch.setattr(store.process, "run_bounded", fake_run_bounded)
+    monkeypatch.setattr(store.process, "run_bounded_captured", fake_run_bounded_captured)
 
     with pytest.raises(protocol.ClaimError):
         store._run_git_with_input(worktree, ["mktree"], input_data=b"")
