@@ -1,8 +1,0 @@
-claim_id = "d2f465eb46684148a12a096c62b43060"
-agent = "claude"
-role = "builder"
-base = "d1dc8a72199cde60ddb6e367b2228f6964bd4d51"
-branch = "claude/issue-182-l1a-land-preflight-eingang-und-bereitsch"
-scope = ["scripts/test_inventory_dropped.txt", "tests/github_fixtures.py", "tests/test_adopt.py", "tests/test_cli.py", "tests/test_land_preflight.py"]
-opened_commit = "c0e34a7af546ce6d6a9307bb95f7488628205b38"
-whole_reason = "Der Eingang und die Bereitschaftsprüfung von aco land verlassen test_cli.py in einem Schritt: ihre Zeilen stehen einmal in test_land_preflight.py auf einer echten GitHub-Welt, landing_pull_request und landing_readiness wohnen in github_fixtures.py, und das Ledger benennt den neuen Owner."
