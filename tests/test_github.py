@@ -1447,7 +1447,7 @@ def test_github_adapter_deletes_a_merged_branch() -> None:
     ],
 )
 def test_github_adapter_deleting_an_already_absent_branch_is_idempotent(decoded: str) -> None:
-    """Issue #405 review finding 5: `gh api`'s real error text puts the
+    """Spec: LANDCMD-16. Issue #405 review finding 5: `gh api`'s real error text puts the
     message before the code (`gh: Reference does not exist (HTTP 422)`);
     the reversed order is covered alongside it so neither order regresses."""
 

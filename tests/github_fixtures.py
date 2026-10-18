@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
 import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
@@ -12,7 +14,14 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue
-from cli_fixtures import CliRun, local_branches, push_lane_branch, real_git, worktrees_and_branches
+from cli_fixtures import (
+    CliRun,
+    add_lane_worktree,
+    local_branches,
+    push_lane_branch,
+    real_git,
+    worktrees_and_branches,
+)
 from store_fixtures import (
     claim_intent,
     lineage_observation,
@@ -100,7 +109,9 @@ def merge_on_the_forge(
     else:
         real_git(clone, "merge", "-q", "--no-ff", "-m", message, f"origin/{source_branch}")
     real_git(clone, "push", "-q", "origin", f"HEAD:{default_branch}")
-    return real_git(clone, "rev-parse", "HEAD").stdout.strip()
+    merge = real_git(clone, "rev-parse", "HEAD").stdout.strip()
+    shutil.rmtree(clone)
+    return merge
 
 
 @dataclass
@@ -584,6 +595,91 @@ def lane_landing_world(
     return LaneLandingWorld(
         clone, remote, client, shared.unchanged, head, entry, default_branch=shared.default_branch
     )
+
+
+@dataclass(frozen=True)
+class LandedWorld:
+    landing: LaneLandingWorld
+    lane: Path
+
+
+def arrange_follow_up_failures(
+    client: FakeForge,
+    close_error: str | None,
+    delete_error: str | None,
+    *,
+    item: int,
+    item_state: forge.ItemState,
+) -> None:
+    """Keep the item open until release and install the requested follow-up failures."""
+    client.closes_on_merge = False
+    client.close_error = forge.ForgeError(close_error) if close_error else None
+    client.delete_error = forge.ForgeError(delete_error) if delete_error else None
+    observed = {
+        "item": client.item_reference(item).state,
+        "auto-close": client.closes_on_merge,
+        "close-error": str(client.close_error) if client.close_error else None,
+        "delete-error": str(client.delete_error) if client.delete_error else None,
+    }
+    expected = {
+        "item": item_state,
+        "auto-close": False,
+        "close-error": close_error,
+        "delete-error": delete_error,
+    }
+    assert observed == expected
+
+
+def landed_world(
+    github_clone: Path,
+    remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    identity: protocol.ClaimIdentity | None = None,
+    branch: str = "codex/issue-72-claims",
+    body: str = "Work-Item: #72\n\nCloses #72",
+    extra_arrange: Callable[[FakeForge, str], None] | None = None,
+    default_branch: str = LANDING_DEFAULT_BRANCH,
+    head_config: str = "",
+) -> LandedWorld:
+    """Add the claimed lane beside the landing checkout and verify the common setup."""
+    monkeypatch.setenv("LC_ALL", "C")
+    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
+    lane = github_clone.parent / "lane"
+
+    def arrange(client: FakeForge, head: str) -> None:
+        if extra_arrange is not None:
+            extra_arrange(client, head)
+        add_lane_worktree(github_clone, lane, branch)
+        observed = {
+            "locale": os.environ["LC_ALL"],
+            "discovery": os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"],
+            "checkout.branch": real_git(github_clone, "branch", "--show-current").stdout,
+            "checkout.status": real_git(github_clone, "status", "--porcelain").stdout,
+            "landing.merged": client.landings[12].merged,
+        }
+        expected = {
+            "locale": "C",
+            "discovery": "1",
+            "checkout.branch": default_branch + "\n",
+            "checkout.status": "",
+            "landing.merged": False,
+        }
+        assert observed == expected
+
+    landing = lane_landing_world(
+        github_clone,
+        remote,
+        monkeypatch,
+        identity=protocol.IssueIdentity(72) if identity is None else identity,
+        branch=branch,
+        body=body,
+        methods=None,
+        default_branch=default_branch,
+        head_config=head_config,
+        arrange=arrange,
+    )
+    return LandedWorld(landing, lane)
 
 
 def landing_world(
