@@ -16915,9 +16915,6 @@ def test_dependency_paths_refusal_escapes_and_bounds_each_name(
 _SQUASH = board.MergeMethod.SQUASH
 
 
-_MERGE_COMMIT = (board.MergeMethod.MERGE, "Merge pull request #12", 2)
-
-
 _LAND_AGAIN = ("land", "12")
 # A rerun's merge already happened, so a stale reviewed head changes nothing.
 _LAND_AGAIN_WITH_A_STALE_HEAD = ("land", "12", "--head", "0000000")

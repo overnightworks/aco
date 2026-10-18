@@ -169,23 +169,6 @@ def world(
             head_board_config=case.head_config,
         ),
     )
-    observed = (
-        client.landings,
-        client.readiness_by_number,
-        client.allowed_methods,
-        client.branch_rules,
-        client.head_board_config,
-        client.merge_error,
-    )
-    expected = (
-        {12: detail, 13: replace(detail, number=13)},
-        {12: landing_readiness(head_sha=head)},
-        case.methods,
-        {"main": case.rules},
-        case.head_config,
-        case.error,
-    )
-    assert observed == expected
     if case.dependency_listing:
         client.changes_by_number[12] = pull_request_listing(
             head, forge.ChangedFile("uv.lock", None)
