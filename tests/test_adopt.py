@@ -1552,22 +1552,24 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
         f"ERROR: pull request #{ADOPTED_PULL_REQUEST} head is {current_head}, "
         f"not the reviewed {reviewed_head}; review the new head before landing\n"
     )
-    assert (landed.status, landed.stdout, landed.stderr) == (
-        (status, _released_line(claim) + f"worktree: {worktree_outcome}\n", "")
-        if merged
-        else (status, "", refusal)
-    )
-    assert [call[1] for call in world.forge.merge_calls] == ([current_head] if merged else [])
-    assert (_remote_tip(world, "main") != trunk_before) is merged
-    assert (state_ref_tip(world.remote) != state_before) is merged
-    assert (not world.pull_request_directory.exists()) is (worktree_outcome == "removed")
-    assert (ADOPTED_BRANCH in real_git(world.clone, "branch", "--list").stdout) is (
-        worktree_outcome != "removed"
-    )
-    assert protocol.claims_on_branch(
+    released_line = _released_line(claim) + f"worktree: {worktree_outcome}\n"
+    expected_run = (status, released_line, "") if merged else (status, "", refusal)
+    merged_heads = [call[1] for call in world.forge.merge_calls]
+    trunk_moved = _remote_tip(world, "main") != trunk_before
+    state_moved = state_ref_tip(world.remote) != state_before
+    worktree_removed = not world.pull_request_directory.exists()
+    branch_kept = ADOPTED_BRANCH in real_git(world.clone, "branch", "--list").stdout
+    claims_left = protocol.claims_on_branch(
         store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
         ADOPTED_BRANCH,
-    ) == (() if merged else (claim,))
+    )
+    assert (landed.status, landed.stdout, landed.stderr) == expected_run
+    assert merged_heads == ([current_head] if merged else [])
+    assert trunk_moved == merged
+    assert state_moved == merged
+    assert worktree_removed == (worktree_outcome == "removed")
+    assert branch_kept == (worktree_outcome != "removed")
+    assert claims_left == (() if merged else (claim,))
     if merged:
         [(_number, _head, _method, _title, merge_body)] = world.forge.merge_calls
         assert merge_body.splitlines()[-1] == "No-Item: deps"
@@ -1600,13 +1602,11 @@ def test_abandoning_an_adopted_lane_frees_the_claim_and_keeps_the_pair_and_the_l
     assert world.pull_request_directory.is_dir()
     assert world.forge.landings[ADOPTED_PULL_REQUEST].body == ADOPTED_BODY
     assert world.forge.requests == forge_requests_before
-    assert (
-        protocol.claims_on_branch(
-            store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
-            ADOPTED_BRANCH,
-        )
-        == ()
+    claims_left = protocol.claims_on_branch(
+        store.fetch_state(worktree=world.clone, remote=str(world.remote)).claims,
+        ADOPTED_BRANCH,
     )
+    assert claims_left == ()
 
 
 def _land_the_abandoned_pull_request(
