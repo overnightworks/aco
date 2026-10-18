@@ -191,7 +191,8 @@ way, the only one it actually writes; `-S`/`--suffix`, `--no-preserve` and
 and `git restore` (skipping `-s`/`--source`, `--conflict`, and
 `--pathspec-from-file` and their own values, and a literal `--` or
 `--end-of-options`) -- a long option is read as `getopt_long` and git read it, by
-its exact name or its one unambiguous abbreviation (`--target`, `--in-pl`) --
+its exact name or its one unambiguous abbreviation among all the command's long
+options, flags included (`--target`, `--in-pl`; `sed --f` is ambiguous) --
 each
 occurrence naming a `(pattern, path)` pair, in the order the command names
 them (issue #380). A literal `--` ends option parsing the same way Bash's

@@ -900,6 +900,21 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             id="sed-abbreviated-in-place-edits-with-dash-i-as-the-script-file",
         ),
         pytest.param(
+            "sed -i -e 'w docs/file' --f docs/file",
+            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            id="sed-prefix-shared-by-a-value-option-and-a-flag-is-a-plain-flag",
+        ),
+        pytest.param(
+            "cp --no- docs",
+            ((hook_input.PATTERN_COPY, "docs"),),
+            id="cp-prefix-shared-by-a-value-option-and-flags-is-a-plain-flag",
+        ),
+        pytest.param(
+            "git restore --pathspec-f docs/file",
+            ((hook_input.PATTERN_GIT_RESTORE, "docs/file"),),
+            id="git-restore-prefix-shared-by-a-value-option-and-a-flag-is-a-plain-flag",
+        ),
+        pytest.param(
             "sed -i -nep docs/file",
             ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
             id="sed-clustered-expression-takes-its-attached-script",

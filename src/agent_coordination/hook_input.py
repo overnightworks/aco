@@ -528,6 +528,25 @@ _SED_SCRIPT_OPTIONS = frozenset({"-e", "--expression", "-f", "--file"})
 # gate finding: `sed -i -l 80 -e p /tmp/file` must judge `/tmp/file` alone,
 # never the fictitious path `80`).
 _SED_LINE_LENGTH_OPTIONS = frozenset({"-l", "--line-length"})
+# GNU sed 4.9 long options that take no value at all.
+_SED_FLAG_OPTIONS = frozenset(
+    {
+        "--binary",
+        "--debug",
+        "--follow-symlinks",
+        "--help",
+        "--null-data",
+        "--posix",
+        "--quiet",
+        "--regexp-extended",
+        "--sandbox",
+        "--separate",
+        "--silent",
+        "--unbuffered",
+        "--version",
+        "--zero-terminated",
+    }
+)
 _CP_TARGET_DIRECTORY_OPTIONS = frozenset({"-t", "--target-directory"})
 _CP_OTHER_VALUE_OPTIONS = frozenset({"-S", "--suffix", "--no-preserve", "--sparse"})
 # Long options that take only an attached `=value`; listed so that an
@@ -535,8 +554,68 @@ _CP_OTHER_VALUE_OPTIONS = frozenset({"-S", "--suffix", "--no-preserve", "--spars
 _CP_OPTIONAL_VALUE_OPTIONS = frozenset(
     {"--backup", "--preserve", "--reflink", "--update", "--context"}
 )
+# GNU coreutils 9.4 `cp` long options that take no value at all; with the
+# value tables above they make the complete list an abbreviation is
+# resolved against.
+_CP_FLAG_OPTIONS = frozenset(
+    {
+        "--archive",
+        "--attributes-only",
+        "--copy-contents",
+        "--debug",
+        "--dereference",
+        "--force",
+        "--help",
+        "--interactive",
+        "--link",
+        "--no-clobber",
+        "--no-dereference",
+        "--no-target-directory",
+        "--one-file-system",
+        "--parents",
+        "--recursive",
+        "--remove-destination",
+        "--strip-trailing-slashes",
+        "--symbolic-link",
+        "--verbose",
+        "--version",
+    }
+)
 _GIT_CHECKOUT_SKIPPED_FLAGS = frozenset({"-f", "--ours", "--theirs"})
 _GIT_RESTORE_VALUE_OPTIONS = frozenset({"--source", "-s", "--conflict", "--pathspec-from-file"})
+# git 2.43 `restore` long options that take no value, each with the
+# `--no-<name>` form git's option parser also accepts (and abbreviates).
+_GIT_RESTORE_FLAG_OPTIONS = frozenset(
+    {
+        "--staged",
+        "--worktree",
+        "--ignore-unmerged",
+        "--overlay",
+        "--quiet",
+        "--recurse-submodules",
+        "--progress",
+        "--merge",
+        "--ours",
+        "--theirs",
+        "--patch",
+        "--ignore-skip-worktree-bits",
+        "--pathspec-file-nul",
+        "--no-source",
+        "--no-staged",
+        "--no-worktree",
+        "--no-ignore-unmerged",
+        "--no-overlay",
+        "--no-quiet",
+        "--no-recurse-submodules",
+        "--no-progress",
+        "--no-merge",
+        "--no-conflict",
+        "--no-patch",
+        "--no-ignore-skip-worktree-bits",
+        "--no-pathspec-from-file",
+        "--no-pathspec-file-nul",
+    }
+)
 _GIT_RESTORE_END_OF_OPTIONS = frozenset({_END_OF_OPTIONS, _GIT_END_OF_OPTIONS})
 
 
@@ -680,9 +759,9 @@ def _parse_short_cluster(
 def _resolve_long_option(written_name: str, known_options: set[str]) -> str:
     """The option `written_name` stands for, as `getopt_long` and git resolve
     it: an exact name, else the one long option of the command's own table
-    it is a prefix of. A prefix of several or of none stays as written -- a
-    plain flag -- since the tool then refuses (several) or knows an option
-    that takes no value (none), and the table lists every option that does."""
+    it is a prefix of among all the command's long options, flags included.
+    A prefix of several or of none stays as written -- a plain flag -- since
+    the tool then refuses (several) or knows no such option."""
     if written_name in known_options or written_name == _LONG_OPTION_PREFIX:
         return written_name
     candidates = [name for name in known_options if name.startswith(written_name)]
@@ -695,12 +774,15 @@ def _parse_long_option(
     *,
     value_options: frozenset[str],
     optional_value_options: frozenset[str],
+    flag_options: frozenset[str],
 ) -> tuple[_OptionValue, int]:
     """One `--name[=value]` option and how many following words it consumed:
     a required value is the `=value` or else the next word, an optional one
     only the `=value`. The name is resolved through its unique abbreviation."""
     written_name, separator, attached = word.text.partition(_LONG_OPTION_VALUE_SEPARATOR)
-    name = _resolve_long_option(written_name, {*value_options, *optional_value_options})
+    name = _resolve_long_option(
+        written_name, {*value_options, *optional_value_options, *flag_options}
+    )
     if separator:
         takes_value = name in value_options | optional_value_options
         return _OptionValue(name, _attached_value(word, attached) if takes_value else None), 0
@@ -714,6 +796,7 @@ def _parse_arguments(
     *,
     value_options: frozenset[str] = frozenset(),
     optional_value_options: frozenset[str] = frozenset(),
+    flag_options: frozenset[str] = frozenset(),
     end_of_options_markers: frozenset[str] = frozenset({_END_OF_OPTIONS}),
     options_end_at_first_operand: bool = False,
 ) -> _ParsedArguments:
@@ -724,7 +807,9 @@ def _parse_arguments(
     an operand whatever it starts with. `end_of_options_markers` is the
     command's own set: `--` for GNU tools, also `--end-of-options` for git.
     `value_options` (`-t`, `--target-directory`) take a required value;
-    `optional_value_options` (`-i`, `--in-place`) only an attached one.
+    `optional_value_options` (`-i`, `--in-place`) only an attached one;
+    `flag_options` are the command's remaining long options, known so that
+    an abbreviation is as ambiguous here as it is for the tool.
     Unlike `_non_flag_arguments`, which drops every word starting with `-`,
     a lone `-` stays an operand here (`git restore -`), as in GNU tools.
     `options_end_at_first_operand` is the POSIX reading (`POSIXLY_CORRECT`):
@@ -753,6 +838,7 @@ def _parse_arguments(
                 following,
                 value_options=value_options,
                 optional_value_options=optional_value_options,
+                flag_options=flag_options,
             )
             options.append(option)
             index += consumed
@@ -773,6 +859,7 @@ def _parse_both_readings(
     *,
     value_options: frozenset[str],
     optional_value_options: frozenset[str] = frozenset(),
+    flag_options: frozenset[str] = frozenset(),
 ) -> tuple[_ParsedArguments, ...]:
     """`words` read the permuted way (GNU's default) and the POSIX way
     (`POSIXLY_CORRECT`). The hook reads no environment, so a tool whose
@@ -782,6 +869,7 @@ def _parse_both_readings(
             words,
             value_options=value_options,
             optional_value_options=optional_value_options,
+            flag_options=flag_options,
             options_end_at_first_operand=posix,
         )
         for posix in (False, True)
@@ -842,6 +930,7 @@ def _match_copy(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | Non
             words[1:],
             value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS,
             optional_value_options=_CP_OPTIONAL_VALUE_OPTIONS,
+            flag_options=_CP_FLAG_OPTIONS,
         )
         for destination in (
             parsed.every_value_of(_CP_TARGET_DIRECTORY_OPTIONS) or parsed.operands[-1:]
@@ -879,6 +968,7 @@ def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...
         words[1:],
         value_options=_SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
         optional_value_options=_SED_IN_PLACE_OPTIONS,
+        flag_options=_SED_FLAG_OPTIONS,
     )
     paths = _unique_in_command_order(
         path for parsed in readings for path in _sed_in_place_paths(parsed)
@@ -929,6 +1019,7 @@ def _match_git_restore(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]
     return PATTERN_GIT_RESTORE, _parse_arguments(
         words[_GIT_RESTORE_PREFIX_LENGTH:],
         value_options=_GIT_RESTORE_VALUE_OPTIONS,
+        flag_options=_GIT_RESTORE_FLAG_OPTIONS,
         end_of_options_markers=_GIT_RESTORE_END_OF_OPTIONS,
     ).operands
 
