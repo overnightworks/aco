@@ -1970,16 +1970,23 @@ class _PushScript:
 
 class _CompetingRun:
     """One more CLI run, as a `_PushScript` effect: another writer's command
-    landing in the middle of this one. `exit_codes` collects its result."""
+    landing in the middle of this one. `exit_codes` collects its result and
+    `outputs` its own stdout/stderr; the outer command's output so far is
+    handed back to `capsys` untouched."""
 
     def __init__(self, capsys: pytest.CaptureFixture[str], *argv: str) -> None:
         self._capsys = capsys
         self._argv = list(argv)
         self.exit_codes: list[int] = []
+        self.outputs: list[tuple[str, str]] = []
 
     def __call__(self) -> None:
+        outer = self._capsys.readouterr()
         self.exit_codes.append(issue_claim.main(self._argv))
-        self._capsys.readouterr()
+        own = self._capsys.readouterr()
+        self.outputs.append((own.out, own.err))
+        print(outer.out, end="")
+        print(outer.err, end="", file=sys.stderr)
 
 
 def _item_new_child_argv(parent_id: str) -> list[str]:
