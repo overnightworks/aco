@@ -1,0 +1,7 @@
+claim_id = "b574cc9619044b71bbbd321d4e09a2d4"
+agent = "claude"
+role = "builder"
+base = "18401be65ce48134228dc8d872437f795a50b750"
+branch = "claude/issue-180-b3-re-push-land-und-aufgeben-einer-berno"
+scope = ["README.md", "specs/adopt.spec.md", "tests/test_adopt.py"]
+opened_commit = "b111aaca1aba4bfb3e8bd6aa27b907b649139046"
