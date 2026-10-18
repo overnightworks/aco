@@ -1,0 +1,8 @@
+claim_id = "ef842879b6b74bd8b2a0c53c17070807"
+agent = "claude"
+role = "builder"
+base = "18401be65ce48134228dc8d872437f795a50b750"
+branch = "claude/issue-178-jedes-n-muster-hat-dieselbe-ziffern-ober"
+scope = ["specs/landing-grammar.spec.md", "src/agent_coordination/board.py", "tests/test_board.py", "tests/test_cli.py"]
+opened_commit = "2c514dd6dadcdd5a6225936c72fb098158891af7"
+whole_reason = "Alle #n-Muster bekommen dieselbe Grenze in einem Schritt; halb begrenzt bliebe ein Absturzweg aus fremdem Text."
