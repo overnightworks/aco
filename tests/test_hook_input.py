@@ -733,11 +733,20 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
         pytest.param(
             "sed -i 's/a/b/' -- -e /repo/target",
             (
+                (hook_input.PATTERN_SED_IN_PLACE, "--"),
                 (hook_input.PATTERN_SED_IN_PLACE, "-e"),
                 (hook_input.PATTERN_SED_IN_PLACE, "/repo/target"),
-                (hook_input.PATTERN_SED_IN_PLACE, "--"),
             ),
             id="sed-dash-e-after-double-dash-is-a-file-and-the-script-is-not",
+        ),
+        pytest.param(
+            "sed -i p /repo/a -n /repo/b",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/a"),
+                (hook_input.PATTERN_SED_IN_PLACE, "-n"),
+                (hook_input.PATTERN_SED_IN_PLACE, "/repo/b"),
+            ),
+            id="sed-readings-are-named-in-the-order-the-command-names-them",
         ),
         pytest.param(
             "sed -i -- 's/a/b/' -f /repo/target",

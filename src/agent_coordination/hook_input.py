@@ -225,11 +225,15 @@ class _Word(NamedTuple):
     when an unquoted (or, inside double quotes, still-substituting) `$`,
     backtick, `~`, `*`, `?`, or `[` appears in the word -- something the
     shell would expand before running it, which this grammar can never
-    resolve without executing the command (issue #380 delta, decision 3)."""
+    resolve without executing the command (issue #380 delta, decision 3).
+    `position` is the index of the argument a word was read from, set only by
+    `_parse_arguments`; it orders the words of several readings of one
+    command, and is `0` everywhere else."""
 
     text: str
     is_operator: bool
     is_expandable: bool
+    position: int = 0
 
 
 class _UnbalancedQuotingError(Exception):
@@ -634,7 +638,7 @@ class _ParsedArguments(NamedTuple):
 
 
 def _attached_value(word: _Word, text: str) -> _Word:
-    return _Word(text, is_operator=False, is_expandable=word.is_expandable)
+    return _Word(text, is_operator=False, is_expandable=word.is_expandable, position=word.position)
 
 
 def _parse_short_cluster(
@@ -701,7 +705,10 @@ def _parse_arguments(
     Unlike `_non_flag_arguments`, which drops every word starting with `-`,
     a lone `-` stays an operand here (`git restore -`), as in GNU tools.
     `options_end_at_first_operand` is the POSIX reading (`POSIXLY_CORRECT`):
-    from the first operand on, every word is an operand, `--` included."""
+    from the first operand on, every word is an operand, `--` included. Every
+    word it returns carries its `position` in `words`; an attached value
+    keeps the position of its option word."""
+    words = tuple(word._replace(position=index) for index, word in enumerate(words))
     options: list[_OptionValue] = []
     operands: list[_Word] = []
     index = 0
@@ -758,8 +765,13 @@ def _parse_both_readings(
     )
 
 
-def _unique_in_order(words: Iterable[_Word]) -> tuple[_Word, ...]:
-    return tuple(dict.fromkeys(words))
+def _unique_in_command_order(words: Iterable[_Word]) -> tuple[_Word, ...]:
+    """`words` of one or more readings of the same command, in the order the
+    command names them, each distinct word once."""
+    first_named: dict[_Word, _Word] = {}
+    for word in sorted(words, key=lambda word: word.position):
+        first_named.setdefault(word._replace(position=0), word)
+    return tuple(first_named.values())
 
 
 def _match_redirect(tokens: tuple[_Word, ...], index: int) -> tuple[str, _Word, int] | None:
@@ -801,7 +813,7 @@ def _match_copy(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | Non
     untouched `README.md`)."""
     if words[0].text != PATTERN_COPY:
         return None
-    destinations = _unique_in_order(
+    destinations = _unique_in_command_order(
         destination
         for parsed in _parse_both_readings(
             words[1:], value_options=_CP_TARGET_DIRECTORY_OPTIONS | _CP_OTHER_VALUE_OPTIONS
@@ -843,7 +855,9 @@ def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...
         value_options=_SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
         optional_value_options=_SED_IN_PLACE_OPTIONS,
     )
-    paths = _unique_in_order(path for parsed in readings for path in _sed_in_place_paths(parsed))
+    paths = _unique_in_command_order(
+        path for parsed in readings for path in _sed_in_place_paths(parsed)
+    )
     return (PATTERN_SED_IN_PLACE, paths) if paths else None
 
 
