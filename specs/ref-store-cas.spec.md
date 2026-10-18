@@ -23,7 +23,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | fetch of a present ref fails | CAS-05 | CAS-05 | CAS-05 |
 | a rejected push whose commit landed | — | CAS-13 | — |
 | two writers race the same tip | — | CAS-14 | — |
-| every push rejected, ref never moves | CAS-65* | CAS-15 | — |
+| every push rejected, ref never moves | CAS-68* | CAS-15 | — |
 | every push rejected, ref keeps moving | CAS-01 | CAS-16 | — |
 | push rejected once then sticks | CAS-01 | CAS-17 | — |
 | a creation push rejected, the re-read finds the ref present | CAS-66 | — | — |
