@@ -5919,27 +5919,31 @@ def test_claim_does_not_corridor_on_a_slice_list(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims
 
 
+_SLICE_TITLE_OF_79 = "Schema traegt den Titel (#79 Scheibe 21)"
+
+
 @pytest.mark.parametrize(
-    ("parents", "expect_warning"),
+    ("title", "parents", "expect_warning"),
     [
-        pytest.param({}, True, id="without_sub_issue_relation"),
+        pytest.param(_SLICE_TITLE_OF_79, {}, True, id="without_sub_issue_relation"),
         pytest.param(
+            _SLICE_TITLE_OF_79,
             {1017: board.ParentIssue(board.IssueReference(REPOSITORY, 79), "## Now\nCut.")},
             False,
             id="with_sub_issue_relation",
         ),
+        pytest.param(f"Schema (#{'9' * 4301} Scheibe 21)", {}, False, id="parent_past_the_bound"),
     ],
 )
 def test_claim_checks_a_slice_shaped_title_for_its_recorded_parent(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
+    title: str,
     parents: dict[int, board.ParentIssue],
     expect_warning: bool,
 ) -> None:
-    target = board_issue(
-        1017, "Schema traegt den Titel (#79 Scheibe 21)", complete_contract("Claim #1017.")
-    )
+    target = board_issue(1017, title, complete_contract("Claim #1017."))
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(target,))
     client.parents.update(parents)
     monkeypatch.setattr(
@@ -16410,6 +16414,24 @@ def test_release_merged_removes_a_clean_merged_lane_worktree_and_branch(
     assert not worktree.exists()
     assert checkout.branch_exists(_CLEANUP_BRANCH) is False
     assert "worktree: removed\n" in capsys.readouterr().out
+
+
+def test_release_merged_survives_an_open_pull_request_with_a_reference_past_the_digit_bound(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
+    number = "1" * 4301
+    cast(FakeForge, github.GitHubForge(REPOSITORY)).board_open_pull_requests = (
+        board.PullRequest(300, "Foreign", f"Refs #{number}\n\nsee #{number}", "foreign/branch"),
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12"]) == 0
+
+    output = capsys.readouterr().out
+    assert output.startswith("RELEASED ")
+    assert "\nfreed: " in output
+    assert "worktree: removed\n" in output
+    assert not worktree.exists()
 
 
 def _start_from_a_stale_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> object:

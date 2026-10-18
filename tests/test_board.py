@@ -3521,6 +3521,26 @@ def test_an_issue_number_past_the_int_digit_limit_is_no_issue_number() -> None:
     ) == board.OtherClassificationLine(line)
 
 
+@pytest.mark.parametrize(
+    ("digits", "is_reference"),
+    [
+        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS, True, id="at-the-bound"),
+        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS + 1, False, id="one-past-the-bound"),
+        pytest.param(4301, False, id="past-the-int-digit-limit"),
+    ],
+)
+def test_a_hash_number_past_the_digit_bound_is_no_reference_and_no_slice_title(
+    digits: int, is_reference: bool
+) -> None:
+    number = "7" * digits
+    expected_references = frozenset({int(number)}) if is_reference else frozenset()
+    expected_slice = (4, int(number)) if is_reference else None
+
+    assert board._references(f"Refs #{number}") == expected_references
+    assert board.slice_title_match(f"Title (#{number} Scheibe 4)") == expected_slice
+    assert board.slice_title_match(f"Scheibe 4 von #{number}") == expected_slice
+
+
 def test_body_defect_text_is_the_shared_renderer() -> None:
     defect = ContractDefect("now", "missing")
     assert body_defect_text(defect) == "body malformed: now: missing"
