@@ -76,6 +76,23 @@ def stub_one_git_call(
     monkeypatch.setattr(checkout, "_git_run", fake)
 
 
+def fail_git_launch(
+    monkeypatch: pytest.MonkeyPatch, leading_arguments: list[str], failure: Exception
+) -> list[list[str]]:
+    """Record matching Git launches and raise the supplied boundary failure."""
+    run_git = process.run_git
+    matched: list[list[str]] = []
+
+    def fail(arguments: list[str], *, directory: Path | None = None) -> process.CapturedResult:
+        if arguments[: len(leading_arguments)] == leading_arguments:
+            matched.append(list(arguments))
+            raise failure
+        return run_git(arguments, directory=directory)
+
+    monkeypatch.setattr(process, "run_git", fail)
+    return matched
+
+
 def recorded_head_read(remote: str) -> tuple[str, ...]:
     """The one git read `checkout.recorded_head_ref` sends for `remote`: a
     fake keyed by it answers every reader of that remote's recorded `HEAD`."""

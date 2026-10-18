@@ -283,3 +283,32 @@ tests/test_cli.py	'remote.git'	#220: The shared bare_remote fixture owns the rem
 tests/test_cli.py	'removes-the-lane'	#220: Both explicit branch-specific parameter IDs retain removal.
 tests/test_cli.py	'the-keep-worktree-flag-keeps-the-lane'	#220: Both explicit branch-specific parameter IDs retain the keep flag.
 tests/test_cli.py	'worktree: kept -- no linked worktree on '	#220: Complete row-owned land.stdout sentences retain the kept advice.
+tests/test_cli.py	' section kept -- git failure: '	#223: Row-owned complete stdout templates in test_release_cleanup replace this interpolated or partial cleanup sentence.
+tests/test_cli.py	' section kept -- git failure: fatal: the listing failed\n'	#223: Row-owned complete stdout templates in test_release_cleanup replace this interpolated or partial cleanup sentence.
+tests/test_cli.py	' section kept -- git failure: git config timed out\n'	#223: Row-owned complete stdout templates in test_release_cleanup replace this interpolated or partial cleanup sentence.
+tests/test_cli.py	'--get-regexp'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'--local'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'--name-only'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'--null'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'--quiet'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'--remove-section'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'--verify'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'-d'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'another-branch-value-not-utf-8'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'commit-raced-past-the-head'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'configuration-listing-refused'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'configuration-listing-timed-out'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'configuration-locked'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'deletion-failed-to-start'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'deletion-timed-out'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'dotted-sibling-without-an-own-section'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'land-with-the-lane-past-the-pinned-head'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'release-rerun-on-the-recorded-head'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'release-rerun-past-the-recorded-head'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'same-name-branch-recreated'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'section-removal-timed-out'	#223: The same parameter ID now belongs to a recorded-head or compare-and-delete row in test_release_cleanup.
+tests/test_cli.py	'update-ref'	#223: The shared cleanup observations, interventions and row-owned launch.argv retain this Git argument in test_release_cleanup.
+tests/test_cli.py	'worktree: kept -- not merged into the default branch\n'	#223: Row-owned complete stdout templates in test_release_cleanup replace this interpolated or partial cleanup sentence.
+tests/test_cli.py	'worktree: removed; branch kept -- git failure: '	#223: Row-owned complete stdout templates in test_release_cleanup replace this interpolated or partial cleanup sentence.
+tests/test_cli.py	'worktree: removed; branch unknown -- git update-ref timed out; check git branch --list '	#223: Row-owned complete stdout templates in test_release_cleanup replace this interpolated or partial cleanup sentence.
+tests/test_cli.py	'worktree: removed; branch.'	#223: Row-owned complete stdout templates in test_release_cleanup replace this interpolated or partial cleanup sentence.
