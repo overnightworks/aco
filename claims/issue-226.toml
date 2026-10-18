@@ -3,5 +3,6 @@ agent = "claude"
 role = "builder"
 base = "ab94d85957a186fd6faa3adde9b55d784a24ae08"
 branch = "claude/issue-226-hook-getopt"
-scope = ["specs/protect.spec.md", "src/agent_coordination/hook_input.py", "tests/test_hook_input.py"]
+scope = ["specs/protect.spec.md", "src/agent_coordination/hook_input.py", "tests/test_hook_input.py", "tests/test_protect.py"]
 opened_commit = "ad7e27ce09fe23cb12b65de70e42f13958001027"
+whole_reason = "Ein Owner (der Gang in hook_input.py), sein Spec-Absatz und seine zwei Testfamilien: Einheitszeilen und eine Zeile durch den echten Hook-Einstieg."
