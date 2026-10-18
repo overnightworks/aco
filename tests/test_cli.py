@@ -16939,7 +16939,6 @@ _SQUASH = board.MergeMethod.SQUASH
 
 _LAND_AGAIN = ("land", "12")
 # A rerun's merge already happened, so a stale reviewed head changes nothing.
-_LAND_AGAIN_WITH_A_STALE_HEAD = ("land", "12", "--head", "0000000")
 _RELEASE_MERGED = ("release", str(WORK_ITEM_ISSUE), "--merged", "12")
 
 
