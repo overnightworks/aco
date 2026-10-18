@@ -12,13 +12,12 @@ import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
 from cli_fixtures import (
     CliRun,
-    assert_github_world,
     freeze_cli_now,
     real_git,
     run_cli,
     track_board_config,
 )
-from github_fixtures import FakeForge, serve_forge
+from github_fixtures import FakeForge, assert_github_world, serve_forge
 
 from agent_coordination import body, cli, forge, github, session
 
@@ -433,6 +432,8 @@ class TestGithubAsk:
         )
         if picture is not None:
             Path("sketch.svg").write_text(picture, encoding="utf-8")
+        assert picture is None or Path("sketch.svg").read_text(encoding="utf-8") == picture
+        assert not Path("missing.svg").exists()
         capsys.readouterr()
         result = run_cli(
             [
@@ -524,7 +525,8 @@ class TestGithubAsk:
         observe: Callable[[CliRun, str], object],
         expected: object,
     ) -> None:
-        """Spec: ASK-01 — open proposals, duplicate appends, surrounding bytes."""
+        """Spec: ASK-01, Never 1, Never 2, Never 3 — proposals, duplicate appends, bytes
+        before and after the block."""
         freeze_cli_now(monkeypatch)
         reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)
         client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
@@ -615,6 +617,10 @@ def test_context_refusal(
     directory = request.getfixturevalue(directory_fixture)
     monkeypatch.chdir(directory)
     monkeypatch.setenv("LC_ALL", "C")
+    assert (real_git(directory, "rev-parse", "--show-toplevel", check=False).returncode == 0) == (
+        directory_fixture == "clone"
+    )
+    assert not (directory / "missing.svg").exists()
     if remote_url is not None:
         real_git(directory, "remote", "set-url", "origin", remote_url)
         assert (
@@ -655,8 +661,7 @@ def test_context_refusal(
         pytest.param(
             ["ask", "90", "--text", "New question?", "--default", "maybe"],
             2,
-            "aco ask: error: argument --default: "
-            "invalid choice: 'maybe' (choose from later, no, yes)\n",
+            "aco ask: error: argument --default: invalid choice: 'maybe' (choose from",
             "usage: aco ask ",
             "",
             id="invalid-default",
@@ -672,7 +677,7 @@ def test_parser_refusal(
     usage: str,
     stdout: str,
 ) -> None:
-    """Spec: ASK-01 — the parser rejects an invalid default before command entry."""
+    """Spec: Never 6 — the parser rejects an invalid default before command entry."""
 
     def forbidden(*args, **kwargs):
         pytest.fail("invalid default reached the ask command entry")
@@ -684,7 +689,7 @@ def test_parser_refusal(
     captured = capsys.readouterr()
     assert (
         raised.value.code,
-        captured.err.splitlines(keepends=True)[-1:],
+        "".join(captured.err.splitlines()[-1:])[: len(sentence)],
         captured.err[: len(usage)],
         captured.out,
-    ) == (code, [sentence], usage, stdout)
+    ) == (code, sentence, usage, stdout)

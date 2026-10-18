@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-import cli_fixtures
+from cli_fixtures import real_git
 
 from agent_coordination import protocol, store
 
@@ -160,9 +160,9 @@ def unrelated_racer_commit(worktree: Path, remote: Path) -> str:
     current = state_ref_tip(remote)
     if current is None:
         raise AssertionError(f"no state ref to race in {remote}")
-    tree = cli_fixtures.real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
-    racer = cli_fixtures.real_git(
+    tree = real_git(worktree, "rev-parse", f"{current}^{{tree}}").stdout.strip()
+    racer = real_git(
         worktree, "commit-tree", tree, "-p", str(current), "-m", "unrelated racer"
     ).stdout.strip()
-    cli_fixtures.real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
+    real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
     return racer

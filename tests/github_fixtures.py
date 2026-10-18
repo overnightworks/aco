@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import REPOSITORY, board_issue
 from cli_fixtures import real_git
+from store_fixtures import state_ref_tip
 
 from agent_coordination import board, body, cmd_land, forge, github
 from agent_coordination.protocol import ClaimError
@@ -393,3 +394,19 @@ class ReaderOnlyForge(FakeForge):
 
     def delete_branch(self, branch: str) -> None:
         pytest.fail("a read-only command must never delete a branch")
+
+
+def assert_github_world(github_clone: Path, bare_remote: Path) -> None:
+    """Verify the arranged GitHub checkout before running its command."""
+    assert real_git(github_clone, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
+    main = real_git(github_clone, "rev-parse", "main").stdout.strip()
+    assert real_git(github_clone, "rev-parse", "origin/HEAD").stdout.strip() == main
+    assert (
+        real_git(github_clone, "config", "--get", "remote.origin.url").stdout
+        == "git@github.com:example/agent-coordination.git\n"
+    )
+    assert (
+        real_git(github_clone, "ls-remote", "origin", "refs/heads/main").stdout
+        == f"{main}\trefs/heads/main\n"
+    )
+    assert state_ref_tip(bare_remote) is None

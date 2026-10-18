@@ -15,8 +15,8 @@ from board_fixtures import (
     proposed_expectation,
     ruled_expectation,
 )
-from cli_fixtures import assert_github_world, real_git, run_cli, track_board_config
-from github_fixtures import FakeForge, serve_forge
+from cli_fixtures import real_git, run_cli, track_board_config
+from github_fixtures import FakeForge, assert_github_world, serve_forge
 
 from agent_coordination import board
 
