@@ -13,6 +13,7 @@ import ast
 import errno
 import re
 import subprocess
+import sys
 import threading
 from collections import Counter
 from collections.abc import Callable
@@ -1262,13 +1263,69 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     assert state_ref_tip(bare_remote) is None
 
 
-@pytest.mark.parametrize(
-    "start_failure",
-    [
-        pytest.param(FileNotFoundError("git"), id="executable-missing"),
-        pytest.param(PermissionError("git"), id="process-start-refused"),
-    ],
-)
+class _PushProcessProbe:
+    """Controls the process boundary of `git push` only: every other git
+    command runs for real, and `started` counts the pushes attempted."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.started = 0
+        self._start_failure: OSError | None = None
+        self._replacement_command: list[str] | None = None
+        real_popen = subprocess.Popen
+
+        def popen(command: list[str], *args: Any, **kwargs: Any) -> Any:
+            if "push" in command:
+                self.started += 1
+                if self._start_failure is not None:
+                    raise self._start_failure
+                if self._replacement_command is not None:
+                    command = self._replacement_command
+            return real_popen(command, *args, **kwargs)
+
+        monkeypatch.setattr(subprocess, "Popen", popen)
+        self._monkeypatch = monkeypatch
+
+    def fails_to_start(self, failure: OSError) -> None:
+        self._start_failure = failure
+
+    def runs_instead(self, command: list[str]) -> None:
+        self._replacement_command = command
+
+    def time_limit(self, seconds: float) -> None:
+        run_without_limit = process.run_bounded_captured
+
+        def bounded(command: list[str], **kwargs: Any) -> Any:
+            return run_without_limit(command, **{**kwargs, "timeout": seconds})
+
+        self._monkeypatch.setattr(process, "run_bounded_captured", bounded)
+
+
+_PUSH_START_FAILURES = [
+    pytest.param(FileNotFoundError("git"), id="executable-missing"),
+    pytest.param(PermissionError("git"), id="permission-refused"),
+    pytest.param(OSError(errno.E2BIG, "Argument list too long"), id="argument-list-too-long"),
+    pytest.param(OSError(errno.ENOEXEC, "Exec format error"), id="exec-format-error"),
+    pytest.param(OSError(errno.EAGAIN, "Resource temporarily unavailable"), id="out-of-processes"),
+]
+
+
+def _the_push_prints_too_much(probe: _PushProcessProbe) -> None:
+    over_the_limit = process.MAX_COMMAND_OUTPUT_BYTES + 1
+    probe.runs_instead([sys.executable, "-c", f"print('x' * {over_the_limit})"])
+
+
+def _the_push_outlives_its_time_limit(probe: _PushProcessProbe) -> None:
+    probe.runs_instead([sys.executable, "-c", "import time; time.sleep(30)"])
+    probe.time_limit(0.2)
+
+
+_PUSH_FAILURES_AFTER_THE_START = [
+    pytest.param(_the_push_prints_too_much, id="output-too-large"),
+    pytest.param(_the_push_outlives_its_time_limit, id="timed-out"),
+]
+
+
+@pytest.mark.parametrize("start_failure", _PUSH_START_FAILURES)
 def test_bootstrap_refuses_plainly_when_the_push_process_never_started(
     bare_remote: Path,
     worktree: Path,
@@ -1276,20 +1333,28 @@ def test_bootstrap_refuses_plainly_when_the_push_process_never_started(
     start_failure: OSError,
 ) -> None:
     """Spec: CAS-56 covers sent writes only; a push that never started is a plain refusal."""
-    real_run = subprocess.run
+    probe = _PushProcessProbe(monkeypatch)
+    probe.fails_to_start(start_failure)
 
-    def run_failing_to_start_a_push(command: list[str], *args: Any, **kwargs: Any) -> Any:
-        if "push" in command:
-            raise start_failure
-        return real_run(command, *args, **kwargs)
-
-    monkeypatch.setattr(subprocess, "run", run_failing_to_start_a_push)
-
-    with pytest.raises(protocol.ClaimError) as raised:
+    with pytest.raises(protocol.PushNotStartedError):
         store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
-    assert not isinstance(raised.value, protocol.UncertainWriteError)
+    assert probe.started == 1
     assert state_ref_tip(bare_remote) is None
+
+
+@pytest.mark.parametrize("break_the_push", _PUSH_FAILURES_AFTER_THE_START)
+def test_bootstrap_calls_a_push_that_failed_after_starting_uncertain(
+    bare_remote: Path,
+    worktree: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    break_the_push: Callable[[_PushProcessProbe], None],
+) -> None:
+    """Spec: CAS-56; once the push process ran, only the remote knows whether it landed."""
+    break_the_push(_PushProcessProbe(monkeypatch))
+
+    with pytest.raises(protocol.UncertainWriteError):
+        store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
 
 def test_git_push_transport_raises_on_a_non_fast_forward_push(
@@ -3019,10 +3084,32 @@ def _another_writer_claims_issue_1(
     )
 
 
+def _the_push_process_outlives_its_time_limit(
+    monkeypatch: pytest.MonkeyPatch, _bare_remote: Path, _worktree: Path
+) -> None:
+    _the_push_outlives_its_time_limit(_PushProcessProbe(monkeypatch))
+
+
+def _the_push_process_prints_too_much(
+    monkeypatch: pytest.MonkeyPatch, _bare_remote: Path, _worktree: Path
+) -> None:
+    _the_push_prints_too_much(_PushProcessProbe(monkeypatch))
+
+
 @pytest.mark.parametrize(
     ("arrange", "raised_kind"),
     [
         pytest.param(_the_push_times_out, protocol.UncertainWriteError, id="push-times-out"),
+        pytest.param(
+            _the_push_process_outlives_its_time_limit,
+            protocol.UncertainWriteError,
+            id="push-process-times-out",
+        ),
+        pytest.param(
+            _the_push_process_prints_too_much,
+            protocol.UncertainWriteError,
+            id="push-process-fails-after-starting",
+        ),
         pytest.param(
             _the_answer_and_its_re_read_are_lost,
             protocol.UncertainWriteError,
@@ -3069,6 +3156,33 @@ def test_commit_transition_says_whether_a_failed_write_may_have_landed(
         )
 
     assert type(raised.value) is raised_kind
+
+
+@pytest.mark.parametrize("start_failure", _PUSH_START_FAILURES)
+def test_commit_transition_refuses_plainly_when_the_push_process_never_started(
+    bare_remote: Path,
+    worktree: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    start_failure: OSError,
+) -> None:
+    """Spec: CAS-56; a transition whose push never started is a plain refusal:
+    no retry, no replay search, the remote tip and the state unchanged."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = fresh_observation(worktree, bare_remote)
+    tip_before = state_ref_tip(bare_remote)
+    probe = _PushProcessProbe(monkeypatch)
+    probe.fails_to_start(start_failure)
+
+    with pytest.raises(protocol.PushNotStartedError):
+        store.commit_transition(
+            observed=observed,
+            subject=store.ClaimTransitionSubject("claim issue 1", item="1"),
+            intent=_issue_claim_intent(1),
+        )
+
+    assert probe.started == 1
+    assert state_ref_tip(bare_remote) == tip_before
+    assert not fresh_observation(worktree, bare_remote).state.claims
 
 
 def test_commit_transition_ten_thread_contention_lands_every_distinct_key(

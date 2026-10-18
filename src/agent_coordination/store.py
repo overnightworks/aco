@@ -268,12 +268,15 @@ class GitPushTransport:
     history; only the documented recovery procedure forces)."""
 
     def push(self, *, worktree: Path, remote: str, ref: str, new_oid: ObjectId) -> None:
+        command = process.git_command(["push", remote, f"{new_oid}:{ref}"], directory=worktree)
         try:
-            result = process.run_git(["push", remote, f"{new_oid}:{ref}"], directory=worktree)
-        except (process.ExecutableMissingError, PermissionError) as error:
+            result = process.run_bounded_captured(command)
+        except (process.ExecutableMissingError, process.ProcessStartFailedError) as error:
             raise PushNotStartedError(f"git push could not start: {error}") from error
-        except process.ProcessTimedOutError as error:
-            raise ClaimError("git timed out while pushing to the claim state store") from error
+        except process.ProcessError as error:
+            raise ClaimError(
+                f"git push to the claim state store did not finish: {error}"
+            ) from error
         if result.exit_status != 0:
             raise PushRejectedError(process.git_failure_detail(result))
 
