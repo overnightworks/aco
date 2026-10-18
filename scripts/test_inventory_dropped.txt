@@ -245,13 +245,6 @@ tests/test_land_merge.py	'branches+'	#207, PR #206 follow-up: landed_observation
 tests/test_land_merge.py	'trunk.is-merge'	#207, PR #206 follow-up: landed_observations owns trunk.same; trunk/merge identity remains.
 tests/test_land_merge.py	'stamp+'	#207, PR #206 follow-up: landed_observations owns stamp; presence comparison remains.
 tests/test_land_merge.py	'anchor+'	#207, PR #206 follow-up: landed_observations owns anchor; presence comparison remains.
-tests/test_cli.py	'); re-run aco land 12\n'	#207: TestLandAfterMerge O03 owns the full literal line; O04 also checks its recovery tail. Old/new narrowing evidence retains this sentence.
-tests/test_cli.py	'; follow-up incomplete: '	#207: TestLandAfterMerge O03 owns the full literal line in each of the five cases, replacing interpolated fragments.
-tests/test_cli.py	'ERROR: MERGED pull request #12 as '	#207: TestLandAfterMerge O03 owns the full literal line, normalizing only the independently read merge OID.
-tests/test_cli.py	'delete branch failed (simulated)'	#207: TestLandAfterMerge delete-branch O03 owns the full error sentence; the new delete_error field supplies its failure.
-tests/test_cli.py	'fast-forward'	#207: TestLandAfterMerge fetch and divergence O03 own the full literal step/error/recovery line.
-tests/test_cli.py	'fatal: Not possible to fast-forward, aborting.'	#207: TestLandAfterMerge ff-only-fails O03 compares this complete git sentence inside the full line; real divergence replaces the stub.
-tests/test_cli.py	'fatal: unreachable\\n\\x1b[2Jhint: \\u202eretry'	#207: TestLandAfterMerge escaped-fetch O03 owns the full literal line; RAW re-proves the old and new escape checks.
 tests/test_cli.py	'); re-run aco land 12\n'	#207: TestLandAfterMerge compares the complete stderr line, including the recovery command.
 tests/test_cli.py	'; follow-up incomplete: '	#207: TestLandAfterMerge compares the complete stderr line for each failed follow-up.
 tests/test_cli.py	'ERROR: MERGED pull request #12 as '	#207: TestLandAfterMerge compares the complete stderr line, normalizing only the independently read merge OID.
