@@ -1613,13 +1613,7 @@ def _land_the_abandoned_pull_request(
     world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
 ) -> CliRun:
     world.forge.merge_remote = world.remote
-    world.forge.readiness_by_number[ADOPTED_PULL_REQUEST] = forge.LandingReadiness(
-        ADOPTED_PULL_REQUEST,
-        True,
-        world.head,
-        forge.MERGEABLE_STATE_CLEAN,
-        (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
-    )
+    _the_forge_reads_the_branch_ready(world)
     return run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", world.head], capsys)
 
 
