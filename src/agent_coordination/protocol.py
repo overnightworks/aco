@@ -1298,8 +1298,8 @@ def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
             "released; release it, then claim again with a fresh claim id"
         )
     blocked_by = blocking_claims(tuple(state.claims.values()), intent)
-    if intent.exclusive_branch and not blocked_by:
-        blocked_by = claims_on_branch(state.claims, intent.branch)
+    if intent.exclusive_branch:
+        blocked_by = branch_holders(state.claims, intent.branch) or blocked_by
     if blocked_by:
         raise ClaimConflictError(
             naming=partial(claimed_by_sentence, intent.identity, intent.branch, blocked_by[0])
@@ -1709,6 +1709,13 @@ def is_issueless_lane_branch(branch: str) -> bool:
 
 def claims_on_branch(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[ActiveClaim, ...]:
     return tuple(claim for claim in claims.values() if claim.branch == branch)
+
+
+def branch_holders(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[ActiveClaim, ...]:
+    """The live claims on `branch`, lane claims before issue claims: the first
+    is the holder ADOPT-06 and CLAIM-71 both name."""
+    holders = claims_on_branch(claims, branch)
+    return tuple(sorted(holders, key=lambda claim: not isinstance(claim.identity, LaneIdentity)))
 
 
 def lookup_identity(

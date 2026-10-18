@@ -324,7 +324,9 @@ def _add_land_parser(commands: _Subcommands, name: str) -> None:
         name,
         help="merge a green pull request with its pinned head sha and run its release path",
     )
-    land.add_argument("pull_request", type=int, help="the pull request number to land")
+    land.add_argument(
+        "pull_request", type=positive_int, help="the positive pull request number to land"
+    )
     land.add_argument(
         "--head",
         type=_reviewed_head,

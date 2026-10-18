@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from pathlib import Path
 
 from . import board, body, checkout, cmd_claim, forge, protocol
@@ -170,7 +171,7 @@ def _start_claim_arguments(
     base: str | None = None,
     branch: str | None = None,
     claim_id: str | None = None,
-) -> argparse.Namespace:
+) -> cmd_claim.ClaimArguments:
     """The `aco claim` arguments `start` claims with: this session's own
     agent as the builder, and a fresh id, exactly as a bare `aco claim`
     mints one (issue #322 review finding 1) -- `start` resumes a live claim
@@ -178,18 +179,14 @@ def _start_claim_arguments(
     logic never needs to recognize a `start`-minted id as special. A
     resume passes its live claim's own `claim_id`, so it never computes a
     second one."""
-    return argparse.Namespace(
+    return cmd_claim.ClaimArguments(
         issue=parsed.item,
-        agent=None,
-        role=cmd_claim.DEFAULT_CLAIM_ROLE,
         base=base,
         branch=branch,
         scope=parsed.scope,
         claim_id=claim_id,
         out_of_order=parsed.out_of_order,
         whole=parsed.whole,
-        resource=None,
-        json=False,
     )
 
 
@@ -217,7 +214,8 @@ def _claim_in_start_worktree(
     # The main checkout's one observation, the same snapshot the lookup above
     # read (CAS-53): nothing fetched since.
     try:
-        return cmd_claim.claim_write(_start_claim_arguments(parsed), context, worktree=target.path)
+        claim_command = argparse.Namespace(**asdict(_start_claim_arguments(parsed)), json=False)
+        return cmd_claim.claim_write(claim_command, context, worktree=target.path)
     except protocol.UncertainWriteError as error:
         named = board.named_refusal(error, context.config.storage)
         return cmd_claim.report_uncertain_worktree_claim(named, target, command=_START_COMMAND)
@@ -279,14 +277,9 @@ def _check_build_and_claim(
     requested = cmd_claim.claim_request(
         _start_claim_arguments(parsed, base=trunk, branch=target.branch)
     )
-    storage = check_context.config.storage
-    try:
-        plan = cmd_claim.checked_claim(requested, check_context, revision=trunk)
-    except protocol.ClaimConflictError as error:
-        raise board.named_refusal(error, storage) from error
-    if plan.refused:
-        cmd_claim.refuse_claim(False, plan.target_issue, plan.checks)
-        return 2
+    plan = cmd_claim.checked_lane_claim(requested, check_context, revision=trunk)
+    if isinstance(plan, int):
+        return plan
     result = cmd_claim.claim_in_new_worktree(
         plan,
         requested,

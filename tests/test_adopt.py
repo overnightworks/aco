@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 import re
 from collections.abc import Callable
@@ -214,14 +213,16 @@ def test_adopt_refuses_a_malformed_command_line_at_the_parser(
 
 
 def _claim_the_branch_as(
-    agent: str, identity: protocol.ClaimIdentity = protocol.LaneIdentity(), claim_id: str = "a1"
+    agent: str, identity: protocol.ClaimIdentity | None = None, claim_id: str = "a1"
 ) -> Callable[[AdoptionWorld], None]:
+    claimed_identity = protocol.LaneIdentity() if identity is None else identity
+
     def claim(world: AdoptionWorld) -> None:
         store.commit_transition(
             observed=fresh_observation(world.clone, world.remote),
-            subject=store.transition_subject("claim", identity, ADOPTED_BRANCH),
+            subject=store.transition_subject("claim", claimed_identity, ADOPTED_BRANCH),
             intent=claim_intent(
-                identity=identity,
+                identity=claimed_identity,
                 agent=agent,
                 branch=ADOPTED_BRANCH,
                 base=protocol.ObjectId(world.head),
@@ -535,16 +536,8 @@ def test_adopt_and_its_dry_run_claim_name_the_same_holder_of_a_twice_held_branch
     refusal and the claim check both name the lane holder."""
     _claim_the_branch_as("Bob", protocol.IssueIdentity(42), "b1")(world)
     _claim_the_branch_as("Carol", claim_id="c1")(world)
-    arguments = argparse.Namespace(
-        issue=None,
-        agent="Ada",
-        role=cmd_claim.DEFAULT_CLAIM_ROLE,
-        base=world.head,
-        branch=ADOPTED_BRANCH,
-        scope=["uv.lock"],
-        claim_id=None,
-        out_of_order=None,
-        whole=None,
+    arguments = cmd_claim.ClaimArguments(
+        agent="Ada", base=world.head, branch=ADOPTED_BRANCH, scope=["uv.lock"]
     )
     request = cmd_claim.claim_request(arguments, adopted=True)
 
@@ -572,16 +565,8 @@ def test_adopts_dry_run_claim_refuses_a_branch_another_claim_holds(world: Adopti
         ),
     )
     tip_before = state_ref_tip(world.remote)
-    arguments = argparse.Namespace(
-        issue=None,
-        agent="Ada",
-        role=cmd_claim.DEFAULT_CLAIM_ROLE,
-        base=world.head,
-        branch=ADOPTED_BRANCH,
-        scope=["uv.lock", "pyproject.toml"],
-        claim_id=None,
-        out_of_order=None,
-        whole=None,
+    arguments = cmd_claim.ClaimArguments(
+        agent="Ada", base=world.head, branch=ADOPTED_BRANCH, scope=["uv.lock", "pyproject.toml"]
     )
 
     request = cmd_claim.claim_request(arguments, adopted=True)

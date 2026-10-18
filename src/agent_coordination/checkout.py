@@ -933,7 +933,8 @@ def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) 
     if recorded_head is not None:
         return recorded_head
     remote_trunk = _first_resolving_ref(
-        (f"refs/remotes/{remote}/main", f"refs/remotes/{remote}/master"), directory=directory
+        (remote_tracking_ref(remote, "main"), remote_tracking_ref(remote, "master")),
+        directory=directory,
     )
     if remote_trunk is not None:
         return remote_trunk
@@ -1260,13 +1261,22 @@ def fetch_remote(remote: str, *, directory: Path) -> None:
         raise ClaimError(process.git_failure_detail(fetch))
 
 
-def remote_branch_exists(remote: str, branch: str, *, directory: Path) -> bool:
-    """Whether `remote` has a branch `branch` right now, asked of the remote
-    itself so the answer never depends on git's localized error text."""
+def remote_tracking_ref(remote: str, branch: str) -> str:
+    return f"refs/remotes/{remote}/{branch}"
+
+
+def remote_branch_tip(remote: str, branch: str, *, directory: Path) -> str | None:
+    """The commit `remote` has on `branch` right now, or `None` when it has no
+    such branch, asked of the remote itself so the answer never depends on
+    git's localized error text."""
     heads = git_output(
         ["ls-remote", "--heads", remote, f"refs/heads/{branch}"], directory=directory
     )
-    return any(line.split("\t")[-1] == f"refs/heads/{branch}" for line in heads.splitlines())
+    for line in heads.splitlines():
+        tip, _, name = line.partition("\t")
+        if name == f"refs/heads/{branch}":
+            return tip
+    return None
 
 
 def fetch_remote_branches(remote: str, branches: tuple[str, ...], *, directory: Path) -> None:
@@ -1274,7 +1284,7 @@ def fetch_remote_branches(remote: str, branches: tuple[str, ...], *, directory: 
     in `directory`, and write no other ref: the remote's configured fetch
     refspecs and tag following are set aside (`--refmap=`, `--no-tags`) because
     one of them may name a local branch."""
-    refspecs = [f"+refs/heads/{name}:refs/remotes/{remote}/{name}" for name in branches]
+    refspecs = [f"+refs/heads/{name}:{remote_tracking_ref(remote, name)}" for name in branches]
     fetch = _git_run(["fetch", "--no-tags", "--refmap=", remote, *refspecs], directory=directory)
     if fetch.exit_status != 0:
         raise ClaimError(process.git_failure_detail(fetch))
