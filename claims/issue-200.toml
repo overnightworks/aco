@@ -1,0 +1,8 @@
+claim_id = "9ed300313f4a4f5596fcef1c46af6264"
+agent = "claude"
+role = "builder"
+base = "bcadeba95c5f27a12d1ffad702c790d187850b9d"
+branch = "claude/issue-200-l3-0-welt-f-r-land-nach-dem-merge-ein-bu"
+scope = ["scripts/test_inventory_dropped.txt", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/test_land_merge.py", "tests/test_land_merge_message.py"]
+opened_commit = "2afe1688a02a26d133933a1b615cd526210cfe08"
+whole_reason = "Der geteilte Builder und das Feld default_branch ändern die Welt beider land-Merge-Module in einem Schritt; halb umgestellt hätten sie zwei Beobachtungen und zwei Welten."
