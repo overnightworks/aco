@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
+from process_fixtures import UnstoppableProcess, reap
 
 from agent_coordination import board, forge, github, process
 from agent_coordination.body import ItemKind
@@ -2678,19 +2679,6 @@ def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
     real_popen = subprocess.Popen
     started: list[subprocess.Popen[bytes]] = []
 
-    class UnstoppableProcess:
-        def __init__(self, child: subprocess.Popen[bytes]) -> None:
-            self._child = child
-
-        def __getattr__(self, name: str) -> object:
-            return getattr(self._child, name)
-
-        def poll(self) -> None:
-            return None
-
-        def wait(self, timeout: float | None = None) -> int:
-            raise subprocess.TimeoutExpired(cmd="hang probe", timeout=timeout or 0)
-
     def start(
         command: list[str],
         *,
@@ -2710,9 +2698,7 @@ def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
                 [sys.executable, "-c", "import time; time.sleep(30)"], purpose="hang probe"
             )
     finally:
-        for child in started:
-            child.kill()
-            child.wait()
+        reap(started)
     assert str(excinfo.value) == "hang probe did not exit"
 
 

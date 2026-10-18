@@ -34,6 +34,7 @@ from cli_fixtures import (
     stub_board_config_tracked,
 )
 from github_fixtures import FakeForge
+from process_fixtures import UnstoppableProcess, reap
 from store_fixtures import (
     CLAIM_BASE,
     STATE_WITH_TIP,
@@ -1264,27 +1265,13 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     assert state_ref_tip(bare_remote) is None
 
 
-class _UnstoppableProcess:
-    """A started push that never reports its exit, so `wait()` always times out."""
-
-    def __init__(self, started: subprocess.Popen[Any]) -> None:
-        self._started = started
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._started, name)
-
-    def poll(self) -> None:
-        return None
-
-    def wait(self, timeout: float | None = None) -> int:
-        raise subprocess.TimeoutExpired(cmd="git push", timeout=timeout or 0)
-
-
 class _PushProcessProbe:
     """Controls the process boundary of `git push` only: every other git
     command runs for real, and `started` counts the pushes attempted from the
-    first control on. The real child of a push made unstoppable stays owned
-    here and is reaped by `reap()`."""
+    first control on. Control starts lazily because tests first bootstrap the
+    store with a real push that must neither be counted nor made to fail. The
+    real child of a push made unstoppable stays owned here and is reaped by
+    `reap()`."""
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self.started = 0
@@ -1313,7 +1300,7 @@ class _PushProcessProbe:
             if self._stoppable:
                 return started
             self.unstoppable_children.append(started)
-            return _UnstoppableProcess(started)
+            return UnstoppableProcess(started)
 
         self._monkeypatch.setattr(subprocess, "Popen", popen)
 
@@ -1340,9 +1327,7 @@ class _PushProcessProbe:
         self._stoppable = False
 
     def reap(self) -> None:
-        for child in self.unstoppable_children:
-            child.kill()
-            child.wait()
+        reap(self.unstoppable_children)
 
 
 @pytest.fixture
@@ -1374,6 +1359,10 @@ def _the_push_outlives_its_time_limit(probe: _PushProcessProbe) -> None:
 def _the_push_cannot_be_stopped(probe: _PushProcessProbe) -> None:
     _the_push_outlives_its_time_limit(probe)
     probe.cannot_stop_the_push()
+
+
+def _the_sentence_ending_in(visible_cause: str) -> str:
+    return rf"did not finish: {re.escape(visible_cause)}$"
 
 
 _PUSH_FAILURES_AFTER_THE_START = [
@@ -1416,11 +1405,11 @@ def test_bootstrap_calls_a_push_that_failed_after_starting_uncertain(
     landed, and the refusal says in its own sentence what went wrong."""
     break_the_push(push_probe)
 
-    with pytest.raises(protocol.UncertainWriteError, match=visible_cause):
+    with pytest.raises(protocol.UncertainWriteError, match=_the_sentence_ending_in(visible_cause)):
         store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
 
-def test_a_push_that_cannot_be_stopped_leaves_no_unreaped_child_after_the_test(
+def test_reap_collects_the_real_child_of_a_push_that_cannot_be_stopped(
     bare_remote: Path, worktree: Path, push_probe: _PushProcessProbe
 ) -> None:
     """Reaping the unstoppable push's real child leaves nothing for the OS to hold."""
@@ -3249,7 +3238,7 @@ def test_commit_transition_calls_a_push_that_failed_after_starting_uncertain(
     observed = fresh_observation(worktree, bare_remote)
     break_the_push(push_probe)
 
-    with pytest.raises(protocol.UncertainWriteError, match=visible_cause):
+    with pytest.raises(protocol.UncertainWriteError, match=_the_sentence_ending_in(visible_cause)):
         store.commit_transition(
             observed=observed,
             subject=store.ClaimTransitionSubject("claim issue 1", item="1"),
