@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "78f826b97553cbd8ca5d29f8fdc5155f54f4cb2d"
 branch = "claude/issue-189-claim-speicher-liest-stderr-von-git-in-d"
-scope = ["src/agent_coordination/process.py", "src/agent_coordination/store.py", "tests/test_process.py", "tests/test_state_board.py", "tests/test_store.py"]
+scope = ["src/agent_coordination/process.py", "src/agent_coordination/store.py", "tests/test_body_cli.py", "tests/test_process.py", "tests/test_state_board.py", "tests/test_store.py"]
 opened_commit = "8611746cb264b2106e17e96bc67a42c9132c7cec"
 whole_reason = "Getrennte Ströme für git mit Eingabe haben einen Owner in process, und store nutzt ihn für jede Objekt-ID; halb umgestellt läse ein Schreibvorgang weiter stderr."
