@@ -892,7 +892,11 @@ def _fake_lane_worktree_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     worktree, where `next` advises `claim`; its advice from the default
     branch's checkout is driven against real git in
     `test_next_advises_a_pull_that_runs_as_printed_where_it_stands`."""
-    monkeypatch.setattr(checkout, "git_output", lambda _arguments, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(
+        checkout,
+        "git_output",
+        lambda arguments, **_kwargs: "" if arguments[0] == "ls-tree" else str(tmp_path),
+    )
     monkeypatch.setattr(
         checkout,
         "resolve_path_checkout",
@@ -6332,6 +6336,30 @@ def test_next_advises_a_pull_that_runs_as_printed_where_it_stands(
     )
 
 
+def test_next_refuses_a_scope_read_git_fails_instead_of_advising_a_command(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """NEXT-42: a git failure reading the top item's scope never lets a
+    directory look like a file; `next` refuses with git's detail and prints
+    no `Next:` or `Run:` line."""
+    _real_state_ref_repository(
+        monkeypatch, tmp_path, {314: _state_ref_item_body("Fresh Slug Title", scope=["src"])}
+    )
+    stub_one_git_call(
+        monkeypatch,
+        ["ls-tree", "HEAD", "--", ":(literal)src"],
+        exit_status=128,
+        stderr=SCOPE_READ_FAILURE,
+    )
+
+    status = issue_claim.main(["next"])
+
+    captured = capsys.readouterr()
+    assert (status, captured.err) == (2, f"ERROR: {SCOPE_READ_FAILURE}\n")
+    assert "Next:" not in captured.out
+    assert "Run:" not in captured.out
+
+
 def _state_ref_container_body(title: str, *slice_titles: str, parent: int | None = None) -> str:
     rows = [
         {"index": index, "title": row, "done_when": "D"}
@@ -10821,11 +10849,10 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
     _arranged_claim_client(monkeypatch)
     monkeypatch.setattr(checkout, "scope_directories", scope_directories)
     git_values = git_checkout()
-    stub_one_git_call(
-        monkeypatch, ["rev-parse", "--verify", "--quiet", "HEAD:scratch"], exit_status=1, stderr=""
-    )
 
     def outside_a_working_tree(arguments: list[str], **_kwargs: object) -> str:
+        if arguments[0] == "ls-tree":
+            return ""
         if arguments[0] == "rev-parse":
             raise ClaimError("fatal: this operation must be run in a work tree")
         return git_values[tuple(arguments)]
@@ -10838,6 +10865,25 @@ def test_claim_with_an_untracked_scope_entry_outside_a_working_tree_keeps_the_ch
         ".aco/board.toml and needs a checkout (a shallow one is "
         "enough): fatal: this operation must be run in a work tree\n"
     )
+
+
+def test_cli_claim_json_reports_a_git_failure_reading_the_scope_as_unavailable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """CLAIM-26: a git failure reading a scope entry is not a path that is no
+    directory, so the claim refuses `unavailable` with git's detail instead
+    of admitting a directory without `--whole`."""
+    scope_directories = checkout.scope_directories
+    _arranged_claim_client(monkeypatch)
+    monkeypatch.setattr(checkout, "scope_directories", scope_directories)
+    _fail_scope_reads(monkeypatch)
+
+    status = issue_claim.main(_claim_argv("--scope", "docs", "--json"))
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.err == f"ERROR: {SCOPE_READ_FAILURE}\n"
+    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 @pytest.mark.parametrize(
@@ -12435,6 +12481,23 @@ def test_cli_rescope_json_refuses_no_active_claim_with_precondition_failed(
     _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
+SCOPE_READ_FAILURE = "fatal: object database unreadable"
+
+
+def _fail_scope_reads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every read of one scope entry's tree entry fails; any other git read
+    keeps answering from the faked checkout, so a gate that swallows the
+    failure shows as a wrong outcome, not as a missing fake entry."""
+    answers = git_checkout()
+
+    def read(arguments: list[str], **_kwargs: object) -> str:
+        if arguments[0] == "ls-tree" and arguments[-1].startswith(":(literal)"):
+            raise ClaimError(SCOPE_READ_FAILURE)
+        return answers[tuple(arguments)]
+
+    monkeypatch.setattr(checkout, "git_output", read)
+
+
 def test_cli_rescope_json_reports_a_git_failure_reading_the_scope_as_unavailable(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -12445,12 +12508,7 @@ def test_cli_rescope_json_reports_a_git_failure_reading_the_scope_as_unavailable
     scope_directories = checkout.scope_directories
     _arrange_github_rescope(monkeypatch, _rescope_forge())
     monkeypatch.setattr(checkout, "scope_directories", scope_directories)
-    stub_one_git_call(
-        monkeypatch,
-        ["rev-parse", "--verify", "--quiet", "HEAD:src/new.py"],
-        exit_status=128,
-        stderr="fatal: object database unreadable",
-    )
+    _fail_scope_reads(monkeypatch)
 
     status = issue_claim.main(
         ["--repo", REPOSITORY, "rescope", "72", "--add", "/repo/src/new.py", "--json"]
@@ -12458,7 +12516,7 @@ def test_cli_rescope_json_reports_a_git_failure_reading_the_scope_as_unavailable
 
     captured = capsys.readouterr()
     assert status == 2
-    assert captured.err == "ERROR: fatal: object database unreadable\n"
+    assert captured.err == f"ERROR: {SCOPE_READ_FAILURE}\n"
     _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 

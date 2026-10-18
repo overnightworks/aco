@@ -21,7 +21,6 @@ from cli_fixtures import (
     AGENT_IDENTITY_ENV_NAMES,
     bare_remote_repository_with_one_commit,
     dangle_recorded_head,
-    fail_git_launch,
     git_checkout,
     init_bare_repository,
     push_repository_trunk,
@@ -94,76 +93,158 @@ def test_scope_directories_finds_git_trees_and_untracked_directories_under_the_h
     def toplevel() -> Path:
         if toplevel_readable:
             return tmp_path
-        raise ClaimError("fatal: not a git repository")
+        raise ClaimError("fatal: this operation must be run in a work tree")
 
-    def entry_exists(arguments: list[str], **_kwargs: object) -> process.CapturedResult:
-        absent = arguments[-1] in {"HEAD:scratch", "HEAD:file.py"}
-        return process.CapturedResult(1 if absent else 0, b"", b"")
+    def tree_entry_of_docs(arguments: list[str], **_kwargs: object) -> str:
+        return "040000 tree 0123\tdocs" if arguments[-1].endswith("docs") else ""
 
-    monkeypatch.setattr(checkout, "_git_run", entry_exists)
-    monkeypatch.setattr(
-        checkout,
-        "git_output",
-        lambda arguments, **_kwargs: "blob" if arguments[-1] == "HEAD:notes.txt" else "tree",
-    )
+    monkeypatch.setattr(checkout, "git_output", tree_entry_of_docs)
 
     directories = checkout.scope_directories(
-        ("scratch", "file.py", "notes.txt", "docs"), directory=None, toplevel=toplevel
+        ("scratch", "file.py", "docs"), directory=None, toplevel=toplevel
     )
 
     assert directories == expected
 
 
+def _scope_repository(tmp_path: Path) -> Path:
+    """A repository whose HEAD tracks a directory, a directory with a glob
+    character and a space in its name, a file, a symlink to a directory, a
+    file that is a directory on disk, and a submodule entry (a gitlink)
+    whose commit lives in no object database here."""
+    repository = _scratch_git_repository(tmp_path)
+    for directory in ("docs", "g*b dir"):
+        (repository / directory).mkdir()
+        (repository / directory / "a.md").write_text("x\n")
+    (repository / "notes.txt").write_text("x\n")
+    (repository / "swapped").write_text("x\n")
+    (repository / "link").symlink_to("docs")
+    real_git(repository, "add", "-A")
+    real_git(repository, "update-index", "--add", "--cacheinfo", f"160000,{BASE[:40]},vendor")
+    real_git(repository, "commit", "-q", "-m", "entries")
+    (repository / "swapped").unlink()
+    (repository / "swapped").mkdir()
+    (repository / "untracked").mkdir()
+    return repository
+
+
 @pytest.mark.parametrize(
-    ("revision", "existence_exit", "tree_read_fails", "launch_failure", "expected_error"),
+    ("use_revision", "expected"),
     [
-        pytest.param(None, 128, False, None, "fatal: boom", id="existence-read-exits-128"),
-        pytest.param(None, 0, True, None, "fatal: unreadable", id="tree-read-exits-128"),
         pytest.param(
-            None, 0, False, OSError("no git"), "no git", id="existence-read-fails-to-launch"
-        ),
-        pytest.param(
-            None,
-            0,
             False,
-            process.ProcessTimedOutError("timed out"),
-            "git rev-parse timed out",
-            id="existence-read-times-out",
+            ("docs", "g*b dir", "link", "swapped", "untracked", "vendor"),
+            id="head-and-working-tree",
         ),
-        pytest.param(BASE, 128, False, None, "fatal: boom", id="start-reads-a-revision"),
+        pytest.param(True, ("docs", "g*b dir", "vendor"), id="revision-only-its-own-trees"),
+    ],
+)
+def test_scope_directories_counts_trees_gitlinks_and_on_disk_directories(
+    tmp_path: Path, use_revision: bool, expected: tuple[str, ...]
+) -> None:
+    """CLAIM-26: a tree, a gitlink (read without entering the submodule),
+    and a tracked entry or untracked path that is a directory on disk count
+    from HEAD; given a revision only its own trees and gitlinks do. Names
+    match literally, and a file or an unknown path never counts."""
+    repository = _scope_repository(tmp_path)
+    revision = real_git(repository, "rev-parse", "HEAD").stdout.strip() if use_revision else None
+
+    directories = checkout.scope_directories(
+        (
+            "docs",
+            "g*b dir",
+            "g*",
+            "link",
+            "notes.txt",
+            "swapped",
+            "untracked",
+            "vendor",
+            "missing",
+        ),
+        directory=repository,
+        toplevel=lambda: repository,
+        revision=revision,
+    )
+
+    assert directories == expected
+
+
+def test_scope_directories_refuses_a_tree_object_git_cannot_read(tmp_path: Path) -> None:
+    """Corruption is not absence: a missing parent tree object fails the
+    read with git's own text instead of dropping the entry."""
+    repository = _scope_repository(tmp_path)
+    docs_tree = real_git(repository, "rev-parse", "HEAD:docs").stdout.strip()
+    (repository / ".git" / "objects" / docs_tree[:2] / docs_tree[2:]).unlink()
+
+    with pytest.raises(ClaimError, match="Could not read"):
+        checkout.scope_directories(
+            ("docs/a.md",), directory=repository, toplevel=lambda: repository
+        )
+
+
+@pytest.mark.parametrize(
+    ("revision", "read_failure", "expected_error"),
+    [
+        pytest.param(
+            None, process.CapturedResult(128, b"", b"fatal: boom"), "fatal: boom", id="exit-128"
+        ),
+        pytest.param(
+            BASE,
+            process.CapturedResult(1, b"", b"error: Could not read"),
+            "Could not read",
+            id="start-reads-a-revision",
+        ),
+        pytest.param(None, OSError("no git"), "no git", id="fails-to-launch"),
+        pytest.param(
+            None, process.ProcessTimedOutError("timed out"), "git ls-tree timed out", id="times-out"
+        ),
     ],
 )
 def test_scope_directories_refuses_a_scope_read_that_git_fails_never_dropping_the_directory(
     monkeypatch: pytest.MonkeyPatch,
     revision: str | None,
-    existence_exit: int,
-    tree_read_fails: bool,
-    launch_failure: Exception | None,
+    read_failure: process.CapturedResult | Exception,
     expected_error: str,
 ) -> None:
     """The width gate never reads a git failure as a path that is no
-    directory: only exit 1 of the existence read means absent."""
-    existence_read = ["rev-parse", "--verify", "--quiet"]
-    if launch_failure is not None:
-        fail_git_launch(monkeypatch, existence_read, launch_failure)
-    else:
-        stub_one_git_call(
-            monkeypatch,
-            [*existence_read, f"{revision or 'HEAD'}:docs"],
-            exit_status=existence_exit,
-            stderr="fatal: boom",
-        )
-    if tree_read_fails:
+    directory: only an empty successful `ls-tree` means absent."""
 
-        def unreadable(_arguments: list[str], **_kwargs: object) -> str:
-            raise ClaimError("fatal: unreadable")
+    def failing_read(
+        _arguments: list[str], *, directory: Path | None = None
+    ) -> process.CapturedResult:
+        if isinstance(read_failure, Exception):
+            raise read_failure
+        return read_failure
 
-        monkeypatch.setattr(checkout, "git_output", unreadable)
+    monkeypatch.setattr(process, "run_git", failing_read)
 
     with pytest.raises(ClaimError, match=re.escape(expected_error)):
         checkout.scope_directories(
             ("docs",), directory=None, toplevel=lambda: Path("/unused"), revision=revision
         )
+
+
+@pytest.mark.parametrize(
+    "toplevel_failure",
+    [
+        checkout.GitTimedOutError("rev-parse"),
+        checkout.GitLaunchError("git is required for issue claims"),
+    ],
+    ids=["times-out", "fails-to-launch"],
+)
+def test_scope_directories_refuses_a_toplevel_read_that_never_answered(
+    tmp_path: Path, toplevel_failure: ClaimError
+) -> None:
+    """Only git saying "no working tree" lets the width gate count no
+    untracked directory; a toplevel read that timed out or never launched
+    refuses with its own text, so a retry cannot admit a wide claim."""
+    repository = _scope_repository(tmp_path)
+
+    def toplevel() -> Path:
+        raise toplevel_failure
+
+    with pytest.raises(ClaimError, match=re.escape(str(toplevel_failure))):
+        checkout.scope_directories(("missing",), directory=repository, toplevel=toplevel)
 
 
 def test_paths_under_scope_matches_prefix_or_exact_entry() -> None:

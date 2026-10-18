@@ -47,6 +47,11 @@ IDENTITY_ENVIRONMENT_ORDER = (
 _GIT_MISSING_EXECUTABLE_ERROR = "git is required for issue claims"
 
 
+class GitLaunchError(ClaimError):
+    """A git step that never started: a missing executable or any other
+    OS-level launch failure."""
+
+
 class GitTimedOutError(ClaimError):
     """A git step that ran past its timeout (issue #603), named by its own
     subcommand, never by a purpose it may not serve. Typed apart from every
@@ -74,11 +79,11 @@ def _git_run(arguments: list[str], *, directory: Path | None = None) -> process.
     try:
         return process.run_git(arguments, directory=directory)
     except process.ExecutableMissingError as error:
-        raise ClaimError(_GIT_MISSING_EXECUTABLE_ERROR) from error
+        raise GitLaunchError(_GIT_MISSING_EXECUTABLE_ERROR) from error
     except process.ProcessTimedOutError as error:
         raise GitTimedOutError(arguments[0]) from error
     except OSError as error:
-        raise ClaimError(f"git failed to launch: {error}") from error
+        raise GitLaunchError(f"git failed to launch: {error}") from error
 
 
 def git_output(arguments: list[str], *, directory: Path | None = None) -> str:
@@ -130,14 +135,13 @@ def attached_branch(checked_out: str) -> str:
 _REV_PARSE_VERIFY_EXIT_UNRESOLVED = 1
 
 
-def resolved_object(name: str, *, directory: Path | None = None) -> str | None:
-    """The object id `name` (any git object name: a commit, `<rev>:<path>`
-    entry, ...) resolves to in `directory` (or the calling process's own
-    cwd), or `None` when it does not resolve to a single object. A git
-    failure that keeps the read from answering either way -- a missing
-    executable, a timeout, or any exit but the documented "unresolved" one --
-    raises `ClaimError` with git's own detail instead."""
-    result = _git_run(["rev-parse", "--verify", "--quiet", name], directory=directory)
+def resolved_commit(ref: str, *, directory: Path | None = None) -> str | None:
+    """`ref`'s current commit in `directory` (or the calling process's own
+    cwd), or `None` when it does not resolve to a
+    single object. A git failure that keeps the read from answering either
+    way -- a missing executable, a timeout, or any exit but the documented
+    "unresolved" one -- raises `ClaimError` with git's own detail instead."""
+    result = _git_run(["rev-parse", "--verify", "--quiet", ref], directory=directory)
     if result.exit_status == _REV_PARSE_VERIFY_EXIT_UNRESOLVED:
         return None
     if result.exit_status != 0:
@@ -322,15 +326,16 @@ def scope_directories(
     (issue #472: its run context's, never a second git read), asked once
     and only for an entry that is no git tree. Given `revision`, only that
     commit's own trees count (issue #479): it has no checkout on disk yet.
-    An entry `<rev>` does not know counts no tree; a git failure reading it
-    raises `ClaimError` with git's own detail, never dropping the entry."""
+    A path `<rev>` does not know falls through to the checkout like any
+    entry that is no tree; a git failure reading it raises `ClaimError` with
+    git's own detail, never dropping the entry."""
     directories: list[str] = []
     checkout_root = functools.cache(lambda: _toplevel_or_none(toplevel))
     for path in paths:
-        entry = f"{revision or 'HEAD'}:{path}"
-        if resolved_object(entry, directory=directory) is not None:
-            if git_output(["cat-file", "-t", entry], directory=directory) == "tree":
-                directories.append(path)
+        if _tree_entry_kind(path, revision=revision or "HEAD", directory=directory) in (
+            _DIRECTORY_ENTRY_KINDS
+        ):
+            directories.append(path)
             continue
         if revision is not None:
             continue
@@ -340,12 +345,30 @@ def scope_directories(
     return tuple(directories)
 
 
+# A gitlink (a submodule's `commit` entry) is a directory of the superproject
+# without reading any object of the submodule's own repository.
+_DIRECTORY_ENTRY_KINDS = frozenset({"tree", "commit"})
+
+
+def _tree_entry_kind(path: str, *, revision: str, directory: Path | None) -> str | None:
+    """The kind (`tree`, `commit`, `blob`) of `path` in `revision`'s tree, or
+    `None` when the tree holds no such entry. One `ls-tree` answers it:
+    exit 0 with no output is the only absence, and a tree git cannot read
+    exits non-zero, so corruption never reads as absence. `:(literal)` keeps
+    glob characters and a leading `:` in `path` plain name characters."""
+    entry = git_output(["ls-tree", revision, "--", f":(literal){path}"], directory=directory)
+    return entry.split(maxsplit=2)[1] if entry else None
+
+
 def _toplevel_or_none(toplevel: Callable[[], Path]) -> Path | None:
-    """`toplevel()`, or `None` when it fails: the width gate then counts no
-    untracked directory, and the command's own toplevel refusal, which runs
-    after it, reports the failure (issue #472)."""
+    """`toplevel()`, or `None` when git ran and said it has none: the width
+    gate then counts no untracked directory, and the command's own toplevel
+    refusal, which runs after it, reports the failure (issue #472). A read
+    that timed out or never launched answered nothing, so it raises."""
     try:
         return toplevel()
+    except (GitTimedOutError, GitLaunchError):
+        raise
     except ClaimError:
         return None
 
@@ -956,7 +979,7 @@ def _first_resolving_ref(candidates: tuple[str, ...], *, directory: Path) -> str
         (
             candidate
             for candidate in candidates
-            if resolved_object(candidate, directory=directory) is not None
+            if resolved_commit(candidate, directory=directory) is not None
         ),
         None,
     )
@@ -1563,7 +1586,7 @@ def cleanup_landed_worktree(
     squash_landed = (
         not merged
         and landed_head is not None
-        and resolved_object(f"refs/heads/{branch}", directory=directory) == landed_head
+        and resolved_commit(f"refs/heads/{branch}", directory=directory) == landed_head
     )
     if not merged and not squash_landed:
         return worktree_cleanup_kept(WORKTREE_KEPT_NOT_MERGED_REASON)
