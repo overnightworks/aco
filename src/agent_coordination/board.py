@@ -54,12 +54,16 @@ WAITING_ON_OPERATOR = "waiting on operator"
 RULING_OLD_AFTER_LANDINGS = 10
 STALE_IDLE_DAYS = 7
 REFERENCE_PATTERN = re.compile(r"(?<!\w)#([1-9]\d*)", re.ASCII)
+# The number is bounded so `int()` of a match can never meet Python's digit
+# limit: a longer one is no reference, whichever line or keyword carries it.
+MAXIMUM_ISSUE_NUMBER_DIGITS = 18
 # One issue named the way GitHub names it across repositories: `OWNER/REPO#n`,
 # or `#n` for the repository the text itself lives in. Every typed line below
 # embeds this one grammar, so a shorthand and its qualified spelling always
 # parse to the same reference.
 QUALIFIED_REFERENCE = (
-    rf"(?:(?P<repository>{protocol.REPOSITORY_PATTERN.pattern}))?#(?P<number>[1-9]\d*)"
+    rf"(?:(?P<repository>{protocol.REPOSITORY_PATTERN.pattern}))?"
+    rf"#(?P<number>[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}})"
 )
 # GitHub links a keyword to a reference only on one line, separated by
 # horizontal space and ending at the reference: `Closes#7`, a keyword whose
@@ -1074,6 +1078,15 @@ def _no_item_classification(value: str) -> Classification | ClassificationDefect
     return NoItemClassification(NoItemKind(value.lower()))
 
 
+def _selected_classification(
+    selected: re.Match[str], repository: str
+) -> Classification | ClassificationDefect:
+    value = selected.group("value").strip(" \t")
+    if selected.group("kind").lower() == WORK_ITEM_KIND:
+        return _work_item_classification(value, repository)
+    return _no_item_classification(value)
+
+
 def parse_pull_request_classification(
     body: str, repository: str
 ) -> Classification | ClassificationDefect:
@@ -1088,10 +1101,7 @@ def parse_pull_request_classification(
     selected = _single_classification_match(matches)
     if isinstance(selected, ClassificationDefect):
         return selected
-    value = selected.group("value").strip(" \t")
-    if selected.group("kind").lower() == WORK_ITEM_KIND:
-        return _work_item_classification(value, repository)
-    return _no_item_classification(value)
+    return _selected_classification(selected, repository)
 
 
 def live_classification_line(body: str) -> str | None:
@@ -1099,6 +1109,55 @@ def live_classification_line(body: str) -> str | None:
     as a terminal may show it (a fenced example is no line), or `None`."""
     first = CLASSIFICATION_LINE_PATTERN.search(_live_text(body))
     return None if first is None else terminal_text(first.group(0))
+
+
+def pull_request_declaration(number: int, author: str, classification: Classification) -> str:
+    """The sentence `check` and `adopt` print for a pull request that declares
+    its classification (LAND-05, LAND-72)."""
+    return f"PR #{number} by {author} declares {classification}"
+
+
+class ClassificationLine(StrEnum):
+    ABSENT = "absent"
+    PRESENT = "present"
+
+
+@dataclass(frozen=True)
+class OtherClassificationLine:
+    """The one live line is not the kind's own `No-Item:` line."""
+
+    line: str
+
+
+@dataclass(frozen=True)
+class MalformedClassificationLines:
+    """More than one live line: why the parser refuses the body."""
+
+    defect: ClassificationDefect
+
+
+ClassificationLineState = (
+    ClassificationLine | OtherClassificationLine | MalformedClassificationLines
+)
+
+
+def classification_line_state(
+    body: str, kind: NoItemKind, repository: str
+) -> ClassificationLineState:
+    """What `aco adopt` finds of its own line in `body`: none, the kind's own
+    `No-Item: <kind>` (as `parse_pull_request_classification` reads it), another
+    single line as a terminal may show it, or the parser's defect for a body
+    with several."""
+    matches = tuple(CLASSIFICATION_LINE_PATTERN.finditer(_live_text(body)))
+    if not matches:
+        return ClassificationLine.ABSENT
+    selected = _single_classification_match(matches)
+    if isinstance(selected, ClassificationDefect):
+        return MalformedClassificationLines(selected)
+    classification = _selected_classification(selected, repository)
+    if isinstance(classification, NoItemClassification) and classification.kind is kind:
+        return ClassificationLine.PRESENT
+    return OtherClassificationLine(terminal_text(selected.group(0)))
 
 
 def body_with_classification(body: str, kind: NoItemKind) -> str:

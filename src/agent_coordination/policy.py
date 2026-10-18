@@ -441,16 +441,25 @@ def classification_defect(
 class AdoptionRequest:
     number: int
     kind: board.NoItemKind
+    agent: str
+    role: str
 
 
 @dataclass(frozen=True)
 class FreshAdoption:
     """What `adoption_preflight` proved adoptable: the claim's scope (LAND-74's
-    path set), the body to write, and the head both were judged at."""
+    path set) and the head it was judged at."""
 
     scope: tuple[str, ...]
-    body: str
     expected_head: str
+
+
+@dataclass(frozen=True)
+class HolderResume:
+    """The branch's one live claim is the asking session's own builder lane
+    claim: its rerun resumes it (ADOPT-26)."""
+
+    claim: protocol.ActiveClaim
 
 
 @dataclass(frozen=True)
@@ -462,41 +471,94 @@ def _adoption_refusal(number: int, defect: board.ClassificationDefect) -> Adopti
     return AdoptionRefusal(f"pull request #{number} {defect.message}")
 
 
+def _is_resumable_claim(claim: protocol.ActiveClaim, agent: str, role: str) -> bool:
+    return isinstance(claim.identity, protocol.LaneIdentity) and protocol.held_by(
+        claim, agent, role
+    )
+
+
 def adoption_holder(
-    claims: Mapping[str, protocol.ActiveClaim], branch: str, storage: body.Storage
-) -> AdoptionRefusal | None:
-    """ADOPT-06: any live claim on the head branch, issue or lane, refuses."""
+    claims: Mapping[str, protocol.ActiveClaim],
+    branch: str,
+    storage: body.Storage,
+    agent: str,
+    role: str,
+) -> AdoptionRefusal | HolderResume | None:
+    """ADOPT-06, ADOPT-26, ADOPT-32: a live claim on the head branch refuses,
+    naming the first claim that is not `agent`'s own lane claim as `role`; that
+    one claim, alone there, is the holder's to resume."""
     holders = protocol.branch_holders(claims, branch)
     if not holders:
         return None
+    foreign = next(
+        (claim for claim in holders if not _is_resumable_claim(claim, agent, role)), None
+    )
+    if foreign is None:
+        return HolderResume(holders[0])
     return AdoptionRefusal(
         protocol.claimed_by_sentence(
-            protocol.LaneIdentity(), branch, holders[0], board.item_labeller(storage)
+            protocol.LaneIdentity(), branch, foreign, board.item_labeller(storage)
         )
     )
 
 
-def adoption_body_defect(
-    context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind
+def _line_defect(
+    body_text: str, state: board.ClassificationLineState, *, resumed: bool
 ) -> board.ClassificationDefect | None:
-    """Why the body `aco adopt` would write is no issue-less landing: it
-    already carries a classification line (ADOPT-05), it would not read
-    `No-Item: <kind>` once the line is added (ADOPT-11), it targets another
-    branch than the default (ADOPT-04), or it closes an item (ADOPT-07)."""
-    live_line = board.live_classification_line(detail.body)
-    if live_line is not None:
+    """ADOPT-05, ADOPT-30: adopt never changes a classification line; only a
+    resumed rerun keeps its own."""
+    if state is board.ClassificationLine.ABSENT or (
+        resumed and state is board.ClassificationLine.PRESENT
+    ):
+        return None
+    if resumed and isinstance(state, board.MalformedClassificationLines):
         return board.ClassificationDefect(
-            f"already carries {live_line}; adopt never changes a classification line"
+            f"{state.defect.message}; adopt never changes a classification line"
         )
-    prospective = board.body_with_classification(detail.body, kind)
+    live_line = (
+        state.line
+        if isinstance(state, board.OtherClassificationLine)
+        else board.live_classification_line(body_text)
+    )
+    return board.ClassificationDefect(
+        f"already carries {live_line}; adopt never changes a classification line"
+    )
+
+
+def adoption_body(
+    context: LandingCheckContext,
+    detail: forge.Landing,
+    kind: board.NoItemKind,
+    *,
+    resumed: bool,
+) -> board.ClassificationDefect | str | None:
+    """The one decider of what `aco adopt` writes: the body it leaves on the
+    pull request, `None` when `detail.body` already reads as adopt leaves it
+    (a resumed rerun keeps its own line, ADOPT-26), or why it is no issue-less
+    landing: it already carries a classification line (ADOPT-05), it would not
+    read `No-Item: <kind>` once the line is added (ADOPT-11), it targets
+    another branch than the default (ADOPT-04), or it closes an item
+    (ADOPT-07)."""
+    state = board.classification_line_state(detail.body, kind, context.repository)
+    line_defect = _line_defect(detail.body, state, resumed=resumed)
+    if line_defect is not None:
+        return line_defect
+    prospective = (
+        detail.body
+        if state is board.ClassificationLine.PRESENT
+        else board.body_with_classification(detail.body, kind)
+    )
     classification = board.parse_pull_request_classification(prospective, context.repository)
     if isinstance(classification, board.ClassificationDefect):
         return board.ClassificationDefect(
             f"body would not read No-Item: {kind} with the line added: {classification.message}"
         )
-    return _target_branch_defect(context, detail) or closing_reference_defect(
+    defect = _target_branch_defect(context, detail) or closing_reference_defect(
         prospective, context.repository
     )
+    if defect is not None:
+        return defect
+    return None if state is board.ClassificationLine.PRESENT else prospective
 
 
 def _adoption_scope(
@@ -521,34 +583,44 @@ def _adoption_scope(
     return listed
 
 
+def _judged_scope(
+    context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind, *, resumed: bool
+) -> board.ClassificationDefect | frozenset[str]:
+    """The listing's path set, once the body adopt would leave passes its own
+    checks: the listing is read only past them."""
+    left_body = adoption_body(context, detail, kind, resumed=resumed)
+    if isinstance(left_body, board.ClassificationDefect):
+        return left_body
+    return _adoption_scope(context, detail, kind)
+
+
 def adoption_preflight(
     context: LandingCheckContext,
     request: AdoptionRequest,
     detail: forge.Landing,
     reference: forge.ItemReference,
     claims_provider: Callable[[], protocol.ClaimState],
-) -> FreshAdoption | AdoptionRefusal:
+) -> FreshAdoption | HolderResume | AdoptionRefusal:
     """Every refusal of `aco adopt` that comes before its build, in the one
     order of `specs/adopt.spec.md`: the first failing step wins. `detail` and
     `reference` are the caller's reads; the claims are read once, only past
     the pull request's own openness and repository, and the listing only past
-    the body's checks, as `cmd_land._land_preflight` orders its reads."""
+    the body's checks, as `cmd_land._land_preflight` orders its reads. The
+    holder's rerun (ADOPT-26) is judged by the same steps on the body it
+    would leave (ADOPT-31)."""
     if reference.state is not forge.ItemState.OPEN:
         return AdoptionRefusal(f"pull request #{request.number} is not open; it cannot be adopted")
     cross_repository = cross_repository_defect(context.repository, detail)
     if cross_repository is not None:
         return _adoption_refusal(request.number, cross_repository)
-    holder = adoption_holder(claims_provider().claims, detail.source_branch, context.storage)
-    if holder is not None:
+    holder = adoption_holder(
+        claims_provider().claims, detail.source_branch, context.storage, request.agent, request.role
+    )
+    if isinstance(holder, AdoptionRefusal):
         return holder
-    body_defect = adoption_body_defect(context, detail, request.kind)
-    if body_defect is not None:
-        return _adoption_refusal(request.number, body_defect)
-    scope = _adoption_scope(context, detail, request.kind)
+    scope = _judged_scope(context, detail, request.kind, resumed=holder is not None)
     if isinstance(scope, board.ClassificationDefect):
         return _adoption_refusal(request.number, scope)
-    return FreshAdoption(
-        tuple(sorted(scope)),
-        board.body_with_classification(detail.body, request.kind),
-        detail.head_sha,
-    )
+    if holder is not None:
+        return holder
+    return FreshAdoption(tuple(sorted(scope)), detail.head_sha)

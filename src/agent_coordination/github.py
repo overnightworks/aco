@@ -11,6 +11,7 @@ import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
+from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 from typing import TypeVar
@@ -436,6 +437,26 @@ def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | No
     if result.exit_status != 0:
         raise _nonzero_exit_failure(decoded, result.exit_status, purpose)
     return decoded
+
+
+class BodyWriteOutcome(StrEnum):
+    """What a failed `update_item_body` tells of the body: `REFUSED` wrote
+    nothing, `UNKNOWN` may have written it."""
+
+    REFUSED = "refused"
+    UNKNOWN = "unknown"
+
+
+def body_write_outcome(error: ClaimError) -> BodyWriteOutcome:
+    """The outcome of a body write that raised `error`: the forge's own
+    refusal of the call (authorization, no such item), and a `gh` that never
+    ran (a plain `ClaimError` -- `_bounded_command` raises only typed forge
+    errors once the process has started) wrote nothing; any other forge
+    failure may have come after the write."""
+    refused = isinstance(
+        error, forge.ForgePermissionDeniedError | forge.ForgeNotFoundError
+    ) or not isinstance(error, forge.ForgeError)
+    return BodyWriteOutcome.REFUSED if refused else BodyWriteOutcome.UNKNOWN
 
 
 _READ_ONLY_OPERATIONS = (
