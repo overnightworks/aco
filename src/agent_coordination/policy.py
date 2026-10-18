@@ -245,14 +245,14 @@ class LandingCheckContext:
 class _ParentRequirement:
     """What an item's parent demands of the pull request that lands the item.
 
-    `last_child` says closing the parent is *permitted* -- this landing
-    closes the parent's one remaining open child; `closing_required` narrows
-    that to *required*, which holds only when the parent's own `Next` line
-    names no further work.
+    `last_child` says this landing closes the parent's one remaining open
+    child, the only case in which closing the parent can be required or
+    permitted; `completion` is what the parent's own body says about closing
+    it, and `FORBIDDEN` holds whether or not this is the last child.
     """
 
     reference: board.IssueReference
-    closing_required: bool
+    completion: board.ParentCompletion
     last_child: bool
 
 
@@ -290,10 +290,10 @@ def _parent_requirement(
     body under the repository's own pin (#150).
 
     Closing a parent's last open child completes the parent only when the
-    parent's own `Next` line names no further work; otherwise the container
-    keeps dispatching slices, and the landing may close the parent (its one
-    remaining child) but need not. A parent keeping other open children
-    stays open, and must say what happens next.
+    parent holds no uncut `[[slice]]` row and its own `Next` line names no
+    further work; with only `Next` work left, the landing may close the
+    parent (its one remaining child) but need not. A parent keeping other
+    open children stays open, and must say what happens next.
     """
     parent = context.client.parent_issue(item.number)
     if parent is None:
@@ -309,19 +309,40 @@ def _parent_requirement(
         for child in context.client.list_children(parent.reference.number)
         if child.state is board.ChildState.OPEN and child.number != item.number
     )
+    completion = board.parent_completion(parsed_parent)
     if not remaining:
-        return _ParentRequirement(
-            parent.reference,
-            not board.has_further_work(parsed_parent.contract.next),
-            True,
-        )
+        return _ParentRequirement(parent.reference, completion, True)
     if not parsed_parent.contract.next:
         children = "child" if len(remaining) == 1 else "children"
         return board.ClassificationDefect(
             f"leaves parent {parent.reference} open with {len(remaining)} other open "
             f"{children}, whose body carries no Next line"
         )
-    return _ParentRequirement(parent.reference, False, False)
+    return _ParentRequirement(parent.reference, completion, False)
+
+
+def _parent_closing_defect(
+    closing: frozenset[board.IssueReference],
+    requirement: _ParentRequirement | None,
+) -> board.ClassificationDefect | None:
+    """Whether closing the parent, or leaving it open, contradicts its body (LAND-21, LAND-79)."""
+    if requirement is None:
+        return None
+    parent_closed = requirement.reference in closing
+    if parent_closed and requirement.completion is board.ParentCompletion.FORBIDDEN:
+        return board.ClassificationDefect(
+            f"closes parent {requirement.reference} although its body still holds "
+            "an uncut slice row; cut it or delete the row first"
+        )
+    if (
+        requirement.last_child
+        and requirement.completion is board.ParentCompletion.REQUIRED
+        and not parent_closed
+    ):
+        return board.ClassificationDefect(
+            f"closes the last open child of parent {requirement.reference}; close the parent too"
+        )
+    return None
 
 
 def _closing_defect(
@@ -334,14 +355,9 @@ def _closing_defect(
     closing = board.closing_references(detail.body, repository)
     if item not in closing:
         return board.ClassificationDefect(f"carries no closing reference for its work item {item}")
-    if (
-        requirement is not None
-        and requirement.closing_required
-        and requirement.reference not in closing
-    ):
-        return board.ClassificationDefect(
-            f"closes the last open child of parent {requirement.reference}; close the parent too"
-        )
+    parent_defect = _parent_closing_defect(closing, requirement)
+    if parent_defect is not None:
+        return parent_defect
     permitted_parent = (
         {requirement.reference} if requirement is not None and requirement.last_child else set()
     )
