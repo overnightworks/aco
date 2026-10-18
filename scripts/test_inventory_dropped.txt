@@ -252,3 +252,10 @@ tests/test_cli.py	'delete branch failed (simulated)'	#207: TestLandAfterMerge de
 tests/test_cli.py	'fast-forward'	#207: TestLandAfterMerge fetch and divergence O03 own the full literal step/error/recovery line.
 tests/test_cli.py	'fatal: Not possible to fast-forward, aborting.'	#207: TestLandAfterMerge ff-only-fails O03 compares this complete git sentence inside the full line; real divergence replaces the stub.
 tests/test_cli.py	'fatal: unreachable\\n\\x1b[2Jhint: \\u202eretry'	#207: TestLandAfterMerge escaped-fetch O03 owns the full literal line; RAW re-proves the old and new escape checks.
+tests/test_cli.py	'); re-run aco land 12\n'	#207: TestLandAfterMerge compares the complete stderr line, including the recovery command.
+tests/test_cli.py	'; follow-up incomplete: '	#207: TestLandAfterMerge compares the complete stderr line for each failed follow-up.
+tests/test_cli.py	'ERROR: MERGED pull request #12 as '	#207: TestLandAfterMerge compares the complete stderr line, normalizing only the independently read merge OID.
+tests/test_cli.py	'delete branch failed (simulated)'	#207: The delete-error case owns its arranged failure and complete expected stderr sentence.
+tests/test_cli.py	'fast-forward'	#207: Fetch and divergence cases compare the complete step, error and recovery sentence.
+tests/test_cli.py	'fatal: Not possible to fast-forward, aborting.'	#207: The real divergence case compares the complete git error within stderr.
+tests/test_cli.py	'fatal: unreachable\\n\\x1b[2Jhint: \\u202eretry'	#207: The escaped-fetch case compares the complete stderr line; injecting raw terminal controls rejects both old and new comparisons.

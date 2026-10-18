@@ -187,6 +187,14 @@ def real_git(
     )
 
 
+def local_branches(clone: Path) -> frozenset[str]:
+    return frozenset(
+        real_git(
+            clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
+        ).stdout.splitlines()
+    )
+
+
 def worktrees_and_branches(repository: Path) -> tuple[str, str]:
     return (
         real_git(repository, "worktree", "list", "--porcelain").stdout,

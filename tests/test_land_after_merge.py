@@ -6,21 +6,19 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import assert_never
 
 import pytest
-from cli_fixtures import add_lane_worktree, real_git, run_cli, stub_one_git_call, trunk_git_calls
-from github_fixtures import FakeForge, LaneLandingWorld, lane_landing_world
+from cli_fixtures import (
+    add_lane_worktree,
+    local_branches,
+    real_git,
+    run_cli,
+    stub_one_git_call,
+    trunk_git_calls,
+)
+from github_fixtures import LANDING_DEFAULT_BRANCH, FakeForge, LaneLandingWorld, lane_landing_world
 
 from agent_coordination import checkout, forge, protocol, store
-
-
-class FailureStage(Enum):
-    DELETE = "delete"
-    FETCH = "fetch"
-    FETCH_CONTROLS = "fetch-controls"
-    DIVERGED = "diverged"
-    RELEASE = "release"
 
 
 class TrunkState(Enum):
@@ -28,12 +26,21 @@ class TrunkState(Enum):
     DIVERGED = "1\t1\n"
 
 
+class ExpectedTrunk(Enum):
+    UNCHANGED = "unchanged"
+    FAST_FORWARDED = "fast-forwarded"
+
+
 @dataclass(frozen=True)
 class FailureCase:
-    stage: FailureStage
     stderr: str
     error: str | None = None
     trunk: TrunkState = TrunkState.ALIGNED
+    delete_error: str | None = None
+    close_error: str | None = None
+    deleted_branches: tuple[str, ...] = ("codex/issue-72-claims",)
+    fetch_calls: tuple[str, ...] = ("fetch",)
+    expected_trunk: ExpectedTrunk = ExpectedTrunk.UNCHANGED
 
 
 @dataclass
@@ -61,17 +68,10 @@ def world(
     def arrange(client: FakeForge, _head: str) -> None:
         add_lane_worktree(github_clone, lane, "codex/issue-72-claims")
         client.closes_on_merge = False
-        match case.stage:
-            case FailureStage.DELETE:
-                client.delete_error = forge.ForgeError("delete branch failed (simulated)")
-            case FailureStage.RELEASE:
-                client.close_error = forge.ForgeError("forge unreachable")
-            case FailureStage.DIVERGED:
-                real_git(github_clone, "commit", "--allow-empty", "-qm", "local trunk change")
-            case FailureStage.FETCH | FailureStage.FETCH_CONTROLS:
-                pass
-            case _ as unreachable:
-                assert_never(unreachable)
+        client.delete_error = forge.ForgeError(case.delete_error) if case.delete_error else None
+        client.close_error = forge.ForgeError(case.close_error) if case.close_error else None
+        if case.trunk is TrunkState.DIVERGED:
+            real_git(github_clone, "commit", "--allow-empty", "-qm", "local trunk change")
         observed = {
             "locale": os.environ["LC_ALL"],
             "branch": real_git(github_clone, "branch", "--show-current").stdout,
@@ -92,10 +92,8 @@ def world(
             "status": "",
             "item": forge.ItemState.OPEN,
             "auto-close": False,
-            "delete-error": "delete branch failed (simulated)"
-            if case.stage is FailureStage.DELETE
-            else None,
-            "close-error": "forge unreachable" if case.stage is FailureStage.RELEASE else None,
+            "delete-error": case.delete_error,
+            "close-error": case.close_error,
             "topology": case.trunk.value,
             "advice": "false\n",
             "merged": False,
@@ -122,8 +120,8 @@ def world(
         landing,
         case,
         lane,
-        real_git(github_clone, "rev-parse", "main").stdout,
-        real_git(bare_remote, "rev-parse", "main").stdout,
+        real_git(github_clone, "rev-parse", LANDING_DEFAULT_BRANCH).stdout.strip(),
+        real_git(bare_remote, "rev-parse", LANDING_DEFAULT_BRANCH).stdout.strip(),
     )
 
 
@@ -133,15 +131,16 @@ class TestLandAfterMerge:
         [
             pytest.param(
                 FailureCase(
-                    FailureStage.DELETE,
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
                     "delete-branch (delete branch failed (simulated)); re-run aco land 12\n",
+                    delete_error="delete branch failed (simulated)",
+                    deleted_branches=(),
+                    fetch_calls=(),
                 ),
                 id="delete-branch",
             ),
             pytest.param(
                 FailureCase(
-                    FailureStage.FETCH,
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
                     "fast-forward (fatal: unreachable); re-run aco land 12\n",
                     error="fatal: unreachable",
@@ -150,7 +149,6 @@ class TestLandAfterMerge:
             ),
             pytest.param(
                 FailureCase(
-                    FailureStage.FETCH_CONTROLS,
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
                     "fast-forward (fatal: unreachable\\n\\x1b[2Jhint: \\u202eretry); "
                     "re-run aco land 12\n",
@@ -160,7 +158,6 @@ class TestLandAfterMerge:
             ),
             pytest.param(
                 FailureCase(
-                    FailureStage.DIVERGED,
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
                     "fast-forward (fatal: Not possible to fast-forward, aborting.); "
                     "re-run aco land 12\n",
@@ -170,9 +167,10 @@ class TestLandAfterMerge:
             ),
             pytest.param(
                 FailureCase(
-                    FailureStage.RELEASE,
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
                     "release (forge unreachable); re-run aco land 12\n",
+                    close_error="forge unreachable",
+                    expected_trunk=ExpectedTrunk.FAST_FORWARDED,
                 ),
                 id="release-fails",
             ),
@@ -193,50 +191,47 @@ class TestLandAfterMerge:
         capsys.readouterr()
         result = run_cli(["land", "12"], capsys)
         land_calls = list(calls)
-        remote = real_git(landing.remote, "rev-parse", "main").stdout
-        trunk = real_git(landing.clone, "rev-parse", "main").stdout
+        remote = real_git(landing.remote, "rev-parse", landing.default_branch).stdout.strip()
+        trunk = real_git(landing.clone, "rev-parse", landing.default_branch).stdout.strip()
         claims = store.peek_state(worktree=landing.clone, remote=str(landing.remote)).claims
-        branches = real_git(
-            landing.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
-        ).stdout.splitlines()
+        branches = local_branches(landing.clone)
+        expected_trunks = {
+            ExpectedTrunk.UNCHANGED: world.trunk_before,
+            ExpectedTrunk.FAST_FORWARDED: landing.forge.landings[12].merge_commit,
+        }
         observed = {
-            "O01": result.status,
-            "O02": result.stdout,
-            "O03": result.stderr.replace(remote.strip(), "<sha>"),
-            "O04": result.stderr.rpartition("; ")[2],
-            "O05": landing.forge.landings[12].merge_commit is not None,
-            "O06": len(landing.forge.merge_calls),
-            "O07": list(landing.forge.deleted_branches),
-            "O08": trunk
-            == (remote if world.case.stage is FailureStage.RELEASE else world.trunk_before),
-            "O09": set(landing.forge.closed_issues),
-            "O10": dict(landing.forge.landing_comments),
-            "O11": tuple(sorted(str(claim.claim_id) for claim in claims.values())),
-            "O12": world.lane.exists(),
-            "O13": "codex/issue-72-claims" in branches,
-            "O14": land_calls,
-            "O15": remote != world.remote_before,
+            "exit": result.status,
+            "stdout": result.stdout,
+            "stderr": result.stderr.replace(remote.strip(), "<sha>"),
+            "merge.recorded": landing.forge.landings[12].merge_commit is not None,
+            "merge.calls": len(landing.forge.merge_calls),
+            "deleted.branches": tuple(landing.forge.deleted_branches),
+            "trunk": trunk,
+            "closed.items": set(landing.forge.closed_issues),
+            "landing.comments": dict(landing.forge.landing_comments),
+            "claims": tuple(sorted(str(claim.claim_id) for claim in claims.values())),
+            "lane.exists": world.lane.exists(),
+            "lane.branch.exists": "codex/issue-72-claims" in branches,
+            "fetch.calls": land_calls,
+            "remote.moved": remote != world.remote_before,
         }
         expected = {
-            "O01": 2,
-            "O02": "",
-            "O03": world.case.stderr,
-            "O04": "re-run aco land 12\n",
-            "O05": True,
-            "O06": 1,
-            "O07": [] if world.case.stage is FailureStage.DELETE else ["codex/issue-72-claims"],
-            "O08": True,
-            "O09": set(),
-            "O10": {},
-            "O11": ("landing",),
-            "O12": True,
-            "O13": True,
-            "O14": []
-            if world.case.stage is FailureStage.DELETE
-            else [("fetch", landing.clone.resolve())],
-            "O15": True,
+            "exit": 2,
+            "stdout": "",
+            "stderr": world.case.stderr,
+            "merge.recorded": True,
+            "merge.calls": 1,
+            "deleted.branches": world.case.deleted_branches,
+            "trunk": expected_trunks[world.case.expected_trunk],
+            "closed.items": set(),
+            "landing.comments": {},
+            "claims": ("landing",),
+            "lane.exists": True,
+            "lane.branch.exists": True,
+            "fetch.calls": [(call, landing.clone.resolve()) for call in world.case.fetch_calls],
+            "remote.moved": True,
         }
-        if world.case.stage is FailureStage.RELEASE:
+        if world.case.close_error is not None:
             release = run_cli(
                 ["release", "72", "--merged", "12", "--branch", "codex/issue-72-claims"], capsys
             )
@@ -246,22 +241,22 @@ class TestLandAfterMerge:
             release_sentence = release.stderr.removeprefix("ERROR: ").removesuffix("\n")
             observed.update(
                 {
-                    "S01": release.status,
-                    "S02": release.stdout,
-                    "S03": release.stderr,
-                    "S04": land_sentence,
-                    "S05": release_sentence,
-                    "S06": land_sentence == release_sentence,
+                    "release.exit": release.status,
+                    "release.stdout": release.stdout,
+                    "release.stderr": release.stderr,
+                    "land.release-sentence": land_sentence,
+                    "release.sentence": release_sentence,
+                    "release.sentence-equal": land_sentence == release_sentence,
                 }
             )
             expected.update(
                 {
-                    "S01": 2,
-                    "S02": "",
-                    "S03": "ERROR: forge unreachable\n",
-                    "S04": "forge unreachable",
-                    "S05": "forge unreachable",
-                    "S06": True,
+                    "release.exit": 2,
+                    "release.stdout": "",
+                    "release.stderr": f"ERROR: {world.case.close_error}\n",
+                    "land.release-sentence": world.case.close_error,
+                    "release.sentence": world.case.close_error,
+                    "release.sentence-equal": True,
                 }
             )
         assert observed == expected

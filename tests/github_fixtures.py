@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue
-from cli_fixtures import CliRun, push_lane_branch, real_git, worktrees_and_branches
+from cli_fixtures import CliRun, local_branches, push_lane_branch, real_git, worktrees_and_branches
 from store_fixtures import (
     claim_intent,
     lineage_observation,
@@ -656,11 +656,7 @@ def landed_observations(
         for line in real_git(world.clone, "worktree", "list", "--porcelain").stdout.splitlines()
         if line.startswith(("worktree ", "branch "))
     )
-    branches = frozenset(
-        real_git(
-            world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
-        ).stdout.splitlines()
-    )
+    branches = local_branches(world.clone)
     entry = world.entry_lineage[0] if world.entry_lineage else ("missing", "missing")
     merge = calls[0] if calls else (None, None, None, None, "")
     comparisons: dict[str, tuple[object, object]] = {

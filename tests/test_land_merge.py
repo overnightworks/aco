@@ -12,6 +12,7 @@ from cli_fixtures import (
     MainBranchState,
     add_lane_worktree,
     landed_from_another_clone,
+    local_branches,
     move_trunk,
     pull_request_listing,
     real_git,
@@ -465,11 +466,7 @@ class TestLandMergeMethod:
         """
         result = land(world, capsys)
         observed, expected = merge_observations(world, result)
-        branches = frozenset(
-            real_git(
-                world.clone, "for-each-ref", "--format=%(refname:short)", "refs/heads"
-            ).stdout.splitlines()
-        )
+        branches = local_branches(world.clone)
         observed.update(
             {
                 "removed-line": "worktree: removed\n" in result.stdout,
