@@ -271,6 +271,13 @@ def _list_files_named(count: int) -> Callable[[AdoptionWorld], None]:
             id="cell-6-classification-line",
         ),
         pytest.param(
+            lambda world: world.serve(lambda landing: replace(landing, body=ADOPTED_BODY)),
+            "deps",
+            f"pull request #{ADOPTED_PULL_REQUEST} already carries No-Item: deps; "
+            "adopt never changes a classification line",
+            id="cell-6-own-line-without-a-claim",
+        ),
+        pytest.param(
             lambda world: world.list_files("uv.lock", "pyproject.toml", "src/x.py"),
             "deps",
             f"pull request #{ADOPTED_PULL_REQUEST} changes src/x.py, "
