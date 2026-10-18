@@ -10,12 +10,14 @@ from cli_fixtures import CliRun, real_git, run_cli, track_board_config, worktree
 from github_fixtures import (
     MERGE_COMMIT_SHA,
     FakeForge,
+    LandingWorld,
     assert_github_world,
+    landing_effects,
     landing_pull_request,
     landing_readiness,
+    refusal_observations,
     serve_forge,
 )
-from store_fixtures import lineage_observation, state_ref_tip
 
 from agent_coordination import cli, forge
 
@@ -43,30 +45,8 @@ class LandingCase:
 
 
 @dataclass
-class LandingWorld:
-    clone: Path
-    remote: Path
-    forge: FakeForge
+class LandingScenario(LandingWorld):
     case: LandingCase
-    unchanged: dict[str, object]
-
-
-def effects(world: LandingWorld) -> dict[str, object]:
-    worktrees, branches = worktrees_and_branches(world.clone)
-    stamp, anchor = lineage_observation(world.clone)
-    return {
-        "merge": list(world.forge.merge_calls),
-        "delete": list(world.forge.deleted_branches),
-        "close": set(world.forge.closed_issues),
-        "body": list(world.forge.body_writes),
-        "remote": state_ref_tip(world.remote),
-        "local": state_ref_tip(world.clone),
-        "worktrees": worktrees,
-        "branches": branches,
-        "trunk": real_git(world.clone, "rev-parse", "main").stdout,
-        "stamp": stamp,
-        "anchor": anchor,
-    }
 
 
 @pytest.fixture
@@ -75,7 +55,7 @@ def world(
     github_clone: Path,
     bare_remote: Path,
     monkeypatch: pytest.MonkeyPatch,
-) -> LandingWorld:
+) -> LandingScenario:
     case: LandingCase = request.param
     monkeypatch.setenv("LC_ALL", "C")
     monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
@@ -108,31 +88,14 @@ def world(
         "stamp": None,
         "anchor": None,
     }
-    result = LandingWorld(github_clone, bare_remote, client, case, unchanged)
-    observed = effects(result)
+    result = LandingScenario(github_clone, bare_remote, client, unchanged, case)
+    observed = landing_effects(result)
     assert observed == unchanged
     return result
 
 
-def land(world: LandingWorld, capsys: pytest.CaptureFixture[str]) -> CliRun:
+def land(world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> CliRun:
     return run_cli(["land", "12", *world.case.arguments], capsys)
-
-
-def refusal_observations(
-    world: LandingWorld, result: CliRun
-) -> tuple[dict[str, object], dict[str, object]]:
-    observed = {"exit": result.status, "out": result.stdout, "err": result.stderr, **effects(world)}
-    expected = {
-        "exit": 2,
-        "out": "",
-        "err": "ERROR: " + world.case.sentence + "\n",
-        **world.unchanged,
-    }
-    if world.case.bounded:
-        length = len(result.stderr.rstrip("\n"))
-        observed["length"] = length if world.case.exact_length else length <= 200
-        expected["length"] = 200 if world.case.exact_length else True
-    return observed, expected
 
 
 class TestLandReadiness:
@@ -257,12 +220,18 @@ class TestLandReadiness:
         ],
         indirect=True,
     )
-    def test_refusal(self, world: LandingWorld, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_refusal(self, world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-02, LANDCMD-03, LANDCMD-04, LANDCMD-05, LANDCMD-06.
         Exact refusal and no writes.
         """
         capsys.readouterr()
-        observed, expected = refusal_observations(world, land(world, capsys))
+        observed, expected = refusal_observations(
+            world,
+            land(world, capsys),
+            world.case.sentence,
+            bounded=world.case.bounded,
+            exact_length=world.case.exact_length,
+        )
         assert observed == expected
 
 
@@ -434,10 +403,16 @@ class TestLandQualityGate:
         ],
         indirect=True,
     )
-    def test_refusal(self, world: LandingWorld, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_refusal(self, world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-02, LANDCMD-43 -- exact refusal and no writes."""
         capsys.readouterr()
-        observed, expected = refusal_observations(world, land(world, capsys))
+        observed, expected = refusal_observations(
+            world,
+            land(world, capsys),
+            world.case.sentence,
+            bounded=world.case.bounded,
+            exact_length=world.case.exact_length,
+        )
         observed["quality reads"] = tuple(world.forge.quality_config_reads)
         expected["quality reads"] = world.case.quality_reads
         assert observed == expected
@@ -549,10 +524,16 @@ class TestLandEntry:
         ],
         indirect=True,
     )
-    def test_refusal(self, world: LandingWorld, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_refusal(self, world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-01, LANDCMD-19, LANDCMD-31 -- exact refusal and no writes."""
         capsys.readouterr()
-        observed, expected = refusal_observations(world, land(world, capsys))
+        observed, expected = refusal_observations(
+            world,
+            land(world, capsys),
+            world.case.sentence,
+            bounded=world.case.bounded,
+            exact_length=world.case.exact_length,
+        )
         if world.case.requests is not None:
             observed["requests"] = world.forge.requests
             expected["requests"] = world.case.requests
@@ -661,7 +642,7 @@ class TestLandEntry:
     indirect=True,
 )
 def test_parser_refusal(
-    world: LandingWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: LandingScenario, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: LANDCMD-33, LANDCMD-44 -- parser refusal, no command entry or forge request."""
 
@@ -682,23 +663,14 @@ def test_parser_refusal(
         status = error.code
         exited = True
     captured = capsys.readouterr()
-    observed = {
-        "exit": status,
-        "out": captured.out,
-        "requests": world.forge.requests,
-        **effects(world),
-    }
-    expected = {"exit": 2, "out": "", "requests": 0, **world.unchanged}
-    if world.case.parser_exit:
-        observed.update(
-            {
-                "exception": exited,
-                "usage": captured.err.startswith(world.case.usage_prefix),
-                "last": captured.err.splitlines()[-1] if captured.err else "",
-            }
-        )
-        expected.update({"exception": True, "usage": True, "last": world.case.sentence})
-    else:
-        observed["err"] = captured.err
-        expected["err"] = "ERROR: " + world.case.sentence + "\n"
+    observed, expected = refusal_observations(
+        world,
+        CliRun(status, captured.out, captured.err),
+        world.case.sentence,
+        parser_exit=world.case.parser_exit,
+        exited=exited,
+        usage_prefix=world.case.usage_prefix,
+    )
+    observed["requests"] = world.forge.requests
+    expected["requests"] = 0
     assert observed == expected

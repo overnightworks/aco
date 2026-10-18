@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from cli_fixtures import real_git
+from cli_fixtures import fresh_observation, real_git
 
 from agent_coordination import protocol, store
 
@@ -189,3 +189,27 @@ def unrelated_racer_commit(worktree: Path, remote: Path) -> str:
     ).stdout.strip()
     real_git(worktree, "push", str(remote), f"{racer}:{store.STATE_REF}")
     return racer
+
+
+def publish_claims_from_a_second_clone(
+    landing_clone: Path, remote: Path, intents: tuple[protocol.ClaimIntent, ...]
+) -> protocol.ClaimState:
+    """Publish fixture claims without stamping or anchoring the landing clone."""
+    seed = landing_clone.parent / "seed"
+    real_git(landing_clone.parent, "clone", "-q", str(remote), str(seed))
+    observed = seed.resolve() != landing_clone.resolve()
+    expected = True
+    assert observed == expected
+    observed = (
+        real_git(seed, "rev-parse", "--absolute-git-dir").stdout
+        != real_git(landing_clone, "rev-parse", "--absolute-git-dir").stdout
+    )
+    assert observed == expected
+    store.bootstrap(worktree=seed, remote=str(remote))
+    for intent in intents:
+        store.commit_transition(
+            observed=fresh_observation(seed, remote),
+            subject=store.transition_subject("claim", intent.identity, intent.branch),
+            intent=intent,
+        )
+    return store.peek_state(worktree=seed, remote=str(remote))

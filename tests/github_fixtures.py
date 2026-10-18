@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue
-from cli_fixtures import real_git
-from store_fixtures import state_ref_tip
+from cli_fixtures import CliRun, real_git, worktrees_and_branches
+from store_fixtures import lineage_observation, state_ref_tip
 
 from agent_coordination import board, body, cmd_land, forge, github
 from agent_coordination.protocol import ClaimError
@@ -476,3 +476,61 @@ def assert_github_world(github_clone: Path, bare_remote: Path) -> None:
         == f"{main}\trefs/heads/main\n"
     )
     assert state_ref_tip(bare_remote) is None
+
+
+@dataclass
+class LandingWorld:
+    clone: Path
+    remote: Path
+    forge: FakeForge
+    unchanged: dict[str, object]
+
+
+def landing_effects(world: LandingWorld) -> dict[str, object]:
+    worktrees, branches = worktrees_and_branches(world.clone)
+    stamp, anchor = lineage_observation(world.clone)
+    return {
+        "merge": list(world.forge.merge_calls),
+        "delete": list(world.forge.deleted_branches),
+        "close": set(world.forge.closed_issues),
+        "body": list(world.forge.body_writes),
+        "remote": state_ref_tip(world.remote),
+        "local": state_ref_tip(world.clone),
+        "worktrees": worktrees,
+        "branches": branches,
+        "trunk": real_git(world.clone, "rev-parse", "main").stdout,
+        "stamp": stamp,
+        "anchor": anchor,
+    }
+
+
+def refusal_observations(
+    world: LandingWorld,
+    result: CliRun,
+    sentence: str,
+    *,
+    bounded: bool = False,
+    exact_length: bool = False,
+    parser_exit: bool = False,
+    exited: bool = False,
+    usage_prefix: str = "usage: aco land ",
+) -> tuple[dict[str, object], dict[str, object]]:
+    observed = {"exit": result.status, "out": result.stdout, **landing_effects(world)}
+    expected = {"exit": 2, "out": "", **world.unchanged}
+    if parser_exit:
+        observed.update(
+            {
+                "exception": exited,
+                "usage": result.stderr.startswith(usage_prefix),
+                "last": result.stderr.splitlines()[-1] if result.stderr else "",
+            }
+        )
+        expected.update({"exception": True, "usage": True, "last": sentence})
+    else:
+        observed["err"] = result.stderr
+        expected["err"] = "ERROR: " + sentence + "\n"
+    if bounded:
+        length = len(result.stderr.rstrip("\n"))
+        observed["length"] = length if exact_length else length <= 200
+        expected["length"] = 200 if exact_length else True
+    return observed, expected
