@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import ast
 import errno
+import os
 import re
 import subprocess
 import sys
 import threading
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from enum import Enum
 from functools import partial
@@ -1263,32 +1264,65 @@ def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     assert state_ref_tip(bare_remote) is None
 
 
+class _UnstoppableProcess:
+    """A started push that never reports its exit, so `wait()` always times out."""
+
+    def __init__(self, started: subprocess.Popen[Any]) -> None:
+        self._started = started
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._started, name)
+
+    def poll(self) -> None:
+        return None
+
+    def wait(self, timeout: float | None = None) -> int:
+        raise subprocess.TimeoutExpired(cmd="git push", timeout=timeout or 0)
+
+
 class _PushProcessProbe:
     """Controls the process boundary of `git push` only: every other git
-    command runs for real, and `started` counts the pushes attempted."""
+    command runs for real, and `started` counts the pushes attempted from the
+    first control on. The real child of a push made unstoppable stays owned
+    here and is reaped by `reap()`."""
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self.started = 0
+        self.unstoppable_children: list[subprocess.Popen[Any]] = []
         self._start_failure: OSError | None = None
         self._replacement_command: list[str] | None = None
+        self._stoppable = True
+        self._monkeypatch = monkeypatch
+        self._controlling = False
+
+    def _control_pushes(self) -> None:
+        if self._controlling:
+            return
+        self._controlling = True
         real_popen = subprocess.Popen
 
         def popen(command: list[str], *args: Any, **kwargs: Any) -> Any:
-            if "push" in command:
-                self.started += 1
-                if self._start_failure is not None:
-                    raise self._start_failure
-                if self._replacement_command is not None:
-                    command = self._replacement_command
-            return real_popen(command, *args, **kwargs)
+            if "push" not in command:
+                return real_popen(command, *args, **kwargs)
+            self.started += 1
+            if self._start_failure is not None:
+                raise self._start_failure
+            if self._replacement_command is not None:
+                command = self._replacement_command
+            started = real_popen(command, *args, **kwargs)
+            if self._stoppable:
+                return started
+            self.unstoppable_children.append(started)
+            return _UnstoppableProcess(started)
 
-        monkeypatch.setattr(subprocess, "Popen", popen)
-        self._monkeypatch = monkeypatch
+        self._monkeypatch.setattr(subprocess, "Popen", popen)
 
     def fails_to_start(self, failure: OSError) -> None:
+        self._control_pushes()
         self._start_failure = failure
 
     def runs_instead(self, command: list[str]) -> None:
+        self._control_pushes()
         self._replacement_command = command
 
     def expires_the_push_at_once(self) -> None:
@@ -1302,28 +1336,20 @@ class _PushProcessProbe:
         self._monkeypatch.setattr(process, "run_bounded_captured", bounded)
 
     def cannot_stop_the_push(self) -> None:
-        real_popen = subprocess.Popen
+        self._control_pushes()
+        self._stoppable = False
 
-        class UnstoppableProcess:
-            """A started push that dies on `kill()` yet never reports its exit."""
+    def reap(self) -> None:
+        for child in self.unstoppable_children:
+            child.kill()
+            child.wait()
 
-            def __init__(self, started: Any) -> None:
-                self._started = started
 
-            def __getattr__(self, name: str) -> Any:
-                return getattr(self._started, name)
-
-            def poll(self) -> None:
-                return None
-
-            def wait(self, timeout: float | None = None) -> int:
-                raise subprocess.TimeoutExpired(cmd="git push", timeout=timeout or 0)
-
-        def popen(command: list[str], *args: Any, **kwargs: Any) -> Any:
-            started = real_popen(command, *args, **kwargs)
-            return UnstoppableProcess(started) if "push" in command else started
-
-        self._monkeypatch.setattr(subprocess, "Popen", popen)
+@pytest.fixture
+def push_probe(monkeypatch: pytest.MonkeyPatch) -> Iterator[_PushProcessProbe]:
+    probe = _PushProcessProbe(monkeypatch)
+    yield probe
+    probe.reap()
 
 
 _PUSH_START_FAILURES = [
@@ -1365,17 +1391,16 @@ _PUSH_FAILURES_AFTER_THE_START = [
 def test_bootstrap_refuses_plainly_when_the_push_process_never_started(
     bare_remote: Path,
     worktree: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    push_probe: _PushProcessProbe,
     start_failure: OSError,
 ) -> None:
     """Spec: CAS-56 covers sent writes only; a push that never started is a plain refusal."""
-    probe = _PushProcessProbe(monkeypatch)
-    probe.fails_to_start(start_failure)
+    push_probe.fails_to_start(start_failure)
 
     with pytest.raises(protocol.PushNotStartedError):
         store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
-    assert probe.started == 1
+    assert push_probe.started == 1
     assert state_ref_tip(bare_remote) is None
 
 
@@ -1383,16 +1408,32 @@ def test_bootstrap_refuses_plainly_when_the_push_process_never_started(
 def test_bootstrap_calls_a_push_that_failed_after_starting_uncertain(
     bare_remote: Path,
     worktree: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    push_probe: _PushProcessProbe,
     break_the_push: Callable[[_PushProcessProbe], None],
     visible_cause: str,
 ) -> None:
     """Spec: CAS-56; once the push process ran, only the remote knows whether it
     landed, and the refusal says in its own sentence what went wrong."""
-    break_the_push(_PushProcessProbe(monkeypatch))
+    break_the_push(push_probe)
 
     with pytest.raises(protocol.UncertainWriteError, match=visible_cause):
         store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+
+def test_a_push_that_cannot_be_stopped_leaves_no_unreaped_child_after_the_test(
+    bare_remote: Path, worktree: Path, push_probe: _PushProcessProbe
+) -> None:
+    """Reaping the unstoppable push's real child leaves nothing for the OS to hold."""
+    _the_push_cannot_be_stopped(push_probe)
+
+    with pytest.raises(protocol.UncertainWriteError):
+        store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    push_probe.reap()
+
+    (child,) = push_probe.unstoppable_children
+    assert child.returncode is not None
+    with pytest.raises(ChildProcessError):
+        os.waitpid(child.pid, os.WNOHANG)
 
 
 def test_git_push_transport_raises_on_a_non_fast_forward_push(
@@ -3178,7 +3219,7 @@ def test_commit_transition_says_whether_a_failed_write_may_have_landed(
 def test_commit_transition_calls_a_push_that_failed_after_starting_uncertain(
     bare_remote: Path,
     worktree: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    push_probe: _PushProcessProbe,
     break_the_push: Callable[[_PushProcessProbe], None],
     visible_cause: str,
 ) -> None:
@@ -3186,7 +3227,7 @@ def test_commit_transition_calls_a_push_that_failed_after_starting_uncertain(
     have landed, and says in its own sentence what went wrong."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     observed = fresh_observation(worktree, bare_remote)
-    break_the_push(_PushProcessProbe(monkeypatch))
+    break_the_push(push_probe)
 
     with pytest.raises(protocol.UncertainWriteError, match=visible_cause):
         store.commit_transition(
@@ -3200,7 +3241,7 @@ def test_commit_transition_calls_a_push_that_failed_after_starting_uncertain(
 def test_commit_transition_refuses_plainly_when_the_push_process_never_started(
     bare_remote: Path,
     worktree: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    push_probe: _PushProcessProbe,
     start_failure: OSError,
 ) -> None:
     """Spec: CAS-56; a transition whose push never started is a plain refusal:
@@ -3208,8 +3249,7 @@ def test_commit_transition_refuses_plainly_when_the_push_process_never_started(
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     observed = fresh_observation(worktree, bare_remote)
     tip_before = state_ref_tip(bare_remote)
-    probe = _PushProcessProbe(monkeypatch)
-    probe.fails_to_start(start_failure)
+    push_probe.fails_to_start(start_failure)
 
     with pytest.raises(protocol.PushNotStartedError):
         store.commit_transition(
@@ -3218,7 +3258,7 @@ def test_commit_transition_refuses_plainly_when_the_push_process_never_started(
             intent=_issue_claim_intent(1),
         )
 
-    assert probe.started == 1
+    assert push_probe.started == 1
     assert state_ref_tip(bare_remote) == tip_before
     assert not fresh_observation(worktree, bare_remote).state.claims
 
