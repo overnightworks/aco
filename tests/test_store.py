@@ -1436,6 +1436,26 @@ def test_a_push_that_cannot_be_stopped_leaves_no_unreaped_child_after_the_test(
         os.waitpid(child.pid, os.WNOHANG)
 
 
+def test_git_push_transport_names_the_cause_of_a_subclass_of_a_known_process_error(
+    worktree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class ProcessTimedOutLater(process.ProcessTimedOutError):
+        pass
+
+    def timing_out(command: list[str]) -> process.CapturedResult:
+        raise ProcessTimedOutLater
+
+    monkeypatch.setattr(process, "run_bounded_captured", timing_out)
+
+    with pytest.raises(protocol.ClaimError, match="did not finish: timed out"):
+        store.GitPushTransport().push(
+            worktree=worktree,
+            remote="origin",
+            ref=store.STATE_REF,
+            new_oid=_UNRESOLVABLE_OBJECT_ID,
+        )
+
+
 def test_git_push_transport_raises_on_a_non_fast_forward_push(
     bare_remote: Path, worktree: Path
 ) -> None:

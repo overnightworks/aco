@@ -282,7 +282,10 @@ class GitPushTransport:
         except (process.ExecutableMissingError, process.ProcessStartFailedError) as error:
             raise PushNotStartedError(f"git push could not start: {error}") from error
         except process.ProcessError as error:
-            cause = _PUSH_STOP_CAUSES.get(type(error), str(error))
+            cause = next(
+                (named for kind, named in _PUSH_STOP_CAUSES.items() if isinstance(error, kind)),
+                str(error),
+            )
             raise ClaimError(
                 f"git push to the claim state store did not finish: {cause}"
             ) from error
