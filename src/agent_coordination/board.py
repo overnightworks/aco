@@ -1790,18 +1790,11 @@ class BoardBuildInputs:
     repository: str
     now: datetime | None = None
     trunk_landings: tuple[datetime, ...] = ()
-    # Item numbers a trunk commit's own trailer block already names as
-    # landed (issue #304) -- independent of `trunk_landings` above, which
-    # carries only each commit's timestamp for ruling-freshness, never its
-    # classification. The caller's own rollup of `trunk_landing_items`
-    # below (issue #371), which carries the same numbers with their sha.
-    trunk_landed_work_items: frozenset[int] = frozenset()
     # Every item a trunk commit's own trailer names as landed, `sha` and all
-    # (issue #371) -- the one source `landing_rows` builds the board's
-    # Landungen view from, under both storages. Read once by the caller from
-    # the same `checkout.trunk_landings` call that already feeds
-    # `trunk_landed_work_items`/`landed_at_by_item` above; kept as its own
-    # field rather than folded into those two, since neither carries `sha`.
+    # (issue #371) -- the one source of both `landing_rows` (the board's
+    # Landungen view, under both storages) and the set of items trunk already
+    # lands. `trunk_landings` above carries only each commit's timestamp, for
+    # ruling-freshness, never its classification.
     trunk_landing_items: tuple[TrunkLandingItem, ...] = ()
     children: Mapping[int, tuple[ChildItem, ...]] = field(default_factory=dict)
     # The forge parent of each `childless_containers_with_uncut_rows`
@@ -1823,16 +1816,11 @@ class BoardBuildInputs:
     # booleans instead of one storage-shaped flag.
     open_pull_requests_supported: bool = True
     # Every claim's own ref-history lifecycle (issue #357,
-    # `store.claim_lifecycle`): `size`/`landed_at` still `None` exactly as
-    # that reader leaves them -- `build_board` is the one place both are
-    # already known (an open item's own current size; a trunk landing's own
-    # date), so it joins them before ever calling `metrics.measure`.
+    # `store.claim_lifecycle`): `size` still `None` exactly as that reader
+    # leaves it -- `build_board` is the one place it is already known (an
+    # item's own current size), so it joins it before ever calling
+    # `metrics.measure`.
     lane_events: tuple[metrics.LaneEvent, ...] = ()
-    # A landed item's own commit date (issue #304's own trailer block,
-    # `board.TrunkWorkItemClassification`), keyed by item number -- read
-    # once by the caller from `checkout.trunk_landings` (a layer `board.py`
-    # may never import) and handed in as plain data.
-    landed_at_by_item: Mapping[int, datetime] = field(default_factory=dict)
     # Every completed lane's own item's *current* size, for an item that is
     # no longer among `issues` at all (issue #357 R2) -- closed, or vanished
     # -- read once by the caller through the forge/state for exactly the
@@ -1857,22 +1845,19 @@ def _item_number_or_none(value: str) -> int | None:
 def _joined_lane_event(
     event: metrics.LaneEvent,
     size_by_number: Mapping[int, metrics.Size | None],
-    landed_at_by_item: Mapping[int, datetime],
 ) -> metrics.LaneEvent:
-    """`event`, its `size` and `landed_at` filled in from this build's own
-    already-fetched data (issue #357, closed items R2): a historical
-    claim's size is read from its item's *current* size, open or closed --
-    `size_by_number` is `build_board`'s own union of every open item's
-    parsed size and `inputs.closed_item_sizes` (read once through the
-    forge/state for exactly the numbers not among the open ones) -- and its
-    landing date from the trunk commit that named it, when one already did.
-    A lane claim (`docs/`/`fix/`, no issue number) never matches either
-    mapping and is returned unchanged, still counted by `metrics.measure`
-    but never sorted into a size class."""
+    """`event`, its `size` filled in from this build's own already-fetched
+    data (issue #357, closed items R2): a historical claim's size is read
+    from its item's *current* size, open or closed -- `size_by_number` is
+    `build_board`'s own union of every open item's parsed size and
+    `inputs.closed_item_sizes` (read once through the forge/state for exactly
+    the numbers not among the open ones). A lane claim (`docs/`/`fix/`, no
+    issue number) never matches and is returned unchanged, still counted by
+    `metrics.measure` but never sorted into a size class."""
     number = _item_number_or_none(event.item)
     if number is None:
         return event
-    return replace(event, size=size_by_number.get(number), landed_at=landed_at_by_item.get(number))
+    return replace(event, size=size_by_number.get(number))
 
 
 def _class_measurement(
@@ -1912,11 +1897,11 @@ def _summed_lane_event(claims: Sequence[metrics.LaneEvent]) -> metrics.LaneEvent
     averaged, so an item worked across several claims -- a builder, then a
     fixer, each its own claim -- contributes exactly one sample to its size
     class rather than `len(claims)` independent ones that would inflate `n`
-    and skew the median. `size`/`container`/`landed_at`/`item` are shared
-    across every claim of one item (`_joined_lane_event` already set them
-    from the same lookup), so the earliest claim's own values carry
-    through unchanged; only `claimed_at`/`released_at` become a synthetic
-    pair whose difference is the summed total, and `rescopes` sums too."""
+    and skew the median. `size`/`item` are shared across every claim of
+    one item (`_joined_lane_event` already set `size` from the same
+    lookup), so the earliest claim's own values carry through unchanged;
+    only `claimed_at`/`released_at` become a synthetic pair whose
+    difference is the summed total, and `rescopes` sums too."""
     first = min(claims, key=lambda claim: claim.claimed_at)
     total_hours = sum(
         (cast(datetime, claim.released_at) - claim.claimed_at).total_seconds() / 3600
@@ -1992,12 +1977,11 @@ def build_board(inputs: BoardBuildInputs) -> Board:
     size_by_number = {number: parsed.size for number, parsed in parsed_bodies.items()}
     historical_size_by_number = {**inputs.closed_item_sizes, **size_by_number}
     joined_events = tuple(
-        _joined_lane_event(event, historical_size_by_number, inputs.landed_at_by_item)
-        for event in inputs.lane_events
+        _joined_lane_event(event, historical_size_by_number) for event in inputs.lane_events
     )
     number_by_item = {item_argument(issue.number, config.storage): issue.number for issue in issues}
     open_items = tuple(
-        metrics.OpenItem(item=item, size=size_by_number[number], container=None)
+        metrics.OpenItem(item=item, size=size_by_number[number])
         for item, number in number_by_item.items()
     )
     report = metrics.measure(_measurement_feed(joined_events), open_items)
@@ -2020,7 +2004,7 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         | _touched_without_closing(open_pull_requests),
         landed_references=_associated_issues(recent_merged_pull_requests, repository)
         | _touched_without_closing(recent_merged_pull_requests)
-        | inputs.trunk_landed_work_items,
+        | frozenset(entry.item for entry in inputs.trunk_landing_items),
         open_branches=frozenset(pr.head_ref_name for pr in open_pull_requests),
         open_pull_requests_supported=inputs.open_pull_requests_supported,
         trunk_landings=inputs.trunk_landings,

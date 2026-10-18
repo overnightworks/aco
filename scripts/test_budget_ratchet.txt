@@ -90,3 +90,5 @@
 # budget: issue #601 deletes the one-time fence migration script and its test module after the #441 freeze; that module was more parametrized than the rest of the suite, so removing it lowers parametrized_share_pct without any remaining test changing shape [#601]
 
 # budget: ADOPT-18 is retired (issue #173): its provisional sentence "passes every adoption check; this aco does not build adoptions yet" no longer exists, because adopt now writes the adoption (ADOPT-20 owns that outcome), so no test cites it any more [ADOPT-18]
+
+# budget: issue #224 deletes the unread container-sum and daily-parallelism metrics together with their one test; that test was parametrized, so removing it lowers parametrized_share_pct without any remaining test changing shape [#224]

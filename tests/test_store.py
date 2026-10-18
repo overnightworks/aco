@@ -2072,8 +2072,8 @@ def test_claim_lifecycle_reads_intervals_from_real_ref_history(
     """Three claims land, rescope, and release; a fourth stays open (issue
     #357, proof 1): `claim_lifecycle` reads every one from `refs/aco/state`'s
     own first-parent history in one `git log` walk, with no item content and
-    no trunk-landing knowledge of its own -- `size`/`landed_at` stay `None`,
-    the caller's own join (`board.py`) fills them."""
+    no trunk-landing knowledge of its own -- `size` stays `None`, the
+    caller's own join (`board.py`) fills it."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     _committed_claim(bare_remote, worktree, issue=10)
     store.commit_transition(
@@ -2127,7 +2127,6 @@ def test_claim_lifecycle_reads_intervals_from_real_ref_history(
     # No item content and no trunk landing read at all (Layers contract:
     # `store` is git transport only).
     assert all(event.size is None for event in lifecycle.events)
-    assert all(event.landed_at is None for event in lifecycle.events)
     assert git_call_spy["log"] == 1
 
 
