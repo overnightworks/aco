@@ -1,7 +1,0 @@
-claim_id = "a1e728dcd5cb414a8828c0175f4a5500"
-agent = "claude"
-role = "builder"
-base = "aaf6b6c4c1df03922db12a74978d519782cc27f4"
-branch = "claude/issue-209-quality-gate-auf-v0-2-0-heben-operator-r"
-scope = [".github/workflows/ci.yml"]
-opened_commit = "ffbf170447682d913d8276c40a5ba33a08b639ec"
