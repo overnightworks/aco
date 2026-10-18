@@ -2,6 +2,15 @@
 # per line (tab separated), naming an assert literal a test-module rewrite dropped on purpose
 # (issue #319). Written by hand in the same
 # change as the rewrite that drops the literal.
+tests/test_cli.py	' 1/2: Decide something\n  1 ruled yes 2026-08-01: Ship it?\n  2 open: New question?\n'	#171: test_ask.py::TestGithubAsk::test_persistence[rulings] compares the complete literal including #90 instead of an interpolated item-number prefix.
+tests/test_cli.py	' could not be read'	#171: test_ask.py refusal rows missing-picture-text/json compare the complete missing-file sentence including its OS reason.
+tests/test_cli.py	' line 1: New question?\n'	#171: test_ask.py::TestGithubAsk::test_text[card] compares the complete ASKED #90 line, not an f-string fragment.
+tests/test_cli.py	' line 2: New question?\n'	#171: test_ask.py text[append/display-control] and persistence[duplicate] compare complete ASKED #90 lines.
+tests/test_cli.py	'--picture '	#171: test_ask.py missing-picture refusals compare the full literal sentence with missing.svg, not an interpolated path fragment.
+tests/test_cli.py	'ASKED #'	#171: test_ask.py text rows compare complete ASKED #90 output; the fragment is no longer a standalone oracle.
+tests/test_cli.py	'ASKED'	#171: test_ask.py::TestGithubAsk::test_text[display-control] replaces the old startswith verb check with the complete line.
+tests/test_cli.py	'ERROR: this forge cannot update_item_body; ask by hand'	#171: test_ask.py::TestGithubAsk::test_refusal[read-only] compares ERROR prefix plus the row-owned complete message and newline, alongside the same literal JSON message.
+tests/test_cli.py	'body malformed: aco: no aco block; ask needs a valid aco block'	#171: test_ask.py::TestGithubAsk::test_refusal[blockless] compares the full row-owned message beginning #90 in stderr and JSON.
 tests/test_board.py	'whole = "   "\n'	#105: The blank value is now driven through test_parse_body_applies_the_whole_bound using JSON-to-TOML serialization.
 tests/test_board.py	'whole = [1]\n'	#105: The list value is now driven through test_parse_body_applies_the_whole_bound using JSON-to-TOML serialization.
 tests/test_board.py	'whole must be a non-empty string'	#105: BODY-62 retires this sentence for the shared whole bound; test_parse_body_applies_the_whole_bound asserts its replacement for every invalid shape.
