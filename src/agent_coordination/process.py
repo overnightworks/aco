@@ -129,7 +129,13 @@ def _stop_process(process_handle: subprocess.Popen[bytes]) -> None:
         process_handle.wait(timeout=_PROCESS_EXIT_POLL_SECONDS)
     except subprocess.TimeoutExpired:
         process_handle.kill()
-        process_handle.wait(timeout=_PROCESS_EXIT_POLL_SECONDS)
+        try:
+            process_handle.wait(timeout=_PROCESS_EXIT_POLL_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            # A child that survives `kill()` is the graver fact, so it replaces the
+            # timeout or oversize error this stop was about to raise, or one already
+            # in flight through the reaping `finally` (which stays its `__context__`).
+            raise ProcessDidNotExitError from error
 
 
 def _close_process_streams(process_handle: subprocess.Popen[bytes]) -> None:
