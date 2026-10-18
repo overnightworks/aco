@@ -23,8 +23,8 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 | same claim id, same fields | CLAIM-13 | — | — |
 | claim id active or released | CLAIM-14, CLAIM-15 | — | — |
 | lane claim beside an issue claim | CLAIM-10 | — | — |
-| exclusive claim on a held branch | CLAIM-71 | — | — |
-| exclusive claim replayed | CLAIM-72 | — | — |
+| `aco adopt`'s exclusive claim on a held branch | CLAIM-71 | — | — |
+| `aco adopt`'s exclusive claim replayed | CLAIM-72 | — | — |
 | scope path outside the repository | CLAIM-19 | — | — |
 | scope path not canonical | CLAIM-20, CLAIM-21 | — | — |
 | scope empty, or over 256 entries | CLAIM-22, CLAIM-23 | — | — |

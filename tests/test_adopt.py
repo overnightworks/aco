@@ -552,12 +552,11 @@ def test_adopts_dry_run_claim_refuses_a_branch_another_claim_holds(world: Adopti
         whole=None,
     )
 
+    request = cmd_claim.claim_request(arguments, adopted=True)
+    context = run_context_over(world.forge)
+
     with pytest.raises(protocol.ClaimConflictError) as refused:
-        cmd_claim.checked_claim(
-            cmd_claim.claim_request(arguments, adopted=True),
-            run_context_over(world.forge),
-            revision=world.head,
-        )
+        cmd_claim.checked_claim(request, context, revision=world.head)
 
     assert str(refused.value) == (
         f"lane '{ADOPTED_BRANCH}' is claimed by Bob (builder) on issue #42 branch {ADOPTED_BRANCH}"
