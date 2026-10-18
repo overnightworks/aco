@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -27,14 +26,6 @@ from agent_coordination import board_read, body, cli, forge, github, session, st
 class RuleInput:
     arguments: tuple[str, ...]
     initial_body: str
-
-
-GIT_DIAGNOSTIC_TAIL = re.compile(r"(fatal: not a git repository)[^\"\n]*")
-
-
-def git_diagnostic_start(text: str) -> str:
-    """Keep git's own diagnostic only by its start: its tail varies with git version and mount."""
-    return GIT_DIAGNOSTIC_TAIL.sub(r"\1", text)
 
 
 def json_wire(stdout: str) -> dict[str, object]:
@@ -480,7 +471,8 @@ class TestGithubRule:
                 (board_read, "item_body_or_refuse"),
             ),
             "this command reads the repository's body contract from .aco/board.toml and needs "
-            "a checkout (a shallow one is enough): fatal: not a git repository",
+            "a checkout (a shallow one is enough): fatal: not a git repository "
+            "(or any of the parent directories): .git",
             "unavailable",
             True,
             id="checkout",
@@ -505,6 +497,7 @@ def test_context_refusal(
     directory = request.getfixturevalue(directory_fixture)
     monkeypatch.chdir(directory)
     monkeypatch.setenv("LC_ALL", "C")
+    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     assert (real_git(directory, "rev-parse", "--show-toplevel", check=False).returncode == 0) == (
         directory_fixture == "clone"
     )
@@ -533,12 +526,11 @@ def test_context_refusal(
     capsys.readouterr()
     result = run_cli([*arguments, *(["--json"] if as_json else [])], capsys)
     expected = {"ok": False, "reason": reason, "message": message}
-    stdout = git_diagnostic_start(result.stdout)
     observed = {
         "exit": result.status,
-        "stderr": git_diagnostic_start(result.stderr),
-        "stdout": stdout,
-        **(json_wire(stdout) if as_json else {}),
+        "stderr": result.stderr,
+        "stdout": result.stdout,
+        **(json_wire(result.stdout) if as_json else {}),
     }
     assert observed == {
         "exit": 2,
