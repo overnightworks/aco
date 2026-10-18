@@ -244,6 +244,23 @@ class _AlwaysRejectingTransport:
         raise protocol.PushRejectedError("simulated permanent rejection")
 
 
+class _RejectsFirstPushesTransport:
+    """A `PushTransport` that rejects its first `rejections` pushes without
+    landing them, then pushes for real, recording every commit it was given."""
+
+    def __init__(self, *, rejections: int) -> None:
+        self._rejections_left = rejections
+        self.pushed_commits: list[protocol.ObjectId] = []
+        self._real = store.GitPushTransport()
+
+    def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
+        self.pushed_commits.append(new_oid)
+        if self._rejections_left:
+            self._rejections_left -= 1
+            raise protocol.PushRejectedError("simulated rejection")
+        self._real.push(worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
+
+
 class _AlwaysRacingTransport:
     """A `PushTransport` where a concurrent writer always lands first: each
     call pushes one real, distinct commit onto the ref before raising, so
@@ -345,21 +362,22 @@ def test_a_failing_hash_object_reports_the_stderr_git_wrote(
         store.hash_blob(outside_any_repository, b"claim state")
 
 
-def test_bootstrap_is_a_no_op_read_when_the_ref_already_exists(
+def test_bootstrap_is_a_no_op_read_when_the_ref_already_holds_state(
     bare_remote: Path, worktree: Path
 ) -> None:
-    first = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-
-    second = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-
-    assert second == first
-    log = subprocess.run(
-        ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
-        check=True,
-        capture_output=True,
-        text=True,
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    claimed = store.commit_transition(
+        observed=fresh_observation(worktree, bare_remote),
+        subject=store.ClaimTransitionSubject("claim issue 42", item="42"),
+        intent=_issue_claim_intent(42),
     )
-    assert log.stdout.strip() == "1"
+    listing_before = state_ref_listing(bare_remote)
+
+    again = store.bootstrap(worktree=worktree, remote=str(bare_remote))
+
+    assert again == claimed.tip == state_ref_tip(bare_remote)
+    assert state_ref_listing(bare_remote) == listing_before
+    assert store.fetch_state(worktree=worktree, remote=str(bare_remote)).claims == claimed.claims
 
 
 def test_bootstrap_fails_loud_on_an_unreachable_remote(tmp_path: Path, worktree: Path) -> None:
@@ -1146,28 +1164,15 @@ def test_linked_worktrees_fetch_concurrently_and_write_distinct_lineage_stamps(
     assert stamp_b.read_text().strip() == tip
 
 
-def test_push_retry_finds_the_operation_id_after_an_accept_then_raise_and_does_not_apply_twice(
+def test_push_retry_returns_the_remote_tip_after_an_accept_then_raise_and_lands_one_root_commit(
     bare_remote: Path, worktree: Path
 ) -> None:
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
     transport = _AcceptThenRaiseTransport()
-    operation_id = "operation-under-test"
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message=f"bootstrap empty claim state\n\noperation_id: {operation_id}\n",
-        operation_id=operation_id,
-    )
 
-    result = store.push_tree(
-        worktree=worktree,
-        remote=str(bare_remote),
-        observed=observed,
-        pending=pending,
-        transport=transport,
-    )
+    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
 
     assert transport.calls == 1
-    assert isinstance(result, protocol.OperationAlreadyApplied)
+    assert tip == state_ref_tip(bare_remote)
     log = subprocess.run(
         ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
         check=True,
@@ -1175,123 +1180,35 @@ def test_push_retry_finds_the_operation_id_after_an_accept_then_raise_and_does_n
         text=True,
     )
     assert log.stdout.strip() == "1"
-    assert result.tip == state_ref_tip(bare_remote)
 
 
-def _reject_existing_state(bare_remote: Path, worktree: Path) -> Callable[[], object]:
-    """Bootstrap first so the ref-exists row's observed.tip is a real parent."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
-    return partial(
-        store.push_tree,
-        worktree=worktree,
-        remote=str(bare_remote),
-        observed=observed,
-        pending=pending,
-        transport=_AlwaysRejectingTransport(),
-    )
+def test_push_retry_creates_the_ref_with_the_same_commit_after_a_rejection_that_left_it_absent(
+    bare_remote: Path, worktree: Path
+) -> None:
+    transport = _RejectsFirstPushesTransport(rejections=1)
+
+    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote), transport=transport)
+
+    assert transport.pushed_commits == [tip, tip]
+    assert state_ref_tip(bare_remote) == tip
+    assert _tree_entries(bare_remote, tip) == {"schema.toml": "version = 2\n"}
 
 
-def _reject_empty_state(bare_remote: Path, worktree: Path) -> Callable[[], object]:
-    return partial(
-        store.bootstrap,
-        worktree=worktree,
-        remote=str(bare_remote),
-        transport=_AlwaysRejectingTransport(),
-    )
-
-
-@pytest.mark.parametrize(
-    ("arrange_rejection", "state_ref_exists"),
-    [
-        pytest.param(_reject_existing_state, True, id="ref-exists"),
-        pytest.param(_reject_empty_state, False, id="from-empty"),
-    ],
-)
 def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
-    bare_remote: Path,
-    worktree: Path,
-    arrange_rejection: Callable[[Path, Path], Callable[[], object]],
-    state_ref_exists: bool,
+    bare_remote: Path, worktree: Path
 ) -> None:
     """Issue #237 finding 22: rejection without advancement names a stuck lock.
 
     Exhaustion must never say "moved N times": that would blame a race
     that never happened.
     """
-    exhaust_the_retries = arrange_rejection(bare_remote, worktree)
-
     with pytest.raises(protocol.ClaimUnavailableError, match="rejected 8 pushes") as raised:
-        exhaust_the_retries()
+        store.bootstrap(
+            worktree=worktree, remote=str(bare_remote), transport=_AlwaysRejectingTransport()
+        )
 
     assert "without the ref ever moving" in str(raised.value)
-    assert (state_ref_tip(bare_remote) is not None) is state_ref_exists
-
-
-def test_push_retry_exhausts_and_names_a_race_when_the_ref_keeps_moving(
-    bare_remote: Path, worktree: Path
-) -> None:
-    """Issue #237 finding 22's other half: a concurrent writer's commit
-    genuinely lands first on every attempt (`_AlwaysRacingTransport`
-    actually advances the ref each time), so exhaustion names a real race,
-    never the stuck-lock repair sentence that would misdiagnose it.
-    """
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
-    transport = _AlwaysRacingTransport()
-
-    with pytest.raises(protocol.ClaimUnavailableError, match="moved 8 times") as raised:
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
-        )
-    assert "stuck" not in str(raised.value)
-    assert "lock" not in str(raised.value)
-
-
-def test_push_retry_exhausts_and_names_the_true_mix_when_the_ref_moves_once_then_sticks(
-    bare_remote: Path, worktree: Path
-) -> None:
-    """Issue #237 finding 22's mixed case: a concurrent writer's commit
-    lands first on exactly the first attempt (`_MovesOnceThenSticksTransport`),
-    then the ref sits fixed while every later push is rejected. Reporting
-    "moved 8 times" here -- the wrong count the shared builder used to
-    print whenever more than one tip was ever observed -- would blame a race
-    that stopped after one move; the true count is one move, then seven
-    pushes rejected without the ref moving again.
-    """
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message="bootstrap empty claim state\n\noperation_id: never-applied\n",
-        operation_id="never-applied",
-    )
-    transport = _MovesOnceThenSticksTransport()
-
-    with pytest.raises(protocol.ClaimUnavailableError, match="moved 1 time") as raised:
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
-        )
-    assert "rejected 7 pushes" in str(raised.value)
-    assert "without the ref moving after it last moved" in str(raised.value)
+    assert state_ref_tip(bare_remote) is None
 
 
 def test_git_push_transport_raises_on_a_non_fast_forward_push(
@@ -1601,45 +1518,6 @@ def test_find_operation_id_fails_loud_when_the_range_is_unresolvable(worktree: P
         )
 
 
-def test_push_retry_stops_instead_of_committing_again_when_the_search_fails(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
-) -> None:
-    """A failing `operation_id` search after a rejected push must stop the
-    retry loud, never be read as "not found" -- that would commit a second
-    time on top of a lost response whose commit already landed."""
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    transport = _AcceptThenRaiseTransport()
-    operation_id = "operation-under-test"
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message=f"bootstrap empty claim state\n\noperation_id: {operation_id}\n",
-        operation_id=operation_id,
-    )
-
-    def failing_search(*_args: object, **_kwargs: object) -> None:
-        raise protocol.ClaimError("simulated search failure")
-
-    monkeypatch.setattr(store, "_find_operation_id", failing_search)
-
-    with pytest.raises(protocol.ClaimError, match="simulated search failure"):
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
-            observed=observed,
-            pending=pending,
-            transport=transport,
-        )
-
-    assert transport.calls == 1
-    log = subprocess.run(
-        ["git", "--git-dir", str(bare_remote), "rev-list", "--count", store.STATE_REF],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert log.stdout.strip() == "1"
-
-
 def _fake_run_captured_failing_candidate_log(
     real: Callable[[list[str]], process.CapturedResult],
 ) -> Callable[[list[str]], process.CapturedResult]:
@@ -1661,24 +1539,14 @@ def _fake_run_captured_failing_candidate_log(
 def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #390 finding 9a: after a lost response, `push_tree`'s retry
-    searches new history for its own `operation_id` before assuming nothing
-    landed. Reading a broken per-candidate read as "not found" would let the
-    retry build and push a second commit on top of the one that already
-    landed -- exactly the double push the search exists to prevent. Run
-    against the pre-fix `_find_operation_id` (which reads a failing
-    candidate read as "not found"), this test is red: the retry does not
-    stop, and `transport.calls` climbs past `1` as it exhausts
-    `_MAX_PUSH_ATTEMPTS` pushing repeatedly instead.
-    """
-    observed = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    """Issue #390 finding 9a, CAS-47: after a lost response, a transition's
+    retry searches new history for its own `operation_id` before assuming
+    nothing landed. Reading a broken per-candidate read as "not found" would
+    let the retry build and push a second transition on top of the one that
+    already landed -- exactly the double push the search exists to prevent."""
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    observed = fresh_observation(worktree, bare_remote)
     transport = _AcceptThenRaiseTransport()
-    operation_id = "operation-under-test"
-    pending = store.PendingCommit(
-        tree_oid=store._write_bootstrap_tree(worktree),
-        message=f"bootstrap empty claim state\n\noperation_id: {operation_id}\n",
-        operation_id=operation_id,
-    )
     monkeypatch.setattr(
         store.process,
         "run_captured",
@@ -1686,11 +1554,10 @@ def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     )
 
     with pytest.raises(protocol.ClaimError, match="cannot read commit"):
-        store.push_tree(
-            worktree=worktree,
-            remote=str(bare_remote),
+        store.commit_transition(
             observed=observed,
-            pending=pending,
+            subject=store.ClaimTransitionSubject("claim issue 42", item="42"),
+            intent=_issue_claim_intent(42),
             transport=transport,
         )
 

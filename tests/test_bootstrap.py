@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from cli_fixtures import (
     count_context_reads,
+    fresh_observation,
     real_git,
     run_cli,
 )
@@ -116,11 +117,7 @@ def test_bootstrap_whose_creation_push_is_rejected_by_a_rival_leaves_the_rivals_
             rival_is_writing.append(True)
             store.bootstrap(worktree=rival_checkout, remote=remote)
             store.commit_transition(
-                observed=store.Observation(
-                    rival_checkout,
-                    remote,
-                    store.fetch_state(worktree=rival_checkout, remote=remote),
-                ),
+                observed=fresh_observation(rival_checkout, remote),
                 subject=store.ClaimTransitionSubject("claim issue 7", item="7"),
                 intent=claim_intent(
                     identity=protocol.IssueIdentity(7), claim_id="rival-claim", operation_id="rival"
