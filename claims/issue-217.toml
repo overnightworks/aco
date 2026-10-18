@@ -1,0 +1,7 @@
+claim_id = "017eff0e1e9742dea0e4f9f41aefa00c"
+agent = "claude"
+role = "builder"
+base = "93f67eeee13d18499e9ef94bfd4b80c36a2945a6"
+branch = "claude/issue-217-quality-v0-2-1-gate-pin-heben-und-codeql"
+scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml"]
+opened_commit = "8b6b48833017f617db62c4482cebe7c3fbed0041"
