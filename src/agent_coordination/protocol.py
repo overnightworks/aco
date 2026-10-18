@@ -1326,7 +1326,7 @@ def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
     new_resources = dict(state.resources)
     if resource_record is not None:
         new_resources[resource_record.name] = resource_record
-    return replace(
+    return replace(  # NOSONAR(S5886) pyright types replace()
         state,
         claims=MappingProxyType(new_claims),
         consumed_ids=state.consumed_ids | {intent.claim_id},
@@ -1348,7 +1348,10 @@ def _apply_rescope_intent(state: ClaimState, intent: RescopeIntent) -> ClaimStat
     whole_reason = current.whole_reason if intent.whole_reason is None else intent.whole_reason
     new_claim = replace(current, scope=intent.scope, whole_reason=whole_reason)
     new_claims = {**state.claims, key: new_claim}
-    return replace(state, claims=MappingProxyType(new_claims))
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType(new_claims),
+    )
 
 
 def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingIntent) -> None:
@@ -1379,7 +1382,10 @@ def _apply_release_intent(state: ClaimState, intent: ReleaseIntent) -> ClaimStat
     new_claims = {
         existing_key: claim for existing_key, claim in state.claims.items() if existing_key != key
     }
-    return replace(state, claims=MappingProxyType(new_claims))
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType(new_claims),
+    )
 
 
 ITEMS_WRITTEN_SINCE_CHECKED = "items/ was written since this write checked it; re-read and retry"
@@ -1407,7 +1413,10 @@ def _apply_item_write_intent(state: ClaimState, intent: ItemWriteIntent) -> Clai
     if intent.store_expected is not None and dict(state.items) != dict(intent.store_expected):
         raise ClaimUnavailableError(ITEMS_WRITTEN_SINCE_CHECKED)
     new_items = {**state.items, intent.item_id: intent.new_oid}
-    return replace(state, items=MappingProxyType(new_items))
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        items=MappingProxyType(new_items),
+    )
 
 
 def require_no_live_claim(state: ClaimState, issue: IssueIdentity) -> None:
@@ -1460,7 +1469,11 @@ def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimStat
         existing_key: claim for existing_key, claim in state.claims.items() if existing_key != key
     }
     new_items = {**state.items, intent.item_id: intent.item_new_oid}
-    return replace(state, claims=MappingProxyType(new_claims), items=MappingProxyType(new_items))
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType(new_claims),
+        items=MappingProxyType(new_items),
+    )
 
 
 def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
