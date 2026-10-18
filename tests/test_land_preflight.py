@@ -11,6 +11,7 @@ from github_fixtures import (
     MERGE_COMMIT_SHA,
     FakeForge,
     LandingWorld,
+    ParserExit,
     assert_github_world,
     landing_effects,
     landing_pull_request,
@@ -667,9 +668,7 @@ def test_parser_refusal(
         world,
         CliRun(status, captured.out, captured.err),
         world.case.sentence,
-        parser_exit=world.case.parser_exit,
-        exited=exited,
-        usage_prefix=world.case.usage_prefix,
+        parser_exit=ParserExit(exited, world.case.usage_prefix) if world.case.parser_exit else None,
     )
     observed["requests"] = world.forge.requests
     expected["requests"] = 0

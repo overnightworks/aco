@@ -244,6 +244,24 @@ def set_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GIT_COMMITTER_EMAIL", "test@example.com")
 
 
+def without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) -> None:
+    """`checkout_path` with no git identity git may use or guess: none
+    configured locally, in the environment or the system configuration (the
+    caller isolates the global configuration)."""
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    real_git(checkout_path, "config", "user.useConfigOnly", "true")
+    real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
+    real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
+    for variable in (
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "EMAIL",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+
+
 def head_sha(repository: Path) -> str:
     return real_git(repository, "rev-parse", "HEAD").stdout.strip()
 

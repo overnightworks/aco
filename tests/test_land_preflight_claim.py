@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tomllib
 from dataclasses import dataclass, field, replace
+from enum import Enum
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from cli_fixtures import (
     run_cli,
     track_board_config,
     trunk_git_calls,
+    without_git_identity,
     worktrees_and_branches,
 )
 from github_fixtures import (
@@ -37,6 +39,19 @@ from store_fixtures import (
 from agent_coordination import forge, protocol, store
 
 
+class CheckoutState(Enum):
+    CLEAN = ("", "main\n")
+    UNTRACKED_FILE = ("?? untracked.txt\n", "main\n")
+    TRACKED_CHANGE = (" M .aco/board.toml\n", "main\n")
+    OTHER_BRANCH = ("", "other\n")
+
+
+class IdentityState(Enum):
+    PRESENT = "present"
+    ABSENT = "absent"
+    AUTHOR_ONLY = "author-only"
+
+
 @dataclass(frozen=True)
 class ClaimCase:
     sentence: str
@@ -58,8 +73,8 @@ class ClaimCase:
         )
     )
     arguments: tuple[str, ...] = ()
-    checkout: str = "clean"
-    identity: str = "present"
+    checkout: CheckoutState = CheckoutState.CLEAN
+    identity: IdentityState = IdentityState.PRESENT
     lane_worktree: bool = False
     default_branch: str = "main"
     item_reads: tuple[int, ...] = (72,)
@@ -76,6 +91,7 @@ class ClaimWorld(LandingWorld):
     case: ClaimCase
     claims: tuple[protocol.ActiveClaim, ...]
     checkout_before: tuple[str, str]
+    lane: Path
     trunk_calls: list[tuple[str, Path]]
     default_trunk: str | None
 
@@ -110,6 +126,18 @@ def world(
         real_git(github_clone, "branch", "trunk")
         real_git(github_clone, "push", "-q", "origin", "trunk")
         real_git(github_clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+        observed = (
+            real_git(
+                github_clone, "rev-parse", "-q", "--verify", "refs/remotes/origin/HEAD", check=False
+            ).returncode
+            == 0,
+            real_git(github_clone, "rev-parse", "-q", "--verify", "trunk", check=False).returncode
+            == 0,
+            real_git(bare_remote, "rev-parse", "-q", "--verify", "trunk", check=False).returncode
+            == 0,
+        )
+        assert observed == (False, True, True)
+    lane = github_clone.parent / "lane"
     if case.lane_worktree:
         real_git(
             github_clone,
@@ -118,36 +146,25 @@ def world(
             "-q",
             "-b",
             LANDING_BRANCH,
-            str(github_clone.parent / "lane"),
+            str(lane),
             "main",
         )
-    if case.checkout == "untracked":
+    if case.checkout is CheckoutState.UNTRACKED_FILE:
         (github_clone / "untracked.txt").write_text("dirty\n")
-    elif case.checkout == "tracked":
+    elif case.checkout is CheckoutState.TRACKED_CHANGE:
         (github_clone / ".aco/board.toml").write_text(case.trunk_config + "# dirty\n")
-    elif case.checkout == "other":
+    elif case.checkout is CheckoutState.OTHER_BRANCH:
         real_git(github_clone, "checkout", "-q", "-b", "other")
-    if case.identity != "present":
-        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-        real_git(github_clone, "config", "user.useConfigOnly", "true")
-        for key in ("user.name", "user.email"):
-            real_git(github_clone, "config", "--unset-all", key, check=False)
-        for key in (
-            "GIT_AUTHOR_NAME",
-            "GIT_AUTHOR_EMAIL",
-            "GIT_COMMITTER_NAME",
-            "GIT_COMMITTER_EMAIL",
-            "EMAIL",
-        ):
-            monkeypatch.delenv(key, raising=False)
-        if case.identity == "author-only":
+    if case.identity is not IdentityState.PRESENT:
+        without_git_identity(monkeypatch, github_clone)
+        if case.identity is IdentityState.AUTHOR_ONLY:
             monkeypatch.setenv("GIT_AUTHOR_NAME", "Author")
             monkeypatch.setenv("GIT_AUTHOR_EMAIL", "author@example.com")
         observed = tuple(
             real_git(github_clone, "var", key, check=False).returncode == 0
             for key in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT")
         )
-        expected = (case.identity == "author-only", False)
+        expected = (case.identity is IdentityState.AUTHOR_ONLY, False)
         assert observed == expected
     client = serve_forge(
         monkeypatch,
@@ -178,6 +195,11 @@ def world(
         real_git(github_clone, "status", "--porcelain").stdout,
         real_git(github_clone, "branch", "--show-current").stdout,
     )
+    assert checkout_before == case.checkout.value
+    assert (client.landings[12], client.readiness_by_number[12]) == (
+        case.pull_request,
+        case.readiness,
+    )
     result = ClaimWorld(
         github_clone,
         bare_remote,
@@ -186,6 +208,7 @@ def world(
         case,
         claims,
         checkout_before,
+        lane,
         trunk_git_calls(monkeypatch, "origin"),
         real_git(github_clone, "rev-parse", "trunk").stdout
         if case.default_branch == "trunk"
@@ -221,9 +244,6 @@ def assert_refusal(world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> Non
             "file": case.file_reads,
         }
     )
-    if case.exact_length and case.head_config:
-        observed["length≤200"] = len(result.stderr.rstrip("\n")) <= 200
-        expected["length≤200"] = True
     if case.check_claims or case.claims_present:
         claims = tuple(store.peek_state(worktree=world.clone, remote="origin").claims.values())
         if case.check_claims:
@@ -233,7 +253,7 @@ def assert_refusal(world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> Non
             observed["claims-present"] = bool(claims)
             expected["claims-present"] = True
     if case.lane_worktree:
-        observed["lane_worktree"] = (world.clone.parent / "lane").exists()
+        observed["lane_worktree"] = world.lane.exists()
         expected["lane_worktree"] = True
     if world.default_trunk is not None:
         local_trunk = real_git(world.clone, "rev-parse", "trunk").stdout
@@ -519,7 +539,7 @@ class TestLandClassification:
         indirect=True,
     )
     def test_refusal(self, world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-07, LANDCMD-09, LANDCMD-06 -- exact refusal and no writes."""
+        """Spec: LANDCMD-07, LANDCMD-09, LANDCMD-06, PIN-47 -- exact refusal and no writes."""
         assert_refusal(world, capsys)
 
 
@@ -743,7 +763,7 @@ class TestLandItemAndClaim:
                         ),
                     ),
                     arguments=(),
-                    checkout="untracked",
+                    checkout=CheckoutState.UNTRACKED_FILE,
                 ),
                 id="foreign-claim-and-dirty-checkout",
             ),
@@ -762,29 +782,29 @@ class TestLandCheckout:
             pytest.param(
                 ClaimCase(
                     "land must run from a clean checkout of the default branch 'main'",
-                    checkout="untracked",
+                    checkout=CheckoutState.UNTRACKED_FILE,
                 ),
                 id="dirty-checkout",
             ),
             pytest.param(
                 ClaimCase(
                     "land must run from a clean checkout of the default branch 'main'",
-                    checkout="tracked",
+                    checkout=CheckoutState.TRACKED_CHANGE,
                 ),
                 id="tracked-change",
             ),
             pytest.param(
                 ClaimCase(
                     "land must run from a clean checkout of the default branch 'main'",
-                    checkout="other",
+                    checkout=CheckoutState.OTHER_BRANCH,
                 ),
                 id="other-branch",
             ),
             pytest.param(
                 ClaimCase(
                     "land must run from a clean checkout of the default branch 'main'",
-                    checkout="untracked",
-                    identity="absent",
+                    checkout=CheckoutState.UNTRACKED_FILE,
+                    identity=IdentityState.ABSENT,
                 ),
                 id="dirty-checkout-and-no-identity",
             ),
@@ -793,7 +813,7 @@ class TestLandCheckout:
                     "land must run from a checkout with a git identity; "
                     "set user.name and user.email there so its release can "
                     "commit to the claim state",
-                    identity="absent",
+                    identity=IdentityState.ABSENT,
                     lane_worktree=True,
                     claims_present=True,
                 ),
@@ -807,7 +827,7 @@ class TestLandCheckout:
                     pull_request=landing_pull_request(
                         body="Work-Item: #72\n\nCloses #72", merged=True
                     ),
-                    identity="absent",
+                    identity=IdentityState.ABSENT,
                     item_reads=(),
                     file_reads=(),
                 ),
@@ -818,7 +838,7 @@ class TestLandCheckout:
                     "land must run from a checkout with a git identity; "
                     "set user.name and user.email there so its release can "
                     "commit to the claim state",
-                    identity="author-only",
+                    identity=IdentityState.AUTHOR_ONLY,
                 ),
                 id="committer-only",
             ),

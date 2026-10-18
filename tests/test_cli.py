@@ -85,6 +85,7 @@ from cli_fixtures import (
     stub_one_git_call,
     terminal_on_stdin,
     trunk_git_calls,
+    without_git_identity,
     worktrees_and_branches,
 )
 from github_fixtures import (
@@ -17716,14 +17717,13 @@ def _land_on_the_forges_trunk(
     tmp_path: Path,
     *,
     canonical: str,
-    checked_out: str,
     leftover_main: bool,
 ) -> tuple[Path, FakeForge]:
     """`_land_scenario` with no recorded `HEAD`, where the forge alone
     names the default branch `trunk` (issue #492): `canonical` carries
     `trunk`, the lane branch, and -- when `leftover_main` -- the `main` the
     switch to `trunk` left behind, the lane branch stands in its own clean
-    linked worktree `lane`, and the checkout stands on `checked_out`. A
+    linked worktree `lane`, and the checkout stands on `trunk`. A
     canonical remote other than `origin` is a fresh bare `<canonical>.git`
     the tracked board configuration names."""
     repo, client = _land_scenario(monkeypatch, tmp_path, set_head=False)
@@ -17744,7 +17744,7 @@ def _land_on_the_forges_trunk(
         bare = Path(real_git(repo, "remote", "get-url", canonical).stdout.strip())
         real_git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
         real_git(repo, "push", "-q", canonical, "--delete", "main")
-    real_git(repo, "checkout", "-q", "-B", checked_out)
+    real_git(repo, "checkout", "-q", "-B", "trunk")
     real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), LANDING_BRANCH)
     return repo, client
 
@@ -17774,7 +17774,6 @@ def test_land_takes_the_forges_default_branch_where_the_remote_records_no_head(
         monkeypatch,
         tmp_path,
         canonical=canonical,
-        checked_out="trunk",
         leftover_main=leftover_main,
     )
     trunk_calls = trunk_git_calls(monkeypatch, canonical)
@@ -18160,7 +18159,7 @@ def _land_from_a_separate_clone(
     real_git(repo, "worktree", "add", "-q", str(tmp_path / "lane"), lane_branch or LANDING_BRANCH)
     clone = tmp_path / "landing-clone"
     real_git(tmp_path, "clone", "-q", str(remote), str(clone))
-    _without_git_identity(monkeypatch, clone)
+    without_git_identity(monkeypatch, clone)
     real_git(clone, "config", "user.name", "Lander")
     real_git(clone, "config", "user.email", "lander@example.com")
     redirect_toplevel(monkeypatch, clone)
@@ -18190,26 +18189,8 @@ def _claim_the_landing_branch(
     )
 
 
-def _without_git_identity(monkeypatch: pytest.MonkeyPatch, checkout_path: Path) -> None:
-    """`checkout_path` with no git identity git may use or guess: none
-    configured locally, in the environment or the system configuration (the
-    caller isolates the global configuration)."""
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    real_git(checkout_path, "config", "user.useConfigOnly", "true")
-    real_git(checkout_path, "config", "--unset-all", "user.name", check=False)
-    real_git(checkout_path, "config", "--unset-all", "user.email", check=False)
-    for variable in (
-        "GIT_AUTHOR_NAME",
-        "GIT_AUTHOR_EMAIL",
-        "GIT_COMMITTER_NAME",
-        "GIT_COMMITTER_EMAIL",
-        "EMAIL",
-    ):
-        monkeypatch.delenv(variable, raising=False)
-
-
 @pytest.mark.usefixtures("isolated_global_git_config")
-def test_land_from_a_separate_clone_releases_or_refuses_before_the_merge(
+def test_land_from_a_separate_clone_merges_and_releases_the_claim_keeping_the_lane_worktree(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,

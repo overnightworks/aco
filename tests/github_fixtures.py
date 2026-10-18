@@ -504,6 +504,12 @@ def landing_effects(world: LandingWorld) -> dict[str, object]:
     }
 
 
+@dataclass(frozen=True)
+class ParserExit:
+    exited: bool
+    usage_prefix: str
+
+
 def refusal_observations(
     world: LandingWorld,
     result: CliRun,
@@ -511,17 +517,15 @@ def refusal_observations(
     *,
     bounded: bool = False,
     exact_length: bool = False,
-    parser_exit: bool = False,
-    exited: bool = False,
-    usage_prefix: str = "usage: aco land ",
+    parser_exit: ParserExit | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
     observed = {"exit": result.status, "out": result.stdout, **landing_effects(world)}
     expected = {"exit": 2, "out": "", **world.unchanged}
-    if parser_exit:
+    if parser_exit is not None:
         observed.update(
             {
-                "exception": exited,
-                "usage": result.stderr.startswith(usage_prefix),
+                "exception": parser_exit.exited,
+                "usage": result.stderr.startswith(parser_exit.usage_prefix),
                 "last": result.stderr.splitlines()[-1] if result.stderr else "",
             }
         )
