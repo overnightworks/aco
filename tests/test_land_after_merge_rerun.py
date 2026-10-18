@@ -39,7 +39,7 @@ class SeparateCase:
     body: str = "Work-Item: #72\n\nCloses #72"
     before_claim: str | None = None
     race_claim: str | None = None
-    release_command: str | None = "aco release 72 --merged 12 --branch codex/issue-72-claims"
+    release_command: str = "aco release 72 --merged 12 --branch codex/issue-72-claims"
     keep_arguments: tuple[str, ...] = ()
     land_status: int = 0
     land_stdout: str = (
@@ -49,11 +49,11 @@ class SeparateCase:
         "in the checkout that holds it\n"
     )
     land_stderr: str = ""
-    release_status: int | None = 0
-    release_stdout: str | None = (
+    release_status: int = 0
+    release_stdout: str = (
         "LANDED pull request #12 already; nothing left to release\nworktree: removed\n"
     )
-    release_stderr: str | None = ""
+    release_stderr: str = ""
     merge_calls: int = 1
     closed_items: frozenset[int] = frozenset()
     comments: dict[int, str] = field(default_factory=dict)
@@ -185,14 +185,9 @@ class SeparateRelease:
     world: SeparateWorld
     tip: str | None
     publications: int = 0
-    fired: bool = False
 
-    def run(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> CliRun | None:
+    def run(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CliRun:
         case = self.world.case
-        if case.release_command is None:
-            return None
         redirect_toplevel(monkeypatch, self.world.original)
         monkeypatch.chdir(self.world.original)
         race_claim = case.race_claim
@@ -201,13 +196,13 @@ class SeparateRelease:
             original_landing = client.landing
 
             def landing(number: int) -> forge.Landing:
-                if not self.fired:
-                    self.fired = True
+                if self.publications == 0:
                     self.tip = publish_separate_claim(self.world, race_claim)
                     self.publications += 1
                 return original_landing(number)
 
             monkeypatch.setattr(client, "landing", landing)
+        # Execute the release command whose printed spelling land_stdout verifies.
         return run_cli([*shlex.split(case.release_command)[1:], *case.keep_arguments], capsys)
 
 
@@ -260,7 +255,6 @@ def prepare_separate_rerun(
         "issue.reads": tuple(client.issue_reference_lookups),
         "claims": separate_claims(world),
         "state.tip": state_ref_tip(world.landing.remote),
-        "race.publications.before": release.publications,
     }
     expected = {
         "closed.items": frozenset(),
@@ -268,7 +262,6 @@ def prepare_separate_rerun(
         "issue.reads": (),
         "claims": before_claims,
         "state.tip": tip,
-        "race.publications.before": 0,
     }
     assert observed == expected
     return str(merge), release
@@ -466,6 +459,26 @@ def world(
     return RerunWorld(shared, case, merge)
 
 
+FOREIGN_LANE = SeparateCase(
+    identity=protocol.LaneIdentity(),
+    branch="dependabot/x",
+    body="No-Item: fix",
+    release_command="aco release --merged 12 --branch dependabot/x",
+    land_stdout="LANDED pull request #12 already; nothing left to release\n"
+    "worktree: kept -- no linked worktree on dependabot/x in this checkout; "
+    "run aco release --merged 12 --branch dependabot/x "
+    "in the checkout that holds it\n",
+)
+RACE_RELEASE_STDOUT = (
+    "LANDED pull request #12 already; nothing left to release\n"
+    "worktree: kept -- claimed again while this release ran\n"
+)
+KEEP_RELEASE_STDOUT = (
+    "LANDED pull request #12 already; nothing left to release\n"
+    "worktree: kept -- --keep-worktree was given\n"
+)
+
+
 class TestLandAfterMergeRerun:
     @pytest.mark.parametrize(
         "separate_world",
@@ -529,8 +542,7 @@ class TestLandAfterMergeRerun:
                 SeparateCase(
                     race_claim="reopened-claim",
                     publications=1,
-                    release_stdout="LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- claimed again while this release ran\n",
+                    release_stdout=RACE_RELEASE_STDOUT,
                     claims=(
                         (protocol.IssueIdentity(72), "codex/issue-72-claims", "reopened-claim"),
                     ),
@@ -542,40 +554,22 @@ class TestLandAfterMergeRerun:
             pytest.param(
                 SeparateCase(
                     keep_arguments=("--keep-worktree",),
-                    release_stdout="LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- --keep-worktree was given\n",
+                    release_stdout=KEEP_RELEASE_STDOUT,
                     lane_exists=True,
                     branch_exists=True,
                 ),
                 id="issue-the-keep-worktree-flag-keeps-the-lane",
             ),
             pytest.param(
-                SeparateCase(
-                    identity=protocol.LaneIdentity(),
-                    branch="dependabot/x",
-                    body="No-Item: fix",
-                    release_command="aco release --merged 12 --branch dependabot/x",
-                    land_stdout="LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- no linked worktree on dependabot/x in this checkout; "
-                    "run aco release --merged 12 --branch dependabot/x "
-                    "in the checkout that holds it\n",
-                ),
+                FOREIGN_LANE,
                 id="foreign-lane-removes-the-lane",
             ),
             pytest.param(
-                SeparateCase(
-                    identity=protocol.LaneIdentity(),
-                    branch="dependabot/x",
-                    body="No-Item: fix",
-                    release_command="aco release --merged 12 --branch dependabot/x",
-                    land_stdout="LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- no linked worktree on dependabot/x in this checkout; "
-                    "run aco release --merged 12 --branch dependabot/x "
-                    "in the checkout that holds it\n",
+                replace(
+                    FOREIGN_LANE,
                     race_claim="reopened-claim",
                     publications=1,
-                    release_stdout="LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- claimed again while this release ran\n",
+                    release_stdout=RACE_RELEASE_STDOUT,
                     claims=((protocol.IssueIdentity(72), "dependabot/x", "reopened-claim"),),
                     lane_exists=True,
                     branch_exists=True,
@@ -583,44 +577,14 @@ class TestLandAfterMergeRerun:
                 id="foreign-lane-a-claim-taken-meanwhile-keeps-the-lane",
             ),
             pytest.param(
-                SeparateCase(
-                    identity=protocol.LaneIdentity(),
-                    branch="dependabot/x",
-                    body="No-Item: fix",
-                    release_command="aco release --merged 12 --branch dependabot/x",
-                    land_stdout="LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- no linked worktree on dependabot/x in this checkout; "
-                    "run aco release --merged 12 --branch dependabot/x "
-                    "in the checkout that holds it\n",
+                replace(
+                    FOREIGN_LANE,
                     keep_arguments=("--keep-worktree",),
-                    release_stdout="LANDED pull request #12 already; nothing left to release\n"
-                    "worktree: kept -- --keep-worktree was given\n",
+                    release_stdout=KEEP_RELEASE_STDOUT,
                     lane_exists=True,
                     branch_exists=True,
                 ),
                 id="foreign-lane-the-keep-worktree-flag-keeps-the-lane",
-            ),
-            pytest.param(
-                SeparateCase(
-                    identity=protocol.LaneIdentity(),
-                    branch="dependabot/x",
-                    body="No-Item: fix",
-                    before_claim="bob-claim",
-                    release_command=None,
-                    land_status=2,
-                    land_stdout="",
-                    land_stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
-                    "release (branch 'dependabot/x' is not an issueless lane; "
-                    "pass an issue number, "
-                    "or check out a branch prefixed 'docs/' or 'fix/'); re-run aco land 12\n",
-                    release_status=None,
-                    release_stdout=None,
-                    release_stderr=None,
-                    claims=((protocol.IssueIdentity(72), "dependabot/x", "bob-claim"),),
-                    lane_exists=True,
-                    branch_exists=True,
-                ),
-                id="foreign-lane-an-issue-claim-taken-since-the-release-refuses",
             ),
         ],
         indirect=True,
@@ -631,7 +595,7 @@ class TestLandAfterMergeRerun:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """Spec: E-LANDCMD-18a, LANDCMD-38, REL-26, REL-47, REL-55, REL-58, REL-59, E-REL-24."""
+        """Spec: E-LANDCMD-18a, LANDCMD-38, REL-26, REL-47, REL-55, REL-59, E-REL-24."""
         world = separate_world
         case = world.case
         merge, release = prepare_separate_rerun(world, capsys)
@@ -644,20 +608,19 @@ class TestLandAfterMergeRerun:
             "follow-up.cwd": Path.cwd(),
             "follow-up.toplevel": Path(checkout.git_output(["rev-parse", "--show-toplevel"])),
         }
-        follow_up_checkout = world.landing.clone if case.release_command is None else world.original
         expected_guard = {
             "race.publications.after": case.publications,
-            "follow-up.cwd": follow_up_checkout,
-            "follow-up.toplevel": follow_up_checkout,
+            "follow-up.cwd": world.original,
+            "follow-up.toplevel": world.original,
         }
         assert observed_guard == expected_guard
         observed = {
             "land.exit": land_result.status,
             "land.stdout": land_result.stdout,
             "land.stderr": land_result.stderr,
-            "release.exit": None if release_result is None else release_result.status,
-            "release.stdout": None if release_result is None else release_result.stdout,
-            "release.stderr": None if release_result is None else release_result.stderr,
+            "release.exit": release_result.status,
+            "release.stdout": release_result.stdout,
+            "release.stderr": release_result.stderr,
             "merge.calls": len(world.landing.forge.merge_calls),
             "closed.items": frozenset(world.landing.forge.closed_issues),
             "landing.comments": world.landing.forge.landing_comments,
@@ -675,6 +638,78 @@ class TestLandAfterMergeRerun:
             "release.exit": case.release_status,
             "release.stdout": case.release_stdout,
             "release.stderr": case.release_stderr,
+            "merge.calls": case.merge_calls,
+            "closed.items": case.closed_items,
+            "landing.comments": case.comments,
+            "issue.reads": case.issue_reads,
+            "claims": case.claims,
+            "state.tip": release.tip,
+            "land.state.tip": before_tip,
+            "lane.exists": case.lane_exists,
+            "lane.branch.exists": case.branch_exists,
+        }
+        assert observed == expected
+
+    @pytest.mark.parametrize(
+        "separate_world",
+        [
+            pytest.param(
+                replace(
+                    FOREIGN_LANE,
+                    before_claim="bob-claim",
+                    land_status=2,
+                    land_stdout="",
+                    land_stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
+                    "release (branch 'dependabot/x' is not an issueless lane; "
+                    "pass an issue number, "
+                    "or check out a branch prefixed 'docs/' or 'fix/'); re-run aco land 12\n",
+                    claims=((protocol.IssueIdentity(72), "dependabot/x", "bob-claim"),),
+                    lane_exists=True,
+                    branch_exists=True,
+                ),
+                id="foreign-lane-an-issue-claim-taken-since-the-release-refuses",
+            ),
+        ],
+        indirect=True,
+    )
+    def test_refuses_a_foreign_lane_with_an_issue_claim(
+        self, separate_world: SeparateWorld, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: REL-58. An issue claim prevents an issueless rerun from releasing the lane."""
+        world = separate_world
+        case = world.case
+        merge, release = prepare_separate_rerun(world, capsys)
+        before_tip = release.tip
+        result = run_cli(["land", "12"], capsys)
+        observed_guard = {
+            "race.publications.after": release.publications,
+            "follow-up.cwd": Path.cwd(),
+            "follow-up.toplevel": Path(checkout.git_output(["rev-parse", "--show-toplevel"])),
+        }
+        expected_guard = {
+            "race.publications.after": case.publications,
+            "follow-up.cwd": world.landing.clone,
+            "follow-up.toplevel": world.landing.clone,
+        }
+        assert observed_guard == expected_guard
+        observed = {
+            "land.exit": result.status,
+            "land.stdout": result.stdout,
+            "land.stderr": result.stderr,
+            "merge.calls": len(world.landing.forge.merge_calls),
+            "closed.items": frozenset(world.landing.forge.closed_issues),
+            "landing.comments": world.landing.forge.landing_comments,
+            "issue.reads": tuple(world.landing.forge.issue_reference_lookups),
+            "claims": separate_claims(world),
+            "state.tip": state_ref_tip(world.landing.remote),
+            "land.state.tip": state_ref_tip(world.landing.remote),
+            "lane.exists": world.lane.exists(),
+            "lane.branch.exists": case.branch in local_branches(world.original),
+        }
+        expected = {
+            "land.exit": case.land_status,
+            "land.stdout": case.land_stdout,
+            "land.stderr": case.land_stderr.format(merge=merge),
             "merge.calls": case.merge_calls,
             "closed.items": case.closed_items,
             "landing.comments": case.comments,

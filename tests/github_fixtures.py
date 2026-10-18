@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import REPOSITORY, board_issue
 from cli_fixtures import (
+    GITHUB_REMOTE_URL,
     CliRun,
     add_lane_worktree,
     local_branches,
@@ -497,7 +498,7 @@ def assert_github_world(github_clone: Path, bare_remote: Path) -> None:
     assert real_git(github_clone, "rev-parse", "origin/HEAD").stdout.strip() == main
     assert (
         real_git(github_clone, "config", "--get", "remote.origin.url").stdout
-        == "git@github.com:example/agent-coordination.git\n"
+        == f"{GITHUB_REMOTE_URL}\n"
     )
     assert (
         real_git(github_clone, "ls-remote", "origin", "refs/heads/main").stdout
