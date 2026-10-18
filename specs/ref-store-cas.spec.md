@@ -27,7 +27,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | every push rejected, ref keeps moving | CAS-01 | CAS-16 | — |
 | push rejected once then sticks | CAS-01 | CAS-17 | — |
 | a creation push rejected, the re-read finds the ref present | CAS-66 | — | — |
-| a sent push whose outcome the store cannot tell | — | CAS-56 | — |
+| a sent push whose outcome the store cannot tell | CAS-56 | CAS-56 | — |
 | a rejected push re-read without its `operation_id`, then refused | — | CAS-57 | — |
 | worktree stamp not an ancestor of the fetched tip | — | — | CAS-11 |
 | ref previously observed, now absent | CAS-12 | CAS-12 | CAS-12 |
