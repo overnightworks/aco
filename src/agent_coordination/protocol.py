@@ -747,9 +747,8 @@ class PushRejectedError(ClaimError):
     """The store's push boundary did not observably land the pushed commit.
 
     Raised for an ordinary non-fast-forward rejection and for a lost response
-    after the remote actually advanced -- the retry loop in `store.py`
-    handles both by re-fetching and looking for its own `operation_id`
-    (criterion 3), so the two causes need no separate types.
+    after the remote actually advanced -- every caller in `store.py` handles
+    both by re-reading the ref, so the two causes need no separate types.
     """
 
 
@@ -955,17 +954,6 @@ class ClaimState:
 
 
 EMPTY_STATE = ClaimState(tip=None)
-
-
-@dataclass(frozen=True)
-class OperationAlreadyApplied:
-    """The push-retry loop found this `operation_id` already on the fetched tip.
-
-    Not an error: a concurrent writer's push landed, so this client's own
-    request is already satisfied and must not be re-applied.
-    """
-
-    tip: ObjectId
 
 
 def serialize_empty_schema_toml() -> str:

@@ -56,7 +56,6 @@ from .protocol import (
     LaneIdentity,
     MalformedStateTreeError,
     ObjectId,
-    OperationAlreadyApplied,
     PushRejectedError,
     ReleaseIntent,
     RescopeIntent,
@@ -168,10 +167,10 @@ _LS_REMOTE_EXIT_NO_MATCH = 2
 # loud with its own detail instead (issue #390 finding 10).
 _MERGE_BASE_EXIT_NOT_ANCESTOR = 1
 
-# Internal bound on the push-retry loop below (criterion 3's seam). Distinct
-# from `_MAX_TRANSITION_ATTEMPTS`: this loop only ever contends over
-# `bootstrap`'s fixed empty-tree commit, a narrower race than a live claim.
-_MAX_PUSH_ATTEMPTS = 8
+# Bound on `bootstrap`'s creation pushes (CAS-65). Distinct from
+# `_MAX_TRANSITION_ATTEMPTS`: it only retries while the ref is proven absent,
+# a narrower race than a live claim.
+_MAX_BOOTSTRAP_ATTEMPTS = 8
 
 # Retry exhaustion for a live claim/rescope/release transition (criterion 5):
 # 32 attempts, then `_retry_exhaustion_error` -- never "held by X" for a
@@ -251,8 +250,9 @@ class PushTransport(Protocol):
     A production implementation performs an ordinary `git push`. A test fake
     can additionally advance the observed remote state and *then* raise, to
     reproduce a lost response after the remote actually accepted the push --
-    the retry loop below treats every raise identically: re-fetch and look
-    for this attempt's `operation_id` before assuming nothing landed.
+    every caller treats every raise identically: re-read the ref before
+    assuming nothing landed -- `bootstrap` by its tip alone (CAS-65),
+    `commit_transition` by its own `operation_id` (CAS-13).
     """
 
     def push(self, *, worktree: Path, remote: str, ref: str, new_oid: ObjectId) -> None:
@@ -1223,17 +1223,6 @@ def _find_operation_id(
     return None
 
 
-@dataclass(frozen=True)
-class PendingCommit:
-    """One not-yet-landed transition: the tree it writes and the commit
-    message carrying its `operation_id`, kept together so a retry re-applies
-    the same write rather than drifting from it."""
-
-    tree_oid: ObjectId
-    message: str
-    operation_id: str
-
-
 def _pluralize_times(count: int) -> str:
     return "time" if count == 1 else "times"
 
@@ -1246,7 +1235,7 @@ def _advance_tip_retry(
     stationary_since_last_move: int,
 ) -> tuple[int, int]:
     """One rejected attempt's move/stationary tally, the bookkeeping shared
-    by `push_tree` and `commit_transition`: a genuine tip move (a concurrent
+    by `bootstrap` and `commit_transition`: a genuine tip move (a concurrent
     writer landing first) resets the stationary count, while finding the ref
     exactly where the previous attempt left it (the push itself never
     landed) extends it -- the split `_retry_exhaustion_error` needs to name
@@ -1271,7 +1260,7 @@ def _retry_exhaustion_error(
     the last move sat stuck, blamed a race for exhaustion a stuck lock
     actually caused. Naming the wrong cause sends an operator chasing
     concurrent writers that were never there; the one owner of this
-    diagnosis is here, for both `push_tree` and `commit_transition`.
+    diagnosis is here, for both `bootstrap` and `commit_transition`.
     """
     if moves == 0:
         return ClaimUnavailableError(
@@ -1292,56 +1281,6 @@ def _retry_exhaustion_error(
         "stale lock or missing push rights took over -- check "
         f"{remote}'s {STATE_REF}.lock (delete it if stale) and push permissions; retrying "
         "the command only helps once that clears"
-    )
-
-
-def push_tree(
-    *,
-    worktree: Path,
-    remote: str,
-    observed: ClaimState,
-    pending: PendingCommit,
-    transport: PushTransport,
-) -> ObjectId | OperationAlreadyApplied:
-    """Commit `pending` onto `observed.tip` and push it as the new state tip.
-
-    Retries against a moved tip (non-fast-forward, or a lost response after
-    the remote actually advanced) until the push lands or `pending`'s
-    `operation_id` is found already applied by a concurrent writer
-    (criterion 3) -- never re-applying it a second time.
-    """
-    parent = observed.tip
-    moves = 0
-    stationary_since_last_move = 0
-    for _attempt in range(_MAX_PUSH_ATTEMPTS):
-        new_commit = _commit_tree(
-            worktree, tree_oid=pending.tree_oid, parent=parent, message=pending.message
-        )
-        try:
-            transport.push(worktree=worktree, remote=remote, ref=STATE_REF, new_oid=new_commit)
-        except PushRejectedError:
-            refreshed = fetch_state(worktree=worktree, remote=remote)
-            if refreshed.tip is not None:
-                found = _find_operation_id(
-                    worktree, since=parent, until=refreshed.tip, operation_id=pending.operation_id
-                )
-                if found is not None:
-                    return OperationAlreadyApplied(tip=refreshed.tip)
-            moves, stationary_since_last_move = _advance_tip_retry(
-                previous_tip=parent,
-                refreshed_tip=refreshed.tip,
-                moves=moves,
-                stationary_since_last_move=stationary_since_last_move,
-            )
-            parent = refreshed.tip
-            continue
-        _write_lineage_stamp(worktree, new_commit)
-        return new_commit
-    raise _retry_exhaustion_error(
-        remote=remote,
-        attempts=_MAX_PUSH_ATTEMPTS,
-        moves=moves,
-        stationary_since_last_move=stationary_since_last_move,
     )
 
 
@@ -1720,11 +1659,11 @@ def commit_transition(
     item write's plain `TransitionSubject` carries no such field at all.
 
     The first attempt applies `intent` to the command's own `observed`
-    state and reads nothing itself (issue #494). Unlike `push_tree`'s fixed
-    bootstrap tree, a transition's result depends on the state it is
-    applied to, so a rejected push re-fetches, looks for its own
-    `operation_id`, and re-applies `intent` to the fresh state instead of
-    reusing a stale tree -- the same seam (criterion 3), generalized. A
+    state and reads nothing itself (issue #494). Unlike `bootstrap`'s fixed
+    tree, a transition's result depends on the state it is applied to, so a
+    rejected push re-fetches, looks for its own `operation_id`, and
+    re-applies `intent` to the fresh state instead of reusing a stale tree
+    (CAS-13). A
     failure after a push was sent whose outcome the store cannot tell is an
     `UncertainWriteError` (CAS-56); a refusal or an exhausted retry after a
     re-read found nothing of this write, so it stays the plain refusal
@@ -1774,31 +1713,44 @@ def bootstrap(
     transport: PushTransport | None = None,
 ) -> ObjectId:
     """Create `refs/aco/state` at an empty state tree if it is proven absent;
-    otherwise report the existing tip untouched.
+    otherwise report the existing tip untouched (CAS-01, CAS-65).
 
     A present ref is a pure read (no write); an absent ref (`ls-remote` exit
-    2) gets one commit holding only `schema.toml`; an unreachable ref
-    (auth/transport, exit 128 and friends) fails loud from `fetch_state`
+    2) gets one parentless commit holding only `schema.toml`; an unreachable
+    ref (auth/transport, exit 128 and friends) fails loud from `fetch_state`
     before either branch runs. A worktree that has observed the ref and
     later finds it absent is a lineage error, not a fresh bootstrap.
+
+    After a rejected creation push the ref is read afresh: a present ref,
+    whoever wrote it -- a rival, or this very push whose response was lost --
+    is returned as it stands, and only a proven absence earns another
+    attempt with the same commit, so no creation commit is ever parented on
+    an existing tip.
     """
-    observed = fetch_state(worktree=worktree, remote=remote)
-    if observed.tip is not None:
-        return observed.tip
-    operation_id = uuid.uuid4().hex
-    pending = PendingCommit(
+    if (tip := fetch_state(worktree=worktree, remote=remote).tip) is not None:
+        return tip
+    transport = transport or GitPushTransport()
+    creation_commit = _commit_tree(
+        worktree,
         tree_oid=_write_bootstrap_tree(worktree),
-        message=f"bootstrap empty claim state\n\noperation_id: {operation_id}\n",
-        operation_id=operation_id,
+        parent=None,
+        message=f"bootstrap empty claim state\n\noperation_id: {uuid.uuid4().hex}\n",
     )
-    result = push_tree(
-        worktree=worktree,
+    for _attempt in range(_MAX_BOOTSTRAP_ATTEMPTS):
+        try:
+            transport.push(worktree=worktree, remote=remote, ref=STATE_REF, new_oid=creation_commit)
+        except PushRejectedError:
+            if (tip := fetch_state(worktree=worktree, remote=remote).tip) is not None:
+                return tip
+            continue
+        _write_lineage_stamp(worktree, creation_commit)
+        return creation_commit
+    raise _retry_exhaustion_error(
         remote=remote,
-        observed=observed,
-        pending=pending,
-        transport=transport or GitPushTransport(),
+        attempts=_MAX_BOOTSTRAP_ATTEMPTS,
+        moves=0,
+        stationary_since_last_move=_MAX_BOOTSTRAP_ATTEMPTS,
     )
-    return result.tip if isinstance(result, OperationAlreadyApplied) else result
 
 
 _WORKTREE_LIST_PATH_PREFIX = "worktree "

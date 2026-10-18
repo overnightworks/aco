@@ -23,9 +23,10 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | fetch of a present ref fails | CAS-05 | CAS-05 | CAS-05 |
 | a rejected push whose commit landed | — | CAS-13 | — |
 | two writers race the same tip | — | CAS-14 | — |
-| every push rejected, ref never moves | CAS-15* | CAS-15 | — |
-| every push rejected, ref keeps moving | CAS-15* | CAS-16 | — |
-| push rejected once then sticks | CAS-15* | CAS-17 | — |
+| every push rejected, ref never moves | CAS-65* | CAS-15 | — |
+| every push rejected, ref keeps moving | CAS-01 | CAS-16 | — |
+| push rejected once then sticks | CAS-01 | CAS-17 | — |
+| a creation push rejected, the re-read finds the ref present | CAS-65 | — | — |
 | a sent push whose outcome the store cannot tell | — | CAS-56 | — |
 | a rejected push re-read without its `operation_id`, then refused | — | CAS-57 | — |
 | worktree stamp not an ancestor of the fetched tip | — | — | CAS-11 |
@@ -40,7 +41,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | a claim lands on the item an `item close` retries | — | CAS-52 | — |
 | a close or edit lands on the item a claim retries | — | CAS-59, CAS-60 | — |
 
-\* `aco bootstrap`'s own push shares CAS-15's exact three-shaped sentence at 8 attempts instead of a transition's 32; see the section preamble below.
+\* `aco bootstrap` ends in CAS-15's stuck-lock sentence at 8 attempts instead of a transition's 32, only when every re-read proved the ref absent (CAS-65); see the section preamble below.
 
 ## `refs/aco/state` and bootstrap's idempotency
 
@@ -81,13 +82,15 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 
 ## The compare-and-swap transition and its retries
 
-Every push against `refs/aco/state` -- bootstrap's own first commit, and
-every live claim/rescope/release/item-write transition -- retries against a
-moving tip through the same three exhaustion sentences below, differing
-only in the remote, the attempt count (`8` for bootstrap, `32` for a live
-transition), and which of the three causes applies.
+Every live claim/rescope/release/item-write transition retries against a
+moving tip through the three exhaustion sentences below, differing only in
+the remote and which of the three causes applies. Bootstrap's own creation
+push is not a retry against a moving tip: a present ref ends it (CAS-01,
+CAS-65), and only a ref that stays absent reaches CAS-15's sentence, at `8`
+attempts instead of a transition's `32`.
 
 - [ ] [CAS-13] A transition whose push is rejected once, but whose commit actually landed (a lost response), is found by its own `operation_id` on retry, never pushed a second time.
+- [ ] [CAS-65] After a rejected bootstrap creation push, `aco bootstrap` reads `refs/aco/state` afresh using the ordinary fetch, validation, and lineage checks. If that read returns a present ref, CAS-01 applies: bootstrap prints the fetched tip, exits `0`, and makes no further creation attempt, including when its own push landed but its response was lost or another writer subsequently advanced it. Only a read proving absence, without a lineage refusal, permits another creation attempt; bootstrap never parents its creation commit on an existing tip. There are at most eight creation pushes. If all eight are rejected and their re-reads prove absence, bootstrap uses CAS-15's stationary-ref diagnostic with eight attempts. A failed re-read stops the operation and never authorizes creation: existing transport, validation, and lineage refusals apply, and an indeterminate sent write remains subject to CAS-56.
 - [ ] [CAS-47] A retry's search for a lost response's own `operation_id` that fails to read one candidate commit refuses `cannot read commit <sha> while searching for operation_id <id>: <detail>` (see E-CAS-06).
 - [ ] [CAS-14] Two transitions on disjoint identities racing for the same tip both land (except CAS-51): the loser re-fetches, re-applies its own `operation_id`'s intent, and lands -- CLAIM-01 owns the printed line.
 - [ ] [CAS-15] 32 stuck pushes refuse `refs/aco/state rejected 32 pushes to <remote> without the ref ever moving: a stale lock or missing push rights`, fix `refs/aco/state.lock`, then `aco reset` (see E-CAS-03).
