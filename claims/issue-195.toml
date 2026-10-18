@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "bcadeba95c5f27a12d1ffad702c790d187850b9d"
 branch = "claude/issue-195-bootstrap-ein-abgelehnter-anlege-push-le"
-scope = ["scripts/test_inventory_dropped.txt", "specs/ref-store-cas.spec.md", "src/agent_coordination/github.py", "src/agent_coordination/process.py", "src/agent_coordination/protocol.py", "src/agent_coordination/store.py", "tests/test_bootstrap.py", "tests/test_github.py", "tests/test_process.py", "tests/test_store.py"]
+scope = ["scripts/test_inventory_dropped.txt", "specs/ref-store-cas.spec.md", "src/agent_coordination/github.py", "src/agent_coordination/process.py", "src/agent_coordination/protocol.py", "src/agent_coordination/store.py", "tests/process_fixtures.py", "tests/test_bootstrap.py", "tests/test_github.py", "tests/test_process.py", "tests/test_store.py"]
 opened_commit = "5af64184ae42bfc0c2861ba6c65904b7c8e1d7f2"
 whole_reason = "Die Schreibentscheidung von bootstrap bekommt einen Owner im Store, und der Push braucht die Startgrenze und das Aufräumen des Prozess-Runners als Owner, dessen neuer Fehlerpfad auch den Satz von github.py ändert; halb umgebaut bliebe ein gesendeter Write ohne Unsicherheitsklasse oder eine falsche Diagnose."
