@@ -4404,13 +4404,14 @@ def test_apply_item_write_intent_checks_its_parent_pin_alone(
         STATE_WITH_TIP, items={k: protocol.ObjectId(v * 40) for k, v in items_before.items()}
     )
     pin = protocol.ItemPin("aco-p", protocol.ObjectId(pinned_oid * 40))
+    intent = _item_intent(item_id="aco-child", parent_pin=pin)
 
     if refusal is None:
-        landed = protocol.apply(state, _item_intent(item_id="aco-child", parent_pin=pin))
+        landed = protocol.apply(state, intent)
         assert landed.items["aco-child"] == _ITEM_OID
         return
     with pytest.raises(protocol.ClaimUnavailableError, match=f"item '{refusal}' was written"):
-        protocol.apply(state, _item_intent(item_id="aco-child", parent_pin=pin))
+        protocol.apply(state, intent)
 
 
 def test_apply_item_write_intent_without_a_parent_pin_ignores_every_other_item() -> None:
