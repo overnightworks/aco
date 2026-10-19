@@ -521,14 +521,15 @@ class PathCheckout:
 NO_COMMIT_CHECKOUT_REASON = "no commit on this branch"
 NOT_IN_A_REPOSITORY_REASON = "not in a repository"
 RELATIVE_PAYLOAD_PATH_DENIAL = "relative payload path"
-# The variables that change which repository git recognizes at a path, measured
-# with git 2.43 on a path outside every repository and on git directories
-# without a local `objects/`: `GIT_DIR` selects one outright, `GIT_COMMON_DIR`
-# and `GIT_OBJECT_DIRECTORY` make a directory missing `refs/` or `objects/`
-# complete (setup.c `is_git_directory`). The other twelve of
-# `git rev-parse --local-env-vars` (config, prefix, index, alternates, graft,
-# shallow, replace, implicit work tree, `GIT_WORK_TREE` alone) left a plain
-# outside path unrecognized (exit 128) in the same probe.
+# The variables that change which repository git recognizes at a path, in
+# either direction, measured with git 2.43: `GIT_DIR` selects one outright;
+# `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY` make git recognize a directory
+# without local `objects/` or `refs/` (setup.c `is_git_directory`), and an
+# empty value makes git fail on a real repository. While one is present a
+# failed discovery cannot read as outside; the cost is a refused write on a
+# genuine outside path only then. The other twelve of
+# `git rev-parse --local-env-vars` left a plain outside path unrecognized
+# (exit 128) and are not kept.
 REPOSITORY_SELECTING_ENVIRONMENT_VARIABLES = (
     "GIT_DIR",
     "GIT_COMMON_DIR",
@@ -587,9 +588,10 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     never inside a repository -- `git -C` cannot even enter it -- so it
     stays `None` whatever sits above it, even an outer checkout's `.git`.
     Only that first discovery may read as "outside", and never while the
-    environment sets a variable that selects a repository (`GIT_DIR`,
-    `GIT_COMMON_DIR`, `GIT_OBJECT_DIRECTORY`: a repository no `.git` marker
-    sits above may exist): once git has
+    environment sets `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_OBJECT_DIRECTORY`
+    (each changes what git recognizes in either direction: a repository no
+    `.git` marker shows may exist, or git may fail on a real one; the cost
+    is a refused write on a genuine outside path only while one is set): once git has
     named the checkout, a failed read of its branch or commit raises, inside
     a git directory as PROT-43's sentence.
     """
