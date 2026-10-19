@@ -8723,7 +8723,7 @@ def test_release_merged_under_state_ref_removes_the_landed_lane_worktree(
     assert not lane_worktree.exists()
 
 
-def test_release_merged_under_state_ref_stops_before_the_transition_when_the_remote_head_read_fails(
+def test_release_merged_under_state_ref_stops_before_the_transition_when_the_head_read_fails(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """REL-32: the trunk the landing is walked against is never guessed
@@ -8746,7 +8746,7 @@ def test_release_merged_under_state_ref_stops_before_the_transition_when_the_rem
     assert real_git(repo, "branch", "--list", "codex/issue-10-claims").stdout.strip()
 
 
-def test_release_merged_under_state_ref_keeps_the_lane_worktree_when_the_cleanup_read_of_the_remote_head_fails(
+def test_release_merged_under_state_ref_keeps_the_worktree_when_the_cleanup_head_read_fails(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """REL-32: the remote `HEAD` read after the cleanup's fetch fails only

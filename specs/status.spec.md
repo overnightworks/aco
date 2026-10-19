@@ -95,6 +95,7 @@ the peer and its claim id, never the meeting paths.
 
 ## Never
 
+- `aco status` never guesses the trunk after a failed read of `<remote>/HEAD`: it reports `unavailable` with git's own text, exit `2` (STAT-18); STAT-21 stays for a defective trunk copy.
 - `aco status --path` never reads a claim's committer-date age: a lineage break in an unrelated claim's `opened_commit` never stops its answer, unlike the plain (non-`--path`) read, which surfaces that break by CLAIM-50's own sentence.
 - `aco status` never writes: it is a pure read of the fetched state, never a compare-and-swap transition -- only `aco bootstrap`'s ordinary path creates `refs/aco/state` (`specs/ref-store-cas.spec.md`'s own Never line; `aco reset --confirm` reaches the same creation, CAS-44/CAS-46), and no other command here writes it either.
 - `aco status --json`'s `"issue"` field is never the state-ref item id, even under that pin (STAT-15).
