@@ -57,6 +57,7 @@ repository or a checkout's own `.git` directory, symlink-resolved.
 | paths across two linked worktrees | — | — | PROT-25 | PROT-33 (own checkout each) | — |
 | a `cd` changes the resolution directory | — | — | — | PROT-34 | — |
 | a `cd` target cannot be resolved | — | — | — | PROT-35 (allow) | — |
+| a `sed` script itself names a file to write | — | — | — | PROT-47 | — |
 | a decoy path key the tool never sends | — | PROT-27 | — | — | — |
 | an OWNER/REPO `--repo`, or a non-GitHub canonical remote | PROT-28 | PROT-28 | PROT-28 | PROT-28 | PROT-28 |
 | `--repo` not shaped OWNER/REPO | OUT-08 | OUT-08 | OUT-08 | OUT-08 | OUT-08 |
@@ -181,7 +182,11 @@ operands, `sed -i` (or `-i<suffix>`/`--in-place[=suffix]`, where `-i` also count
 such as `-ni`, skipping
 `-e`/`--expression`/`-f`/`--file`, `-l`/`--line-length`, and their own
 values -- a lone remaining operand after a spelled-out suffix is judged as
-the file it edits, since sed cannot otherwise write anywhere), `mv` (every
+the file it edits, since sed cannot otherwise write anywhere), `sed w` (the
+file a `sed` script's own `w`, `W` or `s///w` command writes, named in a
+readable `-e`/`--expression` value or the positional script, in the order
+the command names its words, so `sed -i -e 'w docs/a' docs/b` names `docs/a`
+first), `mv` (every
 operand -- a source vanishes exactly like its destination is written), `cp`
 (every `-t`/`--target-directory` value when given, attached or separate, e.g.
 `-t/tmp`/`--target-directory=/tmp`, otherwise its last operand -- either
@@ -213,8 +218,8 @@ pattern of its own, exactly like Bash itself never runs what follows it on
 that line; an unquoted or double-quoted, trailing backslash-newline joins
 the next physical line first -- never inside single quotes, which keep it
 literal -- so a command split that way is judged exactly like the one line
-it forms. `git checkout <branch>` (no `--`) and a plain `sed` without
-`-i`/`--in-place` name no path at all, since neither writes a file; neither
+it forms. `git checkout <branch>` (no `--`) and a `sed` without
+`-i`/`--in-place` and without a `w`/`W`/`s///w` file in its script name no path at all, since neither writes a file; neither
 does a redirect whose own target is exactly `/dev/null`, or a
 file-descriptor-duplication form (`2>&1`, `>&2`) -- its own "target" is
 another operator, never a real file. Unlike every other tool's own
@@ -243,6 +248,7 @@ than a bare `claim first`.
 - [ ] [PROT-33] A recognized pattern's own path outside the live claim's scope denies `<pattern> <path> outside claim scope`, naming both (see E-PROT-08).
 - [ ] [PROT-34] A literal, resolvable `cd` changes the directory every later path in its own `;`/`&&`/`||`/newline list resolves against -- never across a `|`, and only inside its own group.
 - [ ] [PROT-35] An unresolvable `cd` target -- expandable, `-`, or no operand -- ends recognition for the rest of the command outright, allowing it (see E-PROT-10).
+- [ ] [PROT-47] A file a `sed` script writes (`w`, `W`, `s///w`) in a readable `-e` value or positional script is a `sed w` path; script text from the first `-f` or expansion on is not judged (see E-PROT-19).
 
 ## Forge-free
 
@@ -268,6 +274,7 @@ than a bare `claim first`.
 - `shell` and other providers' equivalents never deny a missing path: the hook payload names no file path for those, so `protect` cannot gate what it cannot see (README, "PreToolUse write gate").
 - `Bash` (issue #380) and `Monitor` (issue #448) are the one exception, judging only the fixed pattern list PROT-30 owns.
 - A `python -c ...` one-liner or an opaque script invocation stays invisible on purpose: recognizing a pattern is a best-effort aid against forgetting the claim, never a security boundary.
+- `protect` never reads a `sed -f` script or script text with an expansion, and never judges the text after one either, because the parser state it leaves is unknown.
 - `protect` never guesses a Bash-recognized relative path's `cwd` from the hook process's own cwd: a payload naming no `cwd` allows that path outright (PROT-31).
 - This is PROT-09's own "never guess a relative path" principle, applied as an allow instead of a deny since Bash's own path is expected to be relative.
 - A Bash pattern never judges what only the shell could resolve: an operand with an unquoted (or double-quoted, still-substituting) `$name`, `` `command` ``, `~`, `*`, `?`, or `[` is never judged.
@@ -487,5 +494,16 @@ Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-42`, `refs/rem
 $ echo '{"tool_name": "Write", "tool_input": {"file_path": "<worktree>/README.md"}}' | aco protect
 {"decision": "deny", "reason": "default branch unknown; run git remote set-head origin --auto"}
 2> default branch unknown; run git remote set-head origin --auto
+exit 2
+```
+
+### E-PROT-19 -- a file a `sed` script writes is judged like any pattern's path
+
+Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-42`, already `aco claim 42 --scope src`, cwd is `<worktree>`
+
+```console
+$ echo '{"toolName": "Bash", "toolInput": {"command": "sed -n -e \"w docs/widget.md\" src/a"}, "cwd": "<worktree>"}' | aco protect
+{"decision": "deny", "reason": "sed w docs/widget.md outside claim scope"}
+2> sed w docs/widget.md outside claim scope
 exit 2
 ```
