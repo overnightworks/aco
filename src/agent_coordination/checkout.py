@@ -521,24 +521,18 @@ class PathCheckout:
 NO_COMMIT_CHECKOUT_REASON = "no commit on this branch"
 NOT_IN_A_REPOSITORY_REASON = "not in a repository"
 RELATIVE_PAYLOAD_PATH_DENIAL = "relative payload path"
-# Verbatim from `git rev-parse --local-env-vars` (git 2.43): every variable
-# that makes git read a repository from the environment, not from `.git`.
-LOCAL_GIT_ENVIRONMENT_VARIABLES = (
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-    "GIT_CONFIG",
-    "GIT_CONFIG_PARAMETERS",
-    "GIT_CONFIG_COUNT",
-    "GIT_OBJECT_DIRECTORY",
+# The variables that change which repository git recognizes at a path, measured
+# with git 2.43 on a path outside every repository and on git directories
+# without a local `objects/`: `GIT_DIR` selects one outright, `GIT_COMMON_DIR`
+# and `GIT_OBJECT_DIRECTORY` make a directory missing `refs/` or `objects/`
+# complete (setup.c `is_git_directory`). The other twelve of
+# `git rev-parse --local-env-vars` (config, prefix, index, alternates, graft,
+# shallow, replace, implicit work tree, `GIT_WORK_TREE` alone) left a plain
+# outside path unrecognized (exit 128) in the same probe.
+REPOSITORY_SELECTING_ENVIRONMENT_VARIABLES = (
     "GIT_DIR",
-    "GIT_WORK_TREE",
-    "GIT_IMPLICIT_WORK_TREE",
-    "GIT_GRAFT_FILE",
-    "GIT_INDEX_FILE",
-    "GIT_NO_REPLACE_OBJECTS",
-    "GIT_REPLACE_REF_BASE",
-    "GIT_PREFIX",
-    "GIT_SHALLOW_FILE",
     "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
 )
 
 
@@ -593,9 +587,9 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     never inside a repository -- `git -C` cannot even enter it -- so it
     stays `None` whatever sits above it, even an outer checkout's `.git`.
     Only that first discovery may read as "outside", and never while the
-    environment sets any of git's local variables (`GIT_DIR`, `GIT_WORK_TREE`,
-    `GIT_OBJECT_DIRECTORY`, ...: a repository no `.git` marker sits above
-    may exist): once git has
+    environment sets a variable that selects a repository (`GIT_DIR`,
+    `GIT_COMMON_DIR`, `GIT_OBJECT_DIRECTORY`: a repository no `.git` marker
+    sits above may exist): once git has
     named the checkout, a failed read of its branch or commit raises, inside
     a git directory as PROT-43's sentence.
     """
@@ -618,7 +612,7 @@ def _refuse_a_failure_inside_a_repository(directory: Path, error: ClaimError) ->
     one, so the git failure on it can never read as "outside every
     repository"."""
     _refuse_a_failure_inside_a_git_directory(directory, error)
-    if _has_repository_marker_above(directory) or _environment_sets_a_local_git_variable():
+    if _has_repository_marker_above(directory) or _environment_selects_a_repository():
         raise error
 
 
@@ -630,11 +624,11 @@ def _refuse_a_failure_inside_a_git_directory(directory: Path, error: ClaimError)
         raise ClaimError(inside_git_directory_reason(git_directory)) from error
 
 
-def _environment_sets_a_local_git_variable() -> bool:
-    """Whether the inherited environment has any of git's local variables
+def _environment_selects_a_repository() -> bool:
+    """Whether the inherited environment has a repository-selecting variable
     present, an empty value included: each may place a repository, or what
     git takes for one, where no filesystem marker shows it."""
-    return any(name in os.environ for name in LOCAL_GIT_ENVIRONMENT_VARIABLES)
+    return any(name in os.environ for name in REPOSITORY_SELECTING_ENVIRONMENT_VARIABLES)
 
 
 def inside_git_directory_reason(git_directory: Path) -> str:
@@ -711,7 +705,11 @@ def _enclosing_git_directory(directory: Path) -> Path | None:
     the symlink-resolved path, the one git's own discovery walks."""
     resolved = directory.resolve()
     return next(
-        (candidate for candidate in (resolved, *resolved.parents) if _is_git_directory(candidate)),
+        (
+            candidate
+            for candidate in (resolved, *resolved.parents)
+            if _is_git_directory(candidate, discovery_start=directory)
+        ),
         None,
     )
 
@@ -724,24 +722,64 @@ def _has_repository_marker_above(directory: Path) -> bool:
     discovery walks."""
     resolved = directory.resolve()
     return any(
-        _is_repository_marker(candidate / ".git") for candidate in (resolved, *resolved.parents)
+        _is_repository_marker(candidate / ".git", discovery_start=directory)
+        for candidate in (resolved, *resolved.parents)
     )
 
 
-def _is_repository_marker(dot_git: Path) -> bool:
-    return dot_git.is_file() or _is_git_directory(dot_git)
+def _is_repository_marker(dot_git: Path, *, discovery_start: Path) -> bool:
+    return dot_git.is_file() or _is_git_directory(dot_git, discovery_start=discovery_start)
 
 
-def _is_git_directory(candidate: Path) -> bool:
-    """The layout git's own discovery takes for a repository directory:
-    `HEAD` beside `refs/` and an object directory -- `GIT_OBJECT_DIRECTORY`
-    when set, else `objects/`, as git itself checks it."""
-    object_directory = Path(os.environ.get("GIT_OBJECT_DIRECTORY", candidate / "objects"))
+def _is_git_directory(candidate: Path, *, discovery_start: Path) -> bool:
+    """Whether git 2.43 takes `candidate` for a git directory (setup.c
+    `is_git_directory`): a `HEAD` (`_has_git_head`) beside `refs/` and an
+    object directory, both read from the common directory -- the one a
+    `commondir` file names, relative to `candidate`, or `GIT_COMMON_DIR` --
+    with `GIT_OBJECT_DIRECTORY` replacing `objects/`. A relative environment
+    value is relative to `discovery_start`, where `git -C` runs, not to this
+    process's cwd; an empty one makes git reject the directory."""
+    if not _has_git_head(candidate):
+        return False
+    common_directory = _environment_directory(
+        "GIT_COMMON_DIR", _common_directory_file_target(candidate), discovery_start
+    )
+    if common_directory is None:
+        return False
+    object_directory = _environment_directory(
+        "GIT_OBJECT_DIRECTORY", common_directory / "objects", discovery_start
+    )
     return (
-        (candidate / "HEAD").is_file()
+        object_directory is not None
         and object_directory.is_dir()
-        and (candidate / "refs").is_dir()
+        and (common_directory / "refs").is_dir()
     )
+
+
+def _has_git_head(candidate: Path) -> bool:
+    """git's `validate_headref`: `HEAD` is a readable file, or a symlink
+    naming a ref under `refs/` -- an unborn branch's dangling link too."""
+    head = candidate / "HEAD"
+    return head.is_file() or (head.is_symlink() and os.readlink(head).startswith("refs/"))
+
+
+def _common_directory_file_target(candidate: Path) -> Path:
+    """The common directory a `commondir` file in `candidate` names, else
+    `candidate` itself."""
+    commondir_file = candidate / "commondir"
+    if not commondir_file.is_file():
+        return candidate
+    return candidate / commondir_file.read_text().strip()
+
+
+def _environment_directory(name: str, default: Path, discovery_start: Path) -> Path | None:
+    """The directory environment variable `name` names, resolved against
+    `discovery_start`; `default` when unset; `None` when empty, which git
+    never accepts as a directory."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return discovery_start / value if value else None
 
 
 def _resolve_checkout(directory: Path) -> PathCheckout:

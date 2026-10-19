@@ -1927,20 +1927,33 @@ def test_protect_lets_any_live_claim_write_a_lane_shared_registry_file(
     assert (json.loads(printed)["decision"] if printed else "allow") == decision
 
 
+@pytest.mark.parametrize(
+    "git_environment",
+    [
+        pytest.param({}, id="clean-environment"),
+        pytest.param({"GIT_CONFIG_COUNT": "0"}, id="config-count"),
+        pytest.param({"GIT_PREFIX": "sub/"}, id="prefix"),
+        pytest.param({"GIT_INDEX_FILE": "index"}, id="index-file"),
+    ],
+)
 @pytest.mark.parametrize("payload_for", _TARGET_PATH_PAYLOAD_BUILDERS, ids=["write", "bash-rm"])
 def test_protect_allows_a_path_outside_every_repository_without_identity(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     payload_for: Callable[[Path], dict[str, object]],
+    git_environment: dict[str, str],
 ) -> None:
     """PROT-32 (issue #448): a write outside every git checkout -- the
     session's memory, its scratchpad, `/tmp` -- is not aco's to judge, so an
     `Edit` path and a Bash-recognized one alike allow before identity or the
-    store is ever read (neither is set up here, and both would fail)."""
+    store is ever read (neither is set up here, and both would fail). A git
+    variable that cannot make git recognize a repository changes nothing."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
+    for name, value in git_environment.items():
+        monkeypatch.setenv(name, value)
     outside = tmp_path / "not-a-repository"
     outside.mkdir()
     monkeypatch.chdir(outside)
@@ -3622,14 +3635,46 @@ def _select_external_objects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     return repository / ".git", repository
 
 
-@pytest.fixture(params=[_select_git_directory_and_work_tree, _select_external_objects])
+def _select_common_directory_layout(
+    _monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path]:
+    repository = _committed_repository(tmp_path)
+    git_directory = repository / ".git"
+    common_directory = tmp_path / "common"
+    common_directory.mkdir()
+    for name in ("objects", "refs"):
+        (git_directory / name).rename(common_directory / name)
+    (git_directory / "commondir").write_text("../../common\n")
+    return git_directory, repository
+
+
+def _select_unborn_symlinked_head(
+    _monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path]:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    real_git(repository, "init", "-q", "-b", "main")
+    (repository / ".git" / "HEAD").unlink()
+    (repository / ".git" / "HEAD").symlink_to("refs/heads/main")
+    return repository / ".git", repository
+
+
+@pytest.fixture(
+    params=[
+        _select_git_directory_and_work_tree,
+        _select_external_objects,
+        _select_common_directory_layout,
+        _select_unborn_symlinked_head,
+    ]
+)
 def environment_selected_repository(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> tuple[Path, Path]:
-    """A repository with a commit that only a local git variable of the
-    environment makes recognizable -- `GIT_DIR` with `GIT_WORK_TREE`, or
-    `GIT_OBJECT_DIRECTORY` with the objects moved out of `.git` -- no
-    complete `.git` marker sits above the work tree. Returns
+    """A repository only git's own recognition rules see -- no complete
+    `.git` of plain files and directories sits above the work tree: `GIT_DIR`
+    with `GIT_WORK_TREE`, `GIT_OBJECT_DIRECTORY` with the objects moved out of
+    `.git`, a `commondir` file naming the directory holding `objects/` and
+    `refs/`, or a `HEAD` symlink naming an unborn branch. Returns
     `(git_directory, work_tree)`."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     return request.param(monkeypatch, tmp_path)
@@ -3692,17 +3737,63 @@ def test_protect_names_a_git_directory_when_a_branch_read_fails_in_an_environmen
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
-def test_protect_names_a_git_directory_whose_objects_live_elsewhere(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    "select_repository",
+    [_select_external_objects, _select_common_directory_layout, _select_unborn_symlinked_head],
+)
+def test_protect_names_a_git_directory_git_recognizes_beyond_plain_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    select_repository: Callable[[pytest.MonkeyPatch, Path], tuple[Path, Path]],
 ) -> None:
-    """PROT-43: with `GIT_OBJECT_DIRECTORY` set, a `.git` holding only `HEAD`
-    and `refs/` is the git directory git itself recognizes."""
+    """PROT-43: a path inside a directory git takes for a git directory --
+    objects elsewhere, a `commondir` file, a symlinked `HEAD` -- denies with
+    the git-directory sentence, never git's own text."""
+    git_directory, _ = select_repository(monkeypatch, tmp_path)
+
+    outcome = _protect_refusal(monkeypatch, capsys, git_directory / "widget")
+
+    assert outcome == (2, f"not a checkout: {git_directory.resolve()} is a git directory")
+
+
+@pytest.mark.usefixtures("isolated_global_git_config")
+@pytest.mark.parametrize("protect_directory", ["", "elsewhere"])
+def test_protect_resolves_a_relative_object_directory_from_the_directory_git_runs_in(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    protect_directory: str,
+) -> None:
+    """PROT-43: a relative `GIT_OBJECT_DIRECTORY` is relative to the directory
+    `git -C` runs in -- the payload's -- whichever directory protect runs in."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     git_directory, _ = _select_external_objects(monkeypatch, tmp_path)
+    (tmp_path / "elsewhere").mkdir()
+    monkeypatch.chdir(tmp_path / protect_directory)
+    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", "../../../objects-elsewhere")
 
     outcome = _protect_refusal(monkeypatch, capsys, git_directory / "refs" / "widget")
 
     assert outcome == (2, f"not a checkout: {git_directory.resolve()} is a git directory")
+
+
+@pytest.mark.usefixtures("isolated_global_git_config")
+def test_protect_refuses_with_gits_text_when_the_object_directory_is_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """PROT-17: an empty `GIT_OBJECT_DIRECTORY` makes git reject the
+    repository, so the failure is git's own, never an allow and never
+    PROT-43's sentence."""
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    repository = _committed_repository(tmp_path)
+    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", "")
+
+    status, text = _protect_refusal(monkeypatch, capsys, repository / ".git" / "refs" / "widget")
+
+    assert status == 2
+    assert text
+    assert "is a git directory" not in text
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
