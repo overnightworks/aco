@@ -376,6 +376,7 @@ _DIRECTORY_ENTRY_KINDS = frozenset({"tree", "commit"})
 
 
 _GIT_OBJECT_ID_PATTERN = re.compile(rb"[0-9a-fA-F]{40}")
+_GIT_WHITESPACE = b" \t\n\r"
 _TREE_ENTRY_LINE = re.compile(r"\d+ (?P<kind>\w+) [0-9a-f]+\t.+")
 
 
@@ -735,6 +736,28 @@ def _is_repository_marker(dot_git: Path, *, discovery_start: Path) -> bool:
 
 
 def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
+    """A directory counts when git 2.43 recognizes it
+    (`_recognized_by_git_2_43`) or the layout this repository always accepted
+    does (`_has_plain_git_directory_layout`): the port may differ from git
+    somewhere, never by allowing a write the older rule refused."""
+    return _has_plain_git_directory_layout(suspect) or _recognized_by_git_2_43(
+        suspect, discovery_start=discovery_start
+    )
+
+
+def _has_plain_git_directory_layout(candidate: Path) -> bool:
+    """The layout git's own discovery takes for a repository directory:
+    `HEAD` beside `objects/` and `refs/`. Kept as it was before the port of
+    git's recognition, as a floor that guards against a gap in that port
+    allowing a write this rule refused."""
+    return (
+        (candidate / "HEAD").is_file()
+        and (candidate / "objects").is_dir()
+        and (candidate / "refs").is_dir()
+    )
+
+
+def _recognized_by_git_2_43(suspect: Path, *, discovery_start: Path) -> bool:
     """git 2.43's own recognition (setup.c `is_git_directory`), ported
     literally: `HEAD` must pass `_validate_headref`; the common directory
     (`_common_directory`) must hold `refs` searchable and either `objects` or,
@@ -763,7 +786,8 @@ def _common_directory(suspect: str | Path) -> str | None:
     """setup.c `get_common_dir` / `get_common_dir_noenv`: `GIT_COMMON_DIR`
     verbatim when set (empty included); else the real path of what a
     `commondir` file in `suspect` names, relative to `suspect` unless
-    absolute, trailing line breaks only stripped; else `suspect`. `None`
+    absolute, trailing line breaks only stripped, and read as a C string (cut
+    at the first NUL byte); else `suspect`. `None`
     where git dies: an empty or unreadable `commondir` file, or a path whose
     parent directory does not exist."""
     environment_value = os.environ.get("GIT_COMMON_DIR")
@@ -778,7 +802,8 @@ def _common_directory(suspect: str | Path) -> str | None:
         return None
     if not content:
         return None
-    named = os.path.join(suspect, os.fsdecode(content.rstrip(b"\r\n")))
+    c_string = content.rstrip(b"\r\n").split(b"\0", 1)[0]
+    named = os.path.join(suspect, os.fsdecode(c_string))
     resolved = os.path.realpath(named)
     return resolved if os.path.isdir(os.path.dirname(resolved)) else None
 
@@ -786,9 +811,9 @@ def _common_directory(suspect: str | Path) -> str | None:
 def _validate_headref(head: Path) -> bool:
     """path.c `validate_headref`: a symlink passes when it names `refs/...`
     (a dangling one too); a file passes when its first 255 bytes are `ref:`
-    and `refs/...` after optional whitespace, or begin with an object id
-    (`get_oid_hex_any`: 40 hex digits for SHA-1, 64 for SHA-256, so any
-    64-digit id begins with a 40-digit one)."""
+    and `refs/...` after optional whitespace (git's `isspace`: no vertical tab, no form feed),
+    or begin with an object id (`get_oid_hex`: 40 hex digits for SHA-1, 64 for
+    SHA-256, so any 64-digit id begins with a 40-digit one)."""
     if head.is_symlink():
         return os.fsencode(os.readlink(head)).startswith(b"refs/")
     try:
@@ -796,9 +821,9 @@ def _validate_headref(head: Path) -> bool:
             content = stream.read(255)
     except OSError:
         return False
-    names_ref = content.startswith(b"ref:") and content[len(b"ref:") :].lstrip().startswith(
-        b"refs/"
-    )
+    names_ref = content.startswith(b"ref:") and content[len(b"ref:") :].lstrip(
+        _GIT_WHITESPACE
+    ).startswith(b"refs/")
     return names_ref or _GIT_OBJECT_ID_PATTERN.match(content) is not None
 
 

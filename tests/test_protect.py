@@ -3779,24 +3779,6 @@ def test_protect_resolves_a_relative_object_directory_from_the_directory_git_run
     assert outcome == (2, f"not a checkout: {git_directory.resolve()} is a git directory")
 
 
-@pytest.mark.usefixtures("isolated_global_git_config")
-def test_protect_refuses_with_gits_text_when_the_object_directory_is_empty(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """PROT-17: an empty `GIT_OBJECT_DIRECTORY` makes git reject the
-    repository, so the failure is git's own, never an allow and never
-    PROT-43's sentence."""
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    repository = _committed_repository(tmp_path)
-    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", "")
-
-    status, text = _protect_refusal(monkeypatch, capsys, repository / ".git" / "refs" / "widget")
-
-    assert status == 2
-    assert text
-    assert "is a git directory" not in text
-
-
 def _git_directory_layout(directory: Path) -> Path:
     for name in ("objects", "refs"):
         (directory / name).mkdir(parents=True)
@@ -3843,11 +3825,27 @@ def _provide_executable_file(directory: Path) -> None:
     (directory / "executable").chmod(0o755)
 
 
+def _move_common_files_away(directory: Path) -> None:
+    _move_common_files_into(directory, "c")
+
+
+def _write_head_beside_commondir_without_local_objects(directory: Path, head: bytes) -> None:
+    _write_commondir(directory, b"c", moved_into=b"c")
+    _write_head(directory, head)
+
+
+def _write_commondir_naming_a_symlink_loop(directory: Path) -> None:
+    (directory / "loop").symlink_to("loop")
+    _write_commondir(directory, b"loop")
+
+
 _NON_UTF8_NAME = b"c\xff"
 
 # Each row's answer is what git 2.43 itself measured for the layout
 # (`git --git-dir=D rev-parse --git-dir`, probe script in the lane's journal),
 # a `commondir` git dies reading counted as recognized: protect fails closed.
+# Where a row's layout keeps `HEAD`, `objects/` and `refs/` in the directory
+# itself, main's older rule recognizes it whatever git says: "main's rule".
 GIT_DIRECTORY_RECOGNITION_ROWS = [
     pytest.param(lambda directory: None, {}, True, id="head-names-a-ref"),
     pytest.param(
@@ -3856,7 +3854,9 @@ GIT_DIRECTORY_RECOGNITION_ROWS = [
         True,
         id="head-symlink-to-a-dangling-ref",
     ),
-    pytest.param(_link_head_to_existing_file, {}, False, id="head-symlink-to-a-non-ref-file"),
+    pytest.param(
+        _link_head_to_existing_file, {}, True, id="head-symlink-to-a-non-ref-file-mains-rule"
+    ),
     pytest.param(
         lambda directory: _write_head(directory, b"ref:   \trefs/x"),
         {},
@@ -3866,8 +3866,8 @@ GIT_DIRECTORY_RECOGNITION_ROWS = [
     pytest.param(
         lambda directory: _write_head(directory, b"ref: other/x"),
         {},
-        False,
-        id="head-ref-outside-refs",
+        True,
+        id="head-ref-outside-refs-mains-rule",
     ),
     pytest.param(
         lambda directory: _write_head(directory, b"0123456789abcdef0123456789abcdef01234567\n"),
@@ -3882,21 +3882,32 @@ GIT_DIRECTORY_RECOGNITION_ROWS = [
         id="head-sha256-object-id",
     ),
     pytest.param(
-        lambda directory: _write_head(directory, b"garbage"), {}, False, id="head-garbage"
+        lambda directory: _write_head(directory, b"garbage"),
+        {},
+        True,
+        id="head-garbage-mains-rule",
     ),
-    pytest.param(lambda directory: _write_head(directory, b""), {}, False, id="head-empty"),
+    pytest.param(
+        lambda directory: _write_head(directory, b""), {}, True, id="head-empty-mains-rule"
+    ),
     pytest.param(lambda directory: (directory / "HEAD").unlink(), {}, False, id="head-missing"),
     pytest.param(_make_objects_an_executable_file, {}, True, id="objects-an-executable-file"),
     pytest.param(lambda directory: (directory / "objects").rmdir(), {}, False, id="no-objects"),
     pytest.param(lambda directory: (directory / "refs").rmdir(), {}, False, id="no-refs"),
-    pytest.param(lambda directory: None, {"GIT_OBJECT_DIRECTORY": ""}, False, id="empty-objects"),
+    pytest.param(
+        lambda directory: None, {"GIT_OBJECT_DIRECTORY": ""}, True, id="empty-objects-mains-rule"
+    ),
     pytest.param(
         _provide_executable_file,
         {"GIT_OBJECT_DIRECTORY": "{directory}/executable"},
         True,
         id="object-directory-an-executable-file",
     ),
-    pytest.param(lambda directory: None, {"GIT_COMMON_DIR": ""}, False, id="empty-common-dir"),
+    pytest.param(
+        lambda directory: None, {"GIT_COMMON_DIR": ""}, True, id="empty-common-dir-mains-rule"
+    ),
+    pytest.param(_move_common_files_away, {"GIT_COMMON_DIR": ""}, False, id="empty-common-dir"),
+    pytest.param(_move_common_files_away, {"GIT_OBJECT_DIRECTORY": ""}, False, id="empty-objects"),
     pytest.param(
         lambda directory: _write_commondir(directory, b"c ", moved_into=b"c "),
         {},
@@ -3921,26 +3932,72 @@ GIT_DIRECTORY_RECOGNITION_ROWS = [
     pytest.param(
         lambda directory: _write_commondir(directory, b"nowhere"),
         {},
+        True,
+        id="commondir-to-a-missing-directory-mains-rule",
+    ),
+    pytest.param(
+        lambda directory: _write_commondir(directory, b"nowhere", moved_into=b"c"),
+        {},
         False,
         id="commondir-to-a-missing-directory",
     ),
     pytest.param(
-        lambda directory: _write_commondir(directory, b""),
+        lambda directory: _write_commondir(directory, b"", moved_into=b"c"),
         {},
         True,
         id="commondir-empty-fails-closed",
     ),
     pytest.param(
-        lambda directory: (directory / "commondir").mkdir(),
+        lambda directory: (_move_common_files_away(directory), (directory / "commondir").mkdir()),
         {},
         True,
         id="commondir-unreadable-fails-closed",
     ),
     pytest.param(
-        lambda directory: _write_commondir(directory, b"nowhere/below"),
+        lambda directory: _write_commondir(directory, b"nowhere/below", moved_into=b"c"),
         {},
         True,
         id="commondir-below-a-missing-directory-fails-closed",
+    ),
+    pytest.param(
+        lambda directory: _write_commondir(directory, b"missing/"),
+        {},
+        True,
+        id="commondir-naming-a-missing-directory-with-a-slash-mains-rule",
+    ),
+    pytest.param(
+        _write_commondir_naming_a_symlink_loop,
+        {},
+        True,
+        id="commondir-naming-a-symlink-loop-mains-rule",
+    ),
+    pytest.param(
+        lambda directory: _write_head_beside_commondir_without_local_objects(
+            directory, b"ref:\vrefs/heads/main"
+        ),
+        {},
+        False,
+        id="head-ref-after-a-vertical-tab",
+    ),
+    pytest.param(
+        lambda directory: _write_head_beside_commondir_without_local_objects(
+            directory, b"ref:\frefs/heads/main"
+        ),
+        {},
+        False,
+        id="head-ref-after-a-form-feed",
+    ),
+    pytest.param(
+        lambda directory: _write_head_beside_commondir_without_local_objects(directory, b"garbage"),
+        {},
+        False,
+        id="head-garbage-without-local-objects",
+    ),
+    pytest.param(
+        lambda directory: _write_commondir(directory, b"missing\0ignored", moved_into=b"c"),
+        {},
+        False,
+        id="commondir-cut-at-a-null-byte",
     ),
 ]
 
