@@ -2498,8 +2498,8 @@ class TestCliStateRefForge:
         write -- with no `KeyError` from a missing `LINK_CHILD` capability
         and no refusal; this container's own `[record]` carries no `slice`
         rows, so it creates an untied child exactly like GitHub does for the
-        same shape (the `no_linked_row` case of
-        `test_cut_leaves_the_childs_done_when_empty_without_a_row_done_when`).
+        same shape (see `tests/test_cut.py::test_cut_creates_the_child_and_removes_its_row`
+        with case `untied-without-a-slice-key`).
         The byte-exact `[[slice]]` row removal itself is issue #291's own
         proof, below."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -3169,7 +3169,8 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         """Issue #291 proof 5: GitHub's own equivalent
-        (`test_cut_refuses_a_blockless_container_before_any_write`) hits
+        (`tests/test_cut.py::test_cut_requires_a_valid_block_for_the_row_it_cuts`
+        with case `no-aco-block`) hits
         `board.located_block_or_refuse`'s refusal only because a fetched GitHub
         issue can carry any body at all. A state-ref item cannot: every
         item's `[record]` table is validated once, at read time, by
