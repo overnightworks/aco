@@ -104,7 +104,6 @@ def merge_on_the_forge(
     # `merge` and `commit` start detached maintenance that may still write
     # into `.git/objects` while `rmtree` removes the clone.
     real_git(clone, "config", "maintenance.auto", "false")
-    real_git(clone, "config", "gc.auto", "0")
     real_git(clone, "config", "user.name", "Forge")
     real_git(clone, "config", "user.email", "forge@example.com")
     real_git(clone, "config", "commit.gpgsign", "false")
