@@ -86,6 +86,8 @@ class Intervention(Enum):
     CHECKED_ELSEWHERE = auto()
     GIT_FAILURE = auto()
     FOREIGN_COMMIT_READ_FAILS = auto()
+    INSIDE = auto()
+    NO_WORKTREE = auto()
 
     def install(self, target: CleanupIntervention) -> None:
         actions = {
@@ -105,6 +107,8 @@ class Intervention(Enum):
                 target.before,
                 target.fail_commit_read_of_a_worktree_listed_first,
             ),
+            Intervention.INSIDE: (target.before, target.run_from_inside),
+            Intervention.NO_WORKTREE: (target.before, target.remove_lane_worktree),
         }
         timing, action = actions[self]
         timing(action)
@@ -285,6 +289,13 @@ class CleanupIntervention:
         redirect_toplevel(self.monkeypatch, bystander)
         self.monkeypatch.chdir(bystander)
         self.record.bystander = str(bystander)
+
+    def run_from_inside(self) -> None:
+        redirect_toplevel(self.monkeypatch, self.world.lane)
+        self.monkeypatch.chdir(self.world.lane)
+
+    def remove_lane_worktree(self) -> None:
+        real_git(self.clone, "worktree", "remove", str(self.world.lane))
 
     def fail_worktree_resolution(self) -> None:
         stub_one_git_call(
@@ -661,6 +672,58 @@ def test_a_merged_lane_is_kept_for_the_reason_it_cannot_go(
     cleanup_check(case)
 
 
+NO_LINKED_WORKTREE = (
+    "kept -- no linked worktree on {lane} in this checkout; "
+    "run aco release 72 --merged 12 --branch {lane} in the checkout that holds it"
+)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        *rendered(
+            "keep-worktree-flag",
+            "kept -- --keep-worktree was given",
+            replace(KEPT, command=(*RELEASE_COMMAND, "--keep-worktree")),
+        ),
+        *rendered(
+            "ran-from-inside",
+            "kept -- release ran from inside it",
+            replace(KEPT, intervention=Intervention.INSIDE, workplace="{worktree}"),
+        ),
+        *rendered(
+            "no-linked-worktree",
+            NO_LINKED_WORKTREE,
+            replace(
+                KEPT,
+                intervention=Intervention.NO_WORKTREE,
+                worktree_exists=False,
+                lane_status=Absent(),
+            ),
+        ),
+        *rendered(
+            "not-merged",
+            "kept -- not merged into the default branch",
+            replace(
+                PAST_HEAD,
+                command=RELEASE_COMMAND,
+                premerge=board.MergeMethod.MERGE,
+                worktree_exists=True,
+            ),
+        ),
+    ],
+)
+def test_a_merged_lane_is_kept_when_the_run_declines_to_remove_it(
+    case: CleanupCase, cleanup_check: CleanupCheck
+) -> None:
+    """Keep the lane when the run's location, flag or merge state prevents cleanup.
+
+    Spec: REL-26, REL-27, REL-29, REL-30, REL-35, REL-52,
+    E-REL-09, E-REL-10, E-REL-12, E-REL-13, E-REL-24.
+    """
+    cleanup_check(case)
+
+
 def verify_cleanup(
     case: CleanupCase,
     github_clone: Path,
@@ -709,6 +772,7 @@ def verify_cleanup(
         "parent": parent,
         "clone": str(github_clone),
         "bystander": record.bystander,
+        "worktree": str(world.lane),
     }
     observed_guard = {"intervention.applications": record.applications, **record.snapshot}
     expected_guard = {

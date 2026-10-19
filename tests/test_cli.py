@@ -16332,11 +16332,10 @@ def _release_cleanup_scenario(
     tmp_path: Path,
     *,
     merge_into_main: bool = True,
-    link_worktree: bool = True,
     landed_elsewhere: bool = False,
 ) -> Path:
     """`repo`'s own would-be lane worktree path -- linked to `_CLEANUP_BRANCH`
-    unless `link_worktree` is `False` -- a claimed issue #72 on that branch,
+    -- a claimed issue #72 on that branch,
     and a merged, closing pull request #12 ready for `release --merged` to
     verify. `landed_elsewhere` merges the branch on the remote alone, from
     another clone, and forgets the recorded `origin/HEAD`, so this checkout
@@ -16353,9 +16352,8 @@ def _release_cleanup_scenario(
             *("-m", f"Work-Item: #{WORK_ITEM_ISSUE}"),
         )
     worktree = repo.parent / f"{repo.name}-worktrees" / _CLEANUP_WORKTREE_NAME
-    if link_worktree:
-        worktree.parent.mkdir(parents=True)
-        real_git(repo, "worktree", "add", "-q", str(worktree), _CLEANUP_BRANCH)
+    worktree.parent.mkdir(parents=True)
+    real_git(repo, "worktree", "add", "-q", str(worktree), _CLEANUP_BRANCH)
     standing = request(
         "landing", "Ada", issue=WORK_ITEM_ISSUE, branch=_CLEANUP_BRANCH, scope=("src",)
     )
@@ -16834,84 +16832,6 @@ def test_check_never_takes_a_local_branch_for_the_trunk_of_a_remote_with_branche
         expected_out.format(sha=sha),
         expected_err,
     )
-
-
-def _ran_from_inside_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    worktree = _release_cleanup_scenario(monkeypatch, tmp_path)
-    redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
-    return worktree
-
-
-def _no_linked_worktree_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path | None:
-    _release_cleanup_scenario(monkeypatch, tmp_path, link_worktree=False)
-    return None
-
-
-def _not_merged_locally_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    return _release_cleanup_scenario(monkeypatch, tmp_path, merge_into_main=False)
-
-
-_WORKTREE_CLEANUP_KEPT_SCENARIOS: tuple[
-    tuple[str, Callable[[pytest.MonkeyPatch, Path], Path | None], tuple[str, ...], str], ...
-] = (
-    (
-        "keep-worktree-flag",
-        _release_cleanup_scenario,
-        ("--keep-worktree",),
-        "--keep-worktree was given",
-    ),
-    ("ran-from-inside", _ran_from_inside_scenario, (), "release ran from inside it"),
-    (
-        "no-linked-worktree",
-        _no_linked_worktree_scenario,
-        (),
-        f"no linked worktree on {_CLEANUP_BRANCH} in this checkout; run aco release "
-        f"{WORK_ITEM_ISSUE} --merged 12 --branch {_CLEANUP_BRANCH} in the checkout that holds it",
-    ),
-    (
-        "not-merged-locally",
-        _not_merged_locally_scenario,
-        (),
-        "not merged into the default branch",
-    ),
-)
-
-
-@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
-@pytest.mark.parametrize(
-    ("configure", "extra_args", "reason"),
-    [entry[1:] for entry in _WORKTREE_CLEANUP_KEPT_SCENARIOS],
-    ids=[entry[0] for entry in _WORKTREE_CLEANUP_KEPT_SCENARIOS],
-)
-def test_release_merged_keeps_the_worktree_for_every_reason(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    configure: Callable[[pytest.MonkeyPatch, Path], Path | None],
-    extra_args: tuple[str, ...],
-    reason: str,
-    as_json: bool,
-) -> None:
-    """Issue #322 review/gate finding 4: text and `--json` proof for every
-    reason cleanup keeps the worktree instead of removing it, parametrized
-    over one fixture rather than one near-identical test per reason."""
-    worktree = configure(monkeypatch, tmp_path)
-    arguments = ["--repo", REPOSITORY, "release", "72", "--merged", "12", *extra_args]
-    if as_json:
-        arguments.append("--json")
-
-    status = issue_claim.main(arguments)
-
-    assert status == 0
-    assert checkout.branch_exists(_CLEANUP_BRANCH) is True
-    output = capsys.readouterr().out
-    if as_json:
-        assert json.loads(output)["worktree"] == f"kept -- {reason}"
-    else:
-        assert f"worktree: kept -- {reason}\n" in output
-    if worktree is not None:
-        assert worktree.exists()
 
 
 def _land_repository(
