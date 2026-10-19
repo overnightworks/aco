@@ -17,6 +17,13 @@ different lane's own spec; it reads a relative entry against its checkout
 instead of denying it (RESC-01). Those sentences are documented here, where
 `not in a repository` is `rescope`'s refusal alone -- `protect` allows such a
 path (PROT-32).
+
+Operator ruling of 19.10.2026: `protect` is a tripwire against a forgotten
+claim; the hard boundary against writes outside the lane is the provider's own
+sandbox, which makes only the lane worktree and the scratch directory
+writable. The hook's contract is the listed cases -- the tool table and the
+pattern list PROT-30 -- and a gap outside them is a named limit and a
+follow-up, not a defect of this contract.
 `<path>` is the payload's own absolute file path, lexically normalized;
 `<remote>` is the canonical remote name; `<git-directory>` is a bare
 repository or a checkout's own `.git` directory, symlink-resolved.
@@ -273,7 +280,7 @@ than a bare `claim first`.
 - `protect` never binds the resolved checkout's `HEAD` to a claim's own `base`: it judges the live claim's branch and scope alone.
 - `shell` and other providers' equivalents never deny a missing path: the hook payload names no file path for those, so `protect` cannot gate what it cannot see (README, "PreToolUse write gate").
 - `Bash` (issue #380) and `Monitor` (issue #448) are the one exception, judging only the fixed pattern list PROT-30 owns.
-- A `python -c ...` one-liner or an opaque script invocation stays invisible on purpose: recognizing a pattern is a best-effort aid against forgetting the claim, never a security boundary.
+- A `python -c ...` one-liner or an opaque script invocation stays invisible on purpose: recognizing a pattern is a best-effort aid against forgetting the claim, never a security boundary (the ruling at the head of this file names the boundary that is).
 - `protect` never reads a `sed -f` script or script text with an expansion, and never judges the text after one either, nor after an `-e` without a value or a construct GNU sed rejects that it knows, because the parser state it leaves is unknown or GNU sed never compiles it.
 - `protect` never guesses a Bash-recognized relative path's `cwd` from the hook process's own cwd: a payload naming no `cwd` allows that path outright (PROT-31).
 - This is PROT-09's own "never guess a relative path" principle, applied as an allow instead of a deny since Bash's own path is expected to be relative.
