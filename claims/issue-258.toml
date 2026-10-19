@@ -1,7 +1,0 @@
-claim_id = "3fa0468e47b043d78ec43d58c99b2deb"
-agent = "claude"
-role = "builder"
-base = "27cbecbf24f8e8103bba7627e4a452d7093fb924"
-branch = "claude/issue-258-k1b-check-pr-deps"
-scope = ["scripts/test_inventory_dropped.txt", "tests/test_check_pull_request.py", "tests/test_cli.py"]
-opened_commit = "8a5f92bbc7302462248d0ad1a28dbe1a06a1c978"
