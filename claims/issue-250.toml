@@ -1,0 +1,7 @@
+claim_id = "b83e49f3298340acb9ceb7055dbd1c16"
+agent = "claude"
+role = "builder"
+base = "d9cc4f1577e756f271be38cf1d6756a6ea73fd00"
+branch = "claude/issue-250-protect-tripwire-ruling"
+scope = ["specs/protect.spec.md"]
+opened_commit = "e265172bd703e32ecd8971ceed1bcae86d4a3300"
