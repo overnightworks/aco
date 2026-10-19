@@ -103,6 +103,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 
 ## Never
 
+- `rescope` never reads a git failure as a branch with no commit (PROT-11) or as a remote that records no `HEAD` (PROT-13): it refuses with git's own text (PROT-17, RESC-17).
 - `rescope` never reads or requires checkout `HEAD` to match the claim's own `base`, and never refuses on a dirty working tree: only `claim`'s own precondition (CLM-04, CLM-05) checks either.
 - `rescope` never runs the comma-ungrounded check over `--drop`: a value the live claim already holds is a fact about the claim, not a checkout typo, so dropping a comma-bearing scoped path always matches it as one whole path.
 - `rescope` never joins a relative `--add`/`--drop` entry to the process's own cwd: it is read against the run checkout's toplevel, the form an item body's own `scope` list prints.

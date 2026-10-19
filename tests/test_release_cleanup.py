@@ -85,6 +85,7 @@ class Intervention(Enum):
     DIRTY = auto()
     CHECKED_ELSEWHERE = auto()
     GIT_FAILURE = auto()
+    FOREIGN_COMMIT_READ_FAILS = auto()
     INSIDE = auto()
     NO_WORKTREE = auto()
 
@@ -102,6 +103,10 @@ class Intervention(Enum):
             Intervention.DIRTY: (target.before, target.dirty),
             Intervention.CHECKED_ELSEWHERE: (target.before, target.check_out_elsewhere),
             Intervention.GIT_FAILURE: (target.before, target.fail_worktree_resolution),
+            Intervention.FOREIGN_COMMIT_READ_FAILS: (
+                target.before,
+                target.fail_commit_read_of_a_worktree_listed_first,
+            ),
             Intervention.INSIDE: (target.before, target.run_from_inside),
             Intervention.NO_WORKTREE: (target.before, target.remove_lane_worktree),
         }
@@ -304,6 +309,20 @@ class CleanupIntervention:
             ],
             exit_status=128,
             stderr="fatal: cannot change to 'gone': No such file or directory",
+        )
+
+    def fail_commit_read_of_a_worktree_listed_first(self) -> None:
+        """A candidate on another branch that git lists before the lane's
+        own worktree, whose commit read exits 128: cleanup must keep the
+        lane rather than read the failure as that candidate having none."""
+        foreign = self.clone.parent / "aaa-foreign"
+        real_git(self.clone, "worktree", "add", "-q", str(foreign), "-b", "codex/issue-1-foreign")
+        stub_one_git_call(
+            self.monkeypatch,
+            ["rev-parse", "--verify", "--quiet", "HEAD"],
+            exit_status=128,
+            stderr="fatal: broken",
+            directory=foreign,
         )
 
     def refuse_listing(self) -> None:
@@ -635,6 +654,11 @@ KEPT = replace(
             "git-failure",
             "kept -- git failure: fatal: cannot change to 'gone': No such file or directory",
             replace(KEPT, intervention=Intervention.GIT_FAILURE),
+        ),
+        *rendered(
+            "foreign-worktree-git-failure",
+            "kept -- git failure: fatal: broken",
+            replace(KEPT, intervention=Intervention.FOREIGN_COMMIT_READ_FAILS),
         ),
     ],
 )

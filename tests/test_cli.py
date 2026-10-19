@@ -47,6 +47,7 @@ from board_fixtures import (
     write_repository_config,
 )
 from cli_fixtures import (
+    GIT_FAILURE_INJECTIONS,
     ITEM_NEW_BODY,
     LIVE_TRUNK_REF_AFTER,
     RECORDED_ORIGIN_HEAD_READ,
@@ -78,6 +79,7 @@ from cli_fixtures import (
     read_end_of_a_pipe_carrying,
     real_git,
     real_repository_with_bare_remote,
+    recorded_head_read,
     redirect_toplevel,
     run_cli,
     run_context_over,
@@ -1892,6 +1894,25 @@ def test_a_detached_head_is_named_and_nothing_is_written(
     assert (worktrees_and_branches(repo), fake.transitions) == (before, [])
 
 
+def test_claim_in_a_lane_worktree_refuses_with_gits_text_when_the_remote_head_read_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """A failed read of `<remote>/HEAD` is no trunk to guess for the claim's
+    checkout checks: nothing is written."""
+    repo = _start_scenario(monkeypatch, tmp_path)
+    fake = _patch_store_write(monkeypatch)
+    lane = _stand_in_another_lane(monkeypatch, repo, tmp_path)
+    before = worktrees_and_branches(repo)
+    stub_one_git_call(
+        monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
+    )
+
+    status = issue_claim.main(["--repo", REPOSITORY, "claim", "314", "--scope", "base.txt"])
+
+    assert (status, capsys.readouterr().err) == (2, "ERROR: fatal: broken\n")
+    assert (worktrees_and_branches(repo), fake.transitions, lane.is_dir()) == (before, [], True)
+
+
 @pytest.mark.parametrize(
     ("branch_exists", "switch"),
     [
@@ -2185,6 +2206,91 @@ def _remove_the_lane_pair(repo: Path) -> None:
 
 def _keep_the_lane_pair(_repo: Path) -> None:
     """Item #314's worktree and branch stand as its first `start` built them."""
+
+
+_COMMIT_READ = ["rev-parse", "--verify", "--quiet", "HEAD"]
+
+
+def _fail_the_read_after_the_fetch(
+    monkeypatch: pytest.MonkeyPatch, failing_read: list[str]
+) -> None:
+    """Lets every read through until the real fetch has run, then fails
+    `failing_read` (`fatal: broken`): the read a command makes after its
+    fetch (`RunContext.fetched_trunk_ref`) is one a failing first read never
+    reaches."""
+    real_fetch_remote = checkout.fetch_remote
+
+    def fetch_then_fail_the_read(remote: str, *, directory: Path) -> None:
+        real_fetch_remote(remote, directory=directory)
+        stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+
+    monkeypatch.setattr(checkout, "fetch_remote", fetch_then_fail_the_read)
+
+
+@pytest.mark.parametrize(
+    ("first_start_ran", "reshape_lane", "failing_read", "fails_after_fetch"),
+    [
+        pytest.param(
+            False, _keep_the_lane_pair, list(RECORDED_ORIGIN_HEAD_READ), False, id="fresh-head"
+        ),
+        pytest.param(
+            False,
+            _keep_the_lane_pair,
+            list(RECORDED_ORIGIN_HEAD_READ),
+            True,
+            id="fresh-head-after-fetch",
+        ),
+        pytest.param(False, _keep_the_lane_pair, _COMMIT_READ, False, id="fresh-commit"),
+        pytest.param(True, _keep_the_lane_pair, _COMMIT_READ, False, id="resume-commit"),
+        pytest.param(
+            True, _remove_the_lane_pair, list(RECORDED_ORIGIN_HEAD_READ), False, id="rebuild-head"
+        ),
+        pytest.param(
+            True,
+            _remove_the_lane_pair,
+            list(RECORDED_ORIGIN_HEAD_READ),
+            True,
+            id="rebuild-head-after-fetch",
+        ),
+        pytest.param(True, _remove_the_lane_pair, _COMMIT_READ, False, id="rebuild-commit"),
+    ],
+)
+def test_start_refuses_with_gits_text_and_leaves_its_state_when_a_trunk_read_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    failing_read: list[str],
+    first_start_ran: bool,
+    reshape_lane: Callable[[Path], None],
+    fails_after_fetch: bool,
+) -> None:
+    """A git failure reading `<remote>/HEAD` or the checkout's commit is
+    neither a trunk to guess nor a checkout with no commit: a fresh start
+    builds no worktree, branch or claim, and a resume or rebuild leaves the
+    standing ones exactly as they were."""
+    repo = _start_scenario(monkeypatch, tmp_path)
+    monkeypatch.chdir(repo)
+    if first_start_ran:
+        assert issue_claim.main(["--repo", REPOSITORY, "start", "314"]) == 0
+    reshape_lane(repo)
+    capsys.readouterr()
+    worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
+
+    def standing() -> tuple[bool, str, set[str]]:
+        claims = store.fetch_state(worktree=Path("."), remote="origin").claims
+        branches = real_git(repo, "branch", "--list", _START_BRANCH).stdout
+        return worktree.exists(), branches, set(claims)
+
+    before = standing()
+    if fails_after_fetch:
+        _fail_the_read_after_the_fetch(monkeypatch, failing_read)
+    else:
+        stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+
+    status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
+
+    assert (status, capsys.readouterr().err) == (2, "ERROR: fatal: broken\n")
+    assert standing() == before
 
 
 def test_start_rebuilds_the_gone_worktree_of_its_live_claim_and_reprints_that_claim(
@@ -8010,6 +8116,105 @@ def _state_ref_item_state(repo: Path, tip: str, number: int) -> items.RecordStat
     return items.parse_item_record(item_id, parsed.record).state
 
 
+@pytest.mark.parametrize(
+    ("command", "failing_read"),
+    [
+        pytest.param(["check", "{sha}"], list(RECORDED_ORIGIN_HEAD_READ), id="check-head"),
+        pytest.param(
+            ["check", "{sha}", "--json"], list(RECORDED_ORIGIN_HEAD_READ), id="check-json-head"
+        ),
+        pytest.param(["status"], list(RECORDED_ORIGIN_HEAD_READ), id="status-head"),
+        pytest.param(["status", "--json"], list(RECORDED_ORIGIN_HEAD_READ), id="status-json-head"),
+        pytest.param(
+            ["status", "--path", "src"], list(RECORDED_ORIGIN_HEAD_READ), id="status-path-head"
+        ),
+        pytest.param(["board", "--json"], list(RECORDED_ORIGIN_HEAD_READ), id="board-head"),
+        pytest.param(["next"], list(RECORDED_ORIGIN_HEAD_READ), id="next-head"),
+        # Only `next`, `start`, `protect` and `rescope` call
+        # `checkout.resolve_path_checkout`; `check`, `status`, `board` and
+        # `brief` never reach the commit read.
+        pytest.param(["next"], _COMMIT_READ, id="next-commit"),
+    ],
+)
+def test_a_failed_trunk_read_refuses_with_gits_text_instead_of_guessing(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    command: list[str],
+    failing_read: list[str],
+) -> None:
+    """The caller matrix of issue #244 against real trunk history: git
+    failing to read `<remote>/HEAD` is never a remote that recorded none, nor
+    a failing commit read a checkout with no commit, so no command falls
+    back to `<remote>/main`, judges against it, or prints `cannot resolve
+    the default branch`; a `--json` command reports the refusal as
+    `unavailable`."""
+    repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
+    tip_before = _state_ref_tip(repo, remote)
+    injected = stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+
+    status = issue_claim.main([argument.format(sha=sha) for argument in command])
+
+    captured = capsys.readouterr()
+    assert injected
+    assert status == 2
+    if "--json" in command:
+        assert json.loads(captured.out) == {
+            "ok": False,
+            "reason": "unavailable",
+            "message": "fatal: broken",
+        }
+    else:
+        assert captured.err.splitlines() == ["ERROR: fatal: broken"]
+    assert _state_ref_tip(repo, remote) == tip_before
+
+
+@pytest.mark.parametrize(
+    ("lane_stands", "starts_in_lane"),
+    [
+        pytest.param(True, False, id="resume-head"),
+        pytest.param(True, True, id="resume-head-in-lane"),
+        pytest.param(False, False, id="rebuild-head"),
+    ],
+)
+def test_start_under_state_ref_refuses_a_failed_head_read_and_keeps_the_standing_lane(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    lane_stands: bool,
+    starts_in_lane: bool,
+) -> None:
+    """Under `storage = "state-ref"` the item is read through the state
+    ref's own board, which reads `<remote>/HEAD` for the default branch
+    before `start` decides between resume and build: a failed read refuses
+    with git's text and leaves the live claim, the lane's worktree and
+    branch, and `refs/aco/state` as they stood."""
+    repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    lane_worktree = checkout.sibling_worktree_path(repo, "issue-10-claims")
+    branch = "codex/issue-10-claims"
+    if lane_stands:
+        real_git(repo, "worktree", "add", "-q", "-b", branch, str(lane_worktree), "feature")
+    if starts_in_lane:
+        redirect_toplevel(monkeypatch, lane_worktree)
+        monkeypatch.chdir(lane_worktree)
+    tip_before = _state_ref_tip(repo, remote)
+    injected = stub_one_git_call(
+        monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
+    )
+
+    status = issue_claim.main(["start", "10", "--slug", "claims"])
+
+    captured = capsys.readouterr()
+    assert injected
+    assert (status, captured.out, captured.err) == (2, "", "ERROR: fatal: broken\n")
+    assert _state_ref_tip(repo, remote) == tip_before
+    assert fresh_observation(repo, remote).state.claims
+    assert lane_worktree.is_dir() is lane_stands
+    assert bool(real_git(repo, "branch", "--list", branch).stdout.strip()) is lane_stands
+
+
 def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose_claim_is_gone(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -8101,6 +8306,77 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
         else f"LANDED commit {sha} already; nothing left to release\nworktree: {kept}\n",
     )
     assert _state_ref_tip(repo, remote) == tip_after_release
+
+
+def _state_ref_landing_with_its_lane_worktree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path, Path, list[str]]:
+    """The real state-ref landing of item #10 with the landed lane's linked
+    worktree and branch standing, and the `release --merged` call for it."""
+    repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
+    lane_worktree = tmp_path / "issue-10-lane"
+    real_git(
+        repo, "worktree", "add", "-q", "-b", "codex/issue-10-claims", str(lane_worktree), "feature"
+    )
+    landing = ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
+    return repo, remote, lane_worktree, landing
+
+
+def test_release_merged_under_state_ref_removes_the_landed_lane_worktree(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    _repo, _remote, lane_worktree, landing = _state_ref_landing_with_its_lane_worktree(
+        monkeypatch, tmp_path
+    )
+
+    status = issue_claim.main(landing)
+
+    assert (status, "worktree: removed\n" in capsys.readouterr().out) == (0, True)
+    assert not lane_worktree.exists()
+
+
+def test_release_merged_under_state_ref_stops_before_the_transition_when_the_head_read_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """REL-32: the trunk the landing is walked against is never guessed
+    after a failed read of `<remote>/HEAD`: the claim stays, worktree and
+    branch stand, and `refs/aco/state` does not move."""
+    repo, remote, lane_worktree, landing = _state_ref_landing_with_its_lane_worktree(
+        monkeypatch, tmp_path
+    )
+    tip_before = _state_ref_tip(repo, remote)
+    stub_one_git_call(
+        monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
+    )
+
+    status = issue_claim.main(landing)
+
+    captured = capsys.readouterr()
+    assert (status, captured.out, captured.err) == (2, "", "ERROR: fatal: broken\n")
+    assert _state_ref_tip(repo, remote) == tip_before
+    assert lane_worktree.is_dir()
+    assert real_git(repo, "branch", "--list", "codex/issue-10-claims").stdout.strip()
+
+
+def test_release_merged_under_state_ref_keeps_the_worktree_when_the_cleanup_head_read_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """REL-32: the remote `HEAD` read after the cleanup's fetch fails only
+    then: the release already happened and stays, and the worktree and
+    branch are kept with git's text, never judged merged against a guess."""
+    repo, remote, lane_worktree, landing = _state_ref_landing_with_its_lane_worktree(
+        monkeypatch, tmp_path
+    )
+    _fail_the_read_after_the_fetch(monkeypatch, list(RECORDED_ORIGIN_HEAD_READ))
+
+    status = issue_claim.main(landing)
+
+    assert status == 0
+    assert "worktree: kept -- git failure: fatal: broken\n" in capsys.readouterr().out
+    assert fresh_observation(repo, remote).state.claims == {}
+    assert lane_worktree.is_dir()
+    assert real_git(repo, "branch", "--list", "codex/issue-10-claims").stdout.strip()
 
 
 @pytest.mark.parametrize(
@@ -17798,7 +18074,7 @@ def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_
         ("branch", "--show-current"): "docs/lane-cleanup",
         ("rev-parse", "--show-toplevel"): real_toplevel,
         ("rev-parse", "HEAD"): BASE,
-        ("rev-parse", "--verify", "HEAD"): BASE,
+        ("rev-parse", "--verify", "--quiet", "HEAD"): BASE,
         ("rev-parse", "--git-dir"): "/repo/.git/worktrees/lane-cleanup",
         ("rev-parse", "--git-common-dir"): "/repo/.git",
         # `rescope`'s path-based checkout resolution (issue #314): the same
@@ -18187,6 +18463,31 @@ def test_cli_brief_prints_body_claim_lane_tip_and_touched_files(
         "TOUCHED",
         "README.md",
     ]
+
+
+@pytest.mark.parametrize(("inject", "message"), GIT_FAILURE_INJECTIONS)
+def test_cli_brief_refuses_with_gits_text_when_reading_the_remote_head_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    inject: Callable[[pytest.MonkeyPatch, list[str]], list[list[str]]],
+    message: str,
+) -> None:
+    """A failed read of `<remote>/HEAD` reaches the real reader and refuses
+    with git's own text, never guessing a trunk or printing `cannot resolve
+    the default branch`."""
+    repository, _base, _tip = _scratch_lane_repository(monkeypatch, tmp_path)
+    client = FakeForge()
+    client.issue_references[258] = forge.ItemReference(forge.ItemState.OPEN, "Brief", "Body.")
+    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
+    monkeypatch.chdir(repository)
+    injected = inject(monkeypatch, list(recorded_head_read("origin")))
+
+    status = issue_claim.main(["--repo", REPOSITORY, "brief", "258"])
+
+    assert injected
+    assert status == 2
+    assert capsys.readouterr().err.splitlines() == [f"ERROR: {message}"]
 
 
 def test_cli_brief_reports_no_active_claim_with_empty_tip_and_touched_files(

@@ -180,6 +180,7 @@ never a commit; `git branch -u` restores it.
 
 ## Never
 
+- Cleanup never judges a lane merged against a trunk guessed after a failed read of `<remote>/HEAD`, nor reads a failed git read of a worktree as no match: it keeps both, `worktree: kept -- git failure: <detail>` (REL-32). Under `storage = "state-ref"`, a failed read of `<remote>/HEAD` before the release's transition refuses with git's text and leaves the claim and `refs/aco/state` untouched; one that fails only at the cleanup's read after its fetch leaves the release committed and keeps the worktree and branch.
 - `release` never reads or checks the released item's own body contract (REL-23).
 - `--abandoned` never resolves a forge target, reads the board, or prints `freed`/`next`/`hint`, ever (LAND-39); nor does it ever remove a worktree or branch (REL-33).
 - `--claim-id` is never a second selector among several live claims: at most one claim is ever live per identity (`specs/claim-record.spec.md`), so it only ever confirms or refuses the one claim identity/branch resolution already found.

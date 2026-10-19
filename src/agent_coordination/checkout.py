@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
+from typing import NamedTuple
 
 from . import board, body, process, protocol
 from .protocol import (
@@ -57,6 +58,16 @@ class GitTimedOutError(ClaimError):
         super().__init__(f"git {subcommand} timed out")
 
 
+class GitExitError(ClaimError):
+    """A git step that ran and exited nonzero: git's own detail as the text,
+    its `exit_status` kept so a reader with one measured "absent" exit
+    tells it from a real failure."""
+
+    def __init__(self, result: process.CapturedResult) -> None:
+        super().__init__(process.git_failure_detail(result))
+        self.exit_status = result.exit_status
+
+
 def _git_run(
     arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
 ) -> process.CapturedResult:
@@ -90,14 +101,14 @@ def git_output(
 ) -> str:
     """`git arguments`'s stdout, in `directory` when given via `-C` (issue
     #314) or the calling process's own cwd otherwise; a nonzero exit fails
-    closed. `literal_pathspecs` reads every path argument literally (see
-    `process.run_git`)."""
+    closed as a `GitExitError`. `literal_pathspecs` reads every path
+    argument literally (see `process.run_git`)."""
     if literal_pathspecs:
         result = _git_run(arguments, directory=directory, literal_pathspecs=True)
     else:
         result = _git_run(arguments, directory=directory)
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise GitExitError(result)
     # Trailing-only: every caller wants the one newline `git` appends after its
     # output trimmed, but `git status --porcelain`'s short format is
     # significant in its *leading* column (` M path` names a modified file by
@@ -130,28 +141,38 @@ def attached_branch(checked_out: str) -> str:
     return checked_out
 
 
-# `git rev-parse --verify --quiet <ref>` (git(1)): exit 1 is the one
-# documented "does not resolve to a single object" outcome under `--quiet`
-# -- the same single-defined-exit contract `path_is_tracked` already reads
-# from `ls-files --error-unmatch` above. Any other nonzero exit (128 for a
-# broken checkout, a corrupted ref, ...) is a real git failure, not an
-# absent ref, and must fail loud with its own detail instead of being read
-# the same way `cmd_brief._lane_tip` used to (issue #390 finding 9b).
+# `git rev-parse --verify --quiet <ref>`: measured with git 2.43 (git(1)
+# documents no exit contract for it) -- a ref that is absent or dangling
+# exits 1, which is the one "answers no" outcome here; any other nonzero
+# exit (128 for a broken checkout, a corrupted ref, ...) is a real git
+# failure, not an absent ref, and must fail loud with its own detail.
 _REV_PARSE_VERIFY_EXIT_UNRESOLVED = 1
+
+
+def _verified_read(arguments: list[str], *, directory: Path | None) -> str | None:
+    """`git arguments`'s stdout, or `None` when git exits 1 -- the measured
+    "does not resolve" answer of `rev-parse --verify --quiet`. Every other
+    failure (another exit, a launch failure, a timeout) raises."""
+    try:
+        return git_output(arguments, directory=directory)
+    except GitExitError as error:
+        if error.exit_status == _REV_PARSE_VERIFY_EXIT_UNRESOLVED:
+            return None
+        raise
 
 
 def resolved_commit(ref: str, *, directory: Path | None = None) -> str | None:
     """`ref`'s current commit in `directory` (or the calling process's own
-    cwd), or `None` when it does not resolve to a
-    single object. A git failure that keeps the read from answering either
-    way -- a missing executable, a timeout, or any exit but the documented
-    "unresolved" one -- raises `ClaimError` with git's own detail instead."""
-    result = _git_run(["rev-parse", "--verify", "--quiet", ref], directory=directory)
-    if result.exit_status == _REV_PARSE_VERIFY_EXIT_UNRESOLVED:
-        return None
-    if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
-    return result.stdout.decode().rstrip("\n")
+    cwd), or `None` when it does not resolve to a single object. A git
+    failure that keeps the read from answering either way -- a missing
+    executable, a timeout, or any exit but 1 -- raises `ClaimError` with
+    git's own detail instead.
+
+    Two limits are known and not promised away: an unreadable or destroyed
+    loose ref file can read as exit 1 without a reliable git warning, and a
+    resolved ref proves no readable commit object (a `^{commit}` peel would
+    turn that into a false "no commit on this branch", so none is added)."""
+    return _verified_read(["rev-parse", "--verify", "--quiet", ref], directory=directory)
 
 
 def lane_changed_paths(tip: str, *, trunk: str, directory: Path) -> tuple[str, ...]:
@@ -354,6 +375,8 @@ def scope_directories(
 _DIRECTORY_ENTRY_KINDS = frozenset({"tree", "commit"})
 
 
+_GIT_OBJECT_ID_PATTERN = re.compile(rb"[0-9a-fA-F]{40}")
+_GIT_WHITESPACE = b" \t\n\r"
 _TREE_ENTRY_LINE = re.compile(r"\d+ (?P<kind>\w+) [0-9a-f]+\t.+")
 
 
@@ -484,7 +507,8 @@ class PathCheckout:
     shared by every worktree of the same repository -- the key a caller
     fetching store state once per repository, not once per worktree, caches
     on (issue #314 gate G5). `has_commit` is `False` for an unborn branch
-    (a symbolic `HEAD` naming a branch with no commit yet): a resolved
+    (a symbolic `HEAD` naming a branch with no commit yet, git's exit 1; any
+    other git failure raises instead): a resolved
     checkout with no commit must never itself authorize a write (issue #314
     gate G3), since its branch name can coincidentally match a still-live
     claim's."""
@@ -499,6 +523,20 @@ class PathCheckout:
 NO_COMMIT_CHECKOUT_REASON = "no commit on this branch"
 NOT_IN_A_REPOSITORY_REASON = "not in a repository"
 RELATIVE_PAYLOAD_PATH_DENIAL = "relative payload path"
+# The variables that change which repository git recognizes at a path, in
+# either direction, measured with git 2.43: `GIT_DIR` selects one outright;
+# `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY` make git recognize a directory
+# without local `objects/` or `refs/` (setup.c `is_git_directory`), and an
+# empty value makes git fail on a real repository. While one is present a
+# failed discovery cannot read as outside; the cost is a refused write on a
+# genuine outside path only then. The other twelve of
+# `git rev-parse --local-env-vars` left a plain outside path unrecognized
+# (exit 128) and are not kept.
+REPOSITORY_SELECTING_ENVIRONMENT_VARIABLES = (
+    "GIT_DIR",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+)
 
 
 def checkout_relative(path: Path, *, toplevel: Path) -> PurePosixPath | None:
@@ -551,24 +589,50 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     localized text (issue #483). A `directory` that does not exist yet is
     never inside a repository -- `git -C` cannot even enter it -- so it
     stays `None` whatever sits above it, even an outer checkout's `.git`.
+    Only that first discovery may read as "outside", and never while the
+    environment sets `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_OBJECT_DIRECTORY`
+    (each changes what git recognizes in either direction: a repository no
+    `.git` marker shows may exist, or git may fail on a real one; the cost
+    is a refused write on a genuine outside path only while one is set).
+    Once git has named the checkout, a failed read of its branch or commit
+    raises, inside a git directory as PROT-43's sentence.
     """
     try:
-        return _resolve_checkout(directory)
+        discovered = _discover_checkout(directory)
     except ClaimError as error:
         if directory.is_dir():
             _refuse_a_failure_inside_a_repository(directory, error)
         return None
+    try:
+        return _read_checkout(directory, discovered)
+    except ClaimError as error:
+        _refuse_a_failure_inside_a_git_directory(directory, error)
+        raise
 
 
 def _refuse_a_failure_inside_a_repository(directory: Path, error: ClaimError) -> None:
     """Raises `error` -- or, inside a git directory itself, its own sentence
-    -- when `directory` sits inside a repository, so the git failure on it
-    can never read as "outside every repository"."""
+    -- when `directory` sits inside a repository or the environment selects
+    one, so the git failure on it can never read as "outside every
+    repository"."""
+    _refuse_a_failure_inside_a_git_directory(directory, error)
+    if _has_repository_marker_above(directory) or _environment_selects_a_repository():
+        raise error
+
+
+def _refuse_a_failure_inside_a_git_directory(directory: Path, error: ClaimError) -> None:
+    """Raises PROT-43's sentence when `directory` sits inside a git directory
+    itself; returns otherwise."""
     git_directory = _enclosing_git_directory(directory)
     if git_directory is not None:
         raise ClaimError(inside_git_directory_reason(git_directory)) from error
-    if _has_repository_marker_above(directory):
-        raise error
+
+
+def _environment_selects_a_repository() -> bool:
+    """Whether the inherited environment has a repository-selecting variable
+    present, an empty value included: each may place a repository, or what
+    git takes for one, where no filesystem marker shows it."""
+    return any(name in os.environ for name in REPOSITORY_SELECTING_ENVIRONMENT_VARIABLES)
 
 
 def inside_git_directory_reason(git_directory: Path) -> str:
@@ -645,7 +709,11 @@ def _enclosing_git_directory(directory: Path) -> Path | None:
     the symlink-resolved path, the one git's own discovery walks."""
     resolved = directory.resolve()
     return next(
-        (candidate for candidate in (resolved, *resolved.parents) if _is_git_directory(candidate)),
+        (
+            candidate
+            for candidate in (resolved, *resolved.parents)
+            if _is_git_directory(candidate, discovery_start=directory)
+        ),
         None,
     )
 
@@ -658,22 +726,105 @@ def _has_repository_marker_above(directory: Path) -> bool:
     discovery walks."""
     resolved = directory.resolve()
     return any(
-        _is_repository_marker(candidate / ".git") for candidate in (resolved, *resolved.parents)
+        _is_repository_marker(candidate / ".git", discovery_start=directory)
+        for candidate in (resolved, *resolved.parents)
     )
 
 
-def _is_repository_marker(dot_git: Path) -> bool:
-    return dot_git.is_file() or _is_git_directory(dot_git)
+def _is_repository_marker(dot_git: Path, *, discovery_start: Path) -> bool:
+    return dot_git.is_file() or _is_git_directory(dot_git, discovery_start=discovery_start)
 
 
-def _is_git_directory(candidate: Path) -> bool:
+def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
+    """A directory counts when git 2.43 recognizes it
+    (`_recognized_by_git_2_43`) or the layout this repository always accepted
+    does (`_has_plain_git_directory_layout`): the port may differ from git
+    somewhere, never by allowing a write the older rule refused."""
+    return _has_plain_git_directory_layout(suspect) or _recognized_by_git_2_43(
+        suspect, discovery_start=discovery_start
+    )
+
+
+def _has_plain_git_directory_layout(candidate: Path) -> bool:
     """The layout git's own discovery takes for a repository directory:
-    `HEAD` beside `objects/` and `refs/`."""
+    `HEAD` beside `objects/` and `refs/`. Kept as it was before the port of
+    git's recognition, as a floor that guards against a gap in that port
+    allowing a write this rule refused."""
     return (
         (candidate / "HEAD").is_file()
         and (candidate / "objects").is_dir()
         and (candidate / "refs").is_dir()
     )
+
+
+def _recognized_by_git_2_43(suspect: Path, *, discovery_start: Path) -> bool:
+    """git 2.43's own recognition (setup.c `is_git_directory`), ported
+    literally: `HEAD` must pass `_validate_headref`; the common directory
+    (`_common_directory`) must hold `refs` searchable and either `objects` or,
+    when `GIT_OBJECT_DIRECTORY` is set (empty included), that directory. A
+    relative environment value is relative to `discovery_start`, where
+    `git -C` runs, not to this process's cwd. Where git dies reading the
+    common directory, its discovery fails; that reads as a git directory, so
+    protect refuses rather than allows."""
+    if not _validate_headref(suspect / "HEAD"):
+        return False
+    common_directory = _common_directory(suspect)
+    if common_directory is None:
+        return True
+    object_directory = os.environ.get("GIT_OBJECT_DIRECTORY", f"{common_directory}/objects")
+    return _is_searchable(object_directory, discovery_start) and _is_searchable(
+        f"{common_directory}/refs", discovery_start
+    )
+
+
+def _is_searchable(path: str, discovery_start: Path) -> bool:
+    """C `access(path, X_OK)` from `discovery_start`: an empty path never is."""
+    return bool(path) and os.access(os.path.join(discovery_start, path), os.X_OK)
+
+
+def _common_directory(suspect: str | Path) -> str | None:
+    """setup.c `get_common_dir` / `get_common_dir_noenv`: `GIT_COMMON_DIR`
+    verbatim when set (empty included); else the real path of what a
+    `commondir` file in `suspect` names, relative to `suspect` unless
+    absolute, trailing line breaks only stripped, and read as a C string (cut
+    at the first NUL byte); else `suspect`. `None`
+    where git dies: an empty or unreadable `commondir` file, or a path whose
+    parent directory does not exist."""
+    environment_value = os.environ.get("GIT_COMMON_DIR")
+    if environment_value is not None:
+        return environment_value
+    commondir_file = Path(suspect, "commondir")
+    if not os.path.lexists(commondir_file):
+        return str(suspect)
+    try:
+        content = commondir_file.read_bytes()
+    except OSError:
+        return None
+    if not content:
+        return None
+    c_string = content.rstrip(b"\r\n").split(b"\0", 1)[0]
+    named = os.path.join(suspect, os.fsdecode(c_string))
+    resolved = os.path.realpath(named)
+    return resolved if os.path.isdir(os.path.dirname(resolved)) else None
+
+
+def _validate_headref(head: Path) -> bool:
+    """path.c `validate_headref`: a symlink passes when it names `refs/...`
+    (a dangling one too); a file passes when its first 255 bytes are `ref:`
+    and `refs/...` after optional whitespace (git's `isspace`: no vertical tab, no form feed),
+    or begin with an object id (`get_oid_hex`: 40 hex digits for SHA-1, 64 for
+    SHA-256, so any 64-digit id begins with a 40-digit one)."""
+    if head.is_symlink():
+        return os.fsencode(os.readlink(head)).startswith(b"refs/")
+    try:
+        with head.open("rb") as stream:
+            content = stream.read(255)
+    except OSError:
+        return False
+    names_ref = content.startswith(b"ref:") and content[len(b"ref:") :].lstrip(
+        _GIT_WHITESPACE
+    ).startswith(b"refs/")
+    return names_ref or _GIT_OBJECT_ID_PATTERN.match(content) is not None
 
 
 def _resolve_checkout(directory: Path) -> PathCheckout:
@@ -683,7 +834,19 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
     worktrees of this repository, so any failure resolving one of them is
     real -- a moved or deleted worktree directory, most often -- never a
     legitimate "nothing here"; `resolve_path_checkout` is the one caller
-    that still wants that bare `None` reading)."""
+    that still wants that bare `None` reading, of its discovery alone)."""
+    return _read_checkout(directory, _discover_checkout(directory))
+
+
+class _DiscoveredCheckout(NamedTuple):
+    toplevel: str
+    git_directory: str
+    common_directory: str
+
+
+def _discover_checkout(directory: Path) -> _DiscoveredCheckout:
+    """The toplevel, git directory and common directory git names for
+    `directory`: the one read a failure of which may mean "no repository"."""
     combined = git_output(
         [
             "rev-parse",
@@ -698,19 +861,22 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
         toplevel, git_directory, common_directory = combined.splitlines()
     except ValueError as error:
         raise ClaimError(f"git returned a malformed checkout description: {combined!r}") from error
+    return _DiscoveredCheckout(toplevel, git_directory, common_directory)
+
+
+def _read_checkout(directory: Path, discovered: _DiscoveredCheckout) -> PathCheckout:
+    """What git says of the already discovered checkout: its branch, kind and
+    whether the branch has a commit. Every failure propagates."""
+    toplevel, git_directory, common_directory = discovered
     branch = current_branch(directory=directory)
     kind = CheckoutKind.MAIN if git_directory == common_directory else CheckoutKind.LINKED_WORKTREE
-    try:
-        git_output(["rev-parse", "--verify", "HEAD"], directory=directory)
-        has_commit = True
-    except ClaimError:
-        has_commit = False
+    has_commit = _verified_read(["rev-parse", "--verify", "--quiet", "HEAD"], directory=directory)
     return PathCheckout(
         toplevel=Path(toplevel),
         branch=branch,
         kind=kind,
         common_directory=Path(common_directory),
-        has_commit=has_commit,
+        has_commit=has_commit is not None,
     )
 
 
@@ -866,16 +1032,15 @@ def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | No
     since `claim`, `protect`, and the trunk word or guess differently.
 
     One git read resolves the symbolic ref and proves its target exists; a
-    plain, non-symbolic `HEAD` ref names itself and so no branch."""
+    plain, non-symbolic `HEAD` ref names itself and so no branch. A git
+    failure other than the "absent" exit raises `ClaimError` with git's own
+    detail; it is never read as a remote that recorded none."""
     head = remote_tracking_ref(remote, "HEAD")
-    try:
-        symbolic = git_output(
-            ["rev-parse", "--verify", "--quiet", "--symbolic-full-name", head],
-            directory=directory,
-        )
-    except ClaimError:
-        return None
-    return None if symbolic == head else symbolic
+    symbolic = _verified_read(
+        ["rev-parse", "--verify", "--quiet", "--symbolic-full-name", head],
+        directory=directory,
+    )
+    return None if symbolic in (None, head) else symbolic
 
 
 def recorded_default_branch(remote: str, *, directory: Path | None = None) -> str | None:
@@ -957,7 +1122,9 @@ def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) 
     unpushed local commit as landed. It trusts `remote` to be configured:
     its `RunContext` refuses one this checkout never configured before it
     reads `recorded_head` or asks this at all (issue #508), so neither a
-    ref such a remote left behind nor a local branch answers for it."""
+    ref such a remote left behind nor a local branch answers for it. A
+    `recorded_head` of `None` is a remote that recorded none: a failed read
+    never reaches here, `recorded_head_ref` having raised it."""
     if recorded_head is not None:
         return recorded_head
     remote_trunk = _first_resolving_ref(
