@@ -77,6 +77,7 @@ from cli_fixtures import (
     read_end_of_a_pipe_carrying,
     real_git,
     real_repository_with_bare_remote,
+    recorded_head_read,
     redirect_toplevel,
     run_cli,
     run_context_over,
@@ -2099,6 +2100,35 @@ def test_a_claim_refused_after_the_build_removes_what_start_built(
     assert (status, worktree.exists()) == (2, False)
     assert err.startswith(f"ERROR: {refusal}")
     assert err.endswith(removal.format(worktree=worktree, branch=_START_BRANCH) + "\n")
+
+
+@pytest.mark.parametrize(
+    "failing_read",
+    [
+        pytest.param(list(RECORDED_ORIGIN_HEAD_READ), id="remote-head"),
+        pytest.param(["rev-parse", "--verify", "--quiet", "HEAD"], id="commit"),
+    ],
+)
+def test_a_fresh_start_refuses_with_gits_text_and_builds_nothing_when_a_trunk_read_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    failing_read: list[str],
+) -> None:
+    """A git failure reading `<remote>/HEAD` or the checkout's commit is
+    neither a trunk to guess nor a checkout with no commit: no worktree,
+    branch or claim is created."""
+    repo = _start_scenario(monkeypatch, tmp_path)
+    fake = _patch_store_write(monkeypatch)
+    monkeypatch.chdir(repo)
+    stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+
+    status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
+
+    worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
+    branches = real_git(repo, "branch", "--list", _START_BRANCH).stdout
+    assert (status, capsys.readouterr().err) == (2, "ERROR: fatal: broken\n")
+    assert (worktree.exists(), branches, fake.state.claims) == (False, "", {})
 
 
 def test_a_refused_start_git_cannot_undo_keeps_the_refusal_and_names_what_stays(
@@ -8536,6 +8566,40 @@ def _state_ref_item_state(repo: Path, tip: str, number: int) -> items.RecordStat
     )
     assert parsed.record is not None
     return items.parse_item_record(item_id, parsed.record).state
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        pytest.param(["check", "{sha}"], id="check"),
+        pytest.param(["status"], id="status"),
+        pytest.param(["status", "--json"], id="status-json"),
+        pytest.param(["board", "--json"], id="board"),
+        pytest.param(["next"], id="next"),
+    ],
+)
+def test_a_failed_remote_head_read_refuses_with_gits_text_instead_of_guessing_the_trunk(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    command: list[str],
+) -> None:
+    """The caller matrix of issue #244 against real trunk history: git
+    failing to read `<remote>/HEAD` is never a remote that recorded none, so
+    no command falls back to `<remote>/main`, judges against it, or prints
+    `cannot resolve the default branch`."""
+    repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
+    tip_before = _state_ref_tip(repo, remote)
+    stub_one_git_call(
+        monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
+    )
+
+    status = issue_claim.main([argument.format(sha=sha) for argument in command])
+
+    captured = capsys.readouterr()
+    assert (status, captured.err.splitlines()) == (2, ["ERROR: fatal: broken"])
+    assert _state_ref_tip(repo, remote) == tip_before
 
 
 def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose_claim_is_gone(
@@ -18795,6 +18859,50 @@ def test_cli_brief_prints_body_claim_lane_tip_and_touched_files(
         "TOUCHED",
         "README.md",
     ]
+
+
+def _inject_remote_head_read_exit_128(monkeypatch: pytest.MonkeyPatch) -> None:
+    stub_one_git_call(
+        monkeypatch, list(recorded_head_read("origin")), exit_status=128, stderr="fatal: broken"
+    )
+
+
+def _inject_remote_head_read_launch_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    fail_git_launch(monkeypatch, list(recorded_head_read("origin")), OSError("denied"))
+
+
+@pytest.mark.parametrize(
+    ("inject", "message"),
+    [
+        pytest.param(_inject_remote_head_read_exit_128, "fatal: broken", id="exit-128"),
+        pytest.param(
+            _inject_remote_head_read_launch_failure,
+            "git failed to launch: denied",
+            id="launch-failure",
+        ),
+    ],
+)
+def test_cli_brief_refuses_with_gits_text_when_reading_the_remote_head_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    inject: Callable[[pytest.MonkeyPatch], None],
+    message: str,
+) -> None:
+    """A failed read of `<remote>/HEAD` reaches the real reader and refuses
+    with git's own text, never guessing a trunk or printing `cannot resolve
+    the default branch`."""
+    repository, _base, _tip = _scratch_lane_repository(monkeypatch, tmp_path)
+    client = FakeForge()
+    client.issue_references[258] = forge.ItemReference(forge.ItemState.OPEN, "Brief", "Body.")
+    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
+    monkeypatch.chdir(repository)
+    inject(monkeypatch)
+
+    status = issue_claim.main(["--repo", REPOSITORY, "brief", "258"])
+
+    assert status == 2
+    assert capsys.readouterr().err.splitlines() == [f"ERROR: {message}"]
 
 
 def test_cli_brief_reports_no_active_claim_with_empty_tip_and_touched_files(

@@ -504,7 +504,8 @@ class PathCheckout:
     shared by every worktree of the same repository -- the key a caller
     fetching store state once per repository, not once per worktree, caches
     on (issue #314 gate G5). `has_commit` is `False` for an unborn branch
-    (a symbolic `HEAD` naming a branch with no commit yet): a resolved
+    (a symbolic `HEAD` naming a branch with no commit yet, git's exit 1; any
+    other git failure raises instead): a resolved
     checkout with no commit must never itself authorize a write (issue #314
     gate G3), since its branch name can coincidentally match a still-live
     claim's."""
@@ -972,7 +973,9 @@ def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) 
     unpushed local commit as landed. It trusts `remote` to be configured:
     its `RunContext` refuses one this checkout never configured before it
     reads `recorded_head` or asks this at all (issue #508), so neither a
-    ref such a remote left behind nor a local branch answers for it."""
+    ref such a remote left behind nor a local branch answers for it. A
+    `recorded_head` of `None` is a remote that recorded none: a failed read
+    never reaches here, `recorded_head_ref` having raised it."""
     if recorded_head is not None:
         return recorded_head
     remote_trunk = _first_resolving_ref(

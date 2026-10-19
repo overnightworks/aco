@@ -33,8 +33,10 @@ from cli_fixtures import (
     push_repository_trunk,
     real_git,
     real_repository_with_bare_remote,
+    recorded_head_read,
     set_agent_identity_env,
     stub_board_config_tracked,
+    stub_one_git_call,
 )
 from github_fixtures import FakeForge
 
@@ -1251,6 +1253,37 @@ def test_protect_denies_not_main_for_a_custom_or_unresolved_default_branch(
         == 2
     )
     _assert_protect_decision(capsys, decision="deny", reason=expected_reason)
+
+
+def test_protect_denies_with_gits_text_when_reading_the_remote_head_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """PROT-17: a git failure reading `origin/HEAD` is not a remote that
+    recorded none (PROT-13); it denies with git's own text."""
+    _isolate_protect_home(monkeypatch, tmp_path)
+    work = tmp_path / "work"
+    set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
+    _patch_protect_git(monkeypatch, work, branch="codex/issue-72-claims")
+    forbid_github_construction(monkeypatch)
+    fake_git_output = checkout.git_output
+
+    def failing_head_read(arguments: list[str], **options: object) -> str:
+        if tuple(arguments) == RECORDED_ORIGIN_HEAD_READ:
+            raise checkout.GitExitError(128, "fatal: broken")
+        return fake_git_output(arguments, **options)
+
+    monkeypatch.setattr(checkout, "git_output", failing_head_read)
+
+    assert (
+        _protect_main(
+            monkeypatch,
+            {"toolName": "write", "toolInput": {"path": str(work / "src/widget.py")}},
+        )
+        == 2
+    )
+    _assert_protect_decision(capsys, decision="deny", reason="fatal: broken")
 
 
 def _checkout_root_reason(root: Path) -> str:
@@ -3509,6 +3542,41 @@ def test_protect_and_rescope_judge_the_canonical_remotes_recorded_default_branch
     monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
 
     assert refusal_of(monkeypatch, capsys, path) == (2, sentence)
+
+
+@pytest.mark.parametrize(
+    "failing_read",
+    [
+        pytest.param(list(recorded_head_read("hub")), id="remote-head"),
+        pytest.param(["rev-parse", "--verify", "--quiet", "HEAD"], id="commit"),
+    ],
+)
+@pytest.mark.parametrize(
+    "refusal_of", [_protect_refusal, _rescope_refusal], ids=["protect", "rescope"]
+)
+def test_protect_and_rescope_refuse_with_gits_text_when_a_checkout_read_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    refusal_of: Callable[[pytest.MonkeyPatch, pytest.CaptureFixture[str], Path], tuple[int, str]],
+    failing_read: list[str],
+) -> None:
+    """PROT-17, RESC-17: a git failure reading the canonical remote's `HEAD`
+    or the checkout's commit, run against a real worktree, is neither a
+    remote that recorded none (PROT-13) nor a branch with no commit
+    (PROT-11): it refuses with git's own text."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    _use_real_path_is_tracked(monkeypatch)
+    path = _hub_canonical_worktree_file(
+        tmp_path, canonical="hub", canonical_head="trunk", branch="codex/issue-72-widget"
+    )
+    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
+    stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+
+    assert refusal_of(monkeypatch, capsys, path) == (2, "fatal: broken")
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
