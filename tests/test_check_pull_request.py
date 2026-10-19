@@ -1,4 +1,4 @@
-"""`aco check <pr>`: declarations and dependency paths in the real GitHub world."""
+"""`aco check <pr>`: declarations, dependency paths and parents in the real GitHub world."""
 
 from __future__ import annotations
 
@@ -8,11 +8,12 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY
+from board_fixtures import REPOSITORY, block_body, complete_contract, slice_entries
 from cli_fixtures import pull_request_listing, real_git, run_cli, track_board_config
 from github_fixtures import (
     LANDING_BRANCH,
     MERGE_COMMIT_SHA,
+    WORK_ITEM_ISSUE,
     FakeForge,
     assert_github_world,
     landing_pull_request,
@@ -26,11 +27,22 @@ ITEM_CLAIM = claim_intent(identity=protocol.IssueIdentity(72), branch=LANDING_BR
 LANE_BRANCH = "docs/tidy-readme"
 LANE_CLAIM = claim_intent(identity=protocol.LaneIdentity(), branch=LANE_BRANCH)
 WORK_ITEM = f"{REPOSITORY}#72"
+PARENT_ISSUE = 79
+PARENT = f"{REPOSITORY}#{PARENT_ISSUE}"
 README_LISTING = forge.PullRequestChanges(
     forge.ListingReading(MERGE_COMMIT_SHA, 1),
     forge.ListingReading(MERGE_COMMIT_SHA, 1),
     (forge.ChangedFile("README.md", None),),
 )
+
+
+@dataclass(frozen=True)
+class ParentWorld:
+    text: str
+    other_open_children: int = 0
+    closed_children: int = 0
+    kind: body.ItemKind | None = body.ItemKind.CONTAINER
+    repository: str = REPOSITORY
 
 
 @dataclass(frozen=True)
@@ -42,6 +54,7 @@ class PullRequestWorld:
     default_branch: str = "main"
     dependency_paths: tuple[str, ...] = ()
     listing: forge.PullRequestChanges | forge.ForgeError = README_LISTING
+    parent: ParentWorld | None = None
 
 
 ITEM_WORLD = PullRequestWorld()
@@ -168,6 +181,40 @@ def rendered(rows: dict[str, PullRequestCase]) -> list[object]:
     ]
 
 
+def parent_of_work_item(parent: ParentWorld | None) -> dict[int, board.ParentIssue]:
+    if parent is None:
+        return {}
+    reference = board.IssueReference(parent.repository, PARENT_ISSUE)
+    return {WORK_ITEM_ISSUE: board.ParentIssue(reference, parent.text, parent.kind)}
+
+
+def children_of_parent(parent: ParentWorld | None) -> dict[int, tuple[board.ChildItem, ...]]:
+    if parent is None:
+        return {}
+    open_numbers = (WORK_ITEM_ISSUE, *range(73, 73 + parent.other_open_children))
+    closed_numbers = range(90, 90 + parent.closed_children)
+    return {
+        PARENT_ISSUE: (
+            *(board.ChildItem(number, board.ChildState.OPEN) for number in open_numbers),
+            *(board.ChildItem(number, board.ChildState.CLOSED) for number in closed_numbers),
+        )
+    }
+
+
+def assert_parent_arranged(forge_world: FakeForge, parent: ParentWorld | None) -> None:
+    if parent is None:
+        assert (forge_world.parents, forge_world.children) == ({}, {})
+        return
+    assert set(forge_world.parents) == {WORK_ITEM_ISSUE}
+    children = forge_world.children.get(PARENT_ISSUE, ())
+    open_numbers = [child.number for child in children if child.state is board.ChildState.OPEN]
+    closed_numbers = [child.number for child in children if child.state is board.ChildState.CLOSED]
+    assert WORK_ITEM_ISSUE in open_numbers
+    assert len(open_numbers) - 1 == parent.other_open_children
+    assert len(closed_numbers) == parent.closed_children
+    assert len({*open_numbers, *closed_numbers}) == len(children)
+
+
 def written_by(forge_world: FakeForge, clone: Path, remote: Path) -> WriteTrace:
     return WriteTrace(
         clone_refs=tuple(
@@ -213,9 +260,9 @@ def check_pull_request(
                 github_clone,
                 f"dependency_paths = {json.dumps(list(case.world.dependency_paths))}\n",
             )
-            tracked = real_git(github_clone, "show", f"HEAD:{board.CONFIG_PATH}").stdout
-            configured = board.parse_config(tracked, board.CONFIG_PATH)
-            assert configured.dependency_paths == case.world.dependency_paths
+        tracked = real_git(github_clone, "show", f"HEAD:{board.CONFIG_PATH}").stdout
+        configured = board.parse_config(tracked, board.CONFIG_PATH)
+        assert configured.dependency_paths == case.world.dependency_paths
         seeded = publish_claims_from_a_second_clone(github_clone, bare_remote, case.world.claims)
         assert tuple((claim.identity, claim.branch) for claim in seeded.claims.values()) == tuple(
             (claim.identity, claim.branch) for claim in case.world.claims
@@ -233,8 +280,11 @@ def check_pull_request(
                 },
                 changes_by_number={12: case.world.listing},
                 default_branch_name=case.world.default_branch,
+                parents=parent_of_work_item(case.world.parent),
+                children=children_of_parent(case.world.parent),
             ),
         )
+        assert_parent_arranged(forge_world, case.world.parent)
         before = written_by(forge_world, github_clone, bare_remote)
         result = run_cli(["check", "12", *flags], capsys)
         observed = PullRequestObservation(
@@ -293,7 +343,8 @@ def outside(named: str) -> str:
 
 # Requests read the dispatch reference and landing, then the default branch;
 # a work item also reads the sub-issue relation unless its claim fails first,
-# and a `deps` listing is one more.
+# a `deps` listing is one more, and so are a recorded parent's children unless
+# the parent itself is refused before them.
 DECLARATIONS = {
     "qualified-work-item": declares(
         f"Work-Item: {WORK_ITEM}\n\nCloses #72", f"Work-Item: {WORK_ITEM}", 4
@@ -547,4 +598,180 @@ def test_a_deps_pull_request_is_judged_only_on_a_complete_unchanged_listing(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
     """Spec: LAND-73, LAND-75, LAND-76, CHECK-10, CHECK-01"""
+    check_pull_request(case, flags)
+
+
+def accepted_with_parent(body: str, parent: ParentWorld) -> PullRequestCase:
+    return declares(body, f"Work-Item: {WORK_ITEM}", 5, PullRequestWorld(parent=parent))
+
+
+def refused_with_parent(
+    body: str, message: str, parent: ParentWorld, forge_requests: int = 5
+) -> PullRequestCase:
+    return refused(body, message, forge_requests, PullRequestWorld(parent=parent))
+
+
+CLOSES_ITEM_AND_PARENT = f"Work-Item: #72\n\nCloses #72\nCloses #{PARENT_ISSUE}"
+CLOSES_PARENT_ONLY = f"Work-Item: #72\n\nCloses #{PARENT_ISSUE}"
+CLOSE_PARENT_TOO = f"closes the last open child of parent {PARENT}; close the parent too"
+UNCUT_ROW = (
+    f"closes parent {PARENT} although its body still holds an uncut slice row; "
+    "cut it or delete the row first"
+)
+NO_NEXT_LINE = (
+    f"leaves parent {PARENT} open with {{}} other open {{}}, whose body carries no Next line"
+)
+NOT_A_CONTAINER = (
+    f"has parent {PARENT} of kind {{}}, which is not a container; only a container holds children"
+)
+ONE_UNCUT_ROW = slice_entries("Scheibe 1")
+STALE_NEXT_PROSE = "\n\n## Next\nnichts\n"
+NEXT_IN_BLOCK = block_body(
+    'version = 1\nnow = "N"\nnext = "Cut the next slice."\ndone_when = "D"\n'
+)
+
+
+PARENT_ACCEPTANCES = {
+    "last-child-parent-next-names-work": accepted_with_parent(
+        WORK_ITEM_BODY, ParentWorld(complete_contract("Cut the next slice."))
+    ),
+    "last-child-parent-next-read-from-the-block-not-prose": accepted_with_parent(
+        WORK_ITEM_BODY, ParentWorld(NEXT_IN_BLOCK + STALE_NEXT_PROSE)
+    ),
+    "last-child-with-an-uncut-row-leaves-the-parent-open": accepted_with_parent(
+        WORK_ITEM_BODY, ParentWorld(complete_contract("keiner", slice=ONE_UNCUT_ROW))
+    ),
+    "closing-the-parent-with-further-next-work": accepted_with_parent(
+        CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("Cut the next slice."))
+    ),
+    "closing-the-completed-parent": accepted_with_parent(
+        CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner", now="Epic."))
+    ),
+    "closed-children-do-not-keep-the-parent-open": accepted_with_parent(
+        CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner"), closed_children=2)
+    ),
+    "other-children-parent-says-what-comes-next": accepted_with_parent(
+        WORK_ITEM_BODY, ParentWorld(complete_contract("Dispatch slice 4."), other_open_children=1)
+    ),
+    "other-child-and-next-names-no-work": accepted_with_parent(
+        WORK_ITEM_BODY, ParentWorld(complete_contract("keiner"), other_open_children=1)
+    ),
+}
+
+PARENT_CLOSING_REFUSALS = {
+    "last-child-must-close-the-parent": refused_with_parent(
+        WORK_ITEM_BODY, CLOSE_PARENT_TOO, ParentWorld(complete_contract("keiner"))
+    ),
+    "other-children-and-no-next-line": refused_with_parent(
+        WORK_ITEM_BODY,
+        NO_NEXT_LINE.format(1, "child"),
+        ParentWorld(complete_contract("", now="Epic without a next step."), other_open_children=1),
+    ),
+    "two-other-children-and-no-next-line": refused_with_parent(
+        WORK_ITEM_BODY,
+        NO_NEXT_LINE.format(2, "children"),
+        ParentWorld(complete_contract(""), other_open_children=2),
+    ),
+    "closing-the-parent-besides-other-children": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        f"closes {PARENT} besides its work item {WORK_ITEM}; a pull request lands one item",
+        ParentWorld(complete_contract("Dispatch slice 4."), other_open_children=1),
+    ),
+    "closing-the-parent-with-an-uncut-row": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        UNCUT_ROW,
+        ParentWorld(complete_contract("keiner", slice=ONE_UNCUT_ROW)),
+    ),
+    "closing-the-parent-with-an-unprintable-uncut-row": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        UNCUT_ROW,
+        ParentWorld(complete_contract("keiner", slice=slice_entries("Scheibe\nzwei"))),
+    ),
+    "uncut-row-before-one-item-per-landing": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        UNCUT_ROW,
+        ParentWorld(
+            complete_contract("Dispatch slice 4.", slice=ONE_UNCUT_ROW), other_open_children=1
+        ),
+    ),
+    "no-next-line-before-the-uncut-row": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        NO_NEXT_LINE.format(1, "child"),
+        ParentWorld(complete_contract("", slice=ONE_UNCUT_ROW), other_open_children=1),
+    ),
+    "missing-closing-reference-before-the-uncut-row": refused_with_parent(
+        CLOSES_PARENT_ONLY,
+        f"carries no closing reference for its work item {WORK_ITEM}",
+        ParentWorld(complete_contract("keiner", slice=ONE_UNCUT_ROW)),
+    ),
+}
+
+PARENT_REFUSALS = {
+    "blockless-parent": refused_with_parent(
+        WORK_ITEM_BODY,
+        f"has parent {PARENT} with a body malformed: aco: no aco block",
+        ParentWorld("## Now\nOld prose.\n"),
+        forge_requests=4,
+    ),
+    "malformed-parent-block": refused_with_parent(
+        WORK_ITEM_BODY,
+        f"has parent {PARENT} with a body malformed: version: version must be exactly 1",
+        ParentWorld(block_body('version = 2\nnow = "N"\nnext = "X"\ndone_when = "D"\n')),
+        forge_requests=4,
+    ),
+    "first-defect-of-a-malformed-parent": refused_with_parent(
+        WORK_ITEM_BODY,
+        f"has parent {PARENT} with a body malformed: version: version must be exactly 1",
+        ParentWorld(block_body("version = 2\n")),
+        forge_requests=4,
+    ),
+    "parent-that-is-no-container": refused_with_parent(
+        WORK_ITEM_BODY,
+        NOT_A_CONTAINER.format("task"),
+        ParentWorld(complete_contract("keiner"), kind=body.ItemKind.TASK),
+        forge_requests=4,
+    ),
+    "parent-of-unknown-kind": refused_with_parent(
+        WORK_ITEM_BODY,
+        NOT_A_CONTAINER.format("unknown"),
+        ParentWorld(complete_contract("keiner"), kind=None),
+        forge_requests=4,
+    ),
+    "parent-defect-before-the-closing-reference": refused_with_parent(
+        CLOSES_PARENT_ONLY,
+        NOT_A_CONTAINER.format("task"),
+        ParentWorld(complete_contract("keiner"), kind=body.ItemKind.TASK),
+        forge_requests=4,
+    ),
+    "parent-in-another-repository": refused_with_parent(
+        WORK_ITEM_BODY,
+        f"has parent other/repo#{PARENT_ISSUE} in another repository, "
+        "whose children this check cannot read",
+        ParentWorld(complete_contract("Cut the next slice."), repository="other/repo"),
+        forge_requests=4,
+    ),
+}
+
+
+@pytest.mark.parametrize(("case", "flags"), rendered(PARENT_ACCEPTANCES))
+def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
+    case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
+) -> None:
+    """Spec: LAND-21, LAND-22, LAND-23, LAND-25, CHECK-01"""
+    check_pull_request(case, flags)
+
+
+@pytest.mark.parametrize(("case", "flags"), rendered(PARENT_CLOSING_REFUSALS))
+def test_a_landing_that_contradicts_what_its_parent_still_holds_is_refused(
+    case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
+) -> None:
+    """Spec: LAND-18, LAND-19, LAND-21, LAND-24, LAND-79, CHECK-01"""
+    check_pull_request(case, flags)
+
+
+@pytest.mark.parametrize(("case", "flags"), rendered(PARENT_REFUSALS))
+def test_a_landing_whose_parent_cannot_be_read_or_holds_no_children_is_refused(
+    case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
+) -> None:
+    """Spec: LAND-18, LAND-26, LAND-27, LAND-28, CHECK-01"""
     check_pull_request(case, flags)
