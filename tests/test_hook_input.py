@@ -300,7 +300,7 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
         pytest.param(
             "sed -n 's/a/b/p' tests/t.py",
             (),
-            id="sed-without-in-place-names-no-pattern",
+            id="sed-without-in-place-and-without-a-write-names-no-pattern",
         ),
         pytest.param(
             "mv src/a.py src/b.py",
@@ -934,7 +934,10 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
         ),
         pytest.param(
             "sed -i -e 'w docs/file' --f docs/file",
-            ((hook_input.PATTERN_SED_IN_PLACE, "docs/file"),),
+            (
+                (hook_input.PATTERN_SED_WRITE, "docs/file"),
+                (hook_input.PATTERN_SED_IN_PLACE, "docs/file"),
+            ),
             id="sed-prefix-shared-by-a-value-option-and-a-flag-is-a-plain-flag",
         ),
         pytest.param(
@@ -975,6 +978,352 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             ),
             id="cp-attached-target-value-is-ordered-by-its-option-word",
         ),
+        pytest.param(
+            "sed -n -e '\rw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-carriage-return-between-commands",
+        ),
+        pytest.param(
+            "sed -n -e '\x0bw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-vertical-tab-between-commands",
+        ),
+        pytest.param(
+            "sed -n -e '\x0cw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-form-feed-between-commands",
+        ),
+        pytest.param(
+            "sed -n -e 'p;\rw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-semicolon-and-a-carriage-return",
+        ),
+        pytest.param(
+            "sed -n -e 'p\rw x' f",
+            (),
+            id="sed-script-carriage-return-inside-a-command-is-a-gnu-error-so-names-nothing",
+        ),
+        pytest.param(
+            "sed -n -e 'w x\r' f",
+            ((hook_input.PATTERN_SED_WRITE, "x\r"),),
+            id="sed-script-name-keeps-its-carriage-return",
+        ),
+        pytest.param(
+            "sed -n -e 'a\\ \nw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-backslash-blank-text-start-ends-at-the-line-end",
+        ),
+        pytest.param(
+            "sed -n -e 'a\\\\\nw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-backslash-backslash-text-start-ends-at-the-line-end",
+        ),
+        pytest.param(
+            "sed -n -e 'i\\ \nw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-an-insert-with-a-backslash-blank-text-start",
+        ),
+        pytest.param(
+            "sed -n -e 'c\\\\\nw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-change-with-a-backslash-backslash-text-start",
+        ),
+        pytest.param(
+            "sed -n -e 'e\\ \nw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-an-execute-with-a-backslash-blank-text-start",
+        ),
+        pytest.param(
+            "sed -n -e 'a\\\nw x' f",
+            (),
+            id="sed-script-write-inside-block-form-append-text-is-text",
+        ),
+        pytest.param(
+            "sed -n -e 'a foo\nw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-one-line-append-text",
+        ),
+        pytest.param(
+            "sed -n -e 'a foo\\\nw x' f",
+            (),
+            id="sed-script-write-inside-a-continued-one-line-append-is-text",
+        ),
+        pytest.param(
+            "sed -n -e 'a\\\\\\\nw x' f",
+            (),
+            id="sed-script-write-inside-a-backslash-continued-text-is-text",
+        ),
+        pytest.param(
+            "sed -n -e 'a\\' -e 'w x' f",
+            (),
+            id="sed-script-write-in-the-next-expression-after-an-open-append-is-text",
+        ),
+        pytest.param(
+            "sed -n -e 'e\\' -e 'w x' f",
+            (),
+            id="sed-script-write-in-the-next-expression-after-an-open-execute-is-text",
+        ),
+        pytest.param(
+            "sed -n -e 's/a/b/\r\nw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-substitute-flags-ending-in-a-carriage-return-and-line-feed",
+        ),
+        pytest.param(
+            "sed -n -e '\\\\a\\w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-backslash-delimited-address",
+        ),
+        pytest.param(
+            "sed -n -e '{\rw x\n}' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-block-start-and-a-carriage-return",
+        ),
+        pytest.param(
+            "sed -n -e '{\x0bw x\n}' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-block-start-and-a-vertical-tab",
+        ),
+        pytest.param(
+            "sed -n -e '{\x0cw x\n}' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-block-start-and-a-form-feed",
+        ),
+        pytest.param(
+            "sed -n 'w f' f",
+            ((hook_input.PATTERN_SED_WRITE, "f"),),
+            id="sed-script-write-to-the-input-file-names-it",
+        ),
+        pytest.param(
+            "sed 's/a/b/w f' f",
+            ((hook_input.PATTERN_SED_WRITE, "f"),),
+            id="sed-script-substitute-write-flag-to-the-input-file-names-it",
+        ),
+        pytest.param(
+            "sed -n 'w x\n:a;ba' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-ahead-of-an-endless-loop-still-names-its-target",
+        ),
+        pytest.param(
+            'sed "w $dir/x" f',
+            (),
+            id="sed-script-positional-script-with-an-expansion-names-nothing",
+        ),
+        pytest.param(
+            'sed -e "w $dir/x" f', (), id="sed-script-expression-with-an-expansion-names-nothing"
+        ),
+        pytest.param("sed w*x f", (), id="sed-script-positional-script-with-a-glob-names-nothing"),
+        pytest.param(
+            'sed -n -e "$p" -e "w x" f', (), id="sed-script-text-after-an-expansion-is-not-judged"
+        ),
+        pytest.param(
+            "sed -n -e p -f s -e 'w x' f",
+            (),
+            id="sed-script-text-after-a-script-file-is-not-judged",
+        ),
+        pytest.param(
+            "sed -n -e 'w y' -e \"$p\" -e 'w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "y"),),
+            id="sed-script-write-before-an-expansion-is-judged-and-the-one-after-is-not",
+        ),
+        pytest.param(
+            "sed -n -e 'w y' --file=s -e 'w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "y"),),
+            id="sed-script-write-before-a-script-file-is-judged-and-the-one-after-is-not",
+        ),
+        pytest.param("sed -n -f s f", (), id="sed-script-file-alone-names-nothing"),
+        pytest.param(
+            "sed -i -e 'w docs/first' docs/second",
+            (
+                (hook_input.PATTERN_SED_WRITE, "docs/first"),
+                (hook_input.PATTERN_SED_IN_PLACE, "docs/second"),
+            ),
+            id="sed-in-place-script-write-is-named-before-the-operand-after-it",
+        ),
+        pytest.param(
+            "sed -i docs/second -e 'w docs/first'",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "docs/second"),
+                (hook_input.PATTERN_SED_IN_PLACE, "-e"),
+                (hook_input.PATTERN_SED_IN_PLACE, "w docs/first"),
+                (hook_input.PATTERN_SED_WRITE, "docs/first"),
+            ),
+            id="sed-in-place-operand-first-names-its-file-and-the-posix-operands-then-the-write",
+        ),
+        pytest.param(
+            "sed -i -e 'w a' docs/f -e 'w b'",
+            (
+                (hook_input.PATTERN_SED_WRITE, "a"),
+                (hook_input.PATTERN_SED_IN_PLACE, "docs/f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "-e"),
+                (hook_input.PATTERN_SED_IN_PLACE, "w b"),
+                (hook_input.PATTERN_SED_WRITE, "b"),
+            ),
+            id="sed-in-place-names-both-writes-around-an-operand",
+        ),
+        pytest.param(
+            "sed -i -e 'w f' f",
+            (
+                (hook_input.PATTERN_SED_WRITE, "f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "f"),
+            ),
+            id="sed-in-place-names-a-script-write-to-its-own-operand-as-both-patterns",
+        ),
+        pytest.param(
+            "sed -i -e 's/a/b/w f' f",
+            (
+                (hook_input.PATTERN_SED_WRITE, "f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "f"),
+            ),
+            id="sed-in-place-names-a-substitute-write-to-its-own-operand-as-both-patterns",
+        ),
+        pytest.param(
+            "sed -i -e 'W f' f",
+            (
+                (hook_input.PATTERN_SED_WRITE, "f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "f"),
+            ),
+            id="sed-in-place-names-a-capital-w-write-to-its-own-operand-as-both-patterns",
+        ),
+        pytest.param(
+            "sed -i f -e 'w f'",
+            (
+                (hook_input.PATTERN_SED_IN_PLACE, "f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "-e"),
+                (hook_input.PATTERN_SED_IN_PLACE, "w f"),
+                (hook_input.PATTERN_SED_WRITE, "f"),
+            ),
+            id="sed-in-place-operand-first-names-the-write-to-it-after-the-posix-operands",
+        ),
+        pytest.param(
+            "sed -i -e 'w f' -f s f",
+            (
+                (hook_input.PATTERN_SED_WRITE, "f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "f"),
+            ),
+            id="sed-in-place-names-a-write-ahead-of-a-script-file-as-both-patterns",
+        ),
+        pytest.param(
+            "sed -i -e 'w f' -e 's/a/b/ggw y' f",
+            (
+                (hook_input.PATTERN_SED_WRITE, "f"),
+                (hook_input.PATTERN_SED_IN_PLACE, "f"),
+            ),
+            id="sed-in-place-names-a-write-ahead-of-a-gnu-error-as-both-patterns",
+        ),
+        pytest.param(
+            "sed -i -e 'w docs/file' --fi docs/file",
+            ((hook_input.PATTERN_SED_WRITE, "docs/file"),),
+            id="sed-script-write-with-an-ambiguous-long-option-after-in-place-is-named",
+        ),
+        pytest.param(
+            "sed -i -e 'w docs/file' -nl docs/file",
+            ((hook_input.PATTERN_SED_WRITE, "docs/file"),),
+            id="sed-script-write-with-a-clustered-line-length-after-in-place-is-named",
+        ),
+        pytest.param(
+            "sed -e 'w /outside/x' f",
+            ((hook_input.PATTERN_SED_WRITE, "/outside/x"),),
+            id="sed-script-write-outside-every-repository-is-named",
+        ),
+        pytest.param(
+            "sed 's/a/b/w /outside/x' f",
+            ((hook_input.PATTERN_SED_WRITE, "/outside/x"),),
+            id="sed-script-substitute-write-outside-every-repository-is-named",
+        ),
+        pytest.param(
+            "sed -n 'W x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-capital-w-is-a-write",
+        ),
+        pytest.param(
+            "sed 'w x' f -n",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-positional-script-before-an-option-is-judged",
+        ),
+        pytest.param(
+            "sed -n 'w out;p ' f",
+            ((hook_input.PATTERN_SED_WRITE, "out;p "),),
+            id="sed-script-name-runs-to-the-line-end-with-semicolon-and-trailing-blank",
+        ),
+        pytest.param(
+            "sed -n -e 'w x' -e 'w y' f",
+            (
+                (hook_input.PATTERN_SED_WRITE, "x"),
+                (hook_input.PATTERN_SED_WRITE, "y"),
+            ),
+            id="sed-script-two-expressions-name-two-files",
+        ),
+        pytest.param(
+            "sed 's/a/b/ w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-substitute-write-flag-after-a-blank",
+        ),
+        pytest.param(
+            "sed 's/a/b/gpw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-substitute-write-flag-after-g-and-p",
+        ),
+        pytest.param(
+            "sed 's/a/b/ggw x' f",
+            (),
+            id="sed-script-repeated-global-flag-is-a-gnu-error-so-names-nothing",
+        ),
+        pytest.param(
+            "sed 's/a/b/2 3w x' f",
+            (),
+            id="sed-script-second-number-flag-is-a-gnu-error-so-names-nothing",
+        ),
+        pytest.param(
+            "sed -n 's/[/]/x/w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-bracket-expression-holding-the-delimiter",
+        ),
+        pytest.param(
+            "sed -n -e 'a w x' -e 'y/w/x/' -e 's/a/w x/' -e '/w x/p' -e '#w x' -e 'r w x' f",
+            (),
+            id="sed-script-text-transliteration-replacement-comment-and-read-name-nothing",
+        ),
+        pytest.param(
+            "sed -s -z --posix -E -n 'w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-with-every-sed-flag-in-a-bundle",
+        ),
+        pytest.param(
+            "sed -n -- 'w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-the-end-of-options-marker",
+        ),
+        pytest.param(
+            "sed -n --expression 'w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-in-a-long-expression-option-with-a-separate-value",
+        ),
+        pytest.param(
+            "sed -n --expression='w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-in-a-long-expression-option-with-an-attached-value",
+        ),
+        pytest.param(
+            "sed -n -e'w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-in-a-short-expression-option-with-an-attached-value",
+        ),
+        pytest.param(
+            "sed -n -e 'w y' -e",
+            ((hook_input.PATTERN_SED_WRITE, "y"),),
+            id="sed-script-write-before-an-expression-option-without-a-value-is-judged",
+        ),
+        pytest.param(
+            "sed -n -f s 'w x' f",
+            (),
+            id="sed-script-positional-word-beside-a-script-file-is-an-operand",
+        ),
+        pytest.param("sed w f", (), id="sed-script-write-command-without-a-name-names-nothing"),
+        pytest.param(
+            "sed -n 's/a/b/w' f",
+            (),
+            id="sed-script-substitute-write-flag-without-a-name-names-nothing",
+        ),
     ],
 )
 def test_hook_command_paths_recognizes_every_write_pattern(
@@ -1003,6 +1352,12 @@ def test_hook_command_paths_recognizes_every_write_pattern(
             "/work",
             ((hook_input.PATTERN_REMOVE, "/work/f"),),
             id="cwd-alone-resolves-a-relative-path-with-no-cd-at-all",
+        ),
+        pytest.param(
+            "cd sub && sed -n 'w x' f",
+            "/work",
+            ((hook_input.PATTERN_SED_WRITE, "/work/sub/x"),),
+            id="a-sed-script-write-resolves-against-the-cd-directory",
         ),
         pytest.param(
             "cd $VAR && rm f",

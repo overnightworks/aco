@@ -1,6 +1,7 @@
 """Parses two hook-payload command grammars so `protect` can check every
 file path they touch: Codex's `apply_patch` patch text, and a Bash
-`command`'s own write patterns (issue #380). Pure text parsing -- no
+`command`'s own write patterns (issue #380), a `sed` script's own `w` files
+included. Pure text parsing -- no
 filesystem, process, network, or coordination knowledge -- kept out of
 `protect` so each grammar has one small, independently testable
 owner rather than growing inside `protect`'s already large module.
@@ -12,6 +13,8 @@ import posixpath
 from collections.abc import Iterable
 from enum import Enum, auto
 from typing import NamedTuple
+
+from agent_coordination.sed_script import sed_script_write_targets
 
 _ENVIRONMENT_ID_PREFIX = "*** Environment ID: "
 _BEGIN_PATCH_MARKER = "*** Begin Patch"
@@ -206,6 +209,7 @@ PATTERN_REDIRECT_OVERWRITE = ">"
 PATTERN_REDIRECT_APPEND = ">>"
 PATTERN_TEE = "tee"
 PATTERN_SED_IN_PLACE = "sed -i"
+PATTERN_SED_WRITE = "sed w"
 PATTERN_MOVE = "mv"
 PATTERN_COPY = "cp"
 PATTERN_REMOVE = "rm"
@@ -972,6 +976,12 @@ def _match_remove(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | N
     return PATTERN_REMOVE, _non_flag_arguments(words[1:])
 
 
+_SED_EXPRESSION_OPTIONS = frozenset({"-e", "--expression"})
+_SED_TABLE = _OptionTable(
+    _SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS, _SED_IN_PLACE_OPTIONS, _SED_FLAG_OPTIONS
+)
+
+
 def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | None:
     """`sed -i` (or `-i<suffix>`/`--in-place[=SUFFIX]`): with an explicit
     `-e`/`--expression`/`-f`/`--file` script, every remaining non-flag
@@ -987,20 +997,14 @@ def _match_sed_in_place(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...
     file edit that the sole remaining operand is judged as that file instead
     (issue #380 delta, gate finding: `sed --in-place=.bak f` must judge `f`)
     -- catching a possible write here is safer than silently allowing one.
-    `sed` without `-i`/`--in-place` reads and writes nothing (it prints to
-    stdout), so it names no pattern at all."""
+    Without `-i`/`--in-place` this matcher names no path: the files a
+    script itself writes belong to `_match_sed_script_write`."""
     if words[0].text != "sed":
         return None
-    readings = _parse_both_readings(
-        words[1:],
-        _OptionTable(
-            _SED_SCRIPT_OPTIONS | _SED_LINE_LENGTH_OPTIONS,
-            _SED_IN_PLACE_OPTIONS,
-            _SED_FLAG_OPTIONS,
-        ),
-    )
     paths = _unique_in_command_order(
-        path for parsed in readings for path in _sed_in_place_paths(parsed)
+        path
+        for parsed in _parse_both_readings(words[1:], _SED_TABLE)
+        for path in _sed_in_place_paths(parsed)
     )
     return (PATTERN_SED_IN_PLACE, paths) if paths else None
 
@@ -1017,6 +1021,56 @@ def _sed_in_place_paths(parsed: _ParsedArguments) -> tuple[_Word, ...]:
     ):
         return parsed.operands
     return parsed.operands[1:]
+
+
+def _readable_script_pieces(parsed: _ParsedArguments) -> tuple[_Word, ...]:
+    """The script words of one reading, in the order sed joins them, up to
+    the first one the hook cannot read (an expansion, a `-f` file, an `-e`
+    without value): what follows it is unjudged too, because the parser
+    state it leaves is unknown. The positional script counts only when no
+    `-e`/`-f` is given."""
+    if not parsed.has_option(_SED_SCRIPT_OPTIONS):
+        sources = parsed.operands[:1]
+    else:
+        sources = tuple(
+            option.value if option.name in _SED_EXPRESSION_OPTIONS else None
+            for option in parsed.options
+            if option.name in _SED_SCRIPT_OPTIONS
+        )
+    readable: list[_Word] = []
+    for word in sources:
+        if word is None or word.is_expandable:
+            break
+        readable.append(word)
+    return tuple(readable)
+
+
+def _sed_script_write_paths(parsed: _ParsedArguments) -> tuple[_Word, ...]:
+    """The files the readable script of one reading writes, each named at
+    the position of the script word its command is in."""
+    pieces = _readable_script_pieces(parsed)
+    return tuple(
+        _Word(
+            target.name,
+            is_operator=False,
+            is_expandable=False,
+            position=pieces[target.piece].position,
+        )
+        for target in sed_script_write_targets([piece.text for piece in pieces])
+    )
+
+
+def _match_sed_script_write(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | None:
+    """The files a `sed` script writes by itself (`w`, `W`, `s///w`), with or
+    without `-i`."""
+    if words[0].text != "sed":
+        return None
+    paths = _unique_in_command_order(
+        path
+        for parsed in _parse_both_readings(words[1:], _SED_TABLE)
+        for path in _sed_script_write_paths(parsed)
+    )
+    return (PATTERN_SED_WRITE, paths) if paths else None
 
 
 _GIT_RESTORE_PREFIX_LENGTH = 2  # `git`, `restore`
@@ -1060,17 +1114,17 @@ _COMMAND_MATCHERS = (
     _match_copy,
     _match_remove,
     _match_sed_in_place,
+    _match_sed_script_write,
     _match_git_checkout,
     _match_git_restore,
 )
 
 
-def _first_command_match(words: tuple[_Word, ...]) -> tuple[str, tuple[_Word, ...]] | None:
-    for matcher in _COMMAND_MATCHERS:
-        matched = matcher(words)
-        if matched is not None:
-            return matched
-    return None
+def _command_matches(words: tuple[_Word, ...]) -> tuple[tuple[str, tuple[_Word, ...]], ...]:
+    """Every pattern one command carries: `sed -i -e 'w a' b` is both `sed -i`
+    and `sed w`. The other matchers read `words[0]` and exclude each other."""
+    matches = (matcher(words) for matcher in _COMMAND_MATCHERS)
+    return tuple(matched for matched in matches if matched is not None)
 
 
 def _resolved_operand_path(current_directory: str | None, text: str) -> str:
@@ -1122,6 +1176,24 @@ def _judged_pairs(
         (pattern, _resolved_operand_path(current_directory, word.text))
         for word in words
         if not word.is_expandable
+    )
+
+
+def _judged_pairs_in_command_order(
+    matches: Iterable[tuple[str, tuple[_Word, ...]]], *, current_directory: str | None
+) -> tuple[tuple[str, str], ...]:
+    """The judged pairs of every pattern one command carries, in the order
+    the command names their words (a pattern's own words are not grouped:
+    `sed -i -e 'w a' b` names `a` before `b`); at one position the earlier
+    matcher's pair comes first, so `sed -i` precedes `sed w`."""
+    named = sorted(
+        ((pattern, word) for pattern, words in matches for word in words),
+        key=lambda named_word: named_word[1].position,
+    )
+    return tuple(
+        pair
+        for pattern, word in named
+        for pair in _judged_pairs(pattern, (word,), current_directory=current_directory)
     )
 
 
@@ -1220,12 +1292,10 @@ class _CommandPathWalker:
         words = self._tokens[index:operand_end]
         if words and words[0].text == _CD_COMMAND:
             return self._consume_cd(words, operand_end, pipeline_has_pipe)
-        matched = _first_command_match(words) if words else None
-        if matched is not None:
-            pattern, operand_words = matched
-            self._pairs.extend(
-                _judged_pairs(pattern, operand_words, current_directory=self._directory_stack[-1])
-            )
+        matches = _command_matches(words) if words else ()
+        self._pairs.extend(
+            _judged_pairs_in_command_order(matches, current_directory=self._directory_stack[-1])
+        )
         return operand_end, False
 
     def _consume_cd(
@@ -1254,7 +1324,8 @@ def hook_command_paths(command: str, *, cwd: str | None = None) -> tuple[tuple[s
     """Every `(pattern, path)` pair a Bash `command`'s own recognized write
     patterns name, in the order they appear: a `>`/`>>` redirection
     (including a heredoc target such as `cat > path <<EOF`), `tee`,
-    `sed -i`, `mv`, `cp` (its destination only), `rm`, `git checkout --`,
+    `sed -i`, `sed w` (the files a `sed` script's own `w`, `W` or `s///w`
+    writes), `mv`, `cp` (its destination only), `rm`, `git checkout --`,
     and `git restore` (skipping its own options and their arguments). A
     relative path resolves against `cwd` -- the payload's own working
     directory -- updated by every literal, resolvable `cd` (issue #380
