@@ -889,6 +889,7 @@ _BASH_WRITE_COMMAND_TEMPLATES: tuple[tuple[str, str], ...] = (
     ("echo hi >> {path}", hook_input.PATTERN_REDIRECT_APPEND),
     ("tee {path}", hook_input.PATTERN_TEE),
     ("sed -i 's/a/b/' {path}", hook_input.PATTERN_SED_IN_PLACE),
+    ("sed 's/a/b/w {path}' src/source.py", hook_input.PATTERN_SED_WRITE),
     ("mv {path} src/renamed.py", hook_input.PATTERN_MOVE),
     ("cp src/source.py {path}", hook_input.PATTERN_COPY),
     ("rm {path}", hook_input.PATTERN_REMOVE),
@@ -970,8 +971,27 @@ def _bash_scope_case(
         (
             "sed -i -e 'w docs/file' --f docs/file",
             2,
-            "sed -i docs/file outside claim scope",
+            "sed w docs/file outside claim scope",
         ),
+        (
+            "sed -i -e 'w docs/file' --fi docs/file",
+            2,
+            "sed w docs/file outside claim scope",
+        ),
+        (
+            "sed -i -e 'w docs/file' -nl docs/file",
+            2,
+            "sed w docs/file outside claim scope",
+        ),
+        ("sed -n -e 'w docs/file' src/a", 2, "sed w docs/file outside claim scope"),
+        ("sed -n -e 'w src/file' -e 'w docs/file' src/a", 2, "sed w docs/file outside claim scope"),
+        ("sed '/a/ Iw docs/f' src/a", 2, "sed w docs/f outside claim scope"),
+        ("sed '+w docs/f' src/a", 2, "sed w docs/f outside claim scope"),
+        ("sed '+18446744073709551616w docs/f' src/a", 2, "sed w docs/f outside claim scope"),
+        ("sed -n -e 'w docs/file' -f script.sed src/a", 2, "sed w docs/file outside claim scope"),
+        ("sed -n -f script.sed -e 'w docs/file' src/a", 0, None),
+        ('sed -n -e "w $dir/file" src/a', 0, None),
+        ("sed -n -e 'w src/file' -e 'a w docs/file' src/a", 0, None),
     ],
 )
 def test_protect_bash_judges_a_recognized_pattern_path_by_claim_scope(
