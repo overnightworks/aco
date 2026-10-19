@@ -1,0 +1,8 @@
+claim_id = "a512093194bb40d3ba6d2eb716cc7b68"
+agent = "claude"
+role = "builder"
+base = "11cd1a5923e27e68cf89284831b8f25862a0fce0"
+branch = "claude/issue-248-c1-cut-first-half"
+scope = ["scripts/test_inventory_dropped.txt", "tests/board_fixtures.py", "tests/test_cli.py", "tests/test_cut.py", "tests/test_state_board.py"]
+opened_commit = "2e561b91d2d6c3a8c4ef8afd233a9a9df8a69341"
+whole_reason = "Eine Familien-Scheibe: das neue Modul, das Löschen der alten Knoten, der Helferumzug mit seinen Aufrufstellen, die zwei Docstring-Pins und die Ledger-Zeilen müssen zusammen landen, sonst fehlen Tests oder Namen zeigen ins Leere."
