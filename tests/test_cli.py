@@ -34,6 +34,7 @@ from board_fixtures import (
     blocked_issue,
     board_issue,
     complete_contract,
+    container_issue,
     idea_body,
     projected_board,
     proposed_expectation,
@@ -4434,138 +4435,8 @@ def _cuttable_slice_entries(*titles: str) -> list[dict[str, object]]:
     return [{**entry, "done_when": "D"} for entry in slice_entries(*titles)]
 
 
-def _cut_container_issue(toml_text: str) -> board.Issue:
-    return board.Issue(
-        CUT_CONTAINER,
-        "Epic",
-        (),
-        block_body(toml_text),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-
-
 def _one_slice_container() -> board.Issue:
-    return _cut_container_issue(_cuttable_row_toml("Scheibe 1"))
-
-
-def test_cut_refuses_a_non_container(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    plain = board_issue(CUT_CONTAINER, "Not a container", complete_contract("Ship it."))
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(plain,))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "Scheibe 1"]
-    )
-
-    assert exit_code == 2
-    assert f"ERROR: #{CUT_CONTAINER} is not a container" in capsys.readouterr().err
-
-
-def test_cut_json_refusal_reports_precondition_failed(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #425: every `cut` refusal before any write -- here CUT-02's own
-    non-container target -- reports through the shared envelope as
-    `precondition_failed`, never a bare object."""
-    plain = board_issue(CUT_CONTAINER, "Not a container", complete_contract("Ship it."))
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(plain,))
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "cut",
-            str(CUT_CONTAINER),
-            "--title",
-            "Scheibe 1",
-            "--json",
-        ]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert f"ERROR: #{CUT_CONTAINER} is not a container" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
-
-
-@pytest.mark.parametrize(
-    ("title", "refusal"),
-    [
-        pytest.param("Scheibe 1", f"#{CUT_CONTAINER} is not an open container", id="no-open-issue"),
-        pytest.param(" \t ", "--title must be a non-empty string", id="blank-title"),
-    ],
-)
-def test_cut_refuses_a_number_that_names_no_open_issue_or_a_blank_title(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    title: str,
-    refusal: str,
-) -> None:
-    """CUT-01, and CUT-33 (issue #447): a blank title refuses before `cut`
-    reads the board at all, so no creation path writes a blank-titled item."""
-    _configured_board_client(monkeypatch, tmp_path, open_issues=())
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", title]
-    )
-
-    assert exit_code == 2
-    assert f"ERROR: {refusal}" in capsys.readouterr().err
-
-
-def test_cut_refuses_a_container_that_already_has_a_parent(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(_one_slice_container(),))
-    client.parents[CUT_CONTAINER] = board.ParentIssue(
-        board.IssueReference(REPOSITORY, 1), "", body.ItemKind.CONTAINER
-    )
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "Scheibe 1"]
-    )
-
-    assert exit_code == 2
-    assert (
-        f"ERROR: #{CUT_CONTAINER} is itself a child of {REPOSITORY}#1; "
-        "nested containers are not supported" in capsys.readouterr().err
-    )
-
-
-@pytest.mark.parametrize(
-    "operation",
-    [
-        forge.ForgeOperation.CREATE_CHILD,
-        forge.ForgeOperation.LINK_CHILD,
-        forge.ForgeOperation.UPDATE_ITEM_BODY,
-    ],
-)
-def test_cut_refuses_when_the_forge_cannot_perform_a_required_write(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    operation: forge.ForgeOperation,
-) -> None:
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(_one_slice_container(),))
-    client.capability_overrides[operation] = forge.Capability.READ_ONLY
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "Scheibe 1"]
-    )
-
-    assert exit_code == 2
-    assert client.created_children == []
-    assert client.item_bodies == {}
-    assert (
-        f"ERROR: this forge cannot {operation.value}; cut the slice by hand"
-        in capsys.readouterr().err
-    )
+    return container_issue(CUT_CONTAINER, _cuttable_row_toml("Scheibe 1"))
 
 
 def test_cut_names_the_created_child_when_the_relation_post_fails(
@@ -4660,164 +4531,12 @@ def _write_block_pin(tmp_path: Path) -> None:
     write_repository_config(tmp_path, 'body_contract = "block"\n')
 
 
-@pytest.mark.parametrize(
-    ("toml_text", "scope_flags", "created_scope", "remaining_slice"),
-    [
-        pytest.param(
-            f"{MINIMAL_BLOCK_TOML}"
-            '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "D"\n'
-            '[[slice]]\nindex = 2\ntitle = "Scheibe 2"\ndone_when = "D"\n',
-            (),
-            None,
-            [{"index": 2, "title": "Scheibe 2", "done_when": "D"}],
-            id="no-scope-leaves-the-remaining-row",
-        ),
-        pytest.param(
-            _cuttable_row_toml("Scheibe 1"),
-            ("--scope", "src/c.py"),
-            ("src/c.py",),
-            [],
-            id="a-scope-fills-the-row-and-becomes-the-childs-own-scope",
-        ),
-    ],
-)
-def test_cut_creates_a_child_and_removes_the_first_cuttable_slice(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    toml_text: str,
-    scope_flags: tuple[str, ...],
-    created_scope: tuple[str, ...] | None,
-    remaining_slice: list[dict[str, object]],
-) -> None:
-    """`cut` creates the fresh child and removes the cut row from the
-    container's own slice table; with `--scope` (issue #337 proof 2, REVISE
-    finding 2), that scope fills the row and becomes the fresh child's own
-    top-level scope under GitHub storage too -- the same rule
-    `test_cut_scope_fills_inherits_or_refuses_against_a_slice_rows_scope`
-    proves end to end under `state-ref`."""
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "cut",
-            str(CUT_CONTAINER),
-            "--title",
-            "Scheibe 1",
-            *scope_flags,
-        ]
-    )
-
-    assert exit_code == 0
-    child = client.next_created_child_number - 1
-    assert client.created_children == [
-        (
-            CUT_CONTAINER,
-            "Scheibe 1",
-            cmd_cut._cut_child_body(
-                CUT_CONTAINER, body.Storage.GITHUB, created_scope, done_when="D"
-            ),
-            body.ItemKind.TASK,
-        )
-    ]
-    new_data = body.locate_block(client.item_bodies[CUT_CONTAINER]).data
-    assert new_data["slice"] == remaining_slice
-    assert capsys.readouterr().out == f"CUT #{CUT_CONTAINER} row 1 -> #{child}\n"
-
-
-def test_cut_selects_a_row_by_number_and_removes_only_that_entry(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = (
-        f"{MINIMAL_BLOCK_TOML}"
-        '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "D"\n'
-        '[[slice]]\nindex = 2\ntitle = "Scheibe 2"\ndone_when = "D"\n'
-    )
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "cut",
-            str(CUT_CONTAINER),
-            "--row",
-            "2",
-            "--json",
-        ]
-    )
-
-    assert exit_code == 0
-    assert [created[1] for created in client.created_children] == ["Scheibe 2"]
-    child = client.next_created_child_number - 1
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "cut",
-        "container": CUT_CONTAINER,
-        "row": 2,
-        "child": child,
-    }
-    remaining = body.locate_block(client.item_bodies[CUT_CONTAINER]).data
-    assert remaining["slice"] == [{"index": 1, "title": "Scheibe 1", "done_when": "D"}]
-
-
-def test_cut_creates_an_untied_child_when_slice_is_explicitly_empty(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = f"{MINIMAL_BLOCK_TOML}slice = []\n"
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "Untied"]
-    )
-
-    assert exit_code == 0
-    assert client.item_bodies == {}
-
-
-@pytest.mark.parametrize(
-    "toml_text",
-    [
-        pytest.param(MINIMAL_BLOCK_TOML, id="no_slice_key"),
-        pytest.param(f"{MINIMAL_BLOCK_TOML}slice = []\n", id="empty_slice_table"),
-    ],
-)
-def test_cut_without_a_linked_row_refuses_an_omitted_title_before_any_write(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    toml_text: str,
-) -> None:
-    """Issue #604 line 3: with no row to take a title from, `--title` is
-    required, and its absence refuses by name before anything is written."""
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-    command = ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER)]
-
-    exit_code = issue_claim.main(command)
-
-    assert (exit_code, capsys.readouterr().err) == (
-        2,
-        f"ERROR: #{CUT_CONTAINER} has no slice row; pass --title\n",
-    )
-    assert (client.created_children, client.item_bodies) == ([], {})
-
-
 def test_cut_without_a_title_searches_twins_by_the_linked_rows_title(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Issue #604 line 2 with CUT-29: an omitted `--title` takes the linked
     row's title, and the twin search compares that title."""
-    container = _cut_container_issue(_cuttable_row_toml("Import the ledger"))
+    container = container_issue(CUT_CONTAINER, _cuttable_row_toml("Import the ledger"))
     look_alike = board_issue(951, "Import ledger", complete_contract("Ship it."))
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container, look_alike))
     _write_block_pin(tmp_path)
@@ -4832,153 +4551,18 @@ def test_cut_without_a_title_searches_twins_by_the_linked_rows_title(
     assert client.created_children == []
 
 
-def test_cut_refuses_a_row_with_no_slice_table(
+def test_the_container_a_cut_empties_of_rows_still_passes_body_check(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = _cut_container_issue(MINIMAL_BLOCK_TOML)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
+    """Spec: BODY-49, BODY-67, E-BODY-08.
 
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "cut",
-            str(CUT_CONTAINER),
-            "--title",
-            "X",
-            "--row",
-            "1",
-        ]
-    )
-
-    assert exit_code == 2
-    assert (
-        f"ERROR: #{CUT_CONTAINER} has no slice table; --row needs one to select a row from"
-        in capsys.readouterr().err
-    )
-    assert client.created_children == []
-
-
-@pytest.mark.parametrize(
-    ("toml_text", "cuttable_indices"),
-    [
-        pytest.param(_cuttable_row_toml("Scheibe 1"), "1", id="missing_row"),
-        pytest.param(f"{MINIMAL_BLOCK_TOML}slice = []\n", "none", id="empty_slice_table"),
-    ],
-)
-def test_cut_refuses_a_row_with_no_cuttable_row(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    toml_text: str,
-    cuttable_indices: str,
-) -> None:
-    """CUT-09 distinguishes a missing row in an existing slice table from
-    CUT-08's missing table, even when no rows remain cuttable."""
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "cut",
-            str(CUT_CONTAINER),
-            "--row",
-            "9",
-        ]
-    )
-
-    assert exit_code == 2
-    assert capsys.readouterr().err == (
-        f"ERROR: #{CUT_CONTAINER} has no row 9; cuttable rows: {cuttable_indices}\n"
-    )
-    assert client.created_children == []
-
-
-def test_cut_refuses_a_title_mismatch_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    toml_text = _cuttable_row_toml("Scheibe 1")
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "Wrong title"]
-    )
-
-    assert exit_code == 2
-    assert (
-        f"ERROR: #{CUT_CONTAINER}'s slice 1 is titled 'Scheibe 1'; --title must match it exactly"
-        in capsys.readouterr().err
-    )
-    assert client.created_children == []
-    assert client.item_bodies == {}
-
-
-@pytest.mark.parametrize(
-    ("toml_text", "title_arguments", "row_clause", "written_bodies"),
-    [
-        pytest.param(
-            f'{MINIMAL_BLOCK_TOML}[[slice]]\nindex = 1\ntitle = "Scheibe 1"\n',
-            [],
-            " row 1",
-            [CUT_CONTAINER],
-            id="row_without_done_when",
-        ),
-        pytest.param(MINIMAL_BLOCK_TOML, ["--title", "Untied"], "", [], id="no_linked_row"),
-    ],
-)
-def test_cut_leaves_the_childs_done_when_empty_without_a_row_done_when(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    toml_text: str,
-    title_arguments: list[str],
-    row_clause: str,
-    written_bodies: list[int],
-) -> None:
-    """CUT-25 and CUT-37 (issue #606 lines 2 and 3): a linked row carrying
-    no `done_when`, or no linked row at all, still cuts -- never a refusal
-    -- and the written child's block fills `now` and the fixed `next`
-    while its `done_when` stays empty; an untied cut writes no container
-    body, since no row is removed."""
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), *title_arguments]
-    )
-
-    child = client.next_created_child_number - 1
-    captured = capsys.readouterr()
-    assert (exit_code, captured.out, captured.err) == (
-        0,
-        f"CUT #{CUT_CONTAINER}{row_clause} -> #{child}\n",
-        "",
-    )
-    assert list(client.item_bodies) == written_bodies
-    [(_parent, _title, child_body, _kind)] = client.created_children
-    assert body.parse_body(child_body).contract == body.Contract(
-        f"Cut from #{CUT_CONTAINER}", "Build this slice; claim it with aco start.", ""
-    )
-
-
-def test_cut_fills_the_childs_block_and_keeps_an_emptied_container_body_ok(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """CUT-25 and BODY-67 (issue #606, #310 finding 350): the fresh child's
-    block says where it was cut from, carries the fixed `next`, and takes
-    the row's own `done_when`; the container whose last row was cut, with a
-    ruled `[[expectation]]` beside it, still passes `aco body --check`."""
-    container = _cut_container_issue(
+    The emptied container with a ruled expectation still passes body --check.
+    """
+    container = container_issue(
+        CUT_CONTAINER,
         f"{MINIMAL_BLOCK_TOML}"
         '[[expectation]]\ntext = "A line"\nruling = "yes"\nruled_on = 2026-10-02\n'
-        '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "Scheibe 1 is merged."\n'
+        '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "Scheibe 1 is merged."\n',
     )
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
     _write_block_pin(tmp_path)
@@ -4986,12 +4570,6 @@ def test_cut_fills_the_childs_block_and_keeps_an_emptied_container_body_ok(
     exit_code = issue_claim.main(["--repo", REPOSITORY, "cut", str(CUT_CONTAINER)])
 
     assert exit_code == 0
-    [(_parent, _title, child_body, _kind)] = client.created_children
-    assert body.parse_body(child_body).contract == body.Contract(
-        f"Cut from #{CUT_CONTAINER}",
-        "Build this slice; claim it with aco start.",
-        "Scheibe 1 is merged.",
-    )
     capsys.readouterr()
     assert (
         run_cli(
@@ -5001,117 +4579,11 @@ def test_cut_fills_the_childs_block_and_keeps_an_emptied_container_body_ok(
     )
 
 
-def test_cut_refuses_a_blockless_container_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    container = board.Issue(
-        CUT_CONTAINER,
-        "Epic",
-        (),
-        "## Now\nOld prose.\n",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "X"])
-
-    assert exit_code == 2
-    assert "body malformed: aco: no aco block" in capsys.readouterr().err
-    assert client.created_children == []
-
-
-@pytest.mark.parametrize(
-    "toml_text,cut_arguments,defect",
-    [
-        pytest.param(
-            'version = 2\nnow = "N"\nnext = "X"\ndone_when = "D"\n',
-            ["--title", "X"],
-            "version: version must be exactly 1",
-            id="malformed-version",
-        ),
-        *(
-            pytest.param(
-                f"{MINIMAL_BLOCK_TOML}"
-                '[[slice]]\nindex = 1\ntitle = "Clean"\ndone_when = "D"\n'
-                f'[[slice]]\nindex = 2\ntitle = "Dirty"\ndone_when = "one{escape}two"\n',
-                ["--row", "2"],
-                f"slice[1].done_when: slice[1].done_when of row 2 holds {codepoint}; "
-                "a slice done_when stays on one line",
-                id=f"selected-row-done-when-{codepoint}",
-            )
-            for escape, codepoint in (("\\u000B", "U+000B"), ("\\u001B", "U+001B"))
-        ),
-    ],
-)
-def test_cut_refuses_a_malformed_container_before_any_write(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    toml_text: str,
-    cut_arguments: list[str],
-    defect: str,
-) -> None:
-    """CUT-05 and CUT-39 (issue #606 line 3): a malformed block, or a
-    selected row whose `done_when` breaks BODY-66, refuses in CUT-05's form
-    with `body --check`'s sentence, and nothing is written."""
-    container = _cut_container_issue(toml_text)
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), *cut_arguments])
-
-    captured = capsys.readouterr()
-    assert (exit_code, captured.err) == (
-        2,
-        f"ERROR: #{CUT_CONTAINER} body malformed: {defect}; cut needs a valid aco block\n",
-    )
-    assert (client.created_children, client.item_bodies) == ([], {})
-
-
-@pytest.mark.parametrize(
-    "other_row",
-    [
-        pytest.param('title = "Bad\\u000Btitle"\n', id="title"),
-        pytest.param('title = "Other"\ndone_when = "a\\u001B[2Jb"\n', id="done-when"),
-    ],
-)
-def test_cut_takes_a_clean_row_while_another_row_holds_a_display_control(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    other_row: str,
-) -> None:
-    """CUT-39 (issue #606 line 3): `cut` checks only the row it selects, so
-    the first row `next` advises still cuts while a later row's `title` or
-    `done_when` holds a display control, and that row stays in the block."""
-    container = _cut_container_issue(
-        f"{MINIMAL_BLOCK_TOML}"
-        '[[slice]]\nindex = 1\ntitle = "Good row"\ndone_when = "Clean."\n'
-        f"[[slice]]\nindex = 2\n{other_row}"
-    )
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
-
-    exit_code = issue_claim.main(["--repo", REPOSITORY, "cut", str(CUT_CONTAINER)])
-
-    captured = capsys.readouterr()
-    assert (exit_code, captured.err) == (0, "")
-    [(_parent, title, child_body, _kind)] = client.created_children
-    assert (title, body.parse_body(child_body).contract.done_when) == ("Good row", "Clean.")
-    remaining = body.parse_body(client.item_bodies[CUT_CONTAINER]).slices
-    assert [row.index for row in remaining] == [2]
-
-
 def test_cut_names_the_created_child_when_linking_fails(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     toml_text = _cuttable_row_toml("Scheibe 1")
-    container = _cut_container_issue(toml_text)
+    container = container_issue(CUT_CONTAINER, toml_text)
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
     _write_block_pin(tmp_path)
     client.fail_update_item_body = True
@@ -5447,7 +4919,7 @@ def test_cut_searches_open_and_recently_closed_titles_for_a_twin_before_creating
         board_issue(number, other, complete_contract("Ship it."))
         for number, other in open_titles.items()
     )
-    container = _cut_container_issue(MINIMAL_BLOCK_TOML)
+    container = container_issue(CUT_CONTAINER, MINIMAL_BLOCK_TOML)
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container, *look_alikes))
     client.recently_closed_issues = tuple(
         forge.ClosedIssue(number, other) for number, other in closed_titles.items()
@@ -5636,7 +5108,7 @@ def test_next_prints_a_cut_command_bash_runs_as_printed_and_cut_accepts(
         'version = 1\nnow = "N"\nnext = "nichts"\ndone_when = "D"\n'
         f'[[slice]]\nindex = 1\ntitle = {json.dumps(slice_title)}\ndone_when = "D"\n'
     )
-    container = _cut_container_issue(toml_text)
+    container = container_issue(CUT_CONTAINER, toml_text)
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
     _write_block_pin(tmp_path)
 
@@ -5669,7 +5141,7 @@ def test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line(
         f'version = 1\nnow = "N"\nnext = "{_DIFFERING_NEXT_LINE}"\ndone_when = "D"\n'
         '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "D"\n'
     )
-    container = _cut_container_issue(toml_text)
+    container = container_issue(CUT_CONTAINER, toml_text)
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
     _write_block_pin(tmp_path)
 
@@ -19594,7 +19066,7 @@ def _item_new_github_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     issue it creates joins the open issues a later run reads."""
     look_alike = board_issue(951, "Ship it now", complete_contract("Ship it."))
     client = _configured_board_client(monkeypatch, tmp_path)
-    client.board_issues = (_cut_container_issue(MINIMAL_BLOCK_TOML), look_alike)
+    client.board_issues = (container_issue(CUT_CONTAINER, MINIMAL_BLOCK_TOML), look_alike)
     monkeypatch.setattr(client, "list_open_board_issues", lambda: client.board_issues)
     return client
 
@@ -20857,7 +20329,9 @@ def _cut_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun
         '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "D"\n'
         '[[slice]]\nindex = 2\ntitle = "Scheibe 2"\ndone_when = "D"\n'
     )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(_cut_container_issue(toml_text),))
+    _configured_board_client(
+        monkeypatch, tmp_path, open_issues=(container_issue(CUT_CONTAINER, toml_text),)
+    )
     _write_block_pin(tmp_path)
     argv = ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "Scheibe 1"]
     return _read_once(argv, toplevel=tmp_path, observes=False)

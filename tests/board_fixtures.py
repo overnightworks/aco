@@ -1,5 +1,5 @@
 """Board and claim scenarios for test_board, test_body_cli, test_checkout,
-test_cli, test_github, test_items, test_protect, test_protocol, test_rulings,
+test_cli, test_cut, test_github, test_items, test_protect, test_protocol, test_rulings,
 test_session, test_state_board, cli_fixtures, and github_fixtures.
 
 Consumers import this module directly: pytest's rootless collection puts
@@ -239,6 +239,20 @@ def block_body(
     `before` above it and `after` below its closing line -- ordinary prose
     on both sides by default (issue #150 §4)."""
     return f"{before}{fence}{BLOCK_FENCE_INFO}\n{toml_text}\n{fence}\n{after}"
+
+
+def container_issue(number: int, toml_text: str) -> board.Issue:
+    return board.Issue(
+        number,
+        "Epic",
+        (),
+        block_body(toml_text),
+        "2026-08-20T00:00:00Z",
+        "2026-08-20T00:00:00Z",
+        kind=ItemKind.CONTAINER,
+        children_closed=0,
+        children_total=0,
+    )
 
 
 def write_repository_config(
