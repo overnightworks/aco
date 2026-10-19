@@ -1,0 +1,7 @@
+claim_id = "9ce8fe2c24134417a1341fc23419c92f"
+agent = "claude"
+role = "builder"
+base = "11cd1a5923e27e68cf89284831b8f25862a0fce0"
+branch = "fix/forge-merge-maintenance"
+scope = ["tests/github_fixtures.py"]
+opened_commit = "a41f80e6d46ebb656d9d0bdfa7070cc6c1cad0b1"
