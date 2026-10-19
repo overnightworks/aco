@@ -1,0 +1,7 @@
+claim_id = "476b432021654d8399bf8178a82eee3c"
+agent = "claude"
+role = "builder"
+base = "6f86fe24400afc7edba887fb5f212eb779da2b3a"
+branch = "claude/issue-261-k1c-check-pr-parents"
+scope = ["scripts/test_inventory_dropped.txt", "tests/test_check_pull_request.py", "tests/test_cli.py"]
+opened_commit = "86e2ee0105fa4076086682bd23dbf4114b8042d1"
