@@ -1,7 +1,0 @@
-claim_id = "692847d46e3f44379a9e33e99481ac82"
-agent = "claude"
-role = "builder"
-base = "4746a838127ef20342955e33657a4a5ba2b41df5"
-branch = "claude/issue-251-c2-cut-second-half"
-scope = ["scripts/test_inventory_dropped.txt", "tests/test_cli.py", "tests/test_cut.py"]
-opened_commit = "58fd827d18ac2d66d5f4a32d9453b8760568f893"
