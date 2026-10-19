@@ -1,7 +1,0 @@
-claim_id = "cb9b7444460e44c0a89791fab666fa95"
-agent = "claude"
-role = "builder"
-base = "538913fdb8ec4f940f5149663902bd96f325c358"
-branch = "claude/issue-256-k1a-check-pr-classification"
-scope = ["scripts/test_inventory_dropped.txt", "tests/test_check_pull_request.py", "tests/test_cli.py"]
-opened_commit = "e520e70949bbc3c58f29c340eb99f541c4ece921"
