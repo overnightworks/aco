@@ -20,7 +20,7 @@ from github_fixtures import (
 )
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
-from agent_coordination import forge, protocol
+from agent_coordination import board, body, forge, protocol
 
 ITEM_CLAIM = claim_intent(identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH)
 LANE_BRANCH = "docs/tidy-readme"
@@ -58,13 +58,31 @@ class PullRequestCase:
 
 
 @dataclass(frozen=True)
+class WriteTrace:
+    clone_refs: tuple[str, ...]
+    remote_refs: str
+    created_children: tuple[tuple[int, str, str, body.ItemKind], ...]
+    created_issues: tuple[tuple[str, str, body.ItemKind], ...]
+    linked_children: tuple[tuple[int, int], ...]
+    item_bodies: dict[int, str]
+    body_writes: tuple[tuple[int, str], ...]
+    retyped_items: tuple[tuple[int, body.ItemKind], ...]
+    merge_requests: tuple[tuple[str, board.MergeMethod], ...]
+    merge_calls: tuple[tuple[int, str, board.MergeMethod, str, str], ...]
+    deleted_branches: tuple[str, ...]
+    landing_comments: dict[int, str]
+    closed_issues: frozenset[int]
+    landings: dict[int, forge.Landing]
+
+
+@dataclass(frozen=True)
 class PullRequestObservation:
     exit: int | str | None
     stdout: str
     stderr: str
     forge_requests: int
     changes_reads: tuple[int, ...]
-    written: tuple[object, ...]
+    written: WriteTrace
 
 
 def declares(
@@ -116,28 +134,28 @@ def rendered(rows: dict[str, PullRequestCase]) -> list[object]:
     ]
 
 
-def written_by(forge_world: FakeForge, clone: Path, remote: Path) -> tuple[object, ...]:
-    return (
-        tuple(
+def written_by(forge_world: FakeForge, clone: Path, remote: Path) -> WriteTrace:
+    return WriteTrace(
+        clone_refs=tuple(
             record
             for record in real_git(
                 clone, "for-each-ref", "--format=%(refname) %(objectname)"
             ).stdout.splitlines()
             if record.split(" ", 1)[0] != "refs/worktree/aco/state"
         ),
-        real_git(remote, "for-each-ref").stdout,
-        tuple(forge_world.created_children),
-        tuple(forge_world.created_issues),
-        tuple(forge_world.linked_children),
-        dict(forge_world.item_bodies),
-        tuple(forge_world.body_writes),
-        tuple(forge_world.retyped_items),
-        tuple(forge_world.merge_requests),
-        tuple(forge_world.merge_calls),
-        tuple(forge_world.deleted_branches),
-        dict(forge_world.landing_comments),
-        frozenset(forge_world.closed_issues),
-        dict(forge_world.landings),
+        remote_refs=real_git(remote, "for-each-ref").stdout,
+        created_children=tuple(forge_world.created_children),
+        created_issues=tuple(forge_world.created_issues),
+        linked_children=tuple(forge_world.linked_children),
+        item_bodies=dict(forge_world.item_bodies),
+        body_writes=tuple(forge_world.body_writes),
+        retyped_items=tuple(forge_world.retyped_items),
+        merge_requests=tuple(forge_world.merge_requests),
+        merge_calls=tuple(forge_world.merge_calls),
+        deleted_branches=tuple(forge_world.deleted_branches),
+        landing_comments=dict(forge_world.landing_comments),
+        closed_issues=frozenset(forge_world.closed_issues),
+        landings=dict(forge_world.landings),
     )
 
 
@@ -155,7 +173,10 @@ def check_pull_request(
     assert_github_world(github_clone, bare_remote)
 
     def check(case: PullRequestCase, flags: list[str]) -> None:
-        publish_claims_from_a_second_clone(github_clone, bare_remote, case.world.claims)
+        seeded = publish_claims_from_a_second_clone(github_clone, bare_remote, case.world.claims)
+        assert tuple((claim.identity, claim.branch) for claim in seeded.claims.values()) == tuple(
+            (claim.identity, claim.branch) for claim in case.world.claims
+        )
         forge_world = serve_forge(
             monkeypatch,
             FakeForge(
@@ -202,6 +223,8 @@ OTHER_ITEM_BRANCH = claim_intent(identity=protocol.IssueIdentity(72), branch="co
 OTHER_LANE_BRANCH = claim_intent(identity=protocol.LaneIdentity(), branch="docs/another-lane")
 ITEM_CLAIM_ON_LANE_BRANCH = claim_intent(identity=protocol.IssueIdentity(72), branch=LANE_BRANCH)
 
+# Requests read the dispatch reference and landing, then the default branch;
+# accepted work items also read the sub-issue relation.
 DECLARATIONS = {
     "qualified-work-item": declares(
         f"Work-Item: {WORK_ITEM}\n\nCloses #72", f"Work-Item: {WORK_ITEM}", 4
