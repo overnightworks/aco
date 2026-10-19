@@ -375,6 +375,7 @@ def scope_directories(
 _DIRECTORY_ENTRY_KINDS = frozenset({"tree", "commit"})
 
 
+_GIT_OBJECT_ID_PATTERN = re.compile(rb"[0-9a-fA-F]{40}")
 _TREE_ENTRY_LINE = re.compile(r"\d+ (?P<kind>\w+) [0-9a-f]+\t.+")
 
 
@@ -591,9 +592,9 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     environment sets `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_OBJECT_DIRECTORY`
     (each changes what git recognizes in either direction: a repository no
     `.git` marker shows may exist, or git may fail on a real one; the cost
-    is a refused write on a genuine outside path only while one is set): once git has
-    named the checkout, a failed read of its branch or commit raises, inside
-    a git directory as PROT-43's sentence.
+    is a refused write on a genuine outside path only while one is set).
+    Once git has named the checkout, a failed read of its branch or commit
+    raises, inside a git directory as PROT-43's sentence.
     """
     try:
         discovered = _discover_checkout(directory)
@@ -733,55 +734,72 @@ def _is_repository_marker(dot_git: Path, *, discovery_start: Path) -> bool:
     return dot_git.is_file() or _is_git_directory(dot_git, discovery_start=discovery_start)
 
 
-def _is_git_directory(candidate: Path, *, discovery_start: Path) -> bool:
-    """Whether git 2.43 takes `candidate` for a git directory (setup.c
-    `is_git_directory`): a `HEAD` (`_has_git_head`) beside `refs/` and an
-    object directory, both read from the common directory -- the one a
-    `commondir` file names, relative to `candidate`, or `GIT_COMMON_DIR` --
-    with `GIT_OBJECT_DIRECTORY` replacing `objects/`. A relative environment
-    value is relative to `discovery_start`, where `git -C` runs, not to this
-    process's cwd; an empty one makes git reject the directory."""
-    if not _has_git_head(candidate):
+def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
+    """git 2.43's own recognition (setup.c `is_git_directory`), ported
+    literally: `HEAD` must pass `_validate_headref`; the common directory
+    (`_common_directory`) must hold `refs` searchable and either `objects` or,
+    when `GIT_OBJECT_DIRECTORY` is set (empty included), that directory. A
+    relative environment value is relative to `discovery_start`, where
+    `git -C` runs, not to this process's cwd. Where git dies reading the
+    common directory, its discovery fails; that reads as a git directory, so
+    protect refuses rather than allows."""
+    if not _validate_headref(suspect / "HEAD"):
         return False
-    common_directory = _environment_directory(
-        "GIT_COMMON_DIR", _common_directory_file_target(candidate), discovery_start
-    )
+    common_directory = _common_directory(suspect)
     if common_directory is None:
+        return True
+    object_directory = os.environ.get("GIT_OBJECT_DIRECTORY", f"{common_directory}/objects")
+    return _is_searchable(object_directory, discovery_start) and _is_searchable(
+        f"{common_directory}/refs", discovery_start
+    )
+
+
+def _is_searchable(path: str, discovery_start: Path) -> bool:
+    """C `access(path, X_OK)` from `discovery_start`: an empty path never is."""
+    return bool(path) and os.access(os.path.join(discovery_start, path), os.X_OK)
+
+
+def _common_directory(suspect: str | Path) -> str | None:
+    """setup.c `get_common_dir` / `get_common_dir_noenv`: `GIT_COMMON_DIR`
+    verbatim when set (empty included); else the real path of what a
+    `commondir` file in `suspect` names, relative to `suspect` unless
+    absolute, trailing line breaks only stripped; else `suspect`. `None`
+    where git dies: an empty or unreadable `commondir` file, or a path whose
+    parent directory does not exist."""
+    environment_value = os.environ.get("GIT_COMMON_DIR")
+    if environment_value is not None:
+        return environment_value
+    commondir_file = Path(suspect, "commondir")
+    if not os.path.lexists(commondir_file):
+        return str(suspect)
+    try:
+        content = commondir_file.read_bytes()
+    except OSError:
+        return None
+    if not content:
+        return None
+    named = os.path.join(suspect, os.fsdecode(content.rstrip(b"\r\n")))
+    resolved = os.path.realpath(named)
+    return resolved if os.path.isdir(os.path.dirname(resolved)) else None
+
+
+def _validate_headref(head: Path) -> bool:
+    """path.c `validate_headref`: a symlink passes when it names `refs/...`
+    (a dangling one too); a file passes when its first 255 bytes are `ref:`
+    and `refs/...` after optional whitespace, or begin with an object id
+    (`get_oid_hex_any`: 40 hex digits for SHA-1, 64 for SHA-256, so any
+    64-digit id begins with a 40-digit one)."""
+    if head.is_symlink():
+        return os.fsencode(os.readlink(head)).startswith(b"refs/")
+    try:
+        with head.open("rb") as stream:
+            content = stream.read(255)
+    except OSError:
         return False
-    object_directory = _environment_directory(
-        "GIT_OBJECT_DIRECTORY", common_directory / "objects", discovery_start
+    names_ref = content.startswith(b"ref:") and content[len(b"ref:") :].lstrip().startswith(
+        b"refs/"
     )
-    return (
-        object_directory is not None
-        and object_directory.is_dir()
-        and (common_directory / "refs").is_dir()
-    )
-
-
-def _has_git_head(candidate: Path) -> bool:
-    """git's `validate_headref`: `HEAD` is a readable file, or a symlink
-    naming a ref under `refs/` -- an unborn branch's dangling link too."""
-    head = candidate / "HEAD"
-    return head.is_file() or (head.is_symlink() and os.readlink(head).startswith("refs/"))
-
-
-def _common_directory_file_target(candidate: Path) -> Path:
-    """The common directory a `commondir` file in `candidate` names, else
-    `candidate` itself."""
-    commondir_file = candidate / "commondir"
-    if not commondir_file.is_file():
-        return candidate
-    return candidate / commondir_file.read_text().strip()
-
-
-def _environment_directory(name: str, default: Path, discovery_start: Path) -> Path | None:
-    """The directory environment variable `name` names, resolved against
-    `discovery_start`; `default` when unset; `None` when empty, which git
-    never accepts as a directory."""
-    value = os.environ.get(name)
-    if value is None:
-        return default
-    return discovery_start / value if value else None
+    return names_ref or _GIT_OBJECT_ID_PATTERN.match(content) is not None
 
 
 def _resolve_checkout(directory: Path) -> PathCheckout:
