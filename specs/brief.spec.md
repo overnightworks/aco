@@ -25,7 +25,8 @@ its own name, a plain non-symbolic ref (exit `0`): a failed read of it -- any
 other nonzero exit, a launch failure or a timeout -- refuses instead. Two
 limits are known: an unreadable or destroyed loose ref file can read as absent
 without a reliable git warning, and a resolved ref proves no readable commit
-object. A refusal reaching the shared collection point prints `ERROR: <sentence>` on stderr, exit `2`.
+object. A refusal reaching the shared collection point prints
+`ERROR: <sentence>` on stderr, exit `2`.
 
 ## Behavior table
 

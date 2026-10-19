@@ -8724,8 +8724,6 @@ def test_start_under_state_ref_refuses_a_failed_head_read_and_keeps_the_standing
     branch = "codex/issue-10-claims"
     if lane_stands:
         real_git(repo, "worktree", "add", "-q", "-b", branch, str(lane_worktree), "feature")
-    else:
-        real_git(repo, "branch", branch, "feature")
     if starts_in_lane:
         redirect_toplevel(monkeypatch, lane_worktree)
         monkeypatch.chdir(lane_worktree)
@@ -8742,7 +8740,7 @@ def test_start_under_state_ref_refuses_a_failed_head_read_and_keeps_the_standing
     assert _state_ref_tip(repo, remote) == tip_before
     assert fresh_observation(repo, remote).state.claims
     assert lane_worktree.is_dir() is lane_stands
-    assert real_git(repo, "branch", "--list", branch).stdout.strip()
+    assert bool(real_git(repo, "branch", "--list", branch).stdout.strip()) is lane_stands
 
 
 def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose_claim_is_gone(

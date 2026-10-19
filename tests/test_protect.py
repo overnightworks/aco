@@ -24,11 +24,13 @@ from board_fixtures import (
     write_repository_config,
 )
 from cli_fixtures import (
+    GIT_FAILURE_INJECTIONS,
     RECORDED_ORIGIN_HEAD_READ,
     forbid_forge_resolution,
     forbid_github_construction,
     forbid_protect_git_github_and_identity,
     init_bare_repository,
+    inject_exit_128,
     patch_command,
     push_repository_trunk,
     real_git,
@@ -3582,14 +3584,12 @@ def test_protect_and_rescope_refuse_with_gits_text_when_a_checkout_read_fails(
     assert refusal_of(monkeypatch, capsys, path) == (2, "fatal: broken")
 
 
-@pytest.mark.usefixtures("isolated_global_git_config")
-def test_protect_refuses_a_failed_commit_read_in_a_checkout_selected_by_the_environment(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """PROT-17: `GIT_DIR` and `GIT_WORK_TREE` select a checkout no `.git`
-    marker sits above. Once git has named it, a failed read of its commit
-    refuses with git's own text -- never reads as a path outside every
-    repository, which PROT-32 allows unjudged."""
+def _environment_selected_repository(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path]:
+    """A repository with a commit that only `GIT_DIR` and `GIT_WORK_TREE`
+    select: no `.git` marker sits above the returned work tree. Returns
+    `(git_directory, work_tree)`."""
     repository = tmp_path / "repo"
     repository.mkdir()
     real_git(repository, "init", "-q", "-b", "main")
@@ -3610,17 +3610,62 @@ def test_protect_refuses_a_failed_commit_read_in_a_checkout_selected_by_the_envi
     monkeypatch.setenv("GIT_DIR", str(repository / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(work_tree))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    injected = stub_one_git_call(
-        monkeypatch,
-        ["rev-parse", "--verify", "--quiet", "HEAD"],
-        exit_status=128,
-        stderr="fatal: broken",
-    )
+    return repository / ".git", work_tree
+
+
+@pytest.mark.usefixtures("isolated_global_git_config")
+@pytest.mark.parametrize(
+    "failing_read",
+    [
+        pytest.param(
+            [
+                "rev-parse",
+                "--path-format=absolute",
+                "--show-toplevel",
+                "--git-dir",
+                "--git-common-dir",
+            ],
+            id="discovery",
+        ),
+        pytest.param(["rev-parse", "--verify", "--quiet", "HEAD"], id="commit"),
+    ],
+)
+@pytest.mark.parametrize(("inject", "detail"), GIT_FAILURE_INJECTIONS)
+def test_protect_refuses_a_failed_read_in_a_checkout_selected_by_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    failing_read: list[str],
+    inject: Callable[[pytest.MonkeyPatch, list[str]], list[list[str]]],
+    detail: str,
+) -> None:
+    """PROT-17: `GIT_DIR` and `GIT_WORK_TREE` select a checkout no `.git`
+    marker sits above. A failed read of its discovery or its commit refuses
+    with git's own text -- never reads as a path outside every repository,
+    which PROT-32 allows unjudged."""
+    _, work_tree = _environment_selected_repository(monkeypatch, tmp_path)
+    injected = inject(monkeypatch, failing_read)
 
     outcome = _protect_refusal(monkeypatch, capsys, work_tree / "widget.py")
 
     assert injected
-    assert outcome == (2, "fatal: broken")
+    assert outcome == (2, detail)
+
+
+@pytest.mark.usefixtures("isolated_global_git_config")
+def test_protect_names_a_git_directory_when_a_branch_read_fails_in_an_environment_selected_checkout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """PROT-43: a path inside the git directory denies with `not a checkout:
+    ...`, never git's own error text, even when the read after discovery
+    fails."""
+    git_directory, _ = _environment_selected_repository(monkeypatch, tmp_path)
+    injected = inject_exit_128(monkeypatch, ["branch", "--show-current"])
+
+    outcome = _protect_refusal(monkeypatch, capsys, git_directory / "objects" / "widget")
+
+    assert injected
+    assert outcome == (2, f"not a checkout: {git_directory.resolve()} is a git directory")
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")

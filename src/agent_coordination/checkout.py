@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
+from typing import NamedTuple
 
 from . import board, body, process, protocol
 from .protocol import (
@@ -520,6 +521,7 @@ class PathCheckout:
 NO_COMMIT_CHECKOUT_REASON = "no commit on this branch"
 NOT_IN_A_REPOSITORY_REASON = "not in a repository"
 RELATIVE_PAYLOAD_PATH_DENIAL = "relative payload path"
+REPOSITORY_SELECTING_GIT_VARIABLES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR")
 
 
 def checkout_relative(path: Path, *, toplevel: Path) -> PurePosixPath | None:
@@ -572,10 +574,11 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     localized text (issue #483). A `directory` that does not exist yet is
     never inside a repository -- `git -C` cannot even enter it -- so it
     stays `None` whatever sits above it, even an outer checkout's `.git`.
-    Only that first discovery may read as "outside": once git has named the
-    checkout, a failed read of its branch or commit raises whatever
-    repository markers the filesystem shows (`GIT_DIR` and `GIT_WORK_TREE`
-    can select a checkout no `.git` marker sits above).
+    Only that first discovery may read as "outside", and never while the
+    environment selects a repository (`GIT_DIR`, `GIT_WORK_TREE`,
+    `GIT_COMMON_DIR`: a checkout no `.git` marker sits above): once git has
+    named the checkout, a failed read of its branch or commit raises, inside
+    a git directory as PROT-43's sentence.
     """
     try:
         discovered = _discover_checkout(directory)
@@ -583,18 +586,38 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
         if directory.is_dir():
             _refuse_a_failure_inside_a_repository(directory, error)
         return None
-    return _read_checkout(directory, discovered)
+    try:
+        return _read_checkout(directory, discovered)
+    except ClaimError as error:
+        _refuse_a_failure_inside_a_git_directory(directory, error)
+        raise
 
 
 def _refuse_a_failure_inside_a_repository(directory: Path, error: ClaimError) -> None:
     """Raises `error` -- or, inside a git directory itself, its own sentence
-    -- when `directory` sits inside a repository, so the git failure on it
-    can never read as "outside every repository"."""
+    -- when `directory` sits inside a repository or the environment selects
+    one, so the git failure on it can never read as "outside every
+    repository"."""
+    _refuse_a_failure_inside_a_git_directory(directory, error)
+    if _has_repository_marker_above(directory) or _environment_selects_a_repository():
+        raise error
+
+
+def _refuse_a_failure_inside_a_git_directory(directory: Path, error: ClaimError) -> None:
+    """Raises PROT-43's sentence when `directory` sits inside a git directory
+    itself; returns otherwise."""
     git_directory = _enclosing_git_directory(directory)
     if git_directory is not None:
         raise ClaimError(inside_git_directory_reason(git_directory)) from error
-    if _has_repository_marker_above(directory):
-        raise error
+
+
+def _environment_selects_a_repository() -> bool:
+    """Whether the inherited environment names the repository git works in,
+    so no filesystem marker is needed for one to exist: `GIT_DIR`,
+    `GIT_WORK_TREE` and `GIT_COMMON_DIR` are the variables of git's own
+    `rev-parse --local-env-vars` list that choose a repository or its
+    worktree (the rest locate objects, the index or replacements inside one)."""
+    return any(name in os.environ for name in REPOSITORY_SELECTING_GIT_VARIABLES)
 
 
 def inside_git_directory_reason(git_directory: Path) -> str:
@@ -713,7 +736,13 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
     return _read_checkout(directory, _discover_checkout(directory))
 
 
-def _discover_checkout(directory: Path) -> tuple[str, str, str]:
+class _DiscoveredCheckout(NamedTuple):
+    toplevel: str
+    git_directory: str
+    common_directory: str
+
+
+def _discover_checkout(directory: Path) -> _DiscoveredCheckout:
     """The toplevel, git directory and common directory git names for
     `directory`: the one read a failure of which may mean "no repository"."""
     combined = git_output(
@@ -730,10 +759,12 @@ def _discover_checkout(directory: Path) -> tuple[str, str, str]:
         toplevel, git_directory, common_directory = combined.splitlines()
     except ValueError as error:
         raise ClaimError(f"git returned a malformed checkout description: {combined!r}") from error
-    return toplevel, git_directory, common_directory
+    return _DiscoveredCheckout(toplevel, git_directory, common_directory)
 
 
-def _read_checkout(directory: Path, discovered: tuple[str, str, str]) -> PathCheckout:
+def _read_checkout(directory: Path, discovered: _DiscoveredCheckout) -> PathCheckout:
+    """What git says of the already discovered checkout: its branch, kind and
+    whether the branch has a commit. Every failure propagates."""
     toplevel, git_directory, common_directory = discovered
     branch = current_branch(directory=directory)
     kind = CheckoutKind.MAIN if git_directory == common_directory else CheckoutKind.LINKED_WORKTREE
