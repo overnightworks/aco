@@ -60,7 +60,8 @@ from agent_coordination.sed_script import sed_script_write_targets
         (("1,$!w x",), (("x", 0),)),
         (("\\\\a\\w x",), (("x", 0),)),
         (("s\\a\\b\\w x",), (("x", 0),)),
-        # a + or ~ first address takes no number or a zero one
+        # a + or ~ first address consumes its digits: GNU rejects most numbers but
+        # accepts a multiple of 2^64, which it wraps to zero
         (("+w x",), (("x", 0),)),
         (("~w x",), (("x", 0),)),
         (("+0w x",), (("x", 0),)),
@@ -69,9 +70,13 @@ from agent_coordination.sed_script import sed_script_write_targets
         (("+ w x",), (("x", 0),)),
         (("+0,3w x",), (("x", 0),)),
         (("+p;w x",), (("x", 0),)),
-        (("+1w x",), ()),
-        (("~2w x",), ()),
-        (("+ 2w x",), ()),
+        (("+18446744073709551616w x",), (("x", 0),)),
+        (("~18446744073709551616w x",), (("x", 0),)),
+        (("+36893488147419103232w x",), (("x", 0),)),
+        (("+18446744073709551616p;w x",), (("x", 0),)),
+        (("+1w x",), (("x", 0),)),  # GNU rejects; sentence 6 false alarm
+        (("~2w x",), (("x", 0),)),  # GNU rejects; sentence 6 false alarm
+        (("+ 2w x",), (("x", 0),)),  # GNU rejects; sentence 6 false alarm
         # blanks around the address flags and the step of first~step
         (("/b/ Iw x",), (("x", 0),)),
         (("/b/ I w x",), (("x", 0),)),

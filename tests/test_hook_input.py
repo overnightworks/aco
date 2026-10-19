@@ -1004,6 +1004,11 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             id="sed-script-write-after-a-plus-first-address",
         ),
         pytest.param(
+            "sed '+18446744073709551616w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-plus-first-address-gnu-wraps-to-zero",
+        ),
+        pytest.param(
             "sed -n -e 'p;\rw x' f",
             ((hook_input.PATTERN_SED_WRITE, "x"),),
             id="sed-script-write-after-a-semicolon-and-a-carriage-return",

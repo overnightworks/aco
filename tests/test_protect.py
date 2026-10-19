@@ -987,6 +987,7 @@ def _bash_scope_case(
         ("sed -n -e 'w src/file' -e 'w docs/file' src/a", 2, "sed w docs/file outside claim scope"),
         ("sed '/a/ Iw docs/f' src/a", 2, "sed w docs/f outside claim scope"),
         ("sed '+w docs/f' src/a", 2, "sed w docs/f outside claim scope"),
+        ("sed '+18446744073709551616w docs/f' src/a", 2, "sed w docs/f outside claim scope"),
         ("sed -n -e 'w docs/file' -f script.sed src/a", 2, "sed w docs/file outside claim scope"),
         ("sed -n -f script.sed -e 'w docs/file' src/a", 0, None),
         ('sed -n -e "w $dir/file" src/a', 0, None),

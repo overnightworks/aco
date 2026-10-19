@@ -195,26 +195,26 @@ class _ScriptReader:
         self._at += len(closer)
 
     def _addresses(self) -> None:
-        if self._address(range_end=False):
+        if self._address():
             self._skip_blanks()
             if self._peek() == ",":
                 self._take()
                 self._skip_blanks()
-                if not self._address(range_end=True):
+                if not self._address():
                     raise _RejectedScriptError
             self._skip_blanks()
         if self._peek() == "!":
             self._take()
             self._skip_blanks()
 
-    def _address(self, *, range_end: bool) -> bool:
+    def _address(self) -> bool:
         char = self._peek()
         if char in _DIGITS:
             self._line_or_step_address()
         elif char == "$":
             self._take()
         elif char in _RELATIVE_ADDRESS_MARKS:
-            self._relative_address(range_end=range_end)
+            self._relative_address()
         elif char in {"/", "\\"}:
             self._regex_address()
         else:
@@ -229,11 +229,10 @@ class _ScriptReader:
             self._skip_blanks()
             self._skip_digits()
 
-    def _relative_address(self, *, range_end: bool) -> None:
+    def _relative_address(self) -> None:
         self._take()
         self._skip_blanks()
-        if self._skip_digits().lstrip("0") and not range_end:
-            raise _RejectedScriptError
+        self._skip_digits()
 
     def _regex_address(self) -> None:
         delimiter = "/" if self._take() == "/" else self._delimiter()
