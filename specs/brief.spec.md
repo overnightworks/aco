@@ -20,12 +20,12 @@ otherwise the first of `<remote>/main` and `<remote>/master` that resolves
 in this checkout, and only while `<remote>` has no remote-tracking branch
 at all -- a fresh or offline repository -- the first of the local `main`
 and the local `master` that resolves. `<remote>/HEAD` recorded none means git
-answered that the ref is absent or dangling (exit `1`): a failed read of it --
-any other exit, a launch failure or a timeout -- refuses instead. Two limits are
-known: an unreadable or destroyed loose ref file can read as absent without a
-reliable git warning, and a resolved ref proves no readable commit object. A
-refusal reaching the shared
-collection point prints `ERROR: <sentence>` on stderr, exit `2`.
+answered that the ref is absent or dangling (exit `1`) or that it resolves to
+its own name, a plain non-symbolic ref (exit `0`): a failed read of it -- any
+other nonzero exit, a launch failure or a timeout -- refuses instead. Two
+limits are known: an unreadable or destroyed loose ref file can read as absent
+without a reliable git warning, and a resolved ref proves no readable commit
+object. A refusal reaching the shared collection point prints `ERROR: <sentence>` on stderr, exit `2`.
 
 ## Behavior table
 
@@ -96,7 +96,7 @@ collection point prints `ERROR: <sentence>` on stderr, exit `2`.
 
 ## Never
 
-- The trunk is never guessed from `<remote>/main` or `<remote>/master` because git failed to read `<remote>/HEAD`: only a remote that records no resolving `HEAD` guesses on; a failed read refuses with git's own detail.
+- The trunk is never guessed from `<remote>/main` or `<remote>/master` because git failed to read `<remote>/HEAD`: only a remote that records no resolving `HEAD` (absent, dangling or a plain non-symbolic ref) guesses on; a failed read refuses with git's own detail.
 - `aco brief` never refuses for an `<item>` naming no item at all: the forge's own `MISSING` reference carries no body, so `aco brief` prints one empty first line and proceeds through every other section exactly as BRIEF-01..06 describe (see E-BRIEF-06).
 - `aco brief` never matches a lane claim, only a live issue claim on the same number -- an unrelated lane branch claimed by someone else never appears in its `CLAIM` section.
 - `aco brief` never writes: it is a pure composition of the item's body, the store's live claims, and one local `git diff` -- plus, only with `--step`, the tracked brief configuration -- never a new data source and never a transition against the state ref.

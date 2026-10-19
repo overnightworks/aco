@@ -64,31 +64,42 @@ def stub_one_git_call(
     exit_status: int,
     stderr: str,
     directory: Path | None = None,
-) -> None:
+) -> list[list[str]]:
     """Force exactly one `checkout._git_run` argv -- in `directory` only,
     when given -- to a chosen failure exit,
     every other call reaching the real launcher -- shared by
     checkout and CLI test families (issue #322): a git-level failure
     (an unreachable remote, a colliding worktree path, an unmerged branch
     `git branch -d` itself refuses, ...) is cheaper to force this way than
-    to reproduce with real git state."""
+    to reproduce with real git state.
+
+    Returns the calls it answered: a test asserts it is non-empty, because
+    a read that never reaches `_git_run` (the synthetic world of
+    `conftest._isolate_git_toplevel` answers the remote-HEAD read before
+    it, until the test makes its toplevel a repository) would otherwise
+    pass without the injection ever firing."""
     real_git_run = checkout._git_run
     stubbed_directory = directory
+    answered: list[list[str]] = []
 
     def fake(
         call_arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> process.CapturedResult:
         if call_arguments == arguments and stubbed_directory in (None, directory):
+            answered.append(list(call_arguments))
             return process.CapturedResult(exit_status, b"", stderr.encode())
         return real_git_run(call_arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "_git_run", fake)
+    return answered
 
 
 def fail_git_launch(
     monkeypatch: pytest.MonkeyPatch, leading_arguments: list[str], failure: Exception
 ) -> list[list[str]]:
-    """Record matching Git launches and raise the supplied boundary failure."""
+    """Record matching Git launches and raise the supplied boundary failure;
+    the returned list is empty when no launch matched (see
+    `stub_one_git_call`), which a test asserts against."""
     run_git = process.run_git
     matched: list[list[str]] = []
 
@@ -102,6 +113,29 @@ def fail_git_launch(
 
     monkeypatch.setattr(process, "run_git", fail)
     return matched
+
+
+def inject_exit_128(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> list[list[str]]:
+    return stub_one_git_call(monkeypatch, arguments, exit_status=128, stderr="fatal: broken")
+
+
+def inject_launch_failure(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> list[list[str]]:
+    return fail_git_launch(monkeypatch, arguments, OSError("denied"))
+
+
+def inject_timeout(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> list[list[str]]:
+    return fail_git_launch(monkeypatch, arguments, process.ProcessTimedOutError("slow"))
+
+
+GIT_FAILURE_INJECTIONS = [
+    pytest.param(inject_exit_128, "fatal: broken", id="exit-128"),
+    pytest.param(inject_launch_failure, "git failed to launch: denied", id="launch-failure"),
+    pytest.param(inject_timeout, "git rev-parse timed out", id="timeout"),
+]
+"""Each way a git read can fail, with the detail every refusal carries:
+`(inject(monkeypatch, arguments), detail)`, `inject` returning the calls it
+answered. The timeout detail names `rev-parse`, so use these for reads
+of that subcommand."""
 
 
 def recorded_head_read(remote: str) -> tuple[str, ...]:

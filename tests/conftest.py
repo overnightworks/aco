@@ -34,7 +34,11 @@ _RECORDED_HEAD_READ_PREFIX = ["rev-parse", "--verify", "--quiet", "--symbolic-fu
 
 
 def _is_recorded_head_read(arguments: list[str]) -> bool:
-    return arguments[:4] == _RECORDED_HEAD_READ_PREFIX and arguments[4].endswith("/HEAD")
+    return (
+        len(arguments) == len(_RECORDED_HEAD_READ_PREFIX) + 1
+        and arguments[:4] == _RECORDED_HEAD_READ_PREFIX
+        and arguments[4].endswith("/HEAD")
+    )
 
 
 @pytest.fixture(autouse=True)

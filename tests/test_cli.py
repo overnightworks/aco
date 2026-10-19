@@ -46,6 +46,7 @@ from board_fixtures import (
     write_repository_config,
 )
 from cli_fixtures import (
+    GIT_FAILURE_INJECTIONS,
     ITEM_NEW_BODY,
     LIVE_TRUNK_REF_AFTER,
     RECORDED_ORIGIN_HEAD_READ,
@@ -2209,19 +2210,48 @@ def _keep_the_lane_pair(_repo: Path) -> None:
 _COMMIT_READ = ["rev-parse", "--verify", "--quiet", "HEAD"]
 
 
+def _fail_the_read_after_the_fetch(
+    monkeypatch: pytest.MonkeyPatch, failing_read: list[str]
+) -> None:
+    """Lets every read through until the real fetch has run, then fails
+    `failing_read` (`fatal: broken`): the read a command makes after its
+    fetch (`RunContext.fetched_trunk_ref`) is one a failing first read never
+    reaches."""
+    real_fetch_remote = checkout.fetch_remote
+
+    def fetch_then_fail_the_read(remote: str, *, directory: Path) -> None:
+        real_fetch_remote(remote, directory=directory)
+        stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+
+    monkeypatch.setattr(checkout, "fetch_remote", fetch_then_fail_the_read)
+
+
 @pytest.mark.parametrize(
-    ("first_start_ran", "reshape_lane", "failing_read"),
+    ("first_start_ran", "reshape_lane", "failing_read", "fails_after_fetch"),
     [
-        pytest.param(False, _keep_the_lane_pair, list(RECORDED_ORIGIN_HEAD_READ), id="fresh-head"),
-        pytest.param(False, _keep_the_lane_pair, _COMMIT_READ, id="fresh-commit"),
-        # A standing worktree resumes without reading the remote `HEAD`
-        # (cmd_start.py `_claim_in_start_worktree`), so only its commit read
-        # can fail there.
-        pytest.param(True, _keep_the_lane_pair, _COMMIT_READ, id="resume-commit"),
         pytest.param(
-            True, _remove_the_lane_pair, list(RECORDED_ORIGIN_HEAD_READ), id="rebuild-head"
+            False, _keep_the_lane_pair, list(RECORDED_ORIGIN_HEAD_READ), False, id="fresh-head"
         ),
-        pytest.param(True, _remove_the_lane_pair, _COMMIT_READ, id="rebuild-commit"),
+        pytest.param(
+            False,
+            _keep_the_lane_pair,
+            list(RECORDED_ORIGIN_HEAD_READ),
+            True,
+            id="fresh-head-after-fetch",
+        ),
+        pytest.param(False, _keep_the_lane_pair, _COMMIT_READ, False, id="fresh-commit"),
+        pytest.param(True, _keep_the_lane_pair, _COMMIT_READ, False, id="resume-commit"),
+        pytest.param(
+            True, _remove_the_lane_pair, list(RECORDED_ORIGIN_HEAD_READ), False, id="rebuild-head"
+        ),
+        pytest.param(
+            True,
+            _remove_the_lane_pair,
+            list(RECORDED_ORIGIN_HEAD_READ),
+            True,
+            id="rebuild-head-after-fetch",
+        ),
+        pytest.param(True, _remove_the_lane_pair, _COMMIT_READ, False, id="rebuild-commit"),
     ],
 )
 def test_start_refuses_with_gits_text_and_leaves_its_state_when_a_trunk_read_fails(
@@ -2231,6 +2261,7 @@ def test_start_refuses_with_gits_text_and_leaves_its_state_when_a_trunk_read_fai
     failing_read: list[str],
     first_start_ran: bool,
     reshape_lane: Callable[[Path], None],
+    fails_after_fetch: bool,
 ) -> None:
     """A git failure reading `<remote>/HEAD` or the checkout's commit is
     neither a trunk to guess nor a checkout with no commit: a fresh start
@@ -2250,7 +2281,10 @@ def test_start_refuses_with_gits_text_and_leaves_its_state_when_a_trunk_read_fai
         return worktree.exists(), branches, set(claims)
 
     before = standing()
-    stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+    if fails_after_fetch:
+        _fail_the_read_after_the_fetch(monkeypatch, failing_read)
+    else:
+        stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
 
@@ -8614,8 +8648,14 @@ def _state_ref_item_state(repo: Path, tip: str, number: int) -> items.RecordStat
     ("command", "failing_read"),
     [
         pytest.param(["check", "{sha}"], list(RECORDED_ORIGIN_HEAD_READ), id="check-head"),
+        pytest.param(
+            ["check", "{sha}", "--json"], list(RECORDED_ORIGIN_HEAD_READ), id="check-json-head"
+        ),
         pytest.param(["status"], list(RECORDED_ORIGIN_HEAD_READ), id="status-head"),
         pytest.param(["status", "--json"], list(RECORDED_ORIGIN_HEAD_READ), id="status-json-head"),
+        pytest.param(
+            ["status", "--path", "src"], list(RECORDED_ORIGIN_HEAD_READ), id="status-path-head"
+        ),
         pytest.param(["board", "--json"], list(RECORDED_ORIGIN_HEAD_READ), id="board-head"),
         pytest.param(["next"], list(RECORDED_ORIGIN_HEAD_READ), id="next-head"),
         # Only `next`, `start`, `protect` and `rescope` call
@@ -8635,17 +8675,74 @@ def test_a_failed_trunk_read_refuses_with_gits_text_instead_of_guessing(
     failing to read `<remote>/HEAD` is never a remote that recorded none, nor
     a failing commit read a checkout with no commit, so no command falls
     back to `<remote>/main`, judges against it, or prints `cannot resolve
-    the default branch`."""
+    the default branch`; a `--json` command reports the refusal as
+    `unavailable`."""
     repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
     sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
     tip_before = _state_ref_tip(repo, remote)
-    stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
+    injected = stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
 
     status = issue_claim.main([argument.format(sha=sha) for argument in command])
 
     captured = capsys.readouterr()
-    assert (status, captured.err.splitlines()) == (2, ["ERROR: fatal: broken"])
+    assert injected
+    assert status == 2
+    if "--json" in command:
+        assert json.loads(captured.out) == {
+            "ok": False,
+            "reason": "unavailable",
+            "message": "fatal: broken",
+        }
+    else:
+        assert captured.err.splitlines() == ["ERROR: fatal: broken"]
     assert _state_ref_tip(repo, remote) == tip_before
+
+
+@pytest.mark.parametrize(
+    ("lane_stands", "starts_in_lane"),
+    [
+        pytest.param(True, False, id="resume-head"),
+        pytest.param(True, True, id="resume-head-in-lane"),
+        pytest.param(False, False, id="rebuild-head"),
+    ],
+)
+def test_start_under_state_ref_refuses_a_failed_head_read_and_keeps_the_standing_lane(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    lane_stands: bool,
+    starts_in_lane: bool,
+) -> None:
+    """Under `storage = "state-ref"` the item is read through the state
+    ref's own board, which reads `<remote>/HEAD` for the default branch
+    before `start` decides between resume and build: a failed read refuses
+    with git's text and leaves the live claim, the lane's worktree and
+    branch, and `refs/aco/state` as they stood."""
+    repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    lane_worktree = checkout.sibling_worktree_path(repo, "issue-10-claims")
+    branch = "codex/issue-10-claims"
+    if lane_stands:
+        real_git(repo, "worktree", "add", "-q", "-b", branch, str(lane_worktree), "feature")
+    else:
+        real_git(repo, "branch", branch, "feature")
+    if starts_in_lane:
+        redirect_toplevel(monkeypatch, lane_worktree)
+        monkeypatch.chdir(lane_worktree)
+    tip_before = _state_ref_tip(repo, remote)
+    injected = stub_one_git_call(
+        monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
+    )
+
+    status = issue_claim.main(["start", "10", "--slug", "claims"])
+
+    captured = capsys.readouterr()
+    assert injected
+    assert (status, captured.out, captured.err) == (2, "", "ERROR: fatal: broken\n")
+    assert _state_ref_tip(repo, remote) == tip_before
+    assert fresh_observation(repo, remote).state.claims
+    assert lane_worktree.is_dir() is lane_stands
+    assert real_git(repo, "branch", "--list", branch).stdout.strip()
 
 
 def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose_claim_is_gone(
@@ -8801,15 +8898,7 @@ def test_release_merged_under_state_ref_keeps_the_worktree_when_the_cleanup_head
     repo, remote, lane_worktree, landing = _state_ref_landing_with_its_lane_worktree(
         monkeypatch, tmp_path
     )
-    real_fetch_remote = checkout.fetch_remote
-
-    def fetch_then_fail_the_remote_head_read(remote: str, *, directory: Path) -> None:
-        real_fetch_remote(remote, directory=directory)
-        stub_one_git_call(
-            monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
-        )
-
-    monkeypatch.setattr(checkout, "fetch_remote", fetch_then_fail_the_remote_head_read)
+    _fail_the_read_after_the_fetch(monkeypatch, list(RECORDED_ORIGIN_HEAD_READ))
 
     status = issue_claim.main(landing)
 
@@ -18906,32 +18995,12 @@ def test_cli_brief_prints_body_claim_lane_tip_and_touched_files(
     ]
 
 
-def _inject_remote_head_read_exit_128(monkeypatch: pytest.MonkeyPatch) -> None:
-    stub_one_git_call(
-        monkeypatch, list(recorded_head_read("origin")), exit_status=128, stderr="fatal: broken"
-    )
-
-
-def _inject_remote_head_read_launch_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    fail_git_launch(monkeypatch, list(recorded_head_read("origin")), OSError("denied"))
-
-
-@pytest.mark.parametrize(
-    ("inject", "message"),
-    [
-        pytest.param(_inject_remote_head_read_exit_128, "fatal: broken", id="exit-128"),
-        pytest.param(
-            _inject_remote_head_read_launch_failure,
-            "git failed to launch: denied",
-            id="launch-failure",
-        ),
-    ],
-)
+@pytest.mark.parametrize(("inject", "message"), GIT_FAILURE_INJECTIONS)
 def test_cli_brief_refuses_with_gits_text_when_reading_the_remote_head_fails(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    inject: Callable[[pytest.MonkeyPatch], None],
+    inject: Callable[[pytest.MonkeyPatch, list[str]], list[list[str]]],
     message: str,
 ) -> None:
     """A failed read of `<remote>/HEAD` reaches the real reader and refuses
@@ -18942,10 +19011,11 @@ def test_cli_brief_refuses_with_gits_text_when_reading_the_remote_head_fails(
     client.issue_references[258] = forge.ItemReference(forge.ItemState.OPEN, "Brief", "Body.")
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     monkeypatch.chdir(repository)
-    inject(monkeypatch)
+    injected = inject(monkeypatch, list(recorded_head_read("origin")))
 
     status = issue_claim.main(["--repo", REPOSITORY, "brief", "258"])
 
+    assert injected
     assert status == 2
     assert capsys.readouterr().err.splitlines() == [f"ERROR: {message}"]
 

@@ -59,7 +59,7 @@ class GitTimedOutError(ClaimError):
 
 class GitExitError(ClaimError):
     """A git step that ran and exited nonzero: git's own detail as the text,
-    its `exit_status` kept so a reader with one documented "absent" exit
+    its `exit_status` kept so a reader with one measured "absent" exit
     tells it from a real failure."""
 
     def __init__(self, result: process.CapturedResult) -> None:
@@ -100,8 +100,8 @@ def git_output(
 ) -> str:
     """`git arguments`'s stdout, in `directory` when given via `-C` (issue
     #314) or the calling process's own cwd otherwise; a nonzero exit fails
-    closed as a `GitExitError`. `literal_pathspecs` reads every path argument literally (see
-    `process.run_git`)."""
+    closed as a `GitExitError`. `literal_pathspecs` reads every path
+    argument literally (see `process.run_git`)."""
     if literal_pathspecs:
         result = _git_run(arguments, directory=directory, literal_pathspecs=True)
     else:
@@ -572,13 +572,18 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     localized text (issue #483). A `directory` that does not exist yet is
     never inside a repository -- `git -C` cannot even enter it -- so it
     stays `None` whatever sits above it, even an outer checkout's `.git`.
+    Only that first discovery may read as "outside": once git has named the
+    checkout, a failed read of its branch or commit raises whatever
+    repository markers the filesystem shows (`GIT_DIR` and `GIT_WORK_TREE`
+    can select a checkout no `.git` marker sits above).
     """
     try:
-        return _resolve_checkout(directory)
+        discovered = _discover_checkout(directory)
     except ClaimError as error:
         if directory.is_dir():
             _refuse_a_failure_inside_a_repository(directory, error)
         return None
+    return _read_checkout(directory, discovered)
 
 
 def _refuse_a_failure_inside_a_repository(directory: Path, error: ClaimError) -> None:
@@ -704,7 +709,13 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
     worktrees of this repository, so any failure resolving one of them is
     real -- a moved or deleted worktree directory, most often -- never a
     legitimate "nothing here"; `resolve_path_checkout` is the one caller
-    that still wants that bare `None` reading)."""
+    that still wants that bare `None` reading, of its discovery alone)."""
+    return _read_checkout(directory, _discover_checkout(directory))
+
+
+def _discover_checkout(directory: Path) -> tuple[str, str, str]:
+    """The toplevel, git directory and common directory git names for
+    `directory`: the one read a failure of which may mean "no repository"."""
     combined = git_output(
         [
             "rev-parse",
@@ -719,6 +730,11 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
         toplevel, git_directory, common_directory = combined.splitlines()
     except ValueError as error:
         raise ClaimError(f"git returned a malformed checkout description: {combined!r}") from error
+    return toplevel, git_directory, common_directory
+
+
+def _read_checkout(directory: Path, discovered: tuple[str, str, str]) -> PathCheckout:
+    toplevel, git_directory, common_directory = discovered
     branch = current_branch(directory=directory)
     kind = CheckoutKind.MAIN if git_directory == common_directory else CheckoutKind.LINKED_WORKTREE
     has_commit = _verified_read(["rev-parse", "--verify", "--quiet", "HEAD"], directory=directory)

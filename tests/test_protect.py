@@ -3546,6 +3546,7 @@ def test_protect_and_rescope_judge_the_canonical_remotes_recorded_default_branch
     assert refusal_of(monkeypatch, capsys, path) == (2, sentence)
 
 
+@pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
     "failing_read",
     [
@@ -3579,6 +3580,47 @@ def test_protect_and_rescope_refuse_with_gits_text_when_a_checkout_read_fails(
     stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
 
     assert refusal_of(monkeypatch, capsys, path) == (2, "fatal: broken")
+
+
+@pytest.mark.usefixtures("isolated_global_git_config")
+def test_protect_refuses_a_failed_commit_read_in_a_checkout_selected_by_the_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """PROT-17: `GIT_DIR` and `GIT_WORK_TREE` select a checkout no `.git`
+    marker sits above. Once git has named it, a failed read of its commit
+    refuses with git's own text -- never reads as a path outside every
+    repository, which PROT-32 allows unjudged."""
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    real_git(repository, "init", "-q", "-b", "main")
+    real_git(
+        repository,
+        "-c",
+        "user.name=T",
+        "-c",
+        "user.email=t@e.c",
+        "commit",
+        "-q",
+        "-m",
+        "x",
+        "--allow-empty",
+    )
+    work_tree = tmp_path / "plain"
+    work_tree.mkdir()
+    monkeypatch.setenv("GIT_DIR", str(repository / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(work_tree))
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    injected = stub_one_git_call(
+        monkeypatch,
+        ["rev-parse", "--verify", "--quiet", "HEAD"],
+        exit_status=128,
+        stderr="fatal: broken",
+    )
+
+    outcome = _protect_refusal(monkeypatch, capsys, work_tree / "widget.py")
+
+    assert injected
+    assert outcome == (2, "fatal: broken")
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
