@@ -29,6 +29,7 @@ _FILE_WRITING_COMMANDS = frozenset("wW")
 _LABEL_END = frozenset(" \t\n;}#")
 _BRACKET_CLASS_OPENERS = frozenset(":.=")
 _ADDRESS_FLAGS = frozenset("IM")
+_RELATIVE_ADDRESS_MARKS = frozenset("+~")
 _SUBSTITUTE_PLAIN_FLAGS = frozenset("iImMe \t")
 _SUBSTITUTE_ONCE_FLAGS = frozenset("gp")
 _BLOCK_OR_COMMENT_START = frozenset("}#")
@@ -194,44 +195,53 @@ class _ScriptReader:
         self._at += len(closer)
 
     def _addresses(self) -> None:
-        if self._address():
+        if self._address(range_end=False):
             self._skip_blanks()
             if self._peek() == ",":
                 self._take()
                 self._skip_blanks()
-                self._address_range_end()
+                if not self._address(range_end=True):
+                    raise _RejectedScriptError
             self._skip_blanks()
         if self._peek() == "!":
             self._take()
             self._skip_blanks()
 
-    def _address_range_end(self) -> None:
-        if self._peek() in {"+", "~"}:
-            self._take()
-            self._skip_digits()
-        elif not self._address():
-            raise _RejectedScriptError
-
-    def _address(self) -> bool:
+    def _address(self, *, range_end: bool) -> bool:
         char = self._peek()
         if char in _DIGITS:
-            self._skip_digits()
-            if self._peek() == "~":
-                self._take()
-                self._skip_digits()
+            self._line_or_step_address()
         elif char == "$":
             self._take()
+        elif char in _RELATIVE_ADDRESS_MARKS:
+            self._relative_address(range_end=range_end)
         elif char in {"/", "\\"}:
             self._regex_address()
         else:
             return False
         return True
 
+    def _line_or_step_address(self) -> None:
+        self._skip_digits()
+        self._skip_blanks()
+        if self._peek() == "~":
+            self._take()
+            self._skip_blanks()
+            self._skip_digits()
+
+    def _relative_address(self, *, range_end: bool) -> None:
+        self._take()
+        self._skip_blanks()
+        if self._skip_digits().lstrip("0") and not range_end:
+            raise _RejectedScriptError
+
     def _regex_address(self) -> None:
         delimiter = "/" if self._take() == "/" else self._delimiter()
         self._skip_delimited(delimiter, with_brackets=True)
+        self._skip_blanks()
         while self._peek() in _ADDRESS_FLAGS:
             self._take()
+            self._skip_blanks()
 
     def _substitute(self) -> _Name | None:
         delimiter = self._delimiter()
@@ -260,7 +270,7 @@ class _ScriptReader:
         char = self._peek()
         if char in _DIGITS:
             self._reject_repeat(given_once, _NUMBERED_FLAG)
-            if int(self._skip_digits()) == 0:
+            if not self._skip_digits().lstrip("0"):
                 raise _RejectedScriptError
         elif char in _SUBSTITUTE_ONCE_FLAGS:
             self._reject_repeat(given_once, self._take())

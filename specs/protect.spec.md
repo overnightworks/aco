@@ -248,7 +248,7 @@ than a bare `claim first`.
 - [ ] [PROT-33] A recognized pattern's own path outside the live claim's scope denies `<pattern> <path> outside claim scope`, naming both (see E-PROT-08).
 - [ ] [PROT-34] A literal, resolvable `cd` changes the directory every later path in its own `;`/`&&`/`||`/newline list resolves against -- never across a `|`, and only inside its own group.
 - [ ] [PROT-35] An unresolvable `cd` target -- expandable, `-`, or no operand -- ends recognition for the rest of the command outright, allowing it (see E-PROT-10).
-- [ ] [PROT-47] A file a `sed` script writes (`w`, `W`, `s///w`) in a readable `-e` value or positional script is a `sed w` path; script text from the first `-f` or expansion on is not judged (see E-PROT-19).
+- [ ] [PROT-47] A file a `sed` script writes (`w`, `W`, `s///w`) in a readable `-e` value or positional script is a `sed w` path; script text from the first `-f`, expansion, `-e` without a value or construct GNU sed rejects that the reader knows is not judged (see E-PROT-19).
 
 ## Forge-free
 
@@ -274,7 +274,7 @@ than a bare `claim first`.
 - `shell` and other providers' equivalents never deny a missing path: the hook payload names no file path for those, so `protect` cannot gate what it cannot see (README, "PreToolUse write gate").
 - `Bash` (issue #380) and `Monitor` (issue #448) are the one exception, judging only the fixed pattern list PROT-30 owns.
 - A `python -c ...` one-liner or an opaque script invocation stays invisible on purpose: recognizing a pattern is a best-effort aid against forgetting the claim, never a security boundary.
-- `protect` never reads a `sed -f` script or script text with an expansion, and never judges the text after one either, because the parser state it leaves is unknown.
+- `protect` never reads a `sed -f` script or script text with an expansion, and never judges the text after one either, nor after an `-e` without a value or a construct GNU sed rejects that it knows, because the parser state it leaves is unknown or GNU sed never compiles it.
 - `protect` never guesses a Bash-recognized relative path's `cwd` from the hook process's own cwd: a payload naming no `cwd` allows that path outright (PROT-31).
 - This is PROT-09's own "never guess a relative path" principle, applied as an allow instead of a deny since Bash's own path is expected to be relative.
 - A Bash pattern never judges what only the shell could resolve: an operand with an unquoted (or double-quoted, still-substituting) `$name`, `` `command` ``, `~`, `*`, `?`, or `[` is never judged.

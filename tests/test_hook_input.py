@@ -994,6 +994,16 @@ def test_hook_patch_paths_returns_empty_for_unrecognized_text(text: str) -> None
             id="sed-script-write-after-a-form-feed-between-commands",
         ),
         pytest.param(
+            "sed '/a/ Iw x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-blanks-before-an-address-flag",
+        ),
+        pytest.param(
+            "sed '+w x' f",
+            ((hook_input.PATTERN_SED_WRITE, "x"),),
+            id="sed-script-write-after-a-plus-first-address",
+        ),
+        pytest.param(
             "sed -n -e 'p;\rw x' f",
             ((hook_input.PATTERN_SED_WRITE, "x"),),
             id="sed-script-write-after-a-semicolon-and-a-carriage-return",
