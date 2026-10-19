@@ -91,6 +91,7 @@ layers = [
     "body",
     "metrics",
     "protocol | process | hook_input",
+    "sed_script",
 ]
 # `metrics` moved below `body` (issue #419): it has no `agent_coordination`
 # import of its own (`metrics.py`'s own docstring), so nothing above
