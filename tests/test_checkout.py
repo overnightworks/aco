@@ -21,11 +21,13 @@ from cli_fixtures import (
     AGENT_IDENTITY_ENV_NAMES,
     bare_remote_repository_with_one_commit,
     dangle_recorded_head,
+    fail_git_launch,
     git_checkout,
     init_bare_repository,
     push_repository_trunk,
     real_git,
     real_repository_with_bare_remote,
+    recorded_head_read,
     set_agent_identity_env,
     stub_one_git_call,
 )
@@ -1148,6 +1150,64 @@ def test_a_dangling_or_plain_recorded_head_counts_as_unrecorded_and_the_trunk_gu
         checkout.recorded_default_branch("origin", directory=repo),
         checkout.trunk_ref_after("origin", recorded_head, directory=repo),
     ) == (expected_default_branch, "refs/remotes/origin/main")
+
+
+def _inject_exit_128(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> None:
+    stub_one_git_call(monkeypatch, arguments, exit_status=128, stderr="fatal: broken")
+
+
+def _inject_launch_failure(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> None:
+    fail_git_launch(monkeypatch, arguments, OSError("denied"))
+
+
+def _inject_timeout(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> None:
+    fail_git_launch(monkeypatch, arguments, process.ProcessTimedOutError("slow"))
+
+
+_GIT_FAILURE_INJECTIONS = [
+    pytest.param(_inject_exit_128, "fatal: broken", id="exit-128"),
+    pytest.param(_inject_launch_failure, "git failed to launch: denied", id="launch-failure"),
+    pytest.param(_inject_timeout, "git rev-parse timed out", id="timeout"),
+]
+
+
+@pytest.mark.parametrize(("inject", "detail"), _GIT_FAILURE_INJECTIONS)
+def test_recorded_head_ref_raises_git_failures_instead_of_reading_them_as_never_recorded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    inject: Callable[[pytest.MonkeyPatch, list[str]], None],
+    detail: str,
+) -> None:
+    repository = _scratch_git_repository(tmp_path)
+    inject(monkeypatch, list(recorded_head_read("origin")))
+
+    with pytest.raises(ClaimError, match=re.escape(detail)):
+        checkout.recorded_head_ref("origin", directory=repository)
+
+
+@pytest.mark.parametrize(("inject", "detail"), _GIT_FAILURE_INJECTIONS)
+def test_resolve_checkout_raises_a_failed_commit_read_instead_of_reading_no_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    inject: Callable[[pytest.MonkeyPatch, list[str]], None],
+    detail: str,
+) -> None:
+    repository = _scratch_git_repository(tmp_path)
+    inject(monkeypatch, ["rev-parse", "--verify", "--quiet", "HEAD"])
+
+    with pytest.raises(ClaimError, match=re.escape(detail)):
+        checkout.resolve_path_checkout(repository)
+
+
+def test_resolve_checkout_reads_an_unborn_branch_as_no_commit(tmp_path: Path) -> None:
+    unborn = tmp_path / "unborn"
+    unborn.mkdir()
+    real_git(unborn, "init", "-q", "-b", "main")
+
+    resolved = checkout.resolve_path_checkout(unborn)
+
+    assert resolved is not None
+    assert resolved.has_commit is False
 
 
 def test_trunk_landings_is_empty_when_trunk_has_no_first_parent_landings(

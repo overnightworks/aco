@@ -57,6 +57,16 @@ class GitTimedOutError(ClaimError):
         super().__init__(f"git {subcommand} timed out")
 
 
+class GitExitError(ClaimError):
+    """A git step that ran and exited nonzero, carrying its `exit_status` so
+    a reader with one documented "absent" exit tells it from a real
+    failure; the text is git's own detail."""
+
+    def __init__(self, exit_status: int, detail: str) -> None:
+        super().__init__(detail)
+        self.exit_status = exit_status
+
+
 def _git_run(
     arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
 ) -> process.CapturedResult:
@@ -90,14 +100,14 @@ def git_output(
 ) -> str:
     """`git arguments`'s stdout, in `directory` when given via `-C` (issue
     #314) or the calling process's own cwd otherwise; a nonzero exit fails
-    closed. `literal_pathspecs` reads every path argument literally (see
+    closed as a `GitExitError`. `literal_pathspecs` reads every path argument literally (see
     `process.run_git`)."""
     if literal_pathspecs:
         result = _git_run(arguments, directory=directory, literal_pathspecs=True)
     else:
         result = _git_run(arguments, directory=directory)
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise GitExitError(result.exit_status, process.git_failure_detail(result))
     # Trailing-only: every caller wants the one newline `git` appends after its
     # output trimmed, but `git status --porcelain`'s short format is
     # significant in its *leading* column (` M path` names a modified file by
@@ -130,28 +140,38 @@ def attached_branch(checked_out: str) -> str:
     return checked_out
 
 
-# `git rev-parse --verify --quiet <ref>` (git(1)): exit 1 is the one
-# documented "does not resolve to a single object" outcome under `--quiet`
-# -- the same single-defined-exit contract `path_is_tracked` already reads
-# from `ls-files --error-unmatch` above. Any other nonzero exit (128 for a
-# broken checkout, a corrupted ref, ...) is a real git failure, not an
-# absent ref, and must fail loud with its own detail instead of being read
-# the same way `cmd_brief._lane_tip` used to (issue #390 finding 9b).
+# `git rev-parse --verify --quiet <ref>`: measured with git 2.43 (git(1)
+# documents no exit contract for it) -- a ref that is absent or dangling
+# exits 1, which is the one "answers no" outcome here; any other nonzero
+# exit (128 for a broken checkout, a corrupted ref, ...) is a real git
+# failure, not an absent ref, and must fail loud with its own detail.
 _REV_PARSE_VERIFY_EXIT_UNRESOLVED = 1
+
+
+def _verified_read(arguments: list[str], *, directory: Path | None) -> str | None:
+    """`git arguments`'s stdout, or `None` when git exits 1 -- the measured
+    "does not resolve" answer of `rev-parse --verify --quiet`. Every other
+    failure (another exit, a launch failure, a timeout) raises."""
+    try:
+        return git_output(arguments, directory=directory)
+    except GitExitError as error:
+        if error.exit_status == _REV_PARSE_VERIFY_EXIT_UNRESOLVED:
+            return None
+        raise
 
 
 def resolved_commit(ref: str, *, directory: Path | None = None) -> str | None:
     """`ref`'s current commit in `directory` (or the calling process's own
-    cwd), or `None` when it does not resolve to a
-    single object. A git failure that keeps the read from answering either
-    way -- a missing executable, a timeout, or any exit but the documented
-    "unresolved" one -- raises `ClaimError` with git's own detail instead."""
-    result = _git_run(["rev-parse", "--verify", "--quiet", ref], directory=directory)
-    if result.exit_status == _REV_PARSE_VERIFY_EXIT_UNRESOLVED:
-        return None
-    if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
-    return result.stdout.decode().rstrip("\n")
+    cwd), or `None` when it does not resolve to a single object. A git
+    failure that keeps the read from answering either way -- a missing
+    executable, a timeout, or any exit but 1 -- raises `ClaimError` with
+    git's own detail instead.
+
+    Two limits are known and not promised away: an unreadable or destroyed
+    loose ref file can read as exit 1 without a reliable git warning, and a
+    resolved ref proves no readable commit object (a `^{commit}` peel would
+    turn that into a false "no commit on this branch", so none is added)."""
+    return _verified_read(["rev-parse", "--verify", "--quiet", ref], directory=directory)
 
 
 def lane_changed_paths(tip: str, *, trunk: str, directory: Path) -> tuple[str, ...]:
@@ -700,17 +720,13 @@ def _resolve_checkout(directory: Path) -> PathCheckout:
         raise ClaimError(f"git returned a malformed checkout description: {combined!r}") from error
     branch = current_branch(directory=directory)
     kind = CheckoutKind.MAIN if git_directory == common_directory else CheckoutKind.LINKED_WORKTREE
-    try:
-        git_output(["rev-parse", "--verify", "HEAD"], directory=directory)
-        has_commit = True
-    except ClaimError:
-        has_commit = False
+    has_commit = _verified_read(["rev-parse", "--verify", "--quiet", "HEAD"], directory=directory)
     return PathCheckout(
         toplevel=Path(toplevel),
         branch=branch,
         kind=kind,
         common_directory=Path(common_directory),
-        has_commit=has_commit,
+        has_commit=has_commit is not None,
     )
 
 
@@ -866,16 +882,15 @@ def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | No
     since `claim`, `protect`, and the trunk word or guess differently.
 
     One git read resolves the symbolic ref and proves its target exists; a
-    plain, non-symbolic `HEAD` ref names itself and so no branch."""
+    plain, non-symbolic `HEAD` ref names itself and so no branch. A git
+    failure other than the "absent" exit raises `ClaimError` with git's own
+    detail; it is never read as a remote that recorded none."""
     head = remote_tracking_ref(remote, "HEAD")
-    try:
-        symbolic = git_output(
-            ["rev-parse", "--verify", "--quiet", "--symbolic-full-name", head],
-            directory=directory,
-        )
-    except ClaimError:
-        return None
-    return None if symbolic == head else symbolic
+    symbolic = _verified_read(
+        ["rev-parse", "--verify", "--quiet", "--symbolic-full-name", head],
+        directory=directory,
+    )
+    return None if symbolic in (None, head) else symbolic
 
 
 def recorded_default_branch(remote: str, *, directory: Path | None = None) -> str | None:

@@ -18406,7 +18406,7 @@ def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_
         ("branch", "--show-current"): "docs/lane-cleanup",
         ("rev-parse", "--show-toplevel"): real_toplevel,
         ("rev-parse", "HEAD"): BASE,
-        ("rev-parse", "--verify", "HEAD"): BASE,
+        ("rev-parse", "--verify", "--quiet", "HEAD"): BASE,
         ("rev-parse", "--git-dir"): "/repo/.git/worktrees/lane-cleanup",
         ("rev-parse", "--git-common-dir"): "/repo/.git",
         # `rescope`'s path-based checkout resolution (issue #314): the same

@@ -115,7 +115,7 @@ def _protect_git_values(
     origin_url = f"git@github.com:{REPOSITORY}.git"
     values = {
         ("branch", "--show-current"): branch,
-        ("rev-parse", "--verify", "HEAD"): BASE,
+        ("rev-parse", "--verify", "--quiet", "HEAD"): BASE,
         _PATH_CHECKOUT_ARGUMENTS: "\n".join(
             (str(work.resolve()), str(resolved_git_directory), str(resolved_common_directory))
         ),
@@ -195,7 +195,7 @@ def _patch_protect_git(
             # answering empty (measured locally, issue #238); `origin_head is
             # None` reproduces that shape rather than a missing-fixture-key
             # `KeyError`.
-            raise ClaimError("unknown git failure")
+            raise checkout.GitExitError(1, "unknown git failure")
         return values[key]
 
     monkeypatch.setattr(checkout, "git_output", git)

@@ -504,7 +504,7 @@ def git_checkout(
 ) -> dict[tuple[str, ...], str]:
     return {
         ("rev-parse", "HEAD"): head,
-        ("rev-parse", "--verify", "HEAD"): head,
+        ("rev-parse", "--verify", "--quiet", "HEAD"): head,
         ("rev-parse", "--show-toplevel"): toplevel,
         ("branch", "--show-current"): branch,
         ("rev-parse", "--git-dir"): git_directory,

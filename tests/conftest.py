@@ -30,6 +30,11 @@ def _isolate_protect_unguarded(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 _SHOW_TOPLEVEL_ARGUMENTS = ["rev-parse", "--show-toplevel"]
+_RECORDED_HEAD_READ_PREFIX = ["rev-parse", "--verify", "--quiet", "--symbolic-full-name"]
+
+
+def _is_recorded_head_read(arguments: list[str]) -> bool:
+    return arguments[:4] == _RECORDED_HEAD_READ_PREFIX and arguments[4].endswith("/HEAD")
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +46,11 @@ def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     checkout's own `board.CONFIG_PATH`. A test that needs a specific
     toplevel keeps its own `monkeypatch.setattr(checkout, "git_output", ...)`,
     which takes precedence over this default.
+
+    The world is synthetic exactly while that toplevel is no repository (no
+    `.git` entry, file or directory, checked at call time): there a remote
+    never recorded a `HEAD`, which a real git answers with exit 1. As soon
+    as a test makes the toplevel a repository, the read reaches real git.
     """
     real_git_output = checkout.git_output
 
@@ -49,6 +59,12 @@ def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     ) -> str:
         if arguments == _SHOW_TOPLEVEL_ARGUMENTS and directory is None:
             return str(tmp_path)
+        if (
+            _is_recorded_head_read(arguments)
+            and directory in (None, tmp_path)
+            and not (tmp_path / ".git").exists()
+        ):
+            raise checkout.GitExitError(1, "")
         return real_git_output(arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "git_output", fake_git_output)
