@@ -109,16 +109,12 @@ def cut_check(
     return check
 
 
-def slice_row(index: int, title: str, fields: str = "") -> str:
-    return f'[[slice]]\nindex = {index}\ntitle = "{title}"\n{fields}'
-
-
-def child_body(done_when: str, scope: str = "") -> str:
-    return (
-        'Parent: #79\n\n```aco\nversion = 1\nnow = "Cut from #79"\n'
-        'next = "Build this slice; claim it with aco start."\n'
-        f'done_when = "{done_when}"\n{scope}```\n'
-    )
+SLICE_ROW = '[[slice]]\nindex = {0}\ntitle = "{1}"\n{2}'
+CHILD_BODY = (
+    'Parent: #79\n\n```aco\nversion = 1\nnow = "Cut from #79"\n'
+    'next = "Build this slice; claim it with aco start."\n'
+    'done_when = "{0}"\n{1}```\n'
+)
 
 
 def refused(
@@ -209,7 +205,7 @@ def cut(
                 "precondition_failed",
                 (
                     container_issue(
-                        79, MINIMAL_BLOCK_TOML + slice_row(1, "Slice A", 'done_when = "D"\n')
+                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
                     ),
                 ),
                 ("--title", "Slice A"),
@@ -230,7 +226,7 @@ def cut(
                 "precondition_failed",
                 (
                     container_issue(
-                        79, MINIMAL_BLOCK_TOML + slice_row(1, "Slice A", 'done_when = "D"\n')
+                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
                     ),
                 ),
                 (),
@@ -245,7 +241,7 @@ def cut(
                 "precondition_failed",
                 (
                     container_issue(
-                        79, MINIMAL_BLOCK_TOML + slice_row(1, "Slice A", 'done_when = "D"\n')
+                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
                     ),
                 ),
                 (),
@@ -260,7 +256,7 @@ def cut(
                 "precondition_failed",
                 (
                     container_issue(
-                        79, MINIMAL_BLOCK_TOML + slice_row(1, "Slice A", 'done_when = "D"\n')
+                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
                     ),
                 ),
                 (),
@@ -312,8 +308,8 @@ def test_cut_requires_an_open_top_level_container_and_a_writable_forge(
                         79,
                         MINIMAL_BLOCK_TOML
                         + (
-                            slice_row(1, "Clean", 'done_when = "D"\n')
-                            + slice_row(2, "Dirty", 'done_when = "one\\u000Btwo"\n')
+                            SLICE_ROW.format(1, "Clean", 'done_when = "D"\n')
+                            + SLICE_ROW.format(2, "Dirty", 'done_when = "one\\u000Btwo"\n')
                         ),
                     ),
                 ),
@@ -332,8 +328,8 @@ def test_cut_requires_an_open_top_level_container_and_a_writable_forge(
                         79,
                         MINIMAL_BLOCK_TOML
                         + (
-                            slice_row(1, "Clean", 'done_when = "D"\n')
-                            + slice_row(2, "Dirty", 'done_when = "one\\u001Btwo"\n')
+                            SLICE_ROW.format(1, "Clean", 'done_when = "D"\n')
+                            + SLICE_ROW.format(2, "Dirty", 'done_when = "one\\u001Btwo"\n')
                         ),
                     ),
                 ),
@@ -346,17 +342,17 @@ def test_cut_requires_an_open_top_level_container_and_a_writable_forge(
             cut(
                 MINIMAL_BLOCK_TOML
                 + (
-                    slice_row(1, "Good row", 'done_when = "Clean."\n')
-                    + slice_row(2, "Bad\\u000Btitle", "")
+                    SLICE_ROW.format(1, "Good row", 'done_when = "Clean."\n')
+                    + SLICE_ROW.format(2, "Bad\\u000Btitle", "")
                 ),
                 (),
                 1,
                 "Good row",
-                child_body("Clean.", ""),
+                CHILD_BODY.format("Clean.", ""),
                 {
                     79: block_body(
                         'version = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n\n'
-                        + slice_row(2, "Bad\\u000Btitle", "").rstrip("\n")
+                        + SLICE_ROW.format(2, "Bad\\u000Btitle", "").rstrip("\n")
                     )
                 },
             ),
@@ -366,17 +362,17 @@ def test_cut_requires_an_open_top_level_container_and_a_writable_forge(
             cut(
                 MINIMAL_BLOCK_TOML
                 + (
-                    slice_row(1, "Good row", 'done_when = "Clean."\n')
-                    + slice_row(2, "Other", 'done_when = "a\\u001B[2Jb"\n')
+                    SLICE_ROW.format(1, "Good row", 'done_when = "Clean."\n')
+                    + SLICE_ROW.format(2, "Other", 'done_when = "a\\u001B[2Jb"\n')
                 ),
                 (),
                 1,
                 "Good row",
-                child_body("Clean.", ""),
+                CHILD_BODY.format("Clean.", ""),
                 {
                     79: block_body(
                         'version = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n\n'
-                        + slice_row(2, "Other", 'done_when = "a\\u001B[2Jb"').rstrip("\n")
+                        + SLICE_ROW.format(2, "Other", 'done_when = "a\\u001B[2Jb"').rstrip("\n")
                     )
                 },
             ),
@@ -396,17 +392,17 @@ def test_cut_requires_a_valid_block_for_the_row_it_cuts(case: CutCase, cut_check
             cut(
                 MINIMAL_BLOCK_TOML
                 + (
-                    slice_row(1, "Scheibe 1", 'done_when = "D"\n')
-                    + slice_row(2, "Scheibe 2", 'done_when = "D"\n')
+                    SLICE_ROW.format(1, "Scheibe 1", 'done_when = "D"\n')
+                    + SLICE_ROW.format(2, "Scheibe 2", 'done_when = "D"\n')
                 ),
                 ("--row", "2"),
                 2,
                 "Scheibe 2",
-                child_body("D", ""),
+                CHILD_BODY.format("D", ""),
                 {
                     79: block_body(
                         'version = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n\n'
-                        + slice_row(1, "Scheibe 1", 'done_when = "D"').rstrip("\n")
+                        + SLICE_ROW.format(1, "Scheibe 1", 'done_when = "D"').rstrip("\n")
                     )
                 },
             ),
@@ -418,7 +414,8 @@ def test_cut_requires_a_valid_block_for_the_row_it_cuts(case: CutCase, cut_check
                 "precondition_failed",
                 (
                     container_issue(
-                        79, MINIMAL_BLOCK_TOML + slice_row(1, "Scheibe 1", 'done_when = "D"\n')
+                        79,
+                        MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Scheibe 1", 'done_when = "D"\n'),
                     ),
                 ),
                 ("--title", "Wrong title"),
@@ -442,7 +439,8 @@ def test_cut_requires_a_valid_block_for_the_row_it_cuts(case: CutCase, cut_check
                 "precondition_failed",
                 (
                     container_issue(
-                        79, MINIMAL_BLOCK_TOML + slice_row(1, "Scheibe 1", 'done_when = "D"\n')
+                        79,
+                        MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Scheibe 1", 'done_when = "D"\n'),
                     ),
                 ),
                 ("--row", "9"),
@@ -494,17 +492,17 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
             cut(
                 MINIMAL_BLOCK_TOML
                 + (
-                    slice_row(1, "Scheibe 1", 'done_when = "D"\n')
-                    + slice_row(2, "Scheibe 2", 'done_when = "D"\n')
+                    SLICE_ROW.format(1, "Scheibe 1", 'done_when = "D"\n')
+                    + SLICE_ROW.format(2, "Scheibe 2", 'done_when = "D"\n')
                 ),
                 (),
                 1,
                 "Scheibe 1",
-                child_body("D", ""),
+                CHILD_BODY.format("D", ""),
                 {
                     79: block_body(
                         'version = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n\n'
-                        + slice_row(2, "Scheibe 2", 'done_when = "D"').rstrip("\n")
+                        + SLICE_ROW.format(2, "Scheibe 2", 'done_when = "D"').rstrip("\n")
                     )
                 },
             ),
@@ -512,11 +510,11 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
         *rendered(
             "row-without-done-when",
             cut(
-                MINIMAL_BLOCK_TOML + slice_row(1, "Scheibe 1", ""),
+                MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Scheibe 1", ""),
                 (),
                 1,
                 "Scheibe 1",
-                child_body("", ""),
+                CHILD_BODY.format("", ""),
                 {
                     79: block_body(
                         'version = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n\nslice = []'
@@ -526,7 +524,14 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
         ),
         *rendered(
             "untied-without-a-slice-key",
-            cut(MINIMAL_BLOCK_TOML, ("--title", "Untied"), None, "Untied", child_body("", ""), {}),
+            cut(
+                MINIMAL_BLOCK_TOML,
+                ("--title", "Untied"),
+                None,
+                "Untied",
+                CHILD_BODY.format("", ""),
+                {},
+            ),
         ),
         *rendered(
             "untied-with-an-empty-slice",
@@ -535,7 +540,7 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
                 ("--title", "Untied"),
                 None,
                 "Untied",
-                child_body("", ""),
+                CHILD_BODY.format("", ""),
                 {},
             ),
         ),
@@ -552,11 +557,11 @@ def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: Cut
         *rendered(
             "fills-an-empty-row",
             cut(
-                MINIMAL_BLOCK_TOML + slice_row(1, "Scheibe 1", 'done_when = "D"\n'),
+                MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Scheibe 1", 'done_when = "D"\n'),
                 ("--scope", "src/c.py"),
                 1,
                 "Scheibe 1",
-                child_body("D", '\nscope = ["src/c.py"]\n'),
+                CHILD_BODY.format("D", '\nscope = ["src/c.py"]\n'),
                 {
                     79: block_body(
                         'version = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n\nslice = []'
@@ -568,11 +573,11 @@ def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: Cut
             "inherits-the-rows-scope",
             cut(
                 MINIMAL_BLOCK_TOML
-                + slice_row(1, "Slice C", 'done_when = "D"\nscope = ["src/c.py"]\n'),
+                + SLICE_ROW.format(1, "Slice C", 'done_when = "D"\nscope = ["src/c.py"]\n'),
                 (),
                 1,
                 "Slice C",
-                child_body("D", '\nscope = ["src/c.py"]\n'),
+                CHILD_BODY.format("D", '\nscope = ["src/c.py"]\n'),
                 {
                     79: block_body(
                         'version = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n\nslice = []'
@@ -589,7 +594,7 @@ def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: Cut
                     container_issue(
                         79,
                         MINIMAL_BLOCK_TOML
-                        + slice_row(1, "Slice C", 'done_when = "D"\nscope = ["src/c.py"]\n'),
+                        + SLICE_ROW.format(1, "Slice C", 'done_when = "D"\nscope = ["src/c.py"]\n'),
                     ),
                 ),
                 ("--scope", "src/other.py"),
@@ -603,7 +608,7 @@ def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: Cut
                 ("--title", "Loose Cut", "--scope", "src/loose.py"),
                 None,
                 "Loose Cut",
-                child_body("", '\nscope = ["src/loose.py"]\n'),
+                CHILD_BODY.format("", '\nscope = ["src/loose.py"]\n'),
                 {},
             ),
         ),
