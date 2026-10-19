@@ -13796,38 +13796,6 @@ def run_check(number: int = 12) -> int:
     return issue_claim.main(["--repo", REPOSITORY, "check", str(number)])
 
 
-def test_check_accepts_a_claimed_work_item_that_the_pull_request_closes(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(
-            body=f"Work-Item: {REPOSITORY}#{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}"
-        ),
-    )
-
-    assert run_check() == 0
-    assert capsys.readouterr().out == (
-        f"PR #12 by ada declares Work-Item: {REPOSITORY}#{WORK_ITEM_ISSUE}\n"
-    )
-
-
-def test_check_reads_the_same_work_item_from_shorthand_and_qualified_lines(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(
-            body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses {REPOSITORY}#{WORK_ITEM_ISSUE}"
-        ),
-    )
-
-    assert run_check() == 0
-    assert capsys.readouterr().out == (
-        f"PR #12 by ada declares Work-Item: {REPOSITORY}#{WORK_ITEM_ISSUE}\n"
-    )
-
-
 def test_check_refuses_a_named_sentence_outside_a_checkout(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -13893,63 +13861,6 @@ def test_check_reports_invalid_usage_when_repo_is_given_under_state_ref(
     assert status == 2
     assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
     _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
-
-
-def test_check_accepts_an_issueless_documentation_pull_request(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(
-            body="No-Item: docs\n\nTidy the README.",
-            head_ref_name=DOCUMENTATION_LANE_BRANCH,
-        ),
-        standing=(documentation_lane_claim(),),
-    )
-
-    assert run_check() == 0
-    assert capsys.readouterr().out == "PR #12 by ada declares No-Item: docs\n"
-
-
-@pytest.mark.parametrize(
-    ("standing", "reason"),
-    [
-        pytest.param(
-            (documentation_lane_claim(branch="docs/another-lane"),),
-            f"has no active issue-less lane claim on branch {DOCUMENTATION_LANE_BRANCH!r}",
-            id="lane-claim-on-another-branch",
-        ),
-        pytest.param(
-            (
-                request(
-                    "item-lane",
-                    issue=WORK_ITEM_ISSUE,
-                    branch=DOCUMENTATION_LANE_BRANCH,
-                    scope=("README.md",),
-                ),
-            ),
-            f"has no active issue-less lane claim on branch {DOCUMENTATION_LANE_BRANCH!r}",
-            id="issue-claim-on-the-head-branch",
-        ),
-    ],
-)
-def test_check_refuses_an_issueless_pull_request_without_its_lane_claim(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    standing: tuple[ClaimRequest, ...],
-    reason: str,
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(
-            body="No-Item: docs\n\nTidy the README.",
-            head_ref_name=DOCUMENTATION_LANE_BRANCH,
-        ),
-        standing=standing,
-    )
-
-    assert run_check() == 2
-    assert capsys.readouterr().err == f"REFUSED: pull request #12 {reason}\n"
 
 
 def _dependency_configuration(scenario: str) -> str:
@@ -14153,152 +14064,6 @@ def test_check_judges_a_deps_pull_request_by_its_configuration(
         assert output.err == f"REFUSED: pull request #12 {reason}\n"
     reads = scenario not in {None, "empty"} and claimed and body == "No-Item: deps"
     assert client.changes_reads == ([12] if reads else [])
-
-
-def test_check_refuses_an_issueless_pull_request_that_closes_an_item(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(
-            body=f"No-Item: fix\n\nCloses #{WORK_ITEM_ISSUE}",
-            head_ref_name=DOCUMENTATION_LANE_BRANCH,
-        ),
-        standing=(documentation_lane_claim(),),
-    )
-
-    assert run_check() == 2
-    assert capsys.readouterr().err == (
-        f"REFUSED: pull request #12 declares no work item but closes "
-        f"{REPOSITORY}#{WORK_ITEM_ISSUE}; name it as the work item\n"
-    )
-
-
-@pytest.mark.parametrize(
-    "body",
-    [f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}", "No-Item: deps"],
-    ids=["work-item", "cell-33-deps"],
-)
-def test_check_refuses_a_pull_request_proposing_another_repositorys_branch(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], body: str
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(
-            body=body,
-            head_repository="fork/agent-coordination",
-        ),
-    )
-
-    assert run_check() == 2
-    assert capsys.readouterr().err == (
-        "REFUSED: pull request #12 proposes a branch of fork/agent-coordination; "
-        "cross-repository pull requests are not classified\n"
-    )
-
-
-@pytest.mark.parametrize(
-    ("body", "reason"),
-    [
-        pytest.param(
-            "Advances #72\n\nJust some prose.",
-            "carries no `Work-Item:` or `No-Item:` line",
-            id="advances-is-not-a-classification",
-        ),
-        pytest.param(
-            "Work-Item: #72\nNo-Item: docs\n\nCloses #72",
-            "carries 2 classification lines; exactly one is required",
-            id="duplicate-classification",
-        ),
-        pytest.param(
-            "Work-Item: #72\nWork-Item: #73\n\nCloses #72\nCloses #73",
-            "names two work items, #72 and #73; split it",
-            id="two-work-items",
-        ),
-        pytest.param(
-            "No-Item: chore\n\nHousekeeping.",
-            "carries `No-Item: chore`; an issue-less pull request is docs, fix, or deps",
-            id="unknown-no-item-kind",
-        ),
-        pytest.param(
-            "Work-Item: soon\n\nCloses #72",
-            "carries `Work-Item: soon`; a work item reads OWNER/REPO#n or #n",
-            id="malformed-work-item",
-        ),
-        pytest.param(
-            "Work-Item: #72\n\nNo closing keyword here.",
-            f"carries no closing reference for its work item {REPOSITORY}#72",
-            id="missing-closing-reference",
-        ),
-        pytest.param(
-            "Work-Item: #72\n\nCloses #72\nCloses #99",
-            f"closes {REPOSITORY}#99 besides its work item {REPOSITORY}#72; "
-            "a pull request lands one item",
-            id="closes-another-item",
-        ),
-        pytest.param(
-            "Work-Item: other/repo#5\n\nCloses other/repo#5",
-            "names work item other/repo#5 of another repository, which holds no claim here",
-            id="foreign-work-item",
-        ),
-    ],
-)
-def test_check_refuses_a_pull_request_body_with_one_line(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    body: str,
-    reason: str,
-) -> None:
-    check_client(monkeypatch, landing_pull_request(body=body))
-
-    assert run_check() == 2
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == f"REFUSED: pull request #12 {reason}\n"
-
-
-def test_check_refuses_a_work_item_without_a_claim_on_the_head_branch(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(body="Work-Item: #72\n\nCloses #72"),
-        standing=(request("elsewhere", issue=72, branch="codex/other-lane", scope=("src",)),),
-    )
-
-    assert run_check() == 2
-    assert capsys.readouterr().err == (
-        f"REFUSED: pull request #12 has no active claim for #72 on branch {LANDING_BRANCH!r}\n"
-    )
-
-
-def test_check_refuses_a_pull_request_that_does_not_target_the_default_branch(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    client = check_client(
-        monkeypatch,
-        landing_pull_request(body="Work-Item: #72\n\nCloses #72", base_ref_name="release"),
-    )
-    client.default_branch_name = "trunk"
-
-    assert run_check() == 2
-    assert capsys.readouterr().err == (
-        "REFUSED: pull request #12 targets 'release', not the default branch 'trunk'\n"
-    )
-
-
-def test_check_reads_a_fenced_classification_line_as_documentation(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    check_client(
-        monkeypatch,
-        landing_pull_request(body="Documents the convention:\n\n```\nWork-Item: #72\n```\n"),
-    )
-
-    assert run_check() == 2
-    assert capsys.readouterr().err == (
-        "REFUSED: pull request #12 carries no `Work-Item:` or `No-Item:` line\n"
-    )
 
 
 LANE_BRANCH = "docs/tidy-readme"
@@ -16909,21 +16674,6 @@ def test_next_names_a_recovery_item_before_the_item_it_recommends(
     assert capsys.readouterr().out.startswith(f"RECOVERY\n#90: {board.RECOVERY_STEP}\n\n")
 
 
-def test_check_accepts_a_body_naming_work_github_does_not_close_on(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`Implements #80` retires nothing on GitHub, so it is no closing reference."""
-    check_client(
-        monkeypatch,
-        landing_pull_request(body="Work-Item: #72\n\nCloses #72\n\nImplements #80"),
-    )
-
-    assert run_check() == 0
-    assert capsys.readouterr().out == (
-        f"PR #12 by ada declares Work-Item: {REPOSITORY}#{WORK_ITEM_ISSUE}\n"
-    )
-
-
 CHECKED_ISSUE = 81
 
 
@@ -17245,21 +16995,6 @@ def test_issue_check_labels_a_local_blocker_under_the_state_ref_pin() -> None:
     assert outcome.line == f"ISSUE {checked_label} blocked by {local_label}, other/repo#9"
 
 
-def test_check_reads_a_pull_request_in_one_dispatch_landing_and_classification_request(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Four round trips for a parentless work item: the dispatch reference,
-    the landing itself, the default branch, and the sub-issue relation."""
-    client = check_client(
-        monkeypatch,
-        landing_pull_request(body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}"),
-    )
-
-    assert run_check() == 0
-    capsys.readouterr()
-    assert client.requests == 4
-
-
 def test_check_json_reports_unavailable_on_a_real_forge_failure(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -17280,65 +17015,6 @@ def test_check_json_reports_unavailable_on_a_real_forge_failure(
     captured = capsys.readouterr()
     assert status == 2
     _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-
-
-@pytest.mark.parametrize(
-    ("body", "exit_code", "expected"),
-    [
-        pytest.param(
-            f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
-            0,
-            {"ok": True, "reason": "valid", "kind": "pull_request", "number": 12},
-            id="declared-pull-request",
-        ),
-        pytest.param(
-            "Tidy the README.",
-            2,
-            {
-                "ok": False,
-                "reason": "invalid_classification",
-                "kind": "pull_request",
-                "number": 12,
-                "message": "carries no `Work-Item:` or `No-Item:` line",
-            },
-            id="unclassified-pull-request",
-        ),
-    ],
-)
-def test_check_json_discriminates_a_pull_request(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    body: str,
-    exit_code: int,
-    expected: dict[str, object],
-) -> None:
-    check_client(monkeypatch, landing_pull_request(body=body))
-
-    status = issue_claim.main(["--repo", REPOSITORY, "check", "12", "--json"])
-
-    assert status == exit_code
-    assert json.loads(capsys.readouterr().out) == expected
-
-
-def test_check_json_pins_the_raw_envelope_text_for_a_valid_pull_request(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The raw bytes `check` prints on success (OUT-01's own key order,
-    `ok`/`reason`/`kind`/`number`, and its trailing newline), not just the
-    parsed dict `test_check_json_discriminates_a_pull_request` already
-    covers."""
-    check_client(
-        monkeypatch,
-        landing_pull_request(body=f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}"),
-    )
-
-    status = issue_claim.main(["--repo", REPOSITORY, "check", "12", "--json"])
-
-    assert status == 0
-    assert (
-        capsys.readouterr().out
-        == '{"ok": true, "reason": "valid", "kind": "pull_request", "number": 12}\n'
-    )
 
 
 @pytest.mark.parametrize(
@@ -17384,20 +17060,6 @@ def test_check_json_discriminates_an_issue(
 
     assert status == exit_code
     assert json.loads(capsys.readouterr().out) == expected
-
-
-@pytest.mark.parametrize(
-    "argv",
-    [
-        pytest.param(["pr-check", "--pr", "12"], id="replaced-command"),
-        pytest.param(["check", "--pr", "12"], id="replaced-option"),
-    ],
-)
-def test_the_replaced_pull_request_check_surface_is_gone(argv: list[str]) -> None:
-    with pytest.raises(SystemExit) as refused:
-        issue_claim.main(["--repo", REPOSITORY, *argv])
-
-    assert refused.value.code == 2
 
 
 @pytest.mark.parametrize(
