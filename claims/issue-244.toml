@@ -1,0 +1,8 @@
+claim_id = "e9b93b9d3536444597879c8e4a1b1e0b"
+agent = "claude"
+role = "builder"
+base = "31321f9a5609f375cf3033b4d0809a80d39e3c61"
+branch = "claude/issue-244-trunk-reader-git-failure"
+scope = ["specs/brief.spec.md", "specs/check.spec.md", "specs/protect.spec.md", "specs/release.spec.md", "specs/rescope.spec.md", "specs/start.spec.md", "specs/status.spec.md", "src/agent_coordination/checkout.py", "tests/cli_fixtures.py", "tests/conftest.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_protect.py", "tests/test_release_cleanup.py"]
+opened_commit = "de7d47cf395d2c4e459f26b2fb3aba9b185b25fa"
+whole_reason = "Eine Lane, kein Schnitt: Leseränderung und Release-Nachweis landen zusammen. Eine Entscheidung (ein Git-Fehler ist nie ein nicht aufgezeichneter HEAD und nie ein fehlender Commit) mit einem Fehlertyp am Owner, einem Leser für B, C und resolved_commit, den Never-Sätzen und den Aufruferzeilen; die Test-Isolation ist die Folge desselben Vertrags."
