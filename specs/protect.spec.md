@@ -248,7 +248,7 @@ than a bare `claim first`.
 - [ ] [PROT-33] A recognized pattern's own path outside the live claim's scope denies `<pattern> <path> outside claim scope`, naming both (see E-PROT-08).
 - [ ] [PROT-34] A literal, resolvable `cd` changes the directory every later path in its own `;`/`&&`/`||`/newline list resolves against -- never across a `|`, and only inside its own group.
 - [ ] [PROT-35] An unresolvable `cd` target -- expandable, `-`, or no operand -- ends recognition for the rest of the command outright, allowing it (see E-PROT-10).
-- [ ] [PROT-47] A file a `sed` script writes (`w`, `W`, `s///w`) in a readable `-e` value or positional script is a `sed w` path; reading stops at `-f`, an expansion, a bare `-e` or a GNU-rejected construct (E-PROT-19).
+- [ ] [PROT-47] A file a `sed` script writes (`w`, `W`, `s///w`) in a readable `-e` or positional script is a `sed w` path; reading stops at `-f`, an expansion, a bare `-e` or a GNU-rejected construct (E-PROT-19).
 
 ## Forge-free
 
