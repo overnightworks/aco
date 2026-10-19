@@ -1,8 +1,0 @@
-claim_id = "c963d24f89b94f62af228bfe15cf48bb"
-agent = "claude"
-role = "builder"
-base = "4746a838127ef20342955e33657a4a5ba2b41df5"
-branch = "claude/issue-236-sed-script-writes"
-scope = ["pyproject.toml", "scripts/test_budget_ratchet.txt", "specs/protect.spec.md", "src/agent_coordination/hook_input.py", "src/agent_coordination/sed_script.py", "tests/test_hook_input.py", "tests/test_protect.py", "tests/test_sed_script.py"]
-opened_commit = "5db19116b790026b0b032f8c32470bf8ed858a59"
-whole_reason = "Ein Erkenner und seine Verdrahtung: das neue reine Modul, das Muster im Hook, der Spec-Satz und die Zeilen in beiden Testmodulen beweisen zusammen einen Satz; getrennt landet entweder ungenutzter Code oder ein ungeprüftes Muster."
