@@ -521,7 +521,25 @@ class PathCheckout:
 NO_COMMIT_CHECKOUT_REASON = "no commit on this branch"
 NOT_IN_A_REPOSITORY_REASON = "not in a repository"
 RELATIVE_PAYLOAD_PATH_DENIAL = "relative payload path"
-REPOSITORY_SELECTING_GIT_VARIABLES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR")
+# Verbatim from `git rev-parse --local-env-vars` (git 2.43): every variable
+# that makes git read a repository from the environment, not from `.git`.
+LOCAL_GIT_ENVIRONMENT_VARIABLES = (
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+)
 
 
 def checkout_relative(path: Path, *, toplevel: Path) -> PurePosixPath | None:
@@ -575,8 +593,9 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     never inside a repository -- `git -C` cannot even enter it -- so it
     stays `None` whatever sits above it, even an outer checkout's `.git`.
     Only that first discovery may read as "outside", and never while the
-    environment selects a repository (`GIT_DIR`, `GIT_WORK_TREE`,
-    `GIT_COMMON_DIR`: a checkout no `.git` marker sits above): once git has
+    environment sets any of git's local variables (`GIT_DIR`, `GIT_WORK_TREE`,
+    `GIT_OBJECT_DIRECTORY`, ...: a repository no `.git` marker sits above
+    may exist): once git has
     named the checkout, a failed read of its branch or commit raises, inside
     a git directory as PROT-43's sentence.
     """
@@ -599,7 +618,7 @@ def _refuse_a_failure_inside_a_repository(directory: Path, error: ClaimError) ->
     one, so the git failure on it can never read as "outside every
     repository"."""
     _refuse_a_failure_inside_a_git_directory(directory, error)
-    if _has_repository_marker_above(directory) or _environment_selects_a_repository():
+    if _has_repository_marker_above(directory) or _environment_sets_a_local_git_variable():
         raise error
 
 
@@ -611,13 +630,11 @@ def _refuse_a_failure_inside_a_git_directory(directory: Path, error: ClaimError)
         raise ClaimError(inside_git_directory_reason(git_directory)) from error
 
 
-def _environment_selects_a_repository() -> bool:
-    """Whether the inherited environment names the repository git works in,
-    so no filesystem marker is needed for one to exist: `GIT_DIR`,
-    `GIT_WORK_TREE` and `GIT_COMMON_DIR` are the variables of git's own
-    `rev-parse --local-env-vars` list that choose a repository or its
-    worktree (the rest locate objects, the index or replacements inside one)."""
-    return any(name in os.environ for name in REPOSITORY_SELECTING_GIT_VARIABLES)
+def _environment_sets_a_local_git_variable() -> bool:
+    """Whether the inherited environment has any of git's local variables
+    present, an empty value included: each may place a repository, or what
+    git takes for one, where no filesystem marker shows it."""
+    return any(name in os.environ for name in LOCAL_GIT_ENVIRONMENT_VARIABLES)
 
 
 def inside_git_directory_reason(git_directory: Path) -> str:
@@ -717,10 +734,12 @@ def _is_repository_marker(dot_git: Path) -> bool:
 
 def _is_git_directory(candidate: Path) -> bool:
     """The layout git's own discovery takes for a repository directory:
-    `HEAD` beside `objects/` and `refs/`."""
+    `HEAD` beside `refs/` and an object directory -- `GIT_OBJECT_DIRECTORY`
+    when set, else `objects/`, as git itself checks it."""
+    object_directory = Path(os.environ.get("GIT_OBJECT_DIRECTORY", candidate / "objects"))
     return (
         (candidate / "HEAD").is_file()
-        and (candidate / "objects").is_dir()
+        and object_directory.is_dir()
         and (candidate / "refs").is_dir()
     )
 

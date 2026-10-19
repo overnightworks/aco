@@ -3584,12 +3584,7 @@ def test_protect_and_rescope_refuse_with_gits_text_when_a_checkout_read_fails(
     assert refusal_of(monkeypatch, capsys, path) == (2, "fatal: broken")
 
 
-def _environment_selected_repository(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, Path]:
-    """A repository with a commit that only `GIT_DIR` and `GIT_WORK_TREE`
-    select: no `.git` marker sits above the returned work tree. Returns
-    `(git_directory, work_tree)`."""
+def _committed_repository(tmp_path: Path) -> Path:
     repository = tmp_path / "repo"
     repository.mkdir()
     real_git(repository, "init", "-q", "-b", "main")
@@ -3605,12 +3600,39 @@ def _environment_selected_repository(
         "x",
         "--allow-empty",
     )
+    return repository
+
+
+def _select_git_directory_and_work_tree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path]:
+    repository = _committed_repository(tmp_path)
     work_tree = tmp_path / "plain"
     work_tree.mkdir()
     monkeypatch.setenv("GIT_DIR", str(repository / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(work_tree))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     return repository / ".git", work_tree
+
+
+def _select_external_objects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:
+    repository = _committed_repository(tmp_path)
+    external_objects = tmp_path / "objects-elsewhere"
+    (repository / ".git" / "objects").rename(external_objects)
+    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", str(external_objects))
+    return repository / ".git", repository
+
+
+@pytest.fixture(params=[_select_git_directory_and_work_tree, _select_external_objects])
+def environment_selected_repository(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path]:
+    """A repository with a commit that only a local git variable of the
+    environment makes recognizable -- `GIT_DIR` with `GIT_WORK_TREE`, or
+    `GIT_OBJECT_DIRECTORY` with the objects moved out of `.git` -- no
+    complete `.git` marker sits above the work tree. Returns
+    `(git_directory, work_tree)`."""
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    return request.param(monkeypatch, tmp_path)
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -3633,17 +3655,17 @@ def _environment_selected_repository(
 @pytest.mark.parametrize(("inject", "detail"), GIT_FAILURE_INJECTIONS)
 def test_protect_refuses_a_failed_read_in_a_checkout_selected_by_the_environment(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
+    environment_selected_repository: tuple[Path, Path],
     capsys: pytest.CaptureFixture[str],
     failing_read: list[str],
     inject: Callable[[pytest.MonkeyPatch, list[str]], list[list[str]]],
     detail: str,
 ) -> None:
-    """PROT-17: `GIT_DIR` and `GIT_WORK_TREE` select a checkout no `.git`
-    marker sits above. A failed read of its discovery or its commit refuses
-    with git's own text -- never reads as a path outside every repository,
-    which PROT-32 allows unjudged."""
-    _, work_tree = _environment_selected_repository(monkeypatch, tmp_path)
+    """PROT-17: a local git variable of the environment makes a checkout no
+    complete `.git` marker sits above. A failed read of its discovery or its
+    commit refuses with git's own text -- never reads as a path outside
+    every repository, which PROT-32 allows unjudged."""
+    _, work_tree = environment_selected_repository
     injected = inject(monkeypatch, failing_read)
 
     outcome = _protect_refusal(monkeypatch, capsys, work_tree / "widget.py")
@@ -3659,12 +3681,27 @@ def test_protect_names_a_git_directory_when_a_branch_read_fails_in_an_environmen
     """PROT-43: a path inside the git directory denies with `not a checkout:
     ...`, never git's own error text, even when the read after discovery
     fails."""
-    git_directory, _ = _environment_selected_repository(monkeypatch, tmp_path)
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    git_directory, _ = _select_git_directory_and_work_tree(monkeypatch, tmp_path)
     injected = inject_exit_128(monkeypatch, ["branch", "--show-current"])
 
     outcome = _protect_refusal(monkeypatch, capsys, git_directory / "objects" / "widget")
 
     assert injected
+    assert outcome == (2, f"not a checkout: {git_directory.resolve()} is a git directory")
+
+
+@pytest.mark.usefixtures("isolated_global_git_config")
+def test_protect_names_a_git_directory_whose_objects_live_elsewhere(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """PROT-43: with `GIT_OBJECT_DIRECTORY` set, a `.git` holding only `HEAD`
+    and `refs/` is the git directory git itself recognizes."""
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    git_directory, _ = _select_external_objects(monkeypatch, tmp_path)
+
+    outcome = _protect_refusal(monkeypatch, capsys, git_directory / "refs" / "widget")
+
     assert outcome == (2, f"not a checkout: {git_directory.resolve()} is a git directory")
 
 
