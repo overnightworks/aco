@@ -85,6 +85,7 @@ class Intervention(Enum):
     DIRTY = auto()
     CHECKED_ELSEWHERE = auto()
     GIT_FAILURE = auto()
+    FOREIGN_COMMIT_READ_FAILS = auto()
 
     def install(self, target: CleanupIntervention) -> None:
         actions = {
@@ -100,6 +101,10 @@ class Intervention(Enum):
             Intervention.DIRTY: (target.before, target.dirty),
             Intervention.CHECKED_ELSEWHERE: (target.before, target.check_out_elsewhere),
             Intervention.GIT_FAILURE: (target.before, target.fail_worktree_resolution),
+            Intervention.FOREIGN_COMMIT_READ_FAILS: (
+                target.before,
+                target.fail_commit_read_of_a_worktree_listed_first,
+            ),
         }
         timing, action = actions[self]
         timing(action)
@@ -294,6 +299,23 @@ class CleanupIntervention:
             exit_status=128,
             stderr="fatal: cannot change to 'gone': No such file or directory",
         )
+
+    def fail_commit_read_of_a_worktree_listed_first(self) -> None:
+        """A candidate on another branch that git lists before the lane's
+        own worktree, whose commit read exits 128: cleanup must keep the
+        lane rather than read the failure as that candidate having none."""
+        foreign = self.clone.parent / "aaa-foreign"
+        real_git(self.clone, "worktree", "add", "-q", str(foreign), "-b", "codex/issue-1-foreign")
+        real_git_run = checkout._git_run
+
+        def fail_for_the_foreign_worktree(
+            arguments: list[str], *, directory: Path | None = None, **options: bool
+        ) -> process.CapturedResult:
+            if arguments == ["rev-parse", "--verify", "--quiet", "HEAD"] and directory == foreign:
+                return process.CapturedResult(128, b"", b"fatal: broken")
+            return real_git_run(arguments, directory=directory, **options)
+
+        self.monkeypatch.setattr(checkout, "_git_run", fail_for_the_foreign_worktree)
 
     def refuse_listing(self) -> None:
         stub_one_git_call(
@@ -624,6 +646,11 @@ KEPT = replace(
             "git-failure",
             "kept -- git failure: fatal: cannot change to 'gone': No such file or directory",
             replace(KEPT, intervention=Intervention.GIT_FAILURE),
+        ),
+        *rendered(
+            "foreign-worktree-git-failure",
+            "kept -- git failure: fatal: broken",
+            replace(KEPT, intervention=Intervention.FOREIGN_COMMIT_READ_FAILS),
         ),
     ],
 )

@@ -8695,6 +8695,85 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
     assert _state_ref_tip(repo, remote) == tip_after_release
 
 
+def _state_ref_landing_with_its_lane_worktree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, Path, Path, list[str]]:
+    """The real state-ref landing of item #10 with the landed lane's linked
+    worktree and branch standing, and the `release --merged` call for it."""
+    repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
+    lane_worktree = tmp_path / "issue-10-lane"
+    real_git(
+        repo, "worktree", "add", "-q", "-b", "codex/issue-10-claims", str(lane_worktree), "feature"
+    )
+    landing = ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
+    return repo, remote, lane_worktree, landing
+
+
+def test_release_merged_under_state_ref_removes_the_landed_lane_worktree(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    _repo, _remote, lane_worktree, landing = _state_ref_landing_with_its_lane_worktree(
+        monkeypatch, tmp_path
+    )
+
+    status = issue_claim.main(landing)
+
+    assert (status, "worktree: removed\n" in capsys.readouterr().out) == (0, True)
+    assert not lane_worktree.exists()
+
+
+def test_release_merged_under_state_ref_stops_before_the_transition_when_the_remote_head_read_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """REL-32: the trunk the landing is walked against is never guessed
+    after a failed read of `<remote>/HEAD`: the claim stays, worktree and
+    branch stand, and `refs/aco/state` does not move."""
+    repo, remote, lane_worktree, landing = _state_ref_landing_with_its_lane_worktree(
+        monkeypatch, tmp_path
+    )
+    tip_before = _state_ref_tip(repo, remote)
+    stub_one_git_call(
+        monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
+    )
+
+    status = issue_claim.main(landing)
+
+    captured = capsys.readouterr()
+    assert (status, captured.out, captured.err) == (2, "", "ERROR: fatal: broken\n")
+    assert _state_ref_tip(repo, remote) == tip_before
+    assert lane_worktree.is_dir()
+    assert real_git(repo, "branch", "--list", "codex/issue-10-claims").stdout.strip()
+
+
+def test_release_merged_under_state_ref_keeps_the_lane_worktree_when_the_cleanup_read_of_the_remote_head_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """REL-32: the remote `HEAD` read after the cleanup's fetch fails only
+    then: the release already happened and stays, and the worktree and
+    branch are kept with git's text, never judged merged against a guess."""
+    repo, remote, lane_worktree, landing = _state_ref_landing_with_its_lane_worktree(
+        monkeypatch, tmp_path
+    )
+    real_fetch_remote = checkout.fetch_remote
+
+    def fetch_then_fail_the_remote_head_read(*arguments: object, **options: object) -> None:
+        real_fetch_remote(*arguments, **options)
+        stub_one_git_call(
+            monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
+        )
+
+    monkeypatch.setattr(checkout, "fetch_remote", fetch_then_fail_the_remote_head_read)
+
+    status = issue_claim.main(landing)
+
+    assert status == 0
+    assert "worktree: kept -- git failure: fatal: broken\n" in capsys.readouterr().out
+    assert fresh_observation(repo, remote).state.claims == {}
+    assert lane_worktree.is_dir()
+    assert real_git(repo, "branch", "--list", "codex/issue-10-claims").stdout.strip()
+
+
 @pytest.mark.parametrize(
     "reclaim_on",
     ["codex/issue-10-again", "codex/issue-10-claims", None],
