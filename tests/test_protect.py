@@ -3829,6 +3829,11 @@ def _move_common_files_away(directory: Path) -> None:
     _move_common_files_into(directory, "c")
 
 
+def _make_commondir_unreadable(directory: Path) -> None:
+    _move_common_files_away(directory)
+    (directory / "commondir").mkdir()
+
+
 def _write_head_beside_commondir_without_local_objects(directory: Path, head: bytes) -> None:
     _write_commondir(directory, b"c", moved_into=b"c")
     _write_head(directory, head)
@@ -3948,7 +3953,7 @@ GIT_DIRECTORY_RECOGNITION_ROWS = [
         id="commondir-empty-fails-closed",
     ),
     pytest.param(
-        lambda directory: (_move_common_files_away(directory), (directory / "commondir").mkdir()),
+        _make_commondir_unreadable,
         {},
         True,
         id="commondir-unreadable-fails-closed",
@@ -4006,7 +4011,7 @@ GIT_DIRECTORY_RECOGNITION_ROWS = [
 @pytest.mark.parametrize(
     ("arrange_layout", "environment", "recognized"), GIT_DIRECTORY_RECOGNITION_ROWS
 )
-def test_protect_names_a_git_directory_exactly_when_git_takes_it_for_one(
+def test_protect_names_a_directory_a_git_directory_when_git_or_mains_rule_takes_it_for_one(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -4015,9 +4020,10 @@ def test_protect_names_a_git_directory_exactly_when_git_takes_it_for_one(
     recognized: bool,
 ) -> None:
     """PROT-43: a path in a directory denies with the git-directory sentence
-    exactly when git 2.43 recognizes that directory (setup.c
-    `is_git_directory`); where git does not, the path is outside every
-    repository or the environment's own variable makes git's text the denial."""
+    when git 2.43 (setup.c `is_git_directory`) or main's rule (`HEAD` file
+    beside `objects/` and `refs/`) takes that directory for a git directory;
+    where neither does, the path is outside every repository or the
+    environment's own variable makes git's text the denial."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     directory = _git_directory_layout(tmp_path / "git-directory")
     arrange_layout(directory)
