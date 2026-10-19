@@ -8757,8 +8757,8 @@ def test_release_merged_under_state_ref_keeps_the_worktree_when_the_cleanup_head
     )
     real_fetch_remote = checkout.fetch_remote
 
-    def fetch_then_fail_the_remote_head_read(*arguments: object, **options: object) -> None:
-        real_fetch_remote(*arguments, **options)
+    def fetch_then_fail_the_remote_head_read(remote: str, *, directory: Path) -> None:
+        real_fetch_remote(remote, directory=directory)
         stub_one_git_call(
             monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
         )

@@ -58,20 +58,27 @@ def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def stub_one_git_call(
-    monkeypatch: pytest.MonkeyPatch, arguments: list[str], *, exit_status: int, stderr: str
+    monkeypatch: pytest.MonkeyPatch,
+    arguments: list[str],
+    *,
+    exit_status: int,
+    stderr: str,
+    directory: Path | None = None,
 ) -> None:
-    """Force exactly one `checkout._git_run` argv to a chosen failure exit,
+    """Force exactly one `checkout._git_run` argv -- in `directory` only,
+    when given -- to a chosen failure exit,
     every other call reaching the real launcher -- shared by
     checkout and CLI test families (issue #322): a git-level failure
     (an unreachable remote, a colliding worktree path, an unmerged branch
     `git branch -d` itself refuses, ...) is cheaper to force this way than
     to reproduce with real git state."""
     real_git_run = checkout._git_run
+    stubbed_directory = directory
 
     def fake(
         call_arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> process.CapturedResult:
-        if call_arguments == arguments:
+        if call_arguments == arguments and stubbed_directory in (None, directory):
             return process.CapturedResult(exit_status, b"", stderr.encode())
         return real_git_run(call_arguments, directory=directory, **options)
 

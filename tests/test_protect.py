@@ -197,7 +197,7 @@ def _patch_protect_git(
             # answering empty (measured locally, issue #238); `origin_head is
             # None` reproduces that shape rather than a missing-fixture-key
             # `KeyError`.
-            raise checkout.GitExitError(1, "unknown git failure")
+            raise checkout.GitExitError(process.CapturedResult(1, b"", b"unknown git failure"))
         return values[key]
 
     monkeypatch.setattr(checkout, "git_output", git)
@@ -1269,10 +1269,12 @@ def test_protect_denies_with_gits_text_when_reading_the_remote_head_fails(
     forbid_github_construction(monkeypatch)
     fake_git_output = checkout.git_output
 
-    def failing_head_read(arguments: list[str], **options: object) -> str:
+    def failing_head_read(
+        arguments: list[str], *, directory: Path | None = None, **options: bool
+    ) -> str:
         if tuple(arguments) == RECORDED_ORIGIN_HEAD_READ:
-            raise checkout.GitExitError(128, "fatal: broken")
-        return fake_git_output(arguments, **options)
+            raise checkout.GitExitError(process.CapturedResult(128, b"", b"fatal: broken"))
+        return fake_git_output(arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "git_output", failing_head_read)
 

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_coordination import checkout, protect
+from agent_coordination import checkout, process, protect
 
 # Registers `bare_remote` and `worktree` for every module by name: an import
 # of a fixture only to receive it as a parameter reads as unused to ruff.
@@ -64,7 +64,7 @@ def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
             and directory in (None, tmp_path)
             and not (tmp_path / ".git").exists()
         ):
-            raise checkout.GitExitError(1, "")
+            raise checkout.GitExitError(process.CapturedResult(1, b"", b""))
         return real_git_output(arguments, directory=directory, **options)
 
     monkeypatch.setattr(checkout, "git_output", fake_git_output)

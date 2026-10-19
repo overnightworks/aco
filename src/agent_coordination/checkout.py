@@ -58,13 +58,13 @@ class GitTimedOutError(ClaimError):
 
 
 class GitExitError(ClaimError):
-    """A git step that ran and exited nonzero, carrying its `exit_status` so
-    a reader with one documented "absent" exit tells it from a real
-    failure; the text is git's own detail."""
+    """A git step that ran and exited nonzero: git's own detail as the text,
+    its `exit_status` kept so a reader with one documented "absent" exit
+    tells it from a real failure."""
 
-    def __init__(self, exit_status: int, detail: str) -> None:
-        super().__init__(detail)
-        self.exit_status = exit_status
+    def __init__(self, result: process.CapturedResult) -> None:
+        super().__init__(process.git_failure_detail(result))
+        self.exit_status = result.exit_status
 
 
 def _git_run(
@@ -107,7 +107,7 @@ def git_output(
     else:
         result = _git_run(arguments, directory=directory)
     if result.exit_status != 0:
-        raise GitExitError(result.exit_status, process.git_failure_detail(result))
+        raise GitExitError(result)
     # Trailing-only: every caller wants the one newline `git` appends after its
     # output trimmed, but `git status --porcelain`'s short format is
     # significant in its *leading* column (` M path` names a modified file by

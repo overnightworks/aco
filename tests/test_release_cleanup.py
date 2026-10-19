@@ -306,16 +306,13 @@ class CleanupIntervention:
         lane rather than read the failure as that candidate having none."""
         foreign = self.clone.parent / "aaa-foreign"
         real_git(self.clone, "worktree", "add", "-q", str(foreign), "-b", "codex/issue-1-foreign")
-        real_git_run = checkout._git_run
-
-        def fail_for_the_foreign_worktree(
-            arguments: list[str], *, directory: Path | None = None, **options: bool
-        ) -> process.CapturedResult:
-            if arguments == ["rev-parse", "--verify", "--quiet", "HEAD"] and directory == foreign:
-                return process.CapturedResult(128, b"", b"fatal: broken")
-            return real_git_run(arguments, directory=directory, **options)
-
-        self.monkeypatch.setattr(checkout, "_git_run", fail_for_the_foreign_worktree)
+        stub_one_git_call(
+            self.monkeypatch,
+            ["rev-parse", "--verify", "--quiet", "HEAD"],
+            exit_status=128,
+            stderr="fatal: broken",
+            directory=foreign,
+        )
 
     def refuse_listing(self) -> None:
         stub_one_git_call(
