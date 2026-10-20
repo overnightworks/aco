@@ -46,17 +46,10 @@ request it cannot parse, its `handle` loop reads `self.close_connection` to
 end the connection, and `send_response` reads `self.request_version` to
 decide whether to write headers -- none through a call or read this package
 writes.
-
-`aco_board.access_jwt.AccessJwtVerifier`, its `verify`, and
-`fetch_key_set_over_https` (issue #25, slice AC1 of #6) have no caller inside
-`src` yet: the server wiring that reads the `Cf-Access-Jwt-Assertion` header
-and builds the verifier from configuration is slice AC2 of #6. Each is a named
-future caller, and tests already drive all three.
 """
 
 from datetime import UTC, date, datetime
 
-from aco_board.access_jwt import AccessJwtVerifier, fetch_key_set_over_https
 from aco_board.server import _BoardRequestHandler as _BoardApiRequestHandler
 from agent_coordination.board import (
     Board,
@@ -141,8 +134,6 @@ _referenced_only_for_vulture = (
     NoItemKind.DOCS,
     NoItemKind.FIX,
     MergeMethod.REBASE,
-    AccessJwtVerifier.verify,
-    fetch_key_set_over_https,
     _BoardApiRequestHandler.do_GET,
     _BoardApiRequestHandler.do_POST,
     _BoardApiRequestHandler.log_message,
