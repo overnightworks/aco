@@ -9839,12 +9839,12 @@ def _arranged_claim_client(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
     return client
 
 
-def _claim_argv(*flags: str) -> list[str]:
+def _claim_argv(*flags: str, issue: int = 72, claim_id: str = "cli-claim") -> list[str]:
     return [
         "--repo",
         REPOSITORY,
         "claim",
-        "72",
+        str(issue),
         "--agent",
         "Codex Sol",
         "--role",
@@ -9852,9 +9852,9 @@ def _claim_argv(*flags: str) -> list[str]:
         "--base",
         BASE,
         "--branch",
-        "codex/issue-72",
+        f"codex/issue-{issue}",
         "--claim-id",
-        "cli-claim",
+        claim_id,
         *flags,
     ]
 
@@ -10796,9 +10796,16 @@ def test_cli_claim_replay_does_not_resurrect_a_released_claim(
     assert "already on this ledger, active or released" in capsys.readouterr().err
 
 
+@pytest.fixture
+def comma_scope_world(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(github, "GitHubForge", lambda repository: FakeForge())
+    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
+    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
+
+
+@pytest.mark.usefixtures("comma_scope_world")
 def test_cli_claim_scope_keeps_a_comma_inside_one_path(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A repository-relative path may itself contain a comma
     (`docs/report,v2.md`); the removed comma-splitting used to turn that
@@ -10806,56 +10813,14 @@ def test_cli_claim_scope_keeps_a_comma_inside_one_path(
     path, comma and all -- proved here end to end through the real store, and
     by the absence of an overlap with the substring before the comma, which
     the old splitting would have claimed as its own path."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("docs/report,v2.md",))
 
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "docs/report,v2.md",
-            "--claim-id",
-            "comma-path",
-        ]
-    )
+    claimed = issue_claim.main(_claim_argv("--scope", "docs/report,v2.md", claim_id="comma-path"))
 
     assert claimed == 0
     assert _live_store_claim().scope == ("docs/report,v2.md",)
 
-    second = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "73",
-            "--agent",
-            "Grace",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-73",
-            "--scope",
-            "docs/report",
-            "--claim-id",
-            "half-path",
-        ]
-    )
+    second = issue_claim.main(_claim_argv("--scope", "docs/report", issue=73, claim_id="half-path"))
     captured = capsys.readouterr()
 
     assert second == 0
@@ -10864,59 +10829,24 @@ def test_cli_claim_scope_keeps_a_comma_inside_one_path(
     assert len(store.fetch_state(worktree=Path("."), remote="origin").claims) == 2
 
 
+@pytest.mark.usefixtures("comma_scope_world")
 def test_cli_claim_scope_comma_differs_from_repeated_scope_flags(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A comma inside one --scope value is no longer equivalent to repeating
     the flag: the joined form is a single path whose name contains a comma,
     the repeated form two distinct paths."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     monkeypatch.setattr(
         checkout, "versioned_paths", lambda **_kwargs: ("docs/PRODUCT.md,src/widget.py",)
     )
 
     joined = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "docs/PRODUCT.md,src/widget.py",
-            "--claim-id",
-            "joined",
-        ]
+        _claim_argv("--scope", "docs/PRODUCT.md,src/widget.py", claim_id="joined")
     )
-    repeated_client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: repeated_client)
     repeated = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "73",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-73",
-            "--scope",
-            "docs/PRODUCT.md",
-            "--scope",
-            "src/widget.py",
-            "--claim-id",
-            "repeated",
-        ]
+        _claim_argv(
+            "--scope", "docs/PRODUCT.md", "--scope", "src/widget.py", issue=73, claim_id="repeated"
+        )
     )
 
     assert (joined, repeated) == (0, 0)
@@ -10927,80 +10857,45 @@ def test_cli_claim_scope_comma_differs_from_repeated_scope_flags(
     }
 
 
-def test_cli_claim_refuses_a_comma_scope_that_matches_nothing_in_the_checkout(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`--scope a.py,b.py` passed from the comma-splitting habit that #201
-    removed used to store one path that guards nothing: no such file exists,
-    so the lane's real files stayed unclaimed and no overlap check could ever
-    fire for them (issue #207). The claim is refused before it is written,
-    naming the one-path-per-flag rule."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
+@pytest.mark.usefixtures("comma_scope_world")
+@pytest.mark.parametrize(
+    ("scope", "status", "stderr", "claimed_scopes"),
+    [
+        # Issue #207: `a.py,b.py` from the removed comma-splitting habit used to store one path
+        # that guards nothing, so the lane's real files stayed unclaimed.
+        pytest.param(
             "a.py,b.py",
-            "--claim-id",
-            "habit-comma",
-        ]
-    )
-
-    assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: 'a.py,b.py' matches no versioned file; one --scope path per flag, so its "
-        "comma is read literally -- repeat --scope for a second path\n"
-    )
-
-
-def test_cli_claim_accepts_a_scope_path_without_a_comma_that_does_not_exist_yet(
-    monkeypatch: pytest.MonkeyPatch,
+            2,
+            "ERROR: 'a.py,b.py' matches no versioned file; one --scope path per flag, so its "
+            "comma is read literally -- repeat --scope for a second path\n",
+            [],
+            id="a-comma-matching-nothing-is-refused-before-any-write",
+        ),
+        # A lane routinely claims files it is about to create.
+        pytest.param(
+            "src/not-created-yet.py",
+            0,
+            "",
+            [("src/not-created-yet.py",)],
+            id="a-comma-free-path-git-never-heard-of-still-claims",
+        ),
+    ],
+)
+def test_cli_claim_refuses_only_a_comma_scope_that_matches_nothing_in_the_checkout(
+    scope: str,
+    status: int,
+    stderr: str,
+    claimed_scopes: list[tuple[str, ...]],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """A lane routinely claims files it is about to create; only a comma
-    with no match in the checkout trips the new refusal (issue #207), so a
-    comma-free path git has never heard of still claims cleanly."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
+    observed = issue_claim.main(_claim_argv("--scope", scope))
 
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "src/not-created-yet.py",
-            "--claim-id",
-            "future-file",
-        ]
+    claims = store.fetch_state(worktree=Path("."), remote="origin").claims
+    assert (observed, capsys.readouterr().err, [claim.scope for claim in claims.values()]) == (
+        status,
+        stderr,
+        claimed_scopes,
     )
-
-    assert status == 0
-    assert capsys.readouterr().err == ""
-    assert _live_store_claim().scope == ("src/not-created-yet.py",)
 
 
 def _rescope_forge(whole: str | None = None) -> FakeForge:
@@ -11024,12 +10919,17 @@ def _written_scope_and_whole(written_body: str) -> tuple[tuple[str, ...] | None,
     return parsed.scope, parsed.whole
 
 
-def _arrange_github_rescope(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
-    """Issue #72 claimed by Codex Sol on `src/widget.py` in the faked
+def _arrange_github_rescope(
+    monkeypatch: pytest.MonkeyPatch,
+    client: FakeForge,
+    *,
+    held_scope: tuple[str, ...] = ("src/widget.py",),
+) -> None:
+    """Issue #72 claimed by Codex Sol on `held_scope` in the faked
     checkout at `/repo`, while the run stands in this suite's own cwd -- so
     a relative entry lands in `/repo` only when it is read against the
     checkout's toplevel, never against the cwd itself."""
-    claimed = request(issue=72, branch="codex/issue-72", scope=("src/widget.py",))
+    claimed = request(issue=72, branch="codex/issue-72", scope=held_scope)
     _patch_store_write(monkeypatch, store_claim_from_request(claimed))
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     git_values = git_checkout()
@@ -11202,199 +11102,92 @@ def test_cli_rescope_adds_a_path_without_matching_head_or_a_clean_tree(
     assert standing.scope == ("src/new.py", "src/widget.py")
 
 
-def test_cli_rescope_add_keeps_a_comma_inside_one_path(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`--add` shares `--scope`'s rule: one occurrence is one path, comma and
-    all, never split into two."""
-    client = _rescope_forge()
-    claimed_request = request(issue=72, branch="codex/issue-72", scope=("src/widget.py",))
-    acquired = store_claim_from_request(claimed_request)
-    _patch_store_write(monkeypatch, acquired)
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(head="b" * 40, dirty=" M file")
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("reports/a,b.md",))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+@dataclass(frozen=True)
+class _CommaRescope:
+    """`--add` and `--drop` share `--scope`'s rule (one occurrence is one path,
+    comma and all): the scope the claim holds, the files the checkout versions,
+    the flags after `rescope 72`, and what the run then says and the claim holds."""
 
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "rescope",
-            "72",
-            "--add",
-            "/repo/reports/a,b.md",
-        ]
-    )
-
-    assert status == 0
-    assert capsys.readouterr().out == f"RESCOPED issue #72: {acquired.claim_id}\n"
-    assert _live_store_claim().scope == ("reports/a,b.md", "src/widget.py")
+    held_scope: tuple[str, ...]
+    versioned_paths: tuple[str, ...]
+    argv_tail: tuple[str, ...]
+    status: int
+    stdout: str
+    stderr: str
+    scope: tuple[str, ...]
 
 
-def test_cli_rescope_drop_matches_a_comma_path_as_one_whole_path(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`--drop` shares the same rule: dropping `reports/a,b.md` removes that
-    one path and leaves an unrelated `reports/a` scope entry untouched --
-    the old comma-splitting would instead have tried, and failed, to drop
-    `reports/a` and `b.md` as two separate paths."""
-    client = _rescope_forge()
-    claimed_request = request(
-        issue=72, branch="codex/issue-72", scope=("reports/a", "reports/a,b.md")
-    )
-    acquired = store_claim_from_request(claimed_request)
-    _patch_store_write(monkeypatch, acquired)
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(head="b" * 40, dirty=" M file")
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("reports/a,b.md",))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "rescope",
-            "72",
-            "--drop",
-            "/repo/reports/a,b.md",
-        ]
-    )
-
-    assert status == 0
-    assert capsys.readouterr().out == f"RESCOPED issue #72: {acquired.claim_id}\n"
-    assert _live_store_claim().scope == ("reports/a",)
-
-
-def test_cli_rescope_add_refuses_a_comma_scope_that_matches_nothing_in_the_checkout(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`--add` must not be a way around the same refusal `claim` applies
-    (issue #207): a comma-habit value that names no real path is refused
-    before the rescope is written, leaving the live claim untouched."""
-    client = _rescope_forge()
-    claimed_request = request(issue=72, branch="codex/issue-72", scope=("src/widget.py",))
-    acquired = store_claim_from_request(claimed_request)
-    _patch_store_write(monkeypatch, acquired)
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(head="b" * 40, dirty=" M file")
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "rescope",
-            "72",
-            "--add",
-            "/repo/a.py,b.py",
-        ]
-    )
-
-    assert status == 2
-    assert capsys.readouterr().err == (
+_RESCOPED = "RESCOPED issue #72: claim-a\n"
+_COMMA_RESCOPES = {
+    "add-keeps-a-comma-inside-one-path": _CommaRescope(
+        ("src/widget.py",),
+        ("reports/a,b.md",),
+        ("--add", "/repo/reports/a,b.md"),
+        0,
+        _RESCOPED,
+        "",
+        ("reports/a,b.md", "src/widget.py"),
+    ),
+    # The old comma-splitting would have tried, and failed, to drop `reports/a` and `b.md`.
+    "drop-matches-a-comma-path-as-one-whole-path": _CommaRescope(
+        ("reports/a", "reports/a,b.md"),
+        ("reports/a,b.md",),
+        ("--drop", "/repo/reports/a,b.md"),
+        0,
+        _RESCOPED,
+        "",
+        ("reports/a",),
+    ),
+    # Issue #207: `--add` is no way around the refusal `claim` applies.
+    "add-refuses-a-comma-scope-matching-nothing-in-the-checkout": _CommaRescope(
+        ("src/widget.py",),
+        (),
+        ("--add", "/repo/a.py,b.py"),
+        2,
+        "",
         "ERROR: 'a.py,b.py' matches no versioned file; one --add path per flag, so its comma "
-        "is read literally -- repeat --add for a second path\n"
-    )
-    assert _live_store_claim().scope == ("src/widget.py",)
+        "is read literally -- repeat --add for a second path\n",
+        ("src/widget.py",),
+    ),
+    # The claim's own reason is truer here than the checkout's.
+    "drop-of-a-value-not-in-scope-names-the-claim": _CommaRescope(
+        ("src/widget.py",),
+        (),
+        ("--drop", "/repo/a.py,b.py"),
+        2,
+        "",
+        "ERROR: cannot drop 'a.py,b.py'; it is not in this claim's scope\n",
+        ("src/widget.py",),
+    ),
+    # A value the claim already holds is a fact about the claim, not a typo about the checkout.
+    "drop-removes-a-held-comma-entry-no-file-matches": _CommaRescope(
+        ("a.py,b.py",),
+        ("a.py", "b.py"),
+        ("--drop", "/repo/a.py,b.py", "--add", "/repo/a.py", "--add", "/repo/b.py"),
+        0,
+        _RESCOPED,
+        "",
+        ("a.py", "b.py"),
+    ),
+}
 
 
-def test_cli_rescope_drop_of_a_value_not_in_scope_refuses_with_the_claims_own_reason(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+@pytest.mark.parametrize("case", _COMMA_RESCOPES.values(), ids=_COMMA_RESCOPES.keys())
+def test_cli_rescope_reads_a_comma_inside_one_path_literally(
+    case: _CommaRescope, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`--drop` of a comma-bearing value the live claim never held is
-    refused by `protocol.combined_scope`'s own 'not in this claim's scope' sentence
-    (issue #207): the ungrounded-comma refusal never runs over `--drop` at
-    all, because that existing refusal already covers every value not
-    currently held, with a truer reason naming the claim rather than the
-    checkout."""
-    client = _rescope_forge()
-    claimed_request = request(issue=72, branch="codex/issue-72", scope=("src/widget.py",))
-    acquired = store_claim_from_request(claimed_request)
-    _patch_store_write(monkeypatch, acquired)
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(head="b" * 40, dirty=" M file")
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
+    _arrange_github_rescope(monkeypatch, _rescope_forge(), held_scope=case.held_scope)
+    monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: case.versioned_paths)
+
+    status = issue_claim.main(["--repo", REPOSITORY, "rescope", "72", *case.argv_tail])
+    captured = capsys.readouterr()
+
+    assert (status, captured.out, captured.err, _live_store_claim().scope) == (
+        case.status,
+        case.stdout,
+        case.stderr,
+        case.scope,
     )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "rescope",
-            "72",
-            "--drop",
-            "/repo/a.py,b.py",
-        ]
-    )
-
-    assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: cannot drop 'a.py,b.py'; it is not in this claim's scope\n"
-    )
-    assert _live_store_claim().scope == ("src/widget.py",)
-
-
-def test_cli_rescope_drop_removes_a_comma_entry_the_claim_holds_though_no_file_matches_it(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """The repair this item exists to allow: a claim already holding the
-    comma-habit value `a.py,b.py` (as if claimed before issue #207's fix
-    landed) drops it and adds the two real paths in one rescope. A value the
-    live claim already holds is a fact about the claim, not a typo about the
-    checkout, so the ungrounded-comma refusal must never block dropping it --
-    even though no versioned file matches `a.py,b.py` itself."""
-    client = _rescope_forge()
-    claimed_request = request(issue=72, branch="codex/issue-72", scope=("a.py,b.py",))
-    acquired = store_claim_from_request(claimed_request)
-    _patch_store_write(monkeypatch, acquired)
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(head="b" * 40, dirty=" M file")
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("a.py", "b.py"))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "rescope",
-            "72",
-            "--drop",
-            "/repo/a.py,b.py",
-            "--add",
-            "/repo/a.py",
-            "--add",
-            "/repo/b.py",
-        ]
-    )
-
-    assert status == 0
-    assert capsys.readouterr().out == f"RESCOPED issue #72: {acquired.claim_id}\n"
-    assert _live_store_claim().scope == ("a.py", "b.py")
 
 
 def test_cli_rescope_json_prints_updated_scope_and_same_claim_id(
@@ -12341,10 +12134,22 @@ def test_claim_cost_lists_every_overlapping_claim_separately() -> None:
     )
 
 
-def test_board_shows_claim_age_from_the_claim_comment(
+@pytest.mark.parametrize(
+    ("opened_at", "claim_age", "claim_old"),
+    [
+        pytest.param(datetime(2026, 8, 20, 23, 30, tzinfo=UTC), "0h 30m", False, id="young"),
+        pytest.param(
+            datetime(2026, 8, 20, 22, 59, tzinfo=UTC), "1h 1m", True, id="sixty-one-minutes"
+        ),
+    ],
+)
+def test_board_shows_a_claims_age_and_marks_it_old_after_sixty_minutes(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
+    opened_at: datetime,
+    claim_age: str,
+    claim_old: bool,
 ) -> None:
     claimed = request("mine", "Ada", issue=72, branch="codex/issue-72", scope=("src",))
     client = FakeForge()
@@ -12352,39 +12157,11 @@ def test_board_shows_claim_age_from_the_claim_comment(
     _patch_status_cli(monkeypatch, client)
     _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    _patch_store_write(
-        monkeypatch,
-        store_claim_from_request(claimed),
-        ages={"mine": datetime(2026, 8, 20, 23, 30, tzinfo=UTC)},
-    )
+    _patch_store_write(monkeypatch, store_claim_from_request(claimed), ages={"mine": opened_at})
 
     assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
     item = next(row for row in json.loads(capsys.readouterr().out)["items"] if row["number"] == 72)
-    assert item["claim_age"] == "0h 30m"
-    assert item["claim_old"] is False
-
-
-def test_board_marks_a_claim_old_after_sixty_one_minutes(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-) -> None:
-    claimed = request("mine", "Ada", issue=72, branch="codex/issue-72", scope=("src",))
-    client = FakeForge()
-    client.board_issues = (board_issue(72, "Work", complete_contract("Claim #72.")),)
-    _patch_status_cli(monkeypatch, client)
-    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
-    monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    _patch_store_write(
-        monkeypatch,
-        store_claim_from_request(claimed),
-        ages={"mine": datetime(2026, 8, 20, 22, 59, tzinfo=UTC)},
-    )
-
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
-    item = next(row for row in json.loads(capsys.readouterr().out)["items"] if row["number"] == 72)
-    assert item["claim_age"] == "1h 1m"
-    assert item["claim_old"] is True
+    assert (item["claim_age"], item["claim_old"]) == (claim_age, claim_old)
 
 
 def test_cli_status_and_status_path_show_the_whole_reason(
@@ -12943,372 +12720,161 @@ def test_cli_claim_resource_prints_the_allocated_value(
     assert posted.resource == protocol.ResourceHold("schema-hop", 1)
 
 
-def test_cli_two_claims_of_the_same_directory_are_advisory(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@dataclass(frozen=True)
+class AdvisoryClaims:
+    first_issue: int
+    first_scope: str
+    second_issue: int
+    second_scope: str
+    wholes: tuple[bool, bool]
+    directories: tuple[str, ...]
+    overlap: str
+
+
+ADVISORY_CLAIMS = {
+    "directory-and-directory": AdvisoryClaims(
+        72, "src", 73, "src", (True, True), ("src",), "overlaps issue #72 on src"
+    ),
+    "file-and-file": AdvisoryClaims(
+        72,
+        "src/widget.py",
+        73,
+        "src/widget.py",
+        (False, False),
+        (),
+        "overlaps issue #72 on src/widget.py",
+    ),
+    # Issue #206: the directory in the newly granted scope holds a file a standing claim holds.
+    "directory-over-a-held-file": AdvisoryClaims(
+        1400,
+        "tests/adapters/test_claim_cli.py",
+        1401,
+        "tests",
+        (False, True),
+        ("tests",),
+        "overlaps issue #1400 on tests/adapters/test_claim_cli.py",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", ADVISORY_CLAIMS.values(), ids=ADVISORY_CLAIMS.keys())
+def test_cli_two_claims_of_overlapping_scopes_are_advisory(
+    case: AdvisoryClaims, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    client = FakeForge()
-    _patch_status_cli(monkeypatch, client)
+    _patch_status_cli(monkeypatch, FakeForge())
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(
         checkout,
         "scope_directories",
-        lambda paths, **_kwargs: tuple(path for path in paths if path == "src"),
+        lambda paths, **_kwargs: tuple(path for path in paths if path in case.directories),
     )
 
+    first_whole, second_whole = (("--whole", "wide on purpose") if w else () for w in case.wholes)
     first = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
+        _claim_argv(
+            "--scope", case.first_scope, *first_whole, issue=case.first_issue, claim_id="claim-a"
+        )
+    )
+    capsys.readouterr()
+    second = issue_claim.main(
+        _claim_argv(
+            "--scope", case.second_scope, *second_whole, issue=case.second_issue, claim_id="claim-b"
+        )
+    )
+    claimed = capsys.readouterr().out
+
+    assert (first, second, "CONFLICT" in claimed, case.overlap in claimed) == (0, 0, False, True)
+
+
+@pytest.mark.parametrize(
+    ("scope", "arguments", "lines"),
+    [
+        pytest.param(
             "src",
-            "--claim-id",
-            "dir-a",
-            "--whole",
-            "shared directory",
-        ]
-    )
-    capsys.readouterr()
-    second = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "73",
-            "--agent",
-            "Grok 4.6",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-73",
-            "--scope",
+            ["status"],
+            [
+                "CLAIMED issue #72",
+                "CLAIMED issue #73",
+                "overlaps issue #73 (dir-b)",
+                "overlaps issue #72 (dir-a)",
+            ],
+            id="directory-status",
+        ),
+        pytest.param(
             "src",
-            "--claim-id",
-            "dir-b",
-            "--whole",
-            "shared directory",
-        ]
-    )
-    claimed = capsys.readouterr().out
-
-    assert first == 0
-    assert second == 0
-    assert "CONFLICT" not in claimed
-    assert "overlaps issue #72 on src" in claimed
-
-
-def test_cli_claim_on_a_directory_names_the_file_a_standing_claim_holds_under_it(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The real `claim` output for the case that hurt a consumer twice in one
-    night (issue #206): a directory in the newly granted scope contains a
-    single file a standing claim already holds."""
-    client = FakeForge()
-    _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(
-        checkout,
-        "scope_directories",
-        lambda paths, **_kwargs: tuple(path for path in paths if path == "tests"),
-    )
-
-    first = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "1400",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-1400",
-            "--scope",
-            "tests/adapters/test_claim_cli.py",
-            "--claim-id",
-            "claim-a",
-        ]
-    )
-    capsys.readouterr()
-    second = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "1401",
-            "--agent",
-            "Grok 4.6",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-1401",
-            "--scope",
-            "tests",
-            "--claim-id",
-            "claim-b",
-            "--whole",
-            "the whole test tree",
-        ]
-    )
-    claimed = capsys.readouterr().out
-
-    assert first == 0
-    assert second == 0
-    assert "CONFLICT" not in claimed
-    assert "overlaps issue #1400 on tests/adapters/test_claim_cli.py" in claimed
-
-
-def test_cli_status_and_status_path_show_two_directory_claims_as_advisory(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    dir_a = standing_active_claim(
-        "Ada", claim_id="dir-a", issue=72, branch="codex/issue-72", scope=("src",)
-    )
-    dir_b = standing_active_claim(
-        "Grok 4.6", claim_id="dir-b", issue=73, branch="codex/issue-73", scope=("src",)
-    )
-    _patch_status_store(monkeypatch, dir_a, dir_b)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status"])
-    rendered = capsys.readouterr().out
-    assert status == 0
-    assert "CONFLICT" not in rendered
-    assert "CLAIMED issue #72" in rendered
-    assert "CLAIMED issue #73" in rendered
-    assert "overlaps issue #73 (dir-b)" in rendered
-    assert "overlaps issue #72 (dir-a)" in rendered
-
-    who = issue_claim.main(["--repo", REPOSITORY, "status", "--path", "src"])
-    holders = capsys.readouterr().out
-    assert who == 0
-    assert "CONFLICT" not in holders
-    assert "CLAIMED src issue #72" in holders
-    assert "CLAIMED src issue #73" in holders
-    assert "overlap: issue #72 (dir-a), issue #73 (dir-b)" in holders
-
-
-def test_cli_two_claims_of_the_same_file_are_advisory(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    client = FakeForge()
-    _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    first = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
+            ["status", "--path", "src"],
+            [
+                "CLAIMED src issue #72",
+                "CLAIMED src issue #73",
+                "overlap: issue #72 (dir-a), issue #73 (dir-b)",
+            ],
+            id="directory-status-path",
+        ),
+        pytest.param(
             "src/widget.py",
-            "--claim-id",
-            "file-a",
-        ]
-    )
-    capsys.readouterr()
-    second = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "73",
-            "--agent",
-            "Grok 4.6",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-73",
-            "--scope",
+            ["status"],
+            ["CLAIMED issue #72", "CLAIMED issue #73"],
+            id="file-status",
+        ),
+        pytest.param(
             "src/widget.py",
-            "--claim-id",
-            "file-b",
-        ]
-    )
-    claimed = capsys.readouterr().out
-
-    assert first == 0
-    assert second == 0
-    assert "CONFLICT" not in claimed
-    assert "overlaps issue #72 on src/widget.py" in claimed
-
-
-def test_cli_status_and_status_path_show_two_file_claims_as_advisory(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+            ["status", "--path", "src/widget.py"],
+            [
+                "CLAIMED src/widget.py issue #72",
+                "CLAIMED src/widget.py issue #73",
+                "overlap: issue #72 (dir-a), issue #73 (dir-b)",
+            ],
+            id="file-status-path",
+        ),
+    ],
+)
+def test_cli_status_shows_two_claims_of_one_scope_as_advisory(
+    scope: str,
+    arguments: list[str],
+    lines: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    file_a = standing_active_claim(
-        "Ada", claim_id="file-a", issue=72, branch="codex/issue-72", scope=("src/widget.py",)
+    ada = standing_active_claim(
+        "Ada", claim_id="dir-a", issue=72, branch="codex/issue-72", scope=(scope,)
     )
-    file_b = standing_active_claim(
-        "Grok 4.6",
-        claim_id="file-b",
-        issue=73,
-        branch="codex/issue-73",
-        scope=("src/widget.py",),
+    grok = standing_active_claim(
+        "Grok 4.6", claim_id="dir-b", issue=73, branch="codex/issue-73", scope=(scope,)
     )
-    _patch_status_store(monkeypatch, file_a, file_b)
+    _patch_status_store(monkeypatch, ada, grok)
 
-    status = issue_claim.main(["--repo", REPOSITORY, "status"])
+    status = issue_claim.main(["--repo", REPOSITORY, *arguments])
     rendered = capsys.readouterr().out
-    assert status == 0
-    assert "CONFLICT" not in rendered
-    assert "CLAIMED issue #72" in rendered
-    assert "CLAIMED issue #73" in rendered
 
-    who = issue_claim.main(["--repo", REPOSITORY, "status", "--path", "src/widget.py"])
-    holders = capsys.readouterr().out
-    assert who == 0
-    assert "CONFLICT" not in holders
-    assert "CLAIMED src/widget.py issue #72" in holders
-    assert "CLAIMED src/widget.py issue #73" in holders
-    assert "overlap: issue #72 (file-a), issue #73 (file-b)" in holders
+    missing = [line for line in lines if line not in rendered]
+    assert (status, "CONFLICT" in rendered, missing) == (0, False, [])
 
 
 def test_cli_two_resource_claims_allocate_one_then_two(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    client = FakeForge()
-    _patch_status_cli(monkeypatch, client)
+    _patch_status_cli(monkeypatch, FakeForge())
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
     monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
+    resource = ("--resource", "schema-hop", "--json")
 
     first = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "src/a.py",
-            "--resource",
-            "schema-hop",
-            "--claim-id",
-            "hop-1",
-            "--json",
-        ]
+        _claim_argv("--scope", "src/a.py", *resource, issue=72, claim_id="hop-1")
     )
     first_payload = json.loads(capsys.readouterr().out)
     second = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "73",
-            "--agent",
-            "Grok 4.6",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-73",
-            "--scope",
-            "src/b.py",
-            "--resource",
-            "schema-hop",
-            "--claim-id",
-            "hop-2",
-            "--json",
-        ]
+        _claim_argv("--scope", "src/b.py", *resource, issue=73, claim_id="hop-2")
     )
     second_payload = json.loads(capsys.readouterr().out)
-
-    assert first == 0
-    assert second == 0
-    assert first_payload["resource_value"] == 1
-    assert second_payload["resource_value"] == 2
-
-
-def test_cli_resource_race_still_yields_unique_live_holds(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    client = FakeForge()
-    _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    earlier = request(
-        "earlier",
-        "Grok 4.6",
-        issue=72,
-        scope=("src/a.py",),
-        resource="schema-hop",
-        resource_value=1,
-    )
-    _patch_store_write(monkeypatch, store_claim_from_request(earlier))
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "73",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-73",
-            "--scope",
-            "src/b.py",
-            "--resource",
-            "schema-hop",
-            "--claim-id",
-            "later",
-            "--json",
-        ]
-    )
-    payload = json.loads(capsys.readouterr().out)
     holds = sorted(
         claim.resource.value
         for claim in store.fetch_state(worktree=Path("."), remote="origin").claims.values()
         if claim.resource is not None and claim.resource.name == "schema-hop"
     )
 
-    assert status == 0
-    assert payload["resource_value"] == 2
+    assert (first, second) == (0, 0)
+    assert (first_payload["resource_value"], second_payload["resource_value"]) == (1, 2)
     assert holds == [1, 2]
-
-
-def test_status_path_lists_every_holder_without_calling_overlap_an_error(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    mine = standing_active_claim("Ada", claim_id="mine", issue=72, scope=("src/widget.py",))
-    theirs = standing_active_claim(
-        "Grok 4.6",
-        claim_id="theirs",
-        issue=73,
-        branch="codex/issue-73-claims",
-        scope=("src/widget.py",),
-    )
-    _patch_status_store(monkeypatch, mine, theirs)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "--path", "src/widget.py"])
-    rendered = capsys.readouterr().out
-
-    assert status == 0
-    assert "CONFLICT" not in rendered
-    assert "CLAIMED src/widget.py issue #72" in rendered
-    assert "CLAIMED src/widget.py issue #73" in rendered
-    assert "overlap: issue #72 (mine), issue #73 (theirs)" in rendered
 
 
 def test_next_names_an_old_ruling_when_the_item_is_pulled(
@@ -17366,49 +16932,88 @@ def test_item_mutation_refuses_under_github_storage(
     assert observed == expected
 
 
-def test_item_edit_size_writes_the_top_level_field_under_github_storage(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #357 proof 2: `item edit --size M` writes through the generic
-    `ForgeWriter.update_item_body` both storages already implement, so it
-    reaches a `github`-stored item too -- unlike the whole-body `item edit`
-    above, which refuses under `storage = "github"` by name."""
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
+@dataclass(frozen=True)
+class _ItemFieldEdit:
+    """`item edit --size/--whole` write one top-level field of the item's block through the
+    generic `ForgeWriter.update_item_body` (issues #357, #399): the flag and its value, the
+    block key, and the `EDITED` line a person reads."""
 
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "item", "edit", str(RULE_ITEM), "--size", "M"]
+    flag: str
+    value: str
+    key: str
+    edited_line: str
+
+
+_ITEM_FIELD_EDITS = {
+    "size": _ItemFieldEdit("--size", "M", "size", f"EDITED #{RULE_ITEM} size=M\n"),
+    "whole": _ItemFieldEdit(
+        "--whole",
+        "the four adapters share one lock",
+        "whole",
+        f"EDITED #{RULE_ITEM} whole=the four adapters share one lock\n",
+    ),
+}
+_ITEM_FIELD_EDIT_CASES = pytest.mark.parametrize(
+    "case", _ITEM_FIELD_EDITS.values(), ids=_ITEM_FIELD_EDITS.keys()
+)
+
+
+def _edit_item_field(case: _ItemFieldEdit, *flags: str) -> int:
+    return issue_claim.main(
+        ["--repo", REPOSITORY, "item", "edit", str(RULE_ITEM), case.flag, case.value, *flags]
     )
 
-    assert exit_code == 0
-    assert capsys.readouterr().out == f"EDITED #{RULE_ITEM} size=M\n"
-    assert body.locate_block(client.item_bodies[RULE_ITEM]).data["size"] == "M"
+
+@_ITEM_FIELD_EDIT_CASES
+def test_item_edit_writes_the_top_level_field_under_github_storage(
+    case: _ItemFieldEdit,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Unlike the whole-body `item edit`, which refuses under `storage = "github"` by name."""
+    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
+
+    exit_code = _edit_item_field(case)
+
+    written = body.locate_block(client.item_bodies[RULE_ITEM]).data[case.key]
+    assert (exit_code, capsys.readouterr().out, written) == (0, case.edited_line, case.value)
 
 
-def test_item_edit_size_json_reports_the_item_and_size(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+@_ITEM_FIELD_EDIT_CASES
+def test_item_edit_json_reports_the_item_and_the_field(
+    case: _ItemFieldEdit,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
 
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "item",
-            "edit",
-            str(RULE_ITEM),
-            "--size",
-            "S",
-            "--json",
-        ]
+    exit_code = _edit_item_field(case, "--json")
+
+    assert (exit_code, json.loads(capsys.readouterr().out)) == (
+        0,
+        {"ok": True, "reason": "edited", "item": RULE_ITEM, case.key: case.value},
     )
 
-    assert exit_code == 0
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "edited",
-        "item": RULE_ITEM,
-        "size": "S",
-    }
+
+@_ITEM_FIELD_EDIT_CASES
+def test_item_edit_refuses_through_the_shared_precondition_failed_envelope(
+    case: _ItemFieldEdit,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Issue #425: the forge refusing `update_item_body` reports as `precondition_failed`."""
+    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
+    client.capability_overrides[forge.ForgeOperation.UPDATE_ITEM_BODY] = forge.Capability.READ_ONLY
+
+    exit_code = _edit_item_field(case, "--json")
+
+    captured = capsys.readouterr()
+    refusal = f"this forge cannot update_item_body; item edit {case.flag} by hand"
+    assert (exit_code, refusal in captured.err) == (2, True)
+    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def test_item_edit_size_refuses_an_invalid_value_before_any_write(
@@ -17419,99 +17024,6 @@ def test_item_edit_size_refuses_an_invalid_value_before_any_write(
 
     assert exited.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
-
-
-def test_item_edit_size_refuses_through_the_shared_precondition_failed_envelope(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #425: `item edit --size`'s own runtime refusal -- here the
-    forge refusing `update_item_body` -- reports through the shared
-    envelope as `precondition_failed`."""
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    client.capability_overrides[forge.ForgeOperation.UPDATE_ITEM_BODY] = forge.Capability.READ_ONLY
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "item", "edit", str(RULE_ITEM), "--size", "M", "--json"]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "this forge cannot update_item_body; item edit --size by hand" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
-
-
-def test_item_edit_whole_writes_the_top_level_field_under_github_storage(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #399: `item edit --whole REASON` writes through the same
-    generic `ForgeWriter.update_item_body` `--size` already uses, mirroring
-    `test_item_edit_size_writes_the_top_level_field_under_github_storage`."""
-    reason = "the four adapters share one lock"
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-
-    exit_code = issue_claim.main(
-        ["--repo", REPOSITORY, "item", "edit", str(RULE_ITEM), "--whole", reason]
-    )
-
-    assert exit_code == 0
-    assert capsys.readouterr().out == f"EDITED #{RULE_ITEM} whole={reason}\n"
-    assert body.locate_block(client.item_bodies[RULE_ITEM]).data["whole"] == reason
-
-
-def test_item_edit_whole_json_reports_the_item_and_reason(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    reason = "the four adapters share one lock"
-    _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "item",
-            "edit",
-            str(RULE_ITEM),
-            "--whole",
-            reason,
-            "--json",
-        ]
-    )
-
-    assert exit_code == 0
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "edited",
-        "item": RULE_ITEM,
-        "whole": reason,
-    }
-
-
-def test_item_edit_whole_refuses_through_the_shared_precondition_failed_envelope(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Issue #425: `item edit --whole`'s own runtime refusal -- here the
-    forge refusing `update_item_body` -- reports through the shared
-    envelope as `precondition_failed`."""
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    client.capability_overrides[forge.ForgeOperation.UPDATE_ITEM_BODY] = forge.Capability.READ_ONLY
-
-    exit_code = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "item",
-            "edit",
-            str(RULE_ITEM),
-            "--whole",
-            "a reason",
-            "--json",
-        ]
-    )
-
-    assert exit_code == 2
-    captured = capsys.readouterr()
-    assert "this forge cannot update_item_body; item edit --whole by hand" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def test_item_close_prints_json_under_the_state_ref_pin(
