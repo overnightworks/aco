@@ -441,7 +441,8 @@ def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_othe
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null, "question": 3}]}]}',
+            '[{"index": 1, "text": "Q?", "default": null, "ruling": null, "ruled_on": null, '
+            '"question": 3}]}]}',
             "aco rulings --json is unreadable: question is not text",
         ),
         (
@@ -451,22 +452,29 @@ def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_othe
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruled_on": null}]}]}',
+            '[{"index": 1, "text": "Q?", "ruling": null, "ruled_on": null}]}]}',
+            "aco rulings --json is unreadable: #1 line has no default",
+        ),
+        (
+            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
+            '[{"index": 1, "text": "Q?", "default": null, "ruled_on": null}]}]}',
             "aco rulings --json is unreadable: #1 line has no ruling",
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": null}]}]}',
+            '[{"index": 1, "text": "Q?", "default": null, "ruling": null}]}]}',
             "aco rulings --json is unreadable: #1 line has no ruled_on",
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": "perhaps", "ruled_on": "2026-10-01"}]}]}',
+            '[{"index": 1, "text": "Q?", "default": null, "ruling": "perhaps", '
+            '"ruled_on": "2026-10-01"}]}]}',
             "aco rulings --json is unreadable: ruling is not an outcome",
         ),
         (
             '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": "yes", "ruled_on": "gestern"}]}]}',
+            '[{"index": 1, "text": "Q?", "default": null, "ruling": "yes", '
+            '"ruled_on": "gestern"}]}]}',
             "aco rulings --json is unreadable: ruled_on is not a date",
         ),
     ],
@@ -479,6 +487,7 @@ def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_othe
         "line-not-an-object",
         "question-not-text",
         "default-not-an-outcome",
+        "default-missing",
         "ruling-missing",
         "ruled-on-missing",
         "ruling-not-an-outcome",

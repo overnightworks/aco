@@ -149,9 +149,9 @@ def _line(item: int, title: str, line: object) -> ExpectationLine:
     fields = _as_object(line)
     if fields is None:
         raise _unreadable(f"#{item} has a line that is not an object")
-    # RUL-10 always names a line's ruling and its date, null while open; a
-    # missing key is a broken shape, never an open line.
-    for key in ("ruling", "ruled_on"):
+    # RUL-10 always names a line's default, ruling and ruling date, null while
+    # absent; a missing key is a broken shape, never an open line.
+    for key in ("default", "ruling", "ruled_on"):
         if key not in fields:
             raise _unreadable(f"#{item} line has no {key}")
     return ExpectationLine(
@@ -162,8 +162,6 @@ def _line(item: int, title: str, line: object) -> ExpectationLine:
         question=_optional_text(fields, "question"),
         example=_optional_text(fields, "example"),
         picture=_optional_text(fields, "picture"),
-        # `default` arrives with specs/rulings.spec.md RUL-10's own extension;
-        # an aco from before it omits the key, which reads as no recommendation.
         default=_optional_outcome(fields, "default"),
         ruling=_optional_outcome(fields, "ruling"),
         ruled_on=_optional_date(fields, "ruled_on"),

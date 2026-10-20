@@ -174,8 +174,8 @@ def fetch_dependencies(
 ) -> dict[int, tuple[board.IssueDependency, ...]]:
     """Every named issue's `blocked_by` dependencies (#150), at most
     `BOARD_CHILD_FETCH_CONCURRENCY` `gh` subprocesses at a time -- run only
-    after `build_board`'s base reads and children wave have already finished, so
-    peak concurrent `gh` subprocesses never exceeds today's 3+4."""
+    after `build_board`'s base reads and children wave have already finished,
+    so this wave never overlaps them."""
     if not issue_numbers:
         return {}
     workers = min(len(issue_numbers), BOARD_CHILD_FETCH_CONCURRENCY)
@@ -277,8 +277,9 @@ def build_board(
     # their own executor (`_fetch_children`) so their concurrency stays
     # capped at `BOARD_CHILD_FETCH_CONCURRENCY` even once these three base
     # reads finish and free their own pool's workers. The dependency wave
-    # runs afterward instead (below), so peak concurrent `gh` subprocesses
-    # stays at 3+4, then at most 4.
+    # runs afterward instead (below), so it never overlaps them. The readers in
+    # `github.py` fan out further inside each call, up to
+    # `PARALLEL_FETCH_CONCURRENCY` workers.
     with ThreadPoolExecutor(max_workers=3) as pool:
         open_pull_requests = pool.submit(client.list_open_board_pull_requests)
         merged_pull_requests = pool.submit(client.list_recent_merged_board_pull_requests, since)
