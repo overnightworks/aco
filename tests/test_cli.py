@@ -100,7 +100,15 @@ from github_fixtures import (
     landing_pull_request,
     landing_readiness,
 )
-from store_fixtures import RaceOnceTransport, lineage_observation, unrelated_racer_commit
+from store_fixtures import (
+    RaceOnceTransport,
+    blob,
+    claim_intent,
+    lineage_observation,
+    push_raw_state_tree,
+    raw_tree,
+    unrelated_racer_commit,
+)
 
 from agent_coordination import (
     __version__,
@@ -2739,6 +2747,100 @@ def test_state_ref_reads_answer_from_a_subdirectory_as_from_the_checkout_root(
     assert (main_root[0], linked_root[0]) == (0, 0)
     assert (main_subdirectory, linked_subdirectory) == (main_root, linked_root)
     assert (main_root == linked_root) is checkouts_agree
+
+
+_UNREADABLE_NUMBERS = (
+    pytest.param("²", id="superscript-digit"),
+    pytest.param("٧٢", id="non-ascii-digits"),
+    pytest.param("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="past-the-bound"),
+    pytest.param("7" * 5000, id="past-the-int-digit-limit"),
+)
+
+
+@pytest.mark.parametrize("number", _UNREADABLE_NUMBERS)
+@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
+def test_status_refuses_a_state_ref_claim_key_whose_issue_number_is_unreadable(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    number: str,
+    as_json: bool,
+) -> None:
+    """Spec: CLAIM-64. A hand-corrupted `claims/issue-<number>.toml` beside a
+    valid `issue-72` stops the read with the named refusal, never a traceback
+    and never a second claim on issue 72."""
+    repo, remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
+    claim_content = "\n".join(
+        [
+            'claim_id = "a1"',
+            'agent = "Ada"',
+            'role = "builder"',
+            f'base = "{"c" * 40}"',
+            'branch = "claude/issue-72-cut"',
+            'scope = ["src/x.py"]',
+            f'opened_commit = "{"c" * 40}"',
+            "",
+        ]
+    )
+    claim_blob = blob(repo, claim_content.encode())
+    claims_tree = raw_tree(
+        repo,
+        [
+            ("100644", "blob", claim_blob, "issue-72.toml"),
+            ("100644", "blob", claim_blob, f"issue-{number}.toml"),
+        ],
+    )
+    push_raw_state_tree(
+        remote,
+        repo,
+        [
+            ("100644", "blob", blob(repo, b"version = 2\n"), "schema.toml"),
+            ("040000", "tree", claims_tree, store.CLAIMS_DIRECTORY),
+        ],
+    )
+    refusal = f"claim key has a malformed issue number: 'issue-{number}'"
+
+    status = issue_claim.main(["status", *(["--json"] if as_json else [])])
+
+    assert status == 2
+    captured = capsys.readouterr()
+    if as_json:
+        payload = json.loads(captured.out)
+        assert (payload["ok"], payload["reason"], payload["message"]) == (
+            False,
+            "unavailable",
+            refusal,
+        )
+    else:
+        assert captured.err == f"ERROR: {refusal}\n"
+
+
+@pytest.mark.parametrize("number", [*_UNREADABLE_NUMBERS, pytest.param("docs/x", id="lane")])
+@pytest.mark.parametrize("command", [["board", "--json"], ["next", "--json"]])
+def test_board_and_next_read_an_unreadable_lifecycle_trailer_item_like_a_lane(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    number: str,
+    command: list[str],
+) -> None:
+    """Spec: BOARD-56. A claim commit on `refs/aco/state` whose `item:`
+    trailer is no ASCII number of at most 18 digits neither stops the read nor
+    counts as unparsed."""
+    repo, remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
+    store.commit_transition(
+        observed=fresh_observation(repo, remote),
+        subject=store.ClaimTransitionSubject("claim a corrupted item", item=number),
+        intent=claim_intent(),
+    )
+    capsys.readouterr()
+
+    status = issue_claim.main(command)
+
+    assert status == 0
+    payload = json.loads(capsys.readouterr().out)
+    if command[0] == "board":
+        assert payload["measurements"]["unparsed"] == 0
 
 
 def test_start_under_state_ref_claims_the_worktree_it_builds(
@@ -14505,23 +14607,48 @@ def test_release_merged_refuses_a_work_item_neither_open_nor_closed(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims
 
 
+_MERGED_NEEDS_A_PULL_REQUEST_NUMBER = (
+    "--merged requires a pull request number under storage = github"
+)
+
+
+@pytest.mark.parametrize(
+    "merged",
+    [
+        pytest.param("sha123", id="sha"),
+        pytest.param("²", id="superscript-digit"),
+        pytest.param("٧٢", id="non-ascii-digits"),
+        pytest.param("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="past-the-bound"),
+        pytest.param("7" * 5000, id="past-the-int-digit-limit"),
+    ],
+)
+@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
 def test_release_merged_refuses_a_non_numeric_pull_request_under_github(
-    capsys: pytest.CaptureFixture[str],
+    capsys: pytest.CaptureFixture[str], merged: str, as_json: bool
 ) -> None:
-    """`github.pull_request_number`'s own guard (issue #359): `--merged`
-    under `storage = "github"` (the default here -- no board.toml pins
-    state-ref) takes only a bare pull request number, never the sha grammar
-    that pin's own `<sha|empty>` form reads; refuses before touching git,
-    the store, or the forge at all -- so the store this session never
-    resolved stays at its own untouched default."""
-    status = issue_claim.main(
-        ["release", "72", "--agent", "Codex Sol", "--claim-id", "claim-72", "--merged", "sha123"]
-    )
+    """Spec: REL-60. `github.pull_request_number`'s own guard (issue #359):
+    `--merged` under `storage = "github"` (the default here -- no board.toml
+    pins state-ref) takes only a bare ASCII pull request number of at most
+    18 digits, never the sha grammar that pin's own `<sha|empty>` form
+    reads; refuses before touching git, the store, or the forge at all -- so
+    the store this session never resolved stays at its own untouched
+    default."""
+    arguments = ["release", "72", "--agent", "Codex Sol", "--claim-id", "claim-72"]
+    json_flag = ["--json"] if as_json else []
+
+    status = issue_claim.main([*arguments, "--merged", merged, *json_flag])
 
     assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: --merged requires a pull request number under storage = github\n"
-    )
+    captured = capsys.readouterr()
+    if as_json:
+        payload = json.loads(captured.out)
+        assert (payload["ok"], payload["reason"], payload["message"]) == (
+            False,
+            "precondition_failed",
+            _MERGED_NEEDS_A_PULL_REQUEST_NUMBER,
+        )
+    else:
+        assert captured.err == f"ERROR: {_MERGED_NEEDS_A_PULL_REQUEST_NUMBER}\n"
     assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
 
 

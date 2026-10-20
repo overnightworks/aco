@@ -778,3 +778,27 @@ def test_an_exclusive_claim_refuses_any_holder_of_its_branch_and_replays_unchang
 
     assert (claimed == state) is replays
     assert protocol.claim_key(intent.identity, intent.branch) in claimed.claims
+
+
+@pytest.mark.parametrize(
+    ("text", "number"),
+    [
+        pytest.param("72", 72, id="plain"),
+        pytest.param("007", 7, id="leading-zeros-stay-readable"),
+        pytest.param("0", 0, id="zero"),
+        pytest.param("7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS, int("7" * 18), id="at-the-bound"),
+        pytest.param("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), None, id="past-the-bound"),
+        pytest.param("7" * 5000, None, id="past-the-int-digit-limit"),
+        pytest.param("", None, id="empty"),
+        pytest.param("²", None, id="superscript-digit"),
+        pytest.param("٧٢", None, id="arabic-indic-digits"),
+        pytest.param("abc", None, id="not-a-number"),
+        pytest.param("-1", None, id="signed"),
+        pytest.param("7 ", None, id="padded"),
+    ],
+)
+def test_decimal_number_reads_only_ascii_digits_up_to_the_bound(
+    text: str, number: int | None
+) -> None:
+    """Spec: CLAIM-64, BOARD-56, REL-60."""
+    assert protocol.decimal_number_or_none(text) == number

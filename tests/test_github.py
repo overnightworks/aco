@@ -3333,3 +3333,33 @@ def test_a_failed_body_write_is_refused_only_when_nothing_was_written(
     """Spec: ADOPT-24, ADOPT-25 -- a refusal the forge gave before writing, or a `gh` that
     never ran, wrote nothing; every other failure may have written."""
     assert github.body_write_outcome(error) is github.BodyWriteOutcome[outcome]
+
+
+@pytest.mark.parametrize(
+    ("value", "number"),
+    [
+        pytest.param("12", 12, id="plain"),
+        pytest.param("007", 7, id="leading-zeros-stay-readable"),
+        pytest.param("7" * 18, int("7" * 18), id="at-the-bound"),
+    ],
+)
+def test_pull_request_number_reads_a_bare_ascii_decimal_number(value: str, number: int) -> None:
+    """Spec: REL-60."""
+    assert github.pull_request_number(value) == number
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param("", id="empty"),
+        pytest.param("sha123", id="sha"),
+        pytest.param("²", id="superscript-digit"),
+        pytest.param("٧٢", id="non-ascii-digits"),
+        pytest.param("7" * 19, id="past-the-bound"),
+        pytest.param("7" * 5000, id="past-the-int-digit-limit"),
+    ],
+)
+def test_pull_request_number_refuses_anything_but_a_bounded_ascii_number(value: str) -> None:
+    """Spec: REL-60."""
+    with pytest.raises(ClaimError, match="--merged requires a pull request number"):
+        github.pull_request_number(value)

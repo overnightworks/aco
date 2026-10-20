@@ -795,6 +795,22 @@ class ClaimId(str):
         return super().__new__(cls, value)
 
 
+# The number is bounded so `int()` of a match can never meet Python's digit
+# limit: a longer one is no reference, whether a pattern in `board` or
+# `decimal_number_or_none` reads it.
+MAXIMUM_ISSUE_NUMBER_DIGITS = 18
+
+
+def decimal_number_or_none(text: str) -> int | None:
+    """The one reader of a decimal number the protocol takes from a key, a
+    trailer or the command line: ASCII digits only, at most
+    `MAXIMUM_ISSUE_NUMBER_DIGITS` of them. Leading zeros stay readable; a
+    caller that forbids them says so itself."""
+    if not (text.isascii() and text.isdigit() and len(text) <= MAXIMUM_ISSUE_NUMBER_DIGITS):
+        return None
+    return int(text)
+
+
 # --- Claim key codec (criterion 10, issue #176 slice C2) -------------------
 #
 # One path segment, no `/`, collision-free and reversible -- the only owner
@@ -873,9 +889,10 @@ def parse_claim_key(key: str) -> ClaimIdentity:
     """Invert `claim_key`. Refuses any prefix but the two the codec writes."""
     if key.startswith(_ISSUE_KEY_PREFIX):
         digits = key[len(_ISSUE_KEY_PREFIX) :]
-        if not digits or not digits.isdigit() or digits[0] == "0":
+        issue = decimal_number_or_none(digits)
+        if issue is None or digits[0] == "0":
             raise MalformedStateTreeError(f"claim key has a malformed issue number: {key!r}")
-        return IssueIdentity(int(digits))
+        return IssueIdentity(issue)
     if key.startswith(_LANE_KEY_PREFIX):
         # Validate only; the decoded branch itself lives in the claim file.
         _percent_decode_branch(key[len(_LANE_KEY_PREFIX) :])

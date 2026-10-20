@@ -4552,6 +4552,10 @@ def test_claim_key_issue_and_lane_prefixes_never_collide() -> None:
         pytest.param("issue-0", "malformed issue number", id="issue-zero"),
         pytest.param("issue-01", "malformed issue number", id="issue-leading-zero"),
         pytest.param("issue-abc", "malformed issue number", id="issue-not-a-number"),
+        pytest.param("issue-²", "malformed issue number", id="issue-superscript-digit"),
+        pytest.param("issue-٧٢", "malformed issue number", id="issue-non-ascii-digits"),
+        pytest.param("issue-" + "7" * 19, "malformed issue number", id="issue-past-the-bound"),
+        pytest.param("issue-" + "7" * 5000, "malformed issue number", id="issue-past-int-limit"),
         pytest.param("lane-%2", "malformed percent-escape", id="lane-incomplete-escape"),
         pytest.param("lane-%zz", "malformed percent-escape", id="lane-invalid-escape"),
         # Issue #237 finding 23: `_percent_encode_branch` never emits a
@@ -4567,8 +4571,16 @@ def test_claim_key_issue_and_lane_prefixes_never_collide() -> None:
     ],
 )
 def test_parse_claim_key_rejects_a_malformed_key(key: str, match: str) -> None:
+    """Spec: CLAIM-09, CLAIM-64, CLAIM-65, CLAIM-66."""
     with pytest.raises(protocol.MalformedStateTreeError, match=match):
         protocol.parse_claim_key(key)
+
+
+def test_parse_claim_key_accepts_an_issue_number_at_the_digit_bound() -> None:
+    """Spec: CLAIM-64."""
+    digits = "7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS
+
+    assert protocol.parse_claim_key(f"issue-{digits}") == protocol.IssueIdentity(int(digits))
 
 
 # --- `claims/<key>.toml` and `resources/<name>.toml` codecs ----------------

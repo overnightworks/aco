@@ -39,6 +39,7 @@ reason text.
 | a completed run | — | BOARD-11, BOARD-13 | — |
 | `--json`'s success/refusal envelope | — | BOARD-11, BOARD-43 (OUT-nn cited) | — |
 | an item with a `size`, measured or not | — | BOARD-26, BOARD-27, BOARD-31 | — |
+| a claim commit whose `item:` trailer is no ASCII number of at most 18 digits | — | BOARD-56 | — |
 
 ## No `--json`, and the retired `--serve`
 
@@ -83,6 +84,7 @@ does, before either reads a single issue -- cited there, not restated.
   ```
 - [ ] [BOARD-27] The top-level `measurements` object carries exactly `{"classes", "unfinished", "unparsed", "since", "as_of"}` (see E-BOARD-04).
 - [ ] [BOARD-31] Each `classes` entry carries `{"stats": {"size", "n", "median_hours", "p80_hours", "weak"}, "first_event_at", "last_event_at"}`; `since` is `null` only with no lane event read.
+- [ ] [BOARD-56] A claim commit on the state ref whose `item:` trailer is no ASCII number of at most 18 digits reads like a lane's: left out of the measurements, not counted in `unparsed`; `board` and `next` exit `0`.
 
 ## Never
 

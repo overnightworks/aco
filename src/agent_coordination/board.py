@@ -57,12 +57,8 @@ STALE_IDLE_DAYS = 7
 # limit: a longer one is no reference, whether a pattern below or
 # `parse_item_reference` reads it. The lookahead keeps an in-bound prefix of a
 # longer number from matching.
-MAXIMUM_ISSUE_NUMBER_DIGITS = 18
-ISSUE_NUMBER = rf"[1-9]\d{{0,{MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}}(?!\d)"
+ISSUE_NUMBER = rf"[1-9]\d{{0,{protocol.MAXIMUM_ISSUE_NUMBER_DIGITS - 1}}}(?!\d)"
 REFERENCE_PATTERN = re.compile(rf"(?<!\w)#({ISSUE_NUMBER})", re.ASCII)
-# What `parse_item_reference` accepts as a number: the same bound, but a bare
-# `0` and leading zeros stay readable, as they were before the bound.
-ITEM_NUMBER_PATTERN = re.compile(rf"\d{{1,{MAXIMUM_ISSUE_NUMBER_DIGITS}}}", re.ASCII)
 # One issue named the way GitHub names it across repositories: `OWNER/REPO#n`,
 # or `#n` for the repository the text itself lives in. Every typed line below
 # embeds this one grammar, so a shorthand and its qualified spelling always
@@ -279,9 +275,9 @@ def parse_item_reference(value: str) -> int:
     repository whose history it lands on."""
     if protocol.ITEM_ID_PATTERN.fullmatch(value) is not None:
         return items.item_number(value)
-    digits = value.removeprefix("#")
-    if ITEM_NUMBER_PATTERN.fullmatch(digits) is not None:
-        return int(digits)
+    number = protocol.decimal_number_or_none(value.removeprefix("#"))
+    if number is not None:
+        return number
     raise protocol.ClaimUnavailableError(
         f"{value!r} is not an item reference; use aco-xxxxxx, #n, or the bare number n"
     )
@@ -1838,10 +1834,6 @@ class BoardBuildInputs:
     unparsed_lifecycle_commits: int = 0
 
 
-def _item_number_or_none(value: str) -> int | None:
-    return int(value) if value.isdigit() else None
-
-
 def _joined_lane_event(
     event: metrics.LaneEvent,
     size_by_number: Mapping[int, metrics.Size | None],
@@ -1854,7 +1846,7 @@ def _joined_lane_event(
     the numbers not among the open ones). A lane claim (`docs/`/`fix/`, no
     issue number) never matches and is returned unchanged, still counted by
     `metrics.measure` but never sorted into a size class."""
-    number = _item_number_or_none(event.item)
+    number = protocol.decimal_number_or_none(event.item)
     if number is None:
         return event
     return replace(event, size=size_by_number.get(number))
@@ -3131,9 +3123,14 @@ def closed_item_numbers(
     """Every numbered item `lane_events` names that is not among this board
     build's own open issues (issue #357 R2) -- a completed lane whose item
     has since closed, or one this walk can no longer resolve to a live
-    issue at all. A `docs/`/`fix/` lane claim's own `item` is never numeric
-    and is silently excluded, matching `_item_number_or_none`."""
-    numbers = {int(event.item) for event in lane_events if event.item.isdigit()}
+    issue at all. A `docs/`/`fix/` lane claim's own `item`, like any other
+    trailer that is no `protocol.decimal_number_or_none` number, is silently
+    excluded."""
+    numbers = {
+        number
+        for event in lane_events
+        if (number := protocol.decimal_number_or_none(event.item)) is not None
+    }
     return frozenset(numbers - open_numbers)
 
 
