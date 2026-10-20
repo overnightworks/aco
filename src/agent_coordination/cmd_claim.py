@@ -630,7 +630,7 @@ def _resolved_issue_scope(
     context: session.RunContext,
     storage: body.Storage,
 ) -> tuple[tuple[str, ...], dict[int, board.Issue] | None]:
-    """The scope of an issue-mode claim that omitted `--scope` (issue #337),
+    """The scope of an issue-mode claim that omitted `--scope`,
     paired with the open-board listing that resolving it cost -- `None` when
     it cost nothing, so `run` never fetches that board a second time for its
     own slice-rule checks.
