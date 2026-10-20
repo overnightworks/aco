@@ -1959,6 +1959,7 @@ def _newest_landed_commit(
 
 
 SHA_NOT_ON_TRUNK_DEFECT = "is not on the first-parent trunk"
+NO_WORK_ITEM_TRAILER_DEFECT = "carries no `Work-Item:` trailer"
 
 
 def _trunk_landing_defect(
@@ -1977,7 +1978,7 @@ def _trunk_landing_defect(
         return SHA_NOT_ON_TRUNK_DEFECT
     classification = landing.classification
     if classification is None:
-        return "carries no `Work-Item:` trailer"
+        return NO_WORK_ITEM_TRAILER_DEFECT
     if isinstance(classification, board.ClassificationDefect):
         return classification.message
     if (
@@ -2013,10 +2014,15 @@ def _verify_merge_commit_authority(
     commit trailer is the actual authority, the same `_trunk_landing_defect`
     reads for `storage = state-ref`."""
     defect = _trunk_landing_defect(landings, number, sha, storage)
-    if defect is not None:
-        raise protocol.ClaimUnavailableError(
-            f"merge commit {sha} of pull request #{pull_request} {defect}"
+    if defect is None:
+        return
+    refusal = f"merge commit {sha} of pull request #{pull_request} {defect}"
+    if defect == NO_WORK_ITEM_TRAILER_DEFECT:
+        refusal += (
+            f'; release it with --abandoned "landed as PR #{pull_request} without a '
+            f'Work-Item: trailer" and close {board.item_label(number, storage)} by hand'
         )
+    raise protocol.ClaimUnavailableError(refusal)
 
 
 def landed_commit(

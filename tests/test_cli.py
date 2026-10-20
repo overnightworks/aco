@@ -13235,7 +13235,9 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
                 body="Work-Item: #72\n\nCloses #72",
                 landings=(_trunk_landing(MERGE_COMMIT_SHA, None),),
             ),
-            f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries no `Work-Item:` trailer",
+            f"merge commit {MERGE_COMMIT_SHA} of pull request #12 carries no `Work-Item:` trailer; "
+            'release it with --abandoned "landed as PR #12 without a Work-Item: trailer" '
+            "and close #72 by hand",
             id="no-trailer",
         ),
         pytest.param(

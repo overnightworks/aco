@@ -46,7 +46,7 @@ matching line.
 | `No-Item: deps` PR with configured dependency paths | — | LAND-71..77 | — | — |
 | `No-Item: deps` PR without configured dependency paths | — | LAND-70 | — | — |
 | `No-Item: deps` merge commit trailer | — | LAND-48 | LAND-37, LAND-64 | — |
-| no classification / no trailer | — | LAND-06, LAND-58 | LAND-32, LAND-52, LAND-62 | — |
+| no classification / no trailer | — | LAND-06, LAND-58 | LAND-32, LAND-52, LAND-62, LAND-80 | — |
 | contradictory trunk trailer (both, or repeated `No-Item:`) | — (lands nothing, LAND-42) | LAND-60 | LAND-61 | — |
 | state-ref `Work-Item:` trailer number past `aco-ffffff` | — | LAND-68 | — | — |
 | classification line inside a fenced block | — | LAND-07 | — | — |
@@ -170,6 +170,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - LAND-34 (retired 20.09.2026, issue #397, Befund 41): "pull request #<n> names No-Item: <kind>, not work item #<n>" no longer exists for a numbered item's own release; LAND-62 reads the merge commit instead.
 - LAND-35 (retired 20.09.2026, issue #405, #397 gate follow-up): "pull request #<n> names <ref>; an issue-less lane needs a No-Item line" no longer exists; the merge commit's own trailer decides instead (LAND-64), never the pull request's mutable body.
 - [ ] [LAND-62] A merge commit off the walked trunk, with no `Work-Item:` trailer, or naming another item refuses `merge commit <sha> of pull request #<n> <that LAND-52 defect sentence>`, exit `2`, before any write.
+- [ ] [LAND-80] LAND-62's no-trailer refusal ends `; release it with --abandoned "landed as PR #<n> without a Work-Item: trailer" and close #<item> by hand`; the other LAND-62 sentences gain nothing.
 - [ ] [LAND-64] For a lane release, a merge commit off the trunk, with no trailer, or with a malformed `No-Item:` trailer refuses `merge commit <sha> of pull request #<n> <that defect sentence>`, exit `2`.
 - [ ] [LAND-66] For a lane release, a merge commit whose trailer carries `Work-Item:`, valid or malformed, refuses `merge commit <sha> of pull request #<n> carries \`Work-Item: <value>\`; <LAND-67>`, exit `2`.
 - [ ] [LAND-67] LAND-66's rule and way out read `an issue-less lane needs a \`No-Item: <docs|fix|deps>\` trailer; release it with --abandoned "landed as PR #<n> with a malformed trailer"`.
@@ -316,7 +317,7 @@ Setup: bare-remote, fake `gh`, pull request `#57` merged into `main`, body `Work
 
 ```console
 $ aco release 42 --merged 57
-2> ERROR: merge commit <sha> of pull request #57 carries no `Work-Item:` trailer
+2> ERROR: merge commit <sha> of pull request #57 carries no `Work-Item:` trailer; release it with --abandoned "landed as PR #57 without a Work-Item: trailer" and close #42 by hand
 exit 2
 ```
 
