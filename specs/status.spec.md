@@ -47,7 +47,7 @@ identity coincides -- no command here writes that state; a live claim
 already refuses a second one on the same identity (`specs/claim-record.spec.md`,
 CLAIM-11/CLAIM-12).
 
-- [ ] [STAT-04] Two live claims recorded under the same issue or lane identity both print `CONFLICT` in place of `CLAIMED` at the head of their own line, exit `2`.
+- [ ] [STAT-04] Two live claims recorded under the same lane identity both print `CONFLICT` in place of `CLAIMED` at the head of their own line, exit `2`.
 - [ ] [STAT-05] The same pair under `--json` reports `reason: "conflict"`, `ok: false`, and each claim's own `"state": "CONFLICT"`, exit `2`.
 
 ## Status's own overlap note
@@ -59,6 +59,7 @@ the peer and its claim id, never the meeting paths.
 
 - [ ] [STAT-06] A claim with a live peer ends its own block with `overlaps issue <label> (<claim-id>), issue <label> (<claim-id>)`, comma-joining every peer; a claim with no peer prints no such line (see E-STAT-05).
 - [ ] [STAT-08] `aco status --json`'s `claims[]` object carries an `"overlaps"` array of `{"issue", "lane", "claim_id", "agent"}` objects, one per peer STAT-06's own line names, `[]` when none.
+- [ ] [STAT-24] `aco status <n>` prints issue #<n>'s own claims and every claim that overlaps one of them or shares its identity, in text and under `--json`.
 
 ## The lane-shared files
 
