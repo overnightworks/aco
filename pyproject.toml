@@ -120,6 +120,7 @@ exhaustive = true
 # adapter; the two are independent neighbours that `cli` wires together, and
 # the transport (`server`, `static`, `api`) reaches the rules only through
 # `board`. `static` (the built SPA shell) and `api` (JSON wire form) are
+# independent (issue #652).
 layers = [
     "cli",
     "server",
