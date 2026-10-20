@@ -1,8 +1,0 @@
-claim_id = "488c490660c24b20b80fbbd1df1ac233"
-agent = "claude"
-role = "builder"
-base = "3a153a62652cb2a1f36b6a8fdfa26fa58f3f18e4"
-branch = "claude/issue-290-st2-status-path"
-scope = ["scripts/test_inventory_dropped.txt", "specs/status.spec.md", "tests/store_fixtures.py", "tests/test_cli.py", "tests/test_status.py"]
-opened_commit = "bc0c1a45ae474c8cf8da393fcb4ae8a65882e23f"
-whole_reason = "Das erweiterte Modul, der Rekord-Builder und die Löschung der 8 alten Funktionen müssen zusammen landen, sonst fehlen Tests oder Namen zeigen ins Leere."
