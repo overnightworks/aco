@@ -13,16 +13,11 @@ values. `specs/claim-record.spec.md` owns the record itself, the width
 gate's literal and `--whole`'s own field (CLAIM-25..30), a foreign-claimant
 refusal (CLAIM-37), that a rescope replaces only the scope while
 `claim_id`, `base` and age keep counting (CLAIM-49), and one claim's own
-`--json` field order (CLAIM-69); `specs/protect.spec.md` owns the checkout
-resolver's `not in a repository` reason, which `rescope` names its entry
-with, and its `no commit on this branch` and `default branch unknown; run
-git remote set-head <remote> --auto` sentences (PROT-10, PROT-11, PROT-13),
-the sentence naming a canonical remote with no URL configured (PROT-45),
-and the sentences for a path no claim can ever cover (PROT-14, PROT-42,
-PROT-43) that `rescope` shares verbatim, `protect`'s own docstring names the
-sharing; `specs/claim.spec.md` owns the issueless-lane branch refusal
-(CLM-07), which rescope shares; this file owns RESC-27's exception for a
-live lane claim. This file cites
+`--json` field order (CLAIM-69); this file also owns the checkout
+resolver's sentences for the location a path names (RESC-18, RESC-19,
+RESC-21, RESC-26, RESC-28..32); `specs/claim.spec.md` owns the
+issueless-lane branch refusal (CLM-07), which rescope shares; this file owns
+RESC-27's exception for a live lane claim. This file cites
 those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 `<path>` a path, `<claim-id>` the selected claim's own id; `<subject>` and
 `<identity>` are `specs/release.spec.md`'s own, naming an item `<label>`.
@@ -35,12 +30,14 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 | a relative entry climbs out of the run checkout | RESC-05 | RESC-05 | — | — |
 | the path's directories do not exist yet | RESC-18 | RESC-18 | — | — |
 | resolved checkout is outside every repository | RESC-26 | RESC-26 | RESC-26 | — |
-| the path is inside a git directory itself | PROT-43 | PROT-43 | — | — |
-| resolved checkout has no commit yet | PROT-11 | PROT-11 | PROT-11 | — |
+| the path is inside a git directory itself and a git read fails | RESC-31 | RESC-31 | — | — |
+| the environment selects a repository and a git read fails | RESC-32 | RESC-32 | RESC-32 | — |
+| the path names a nested checkout's own root | RESC-30 | RESC-30 | — | — |
+| resolved checkout has no commit yet | RESC-28 | RESC-28 | RESC-28 | — |
 | current branch is empty | RESC-02 | RESC-02 | RESC-02 | — |
 | shared main checkout, branch known | RESC-03 | RESC-03 | RESC-03 | — |
 | on the repository's own trunk branch | RESC-04 | RESC-04 | RESC-04 | — |
-| default branch cannot be resolved | PROT-13 | PROT-13 | PROT-13 | — |
+| default branch cannot be resolved | RESC-29 | RESC-29 | RESC-29 | — |
 | canonical remote has no URL configured | RESC-21 | RESC-21 | RESC-21 | — |
 | the path is below a file or a dangling symlink, or the checkout root | RESC-19 | RESC-19 | — | — |
 | the path resolves outside the checkout | RESC-05 | RESC-05 | — | — |
@@ -64,13 +61,18 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 - [ ] [RESC-01] A relative entry joins the run checkout's toplevel; with none it refuses `<flag> path '<path>' is relative and <cwd> is not in a repository; pass it as an absolute path`, exit `2`.
 - [ ] [RESC-02] A resolved checkout with an empty current branch refuses `rescope requires a non-empty current branch; check out the claim branch, or pass an issue number`, exit `2`.
 - [ ] [RESC-03] Sharing main's git dir, rescope refuses `build claims require a linked isolated worktree checkout; run this command from this claim's own worktree on '<branch>', not the primary checkout`, exit `2`.
-- [ ] [RESC-20] RESC-03, RESC-04 and PROT-13 judge the default branch the resolved checkout's canonical remote records, after its board configuration (PIN-01/PIN-32) is read.
-- [ ] [RESC-21] A canonical `<remote>` with no URL configured refuses PROT-45's sentence, exit `2`, before RESC-03/RESC-04 (see E-RESC-06).
+- [ ] [RESC-20] RESC-03, RESC-04 and RESC-29 judge the default branch the resolved checkout's canonical remote records, after its board configuration (PIN-01/PIN-32) is read.
+- [ ] [RESC-21] A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, before RESC-03/RESC-04 (see E-RESC-06).
 - [ ] [RESC-04] On the repository's own trunk branch, rescope refuses `build claims require an isolated non-main worktree branch; run this command from this claim's own worktree, not the primary checkout`, exit `2`.
 - [ ] [RESC-05] A `--add`/`--drop` path resolving outside the resolved checkout refuses `<flag> path '<path>' is outside the resolved checkout <toplevel>`, exit `2`; a relative one first, against the run checkout.
-- [ ] [RESC-18] A `--add`/`--drop` path whose directories do not exist yet resolves its checkout from the nearest existing ancestor, as `protect` judges it (PROT-39).
-- [ ] [RESC-26] A `--add`/`--drop` path outside every repository refuses `<flag> path '<path>' is not in a repository`, exit `2`; with neither flag, PROT-10's own sentence (see E-RESC-07).
-- [ ] [RESC-19] A `--add`/`--drop` path below a file or a dangling symlink, or naming the checkout root, refuses PROT-42's or PROT-14's own sentence, exit `2`, as `protect` denies it (see E-RESC-05).
+- [ ] [RESC-18] A `--add`/`--drop` path whose directories do not exist yet resolves its checkout from the nearest existing ancestor directory.
+- [ ] [RESC-26] A `--add`/`--drop` path outside every repository refuses `<flag> path '<path>' is not in a repository`, exit `2`; with neither flag, `not in a repository` (see E-RESC-07).
+- [ ] [RESC-19] A `--add`/`--drop` path below a file refuses `<path> cannot exist: <file> is a file` (`<link> is a dangling symlink`); the root, `<path> is the checkout root itself`; exit `2`, after RESC-02..04.
+- [ ] [RESC-28] A resolved checkout with no commit yet (an unborn branch) refuses `no commit on this branch`, exit `2`.
+- [ ] [RESC-29] A resolved checkout whose canonical `<remote>` records no resolving `HEAD` refuses `default branch unknown; run git remote set-head <remote> --auto`, exit `2`, never a `main`/`master` guess.
+- [ ] [RESC-30] A path naming a nested checkout's own root is judged by that checkout, not an outer one its parent sits inside, and refuses `<root> is the checkout root itself`, exit `2`, after RESC-02..04.
+- [ ] [RESC-31] A git read failing on a path inside a git directory (`.git/`, a bare repository, one the environment selects) refuses `not a checkout: <git-directory> is a git directory`, exit `2`, not git's text.
+- [ ] [RESC-32] While `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_OBJECT_DIRECTORY` is set, even empty, a failed git read never reads as outside every repository: it refuses git's text or, in a git directory, RESC-31's.
 
 ## Selecting the live claim
 
@@ -97,13 +99,13 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 
 ## `--json`'s own `reason` vocabulary
 
-- [ ] [RESC-15] A malformed `--add`/`--drop` value (RESC-01, RESC-05..09, RESC-19) reports `reason: "invalid_usage"` under `--json`.
+- [ ] [RESC-15] A malformed `--add`/`--drop` value (RESC-01, RESC-05..09, RESC-19, RESC-30) reports `reason: "invalid_usage"` under `--json`.
 - [ ] [RESC-16] No live claim (RESC-14), a foreign claimant (CLAIM-37), a wide combined scope (RESC-10) or an item body that cannot take it (RESC-24) reports `reason: "precondition_failed"` (see E-RESC-04).
-- [ ] [RESC-17] Every other refusal -- an unresolved checkout (RESC-02..04, RESC-26, PROT-11/13/43), a failed write (RESC-23) or a corrupted record -- reports `reason: "unavailable"` (a missing identity: OUT-05).
+- [ ] [RESC-17] Every other refusal -- an unresolved checkout (RESC-02..04, RESC-26, RESC-28/29/31/32), a failed write (RESC-23) or a corrupted record -- reports `reason: "unavailable"` (a missing identity: OUT-05).
 
 ## Never
 
-- `rescope` never reads a git failure as a branch with no commit (PROT-11) or as a remote that records no `HEAD` (PROT-13): it refuses with git's own text (PROT-17, RESC-17).
+- `rescope` never reads a git failure as a branch with no commit (RESC-28) or as a remote that records no `HEAD` (RESC-29): it refuses with git's own text (RESC-17), except inside a git directory, where RESC-31's sentence replaces it.
 - `rescope` never reads or requires checkout `HEAD` to match the claim's own `base`, and never refuses on a dirty working tree: only `claim`'s own precondition (CLM-04, CLM-05) checks either.
 - `rescope` never runs the comma-ungrounded check over `--drop`: a value the live claim already holds is a fact about the claim, not a checkout typo, so dropping a comma-bearing scoped path always matches it as one whole path.
 - `rescope` never joins a relative `--add`/`--drop` entry to the process's own cwd: it is read against the run checkout's toplevel, the form an item body's own `scope` list prints.
@@ -200,7 +202,7 @@ $ aco rescope 42 --add <worktree>/AGENTS.md --json
 exit 2
 ```
 
-### E-RESC-05 — a path no claim can ever cover names why, as `protect` does
+### E-RESC-05 — a path no claim can ever cover names why
 
 Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-42`, a tracked `README.md`, already `aco claim 42 --scope README.md`
 
@@ -214,7 +216,7 @@ $ aco rescope 42 --add <worktree> --json
 exit 2
 ```
 
-### E-RESC-06 — a canonical remote with no URL configured is named, as `protect` does
+### E-RESC-06 — a canonical remote with no URL configured is named
 
 Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-42`, the tracked `.aco/board.toml` naming `canonical_remote = "upstream"`, `upstream` only a URL-less `remote.upstream.fetch` line
 
