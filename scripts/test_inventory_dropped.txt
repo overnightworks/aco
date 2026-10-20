@@ -39,3 +39,236 @@ tests/test_cli.py	'version = 1\nnow = ""\nnext = ""\ndone_when = ""\n'	#263 F12 
 tests/test_cli.py	'version = 1\nnow = "Ready."\nnext = "Land it."\ndone_when = ""\n'	#263 F12: R5 keeps this exact input in INCOMPLETE and compares its independent result through the fixture.
 tests/test_cli.py	'version = 1\nnow = 1\nnext = "X"\ndone_when = "D"\n'	#263 F11 single bad-value input is replaced by R4's two-defect body, allowing Y10 to prove first-defect selection.
 tests/test_cli.py	'{sha} declares Work-Item: #16777216'	#263 F5: declared and TrunkCase.streams supply this independent exact expectation for R24/R26.
+tests/test_protect.py	"sed '+18446744073709551616w docs/f' src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed '+w docs/f' src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed '/a/ Iw docs/f' src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -i -e 'w docs/file' --f docs/file"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -i -e 'w docs/file' --fi docs/file"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -i -e 'w docs/file' -nl docs/file"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -n -e 'w docs/file' -f script.sed src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -n -e 'w docs/file' src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -n -e 'w src/file' -e 'a w docs/file' src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -n -e 'w src/file' -e 'w docs/file' src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	"sed -n -f script.sed -e 'w docs/file' src/a"	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	'  *** Update File: '	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	' && rm docs/widget.md'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	' '	#254 protect removed: separator of a deleted hook test's command text.
+tests/test_protect.py	' outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	''	#254 protect removed: empty scenario value of a deleted hook test.
+tests/test_protect.py	'*** Add File: '	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	'*** Add File: {work}/docs/widget.md'	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	'*** Begin Patch\n*** End Patch'	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	'*** Move to: {work}/docs/widget.py'	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	'*** Update File: '	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	'*** Update File: {work}/src/widget.py'	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	'+content'	#254 protect removed: apply_patch body line of a deleted hook test.
+tests/test_protect.py	'+hi'	#254 protect removed: apply_patch body line of a deleted hook test.
+tests/test_protect.py	'+new'	#254 protect removed: apply_patch body line of a deleted hook test.
+tests/test_protect.py	'-hello'	#254 protect removed: apply_patch body line of a deleted hook test.
+tests/test_protect.py	'-old'	#254 protect removed: apply_patch body line of a deleted hook test.
+tests/test_protect.py	'.aco/board.toml is not tracked in this checkout, so its storage pin cannot be trusted: git add -f .aco/board.toml'	#254 protect removed: the hook's copy of this refusal; the CLI-level one stays proven by test_an_untrusted_board_config_refuses_every_store_command_by_name in test_cli.py.
+tests/test_protect.py	'.claude/notes.md'	#254 protect removed: the hook's ignored-settings escape (issue #448) existed only in the hook.
+tests/test_protect.py	'.claude/settings.json'	#254 protect removed: the hook's ignored-settings escape (issue #448) existed only in the hook.
+tests/test_protect.py	'.claude/settings.local.json'	#254 protect removed: the hook's ignored-settings escape (issue #448) existed only in the hook.
+tests/test_protect.py	'.old'	#254 protect removed: suffix of a deleted hook test's mv or cp command text.
+tests/test_protect.py	'/src/into-nested-git'	#254 protect removed: symlink-target scenario of the hook's write judgement; rescope resolves paths as RESC-18, RESC-19, RESC-26 and RESC-30 state.
+tests/test_protect.py	'/src/into-nested-worktree.md'	#254 protect removed: symlink-target scenario of the hook's write judgement; rescope resolves paths as RESC-18, RESC-19, RESC-26 and RESC-30 state.
+tests/test_protect.py	'/src/into-nested.md'	#254 protect removed: symlink-target scenario of the hook's write judgement; rescope resolves paths as RESC-18, RESC-19, RESC-26 and RESC-30 state.
+tests/test_protect.py	'/src/into-other.md'	#254 protect removed: symlink-target scenario of the hook's write judgement; rescope resolves paths as RESC-18, RESC-19, RESC-26 and RESC-30 state.
+tests/test_protect.py	'/src/into-outside.md'	#254 protect removed: symlink-target scenario of the hook's write judgement; rescope resolves paths as RESC-18, RESC-19, RESC-26 and RESC-30 state.
+tests/test_protect.py	'/src/into-own.md'	#254 protect removed: symlink-target scenario of the hook's write judgement; rescope resolves paths as RESC-18, RESC-19, RESC-26 and RESC-30 state.
+tests/test_protect.py	'/src/nested/repo/.git is a git directory'	#254 protect removed: nested-checkout scenario of the hook; RESC-30 and RESC-31 stay proven in test_rescope_checkout.py.
+tests/test_protect.py	'1'	#254 protect removed: generic scenario value of a deleted hook test.
+tests/test_protect.py	'238'	#254 protect removed: generic scenario value of a deleted hook test.
+tests/test_protect.py	': '	#254 protect removed: separator of a deleted hook test's denial text.
+tests/test_protect.py	': cannot fetch'	#254 protect removed: the hook's store-failure denial text; no surviving command shares it.
+tests/test_protect.py	'@@'	#254 protect removed: apply_patch hunk marker of a deleted hook test.
+tests/test_protect.py	'ACO_PROTECT_UNGUARDED: {entry} is not an absolute directory'	#254 protect removed: the ACO_PROTECT_UNGUARDED exemption existed only in the hook.
+tests/test_protect.py	'Ada'	#254 protect removed: agent name of a deleted hook test.
+tests/test_protect.py	'Artifact'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'AskUserQuestion'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'Bash'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'Codex Sol'	#254 protect removed: agent name of a deleted hook test.
+tests/test_protect.py	'Edit'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'HOOK_TOOL_EFFECTS'	#254 protect removed: the hook's tool table existed only in the hook.
+tests/test_protect.py	'ListAgents'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'Monitor'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'MultiEdit'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'NotebookEdit'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'README.md outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'README.md'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'Read'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'ScheduleWakeup'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'SendFeedback'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'SendMessage'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'Skill'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'StructuredOutput'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'TaskOutput'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'TaskStop'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'ToolSearch'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'Workflow'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'Write'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'[]'	#254 protect removed: empty value of a deleted hook test.
+tests/test_protect.py	'adapter failed'	#254 protect removed: injected store failure of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'agent identity is required: set ACO_AGENT, GROK_SESSION_ID, or CLAUDE_CODE_SESSION_ID (ACO_AGENT can sit in the hook line)'	#254 protect removed: the hook's identity denial; claim and start keep their own identity refusals over IDENTITY_ENVIRONMENT_ORDER.
+tests/test_protect.py	'agent_coordination'	#254 protect removed: module name in a deleted hook test.
+tests/test_protect.py	'allow'	#254 protect removed: hook verdict word.
+tests/test_protect.py	'apply_patch'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'auth or transport failure'	#254 protect removed: injected store failure of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'bad tree'	#254 protect removed: injected store failure of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'cannot fetch'	#254 protect removed: injected store failure of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'cannot reach '	#254 protect removed: the hook's store-failure denial prefix; no surviving command shares it.
+tests/test_protect.py	'cd '	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'cell_type'	#254 protect removed: notebook payload field of a deleted hook test.
+tests/test_protect.py	'claim first'	#254 protect removed: the hook's unclaimed-write denial hint.
+tests/test_protect.py	'claimed-shared'	#254 protect removed: lane-shared write scenario id; the lane_shared listing stays proven by test_status_and_brief_show_the_trunks_lane_shared_files_or_its_defect.
+tests/test_protect.py	'claimed/repo-worktrees/issue-72-widget'	#254 protect removed: claimed-write scenario path of the hook.
+tests/test_protect.py	'claimed/repo/into-nested-git'	#254 protect removed: claimed-write scenario path of the hook.
+tests/test_protect.py	'claimed/repo/into-worktree.md'	#254 protect removed: claimed-write scenario path of the hook.
+tests/test_protect.py	'cli.py'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'code'	#254 protect removed: payload field of a deleted hook test.
+tests/test_protect.py	'codex/issue-72-claims'	#254 protect removed: claim-branch scenario of the hook's write judgement.
+tests/test_protect.py	'codex/issue-9-widget'	#254 protect removed: claim-branch scenario of the hook's write judgement.
+tests/test_protect.py	'codex/issue-99-other'	#254 protect removed: claim-branch scenario of the hook's write judgement.
+tests/test_protect.py	'command'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'contents'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'cp --target=docs -S -tdocs src/a'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'cp docs outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'cp docs/file outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'cp src/a src/b --suffix docs'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'cwd'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'dangling/file.md'	#254 protect removed: scenario path of the hook; the dangling-symlink case of rescope stays proven (RESC-19).
+tests/test_protect.py	'decision'	#254 protect removed: hook verdict field.
+tests/test_protect.py	'default branch unknown; run git remote set-head origin --auto'	#254 protect removed: the origin spelling was the hook's; rescope proves this sentence (RESC-29) in test_rescope_checkout.py with the hub remote.
+tests/test_protect.py	'defective-trunk'	#254 protect removed: scenario id of the hook's lane-shared write judgement; the defect listing stays proven in test_cli.py.
+tests/test_protect.py	'deny'	#254 protect removed: hook verdict word.
+tests/test_protect.py	'docs/evil.md outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'docs/evil.md'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'docs/new/page.md'	#254 protect removed: scenario file of a deleted hook test; the new-directory rescope case stays proven (RESC-18).
+tests/test_protect.py	'docs/widget.ipynb'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'docs/widget.py'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'echo hi >> '	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'edit src'	#254 protect removed: scenario command of a deleted hook test.
+tests/test_protect.py	'edit_mode'	#254 protect removed: notebook payload field of a deleted hook test.
+tests/test_protect.py	'elsewhere'	#254 protect removed: scenario directory of a deleted hook test.
+tests/test_protect.py	'fetch-failure'	#254 protect removed: injected store failure of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'filePath'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'file_path'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'flags=W; git restore -"$flags" docs/file'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'git diff'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'git restore --end-of-options -Ws docs/file'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'git restore -Ws outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'git restore docs/file outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'git status'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'grep foo bar.py && ls && pytest'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'grep'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'guarded-link/README.md'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario path; the exemption existed only in the hook.
+tests/test_protect.py	'guarded-worktree/into-throwaway.md'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario path; the exemption existed only in the hook.
+tests/test_protect.py	'guarded-worktree/src/x.py'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario path; the exemption existed only in the hook.
+tests/test_protect.py	'into-nested-worktree.md'	#254 protect removed: symlink-target scenario of the hook's write judgement.
+tests/test_protect.py	'invalid hook payload'	#254 protect removed: the hook's payload refusal; hook_input is deleted.
+tests/test_protect.py	'invented_tool'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'issue-90-other'	#254 protect removed: claim scenario of the hook; rescope's foreign-cwd case keeps its own slug in test_rescope_checkout.py.
+tests/test_protect.py	'lane/into-guarded.md'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario path; the exemption existed only in the hook.
+tests/test_protect.py	'lane_shared = ["scripts/registry.txt", "scripts/missing.txt", "src"]\n'	#254 protect removed: the hook's lane-shared write scenario; PIN-37 to PIN-42 stay proven through status and brief in test_cli.py.
+tests/test_protect.py	'lineage'	#254 protect removed: scenario id of a deleted hook test.
+tests/test_protect.py	'list_dir'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'main'	#254 protect removed: branch name of a deleted hook scenario; the main-checkout refusal of rescope stays proven (RESC-03, RESC-04).
+tests/test_protect.py	'malformed'	#254 protect removed: scenario id of a deleted hook test.
+tests/test_protect.py	'master'	#254 protect removed: branch name of a deleted hook scenario.
+tests/test_protect.py	'matching-claim'	#254 protect removed: scenario id of the hook's claim lookup.
+tests/test_protect.py	'mv '	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'names-no-trunk-file'	#254 protect removed: scenario id of the hook's lane-shared write judgement; the names-no-file marker stays proven in test_cli.py.
+tests/test_protect.py	'new_source'	#254 protect removed: notebook payload field of a deleted hook test.
+tests/test_protect.py	'newer_aco_key = true\n'	#254 protect removed: the hook's defective-trunk scenario; the defect listing stays proven in test_cli.py (PIN-42).
+tests/test_protect.py	'non-overlapping-scope'	#254 protect removed: scenario id of the hook's claim lookup.
+tests/test_protect.py	'not a checkout: {tmp_path}/'	#254 protect removed: the hook's spelling; rescope proves RESC-31 with the resolved git directory in test_rescope_checkout.py.
+tests/test_protect.py	'not a patch at all'	#254 protect removed: apply_patch grammar was read only by the deleted hook.
+tests/test_protect.py	'not main'	#254 protect removed: the hook's shared-checkout denial reason (PROTECT_NOT_MAIN_REASON, deleted); rescope refuses by RESC-03 and RESC-04.
+tests/test_protect.py	'not-a-repository'	#254 protect removed: scenario id of the hook; rescope's outside-every-repository case stays proven (RESC-26).
+tests/test_protect.py	'not-json'	#254 protect removed: hook payload refusal scenario; hook_input is deleted.
+tests/test_protect.py	'not-shared'	#254 protect removed: scenario id of the hook's lane-shared write judgement.
+tests/test_protect.py	'notebook.ipynb'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'notebook_path'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'notes.md'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'null'	#254 protect removed: JSON value of a deleted hook payload test.
+tests/test_protect.py	'options=v; cp -"$options" src/a docs/file'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'origin'	#254 protect removed: remote name of a deleted hook scenario.
+tests/test_protect.py	'other.py'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'other/issue-72'	#254 protect removed: claim-branch scenario of the hook's write judgement.
+tests/test_protect.py	'outside.md'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'path required'	#254 protect removed: the hook's missing-path denial.
+tests/test_protect.py	'path'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'pattern'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'print(1)'	#254 protect removed: notebook cell text of a deleted hook test.
+tests/test_protect.py	'prompt'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'protect-canonical-remote-not-configured'	#254 protect removed: protect's test id; rescope keeps the case in test_rescope_checkout.py (RESC-21).
+tests/test_protect.py	'protect-hub-default'	#254 protect removed: protect's test id; rescope keeps the case in test_rescope_checkout.py (RESC-20).
+tests/test_protect.py	'protect-hub-unrecorded'	#254 protect removed: protect's test id; rescope keeps the case in test_rescope_checkout.py (RESC-29).
+tests/test_protect.py	'protect-unconfigured-remote-left-a-recorded-head'	#254 protect removed: protect's test id; rescope keeps the case in test_rescope_checkout.py (RESC-21).
+tests/test_protect.py	'read_file'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'refs/remotes/origin/main'	#254 protect removed: ref name of a deleted hook scenario; rescope keeps its refs arrangements in test_rescope_checkout.py.
+tests/test_protect.py	'refs/remotes/origin/master'	#254 protect removed: ref name of a deleted hook scenario.
+tests/test_protect.py	'refs/remotes/origin/trunk'	#254 protect removed: ref name of a deleted hook scenario.
+tests/test_protect.py	'replace'	#254 protect removed: hook payload field; no surviving command reads a hook payload.
+tests/test_protect.py	'repo'	#254 protect removed: scenario directory of a deleted hook test.
+tests/test_protect.py	'repo/.claude/settings.local.json'	#254 protect removed: the hook's ignored-settings escape (issue #448) existed only in the hook.
+tests/test_protect.py	'repo/README.md'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'repo/into-guarded-directory'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario path; the exemption existed only in the hook.
+tests/test_protect.py	'repo/into-guarded-worktree.md'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario path; the exemption existed only in the hook.
+tests/test_protect.py	'repo/into-guarded.md'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario path; the exemption existed only in the hook.
+tests/test_protect.py	'repo/into-outside.md'	#254 protect removed: symlink-target scenario of the hook's write judgement.
+tests/test_protect.py	'repo/into-own-git'	#254 protect removed: symlink-target scenario of the hook's write judgement.
+tests/test_protect.py	'repo/into-own-readme.md'	#254 protect removed: symlink-target scenario of the hook's write judgement.
+tests/test_protect.py	'rewritten'	#254 protect removed: scenario id of a deleted hook test.
+tests/test_protect.py	'rm '	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'rm -rf '	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'rm README.md outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'rm docs outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'rm docs/new/page.md outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'rm docs/widget.md outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'rm docs/widget.md'	#254 protect removed: Bash command text judged only by the deleted hook.
+tests/test_protect.py	'run_terminal_command'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'scratch'	#254 protect removed: scenario directory of a deleted hook test.
+tests/test_protect.py	'scripts/missing.txt'	#254 protect removed: the hook's lane-shared write scenario; the names-no-file marker stays proven in test_cli.py (PIN-41).
+tests/test_protect.py	'scripts/registry.txt'	#254 protect removed: the hook's lane-shared write scenario; the listing stays proven in test_cli.py (PIN-37 to PIN-42).
+tests/test_protect.py	'search_replace'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'secret'	#254 protect removed: scenario value of a deleted hook test.
+tests/test_protect.py	'sed --in-pl -f -i docs/file'	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	'sed -i docs/file outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'sed -n -e "w $dir/file" src/a'	#254 protect removed: sed-script write detection existed only in the deleted hook; no surviving command parses sed.
+tests/test_protect.py	'sed w docs/f outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'sed w docs/file outside claim scope'	#254 protect removed: the hook's scope-miss denial wording; no surviving command judges a write against a claim scope.
+tests/test_protect.py	'shared-directory-itself'	#254 protect removed: scenario id of the hook's lane-shared write judgement.
+tests/test_protect.py	'shared-only-by-the-lane'	#254 protect removed: scenario id of the hook's lane-shared write judgement.
+tests/test_protect.py	'spawn_subagent'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'src'	#254 protect removed: scenario directory of a deleted hook test.
+tests/test_protect.py	'src/nested/repo-worktrees/issue-72-widget'	#254 protect removed: nested-worktree scenario path of the hook; RESC-30 stays proven in test_rescope_checkout.py.
+tests/test_protect.py	'src/new/package/module.py'	#254 protect removed: scenario file of a deleted hook test; the new-directory rescope case stays proven (RESC-18).
+tests/test_protect.py	'src/new_module.py'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'src/secret.py'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'src/widget.ipynb'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'src/x.py'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'src/y.py'	#254 protect removed: scenario file of a deleted hook test.
+tests/test_protect.py	'store unreadable'	#254 protect removed: injected store failure of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'subdir'	#254 protect removed: scenario directory of a deleted hook test.
+tests/test_protect.py	'toolInput'	#254 protect removed: hook payload field; hook_input is deleted.
+tests/test_protect.py	'toolName'	#254 protect removed: hook payload field; hook_input is deleted.
+tests/test_protect.py	'tool_input'	#254 protect removed: hook payload field; hook_input is deleted.
+tests/test_protect.py	'tool_name'	#254 protect removed: hook payload field; hook_input is deleted.
+tests/test_protect.py	'unborn'	#254 protect removed: branch name of a deleted hook scenario; the unborn-checkout case of rescope stays proven (RESC-28).
+tests/test_protect.py	'unclaimed'	#254 protect removed: scenario id of the hook's claim lookup.
+tests/test_protect.py	'unreachable'	#254 protect removed: injected store failure of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'work'	#254 protect removed: scenario directory of a deleted hook test.
+tests/test_protect.py	'write path crashed'	#254 protect removed: injected crash of the hook's fail-closed proof; no surviving command judges a write.
+tests/test_protect.py	'write'	#254 protect removed: hook tool name; no surviving command reads a hook payload.
+tests/test_protect.py	'wrong-branch'	#254 protect removed: scenario id of the hook's claim lookup.
+tests/test_protect.py	'x'	#254 protect removed: generic scenario value of a deleted hook test.
+tests/test_protect.py	'{"toolName": 1}'	#254 protect removed: hook payload refusal scenario; hook_input is deleted.
+tests/test_protect.py	'{scratch}'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario template; the exemption existed only in the hook.
+tests/test_protect.py	'{scratch}/missing'	#254 protect removed: ACO_PROTECT_UNGUARDED scenario template; the exemption existed only in the hook.
+tests/test_protect.py	'{}'	#254 protect removed: empty hook payload of a deleted test.
+tests/test_protect.py	'|'	#254 protect removed: separator of a deleted hook test's command text.
+tests/test_protect.py	1	#254 protect removed: generic scenario value of a deleted hook test.
+tests/test_protect.py	True	#254 protect removed: generic scenario value of a deleted hook test.
+tests/test_protect.py	b'\xff\xfe\x80'	#254 protect removed: undecodable hook payload scenario; hook_input is deleted.
