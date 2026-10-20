@@ -136,7 +136,7 @@ from agent_coordination import (
     store,
 )
 from agent_coordination import cli as issue_claim
-from agent_coordination.cmd_status import _status, _status_json
+from agent_coordination.cmd_status import _status
 from agent_coordination.protocol import (
     ClaimError,
     ClaimRequest,
@@ -7175,42 +7175,6 @@ def test_status_scope_index_never_rescans_scope_pairs(
     assert capsys.readouterr().out.count("CLAIMED") == 1
 
 
-def test_status_reports_repository_scope_overlaps_as_notes(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    first = standing_active_claim(issue=72, scope=("shared",))
-    second = standing_active_claim(claim_id="claim-b", issue=73, scope=("shared/file.py",))
-    opened_at = datetime(2026, 8, 21, tzinfo=UTC)
-    ages: dict[str, datetime] = {first.claim_id: opened_at, second.claim_id: opened_at}
-
-    exit_code = _status((first, second), None, ages, body.Storage.GITHUB)
-
-    assert exit_code == 0
-    rendered = capsys.readouterr().out
-    assert rendered.count("CLAIMED") == 2
-    assert "CONFLICT" not in rendered
-    assert "overlaps issue #73 (claim-b)" in rendered
-    assert "overlaps issue #72 (cli-claim)" in rendered
-    assert _status((first, second), 72, ages, body.Storage.GITHUB) == 0
-    issue_rendered = capsys.readouterr().out
-    assert issue_rendered.count("CLAIMED") == 2
-    assert "overlaps issue #73 (claim-b)" in issue_rendered
-
-
-def test_status_notes_a_scope_that_is_claimed_after_its_descendant(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    descendant = standing_active_claim(issue=72, scope=("shared/file.py",))
-    parent = standing_active_claim(claim_id="claim-b", issue=73, scope=("shared",))
-    opened_at = datetime(2026, 8, 21, tzinfo=UTC)
-    ages: dict[str, datetime] = {descendant.claim_id: opened_at, parent.claim_id: opened_at}
-
-    assert _status((descendant, parent), None, ages, body.Storage.GITHUB) == 0
-    rendered = capsys.readouterr().out
-    assert rendered.count("CLAIMED") == 2
-    assert "CONFLICT" not in rendered
-
-
 def _write_state_ref_pin(toplevel: Path) -> None:
     """`.aco/board.toml` pinned to `storage = "state-ref"` in
     `toplevel`: the isolated toplevel `_isolate_git_toplevel` (conftest.py)
@@ -9532,33 +9496,6 @@ def _patch_status_store(
     monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
 
 
-def test_cli_status_empty_store_prints_unclaimed_repository(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    _patch_status_store(monkeypatch)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status"]) == 0
-    assert capsys.readouterr().out == "UNCLAIMED repository\n"
-
-
-def test_cli_status_before_bootstrap_prints_unclaimed_repository(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A repository with no `refs/aco/state` at all (`protocol.EMPTY_STATE`, `tip is
-    None`) still answers `status` plainly -- there is nothing to derive a
-    claim's age from yet because there are no claims yet either."""
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
-    )
-    monkeypatch.setattr(store, "fetch_state", lambda *, worktree, remote: protocol.EMPTY_STATE)
-    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status"]) == 0
-    assert capsys.readouterr().out == "UNCLAIMED repository\n"
-
-
 def test_cli_status_reports_unavailable_for_a_rewritten_state_ref(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -9582,34 +9519,6 @@ def test_cli_status_reports_unavailable_for_a_rewritten_state_ref(
     assert status == 2
     assert captured.err == "ERROR: <oid> is not an ancestor of <tip>\n"
     _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-
-
-def test_cli_status_json_before_bootstrap_reports_a_null_tip(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`status --json`'s `tip` is `null` for `protocol.EMPTY_STATE` (issue #256): a
-    repository with no `refs/aco/state` ref yet has no oid a monitor could
-    poll for movement."""
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
-    )
-    monkeypatch.setattr(store, "fetch_state", lambda *, worktree, remote: protocol.EMPTY_STATE)
-    monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["tip"] is None
-
-
-def test_cli_status_issue_with_no_claim_prints_unclaimed_issue(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    _patch_status_store(monkeypatch)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "72"]) == 0
-    assert capsys.readouterr().out == "UNCLAIMED issue #72\n"
 
 
 @pytest.mark.parametrize(
@@ -9721,24 +9630,6 @@ def test_cli_status_shows_a_live_store_claim_then_the_lane_shared_files(
     )
 
 
-def test_cli_status_prints_the_resource_line_for_an_allocated_hold(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    claimed = standing_active_claim(
-        "Ada",
-        claim_id="hop-1",
-        issue=72,
-        scope=("src",),
-        resource=protocol.ResourceHold("schema-hop", 1),
-    )
-    _patch_status_store(monkeypatch, claimed)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "72"])
-
-    assert status == 0
-    assert "  resource schema-hop=1\n" in capsys.readouterr().out
-
-
 def test_cli_lane_claim_and_release_round_trip_without_issue_number(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -9788,27 +9679,6 @@ def test_cli_lane_claim_and_release_round_trip_without_issue_number(
     released = issue_claim.main(["--repo", REPOSITORY, "release", "--abandoned", "stopped"])
     assert released == 0
     assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
-
-
-def test_cli_status_shows_a_live_lane_claim(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    claimed = standing_active_claim(
-        "Codex Sol",
-        claim_id="cli-lane-claim",
-        lane=True,
-        branch="docs/lane-cleanup",
-        scope=("docs",),
-    )
-    _patch_status_store(monkeypatch, claimed)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status"]) == 0
-    assert capsys.readouterr().out == (
-        f"CLAIMED lane docs/lane-cleanup: Codex Sol (builder) base={BASE} "
-        "branch=docs/lane-cleanup claim=cli-lane-claim 0h 0m\n"
-        "  docs\n"
-    )
 
 
 @pytest.mark.parametrize("command", ["claim", "release"])
@@ -9864,34 +9734,6 @@ def test_cli_release_requires_a_non_empty_current_branch_without_an_issue(
     assert "lane release requires a non-empty current branch" in capsys.readouterr().err
 
 
-def test_cli_status_overlapping_store_claims_print_notes(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    first = standing_active_claim("Codex Sol", claim_id="claim-a", issue=72, scope=("shared",))
-    second = standing_active_claim(
-        "Grok 4.6",
-        claim_id="claim-b",
-        issue=73,
-        branch="codex/issue-73-claims",
-        scope=("shared/file.py",),
-    )
-    _patch_status_store(monkeypatch, first, second)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status"])
-    assert status == 0
-    assert capsys.readouterr().out == (
-        f"CLAIMED issue #72: Codex Sol (builder) base={BASE} "
-        "branch=codex/issue-72-claims claim=claim-a 0h 0m\n"
-        "  shared\n"
-        "  overlaps issue #73 (claim-b)\n"
-        f"CLAIMED issue #73: Grok 4.6 (builder) base={BASE} "
-        "branch=codex/issue-73-claims claim=claim-b 0h 0m\n"
-        "  shared/file.py\n"
-        "  overlaps issue #72 (claim-a)\n"
-    )
-
-
 def test_cli_rescope_requires_a_non_empty_current_branch(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -9923,247 +9765,9 @@ def test_cli_rescope_requires_a_non_empty_current_branch(
     assert "non-empty current branch" in capsys.readouterr().err
 
 
-def test_status_direct_empty_claims_prints_unclaimed_repository_without_ledger(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    assert _status((), None, {}, body.Storage.GITHUB) == 0
-    assert capsys.readouterr().out == "UNCLAIMED repository\n"
-
-
 def _no_lane_shared() -> dict[str, object]:
     """`--json`'s lane-shared keys when the trunk names none (issue #586)."""
     return {"lane_shared": [], "lane_shared_unavailable": None}
-
-
-@pytest.mark.parametrize(
-    ("subject", "issue"),
-    [pytest.param((), None, id="empty-store"), pytest.param(("72",), 72, id="issue-unclaimed")],
-)
-def test_cli_status_json_with_no_matching_claim_prints_unclaimed_object(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    subject: tuple[str, ...],
-    issue: int | None,
-) -> None:
-    _patch_status_store(monkeypatch)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", *subject, "--json"]) == 0
-    assert (
-        capsys.readouterr().out
-        == json.dumps(
-            {
-                "ok": True,
-                "reason": "unclaimed",
-                "issue": issue,
-                "tip": BASE,
-                "claims": [],
-                **_no_lane_shared(),
-            }
-        )
-        + "\n"
-    )
-
-
-def test_cli_status_json_shows_a_live_store_claim(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    claimed = standing_active_claim(
-        "Codex Sol", claim_id="cli-claim", issue=72, branch="codex/issue-72", scope=("src",)
-    )
-    _patch_status_store(monkeypatch, claimed)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "72", "--json"])
-    assert status == 0
-    assert (
-        capsys.readouterr().out
-        == json.dumps(
-            {
-                "ok": True,
-                "reason": "claimed",
-                "issue": 72,
-                "tip": BASE,
-                "claims": [
-                    {
-                        "issue": 72,
-                        "lane": None,
-                        "claim_id": "cli-claim",
-                        "agent": "Codex Sol",
-                        "role": "builder",
-                        "base": BASE,
-                        "branch": "codex/issue-72",
-                        "scope": ["src"],
-                        "resource": None,
-                        "resource_value": None,
-                        "overlaps": [],
-                        "state": "CLAIMED",
-                        "age": "0h 0m",
-                        "old": False,
-                    }
-                ],
-                **_no_lane_shared(),
-            }
-        )
-        + "\n"
-    )
-
-
-def test_cli_status_json_overlapping_store_claims_print_claimed_object(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    first = standing_active_claim("Codex Sol", claim_id="claim-a", issue=72, scope=("shared",))
-    second = standing_active_claim(
-        "Grok 4.6",
-        claim_id="claim-b",
-        issue=73,
-        branch="codex/issue-73-claims",
-        scope=("shared/file.py",),
-    )
-    _patch_status_store(monkeypatch, first, second)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "--json"])
-    assert status == 0
-    assert (
-        capsys.readouterr().out
-        == json.dumps(
-            {
-                "ok": True,
-                "reason": "claimed",
-                "issue": None,
-                "tip": BASE,
-                "claims": [
-                    {
-                        "issue": 72,
-                        "lane": None,
-                        "claim_id": "claim-a",
-                        "agent": "Codex Sol",
-                        "role": "builder",
-                        "base": BASE,
-                        "branch": "codex/issue-72-claims",
-                        "scope": ["shared"],
-                        "resource": None,
-                        "resource_value": None,
-                        "overlaps": [
-                            {
-                                "issue": 73,
-                                "lane": None,
-                                "claim_id": "claim-b",
-                                "agent": "Grok 4.6",
-                            }
-                        ],
-                        "state": "CLAIMED",
-                        "age": "0h 0m",
-                        "old": False,
-                    },
-                    {
-                        "issue": 73,
-                        "lane": None,
-                        "claim_id": "claim-b",
-                        "agent": "Grok 4.6",
-                        "role": "builder",
-                        "base": BASE,
-                        "branch": "codex/issue-73-claims",
-                        "scope": ["shared/file.py"],
-                        "resource": None,
-                        "resource_value": None,
-                        "overlaps": [
-                            {
-                                "issue": 72,
-                                "lane": None,
-                                "claim_id": "claim-a",
-                                "agent": "Codex Sol",
-                            }
-                        ],
-                        "state": "CLAIMED",
-                        "age": "0h 0m",
-                        "old": False,
-                    },
-                ],
-                **_no_lane_shared(),
-            }
-        )
-        + "\n"
-    )
-
-
-def test_cli_status_json_issue_on_overlap_prints_related_claimed_object(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    first = standing_active_claim("Codex Sol", claim_id="claim-a", issue=72, scope=("shared",))
-    second = standing_active_claim(
-        "Grok 4.6",
-        claim_id="claim-b",
-        issue=73,
-        branch="codex/issue-73-claims",
-        scope=("shared/file.py",),
-    )
-    _patch_status_store(monkeypatch, first, second)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "72", "--json"])
-    assert status == 0
-    assert (
-        capsys.readouterr().out
-        == json.dumps(
-            {
-                "ok": True,
-                "reason": "claimed",
-                "issue": 72,
-                "tip": BASE,
-                "claims": [
-                    {
-                        "issue": 72,
-                        "lane": None,
-                        "claim_id": "claim-a",
-                        "agent": "Codex Sol",
-                        "role": "builder",
-                        "base": BASE,
-                        "branch": "codex/issue-72-claims",
-                        "scope": ["shared"],
-                        "resource": None,
-                        "resource_value": None,
-                        "overlaps": [
-                            {
-                                "issue": 73,
-                                "lane": None,
-                                "claim_id": "claim-b",
-                                "agent": "Grok 4.6",
-                            }
-                        ],
-                        "state": "CLAIMED",
-                        "age": "0h 0m",
-                        "old": False,
-                    },
-                    {
-                        "issue": 73,
-                        "lane": None,
-                        "claim_id": "claim-b",
-                        "agent": "Grok 4.6",
-                        "role": "builder",
-                        "base": BASE,
-                        "branch": "codex/issue-73-claims",
-                        "scope": ["shared/file.py"],
-                        "resource": None,
-                        "resource_value": None,
-                        "overlaps": [
-                            {
-                                "issue": 72,
-                                "lane": None,
-                                "claim_id": "claim-a",
-                                "agent": "Codex Sol",
-                            }
-                        ],
-                        "state": "CLAIMED",
-                        "age": "0h 0m",
-                        "old": False,
-                    },
-                ],
-                **_no_lane_shared(),
-            }
-        )
-        + "\n"
-    )
 
 
 def test_cli_claim_and_release_accept_json_while_parent_and_bootstrap_reject_it() -> None:
@@ -12786,50 +12390,6 @@ def test_board_marks_a_claim_old_after_sixty_one_minutes(
     assert item["claim_old"] is True
 
 
-def test_cli_status_shows_claim_age_from_the_opened_commit(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """The store equivalent of the ledger's claim-age display (issue #176):
-    age comes from `opened_commit`'s committer date (faked here via
-    `_patch_status_store`'s `ages`), never a later rescope -- that
-    invariant is `protocol.apply`'s own (see test_store.py), not re-proven here."""
-    claimed = standing_active_claim(
-        "Ada", claim_id="mine", issue=72, branch="codex/issue-72", scope=("src",)
-    )
-    opened_at = datetime.fromisoformat("2026-08-20T23:30:00+00:00")
-    _patch_status_store(monkeypatch, claimed, ages={claimed.claim_id: opened_at})
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "72"]) == 0
-    status_out = capsys.readouterr().out
-    assert " 0h 30m\n" in status_out
-    assert " old" not in status_out.split("CLAIMED", 1)[1]
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "72", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["claims"][0]["age"] == "0h 30m"
-    assert payload["claims"][0]["old"] is False
-
-
-def test_cli_status_marks_a_claim_old_after_sixty_one_minutes(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    claimed = standing_active_claim(
-        "Ada", claim_id="mine", issue=72, branch="codex/issue-72", scope=("src",)
-    )
-    opened_at = datetime.fromisoformat("2026-08-20T22:59:00+00:00")
-    _patch_status_store(monkeypatch, claimed, ages={claimed.claim_id: opened_at})
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "72"]) == 0
-    assert " 1h 1m old\n" in capsys.readouterr().out
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "72", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["claims"][0]["age"] == "1h 1m"
-    assert payload["claims"][0]["old"] is True
-
-
 def test_cli_status_and_status_path_show_the_whole_reason(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -13861,37 +13421,6 @@ def test_next_names_an_old_ruling_when_the_item_is_pulled(
     assert payload["ruling_landings"] == 10
     assert payload["ruling_old"] is True
     assert payload["ruling_hint"] == "ruled 10 landings ago: refine again at the pull"
-
-
-def test_identity_conflict_still_marks_status_conflict(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    first = standing_active_claim(issue=72, scope=("src/a.py",))
-    second = standing_active_claim(
-        claim_id="claim-b", agent="Grok 4.6", issue=72, scope=("src/b.py",)
-    )
-    opened_at = datetime(2026, 8, 21, tzinfo=UTC)
-    ages: dict[str, datetime] = {first.claim_id: opened_at, second.claim_id: opened_at}
-
-    assert _status((first, second), None, ages, body.Storage.GITHUB) == 2
-    rendered = capsys.readouterr().out
-    assert rendered.count("CONFLICT") == 2
-
-
-def test_identity_conflict_still_marks_status_json_conflict(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    first = standing_active_claim(issue=72, scope=("src/a.py",))
-    second = standing_active_claim(
-        claim_id="claim-b", agent="Grok 4.6", issue=72, scope=("src/b.py",)
-    )
-    opened_at = datetime(2026, 8, 21, tzinfo=UTC)
-    ages: dict[str, datetime] = {first.claim_id: opened_at, second.claim_id: opened_at}
-
-    assert _status_json((first, second), None, ages, None) == 2
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["ok"] is False
-    assert payload["reason"] == "conflict"
 
 
 def test_no_path_class_list_is_read_or_written() -> None:

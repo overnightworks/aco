@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from cli_fixtures import fresh_observation, real_git
@@ -199,9 +201,16 @@ def unrelated_racer_commit(worktree: Path, remote: Path) -> str:
 
 
 def publish_claims_from_a_second_clone(
-    landing_clone: Path, remote: Path, intents: tuple[protocol.ClaimIntent, ...]
+    landing_clone: Path,
+    remote: Path,
+    intents: tuple[protocol.ClaimIntent, ...],
+    *,
+    bootstrapped_at: str | None = None,
 ) -> protocol.ClaimState:
-    """Publish fixture claims without stamping or anchoring the landing clone."""
+    """Publish fixture claims without stamping or anchoring the landing clone.
+
+    `bootstrapped_at` dates the bootstrap commit alone: the commit the first
+    claim's `opened_commit` names, which `aco status` reads its age from."""
     seed = landing_clone.parent / "seed"
     real_git(landing_clone.parent, "clone", "-q", str(remote), str(seed))
     observed = seed.resolve() != landing_clone.resolve()
@@ -212,7 +221,8 @@ def publish_claims_from_a_second_clone(
         != real_git(landing_clone, "rev-parse", "--absolute-git-dir").stdout
     )
     assert observed == expected
-    store.bootstrap(worktree=seed, remote=str(remote))
+    with patch.dict(os.environ, {"GIT_COMMITTER_DATE": bootstrapped_at} if bootstrapped_at else {}):
+        store.bootstrap(worktree=seed, remote=str(remote))
     for intent in intents:
         store.commit_transition(
             observed=fresh_observation(seed, remote),
@@ -220,3 +230,40 @@ def publish_claims_from_a_second_clone(
             intent=intent,
         )
     return store.peek_state(worktree=seed, remote=str(remote))
+
+
+def push_twin_claim(
+    remote: Path, worktree: Path, original: protocol.ClaimIntent, twin_claim_id: str
+) -> None:
+    """Add a second `claims/` entry repeating `original`'s record under another
+    claim id -- the one lane state `aco status` calls a CONFLICT and no command
+    writes."""
+    tip = state_ref_tip(remote)
+    assert tip is not None
+    real_git(worktree, "fetch", "-q", str(remote), store.STATE_REF)
+    key = protocol.claim_key(original.identity, original.branch)
+    record = real_git(remote, "cat-file", "-p", f"{tip}:claims/{key}.toml").stdout
+    twin = blob(
+        worktree,
+        record.replace(
+            f'claim_id = "{original.claim_id}"', f'claim_id = "{twin_claim_id}"'
+        ).encode(),
+    )
+    entries = {
+        line.split("\t")[1]: line.split()[2]
+        for line in real_git(remote, "ls-tree", f"{tip}:claims").stdout.splitlines()
+    }
+    claims = raw_tree(
+        worktree,
+        [
+            ("100644", "blob", oid, name)
+            for name, oid in {**entries, f"{key}-twin.toml": twin}.items()
+        ],
+    )
+    top = [line.split(maxsplit=3) for line in real_git(remote, "ls-tree", tip).stdout.splitlines()]
+    tree = raw_tree(
+        worktree,
+        [(mode, kind, claims if name == "claims" else oid, name) for mode, kind, oid, name in top],
+    )
+    commit = real_git(worktree, "commit-tree", tree, "-p", tip, "-m", "twin claim").stdout.strip()
+    real_git(worktree, "push", "-q", str(remote), f"{commit}:{store.STATE_REF}")
