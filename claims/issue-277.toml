@@ -1,8 +1,0 @@
-claim_id = "2cb56098013a4a5fa2d27c223b9b0bd3"
-agent = "claude"
-role = "builder"
-base = "16c639cc1ec3b4315dda345ac0134e7c0cdc3888"
-branch = "claude/issue-277-protect-removal-s2-delete"
-scope = ["README.md", "pyproject.toml", "scripts/package_smoke.sh", "scripts/similar_methods_exemptions.txt", "scripts/spec_lint.py", "scripts/test_budget_ratchet.txt", "scripts/test_inventory_dropped.txt", "specs/bootstrap.spec.md", "specs/claim-record.spec.md", "specs/output.spec.md", "specs/protect.spec.md", "specs/rescope.spec.md", "specs/storage-pin.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/checkout.py", "src/agent_coordination/cli.py", "src/agent_coordination/cmd_protect.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/hook_input.py", "src/agent_coordination/protect.py", "src/agent_coordination/protocol.py", "src/agent_coordination/sed_script.py", "src/agent_coordination/session.py", "tests/board_fixtures.py", "tests/cli_fixtures.py", "tests/conftest.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_hook_input.py", "tests/test_protect.py", "tests/test_rescope_checkout.py", "tests/test_sed_script.py", "tests/test_session.py", "tests/test_spec_lint.py"]
-opened_commit = "c223cd2ffdcaecddd07cc1689f4a0f4ba4a648f2"
-whole_reason = "Eine Entfernung: der Befehl, seine Module, ihre Tests, die Spec, die Querverweise und die Ledger-Einträge brechen einzeln den Build oder lassen tote Verweise."
