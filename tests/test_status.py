@@ -24,6 +24,7 @@ from store_fixtures import (
     publish_claims_from_a_second_clone,
     push_twin_claim,
     state_ref_tip,
+    twin_claim_key,
 )
 
 from agent_coordination import board, cmd_status, github, protocol, store
@@ -404,13 +405,13 @@ def assert_world_arranged(
     history = [
         line.split()
         for line in real_git(
-            remote, "log", "--first-parent", "--reverse", "--format=%H %cI", tip
+            remote, "log", "--first-parent", "--reverse", "--format=%H %ct", tip
         ).stdout.splitlines()
     ]
-    opened_at = (FROZEN_CLI_NOW - world.claim_age).isoformat()
-    assert [date for _commit, date in history] == [
+    opened_at = int((FROZEN_CLI_NOW - world.claim_age).timestamp())
+    assert [int(date) for _commit, date in history] == [
         opened_at,
-        *[FROZEN_CLI_NOW.isoformat()] * (len(intents) + int(world.twin is not None)),
+        *[int(FROZEN_CLI_NOW.timestamp())] * (len(intents) + int(world.twin is not None)),
     ]
     opened_commits = {
         intent.claim_id: history[position][0] for position, intent in enumerate(intents)
@@ -424,9 +425,7 @@ def assert_world_arranged(
     if world.twin is not None:
         original = next(intent for intent in intents if intent.branch == world.twin.branch)
         twin = replace(world.twin, base=original.base)
-        arranged[f"{protocol.claim_key(twin.identity, twin.branch)}-twin"] = recorded(
-            twin, opened_commits[original.claim_id]
-        )
+        arranged[twin_claim_key(original)] = recorded(twin, opened_commits[original.claim_id])
     live = store.peek_state(worktree=clone, remote=str(remote)).claims
     assert {key: published(claim) for key, claim in live.items()} == arranged
     return tip

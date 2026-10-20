@@ -232,6 +232,10 @@ def publish_claims_from_a_second_clone(
     return store.peek_state(worktree=seed, remote=str(remote))
 
 
+def twin_claim_key(original: protocol.ClaimIntent) -> str:
+    return f"{protocol.claim_key(original.identity, original.branch)}-twin"
+
+
 def push_twin_claim(
     remote: Path, worktree: Path, original: protocol.ClaimIntent, twin_claim_id: str
 ) -> None:
@@ -257,7 +261,7 @@ def push_twin_claim(
         worktree,
         [
             ("100644", "blob", oid, name)
-            for name, oid in {**entries, f"{key}-twin.toml": twin}.items()
+            for name, oid in {**entries, f"{twin_claim_key(original)}.toml": twin}.items()
         ],
     )
     top = [line.split(maxsplit=3) for line in real_git(remote, "ls-tree", tip).stdout.splitlines()]
