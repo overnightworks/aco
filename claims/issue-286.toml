@@ -1,8 +1,0 @@
-claim_id = "8c451fa9092e410cb3c3b6489089afb3"
-agent = "claude"
-role = "builder"
-base = "ab51d6c7677912d3fbcedc1a2c76a8d3857bfbb2"
-branch = "claude/issue-286-board-short-body-adapter-errors"
-scope = ["specs/aco-board.spec.md", "src/aco_board/aco_cli.py", "src/aco_board/server.py", "tests/aco_board/aco_board_fixtures.py", "tests/aco_board/test_aco_board_api.py", "tests/aco_board/test_aco_board_server.py"]
-opened_commit = "96525f71ebe4ba5adeb8d33689b12016d52c327b"
-whole_reason = "Zwei Fehler in einer Modulfamilie mit einem Owner (#13): ein Transportprüfer, ein Adapterübersetzer, ein Spec-Halbsatz und ihre Testzeilen in den zwei zuständigen Testdateien."
