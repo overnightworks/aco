@@ -4342,6 +4342,38 @@ class TestCliStateRefForge:
         ruled = issue_claim.main(["rule", RULABLE_ID, "--line", "1", "--yes"])
         assert ruled == 0
 
+    def test_check_names_a_blocked_item_and_its_local_blocker_by_their_ids(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+    ) -> None:
+        """Spec: CHECK-08, CHECK-09"""
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
+
+        text = run_cli(["check", CHILD_B_ID], capsys)
+        as_json = run_cli(["check", CHILD_B_ID, "--json"], capsys)
+
+        blocked = f"blocked by {CHILD_A_ID}"
+        envelope = {
+            "ok": False,
+            "reason": "blocked",
+            "kind": "issue",
+            "number": CHILD_B_NUMBER,
+            "blocked_by": [CHILD_A_ID],
+            "message": blocked,
+        }
+        observed_text = (text.status, text.stdout, text.stderr)
+        assert observed_text == (3, "", f"ISSUE {CHILD_B_ID} {blocked}\n")
+        observed_json = (as_json.status, as_json.stdout, as_json.stderr)
+        assert observed_json == (
+            3,
+            json.dumps(envelope) + "\n",
+            "",
+        )
+
     def test_item_edit_replaces_the_body_and_a_fresh_process_reads_it_back(
         self,
         monkeypatch: pytest.MonkeyPatch,
