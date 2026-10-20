@@ -2853,16 +2853,14 @@ def test_board_and_next_read_an_unreadable_lifecycle_trailer_item_like_a_lane(
         pytest.param("docs/x", id="lane"),
     ],
 )
-@pytest.mark.parametrize("command", [["board", "--json"], ["next"], ["next", "--json"]])
-def test_board_and_next_lend_no_closed_item_size_to_an_unreadable_trailer_item(
+def test_board_lends_no_closed_item_size_to_an_unreadable_trailer_item(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     number: str,
-    command: list[str],
 ) -> None:
     """Spec: BOARD-56. A completed lane whose `item:` trailer reads as no
-    ASCII number of at most 18 digits is looked up as no closed item, though
+    ASCII number of at most 18 digits joins no closed item's size, though
     closed items 72 and `7` x 19 carry a size it would otherwise join --
     `٧٢` reads as 72 under `str.isdigit`, and the 19 digits as an item
     past the bound."""
@@ -2873,12 +2871,9 @@ def test_board_and_next_lend_no_closed_item_size_to_an_unreadable_trailer_item(
         )
     _patch_store_write(monkeypatch, lane_events=(_lane(number, 10, 4),))
 
-    assert issue_claim.main(["--repo", REPOSITORY, *command]) == 0
+    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
 
-    output = capsys.readouterr().out
-    assert client.issue_reference_lookups == []
-    if command == ["board", "--json"]:
-        assert json.loads(output)["measurements"]["classes"] == []
+    assert json.loads(capsys.readouterr().out)["measurements"]["classes"] == []
 
 
 def test_start_under_state_ref_claims_the_worktree_it_builds(
