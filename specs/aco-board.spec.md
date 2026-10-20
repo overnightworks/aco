@@ -61,7 +61,7 @@ resolved directory's name.
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's failure sentence, `items: []` (E-ABRD-06).
 - [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint`, `outcome`, `note`; answers 200 `{"status", "message"}`, else 400 `{"error": "bad request: decision"}` (E-ABRD-04, E-ABRD-07).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the start token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
-- [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, answers 408 `{"error": "request timeout: body incomplete"}`.
+- [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before then, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.

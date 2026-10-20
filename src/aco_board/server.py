@@ -348,13 +348,14 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         try:
             body = read_before_deadline(self.rfile, self.connection, length, deadline_seconds)
         except TimeoutError:
-            # The read shrank the socket timeout; restore it before writing
-            # the refusal, so that answer is not cut short by the nearly
-            # exhausted deadline it is reporting.
-            self.connection.settimeout(deadline_seconds)
+            body = None
+        # The read shrank the socket timeout; restore it before writing a
+        # refusal, so that answer is not cut short by the nearly exhausted
+        # deadline it is reporting.
+        self.connection.settimeout(deadline_seconds)
+        if body is None or len(body) < length:
             refuse(HTTPStatus.REQUEST_TIMEOUT, _BODY_INCOMPLETE)
             return None
-        self.connection.settimeout(deadline_seconds)
         return body
 
     def _decide(self, request: api.DecisionRequest) -> None:
