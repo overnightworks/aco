@@ -12161,7 +12161,8 @@ def test_board_shows_a_claims_age_and_marks_it_old_after_sixty_minutes(
 
     assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
     item = next(row for row in json.loads(capsys.readouterr().out)["items"] if row["number"] == 72)
-    assert (item["claim_age"], item["claim_old"]) == (claim_age, claim_old)
+    assert item["claim_age"] == claim_age
+    assert item["claim_old"] is claim_old
 
 
 def test_cli_status_and_status_path_show_the_whole_reason(
