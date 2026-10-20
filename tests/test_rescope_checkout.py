@@ -883,10 +883,9 @@ UNCONFIGURED_UPSTREAM = "cannot determine the trunk: canonical remote 'upstream'
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
     "canonical_head",
-    [None, "trunk"],
-    ids=[
-        "rescope-canonical-remote-not-configured",
-        "rescope-unconfigured-remote-left-a-recorded-head",
+    [
+        pytest.param(None, id="rescope-canonical-remote-not-configured"),
+        pytest.param("trunk", id="rescope-unconfigured-remote-left-a-recorded-head"),
     ],
 )
 def test_rescope_names_a_canonical_remote_the_clone_never_configured(
