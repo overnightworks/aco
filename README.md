@@ -280,10 +280,11 @@ build.
 
 ## Scope and boundaries
 
-GitHub through the `gh` CLI is the one forge adapter that exists today. A
-second forge attaches at the same port -- a `ForgeReader`/`ForgeWriter` pair
-with a `Capability` answer per operation -- and not inside the commands
-themselves, so adding one never changes a command's own contract. `status`,
+GitHub through the `gh` CLI is the one forge adapter that exists today. The
+port is a `ForgeReader`/`ForgeWriter` pair with a `Capability` answer per
+operation, but `land`, `release` and `item` depend on the GitHub adapter and
+the state-ref board directly, so a second forge would first need its own
+contract for those commands. `status`,
 `bootstrap`, `reset`, and a lane `claim`/`rescope`/`release` never
 resolve a forge at all: they read and write only `refs/aco/state`, so a
 canonical remote on any host, including a bare `file://` path, is no error

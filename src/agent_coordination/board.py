@@ -3108,11 +3108,10 @@ def merged_pull_request_floor(issues: tuple[Issue, ...], now: datetime) -> datet
     arbitrary fixed window — is what lets a slice's "Refs #N"/"Part of #N"
     landing keep crediting its still-open epic for as long as the epic stays
     open, rather than for a fixed number of days after which the credit
-    silently reverts. Residual: the underlying query is still capped (see
-    `GitHubForge.list_recent_merged_board_pull_requests`), so an epic
-    old enough to have more merges than that cap between its filing and now
-    can still lose credit for an early slice; this floor removes the
-    fortnight-sized version of that gap, not every version of it.
+    silently reverts. Residual: the underlying query is capped per merge day
+    (see `GitHubForge.list_recent_merged_board_pull_requests`), so a day with
+    more merges than that cap can still lose a landing that day, and with it
+    the credit for an early slice of an open epic.
     """
     return oldest_created_at(issues) or now
 

@@ -88,7 +88,7 @@ layers = [
     "protocol | process",
 ]
 # `metrics` moved below `body` (issue #419): it has no `agent_coordination`
-# import of its own (`metrics.py`'s own docstring), so nothing above
+# import of its own, so nothing above
 # depended on its old position ahead of `items`/`body` -- moving it lets
 # `body` (the body-block codec) reach `metrics.Size` for its own
 # `size`/`[[expectation]]` schema, while `items` may still import `body`,
