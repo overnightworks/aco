@@ -145,7 +145,14 @@ def named_repository(tmp_path: Path, name: str) -> FakeAcoRepository:
 
 def line(index: int, text: str, *, ruling: str | None = None, **card: str) -> dict[str, object]:
     ruled_on = "2026-10-01" if ruling is not None else None
-    return {"index": index, "text": text, "ruling": ruling, "ruled_on": ruled_on, **card}
+    return {
+        "index": index,
+        "text": text,
+        "default": None,
+        "ruling": ruling,
+        "ruled_on": ruled_on,
+        **card,
+    }
 
 
 def row(number: int, title: str, *lines: dict[str, object]) -> dict[str, object]:

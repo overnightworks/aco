@@ -78,7 +78,6 @@ resolved directory's name.
 - The board never writes a decision for a line it did not just read as open with the same shown fields: ABRD-02 compares before every write.
 - The board never runs two `aco rule` commands at once across any configured repo, and never starts one after stopping began (ABRD-03, ABRD-04, ABRD-17, ABRD-18).
 - No answer carries an `Access-Control-*` header, so a page from another origin can neither read an answer nor send the token header (ABRD-10).
-- A missing `default` key is never unreadable: a line from an aco whose RUL-10 rows do not yet carry that field has no recommended outcome.
 - The board never resolves a repo label from a request into a path: a label is only ever a lookup key among the repos `--repo` configured at start (ABRD-16).
 - A card's fingerprint never satisfies another configured repo's check, even with identical line content: it binds the repo label it was read under (ABRD-21).
 
