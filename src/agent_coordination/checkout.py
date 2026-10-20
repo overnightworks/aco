@@ -722,7 +722,8 @@ def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
     """A directory counts when git 2.43 recognizes it
     (`_recognized_by_git_2_43`) or the layout this repository always accepted
     does (`_has_plain_git_directory_layout`): the port may differ from git
-    somewhere, never by allowing a write the older rule refused."""
+    somewhere, never by failing to recognize a repository directory the
+    plain layout names."""
     return _has_plain_git_directory_layout(suspect) or _recognized_by_git_2_43(
         suspect, discovery_start=discovery_start
     )
@@ -730,9 +731,9 @@ def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
 
 def _has_plain_git_directory_layout(candidate: Path) -> bool:
     """The layout git's own discovery takes for a repository directory:
-    `HEAD` beside `objects/` and `refs/`. Kept as it was before the port of
-    git's recognition, as a floor that guards against a gap in that port
-    allowing a write this rule refused."""
+    `HEAD` beside `objects/` and `refs/`. Kept as a floor beneath the port of
+    git's recognition, so a gap in that port cannot make a path inside such a
+    directory look like an ordinary checkout path."""
     return (
         (candidate / "HEAD").is_file()
         and (candidate / "objects").is_dir()

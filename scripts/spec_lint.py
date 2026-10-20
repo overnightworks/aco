@@ -35,9 +35,9 @@ Checks (one finding per hit, each named ``file:line``):
 * ``implementation_name``: a criterion's text, with every backtick-quoted span removed first,
   still names a Python-shaped identifier outside any literal: a snake_case identifier with a
   lowercase letter on both sides of an underscore (``_git_run``, ``claim_lifecycle``), a
-  Python file name (``checkout.py``), a call (``hook_command_paths()``), or a dotted attribute
+  Python file name (``checkout.py``), a call (``relative_scope_entry()``), or a dotted attribute
   whose final segment is not a contract file extension (``store.claim_lifecycle``,
-  ``HookToolEffect.COMMAND_TEXT``, but not ``board.toml`` or ``next.spec.md``). A shell only
+  ``CheckoutKind.MAIN``, but not ``board.toml`` or ``next.spec.md``). A shell only
   ever observes a command, flag, path, or printed literal, and aco's house style already
   backticks every one of those, an UPPER_SNAKE environment name (``XDG_CONFIG_HOME``), a
   trailer key (``Work-Item:``), and an id (``CLAIM-15``); the calibration pass over all 23
@@ -111,7 +111,7 @@ PYTHON_FILENAME_PATTERN = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\.py\b")
 # has no such underscore -- both its neighbours are uppercase -- so it never matches here.
 _IDENTIFIER_PATTERN = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 _LOWERCASE_SNAKE_UNDERSCORE_PATTERN = re.compile(r"[a-z]_[a-z]")
-# A dotted attribute access, e.g. ``store.claim_lifecycle`` or ``HookToolEffect.COMMAND_TEXT``.
+# A dotted attribute access, e.g. ``store.claim_lifecycle`` or ``CheckoutKind.MAIN``.
 # Each segment must be at least two characters: a real module, class, or attribute name always
 # is, while a one-letter segment is prose shorthand (``e.g.``, ``i.e.``), not an identifier.
 # Excluded below when its final segment is a contract file extension: those dotted chains

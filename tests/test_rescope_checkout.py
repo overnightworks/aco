@@ -1,9 +1,8 @@
 """`aco rescope`'s own checkout resolution against real repositories: which
 checkout a `--add`/`--drop` path locates, and the sentence each path or
 checkout no claim can ever cover is refused with (`specs/rescope.spec.md`).
-Also owns the arrangements other checkout-judging tests reuse -- a real
-repository with linked worktrees, the canonical-remote repository, and the
-layouts git takes for a git directory."""
+Also owns the real-repository arrangements these tests build -- linked
+worktrees, nested worktrees, and a canonical-remote repository."""
 
 from __future__ import annotations
 
@@ -133,6 +132,11 @@ def _path_below_a_dangling_symlink(_main: Path, worktree: Path) -> tuple[Path, s
 
 def _the_checkout_root(_main: Path, worktree: Path) -> tuple[Path, str]:
     return worktree, _checkout_root_reason(worktree)
+
+
+def _path_with_a_newline_in_its_name(_main: Path, worktree: Path) -> tuple[Path, str]:
+    path = worktree / "a\nb"
+    return path, f"--add path {str(path)!r} is outside the resolved checkout {worktree.resolve()}"
 
 
 def _path_in_a_bare_repository(main: Path, _worktree: Path) -> tuple[Path, str]:
@@ -746,6 +750,7 @@ def test_rescope_json_reports_a_dotdot_path_through_a_missing_directory_as_unava
             _path_below_a_dangling_symlink, "invalid_usage", id="below-a-dangling-symlink"
         ),
         pytest.param(_the_checkout_root, "invalid_usage", id="checkout-root"),
+        pytest.param(_path_with_a_newline_in_its_name, "invalid_usage", id="newline-in-name"),
         pytest.param(_path_in_a_bare_repository, "unavailable", id="bare-repository"),
         pytest.param(_path_in_a_checkouts_git_directory, "unavailable", id="dot-git"),
     ],
@@ -760,11 +765,11 @@ def test_rescope_refuses_a_path_no_claim_can_cover_with_one_sentence_and_its_jso
     output_mode: str,
 ) -> None:
     """Spec: RESC-15, RESC-17, RESC-19, RESC-31. A path below a file or a
-    dangling symlink, the checkout root itself, and a path inside a git
-    directory are refused with one sentence before the store is read, in
-    text and under `--json`; the first three name a malformed `--add`, the
-    last two an unresolved checkout (issue #483, #310 findings 110, 111, 112,
-    115)."""
+    dangling symlink, the checkout root itself, and a path no scope entry can
+    spell (a newline in its name) are refused as a malformed `--add`; a path
+    inside a git directory as an unresolved checkout -- each with one
+    sentence before the store is read, in text and under `--json` (issue
+    #483, #310 findings 110, 111, 112, 115)."""
     _isolate_home(monkeypatch, tmp_path)
     main, worktree = _real_repository_with_worktree(tmp_path)
     path, sentence = build_case(main, worktree)
