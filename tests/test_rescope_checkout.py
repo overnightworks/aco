@@ -21,11 +21,13 @@ from board_fixtures import (
 )
 from cli_fixtures import (
     GIT_FAILURE_INJECTIONS,
+    hub_canonical_worktree_file,
     init_bare_repository,
     inject_exit_128,
     real_git,
     recorded_head_read,
     set_agent_identity_env,
+    store_must_not_be_read,
     stub_one_git_call,
 )
 from github_fixtures import FakeForge
@@ -34,7 +36,7 @@ from agent_coordination import board, body, checkout, forge, github, protocol, s
 from agent_coordination import cli as issue_claim
 
 
-def real_repository_with_worktree(
+def _real_repository_with_worktree(
     tmp_path: Path,
     *,
     slug: str = "issue-72-widget",
@@ -76,12 +78,12 @@ def real_repository_with_worktree(
     return main, worktree
 
 
-def real_repository_with_nested_worktree(
+def _real_repository_with_nested_worktree(
     tmp_path: Path, *, slug: str = "issue-1-x"
 ) -> tuple[Path, Path]:
     """A real repository (`outer`) with one linked worktree nested *inside*
     its own working tree (`outer/nested-worktrees/<slug>`), unlike
-    `real_repository_with_worktree`'s sibling layout: the nested root's
+    `_real_repository_with_worktree`'s sibling layout: the nested root's
     own parent directory sits inside `outer`'s checkout, so `git -C parent`
     resolves to `outer` rather than to nothing -- the shape in which a
     parent-first lookup would let `outer`'s own checkout silently answer for
@@ -104,78 +106,41 @@ def real_repository_with_nested_worktree(
     return outer, nested
 
 
-def hub_canonical_worktree_file(
-    tmp_path: Path, *, canonical: str, canonical_head: str | None, branch: str
-) -> Path:
-    """A file in a linked worktree on `branch` of a repository with the
-    remotes `origin` and `hub` whose tracked `board.toml` makes `canonical`
-    canonical, with `origin/HEAD` naming `main` and `<canonical>/HEAD`
-    naming `canonical_head` -- or never recorded (issue #490). A recorded
-    `HEAD` of a canonical remote the repository never configured is one a
-    removed remote left behind (issue #492)."""
-    main = tmp_path / "repo"
-    main.mkdir()
-    real_git(main, "init", "-q", "-b", "main")
-    real_git(main, "config", "user.name", "Test")
-    real_git(main, "config", "user.email", "test@example.com")
-    write_repository_config(main, f'canonical_remote = "{canonical}"\n')
-    real_git(main, "add", "-f", board.CONFIG_PATH.as_posix())
-    real_git(main, "commit", "-q", "-m", "initial")
-    real_git(main, "branch", "trunk")
-    for remote in ("origin", "hub"):
-        real_git(main, "remote", "add", remote, f"https://example.invalid/{remote}/repo.git")
-        real_git(main, "update-ref", f"refs/remotes/{remote}/main", "HEAD")
-        real_git(main, "update-ref", f"refs/remotes/{remote}/trunk", "HEAD")
-    real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-    if canonical_head is not None:
-        recorded = f"refs/remotes/{canonical}/{canonical_head}"
-        real_git(main, "update-ref", recorded, "HEAD")
-        real_git(main, "symbolic-ref", f"refs/remotes/{canonical}/HEAD", recorded)
-    worktree = tmp_path / "repo-worktrees" / "lane"
-    worktree.parent.mkdir()
-    real_git(main, "worktree", "add", "-q", str(worktree), "-B", branch)
-    return worktree / "widget.py"
-
-
-def store_must_not_be_read(*, worktree: Path, remote: str) -> protocol.ClaimState:
-    raise AssertionError(f"store read for {worktree} on {remote}")
-
-
-def checkout_root_reason(root: Path) -> str:
+def _checkout_root_reason(root: Path) -> str:
     return f"{root} is the checkout root itself"
 
 
-def hook_in_a_bare_repository(tmp_path: Path) -> Path:
+def _hook_in_a_bare_repository(tmp_path: Path) -> Path:
     """The shape of a forge-free canonical remote (README, "A workflow
     without a forge"): a bare repository has no `.git` entry at all, yet a
-    write into its hooks is a write into a repository."""
+    path into its hooks is a path in a repository."""
     served = tmp_path / "served.git"
     init_bare_repository(served)
     return served / "hooks" / "pre-receive"
 
 
-def path_below_a_file(_main: Path, worktree: Path) -> tuple[Path, str]:
+def _path_below_a_file(_main: Path, worktree: Path) -> tuple[Path, str]:
     path = worktree / "README.md" / "x.py"
     return path, f"{path} cannot exist: {worktree / 'README.md'} is a file"
 
 
-def path_below_a_dangling_symlink(_main: Path, worktree: Path) -> tuple[Path, str]:
+def _path_below_a_dangling_symlink(_main: Path, worktree: Path) -> tuple[Path, str]:
     link = worktree / "dangling"
     link.symlink_to(worktree.parent / "nowhere", target_is_directory=True)
     path = link / "deep" / "x.py"
     return path, f"{path} cannot exist: {link} is a dangling symlink"
 
 
-def the_checkout_root(_main: Path, worktree: Path) -> tuple[Path, str]:
-    return worktree, checkout_root_reason(worktree)
+def _the_checkout_root(_main: Path, worktree: Path) -> tuple[Path, str]:
+    return worktree, _checkout_root_reason(worktree)
 
 
-def path_in_a_bare_repository(main: Path, _worktree: Path) -> tuple[Path, str]:
-    hook = hook_in_a_bare_repository(main.parent)
+def _path_in_a_bare_repository(main: Path, _worktree: Path) -> tuple[Path, str]:
+    hook = _hook_in_a_bare_repository(main.parent)
     return hook, f"not a checkout: {hook.parent.parent.resolve()} is a git directory"
 
 
-def path_in_a_checkouts_git_directory(main: Path, _worktree: Path) -> tuple[Path, str]:
+def _path_in_a_checkouts_git_directory(main: Path, _worktree: Path) -> tuple[Path, str]:
     git_directory = main / ".git"
     return (
         git_directory / "info" / "x",
@@ -202,7 +167,7 @@ def _committed_repository(tmp_path: Path) -> Path:
     return repository
 
 
-def select_git_directory_and_work_tree(
+def _select_git_directory_and_work_tree(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> tuple[Path, Path]:
     repository = _committed_repository(tmp_path)
@@ -213,7 +178,7 @@ def select_git_directory_and_work_tree(
     return repository / ".git", work_tree
 
 
-def select_external_objects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:
+def _select_external_objects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:
     repository = _committed_repository(tmp_path)
     external_objects = tmp_path / "objects-elsewhere"
     (repository / ".git" / "objects").rename(external_objects)
@@ -221,7 +186,7 @@ def select_external_objects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     return repository / ".git", repository
 
 
-def select_common_directory_layout(
+def _select_common_directory_layout(
     _monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> tuple[Path, Path]:
     repository = _committed_repository(tmp_path)
@@ -234,7 +199,7 @@ def select_common_directory_layout(
     return git_directory, repository
 
 
-def select_unborn_symlinked_head(
+def _select_unborn_symlinked_head(
     _monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> tuple[Path, Path]:
     repository = tmp_path / "repo"
@@ -247,13 +212,13 @@ def select_unborn_symlinked_head(
 
 @pytest.fixture(
     params=[
-        select_git_directory_and_work_tree,
-        select_external_objects,
-        select_common_directory_layout,
-        select_unborn_symlinked_head,
+        _select_git_directory_and_work_tree,
+        _select_external_objects,
+        _select_common_directory_layout,
+        _select_unborn_symlinked_head,
     ]
 )
-def environment_selected_repository(
+def _environment_selected_repository(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> tuple[Path, Path]:
     """A repository only git's own recognition rules see -- no complete
@@ -266,7 +231,7 @@ def environment_selected_repository(
     return request.param(monkeypatch, tmp_path)
 
 
-def git_directory_layout(directory: Path) -> Path:
+def _git_directory_layout(directory: Path) -> Path:
     for name in ("objects", "refs"):
         (directory / name).mkdir(parents=True)
     (directory / "HEAD").write_text("ref: refs/heads/main\n")
@@ -337,8 +302,10 @@ _NON_UTF8_NAME = b"c\xff"
 # (`git --git-dir=D rev-parse --git-dir`); a `commondir` git dies reading
 # counts as recognized, so rescope refuses it as a git directory (RESC-31).
 # Where a row's layout keeps `HEAD`, `objects/` and `refs/` in the directory
-# itself, main's older rule recognizes it whatever git says: "main's rule".
-GIT_DIRECTORY_RECOGNITION_ROWS = [
+# itself, the plain layout rule (`checkout._has_plain_git_directory_layout`,
+# kept from before the port of git's recognition) recognizes it whatever git
+# says.
+_GIT_DIRECTORY_RECOGNITION_ROWS = [
     pytest.param(lambda directory: None, {}, True, id="head-names-a-ref"),
     pytest.param(
         lambda directory: _link_head_to(directory, "refs/heads/unborn"),
@@ -494,7 +461,7 @@ GIT_DIRECTORY_RECOGNITION_ROWS = [
 ]
 
 
-def serve_item_72_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
+def _serve_item_72_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
     """Issue #72's own body, with the `aco` block a rescope keeps in
     step with its claim (issue #554), on a GitHub fake the checkout's
     canonical remote names -- so no rescope here ever reaches a real forge."""
@@ -569,7 +536,7 @@ def test_rescope_succeeds_from_every_cwd_when_the_add_path_is_absolute(
     linked worktree through a subagent) can give without knowing its cwd.
     The item body's scope moves with the claim (issue #554)."""
     _isolate_home(monkeypatch, tmp_path)
-    main, worktree = real_repository_with_worktree(tmp_path)
+    main, worktree = _real_repository_with_worktree(tmp_path)
     add = str(worktree / "docs" / "widget.md")
     if cwd_kind == "claimed_worktree":
         cwd = worktree
@@ -579,7 +546,7 @@ def test_rescope_succeeds_from_every_cwd_when_the_add_path_is_absolute(
         cwd = tmp_path / "elsewhere"
         cwd.mkdir()
     monkeypatch.chdir(cwd)
-    client = serve_item_72_body(monkeypatch)
+    client = _serve_item_72_body(monkeypatch)
     claimed = _serve_the_claim_on_the_widget_branch(monkeypatch)
 
     status = issue_claim.main(["rescope", "72", "--add", add])
@@ -598,9 +565,9 @@ def test_rescope_admits_a_file_in_a_directory_not_created_yet(
     do not exist yet resolves the worktree from their nearest existing
     ancestor, so the claim can grow before the file is written."""
     _isolate_home(monkeypatch, tmp_path)
-    _main, worktree = real_repository_with_worktree(tmp_path)
+    _main, worktree = _real_repository_with_worktree(tmp_path)
     new_file = worktree / "neu" / "tief" / "x.py"
-    client = serve_item_72_body(monkeypatch)
+    client = _serve_item_72_body(monkeypatch)
     claimed = _serve_the_claim_on_the_widget_branch(monkeypatch)
 
     status = issue_claim.main(["rescope", "72", "--add", str(new_file)])
@@ -624,11 +591,11 @@ def test_rescope_rejects_a_wide_scope_from_a_foreign_cwd_via_the_resolved_checko
     inside that worktree, because `docs` is classified against the worktree
     via `-C`, not against the foreign cwd."""
     _isolate_home(monkeypatch, tmp_path)
-    _main, worktree = real_repository_with_worktree(tmp_path)
+    _main, worktree = _real_repository_with_worktree(tmp_path)
     foreign_cwd = tmp_path / "elsewhere"
     foreign_cwd.mkdir()
     monkeypatch.chdir(foreign_cwd)
-    serve_item_72_body(monkeypatch)
+    _serve_item_72_body(monkeypatch)
     _serve_the_claim_on_the_widget_branch(monkeypatch)
 
     status = issue_claim.main(["rescope", "72", "--add", str(worktree / "docs")])
@@ -640,7 +607,7 @@ def test_rescope_rejects_a_wide_scope_from_a_foreign_cwd_via_the_resolved_checko
 
 
 def _rescope_args_mixed_absolute_and_relative(tmp_path: Path) -> list[str]:
-    _main, worktree = real_repository_with_worktree(tmp_path)
+    _main, worktree = _real_repository_with_worktree(tmp_path)
     return [
         "rescope",
         "72",
@@ -652,8 +619,8 @@ def _rescope_args_mixed_absolute_and_relative(tmp_path: Path) -> list[str]:
 
 
 def _rescope_args_add_path_outside_the_first_paths_checkout(tmp_path: Path) -> list[str]:
-    _main, worktree = real_repository_with_worktree(tmp_path)
-    _main2, other_worktree = real_repository_with_worktree(tmp_path, slug="issue-90-other")
+    _main, worktree = _real_repository_with_worktree(tmp_path)
+    _main2, other_worktree = _real_repository_with_worktree(tmp_path, slug="issue-90-other")
     return [
         "rescope",
         "72",
@@ -679,7 +646,7 @@ def _rescope_args_add_path_in_a_new_directory_outside_any_repository(
 def _rescope_args_add_dotdot_path_through_a_missing_directory_out_of_the_worktree(
     tmp_path: Path,
 ) -> list[str]:
-    _main, worktree = real_repository_with_worktree(tmp_path)
+    _main, worktree = _real_repository_with_worktree(tmp_path)
     escape_to_outside = os.path.relpath(tmp_path / "outside", worktree)
     return ["rescope", "72", "--add", f"{worktree}/missing/../{escape_to_outside}/new/q.py"]
 
@@ -774,11 +741,13 @@ def test_rescope_json_reports_a_dotdot_path_through_a_missing_directory_as_unava
 @pytest.mark.parametrize(
     ("build_case", "reason"),
     [
-        pytest.param(path_below_a_file, "invalid_usage", id="below-a-file"),
-        pytest.param(path_below_a_dangling_symlink, "invalid_usage", id="below-a-dangling-symlink"),
-        pytest.param(the_checkout_root, "invalid_usage", id="checkout-root"),
-        pytest.param(path_in_a_bare_repository, "unavailable", id="bare-repository"),
-        pytest.param(path_in_a_checkouts_git_directory, "unavailable", id="dot-git"),
+        pytest.param(_path_below_a_file, "invalid_usage", id="below-a-file"),
+        pytest.param(
+            _path_below_a_dangling_symlink, "invalid_usage", id="below-a-dangling-symlink"
+        ),
+        pytest.param(_the_checkout_root, "invalid_usage", id="checkout-root"),
+        pytest.param(_path_in_a_bare_repository, "unavailable", id="bare-repository"),
+        pytest.param(_path_in_a_checkouts_git_directory, "unavailable", id="dot-git"),
     ],
 )
 @pytest.mark.parametrize("output_mode", ["text", "json"])
@@ -797,7 +766,7 @@ def test_rescope_refuses_a_path_no_claim_can_cover_with_one_sentence_and_its_jso
     last two an unresolved checkout (issue #483, #310 findings 110, 111, 112,
     115)."""
     _isolate_home(monkeypatch, tmp_path)
-    main, worktree = real_repository_with_worktree(tmp_path)
+    main, worktree = _real_repository_with_worktree(tmp_path)
     path, sentence = build_case(main, worktree)
     monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
@@ -825,15 +794,15 @@ def test_rescope_judges_a_nested_checkouts_root_by_that_checkout(
     checkout's scope judging it -- also for a lexically equivalent but
     unnormalized spelling of the same root."""
     _isolate_home(monkeypatch, tmp_path)
-    outer, nested = real_repository_with_nested_worktree(tmp_path)
+    outer, nested = _real_repository_with_nested_worktree(tmp_path)
     monkeypatch.chdir(outer)
     monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
-    assert _rescope_refusal(capsys, root_form(nested)) == (2, checkout_root_reason(nested))
+    assert _rescope_refusal(capsys, root_form(nested)) == (2, _checkout_root_reason(nested))
     assert _rescope_json_refusal(capsys, root_form(nested))[:3] == (
         2,
         "invalid_usage",
-        checkout_root_reason(nested),
+        _checkout_root_reason(nested),
     )
 
 
@@ -877,7 +846,7 @@ def test_rescope_judges_the_canonical_remotes_recorded_default_branch(
     assert _rescope_refusal(capsys, path) == (2, sentence)
 
 
-UNCONFIGURED_UPSTREAM = "cannot determine the trunk: canonical remote 'upstream' is not configured"
+_UNCONFIGURED_UPSTREAM = "cannot determine the trunk: canonical remote 'upstream' is not configured"
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -906,7 +875,7 @@ def test_rescope_names_a_canonical_remote_the_clone_never_configured(
     )
     monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
-    assert _rescope_refusal(capsys, path) == (2, UNCONFIGURED_UPSTREAM)
+    assert _rescope_refusal(capsys, path) == (2, _UNCONFIGURED_UPSTREAM)
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -928,7 +897,7 @@ def test_rescope_names_a_canonical_remote_that_has_config_lines_but_no_url(
     )
     monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
-    assert _rescope_refusal(capsys, path) == (2, UNCONFIGURED_UPSTREAM)
+    assert _rescope_refusal(capsys, path) == (2, _UNCONFIGURED_UPSTREAM)
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -1004,7 +973,7 @@ def test_rescope_never_reads_a_git_failure_as_outside_while_the_environment_sele
 @pytest.mark.parametrize(("inject", "detail"), GIT_FAILURE_INJECTIONS)
 def test_rescope_refuses_a_failed_read_in_a_checkout_gits_own_recognition_sees(
     monkeypatch: pytest.MonkeyPatch,
-    environment_selected_repository: tuple[Path, Path],
+    _environment_selected_repository: tuple[Path, Path],
     capsys: pytest.CaptureFixture[str],
     failing_read: list[str],
     inject: Callable[[pytest.MonkeyPatch, list[str]], list[list[str]]],
@@ -1015,7 +984,7 @@ def test_rescope_refuses_a_failed_read_in_a_checkout_gits_own_recognition_sees(
     `.git` marker above it. A failed read of its discovery or its commit
     refuses with git's own text, never reads as a path outside every
     repository."""
-    _, work_tree = environment_selected_repository
+    _, work_tree = _environment_selected_repository
     injected = inject(monkeypatch, failing_read)
 
     outcome = _rescope_refusal(capsys, work_tree / "widget.py")
@@ -1032,7 +1001,7 @@ def test_rescope_names_a_git_directory_when_a_branch_read_fails_in_an_environmen
     checkout: ...`, never git's own error text, even when the read after
     discovery fails."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    git_directory, _ = select_git_directory_and_work_tree(monkeypatch, tmp_path)
+    git_directory, _ = _select_git_directory_and_work_tree(monkeypatch, tmp_path)
     injected = inject_exit_128(monkeypatch, ["branch", "--show-current"])
 
     outcome = _rescope_refusal(capsys, git_directory / "objects" / "widget")
@@ -1049,7 +1018,7 @@ def test_rescope_judges_a_git_directory_the_environment_selects_when_no_git_read
     only: where every git read succeeds in a valid `GIT_DIR` with its
     `GIT_WORK_TREE`, `rescope` judges the path as it does any other."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    git_directory, _ = select_git_directory_and_work_tree(monkeypatch, tmp_path)
+    git_directory, _ = _select_git_directory_and_work_tree(monkeypatch, tmp_path)
 
     outcome = _rescope_json_refusal(capsys, git_directory / "objects" / "widget")
 
@@ -1073,7 +1042,7 @@ def test_rescope_resolves_a_relative_object_directory_from_the_directory_git_run
     directory `git -C` runs in -- the path's -- whichever directory rescope
     runs in."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    git_directory, _ = select_external_objects(monkeypatch, tmp_path)
+    git_directory, _ = _select_external_objects(monkeypatch, tmp_path)
     (tmp_path / "elsewhere").mkdir()
     monkeypatch.chdir(tmp_path / rescope_directory)
     monkeypatch.setenv("GIT_OBJECT_DIRECTORY", "../../../objects-elsewhere")
@@ -1085,9 +1054,9 @@ def test_rescope_resolves_a_relative_object_directory_from_the_directory_git_run
 
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
-    ("arrange_layout", "environment", "recognized"), GIT_DIRECTORY_RECOGNITION_ROWS
+    ("arrange_layout", "environment", "recognized"), _GIT_DIRECTORY_RECOGNITION_ROWS
 )
-def test_rescope_names_a_directory_a_git_directory_when_git_or_mains_rule_takes_it_for_one(
+def test_rescope_names_a_directory_a_git_directory_when_git_or_plain_layout_takes_it_for_one(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1097,12 +1066,12 @@ def test_rescope_names_a_directory_a_git_directory_when_git_or_mains_rule_takes_
 ) -> None:
     """Spec: RESC-31, RESC-32. A path in a directory refuses with the
     git-directory sentence when git 2.43 (setup.c `is_git_directory`) or
-    main's rule (`HEAD` file beside `objects/` and `refs/`) takes that
+    the plain layout rule (`HEAD` file beside `objects/` and `refs/`) takes that
     directory for a git directory; where neither does, the path is outside
     every repository or the environment's own variable makes git's text the
     refusal."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    directory = git_directory_layout(tmp_path / "git-directory")
+    directory = _git_directory_layout(tmp_path / "git-directory")
     arrange_layout(directory)
     for name, value in environment.items():
         monkeypatch.setenv(name, value.format(directory=directory))

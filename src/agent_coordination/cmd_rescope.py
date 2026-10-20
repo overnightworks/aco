@@ -98,8 +98,8 @@ def _rescope_scope_entries(
 ) -> tuple[str, ...]:
     """One `--add`/`--drop` list, already absolute (`_RescopePaths`),
     canonicalized to repository-relative scope entries against `toplevel`.
-    A path no claim could ever cover refuses with the sentence `protect`
-    denies it with (issue #483)."""
+    A path no claim could ever cover refuses with RESC-19's sentence (issue
+    #483)."""
     if not absolute_paths:
         return ()
     canonical: list[str] = []
@@ -120,13 +120,10 @@ def _outside_checkout_reason(flag: str, path: str, toplevel: Path) -> str:
 
 def _rescope_checkout(paths: _RescopePaths) -> checkout.PathCheckout:
     """`rescope`'s checkout, resolved from its first entry whenever one
-    names a location (issue #314), else from the process's own cwd, read
-    through the same path-based resolver `protect` uses. A checkout with no
-    commit yet denies here too (gate G3), the same precondition `protect`
-    enforces on its own resolved checkout. The path resolves exactly as
-    `protect` resolves a payload path -- a checkout root as its own
-    checkout, a file in a directory not created yet from its nearest
-    existing ancestor (issues #474, #483)."""
+    names a location (issue #314), else from the process's own cwd. A
+    checkout with no commit yet refuses (gate G3). A checkout root resolves
+    as its own checkout, a file in a directory not created yet from its
+    nearest existing ancestor (issues #474, #483)."""
     named = paths.named()
     location = Path(named[0][1]) if named else Path.cwd()
     path_checkout = checkout.resolve_named_path_checkout(location)
@@ -138,7 +135,7 @@ def _rescope_checkout(paths: _RescopePaths) -> checkout.PathCheckout:
 
 
 def _outside_every_repository_reason(named: tuple[tuple[str, str], ...]) -> str:
-    """PROT-10's own sentence, naming the entry that located no checkout
+    """RESC-26's sentence, naming the entry that located no checkout
     whenever an entry did the locating (issue #554)."""
     if not named:
         return checkout.NOT_IN_A_REPOSITORY_REASON

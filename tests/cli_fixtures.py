@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TextIO
 
 import pytest
-from board_fixtures import BASE, REPOSITORY, complete_contract
+from board_fixtures import BASE, REPOSITORY, complete_contract, write_repository_config
 
 from agent_coordination import (
     board,
@@ -516,9 +516,8 @@ def dangle_recorded_head(repo: Path, remote_name: str) -> None:
 
 def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every store-command test reads a tracked `board.toml` by default
-    (issue #315), whichever of `test_cli.py`'s faked worktree, `test_protect.py`'s
-    non-git `_isolate_protect_home` directory, or `test_store.py`'s real
-    scratch checkout it runs against -- none of them actually `git add`s the
+    (issue #315), whichever of `test_cli.py`'s faked worktree or
+    `test_store.py`'s real scratch checkout it runs against -- neither actually `git add`s the
     file, so a real `git ls-files` check would otherwise always read "not
     tracked" here. The untracked/ignored refusal is its own axis, proven by
     `checkout.path_is_tracked`'s own tests in `test_checkout.py` and by
@@ -630,21 +629,41 @@ def assert_missing_identity_message(message: str) -> None:
     assert "GROK_AGENT" not in message
 
 
-def forbid_protect_git_github_and_identity(monkeypatch: pytest.MonkeyPatch) -> None:
-    def unused(*args, **kwargs):
-        pytest.fail("this protect path must not use identity, git, GitHub, or the store")
+def hub_canonical_worktree_file(
+    tmp_path: Path, *, canonical: str, canonical_head: str | None, branch: str
+) -> Path:
+    """A file in a linked worktree on `branch` of a repository with the
+    remotes `origin` and `hub` whose tracked `board.toml` makes `canonical`
+    canonical, with `origin/HEAD` naming `main` and `<canonical>/HEAD`
+    naming `canonical_head` -- or never recorded (issue #490). A recorded
+    `HEAD` of a canonical remote the repository never configured is one a
+    removed remote left behind (issue #492)."""
+    main = tmp_path / "repo"
+    main.mkdir()
+    real_git(main, "init", "-q", "-b", "main")
+    real_git(main, "config", "user.name", "Test")
+    real_git(main, "config", "user.email", "test@example.com")
+    write_repository_config(main, f'canonical_remote = "{canonical}"\n')
+    real_git(main, "add", "-f", board.CONFIG_PATH.as_posix())
+    real_git(main, "commit", "-q", "-m", "initial")
+    real_git(main, "branch", "trunk")
+    for remote in ("origin", "hub"):
+        real_git(main, "remote", "add", remote, f"https://example.invalid/{remote}/repo.git")
+        real_git(main, "update-ref", f"refs/remotes/{remote}/main", "HEAD")
+        real_git(main, "update-ref", f"refs/remotes/{remote}/trunk", "HEAD")
+    real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    if canonical_head is not None:
+        recorded = f"refs/remotes/{canonical}/{canonical_head}"
+        real_git(main, "update-ref", recorded, "HEAD")
+        real_git(main, "symbolic-ref", f"refs/remotes/{canonical}/HEAD", recorded)
+    worktree = tmp_path / "repo-worktrees" / "lane"
+    worktree.parent.mkdir()
+    real_git(main, "worktree", "add", "-q", str(worktree), "-B", branch)
+    return worktree / "widget.py"
 
-    monkeypatch.setattr(checkout, "session_agent", unused)
-    monkeypatch.setattr(checkout, "git_output", unused)
-    monkeypatch.setattr(github, "GitHubForge", unused)
-    monkeypatch.setattr(github, "discover_repository", unused)
-    monkeypatch.setattr(store, "fetch_state", unused)
 
-
-def patch_command(*lines: str) -> str:
-    """Wrap Codex's `apply_patch` file-line grammar in its `Begin`/`End Patch`
-    envelope, the way `command` actually arrives in the hook payload."""
-    return "\n".join(("*** Begin Patch", *lines, "*** End Patch"))
+def store_must_not_be_read(*, worktree: Path, remote: str) -> ClaimState:
+    raise AssertionError(f"store read for {worktree} on {remote}")
 
 
 def _forbid_remote_url(monkeypatch: pytest.MonkeyPatch) -> None:

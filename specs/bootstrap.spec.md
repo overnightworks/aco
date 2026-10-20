@@ -89,7 +89,7 @@ Setup: bare-remote, bootstrapped
 ```console
 $ aco bootstrap --ledger 5
 2> usage: aco [-h] [--version] [--repo REPO]
-2>            {bootstrap,reset,status,board,rulings,next,claim,release,rescope,cut,ask,rule,check,body,brief,item,protect,register,run,login,_run-at-login}
+2>            {bootstrap,reset,status,board,rulings,next,claim,release,rescope,cut,ask,rule,check,body,brief,item,register,run,login,_run-at-login}
 2>            ...
 2> aco: error: unrecognized arguments: --ledger 5
 exit 2

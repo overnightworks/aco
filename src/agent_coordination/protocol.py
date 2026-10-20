@@ -15,7 +15,7 @@ from typing import Protocol, TypeVar, cast
 
 # Named refusal when a write-path command would otherwise create
 # `refs/aco/state` as a side effect (issue #176 done-when 1). One owner so
-# `apply`, `store.commit_transition`, and `protect` cannot drift.
+# `apply` and `store.commit_transition` cannot drift.
 MISSING_STATE_REF = (
     "the claim state ref does not exist yet; run bootstrap before claim, rescope, "
     "release, or item write"
@@ -1014,7 +1014,7 @@ def parse_schema_toml(content: str, *, tip: ObjectId) -> ClaimState:
 # write-path command before this ever runs against `EMPTY_STATE` -- only
 # `bootstrap` may create the ref itself (done-when: a missing ref is never
 # created as a side effect of a claim/rescope/release/override/takeover/
-# resource/protect/item-write call).
+# resource/item-write call).
 
 
 @dataclass(frozen=True)
@@ -1106,8 +1106,7 @@ class ItemWriteIntent:
     `expected=None` means "this item must not exist yet"; any other value
     must equal the item's current oid or the write refuses loud, never
     overwriting. Needs no claim: an item write is plumbing straight to
-    `refs/aco/state`, never a worktree path, so the `protect` boundary is
-    unaffected.
+    `refs/aco/state`, never a worktree path.
 
     `store_expected`, when set, is the whole `items/` map a caller checked
     before writing (PIN-29, issue #447): any item written since refuses the

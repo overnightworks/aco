@@ -67,7 +67,6 @@ from cli_fixtures import (
     forbid_forge_resolution,
     forbid_git_fill,
     forbid_github_construction,
-    forbid_protect_git_github_and_identity,
     freeze_cli_now,
     fresh_observation,
     git_checkout,
@@ -128,7 +127,6 @@ from agent_coordination import (
     items,
     metrics,
     process,
-    protect,
     protocol,
     report,
     session,
@@ -2904,12 +2902,12 @@ def test_start_under_state_ref_claims_the_worktree_it_builds(
 
 
 def _lane_on_a_state_ref_board_with_registries(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, trunk_lane_shared: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, trunk_configuration_tail: str
 ) -> None:
     """A real state-ref board whose trunk tracks `scripts/registry.txt` and
     `src/x.py` and names both registries lane-shared, and a lane `start`
     built on it for item #314; the trunk's configuration then moves on to
-    `session.trunk_lane_shared` -- as a newer aco's landing would -- while the
+    `trunk_configuration_tail` -- as a newer aco's landing would -- while the
     lane's own copy stays as it was cut. The run stands in the lane."""
     repo, _remote, _oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     for registry in ("scripts/registry.txt", "src/x.py"):
@@ -2922,7 +2920,7 @@ def _lane_on_a_state_ref_board_with_registries(
     real_git(repo, "commit", "-q", "-m", "registries")
     push_repository_trunk(repo, "origin")
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
-    configuration.write_text(f"{pinned}{trunk_lane_shared}")
+    configuration.write_text(f"{pinned}{trunk_configuration_tail}")
     real_git(repo, "commit", "-q", "-am", "trunk configuration")
     push_repository_trunk(repo, "origin")
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
@@ -2937,7 +2935,7 @@ def _trunk_defect(sentence: str) -> str:
 
 
 @pytest.mark.parametrize(
-    ("trunk_lane_shared", "shown", "entries", "defect", "path_answer"),
+    ("trunk_configuration_tail", "shown", "entries", "defect", "path_answer"),
     [
         pytest.param(
             'lane_shared = ["scripts/registry.txt", "src"]\n',
@@ -2979,7 +2977,7 @@ def test_status_and_brief_show_the_trunks_lane_shared_files_or_its_defect(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    trunk_lane_shared: str,
+    trunk_configuration_tail: str,
     shown: list[str],
     entries: list[dict[str, object]] | None,
     defect: str | None,
@@ -2991,7 +2989,7 @@ def test_status_and_brief_show_the_trunks_lane_shared_files_or_its_defect(
     lane-shared file `LANE-SHARED`. A trunk configuration this aco cannot
     read costs only that answer -- the claims still show, the defect named
     in text and `--json` alike, and no file reads as lane-shared."""
-    _lane_on_a_state_ref_board_with_registries(monkeypatch, tmp_path, trunk_lane_shared)
+    _lane_on_a_state_ref_board_with_registries(monkeypatch, tmp_path, trunk_configuration_tail)
     item = items.format_item_id(314)
     registry = "scripts/registry.txt"
     capsys.readouterr()
@@ -3157,7 +3155,7 @@ def test_rescope_outside_every_repository_names_the_entry_that_located_no_checko
 ) -> None:
     """RESC-01, RESC-18: outside every repository a relative entry has no
     checkout to be read against and an absolute one locates none; each
-    refusal names the entry, and the cwd fallback keeps PROT-10's sentence."""
+    refusal names the entry, and the cwd fallback keeps RESC-26's sentence."""
     monkeypatch.chdir(tmp_path)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     flags, reason = scenario(tmp_path)
@@ -4023,7 +4021,6 @@ def test_help_lists_commands_in_their_stable_registration_order() -> None:
         "body",
         "brief",
         "item",
-        "protect",
         "register",
         "run",
         "login",
@@ -7764,7 +7761,7 @@ def _state_ref_item_state(repo: Path, tip: str, number: int) -> items.RecordStat
         ),
         pytest.param(["board", "--json"], list(RECORDED_ORIGIN_HEAD_READ), id="board-head"),
         pytest.param(["next"], list(RECORDED_ORIGIN_HEAD_READ), id="next-head"),
-        # Only `next`, `start`, `protect` and `rescope` call
+        # Only `next`, `start` and `rescope` call
         # `checkout.resolve_path_checkout`; `check`, `status`, `board` and
         # `brief` never reach the commit read.
         pytest.param(["next"], _COMMIT_READ, id="next-commit"),
@@ -13326,21 +13323,17 @@ def test_cli_claim_json_transport_failure_reports_unavailable_not_conflict(
     _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
-def _run_cli_module_as_main_with_hook_stdin(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, hook_stdin: str
-) -> str | int | None:
-    """The exit code of `python -m agent_coordination.cli protect` fed
-    `hook_stdin`, in a home and a working directory with no git, GitHub or
-    store behind them."""
-    home = tmp_path / "home"
-    work = tmp_path / "work"
-    home.mkdir()
-    work.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.chdir(work)
-    forbid_protect_git_github_and_identity(monkeypatch)
-    monkeypatch.setattr(sys, "argv", ["aco", "--repo", REPOSITORY, "protect"])
-    monkeypatch.setattr(sys, "stdin", io.StringIO(hook_stdin))
+def test_cli_module_entry_point_exits_with_mains_return_code(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`python -m agent_coordination.cli` and the installed console script run
+    the `if __name__ == "__main__":` guard, not `cli.main()` as a library call --
+    exercise that guard directly rather than only ever calling `cli.main()`.
+
+    An unknown command is refused by the parser before any repository, git,
+    GitHub or store is reached, so the exit code this observes is
+    `cli.main`'s own return value and nothing else's."""
+    monkeypatch.setattr(sys, "argv", ["aco", "no-such-command"])
 
     with (
         pytest.warns(RuntimeWarning, match="agent_coordination.cli"),
@@ -13348,72 +13341,8 @@ def _run_cli_module_as_main_with_hook_stdin(
     ):
         runpy.run_module("agent_coordination.cli", run_name="__main__")
 
-    return exited.value.code
-
-
-@pytest.mark.parametrize(
-    ("hook_stdin", "exit_code", "stdout", "stderr"),
-    [
-        pytest.param(
-            "not a hook payload",
-            2,
-            '{"decision": "deny", "reason": "invalid hook payload"}\n',
-            "invalid hook payload\n",
-            id="an-unparseable-payload-denies",
-        ),
-        pytest.param(
-            '{"tool_name": "Read", "tool_input": {}}',
-            0,
-            "",
-            "",
-            id="a-read-tool-allows-silently",
-        ),
-    ],
-)
-def test_cli_module_entry_point_exits_with_mains_return_code(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    hook_stdin: str,
-    exit_code: int,
-    stdout: str,
-    stderr: str,
-) -> None:
-    """`python -m agent_coordination.cli` and the installed console script run
-    the `if __name__ == "__main__":` guard, not `cli.main()` as a library call --
-    exercise that guard directly rather than only ever calling `cli.main()`.
-
-    `protect` on a payload it needs no git for is the one command that answers
-    without git, GitHub, or the store, so the exit code this observes is
-    `cli.main`'s own return value and nothing else's."""
-    code = _run_cli_module_as_main_with_hook_stdin(monkeypatch, tmp_path, hook_stdin)
-
-    assert code == exit_code
-    captured = capsys.readouterr()
-    assert (captured.out, captured.err) == (stdout, stderr)
-
-
-def test_cli_module_entry_point_denies_when_the_judge_raises(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """PROT-17: an exception out of `protect.judge` still reaches the host as
-    a deny with the exception's bare text and no traceback."""
-
-    def judge_that_raises(*_args: object, **_keywords: object) -> protect.Verdict:
-        raise RuntimeError("judge exploded")
-
-    monkeypatch.setattr(protect, "judge", judge_that_raises)
-
-    code = _run_cli_module_as_main_with_hook_stdin(monkeypatch, tmp_path, "{}")
-
-    assert code == 2
-    captured = capsys.readouterr()
-    assert (json.loads(captured.out), captured.err) == (
-        {"decision": "deny", "reason": "judge exploded"},
-        "judge exploded\n",
-    )
+    assert exited.value.code == 2
+    assert "invalid choice: 'no-such-command'" in capsys.readouterr().err
 
 
 def test_cli_claim_resource_prints_the_allocated_value(

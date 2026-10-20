@@ -2,10 +2,10 @@
 
 One live claim as it is stored under `refs/aco/state`: its identity, its file
 name and fields, the scope grammar and the width gate, roles, resources,
-overlap, and age. `aco claim`, `aco rescope`, `aco release`, `aco status` and
-`aco protect` all read and write this record; the commands appear here only as
-far as they make it visible, and each command's own spec cites these IDs
-instead of restating them.
+overlap, and age. `aco claim`, `aco rescope`, `aco release` and `aco status`
+all read and write this record; the commands appear here only as far as they
+make it visible, and each command's own spec cites these IDs instead of
+restating them.
 
 A refusal reaching the shared collection point prints `ERROR: <sentence>` on
 stderr and exits `2`. `<claim-id>`, `<sha>`, `<oid>` and `<tip>` are the

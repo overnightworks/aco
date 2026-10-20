@@ -18,8 +18,7 @@ directory from scratch (`land`'s delegated release takes one rather than
 reusing a context it already read from); `observed_afresh` drops exactly its state-ref
 observation and the forge built from it, and keeps every other fact it read
 -- toplevel, board configuration, remote, forge repository, default
-branch, trunk -- so the next ask re-reads only the state ref. `protect`
-never builds one: it judges from its own payload's path.
+branch, trunk -- so the next ask re-reads only the state ref.
 """
 
 from __future__ import annotations
@@ -141,7 +140,7 @@ def _build_forge(context: RunContext) -> forge.ForgeReader:
 
 def run_context(repo: forge.RepositoryId | None) -> RunContext:
     """This run's root context, built once the command is known to need a
-    repository at all (after the workspace and `protect` dispatch)."""
+    repository at all (after the workspace dispatch)."""
     return RunContext(repo, build_forge=_build_forge)
 
 
@@ -160,10 +159,10 @@ def board_config(toplevel: Path) -> board.BoardConfig:
     surfaced as the unrelated "no forge adapter for host ..." the moment a
     forge command resolved a non-GitHub canonical remote. Reads `toplevel`
     explicitly (issue #314 gate B3), never the calling process's own cwd:
-    `protect` and `rescope` pass their payload's own resolved checkout, so a
-    foreign cwd can never wrongly deny a valid config or bless an untracked
-    one. A file absent altogether is no repair `git add -f` could make
-    (issue #505): `_absent_board_config_refusal` names the repair instead."""
+    `rescope` passes its own resolved checkout, so a foreign cwd can never
+    wrongly deny a valid config or bless an untracked one. A file absent
+    altogether is no repair `git add -f` could make (issue #505):
+    `_absent_board_config_refusal` names the repair instead."""
     if not checkout.path_is_tracked(board.CONFIG_PATH.as_posix(), directory=toplevel):
         if not (toplevel / board.CONFIG_PATH).exists():
             raise protocol.ClaimUnavailableError(_absent_board_config_refusal(toplevel))
@@ -202,23 +201,6 @@ def _trunk_board_configuration(remote: str, toplevel: Path) -> _TrunkBoardConfig
     return _TrunkBoardConfiguration(trunk, text)
 
 
-def trunk_lane_shared(remote: str, toplevel: Path) -> tuple[str, ...]:
-    """The lane-shared registry files (issue #575) the trunk's committed
-    board configuration names (`_trunk_board_configuration`), so a lane
-    cannot authorise itself by editing its worktree's `board.toml`: a change
-    to the list takes effect once it lands. Only an entry the trunk tracks
-    as a file grants (`LaneSharedEntry`, issue #586). A trunk that does not
-    resolve, or that holds no configuration, names none; a defective
-    configuration refuses, so `protect` never grants a write it cannot read."""
-    configuration = _trunk_board_configuration(remote, toplevel)
-    if configuration is None:
-        return ()
-    entries = _lane_shared_entries(
-        configuration.parsed().lane_shared, trunk=configuration.trunk, toplevel=toplevel
-    )
-    return lane_shared_files(entries)
-
-
 @dataclass(frozen=True)
 class LaneSharedEntry:
     """One `lane_shared` entry, and whether it names a file the trunk tracks
@@ -240,10 +222,13 @@ LaneSharedReading = tuple[LaneSharedEntry, ...] | LaneSharedUnavailable
 
 
 def trunk_lane_shared_reading(remote: str, toplevel: Path) -> LaneSharedReading:
-    """`trunk_lane_shared`'s answer as `status` and `brief` show it (issue
-    #586): each entry beside whether the trunk tracks it as a file, or the
-    defect that keeps the trunk's configuration from naming any -- reported
-    by these orientation reads rather than stopping them."""
+    """The lane-shared registry files (issue #575) the trunk's committed
+    board configuration names (`_trunk_board_configuration`), as `status` and
+    `brief` show them (issue #586): each entry beside whether the trunk
+    tracks it as a file, or the defect that keeps the trunk's configuration
+    from naming any -- reported by these orientation reads rather than
+    stopping them. Only the trunk's copy is read, so a lane cannot change
+    the list by editing its worktree's `board.toml`."""
     configuration = _trunk_board_configuration(remote, toplevel)
     if configuration is None:
         return ()
@@ -266,8 +251,7 @@ def _lane_shared_entries(
     entries: tuple[str, ...], *, trunk: str, toplevel: Path
 ) -> tuple[LaneSharedEntry, ...]:
     """Each `lane_shared` entry beside whether `trunk` tracks it as a file in
-    the checkout at `toplevel` -- the one decider of what an entry grants,
-    for `protect` and the orientation reads alike."""
+    the checkout at `toplevel` -- the one decider of what an entry names."""
     if not entries:
         return ()
     trunk_files = frozenset(checkout.versioned_paths(directory=toplevel, revision=trunk))
@@ -541,7 +525,7 @@ class RunContext:
         checkout does not configure that remote, whose leftover `HEAD`
         records nothing (issue #508): the offline checks' default branch,
         each check keeping its own rule for `None` -- `rescope`'s names the
-        unconfigured remote itself (PROT-45)."""
+        unconfigured remote itself (RESC-21)."""
         if self._unconfigured_canonical_remote_refusal is not None:
             return None
         return checkout.recorded_default_branch(self.canonical_remote, directory=self.toplevel)
