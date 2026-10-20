@@ -1290,7 +1290,8 @@ def test_board_json_shows_freed_on_and_freed_days() -> None:
 
 @dataclass(frozen=True)
 class _Ranking:
-    """The board's order as `(number, priority_bucket)`, and whether the second item outscores
+    """The board's order as `(number, priority_bucket)`, each item's priority category in that
+    order, and whether the second item outscores
     the first (1), ties it (0) or trails it (-1) -- the premise that category, not score or
     issue number, decided the order."""
 
@@ -1298,6 +1299,7 @@ class _Ranking:
     pull_requests: tuple[board.PullRequest, ...]
     dependencies: dict[int, tuple[board.IssueDependency, ...]]
     order: list[tuple[int, str]]
+    categories: list[int]
     second_against_first_score: int
 
 
@@ -1316,6 +1318,7 @@ _RANKINGS = {
         (board.PullRequest(90, "Fixes #31", "", "branch"),),
         {32: (block_dependency(31),)},
         [(30, "ci"), (31, "blocker"), (32, "unlabelled")],
+        [0, 1, 6],
         1,
     ),
     # The Bug carries the lower issue number, so a number tie-break would give `[1, 30]`.
@@ -1324,6 +1327,7 @@ _RANKINGS = {
         (),
         {},
         [(30, "ci"), (1, "bug")],
+        [0, 0],
         0,
     ),
     # The Bug and a product competitor carry the lowest numbers; a number tie-break would
@@ -1339,6 +1343,7 @@ _RANKINGS = {
         (),
         {},
         [(40, "security"), (41, "data"), (42, "ci"), (1, "bug"), (2, "product")],
+        [0, 0, 0, 0, 3],
         0,
     ),
     # Category always wins over score, and the product item has the lower number too.
@@ -1347,6 +1352,7 @@ _RANKINGS = {
         (board.PullRequest(90, "Fixes #2", "", "branch"),),
         {},
         [(40, "bug"), (2, "product")],
+        [0, 3],
         1,
     ),
 }
@@ -1361,8 +1367,9 @@ def test_board_ranks_by_category_before_score_and_issue_number(case: _Ranking) -
     first, second = projected.items[:2]
     assert (
         [(item.number, item.priority_bucket) for item in projected.items],
+        [item.priority_category for item in projected.items],
         (second.score > first.score) - (second.score < first.score),
-    ) == (case.order, case.second_against_first_score)
+    ) == (case.order, case.categories, case.second_against_first_score)
 
 
 def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
