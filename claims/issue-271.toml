@@ -1,0 +1,8 @@
+claim_id = "f35857267d484f52b9f38a3290216e74"
+agent = "claude"
+role = "builder"
+base = "3a667a22d92092212e60b310d555b44bb732ff4b"
+branch = "claude/issue-271-delete-access-jwt"
+scope = ["pyproject.toml", "scripts/vulture_whitelist.py", "src/aco_board/access_jwt.py", "tests/aco_board/test_access_jwt.py", "uv.lock"]
+opened_commit = "941a2e27d3899a88cd77429ecf6325f7816179f7"
+whole_reason = "Eine Loeschung: Modul, sein Test und die Stellen, die nur dieses Modul nennt (Whitelist, Layer, drei Abhaengigkeiten samt Lock), brechen einzeln den Build."
