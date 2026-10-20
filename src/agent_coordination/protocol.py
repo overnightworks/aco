@@ -34,6 +34,10 @@ ITEM_FILENAME_SUFFIX = ".md"
 RESOURCE_NAME_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9._-]{0,63}")
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 BRANCH_NAME_MAX_LENGTH = 255
+AGENT_MAX_LENGTH = 128
+ROLE_MAX_LENGTH = 64
+RESOURCE_NAME_MAX_LENGTH = 64
+ABANDONED_REASON_MAX_LENGTH = 512
 BRANCH_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
 REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}")
 # RFC 3339 UTC, second precision -- the one timestamp shape a forge issue's
@@ -291,7 +295,7 @@ def outbound_text(value: object, field: str, *, maximum: int) -> str:
 
 
 def outbound_resource_name(value: object) -> str:
-    name = outbound_text(value, "resource", maximum=64)
+    name = outbound_text(value, "resource", maximum=RESOURCE_NAME_MAX_LENGTH)
     if RESOURCE_NAME_PATTERN.fullmatch(name) is None:
         raise ClaimError("resource is not a resource name")
     return name

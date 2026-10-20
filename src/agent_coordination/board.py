@@ -1784,7 +1784,7 @@ class BoardBuildInputs:
     claims: tuple[protocol.ScopedClaim, ...]
     config: BoardConfig
     repository: str
-    now: datetime | None = None
+    now: datetime
     trunk_landings: tuple[datetime, ...] = ()
     # Every item a trunk commit's own trailer names as landed, `sha` and all
     # (issue #371) -- the one source of both `landing_rows` (the board's
@@ -1933,7 +1933,7 @@ def build_board(inputs: BoardBuildInputs) -> Board:
     recent_merged_pull_requests = inputs.recent_merged_pull_requests
     config = inputs.config
     repository = inputs.repository
-    observed_at = (inputs.now or datetime.now(UTC)).astimezone(UTC)
+    observed_at = inputs.now.astimezone(UTC)
     parsed_bodies = {
         issue.number: (
             parse_body(issue.body, storage=config.storage)

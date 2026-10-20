@@ -15,6 +15,7 @@ from typing import NamedTuple
 
 from . import board, body, process, protocol
 from .protocol import (
+    AGENT_MAX_LENGTH,
     ClaimError,
     ClaimRequest,
     InvalidClaimMarkerError,
@@ -1307,7 +1308,7 @@ def merge_base(first: str, second: str, *, directory: Path) -> str | None:
 
 def resolved_agent(explicit: str | None) -> str:
     if explicit is not None:
-        return outbound_text(explicit, "agent", maximum=128)
+        return outbound_text(explicit, "agent", maximum=AGENT_MAX_LENGTH)
     agent = session_agent()
     if agent is None:
         raise ClaimError(
@@ -1322,13 +1323,13 @@ def session_agent() -> str | None:
     the CLI commands have an `--agent` flag."""
     configured = os.environ.get(ACO_AGENT_ENV)
     if configured:
-        return outbound_text(configured, "agent", maximum=128)
+        return outbound_text(configured, "agent", maximum=AGENT_MAX_LENGTH)
     grok_session = os.environ.get(GROK_SESSION_ID_ENV)
     if grok_session:
-        return outbound_text(f"Grok {grok_session}", "agent", maximum=128)
+        return outbound_text(f"Grok {grok_session}", "agent", maximum=AGENT_MAX_LENGTH)
     claude_session = os.environ.get(CLAUDE_CODE_SESSION_ID_ENV)
     if claude_session:
-        return outbound_text(f"Claude {claude_session}", "agent", maximum=128)
+        return outbound_text(f"Claude {claude_session}", "agent", maximum=AGENT_MAX_LENGTH)
     return None
 
 

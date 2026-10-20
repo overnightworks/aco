@@ -63,7 +63,7 @@ def test_viewer_attempt_parses_canonical_pending_and_failed_uuidv4_tokens() -> N
 def test_target_metadata_conflict_is_not_adopted() -> None:
     assert (
         terminal.target_matches(
-            {"@aco_project": "alpha", "@aco_session_id": "session-a"},
+            terminal.Target(terminal.TargetState.DETACHED, project="alpha", session_id="session-a"),
             "alpha",
             providers.Provider.CODEX,
             "session-b",
@@ -73,7 +73,9 @@ def test_target_metadata_conflict_is_not_adopted() -> None:
 
 
 def test_legacy_target_metadata_matches_only_codex() -> None:
-    metadata = {"@aco_project": "alpha", "@aco_session_id": "session-a"}
+    metadata = terminal.Target(
+        terminal.TargetState.DETACHED, project="alpha", session_id="session-a"
+    )
 
     assert terminal.target_matches(metadata, "alpha", providers.Provider.CODEX, "session-a") is True
     assert (
@@ -82,11 +84,12 @@ def test_legacy_target_metadata_matches_only_codex() -> None:
 
 
 def test_explicit_target_provider_mismatch_is_not_adopted() -> None:
-    metadata = {
-        "@aco_project": "alpha",
-        "@aco_provider": "codex",
-        "@aco_session_id": "session-a",
-    }
+    metadata = terminal.Target(
+        terminal.TargetState.DETACHED,
+        project="alpha",
+        session_id="session-a",
+        provider=providers.Provider.CODEX,
+    )
 
     assert (
         terminal.target_matches(metadata, "alpha", providers.Provider.CLAUDE, "session-a") is False

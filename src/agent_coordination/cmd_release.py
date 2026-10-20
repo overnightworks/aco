@@ -138,7 +138,9 @@ def _release_outcome(merged: int | None, abandoned: str | None) -> protocol.Rele
     if merged is not None:
         return protocol.MergedRelease(merged)
     return protocol.AbandonedRelease(
-        protocol.outbound_text(abandoned, "abandoned reason", maximum=512)
+        protocol.outbound_text(
+            abandoned, "abandoned reason", maximum=protocol.ABANDONED_REASON_MAX_LENGTH
+        )
     )
 
 
