@@ -71,7 +71,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 
 - [ ] [CLAIM-09] A claims entry whose name carries neither prefix refuses `claim key has neither the issue nor lane prefix: '<key>'`, exit `2`.
 - [ ] [CLAIM-56] A lane entry name whose escaped bytes are not UTF-8 refuses `claim key does not decode as utf-8: '<key>'`, exit `2`.
-- [ ] [CLAIM-64] An issue entry name carrying `0`, a leading zero or a non-number refuses `claim key has a malformed issue number: '<key>'`, exit `2`.
+- [ ] [CLAIM-64] An issue entry name carrying `0`, a leading zero, a non-number, over 18 ASCII digits or any non-ASCII digit refuses `claim key has a malformed issue number: '<key>'`, exit `2` (see E-CLAIM-07).
 - [ ] [CLAIM-65] A flat lane entry with a non-ASCII byte refuses `claim key has an unescaped reserved character: '<key>'`, exit `2`; a literal `/` is a nested path silently dropped instead.
 - [ ] [CLAIM-66] A lane entry name carrying an incomplete or non-hexadecimal escape refuses `claim key has a malformed percent-escape: '<key>'`, exit `2`.
 
@@ -257,4 +257,14 @@ $ aco claim 42 --claim-id <claim-id>
 CLAIMED issue #42: <claim-id>
 2 of 6 versioned files (33%); overlaps no other open claims
 exit 0
+```
+
+### E-CLAIM-07 — an issue entry name in a non-ASCII digit is no second claim on issue 72
+
+Setup: bare-remote, bootstrapped, `claims/` holds `issue-72.toml` and `issue-٧٢.toml`
+
+```console
+$ aco status
+2> ERROR: claim key has a malformed issue number: 'issue-٧٢'
+exit 2
 ```

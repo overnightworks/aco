@@ -134,11 +134,12 @@ def pull_request_number(value: str) -> int:
     decimal pull request number -- the sha grammar and the empty "newest
     trunk landing" sentinel both belong to `storage = "state-ref"` alone,
     since GitHub has no trunk walk to read either from."""
-    if not value or not value.isdigit():
+    number = protocol.decimal_number_or_none(value)
+    if number is None:
         raise protocol.ClaimUnavailableError(
             "--merged requires a pull request number under storage = github"
         )
-    return int(value)
+    return number
 
 
 def landing_comment(pull_request: int) -> str:

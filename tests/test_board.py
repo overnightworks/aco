@@ -3611,8 +3611,8 @@ def test_an_issue_number_past_the_int_digit_limit_is_no_issue_number() -> None:
 @pytest.mark.parametrize(
     ("digits", "is_reference"),
     [
-        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS, True, id="at-the-bound"),
-        pytest.param(board.MAXIMUM_ISSUE_NUMBER_DIGITS + 1, False, id="one-past-the-bound"),
+        pytest.param(protocol.MAXIMUM_ISSUE_NUMBER_DIGITS, True, id="at-the-bound"),
+        pytest.param(protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1, False, id="one-past-the-bound"),
         pytest.param(4301, False, id="past-the-int-digit-limit"),
     ],
 )
@@ -3632,7 +3632,9 @@ def test_a_number_past_the_digit_bound_is_no_slice_title_number_on_either_side(
 @pytest.mark.parametrize(
     "value",
     [
-        pytest.param("#" + "7" * (board.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="one-past-the-bound"),
+        pytest.param(
+            "#" + "7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="one-past-the-bound"
+        ),
         pytest.param("#" + "7" * 4301, id="past-the-int-digit-limit"),
         pytest.param("#²", id="superscript-digit"),
         pytest.param("#٣", id="non-ascii-digit"),
@@ -3646,10 +3648,10 @@ def test_a_trunk_trailer_number_past_the_digit_bound_is_a_classification_defect(
 
 @pytest.mark.parametrize(
     "value",
-    ["#" + "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS, "7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS],
+    ["#" + "7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS, "7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS],
 )
 def test_parse_item_reference_accepts_a_number_at_the_digit_bound(value: str) -> None:
-    assert board.parse_item_reference(value) == int("7" * board.MAXIMUM_ISSUE_NUMBER_DIGITS)
+    assert board.parse_item_reference(value) == int("7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS)
 
 
 def test_body_defect_text_is_the_shared_renderer() -> None:
@@ -3897,6 +3899,80 @@ def test_build_board_leaves_a_lane_claims_own_event_unjoined_to_any_size_class()
         entry for entry in projected.measurements.classes if entry.stats.size is metrics.Size.MEDIUM
     )
     assert m_class.stats.n == 3
+
+
+def test_closed_item_numbers_reads_only_ascii_numbers_up_to_the_bound() -> None:
+    """Spec: BOARD-56."""
+    readable = ("007", "7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS)
+    unreadable = ("²", "٧٢", "7" * 19, "7" * 5000, "docs/tidy-readme")
+    claimed = datetime(2026, 8, 10, tzinfo=UTC)
+    lane_events = tuple(
+        _lane_event(item, claimed_at=claimed, released_at=None) for item in (*readable, *unreadable)
+    )
+
+    assert board.closed_item_numbers(lane_events, frozenset()) == frozenset(
+        {7, int("7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS)}
+    )
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        pytest.param("²", id="superscript-digit"),
+        pytest.param("٧٢", id="non-ascii-digits"),
+        pytest.param("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="past-the-bound"),
+        pytest.param("7" * 5000, id="past-the-int-digit-limit"),
+        pytest.param("docs/tidy-readme", id="lane-branch"),
+    ],
+)
+def test_build_board_gives_an_unreadable_trailer_item_no_size_class(item: str) -> None:
+    """Spec: BOARD-56 -- the event is not joined to open item 72 or to the open
+    item past the bound, whose size it would otherwise lend (`٧٢` reads as 72
+    under `str.isdigit`)."""
+    lane_events = (
+        _lane_event(
+            item,
+            claimed_at=datetime(2026, 8, 10, tzinfo=UTC),
+            released_at=datetime(2026, 8, 10, 4, tzinfo=UTC),
+        ),
+    )
+    projected = projected_board(
+        (
+            _sized_item(72, "M"),
+            _sized_item(int("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1)), "M"),
+        ),
+        (),
+        (),
+        (),
+        board.BoardConfig(),
+        now=datetime(2026, 8, 21, tzinfo=UTC),
+        lane_events=lane_events,
+    )
+
+    assert projected.items[0].estimate is None
+    assert projected.measurements.classes == ()
+
+
+def test_build_board_still_joins_a_trailer_item_with_leading_zeros() -> None:
+    """Spec: BOARD-56."""
+    lane_events = (
+        _lane_event(
+            "072",
+            claimed_at=datetime(2026, 8, 10, tzinfo=UTC),
+            released_at=datetime(2026, 8, 10, 4, tzinfo=UTC),
+        ),
+    )
+    projected = projected_board(
+        (_sized_item(72, "M"),),
+        (),
+        (),
+        (),
+        board.BoardConfig(),
+        now=datetime(2026, 8, 21, tzinfo=UTC),
+        lane_events=lane_events,
+    )
+
+    assert projected.items[0].estimate is not None
 
 
 def test_build_board_sums_multiple_claims_of_one_item_into_one_sample() -> None:

@@ -49,6 +49,7 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 | `refs/aco/state` not yet bootstrapped | REL-15 (CAS-03) | REL-15 | REL-15 |
 | pull request verification | — | LAND-29..39, 49, 50, 55, 62/63/64 | — |
 | `storage = "state-ref"` trunk verification | — | REL-17 (LAND-47, LAND-52, LAND-56, LAND-59) | — |
+| `storage = "github"`, `--merged` value that is no ASCII number of at most 18 digits | — | REL-60 | — |
 | released item's own body contract | REL-23 | REL-23 | REL-23 |
 | successful release, text output | REL-18 | REL-18 | REL-18 |
 | successful release, `--json` | REL-19, REL-36 | REL-19, REL-35, REL-36 | REL-19, REL-36 |
@@ -125,6 +126,7 @@ claim and closes its reopened item.
 - [ ] [REL-38] Under `storage = "github"`, the release's board report and its worktree cleanup (REL-25, REL-29) walk that same `<remote>/<branch>`.
 - [ ] [REL-39] A canonical `<remote>` with no URL configured refuses before any write: `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-REL-18).
 - [ ] [REL-17] `release --merged` under `storage = "state-ref"` reads `<sha|empty>` against the local trunk walk, never a pull request or forge (LAND-47, LAND-52, LAND-56, LAND-59, `specs/landing-grammar.spec.md`).
+- [ ] [REL-60] Under `storage = "github"`, `--merged` takes only a bare ASCII number of at most 18 digits; else it refuses `--merged requires a pull request number under storage = github`, exit `2` (see E-REL-27).
 - [ ] [REL-23] `release` never reads the released item's own body contract, unlike issue-mode `claim` (`specs/body-block.spec.md` BODY-52).
 
 ## The `RELEASED` line and `--json`
@@ -569,3 +571,15 @@ exit 2
 
 The claim on `ada/issue-42-again`, the open item and its worktree all stand; `refs/aco/state`
 does not move. With no live claim on `aco-00002a` the same command meets REL-47 instead.
+
+### E-REL-27 — a pull request number in non-ASCII digits is no pull request number
+
+Setup: `storage = "github"`, issue `#72` claimed by `Ada (builder)` on `ada/issue-72`
+
+```console
+$ aco release 72 --claim-id <claim-id> --merged ٧٢
+2> ERROR: --merged requires a pull request number under storage = github
+exit 2
+```
+
+The claim stays live and nothing is read from the forge.
