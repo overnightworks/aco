@@ -241,15 +241,14 @@ def console_title(project: str) -> str:
 
 
 def target_matches(
-    metadata: Mapping[str, str], project: str, provider: providers.Provider, session_id: str
+    target: Target, project: str, provider: providers.Provider, session_id: str
 ) -> bool:
-    target_provider = metadata.get(_PROVIDER_OPTION)
     return (
-        metadata.get(_PROJECT_OPTION) == project
-        and metadata.get(_SESSION_OPTION) == session_id
+        target.project == project
+        and target.session_id == session_id
         and (
-            target_provider == provider.value
-            if target_provider
+            target.provider is provider
+            if target.provider is not None
             else provider is providers.Provider.CODEX
         )
     )

@@ -46,15 +46,17 @@ def _touch_summary(
 
 
 def claim_cost_line(
-    n: int,
-    total: int,
+    covered_file_count: int,
+    versioned_file_count: int,
     own_scope: tuple[str, ...],
     touches: tuple[protocol.ScopedClaim, ...],
     storage: body.Storage,
 ) -> str:
-    percent = 0 if total == 0 else round(100 * n / total)
+    percent = (
+        0 if versioned_file_count == 0 else round(100 * covered_file_count / versioned_file_count)
+    )
     return (
-        f"{n} of {total} versioned files ({percent}%); "
+        f"{covered_file_count} of {versioned_file_count} versioned files ({percent}%); "
         f"{_touch_summary(own_scope, touches, storage)}"
     )
 
@@ -136,8 +138,10 @@ def claim_request(
     `start` checks its claim before the worktree exists). `adopted` claims a
     pull request's own head branch, whatever its prefix, as an issue-less
     lane (`aco adopt`); `aco claim` never passes it."""
-    agent = protocol.outbound_text(checkout.resolved_agent(arguments.agent), "agent", maximum=128)
-    role = protocol.outbound_text(arguments.role, "role", maximum=64)
+    agent = protocol.outbound_text(
+        checkout.resolved_agent(arguments.agent), "agent", maximum=protocol.AGENT_MAX_LENGTH
+    )
+    role = protocol.outbound_text(arguments.role, "role", maximum=protocol.ROLE_MAX_LENGTH)
     base = (
         checkout.git_output(["rev-parse", "HEAD"], directory=directory)
         if arguments.base is None
@@ -621,6 +625,7 @@ def _whole_from_item_body(
 
 def _resolved_claim_request(
     requested: protocol.ClaimRequest,
+    identity: protocol.IssueIdentity,
     observed: protocol.ClaimState,
     context: session.RunContext,
     storage: body.Storage,
@@ -642,8 +647,6 @@ def _resolved_claim_request(
     `scope = [...]` is the source of truth, fetched from the same open board
     `run` needs anyway for its slice-rule checks, so the caller reuses
     it rather than asking again."""
-    identity = requested.identity
-    assert isinstance(identity, protocol.IssueIdentity)
     live = observed.claims.get(protocol.claim_key(identity, requested.branch))
     if live is not None:
         return replace(requested, scope=live.scope), None
@@ -704,10 +707,19 @@ def scope_versioning(
     directories = checkout.scope_directories(
         scope, directory=context.directory, toplevel=lambda: context.toplevel, revision=revision
     )
-    n, total, share, effective_whole_reason = policy.reject_wide_scope(
-        scope, versioned, whole_reason, directories=directories, whole_from_body=whole_from_body
+    covered_file_count, versioned_file_count, share, effective_whole_reason = (
+        policy.reject_wide_scope(
+            scope,
+            versioned,
+            whole_reason,
+            directories=directories,
+            whole_from_body=whole_from_body,
+        )
     )
-    return ScopeVersioning(n, total, share), effective_whole_reason
+    return (
+        ScopeVersioning(covered_file_count, versioned_file_count, share),
+        effective_whole_reason,
+    )
 
 
 @dataclass(frozen=True)
@@ -901,7 +913,9 @@ def checked_claim(
         observed = context.observation
         protocol.require_state_ref(observed)
         storage = context.config.storage
-        requested, open_by_number = _resolved_claim_request(requested, observed, context, storage)
+        requested, open_by_number = _resolved_claim_request(
+            requested, requested.identity, observed, context, storage
+        )
         versioning, effective_whole = scope_versioning(
             requested.scope,
             requested.whole_reason,

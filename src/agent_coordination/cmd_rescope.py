@@ -309,7 +309,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
         toplevel=lambda: checkout_context.toplevel,
     )
     try:
-        _n, _total, _share, whole_reason = policy.reject_wide_scope(
+        _covered_file_count, _versioned_file_count, _share, whole_reason = policy.reject_wide_scope(
             combined,
             versioned,
             requested.whole_reason or selected.whole_reason,

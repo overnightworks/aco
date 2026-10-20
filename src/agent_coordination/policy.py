@@ -12,10 +12,10 @@ from .session import RunContext
 
 
 def _scope_cost(versioned: tuple[str, ...], scope: tuple[str, ...]) -> tuple[int, int, float]:
-    n = len(checkout.paths_under_scope(versioned, scope))
-    total = len(versioned)
-    share = 0.0 if total == 0 else n / total
-    return n, total, share
+    covered_file_count = len(checkout.paths_under_scope(versioned, scope))
+    versioned_file_count = len(versioned)
+    share = 0.0 if versioned_file_count == 0 else covered_file_count / versioned_file_count
+    return covered_file_count, versioned_file_count, share
 
 
 def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
@@ -56,10 +56,10 @@ def reject_wide_scope(
     `whole_from_body`, and keeps the plain refusal. `directories` are
     the scope entries that name a directory in the tree `versioned` lists
     (`checkout.scope_directories`)."""
-    n, total, share = _scope_cost(versioned, scope)
+    covered_file_count, versioned_file_count, share = _scope_cost(versioned, scope)
     trip = wide_scope_trip(scope, versioned, directories=directories)
     if trip is None:
-        return n, total, share, whole_reason
+        return covered_file_count, versioned_file_count, share, whole_reason
     effective = whole_reason
     if effective is None and whole_from_body is not None:
         effective = whole_from_body()
@@ -67,7 +67,7 @@ def reject_wide_scope(
         raise protocol.ClaimError(
             _wide_scope_refusal(trip, names_body_fallback=whole_from_body is not None)
         )
-    return n, total, share, effective
+    return covered_file_count, versioned_file_count, share, effective
 
 
 def wide_scope_trip(
@@ -76,9 +76,12 @@ def wide_scope_trip(
     """`scope`'s width judged against the tree `versioned` lists, whose
     entries naming a directory are `directories` -- the one measure the
     width gate refuses by and `next`'s advice anticipates (issue #566)."""
-    n, total, _share = _scope_cost(versioned, scope)
+    covered_file_count, versioned_file_count, _share = _scope_cost(versioned, scope)
     return protocol.wide_scope_trip(
-        scope, directories=directories, covered_file_count=n, versioned_file_count=total
+        scope,
+        directories=directories,
+        covered_file_count=covered_file_count,
+        versioned_file_count=versioned_file_count,
     )
 
 

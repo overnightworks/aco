@@ -491,11 +491,7 @@ def _run_project(
     if target.state is terminal.TargetState.ABSENT:
         return _launch_if_unowned(controller, project, launch, RunState.STARTED, environment)
     if not terminal.target_matches(
-        {
-            "@aco_project": target.project or "",
-            "@aco_provider": target.provider.value if target.provider is not None else "",
-            "@aco_session_id": target.session_id or "",
-        },
+        target,
         project.key,
         project.provider,
         project.session_id,

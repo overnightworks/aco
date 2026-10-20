@@ -291,7 +291,8 @@ def build_board(
             config.storage,
         )
         children = _fetch_children(client, container_numbers)
-        pull_requests = (open_pull_requests.result(), merged_pull_requests.result())
+        open_pull_request_rows = open_pull_requests.result()
+        merged_pull_request_rows = merged_pull_requests.result()
         closed_item_sizes = closed_item_sizes_future.result()
     # The same forge relation `cmd_cut._cut_target` refuses a nested container on
     # (issue #503), so `next` never proposes a `cut` that `cut` refuses.
@@ -329,8 +330,8 @@ def build_board(
     return board.build_board(
         board.BoardBuildInputs(
             issues=issues,
-            open_pull_requests=pull_requests[0],
-            recent_merged_pull_requests=pull_requests[1],
+            open_pull_requests=open_pull_request_rows,
+            recent_merged_pull_requests=merged_pull_request_rows,
             claims=claims,
             config=config,
             repository=client.repository.path,
