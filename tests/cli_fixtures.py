@@ -40,6 +40,7 @@ from agent_coordination.session import RunContext
 
 # Captured at import, before any test's stub replaces it.
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked
+_REAL_GIT_OUTPUT = checkout.git_output
 
 
 FROZEN_CLI_NOW = datetime(2026, 8, 21, tzinfo=UTC)
@@ -419,6 +420,21 @@ def push_repository_trunk(repo: Path, remote_name: str) -> None:
     fixture repeats once its own commits are built (issue #359 CI)."""
     real_git(repo, "push", "-q", remote_name, "main")
     real_git(repo, "remote", "set-head", remote_name, "main")
+
+
+@pytest.fixture
+def outside_a_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """A working directory no git repository holds, answered by the real
+    `git rev-parse --show-toplevel` in git's untranslated words -- the one
+    session `conftest.py`'s `_isolate_git_toplevel` otherwise makes
+    unreachable."""
+    nowhere = tmp_path / "nowhere"
+    nowhere.mkdir()
+    monkeypatch.setattr(checkout, "git_output", _REAL_GIT_OUTPUT)
+    monkeypatch.setenv("LC_ALL", "C")
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    monkeypatch.chdir(nowhere)
+    return nowhere
 
 
 def push_lane_branch(clone: Path, branch: str) -> str:

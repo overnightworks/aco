@@ -41,7 +41,7 @@ the trailer grammar that mode reads and the sentences it refuses with
 | `<sha>` is a trunk commit the trailer grammar refuses | CHECK-13 | CHECK-14 |
 | `<sha>` is off the walked first-parent trunk | CHECK-13 | CHECK-14 |
 | `<sha>`, the canonical remote with no URL configured | CHECK-15 | CHECK-15 |
-| no checkout, or another pre-dispatch failure | CHECK-10 | CHECK-10 |
+| no checkout, or another forge or store failure while reading | CHECK-10 | CHECK-10 |
 | `--repo` given, `storage = "state-ref"` | CHECK-11 | CHECK-11 |
 
 ## `--json`'s own envelope
@@ -65,7 +65,7 @@ the trailer grammar that mode reads and the sentences it refuses with
 | trunk trailer refused (CHECK-13) | `invalid_classification` | `2` |
 | `<sha>` off the walked trunk (CHECK-13) | `not_on_trunk` | `2` |
 | `<sha>`, the canonical remote with no URL configured (CHECK-15) | `unavailable` | `2` |
-| no checkout, or another pre-dispatch failure (CHECK-10) | `unavailable` | `2` |
+| no checkout, or another forge or store failure while reading (CHECK-10) | `unavailable` | `2` |
 | `--repo` given, `storage = "state-ref"` (CHECK-11) | `invalid_usage` | `2` |
 | `<n>` past `aco-ffffff`, `storage = "state-ref"` (PIN-31) | `invalid_usage` | `2` |
 
@@ -80,7 +80,7 @@ the trailer grammar that mode reads and the sentences it refuses with
 own text (BODY-01..BODY-50, BODY-12).
 
 - [ ] [CHECK-04] `<n>` naming a valid, complete, unblocked issue prints `ISSUE #<n> body ok` on stdout, exit `0` (see E-CHECK-03).
-- [ ] [CHECK-06] A malformed body prints `ISSUE #<n> <body defect sentence>` on stderr, exit `2` (see E-CHECK-04).
+- [ ] [CHECK-06] A malformed body prints `ISSUE #<n> <body defect sentence>` on stderr for its first defect, exit `2` (see E-CHECK-04).
 - [ ] [CHECK-07] A structurally valid but unfilled body prints `ISSUE #<n> body incomplete: <sections>` on stderr, exit `2`.
 - [ ] [CHECK-08] An issue with open `blocked_by` dependencies prints `ISSUE #<n> blocked by <label>, <label>` on stderr, exit `3`, local blockers first (see E-CHECK-05).
 - [ ] [CHECK-09] Under `storage = "state-ref"`, a local blocker's own label is `specs/landing-grammar.spec.md`'s `<label>` (`aco-xxxxxx`); a foreign one stays `owner/repo#n` regardless of either pin.
@@ -101,7 +101,7 @@ LAND-58, LAND-60, LAND-68).
 contract from .aco/board.toml and needs a checkout (a shallow one
 is enough): <git detail>`.
 
-- [ ] [CHECK-10] `aco check <n>` outside a git checkout, or on any other pre-dispatch forge failure, refuses `ERROR: <sentence>`, `--json` `reason: "unavailable"`, exit `2` (see E-CHECK-06).
+- [ ] [CHECK-10] `aco check <n>` outside a git checkout, or any other forge or store failure while reading, refuses `ERROR: <sentence>`, `--json` `reason: "unavailable"`, exit `2` (see E-CHECK-06).
 - [ ] [CHECK-11] Under `storage = "state-ref"`, `--repo` here refuses the same sentence as `specs/storage-pin.spec.md`'s PIN-04, `--json` `reason: "invalid_usage"`, exit `2` (see E-CHECK-07).
 
 ## Never
