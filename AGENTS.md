@@ -1,9 +1,5 @@
-Repository facts only; the global contract owns every general rule.
-
-Entry points (pointers only; the facts live there): `README.md` is operator documentation for install, the CLI, and the claim protocol. Follow the installed `aco` CLI for the live rules. `specs/*.spec.md` owns every command's behaviour -- its printed literals, exit codes, and `--json` shapes.
-
-Repository facts (owners in parentheses):
-- Python >= 3.11 (`pyproject.toml`).
-- Verification (`.github/workflows/ci.yml` lists the exact steps): `uv sync --locked --group dev`, then `uv run --locked` for `ruff check .`, `ruff format --check .`, `pyright src tests scripts`, `lint-imports`, and `pytest`; for `frontend/`, `pnpm --dir frontend install --frozen-lockfile`, then `check`, `lint`, `knip`, `test`, and `build`, and commit the rebuilt `src/aco_board/static/`.
-- Quality gate: the `quality` job in `.github/workflows/ci.yml` calls overnightworks/quality's `gate.yml`; its required check is `quality / verdict`, and `quality/config.toml` lists the mandatory jobs. Sonar and secret scans run there, not in separate jobs.
-- Package version: `src/agent_coordination/__init__.py` (`__version__`).
+- `README.md` documents installation, CLI usage and the claim protocol; its command table links each command to the owning `specs/*.spec.md` for behaviour, printed literals, exit codes and `--json` shapes.
+- `pyproject.toml` owns Python compatibility and the `dev` dependency group; `src/agent_coordination/__init__.py` owns the package version (`__version__`).
+- `.github/workflows/ci.yml` owns verification; its `quality` job calls overnightworks/quality's `gate.yml`, and `quality/config.toml` lists the mandatory jobs (required check `quality / verdict`).
+- Local Python tests: `uv sync --locked --group dev`, then `PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest -n 4 <test paths or -k selection>`. With the main checkout's shared virtualenv instead, set `PYTHONPATH=src` from the worktree root: its editable install points at the main checkout.
+- Frontend: scripts are in `frontend/package.json`; run selected files with `pnpm --dir frontend test <test paths>`. After changing `frontend/`, rebuild and commit `src/aco_board/static/` as README's Board section says.
