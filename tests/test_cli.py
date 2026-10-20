@@ -2770,6 +2770,7 @@ def test_status_refuses_a_state_ref_claim_key_whose_issue_number_is_unreadable(
     valid `issue-72` stops the read with the named refusal, never a traceback
     and never a second claim on issue 72."""
     repo, remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
+    state_tip = _state_ref_tip(repo, remote)
     claim_content = "\n".join(
         [
             'claim_id = "a1"',
@@ -2778,7 +2779,7 @@ def test_status_refuses_a_state_ref_claim_key_whose_issue_number_is_unreadable(
             f'base = "{"c" * 40}"',
             'branch = "claude/issue-72-cut"',
             'scope = ["src/x.py"]',
-            f'opened_commit = "{"c" * 40}"',
+            f'opened_commit = "{state_tip}"',
             "",
         ]
     )
@@ -2797,6 +2798,7 @@ def test_status_refuses_a_state_ref_claim_key_whose_issue_number_is_unreadable(
             ("100644", "blob", blob(repo, b"version = 2\n"), "schema.toml"),
             ("040000", "tree", claims_tree, store.CLAIMS_DIRECTORY),
         ],
+        successor_of=state_tip,
     )
     refusal = f"claim key has a malformed issue number: 'issue-{number}'"
 
@@ -2816,7 +2818,7 @@ def test_status_refuses_a_state_ref_claim_key_whose_issue_number_is_unreadable(
 
 
 @pytest.mark.parametrize("number", [*_UNREADABLE_NUMBERS, pytest.param("docs/x", id="lane")])
-@pytest.mark.parametrize("command", [["board", "--json"], ["next", "--json"]])
+@pytest.mark.parametrize("command", [["board", "--json"], ["next"], ["next", "--json"]])
 def test_board_and_next_read_an_unreadable_lifecycle_trailer_item_like_a_lane(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -2838,9 +2840,45 @@ def test_board_and_next_read_an_unreadable_lifecycle_trailer_item_like_a_lane(
     status = issue_claim.main(command)
 
     assert status == 0
-    payload = json.loads(capsys.readouterr().out)
-    if command[0] == "board":
-        assert payload["measurements"]["unparsed"] == 0
+    output = capsys.readouterr().out
+    if command == ["board", "--json"]:
+        assert json.loads(output)["measurements"]["unparsed"] == 0
+
+
+@pytest.mark.parametrize(
+    "number",
+    [
+        pytest.param("٧٢", id="non-ascii-digits"),
+        pytest.param("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="past-the-bound"),
+        pytest.param("docs/x", id="lane"),
+    ],
+)
+@pytest.mark.parametrize("command", [["board", "--json"], ["next"], ["next", "--json"]])
+def test_board_and_next_lend_no_closed_item_size_to_an_unreadable_trailer_item(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    number: str,
+    command: list[str],
+) -> None:
+    """Spec: BOARD-56. A completed lane whose `item:` trailer reads as no
+    ASCII number of at most 18 digits is looked up as no closed item, though
+    closed items 72 and `7` x 19 carry a size it would otherwise join --
+    `٧٢` reads as 72 under `str.isdigit`, and the 19 digits as an item
+    past the bound."""
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=_TOP_AND_BLOCKED[1:2])
+    for lookalike in (72, int("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1))):
+        client.issue_references[lookalike] = forge.ItemReference(
+            forge.ItemState.CLOSED, body=complete_contract("Closed.", size="M")
+        )
+    _patch_store_write(monkeypatch, lane_events=(_lane(number, 10, 4),))
+
+    assert issue_claim.main(["--repo", REPOSITORY, *command]) == 0
+
+    output = capsys.readouterr().out
+    assert client.issue_reference_lookups == []
+    if command == ["board", "--json"]:
+        assert json.loads(output)["measurements"]["classes"] == []
 
 
 def test_start_under_state_ref_claims_the_worktree_it_builds(
@@ -14624,15 +14662,26 @@ _MERGED_NEEDS_A_PULL_REQUEST_NUMBER = (
 )
 @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
 def test_release_merged_refuses_a_non_numeric_pull_request_under_github(
-    capsys: pytest.CaptureFixture[str], merged: str, as_json: bool
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    merged: str,
+    as_json: bool,
 ) -> None:
     """Spec: REL-60. `github.pull_request_number`'s own guard (issue #359):
     `--merged` under `storage = "github"` (the default here -- no board.toml
     pins state-ref) takes only a bare ASCII pull request number of at most
     18 digits, never the sha grammar that pin's own `<sha|empty>` form
-    reads; refuses before touching git, the store, or the forge at all -- so
-    the store this session never resolved stays at its own untouched
-    default."""
+    reads; the refusal reaches no forge and leaves the live claim, and the
+    state ref it sits on, exactly as they were."""
+    worktree, bare_remote = _reset_repository(monkeypatch, tmp_path)
+    _use_real_store(monkeypatch)
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    claim = _land_real_claim(worktree, bare_remote, issue=72, claim_id="claim-72")
+    tip_before = _state_ref_tip(worktree, bare_remote)
+    monkeypatch.setattr(
+        github, "GitHubForge", lambda _repository: pytest.fail("the refusal reached the forge")
+    )
     arguments = ["release", "72", "--agent", "Codex Sol", "--claim-id", "claim-72"]
     json_flag = ["--json"] if as_json else []
 
@@ -14649,7 +14698,10 @@ def test_release_merged_refuses_a_non_numeric_pull_request_under_github(
         )
     else:
         assert captured.err == f"ERROR: {_MERGED_NEEDS_A_PULL_REQUEST_NUMBER}\n"
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
+    assert _state_ref_tip(worktree, bare_remote) == tip_before
+    assert store.fetch_state(worktree=worktree, remote="origin").claims == {
+        protocol.claim_key(claim.identity, claim.branch): claim
+    }
 
 
 @pytest.mark.parametrize(

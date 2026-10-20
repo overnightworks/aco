@@ -3926,8 +3926,9 @@ def test_closed_item_numbers_reads_only_ascii_numbers_up_to_the_bound() -> None:
     ],
 )
 def test_build_board_gives_an_unreadable_trailer_item_no_size_class(item: str) -> None:
-    """Spec: BOARD-56 -- the event is not joined to open item 72, whose size
-    it would otherwise lend (`٧٢` reads as 72 under `str.isdigit`)."""
+    """Spec: BOARD-56 -- the event is not joined to open item 72 or to the open
+    item past the bound, whose size it would otherwise lend (`٧٢` reads as 72
+    under `str.isdigit`)."""
     lane_events = (
         _lane_event(
             item,
@@ -3936,7 +3937,10 @@ def test_build_board_gives_an_unreadable_trailer_item_no_size_class(item: str) -
         ),
     )
     projected = projected_board(
-        (_sized_item(72, "M"),),
+        (
+            _sized_item(72, "M"),
+            _sized_item(int("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1)), "M"),
+        ),
         (),
         (),
         (),

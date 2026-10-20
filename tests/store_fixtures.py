@@ -49,14 +49,21 @@ def blob(worktree: Path, content: bytes) -> str:
 
 
 def push_raw_state_tree(
-    remote: Path, worktree: Path, entries: list[tuple[str, str, str, str]]
+    remote: Path,
+    worktree: Path,
+    entries: list[tuple[str, str, str, str]],
+    *,
+    successor_of: str | None = None,
 ) -> str:
     """Push an arbitrary top-level tree (built via `raw_tree`) onto `STATE_REF`,
-    for the malformed shapes `store`'s own write path can never produce."""
+    for the malformed shapes `store`'s own write path can never produce. A
+    `successor_of` commit keeps the history a reader has already fetched
+    intact; without it the history is replaced by a parentless commit."""
     tree = raw_tree(worktree, entries)
+    parent = [] if successor_of is None else ["-p", successor_of]
     commit = (
         subprocess.run(
-            ["git", "-C", str(worktree), "commit-tree", tree, "-m", "test fixture"],
+            ["git", "-C", str(worktree), "commit-tree", tree, *parent, "-m", "test fixture"],
             check=True,
             capture_output=True,
         )
