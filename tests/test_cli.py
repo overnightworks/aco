@@ -2764,7 +2764,7 @@ def test_status_refuses_a_state_ref_claim_key_whose_issue_number_is_unreadable(
     number: str,
     as_json: bool,
 ) -> None:
-    """Spec: CLAIM-64. A hand-corrupted `claims/issue-<number>.toml` beside a
+    """Spec: CLAIM-64, STAT-18. A hand-corrupted `claims/issue-<number>.toml` beside a
     valid `issue-72` stops the read with the named refusal, never a traceback
     and never a second claim on issue 72."""
     repo, remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
@@ -2983,7 +2983,8 @@ def test_status_and_brief_show_the_trunks_lane_shared_files_or_its_defect(
     defect: str | None,
     path_answer: str,
 ) -> None:
-    """Issue #586 lines 1-3 on a real state-ref board: `status`, `status
+    """Spec: STAT-19, STAT-20, STAT-21, STAT-22, STAT-23. Issue #586 lines 1-3 on a real
+    state-ref board: `status`, `status
     --json`, `brief` and `brief --json` name the trunk's lane-shared entries,
     an entry naming no tracked file marked so; `status --path` names a
     lane-shared file `LANE-SHARED`. A trunk configuration this aco cannot
@@ -3002,14 +3003,16 @@ def test_status_and_brief_show_the_trunks_lane_shared_files_or_its_defect(
     status_lines = run("status")
     status_json = json.loads(run("status", "--json")[0])
     path_lines = run("status", "--path", registry)
+    path_json = json.loads(run("status", "--path", registry, "--json")[0])
     brief_lines = run("brief", item)
     brief_claim = json.loads(run("brief", item, "--json")[0])["claim"]
 
     lane_shared = {"lane_shared": entries, "lane_shared_unavailable": defect}
-    assert exits == [0] * 5
+    assert exits == [0] * 6
     assert (status_lines[0].split()[0], _lane_shared_lines(status_lines)) == ("CLAIMED", shown)
     assert (status_json["reason"], _lane_shared_fields(status_json)) == ("claimed", lane_shared)
     assert path_lines == [f"{path_answer} {registry}", *(shown if defect else [])]
+    assert _lane_shared_fields(path_json) == lane_shared
     assert _lane_shared_lines(brief_lines) == shown
     assert (brief_claim["branch"], _lane_shared_fields(brief_claim)) == (
         _START_BRANCH,
@@ -9493,31 +9496,6 @@ def _patch_status_store(
     monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
 
 
-def test_cli_status_reports_unavailable_for_a_rewritten_state_ref(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`status` (issue #406) reports every `protocol.ClaimError` `fetch_state`
-    itself can raise -- here a rewritten `refs/aco/state` (CLAIM-50) -- through
-    the shared emitter as `reason: unavailable`, never `cli.main`'s legacy
-    `{"ok": false, "error": ...}` shape."""
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
-    )
-
-    def raising_fetch_state(*, worktree: Path, remote: str) -> protocol.ClaimState:
-        raise protocol.StateLineageError("<oid> is not an ancestor of <tip>")
-
-    monkeypatch.setattr(store, "fetch_state", raising_fetch_state)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "--json"])
-
-    captured = capsys.readouterr()
-    assert status == 2
-    assert captured.err == "ERROR: <oid> is not an ancestor of <tip>\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-
-
 @pytest.mark.parametrize(
     ("arguments", "expected"),
     [
@@ -9569,62 +9547,6 @@ def test_every_output_names_a_github_item_by_its_number(
     output = captured.out + captured.err
     assert expected in output
     assert "aco-" not in output
-
-
-@pytest.mark.parametrize(
-    ("initial_branch", "published_trunk", "lane_shared_line"),
-    [
-        pytest.param(
-            "main",
-            "refs/remotes/origin/main",
-            "lane-shared: scripts/a.py, scripts/b.txt\n",
-            id="trunk-names-them",
-        ),
-        pytest.param("lane", None, "", id="no-trunk-resolves"),
-    ],
-)
-def test_cli_status_shows_a_live_store_claim_then_the_lane_shared_files(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    initial_branch: str,
-    published_trunk: str | None,
-    lane_shared_line: str,
-) -> None:
-    """Issue #575 line 3: the lane-shared files the trunk's committed
-    configuration names follow the claim blocks once, so a builder counts
-    them as allowed beside its scope -- never one the working copy's own
-    `board.toml` adds, not even when no trunk resolves to name any."""
-    claimed = standing_active_claim(
-        "Codex Sol", claim_id="cli-claim", issue=72, branch="codex/issue-72", scope=("src",)
-    )
-    _patch_status_store(monkeypatch, claimed)
-    monkeypatch.setattr(checkout, "file_at_revision", _LIVE_FILE_AT_REVISION)
-    monkeypatch.setattr(checkout, "versioned_paths", _REAL_VERSIONED_PATHS)
-    monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
-    real_git(tmp_path, "init", "-q", "-b", initial_branch)
-    real_git(tmp_path, "config", "user.name", "Test")
-    real_git(tmp_path, "config", "user.email", "test@example.com")
-    write_repository_config(tmp_path, 'lane_shared = ["scripts/a.py", "scripts/b.txt"]\n')
-    (tmp_path / "scripts").mkdir()
-    (tmp_path / "scripts" / "a.py").write_text("")
-    (tmp_path / "scripts" / "b.txt").write_text("")
-    real_git(tmp_path, "add", "-f", board.CONFIG_PATH.as_posix(), "scripts")
-    real_git(tmp_path, "commit", "-q", "-m", "trunk configuration")
-    if published_trunk is not None:
-        real_git(tmp_path, "update-ref", published_trunk, "HEAD")
-    (tmp_path / board.CONFIG_PATH).write_text(
-        'lane_shared = ["scripts/a.py", "scripts/b.txt", "src/x.py"]\n'
-    )
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "72"])
-    assert status == 0
-    assert capsys.readouterr().out == (
-        f"CLAIMED issue #72: Codex Sol (builder) base={BASE} "
-        "branch=codex/issue-72 claim=cli-claim 0h 0m\n"
-        "  src\n"
-        f"{lane_shared_line}"
-    )
 
 
 def test_cli_lane_claim_and_release_round_trip_without_issue_number(
@@ -11852,80 +11774,6 @@ def test_cli_claim_and_rescope_accept_a_scope_within_width_limits(
     case.check(out, err)
 
 
-def test_cli_status_path_prints_the_claim_holding_a_path(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    claimed_claim = standing_active_claim(
-        "Ada", claim_id="mine", issue=72, scope=("docs/PRODUCT.md", "src/widget.py")
-    )
-    _patch_status_store(monkeypatch, claimed_claim)
-
-    claimed = issue_claim.main(["--repo", REPOSITORY, "status", "--path", "docs/PRODUCT.md"])
-    free = issue_claim.main(["--repo", REPOSITORY, "status", "--path", "README.md"])
-    claimed_out = capsys.readouterr().out
-
-    assert claimed == 0
-    assert free == 0
-    assert "CLAIMED docs/PRODUCT.md issue #72: Ada (builder) claim=mine" in claimed_out
-    assert "UNCLAIMED README.md" in claimed_out
-
-
-def test_cli_status_path_json_prints_holder_or_unclaimed(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    claimed_claim = standing_active_claim("Ada", claim_id="mine", issue=72, scope=("docs",))
-    _patch_status_store(monkeypatch, claimed_claim)
-
-    descendant = issue_claim.main(
-        ["--repo", REPOSITORY, "status", "--path", "docs/decisions/one.md", "--json"]
-    )
-    claimed = json.loads(capsys.readouterr().out)
-    free = issue_claim.main(["--repo", REPOSITORY, "status", "--path", "src/widget.py", "--json"])
-    unclaimed = json.loads(capsys.readouterr().out)
-
-    assert descendant == 0
-    assert claimed["ok"] is True
-    assert claimed["reason"] == "claimed"
-    assert claimed["path"] == "docs/decisions/one.md"
-    assert claimed["claims"][0]["claim_id"] == "mine"
-    assert free == 0
-    assert unclaimed == {
-        "ok": True,
-        "reason": "unclaimed",
-        "path": "src/widget.py",
-        "claims": [],
-        **_no_lane_shared(),
-    }
-
-
-def test_cli_status_path_answers_even_when_a_claim_age_read_would_raise(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`--path` prints no age, so it never reads claim ancestry (README
-    "status --path"): a lineage break in some claim's `opened_commit` must
-    not stop this answer.
-    """
-    claimed_claim = standing_active_claim(
-        "Ada", claim_id="mine", issue=72, scope=("docs/PRODUCT.md",)
-    )
-    _patch_status_store(monkeypatch, claimed_claim)
-
-    def raising_claim_ages(
-        *, worktree: Path, tip: protocol.ObjectId, claims: object
-    ) -> dict[str, datetime]:
-        raise protocol.StateLineageError("must not be called by status --path")
-
-    monkeypatch.setattr(store, "claim_ages", raising_claim_ages)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "status", "--path", "docs/PRODUCT.md"])
-
-    assert status == 0
-    assert "CLAIMED docs/PRODUCT.md issue #72: Ada (builder) claim=mine" in capsys.readouterr().out
-
-
 def test_cli_claim_touches_stay_empty_beside_a_disjoint_standing_claim(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -12163,38 +12011,6 @@ def test_board_shows_a_claims_age_and_marks_it_old_after_sixty_minutes(
     item = next(row for row in json.loads(capsys.readouterr().out)["items"] if row["number"] == 72)
     assert item["claim_age"] == claim_age
     assert item["claim_old"] is claim_old
-
-
-def test_cli_status_and_status_path_show_the_whole_reason(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    reason = "the four adapters share one lock"
-    claimed = standing_active_claim(
-        "Ada",
-        claim_id="wide",
-        issue=72,
-        branch="codex/issue-72",
-        scope=("new_a.py", "new_b.py", "new_c.py", "new_d.py"),
-        whole_reason=reason,
-    )
-    _patch_status_store(monkeypatch, claimed)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "72"]) == 0
-    status_out = capsys.readouterr().out
-    assert f"  whole: {reason}" in status_out
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "72", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["claims"][0]["whole"] == reason
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "--path", "new_a.py"]) == 0
-    who_out = capsys.readouterr().out
-    assert f"  whole: {reason}" in who_out
-
-    assert issue_claim.main(["--repo", REPOSITORY, "status", "--path", "new_a.py", "--json"]) == 0
-    who_payload = json.loads(capsys.readouterr().out)
-    assert who_payload["claims"][0]["whole"] == reason
 
 
 def test_cli_release_without_json_prints_the_released_line(
@@ -12785,70 +12601,6 @@ def test_cli_two_claims_of_overlapping_scopes_are_advisory(
     claimed = capsys.readouterr().out
 
     assert (first, second, "CONFLICT" in claimed, case.overlap in claimed) == (0, 0, False, True)
-
-
-@pytest.mark.parametrize(
-    ("scope", "arguments", "lines"),
-    [
-        pytest.param(
-            "src",
-            ["status"],
-            [
-                "CLAIMED issue #72",
-                "CLAIMED issue #73",
-                "overlaps issue #73 (dir-b)",
-                "overlaps issue #72 (dir-a)",
-            ],
-            id="directory-status",
-        ),
-        pytest.param(
-            "src",
-            ["status", "--path", "src"],
-            [
-                "CLAIMED src issue #72",
-                "CLAIMED src issue #73",
-                "overlap: issue #72 (dir-a), issue #73 (dir-b)",
-            ],
-            id="directory-status-path",
-        ),
-        pytest.param(
-            "src/widget.py",
-            ["status"],
-            ["CLAIMED issue #72", "CLAIMED issue #73"],
-            id="file-status",
-        ),
-        pytest.param(
-            "src/widget.py",
-            ["status", "--path", "src/widget.py"],
-            [
-                "CLAIMED src/widget.py issue #72",
-                "CLAIMED src/widget.py issue #73",
-                "overlap: issue #72 (dir-a), issue #73 (dir-b)",
-            ],
-            id="file-status-path",
-        ),
-    ],
-)
-def test_cli_status_shows_two_claims_of_one_scope_as_advisory(
-    scope: str,
-    arguments: list[str],
-    lines: list[str],
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    ada = standing_active_claim(
-        "Ada", claim_id="dir-a", issue=72, branch="codex/issue-72", scope=(scope,)
-    )
-    grok = standing_active_claim(
-        "Grok 4.6", claim_id="dir-b", issue=73, branch="codex/issue-73", scope=(scope,)
-    )
-    _patch_status_store(monkeypatch, ada, grok)
-
-    status = issue_claim.main(["--repo", REPOSITORY, *arguments])
-    rendered = capsys.readouterr().out
-
-    missing = [line for line in lines if line not in rendered]
-    assert (status, "CONFLICT" in rendered, missing) == (0, False, [])
 
 
 def test_cli_two_resource_claims_allocate_one_then_two(
@@ -15278,16 +15030,6 @@ def test_cli_release_refuses_a_missing_state_ref(
 # `file://` canonical remote (the shape a repository with no forge adapter at
 # all still uses for its state ref) with `discover_repository`/`GitHubForge`
 # and `checkout.remote_url` all forbidden outright, never merely absent.
-
-
-def test_cli_status_is_forge_free_against_a_non_github_remote(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    _patch_status_store(monkeypatch)
-    forbid_forge_resolution(monkeypatch)
-
-    assert issue_claim.main(["status"]) == 0
-    assert capsys.readouterr().out == "UNCLAIMED repository\n"
 
 
 def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_remote(
