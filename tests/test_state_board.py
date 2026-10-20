@@ -4365,10 +4365,10 @@ class TestCliStateRefForge:
             "blocked_by": [CHILD_A_ID],
             "message": blocked,
         }
-        observed = (text.status, text.stdout, text.stderr)
-        assert observed == (3, "", f"ISSUE {CHILD_B_ID} {blocked}\n")
-        observed = (as_json.status, as_json.stdout, as_json.stderr)
-        assert observed == (
+        observed_text = (text.status, text.stdout, text.stderr)
+        assert observed_text == (3, "", f"ISSUE {CHILD_B_ID} {blocked}\n")
+        observed_json = (as_json.status, as_json.stdout, as_json.stderr)
+        assert observed_json == (
             3,
             json.dumps(envelope) + "\n",
             "",

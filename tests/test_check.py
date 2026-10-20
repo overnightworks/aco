@@ -1,5 +1,5 @@
 """`aco check <n>` for issues and absent numbers, `aco check <sha>`, and the refusals
-before dispatch, in the real GitHub world."""
+without an issue verdict, in the real GitHub world."""
 
 from __future__ import annotations
 
@@ -170,6 +170,12 @@ def unavailable(
     )
 
 
+@dataclass(frozen=True)
+class Repositories:
+    clone: Path
+    remote: Path
+
+
 def refs_of(repositories: Repositories) -> tuple[str, str]:
     return (
         real_git(repositories.clone, "for-each-ref", "--format=%(refname) %(objectname)").stdout,
@@ -178,12 +184,6 @@ def refs_of(repositories: Repositories) -> tuple[str, str]:
 
 
 NumberCheck = Callable[[NumberCase, Flags], None]
-
-
-@dataclass(frozen=True)
-class Repositories:
-    clone: Path
-    remote: Path
 
 
 @pytest.fixture
@@ -274,7 +274,7 @@ BLOCKED = {
     ),
 }
 ABSENT = {"in-the-id-space": absent(ISSUE), "past-the-id-space": absent(16_777_216)}
-REFUSED_BEFORE_DISPATCH = {
+REFUSALS_WITHOUT_ISSUE_VERDICT = {
     "forge-failure": unavailable(
         ("check", str(ISSUE)),
         FORGE_FAILURE,
@@ -318,9 +318,9 @@ def test_a_number_in_neither_number_space_is_named_missing(
 
 @IN_BOTH_FORMS
 @pytest.mark.parametrize(
-    "case", REFUSED_BEFORE_DISPATCH.values(), ids=REFUSED_BEFORE_DISPATCH.keys()
+    "case", REFUSALS_WITHOUT_ISSUE_VERDICT.values(), ids=REFUSALS_WITHOUT_ISSUE_VERDICT.keys()
 )
-def test_a_refusal_before_dispatch_is_reported_in_both_forms(
+def test_a_refusal_without_an_issue_verdict_is_reported_in_both_forms(
     case: NumberCase, flags: Flags, check_number: NumberCheck
 ) -> None:
     """Spec: CHECK-10, CHECK-11"""
@@ -432,15 +432,15 @@ TRUNK = {
         "main", UNREADABLE_TRAILER, world=tip_trailed(CONTROL_BYTE_TRAILER)
     ),
 }
-PAST_THE_ID_SPACE_TRAILERS = {"hash": "Work-Item: #16777216", "bare": "Work-Item: 16777216"}
 PAST_THE_ID_SPACE_ROWS = {
-    f"{name}-{pin}": (
-        refused_trunk("main", PAST_THE_ID_SPACE, world=tip_trailed(trailer, STATE_REF_CONFIG))
-        if pin == "state-ref"
-        else declared("main", "Work-Item: #16777216", tip_trailed(trailer))
-    )
-    for name, trailer in PAST_THE_ID_SPACE_TRAILERS.items()
-    for pin in ("state-ref", "github")
+    "hash-state-ref": refused_trunk(
+        "main", PAST_THE_ID_SPACE, world=tip_trailed("Work-Item: #16777216", STATE_REF_CONFIG)
+    ),
+    "hash-github": declared("main", "Work-Item: #16777216", tip_trailed("Work-Item: #16777216")),
+    "bare-state-ref": refused_trunk(
+        "main", PAST_THE_ID_SPACE, world=tip_trailed("Work-Item: 16777216", STATE_REF_CONFIG)
+    ),
+    "bare-github": declared("main", "Work-Item: #16777216", tip_trailed("Work-Item: 16777216")),
 }
 
 
@@ -463,6 +463,7 @@ def assert_trunk_arranged(clone: Path, world: TrunkWorld) -> None:
         world.config,
     )
     assert trailers[-len(world.trailers) :] == list(world.trailers)
+    assert real_git(clone, "show", "-s", "--format=%b", side).stdout.strip() == "Work-Item: #21"
 
 
 TrunkCheck = Callable[[TrunkCase, Flags], None]
@@ -524,7 +525,7 @@ def test_a_trunk_commit_is_classified_by_its_own_trailer(
     check_trunk(case, flags)
 
 
-@pytest.mark.parametrize("flags", [[], ["--json"]], ids=["text", "json"])
+@IN_BOTH_FORMS
 @pytest.mark.parametrize("case", PAST_THE_ID_SPACE_ROWS.values(), ids=PAST_THE_ID_SPACE_ROWS.keys())
 def test_a_trailer_number_past_the_id_space_is_refused_only_under_state_ref(
     case: TrunkCase, flags: Flags, check_trunk: TrunkCheck
