@@ -1,7 +1,0 @@
-claim_id = "dac47cebd276414bbdba733ae1ad3087"
-agent = "claude"
-role = "builder"
-base = "f3efc9411fce6ff401a8aeb0de4d88a3fb335c9b"
-branch = "claude/issue-202-release-merged-no-trailer-way-out"
-scope = ["specs/landing-grammar.spec.md", "src/agent_coordination/checkout.py", "tests/test_cli.py"]
-opened_commit = "56ceebc34e7d09d85964283c5964faee2b2f5ac3"
