@@ -152,44 +152,8 @@ def _push_custom_tree(
     that `store`'s own write path can never produce -- it never writes
     anything but a well-formed `schema.toml`-only tree.
     """
-    blob_oids = {}
-    for name, content in files.items():
-        hashed = subprocess.run(
-            ["git", "-C", str(worktree), "hash-object", "-w", "--stdin"],
-            input=content,
-            check=True,
-            capture_output=True,
-        )
-        blob_oids[name] = hashed.stdout.decode().strip()
-    mktree_input = "".join(f"100644 blob {oid}\t{name}\n" for name, oid in blob_oids.items())
-    tree = (
-        subprocess.run(
-            ["git", "-C", str(worktree), "mktree"],
-            input=mktree_input.encode(),
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
-    )
-    commit_arguments = ["commit-tree", tree, "-m", "test fixture"]
-    if parent is not None:
-        commit_arguments += ["-p", parent]
-    commit = (
-        subprocess.run(
-            ["git", "-C", str(worktree), *commit_arguments],
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
-    )
-    subprocess.run(
-        ["git", "-C", str(worktree), "push", "--force", str(remote), f"{commit}:{store.STATE_REF}"],
-        check=True,
-        capture_output=True,
-    )
-    return commit
+    entries = [("100644", "blob", blob(worktree, content), name) for name, content in files.items()]
+    return push_raw_state_tree(remote, worktree, entries, successor_of=parent)
 
 
 def _push_message_only_commit(remote: Path, worktree: Path, *, parent: str, message: str) -> str:
@@ -1763,26 +1727,9 @@ def test_parse_state_tree_fails_loud_when_a_blob_is_missing_from_the_object_data
     # pushed or fetched. `git archive` -- the bulk-read boundary (issue
     # #241) -- is what notices, not `ls-tree`, which happily lists a
     # dangling entry.
-    blob_oid = (
-        subprocess.run(
-            ["git", "-C", str(worktree), "hash-object", "-w", "--stdin"],
-            input=_SCHEMA_TOML_VERSION_ONE,
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
-    )
+    blob_oid = blob(worktree, _SCHEMA_TOML_VERSION_ONE)
     tree = raw_tree(worktree, [("100644", "blob", blob_oid, "schema.toml")])
-    commit = (
-        subprocess.run(
-            ["git", "-C", str(worktree), "commit-tree", tree, "-m", "test fixture"],
-            check=True,
-            capture_output=True,
-        )
-        .stdout.decode()
-        .strip()
-    )
+    commit = real_git(worktree, "commit-tree", tree, "-m", "test fixture").stdout.strip()
     loose_object = worktree / ".git" / "objects" / blob_oid[:2] / blob_oid[2:]
     loose_object.unlink()
     commit_oid = protocol.ObjectId(commit)
@@ -2407,96 +2354,72 @@ def test_claim_lifecycle_counts_a_rescope_after_release_as_unparsed(
     assert event.rescopes == 0
 
 
-def test_claim_lifecycle_fails_loud_when_the_log_read_fails(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
+_LIFECYCLE_CLAIM_BODY = "claim issue 1\n\nintent: claim\nclaim_id: c1\nitem: 1\n"
+
+# Issue #357: `claim_lifecycle` reads only `git log`; every case fixes that one stream.
+_BROKEN_LIFECYCLE_LOGS = {
+    "the-log-read-fails": (1, b"", "cannot read the commit history"),
+    # A `-z` stream whose field count is not a multiple of three plus one trailing empty
+    # (`_CLAIM_LIFECYCLE_FIELD_COUNT`) is a broken git read, never a partial history to guess at.
+    "a-field-count-no-three-fits": (
+        0,
+        b"sha\x00date\x00body",
+        "malformed state-ref transition log",
+    ),
+}
+_READABLE_LIFECYCLE_LOGS = {
+    # A byte-empty read (never seen against a real ref) is an empty lifecycle, not a malformed one.
+    "empty-history-is-no-transitions": (b"", 0),
+    # One broken record must not abort the board: a non-ISO committer date is skipped and
+    # counted, never raised (R2).
+    "a-malformed-committer-date-is-unparsed": (
+        b"deadbeef\x00not-a-date\x00"
+        + (_LIFECYCLE_CLAIM_BODY + "operation_id: op-1\n").encode()
+        + b"\x00",
+        1,
+    ),
+    # S6353: a trailer key is ASCII-only, so `noté:` fails the every-line check and the commit
+    # reads as foreign, not as a claim-shaped commit with an extra key.
+    "a-non-ascii-trailer-key-is-a-foreign-commit": (
+        b"deadbeef\x002024-01-01T00:00:00+00:00\x00"
+        + (_LIFECYCLE_CLAIM_BODY + "noté: stray\n").encode()
+        + b"\x00",
+        0,
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("exit_status", "stdout", "refusal"),
+    _BROKEN_LIFECYCLE_LOGS.values(),
+    ids=_BROKEN_LIFECYCLE_LOGS.keys(),
+)
+def test_claim_lifecycle_fails_loud_on_a_broken_log_read(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    exit_status: int,
+    stdout: bytes,
+    refusal: str,
 ) -> None:
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert state.tip is not None
-    _fake_git_log_result(monkeypatch, exit_status=1, stdout=b"")
+    _fake_git_log_result(monkeypatch, exit_status=exit_status, stdout=stdout)
 
-    with pytest.raises(protocol.ClaimError, match="cannot read the commit history"):
-        store.claim_lifecycle(worktree=worktree, tip=state.tip)
+    with pytest.raises(protocol.ClaimError, match=refusal):
+        store.claim_lifecycle(worktree=tmp_path, tip=_OTHER_TIP)
 
 
-def test_claim_lifecycle_reads_empty_history_as_no_transitions(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
+@pytest.mark.parametrize(
+    ("stdout", "unparsed"),
+    _READABLE_LIFECYCLE_LOGS.values(),
+    ids=_READABLE_LIFECYCLE_LOGS.keys(),
+)
+def test_claim_lifecycle_reads_a_log_that_holds_no_claim_transition(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stdout: bytes, unparsed: int
 ) -> None:
-    """A successful but byte-empty `git log` read (never observed against a
-    real ref, whose own tip commit always prints at least itself) is still
-    an empty lifecycle, not a malformed one."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert state.tip is not None
-    _fake_git_log_result(monkeypatch, exit_status=0, stdout=b"")
+    _fake_git_log_result(monkeypatch, exit_status=0, stdout=stdout)
 
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=state.tip)
+    lifecycle = store.claim_lifecycle(worktree=tmp_path, tip=_OTHER_TIP)
 
-    assert lifecycle == store.ClaimLifecycle(events=(), unparsed=0)
-
-
-def test_claim_lifecycle_fails_loud_on_a_malformed_transition_log(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
-) -> None:
-    """A `-z`-delimited stream whose field count is not a multiple of three
-    plus one trailing empty (`_CLAIM_LIFECYCLE_FIELD_COUNT`) is a broken git
-    read, never a partial history to guess through."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert state.tip is not None
-    _fake_git_log_result(monkeypatch, exit_status=0, stdout=b"sha\x00date\x00body")
-
-    with pytest.raises(protocol.ClaimError, match="malformed state-ref transition log"):
-        store.claim_lifecycle(worktree=worktree, tip=state.tip)
-
-
-def test_claim_lifecycle_counts_a_malformed_committer_date_as_unparsed(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
-) -> None:
-    """A claim-shaped commit whose committer date `git` reports is not
-    ISO-8601 is skipped and counted, never raised (issue #357 R2): the same
-    "one broken record must not abort the whole board" contract as a
-    trailer block missing its own required keys."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert state.tip is not None
-    body = "claim issue 1\n\noperation_id: op-1\nclaim_id: c1\nitem: 1\nintent: claim\n"
-    _fake_git_log_result(
-        monkeypatch, exit_status=0, stdout=f"deadbeef\x00not-a-date\x00{body}\x00".encode()
-    )
-
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=state.tip)
-
-    assert lifecycle == store.ClaimLifecycle(events=(), unparsed=1)
-
-
-def test_claim_lifecycle_treats_a_non_ascii_trailer_key_as_a_foreign_commit(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
-) -> None:
-    """Issue #357 S6353: a trailer key is ASCII-only by contract, so a line
-    whose key carries a non-ASCII word character (here `é`) never
-    matches `_TRAILER_LINE_PATTERN` -- the whole terminal paragraph then
-    fails `_terminal_trailer_block`'s every-line check and the commit reads
-    as foreign, the same as any commit predating the trailer convention,
-    not as a claim-shaped commit with an extra unrecognized key."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert state.tip is not None
-    body = "claim issue 1\n\nintent: claim\nclaim_id: c1\nitem: 1\nnoté: stray\n"
-    _fake_git_log_result(
-        monkeypatch,
-        exit_status=0,
-        stdout=f"deadbeef\x002024-01-01T00:00:00+00:00\x00{body}\x00".encode(),
-    )
-
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=state.tip)
-
-    assert lifecycle == store.ClaimLifecycle(events=(), unparsed=0)
+    assert lifecycle == store.ClaimLifecycle(events=(), unparsed=unparsed)
 
 
 def test_commit_transition_and_fetch_state_round_trip_a_claim_with_a_resource(
@@ -4775,24 +4698,15 @@ def test_parse_claim_toml_rejects_a_non_text_whole_reason() -> None:
         protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
 
 
-def test_fetch_state_refuses_a_deleted_ref_this_worktree_has_observed(
-    bare_remote: Path, worktree: Path
+@pytest.mark.parametrize("read_state", [store.fetch_state, store.bootstrap])
+def test_state_read_refuses_a_deleted_ref_this_worktree_has_observed(
+    read_state: Callable[..., object], bare_remote: Path, worktree: Path
 ) -> None:
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
 
     with pytest.raises(protocol.StateLineageError, match="now absent"):
-        store.fetch_state(worktree=worktree, remote=str(bare_remote))
-
-
-def test_bootstrap_refuses_a_deleted_ref_this_worktree_has_observed(
-    bare_remote: Path, worktree: Path
-) -> None:
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
-
-    with pytest.raises(protocol.StateLineageError, match="now absent"):
-        store.bootstrap(worktree=worktree, remote=str(bare_remote))
+        read_state(worktree=worktree, remote=str(bare_remote))
 
 
 def test_commit_transition_refuses_a_missing_state_ref(worktree: Path, tmp_path: Path) -> None:
