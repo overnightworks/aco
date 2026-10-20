@@ -1,7 +1,0 @@
-claim_id = "e801c379a4674b44903becf3ff9c7839"
-agent = "claude"
-role = "builder"
-base = "2b5177ed1c663e4e763e2d3a845b8b5ef8eb6dff"
-branch = "claude/issue-281-consolidate-board-github"
-scope = ["tests/board_fixtures.py", "tests/test_board.py", "tests/test_github.py"]
-opened_commit = "9b35e4460e540a3749a350a006438ea53870199f"
