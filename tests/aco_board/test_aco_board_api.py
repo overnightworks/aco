@@ -379,23 +379,41 @@ def test_an_aco_that_cannot_be_run_fails_the_decision_with_one_sentence(
     assert result == DecisionResult(DecisionStatus.FAILED, f"aco rule {reason}")
 
 
-def test_a_repo_whose_directory_is_a_file_carries_its_error_and_the_others_keep_their_items(
+def _make_a_file(directory: Path) -> None:
+    shutil.rmtree(directory)
+    directory.write_text("", encoding="utf-8")
+
+
+def _make_unenterable(directory: Path) -> None:
+    directory.chmod(0o000)
+
+
+@pytest.mark.parametrize(
+    ("break_directory", "error"),
+    [
+        (_make_a_file, "aco rulings could not be run: Not a directory"),
+        (_make_unenterable, "aco rulings could not be run: Permission denied"),
+    ],
+    ids=["directory-is-a-file", "directory-not-enterable"],
+)
+def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_others_keep_theirs(
     two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+    break_directory: Callable[[Path], None],
+    error: str,
 ) -> None:
     repository_a, repository_b = two_repositories
     repository_a.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    shutil.rmtree(repository_b.directory)
-    repository_b.directory.write_text("", encoding="utf-8")
+    break_directory(repository_b.directory)
 
-    with serving_two(two_repositories) as board:
-        response = board.get_board_json()
+    try:
+        with serving_two(two_repositories) as board:
+            response = board.get_board_json()
+    finally:
+        repository_b.directory.chmod(0o755)
 
     assert response.status == 200
     repos = cast(list[dict[str, Any]], response.json()["repos"])
-    assert [(repo["name"], repo["error"]) for repo in repos] == [
-        ("a", None),
-        ("b", "aco rulings could not be run: Not a directory"),
-    ]
+    assert [(repo["name"], repo["error"]) for repo in repos] == [("a", None), ("b", error)]
     assert [item["number"] for item in repos[0]["items"]] == [42]
     assert repos[1]["items"] == []
 
