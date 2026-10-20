@@ -4,7 +4,8 @@
 reading, `versioned_paths`, trunk landings, and remote-location parsing.
 `validate_checkout` -- the precondition every `claim` call site in `cli.py`
 uses -- is exercised directly. Tests that drive these through
-`issue_claim.main([...])` stay in `tests/test_cli.py` as CLI-wiring behavior."""
+`issue_claim.main([...])` stay in `tests/test_cli.py` as CLI-wiring behavior,
+except `claim`'s own proof of the default branch the checkout judges."""
 
 from __future__ import annotations
 
@@ -31,8 +32,10 @@ from cli_fixtures import (
     set_agent_identity_env,
     stub_one_git_call,
 )
+from test_rescope_checkout import hub_canonical_worktree_file, store_must_not_be_read
 
-from agent_coordination import board, checkout, process
+from agent_coordination import board, checkout, process, store
+from agent_coordination import cli as issue_claim
 from agent_coordination.protocol import ClaimError, ClaimRequest
 
 _LIVE_VERSIONED_PATHS = checkout.versioned_paths
@@ -482,6 +485,51 @@ def test_checkout_validation_names_the_isolated_worktree_recipe_for_a_shared_che
     assert str(error.value) == (
         "build claims require a linked isolated worktree checkout; "
         f"run {checkout.ISOLATED_WORKTREE_RECIPE}"
+    )
+
+
+@pytest.mark.usefixtures("isolated_global_git_config")
+@pytest.mark.parametrize(
+    ("canonical_head", "branch"),
+    [
+        pytest.param("trunk", "trunk", id="hub-default"),
+        pytest.param(None, "master", id="hub-unrecorded-guesses"),
+    ],
+)
+def test_claim_judges_the_canonical_remotes_recorded_default_branch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    canonical_head: str | None,
+    branch: str,
+) -> None:
+    """Spec: CLM-29. Issue #490 proof 1: with `hub` canonical and `origin/HEAD`
+    naming `main`, a worktree on `hub`'s default branch is refused; without a
+    recorded `hub/HEAD`, `claim` guesses `main`/`master` -- `origin/HEAD`
+    never answers for `hub`. `claim` stands in the worktree: its toplevel
+    read asks that worktree, past the autouse toplevel isolation."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    path = hub_canonical_worktree_file(
+        tmp_path, canonical="hub", canonical_head=canonical_head, branch=branch
+    )
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
+    isolated_git_output = checkout.git_output
+
+    def git_output(arguments: list[str], *, directory: Path | None = None) -> str:
+        return isolated_git_output(arguments, directory=directory or path.parent)
+
+    monkeypatch.setattr(checkout, "git_output", git_output)
+    monkeypatch.chdir(path.parent)
+
+    status = issue_claim.main(["claim", "72", "--scope", path.name])
+
+    assert status == 2
+    assert capsys.readouterr().err == (
+        "ERROR: build claims require an isolated non-main worktree branch; "
+        f"run {checkout.ISOLATED_WORKTREE_RECIPE}\n"
     )
 
 

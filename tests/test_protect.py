@@ -16,12 +16,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+import test_rescope_checkout
 from board_fixtures import (
     BASE,
     REPOSITORY,
-    complete_contract,
     standing_active_claim,
-    write_repository_config,
 )
 from cli_fixtures import (
     GIT_FAILURE_INJECTIONS,
@@ -29,7 +28,6 @@ from cli_fixtures import (
     forbid_forge_resolution,
     forbid_github_construction,
     forbid_protect_git_github_and_identity,
-    init_bare_repository,
     inject_exit_128,
     patch_command,
     push_repository_trunk,
@@ -40,14 +38,31 @@ from cli_fixtures import (
     stub_board_config_tracked,
     stub_one_git_call,
 )
-from github_fixtures import FakeForge
+from test_rescope_checkout import (
+    GIT_DIRECTORY_RECOGNITION_ROWS,
+    UNCONFIGURED_UPSTREAM,
+    checkout_root_reason,
+    git_directory_layout,
+    hook_in_a_bare_repository,
+    hub_canonical_worktree_file,
+    path_below_a_dangling_symlink,
+    path_below_a_file,
+    path_in_a_bare_repository,
+    path_in_a_checkouts_git_directory,
+    real_repository_with_nested_worktree,
+    real_repository_with_worktree,
+    select_common_directory_layout,
+    select_external_objects,
+    select_git_directory_and_work_tree,
+    select_unborn_symlinked_head,
+    serve_item_72_body,
+    store_must_not_be_read,
+    the_checkout_root,
+)
 
 from agent_coordination import (
     board,
-    body,
     checkout,
-    forge,
-    github,
     hook_input,
     process,
     protect,
@@ -56,6 +71,10 @@ from agent_coordination import (
 )
 from agent_coordination import cli as issue_claim
 from agent_coordination.protocol import ClaimError
+
+# Registers the shared fixture here by name; importing it would make ruff read
+# the test parameter that requests it as a redefinition.
+environment_selected_repository = test_rescope_checkout.environment_selected_repository
 
 # Captured at import, before this module's autouse stub replaces it.
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked
@@ -1310,12 +1329,8 @@ def test_protect_denies_with_gits_text_when_reading_the_remote_head_fails(
     _assert_protect_decision(capsys, decision="deny", reason="fatal: broken")
 
 
-def _checkout_root_reason(root: Path) -> str:
-    return f"{root} is the checkout root itself"
-
-
 @pytest.mark.parametrize("payload_for", _TARGET_PATH_PAYLOAD_BUILDERS, ids=["write", "bash-rm"])
-def test_protect_path_resolving_to_the_checkout_root_denies_naming_the_root(
+def test_protect_path_resolving_tothe_checkout_root_denies_naming_the_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1338,7 +1353,7 @@ def test_protect_path_resolving_to_the_checkout_root_denies_naming_the_root(
     forbid_github_construction(monkeypatch)
 
     assert _protect_main(monkeypatch, payload_for(work / "subdir" / "..")) == 2
-    _assert_protect_decision(capsys, decision="deny", reason=_checkout_root_reason(work))
+    _assert_protect_decision(capsys, decision="deny", reason=checkout_root_reason(work))
 
 
 @pytest.mark.parametrize(
@@ -1602,49 +1617,6 @@ def _use_real_path_is_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(checkout, "path_is_tracked", _REAL_PATH_IS_TRACKED)
 
 
-def _protect_real_repo_with_worktree(
-    tmp_path: Path,
-    *,
-    slug: str = "issue-72-widget",
-    board_config: str = "",
-    trunk_files: tuple[str, ...] = (),
-) -> tuple[Path, Path]:
-    """A real repository (`main`, reused across worktrees) with one linked,
-    isolated worktree on a feature branch -- the same `git worktree add`
-    recipe `checkout.ISOLATED_WORKTREE_RECIPE` documents. `main` carries a
-    real, tracked (`git add -f`) `.aco/board.toml` holding
-    `board_config`, empty by default, beside the `trunk_files` it tracks
-    (issue #314 gate B3): every worktree shares `main`'s history, so `path_is_tracked`
-    reads a real "tracked" answer for it from any of them, via
-    `_use_real_path_is_tracked`. `main` also carries a real, resolvable
-    `origin/HEAD` (gate G4): every worktree's own feature branch reads a
-    real default-branch name through it, rather than denying "default
-    branch unknown" -- a repository with no recorded `origin/HEAD` at all is
-    its own dedicated proof, `_real_worktree_on_default_branch_target`."""
-    main = tmp_path / "repo"
-    if not main.exists():
-        main.mkdir()
-        real_git(main, "init", "-q", "-b", "main")
-        real_git(main, "config", "user.name", "Test")
-        real_git(main, "config", "user.email", "test@example.com")
-        (main / "README.md").write_text("hello\n")
-        write_repository_config(main, board_config)
-        for trunk_file in trunk_files:
-            (main / trunk_file).parent.mkdir(parents=True, exist_ok=True)
-            (main / trunk_file).write_text("tracked\n")
-        real_git(main, "add", "-f", "README.md", board.CONFIG_PATH.as_posix(), *trunk_files)
-        real_git(main, "commit", "-q", "-m", "initial")
-        real_git(main, "remote", "add", "origin", "https://example.invalid/example/repo.git")
-        real_git(main, "update-ref", "refs/remotes/origin/main", "HEAD")
-        real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-    worktree = tmp_path / "repo-worktrees" / slug
-    worktree.parent.mkdir(parents=True, exist_ok=True)
-    real_git(main, "worktree", "add", "-q", str(worktree), "-b", f"codex/{slug}")
-    (worktree / "src").mkdir()
-    (worktree / "docs").mkdir()
-    return main, worktree
-
-
 def test_protect_bash_denies_deleting_a_linked_worktrees_own_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1663,7 +1635,7 @@ def test_protect_bash_denies_deleting_a_linked_worktrees_own_root(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    main, worktree = _protect_real_repo_with_worktree(tmp_path)
+    main, worktree = real_repository_with_worktree(tmp_path)
     monkeypatch.chdir(main)
 
     assert (
@@ -1677,7 +1649,7 @@ def test_protect_bash_denies_deleting_a_linked_worktrees_own_root(
         )
         == 2
     )
-    _assert_protect_decision(capsys, decision="deny", reason=_checkout_root_reason(worktree))
+    _assert_protect_decision(capsys, decision="deny", reason=checkout_root_reason(worktree))
 
 
 def test_protect_bash_judges_an_ordinary_directory_by_its_own_checkout(
@@ -1698,7 +1670,7 @@ def test_protect_bash_judges_an_ordinary_directory_by_its_own_checkout(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    main, worktree = _protect_real_repo_with_worktree(tmp_path)
+    main, worktree = real_repository_with_worktree(tmp_path)
     monkeypatch.chdir(main)
     _patch_protect_claim(monkeypatch, branch="codex/issue-72-widget", scope=("src",))
 
@@ -1714,35 +1686,6 @@ def test_protect_bash_judges_an_ordinary_directory_by_its_own_checkout(
         == 2
     )
     _assert_protect_decision(capsys, decision="deny", reason="rm docs outside claim scope")
-
-
-def _protect_real_repo_with_nested_worktree(
-    tmp_path: Path, *, slug: str = "issue-1-x"
-) -> tuple[Path, Path]:
-    """A real repository (`outer`) with one linked worktree nested *inside*
-    its own working tree (`outer/nested-worktrees/<slug>`), unlike
-    `_protect_real_repo_with_worktree`'s sibling layout: the nested root's
-    own parent directory sits inside `outer`'s checkout, so `git -C parent`
-    resolves to `outer` rather than to nothing -- the shape PROT-36 (issue
-    #380 round 4, gate finding) exists for, since a parent-first lookup
-    would otherwise let `outer`'s own checkout silently answer for a path
-    that is itself a different, nested checkout's own root."""
-    outer = tmp_path / "outer-repo"
-    outer.mkdir()
-    real_git(outer, "init", "-q", "-b", "main")
-    real_git(outer, "config", "user.name", "Test")
-    real_git(outer, "config", "user.email", "test@example.com")
-    (outer / "README.md").write_text("hello\n")
-    write_repository_config(outer)
-    real_git(outer, "add", "-f", "README.md", board.CONFIG_PATH.as_posix())
-    real_git(outer, "commit", "-q", "-m", "initial")
-    real_git(outer, "remote", "add", "origin", "https://example.invalid/example/repo.git")
-    real_git(outer, "update-ref", "refs/remotes/origin/main", "HEAD")
-    real_git(outer, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-    nested = outer / "nested-worktrees" / slug
-    nested.parent.mkdir(parents=True, exist_ok=True)
-    real_git(outer, "worktree", "add", "-q", str(nested), "-b", f"codex/{slug}")
-    return outer, nested
 
 
 @pytest.mark.parametrize("payload_for", _TARGET_PATH_PAYLOAD_BUILDERS, ids=["write", "bash-rm"])
@@ -1776,14 +1719,14 @@ def test_protect_denies_deleting_a_nested_worktrees_own_root(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    outer, nested = _protect_real_repo_with_nested_worktree(tmp_path)
+    outer, nested = real_repository_with_nested_worktree(tmp_path)
     monkeypatch.chdir(outer)
     payload = payload_for(root_form(nested))
     if payload["toolName"] == "Bash":
         payload["cwd"] = str(outer)
 
     assert _protect_main(monkeypatch, payload) == 2
-    _assert_protect_decision(capsys, decision="deny", reason=_checkout_root_reason(nested))
+    _assert_protect_decision(capsys, decision="deny", reason=checkout_root_reason(nested))
 
 
 @pytest.mark.parametrize(
@@ -1806,8 +1749,8 @@ def test_protect_allows_the_same_payload_path_from_every_cwd(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    main, worktree = _protect_real_repo_with_worktree(tmp_path)
-    _main2, other_worktree = _protect_real_repo_with_worktree(tmp_path, slug="issue-90-other")
+    main, worktree = real_repository_with_worktree(tmp_path)
+    _main2, other_worktree = real_repository_with_worktree(tmp_path, slug="issue-90-other")
     outside = tmp_path / "elsewhere"
     outside.mkdir()
     if cwd_kind == "main_other_branch":
@@ -1848,7 +1791,7 @@ def test_protect_denies_a_path_outside_every_claim_scope_still(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
+    _main, worktree = real_repository_with_worktree(tmp_path)
     monkeypatch.chdir(worktree)
     state = _protect_state_with_claim(
         _protect_active_claim("Grok sess-1", branch="codex/issue-72-widget")
@@ -1925,7 +1868,7 @@ def test_protect_lets_any_live_claim_write_a_lane_shared_registry_file(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    _main, worktree = _protect_real_repo_with_worktree(
+    _main, worktree = real_repository_with_worktree(
         tmp_path,
         board_config=(
             f'{trunk_defect}lane_shared = ["scripts/registry.txt", "scripts/missing.txt", "src"]\n'
@@ -2050,8 +1993,8 @@ def test_protect_apply_patch_judges_two_worktrees_separately_and_one_deny_wins(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    _main, claimed_worktree = _protect_real_repo_with_worktree(tmp_path)
-    _main2, unclaimed_worktree = _protect_real_repo_with_worktree(tmp_path, slug="issue-90-other")
+    _main, claimed_worktree = real_repository_with_worktree(tmp_path)
+    _main2, unclaimed_worktree = real_repository_with_worktree(tmp_path, slug="issue-90-other")
     monkeypatch.chdir(tmp_path)
     state = _protect_state_with_claim(
         _protect_active_claim("Grok sess-1", branch="codex/issue-72-widget")
@@ -2075,71 +2018,6 @@ def test_protect_apply_patch_judges_two_worktrees_separately_and_one_deny_wins(
     _assert_protect_decision(capsys, decision="deny", reason="claim first")
 
 
-def _serve_item_72_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
-    """Issue #72's own body, with the `aco` block a rescope keeps in
-    step with its claim (issue #554), on a GitHub fake the checkout's
-    canonical remote names -- so no rescope here ever reaches a real forge."""
-    client = FakeForge()
-    client.issue_references[72] = forge.ItemReference(
-        forge.ItemState.OPEN, "Widget", complete_contract("Build it.")
-    )
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: f"https://github.com/{REPOSITORY}.git"
-    )
-    return client
-
-
-@pytest.mark.parametrize(
-    "cwd_kind", ["claimed_worktree", "foreign_tmp_dir", "foreign_main_checkout"]
-)
-def test_rescope_succeeds_from_every_cwd_when_the_add_path_is_absolute(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    cwd_kind: str,
-) -> None:
-    """Issue #314's own fourth proof: the same absolute `--add` path
-    locates the claimed worktree's own checkout from the worktree itself,
-    an unrelated tmp directory outside every repository, and the shared
-    main checkout alike -- the one location signal a dispatcher in the
-    head's own shared environment (editing a linked worktree through a
-    subagent) can give without knowing its cwd. The item body's scope moves
-    with the claim (issue #554)."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    _use_real_path_is_tracked(monkeypatch)
-    main, worktree = _protect_real_repo_with_worktree(tmp_path)
-    add = str(worktree / "docs" / "widget.md")
-    if cwd_kind == "claimed_worktree":
-        cwd = worktree
-    elif cwd_kind == "foreign_main_checkout":
-        cwd = main
-    else:
-        cwd = tmp_path / "elsewhere"
-        cwd.mkdir()
-    monkeypatch.chdir(cwd)
-    client = _serve_item_72_body(monkeypatch)
-    claimed = _protect_active_claim(
-        "Codex Sol", scope=("src/widget.py",), branch="codex/issue-72-widget"
-    )
-    state = _protect_state_with_claim(claimed)
-    monkeypatch.setattr(store, "fetch_state", lambda *, worktree, remote: state)
-    monkeypatch.setattr(
-        store,
-        "commit_transition",
-        lambda *, observed, subject, intent: protocol.apply(observed.state, intent),
-    )
-
-    status = issue_claim.main(["rescope", "72", "--add", add])
-
-    assert status == 0
-    assert capsys.readouterr().out == f"RESCOPED issue #72: {claimed.claim_id}\n"
-    assert body.parse_body(client.item_bodies[72]).scope == ("docs/widget.md", "src/widget.py")
-
-
 def test_rescope_admits_a_file_in_a_new_directory_that_protect_then_allows_writing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -2154,9 +2032,9 @@ def test_rescope_admits_a_file_in_a_new_directory_that_protect_then_allows_writi
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     _use_real_path_is_tracked(monkeypatch)
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
+    _main, worktree = real_repository_with_worktree(tmp_path)
     new_file = worktree / "neu" / "tief" / "x.py"
-    _serve_item_72_body(monkeypatch)
+    serve_item_72_body(monkeypatch)
     claimed = _protect_active_claim(
         "Codex Sol", scope=("src/widget.py",), branch="codex/issue-72-widget"
     )
@@ -2177,55 +2055,6 @@ def test_rescope_admits_a_file_in_a_new_directory_that_protect_then_allows_writi
     _assert_protect_decision(capsys, decision="allow", reason=None)
 
 
-def _rescope_args_mixed_absolute_and_relative(tmp_path: Path) -> list[str]:
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
-    return [
-        "rescope",
-        "72",
-        "--add",
-        str(worktree / "docs" / "widget.md"),
-        "--drop",
-        "src/widget.py",
-    ]
-
-
-def test_rescope_rejects_a_wide_scope_from_a_foreign_cwd_via_the_resolved_checkout(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Issue #314 repeat gate B4: the width guard's own directory classifier
-    (`checkout.scope_directories`) must read the resolved checkout's own
-    directory, never the calling process's cwd. From a foreign cwd -- which
-    has no `docs` directory at all, and is not even a git checkout -- an
-    absolute `--add` naming the claimed worktree's own `docs` directory
-    still trips the same `--whole` refusal it would from inside that
-    worktree, because `docs` is classified against the worktree via `-C`,
-    not against the foreign cwd."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    _use_real_path_is_tracked(monkeypatch)
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
-    foreign_cwd = tmp_path / "elsewhere"
-    foreign_cwd.mkdir()
-    monkeypatch.chdir(foreign_cwd)
-    _serve_item_72_body(monkeypatch)
-    claimed = _protect_active_claim(
-        "Codex Sol", scope=("src/widget.py",), branch="codex/issue-72-widget"
-    )
-    state = _protect_state_with_claim(claimed)
-    monkeypatch.setattr(store, "fetch_state", lambda *, worktree, remote: state)
-
-    status = issue_claim.main(["rescope", "72", "--add", str(worktree / "docs")])
-
-    assert status == 2
-    err = capsys.readouterr().err
-    assert "scope is wide" in err
-    assert "--whole" in err
-
-
 def test_protect_denies_a_relative_payload_path_even_from_the_claimed_worktree_cwd(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -2242,7 +2071,7 @@ def test_protect_denies_a_relative_payload_path_even_from_the_claimed_worktree_c
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
+    _main, worktree = real_repository_with_worktree(tmp_path)
     monkeypatch.chdir(worktree)
     state = _protect_state_with_claim(
         _protect_active_claim("Grok sess-1", branch="codex/issue-72-widget")
@@ -2259,7 +2088,7 @@ def test_protect_denies_a_relative_payload_path_even_from_the_claimed_worktree_c
 def _real_main_checkout_target(tmp_path: Path) -> Path:
     """Finding R3's own proof target: a real main checkout's own file, no
     fake `git_output` involved."""
-    main, _worktree = _protect_real_repo_with_worktree(tmp_path)
+    main, _worktree = real_repository_with_worktree(tmp_path)
     return main / "README.md"
 
 
@@ -2340,15 +2169,6 @@ def test_protect_denies_not_main_for_a_real_checkout(
     _assert_protect_decision(capsys, decision="deny", reason="not main")
 
 
-def _hook_in_a_bare_repository(tmp_path: Path) -> Path:
-    """The shape of a forge-free canonical remote (README, "A workflow
-    without a forge"): a bare repository has no `.git` entry at all, yet a
-    write into its hooks is a write into a repository."""
-    served = tmp_path / "served.git"
-    init_bare_repository(served)
-    return served / "hooks" / "pre-receive"
-
-
 def _bash_payload(command: str) -> dict[str, object]:
     return {"toolName": "Bash", "toolInput": {"command": command}}
 
@@ -2403,7 +2223,7 @@ def _file_outside_every_repository(tmp_path: Path) -> Path:
     ("build_target", "exit_code"),
     [
         (_real_main_checkout_target, 2),
-        (_hook_in_a_bare_repository, 2),
+        (hook_in_a_bare_repository, 2),
         (_file_outside_every_repository, 0),
     ],
     ids=[
@@ -2484,8 +2304,8 @@ def test_protect_apply_patch_fetches_store_state_once_per_repository(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.GROK_SESSION_ID_ENV: "sess-1"})
     _use_real_path_is_tracked(monkeypatch)
-    _main, claimed_worktree = _protect_real_repo_with_worktree(tmp_path)
-    _main2, unclaimed_worktree = _protect_real_repo_with_worktree(tmp_path, slug="issue-90-other")
+    _main, claimed_worktree = real_repository_with_worktree(tmp_path)
+    _main2, unclaimed_worktree = real_repository_with_worktree(tmp_path, slug="issue-90-other")
     monkeypatch.chdir(tmp_path)
     state = _protect_state_with_claim(
         _protect_active_claim("Grok sess-1", branch="codex/issue-72-widget")
@@ -2514,131 +2334,6 @@ def test_protect_apply_patch_fetches_store_state_once_per_repository(
     )
     _assert_protect_decision(capsys, decision="deny", reason="claim first")
     assert len(fetch_calls) == 1
-
-
-def _rescope_args_add_path_outside_the_first_paths_checkout(tmp_path: Path) -> list[str]:
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
-    _main2, other_worktree = _protect_real_repo_with_worktree(tmp_path, slug="issue-90-other")
-    return [
-        "rescope",
-        "72",
-        "--add",
-        str(worktree / "docs" / "widget.md"),
-        "--add",
-        str(other_worktree / "src" / "other.py"),
-    ]
-
-
-def _rescope_args_add_path_outside_any_repository(tmp_path: Path) -> list[str]:
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    return ["rescope", "72", "--add", str(outside / "file.py")]
-
-
-def _rescope_args_add_path_in_a_new_directory_outside_any_repository(
-    tmp_path: Path,
-) -> list[str]:
-    return ["rescope", "72", "--add", str(tmp_path / "outside" / "neu" / "x.py")]
-
-
-def _rescope_args_add_dotdot_path_through_a_missing_directory_out_of_the_worktree(
-    tmp_path: Path,
-) -> list[str]:
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
-    escape_to_outside = os.path.relpath(tmp_path / "outside", worktree)
-    return ["rescope", "72", "--add", f"{worktree}/missing/../{escape_to_outside}/new/q.py"]
-
-
-def _rescope_args_add_path_in_an_unborn_checkout(tmp_path: Path) -> list[str]:
-    unborn = tmp_path / "unborn"
-    unborn.mkdir()
-    real_git(unborn, "init", "-q", "-b", "codex/issue-72-widget")
-    return ["rescope", "72", "--add", str(unborn / "widget.py")]
-
-
-@pytest.mark.parametrize(
-    ("build_args", "expected_error_fragment"),
-    [
-        (
-            _rescope_args_add_path_outside_the_first_paths_checkout,
-            "is outside the resolved checkout",
-        ),
-        (_rescope_args_add_path_outside_any_repository, "not in a repository"),
-        (
-            _rescope_args_add_path_in_a_new_directory_outside_any_repository,
-            "not in a repository",
-        ),
-        (
-            _rescope_args_add_dotdot_path_through_a_missing_directory_out_of_the_worktree,
-            "not in a repository",
-        ),
-        (_rescope_args_add_path_in_an_unborn_checkout, checkout.NO_COMMIT_CHECKOUT_REASON),
-        (
-            _rescope_args_mixed_absolute_and_relative,
-            "--drop path 'src/widget.py' is relative and {tmp_path} is not in a repository; "
-            "pass it as an absolute path",
-        ),
-    ],
-    ids=[
-        "second-add-path-outside-checkout",
-        "outside-any-repository",
-        "new-directory-outside-any-repository",
-        "dotdot-through-missing-directory-outside-any-repository",
-        "checkout-has-no-commit",
-        "mixed-absolute-and-relative",
-    ],
-)
-def test_rescope_denies_before_touching_the_store(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    build_args: Callable[[Path], list[str]],
-    expected_error_fragment: str,
-) -> None:
-    """`rescope`'s own new checkout-resolution paths (issue #314 delta and
-    repeat gate, finding R1): a second `--add`/`--drop` path outside the
-    first path's own checkout (`cmd_rescope._rescope_scope_entries`) refuses rather than
-    silently mis-scoping; a location outside every repository, and gate
-    G3's no-commit checkout (`cmd_rescope._rescope_checkout`); and a relative
-    `--drop` entry beside an absolute `--add` that names a real checkout,
-    run from a cwd outside every repository, which has no checkout to read
-    it against (RESC-01) -- all refuse before the store is ever touched."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.chdir(tmp_path)
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
-    args = build_args(tmp_path)
-
-    status = issue_claim.main(args)
-
-    assert status == 2
-    assert expected_error_fragment.format(tmp_path=tmp_path) in capsys.readouterr().err
-
-
-def test_rescope_json_reports_a_dotdot_path_through_a_missing_directory_as_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """RESC-17: a `..` path that leaves the worktree through a missing
-    directory is an unresolved checkout, so `--json` reports `unavailable`
-    with the sentence stderr printed."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    args = _rescope_args_add_dotdot_path_through_a_missing_directory_out_of_the_worktree(tmp_path)
-
-    status = issue_claim.main([*args, "--json"])
-
-    captured = capsys.readouterr()
-    refusal = json.loads(captured.out)
-    assert status == 2
-    assert (refusal["ok"], refusal["reason"]) == (False, "unavailable")
-    assert "not in a repository" in refusal["message"]
-    assert captured.err == f"ERROR: {refusal['message']}\n"
 
 
 # `protect.judge`'s own direct proofs (issue #394): a real bare-remote
@@ -2736,18 +2431,18 @@ def test_judge_denies_a_bash_recognized_pattern_path_outside_the_live_claims_sco
     )
 
 
-def test_judge_denies_a_path_resolving_to_the_checkout_root_before_reading_the_store(
+def test_judge_denies_a_path_resolving_tothe_checkout_root_before_reading_the_store(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """PROT-14 fires from the checkout gate alone, before the store is ever
-    read (`_store_must_not_be_read` fails the test if it is): a payload path
+    read (`store_must_not_be_read` fails the test if it is): a payload path
     that resolves to exactly the checkout root denies naming that root. The
     canonical remote is asked only for its recorded default branch (issue
     #490)."""
     branch = "codex/issue-9-widget"
     worktree = _judge_worktree(tmp_path, branch=branch)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
     payload = {"toolName": "Edit", "toolInput": {"path": str(worktree)}}
 
     verdict = protect.judge(
@@ -2758,7 +2453,7 @@ def test_judge_denies_a_path_resolving_to_the_checkout_root_before_reading_the_s
 
     assert _judge_decision_and_reason(verdict) == (
         protect.Decision.DENY,
-        _checkout_root_reason(worktree),
+        checkout_root_reason(worktree),
     )
 
 
@@ -2864,7 +2559,7 @@ def _unguarded_scratchpad(tmp_path: Path) -> Path:
     (`repo/into-guarded-directory`), and a dangling directory
     symlink outside every repository into a directory of that main checkout
     not created yet (`dangling`)."""
-    guarded, _worktree = _protect_real_repo_with_worktree(tmp_path)
+    guarded, _worktree = real_repository_with_worktree(tmp_path)
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     throwaway = _real_main_checkout_with_session_settings(scratch)
@@ -3068,11 +2763,11 @@ def _symlinks_across_checkouts(tmp_path: Path) -> None:
     checkout's git directory (`into-nested-git`)."""
     for name in ("claimed", "other"):
         (tmp_path / name).mkdir()
-    main, claimed_worktree = _protect_real_repo_with_worktree(tmp_path / "claimed")
-    other, _other_worktree = _protect_real_repo_with_worktree(tmp_path / "other")
+    main, claimed_worktree = real_repository_with_worktree(tmp_path / "claimed")
+    other, _other_worktree = real_repository_with_worktree(tmp_path / "other")
     source = claimed_worktree / "src"
     (source / "nested").mkdir()
-    nested, nested_worktree = _protect_real_repo_with_worktree(source / "nested")
+    nested, nested_worktree = real_repository_with_worktree(source / "nested")
     (source / "x.py").write_text("x = 1\n")
     (tmp_path / "outside.md").write_text("outside\n")
     links = {
@@ -3314,42 +3009,13 @@ def test_protect_denies_path_required_for_a_worktree_symlink_leading_outside_it(
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    _main, worktree = _protect_real_repo_with_worktree(tmp_path)
+    _main, worktree = real_repository_with_worktree(tmp_path)
     link = worktree / "docs" / "outside.md"
     link.symlink_to(_file_outside_every_repository(tmp_path))
-    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
     assert _protect_main(monkeypatch, _write_target_payload(link)) == 2
     _assert_protect_decision(capsys, decision="deny", reason=protect.PATH_REQUIRED)
-
-
-def _path_below_a_file(_main: Path, worktree: Path) -> tuple[Path, str]:
-    path = worktree / "README.md" / "x.py"
-    return path, f"{path} cannot exist: {worktree / 'README.md'} is a file"
-
-
-def _path_below_a_dangling_symlink(_main: Path, worktree: Path) -> tuple[Path, str]:
-    link = worktree / "dangling"
-    link.symlink_to(worktree.parent / "nowhere", target_is_directory=True)
-    path = link / "deep" / "x.py"
-    return path, f"{path} cannot exist: {link} is a dangling symlink"
-
-
-def _the_checkout_root(_main: Path, worktree: Path) -> tuple[Path, str]:
-    return worktree, _checkout_root_reason(worktree)
-
-
-def _path_in_a_bare_repository(main: Path, _worktree: Path) -> tuple[Path, str]:
-    hook = _hook_in_a_bare_repository(main.parent)
-    return hook, f"not a checkout: {hook.parent.parent.resolve()} is a git directory"
-
-
-def _path_in_a_checkouts_git_directory(main: Path, _worktree: Path) -> tuple[Path, str]:
-    git_directory = main / ".git"
-    return (
-        git_directory / "info" / "x",
-        f"not a checkout: {git_directory.resolve()} is a git directory",
-    )
 
 
 def _protect_refusal(
@@ -3361,147 +3027,48 @@ def _protect_refusal(
     return status, captured.err.removesuffix("\n")
 
 
-def _rescope_refusal(
-    _monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], path: Path
-) -> tuple[int, str]:
-    status = issue_claim.main(["rescope", "72", "--add", str(path)])
-    return status, capsys.readouterr().err.removeprefix("ERROR: ").removesuffix("\n")
-
-
-def _store_must_not_be_read(*, worktree: Path, remote: str) -> protocol.ClaimState:
-    raise AssertionError(f"store read for {worktree} on {remote}")
-
-
-@pytest.mark.parametrize(
-    "refusal_of", [_protect_refusal, _rescope_refusal], ids=["protect", "rescope"]
-)
 @pytest.mark.parametrize(
     "build_case",
     [
-        _path_below_a_file,
-        _path_below_a_dangling_symlink,
-        _the_checkout_root,
-        _path_in_a_bare_repository,
-        _path_in_a_checkouts_git_directory,
+        path_below_a_file,
+        path_below_a_dangling_symlink,
+        the_checkout_root,
+        path_in_a_bare_repository,
+        path_in_a_checkouts_git_directory,
     ],
     ids=["below-a-file", "below-a-dangling-symlink", "checkout-root", "bare-repository", "dot-git"],
 )
-def test_protect_and_rescope_refuse_a_path_no_claim_can_cover_with_one_sentence(
+def test_protect_refuses_a_path_no_claim_can_cover_with_one_sentence(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    refusal_of: Callable[[pytest.MonkeyPatch, pytest.CaptureFixture[str], Path], tuple[int, str]],
     build_case: Callable[[Path, Path], tuple[Path, str]],
 ) -> None:
-    """PROT-14, PROT-42, PROT-43 and RESC-19 (issue #483, #310 findings 110,
-    111, 112, 115): a path below a file or a dangling symlink, the checkout
-    root itself, and a path inside a git directory are refused by `protect`
-    and `rescope` with the same sentence, before the store is read."""
+    """PROT-14, PROT-42 and PROT-43 (issue #483, #310 findings 110, 111,
+    112, 115): a path below a file or a dangling symlink, the checkout root
+    itself, and a path inside a git directory are refused with one sentence,
+    before the store is read."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     _use_real_path_is_tracked(monkeypatch)
-    main, worktree = _protect_real_repo_with_worktree(tmp_path)
+    main, worktree = real_repository_with_worktree(tmp_path)
     path, sentence = build_case(main, worktree)
-    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
-    assert refusal_of(monkeypatch, capsys, path) == (2, sentence)
-
-
-def _hub_canonical_worktree_file(
-    tmp_path: Path, *, canonical: str, canonical_head: str | None, branch: str
-) -> Path:
-    """A file in a linked worktree on `branch` of a repository with the
-    remotes `origin` and `hub` whose tracked `board.toml` makes `canonical`
-    canonical, with `origin/HEAD` naming `main` and `<canonical>/HEAD`
-    naming `canonical_head` -- or never recorded (issue #490). A recorded
-    `HEAD` of a canonical remote the repository never configured is one a
-    removed remote left behind (issue #492)."""
-    main = tmp_path / "repo"
-    main.mkdir()
-    real_git(main, "init", "-q", "-b", "main")
-    real_git(main, "config", "user.name", "Test")
-    real_git(main, "config", "user.email", "test@example.com")
-    write_repository_config(main, f'canonical_remote = "{canonical}"\n')
-    real_git(main, "add", "-f", board.CONFIG_PATH.as_posix())
-    real_git(main, "commit", "-q", "-m", "initial")
-    real_git(main, "branch", "trunk")
-    for remote in ("origin", "hub"):
-        real_git(main, "remote", "add", remote, f"https://example.invalid/{remote}/repo.git")
-        real_git(main, "update-ref", f"refs/remotes/{remote}/main", "HEAD")
-        real_git(main, "update-ref", f"refs/remotes/{remote}/trunk", "HEAD")
-    real_git(main, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-    if canonical_head is not None:
-        recorded = f"refs/remotes/{canonical}/{canonical_head}"
-        real_git(main, "update-ref", recorded, "HEAD")
-        real_git(main, "symbolic-ref", f"refs/remotes/{canonical}/HEAD", recorded)
-    worktree = tmp_path / "repo-worktrees" / "lane"
-    worktree.parent.mkdir()
-    real_git(main, "worktree", "add", "-q", str(worktree), "-B", branch)
-    return worktree / "widget.py"
+    assert _protect_refusal(monkeypatch, capsys, path) == (2, sentence)
 
 
-def _claim_refusal(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], path: Path
-) -> tuple[int, str]:
-    """`claim` standing in `path`'s worktree: its toplevel read asks that
-    worktree, past the autouse toplevel isolation."""
-    isolated_git_output = checkout.git_output
-
-    def git_output(arguments: list[str], *, directory: Path | None = None) -> str:
-        return isolated_git_output(arguments, directory=directory or path.parent)
-
-    monkeypatch.setattr(checkout, "git_output", git_output)
-    monkeypatch.chdir(path.parent)
-    status = issue_claim.main(["claim", "72", "--scope", path.name])
-    return status, capsys.readouterr().err.removeprefix("ERROR: ").removesuffix("\n")
-
-
-_CLAIM_ON_THE_DEFAULT_BRANCH = (
-    "build claims require an isolated non-main worktree branch; run git worktree add "
-    "../<repo>-worktrees/issue-<n>-<slug> -b <agent>/issue-<n>-<slug>"
-)
-
-
-_UNCONFIGURED_UPSTREAM = "cannot determine the trunk: canonical remote 'upstream' is not configured"
 _HUB_DEFAULT_BRANCH_UNKNOWN = "default branch unknown; run git remote set-head hub --auto"
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
-    ("refusal_of", "canonical", "canonical_head", "branch", "sentence"),
+    ("canonical", "canonical_head", "branch", "sentence"),
     [
+        pytest.param("hub", "trunk", "trunk", "not main", id="protect-hub-default"),
         pytest.param(
-            _claim_refusal,
-            "hub",
-            "trunk",
-            "trunk",
-            _CLAIM_ON_THE_DEFAULT_BRANCH,
-            id="claim-hub-default",
-        ),
-        pytest.param(
-            _claim_refusal,
-            "hub",
-            None,
-            "master",
-            _CLAIM_ON_THE_DEFAULT_BRANCH,
-            id="claim-hub-unrecorded-guesses",
-        ),
-        pytest.param(
-            _protect_refusal, "hub", "trunk", "trunk", "not main", id="protect-hub-default"
-        ),
-        pytest.param(
-            _rescope_refusal,
-            "hub",
-            "trunk",
-            "trunk",
-            "build claims require an isolated non-main worktree branch; "
-            "run this command from this claim's own worktree, not the primary checkout",
-            id="rescope-hub-default",
-        ),
-        pytest.param(
-            _protect_refusal,
             "hub",
             None,
             "codex/issue-72-widget",
@@ -3509,62 +3076,34 @@ _HUB_DEFAULT_BRANCH_UNKNOWN = "default branch unknown; run git remote set-head h
             id="protect-hub-unrecorded",
         ),
         pytest.param(
-            _rescope_refusal,
-            "hub",
-            None,
-            "codex/issue-72-widget",
-            _HUB_DEFAULT_BRANCH_UNKNOWN,
-            id="rescope-hub-unrecorded",
-        ),
-        pytest.param(
-            _protect_refusal,
             "upstream",
             None,
             "codex/issue-72-widget",
-            _UNCONFIGURED_UPSTREAM,
+            UNCONFIGURED_UPSTREAM,
             id="protect-canonical-remote-not-configured",
         ),
         pytest.param(
-            _rescope_refusal,
-            "upstream",
-            None,
-            "codex/issue-72-widget",
-            _UNCONFIGURED_UPSTREAM,
-            id="rescope-canonical-remote-not-configured",
-        ),
-        pytest.param(
-            _protect_refusal,
             "upstream",
             "trunk",
             "codex/issue-72-widget",
-            _UNCONFIGURED_UPSTREAM,
+            UNCONFIGURED_UPSTREAM,
             id="protect-unconfigured-remote-left-a-recorded-head",
-        ),
-        pytest.param(
-            _rescope_refusal,
-            "upstream",
-            "trunk",
-            "codex/issue-72-widget",
-            _UNCONFIGURED_UPSTREAM,
-            id="rescope-unconfigured-remote-left-a-recorded-head",
         ),
     ],
 )
-def test_protect_and_rescope_judge_the_canonical_remotes_recorded_default_branch(
+def test_protect_judges_the_canonical_remotes_recorded_default_branch(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    refusal_of: Callable[[pytest.MonkeyPatch, pytest.CaptureFixture[str], Path], tuple[int, str]],
     canonical: str,
     canonical_head: str | None,
     branch: str,
     sentence: str,
 ) -> None:
-    """Issue #490 proof 1 (PROT-12, PROT-13, RESC-20, CLM-29): with `hub`
-    canonical and `origin/HEAD` naming `main`, a worktree on `hub`'s
-    default branch is refused; without a recorded `hub/HEAD`, `protect` and
-    `rescope` refuse `default branch unknown` while `claim` guesses
-    `main`/`master` -- `origin/HEAD` never answers for `hub`. A canonical
+    """Issue #490 proof 1 (PROT-12, PROT-13): with `hub` canonical and
+    `origin/HEAD` naming `main`, a worktree on `hub`'s default branch is
+    refused; without a recorded `hub/HEAD`, `protect` refuses `default
+    branch unknown` -- `origin/HEAD` never answers for `hub`. A canonical
     remote the clone never added is named instead, in every command's own
     sentence, even where a `HEAD` it left behind still resolves (issues
     #492, #516)."""
@@ -3573,12 +3112,12 @@ def test_protect_and_rescope_judge_the_canonical_remotes_recorded_default_branch
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     _use_real_path_is_tracked(monkeypatch)
-    path = _hub_canonical_worktree_file(
+    path = hub_canonical_worktree_file(
         tmp_path, canonical=canonical, canonical_head=canonical_head, branch=branch
     )
-    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
-    assert refusal_of(monkeypatch, capsys, path) == (2, sentence)
+    assert _protect_refusal(monkeypatch, capsys, path) == (2, sentence)
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -3589,17 +3128,13 @@ def test_protect_and_rescope_judge_the_canonical_remotes_recorded_default_branch
         pytest.param(["rev-parse", "--verify", "--quiet", "HEAD"], id="commit"),
     ],
 )
-@pytest.mark.parametrize(
-    "refusal_of", [_protect_refusal, _rescope_refusal], ids=["protect", "rescope"]
-)
-def test_protect_and_rescope_refuse_with_gits_text_when_a_checkout_read_fails(
+def test_protect_refuses_with_gits_text_when_a_checkout_read_fails(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    refusal_of: Callable[[pytest.MonkeyPatch, pytest.CaptureFixture[str], Path], tuple[int, str]],
     failing_read: list[str],
 ) -> None:
-    """PROT-17, RESC-17: a git failure reading the canonical remote's `HEAD`
+    """PROT-17: a git failure reading the canonical remote's `HEAD`
     or the checkout's commit, run against a real worktree, is neither a
     remote that recorded none (PROT-13) nor a branch with no commit
     (PROT-11): it refuses with git's own text."""
@@ -3608,96 +3143,13 @@ def test_protect_and_rescope_refuse_with_gits_text_when_a_checkout_read_fails(
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     _use_real_path_is_tracked(monkeypatch)
-    path = _hub_canonical_worktree_file(
+    path = hub_canonical_worktree_file(
         tmp_path, canonical="hub", canonical_head="trunk", branch="codex/issue-72-widget"
     )
-    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
     stub_one_git_call(monkeypatch, failing_read, exit_status=128, stderr="fatal: broken")
 
-    assert refusal_of(monkeypatch, capsys, path) == (2, "fatal: broken")
-
-
-def _committed_repository(tmp_path: Path) -> Path:
-    repository = tmp_path / "repo"
-    repository.mkdir()
-    real_git(repository, "init", "-q", "-b", "main")
-    real_git(
-        repository,
-        "-c",
-        "user.name=T",
-        "-c",
-        "user.email=t@e.c",
-        "commit",
-        "-q",
-        "-m",
-        "x",
-        "--allow-empty",
-    )
-    return repository
-
-
-def _select_git_directory_and_work_tree(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, Path]:
-    repository = _committed_repository(tmp_path)
-    work_tree = tmp_path / "plain"
-    work_tree.mkdir()
-    monkeypatch.setenv("GIT_DIR", str(repository / ".git"))
-    monkeypatch.setenv("GIT_WORK_TREE", str(work_tree))
-    return repository / ".git", work_tree
-
-
-def _select_external_objects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:
-    repository = _committed_repository(tmp_path)
-    external_objects = tmp_path / "objects-elsewhere"
-    (repository / ".git" / "objects").rename(external_objects)
-    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", str(external_objects))
-    return repository / ".git", repository
-
-
-def _select_common_directory_layout(
-    _monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, Path]:
-    repository = _committed_repository(tmp_path)
-    git_directory = repository / ".git"
-    common_directory = tmp_path / "common"
-    common_directory.mkdir()
-    for name in ("objects", "refs"):
-        (git_directory / name).rename(common_directory / name)
-    (git_directory / "commondir").write_text("../../common\n")
-    return git_directory, repository
-
-
-def _select_unborn_symlinked_head(
-    _monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, Path]:
-    repository = tmp_path / "repo"
-    repository.mkdir()
-    real_git(repository, "init", "-q", "-b", "main")
-    (repository / ".git" / "HEAD").unlink()
-    (repository / ".git" / "HEAD").symlink_to("refs/heads/main")
-    return repository / ".git", repository
-
-
-@pytest.fixture(
-    params=[
-        _select_git_directory_and_work_tree,
-        _select_external_objects,
-        _select_common_directory_layout,
-        _select_unborn_symlinked_head,
-    ]
-)
-def environment_selected_repository(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> tuple[Path, Path]:
-    """A repository only git's own recognition rules see -- no complete
-    `.git` of plain files and directories sits above the work tree: `GIT_DIR`
-    with `GIT_WORK_TREE`, `GIT_OBJECT_DIRECTORY` with the objects moved out of
-    `.git`, a `commondir` file naming the directory holding `objects/` and
-    `refs/`, or a `HEAD` symlink naming an unborn branch. Returns
-    `(git_directory, work_tree)`."""
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    return request.param(monkeypatch, tmp_path)
+    assert _protect_refusal(monkeypatch, capsys, path) == (2, "fatal: broken")
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -3748,7 +3200,7 @@ def test_protect_names_a_git_directory_when_a_branch_read_fails_in_an_environmen
     ...`, never git's own error text, even when the read after discovery
     fails."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    git_directory, _ = _select_git_directory_and_work_tree(monkeypatch, tmp_path)
+    git_directory, _ = select_git_directory_and_work_tree(monkeypatch, tmp_path)
     injected = inject_exit_128(monkeypatch, ["branch", "--show-current"])
 
     outcome = _protect_refusal(monkeypatch, capsys, git_directory / "objects" / "widget")
@@ -3760,7 +3212,7 @@ def test_protect_names_a_git_directory_when_a_branch_read_fails_in_an_environmen
 @pytest.mark.usefixtures("isolated_global_git_config")
 @pytest.mark.parametrize(
     "select_repository",
-    [_select_external_objects, _select_common_directory_layout, _select_unborn_symlinked_head],
+    [select_external_objects, select_common_directory_layout, select_unborn_symlinked_head],
 )
 def test_protect_names_a_git_directory_git_recognizes_beyond_plain_files(
     monkeypatch: pytest.MonkeyPatch,
@@ -3789,7 +3241,7 @@ def test_protect_resolves_a_relative_object_directory_from_the_directory_git_run
     """PROT-43: a relative `GIT_OBJECT_DIRECTORY` is relative to the directory
     `git -C` runs in -- the payload's -- whichever directory protect runs in."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    git_directory, _ = _select_external_objects(monkeypatch, tmp_path)
+    git_directory, _ = select_external_objects(monkeypatch, tmp_path)
     (tmp_path / "elsewhere").mkdir()
     monkeypatch.chdir(tmp_path / protect_directory)
     monkeypatch.setenv("GIT_OBJECT_DIRECTORY", "../../../objects-elsewhere")
@@ -3797,234 +3249,6 @@ def test_protect_resolves_a_relative_object_directory_from_the_directory_git_run
     outcome = _protect_refusal(monkeypatch, capsys, git_directory / "refs" / "widget")
 
     assert outcome == (2, f"not a checkout: {git_directory.resolve()} is a git directory")
-
-
-def _git_directory_layout(directory: Path) -> Path:
-    for name in ("objects", "refs"):
-        (directory / name).mkdir(parents=True)
-    (directory / "HEAD").write_text("ref: refs/heads/main\n")
-    return directory
-
-
-def _move_common_files_into(directory: Path, name: str) -> None:
-    """Moves `objects/` and `refs/` into `directory/name`, where a `commondir`
-    file naming `name` makes git look for them."""
-    (directory / name).mkdir()
-    for moved in ("objects", "refs"):
-        (directory / moved).rename(directory / name / moved)
-
-
-def _write_commondir(directory: Path, content: bytes, *, moved_into: bytes | None = None) -> None:
-    if moved_into is not None:
-        _move_common_files_into(directory, os.fsdecode(moved_into))
-    (directory / "commondir").write_bytes(content)
-
-
-def _write_head(directory: Path, content: bytes) -> None:
-    (directory / "HEAD").write_bytes(content)
-
-
-def _link_head_to(directory: Path, target: str) -> None:
-    (directory / "HEAD").unlink()
-    (directory / "HEAD").symlink_to(target)
-
-
-def _link_head_to_existing_file(directory: Path) -> None:
-    (directory / "elsewhere").write_text("content")
-    _link_head_to(directory, str(directory / "elsewhere"))
-
-
-def _make_objects_an_executable_file(directory: Path) -> None:
-    (directory / "objects").rmdir()
-    (directory / "objects").write_text("#!/bin/sh\n")
-    (directory / "objects").chmod(0o755)
-
-
-def _provide_executable_file(directory: Path) -> None:
-    (directory / "executable").write_text("#!/bin/sh\n")
-    (directory / "executable").chmod(0o755)
-
-
-def _move_common_files_away(directory: Path) -> None:
-    _move_common_files_into(directory, "c")
-
-
-def _make_commondir_unreadable(directory: Path) -> None:
-    _move_common_files_away(directory)
-    (directory / "commondir").mkdir()
-
-
-def _write_head_beside_commondir_without_local_objects(directory: Path, head: bytes) -> None:
-    _write_commondir(directory, b"c", moved_into=b"c")
-    _write_head(directory, head)
-
-
-def _write_commondir_naming_a_symlink_loop(directory: Path) -> None:
-    (directory / "loop").symlink_to("loop")
-    _write_commondir(directory, b"loop")
-
-
-_NON_UTF8_NAME = b"c\xff"
-
-# Each row's answer is what git 2.43 itself measured for the layout
-# (`git --git-dir=D rev-parse --git-dir`, probe script in the lane's journal),
-# a `commondir` git dies reading counted as recognized: protect fails closed.
-# Where a row's layout keeps `HEAD`, `objects/` and `refs/` in the directory
-# itself, main's older rule recognizes it whatever git says: "main's rule".
-GIT_DIRECTORY_RECOGNITION_ROWS = [
-    pytest.param(lambda directory: None, {}, True, id="head-names-a-ref"),
-    pytest.param(
-        lambda directory: _link_head_to(directory, "refs/heads/unborn"),
-        {},
-        True,
-        id="head-symlink-to-a-dangling-ref",
-    ),
-    pytest.param(
-        _link_head_to_existing_file, {}, True, id="head-symlink-to-a-non-ref-file-mains-rule"
-    ),
-    pytest.param(
-        lambda directory: _write_head(directory, b"ref:   \trefs/x"),
-        {},
-        True,
-        id="head-ref-after-whitespace",
-    ),
-    pytest.param(
-        lambda directory: _write_head(directory, b"ref: other/x"),
-        {},
-        True,
-        id="head-ref-outside-refs-mains-rule",
-    ),
-    pytest.param(
-        lambda directory: _write_head(directory, b"0123456789abcdef0123456789abcdef01234567\n"),
-        {},
-        True,
-        id="head-sha1-object-id",
-    ),
-    pytest.param(
-        lambda directory: _write_head(directory, b"0123456789abcdef" * 4),
-        {},
-        True,
-        id="head-sha256-object-id",
-    ),
-    pytest.param(
-        lambda directory: _write_head(directory, b"garbage"),
-        {},
-        True,
-        id="head-garbage-mains-rule",
-    ),
-    pytest.param(
-        lambda directory: _write_head(directory, b""), {}, True, id="head-empty-mains-rule"
-    ),
-    pytest.param(lambda directory: (directory / "HEAD").unlink(), {}, False, id="head-missing"),
-    pytest.param(_make_objects_an_executable_file, {}, True, id="objects-an-executable-file"),
-    pytest.param(lambda directory: (directory / "objects").rmdir(), {}, False, id="no-objects"),
-    pytest.param(lambda directory: (directory / "refs").rmdir(), {}, False, id="no-refs"),
-    pytest.param(
-        lambda directory: None, {"GIT_OBJECT_DIRECTORY": ""}, True, id="empty-objects-mains-rule"
-    ),
-    pytest.param(
-        _provide_executable_file,
-        {"GIT_OBJECT_DIRECTORY": "{directory}/executable"},
-        True,
-        id="object-directory-an-executable-file",
-    ),
-    pytest.param(
-        lambda directory: None, {"GIT_COMMON_DIR": ""}, True, id="empty-common-dir-mains-rule"
-    ),
-    pytest.param(_move_common_files_away, {"GIT_COMMON_DIR": ""}, False, id="empty-common-dir"),
-    pytest.param(_move_common_files_away, {"GIT_OBJECT_DIRECTORY": ""}, False, id="empty-objects"),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"c ", moved_into=b"c "),
-        {},
-        True,
-        id="commondir-name-with-trailing-space",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"c\r\n", moved_into=b"c"),
-        {},
-        True,
-        id="commondir-with-crlf",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, _NON_UTF8_NAME, moved_into=_NON_UTF8_NAME),
-        {},
-        True,
-        id="commondir-non-utf8-name",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"\n"), {}, True, id="commondir-line-break"
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"nowhere"),
-        {},
-        True,
-        id="commondir-to-a-missing-directory-mains-rule",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"nowhere", moved_into=b"c"),
-        {},
-        False,
-        id="commondir-to-a-missing-directory",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"", moved_into=b"c"),
-        {},
-        True,
-        id="commondir-empty-fails-closed",
-    ),
-    pytest.param(
-        _make_commondir_unreadable,
-        {},
-        True,
-        id="commondir-unreadable-fails-closed",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"nowhere/below", moved_into=b"c"),
-        {},
-        True,
-        id="commondir-below-a-missing-directory-fails-closed",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"missing/"),
-        {},
-        True,
-        id="commondir-naming-a-missing-directory-with-a-slash-mains-rule",
-    ),
-    pytest.param(
-        _write_commondir_naming_a_symlink_loop,
-        {},
-        True,
-        id="commondir-naming-a-symlink-loop-mains-rule",
-    ),
-    pytest.param(
-        lambda directory: _write_head_beside_commondir_without_local_objects(
-            directory, b"ref:\vrefs/heads/main"
-        ),
-        {},
-        False,
-        id="head-ref-after-a-vertical-tab",
-    ),
-    pytest.param(
-        lambda directory: _write_head_beside_commondir_without_local_objects(
-            directory, b"ref:\frefs/heads/main"
-        ),
-        {},
-        False,
-        id="head-ref-after-a-form-feed",
-    ),
-    pytest.param(
-        lambda directory: _write_head_beside_commondir_without_local_objects(directory, b"garbage"),
-        {},
-        False,
-        id="head-garbage-without-local-objects",
-    ),
-    pytest.param(
-        lambda directory: _write_commondir(directory, b"missing\0ignored", moved_into=b"c"),
-        {},
-        False,
-        id="commondir-cut-at-a-null-byte",
-    ),
-]
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -4045,7 +3269,7 @@ def test_protect_names_a_directory_a_git_directory_when_git_or_mains_rule_takes_
     where neither does, the path is outside every repository or the
     environment's own variable makes git's text the denial."""
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    directory = _git_directory_layout(tmp_path / "git-directory")
+    directory = git_directory_layout(tmp_path / "git-directory")
     arrange_layout(directory)
     for name, value in environment.items():
         monkeypatch.setenv(name, value.format(directory=directory))
@@ -4059,31 +3283,26 @@ def test_protect_names_a_directory_a_git_directory_when_git_or_mains_rule_takes_
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
-@pytest.mark.parametrize(
-    "refusal_of", [_protect_refusal, _rescope_refusal], ids=["protect", "rescope"]
-)
-def test_protect_and_rescope_name_a_canonical_remote_that_has_config_lines_but_no_url(
+def test_protect_names_a_canonical_remote_that_has_config_lines_but_no_url(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    refusal_of: Callable[[pytest.MonkeyPatch, pytest.CaptureFixture[str], Path], tuple[int, str]],
 ) -> None:
-    """Issues #512 line 1 and #516 line 2 (PROT-45, RESC-21): a
+    """Issues #512 line 1 and #516 line 2 (PROT-45): a
     `remote.upstream.fetch` line without a URL, beside a `HEAD` the remote
-    left behind, is still no configured canonical remote -- `protect` and
-    `rescope` name it in every command's own sentence rather than judging
-    its branch."""
+    left behind, is still no configured canonical remote -- `protect` names
+    it in every command's own sentence rather than judging its branch."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     _use_real_path_is_tracked(monkeypatch)
-    path = _hub_canonical_worktree_file(
+    path = hub_canonical_worktree_file(
         tmp_path, canonical="upstream", canonical_head="trunk", branch="codex/issue-72-widget"
     )
     real_git(
         path.parent, "config", "remote.upstream.fetch", "+refs/heads/*:refs/remotes/upstream/*"
     )
-    monkeypatch.setattr(store, "fetch_state", _store_must_not_be_read)
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
-    assert refusal_of(monkeypatch, capsys, path) == (2, _UNCONFIGURED_UPSTREAM)
+    assert _protect_refusal(monkeypatch, capsys, path) == (2, UNCONFIGURED_UPSTREAM)
