@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "9a2cd8dcb7aa021e94efd8696767ad4350f1bc53"
 branch = "claude/issue-269-ascii-decimal-numbers"
-scope = ["specs/board.spec.md", "specs/claim-record.spec.md", "specs/release.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/github.py", "src/agent_coordination/protocol.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_protocol.py", "tests/test_store.py"]
+scope = ["specs/board.spec.md", "specs/claim-record.spec.md", "specs/release.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/github.py", "src/agent_coordination/protocol.py", "tests/store_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_protocol.py", "tests/test_store.py"]
 opened_commit = "8c0efd58490af942c914472ff1c22479ccc723a4"
 whole_reason = "Ein Parser in protocol ersetzt vier Zahl-Lesestellen; die drei vom Operator entschiedenen Spec-Sätze und ihre Tests müssen mit dem Code zusammen landen, sonst lügt die Spec oder ein Test."
