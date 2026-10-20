@@ -11,13 +11,15 @@ are real.
 
 from __future__ import annotations
 
+import json
 import socket
 import threading
 from contextlib import ExitStack
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, FakeAcoRepository, line, row, serving
+from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, row, serving
 
 from aco_board.aco_cli import AcoCli
 from aco_board.ports import Decision, DecisionResult, ExpectationLine
@@ -48,7 +50,6 @@ _NO_CONTENT_LENGTH = b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: {tok
         _post(b"{}", b"\xd9\xa3"),
         _post(b"{}", b"9" * 5000),
         _post(b"{}", b"16385"),
-        _post(b"{}", b"40"),
         _post(b"x" * 16385),
         _post(b"[" * 16000),
         _post(b'{"item": 1' + b"0" * 5000 + b"}"),
@@ -61,7 +62,6 @@ _NO_CONTENT_LENGTH = b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: {tok
         "content-length-non-ascii-digit",
         "content-length-past-int-limit",
         "content-length-over-limit",
-        "body-cut-short",
         "body-over-limit",
         "body-nested-too-deep",
         "body-integer-past-int-limit",
@@ -82,6 +82,22 @@ def test_a_malformed_api_request_gets_a_fixed_400_without_a_traceback(
     assert str(Path(__file__).parents[2]).encode() not in rest
     assert "Traceback" not in capsys.readouterr().err
     assert repository.rule_calls() == []
+
+
+def _decision_json(board: BoardClient) -> bytes:
+    """A decision on item 42, line 1, with the fingerprint the board lists now."""
+    repos = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+    listed = repos[0]["items"][0]["lines"][0]
+    return json.dumps(
+        {
+            "repo": board.repo,
+            "item": 42,
+            "line": 1,
+            "fingerprint": listed["fingerprint"],
+            "outcome": "yes",
+            "note": None,
+        }
+    ).encode()
 
 
 _SHORT_DEADLINE_SECONDS = 0.2
@@ -109,6 +125,27 @@ def test_a_stalled_request_is_dropped_after_the_deadline_without_a_traceback(
     assert (answer.split(b" ")[1] if answer else None) == status
     assert "Traceback" not in capsys.readouterr().err
     assert repository.calls() == []
+
+
+@pytest.mark.parametrize(
+    "truncate", [False, True], ids=["valid-decision-ending-early", "cut-mid-object"]
+)
+def test_a_body_ending_before_its_declared_length_answers_408_and_rules_nothing(
+    repository: FakeAcoRepository, board: BoardClient, truncate: bool
+) -> None:
+    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    decision = _decision_json(board)
+    body = decision[: len(decision) // 2] if truncate else decision
+    declared_length = str(len(decision) + 25).encode()
+
+    answer = board.send_raw(_post(body, declared_length).replace(b"{token}", board.token.encode()))
+
+    response = Response.from_raw(answer)
+    assert (response.status, response.json()) == (
+        408,
+        {"error": "request timeout: body incomplete"},
+    )
+    assert repository.rule_calls() == []
 
 
 def test_a_body_still_arriving_when_its_deadline_has_passed_times_out() -> None:

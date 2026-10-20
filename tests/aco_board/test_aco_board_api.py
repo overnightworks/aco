@@ -8,6 +8,8 @@ Each test drives the real server, wire form, and `aco` adapter; only the
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -19,6 +21,7 @@ from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
     Response,
+    install_fake_aco,
     line,
     row,
     serving,
@@ -27,7 +30,14 @@ from aco_board_fixtures import (
 
 from aco_board.aco_cli import AcoCli
 from aco_board.board import LINE_CHANGED
-from aco_board.ports import NOTE_MAX_LENGTH
+from aco_board.ports import (
+    NOTE_MAX_LENGTH,
+    Decision,
+    DecisionResult,
+    DecisionSourceUnavailableError,
+    DecisionStatus,
+    Outcome,
+)
 
 _ORIGIN_ELSEWHERE = {"Origin": "http://elsewhere.example"}
 
@@ -301,6 +311,111 @@ def test_a_broken_aco_during_a_decision_keeps_the_line_undecided(
 
     assert answer.json() == {"status": "failed", "message": message}
     assert repository.rule_calls() == []
+
+
+def _aco_without_execute_permission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    bin_directory = tmp_path / "bin-without-execute"
+    bin_directory.mkdir()
+    (bin_directory / "aco").write_text("#!/bin/sh\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", str(bin_directory))
+    return tmp_path
+
+
+def _working_directory_that_is_a_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    install_fake_aco(tmp_path / "bin")
+    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}")
+    file_instead_of_directory = tmp_path / "repository"
+    file_instead_of_directory.write_text("", encoding="utf-8")
+    return file_instead_of_directory
+
+
+def _aco_answering_bytes_that_are_not_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    bin_directory = tmp_path / "bin-not-utf8"
+    bin_directory.mkdir()
+    executable = bin_directory / "aco"
+    executable.write_text("#!/bin/sh\nprintf '\\377\\376'\n", encoding="utf-8")
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_directory}{os.pathsep}{os.environ['PATH']}")
+    return tmp_path
+
+
+_ACO_CANNOT_BE_RUN = pytest.mark.parametrize(
+    ("arrange", "reason"),
+    [
+        (_aco_without_execute_permission, "could not be run: Permission denied"),
+        (_working_directory_that_is_a_file, "could not be run: Not a directory"),
+        (_aco_answering_bytes_that_are_not_utf8, "answered output that is not UTF-8"),
+    ],
+    ids=["no-execute-permission", "working-directory-is-a-file", "output-not-utf8"],
+)
+
+
+@_ACO_CANNOT_BE_RUN
+def test_an_aco_that_cannot_be_run_makes_the_rulings_read_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    arrange: Callable[[Path, pytest.MonkeyPatch], Path],
+    reason: str,
+) -> None:
+    decisions = AcoCli(directory=arrange(tmp_path, monkeypatch))
+
+    with pytest.raises(DecisionSourceUnavailableError) as unavailable:
+        decisions.expectation_lines()
+
+    assert str(unavailable.value) == f"aco rulings {reason}"
+
+
+@_ACO_CANNOT_BE_RUN
+def test_an_aco_that_cannot_be_run_fails_the_decision_with_one_sentence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    arrange: Callable[[Path, pytest.MonkeyPatch], Path],
+    reason: str,
+) -> None:
+    decisions = AcoCli(directory=arrange(tmp_path, monkeypatch))
+
+    result = decisions.rule(Decision(42, 1, Outcome.YES, None))
+
+    assert result == DecisionResult(DecisionStatus.FAILED, f"aco rule {reason}")
+
+
+def _make_a_file(directory: Path) -> None:
+    shutil.rmtree(directory)
+    directory.write_text("", encoding="utf-8")
+
+
+def _make_unenterable(directory: Path) -> None:
+    directory.chmod(0o000)
+
+
+@pytest.mark.parametrize(
+    ("break_directory", "error"),
+    [
+        (_make_a_file, "aco rulings could not be run: Not a directory"),
+        (_make_unenterable, "aco rulings could not be run: Permission denied"),
+    ],
+    ids=["directory-is-a-file", "directory-not-enterable"],
+)
+def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_others_keep_theirs(
+    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+    break_directory: Callable[[Path], None],
+    error: str,
+) -> None:
+    repository_a, repository_b = two_repositories
+    repository_a.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    break_directory(repository_b.directory)
+
+    try:
+        with serving_two(two_repositories) as board:
+            response = board.get_board_json()
+    finally:
+        repository_b.directory.chmod(0o755)
+
+    assert response.status == 200
+    repos = cast(list[dict[str, Any]], response.json()["repos"])
+    assert [(repo["name"], repo["error"]) for repo in repos] == [("a", None), ("b", error)]
+    assert [item["number"] for item in repos[0]["items"]] == [42]
+    assert repos[1]["items"] == []
 
 
 @pytest.mark.parametrize(

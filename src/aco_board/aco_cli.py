@@ -95,6 +95,14 @@ class AcoCli:
             raise DecisionSourceUnavailableError(
                 f"aco {arguments[0]} did not answer within {self.timeout_seconds:g} seconds"
             ) from error
+        except OSError as error:
+            raise DecisionSourceUnavailableError(
+                f"aco {arguments[0]} could not be run: {error.strerror}"
+            ) from error
+        except UnicodeDecodeError as error:
+            raise DecisionSourceUnavailableError(
+                f"aco {arguments[0]} answered output that is not UTF-8"
+            ) from error
         return _Completed(completed.returncode, completed.stdout, completed.stderr)
 
 
