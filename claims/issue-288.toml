@@ -1,8 +1,0 @@
-claim_id = "9fcd260b6e6445a0b0373c30d54f7eae"
-agent = "claude"
-role = "builder"
-base = "6cf6336634c60b7aa84cff70e8f672c17dedf821"
-branch = "claude/issue-288-pflege-222"
-scope = ["src/agent_coordination/board.py", "src/agent_coordination/board_read.py", "src/agent_coordination/checkout.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_cut.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/cmd_rescope.py", "src/agent_coordination/policy.py", "src/agent_coordination/protocol.py", "src/agent_coordination/terminal.py", "src/agent_coordination/workspace.py", "tests/test_workspace_terminal.py"]
-opened_commit = "3e3523bdf8eff36d19b27432a36dd5915f499adc"
-whole_reason = "Bündelkarte aus sechs Pflegebefunden von #222 mit je wenigen Zeilen; eine Lane statt sechs spart die feste Lane-Last."
