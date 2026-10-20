@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "eb0d6ec7cc548f65adb693d54e26570c69044362"
 branch = "claude/issue-275-protect-removal-s1-proofs"
-scope = ["scripts/similar_methods_exemptions.txt", "specs/claim.spec.md", "specs/rescope.spec.md", "tests/test_checkout.py", "tests/test_protect.py", "tests/test_rescope_checkout.py"]
+scope = ["scripts/similar_methods_exemptions.txt", "scripts/test_inventory_dropped.txt", "specs/claim.spec.md", "specs/rescope.spec.md", "tests/test_checkout.py", "tests/test_protect.py", "tests/test_rescope_checkout.py"]
 opened_commit = "55f1de5312659ce246550494883a4d8f0f79b663"
 whole_reason = "Die umgezogenen Beweise, ihre neuen Spec-Sätze und das Entfernen der Hälften aus test_protect.py müssen zusammen landen, sonst fehlt ein Beweis oder er steht doppelt."
