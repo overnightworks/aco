@@ -1,5 +1,5 @@
-"""Root allowlist check (operator ruling 06.09.2026; owner: marketplace
-`AGENTS.md`, section "Repository layout").
+"""Root allowlist check (operator ruling 06.09.2026; owner: the global
+contract, section "# Code policy" -> "Repository layout").
 
 The repository root holds only what a tool must find there -- the package
 manifest and lockfile, scanner configuration, the license -- and the entry
