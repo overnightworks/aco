@@ -1,0 +1,7 @@
+claim_id = "ce65cc50d6cb4d69a869df3ab2d69a63"
+agent = "claude"
+role = "builder"
+base = "96d7c02d28e165926d6931300e9c0fe322b6be6a"
+branch = "claude/issue-266-agents-md-facts-only"
+scope = [".aco/brief.toml", "AGENTS.md", "scripts/check_root_layout.py"]
+opened_commit = "c95a469dccd3943f232ce294c44da0dcb8e1f063"
