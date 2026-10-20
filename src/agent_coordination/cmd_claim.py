@@ -623,17 +623,17 @@ def _whole_from_item_body(
     return resolve
 
 
-def _resolved_claim_request(
-    requested: protocol.ClaimRequest,
+def _resolved_issue_scope(
     identity: protocol.IssueIdentity,
+    branch: str,
     observed: protocol.ClaimState,
     context: session.RunContext,
     storage: body.Storage,
-) -> tuple[protocol.ClaimRequest, dict[int, board.Issue] | None]:
-    """`requested` with its scope filled in for an issue-mode claim that
-    omitted `--scope` (issue #337), paired with the open-board listing that
-    filling it cost -- `None` when it cost nothing, so `run` never
-    fetches that board a second time for its own slice-rule checks.
+) -> tuple[tuple[str, ...], dict[int, board.Issue] | None]:
+    """The scope of an issue-mode claim that omitted `--scope` (issue #337),
+    paired with the open-board listing that resolving it cost -- `None` when
+    it cost nothing, so `run` never fetches that board a second time for its
+    own slice-rule checks.
 
     A live claim already on this identity and branch is a replayed,
     interrupted request even when the retry drops `--scope`: its own stored
@@ -647,15 +647,15 @@ def _resolved_claim_request(
     `scope = [...]` is the source of truth, fetched from the same open board
     `run` needs anyway for its slice-rule checks, so the caller reuses
     it rather than asking again."""
-    live = observed.claims.get(protocol.claim_key(identity, requested.branch))
+    live = observed.claims.get(protocol.claim_key(identity, branch))
     if live is not None:
-        return replace(requested, scope=live.scope), None
+        return live.scope, None
     client = context.forge
     open_by_number = {issue.number: issue for issue in client.list_open_board_issues()}
     item_scope = _item_scope(client, open_by_number, identity.issue, storage=storage)
     if item_scope is None:
         raise _ClaimBodyInvalidError(_CLAIM_SCOPE_MISSING)
-    return replace(requested, scope=item_scope), open_by_number
+    return item_scope, open_by_number
 
 
 def _reject_scope_mismatch(
@@ -913,9 +913,10 @@ def checked_claim(
         observed = context.observation
         protocol.require_state_ref(observed)
         storage = context.config.storage
-        requested, open_by_number = _resolved_claim_request(
-            requested, requested.identity, observed, context, storage
+        scope, open_by_number = _resolved_issue_scope(
+            requested.identity, requested.branch, observed, context, storage
         )
+        requested = replace(requested, scope=scope)
         versioning, effective_whole = scope_versioning(
             requested.scope,
             requested.whole_reason,
