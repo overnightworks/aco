@@ -1,8 +1,0 @@
-claim_id = "391e026fd61242a28bdca21ad7bd963b"
-agent = "claude"
-role = "builder"
-base = "eb0d6ec7cc548f65adb693d54e26570c69044362"
-branch = "claude/issue-274-st1-status-display"
-scope = ["scripts/test_inventory_dropped.txt", "specs/status.spec.md", "tests/store_fixtures.py", "tests/test_cli.py", "tests/test_status.py"]
-opened_commit = "72b409369fb95b89c63155d95bf288dee8f63d42"
-whole_reason = "Das neue Modul, der Zwillings-Builder und die Löschung der 18 alten Funktionen und die zwei Spec-Zeilen müssen zusammen landen, sonst fehlen Tests oder Namen zeigen ins Leere."
