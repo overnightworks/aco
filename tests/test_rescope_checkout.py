@@ -334,8 +334,8 @@ def _write_commondir_naming_a_symlink_loop(directory: Path) -> None:
 _NON_UTF8_NAME = b"c\xff"
 
 # Each row's answer is what git 2.43 itself measured for the layout
-# (`git --git-dir=D rev-parse --git-dir`, probe script in the lane's journal),
-# a `commondir` git dies reading counted as recognized: protect fails closed.
+# (`git --git-dir=D rev-parse --git-dir`); a `commondir` git dies reading
+# counts as recognized, so rescope refuses it as a git directory (RESC-31).
 # Where a row's layout keeps `HEAD`, `objects/` and `refs/` in the directory
 # itself, main's older rule recognizes it whatever git says: "main's rule".
 GIT_DIRECTORY_RECOGNITION_ROWS = [
@@ -781,24 +781,30 @@ def test_rescope_json_reports_a_dotdot_path_through_a_missing_directory_as_unava
         pytest.param(path_in_a_checkouts_git_directory, "unavailable", id="dot-git"),
     ],
 )
+@pytest.mark.parametrize("output_mode", ["text", "json"])
 def test_rescope_refuses_a_path_no_claim_can_cover_with_one_sentence_and_its_json_reason(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     build_case: Callable[[Path, Path], tuple[Path, str]],
     reason: str,
+    output_mode: str,
 ) -> None:
     """Spec: RESC-15, RESC-17, RESC-19, RESC-31. A path below a file or a
     dangling symlink, the checkout root itself, and a path inside a git
-    directory are refused with one sentence before the store is read; the
-    first three name a malformed `--add`, the last two an unresolved checkout
-    (issue #483, #310 findings 110, 111, 112, 115)."""
+    directory are refused with one sentence before the store is read, in
+    text and under `--json`; the first three name a malformed `--add`, the
+    last two an unresolved checkout (issue #483, #310 findings 110, 111, 112,
+    115)."""
     _isolate_home(monkeypatch, tmp_path)
     main, worktree = real_repository_with_worktree(tmp_path)
     path, sentence = build_case(main, worktree)
     monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
-    assert _rescope_json_refusal(capsys, path) == (2, reason, sentence, f"ERROR: {sentence}\n")
+    if output_mode == "text":
+        assert _rescope_refusal(capsys, path) == (2, sentence)
+    else:
+        assert _rescope_json_refusal(capsys, path) == (2, reason, sentence, f"ERROR: {sentence}\n")
 
 
 @pytest.mark.parametrize(
@@ -824,6 +830,11 @@ def test_rescope_judges_a_nested_checkouts_root_by_that_checkout(
     monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
 
     assert _rescope_refusal(capsys, root_form(nested)) == (2, checkout_root_reason(nested))
+    assert _rescope_json_refusal(capsys, root_form(nested))[:3] == (
+        2,
+        "invalid_usage",
+        checkout_root_reason(nested),
+    )
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -835,13 +846,13 @@ def test_rescope_judges_a_nested_checkouts_root_by_that_checkout(
             "trunk",
             "build claims require an isolated non-main worktree branch; "
             "run this command from this claim's own worktree, not the primary checkout",
-            id="hub-default",
+            id="rescope-hub-default",
         ),
         pytest.param(
             None,
             "codex/issue-72-widget",
             "default branch unknown; run git remote set-head hub --auto",
-            id="hub-unrecorded",
+            id="rescope-hub-unrecorded",
         ),
     ],
 )
@@ -870,7 +881,14 @@ UNCONFIGURED_UPSTREAM = "cannot determine the trunk: canonical remote 'upstream'
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
-@pytest.mark.parametrize("canonical_head", [None, "trunk"], ids=["no-head", "left-a-recorded-head"])
+@pytest.mark.parametrize(
+    "canonical_head",
+    [None, "trunk"],
+    ids=[
+        "rescope-canonical-remote-not-configured",
+        "rescope-unconfigured-remote-left-a-recorded-head",
+    ],
+)
 def test_rescope_names_a_canonical_remote_the_clone_never_configured(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

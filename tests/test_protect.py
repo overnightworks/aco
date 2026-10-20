@@ -1330,7 +1330,7 @@ def test_protect_denies_with_gits_text_when_reading_the_remote_head_fails(
 
 
 @pytest.mark.parametrize("payload_for", _TARGET_PATH_PAYLOAD_BUILDERS, ids=["write", "bash-rm"])
-def test_protect_path_resolving_tothe_checkout_root_denies_naming_the_root(
+def test_protect_path_resolving_to_the_checkout_root_denies_naming_the_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -2431,7 +2431,7 @@ def test_judge_denies_a_bash_recognized_pattern_path_outside_the_live_claims_sco
     )
 
 
-def test_judge_denies_a_path_resolving_tothe_checkout_root_before_reading_the_store(
+def test_judge_denies_a_path_resolving_to_the_checkout_root_before_reading_the_store(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """PROT-14 fires from the checkout gate alone, before the store is ever

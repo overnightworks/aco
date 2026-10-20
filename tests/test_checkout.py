@@ -492,8 +492,8 @@ def test_checkout_validation_names_the_isolated_worktree_recipe_for_a_shared_che
 @pytest.mark.parametrize(
     ("canonical_head", "branch"),
     [
-        pytest.param("trunk", "trunk", id="hub-default"),
-        pytest.param(None, "master", id="hub-unrecorded-guesses"),
+        pytest.param("trunk", "trunk", id="claim-hub-default"),
+        pytest.param(None, "master", id="claim-hub-unrecorded-guesses"),
     ],
 )
 def test_claim_judges_the_canonical_remotes_recorded_default_branch(
@@ -527,10 +527,11 @@ def test_claim_judges_the_canonical_remotes_recorded_default_branch(
     status = issue_claim.main(["claim", "72", "--scope", path.name])
 
     assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: build claims require an isolated non-main worktree branch; "
-        f"run {checkout.ISOLATED_WORKTREE_RECIPE}\n"
+    sentence = (
+        "build claims require an isolated non-main worktree branch; run git worktree add "
+        "../<repo>-worktrees/issue-<n>-<slug> -b <agent>/issue-<n>-<slug>"
     )
+    assert capsys.readouterr().err == f"ERROR: {sentence}\n"
 
 
 def test_checkout_validation_names_the_first_three_dirty_paths_and_the_rest_as_a_count(

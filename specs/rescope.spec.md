@@ -30,7 +30,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 | a relative entry climbs out of the run checkout | RESC-05 | RESC-05 | — | — |
 | the path's directories do not exist yet | RESC-18 | RESC-18 | — | — |
 | resolved checkout is outside every repository | RESC-26 | RESC-26 | RESC-26 | — |
-| the path is inside a git directory itself | RESC-31 | RESC-31 | — | — |
+| the path is inside a git directory itself and a git read fails | RESC-31 | RESC-31 | — | — |
 | the environment selects a repository and a git read fails | RESC-32 | RESC-32 | RESC-32 | — |
 | the path names a nested checkout's own root | RESC-30 | RESC-30 | — | — |
 | resolved checkout has no commit yet | RESC-28 | RESC-28 | RESC-28 | — |
@@ -67,10 +67,10 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 - [ ] [RESC-05] A `--add`/`--drop` path resolving outside the resolved checkout refuses `<flag> path '<path>' is outside the resolved checkout <toplevel>`, exit `2`; a relative one first, against the run checkout.
 - [ ] [RESC-18] A `--add`/`--drop` path whose directories do not exist yet resolves its checkout from the nearest existing ancestor directory.
 - [ ] [RESC-26] A `--add`/`--drop` path outside every repository refuses `<flag> path '<path>' is not in a repository`, exit `2`; with neither flag, `not in a repository` (see E-RESC-07).
-- [ ] [RESC-19] A `--add`/`--drop` path below a file refuses `<path> cannot exist: <file> is a file` (`<link> is a dangling symlink`); the checkout root, `<path> is the checkout root itself`; exit `2`.
+- [ ] [RESC-19] A `--add`/`--drop` path below a file refuses `<path> cannot exist: <file> is a file` (`<link> is a dangling symlink`); the checkout root, `<path> is the checkout root itself`; exit `2`, after RESC-02..04.
 - [ ] [RESC-28] A resolved checkout with no commit yet (an unborn branch) refuses `no commit on this branch`, exit `2`.
 - [ ] [RESC-29] A resolved checkout whose canonical `<remote>` records no resolving `HEAD` refuses `default branch unknown; run git remote set-head <remote> --auto`, exit `2`, never a `main`/`master` guess.
-- [ ] [RESC-30] A path naming a nested checkout's own root is judged by that checkout, never by an outer one its parent directory sits inside, and refuses `<root> is the checkout root itself`, exit `2`.
+- [ ] [RESC-30] A path naming a nested checkout's own root is judged by that checkout, not an outer one its parent sits inside, and refuses `<root> is the checkout root itself`, exit `2`, after RESC-02..04.
 - [ ] [RESC-31] A git read failing on a path inside a git directory (`.git/`, a bare repository, one the environment selects) refuses `not a checkout: <git-directory> is a git directory`, exit `2`, not git's text.
 - [ ] [RESC-32] While `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_OBJECT_DIRECTORY` is set, even empty, a failed git read never reads as outside every repository: it refuses git's text or, in a git directory, RESC-31's.
 
@@ -105,7 +105,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 
 ## Never
 
-- `rescope` never reads a git failure as a branch with no commit (RESC-28) or as a remote that records no `HEAD` (RESC-29): it refuses with git's own text (RESC-17).
+- `rescope` never reads a git failure as a branch with no commit (RESC-28) or as a remote that records no `HEAD` (RESC-29): it refuses with git's own text (RESC-17), except inside a git directory, where RESC-31's sentence replaces it.
 - `rescope` never reads or requires checkout `HEAD` to match the claim's own `base`, and never refuses on a dirty working tree: only `claim`'s own precondition (CLM-04, CLM-05) checks either.
 - `rescope` never runs the comma-ungrounded check over `--drop`: a value the live claim already holds is a fact about the claim, not a checkout typo, so dropping a comma-bearing scoped path always matches it as one whole path.
 - `rescope` never joins a relative `--add`/`--drop` entry to the process's own cwd: it is read against the run checkout's toplevel, the form an item body's own `scope` list prints.
