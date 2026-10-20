@@ -1,0 +1,8 @@
+claim_id = "5863aa0c782f44c1bc2a0c8285d45429"
+agent = "claude"
+role = "builder"
+base = "96d7c02d28e165926d6931300e9c0fe322b6be6a"
+branch = "claude/issue-263-k2-check-number-trunk"
+scope = ["scripts/similar_methods_exemptions.txt", "scripts/test_inventory_dropped.txt", "specs/check.spec.md", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/test_check.py", "tests/test_cli.py", "tests/test_state_board.py"]
+opened_commit = "327bff55e3c4029aa5ff69e2b13f062cd4aa8519"
+whole_reason = "Das neue Modul, die Fixtures, der State-Ref-Knoten, die Spec-Zeilen und die Löschung der alten Knoten und Helfer müssen zusammen landen, sonst fehlen Tests oder Namen zeigen ins Leere."
