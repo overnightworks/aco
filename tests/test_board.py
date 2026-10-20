@@ -10,7 +10,7 @@ import json
 import re
 import tomllib
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import cast
@@ -1288,116 +1288,88 @@ def test_board_json_shows_freed_on_and_freed_days() -> None:
     assert items[22]["freed_days"] is None
 
 
-def test_board_category_order_keeps_ci_ahead_of_a_high_scoring_blocker() -> None:
-    now = datetime(2026, 8, 21, tzinfo=UTC)
-    ci = board.Issue(30, "CI", ("ci",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z")
-    blocker = board.Issue(31, "Blocker", (), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z")
-    dependent = board.Issue(
-        32,
-        "Dependent",
-        (),
-        "## Blocked by\n#31",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-    )
-    open_pull_request = board.PullRequest(90, "Fixes #31", "", "branch")
+@dataclass(frozen=True)
+class _Ranking:
+    """The board's order as `(number, priority_bucket)`, each item's priority category in that
+    order, and whether the second item outscores
+    the first (1), ties it (0) or trails it (-1) -- the premise that category, not score or
+    issue number, decided the order."""
 
-    projected = projected_board(
-        (ci, blocker, dependent),
-        (open_pull_request,),
-        (),
-        (),
-        board.BoardConfig(),
-        now=now,
-    )
-
-    assert [item.number for item in projected.items[:2]] == [30, 31]
-    assert projected.items[1].score > projected.items[0].score
+    issues: tuple[board.Issue, ...]
+    pull_requests: tuple[board.PullRequest, ...]
+    dependencies: dict[int, tuple[board.IssueDependency, ...]]
+    order: list[tuple[int, str]]
+    categories: list[int]
+    second_against_first_score: int
 
 
-def test_board_ranks_a_labelled_critical_item_ahead_of_a_bug_at_equal_score() -> None:
-    """Both stay in the critical category (0), but the configured label's
-    index still tie-breaks ahead of an unlabelled Bug's -- the same order
-    the critical category has always used inside itself. The Bug carries the
-    lower issue number, so a naive number tie-break (the Bug ladder removed)
-    would flip this to `[1, 30]`."""
-    now = datetime(2026, 8, 21, tzinfo=UTC)
-    bug = board.Issue(
+def _bug(number: int) -> board.Issue:
+    return board_issue(number, "A fresh bug", "", kind=ItemKind.BUG)
+
+
+_RANKINGS = {
+    # Issue 31 blocks 32 through a real dependency, not through prose in 32's body.
+    "ci-ahead-of-a-high-scoring-blocker": _Ranking(
+        (
+            board_issue(30, "CI", "", labels=("ci",)),
+            board_issue(31, "Blocker", ""),
+            board_issue(32, "Dependent", "", blocked_by_count=1),
+        ),
+        (board.PullRequest(90, "Fixes #31", "", "branch"),),
+        {32: (block_dependency(31),)},
+        [(30, "ci"), (31, "blocker"), (32, "unlabelled")],
+        [0, 1, 6],
         1,
-        "A fresh bug",
+    ),
+    # The Bug carries the lower issue number, so a number tie-break would give `[1, 30]`.
+    "a-labelled-critical-item-ahead-of-a-bug-at-equal-score": _Ranking(
+        (board_issue(30, "CI work", "", labels=("ci",)), _bug(1)),
         (),
-        "",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.BUG,
-    )
-    ci = board.Issue(30, "CI work", ("ci",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z")
-
-    projected = projected_board((ci, bug), (), (), (), board.BoardConfig(), now=now)
-
-    assert [item.number for item in projected.items] == [30, 1]
-    assert projected.items[0].score == projected.items[1].score
-    assert projected.items[0].priority_category == projected.items[1].priority_category
-
-
-def test_board_ranks_a_bug_last_inside_the_critical_category() -> None:
-    """The Bug and a non-critical product competitor both carry the lowest
-    issue numbers here, so a naive number tie-break (the Bug ladder removed)
-    would rank them `[1, 2, 40, 41, 42]` instead."""
-    now = datetime(2026, 8, 21, tzinfo=UTC)
-    bug = board.Issue(
+        {},
+        [(30, "ci"), (1, "bug")],
+        [0, 0],
+        0,
+    ),
+    # The Bug and a product competitor carry the lowest numbers; a number tie-break would
+    # give `[1, 2, 40, 41, 42]`.
+    "a-bug-last-inside-the-critical-category": _Ranking(
+        (
+            board_issue(40, "Security", "", labels=("security",)),
+            board_issue(41, "Data", "", labels=("data",)),
+            board_issue(42, "CI", "", labels=("ci",)),
+            _bug(1),
+            board_issue(2, "Product work", "", labels=("product",)),
+        ),
+        (),
+        {},
+        [(40, "security"), (41, "data"), (42, "ci"), (1, "bug"), (2, "product")],
+        [0, 0, 0, 0, 3],
+        0,
+    ),
+    # Category always wins over score, and the product item has the lower number too.
+    "a-bug-ahead-of-a-higher-scoring-product-item": _Ranking(
+        (board_issue(2, "Product work", "", labels=("product",)), _bug(40)),
+        (board.PullRequest(90, "Fixes #2", "", "branch"),),
+        {},
+        [(40, "bug"), (2, "product")],
+        [0, 3],
         1,
-        "A fresh bug",
-        (),
-        "",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.BUG,
-    )
-    product = board.Issue(
-        2, "Product work", ("product",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
-    )
-    security = board.Issue(
-        40, "Security", ("security",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
-    )
-    data = board.Issue(41, "Data", ("data",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z")
-    ci = board.Issue(42, "CI", ("ci",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z")
+    ),
+}
 
+
+@pytest.mark.parametrize("case", _RANKINGS.values(), ids=_RANKINGS.keys())
+def test_board_ranks_by_category_before_score_and_issue_number(case: _Ranking) -> None:
     projected = projected_board(
-        (security, data, ci, bug, product), (), (), (), board.BoardConfig(), now=now
+        case.issues, case.pull_requests, (), (), board.BoardConfig(), dependencies=case.dependencies
     )
 
-    assert [item.number for item in projected.items] == [40, 41, 42, 1, 2]
-    assert [item.priority_category for item in projected.items[:4]] == [0, 0, 0, 0]
-    assert projected.items[4].priority_category > 0
-
-
-def test_board_ranks_a_bug_ahead_of_a_higher_scoring_product_item() -> None:
-    """Category always wins over score: a fresh Bug (category 0) outranks an
-    in-flight product item (category 3) even though the product item scores
-    higher and carries the lower issue number -- neither a score- nor a
-    number-based sort would save this."""
-    now = datetime(2026, 8, 21, tzinfo=UTC)
-    product = board.Issue(
-        2, "Product work", ("product",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
-    )
-    bug = board.Issue(
-        40,
-        "A fresh bug",
-        (),
-        "",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.BUG,
-    )
-    in_flight_pull_request = board.PullRequest(90, "Fixes #2", "", "branch")
-
-    projected = projected_board(
-        (product, bug), (in_flight_pull_request,), (), (), board.BoardConfig(), now=now
-    )
-
-    assert [item.number for item in projected.items] == [40, 2]
-    assert projected.items[1].score > projected.items[0].score
+    first, second = projected.items[:2]
+    assert (
+        [(item.number, item.priority_bucket) for item in projected.items],
+        [item.priority_category for item in projected.items],
+        (second.score > first.score) - (second.score < first.score),
+    ) == (case.order, case.categories, case.second_against_first_score)
 
 
 def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
@@ -2602,31 +2574,19 @@ def test_parse_body_ruling_date_is_the_oldest_across_non_monotonic_expectations(
     assert parsed.ruling_date == date(2026, 8, 1)
 
 
-def test_parse_body_refuses_a_frozen_until_that_is_not_a_table() -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}frozen_until = "not a table"\n'
-
-    parsed = parse_body(block_body(toml_text))
-
-    assert parsed.read_state is BodyReadState.MALFORMED
-    assert parsed.contract.defects[0].field == "frozen_until.trigger"
-
-
-def test_parse_body_refuses_a_non_table_expectation_entry() -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}expectation = ["oops"]\n'
-
-    parsed = parse_body(block_body(toml_text))
+@pytest.mark.parametrize(
+    ("entry", "field"),
+    [
+        pytest.param('frozen_until = "not a table"', "frozen_until.trigger", id="frozen-until"),
+        pytest.param('expectation = ["oops"]', "expectation[0]", id="expectation"),
+        pytest.param('slice = ["oops"]', "slice[0]", id="slice"),
+    ],
+)
+def test_parse_body_refuses_a_non_table_entry(entry: str, field: str) -> None:
+    parsed = parse_body(block_body(f"{MINIMAL_BLOCK_TOML}{entry}\n"))
 
     assert parsed.read_state is BodyReadState.MALFORMED
-    assert parsed.contract.defects[0].field == "expectation[0]"
-
-
-def test_parse_body_refuses_a_non_table_slice_entry() -> None:
-    toml_text = f'{MINIMAL_BLOCK_TOML}slice = ["oops"]\n'
-
-    parsed = parse_body(block_body(toml_text))
-
-    assert parsed.read_state is BodyReadState.MALFORMED
-    assert parsed.contract.defects[0].field == "slice[0]"
+    assert parsed.contract.defects[0].field == field
 
 
 def test_parse_body_refuses_a_duplicate_slice_index() -> None:
@@ -2930,48 +2890,34 @@ def test_parse_body_recognizes_a_crlf_fenced_block() -> None:
     assert parsed.contract == Contract("N", "X", "D", ())
 
 
-def test_next_action_skips_a_blockless_childless_container() -> None:
-    body = "## Now\nStill going.\n\n## Next\nDo the thing.\n"
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        pytest.param(
+            "## Now\nStill going.\n\n## Next\nDo the thing.\n",
+            "body malformed: aco: no aco block",
+            id="blockless",
+        ),
+        pytest.param(
+            block_body('version = 2\nnow = "N"\nnext = "X"\ndone_when = "D"\n'),
+            "body malformed: version: version must be exactly 1",
+            id="malformed",
+        ),
+    ],
+)
+def test_next_action_skips_a_childless_container_whose_body_is_unreadable(
+    body: str, reason: str
+) -> None:
     container = replace(
-        board_issue(210, "Blockless container", body),
+        board_issue(210, "Unreadable container", body),
         kind=ItemKind.CONTAINER,
         children_closed=0,
         children_total=0,
     )
-    projected = projected_board(
-        (container,),
-        (),
-        (),
-        (),
-        board.BoardConfig(),
-        now=datetime(2026, 8, 21, tzinfo=UTC),
-    )
 
-    assert board.next_action(projected) is None
-    item = next(item for item in projected.items if item.number == 210)
-    assert item.actionable_reason == "body malformed: aco: no aco block"
+    projected = projected_board((container,), (), (), (), board.BoardConfig())
 
-
-def test_next_action_skips_a_malformed_childless_container() -> None:
-    body = block_body('version = 2\nnow = "N"\nnext = "X"\ndone_when = "D"\n')
-    container = replace(
-        board_issue(211, "Malformed container", body),
-        kind=ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    projected = projected_board(
-        (container,),
-        (),
-        (),
-        (),
-        board.BoardConfig(),
-        now=datetime(2026, 8, 21, tzinfo=UTC),
-    )
-
-    assert board.next_action(projected) is None
-    item = next(item for item in projected.items if item.number == 211)
-    assert item.actionable_reason == "body malformed: version: version must be exactly 1"
+    assert (board.next_action(projected), projected.items[0].actionable_reason) == (None, reason)
 
 
 PARENT_ISSUE_REFERENCE = board.IssueReference(REPOSITORY, 79)

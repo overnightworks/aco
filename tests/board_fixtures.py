@@ -105,7 +105,7 @@ def projected_board(
             claims=claims,
             config=config,
             repository=repository,
-            now=now,
+            now=observed_at,
             trunk_landings=trunk_landings,
             trunk_landing_items=trunk_landing_items,
             children=children,

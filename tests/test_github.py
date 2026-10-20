@@ -14,6 +14,7 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from board_fixtures import REPOSITORY
@@ -882,10 +883,11 @@ def test_github_adapter_reads_a_pending_combined_status_aggregate_with_an_empty_
     assert readiness.checks == (forge.CheckRun(github.EXTERNAL_STATUS_FALLBACK_NAME, None),)
 
 
-def test_github_adapter_reads_a_failing_combined_status_aggregate() -> None:
-    """Issue #405 review/gate finding: a `failure` (or `error`) aggregate
-    from the combined-status endpoint blocks the same way, named from
-    whatever context its own paginated `statuses` does carry."""
+@pytest.mark.parametrize("aggregate", ["failure", "error"])
+def test_github_adapter_reads_a_blocking_combined_status_aggregate(aggregate: str) -> None:
+    """Issue #405 review/gate finding and round-4 finding 2: a `failure` or `error`
+    aggregate from the combined-status endpoint blocks, named from whatever context its
+    own paginated `statuses` does carry and read verbatim as the check's conclusion."""
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = arguments[1]
@@ -896,7 +898,7 @@ def test_github_adapter_reads_a_failing_combined_status_aggregate() -> None:
         if path.startswith(_READINESS_CHECK_RUNS_PATH):
             return ""
         if path == _READINESS_STATUS_PATH:
-            return json.dumps({"state": "failure", "total": 1})
+            return json.dumps({"state": aggregate, "total": 1})
         assert path.startswith(_READINESS_STATUS_PATH)
         return json.dumps({"name": "sonarcloud"})
 
@@ -904,33 +906,7 @@ def test_github_adapter_reads_a_failing_combined_status_aggregate() -> None:
 
     readiness = client.landing_readiness(57)
 
-    assert readiness.checks == (forge.CheckRun("sonarcloud", "failure"),)
-
-
-def test_github_adapter_reads_an_error_combined_status_aggregate() -> None:
-    """Issue #405 round-4 finding 2: an `error` aggregate from the
-    combined-status endpoint blocks exactly as `failure` does -- both are
-    non-`success` verdicts this adapter reads verbatim as the check's own
-    conclusion."""
-
-    def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        path = arguments[1]
-        if path == _READINESS_PULL_REQUEST_PATH:
-            return json.dumps(
-                {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": "clean"}
-            )
-        if path.startswith(_READINESS_CHECK_RUNS_PATH):
-            return ""
-        if path == _READINESS_STATUS_PATH:
-            return json.dumps({"state": "error", "total": 1})
-        assert path.startswith(_READINESS_STATUS_PATH)
-        return json.dumps({"name": "sonarcloud"})
-
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
-
-    readiness = client.landing_readiness(57)
-
-    assert readiness.checks == (forge.CheckRun("sonarcloud", "error"),)
+    assert readiness.checks == (forge.CheckRun("sonarcloud", aggregate),)
 
 
 def test_github_adapter_reads_a_successful_combined_status_aggregate_as_a_named_check() -> None:
@@ -2406,28 +2382,32 @@ def test_bounded_command_wraps_stdin_write_errors(
         )
 
 
-def test_bounded_command_reaps_child_when_selector_setup_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    observed: dict[str, subprocess.Popen[bytes]] = {}
+@pytest.fixture
+def launched_children(monkeypatch: pytest.MonkeyPatch) -> list[subprocess.Popen[Any]]:
+    """Every child `subprocess.Popen` starts, so a test can observe its cleanup."""
+    children: list[subprocess.Popen[Any]] = []
     original_popen = subprocess.Popen
 
-    def start(
-        command: list[str],
-        *,
-        stdin: int | None = None,
-        stdout: int | None = None,
-        stderr: int | None = None,
-        env: dict[str, str] | None = None,
-    ) -> subprocess.Popen[bytes]:
-        process = original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env)
-        observed["process"] = process
-        return process
+    def start(command: list[str], **keywords: Any) -> subprocess.Popen[bytes]:
+        children.append(original_popen(command, **keywords))
+        return children[-1]
 
+    monkeypatch.setattr(subprocess, "Popen", start)
+    return children
+
+
+def _assert_child_reaped_with_its_output_closed(child: subprocess.Popen[Any]) -> None:
+    assert child.poll() is not None
+    assert child.stdout is not None
+    assert child.stdout.closed
+
+
+def test_bounded_command_reaps_child_when_selector_setup_fails(
+    monkeypatch: pytest.MonkeyPatch, launched_children: list[subprocess.Popen[Any]]
+) -> None:
     def cannot_select():
         raise OSError(5, "selector failed")
 
-    monkeypatch.setattr(subprocess, "Popen", start)
     monkeypatch.setattr(process.selectors, "DefaultSelector", cannot_select)
 
     with pytest.raises(ClaimError, match="failed while coordinating I/O"):
@@ -2436,29 +2416,12 @@ def test_bounded_command_reaps_child_when_selector_setup_fails(
             purpose="selector setup probe",
         )
 
-    assert observed["process"].poll() is not None
-    assert observed["process"].stdout is not None
-    assert observed["process"].stdout.closed
+    _assert_child_reaped_with_its_output_closed(launched_children[0])
 
 
 def test_bounded_command_reaps_child_when_select_fails(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, launched_children: list[subprocess.Popen[Any]]
 ) -> None:
-    observed: dict[str, subprocess.Popen[bytes]] = {}
-    original_popen = subprocess.Popen
-
-    def start(
-        command: list[str],
-        *,
-        stdin: int | None = None,
-        stdout: int | None = None,
-        stderr: int | None = None,
-        env: dict[str, str] | None = None,
-    ) -> subprocess.Popen[bytes]:
-        process = original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env)
-        observed["process"] = process
-        return process
-
     class FailingSelector:
         instance: FailingSelector | None = None
 
@@ -2478,7 +2441,6 @@ def test_bounded_command_reaps_child_when_select_fails(
         def close(self) -> None:
             self.closed = True
 
-    monkeypatch.setattr(subprocess, "Popen", start)
     monkeypatch.setattr(process.selectors, "DefaultSelector", FailingSelector)
 
     with pytest.raises(ClaimError, match="failed while waiting for I/O"):
@@ -2487,80 +2449,36 @@ def test_bounded_command_reaps_child_when_select_fails(
             purpose="select probe",
         )
 
-    spawned = observed["process"]
-    assert spawned.poll() is not None
-    assert spawned.stdout is not None
-    assert spawned.stdout.closed
+    _assert_child_reaped_with_its_output_closed(launched_children[0])
     assert FailingSelector.instance is not None
     assert FailingSelector.instance.closed
 
 
 def test_bounded_command_reaps_child_when_output_read_fails(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, launched_children: list[subprocess.Popen[Any]]
 ) -> None:
-    observed: dict[str, subprocess.Popen[bytes]] = {}
-    original_popen = subprocess.Popen
     original_read = github.os.read
 
-    def start(
-        command: list[str],
-        *,
-        stdin: int | None = None,
-        stdout: int | None = None,
-        stderr: int | None = None,
-        env: dict[str, str] | None = None,
-    ) -> subprocess.Popen[bytes]:
-        process = original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env)
-        observed["process"] = process
-        return process
-
     def cannot_read(file_descriptor: int, count: int) -> bytes:
-        process = observed.get("process")
-        if (
-            process is not None
-            and process.stdout is not None
-            and file_descriptor == process.stdout.fileno()
-        ):
+        output = launched_children[0].stdout if launched_children else None
+        if output is not None and file_descriptor == output.fileno():
             raise OSError(5, "read failed")
         return original_read(file_descriptor, count)
 
-    monkeypatch.setattr(subprocess, "Popen", start)
     monkeypatch.setattr(github.os, "read", cannot_read)
 
     with pytest.raises(ClaimError, match="failed while reading output"):
         github._bounded_command(
-            [
-                sys.executable,
-                "-u",
-                "-c",
-                "import time; print('ready'); time.sleep(30)",
-            ],
+            [sys.executable, "-u", "-c", "import time; print('ready'); time.sleep(30)"],
             purpose="read probe",
         )
 
-    assert observed["process"].poll() is not None
-    assert observed["process"].stdout is not None
-    assert observed["process"].stdout.closed
+    _assert_child_reaped_with_its_output_closed(launched_children[0])
 
 
 def test_bounded_command_reaps_child_on_cancellation(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, launched_children: list[subprocess.Popen[Any]]
 ) -> None:
-    observed: dict[str, subprocess.Popen[bytes]] = {}
-    original_popen = subprocess.Popen
-
-    def start(
-        command: list[str],
-        *,
-        stdin: int | None = None,
-        stdout: int | None = None,
-        stderr: int | None = None,
-        env: dict[str, str] | None = None,
-    ) -> subprocess.Popen[bytes]:
-        process = original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env)
-        observed["process"] = process
-        return process
-
     class CancellationSentinel(BaseException):
         pass
 
@@ -2577,7 +2495,6 @@ def test_bounded_command_reaps_child_on_cancellation(
         def close(self) -> None:
             pass
 
-    monkeypatch.setattr(subprocess, "Popen", start)
     monkeypatch.setattr(process.selectors, "DefaultSelector", CancellingSelector)
 
     with pytest.raises(CancellationSentinel):
@@ -2586,9 +2503,7 @@ def test_bounded_command_reaps_child_on_cancellation(
             purpose="cancellation probe",
         )
 
-    assert observed["process"].poll() is not None
-    assert observed["process"].stdout is not None
-    assert observed["process"].stdout.closed
+    _assert_child_reaped_with_its_output_closed(launched_children[0])
 
 
 def test_bounded_command_requires_the_named_executable() -> None:
@@ -2600,23 +2515,9 @@ def test_bounded_command_requires_the_named_executable() -> None:
     assert str(excinfo.value) == "missing-claim-command is required for issue claims"
 
 
-def test_bounded_command_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
-    recorded: dict[str, subprocess.Popen[bytes]] = {}
-    original_popen = subprocess.Popen
-
-    def start(
-        command: list[str],
-        *,
-        stdin: int | None = None,
-        stdout: int | None = None,
-        stderr: int | None = None,
-        env: dict[str, str] | None = None,
-    ) -> subprocess.Popen[bytes]:
-        process = original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env)
-        recorded["process"] = process
-        return process
-
-    monkeypatch.setattr(subprocess, "Popen", start)
+def test_bounded_command_times_out(
+    monkeypatch: pytest.MonkeyPatch, launched_children: list[subprocess.Popen[Any]]
+) -> None:
     monkeypatch.setattr(github, "GH_TIMEOUT_SECONDS", 0.05)
     with pytest.raises(ClaimError) as excinfo:
         github._bounded_command(
@@ -2624,28 +2525,12 @@ def test_bounded_command_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
             purpose="timeout probe",
         )
     assert str(excinfo.value) == "timeout probe timed out"
-    assert recorded["process"].poll() is not None
+    assert launched_children[0].poll() is not None
 
 
 def test_bounded_command_stops_a_child_that_hangs_after_closing_output(
-    monkeypatch: pytest.MonkeyPatch,
+    launched_children: list[subprocess.Popen[Any]],
 ) -> None:
-    recorded: dict[str, subprocess.Popen[bytes]] = {}
-    original_popen = subprocess.Popen
-
-    def start(
-        command: list[str],
-        *,
-        stdin: int | None = None,
-        stdout: int | None = None,
-        stderr: int | None = None,
-        env: dict[str, str] | None = None,
-    ) -> subprocess.Popen[bytes]:
-        process = original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env)
-        recorded["process"] = process
-        return process
-
-    monkeypatch.setattr(subprocess, "Popen", start)
     with pytest.raises(ClaimError) as excinfo:
         github._bounded_command(
             [
@@ -2669,7 +2554,7 @@ def test_bounded_command_stops_a_child_that_hangs_after_closing_output(
             purpose="hang probe",
         )
     assert str(excinfo.value) == "hang probe did not exit"
-    assert recorded["process"].poll() is not None
+    assert launched_children[0].poll() is not None
 
 
 def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
@@ -2677,7 +2562,7 @@ def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
 ) -> None:
     """The same sentence holds when the child is still running while its output is open."""
     real_popen = subprocess.Popen
-    started: list[subprocess.Popen[bytes]] = []
+    started: list[subprocess.Popen[Any]] = []
 
     def start(
         command: list[str],
