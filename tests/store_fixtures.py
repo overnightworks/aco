@@ -236,38 +236,29 @@ def twin_claim_key(original: protocol.ClaimIntent) -> str:
     return f"{protocol.claim_key(original.identity, original.branch)}-twin"
 
 
-def push_twin_claim(
-    remote: Path, worktree: Path, original: protocol.ClaimIntent, twin_claim_id: str
+def push_claim_record(
+    remote: Path, worktree: Path, *, source_key: str, key: str, edit: Callable[[str], str]
 ) -> None:
-    """Add a second `claims/` entry repeating `original`'s record under another
-    claim id -- the one lane state `aco status` calls a CONFLICT and no command
-    writes."""
+    """Write `claims/<key>.toml` into the state ref as `edit` of `claims/<source_key>.toml`
+    -- a state no command writes, such as a second record on one identity
+    (`aco status` calls it a CONFLICT) or a claim opened outside the ref's history."""
     tip = state_ref_tip(remote)
     assert tip is not None
     real_git(worktree, "fetch", "-q", str(remote), store.STATE_REF)
-    key = protocol.claim_key(original.identity, original.branch)
-    record = real_git(remote, "cat-file", "-p", f"{tip}:claims/{key}.toml").stdout
-    twin = blob(
-        worktree,
-        record.replace(
-            f'claim_id = "{original.claim_id}"', f'claim_id = "{twin_claim_id}"'
-        ).encode(),
-    )
+    record = real_git(remote, "cat-file", "-p", f"{tip}:claims/{source_key}.toml").stdout
+    edited = blob(worktree, edit(record).encode())
     entries = {
         line.split("\t")[1]: line.split()[2]
         for line in real_git(remote, "ls-tree", f"{tip}:claims").stdout.splitlines()
     }
     claims = raw_tree(
         worktree,
-        [
-            ("100644", "blob", oid, name)
-            for name, oid in {**entries, f"{twin_claim_key(original)}.toml": twin}.items()
-        ],
+        [("100644", "blob", oid, name) for name, oid in {**entries, f"{key}.toml": edited}.items()],
     )
     top = [line.split(maxsplit=3) for line in real_git(remote, "ls-tree", tip).stdout.splitlines()]
     tree = raw_tree(
         worktree,
         [(mode, kind, claims if name == "claims" else oid, name) for mode, kind, oid, name in top],
     )
-    commit = real_git(worktree, "commit-tree", tree, "-p", tip, "-m", "twin claim").stdout.strip()
+    commit = real_git(worktree, "commit-tree", tree, "-p", tip, "-m", "edited claim").stdout.strip()
     real_git(worktree, "push", "-q", str(remote), f"{commit}:{store.STATE_REF}")
