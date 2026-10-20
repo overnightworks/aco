@@ -1,0 +1,7 @@
+claim_id = "247e68b843c246e8aab3a7318694b290"
+agent = "claude"
+role = "builder"
+base = "2b5177ed1c663e4e763e2d3a845b8b5ef8eb6dff"
+branch = "claude/issue-282-consolidate-store-state"
+scope = ["tests/test_state_board.py", "tests/test_store.py"]
+opened_commit = "ce0a9e7eb2ce59712793d037ba51bd8759dfc9ef"
