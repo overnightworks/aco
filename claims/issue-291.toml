@@ -1,0 +1,8 @@
+claim_id = "4cb854d44b4c4d30928e83e4d248c7c9"
+agent = "claude"
+role = "builder"
+base = "3a153a62652cb2a1f36b6a8fdfa26fa58f3f18e4"
+branch = "claude/issue-291-board-cli-contract-prose"
+scope = ["README.md", "pyproject.toml", "specs/aco-board.spec.md", "src/aco_board/aco_cli.py", "src/agent_coordination/board.py", "src/agent_coordination/board_read.py", "src/agent_coordination/forge.py", "tests/aco_board/aco_board_fixtures.py", "tests/aco_board/test_aco_board_api.py"]
+opened_commit = "860ca83b67fbbd8543497031d07f824f6ccf7cef"
+whole_reason = "Bündelkarte aus vier kleinen Befunden von #193 und #194, meist Prosa; eine Lane statt vier spart die feste Lane-Last."
