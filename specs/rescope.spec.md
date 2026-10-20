@@ -67,7 +67,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 - [ ] [RESC-05] A `--add`/`--drop` path resolving outside the resolved checkout refuses `<flag> path '<path>' is outside the resolved checkout <toplevel>`, exit `2`; a relative one first, against the run checkout.
 - [ ] [RESC-18] A `--add`/`--drop` path whose directories do not exist yet resolves its checkout from the nearest existing ancestor directory.
 - [ ] [RESC-26] A `--add`/`--drop` path outside every repository refuses `<flag> path '<path>' is not in a repository`, exit `2`; with neither flag, `not in a repository` (see E-RESC-07).
-- [ ] [RESC-19] A `--add`/`--drop` path below a file refuses `<path> cannot exist: <file> is a file` (`<link> is a dangling symlink`); the root, `<path> is the checkout root itself`; exit `2`, after RESC-02..04.
+- [ ] [RESC-19] A `--add`/`--drop` path below a file refuses `<path> cannot exist: <file> is a file` (`<link> is a dangling symlink`); checkout root, `<path> is the checkout root itself`; exit `2`, after RESC-02..04.
 - [ ] [RESC-28] A resolved checkout with no commit yet (an unborn branch) refuses `no commit on this branch`, exit `2`.
 - [ ] [RESC-29] A resolved checkout whose canonical `<remote>` records no resolving `HEAD` refuses `default branch unknown; run git remote set-head <remote> --auto`, exit `2`, never a `main`/`master` guess.
 - [ ] [RESC-30] A path naming a nested checkout's own root is judged by that checkout, not an outer one its parent sits inside, and refuses `<root> is the checkout root itself`, exit `2`, after RESC-02..04.

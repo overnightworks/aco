@@ -499,11 +499,11 @@ class BoardConfig:
     # guessed from the remote's own host. `github` is the default -- every
     # repository pinned today lives there.
     storage: Storage = Storage.GITHUB
-    # Repository files any live claim in a checkout may write without naming
-    # them in its scope (issue #575): registries that follow every code
-    # change mechanically -- a dead-code whitelist, a test-budget ledger --
-    # so no lane can know in advance whether it will need one. Only the
-    # trunk's committed copy is obeyed (`session.trunk_lane_shared`).
+    # Repository files a lane may change beyond its scope (issue #575):
+    # registries that follow every code change mechanically -- a dead-code
+    # whitelist, a test-budget ledger -- so no lane can know in advance
+    # whether it will need one. Only the trunk's committed copy is read
+    # (`session.trunk_lane_shared_reading`).
     lane_shared: tuple[str, ...] = ()
     # The repository's own history convention for `aco land` (issue #578):
     # a forge may allow several methods while the repository keeps one, so
@@ -771,7 +771,7 @@ def _validated_repository_paths(
     *,
     directories: bool = False,
 ) -> tuple[str, ...]:
-    """Keep the canonical form that `protect` compares as text. Judge syntax
+    """Keep the canonical form that is compared as text. Judge syntax
     only, without requiring files to exist; entries are foreign text, so
     refusal messages escape them. Dependency directories retain their slash.
     """

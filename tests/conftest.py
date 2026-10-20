@@ -14,19 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from agent_coordination import checkout, process, protect
+from agent_coordination import checkout, process
 
 # Registers `bare_remote` and `worktree` for every module by name: an import
 # of a fixture only to receive it as a parameter reads as unused to ruff.
 pytest_plugins = ["cli_fixtures"]
-
-
-@pytest.fixture(autouse=True)
-def _isolate_protect_unguarded(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No test inherits the session's own `ACO_PROTECT_UNGUARDED`: a
-    developer's scratchpad exemption would otherwise let a protect test
-    allow what it means to prove denied."""
-    monkeypatch.delenv(protect.PROTECT_UNGUARDED_ENV, raising=False)
 
 
 _SHOW_TOPLEVEL_ARGUMENTS = ["rev-parse", "--show-toplevel"]

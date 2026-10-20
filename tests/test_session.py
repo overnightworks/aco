@@ -5,7 +5,6 @@ answered per directory."""
 from __future__ import annotations
 
 import io
-import json
 import subprocess
 import sys
 from collections.abc import Callable
@@ -660,24 +659,6 @@ def test_a_repo_that_is_not_owner_slash_repo_refuses_before_any_git_or_gh_call(
 
     refusal = f"ERROR: repository must be OWNER/REPO, not '{repo}'\n"
     assert (run.status, run.stdout, run.stderr) == (2, envelope, refusal)
-
-
-def test_protect_judges_its_payload_without_ever_building_a_run_context(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Issue #457 proof 2: `protect` is dispatched before the run's context
-    exists and judges from its own payload's path -- here a real one
-    outside every repository, which it allows unjudged. What an allow
-    prints is the hook protocol's (PROT-01), not this proof's."""
-
-    def unused(*_args: object, **_kwargs: object) -> None:
-        pytest.fail("protect must never build a run context")
-
-    monkeypatch.setattr(RunContext, "__init__", unused)
-    payload = {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "notes.txt")}}
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
-
-    assert run_cli(["protect"], capsys).status == 0
 
 
 @pytest.mark.parametrize(

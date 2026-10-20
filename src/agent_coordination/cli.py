@@ -28,7 +28,6 @@ from . import (
     cmd_item,
     cmd_land,
     cmd_next,
-    cmd_protect,
     cmd_release,
     cmd_rescope,
     cmd_reset,
@@ -663,10 +662,6 @@ def _add_item_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(close)
 
 
-def _add_protect_parser(commands: _Subcommands, name: str) -> None:
-    commands.add_parser(name, help="deny PreToolUse writes without this session's live claim")
-
-
 def _add_register_parser(commands: _Subcommands, name: str) -> None:
     register = commands.add_parser(
         name,
@@ -844,7 +839,7 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
 
 @dataclass(frozen=True)
 class _RepositoryCommand:
-    """A context-taking type keeps repository setup out of local and hook commands."""
+    """A context-taking type keeps repository setup out of local commands."""
 
     add_parser: Callable[[_Subcommands, str], None]
     run: Callable[[argparse.Namespace, RunContext], int]
@@ -861,8 +856,7 @@ class _LocalCommand:
 
 @dataclass(frozen=True)
 class _NoArgumentsCommand:
-    """A distinct type keeps `protect` inside its own exception boundary before
-    any setup and lets the hidden login runner execute without reading a namespace."""
+    """A distinct type lets the hidden login runner execute without reading a namespace."""
 
     add_parser: Callable[[_Subcommands, str], None]
     run: Callable[[], int]
@@ -893,7 +887,6 @@ _COMMANDS: dict[str, _Command] = {
     "body": _RepositoryCommand(_add_body_parser, cmd_body.run),
     "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),
     "item": _RepositoryCommand(_add_item_parser, cmd_item.run),
-    "protect": _NoArgumentsCommand(_add_protect_parser, cmd_protect.run),
     "register": _LocalCommand(_add_register_parser, cmd_workspace.register_workspace),
     "run": _LocalCommand(_add_run_parser, cmd_workspace.run_workspace),
     "login": _LocalCommand(_add_login_parser, cmd_workspace.manage_login),

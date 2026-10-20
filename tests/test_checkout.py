@@ -1,6 +1,6 @@
 """Direct `checkout.py` behavior: remote/worktree/branch validation, the
 `git_output` boundary and its `directory` (issue #314), `resolve_path_checkout`
-(the path-based checkout resolver `protect` and `rescope` share), dirty-path
+(the path-based checkout resolver `rescope` uses), dirty-path
 reading, `versioned_paths`, trunk landings, and remote-location parsing.
 `validate_checkout` -- the precondition every `claim` call site in `cli.py`
 uses -- is exercised directly. Tests that drive these through
@@ -24,15 +24,16 @@ from cli_fixtures import (
     bare_remote_repository_with_one_commit,
     dangle_recorded_head,
     git_checkout,
+    hub_canonical_worktree_file,
     init_bare_repository,
     push_repository_trunk,
     real_git,
     real_repository_with_bare_remote,
     recorded_head_read,
     set_agent_identity_env,
+    store_must_not_be_read,
     stub_one_git_call,
 )
-from test_rescope_checkout import hub_canonical_worktree_file, store_must_not_be_read
 
 from agent_coordination import board, checkout, process, store
 from agent_coordination import cli as issue_claim
@@ -667,7 +668,7 @@ def test_git_output_denies_loud_on_a_non_standard_os_error_launching_git(
     -- as a raw `OSError` (issue #314 gate G's follow-up). Every
     `git_output` caller judges a checkout for a security decision, so this
     must fail closed with `ClaimError` too, never an uncaught traceback out
-    of `protect`'s hook boundary."""
+    of the command."""
 
     def raises_os_error(command: list[str], **_kwargs: object) -> object:
         raise PermissionError("denied")

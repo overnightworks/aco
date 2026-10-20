@@ -215,86 +215,6 @@ authentication -- it restores each conversation to its native input line and
 stops there; use `aco run` for an explicit same-boot retry instead. The
 exact preconditions and refusals are also `specs/workspace.spec.md`'s own.
 
-## PreToolUse write gate
-
-Copy this hook once into the file the provider actually loads. When a
-`PreToolUse` hook already runs `aco protect`, add no second entry: set that
-entry's `matcher` to the one shown. The formerly documented `"matcher": "*"`
-sends every tool -- MCP tools, plan mode, task lists -- to `protect`, which
-denies each unknown name and stalls the session.
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|Monitor|write|search_replace|apply_patch|create_file|str_replace_editor",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "aco protect",
-            "timeout": 60
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Install this in the settings of the session that actually runs the
-subagents -- the orchestrating head's settings, not each worktree's own --
-since every dispatched subagent's tool calls share that one session's
-process, cwd included (issue #314). The matcher names every tool the table
-gates -- each name `HOOK_TOOL_EFFECTS` marks mutating, plus the command-text
-tools `Bash` and `Monitor` -- so every other tool (MCP tools, plan mode, task
-lists, worktree and cron tools) never reaches the hook and cannot stall the
-session; a new gated tool joins both that table and this matcher. A named
-limit: `shell` and `run_terminal_command` can write, but their payload names
-no path to judge, so the table clears them as read-only and the matcher leaves
-them out -- like MCP write tools and the worktree tools, the gate does not see
-those writes. Likewise a `Bash` command only shows the fixed write patterns:
-an interpreter's own script (`python3 -c`, `python3 - <<EOF`) writes what its
-text names, which the gate never reads. `protect` judges a write from the
-payload's own path, never from that shared process cwd, and fails closed on
-any tool name that reaches it unrecognized. A write outside every repository
-(the session's memory, scratchpad, `/tmp`) allows, unless it goes through a
-file symlink into a checkout -- then that checkout judges it. A git-ignored
-file under a checkout's `.claude/` allows too; every other write inside
-a repository needs a live claim covering it from a linked worktree. The
-full judgement order, every denial reason, and the verdict's output are
-`specs/protect.spec.md`'s own.
-
-Identity: the hook inherits the session's own environment and weighs a
-write against the claim of the agent it resolves there -- `ACO_AGENT`, else
-`GROK_SESSION_ID`, else `CLAUDE_CODE_SESSION_ID`, the same order `aco claim`
-uses. Start the session with the name the head claims under
-(`ACO_AGENT="Claude head" claude`), or pin it in the hook line
-(`"command": "ACO_AGENT='Claude head' aco protect"`). Without one, a write
-that reaches a claim check -- a recognized write in a `Bash` or `Monitor`
-command included -- denies `agent identity is required: ...`. Reads, the
-read-only session tools, and writes outside every repository need no
-identity; `Monitor` is a session tool too, but it is judged like `Bash`.
-
-Way out: install the hook in the git-ignored `.claude/settings.local.json`,
-never a tracked settings file. A session whose hook misbehaves removes the
-`PreToolUse` entry there itself -- `protect` allows that write even in the
-main checkout, so no operator is needed. Claude Code reads hooks at session
-start; whether an edit also applies mid-session depends on its version
-(unverified here), and the next session start always picks it up.
-
-Throwaway repositories: `ACO_PROTECT_UNGUARDED` names directories, separated
-like `PATH`, whose repositories `protect` never judges -- a tester's scratch
-checkouts. Set it in the environment the hook runs in, for example
-`ACO_PROTECT_UNGUARDED=/tmp/claude-1000` for the session scratchpads rather
-than all of `/tmp`, so a clone of a real repository elsewhere in `/tmp` stays
-guarded. Unset or empty, every repository is judged. The match is on the
-repository itself (its common git directory), not on where a worktree lies:
-a linked worktree of a guarded repository placed inside that directory still
-needs a claim, and a write through a symlink into a guarded checkout is judged
-there. An entry that is not an existing absolute directory denies every write
-in a checkout, except the ignored `settings.local.json` that repairs it.
-
 ## Configuration
 
 `.aco/board.toml` defines exactly eight top-level keys; any other key
@@ -322,8 +242,8 @@ is refused by name.
 - `body_contract` -- must be `"block"` (the only work-item body format aco
   reads) when present; absent means the same thing.
 - `lane_shared` -- exact repository file paths, such as a vulture whitelist,
-  that any live claim may write though its scope never names them. Only the
-  trunk's committed copy counts, so a change takes effect once it lands.
+  a lane may change beyond its scope; `status` and `brief` list them. Only
+  the trunk's committed copy counts, so a change takes effect once it lands.
 - `dependency_paths` -- the paths a `No-Item: deps` pull request may change;
   a trailing `/` covers a directory; other entries match
   exactly. For landing, only the trunk checkout's tracked copy counts. This
@@ -364,7 +284,7 @@ GitHub through the `gh` CLI is the one forge adapter that exists today. A
 second forge attaches at the same port -- a `ForgeReader`/`ForgeWriter` pair
 with a `Capability` answer per operation -- and not inside the commands
 themselves, so adding one never changes a command's own contract. `status`,
-`protect`, `bootstrap`, `reset`, and a lane `claim`/`rescope`/`release` never
+`bootstrap`, `reset`, and a lane `claim`/`rescope`/`release` never
 resolve a forge at all: they read and write only `refs/aco/state`, so a
 canonical remote on any host, including a bare `file://` path, is no error
 for them. aco does not allocate work, merge code, or operate a lease server;
@@ -420,10 +340,9 @@ by exactly one file below; this table is the map, not a copy.
 | `aco cut` | `specs/cut.spec.md` | dispatches a container's next slice as a fresh child whose block says where it was cut from, to build it with `aco start`, and the slice row's `done_when` |
 | `aco item new/show/edit/close` | `specs/item.spec.md` | the state-ref item lifecycle, and `item new` of a GitHub issue |
 | `aco body --check` | `specs/body.spec.md` | validates a piped body offline |
-| `aco protect` | `specs/protect.spec.md` | the `PreToolUse` hook's write verdict |
 | `aco register/run/login` | `specs/workspace.spec.md` | records, resumes, and autostarts a provider workspace mapping |
 | `aco` block grammar | `specs/body-block.spec.md` | the fenced TOML block every item-reading command parses |
-| claim record | `specs/claim-record.spec.md` | the stored claim fields `claim`/`release`/`rescope`/`status`/`protect` share |
+| claim record | `specs/claim-record.spec.md` | the stored claim fields `claim`/`release`/`rescope`/`status` share |
 | state ref transport | `specs/ref-store-cas.spec.md` | the compare-and-swap `refs/aco/state` every store command reads and writes |
 | landing grammar | `specs/landing-grammar.spec.md` | what counts as a landing, read by `check`, `release --merged`, and `board` |
 | storage pin | `specs/storage-pin.spec.md` | the `storage` key gating GitHub versus state-ref item storage |

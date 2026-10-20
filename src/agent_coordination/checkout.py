@@ -28,7 +28,7 @@ ACO_AGENT_ENV = "ACO_AGENT"
 GROK_SESSION_ID_ENV = "GROK_SESSION_ID"
 CLAUDE_CODE_SESSION_ID_ENV = "CLAUDE_CODE_SESSION_ID"
 # `session_agent`'s own order, for the sentences built from it: `claim`'s and
-# `start`'s identity refusals, `protect`'s PROT-08 denial, and `--agent`'s help.
+# `start`'s identity refusals and `--agent`'s help.
 IDENTITY_ENVIRONMENT_ORDER = (
     f"{ACO_AGENT_ENV}, {GROK_SESSION_ID_ENV}, or {CLAUDE_CODE_SESSION_ID_ENV}"
 )
@@ -80,7 +80,7 @@ def _git_run(
     Every OS-level launch failure -- a missing executable, a timeout, or
     anything else (permission denied, out of file descriptors, `-C` naming a
     non-directory, ...) -- fails closed as a `ClaimError`, never an
-    uncaught traceback out of `protect`'s hook boundary. Interpreting a
+    uncaught traceback. Interpreting a
     successful launch's exit status is each caller's own job. A timeout
     raises `GitTimedOutError`, naming `arguments`' own subcommand.
     """
@@ -304,18 +304,9 @@ def file_at_revision(path: str, *, revision: str, directory: Path) -> str | None
     return result.stdout.decode()
 
 
-def path_is_ignored(path: str, *, directory: Path) -> bool:
-    """Whether git's own exclude rules (`.gitignore`, `.git/info/exclude`,
-    the global excludes file) ignore `path` (repo-relative) in the checkout
-    at `directory` -- for a path that need not exist yet, and never for a
-    tracked one, which no exclude rule can ignore (issue #448: `protect`'s
-    escape for a session's own ignored `.claude/` settings)."""
-    return _git_yes_or_no(["check-ignore", "--quiet", "--", path], directory=directory)
-
-
 def _git_yes_or_no(arguments: list[str], *, directory: Path | None) -> bool:
     """A git question answered by exit status alone: `0` yes, `1` no -- the
-    one "no" both `ls-files --error-unmatch` and `check-ignore` define. Any
+    one "no" `ls-files --error-unmatch` defines. Any
     other nonzero exit (e.g. 128 outside a git repository) is a real git
     failure, matching `versioned_paths`'s handling in this module -- it must
     never read as a plain "no" instead of a git error."""
@@ -487,9 +478,9 @@ def _validate_worktree_branch(
 
 class CheckoutKind(StrEnum):
     """Whether a resolved checkout is the shared main checkout or a linked,
-    isolated worktree (issue #314) -- the one structural fact `protect` and
-    `rescope` judge a write or a rescope by, read from the checkout itself
-    rather than from a branch name."""
+    isolated worktree (issue #314) -- the one structural fact `rescope`
+    judges a rescope by, read from the checkout itself rather than from a
+    branch name."""
 
     MAIN = "main"
     LINKED_WORKTREE = "linked_worktree"
@@ -500,8 +491,7 @@ class PathCheckout:
     """The git checkout that owns a directory, resolved directly from that
     directory (issue #314) -- never from the calling process's own cwd, so
     the same directory yields the same checkout regardless of where the
-    process runs. `protect` resolves this from a hook payload path's own
-    parent directory; `rescope` resolves it from the first absolute path it
+    process runs. `rescope` resolves it from the first absolute path it
     is given, falling back to its own process cwd when none is (its one
     other legitimate location signal). `common_directory` is the one fact
     shared by every worktree of the same repository -- the key a caller
@@ -509,9 +499,9 @@ class PathCheckout:
     on (issue #314 gate G5). `has_commit` is `False` for an unborn branch
     (a symbolic `HEAD` naming a branch with no commit yet, git's exit 1; any
     other git failure raises instead): a resolved
-    checkout with no commit must never itself authorize a write (issue #314
-    gate G3), since its branch name can coincidentally match a still-live
-    claim's."""
+    checkout with no commit must never itself authorize a rescope (issue
+    #314 gate G3), since its branch name can coincidentally match a
+    still-live claim's."""
 
     toplevel: Path
     branch: str
@@ -522,13 +512,12 @@ class PathCheckout:
 
 NO_COMMIT_CHECKOUT_REASON = "no commit on this branch"
 NOT_IN_A_REPOSITORY_REASON = "not in a repository"
-RELATIVE_PAYLOAD_PATH_DENIAL = "relative payload path"
 # The variables that change which repository git recognizes at a path, in
 # either direction, measured with git 2.43: `GIT_DIR` selects one outright;
 # `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY` make git recognize a directory
 # without local `objects/` or `refs/` (setup.c `is_git_directory`), and an
 # empty value makes git fail on a real repository. While one is present a
-# failed discovery cannot read as outside; the cost is a refused write on a
+# failed discovery cannot read as outside; the cost is a refused rescope of a
 # genuine outside path only then. The other twelve of
 # `git rev-parse --local-env-vars` left a plain outside path unrecognized
 # (exit 128) and are not kept.
@@ -541,9 +530,8 @@ REPOSITORY_SELECTING_ENVIRONMENT_VARIABLES = (
 
 def checkout_relative(path: Path, *, toplevel: Path) -> PurePosixPath | None:
     """`path`, symlinks resolved, relative to `toplevel`, or `None` when it
-    lies outside: the one containment rule protect and rescope share, so a
-    relative rescope entry and its absolute form get the same answer
-    (E-RESC-02)."""
+    lies outside: the one containment rule `rescope` applies, so a relative
+    rescope entry and its absolute form get the same answer (E-RESC-02)."""
     resolved = path.resolve()
     if not resolved.is_relative_to(toplevel):
         return None
@@ -551,12 +539,11 @@ def checkout_relative(path: Path, *, toplevel: Path) -> PurePosixPath | None:
 
 
 def relative_scope_entry(absolute_path: str, *, toplevel: Path) -> str | None:
-    """`absolute_path` (already an absolute filesystem path -- a hook
-    payload path, or a `rescope --add`/`--drop` entry given that way) as a
-    canonical, repository-relative scope entry under `toplevel`, or `None`
-    when it resolves outside `toplevel` or is otherwise not a valid scope
-    entry. Shared by `protect.judge` (issue #314) and `cmd_rescope`'s own
-    `rescope` absolute-path handling (issue #314 delta, finding R1)."""
+    """`absolute_path` (already an absolute filesystem path -- a
+    `rescope --add`/`--drop` entry given that way) as a canonical,
+    repository-relative scope entry under `toplevel`, or `None` when it
+    resolves outside `toplevel` or is otherwise not a valid scope entry
+    (issue #314 delta, finding R1)."""
     try:
         relative = checkout_relative(Path(absolute_path), toplevel=toplevel)
         if relative is None:
@@ -572,9 +559,9 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
 
     Every git read runs `git -C directory`, so the result is the same
     regardless of the calling process's own cwd -- unlike the ad hoc,
-    cwd-implicit `git_output` calls this replaces in `protect` and
-    `rescope`, which silently read the *process's* checkout instead of the
-    one the caller actually means. `--path-format=absolute` makes the
+    cwd-implicit `git_output` calls this replaces in `rescope`, which
+    silently read the *process's* checkout instead of the one the caller
+    actually means. `--path-format=absolute` makes the
     toplevel/git-dir/common-dir comparison below meaningful: git's default,
     relative-to-`-C`-directory paths would otherwise have to be re-resolved
     against `directory` itself, not the caller's own cwd.
@@ -582,9 +569,9 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     A git failure on an existing `directory` is "outside every repository"
     only when no repository marker sits in it or any of its ancestors
     either; below one, the failure is raised instead (issue #448 review
-    finding: `protect` allows a `None` path unjudged, so a missing git must
-    never read as "no repository here"). Inside a git directory itself -- a
-    checkout's `.git/` or a bare repository -- the failure is raised as
+    finding: a missing git must never read as "no repository here"). Inside
+    a git directory itself -- a checkout's `.git/` or a bare repository --
+    the failure is raised as
     `inside_git_directory_reason`'s sentence rather than git's own
     localized text (issue #483). A `directory` that does not exist yet is
     never inside a repository -- `git -C` cannot even enter it -- so it
@@ -593,9 +580,9 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     environment sets `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_OBJECT_DIRECTORY`
     (each changes what git recognizes in either direction: a repository no
     `.git` marker shows may exist, or git may fail on a real one; the cost
-    is a refused write on a genuine outside path only while one is set).
+    is a refused rescope of a genuine outside path only while one is set).
     Once git has named the checkout, a failed read of its branch or commit
-    raises, inside a git directory as PROT-43's sentence.
+    raises, inside a git directory as RESC-31's sentence.
     """
     try:
         discovered = _discover_checkout(directory)
@@ -621,7 +608,7 @@ def _refuse_a_failure_inside_a_repository(directory: Path, error: ClaimError) ->
 
 
 def _refuse_a_failure_inside_a_git_directory(directory: Path, error: ClaimError) -> None:
-    """Raises PROT-43's sentence when `directory` sits inside a git directory
+    """Raises RESC-31's sentence when `directory` sits inside a git directory
     itself; returns otherwise."""
     git_directory = _enclosing_git_directory(directory)
     if git_directory is not None:
@@ -640,16 +627,15 @@ def inside_git_directory_reason(git_directory: Path) -> str:
 
 
 def resolve_named_path_checkout(path: Path) -> PathCheckout | None:
-    """The checkout an absolute path a caller names belongs to -- the one
-    resolver `protect` and `rescope` share for a payload path or an
-    `--add`/`--drop` entry (issue #483). A directory that is itself a
-    checkout root resolves as that checkout (PROT-36): a nested checkout's
-    own root, whose parent sits inside an outer repository, must not have
-    the outer checkout answer for it, and a root whose parent sits outside
-    every repository is still judged as that checkout's own root (PROT-14).
-    Any other directory resolves from its parent first and from itself only
-    as a fallback; a file -- existing or not yet written -- from its
-    nearest existing ancestor directory (PROT-39). `path` is normalized
+    """The checkout an absolute path a caller names belongs to -- the
+    resolver `rescope` uses for an `--add`/`--drop` entry (issue #483). A
+    directory that is itself a checkout root resolves as that checkout
+    (RESC-30): a nested checkout's own root, whose parent sits inside an
+    outer repository, must not have the outer checkout answer for it, and a
+    root whose parent sits outside every repository is still judged as that
+    checkout's own root. Any other directory resolves from its parent first
+    and from itself only as a fallback; a file -- existing or not yet
+    written -- from its nearest existing ancestor directory (RESC-18). `path` is normalized
     lexically first (`os.path.normpath`, no symlink resolution), so
     `nested/../nested` or `nested/.` reach the comparison the way `nested`
     does."""
@@ -664,8 +650,8 @@ def resolve_named_path_checkout(path: Path) -> PathCheckout | None:
 
 def unscopable_path_reason(absolute_path: str, *, toplevel: Path) -> str | None:
     """Why `absolute_path`, inside the checkout at `toplevel`, can never be a
-    scope entry, or `None` when it can -- the one sentence `protect` denies
-    with and `rescope` refuses with (issue #483). Below a file or a
+    scope entry, or `None` when it can -- the sentence `rescope` refuses
+    with (issue #483). Below a file or a
     dangling symlink the path can never exist; the checkout root itself is
     the whole checkout, not a path in it."""
     path = Path(os.path.normpath(absolute_path))
@@ -682,16 +668,13 @@ def unscopable_path_reason(absolute_path: str, *, toplevel: Path) -> str | None:
 
 def resolve_nearest_existing_checkout(directory: Path) -> PathCheckout | None:
     """The checkout owning `directory`, judged from its nearest existing
-    ancestor when it does not exist yet (PROT-39): a file about to be
+    ancestor when it does not exist yet (RESC-18): a file about to be
     written may sit in directories not created yet either, and resolving a
-    missing directory would read as "outside every repository". The one
-    resolver `protect` and `rescope` share for a path's directory (issue
-    #474: `rescope --add` of a file in a new directory refused `not in a
-    repository` while `protect` judged the same path by its checkout).
-    `directory` is normalized lexically first, as `protect` normalizes its
-    payload: a `..` through a directory not created yet must not walk up to
-    an ancestor the normalized path has already left (issue #474 drive
-    finding)."""
+    missing directory would read as "outside every repository" (issue #474:
+    `rescope --add` of a file in a new directory refused `not in a
+    repository`). `directory` is normalized lexically first: a `..` through
+    a directory not created yet must not walk up to an ancestor the
+    normalized path has already left (issue #474 drive finding)."""
     return resolve_path_checkout(_nearest_existing_directory(Path(os.path.normpath(directory))))
 
 
@@ -739,7 +722,8 @@ def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
     """A directory counts when git 2.43 recognizes it
     (`_recognized_by_git_2_43`) or the layout this repository always accepted
     does (`_has_plain_git_directory_layout`): the port may differ from git
-    somewhere, never by allowing a write the older rule refused."""
+    somewhere, never by failing to recognize a repository directory the
+    plain layout names."""
     return _has_plain_git_directory_layout(suspect) or _recognized_by_git_2_43(
         suspect, discovery_start=discovery_start
     )
@@ -747,9 +731,9 @@ def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
 
 def _has_plain_git_directory_layout(candidate: Path) -> bool:
     """The layout git's own discovery takes for a repository directory:
-    `HEAD` beside `objects/` and `refs/`. Kept as it was before the port of
-    git's recognition, as a floor that guards against a gap in that port
-    allowing a write this rule refused."""
+    `HEAD` beside `objects/` and `refs/`. Kept as a floor beneath the port of
+    git's recognition, so a gap in that port cannot make a path inside such a
+    directory look like an ordinary checkout path."""
     return (
         (candidate / "HEAD").is_file()
         and (candidate / "objects").is_dir()
@@ -765,7 +749,7 @@ def _recognized_by_git_2_43(suspect: Path, *, discovery_start: Path) -> bool:
     relative environment value is relative to `discovery_start`, where
     `git -C` runs, not to this process's cwd. Where git dies reading the
     common directory, its discovery fails; that reads as a git directory, so
-    protect refuses rather than allows."""
+    `rescope` refuses rather than allows."""
     if not _validate_headref(suspect / "HEAD"):
         return False
     common_directory = _common_directory(suspect)
@@ -957,12 +941,11 @@ def validate_checkout(
 
 DEFAULT_BRANCH_FALLBACK = frozenset({"main", "master"})
 
-# `protect`'s and `rescope`'s own denial when a resolved checkout's default
-# branch cannot be determined at all (issue #314 gate G4): unlike `claim`'s
-# `is_default_branch` fallback below, they never guess -- see
-# `refuse_shared_checkout`'s and `_protect_not_main_denial`'s own
-# docstrings for why the callers of the same `recorded_default_branch`
-# reader accept different risk here. It names the one git command that
+# `rescope`'s own denial when a resolved checkout's default branch cannot be
+# determined at all (issue #314 gate G4): unlike `claim`'s
+# `is_default_branch` fallback below, it never guesses -- see
+# `refuse_shared_checkout`'s own docstring for why the callers of the same
+# `recorded_default_branch` reader accept different risk here. It names the one git command that
 # records the canonical remote's `HEAD` (issue #603), since a bare "unknown"
 # left an agent no repair to run.
 _DEFAULT_BRANCH_UNKNOWN_REASON = "default branch unknown; run git remote set-head {remote} --auto"
@@ -997,7 +980,7 @@ def unconfigured_remote_refusal(remote: str, *, directory: Path | None) -> str |
 def default_branch_unknown_reason(
     remote: str, default_branch: str | None, *, directory: Path
 ) -> str | None:
-    """`protect`'s and `rescope`'s denial when the checkout at `directory`
+    """`rescope`'s denial when the checkout at `directory`
     has no default branch of its canonical `remote` to judge by, or `None`
     once `default_branch`, `remote`'s recorded one, stands. A remote with no
     URL configured is named first, in every command's own sentence (issues
@@ -1012,14 +995,6 @@ def default_branch_unknown_reason(
     return None
 
 
-# One owner for `protect`'s "not main" denial (issue #314 repeat gate,
-# finding 4, Sonar S1192): `_protect_not_main_denial` in `protect.py` returns
-# this for both a shared main checkout and a linked worktree that sits on
-# the resolved default branch, so the one production spelling lives here
-# instead of twice in that function.
-PROTECT_NOT_MAIN_REASON = "not main"
-
-
 def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | None:
     """`remote`'s recorded `HEAD` symbolic ref (e.g.
     `refs/remotes/origin/trunk`), read from `directory` via `-C` when given
@@ -1029,7 +1004,7 @@ def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | No
     the branch it names no longer resolves (issue #490: the remote renamed
     it and `fetch --prune` removed the old one). The one reader of a
     remote's `HEAD`; each caller decides its own fallback (issue #238),
-    since `claim`, `protect`, and the trunk word or guess differently.
+    since `claim`, `rescope`, and the trunk word or guess differently.
 
     One git read resolves the symbolic ref and proves its target exists; a
     plain, non-symbolic `HEAD` ref names itself and so no branch. A git
@@ -1062,8 +1037,8 @@ def is_default_branch(branch: str, default_branch: str | None) -> bool:
     since a fresh claim is created by literally standing in the worktree it
     claims -- there is no attacker-reachable payload location to spoof
     here, so the historical guess stays an accepted risk (issue #238).
-    `protect` and `rescope` deny outright when no default branch is
-    recorded (issue #314 gate G4), rather than share this guess.
+    `rescope` denies outright when no default branch is recorded (issue
+    #314 gate G4), rather than share this guess.
     """
     if default_branch is not None:
         return branch == default_branch
@@ -1344,8 +1319,7 @@ def resolved_agent(explicit: str | None) -> str:
 def session_agent() -> str | None:
     """This session's own agent identity from its environment, or `None`
     when it names none -- each caller says how to supply one, since only
-    the CLI commands have an `--agent` flag (`protect`'s hook line does
-    not, issue #448)."""
+    the CLI commands have an `--agent` flag."""
     configured = os.environ.get(ACO_AGENT_ENV)
     if configured:
         return outbound_text(configured, "agent", maximum=128)
@@ -1496,9 +1470,9 @@ def create_linked_worktree(
     a ref or commit selected by the caller. Git's own `branch.autoSetupMerge`
     determines whether the new branch tracks that start point.
     Reads and writes `directory`'s own checkout via `-C` when given (issue
-    #394: `protect.judge`'s own direct tests build a worktree fixture from
-    an explicit repository path, never the test process's cwd) or the
-    calling process's own checkout otherwise."""
+    #394: a test builds a worktree fixture from an explicit repository
+    path, never the test process's cwd) or the calling process's own
+    checkout otherwise."""
     result = _git_run(
         ["worktree", "add", str(path), "-b", branch, start_point], directory=directory
     )

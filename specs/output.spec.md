@@ -51,7 +51,6 @@ issue #432).
 - An abbreviation never stands for a destructive flag (issue #502): `aco reset --conf --f` refuses before any read, never acting as `--confirm --force-unreadable`.
 - A `--repo` path, bare owner, third segment, or `.`/`..` name is never dropped for the checkout's own remote: it refuses by name (OUT-08, issue #465).
 - A non-zero exit never means a refusal on its own: a command may name a further code for an answer it did give, and its own spec owns that code.
-- `protect` never joins this envelope, migrated or not: its hook protocol (a silent exit `0`, or the deny object on exit `2`; PROT-01/PROT-02) is a permanent exception (`specs/protect.spec.md`).
 - `bootstrap`, `reset`, `start`, `adopt`, `register`, `run`, and `login` never gain a `--json` mode of their own (each command's own product decision, not a pending migration): each names it in its own `## Never` (`specs/bootstrap.spec.md`, `specs/reset.spec.md`, `specs/start.spec.md`, `specs/adopt.spec.md`, `specs/workspace.spec.md`).
 
 ## Examples

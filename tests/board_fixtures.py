@@ -1,5 +1,5 @@
 """Board and claim scenarios for test_board, test_body_cli, test_checkout,
-test_cli, test_cut, test_github, test_items, test_protect, test_protocol, test_rulings,
+test_cli, test_cut, test_github, test_items, test_protocol, test_rulings,
 test_session, test_state_board, cli_fixtures, and github_fixtures.
 
 Consumers import this module directly: pytest's rootless collection puts
@@ -155,7 +155,7 @@ def standing_active_claim(
 ) -> protocol.ActiveClaim:
     """Build one store-truth `ActiveClaim` directly (issue #176): the store
     fake's counterpart to `request()`'s ledger-comment `ClaimRequest` --
-    every `protect`/`status` test that needs a live claim on a faked
+    every `status` test that needs a live claim on a faked
     `store.fetch_state` builds it from here instead of round-tripping
     through a comment marker no store command reads any more."""
     identity: protocol.ClaimIdentity = (

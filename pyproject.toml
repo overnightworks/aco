@@ -72,10 +72,9 @@ containers = ["agent_coordination"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_adopt | cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_protect | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_start | cmd_status | cmd_workspace",
+    "cmd_adopt | cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_start | cmd_status | cmd_workspace",
     "board_read | policy | report",
     "session",
-    "protect",
     "workspace",
     "terminal",
     "providers",
@@ -86,8 +85,7 @@ layers = [
     "items",
     "body",
     "metrics",
-    "protocol | process | hook_input",
-    "sed_script",
+    "protocol | process",
 ]
 # `metrics` moved below `body` (issue #419): it has no `agent_coordination`
 # import of its own (`metrics.py`'s own docstring), so nothing above
