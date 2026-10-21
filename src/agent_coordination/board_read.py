@@ -473,6 +473,15 @@ def item_body_or_refuse(
     return reference.body or ""
 
 
+def require_readable_item(client: forge.ForgeReader, issue: board.Issue | None) -> None:
+    """Refuses a board row the state-ref store set aside as unreadable with
+    the store's own refusal for that item (PIN-14, PIN-15), the one sentence a
+    single-item read of it prints. A row on any other storage is never
+    unreadable, so this does nothing there."""
+    if issue is not None and issue.unreadable is not None:
+        client.item_reference(issue.number)
+
+
 def require_update_item_body(client: forge.ForgeWriter, *, command: str) -> None:
     if client.capability(forge.ForgeOperation.UPDATE_ITEM_BODY) is not forge.Capability.READ_WRITE:
         raise protocol.ClaimUnavailableError(

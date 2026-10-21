@@ -76,8 +76,8 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `items/aco-00
 
 ```console
 $ aco ask aco-000001 --text "New question?" --json
-2> ERROR: aco-000001 body malformed: aco: no aco block; ask needs a valid aco block
-{"ok": false, "reason": "invalid_item", "message": "aco-000001 body malformed: aco: no aco block; ask needs a valid aco block"}
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+{"ok": false, "reason": "invalid_item", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]"}
 exit 2
 ```
 

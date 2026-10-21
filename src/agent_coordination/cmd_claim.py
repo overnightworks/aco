@@ -652,6 +652,7 @@ def _resolved_issue_scope(
         return live.scope, None
     client = context.forge
     open_by_number = {issue.number: issue for issue in client.list_open_board_issues()}
+    board_read.require_readable_item(client, open_by_number.get(identity.issue))
     item_scope = _item_scope(client, open_by_number, identity.issue, storage=storage)
     if item_scope is None:
         raise _ClaimBodyInvalidError(_CLAIM_SCOPE_MISSING)
@@ -763,6 +764,7 @@ def _claim_target_checks(
     open_by_number = target.open_by_number
     if open_by_number is None:
         open_by_number = {issue.number: issue for issue in client.list_open_board_issues()}
+    board_read.require_readable_item(client, open_by_number.get(target_issue))
     _reject_scope_mismatch(open_by_number, target_issue, requested.scope, target.storage)
     projected = board_read.build_board(
         context,
