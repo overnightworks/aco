@@ -257,6 +257,27 @@ def is_display_control(character: str) -> bool:
     )
 
 
+def terminal_text(text: str) -> str:
+    """Foreign `text` -- a title, a `Next` line -- as it may reach a terminal
+    (issues #532, #538): every `is_display_control` character shown
+    as its printable escape (ESC as `\\x1b`, U+202E as `\\u202e`), so a
+    title can neither retitle the window, clear the screen, nor reorder the
+    text around it; printable text, `Größe`, TAB and NBSP included, stays as
+    it is. Commands are `shell_command`'s to render, never `protocol`'s."""
+    return "".join(
+        character.encode("unicode_escape").decode() if is_display_control(character) else character
+        for character in text
+    )
+
+
+def terminal_block(text: str) -> str:
+    """Foreign multi-line `text` -- a stored body -- as it may reach a
+    terminal (issue #544): each line as `terminal_text` shows it, so its
+    line feeds still break lines while every other display control, the
+    carriage return included, prints as its escape."""
+    return "\n".join(terminal_text(line) for line in text.split("\n"))
+
+
 def _has_control_character(text: str) -> bool:
     return any(
         ord(character) < ASCII_PRINTABLE_MIN or ord(character) == ASCII_DEL for character in text

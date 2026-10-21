@@ -6,7 +6,7 @@ import json
 import sys
 from enum import StrEnum
 
-from . import board, protocol
+from . import protocol
 
 CLI_ERROR_PREFIX = "ERROR: "
 REFUSAL_LINE_LENGTH_LIMIT = 200
@@ -43,7 +43,7 @@ def bounded_refusal(sentence: str) -> str:
     (a check name, a head's board configuration key) may carry a newline or
     a terminal escape, so it is shown as `next` shows foreign text (`\\n`,
     `\\x1b`) before the length cap applies (issues #505, #538)."""
-    return _cut_to(board.terminal_text(sentence), _REFUSAL_SENTENCE_LENGTH_LIMIT)
+    return _cut_to(protocol.terminal_text(sentence), _REFUSAL_SENTENCE_LENGTH_LIMIT)
 
 
 def refusal_around_foreign_text(template: str, foreign_text: str, **words: object) -> str:
@@ -51,7 +51,7 @@ def refusal_around_foreign_text(template: str, foreign_text: str, **words: objec
     shown as `bounded_refusal` shows foreign text, and cut alone so that the
     words around it always survive."""
     room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
-    shown = _cut_to(board.terminal_text(foreign_text), room)
+    shown = _cut_to(protocol.terminal_text(foreign_text), room)
     return template.format(foreign=shown, **words)
 
 

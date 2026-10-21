@@ -589,7 +589,7 @@ class BoardItem:
     # `waiting on operator:` and never cuts or checks such a container.
     waits_on_operator: bool
     # `actionable_reason` as `next`'s text prints it under `SKIPPED` (issue
-    # #532): through `terminal_text`. The prose itself, a cut slice's title
+    # #532): through `protocol.terminal_text`. The prose itself, a cut slice's title
     # quoted by `_quoted_prose` included (#310 finding 190), is one reason
     # text and `--json` share; JSON and the HTML board escape on their own.
     terminal_actionable_reason: str | None
@@ -792,7 +792,7 @@ def _validated_repository_paths(
             protocol.valid_scope([entry.removesuffix("/") if directories else entry])
         except protocol.InvalidClaimMarkerError as error:
             raise protocol.ClaimError(
-                f"board configuration {path} {key} entry '{terminal_text(entry)}' "
+                f"board configuration {path} {key} entry '{protocol.terminal_text(entry)}' "
                 "is not a canonical path inside the repository"
             ) from error
     return tuple(entries)
@@ -805,11 +805,11 @@ def _refuse_unknown_config_keys(raw: dict[str, object], path: Path) -> None:
     Silence here is expensive: `priorty_labels = [...]` would leave the
     board ordered by the defaults, with nothing in any output saying the
     repository's own ladder was never read. A key is foreign text, so it is
-    named as `terminal_text` shows it (issue #540).
+    named as `protocol.terminal_text` shows it (issue #540).
     """
     unknown = sorted(set(raw) - CONFIG_KEYS)
     if unknown:
-        named = terminal_text(", ".join(unknown))
+        named = protocol.terminal_text(", ".join(unknown))
         raise protocol.ClaimError(f"board configuration {path} has unknown top-level key {named}")
 
 
@@ -935,7 +935,7 @@ def _validated_brief_step_rules(
         raise protocol.ClaimError(f"brief configuration {path} [{section}] must be a table")
     unknown = sorted(set(section_raw) - BRIEF_STEP_KEYS)
     if unknown:
-        named = terminal_text(", ".join(unknown))
+        named = protocol.terminal_text(", ".join(unknown))
         raise protocol.ClaimError(f"brief configuration {path} [{section}] has unknown key {named}")
     return BriefStepRules(
         rules=_validated_brief_string_list(section_raw, path, section, "rules"),
@@ -946,7 +946,7 @@ def _validated_brief_step_rules(
 def _refuse_unknown_brief_config_keys(raw: dict[str, object], path: Path) -> None:
     unknown = sorted(set(raw) - BRIEF_CONFIG_STEPS)
     if unknown:
-        named = terminal_text(", ".join(unknown))
+        named = protocol.terminal_text(", ".join(unknown))
         raise protocol.ClaimError(f"brief configuration {path} has unknown top-level key {named}")
 
 
@@ -1110,7 +1110,7 @@ def live_classification_line(body: str) -> str | None:
     """The first live `Work-Item:`/`No-Item:` line of `body`, valid or not,
     as a terminal may show it (a fenced example is no line), or `None`."""
     first = CLASSIFICATION_LINE_PATTERN.search(_live_text(body))
-    return None if first is None else terminal_text(first.group(0))
+    return None if first is None else protocol.terminal_text(first.group(0))
 
 
 def pull_request_declaration(number: int, author: str, classification: Classification) -> str:
@@ -1159,7 +1159,7 @@ def classification_line_state(
     classification = _selected_classification(selected, repository)
     if isinstance(classification, NoItemClassification) and classification.kind is kind:
         return ClassificationLine.PRESENT
-    return OtherClassificationLine(terminal_text(selected.group(0)))
+    return OtherClassificationLine(protocol.terminal_text(selected.group(0)))
 
 
 def body_with_classification(body: str, kind: NoItemKind) -> str:
@@ -1766,7 +1766,7 @@ def _board_item(
         actionable_reason=actionable_reason,
         waits_on_operator=_waits_on_operator(actionability),
         terminal_actionable_reason=(
-            None if actionable_reason is None else terminal_text(actionable_reason)
+            None if actionable_reason is None else protocol.terminal_text(actionable_reason)
         ),
         read_state=parsed.read_state,
         childless_verdict=childless_verdict,
@@ -2689,29 +2689,6 @@ def truncated_display_name(name: str) -> str:
     if len(name) <= _DISPLAY_NAME_LENGTH_LIMIT:
         return name
     return name[: _DISPLAY_NAME_LENGTH_LIMIT - 1] + "…"
-
-
-def terminal_text(text: str) -> str:
-    """Foreign `text` -- a title, a `Next` line -- as it may reach a terminal
-    (issues #532, #538): every `protocol.is_display_control` character shown
-    as its printable escape (ESC as `\\x1b`, U+202E as `\\u202e`), so a
-    title can neither retitle the window, clear the screen, nor reorder the
-    text around it; printable text, `Größe`, TAB and NBSP included, stays as
-    it is. Commands are `shell_command`'s to render, never this owner's."""
-    return "".join(
-        character.encode("unicode_escape").decode()
-        if protocol.is_display_control(character)
-        else character
-        for character in text
-    )
-
-
-def terminal_block(text: str) -> str:
-    """Foreign multi-line `text` -- a stored body -- as it may reach a
-    terminal (issue #544): each line as `terminal_text` shows it, so its
-    line feeds still break lines while every other display control, the
-    carriage return included, prints as its escape."""
-    return "\n".join(terminal_text(line) for line in text.split("\n"))
 
 
 def _quoted_prose(text: str) -> str:

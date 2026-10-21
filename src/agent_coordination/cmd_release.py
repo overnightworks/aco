@@ -131,7 +131,7 @@ def _release_next_line(item: board.BoardItem | None, storage: body.Storage) -> s
     if item is None:
         return "next: none"
     label = board.item_label(item.number, storage)
-    return f"next: {label} score {item.score}: {board.terminal_text(item.title)}"
+    return f"next: {label} score {item.score}: {protocol.terminal_text(item.title)}"
 
 
 def _release_outcome(merged: int | None, abandoned: str | None) -> protocol.ReleaseOutcome:

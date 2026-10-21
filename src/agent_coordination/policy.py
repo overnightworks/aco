@@ -179,7 +179,7 @@ def dependency_rule_defect(
     outside = sorted(path for path in paths if not config.covers_dependency_path(path))
     if outside:
         named = protocol.named_with_overflow_count(
-            tuple(board.truncated_display_name(board.terminal_text(path)) for path in outside)
+            tuple(board.truncated_display_name(protocol.terminal_text(path)) for path in outside)
         )
         return board.ClassificationDefect(
             f"changes {named}, which dependency_paths in "

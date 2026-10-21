@@ -58,6 +58,7 @@ from .protocol import (
     MalformedStateTreeError,
     ObjectId,
     item_id_of_filename,
+    terminal_text,
 )
 
 STATE_REF_CAPABILITIES: Mapping[forge.ForgeOperation, forge.Capability] = MappingProxyType(
@@ -276,7 +277,7 @@ def _decode_item(item_id: str, content: bytes, oid: ObjectId) -> _DecodedItem | 
         return _MalformedItem(
             problem=(
                 f"has a malformed {BLOCK_FENCE_INFO} block "
-                f"({board.terminal_text(body_defect_text(defect))})"
+                f"({terminal_text(body_defect_text(defect))})"
             ),
             defect=defect,
             oid=oid,

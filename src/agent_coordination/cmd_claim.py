@@ -247,7 +247,7 @@ class _SliceCheck:
 
     def render(self) -> str:
         prefix = "ERROR" if self.level == "error" else "WARNING"
-        return f"{prefix}: {board.terminal_text(self.text)}"
+        return f"{prefix}: {protocol.terminal_text(self.text)}"
 
     def as_json(self) -> dict[str, object]:
         return {

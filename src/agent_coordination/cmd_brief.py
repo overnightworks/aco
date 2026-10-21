@@ -92,16 +92,16 @@ def _print_brief_step_rules(step_rules: board.BriefStepRules) -> None:
     """`RULES` and `CHECKS` (issue #324): two more sections after the four
     `_print_brief` always prints, only under `--step` -- the repository's own
     `.aco/brief.toml` entries for that lane step, one per line,
-    each as `board.terminal_text` shows it so no entry can break into a forged
+    each as `protocol.terminal_text` shows it so no entry can break into a forged
     line or section (issue #548)."""
     print()
     print("RULES")
     for rule in step_rules.rules:
-        print(board.terminal_text(rule))
+        print(protocol.terminal_text(rule))
     print()
     print("CHECKS")
     for check in step_rules.checks:
-        print(board.terminal_text(check))
+        print(protocol.terminal_text(check))
 
 
 @dataclass(frozen=True)
@@ -121,7 +121,7 @@ class _BriefComposition:
 
 
 def _print_brief(composition: _BriefComposition) -> None:
-    print(board.terminal_block(composition.body))
+    print(protocol.terminal_block(composition.body))
     print()
     print("CLAIM")
     if composition.live is None:

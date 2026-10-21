@@ -388,7 +388,7 @@ def _land_merge(
     except forge.ForgeMergeRefusedError as error:
         raise protocol.ClaimUnavailableError(
             f"GitHub refused the merge of pull request #{detail.number}: "
-            f"{board.terminal_text(str(error))}"
+            f"{protocol.terminal_text(str(error))}"
         ) from error
 
 
@@ -411,7 +411,7 @@ def _land_step(
     except protocol.ClaimError as error:
         raise protocol.ClaimUnavailableError(
             f"MERGED pull request #{number} as {sha}; follow-up incomplete: {step} "
-            f"({board.terminal_text(str(error))}); re-run aco land {number}"
+            f"({protocol.terminal_text(str(error))}); re-run aco land {number}"
         ) from error
 
 
