@@ -7163,6 +7163,47 @@ def test_next_still_skips_the_same_prose_without_the_label_as_malformed(
     )
 
 
+def test_next_keeps_an_unlabelled_projectionless_item_skipped_with_an_active_idea_label(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    write_repository_config(tmp_path, 'idea_label = "idea"\n')
+    incomplete = board_issue(10, "Incomplete work", idea_body("Investigate."))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(incomplete,))
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
+    assert capsys.readouterr().out == (
+        "No actionable item.\n"
+        + _NO_ACTION_NEXT_TAIL
+        + "\nSKIPPED\n#10: body incomplete: Now, Next, Done when\n"
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next", "--json"]) == 3
+    assert json.loads(capsys.readouterr().out) == {
+        "ok": False,
+        "reason": "nothing_actionable",
+        "recovery": [],
+        "skipped": [{"number": 10, "reason": "body incomplete: Now, Next, Done when"}],
+        "parallel": _EMPTY_PARALLEL_JSON,
+        "close": [],
+        "waiting_on_operator": [],
+        "ideas": [],
+    }
+
+
+def test_next_keeps_a_vision_labelled_projectionless_item_incomplete_without_configuration(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    idea = board_issue(10, "Operator vision", idea_body("Investigate."), labels=("vision",))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
+    assert capsys.readouterr().out == (
+        "No actionable item.\n"
+        + _NO_ACTION_NEXT_TAIL
+        + "\nSKIPPED\n#10: body incomplete: Now, Next, Done when\n"
+    )
+
+
 def test_next_takes_the_configured_idea_label_instead_of_the_default(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
