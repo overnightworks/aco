@@ -2793,7 +2793,9 @@ class TestCliStateRefForge:
         `--row 9` naming no entry, a container that is itself a child, or a
         row whose `done_when` holds a display control (BODY-66, CUT-05)
         refuses by the item id -- the same by-name refusals GitHub's own
-        cut tests prove -- and nothing reaches the remote."""
+        cut tests prove -- and nothing reaches the remote. A readable
+        container keeps CUT-05's form, not PIN-15's (CUT-40, matrix B
+        cell 11)."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
         remote_url = f"file://{bare_remote}"
         before = store.fetch_state(worktree=worktree, remote=remote_url)
@@ -3269,31 +3271,6 @@ class TestCliStateRefForge:
         assert capsys.readouterr().err == f"ERROR: {refusal}\n"
         after = store.fetch_state(worktree=worktree, remote=remote_url)
         assert after.tip == before.tip
-
-    def test_cut_keeps_cut_05_for_a_readable_container_whose_row_is_unsafe(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        """Spec: CUT-05, CUT-39. E2: matrix B cell 11 -- a readable item
-        keeps CUT-05's form; only an item PIN-15 refuses takes PIN-15."""
-        unsafe = (
-            _container_body_with_slices(((1, "Slice A"),))
-            .replace('done_when = "D"', 'done_when = "a\\u001b[2Jb"')
-            .encode()
-        )
-        self._live_state_ref_checkout(
-            monkeypatch, tmp_path, bare_remote, worktree, {f"{CONTAINER_ID}.md": unsafe}
-        )
-
-        result = run_cli(["cut", CONTAINER_ID, "--title", "Slice A"], capsys)
-
-        assert result.status == 2
-        assert result.stderr.startswith(f"ERROR: {CONTAINER_ID} body malformed: ")
-        assert result.stderr.endswith("; cut needs a valid aco block\n")
 
     def test_board_reads_a_real_state_ref_without_gh(
         self,

@@ -51,7 +51,7 @@ line's 1-based index.
 `<body defect sentence>` is `specs/body-block.spec.md`'s own first-defect
 text (BODY-01..BODY-50); a picture's own content rules are BODY-37..BODY-42.
 
-- [ ] [ASK-05] A MALFORMED item body refuses `#<n> <body defect sentence>; ask needs a valid aco block`, exit `2`, before any write (see E-ASK-03).
+- [ ] [ASK-05] A MALFORMED item body refuses `#<n> <body defect sentence>; ask needs a valid aco block`, exit `2`, before any write (see E-ASK-03); under `state-ref` ASK-13 applies.
 - [ ] [ASK-06] `--picture FILE.svg` naming an unreadable file refuses `--picture <path> could not be read: <error>`, exit `2`, before the forge or the item body are touched (see E-ASK-04).
 - [ ] [ASK-07] A `--picture` failing a BODY-37..42 rule refuses `picture <reason>` (no `expectation[0].` prefix), exit `2`, before any write; `<reason>` is the first-matching row below.
 - [ ] [ASK-08] `--text` that is blank or all whitespace refuses `expectation text must be a non-empty string`, exit `2`, before any write.
@@ -59,12 +59,13 @@ text (BODY-01..BODY-50); a picture's own content rules are BODY-37..BODY-42.
 - [ ] [ASK-10] A `--question`/`--example` failing BODY-34..36 refuses `<field> <reason>`, exit `2`, before any write; `<field>` is `question` or `example`, `<reason>` from the table below (see E-ASK-06).
 - [ ] [ASK-11] Under `storage = "state-ref"`, `aco ask` resolves the state-ref forge like `aco rule`; `--repo` there refuses the same as PIN-04 (see E-ASK-07).
 - [ ] [ASK-12] A forge failure appending the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-ASK-08).
+- [ ] [ASK-13] Under `storage = "state-ref"`, PIN-14/PIN-15 refuse a malformed body with their sentence and ITEM-38's repair clause, exit `2`, before any write; `reason` stays `invalid_item` (see E-ASK-03).
 
 `reason`, by which refusal fired:
 
 | refusal | `reason` |
 |---|---|
-| ASK-05 (malformed body), RULE-07 (missing item, cited), RULE-08 (pull-request target, cited) | `invalid_item` |
+| ASK-05 (malformed body), ASK-13 (state-ref malformed body), RULE-07 (missing item, cited), RULE-08 (pull-request target, cited) | `invalid_item` |
 | ASK-06 (`--picture` unreadable), ASK-07 (`--picture` content refused) | `invalid_picture` |
 | ASK-08 (blank `--text`), ASK-10 (`--question`/`--example` content refused) | `invalid_expectation` |
 | ASK-11 (`--repo` under `storage = state-ref`, cites PIN-04) | `invalid_usage` |
