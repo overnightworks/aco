@@ -1,0 +1,174 @@
+# Measured by `quality baseline write`. Entries only ever go down.
+
+[ccn."src/agent_coordination/board.py"]
+"build_board" = 33
+
+[ccn."src/agent_coordination/board_read.py"]
+"build_board" = 16
+
+[ccn."src/agent_coordination/cmd_cut.py"]
+"_adopt_existing_child" = 19
+
+[ccn."src/agent_coordination/github.py"]
+"GitHubForge._board_dependency" = 18
+"GitHubForge._board_issue" = 20
+"GitHubForge._landing" = 28
+
+[ccn."src/agent_coordination/protocol.py"]
+"valid_scope" = 17
+
+[ccn."src/agent_coordination/terminal.py"]
+"external_ownership" = 18
+
+[ccn."tests/test_status.py"]
+"check_status.check" = 19
+
+[file_lines]
+"scripts/test_inventory.py" = 933
+"src/agent_coordination/board.py" = 3160
+"src/agent_coordination/body.py" = 1669
+"src/agent_coordination/checkout.py" = 2041
+"src/agent_coordination/cli.py" = 1062
+"src/agent_coordination/cmd_claim.py" = 1137
+"src/agent_coordination/cmd_release.py" = 925
+"src/agent_coordination/github.py" = 1765
+"src/agent_coordination/protocol.py" = 1881
+"src/agent_coordination/state_board.py" = 957
+"src/agent_coordination/store.py" = 2115
+"src/agent_coordination/workspace.py" = 1026
+"tests/aco_board/test_aco_board_api.py" = 1060
+"tests/cli_fixtures.py" = 969
+"tests/github_fixtures.py" = 839
+"tests/test_adopt.py" = 1650
+"tests/test_board.py" = 4456
+"tests/test_checkout.py" = 2085
+"tests/test_cli.py" = 17839
+"tests/test_cut.py" = 1125
+"tests/test_github.py" = 3250
+"tests/test_land_after_merge_rerun.py" = 884
+"tests/test_land_preflight_claim.py" = 858
+"tests/test_protocol.py" = 804
+"tests/test_release_cleanup.py" = 814
+"tests/test_rescope_checkout.py" = 1088
+"tests/test_reset.py" = 954
+"tests/test_state_board.py" = 6121
+"tests/test_store.py" = 5526
+"tests/test_workspace.py" = 2017
+"tests/test_workspace_terminal.py" = 1269
+
+[function_lines."src/agent_coordination/board.py"]
+"_board_item" = 103
+"build_board" = 117
+
+[function_lines."src/agent_coordination/board_read.py"]
+"build_board" = 111
+
+[function_lines."src/agent_coordination/cli.py"]
+"_add_item_parser" = 84
+
+[function_lines."src/agent_coordination/cmd_claim.py"]
+"checked_claim" = 77
+
+[function_lines."src/agent_coordination/cmd_cut.py"]
+"_adopt_existing_child" = 67
+
+[function_lines."src/agent_coordination/cmd_land.py"]
+"_land_preflight" = 72
+"run" = 78
+
+[function_lines."src/agent_coordination/cmd_release.py"]
+"_cmd_release_landed" = 98
+"release_transition" = 74
+
+[function_lines."src/agent_coordination/cmd_rescope.py"]
+"_rescope_write" = 69
+
+[function_lines."src/agent_coordination/github.py"]
+"GitHubForge._landing" = 60
+
+[function_lines."src/agent_coordination/store.py"]
+"claim_lifecycle" = 62
+"commit_transition" = 63
+
+[function_lines."tests/github_fixtures.py"]
+"landed_observations" = 61
+"lane_landing_world" = 71
+
+[function_lines."tests/test_ask.py"]
+"TestGithubAsk.test_refusal" = 61
+
+[function_lines."tests/test_board.py"]
+"test_board_json_carries_a_scoped_uncut_slice_row_canonically" = 60
+"test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change" = 61
+
+[function_lines."tests/test_checkout.py"]
+"_trunk_history_repository" = 63
+
+[function_lines."tests/test_cli.py"]
+"_board_fixture_environment" = 122
+"_run_scope_width_command" = 75
+"test_cli_claim_json_prints_acquired_claim_object" = 63
+"test_cli_claim_scope_derivation_against_the_items_own_body" = 69
+"test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_remote" = 82
+"test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state" = 60
+"test_next_close_names_every_zero_cost_action_regardless_of_rank" = 62
+"test_next_names_a_nested_containers_repair_where_cut_refuses_its_row" = 60
+"test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed" = 65
+"test_next_parallel_set_uses_a_cut_proposals_own_row_scope" = 68
+"test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line" = 62
+"test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
+"test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped" = 61
+"test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 71
+"test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 67
+"test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 61
+
+[function_lines."tests/test_cut.py"]
+"cut_check" = 63
+
+[function_lines."tests/test_github.py"]
+"test_github_adapter_item_references_reads_every_number_from_one_batch" = 64
+
+[function_lines."tests/test_land_after_merge_rerun.py"]
+"TestLandAfterMergeRerun.test_releases_in_the_original_checkout" = 60
+"separate_world" = 77
+
+[function_lines."tests/test_land_merge.py"]
+"world" = 105
+
+[function_lines."tests/test_land_merge_message.py"]
+"world" = 110
+"world.arrange" = 67
+
+[function_lines."tests/test_land_preflight_claim.py"]
+"world" = 104
+
+[function_lines."tests/test_release_cleanup.py"]
+"verify_cleanup" = 88
+
+[function_lines."tests/test_reset.py"]
+"test_reset_bundle_restores_the_released_history" = 64
+"test_reset_plans_or_performs_each_state" = 70
+"test_reset_refuses_live_claims_and_touches_nothing" = 95
+
+[function_lines."tests/test_state_board.py"]
+"TestCliStateRefForge.test_cut_adopts_the_child_after_a_partial_failure_from_a_competing_write" = 110
+"TestCliStateRefForge.test_cut_removes_the_slice_row_byte_exact_and_a_fresh_board_shows_the_child" = 68
+"TestCliStateRefForge.test_item_close_refuses_a_live_claim_then_succeeds_after_release_abandoned" = 60
+"TestCliStateRefForge.test_item_new_with_origin_writes_the_record_and_a_fresh_show_prints_it" = 65
+"TestCliStateRefForge.test_next_status_and_rulings_print_state_ref_ids_where_github_prints_hash_n" = 61
+"TestCliStateRefForge.test_readme_week_without_a_forge_runs_end_to_end_against_a_fresh_bare_remote" = 157
+"TestCliStateRefForge.test_whole_state_ref_paths_preserve_state" = 111
+
+[function_lines."tests/test_status.py"]
+"check_status" = 91
+"check_status.check" = 72
+
+[function_lines."tests/test_store.py"]
+"test_claim_lifecycle_reads_intervals_from_real_ref_history" = 62
+"test_commit_transition_preserves_items_across_claim_rescope_and_release" = 63
+"test_commit_transition_ten_thread_contention_lands_every_distinct_key" = 66
+"test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the_ref" = 74
+
+[function_lines."tests/test_workspace_terminal.py"]
+"test_initial_and_retried_codex_children_receive_the_sanitized_environment" = 125
+"test_open_viewer_acceptance_keeps_a_newer_attempt_token_after_its_condition_runs" = 112
