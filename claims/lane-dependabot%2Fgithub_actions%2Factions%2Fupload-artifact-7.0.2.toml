@@ -1,7 +1,0 @@
-claim_id = "1da54c26a25340ef8dc0a9f25c63a4f8"
-agent = "claude"
-role = "builder"
-base = "0f2073a192e7537a79721863a50053d8d8090eff"
-branch = "dependabot/github_actions/actions/upload-artifact-7.0.2"
-scope = [".github/workflows/ci.yml"]
-opened_commit = "fdc13dca6de22aae3537dcf1074a0520299ce80f"
