@@ -15,7 +15,8 @@ grammar, the width gate, roles, resources, overlap, the cost line
 claim's own `--json` field order (CLAIM-69); `specs/body-block.spec.md`
 owns a malformed body's own defect sentence (BODY-50) and an incomplete
 projection's own skip (BODY-51); `aco claim` reuses either sentence
-verbatim before any write (BODY-52). This file cites those IDs rather than
+verbatim before any write (BODY-52), except that under `storage = "state-ref"`
+an item PIN-14 or PIN-15 refuses prints that sentence instead (CLAIM-73). This file cites those IDs rather than
 restating them. `<n>` is a claimed issue number, a printed `#<n>` its
 `storage = "github"` form and the item id under `storage = "state-ref"`
 (PIN-30). `<path>` a repository-relative path, `<reason>` a free-text
@@ -40,7 +41,7 @@ sentence.
 | target is blocked | CLM-10 | CLM-10 | — |
 | target is a container | CLM-11 | CLM-11 | — |
 | target is closed or missing | CLM-12 | CLM-12 | — |
-| target body is malformed | BODY-50, BODY-52 | BODY-50, BODY-52 | — |
+| target body is malformed | BODY-50, BODY-52, CLAIM-73 | BODY-50, BODY-52, CLAIM-73 | — |
 | target body is incomplete | CLM-13 | CLM-13 | — |
 | slice-shaped title, no recorded parent | CLM-14, CLM-28 | CLM-14, CLM-28 | — |
 | a replayed (interrupted) request | CLM-15, CLAIM-13 | CLM-15, CLAIM-13 | CLM-15, CLAIM-13 |
@@ -115,10 +116,10 @@ to the clause each names below.
 
 | refusal | `reason` |
 |---|---|
-| CLM-01..14, CLM-18, CLM-20, CLM-22, CLM-23, CLM-36, CLM-37 under `state-ref` (PIN-15) and every refusal not named below | `unavailable` |
+| CLM-01..14, CLM-18, CLM-20, CLM-22, CLM-23, CLM-36, CLM-37 and CLAIM-73 under `state-ref` (PIN-14, PIN-15) and every refusal not named below | `unavailable` |
 | CLM-17 (an error-level check) | `precondition_failed` |
 | CLM-24 (a missing or pull-request target while deriving scope) | `target_invalid` |
-| CLAIM-55 (item names no scope), CLAIM-54 (scope mismatch), CLAIM-68 (malformed body while deriving), CLM-37 under `github` (malformed body behind a wide scope) | `body_invalid` |
+| CLAIM-55 (item names no scope), CLAIM-54 (scope mismatch), CLAIM-68 (malformed body while deriving, `github` only), CLM-37 under `github` (malformed body behind a wide scope) | `body_invalid` |
 | CLM-25 (identity, claim id, or resource conflict) | `claim_conflict` |
 | CLM-26 (`--repo` under `storage = state-ref`) | `invalid_usage` |
 | a missing agent identity, before the command starts (OUT-05) | `precondition_failed` |

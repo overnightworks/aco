@@ -41,7 +41,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 | foreign claim, coordinator override | CLAIM-51 | — | CLAIM-38, CLAIM-39, CLAIM-40 |
 | hand-corrupted claim file | CLAIM-06..CLAIM-08, CLAIM-59..CLAIM-63, CLAIM-70 | CLAIM-06..CLAIM-08, CLAIM-59..CLAIM-63, CLAIM-70 | — |
 | hand-corrupted claim key | CLAIM-09, CLAIM-56, CLAIM-64..CLAIM-66 | CLAIM-09, CLAIM-56, CLAIM-64..CLAIM-66 | — |
-| item naming its own scope | CLAIM-53, CLAIM-54, CLAIM-55, CLAIM-67, CLAIM-68 | — | — |
+| item naming its own scope | CLAIM-53, CLAIM-54, CLAIM-55, CLAIM-67, CLAIM-68, CLAIM-73 | — | — |
 | one claim's own `--json` view | CLAIM-69 | CLAIM-69 | CLAIM-69 |
 
 ## The record and its key
@@ -147,6 +147,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-55] An item naming no `scope` refuses issue-mode `aco claim 42` without `--scope` with `item names no scope; pass --scope`, exit `2`.
 - [ ] [CLAIM-67] An explicit `--scope` matching the item's own `scope` as a set, reordered, still claims: CLAIM-54 refuses only a genuine mismatch, never a reordering.
 - [ ] [CLAIM-68] Deriving scope from a malformed `aco` block names that block's own defect (the family `aco body --check` reports) before it ever refuses CLAIM-55's less specific "item names no scope".
+- [ ] [CLAIM-73] Under `storage = "state-ref"`, an issue claim, whatever its scope, on an item PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CLAIM-68's, before any write.
 
 ## One claim's own `--json` field order
 
