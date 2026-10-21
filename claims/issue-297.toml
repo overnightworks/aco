@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "c3ec9ec9a1a84cc0f35bc3f8c1f9990c3ebae065"
 branch = "claude/issue-297-ideas-by-label-land-unknown"
-scope = ["README.md", "specs/board.spec.md", "specs/land.spec.md", "specs/next.spec.md", "specs/storage-pin.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/body.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_land.py", "src/agent_coordination/cmd_next.py", "src/agent_coordination/forge.py", "tests/board_fixtures.py", "tests/github_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_land_preflight.py", "tests/test_state_board.py"]
+scope = ["README.md", "scripts/test_inventory_dropped.txt", "specs/board.spec.md", "specs/land.spec.md", "specs/next.spec.md", "specs/storage-pin.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/body.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_land.py", "src/agent_coordination/cmd_next.py", "src/agent_coordination/forge.py", "tests/board_fixtures.py", "tests/github_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_land_merge.py", "tests/test_land_preflight.py", "tests/test_state_board.py"]
 opened_commit = "3913a83a1ec4d84988ac4e9eb24de9e829343e02"
 whole_reason = "Vier kleine Änderungen in zwei disjunkten Bereichen (Idee-Label, aco land), vom Head als eine Lane gebündelt; breit sind Produktion, Specs und pinnende Tests, in zwei Commits."
