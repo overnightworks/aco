@@ -2207,6 +2207,10 @@ def test_board_configuration_reads_and_validates_the_idea_label(tmp_path: Path) 
 
     assert board.load_config(config_path) == board.BoardConfig(("ux", "security"), "idea")
 
+    config_path.write_text('priority_labels = ["ux"]\n')
+    assert board.load_config(config_path).idea_label == "idea"
+    assert board.load_config(tmp_path / "absent.toml").idea_label == "idea"
+
     config_path.write_text('idea_label = ""\n')
     with pytest.raises(ClaimError, match="idea_label"):
         board.load_config(config_path)
@@ -2441,7 +2445,6 @@ def test_parse_body_reads_a_skeleton_block_as_incomplete_but_valid() -> None:
 
     assert parsed.read_state is BodyReadState.VALID
     assert parsed.contract_complete is False
-    assert parsed.projectionless is True
 
 
 @pytest.mark.parametrize(
@@ -3210,18 +3213,17 @@ def test_board_treats_a_same_repository_pull_request_dependency_like_any_other()
 
 
 @pytest.mark.parametrize(
-    ("frozen_until", "claims", "dependencies", "expected_reason"),
+    ("frozen_until", "claims", "dependencies"),
     [
-        pytest.param(FROZEN_UNTIL, (), (), f"frozen: {FROZEN_TRIGGER}", id="frozen"),
-        pytest.param(None, (request(issue=10, agent="Grok 4.6"),), (), "claimed", id="claimed"),
-        pytest.param(None, (), (block_dependency(9),), "blocked by #9", id="blocked"),
+        pytest.param(FROZEN_UNTIL, (), (), id="frozen"),
+        pytest.param(None, (request(issue=10, agent="Grok 4.6"),), (), id="claimed"),
+        pytest.param(None, (), (block_dependency(9),), id="blocked"),
     ],
 )
-def test_a_configured_idea_keeps_freeze_claim_and_blocker_reasons(
+def test_the_idea_label_alone_decides_over_freeze_claim_and_blocker(
     frozen_until: dict[str, object] | None,
     claims: tuple[ClaimRequest, ...],
     dependencies: tuple[board.IssueDependency, ...],
-    expected_reason: str,
 ) -> None:
     wish = "## Wunsch\nMake the board clearer.\n\n"
     block_entries: dict[str, object] = (
@@ -3247,7 +3249,8 @@ def test_a_configured_idea_keeps_freeze_claim_and_blocker_reasons(
     item = next(item for item in projected.items if item.number == idea.number)
 
     assert item not in projected.ready_now
-    assert item.actionable_reason == expected_reason
+    assert (item.idea, item.actionable_reason) == (True, board.IDEA_REASON)
+    assert board.ideas(projected) == (idea.number,)
 
 
 def test_an_idea_without_a_priority_label_follows_the_regular_score_order() -> None:

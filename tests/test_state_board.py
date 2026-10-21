@@ -1165,6 +1165,16 @@ class TestStateRefBoardMethods:
         assert state_ref_board.list_open_board_pull_requests() == ()
         assert state_ref_board.list_recent_merged_board_pull_requests(OBSERVED_AT) == ()
 
+    def test_an_item_whose_record_carries_the_idea_label_is_listed_as_an_idea(self) -> None:
+        record = _record(title="Wish", state="open", kind="task", labels=("idea",))
+        body = _state_ref_body(_CHILD_A_PROJECTION, record)
+        adapter = _state_ref_board({f"{CHILD_A_ID}.md": body.encode()})
+
+        projected = _projected(adapter, storage=Storage.STATE_REF)
+
+        assert board.ideas(projected) == (CHILD_A_NUMBER,)
+        assert board.next_action(projected) is None
+
 
 class TestStateRefBoardAgainstARealStateTree:
     def test_lists_every_open_item(self, state_ref_board: StateRefBoard) -> None:

@@ -89,7 +89,7 @@ _board_item_for_vulture = BoardItem(
     contract=Contract(now=None, next=None, done_when=None),
     next_step=None,
     contract_complete=False,
-    projectionless_idea=False,
+    idea=False,
     expectation_state=ExpectationState.NONE,
     expectation_progress=ExpectationProgress(open=0, total=0),
     ruling_landings=None,

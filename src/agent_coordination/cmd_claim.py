@@ -363,7 +363,7 @@ def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple
     # body this check exists to name. A freshly `cut` child (an incomplete
     # but defect-free skeleton) is refused here exactly as it is invisible to
     # `next`, regardless of what else may also be true of it.
-    if not item.contract_complete and not item.projectionless_idea:
+    if not item.contract_complete:
         missing = ", ".join(body.missing_or_empty_sections(contract))
         checks.append(
             _SliceCheck(

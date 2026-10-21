@@ -331,7 +331,7 @@ def ruled_expectation(
 
 def idea_body(wish: str) -> str:
     """An operator's idea: the wish in their own prose, above a block whose
-    projection keys are all still empty -- what `projectionless` reads."""
+    projection keys are all still empty."""
     return f"## Wunsch\n{wish}\n\n" + complete_contract("", now="", done_when="")
 
 

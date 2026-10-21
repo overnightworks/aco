@@ -75,7 +75,8 @@ here reads or writes it. `specs/bootstrap.spec.md` owns `bootstrap`.
 
 The quick start shows the head path. `aco next` names the
 one item the board recommends pulling now; an item labelled
-`needs-operator` waits on the operator and is never pulled. `aco start 42`
+`needs-operator` waits on the operator and an item labelled `idea` is an
+idea; neither is ever pulled. `aco start 42`
 fetches, creates the linked worktree `../<repo>-worktrees/issue-42-<slug>`
 on the branch `<agent>/issue-42-<slug>` from the trunk, and claims it with
 the scope the item's body names; repeated, it reprints the live claim
@@ -233,8 +234,9 @@ is refused by name.
 - `priority_labels` -- an ordered list of labels that rank as critical work
   on the board (default `security`, `data`, `ci`, `product`, `ux`,
   `cleanup`).
-- `idea_label` -- the label marking a not-yet-refined idea; `aco next` tells
-  the head to refine it before dispatch instead of proposing a build.
+- `idea_label` -- the label marking an idea, `idea` when absent; `aco next`
+  never proposes such an item and lists it apart under `ideas:`, whatever its
+  body holds.
 - `merge_method` -- `"merge"` or `"squash"`, the method `aco land` merges
   with. Absent, `land` reads the repository's allowed methods from the
   forge: a merge commit unless the forge forbids one, else a squash; the

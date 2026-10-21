@@ -240,8 +240,8 @@ class _NextReport:
     ceiling (issue #348): the board's own first action (`None` when nothing
     qualifies), the unworkable rows `SKIPPED` names, the landed-but-open
     `RECOVERY` rows, the parallel-capacity projection, the zero-cost
-    `close:` list, the items waiting on the operator (issue #553), and
-    whether `claim` accepts this checkout, which picks `claim` or `start`
+    `close:` list, the items waiting on the operator (issue #553), the items
+    labelled as ideas, and whether `claim` accepts this checkout, which picks `claim` or `start`
     as the advice (issue #562)."""
 
     action: board.NextAction | None
@@ -250,6 +250,7 @@ class _NextReport:
     parallel: board.ParallelSet
     close: tuple[int, ...]
     waiting: tuple[int, ...]
+    ideas: tuple[int, ...]
     site: _PullSite
 
 
@@ -278,6 +279,7 @@ def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
         "parallel": _parallel_json(next_report.parallel, storage),
         "close": _next_json_numbers(next_report.close, storage),
         "waiting_on_operator": _next_json_numbers(next_report.waiting, storage),
+        "ideas": _next_json_numbers(next_report.ideas, storage),
     }
     if next_report.action is not None:
         payload.update(_next_action_payload(next_report.action, storage, site=next_report.site))
@@ -346,6 +348,9 @@ def _next(next_report: _NextReport, storage: body.Storage) -> None:
     if next_report.waiting:
         named = ", ".join(board.item_label(number, storage) for number in next_report.waiting)
         lines.append(f"{board.WAITING_ON_OPERATOR}: {named}")
+    if next_report.ideas:
+        named = ", ".join(board.item_label(number, storage) for number in next_report.ideas)
+        lines.append(f"ideas: {named}")
     if next_report.skipped:
         skipped_lines = (
             f"{board.item_label(skipped_item.number, storage)}: "
@@ -382,7 +387,8 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
         return report.refuse(_NextReason.UNAVAILABLE, error, as_json=as_json)
     close = board.zero_cost_closes(projected)
     waiting = board.waiting_on_operator(projected)
-    already_named = {_next_action_container_number(action), *close, *waiting}
+    ideas = board.ideas(projected)
+    already_named = {_next_action_container_number(action), *close, *waiting, *ideas}
     skipped = tuple(item for item in _unworkable(projected) if item.number not in already_named)
     next_report = _NextReport(
         action=action,
@@ -391,6 +397,7 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
         parallel=board.parallel_set(projected, observed.live_claims, action),
         close=close,
         waiting=waiting,
+        ideas=ideas,
         site=site,
     )
     if as_json:
