@@ -510,6 +510,16 @@ def test_cut_requires_an_open_top_level_container_and_a_writable_forge(
             ),
         ),
         *rendered(
+            "unknown-key-with-display-controls",
+            refused(
+                "#79 body malformed: k\\x1b]0;x\\x07: unknown top-level key k\\x1b]0;x\\x07; "
+                "cut needs a valid aco block",
+                "precondition_failed",
+                (container_issue(79, MINIMAL_BLOCK_TOML + '"k\\u001b]0;x\\u0007" = 1\n'),),
+                ("--title", "X"),
+            ),
+        ),
+        *rendered(
             "selected-row-done-when-U+000B",
             refused(
                 "#79 body malformed: slice[1].done_when: slice[1].done_when of row 2 holds U+000B; "
@@ -592,7 +602,7 @@ def test_cut_requires_an_open_top_level_container_and_a_writable_forge(
     ],
 )
 def test_cut_requires_a_valid_block_for_the_row_it_cuts(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-05, CUT-39, E-CUT-03."""
+    """Spec: CUT-05, CUT-39, BODY-68, E-CUT-03."""
     cut_check(case)
 
 

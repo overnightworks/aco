@@ -181,6 +181,36 @@ class TestBodyCheck:
                 '"defects": ["body incomplete: Done when"]}\n',
                 id="only-done-when-empty",
             ),
+            pytest.param(
+                block_body(MINIMAL_BLOCK_TOML + '"k\\u001b]0;x\\u0007" = 1\n'),
+                ["body malformed: k\\x1b]0;x\\x07: unknown top-level key k\\x1b]0;x\\x07"],
+                "malformed",
+                2,
+                r'{"ok": false, "reason": "malformed", "defects": '
+                r'["body malformed: k\\x1b]0;x\\x07: unknown top-level key k\\x1b]0;x\\x07"]}'
+                "\n",
+                id="display-control-key-is-escaped",
+            ),
+            pytest.param(
+                block_body(MINIMAL_BLOCK_TOML + '"a\\nb" = 1\n'),
+                ["body malformed: a\\nb: unknown top-level key a\\nb"],
+                "malformed",
+                2,
+                r'{"ok": false, "reason": "malformed", "defects": '
+                r'["body malformed: a\\nb: unknown top-level key a\\nb"]}'
+                "\n",
+                id="line-feed-key-is-escaped",
+            ),
+            pytest.param(
+                block_body(MINIMAL_BLOCK_TOML + '"Größe\\t\\u00a0" = 1\n'),
+                ["body malformed: Größe\t\u00a0: unknown top-level key Größe\t\u00a0"],
+                "malformed",
+                2,
+                '{"ok": false, "reason": "malformed", "defects": '
+                '["body malformed: Gr\\u00f6\\u00dfe\\t\\u00a0: unknown top-level key '
+                'Gr\\u00f6\\u00dfe\\t\\u00a0"]}\n',
+                id="printable-key-is-unchanged",
+            ),
         ],
     )
     def test_body_check_judges_a_piped_body(
@@ -193,7 +223,7 @@ class TestBodyCheck:
         exit_code: int,
         wire: str,
     ) -> None:
-        """Spec: BDY-07, BDY-08, BDY-09, BODY-12, BODY-14, OUT-01."""
+        """Spec: BDY-07, BDY-08, BDY-09, BODY-12, BODY-14, BODY-68, OUT-01."""
         result = run_cli(
             ["body", "--check", *(["--json"] if as_json else [])], capsys, stdin=raw_body
         )

@@ -37,6 +37,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | a `[[slice]]` title holding a display control (`specs/next.spec.md`) | BODY-63 | BODY-64 | BODY-64 |
 | a `[[slice]]` `done_when` holding a display control | BODY-66 | BODY-64 | BODY-64 |
 | `slice = []` | BODY-49, BODY-67 | — | — |
+| a key or message of any defect holding a display control | BODY-68 | BODY-68 | BODY-68 |
 | `scope` defective | BODY-53..BODY-56 | BODY-50 | BODY-52 |
 | `size` valid or defective | BODY-57..BODY-59 | BODY-50 (defective only) | BODY-52 (defective only) |
 | `whole` valid or defective | BODY-60..BODY-62 | BODY-50 (defective only) | BODY-52 (defective only) |
@@ -122,6 +123,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-50] An item whose body carries any defect above is named by `aco board` with its first defect sentence as its reason, `body malformed: <field>: <message>`, and is never proposed as a cut or a close.
 - [ ] [BODY-51] An item whose block is valid but carries an empty projection key is skipped by `aco next`, which names it `SKIPPED` with BODY-12's `body incomplete: <keys>`.
 - [ ] [BODY-52] Issue-mode `aco claim <n>` against such an item refuses before any write with the same sentence as a `body-contract` check, exit `2` (see E-BODY-03).
+- [ ] [BODY-68] Every sentence and `--json` field naming a malformed body's defect shows each display control as NEXT-37 does; all other text is byte for byte the same (see E-BODY-09).
 
 ## `scope`, the item's own files
 
@@ -365,4 +367,23 @@ ruled_on = 2026-10-02
 BODY
 body ok
 exit 0
+````
+
+### E-BODY-09 — a defect shows display controls as escapes
+
+Setup: bare-remote, `storage = "github"`
+
+````console
+$ aco body --check <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Cut it."
+done_when = "Every slice is cut."
+
+"k\u001b]0;x\u0007" = 1
+```
+BODY
+2> body malformed: k\x1b]0;x\x07: unknown top-level key k\x1b]0;x\x07
+exit 2
 ````
