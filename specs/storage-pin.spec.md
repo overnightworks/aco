@@ -23,6 +23,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | a key the configuration does not define | PIN-33 | PIN-33 | PIN-33 | PIN-33 | — |
 | `lane_shared` is no list of unique files inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
 | dependency paths configured or invalid | PIN-44..48 | PIN-44..48 | PIN-44..48 | PIN-44..48 | — |
+| `idea_label` absent or invalid | PIN-49 | PIN-49 | PIN-49 | PIN-49 | — |
 | only the trunk's committed copy refuses | PIN-42 | PIN-42 | PIN-42 | PIN-42 | — |
 | `storage = "state-ref"` | PIN-04\*, PIN-05\*, PIN-30 | PIN-18..21 | PIN-22..28 | —\*\* | PIN-08, PIN-31 |
 | a state-ref item file itself is malformed | PIN-14..17, PIN-34, PIN-29 | ITEM-37 | ITEM-39, PIN-29 | BOARD-54 | — |
@@ -90,6 +91,7 @@ can know in advance whether it needs one. `status` and `brief` list them.
 - [ ] [PIN-45] A `dependency_paths` value that is no list of unique strings refuses `board configuration <path> dependency_paths must be a list of unique repository paths`.
 - [ ] [PIN-46] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> dependency_paths entry '<entry>' is not a canonical path inside the repository`.
 - [ ] [PIN-47] Only the run's own tracked `<path>` decides; `aco land` reads the default branch's clean checkout (LANDCMD-11), never the pull request head's copy.
+- [ ] [PIN-49] Without an `idea_label` entry the label is `idea`; a value that is no non-empty string without surrounding space refuses `board configuration idea_label must be a non-empty label`.
 
 ## `storage = "state-ref"` is forge-free
 

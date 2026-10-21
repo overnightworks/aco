@@ -481,7 +481,7 @@ def test_board_json_pins_the_raw_envelope_text_for_a_single_item(
         '"priority_order": 0, "container": null, "container_parent": null, "scope": null, '
         '"contract": {"now": "Work is ready.", "next": "Ship #10.", '
         '"done_when": "The work is merged.", "defects": []}, "next_step": "Ship #10.", '
-        '"contract_complete": true, "projectionless_idea": false, "expectation_state": "-", '
+        '"contract_complete": true, "idea": false, "expectation_state": "-", '
         '"expectation_progress": {"open": 0, "total": 0}, "ruling_landings": null, '
         '"ruling_old": null, "frozen_trigger": null, "freed_on": null, "freed_days": null, '
         '"stage": "text-only", "age_days": 1, "idle_days": 1, "active_claim": null, '
@@ -493,7 +493,7 @@ def test_board_json_pins_the_raw_envelope_text_for_a_single_item(
         '"container": null, "container_parent": null, "scope": null, '
         '"contract": {"now": "Work is ready.", "next": "Ship #10.", '
         '"done_when": "The work is merged.", "defects": []}, "next_step": "Ship #10.", '
-        '"contract_complete": true, "projectionless_idea": false, "expectation_state": "-", '
+        '"contract_complete": true, "idea": false, "expectation_state": "-", '
         '"expectation_progress": {"open": 0, "total": 0}, "ruling_landings": null, '
         '"ruling_old": null, "frozen_trigger": null, "freed_on": null, "freed_days": null, '
         '"stage": "text-only", "age_days": 1, "idle_days": 1, "active_claim": null, '
@@ -1080,6 +1080,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
                 "close": [],
                 "waiting_on_operator": [],
+                "ideas": [],
             },
             id="emits_the_highest_scored_actionable_item_as_json",
         ),
@@ -1149,6 +1150,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "parallel": _EMPTY_PARALLEL_JSON,
                 "close": [],
                 "waiting_on_operator": [],
+                "ideas": [],
             },
             id="emits_nothing_actionable_on_a_fully_empty_board",
         ),
@@ -1190,6 +1192,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 },
                 "close": [],
                 "waiting_on_operator": [],
+                "ideas": [],
             },
             id="parallel_set_json_carries_full_scopes_for_every_candidate",
         ),
@@ -1226,6 +1229,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
                 "close": [],
                 "waiting_on_operator": [230],
+                "ideas": [],
             },
             id="json_lists_the_item_waiting_on_the_operator_apart_from_skipped",
         ),
@@ -1263,6 +1267,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
                 "close": [443],
                 "waiting_on_operator": [441, 442],
+                "ideas": [],
             },
             id="json_lists_operator_held_containers_as_waiting_and_a_closable_one_under_close",
         ),
@@ -1312,7 +1317,7 @@ def test_next_json_pins_the_raw_envelope_text_for_a_work_item_success(
         '{"ok": true, "reason": "work_item", "recovery": [], '
         '"skipped": [{"number": 12, "reason": "blocked by #11"}], '
         '"parallel": {"first_scope_unknown": true, "candidates": [], "scope_unknown": []}, '
-        '"close": [], "waiting_on_operator": [], "number": 11, "score": 10, '
+        '"close": [], "waiting_on_operator": [], "ideas": [], "number": 11, "score": 10, '
         '"title": "Top work", "next": "Claim #11.", '
         '"command": "aco claim 11 --scope <paths>", "ruling_landings": null, '
         '"ruling_old": null}\n'
@@ -1444,6 +1449,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
         "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
         "close": [],
         "waiting_on_operator": [],
+        "ideas": [],
     }
 
 
@@ -4387,6 +4393,32 @@ def test_claim_does_not_require_out_of_order_for_the_top_ranked_item(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims
 
 
+def test_claim_does_not_require_out_of_order_past_a_higher_ranked_labelled_idea(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    work = board_issue(10, "Regular work", complete_contract("Claim #10."))
+    idea = board_issue(
+        11,
+        "Higher-ranked idea",
+        complete_contract("Build it.", scope=["src/idea.py"]),
+        labels=("idea", "security"),
+    )
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(work, idea))
+    monkeypatch.setattr(
+        cmd_claim,
+        "_request",
+        lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
+    )
+
+    exit_code = issue_claim.main(
+        ["--repo", REPOSITORY, "claim", "10", "--agent", "Codex Sol", "--scope", "src/work.py"]
+    )
+
+    assert exit_code == 0
+    assert "higher-priority actionable item" not in capsys.readouterr().err
+    assert store.fetch_state(worktree=Path("."), remote="origin").claims
+
+
 @pytest.mark.parametrize(
     ("state", "title", "check", "expected_text"),
     [
@@ -6599,6 +6631,40 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
     }
 
 
+@pytest.mark.parametrize("as_container", [False, True], ids=["plain-item", "container"])
+def test_next_lists_a_labelled_idea_with_a_merged_pull_request_only_under_ideas(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    as_container: bool,
+) -> None:
+    idea_body_text = complete_contract("Build it.")
+    idea = (
+        _childless_container(90, idea_body_text, labels=("idea",))
+        if as_container
+        else board_issue(90, "Landed idea", idea_body_text, labels=("idea",))
+    )
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
+    monkeypatch.setattr(
+        client,
+        "list_recent_merged_board_pull_requests",
+        lambda _since: (
+            board.PullRequest(
+                150, "Lands it", "Work-Item: #90\n\nCloses #90", "branch", "2026-08-20T00:00:00Z"
+            ),
+        ),
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
+    assert (
+        capsys.readouterr().out == "No actionable item.\n" + _NO_ACTION_NEXT_TAIL + "ideas: #90\n"
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next", "--json"]) == 3
+    payload = json.loads(capsys.readouterr().out)
+    assert (payload["recovery"], payload["close"], payload["ideas"]) == ([], [], [90])
+
+
 def test_next_close_names_every_zero_cost_action_regardless_of_rank(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
@@ -7021,36 +7087,80 @@ def test_validated_dependencies_refuses_a_duplicate_dependency() -> None:
         board_read.validated_dependencies((issue,), fetched)
 
 
-def test_next_pulls_a_configured_projectionless_idea_with_refinement_step(
+def test_next_names_other_work_and_lists_a_labelled_idea_apart(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    write_repository_config(tmp_path, 'idea_label = "idea"\n')
-    idea = board_issue(10, "Operator idea", idea_body("Make the board clearer."), labels=("idea",))
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
+    idea = board_issue(
+        10, "Operator idea", complete_contract("Build it."), labels=("idea", "security")
+    )
+    work = board_issue(11, "Plain work", complete_contract("Claim #11."))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(idea, work))
 
     assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 0
     assert capsys.readouterr().out == (
-        "#10 score -20: Operator idea\nNext: Problem neu prüfen und Item verfeinern\n"
-        "Run: aco claim 10 --scope <paths>\n" + _UNKNOWN_SCOPE_NEXT_TAIL
+        "#11 score -10: Plain work\nNext: Claim #11.\n"
+        "Run: aco claim 11 --scope <paths>\n" + _UNKNOWN_SCOPE_NEXT_TAIL + "ideas: #10\n"
     )
 
     assert issue_claim.main(["--repo", REPOSITORY, "next", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out) == {
-        "ok": True,
-        "reason": "work_item",
-        "number": 10,
-        "score": -20,
-        "title": "Operator idea",
-        "next": "Problem neu prüfen und Item verfeinern",
-        "command": "aco claim 10 --scope <paths>",
-        "ruling_landings": None,
-        "ruling_old": None,
-        "recovery": [],
-        "skipped": [],
-        "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-        "close": [],
-        "waiting_on_operator": [],
-    }
+    payload = json.loads(capsys.readouterr().out)
+    assert (payload["number"], payload["skipped"], payload["ideas"]) == (11, [], [10])
+
+
+@pytest.mark.parametrize(
+    ("body_text", "as_container"),
+    [
+        pytest.param(idea_body("Make the board clearer."), False, id="empty-projection"),
+        pytest.param(complete_contract("Build it."), False, id="full-projection"),
+        pytest.param("Just a wish.\n", False, id="no-aco-block"),
+        pytest.param(
+            complete_contract("Cut it.", slice=slice_entries("Scheibe A")),
+            True,
+            id="container-with-an-uncut-row",
+        ),
+    ],
+)
+def test_next_with_only_a_labelled_idea_names_no_action_and_the_idea(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    body_text: str,
+    as_container: bool,
+) -> None:
+    idea = (
+        _childless_container(10, body_text, labels=("idea",))
+        if as_container
+        else board_issue(10, "Operator idea", body_text, labels=("idea",))
+    )
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
+    assert (
+        capsys.readouterr().out == "No actionable item.\n" + _NO_ACTION_NEXT_TAIL + "ideas: #10\n"
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next", "--json"]) == 3
+    payload = json.loads(capsys.readouterr().out)
+    assert (payload["reason"], payload["skipped"], payload["ideas"]) == (
+        "nothing_actionable",
+        [],
+        [10],
+    )
+
+
+def test_next_still_skips_the_same_prose_without_the_label_as_malformed(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    _configured_board_client(
+        monkeypatch, tmp_path, open_issues=(board_issue(11, "Prose work", "Just a wish.\n"),)
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
+    assert capsys.readouterr().out == (
+        "No actionable item.\n"
+        + _NO_ACTION_NEXT_TAIL
+        + "\nSKIPPED\n#11: body malformed: aco: no aco block\n"
+    )
 
 
 def test_next_keeps_an_unlabelled_projectionless_item_skipped_with_an_active_idea_label(
@@ -7076,6 +7186,7 @@ def test_next_keeps_an_unlabelled_projectionless_item_skipped_with_an_active_ide
         "parallel": _EMPTY_PARALLEL_JSON,
         "close": [],
         "waiting_on_operator": [],
+        "ideas": [],
     }
 
 
@@ -7093,60 +7204,52 @@ def test_next_keeps_a_vision_labelled_projectionless_item_incomplete_without_con
     )
 
 
-def test_next_keeps_a_configured_idea_with_a_complete_projection_own_next(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    write_repository_config(tmp_path, 'idea_label = "idea"\n')
-    idea = board_issue(
-        10,
-        "Refined idea",
-        complete_contract("Build the chosen direction."),
-        labels=("idea",),
-    )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
-
-    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 0
-    assert capsys.readouterr().out == (
-        "#10 score -10: Refined idea\nNext: Build the chosen direction.\n"
-        "Run: aco claim 10 --scope <paths>\n" + _UNKNOWN_SCOPE_NEXT_TAIL
-    )
-
-
-def test_claim_treats_a_higher_ranked_configured_idea_as_out_of_order(
+def test_next_takes_the_configured_idea_label_instead_of_the_default(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     write_repository_config(tmp_path, 'idea_label = "vision"\n')
-    lower = board_issue(10, "Lower work", complete_contract("Claim #10."))
-    idea = board_issue(
-        11,
-        "Higher-ranked vision",
-        "## Wunsch\nImprove claims.\n\n"
-        + complete_contract("", now="", done_when="", scope=["src/idea.py"]),
-        labels=("vision", "security"),
+    default_labelled = board_issue(
+        10, "Plain work", complete_contract("Claim #10."), labels=("idea",)
     )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(lower, idea))
+    vision = board_issue(11, "A vision", complete_contract("Build it."), labels=("vision",))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(default_labelled, vision))
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 0
+    assert capsys.readouterr().out == (
+        "#10 score -10: Plain work\nNext: Claim #10.\n"
+        "Run: aco claim 10 --scope <paths>\n" + _UNKNOWN_SCOPE_NEXT_TAIL + "ideas: #11\n"
+    )
+
+
+def test_board_json_marks_a_labelled_item_as_an_idea_that_is_not_actionable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    idea = board_issue(10, "Operator idea", complete_contract("Build it."), labels=("idea",))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
+
+    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
+
+    item = json.loads(capsys.readouterr().out)["items"][0]
+    assert (item["idea"], item["actionable"], item["actionable_reason"]) == (True, False, "idea")
+
+
+def test_claim_refuses_an_empty_labelled_idea_as_an_incomplete_body(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    idea = board_issue(10, "Operator idea", idea_body("Make it clearer."), labels=("idea",))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
     monkeypatch.setattr(
         cmd_claim,
         "_request",
-        lambda _arguments, **_kwargs: request(issue=10, scope=("src/lower.py",)),
+        lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
     )
 
-    assert (
-        issue_claim.main(
-            [
-                "--repo",
-                REPOSITORY,
-                "claim",
-                "10",
-                "--agent",
-                "Codex Sol",
-                "--scope",
-                "src/lower.py",
-            ]
-        )
-        == 2
+    exit_code = issue_claim.main(
+        ["--repo", REPOSITORY, "claim", "10", "--agent", "Codex Sol", "--scope", "src/work.py"]
     )
-    assert "ERROR: higher-priority actionable item #11" in capsys.readouterr().err
+
+    assert exit_code == 2
+    assert "body incomplete: Now, Next, Done when" in capsys.readouterr().err
 
 
 def test_status_scope_index_never_rescans_scope_pairs(

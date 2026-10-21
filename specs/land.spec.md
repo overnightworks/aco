@@ -50,6 +50,7 @@ order `merge`, `squash`, `rebase`.
 | pull request not open | LANDCMD-02 |
 | the default branch adopts the quality gate and the completed checks hold no `quality / verdict` | LANDCMD-43 |
 | not mergeable | LANDCMD-03 |
+| `mergeable_state` is `unknown` | LANDCMD-45 |
 | no CI checks at all | LANDCMD-04 |
 | a check still running | LANDCMD-05 |
 | a check finished without success | LANDCMD-06 |
@@ -87,6 +88,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
 - [ ] [LANDCMD-43] If `<branch>` holds `quality/config.toml`, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
+- [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
 - [ ] [LANDCMD-06] A pull request whose checks all completed, at least one without success, refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
@@ -331,6 +333,18 @@ $ aco land 57
 2> ERROR: GitHub allows no merge method aco can use on main
 exit 2
 ```
+
+### E-LANDCMD-45 — a state GitHub keeps recomputing is waited out, then refused
+
+Setup: bare-remote, fake `gh`, pull request `#57` open, every read of its `mergeable_state` answering `unknown`, one completed check `build`
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 is not mergeable (unknown)
+exit 2
+```
+
+The command re-read the readiness 10 times, 3 seconds apart, before it refused; had the third read answered `clean`, it would have gone on after about 6 seconds, and a `dirty` answer refuses at once (LANDCMD-03).
 
 ### E-LANDCMD-14 — the pull request changed since preflight refuses the merge
 

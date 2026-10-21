@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 
@@ -30,7 +30,7 @@ from github_fixtures import (
     refusal_observations,
 )
 
-from agent_coordination import board, forge, protocol
+from agent_coordination import board, cmd_land, forge, protocol
 
 
 class ClaimHolder(Enum):
@@ -93,6 +93,7 @@ class MergeCase:
     default_branch: DefaultBranch = DefaultBranch.MAIN
     decoy_rules: tuple[frozenset[board.MergeMethod], ...] = ()
     length: RefusalLength = RefusalLength.WITHIN_LIMIT
+    unknown_reads_before_clean: int = 0
 
 
 @dataclass
@@ -109,6 +110,7 @@ def world(
     monkeypatch: pytest.MonkeyPatch,
 ) -> MergeWorld:
     case: MergeCase = request.param
+    monkeypatch.setattr(cmd_land, "pause_between_reads", lambda _seconds: None)
     monkeypatch.setenv("LC_ALL", "C")
     monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     assert_github_world(github_clone, bare_remote)
@@ -126,6 +128,14 @@ def world(
         if case.invalid_configuration:
             track_board_config(github_clone, case.trunk_config)
             real_git(github_clone, "push", "-q", "origin", default_branch)
+        if case.unknown_reads_before_clean:
+            clean = client.readiness_by_number[12]
+            unknown = replace(clean, mergeable_state="unknown")
+            client.readiness_by_number[12] = unknown
+            client.later_readiness_by_number[12] = (
+                *(unknown,) * (case.unknown_reads_before_clean - 1),
+                clean,
+            )
         if case.lane_worktree is LaneWorktree.PRESENT:
             add_lane_worktree(github_clone, lane, case.branch)
         observed = (
@@ -290,6 +300,10 @@ class TestLandMerge:
                 id="only-non-governing-settings-changed",
             ),
             pytest.param(MergeCase(Landed(), reviewed=ReviewedHead.FULL), id="full-sha-matches"),
+            pytest.param(
+                MergeCase(Landed(), reviewed=ReviewedHead.FULL, unknown_reads_before_clean=2),
+                id="unknown-settles-to-clean-and-the-reviewed-head-lands",
+            ),
             pytest.param(
                 MergeCase(Landed(), reviewed=ReviewedHead.UPPERCASE_PREFIX),
                 id="uppercase-prefix-matches",

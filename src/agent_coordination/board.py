@@ -45,7 +45,10 @@ from .body import (
 DEFAULT_PRIORITY_LABELS = ("security", "data", "ci", "product", "ux", "cleanup")
 DEFAULT_CANONICAL_REMOTE = "origin"
 CONFIG_PATH = Path(".aco/board.toml")
-IDEA_REFINEMENT_STEP = "Problem neu prüfen und Item verfeinern"
+DEFAULT_IDEA_LABEL = "idea"
+# An item carrying the idea label is never proposed: it is pulled into work
+# only after the operator takes the label off, so `next` lists it apart.
+IDEA_REASON = "idea"
 # The one typed marker that an item waits on the operator's ruling (issue
 # #553): no agent can pull it, so `next` names it apart and `claim`'s
 # precedence check never stops on it. A label, so both storages carry it.
@@ -489,7 +492,7 @@ LANDING_MERGE_METHODS = frozenset({MergeMethod.MERGE, MergeMethod.SQUASH})
 @dataclass(frozen=True)
 class BoardConfig:
     priority_labels: tuple[str, ...] = DEFAULT_PRIORITY_LABELS
-    idea_label: str | None = None
+    idea_label: str = DEFAULT_IDEA_LABEL
     # The remote `refs/aco/state` lives on (issue #176, §1); every store and
     # import refusal is phrased in its terms. The store takes it from every
     # caller, so this default is its one owner (issue #522).
@@ -565,7 +568,7 @@ class BoardItem:
     contract: Contract
     next_step: str | None
     contract_complete: bool
-    projectionless_idea: bool
+    idea: bool
     expectation_state: ExpectationState
     expectation_progress: ExpectationProgress
     ruling_landings: int | None
@@ -660,7 +663,7 @@ class Board:
 
     `recovery` holds the items a merged pull request declared as its work
     item while they stayed open: the landing happened, the bookkeeping did
-    not.
+    not. An idea is never one: the label alone decides its list.
 
     `landings` is the Landungen view (issue #371): `landing_rows`' own
     projection over the trunk walk (plus, under `github`, its
@@ -695,11 +698,9 @@ def _validated_priority_labels(raw: dict[str, object]) -> tuple[str, ...]:
     return tuple(labels)
 
 
-def _validated_idea_label(raw: dict[str, object]) -> str | None:
-    idea_label = raw.get("idea_label")
-    if idea_label is not None and (
-        not isinstance(idea_label, str) or idea_label.strip() != idea_label or not idea_label
-    ):
+def _validated_idea_label(raw: dict[str, object]) -> str:
+    idea_label = raw.get("idea_label", DEFAULT_IDEA_LABEL)
+    if not isinstance(idea_label, str) or idea_label.strip() != idea_label or not idea_label:
         raise protocol.ClaimError("board configuration idea_label must be a non-empty label")
     return idea_label
 
@@ -1316,8 +1317,8 @@ def _priority_index(labels: tuple[str, ...], config: BoardConfig) -> int | None:
     return min(matches, default=None)
 
 
-def has_label(labels: tuple[str, ...], label: str | None) -> bool:
-    return label is not None and any(item.casefold() == label.casefold() for item in labels)
+def has_label(labels: tuple[str, ...], label: str) -> bool:
+    return any(item.casefold() == label.casefold() for item in labels)
 
 
 CRITICAL_CATEGORY = 0
@@ -1681,8 +1682,7 @@ def _board_item(
     claim = context.claims_by_issue.get(issue.number)
     stage = _board_stage(issue, claim, context)
     single_next = _single_concrete_next(contract.next)
-    projectionless_idea = parsed.projectionless and has_label(issue.labels, config.idea_label)
-    next_step = IDEA_REFINEMENT_STEP if projectionless_idea else contract.next
+    idea = has_label(issue.labels, config.idea_label)
     unblocks_count = context.unblocks[issue.number]
     container_parent = context.child_container.get(issue.number)
     completes_container = _completes_container(
@@ -1716,7 +1716,7 @@ def _board_item(
         storage=config.storage,
         contract=contract,
         contract_complete=parsed.contract_complete,
-        projectionless_idea=projectionless_idea,
+        idea=idea,
         labelled_needs_operator=has_label(issue.labels, NEEDS_OPERATOR_LABEL),
         read_state=parsed.read_state,
         malformed_defect=(
@@ -1743,9 +1743,9 @@ def _board_item(
         scope=parsed.scope,
         whole=parsed.whole,
         contract=contract,
-        next_step=next_step,
+        next_step=contract.next,
         contract_complete=parsed.contract_complete,
-        projectionless_idea=projectionless_idea,
+        idea=idea,
         expectation_state=parsed.expectation_state,
         expectation_progress=parsed.expectation_progress,
         ruling_landings=ruling_landings,
@@ -2033,7 +2033,9 @@ def build_board(inputs: BoardBuildInputs) -> Board:
             for item in ordered
             if item.idle_days > STALE_IDLE_DAYS and item.stage is Stage.TEXT_ONLY
         ),
-        recovery=tuple(item for item in ordered if item.number in landed_work_items),
+        recovery=tuple(
+            item for item in ordered if item.number in landed_work_items and not item.idea
+        ),
         landings=landing_rows(
             inputs.trunk_landing_items, recent_merged_pull_requests, repository, config.storage
         ),
@@ -2347,6 +2349,12 @@ def waiting_on_operator(board: Board) -> tuple[int, ...]:
     )
 
 
+def ideas(board: Board) -> tuple[int, ...]:
+    """The numbers of every item carrying the idea label, in board order:
+    `next` lists them apart, since none is ever proposed."""
+    return tuple(item.number for item in board.items if item.idea)
+
+
 def zero_cost_closes(board: Board) -> tuple[int, ...]:
     """Every item `next` can close for free right now, regardless of which
     row ranks first (issue #348; #310 finding 29: "warum wurde #122 nicht
@@ -2406,8 +2414,9 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
     own finding elsewhere and is never guessed through, a
     `NestedRepairVerdict` names its repair under `SKIPPED` instead of a `cut`
     that `cut` refuses (issue #503), and a container waiting on the operator
-    is only ever closed, never cut or checked (issue #604)."""
-    if item.read_state is not BodyReadState.VALID:
+    is only ever closed, never cut or checked (issue #604). A container
+    labelled as an idea is none of the three."""
+    if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
     if item.waits_on_operator and not isinstance(verdict, CloseVerdict):
@@ -2734,7 +2743,7 @@ class _ActionabilityFacts:
     storage: Storage
     contract: Contract
     contract_complete: bool
-    projectionless_idea: bool
+    idea: bool
     labelled_needs_operator: bool
     read_state: BodyReadState = BodyReadState.VALID
     malformed_defect: ContractDefect | None = None
@@ -2954,7 +2963,7 @@ def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
             open_blocker_label(reference, facts.repository, facts.storage)
             for reference in facts.open_blockers
         )
-    if not facts.contract_complete and not facts.projectionless_idea:
+    if not facts.contract_complete:
         missing = ", ".join(missing_or_empty_sections(facts.contract))
         return f"body incomplete: {missing}"
     return None
@@ -2965,8 +2974,8 @@ def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
     #604): a readable container labelled `NEEDS_OPERATOR_LABEL` or frozen,
     which `next` then never cuts or checks, or any other readable item so
     labelled while unfrozen and unclaimed -- a frozen or claimed one names
-    that reason instead."""
-    if facts.read_state is BodyReadState.MALFORMED:
+    that reason instead. An idea waits on no ruling: `next` lists it apart."""
+    if facts.idea or facts.read_state is BodyReadState.MALFORMED:
         return False
     if facts.kind is ItemKind.CONTAINER:
         return facts.labelled_needs_operator or facts.frozen_trigger is not None
@@ -2978,6 +2987,8 @@ def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
 
 
 def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
+    if facts.idea:
+        return IDEA_REASON
     read_state_reason = _read_state_actionable_reason(facts)
     if read_state_reason is not None:
         return read_state_reason

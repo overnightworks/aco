@@ -54,6 +54,7 @@ other printable space are text.
 | an unworkable item exists beside the top action | NEXT-08 | NEXT-14 |
 | an item carries the label `needs-operator` | NEXT-39, NEXT-40 | NEXT-14 |
 | a container is labelled `needs-operator` or frozen | NEXT-39, NEXT-28 | NEXT-14 |
+| an item carries the idea label | NEXT-43, NEXT-28 | NEXT-44 |
 | further free items exist, disjoint from the first action | NEXT-09, NEXT-21, NEXT-22 | NEXT-15 |
 | more than three such candidates | NEXT-10 | NEXT-15 |
 | the first action itself names no scope | NEXT-16 | NEXT-15 |
@@ -96,9 +97,10 @@ other printable space are text.
 - [ ] [NEXT-08] Every other unworkable item is named once under a trailing `SKIPPED` block, `<label>: <reason>`; a container `next` itself recommends cutting or closing is left out of that list.
 - [ ] [NEXT-26] A NEXT-06 container that is not the first action reads `no open children; check done_when` under `SKIPPED`, never `container; claim a child` and never `close:`.
 - [ ] [NEXT-34] A NEXT-05 container not the first action reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` in `<title>` escaped in text and `--json`; never `container; claim a child`.
-- [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED` or `waiting on operator:`, in text or `--json` (see E-NEXT-06).
+- [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] An unclaimed, unfrozen item or any container labelled `needs-operator`, or a frozen container, is never pulled, cut or checked; `waiting on operator: <labels>` names it (E-NEXT-13, E-NEXT-15).
 - [ ] [NEXT-40] `aco next --help` names that label and how to set or remove it: `gh issue edit <n> --add-label/--remove-label`, or `aco item edit <item-id>` under `storage = "state-ref"`.
+- [ ] [NEXT-43] An item labelled `idea_label` (PIN-49) is never pulled, cut, checked or closed, whatever its body or merged pull request; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
 
 ## `parallel:`
 
@@ -120,8 +122,9 @@ other printable space are text.
 - [ ] [NEXT-11] A work-item action's `reason` is `work_item` (`ok: true`), adding `number`, `score`, `title`, `next`, `command`, `ruling_landings`/`ruling_old`/`ruling_hint` per NEXT-04 (E-NEXT-07).
 - [ ] [NEXT-12] A cut proposal's `reason` is `"cut_slice"` (`ok: true`), the object adding `number`, `title`, `slice`, `cut_title`, `command` (see E-NEXT-07).
 - [ ] [NEXT-13] A close or check proposal's `reason` is `"close_container"` or `"check_container"` (`ok: true`), adding `number`, `closed`, `total`, `next_step` (`null` on close), never `command`.
-- [ ] [NEXT-14] The object always carries `recovery` (`{number, title, step}` each), `skipped` (`{number, reason}` each), `close` and `waiting_on_operator` (bare number arrays), independent of `reason`.
+- [ ] [NEXT-14] The object always carries `recovery` (`{number, title, step}` each), `skipped` (`{number, reason}` each), `close` and `waiting_on_operator` (bare number arrays), independent of `reason`; see NEXT-44.
 - [ ] [NEXT-15] `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope}` each, uncapped), and `scope_unknown` (a bare number array).
+- [ ] [NEXT-44] The object always carries `ideas`, a bare number array after `waiting_on_operator`, `[]` when no item carries the idea label (NEXT-43).
 - [ ] [NEXT-35] Under `storage = "state-ref"` each item these fields name, `number` included, is the `aco-xxxxxx` id the text prints, a string in place of the bare number.
 - [ ] [NEXT-24] `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-NEXT-08).
 
@@ -263,7 +266,7 @@ Setup: bare-remote, fake `gh`, container `#181` as in E-NEXT-03
 
 ```console
 $ aco next --json
-{"ok": true, "reason": "cut_slice", "recovery": [], "skipped": [], "parallel": {"first_scope_unknown": false, "candidates": [], "scope_unknown": []}, "close": [], "waiting_on_operator": [], "number": 181, "title": "Epic", "slice": "Scheibe C", "cut_title": "Scheibe C", "command": "aco cut 181"}
+{"ok": true, "reason": "cut_slice", "recovery": [], "skipped": [], "parallel": {"first_scope_unknown": false, "candidates": [], "scope_unknown": []}, "close": [], "waiting_on_operator": [], "ideas": [], "number": 181, "title": "Epic", "slice": "Scheibe C", "cut_title": "Scheibe C", "command": "aco cut 181"}
 exit 0
 ```
 
@@ -374,7 +377,7 @@ close: none
 waiting on operator: #230
 exit 0
 $ aco next --json
-{"ok": true, "reason": "work_item", "recovery": [], "skipped": [], "parallel": {"first_scope_unknown": true, "candidates": [], "scope_unknown": []}, "close": [], "waiting_on_operator": [230], "number": 11, "score": -10, "title": "Top work", "next": "Claim #11.", "command": "aco claim 11 --scope <paths>", "ruling_landings": null, "ruling_old": null}
+{"ok": true, "reason": "work_item", "recovery": [], "skipped": [], "parallel": {"first_scope_unknown": true, "candidates": [], "scope_unknown": []}, "close": [], "waiting_on_operator": [230], "ideas": [], "number": 11, "score": -10, "title": "Top work", "next": "Claim #11.", "command": "aco claim 11 --scope <paths>", "ruling_landings": null, "ruling_old": null}
 exit 0
 ```
 

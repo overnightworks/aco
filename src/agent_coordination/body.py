@@ -254,7 +254,6 @@ class ParsedBody:
 
     contract: Contract
     contract_complete: bool
-    projectionless: bool
     expectation_state: ExpectationState
     expectation_progress: ExpectationProgress
     ruling_date: date | None
@@ -882,7 +881,6 @@ def malformed_parsed_body(defects: tuple[ContractDefect, ...]) -> ParsedBody:
     return ParsedBody(
         contract=Contract(None, None, None, tuple(_escaped_defect(defect) for defect in defects)),
         contract_complete=False,
-        projectionless=False,
         expectation_state=ExpectationState.NONE,
         expectation_progress=ExpectationProgress(0, 0),
         ruling_date=None,
@@ -974,7 +972,6 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
     return ParsedBody(
         contract=Contract(now, next_value, done_when, ()),
         contract_complete=bool(now and next_value and done_when),
-        projectionless=not (now or next_value or done_when),
         expectation_state=expectation_state,
         expectation_progress=_block_expectation_progress(expectations),
         ruling_date=(

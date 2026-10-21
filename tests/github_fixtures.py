@@ -161,6 +161,12 @@ class FakeForge:
     drop_created_issue_type: bool = False
     capability_overrides: dict[forge.ForgeOperation, forge.Capability] = field(default_factory=dict)
     readiness_by_number: dict[int, forge.LandingReadiness] = field(default_factory=dict)
+    # What each read after the first answers, the last state repeating: GitHub
+    # settling a pull request's `mergeable_state` between two reads.
+    later_readiness_by_number: dict[int, tuple[forge.LandingReadiness, ...]] = field(
+        default_factory=dict
+    )
+    readiness_reads: dict[int, int] = field(default_factory=dict)
     merge_calls: list[tuple[int, str, board.MergeMethod, str, str]] = field(default_factory=list)
     merge_requests: list[tuple[str, board.MergeMethod]] = field(default_factory=list)
     merge_error: forge.ForgeError | None = None
@@ -293,6 +299,11 @@ class FakeForge:
         readiness = self.readiness_by_number.get(number)
         if readiness is None:
             raise ClaimError(f"GitHub has no readiness for pull request #{number}")
+        reads = self.readiness_reads.get(number, 0)
+        self.readiness_reads[number] = reads + 1
+        later = self.later_readiness_by_number.get(number, ())
+        if reads > 0 and later:
+            return later[min(reads - 1, len(later) - 1)]
         return readiness
 
     def allowed_merge_methods(self) -> frozenset[board.MergeMethod] | None:
