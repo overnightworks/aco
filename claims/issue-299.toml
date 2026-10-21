@@ -1,0 +1,8 @@
+claim_id = "a930149dc6514ecdae3af2909e33c295"
+agent = "claude"
+role = "builder"
+base = "c3ec9ec9a1a84cc0f35bc3f8c1f9990c3ebae065"
+branch = "claude/issue-299-state-ref-pin15-cut-claim"
+scope = ["specs/ask.spec.md", "specs/body-block.spec.md", "specs/claim-record.spec.md", "specs/claim.spec.md", "specs/cut.spec.md", "specs/output.spec.md", "src/agent_coordination/board_read.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_cut.py", "tests/test_ask.py", "tests/test_cut.py", "tests/test_state_board.py"]
+opened_commit = "c285b8ce22b6179df13f9d6a8e06fdf81186a75b"
+whole_reason = "Ein Guard an zwei Lesestellen samt den Spec-Sätzen aller betroffenen Befehle; ohne die Spec-Dateien widersprächen sich Code und Vertrag."
