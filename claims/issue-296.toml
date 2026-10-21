@@ -1,8 +1,0 @@
-claim_id = "a2c2f19898344b718d443a1442481597"
-agent = "claude"
-role = "builder"
-base = "396ff4741536c52a89c68b857ab9e913262f1090"
-branch = "claude/issue-296-escape-defects-at-root"
-scope = ["specs/body-block.spec.md", "specs/next.spec.md", "src/agent_coordination/board.py", "src/agent_coordination/body.py", "src/agent_coordination/cmd_brief.py", "src/agent_coordination/cmd_claim.py", "src/agent_coordination/cmd_item.py", "src/agent_coordination/cmd_land.py", "src/agent_coordination/cmd_next.py", "src/agent_coordination/cmd_release.py", "src/agent_coordination/cmd_rulings.py", "src/agent_coordination/policy.py", "src/agent_coordination/protocol.py", "src/agent_coordination/report.py", "src/agent_coordination/state_board.py", "tests/test_board.py", "tests/test_body_cli.py", "tests/test_cut.py", "tests/test_state_board.py"]
-opened_commit = "16fe7ac6f599f92a1d097e801736598b7f2faca3"
-whole_reason = "Der Umzug einer Funktion mit rund 25 Aufrufern in 12 Modulen lässt sich nicht halbieren, ohne einen Alias als zweiten Weg zu hinterlassen."
