@@ -247,7 +247,7 @@ class _SliceCheck:
 
     def render(self) -> str:
         prefix = "ERROR" if self.level == "error" else "WARNING"
-        return f"{prefix}: {board.terminal_text(self.text)}"
+        return f"{prefix}: {protocol.terminal_text(self.text)}"
 
     def as_json(self) -> dict[str, object]:
         return {
@@ -355,7 +355,7 @@ def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple
     if malformed is not None:
         return malformed
     contract = item.contract
-    checks = [_SliceCheck("error", "body-contract", defect.message) for defect in contract.defects]
+    checks: list[_SliceCheck] = []
     # Read the two atomic facts directly rather than `item.actionable_reason`:
     # that reason is the *first* one `board._actionable_reason` finds (frozen,
     # claimed, blocked, then incomplete), so an item that is both blocked and

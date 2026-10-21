@@ -177,9 +177,10 @@ def body_defect_text(defect: ContractDefect) -> str:
     """The one rendering of a malformed body defect (issue #176 H3).
 
     `cut` and the board/claim checks share this; a second renderer is a
-    defect. `check` in slice F reuses it.
+    defect. `check` in slice F reuses it. It escapes each display control
+    as `protocol.terminal_text` does, so no caller prints a stored key raw.
     """
-    return f"body malformed: {defect.field}: {defect.message}"
+    return protocol.terminal_text(f"body malformed: {defect.field}: {defect.message}")
 
 
 def contract_fields(contract: Contract) -> tuple[tuple[str, str | None], ...]:
@@ -871,9 +872,15 @@ def _block_schema_defects(data: dict[str, object], storage: Storage) -> tuple[Co
     return tuple(defects)
 
 
+def _escaped_defect(defect: ContractDefect) -> ContractDefect:
+    return ContractDefect(
+        protocol.terminal_text(defect.field), protocol.terminal_text(defect.message)
+    )
+
+
 def malformed_parsed_body(defects: tuple[ContractDefect, ...]) -> ParsedBody:
     return ParsedBody(
-        contract=Contract(None, None, None, defects),
+        contract=Contract(None, None, None, tuple(_escaped_defect(defect) for defect in defects)),
         contract_complete=False,
         projectionless=False,
         expectation_state=ExpectationState.NONE,

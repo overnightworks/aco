@@ -76,13 +76,13 @@ def _rulings_line_json(line: body.ExpectationLine) -> dict[str, object]:
 
 def _rulings_line_text(line: body.ExpectationLine) -> str:
     state = body.expectation_line_state(line)
-    summary = board.terminal_text(body.expectation_line_summary(line))
+    summary = protocol.terminal_text(body.expectation_line_summary(line))
     return f"  {line.index} {state}: {summary}"
 
 
 def _rulings_row_text(row: _RulingsRow, storage: body.Storage) -> str:
     label = board.item_label(row.item.number, storage)
-    title = board.terminal_text(row.item.title)
+    title = protocol.terminal_text(row.item.title)
     header = f"{label} {row.progress.open}/{row.progress.total}: {title}"
     return "\n".join((header, *(_rulings_line_text(line) for line in row.lines)))
 

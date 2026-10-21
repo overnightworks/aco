@@ -761,7 +761,7 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
         )
         return 0
     print(_item_header(number, reference, parent))
-    print(board.terminal_block(body), end="")
+    print(protocol.terminal_block(body), end="")
     return 0
 
 

@@ -292,8 +292,8 @@ def _next_action_lines(
         item = action.item
         label = board.item_label(item.number, storage)
         lines = [
-            f"{label} score {item.score}: {board.terminal_text(item.title)}",
-            f"Next: {board.terminal_text(str(item.next_step))}",
+            f"{label} score {item.score}: {protocol.terminal_text(item.title)}",
+            f"Next: {protocol.terminal_text(str(item.next_step))}",
             f"Run: {_next_action_command(action, storage, site=site)}",
         ]
         if action.scope is None:
@@ -305,13 +305,13 @@ def _next_action_lines(
     container_label = board.item_label(action.container.number, storage)
     if isinstance(action, board.CutSliceAction):
         return [
-            f"cut_slice {container_label}: {board.terminal_text(action.next_step)}",
+            f"cut_slice {container_label}: {protocol.terminal_text(action.next_step)}",
             f"Next: {_next_action_command(action, storage, site=site)}",
         ]
     if isinstance(action, board.CheckContainerAction):
         return [
             f"check_container {container_label}: {board.CHECK_DONE_WHEN}",
-            f"Next: {board.terminal_text(action.next_step)}",
+            f"Next: {protocol.terminal_text(action.next_step)}",
         ]
     progress = action.container_progress
     return [

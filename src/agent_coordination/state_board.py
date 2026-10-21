@@ -274,10 +274,7 @@ def _decode_item(item_id: str, content: bytes, oid: ObjectId) -> _DecodedItem | 
     if parsed.read_state is not BodyReadState.VALID or parsed.record is None:
         defect = (parsed.contract.defects or (_NO_RECORD,))[0]
         return _MalformedItem(
-            problem=(
-                f"has a malformed {BLOCK_FENCE_INFO} block "
-                f"({board.terminal_text(body_defect_text(defect))})"
-            ),
+            problem=f"has a malformed {BLOCK_FENCE_INFO} block ({body_defect_text(defect)})",
             defect=defect,
             oid=oid,
             text=text,
