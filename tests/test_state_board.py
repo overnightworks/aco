@@ -4165,6 +4165,31 @@ class TestCliStateRefForge:
         )
         assert "\x1b" not in own_show_err
 
+    def test_board_json_shows_an_unreadable_items_display_controls_as_escapes(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+    ) -> None:
+        """Spec: BODY-68. The record key's ESC and BEL reach `board --json`'s
+        `contract.defects` and `actionable_reason` as escapes, never raw."""
+        content = _task_item(None).replace(
+            b"[record]\n", b'[record]\n"\\u001b]0;pwned\\u0007\\u001b[2J" = 1\n'
+        )
+        item_files = _item_files_with_a_malformed_item(content)
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
+        shown_key = "record.\\x1b]0;pwned\\x07\\x1b[2J"
+
+        board_items = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"]
+
+        item = next(item for item in board_items if item["number"] == MALFORMED_NUMBER)
+        assert (item["contract"]["defects"], item["actionable_reason"]) == (
+            [{"field": shown_key, "message": f"unknown key {shown_key}"}],
+            f"body malformed: {shown_key}: unknown key {shown_key}",
+        )
+
     @pytest.mark.parametrize(
         ("unplaced_content", "problem"),
         [

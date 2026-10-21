@@ -3619,20 +3619,6 @@ def test_body_defect_text_shows_display_controls_as_escapes(text: str, shown: st
     assert body_defect_text(defect) == f"body malformed: {shown}: unknown top-level key {shown}"
 
 
-def test_board_json_shows_a_malformed_body_defect_with_display_controls_escaped() -> None:
-    """Spec: BODY-68."""
-    issue = board_issue(7, "Broken", block_body(MINIMAL_BLOCK_TOML + '"k\\u001b]0;x\\u0007" = 1\n'))
-    projected = projected_board((issue,), (), (), (), board.BoardConfig())
-
-    item = _payload_items(board.board_payload(projected))[0]
-
-    shown = "k\\x1b]0;x\\x07"
-    assert _as_dict(item["contract"])["defects"] == [
-        {"field": shown, "message": f"unknown top-level key {shown}"}
-    ]
-    assert item["actionable_reason"] == f"body malformed: {shown}: unknown top-level key {shown}"
-
-
 @pytest.mark.parametrize(
     ("value", "number"),
     [("aco-3f9a2c", 0x3F9A2C), ("#42", 42), ("42", 42)],
