@@ -1,0 +1,7 @@
+claim_id = "2a1300ce82544fa797648b28f20d52d1"
+agent = "claude"
+role = "builder"
+base = "d80fdfa850a8ec1d365ffbaa69376a8c29705942"
+branch = "dependabot/github_actions/pnpm/action-setup-6.1.0"
+scope = [".github/workflows/ci.yml"]
+opened_commit = "9a79f3025bf9bb5a641f59fe7e522916ec2e739e"
