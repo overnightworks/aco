@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
@@ -41,6 +42,32 @@ def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
     if parsed.keep_worktree:
         command.append(cmd_release.KEEP_WORKTREE_FLAG)
     return tuple(command)
+
+
+# GitHub answers `mergeable_state = unknown` while it recomputes a pull
+# request's state after a push or a base change, and settles within about
+# half a minute. Bounded by a count of reads, so only the pause needs a seam.
+UNKNOWN_STATE_PAUSE_SECONDS = 3.0
+UNKNOWN_STATE_MAXIMUM_PAUSES = 10
+# Looked up at each call, so a test replaces it and never really waits.
+pause_between_reads = time.sleep
+
+
+def settled_readiness(
+    read: Callable[[], forge.LandingReadiness], pause: Callable[[float], None]
+) -> forge.LandingReadiness:
+    """The readiness `read` reports once GitHub's transient `unknown`
+    mergeable state has passed: re-read after `pause` for at most
+    `UNKNOWN_STATE_MAXIMUM_PAUSES` pauses, so a state that stays unknown is
+    judged as it stands. Any other state, and a pull request that is not
+    open, is judged at once."""
+    readiness = read()
+    for _ in range(UNKNOWN_STATE_MAXIMUM_PAUSES):
+        if not readiness.open or readiness.mergeable_state != forge.MERGEABLE_STATE_UNKNOWN:
+            break
+        pause(UNKNOWN_STATE_PAUSE_SECONDS)
+        readiness = read()
+    return readiness
 
 
 _LAND_QUALITY_CONFIG_PATH = Path("quality/config.toml")
@@ -237,7 +264,7 @@ def _land_preflight(
     the fresh/rerun split that skips it entirely on a rerun -- so this
     function itself never repeats that check.
     """
-    readiness = client.landing_readiness(number)
+    readiness = settled_readiness(lambda: client.landing_readiness(number), pause_between_reads)
     _refuse_unreviewed_head(readiness, parsed.head)
     _refuse_land_readiness(client, readiness, lambda: context.run.default_branch)
     detail = client.landing(number)

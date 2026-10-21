@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import pytest
@@ -21,7 +21,7 @@ from github_fixtures import (
     serve_forge,
 )
 
-from agent_coordination import cli, forge
+from agent_coordination import cli, cmd_land, forge
 
 
 @dataclass(frozen=True)
@@ -43,11 +43,14 @@ class LandingCase:
     quality_reads: tuple[str, ...] | None = None
     parser_exit: bool = False
     usage_prefix: str = "usage: aco land "
+    later_readiness: tuple[forge.LandingReadiness, ...] = ()
+    expected_pauses: tuple[float, ...] = ()
 
 
 @dataclass
 class LandingScenario(LandingWorld):
     case: LandingCase
+    pauses: list[float] = field(default_factory=list)
 
 
 @pytest.fixture
@@ -68,6 +71,7 @@ def world(
         FakeForge(
             landings={12: landing_pull_request(body=case.body, merged=case.merged)},
             readiness_by_number={12: case.readiness},
+            later_readiness_by_number={12: case.later_readiness},
             quality_config=case.quality_config,
             quality_config_at_other_refs=case.head_config,
             default_branch_name=case.default_branch,
@@ -78,6 +82,7 @@ def world(
     shared = landing_world(github_clone, bare_remote, client)
     unchanged = shared.unchanged
     result = LandingScenario(github_clone, bare_remote, client, unchanged, case)
+    monkeypatch.setattr(cmd_land, "pause_between_reads", result.pauses.append)
     return result
 
 
@@ -203,12 +208,49 @@ class TestLandReadiness:
                 ),
                 id="running-and-failed",
             ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(mergeable_state="unknown"),
+                    "pull request #12 is not mergeable (unknown)",
+                    expected_pauses=(3.0,) * 10,
+                ),
+                id="unknown-for-good",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(mergeable_state="unknown"),
+                    "pull request #12 is not mergeable (dirty)",
+                    later_readiness=(landing_readiness(mergeable_state="dirty"),),
+                    expected_pauses=(3.0,),
+                ),
+                id="unknown-settles-to-dirty",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(mergeable_state="unknown"),
+                    "pull request #12 carries no `Work-Item:` or `No-Item:` line",
+                    body="Advances #72",
+                    later_readiness=(
+                        landing_readiness(mergeable_state="unknown"),
+                        landing_readiness(),
+                    ),
+                    expected_pauses=(3.0, 3.0),
+                ),
+                id="unknown-settles-to-clean",
+            ),
+            pytest.param(
+                LandingCase(
+                    replace(landing_readiness(mergeable_state="unknown"), open=False),
+                    "pull request #12 is not open; it cannot be landed",
+                ),
+                id="not-open-is-judged-without-waiting",
+            ),
         ],
         indirect=True,
     )
     def test_refusal(self, world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-02, LANDCMD-03, LANDCMD-04, LANDCMD-05, LANDCMD-06.
-        Exact refusal and no writes.
+        """Spec: LANDCMD-02, LANDCMD-03, LANDCMD-04, LANDCMD-05, LANDCMD-06, LANDCMD-45.
+        Exact refusal and no writes; GitHub's transient `unknown` is waited out first.
         """
         capsys.readouterr()
         observed, expected = refusal_observations(
@@ -218,6 +260,40 @@ class TestLandReadiness:
             length=world.case.length,
         )
         assert observed == expected
+        assert tuple(world.pauses) == world.case.expected_pauses
+
+
+class TestSettledReadiness:
+    @pytest.mark.parametrize(
+        ("states", "settled_state", "pauses"),
+        [
+            pytest.param(("unknown", "unknown", "clean"), "clean", (3.0, 3.0), id="settles"),
+            pytest.param(("dirty",), "dirty", (), id="dirty-needs-no-pause"),
+            pytest.param(("clean",), "clean", (), id="clean-needs-no-pause"),
+            pytest.param(("unknown",), "unknown", (3.0,) * 10, id="unknown-for-good"),
+        ],
+    )
+    def test_waits_only_while_the_state_is_unknown(
+        self, states: tuple[str, ...], settled_state: str, pauses: tuple[float, ...]
+    ) -> None:
+        readings = iter(states)
+        last = states[-1]
+        observed_pauses: list[float] = []
+
+        def read() -> forge.LandingReadiness:
+            return landing_readiness(mergeable_state=next(readings, last))
+
+        settled = cmd_land.settled_readiness(read, observed_pauses.append)
+
+        assert (settled.mergeable_state, tuple(observed_pauses)) == (settled_state, pauses)
+
+    def test_judges_a_pull_request_that_is_not_open_without_waiting(self) -> None:
+        closed = replace(landing_readiness(mergeable_state="unknown"), open=False)
+        observed_pauses: list[float] = []
+
+        settled = cmd_land.settled_readiness(lambda: closed, observed_pauses.append)
+
+        assert (settled, observed_pauses) == (closed, [])
 
 
 class TestLandQualityGate:

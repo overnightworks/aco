@@ -233,6 +233,7 @@ class Landing:
 # verbatim into a refusal -- never enumerated as a closed `StrEnum`, which
 # would refuse a legitimate answer this tool has simply never seen before.
 MERGEABLE_STATE_CLEAN = "clean"
+MERGEABLE_STATE_UNKNOWN = "unknown"
 CHECK_CONCLUSION_SUCCESS = "success"
 
 

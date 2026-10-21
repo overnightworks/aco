@@ -86,7 +86,7 @@ the item's body, live claim, lane tip, and touched files -- what a builder
 starts from. The pull request names `Closes #42` and `Work-Item: #42`.
 
 `aco land <pull request>`, from a clean default-branch checkout, verifies it against GitHub
--- mergeable, checks green (and `quality / verdict` present where the default branch holds `quality/config.toml`), body carrying Closes and Work-Item; with
+-- mergeable (waiting up to 30 seconds while GitHub still recomputes that), checks green (and `quality / verdict` present where the default branch holds `quality/config.toml`), body carrying Closes and Work-Item; with
 `--head <sha>`, pinned to the head its reviewers saw and refused when the head moved -- merges it
 with a merge commit, or squashes it where the repository allows no merge
 commit or `merge_method` asks for it, deletes the branch, removes the lane's
