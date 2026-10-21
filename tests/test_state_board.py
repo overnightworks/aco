@@ -439,10 +439,7 @@ def _assert_whole_state_result(cell: int, status: int | str | None, out: str, er
         assert out.startswith(f"CLAIMED issue {MALFORMED_ID}: whole-proof\n")
         return
     assert status == 2
-    if cell in {20, 21, 23}:
-        label = f"{MALFORMED_ID} " if cell == 20 else ""
-        assert err == f"ERROR: {label}{defect}\n"
-    elif cell == 29:
+    if cell == 29:
         assert defect in err
     elif cell in {35, 36, 37, 39}:
         assert err == f"ERROR: {sentence}\n"
@@ -2188,24 +2185,104 @@ class TestCliStateRefForge:
             json_result = run_cli([*commands[operation], "--json"], capsys, stdin=piped or None)
             assert json_result.status == 2
             payload = json.loads(json_result.stdout)
-            if cell not in {21, 23}:
-                assert json_result.stderr == result.stderr
+            assert json_result.stderr == result.stderr
             reason = (
                 "body_invalid"
-                if cell in {20, 29}
-                else "unavailable"
-                if cell in {22, 25}
+                if cell == 29
                 else "precondition_failed"
+                if cell == 28
+                else "unavailable"
             )
             assert payload["reason"] == reason
-            if cell in {21, 23}:
-                assert payload["checks"]
         after = store.fetch_state(worktree=worktree, remote=remote)
         assert after.claims == before.claims
         assert after.items == before.items
         assert worktrees_and_branches(worktree) == checkout_before
         if not live:
             assert not after.claims
+
+    @pytest.mark.parametrize(
+        ("content", "problem"),
+        [
+            pytest.param(
+                CONTAINER_BODY.encode(),
+                _malformed_block("record: no [record] table"),
+                id="no-record",
+            ),
+            pytest.param(
+                _task_item(None).replace(
+                    b"[record]\n", b'[record]\n"\\u001b]0;pwned\\u0007\\u001b[2J" = 1\n'
+                ),
+                _malformed_block(DISPLAY_CONTROL_KEY_DEFECT),
+                id="display-control-key",
+            ),
+            pytest.param(b"\xff\xfe not utf-8", NOT_UTF8_PROBLEM, id="not-utf8"),
+            pytest.param(
+                b"prose, no block\n", _malformed_block("aco: no aco block"), id="no-block"
+            ),
+        ],
+    )
+    @pytest.mark.parametrize(
+        ("command", "reason"),
+        [
+            pytest.param(["cut", MALFORMED_ID, "--title", "X"], "precondition_failed", id="cut"),
+            pytest.param(["claim", MALFORMED_ID], "unavailable", id="claim-derived"),
+            pytest.param(["claim", MALFORMED_ID, "--scope", "a.py"], "unavailable", id="narrow"),
+            pytest.param(
+                [
+                    "claim",
+                    MALFORMED_ID,
+                    *[part for path in "abcd" for part in ("--scope", f"{path}.py")],
+                    "--whole",
+                    "ok",
+                ],
+                "unavailable",
+                id="wide-whole",
+            ),
+        ],
+    )
+    def test_cut_and_claim_refuse_a_malformed_item_by_its_repair(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+        command: list[str],
+        reason: str,
+        content: bytes,
+        problem: str,
+    ) -> None:
+        """Spec: CUT-40, CLAIM-73, PIN-14, PIN-15, PIN-43, ITEM-38, E-CUT-10.
+        E2: matrix B cells 1 to 9."""
+        self._live_state_ref_checkout(
+            monkeypatch, tmp_path, bare_remote, worktree, {f"{MALFORMED_ID}.md": content}
+        )
+        _stub_claim_checkout(monkeypatch)
+        monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Codex Sol")
+        remote = f"file://{bare_remote}"
+        arguments = [
+            *command,
+            *(
+                ["--agent", "Codex Sol", "--branch", "codex/b", "--base", head_sha(worktree)]
+                if command[0] == "claim"
+                else []
+            ),
+        ]
+        before = store.fetch_state(worktree=worktree, remote=remote)
+        checkout_before = worktrees_and_branches(worktree)
+
+        text = run_cli(arguments, capsys)
+        as_json = run_cli([*arguments, "--json"], capsys)
+
+        refusal = _malformed_item_refusal(problem)
+        assert (text.status, text.stdout, text.stderr) == (2, "", f"ERROR: {refusal}\n")
+        assert as_json.status == 2
+        payload = json.loads(as_json.stdout)
+        assert (payload["reason"], payload["message"]) == (reason, refusal)
+        after = store.fetch_state(worktree=worktree, remote=remote)
+        assert (after.claims, after.items) == (before.claims, before.items)
+        assert worktrees_and_branches(worktree) == checkout_before
 
     def test_whole_state_ref_board_and_repair(
         self,
@@ -3188,9 +3265,35 @@ class TestCliStateRefForge:
         status = issue_claim.main(["cut", str(CONTAINER_NUMBER), "--title", "X"])
 
         assert status == 2
-        assert capsys.readouterr().err == ("ERROR: body malformed: aco: no aco block\n")
+        refusal = _malformed_item_refusal(_malformed_block("aco: no aco block"), CONTAINER_ID)
+        assert capsys.readouterr().err == f"ERROR: {refusal}\n"
         after = store.fetch_state(worktree=worktree, remote=remote_url)
         assert after.tip == before.tip
+
+    def test_cut_keeps_cut_05_for_a_readable_container_whose_row_is_unsafe(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+    ) -> None:
+        """Spec: CUT-05, CUT-39. E2: matrix B cell 11 -- a readable item
+        keeps CUT-05's form; only an item PIN-15 refuses takes PIN-15."""
+        unsafe = (
+            _container_body_with_slices(((1, "Slice A"),))
+            .replace('done_when = "D"', 'done_when = "a\\u001b[2Jb"')
+            .encode()
+        )
+        self._live_state_ref_checkout(
+            monkeypatch, tmp_path, bare_remote, worktree, {f"{CONTAINER_ID}.md": unsafe}
+        )
+
+        result = run_cli(["cut", CONTAINER_ID, "--title", "Slice A"], capsys)
+
+        assert result.status == 2
+        assert result.stderr.startswith(f"ERROR: {CONTAINER_ID} body malformed: ")
+        assert result.stderr.endswith("; cut needs a valid aco block\n")
 
     def test_board_reads_a_real_state_ref_without_gh(
         self,

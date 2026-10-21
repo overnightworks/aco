@@ -29,8 +29,6 @@ def open_container(
         raise protocol.ClaimUnavailableError(
             f"{board.item_label(number, storage)} is not an open container"
         )
-    if target.unreadable is not None:
-        raise protocol.ClaimUnavailableError(body.body_defect_text(target.unreadable))
     if target.kind not in accepted_kinds:
         raise protocol.ClaimUnavailableError(
             f"{board.item_label(number, storage)} is not a container"
@@ -45,6 +43,10 @@ def _cut_target(
     storage: body.Storage,
 ) -> board.Issue:
     """The open container `cut` targets, or why it refuses before any write."""
+    open_issues = tuple(open_issues)
+    board_read.require_readable_item(
+        client, next((issue for issue in open_issues if issue.number == number), None)
+    )
     target = open_container(open_issues, number, storage)
     parent = client.parent_issue(number)
     if parent is not None:

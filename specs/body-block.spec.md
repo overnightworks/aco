@@ -122,7 +122,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 
 - [ ] [BODY-50] An item whose body carries any defect above is named by `aco board` with its first defect sentence as its reason, `body malformed: <field>: <message>`, and is never proposed as a cut or a close.
 - [ ] [BODY-51] An item whose block is valid but carries an empty projection key is skipped by `aco next`, which names it `SKIPPED` with BODY-12's `body incomplete: <keys>`.
-- [ ] [BODY-52] Issue-mode `aco claim <n>` against such an item refuses before any write with the same sentence as a `body-contract` check, exit `2` (see E-BODY-03).
+- [ ] [BODY-52] Issue-mode `aco claim <n>` against such an item refuses before any write with the same sentence as a `body-contract` check, exit `2` (see E-BODY-03); under `state-ref` PIN-15 refuses, `unavailable`.
 - [ ] [BODY-68] Every sentence and `--json` field naming a malformed body's defect shows each display control as NEXT-37 does; all other text is byte for byte the same (see E-BODY-09).
 
 ## `scope`, the item's own files

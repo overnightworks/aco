@@ -33,7 +33,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | `<n>` open but not a container | CUT-02 | CUT-02 | CUT-02 | CUT-02 |
 | `<n>` itself has a parent | CUT-03 | CUT-03 | CUT-03 | CUT-03 |
 | a required forge write is unsupported | CUT-04 | CUT-04 | CUT-04 | CUT-04 |
-| `<n>`'s body is malformed | CUT-05 | CUT-05 | — | CUT-05 |
+| `<n>`'s body is malformed | CUT-05, CUT-40 | CUT-05, CUT-40 | — | CUT-05, CUT-40 |
 | the linked row's `done_when` holds a display control | CUT-39 | CUT-39 | — | CUT-05 |
 | a slice table, no `--row` | CUT-06, CUT-11 | — | — | CUT-12 |
 | a slice table, `--row N` present | — | CUT-06, CUT-11 | — | CUT-12 |
@@ -75,6 +75,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 
 - [ ] [CUT-05] `<n>` with a malformed body (BODY-50) refuses `#<n> body malformed: <field>: <message>; cut needs a valid aco block`, exit `2`; an incomplete body (BODY-51) is accepted.
 - [ ] [CUT-39] If the row cut selects has a `done_when` with a display control (BODY-66), `cut` refuses in CUT-05's form with `body --check`'s sentence before any write; no other row refuses (issue #606, E-CUT-03).
+- [ ] [CUT-40] Under `storage = "state-ref"`, an `<n>` PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CUT-05's, exit `2`, before any write (see E-CUT-10).
 
 ## Row selection
 
@@ -329,5 +330,20 @@ exit 2
 $ aco cut 90 --title "Import ledger" --json
 {"ok": false, "reason": "precondition_failed", "message": "possible twin #85; pass --not-a-twin"}
 2> ERROR: possible twin #85; pass --not-a-twin
+exit 2
+```
+
+### E-CUT-10 -- `storage = "state-ref"`, a container whose item PIN-15 refuses
+
+Setup: bare-remote, `storage = "state-ref"` tracked, bootstrapped, item
+`aco-000001` (`#<n>`) a file with prose and no `aco` block
+
+```console
+$ aco cut <n> --title "Slice A"
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+exit 2
+$ aco cut <n> --title "Slice A" --json
+{"ok": false, "reason": "precondition_failed", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]"}
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
 exit 2
 ```
