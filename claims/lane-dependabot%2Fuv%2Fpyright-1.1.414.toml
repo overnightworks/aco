@@ -1,0 +1,7 @@
+claim_id = "9fed2cd102dd4ad2837e18cdf5e8f4f8"
+agent = "claude"
+role = "builder"
+base = "55910c355a23bf718eb6b8974d602619f9b5154c"
+branch = "dependabot/uv/pyright-1.1.414"
+scope = ["pyproject.toml", "uv.lock"]
+opened_commit = "28b6e7d729730c70fb5731206ed91709829ce13b"
