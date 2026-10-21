@@ -663,7 +663,7 @@ class Board:
 
     `recovery` holds the items a merged pull request declared as its work
     item while they stayed open: the landing happened, the bookkeeping did
-    not.
+    not. An idea is never one: the label alone decides its list.
 
     `landings` is the Landungen view (issue #371): `landing_rows`' own
     projection over the trunk walk (plus, under `github`, its
@@ -2033,7 +2033,9 @@ def build_board(inputs: BoardBuildInputs) -> Board:
             for item in ordered
             if item.idle_days > STALE_IDLE_DAYS and item.stage is Stage.TEXT_ONLY
         ),
-        recovery=tuple(item for item in ordered if item.number in landed_work_items),
+        recovery=tuple(
+            item for item in ordered if item.number in landed_work_items and not item.idea
+        ),
         landings=landing_rows(
             inputs.trunk_landing_items, recent_merged_pull_requests, repository, config.storage
         ),

@@ -100,7 +100,7 @@ other printable space are text.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] An unclaimed, unfrozen item or any container labelled `needs-operator`, or a frozen container, is never pulled, cut or checked; `waiting on operator: <labels>` names it (E-NEXT-13, E-NEXT-15).
 - [ ] [NEXT-40] `aco next --help` names that label and how to set or remove it: `gh issue edit <n> --add-label/--remove-label`, or `aco item edit <item-id>` under `storage = "state-ref"`.
-- [ ] [NEXT-43] An item labelled `idea_label` (PIN-49) is never pulled, cut or checked, whatever its body; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
+- [ ] [NEXT-43] An item labelled `idea_label` (PIN-49) is never pulled, cut, checked or closed, whatever its body or merged pull request; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
 
 ## `parallel:`
 

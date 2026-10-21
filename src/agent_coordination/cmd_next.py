@@ -241,8 +241,8 @@ class _NextReport:
     qualifies), the unworkable rows `SKIPPED` names, the landed-but-open
     `RECOVERY` rows, the parallel-capacity projection, the zero-cost
     `close:` list, the items waiting on the operator (issue #553), the items
-    labelled as ideas, and whether `claim` accepts this checkout, which picks `claim` or `start`
-    as the advice (issue #562)."""
+    labelled as ideas, and whether `claim` accepts this checkout, which picks
+    `claim` or `start` as the advice (issue #562)."""
 
     action: board.NextAction | None
     skipped: tuple[board.BoardItem, ...]

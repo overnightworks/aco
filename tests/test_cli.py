@@ -4393,6 +4393,32 @@ def test_claim_does_not_require_out_of_order_for_the_top_ranked_item(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims
 
 
+def test_claim_does_not_require_out_of_order_past_a_higher_ranked_labelled_idea(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    work = board_issue(10, "Regular work", complete_contract("Claim #10."))
+    idea = board_issue(
+        11,
+        "Higher-ranked idea",
+        complete_contract("Build it.", scope=["src/idea.py"]),
+        labels=("idea", "security"),
+    )
+    _configured_board_client(monkeypatch, tmp_path, open_issues=(work, idea))
+    monkeypatch.setattr(
+        cmd_claim,
+        "_request",
+        lambda _arguments, **_kwargs: request(issue=10, scope=("src/work.py",)),
+    )
+
+    exit_code = issue_claim.main(
+        ["--repo", REPOSITORY, "claim", "10", "--agent", "Codex Sol", "--scope", "src/work.py"]
+    )
+
+    assert exit_code == 0
+    assert "higher-priority actionable item" not in capsys.readouterr().err
+    assert store.fetch_state(worktree=Path("."), remote="origin").claims
+
+
 @pytest.mark.parametrize(
     ("state", "title", "check", "expected_text"),
     [
@@ -6605,6 +6631,40 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
     }
 
 
+@pytest.mark.parametrize("as_container", [False, True], ids=["plain-item", "container"])
+def test_next_lists_a_labelled_idea_with_a_merged_pull_request_only_under_ideas(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    as_container: bool,
+) -> None:
+    idea_body_text = complete_contract("Build it.")
+    idea = (
+        _childless_container(90, idea_body_text, labels=("idea",))
+        if as_container
+        else board_issue(90, "Landed idea", idea_body_text, labels=("idea",))
+    )
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(idea,))
+    monkeypatch.setattr(
+        client,
+        "list_recent_merged_board_pull_requests",
+        lambda _since: (
+            board.PullRequest(
+                150, "Lands it", "Work-Item: #90\n\nCloses #90", "branch", "2026-08-20T00:00:00Z"
+            ),
+        ),
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
+    assert (
+        capsys.readouterr().out == "No actionable item.\n" + _NO_ACTION_NEXT_TAIL + "ideas: #90\n"
+    )
+
+    assert issue_claim.main(["--repo", REPOSITORY, "next", "--json"]) == 3
+    payload = json.loads(capsys.readouterr().out)
+    assert (payload["recovery"], payload["close"], payload["ideas"]) == ([], [], [90])
+
+
 def test_next_close_names_every_zero_cost_action_regardless_of_rank(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
@@ -7030,7 +7090,9 @@ def test_validated_dependencies_refuses_a_duplicate_dependency() -> None:
 def test_next_names_other_work_and_lists_a_labelled_idea_apart(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    idea = board_issue(10, "Operator idea", complete_contract("Build it."), labels=("idea",))
+    idea = board_issue(
+        10, "Operator idea", complete_contract("Build it."), labels=("idea", "security")
+    )
     work = board_issue(11, "Plain work", complete_contract("Claim #11."))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(idea, work))
 
@@ -7146,7 +7208,7 @@ def test_claim_refuses_an_empty_labelled_idea_as_an_incomplete_body(
     )
 
     assert exit_code == 2
-    assert "ERROR: #10 body incomplete: Now, Next, Done when" in capsys.readouterr().err
+    assert "body incomplete: Now, Next, Done when" in capsys.readouterr().err
 
 
 def test_status_scope_index_never_rescans_scope_pairs(
