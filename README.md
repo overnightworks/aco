@@ -1,351 +1,113 @@
 # agent-coordination
 
-`agent-coordination` is a small installable CLI that gives coding agents one
-claim state per repository: a compare-and-swap git ref, `refs/aco/state`, on
-the repository's own canonical remote. It is provider-neutral: Codex, Claude,
-Grok, people, and future agents use the same contract. Its command is `aco`.
+`aco` gives coding agents and the people steering them one claim state per
+repository: a compare-and-swap git ref, `refs/aco/state`, on the repository's
+canonical remote. It is provider-neutral: Codex, Claude, Grok and people use the
+same contract. Read this file to install `aco` and run one lane; each command's
+exact behaviour is in its spec under `specs/`.
 
-This file is the operator's view — what aco is, how to install and run it,
-and how each workflow fits together. Every command's exact flags, outputs,
-exit codes, and refusal sentences belong to one file under `specs/`; the
-table at the end names which file owns which command.
+## What aco is for, and is not
 
-## What belongs in aco
+A capability belongs in `aco` only if it helps agents coordinate in a shared
+repository, holds what an agent would forget or cannot know alone (who holds
+what, what a landing freed, what is disjoint), and no native tool does it
+better. Git, `gh` and the forge own commits, branches, pull requests and issue
+text. aco runs no lease server and writes no provider configuration. GitHub
+through `gh` is the one forge adapter; `status`, `bootstrap`, `reset`, lane
+`claim`/`rescope` and `release --abandoned` read and write only `refs/aco/state`
+and need no forge. `release --merged` needs it under `storage = "github"`.
 
-A capability belongs in `aco` only if it clears three tests (ruling
-19.09.2026): it helps a coding agent coordinate in a shared repository; it
-holds what an agent would forget or cannot know alone -- who holds what, what
-a landing freed, what's disjoint; and no native tool does it better -- git,
-`gh`, and GitLab own commits, branches, pull requests, and issue text. What
-fails is ballast: unbuilt, or removed once it fails. aco is meant for every
-repository: GitHub today, forges next. Workspace-recovery (`register`, `run`,
-`login`) stays: it restores the operator's project heads after a restart.
-
-## Install and maintain
+## Install
 
 ```bash
-uv tool install git+https://github.com/overnightworks/agent-coordination.git@v4.2.0
-# or: pipx install git+https://github.com/overnightworks/agent-coordination.git@v4.2.0
+uv tool install git+https://github.com/overnightworks/agent-coordination.git
+# or: pipx install git+https://github.com/overnightworks/agent-coordination.git
 uv tool upgrade agent-coordination
 uv tool uninstall agent-coordination
 ```
 
-Local proofs run under the pinned interpreter named in `.python-version`
-(currently 3.12); `uv sync` creates the development venv from that file.
+The supported Python range is in `pyproject.toml`.
 
-Claim state lives as a git tree under `refs/aco/state`, read and written
-whole: an unknown key or a malformed record refuses the whole read rather
-than patching around it (operator ruling 16.09.2026: no backwards
-compatibility). The exact tree shape, versioning, and transport contract are
-`specs/ref-store-cas.spec.md`'s own facts.
+## One lane
 
-## Quick start
-
-The quick start assumes a GitHub `origin`; a repository without one follows
-[A workflow without a forge](#a-workflow-without-a-forge). `ACO_AGENT` names
-the agent and the branch prefix `start` creates; in a plain shell `start`
-refuses without it (or `GROK_SESSION_ID` / `CLAUDE_CODE_SESSION_ID`), so the
-block exports it once.
-
-```bash
-# adopt once, without aco: a pull request adding only this file, merged into main
-mkdir .aco && touch .aco/board.toml
-git add -f .aco/board.toml && git commit -m "adopt aco"
-# once that commit is on main
-export ACO_AGENT=Ada
-aco bootstrap
-aco next
-aco start 42 --slug widget
-aco brief 42
-# build in ../<repo>-worktrees/issue-42-widget, push, open pull request 57
-# then, from the clean default-branch checkout
-aco land 57
+```mermaid
+flowchart LR
+    item["work item<br/>aco next"] -->|aco start| claim["claim in<br/>refs/aco/state<br/>+ worktree"]
+    claim --> build["build, push,<br/>open pull request"]
+    build -->|aco land| merge["merge, release claim,<br/>report freed items"]
+    merge -->|aco next| item
 ```
 
-Adoption is the one step outside the claim protocol: until this checkout
-carries `.aco/board.toml`, every store command refuses and names
-its repair (`specs/storage-pin.spec.md`, PIN-32): this step when the last
-fetched trunk lacks the file, merging that trunk when only this branch
-predates it, and restoring the file when this branch removed it itself.
-The commit adding it -- that file alone -- lands without a claim.
-`bootstrap` creates the state ref once per repository; every other command
-here reads or writes it. `specs/bootstrap.spec.md` owns `bootstrap`.
+Set `ACO_AGENT` to the agent's name once: `start` refuses in a plain
+shell without it. A repository adopts aco by landing one commit that adds an
+empty `.aco/board.toml` and nothing else, then runs `aco bootstrap` once to
+create the state ref (`specs/bootstrap.spec.md`, `specs/storage-pin.spec.md`).
+After that: `aco next` names the item to pull, `aco start <n>` creates its
+worktree and branch and claims its scope, `aco brief <n>` prints what a builder
+starts from, and `aco land <pull request> --head <sha>`, from a clean
+default-branch checkout, merges a green pull request pinned to the head the
+reviewers saw and releases the claim (`specs/start.spec.md`,
+`specs/brief.spec.md`, `specs/land.spec.md`).
 
-## A GitHub workflow: start, build, land
+## Other modes
 
-The quick start shows the head path. `aco next` names the
-one item the board recommends pulling now; an item labelled
-`needs-operator` waits on the operator and an item labelled `idea` is an
-idea; neither is ever pulled. `aco start 42`
-fetches, creates the linked worktree `../<repo>-worktrees/issue-42-<slug>`
-on the branch `<agent>/issue-42-<slug>` from the trunk, and claims it with
-the scope the item's body names; repeated, it reprints the live claim
-instead of minting a second one. It refuses out-of-order or blocked work by
-name unless overridden with `--out-of-order REASON`. `aco brief 42` prints
-the item's body, live claim, lane tip, and touched files -- what a builder
-starts from. The pull request names `Closes #42` and `Work-Item: #42`.
-
-`aco land <pull request>`, from a clean default-branch checkout, verifies it against GitHub
--- mergeable (waiting up to 30 seconds while GitHub still recomputes that), checks green (and `quality / verdict` present where the default branch holds `quality/config.toml`), body carrying Closes and Work-Item; with
-`--head <sha>`, pinned to the head its reviewers saw and refused when the head moved -- merges it
-with a merge commit, or squashes it where the repository allows no merge
-commit or `merge_method` asks for it, deletes the branch, removes the lane's
-worktree (or, when the worktree lives in another checkout, names the `aco release` command
-that removes it there; a rerun after the release finishes with `LANDED ... already`),
-closes the item, releases the claim, and reports what that landing freed and what
-to pull next. The exact preconditions, identity resolution, and refusals are
-`specs/next.spec.md`, `specs/start.spec.md`, `specs/brief.spec.md`,
-`specs/land.spec.md`, and `specs/release.spec.md`'s own; `start` acquires
-its claim exactly as `aco claim` does (`specs/claim.spec.md`), and the
-claim record itself -- scope, roles, resources, overlap -- is
-`specs/claim-record.spec.md`'s.
-
-## Issueless lane claims and resources
-
-`aco claim` is the path wherever `start` has no item to start from. A
-`docs/`- or `fix/`-prefixed branch claims and releases without a GitHub
-issue: the branch name is the lane's identity, so `claim` and `release`
-take no positional number in this mode. `claim --resource NAME` allocates
-the next free value of a named scarce resource and holds it for the lane.
-
-```bash
-git worktree add ../repo-worktrees/docs-tidy-readme -b docs/tidy-readme
-cd ../repo-worktrees/docs-tidy-readme
-aco claim --agent "Ada" --scope README.md
-# edit, commit, push, open a pull request whose body declares No-Item: docs
-aco release --merged 58
-```
-
-This lane branch must land within the session it was claimed in; it never
-appears on `board`, `rulings`, or `next` since it owns no issue. Its pull
-request carries `No-Item: docs`, `No-Item: fix` or `No-Item: deps` in place of a `Work-Item:`
-line -- the one classification `release --merged` accepts for a lane with no
-issue to close. `specs/claim.spec.md` owns the exact branch-name grammar and
-its refusal when a checkout is not on a matching branch;
-`specs/landing-grammar.spec.md` owns the `No-Item:` classification and its
-refusals. A `deps` pull request may change only paths named by `dependency_paths`
-in the repository's tracked `.aco/board.toml`; a trailing `/` covers a directory's
-contents, and other entries match exactly. This bounds paths, not safety: review
-must still check workflow permissions, secret use, actions and run steps, disabled
-checks, and tool configuration. See `specs/storage-pin.spec.md` for the key's contract.
-
-`aco adopt <pull request> --no-item <kind>` makes a pull request someone else
-opened (a dependency bot's, for one) such a lane: an open pull request of this
-repository, aimed at the default branch, whose body carries no classification line and
-closes no item, whose complete file listing stays within `dependency_paths` for `deps`, whose
-head branch no claim, local branch or worktree path stands on, and whose claim scope passes
-`claim`'s width gate. It refuses with the first failing check's sentence; when every check
-passes it builds `<repo>-worktrees/pr-<n>` on the head branch, claims that branch
-exclusively as this session's builder, appends `No-Item: <kind>` to the body, reads the body
-back and prints the declaration. It never pushes to the pull request's branch and never
-changes its title, labels, base or commits. Run it again after an interruption: the
-session that holds the branch's claim resumes it, adding the line only if it is missing. To
-give an adopted pull request up, run `aco release --branch <head-branch> --abandoned REASON`
-from the main checkout, then `git worktree remove <path>` and `git branch -D <branch>`; the
-line stays in the body, so a later `adopt` of that pull request refuses until it is removed.
-A bot's re-push ends no claim, and `aco land --head` demands the new head; a re-push that
-rewrote the branch leaves the worktree behind: pull it to the new head by hand first, or
-`land` reports `worktree: kept -- not merged into the default branch` (REL-29).
-`specs/adopt.spec.md` owns the checks, their order and their refusals.
-
-## A workflow without a forge
-
-A repository with a `file://` remote and no GitHub coordinates entirely out
-of `refs/aco/state`: pin `storage = "state-ref"`, and items live as files
-instead of issues. The pin's own commit is the adoption step, pushed to
-`main` directly and without aco.
-
-```bash
-git init --bare -b main /srv/aco/repo.git
-git clone file:///srv/aco/repo.git repo && cd repo
-mkdir .aco
-printf 'storage = "state-ref"\n' > .aco/board.toml
-git add -f .aco/board.toml && git commit -m "pin state-ref storage"
-git push -u origin main
-git remote set-head origin main
-aco bootstrap
-```
-
-Cut the epic and its first slice, fill in each body, then start, build, and
-land the same way a GitHub lane does -- except a landing is verified from
-the trunk commit's own `Work-Item:` trailer instead of a pull request:
-
-```bash
-export ACO_AGENT=Ada
-aco item new --kind container --title "Ship the widget"
-aco item new --title "Build the widget" --parent <container-id>
-aco item edit <item-id> < body.md
-aco start <item-id>
-# build in the printed worktree, then land a commit carrying "Work-Item: <item-id>" on main
-aco release <item-id> --merged
-```
-
-`specs/storage-pin.spec.md` owns the pin and the two item-id forms
-(`aco-xxxxxx` versus `#n`); `specs/item.spec.md` owns `item new`/`show`/
-`edit`/`close`; `specs/landing-grammar.spec.md` owns what a trunk trailer
-must say to count as a landing.
-
-## Recovering a provider workspace
-
-```bash
-aco register widget --path ~/git/widget --session-id 11111111-1111-1111-1111-111111111111 --agent Ada --stopped
-aco run widget
-```
-
-`aco register` records a local, deliberate mapping from a project to a
-stopped or explicitly selected running native provider conversation
-(Codex, Claude, or Grok); `aco run` resumes that mapping in a dedicated
-tmux session and opens one desktop console for it, reattaching an existing
-one rather than duplicating it. Neither command alters the conversation,
-repository files, provider credentials, or a live claim -- registration only
-records where to find the conversation again. A stopped registration needs
-an explicit acknowledgement, since aco cannot otherwise prove an unmanaged
-provider process is still running; registering a live process instead
-validates that exact process. Claude's own `claude-revive` SessionStart
-hook is a separate recovery owner -- do not run both paths for the same
-conversation. The exact flags, refusals, and recovery states are
-`specs/workspace.spec.md`'s own.
-
-## Desktop-login autostart
-
-`aco login enable` installs one desktop-login launcher that resumes every
-registered project, in order, at each login; `aco login disable` removes
-only that launcher; `aco login status` reports launcher and mapping state
-without starting anything. Login recovery never sends a prompt or copies
-authentication -- it restores each conversation to its native input line and
-stops there; use `aco run` for an explicit same-boot retry instead. The
-exact preconditions and refusals are also `specs/workspace.spec.md`'s own.
+- **Issueless lanes.** On a `docs/` or `fix/` branch, `aco claim --scope PATH`
+  claims without an issue; the pull request carries `No-Item: docs|fix|deps`
+  and `aco release --merged <pull request>` ends the claim once the forge shows
+  the merge (`specs/claim.spec.md`, `specs/landing-grammar.spec.md`).
+- **Foreign pull requests.** `aco adopt <pull request> --no-item <kind>` turns
+  a bot's pull request into such a lane (`specs/adopt.spec.md`).
+- **No forge.** Pinning `storage = "state-ref"` keeps items as files; use
+  `aco item new/show/edit/close` and land with a `Work-Item:` trailer on the
+  trunk commit; `aco release --merged <sha>` checks the local trunk, not a forge
+  (`specs/storage-pin.spec.md`, `specs/item.spec.md`, `specs/release.spec.md`).
+- **Workspace recovery.** `aco register`, `aco run` and `aco login` map projects
+  to provider conversations and resume them (`specs/workspace.spec.md`).
 
 ## Configuration
 
-`.aco/board.toml` defines exactly eight top-level keys; any other key
-is refused by name.
+A tracked `.aco/board.toml` on the trunk may set these top-level keys; any
+other key is refused by name (`specs/storage-pin.spec.md`).
 
-- `storage` -- `"github"` (default) or `"state-ref"`; the pin and its
-  precondition are `specs/storage-pin.spec.md`'s own.
-- `canonical_remote` -- the git remote name claim state and forge reads use
-  (default `origin`). It decides the repository aco recognizes, the trunk,
-  and the default branch: its recorded `HEAD` names them for the offline
-  checks and under `state-ref`, while under `github` `land` and
-  `release --merged` take the forge's default branch. A remote that has
-  branches but no recorded `HEAD`, `main`, or `master` -- a renamed default
-  branch -- refuses rather than guessing a local branch; the repair is
-  `git remote set-head <canonical_remote> -a`.
-- `priority_labels` -- an ordered list of labels that rank as critical work
-  on the board (default `security`, `data`, `ci`, `product`, `ux`,
-  `cleanup`).
-- `idea_label` -- the label marking an idea, `idea` when absent; `aco next`
-  never proposes such an item and lists it apart under `ideas:`, whatever its
-  body holds.
-- `merge_method` -- `"merge"` or `"squash"`, the method `aco land` merges
-  with. Absent, `land` reads the repository's allowed methods from the
-  forge: a merge commit unless the forge forbids one, else a squash; the
-  exact rule is `specs/land.spec.md`'s own.
-- `body_contract` -- must be `"block"` (the only work-item body format aco
-  reads) when present; absent means the same thing.
-- `lane_shared` -- exact repository file paths, such as a vulture whitelist,
-  a lane may change beyond its scope; `status` and `brief` list them. Only
-  the trunk's committed copy counts, so a change takes effect once it lands.
-- `dependency_paths` -- the paths a `No-Item: deps` pull request may change;
-  a trailing `/` covers a directory; other entries match
-  exactly. For landing, only the trunk checkout's tracked copy counts. This
-  bounds paths and does not certify safety (`specs/storage-pin.spec.md`, PIN-44..48).
+| Key | Meaning (default) |
+|---|---|
+| `storage` | `"github"` (default) or `"state-ref"` |
+| `canonical_remote` | git remote holding the state ref and naming the trunk (`origin`) |
+| `priority_labels` | ordered labels ranking critical work (`security`, `data`, `ci`, `product`, `ux`, `cleanup`) |
+| `idea_label` | label marking an idea, never proposed by `next` (`idea`) |
+| `merge_method` | `"merge"` or `"squash"` for `aco land`; absent, the forge's allowed method (`specs/land.spec.md`) |
+| `body_contract` | only `"block"` is accepted; absent means the same |
+| `lane_shared` | repository files a lane may change beyond its scope |
+| `dependency_paths` | paths a `No-Item: deps` pull request may change; a trailing `/` covers a directory |
 
 ## Board
 
-`aco board --json` projects the open work board, read-only, as the
-machine-readable status overview for agents and scripts; `aco-board` reads
-its own decisions through `aco rulings --json` and writes them through
-`aco rule` instead (`specs/aco-board.spec.md`). `--html` and `--serve`
-(issue #280) were removed once `aco-board` took over the decision board
-(issue #5): `aco board --serve` now refuses, pointing at `aco-board serve`
-instead.
-Each item in `aco board --json` carries `size` and a nullable `estimate`;
-`specs/board.spec.md` defines their JSON representation.
+`aco board --json` projects the open work board read-only for agents and
+scripts. `aco-board serve [--port N] [--repo PATH]...` serves the open
+expectation lines of one or more repositories as yes/no cards on 127.0.0.1; the
+access token travels only in the printed URL's `#` fragment
+(`specs/aco-board.spec.md`). The browser app lives in `frontend/`; its build
+output is committed under `src/aco_board/static/`.
 
-`aco-board serve [--port N] [--repo PFAD]...` serves one or more
-repositories' open expectation lines, under one URL, as yes/no cards on
-127.0.0.1; the access token travels only in the printed URL's `#` fragment,
-which a browser never sends back to the server. Each `--repo` (repeatable)
-is labelled by its resolved directory's name; without it, the current
-directory is the one repository served. A choice can be undone for 8
-seconds, then it is written through `aco rule` in its own repository.
+## Machine output
 
-`frontend/` holds the board's browser app (Svelte, built with pnpm; the Node
-range and pnpm version are pinned in its `package.json`). Its build output is
-committed under `src/aco_board/static/`, which `aco-board serve` delivers at
-`/` and `/assets/**` without a token; only the JSON API under `/api/` needs
-one. After changing `frontend/`, run `pnpm --dir frontend install
---frozen-lockfile && pnpm --dir frontend build` and commit the rebuilt files
-with the change: CI's `frontend` job fails when they differ from a fresh
-build.
-
-## Scope and boundaries
-
-GitHub through the `gh` CLI is the one forge adapter that exists today. The
-port is a `ForgeReader`/`ForgeWriter` pair with a `Capability` answer per
-operation, but `land`, `release` and `item` depend on the GitHub adapter and
-the state-ref board directly, so a second forge would first need its own
-contract for those commands. `status`,
-`bootstrap`, `reset`, and a lane `claim`/`rescope`/`release` never
-resolve a forge at all: they read and write only `refs/aco/state`, so a
-canonical remote on any host, including a bare `file://` path, is no error
-for them. aco does not allocate work, merge code, or operate a lease server;
-it never writes provider configuration, and never touches `~/.claude`,
-`~/.codex`, or `~/.grok` except the one workspace mapping described above.
-
-Most commands accept `--json` for a machine-readable form: one object on
-stdout, refusals included. Read it in that order -- the exit code, then
-`ok` and `reason`, then the payload. The exit code decides first: a refusal
-is never `0`, so a script that reads stdout without it eventually parses a
-refusal as an answer (one did, 08.09.2026). `ok` and `reason` are always the
-object's first two keys, and `reason` is the token to branch on: a stable
-word from that command's own vocabulary, never a sentence to match against,
-and never a payload key whose presence you test -- a success may carry `ok`
-and `reason` alone. A closing `message` is prose for a person: the refusal's own
-sentence, the one the text form prints -- behind `ERROR: ` for most
-commands, behind `REFUSED: <sha> ` for `aco check <sha>` -- and optional,
-because not every refusal names one. It is no promise of a matching
-stderr line: under `--json`, `check` writes the object alone. A usage
-error the parser itself raises joins the same object, but only for a
-command that declares `--json`: `aco bootstrap --json` stays argparse's own
-text on stderr, stdout empty. A non-zero exit is not always a refusal --
-`next` exits non-zero on an empty board without refusing anything
-(`specs/next.spec.md`). No command carves itself out of this shape any
-more: `aco check <sha>` answers in the same `ok`/`reason` object every
-other command does, naming its commit under `sha` and its defect sentence
-under `message` (issue #435). `specs/output.spec.md` owns the envelope;
-each command's spec owns its own `reason` values.
+Most commands accept `--json` and print one object on stdout, refusals
+included. Read the exit code first, then `ok` and `reason`; branch on `reason`,
+never on prose (`specs/output.spec.md`).
 
 ## Commands and their specs
 
-Every command's flags, outputs, exit codes, and refusal sentences are owned
-by exactly one file below; this table is the map, not a copy.
+`aco --help` lists the commands and `aco <command> --help` their flags. Each
+command's behaviour, printed literals, exit codes and `--json` shapes are in
+`specs/<command>.spec.md`; `register`, `run`, `login` and `_run-at-login` share
+`specs/workspace.spec.md`, and `aco-board` has `specs/aco-board.spec.md`. The
+rules several commands share (output envelope, body block, claim record,
+landing grammar, storage pin, state ref transport) are in
+[`specs/`](specs/) too.
 
-| Command / contract | Spec | What it covers |
-|---|---|---|
-| `aco bootstrap` | `specs/bootstrap.spec.md` | creates or reports the state ref |
-| `aco start` | `specs/start.spec.md` | creates an item's worktree and branch, then claims it |
-| `aco claim` | `specs/claim.spec.md` | opens a claim on an issue or an issueless lane |
-| `aco rescope` | `specs/rescope.spec.md` | adds or drops paths on a live claim |
-| `aco release` | `specs/release.spec.md` | ends a claim as merged or abandoned |
-| `aco land` | `specs/land.spec.md` | merges a green pull request, then releases its claim |
-| `aco adopt` | `specs/adopt.spec.md` | makes a foreign pull request an issue-less lane: worktree, exclusive claim and `No-Item` line |
-| `aco status` | `specs/status.spec.md` | reads every live claim, repository-wide or by path |
-| `aco reset` | `specs/reset.spec.md` | rebuilds a broken or rewritten state ref |
-| `aco check` | `specs/check.spec.md` | answers whether a pull request, an issue, or a trunk commit is sound |
-| `aco brief` | `specs/brief.spec.md` | composes one item's body, claim, tip, and touched files |
-| `aco board` | `specs/board.spec.md` | projects the open board (`--json` only) |
-| `aco ask` | `specs/ask.spec.md` | proposes one expectation line on an item |
-| `aco rule` | `specs/rule.spec.md` | rules one proposed expectation line |
-| `aco rulings` | `specs/rulings.spec.md` | lists every item with an open expectation line |
-| `aco next` | `specs/next.spec.md` | names the one action the board recommends pulling now |
-| `aco cut` | `specs/cut.spec.md` | dispatches a container's next slice as a fresh child whose block says where it was cut from, to build it with `aco start`, and the slice row's `done_when` |
-| `aco item new/show/edit/close` | `specs/item.spec.md` | the state-ref item lifecycle, and `item new` of a GitHub issue |
-| `aco body --check` | `specs/body.spec.md` | validates a piped body offline |
-| `aco register/run/login` | `specs/workspace.spec.md` | records, resumes, and autostarts a provider workspace mapping |
-| `aco` block grammar | `specs/body-block.spec.md` | the fenced TOML block every item-reading command parses |
-| claim record | `specs/claim-record.spec.md` | the stored claim fields `claim`/`release`/`rescope`/`status` share |
-| state ref transport | `specs/ref-store-cas.spec.md` | the compare-and-swap `refs/aco/state` every store command reads and writes |
-| landing grammar | `specs/landing-grammar.spec.md` | what counts as a landing, read by `check`, `release --merged`, and `board` |
-| storage pin | `specs/storage-pin.spec.md` | the `storage` key gating GitHub versus state-ref item storage |
+## Documentation
+
+`specs/` holds the behaviour contracts, `docs/decisions/` the decision record
+([claim state without a ledger issue](docs/decisions/0001-claim-state-without-a-ledger-issue.md)),
+and [`docs/board/mockup.html`](docs/board/mockup.html) the frozen picture of the
+board surface.
