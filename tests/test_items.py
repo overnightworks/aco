@@ -6,15 +6,15 @@ from datetime import UTC, datetime
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
 
-from agent_coordination import items, protocol
-from agent_coordination.body import (
+from aco import items, protocol
+from aco.body import (
     BodyReadState,
     ContractDefect,
     Storage,
     parse_body,
     render_block,
 )
-from agent_coordination.protocol import ClaimUnavailableError, MalformedStateTreeError
+from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
 
 ITEM_ID = "aco-8f3a2c"
 

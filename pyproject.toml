@@ -3,29 +3,29 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agent-coordination"
+name = "overnightworks-aco"
 dynamic = ["version"]
 description = "Repository-neutral GitHub issue claims for coding agents"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "MIT"
-authors = [{name = "agent-coordination contributors"}]
+authors = [{name = "aco contributors"}]
 dependencies = []
 
 [project.scripts]
-aco = "agent_coordination.cli:main"
-aco-board = "aco_board.cli:main"
+aco = "aco.cli:main"
+aco-board = "aco.board.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# The board's built assets are committed under src/aco_board/static/ so a
+# The board's built assets are committed under src/aco/board/static/ so a
 # Python-only install needs no Node; scripts/package_smoke.sh proves they ship.
 [tool.setuptools.package-data]
-aco_board = ["static/**"]
+"aco.board" = ["static/**"]
 
 [tool.setuptools.dynamic]
-version = {attr = "agent_coordination.__version__"}
+version = {attr = "aco.__version__"}
 
 # uv invalidates builds of path sources only via pyproject.toml's mtime by
 # default, so `uv tool install --from .` can silently reinstall a cached wheel
@@ -62,13 +62,13 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "PL", "FURB", "N", "SLF001"]
 "tests/**" = ["PLR2004", "PLR0913", "PLR0917", "SLF001"]
 
 [tool.importlinter]
-root_packages = ["agent_coordination", "aco_board"]
+root_packages = ["aco"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Layers"
 type = "layers"
-containers = ["agent_coordination"]
+containers = ["aco"]
 exhaustive = true
 layers = [
     "cli",
@@ -81,13 +81,13 @@ layers = [
     "checkout | store",
     "github | state_board",
     "forge",
-    "board",
+    "workboard",
     "items",
     "body",
     "metrics",
-    "protocol | process",
+    "protocol | process | board",
 ]
-# `metrics` moved below `body` (issue #419): it has no `agent_coordination`
+# `metrics` moved below `body` (issue #419): it has no `aco`
 # import of its own, so nothing above
 # depended on its old position ahead of `items`/`body` -- moving it lets
 # `body` (the body-block codec) reach `metrics.Size` for its own
@@ -100,19 +100,19 @@ layers = [
 # and ITEM-33 cites CUT-29..31; ITEM-25 cites body --check (#2, manifest S18–S21);
 # ask.spec ASK-09 cites rule.spec RULE-06..08.
 ignore_imports = [
-    "agent_coordination.cmd_adopt -> agent_coordination.cmd_claim",
-    "agent_coordination.cmd_ask -> agent_coordination.cmd_rule",
-    "agent_coordination.cmd_brief -> agent_coordination.cmd_status",
-    "agent_coordination.cmd_item -> agent_coordination.cmd_body",
-    "agent_coordination.cmd_item -> agent_coordination.cmd_cut",
-    "agent_coordination.cmd_land -> agent_coordination.cmd_release",
-    "agent_coordination.cmd_start -> agent_coordination.cmd_claim",
+    "aco.cmd_adopt -> aco.cmd_claim",
+    "aco.cmd_ask -> aco.cmd_rule",
+    "aco.cmd_brief -> aco.cmd_status",
+    "aco.cmd_item -> aco.cmd_body",
+    "aco.cmd_item -> aco.cmd_cut",
+    "aco.cmd_land -> aco.cmd_release",
+    "aco.cmd_start -> aco.cmd_claim",
 ]
 
 [[tool.importlinter.contracts]]
 name = "Decision board layers"
 type = "layers"
-containers = ["aco_board"]
+containers = ["aco.board"]
 exhaustive = true
 # Issue #617: the board's rules (`board`) know only the port, never the aco
 # adapter; the two are independent neighbours that `cli` wires together, and
@@ -133,25 +133,32 @@ type = "forbidden"
 # The layers contract alone lets `server`, `static`, and `api` import
 # `aco_cli`, which sits below them; only `cli` may wire the adapter in
 # (issue #617).
-source_modules = ["aco_board.server", "aco_board.static", "aco_board.api"]
-forbidden_modules = ["aco_board.aco_cli"]
+source_modules = ["aco.board.server", "aco.board.static", "aco.board.api"]
+forbidden_modules = ["aco.board.aco_cli"]
 allow_indirect_imports = false
 
 [[tool.importlinter.contracts]]
 name = "aco does not import the decision board"
-type = "forbidden"
-source_modules = ["agent_coordination"]
-forbidden_modules = ["aco_board"]
-allow_indirect_imports = false
+type = "protected"
+# The Layers contract holds board -> core only one way (a layer may import
+# the layers below it, never one above); this contract holds core -> board and
+# `aco/__init__` -> board, which a forbidden contract over overlapping source
+# and forbidden sets would silently keep.
+protected_modules = ["aco.board"]
+allowed_importers = ["aco.board"]
 
 [[tool.importlinter.contracts]]
 name = "The decision board reaches aco only through its command line"
 type = "forbidden"
 # Issue #617: the board talks to aco through the installed `aco` CLI and its
 # specified JSON, never through aco's internal modules.
-source_modules = ["aco_board"]
-forbidden_modules = ["agent_coordination"]
+# `as_packages = false` lists every module of the board as its own source, so
+# the overlap with the forbidden `aco` package does not make the contract
+# keep silently; it holds board -> `aco/__init__`.
+source_modules = ["aco.board", "aco.board.**"]
+forbidden_modules = ["aco"]
 allow_indirect_imports = false
+as_packages = false
 
 [[tool.importlinter.contracts]]
 name = "items does not import metrics"
@@ -165,22 +172,22 @@ type = "forbidden"
 # through the allowed items -> body -> metrics chain, so checking
 # indirectly would flag that permitted chain along with a genuine direct
 # items -> metrics import.
-source_modules = ["agent_coordination.items"]
-forbidden_modules = ["agent_coordination.metrics"]
+source_modules = ["aco.items"]
+forbidden_modules = ["aco.metrics"]
 allow_indirect_imports = true
 as_packages = false
 
 [[tool.importlinter.contracts]]
 name = "The claim-state store is git transport only"
 type = "forbidden"
-source_modules = ["agent_coordination.store"]
+source_modules = ["aco.store"]
 forbidden_modules = [
-    "agent_coordination.github",
-    "agent_coordination.state_board",
-    "agent_coordination.forge",
-    "agent_coordination.board",
-    "agent_coordination.items",
-    "agent_coordination.checkout",
+    "aco.github",
+    "aco.state_board",
+    "aco.forge",
+    "aco.workboard",
+    "aco.items",
+    "aco.checkout",
 ]
 # false checks every chain, not only a direct import: store being "git
 # transport only" is a full isolation boundary, so store reaching a
@@ -193,18 +200,18 @@ as_packages = false
 name = "Workspace recovery does not reach repository coordination"
 type = "forbidden"
 source_modules = [
-    "agent_coordination.cmd_workspace",
-    "agent_coordination.workspace",
-    "agent_coordination.terminal",
-    "agent_coordination.providers",
+    "aco.cmd_workspace",
+    "aco.workspace",
+    "aco.terminal",
+    "aco.providers",
 ]
 forbidden_modules = [
-    "agent_coordination.store",
-    "agent_coordination.checkout",
-    "agent_coordination.github",
-    "agent_coordination.state_board",
-    "agent_coordination.forge",
-    "agent_coordination.items",
+    "aco.store",
+    "aco.checkout",
+    "aco.github",
+    "aco.state_board",
+    "aco.forge",
+    "aco.items",
 ]
 allow_indirect_imports = false
 as_packages = false
@@ -212,34 +219,35 @@ as_packages = false
 [[tool.importlinter.contracts]]
 name = "Provider definitions do not drive workspace orchestration"
 type = "forbidden"
-source_modules = ["agent_coordination.providers"]
-forbidden_modules = ["agent_coordination.workspace", "agent_coordination.terminal"]
+source_modules = ["aco.providers"]
+forbidden_modules = ["aco.workspace", "aco.terminal"]
 allow_indirect_imports = false
 as_packages = false
 
 [[tool.importlinter.contracts]]
 name = "Only the process boundary imports subprocess"
 type = "forbidden"
-# "agent_coordination.**" (recursive), not "agent_coordination.*": the
+# "aco.**" (recursive), not "aco.*": the
 # single-level wildcard is blind to a subpackage's own submodules, so a
 # future nested module could import subprocess unnoticed.
-source_modules = ["agent_coordination", "agent_coordination.**"]
+source_modules = ["aco", "aco.**"]
 forbidden_modules = ["subprocess"]
 # true checks only the direct edge: subprocess has no other module to
 # reach it through, so the only "indirect" chain would be through another
-# agent_coordination module that itself directly imports subprocess --
+# aco module that itself directly imports subprocess --
 # checking indirectly would misattribute that module's violation to every
 # caller along the chain instead of the module that actually wrote the
 # import.
 allow_indirect_imports = true
 as_packages = false
-ignore_imports = ["agent_coordination.process -> subprocess"]
+# The decision board's one adapter calls the installed `aco` command line.
+ignore_imports = ["aco.process -> subprocess", "aco.board.aco_cli -> subprocess"]
 
 [[tool.importlinter.contracts]]
 name = "Only the gh, git, and terminal owners run commands"
 type = "forbidden"
-source_modules = ["agent_coordination", "agent_coordination.**"]
-forbidden_modules = ["agent_coordination.process"]
+source_modules = ["aco", "aco.**"]
+forbidden_modules = ["aco.process"]
 # true checks only the direct edge: many modules legitimately depend on an
 # allowed process caller (github, checkout, store, terminal) further up
 # their own chain, so checking indirectly would flag every one of those
@@ -247,10 +255,10 @@ forbidden_modules = ["agent_coordination.process"]
 allow_indirect_imports = true
 as_packages = false
 ignore_imports = [
-    "agent_coordination.github -> agent_coordination.process",
-    "agent_coordination.checkout -> agent_coordination.process",
-    "agent_coordination.store -> agent_coordination.process",
-    "agent_coordination.terminal -> agent_coordination.process",
+    "aco.github -> aco.process",
+    "aco.checkout -> aco.process",
+    "aco.store -> aco.process",
+    "aco.terminal -> aco.process",
 ]
 
 [tool.pyright]

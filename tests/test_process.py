@@ -1,4 +1,4 @@
-"""Behavior of `agent_coordination.process`: native `/proc` inspection, the
+"""Behavior of `aco.process`: native `/proc` inspection, the
 bounded subprocess boundary (`run_bounded`) it also owns, and the one git
 launcher (`run_git`/`git_command`/`git_failure_detail`/
 `git_failure_detail_from_stderr`, issue #372) `checkout` and `store` each call
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_coordination import process
+from aco import process
 
 
 def test_git_command_prefixes_the_directory_flag_only_when_given(tmp_path: Path) -> None:

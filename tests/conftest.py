@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_coordination import checkout, process
+from aco import checkout, process
 
 # Registers `bare_remote` and `worktree` for every module by name: an import
 # of a fixture only to receive it as a parameter reads as unused to ruff.

@@ -17,7 +17,7 @@ from aco_board_fixtures import (
     serving,
 )
 
-from aco_board.aco_cli import AcoCli
+from aco.board.aco_cli import AcoCli
 
 
 @pytest.fixture

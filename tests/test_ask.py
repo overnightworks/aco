@@ -19,7 +19,7 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
-from agent_coordination import body, cli, forge, github, session
+from aco import body, cli, forge, github, session
 
 
 @dataclass(frozen=True)

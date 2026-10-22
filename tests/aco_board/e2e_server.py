@@ -4,7 +4,7 @@
 tests/aco_board/e2e_server.py` and points every spec straight at the port it
 prints -- no dev server, no proxy: it serves the same committed, built SPA a
 live `aco-board serve` does. It speaks the same protocol, too
-(`aco_board.server.start_board`), so a spec drives the real wire form
+(`aco.board.server.start_board`), so a spec drives the real wire form
 (`specs/aco-board.spec.md` ABRD-08/09/21) end to end -- the only thing fake
 is `aco` itself (`aco_board_fixtures.install_fake_aco`).
 
@@ -31,9 +31,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aco_board_fixtures import DEFAULT_LABEL, install_fake_aco, named_repository, path_with
 
-from aco_board.aco_cli import AcoCli
-from aco_board.board import Board, Boards
-from aco_board.server import start_board
+from aco.board.aco_cli import AcoCli
+from aco.board.board import Board, Boards
+from aco.board.server import start_board
 
 
 def main() -> None:

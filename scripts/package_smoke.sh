@@ -26,8 +26,8 @@ out_dir="$(cd "$out_dir" && pwd)"
 # that exists only in the working tree (a stray build output, a sourcemap) would
 # otherwise ship unproven. Read before the narrowed PATH hides git.
 expected_static="$scratch/expected-static"
-git -C "$repository_root" ls-files -- src/aco_board/static \
-    | sed 's|^src/aco_board/static/||' | sort >"$expected_static"
+git -C "$repository_root" ls-files -- src/aco/board/static \
+    | sed 's|^src/aco/board/static/||' | sort >"$expected_static"
 
 # A PATH holding only the tools this script needs proves the install path never
 # reaches for Node, which a developer machine or CI runner usually has.
@@ -78,22 +78,22 @@ check_no_build_inputs() {
     fi
 }
 
-# Compares an archive's static files, relative to aco_board/static/, with the
+# Compares an archive's static files, relative to aco/board/static/, with the
 # committed manifest and names every missing or extra file.
 check_static_manifest() {
     local archive="$1" listing="$2" static_prefix="$3" shipped
     shipped="$(grep -E "^${static_prefix}[^/]" <<<"$listing" | grep -v '/$' \
         | sed -E "s|^${static_prefix}||" | sort || true)"
     if ! diff -u --label committed --label "$archive" "$expected_static" - <<<"$shipped" >&2; then
-        echo "ERROR: $archive static files differ from src/aco_board/static (see diff above)" >&2
+        echo "ERROR: $archive static files differ from src/aco/board/static (see diff above)" >&2
         exit 1
     fi
 }
 
 check_no_build_inputs "${wheel##*/}" "$wheel_listing"
 check_no_build_inputs "${sdist##*/}" "$sdist_listing"
-check_static_manifest "${wheel##*/}" "$wheel_listing" 'aco_board/static/'
-check_static_manifest "${sdist##*/}" "$sdist_listing" '[^/]+/src/aco_board/static/'
+check_static_manifest "${wheel##*/}" "$wheel_listing" 'aco/board/static/'
+check_static_manifest "${sdist##*/}" "$sdist_listing" '[^/]+/src/aco/board/static/'
 echo "wheel and sdist carry exactly the committed board assets"
 
 UV_TOOL_DIR="$scratch/tools" UV_TOOL_BIN_DIR="$scratch/bin" \
@@ -105,9 +105,9 @@ echo "installed aco and aco-board run"
 uv run --isolated --no-project --with "$wheel" python -c "
 import sys
 from importlib.resources import files
-sys.exit(0 if files('aco_board').joinpath('static/index.html').is_file() else 1)
+sys.exit(0 if files('aco.board').joinpath('static/index.html').is_file() else 1)
 "
-echo "importlib.resources finds aco_board/static/index.html"
+echo "importlib.resources finds aco/board/static/index.html"
 
 # Proves the installed tool actually answers the shell over HTTP -- the
 # importlib.resources check above only proves the file ships, not that

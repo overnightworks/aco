@@ -1,4 +1,4 @@
-"""Behavior of the GitHub adapter (`agent_coordination.github`): `GitHubForge`'s
+"""Behavior of the GitHub adapter (`aco.github`): `GitHubForge`'s
 reader/writer methods, repository discovery, and the `gh` process boundary it
 wraps. CLI wiring that merely drives a forge through `cli.py` -- including
 tests that build a `GitHubForge` only to hand it to `board_read.build_board`/
@@ -21,9 +21,9 @@ from board_fixtures import REPOSITORY
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
 from process_fixtures import UnstoppableProcess, reap
 
-from agent_coordination import board, forge, github, process
-from agent_coordination.body import ItemKind
-from agent_coordination.protocol import ClaimError
+from aco import forge, github, process, workboard
+from aco.body import ItemKind
+from aco.protocol import ClaimError
 
 GitHubForge = github.GitHubForge
 
@@ -49,7 +49,7 @@ def test_only_the_github_adapter_speaks_gh_argv() -> None:
     grepping every other module for the literal command name instead. Every
     module in the package is enumerated, not a fixed list, so a new module
     is covered the day it is added."""
-    package = Path("src/agent_coordination")
+    package = Path("src/aco")
     other_modules = sorted(p for p in package.glob("*.py") if p.name != "github.py")
     assert len(other_modules) >= 7
     for module in other_modules:
@@ -235,7 +235,7 @@ def test_github_adapter_reads_an_open_board_pull_request() -> None:
     )
 
     assert client.list_open_board_pull_requests() == (
-        board.PullRequest(62, "Fixes #10", "Ship it.", "codex/issue-10", None),
+        workboard.PullRequest(62, "Fixes #10", "Ship it.", "codex/issue-10", None),
     )
 
 
@@ -1038,9 +1038,9 @@ def test_github_adapter_fails_loud_on_an_empty_mergeable_state() -> None:
         client.landing_readiness(57)
 
 
-@pytest.mark.parametrize("method", sorted(board.LANDING_MERGE_METHODS))
+@pytest.mark.parametrize("method", sorted(workboard.LANDING_MERGE_METHODS))
 def test_github_adapter_merges_a_pull_request_with_a_pinned_sha(
-    method: board.MergeMethod,
+    method: workboard.MergeMethod,
 ) -> None:
     """Issue #405: `merge_landing` merges through `gh api --method PUT
     pulls/<n>/merge`, never `gh pr merge`, which re-reads the pull
@@ -1083,17 +1083,17 @@ def test_github_adapter_merges_a_pull_request_with_a_pinned_sha(
     [
         pytest.param(
             {"merge": True, "squash": True, "rebase": True},
-            frozenset(board.MergeMethod),
+            frozenset(workboard.MergeMethod),
             id="all-three",
         ),
         pytest.param(
             {"merge": False, "squash": True, "rebase": False},
-            frozenset({board.MergeMethod.SQUASH}),
+            frozenset({workboard.MergeMethod.SQUASH}),
             id="squash",
         ),
         pytest.param(
             {"merge": False, "squash": False, "rebase": True},
-            frozenset({board.MergeMethod.REBASE}),
+            frozenset({workboard.MergeMethod.REBASE}),
             id="rebase",
         ),
         pytest.param(
@@ -1104,7 +1104,7 @@ def test_github_adapter_merges_a_pull_request_with_a_pinned_sha(
     ],
 )
 def test_github_adapter_reads_the_repositorys_allowed_merge_methods(
-    settings: dict[str, object], allowed: frozenset[board.MergeMethod] | None
+    settings: dict[str, object], allowed: frozenset[workboard.MergeMethod] | None
 ) -> None:
     """Issue #578: `allowed_merge_methods` reads the repository's own
     `allow_merge_commit`/`allow_squash_merge`/`allow_rebase_merge`, and
@@ -1263,21 +1263,21 @@ def test_github_adapter_fails_loud_on_any_other_branch_rules_refusal(
         pytest.param(json.dumps({"type": "deletion"}), (), id="rule-without-a-merge-restriction"),
         pytest.param(
             json.dumps({"type": "required_linear_history"}),
-            (frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+            (frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),),
             id="required-linear-history-drops-the-merge-commit",
         ),
         pytest.param(
             _pull_request_rule(["squash", "rebase"]) + _pull_request_rule(["squash"]),
             (
-                frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),
-                frozenset({board.MergeMethod.SQUASH}),
+                frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                frozenset({workboard.MergeMethod.SQUASH}),
             ),
             id="two-rulesets",
         ),
     ],
 )
 def test_github_adapter_reads_the_default_branchs_merge_rules(
-    answer: str, rules: tuple[frozenset[board.MergeMethod], ...]
+    answer: str, rules: tuple[frozenset[workboard.MergeMethod], ...]
 ) -> None:
     """Issue #615 lines 4, 6 and 7: `branch_merge_rules` reads every rule on
     the branch through the branch-rules endpoint, one method set per
@@ -1329,7 +1329,7 @@ def test_github_adapter_tells_a_moved_head_from_a_refused_merge(
         client.merge_landing(
             57,
             head_sha=MERGE_COMMIT_SHA,
-            method=board.MergeMethod.MERGE,
+            method=workboard.MergeMethod.MERGE,
             title="t",
             body="Work-Item: #42\n",
         )
@@ -1359,18 +1359,18 @@ def test_github_adapter_reads_a_file_at_a_commit_from_its_base64_contents() -> N
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=run)
 
-    text = client.file_at_commit(board.CONFIG_PATH, MERGE_COMMIT_SHA)
+    text = client.file_at_commit(workboard.CONFIG_PATH, MERGE_COMMIT_SHA)
 
     assert text == 'storage = "github"\n'
     assert calls[0][1] == (
-        f"repos/{REPOSITORY}/contents/{board.CONFIG_PATH.as_posix()}?ref={MERGE_COMMIT_SHA}"
+        f"repos/{REPOSITORY}/contents/{workboard.CONFIG_PATH.as_posix()}?ref={MERGE_COMMIT_SHA}"
     )
 
 
 def test_github_adapter_reads_a_file_absent_at_a_commit_as_none() -> None:
     client = _file_contents_client(forge.ForgeNotFoundError("gh: Not Found (HTTP 404)"))
 
-    assert client.file_at_commit(board.CONFIG_PATH, MERGE_COMMIT_SHA) is None
+    assert client.file_at_commit(workboard.CONFIG_PATH, MERGE_COMMIT_SHA) is None
 
 
 @pytest.mark.parametrize(
@@ -1392,7 +1392,7 @@ def test_github_adapter_reads_a_file_absent_at_a_commit_as_none() -> None:
 )
 def test_github_adapter_fails_loud_on_malformed_file_contents(answer: str) -> None:
     client = _file_contents_client(answer)
-    path = board.CONFIG_PATH
+    path = workboard.CONFIG_PATH
 
     with pytest.raises(forge.ForgeMalformedResponseError, match="malformed file contents"):
         client.file_at_commit(path, MERGE_COMMIT_SHA)
@@ -1459,7 +1459,7 @@ def test_github_adapter_delete_branch_reraises_an_unrelated_422() -> None:
             lambda client: client.merge_landing(
                 57,
                 head_sha=MERGE_COMMIT_SHA,
-                method=board.MergeMethod.MERGE,
+                method=workboard.MergeMethod.MERGE,
                 title="t",
                 body="Work-Item: #42\n",
             ),
@@ -1534,7 +1534,7 @@ def test_github_adapter_fails_loud_on_a_malformed_merge_result(result: dict[str,
         client.merge_landing(
             57,
             head_sha=MERGE_COMMIT_SHA,
-            method=board.MergeMethod.MERGE,
+            method=workboard.MergeMethod.MERGE,
             title="t",
             body="Work-Item: #42\n",
         )
@@ -1550,7 +1550,7 @@ def test_github_adapter_fails_loud_on_a_merge_result_with_more_than_one_value() 
         client.merge_landing(
             57,
             head_sha=MERGE_COMMIT_SHA,
-            method=board.MergeMethod.MERGE,
+            method=workboard.MergeMethod.MERGE,
             title="t",
             body="Work-Item: #42\n",
         )
@@ -1977,15 +1977,15 @@ def test_github_reads_board_dependencies_local_and_foreign(
     client = GitHubForge(github.repository_id("example/agent-coordination"), run=run)
 
     assert client.list_board_dependencies(150) == (
-        board.IssueDependency(
-            board.IssueReference("example/agent-coordination", 151),
-            board.BlockerState.CLOSED,
+        workboard.IssueDependency(
+            workboard.IssueReference("example/agent-coordination", 151),
+            workboard.BlockerState.CLOSED,
             False,
             datetime(2026, 9, 5, tzinfo=UTC),
         ),
-        board.IssueDependency(
-            board.IssueReference("overnightworks/other-repo", 7),
-            board.BlockerState.OPEN,
+        workboard.IssueDependency(
+            workboard.IssueReference("overnightworks/other-repo", 7),
+            workboard.BlockerState.OPEN,
             False,
             None,
         ),
@@ -2978,13 +2978,13 @@ def test_github_adapter_reads_a_recorded_parent_and_its_children() -> None:
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=run)
 
-    assert client.parent_issue(72) == board.ParentIssue(
-        board.IssueReference(REPOSITORY, 79), "## Next\nCut."
+    assert client.parent_issue(72) == workboard.ParentIssue(
+        workboard.IssueReference(REPOSITORY, 79), "## Next\nCut."
     )
     assert client.parent_number(72) == 79
     assert client.list_children(79) == (
-        board.ChildItem(72, board.ChildState.OPEN),
-        board.ChildItem(73, board.ChildState.OPEN),
+        workboard.ChildItem(72, workboard.ChildState.OPEN),
+        workboard.ChildItem(73, workboard.ChildState.OPEN),
     )
 
 
@@ -2992,8 +2992,8 @@ def test_github_adapter_reports_a_closed_child_alongside_open_ones() -> None:
     client = sub_issue_client(api_sub_issue(72, "closed"), api_sub_issue(73, "open"))
 
     assert client.list_children(79) == (
-        board.ChildItem(72, board.ChildState.CLOSED),
-        board.ChildItem(73, board.ChildState.OPEN),
+        workboard.ChildItem(72, workboard.ChildState.CLOSED),
+        workboard.ChildItem(73, workboard.ChildState.OPEN),
     )
 
 
@@ -3053,8 +3053,8 @@ def test_github_adapter_reads_the_parents_native_kind() -> None:
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=run)
 
-    assert client.parent_issue(72) == board.ParentIssue(
-        board.IssueReference(REPOSITORY, 79), "## Next\nCut.", ItemKind.CONTAINER
+    assert client.parent_issue(72) == workboard.ParentIssue(
+        workboard.IssueReference(REPOSITORY, 79), "## Next\nCut.", ItemKind.CONTAINER
     )
 
 

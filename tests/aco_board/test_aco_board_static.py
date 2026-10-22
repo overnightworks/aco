@@ -15,10 +15,10 @@ from pathlib import Path
 import pytest
 from aco_board_fixtures import FakeAcoRepository, serving
 
-from aco_board import static
-from aco_board.aco_cli import AcoCli
-from aco_board.board import Boards
-from aco_board.server import start_board
+from aco.board import static
+from aco.board.aco_cli import AcoCli
+from aco.board.board import Boards
+from aco.board.server import start_board
 
 
 @pytest.fixture

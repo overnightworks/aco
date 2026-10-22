@@ -5,7 +5,7 @@
  * Policy directive: ...". An expected failed fetch (a simulated 502, say)
  * also logs a console error, so this guard matches only the CSP wording,
  * not every error: a clean run across the whole suite is this suite's own
- * proof that the shell's policy (`aco_board.server.CONTENT_SECURITY_POLICY`)
+ * proof that the shell's policy (`aco.board.server.CONTENT_SECURITY_POLICY`)
  * holds in a real browser (issue #652, #620).
  */
 

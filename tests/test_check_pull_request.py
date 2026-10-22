@@ -21,7 +21,7 @@ from github_fixtures import (
 )
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
-from agent_coordination import board, body, forge, protocol
+from aco import body, forge, protocol, workboard
 
 ITEM_CLAIM = claim_intent(identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH)
 LANE_BRANCH = "docs/tidy-readme"
@@ -84,8 +84,8 @@ class WriteTrace:
     item_bodies: dict[int, str]
     body_writes: tuple[tuple[int, str], ...]
     retyped_items: tuple[tuple[int, body.ItemKind], ...]
-    merge_requests: tuple[tuple[str, board.MergeMethod], ...]
-    merge_calls: tuple[tuple[int, str, board.MergeMethod, str, str], ...]
+    merge_requests: tuple[tuple[str, workboard.MergeMethod], ...]
+    merge_calls: tuple[tuple[int, str, workboard.MergeMethod, str, str], ...]
     deleted_branches: tuple[str, ...]
     landing_comments: dict[int, str]
     closed_issues: frozenset[int]
@@ -181,22 +181,25 @@ def rendered(rows: dict[str, PullRequestCase]) -> list[object]:
     ]
 
 
-def parent_of_work_item(parent: ParentWorld | None) -> dict[int, board.ParentIssue]:
+def parent_of_work_item(parent: ParentWorld | None) -> dict[int, workboard.ParentIssue]:
     if parent is None:
         return {}
-    reference = board.IssueReference(parent.repository, PARENT_ISSUE)
-    return {WORK_ITEM_ISSUE: board.ParentIssue(reference, parent.text, parent.kind)}
+    reference = workboard.IssueReference(parent.repository, PARENT_ISSUE)
+    return {WORK_ITEM_ISSUE: workboard.ParentIssue(reference, parent.text, parent.kind)}
 
 
-def children_of_parent(parent: ParentWorld | None) -> dict[int, tuple[board.ChildItem, ...]]:
+def children_of_parent(parent: ParentWorld | None) -> dict[int, tuple[workboard.ChildItem, ...]]:
     if parent is None:
         return {}
     open_numbers = (WORK_ITEM_ISSUE, *range(73, 73 + parent.other_open_children))
     closed_numbers = range(90, 90 + parent.closed_children)
     return {
         PARENT_ISSUE: (
-            *(board.ChildItem(number, board.ChildState.OPEN) for number in open_numbers),
-            *(board.ChildItem(number, board.ChildState.CLOSED) for number in closed_numbers),
+            *(workboard.ChildItem(number, workboard.ChildState.OPEN) for number in open_numbers),
+            *(
+                workboard.ChildItem(number, workboard.ChildState.CLOSED)
+                for number in closed_numbers
+            ),
         )
     }
 
@@ -207,8 +210,10 @@ def assert_parent_arranged(forge_world: FakeForge, parent: ParentWorld | None) -
         return
     assert set(forge_world.parents) == {WORK_ITEM_ISSUE}
     children = forge_world.children.get(PARENT_ISSUE, ())
-    open_numbers = [child.number for child in children if child.state is board.ChildState.OPEN]
-    closed_numbers = [child.number for child in children if child.state is board.ChildState.CLOSED]
+    open_numbers = [child.number for child in children if child.state is workboard.ChildState.OPEN]
+    closed_numbers = [
+        child.number for child in children if child.state is workboard.ChildState.CLOSED
+    ]
     assert WORK_ITEM_ISSUE in open_numbers
     assert len(open_numbers) - 1 == parent.other_open_children
     assert len(closed_numbers) == parent.closed_children
@@ -260,8 +265,8 @@ def check_pull_request(
                 github_clone,
                 f"dependency_paths = {json.dumps(list(case.world.dependency_paths))}\n",
             )
-        tracked = real_git(github_clone, "show", f"HEAD:{board.CONFIG_PATH}").stdout
-        configured = board.parse_config(tracked, board.CONFIG_PATH)
+        tracked = real_git(github_clone, "show", f"HEAD:{workboard.CONFIG_PATH}").stdout
+        configured = workboard.parse_config(tracked, workboard.CONFIG_PATH)
         assert configured.dependency_paths == case.world.dependency_paths
         seeded = publish_claims_from_a_second_clone(github_clone, bare_remote, case.world.claims)
         assert tuple((claim.identity, claim.branch) for claim in seeded.claims.values()) == tuple(

@@ -12,7 +12,7 @@ from threading import Event, Thread
 
 import pytest
 
-from agent_coordination import providers, terminal, workspace
+from aco import providers, terminal, workspace
 
 SESSION_ID = "123e4567-e89b-12d3-a456-426614174000"
 
@@ -29,14 +29,14 @@ def _completed_login_record() -> dict[str, object]:
 
 
 def _owned_login_entry(
-    command: str = "/candidate/python -I -m agent_coordination.cli _run-at-login",
+    command: str = "/candidate/python -I -m aco.cli _run-at-login",
 ) -> str:
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
         "Name=ACO workspace recovery\n"
         f"Exec={command}\n"
-        "X-Aco-Owner=agent-coordination/login-v1\n"
+        "X-Aco-Owner=aco/login-v1\n"
     )
 
 
@@ -58,8 +58,8 @@ def test_login_enable_writes_only_a_validated_owned_desktop_entry(tmp_path: Path
         "[Desktop Entry]\n"
         "Type=Application\n"
         "Name=ACO workspace recovery\n"
-        'Exec="/opt/aco python/bin/python" -I -m agent_coordination.cli _run-at-login\n'
-        "X-Aco-Owner=agent-coordination/login-v1\n"
+        'Exec="/opt/aco python/bin/python" -I -m aco.cli _run-at-login\n'
+        "X-Aco-Owner=aco/login-v1\n"
     )
     assert (
         workspace.enable_login(config_path, environment, Path("/opt/aco python/bin/python"))
@@ -134,8 +134,8 @@ def test_login_enable_serializes_reserved_executable_characters_exactly(
         "[Desktop Entry]\n"
         "Type=Application\n"
         "Name=ACO workspace recovery\n"
-        f"{expected_exec} -I -m agent_coordination.cli _run-at-login\n"
-        "X-Aco-Owner=agent-coordination/login-v1\n"
+        f"{expected_exec} -I -m aco.cli _run-at-login\n"
+        "X-Aco-Owner=aco/login-v1\n"
     )
     assert (
         workspace.login_launcher_state(environment, executable)
@@ -176,7 +176,7 @@ def test_login_preserves_the_lexical_venv_python_path(tmp_path: Path) -> None:
     workspace.enable_login(config_path, environment, executable)
 
     assert (
-        f"Exec={executable} -I -m agent_coordination.cli _run-at-login"
+        f"Exec={executable} -I -m aco.cli _run-at-login"
         in workspace.login_desktop_path(environment).read_text()
     )
 
@@ -223,8 +223,8 @@ def test_login_refuses_a_non_python_launcher_without_changing_it(tmp_path: Path)
     desktop_path.parent.chmod(0o700)
     desktop_path.write_text(
         "[Desktop Entry]\nType=Application\nName=ACO workspace recovery\n"
-        "Exec=/bin/sh -I -m agent_coordination.cli _run-at-login\n"
-        "X-Aco-Owner=agent-coordination/login-v1\n"
+        "Exec=/bin/sh -I -m aco.cli _run-at-login\n"
+        "X-Aco-Owner=aco/login-v1\n"
     )
     original = desktop_path.read_bytes()
 
@@ -254,8 +254,8 @@ def test_login_refuses_a_relative_python_launcher_without_changing_it(tmp_path: 
     desktop_path.parent.chmod(0o700)
     desktop_path.write_text(
         "[Desktop Entry]\nType=Application\nName=ACO workspace recovery\n"
-        "Exec=python -I -m agent_coordination.cli _run-at-login\n"
-        "X-Aco-Owner=agent-coordination/login-v1\n"
+        "Exec=python -I -m aco.cli _run-at-login\n"
+        "X-Aco-Owner=aco/login-v1\n"
     )
     original = desktop_path.read_bytes()
 
@@ -687,12 +687,12 @@ def test_login_rejects_malformed_persisted_attempt_records(tmp_path: Path, recor
         _owned_login_entry().replace("Name=ACO workspace recovery", "Name=Foreign recovery"),
         _owned_login_entry().replace("_run-at-login", "_run-at-login extra"),
         _owned_login_entry().replace("Exec=/", "Exec= /"),
-        _owned_login_entry('"/candidate\\\\q" -I -m agent_coordination.cli _run-at-login'),
-        _owned_login_entry('"/candidate/python -I -m agent_coordination.cli _run-at-login'),
-        _owned_login_entry('"/candidate/python"x -I -m agent_coordination.cli _run-at-login'),
-        _owned_login_entry("/candidate/$python -I -m agent_coordination.cli _run-at-login"),
-        _owned_login_entry("/candidate\\python -I -m agent_coordination.cli _run-at-login"),
-        _owned_login_entry("/candidate/python% -I -m agent_coordination.cli _run-at-login"),
+        _owned_login_entry('"/candidate\\\\q" -I -m aco.cli _run-at-login'),
+        _owned_login_entry('"/candidate/python -I -m aco.cli _run-at-login'),
+        _owned_login_entry('"/candidate/python"x -I -m aco.cli _run-at-login'),
+        _owned_login_entry("/candidate/$python -I -m aco.cli _run-at-login"),
+        _owned_login_entry("/candidate\\python -I -m aco.cli _run-at-login"),
+        _owned_login_entry("/candidate/python% -I -m aco.cli _run-at-login"),
     ],
 )
 def test_login_status_preserves_malformed_desktop_templates_as_conflicts(

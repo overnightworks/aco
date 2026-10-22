@@ -32,7 +32,7 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import checkout, process, protocol, session, store
+from aco import checkout, process, protocol, session, store
 
 
 def _bootstrap_output(stdout: str) -> tuple[tuple[str, ...], str | None]:

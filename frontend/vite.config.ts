@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 // The Python package serves these committed files, so every name is fixed:
 // a content hash would turn each rebuild into a rename the "assets fresh"
 // CI gate reports as drift.
-const STATIC_DIRECTORY = '../src/aco_board/static';
+const STATIC_DIRECTORY = '../src/aco/board/static';
 
 // `pnpm dev` proxies the API to a board already running on its default
 // loopback port; the E2E harness (frontend/e2e/global-setup.ts) overrides

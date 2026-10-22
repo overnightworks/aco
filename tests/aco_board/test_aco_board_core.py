@@ -17,9 +17,9 @@ from datetime import date
 import pytest
 from aco_board_fixtures import FakeAcoRepository, line, row
 
-from aco_board.aco_cli import AcoCli
-from aco_board.board import SHUTTING_DOWN, Board, Boards
-from aco_board.ports import Decision, DecisionResult, DecisionStatus, ExpectationLine, Outcome
+from aco.board.aco_cli import AcoCli
+from aco.board.board import SHUTTING_DOWN, Board, Boards
+from aco.board.ports import Decision, DecisionResult, DecisionStatus, ExpectationLine, Outcome
 
 _WAIT_SECONDS = 5
 _LABEL = "repo"

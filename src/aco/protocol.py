@@ -1,0 +1,1881 @@
+"""Claim protocol: claim records, scope rules, and the `refs/aco/state` codec."""
+
+from __future__ import annotations
+
+import re
+import tomllib
+import unicodedata
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
+from enum import StrEnum
+from functools import partial
+from pathlib import PurePosixPath, PureWindowsPath
+from types import MappingProxyType
+from typing import Protocol, TypeVar, cast
+
+# Named refusal when a write-path command would otherwise create
+# `refs/aco/state` as a side effect (issue #176 done-when 1). One owner so
+# `apply` and `store.commit_transition` cannot drift.
+MISSING_STATE_REF = (
+    "the claim state ref does not exist yet; run bootstrap before claim, rescope, "
+    "release, or item write"
+)
+# Coordination-contract convention: the branch prefixes `claim` accepts for an issue-less
+# lane, so a builder that forgot its issue number never gets a silent, unlabeled,
+# non-projected claim instead of a loud refusal.
+ISSUELESS_LANE_BRANCH_PREFIXES = ("docs/", "fix/")
+CLAIM_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+# `aco-` plus six lowercase hex characters (issue #248, parent #230 ruling
+# 15.09.2026): a short random id, never a counter, never reused. An item
+# lives at exactly this id plus `.md` under `items/` (`item_filename`), so a
+# rename of the file is the only way its id ever changes.
+ITEM_ID_PATTERN = re.compile(r"aco-[0-9a-f]{6}")
+ITEM_FILENAME_SUFFIX = ".md"
+RESOURCE_NAME_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9._-]{0,63}")
+COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
+BRANCH_NAME_MAX_LENGTH = 255
+AGENT_MAX_LENGTH = 128
+ROLE_MAX_LENGTH = 64
+RESOURCE_NAME_MAX_LENGTH = 64
+ABANDONED_REASON_MAX_LENGTH = 512
+BRANCH_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
+REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}")
+# RFC 3339 UTC, second precision -- the one timestamp shape a forge issue's
+# `created_at`/`updated_at`, a state-ref item's `[record]` fields, and this
+# repository's git-object clock all share (issue #378). Owned here, the one
+# module `github`, `workboard`, and `items` can each import without breaking
+# the Layers contract.
+RFC3339_TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+RFC3339_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+MAX_SCOPE_ENTRIES = 256
+MAX_SCOPE_PATH_LENGTH = 512
+WIDE_SCOPE_PATH_LIMIT = 3
+WIDE_SCOPE_SHARE_LIMIT = 0.25
+# A tiny repository must not trip the share condition.
+WIDE_SCOPE_SHARE_FLOOR = 12
+# How many paths a truncated listing names in full before counting the rest --
+# the dirty-tree refusal's and the claim overlap notice's shared shape for a
+# list too long to print whole.
+NAMED_PATH_OVERFLOW_LIMIT = 3
+# The first printable ASCII code point (space) and DEL bound the control
+# characters a claim marker field, scope path, or outbound text may never
+# contain -- each is meant to read as a single printable line.
+ASCII_PRINTABLE_MIN = 0x20
+ASCII_DEL = 0x7F
+
+
+ItemLabel = Callable[[int], str]
+ItemNaming = Callable[[ItemLabel], str]
+
+
+def forge_item_label(number: int) -> str:
+    """An item as the forge names it, `#<n>` -- a claim-ledger refusal's own
+    text, since this layer never reads the storage pin (issue #471)."""
+    return f"#{number}"
+
+
+class ClaimError(RuntimeError):
+    """A claim-ledger refusal. One that names an item keeps its sentence as
+    `naming`, a function of how the caller names an item: its own text is
+    the forge form, and a caller that knows the storage pin asks `named`
+    for that storage's form (issue #471)."""
+
+    def __init__(self, message: str = "", *, naming: ItemNaming | None = None) -> None:
+        super().__init__(message if naming is None else naming(forge_item_label))
+        self.naming = naming
+
+    def named(self, item_label: ItemLabel) -> str:
+        return str(self) if self.naming is None else self.naming(item_label)
+
+
+class ClaimUnavailableError(ClaimError):
+    pass
+
+
+class ClaimConflictError(ClaimUnavailableError):
+    """`apply()`'s own refusal to write a claim intent because another live
+    claim, a consumed claim id, or a resource hold already occupies the
+    value (issue #406, CLM-25) -- distinct from every other
+    `ClaimUnavailableError` (a transport, git, lineage, or
+    retry-exhaustion failure surfacing through `store.commit_transition`)
+    so `cmd_claim.run` can choose `claim_conflict` over the broader
+    `unavailable` by type rather than by parsing prose."""
+
+
+class InvalidClaimMarkerError(ClaimError):
+    pass
+
+
+@dataclass(frozen=True)
+class IssueIdentity:
+    """A claim scoped to one numbered GitHub issue."""
+
+    issue: int
+
+    def __post_init__(self) -> None:
+        if isinstance(self.issue, bool) or not isinstance(self.issue, int) or self.issue < 1:
+            raise ClaimError("issue identity must be a positive integer")
+
+
+@dataclass(frozen=True)
+class LaneIdentity:
+    """A claim scoped to one issue-less lane.
+
+    Carries no branch of its own: the lane name is owned entirely by the enclosing
+    claim record's `branch`, which every lane claim already has. A second
+    branch-shaped field here would give the branch two owners that could drift apart.
+    """
+
+
+ClaimIdentity = IssueIdentity | LaneIdentity
+
+
+def transition_item_identifier(identity: ClaimIdentity, branch: str) -> str:
+    """The bare work item a claim/rescope/release transition names -- an
+    issue number as text, or a lane's own branch (issue #357 R1): computed
+    once from the identity/branch every caller already has, and stored
+    verbatim in the commit's own `item:` trailer (`store._transition_message`)
+    for `claim_lifecycle` to read back unparsed, matching
+    `metrics.LaneEvent.item`'s own bare shape -- never a second grammar a
+    reader has to reconstruct from the commit's human-prose subject line.
+    `store.transition_subject` also reads this for the identifier half of its
+    own `"claim issue 42"`/`"rescope lane docs/x"` prose.
+    """
+    if isinstance(identity, LaneIdentity):
+        return branch
+    return str(identity.issue)
+
+
+@dataclass(frozen=True)
+class ResourceHold:
+    """One named scarce value held by a live claim until land or release."""
+
+    name: str
+    value: int
+
+
+@dataclass(frozen=True)
+class MergedRelease:
+    """A claim released because the named pull request landed on the default branch."""
+
+    pull_request: int
+
+    @property
+    def reason(self) -> str:
+        return f"merged #{self.pull_request}"
+
+
+@dataclass(frozen=True)
+class AbandonedRelease:
+    """A claim released without a landing, and why."""
+
+    explanation: str
+
+    @property
+    def reason(self) -> str:
+        return f"abandoned: {self.explanation}"
+
+
+@dataclass(frozen=True)
+class LandedRelease:
+    """A claim released because its item's own trunk commit named it (issue
+    #359): the `storage = "state-ref"` counterpart of `MergedRelease` for a
+    repository with no forge pull request to verify -- `commit` is the
+    first-parent trunk commit `release --merged <sha|empty>` resolved
+    (LAND-47/LAND-52, `specs/landing-grammar.spec.md`)."""
+
+    commit: ObjectId
+
+    @property
+    def reason(self) -> str:
+        return f"landed {self.commit}"
+
+
+ReleaseOutcome = MergedRelease | AbandonedRelease | LandedRelease
+
+
+@dataclass(frozen=True)
+class ClaimRequest:
+    identity: ClaimIdentity
+    agent: str
+    role: str
+    base: str
+    branch: str
+    scope: tuple[str, ...]
+    claim_id: str
+    out_of_order_reason: str | None = None
+    whole_reason: str | None = None
+    resource: str | None = None
+    resource_value: int | None = None
+    exclusive_branch: bool = False
+
+
+@dataclass(frozen=True)
+class RescopeRequest:
+    """CLI-facing rescope input; converted to `RescopeIntent` before `apply`."""
+
+    identity: ClaimIdentity
+    agent: str
+    add: tuple[str, ...]
+    drop: tuple[str, ...]
+    claim_id: str | None
+    branch: str | None
+    whole_reason: str | None = None
+
+
+# Characters that `unicodedata` files as separators (Zl/Zp) or formats (Cf)
+# rather than controls, yet end a line, reorder the text around them (the
+# Trojan Source bidi controls and the Arabic letter mark), or hide inside it
+# (the zero-width ones, the word joiner and the tag characters, issue #540).
+_INVISIBLE_DISPLAY_CONTROLS = frozenset(
+    {
+        "\N{LINE SEPARATOR}",
+        "\N{PARAGRAPH SEPARATOR}",
+        "\N{ZERO WIDTH SPACE}",
+        "\N{ZERO WIDTH NON-JOINER}",
+        "\N{ZERO WIDTH JOINER}",
+        "\N{LEFT-TO-RIGHT MARK}",
+        "\N{RIGHT-TO-LEFT MARK}",
+        "\N{ARABIC LETTER MARK}",
+        "\N{WORD JOINER}",
+        "\N{ZERO WIDTH NO-BREAK SPACE}",
+        *map(chr, range(0x202A, 0x202F)),
+        *map(chr, range(0x2066, 0x206A)),
+        *map(chr, range(0xE0000, 0xE0080)),
+    }
+)
+
+
+def is_display_control(character: str) -> bool:
+    """Whether `character` must never reach a terminal or a one-line field
+    as itself (issues #538, #540): every control character but TAB -- C0,
+    DEL and C1 -- plus the line and paragraph separators, the bidi controls,
+    the Arabic letter mark, the zero-width characters, the word joiner and
+    the tag characters. NBSP and every other printable space are text."""
+    return character != "\t" and (
+        unicodedata.category(character) == "Cc" or character in _INVISIBLE_DISPLAY_CONTROLS
+    )
+
+
+def terminal_text(text: str) -> str:
+    """Foreign `text` -- a title, a `Next` line -- as it may reach a terminal
+    (issues #532, #538): every `is_display_control` character shown
+    as its printable escape (ESC as `\\x1b`, U+202E as `\\u202e`), so a
+    title can neither retitle the window, clear the screen, nor reorder the
+    text around it; printable text, `Größe`, TAB and NBSP included, stays as
+    it is. Commands are `shell_command`'s to render, never `protocol`'s."""
+    return "".join(
+        character.encode("unicode_escape").decode() if is_display_control(character) else character
+        for character in text
+    )
+
+
+def terminal_block(text: str) -> str:
+    """Foreign multi-line `text` -- a stored body -- as it may reach a
+    terminal (issue #544): each line as `terminal_text` shows it, so its
+    line feeds still break lines while every other display control, the
+    carriage return included, prints as its escape."""
+    return "\n".join(terminal_text(line) for line in text.split("\n"))
+
+
+def has_control_character(text: str) -> bool:
+    return any(
+        ord(character) < ASCII_PRINTABLE_MIN or ord(character) == ASCII_DEL for character in text
+    )
+
+
+def _required_text(payload: dict[str, object], key: str, *, maximum: int = 512) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str):
+        raise InvalidClaimMarkerError(f"claim marker field {key!r} must be text")
+    normalized = value.strip()
+    if (
+        not normalized
+        or normalized != value
+        or len(normalized) > maximum
+        or has_control_character(normalized)
+    ):
+        raise InvalidClaimMarkerError(
+            f"claim marker field {key!r} must be one bounded non-empty line"
+        )
+    return normalized
+
+
+def outbound_text(value: object, field: str, *, maximum: int) -> str:
+    if not isinstance(value, str):
+        raise ClaimError(f"{field} must be text")
+    normalized = value.strip()
+    if (
+        not normalized
+        or normalized != value
+        or len(normalized) > maximum
+        or has_control_character(normalized)
+    ):
+        raise ClaimError(f"{field} must be one bounded non-empty line")
+    return normalized
+
+
+def outbound_resource_name(value: object) -> str:
+    name = outbound_text(value, "resource", maximum=RESOURCE_NAME_MAX_LENGTH)
+    if RESOURCE_NAME_PATTERN.fullmatch(name) is None:
+        raise ClaimError("resource is not a resource name")
+    return name
+
+
+LANE_MARKER_KEY = "lane"
+
+
+def identity_summary(identity: ClaimIdentity, branch: str, item_label: ItemLabel) -> str:
+    """The subject a claim-ledger refusal names: `lane '<branch>'`, or
+    `issue <label>` in `item_label`'s form (issue #471)."""
+    if isinstance(identity, LaneIdentity):
+        return f"lane {branch!r}"
+    return f"issue {item_label(identity.issue)}"
+
+
+def is_safe_branch_name(branch: str) -> bool:
+    """Whether `branch` is a safe Git ref name: the one rule `valid_branch`
+    enforces on a stored claim marker, factored out so `start` (issue #322)
+    can hold a freshly built branch name to the identical rule -- including
+    the same `BRANCH_NAME_MAX_LENGTH` bound, not a shape check that merely
+    happened to cap length the same way through an unrelated regex quantifier
+    -- before its first `git worktree add`, never a second, drifted copy of
+    the same shape (review finding: the pre-write check omitted the bound)."""
+    segments = branch.split("/")
+    return not (
+        len(branch) > BRANCH_NAME_MAX_LENGTH
+        or BRANCH_PATTERN.fullmatch(branch) is None
+        or branch.startswith("-")
+        or branch.endswith(("/", "."))
+        or ".." in branch
+        or "//" in branch
+        or "@{" in branch
+        or any(
+            not segment or segment.startswith(".") or segment.endswith((".", ".lock"))
+            for segment in segments
+        )
+    )
+
+
+def valid_branch(payload: dict[str, object]) -> str:
+    branch = _required_text(payload, "branch", maximum=BRANCH_NAME_MAX_LENGTH)
+    if not is_safe_branch_name(branch):
+        raise InvalidClaimMarkerError(f"claim marker branch is not a safe Git ref: {branch!r}")
+    return branch
+
+
+SCOPE_ENTRIES_MUST_BE_CANONICAL = "claim scope entries must be canonical bounded paths"
+
+
+def _scope_list_entries(scope: object) -> list[str]:
+    """Validate a stored or CLI scope list: one list entry, one path.
+
+    A path is taken verbatim, comma and all -- a repository-relative path
+    that contains a comma is otherwise unrepresentable. A caller with more
+    than one path repeats the flag (`--scope a --scope b`); nothing here
+    joins or splits entries.
+    """
+    if not isinstance(scope, list) or not scope:
+        raise InvalidClaimMarkerError("claim marker scope must be a non-empty list")
+    entries: list[str] = []
+    for raw_path in scope:
+        if not isinstance(raw_path, str):
+            raise InvalidClaimMarkerError("claim scope entries must be text")
+        if raw_path.strip() != raw_path or not raw_path:
+            raise InvalidClaimMarkerError(SCOPE_ENTRIES_MUST_BE_CANONICAL)
+        entries.append(raw_path)
+    if len(entries) > MAX_SCOPE_ENTRIES:
+        raise InvalidClaimMarkerError(f"claim marker scope exceeds {MAX_SCOPE_ENTRIES} entries")
+    return entries
+
+
+def valid_scope(scope: object) -> tuple[str, ...]:
+    """The one canonical scope form (issue #331): sorted, deduplicated,
+    every entry a validated repository-relative path. Every claim's scope
+    passes through here at creation (`cmd_claim._request`) and at rescope
+    (`combined_scope`), so a live claim's scope is always already this
+    exact form; `workboard._canonical_scope` calls this same function to
+    project a body's own `scope = [...]`, rather than sorting a second
+    time, so the two stay comparable as tuples regardless of the order
+    either was typed in."""
+    result: list[str] = []
+    for path in _scope_list_entries(scope):
+        if (
+            len(path) > MAX_SCOPE_PATH_LENGTH
+            or "\\" in path
+            # A path also refuses TAB, which a display keeps (CLAIM-20).
+            or any(character == "\t" or is_display_control(character) for character in path)
+        ):
+            raise InvalidClaimMarkerError(SCOPE_ENTRIES_MUST_BE_CANONICAL)
+        parsed = PurePosixPath(path)
+        windows_path = PureWindowsPath(path)
+        if (
+            path == "."
+            or parsed.is_absolute()
+            or windows_path.drive
+            or windows_path.root
+            or ".." in parsed.parts
+            or path.startswith("~")
+            or not parsed.parts
+            or parsed.parts[0] == ".git"
+            or str(parsed) != path
+        ):
+            raise InvalidClaimMarkerError(f"claim scope must be repository-relative: {path!r}")
+        result.append(path)
+    if len(set(result)) != len(result):
+        raise InvalidClaimMarkerError("claim scope contains duplicate paths")
+    return tuple(sorted(result))
+
+
+class WideScopeReason(StrEnum):
+    """Which of the three wide-scope conditions tripped -- named so a
+    refusal can print the one that actually fired instead of restating the
+    whole rule."""
+
+    PATH_COUNT = "path_count"
+    DIRECTORY = "directory"
+    SHARE = "share"
+
+
+@dataclass(frozen=True)
+class WideScopeTrip:
+    """The tripped condition, plus the numbers it was judged against -- a
+    refusal renders these instead of recomputing them."""
+
+    reason: WideScopeReason
+    path_count: int
+    directories: tuple[str, ...]
+    covered_file_count: int
+    versioned_file_count: int
+
+
+def wide_scope_trip(
+    scope: tuple[str, ...],
+    *,
+    directories: tuple[str, ...],
+    covered_file_count: int,
+    versioned_file_count: int,
+) -> WideScopeTrip | None:
+    """Which wide-scope condition fires first, in the rule's own priority
+    order -- more than three paths, then any directory, then, once the
+    repository has at least `WIDE_SCOPE_SHARE_FLOOR` versioned files, more
+    than a quarter of them -- or `None` when scope is not wide."""
+
+    def trip(reason: WideScopeReason) -> WideScopeTrip:
+        return WideScopeTrip(
+            reason, len(scope), directories, covered_file_count, versioned_file_count
+        )
+
+    if len(scope) > WIDE_SCOPE_PATH_LIMIT:
+        return trip(WideScopeReason.PATH_COUNT)
+    if directories:
+        return trip(WideScopeReason.DIRECTORY)
+    if versioned_file_count < WIDE_SCOPE_SHARE_FLOOR:
+        return None
+    if covered_file_count / versioned_file_count > WIDE_SCOPE_SHARE_LIMIT:
+        return trip(WideScopeReason.SHARE)
+    return None
+
+
+def scope_overlap_paths(left: tuple[str, ...], right: tuple[str, ...]) -> tuple[str, ...]:
+    """The concrete paths where two scopes meet, sorted and deduplicated.
+
+    A scope path stands for itself and everything under it, so two paths meet
+    when one is an ancestor (or equal) of the other; the meeting point named
+    is always the deeper (more specific) of the two, since that is the real
+    file or directory the overlap touches -- not the ancestor that merely
+    covers it. A directory in `left` meeting a single file under it in
+    `right` therefore names that file, and an identical path in both names
+    that path once.
+    """
+    meeting: set[str] = set()
+    for left_path in left:
+        left_parts = PurePosixPath(left_path).parts
+        for right_path in right:
+            right_parts = PurePosixPath(right_path).parts
+            if len(left_parts) <= len(right_parts):
+                ancestor_parts, descendant_path, descendant_parts = (
+                    left_parts,
+                    right_path,
+                    right_parts,
+                )
+            else:
+                ancestor_parts, descendant_path, descendant_parts = (
+                    right_parts,
+                    left_path,
+                    left_parts,
+                )
+            if descendant_parts[: len(ancestor_parts)] == ancestor_parts:
+                meeting.add(descendant_path)
+    return tuple(sorted(meeting))
+
+
+def scopes_overlap(left: tuple[str, ...], right: tuple[str, ...]) -> bool:
+    return bool(scope_overlap_paths(left, right))
+
+
+def named_with_overflow_count(
+    paths: tuple[str, ...], *, limit: int = NAMED_PATH_OVERFLOW_LIMIT
+) -> str:
+    """Render `paths` as a comma-separated list, naming only the first `limit`
+    and counting the rest -- too many to list is still a fact worth stating,
+    just not one worth printing in full."""
+    named = ", ".join(paths[:limit])
+    remainder = len(paths) - limit
+    if remainder > 0:
+        named += f", and {remainder} more"
+    return named
+
+
+class ScopedClaim(Protocol):
+    """The structural shape the conflict/overlap helpers need.
+
+    Satisfied by both the CLI's `ClaimRequest` and the store's
+    `ActiveClaim`/`ClaimIntent` pair (issue #176, slice C2), so one set of
+    pure functions serves all of them instead of a nominal union that would
+    grow every time a new claim-shaped record is added. Read-only
+    properties, not plain attributes: a frozen dataclass field is itself
+    read-only, and `claim_id` varies covariantly (`str` here, `ClaimId` on
+    the store's records) between the two implementations this protocol
+    covers.
+    """
+
+    @property
+    def identity(self) -> ClaimIdentity: ...
+    @property
+    def claim_id(self) -> str: ...
+    @property
+    def agent(self) -> str: ...
+    @property
+    def role(self) -> str: ...
+    @property
+    def branch(self) -> str: ...
+    @property
+    def scope(self) -> tuple[str, ...]: ...
+
+
+def _identity_conflicts(left: ScopedClaim, right: ScopedClaim) -> bool:
+    """Two claims share an identity: same issue number, or same lane branch.
+
+    A lane claim and an issue claim never share an identity by themselves — only
+    scope overlap can put them in conflict.
+    """
+    match left.identity, right.identity:
+        case IssueIdentity(issue=left_issue), IssueIdentity(issue=right_issue):
+            return left_issue == right_issue
+        case LaneIdentity(), LaneIdentity():
+            return left.branch == right.branch
+        case _:
+            return False
+
+
+def claims_conflict(left: ScopedClaim, right: ScopedClaim) -> bool:
+    """True when two claims share an issue or lane branch.
+
+    Path overlap is advisory: it is a visible note, not a conflict.
+    """
+    return _identity_conflicts(left, right)
+
+
+def claims_overlap(left: ScopedClaim, right: ScopedClaim) -> bool:
+    return scopes_overlap(left.scope, right.scope)
+
+
+def claims_holding_path(claims: tuple[_ScopedClaimT, ...], path: str) -> tuple[_ScopedClaimT, ...]:
+    target = valid_scope([path])
+    return tuple(claim for claim in claims if scopes_overlap(claim.scope, target))
+
+
+_ScopedClaimT = TypeVar("_ScopedClaimT", bound=ScopedClaim)
+
+
+def blocking_claims(
+    claims: tuple[_ScopedClaimT, ...], candidate: ScopedClaim
+) -> tuple[_ScopedClaimT, ...]:
+    return tuple(
+        claim
+        for claim in claims
+        if claim.claim_id != candidate.claim_id and claims_conflict(claim, candidate)
+    )
+
+
+def overlapping_claims(
+    claims: tuple[_ScopedClaimT, ...], candidate: ScopedClaim
+) -> tuple[_ScopedClaimT, ...]:
+    return tuple(
+        claim
+        for claim in claims
+        if claim.claim_id != candidate.claim_id and claims_overlap(claim, candidate)
+    )
+
+
+def conflicting_claims(
+    claims: tuple[_ScopedClaimT, ...], candidate: ScopedClaim
+) -> tuple[_ScopedClaimT, ...]:
+    """Path-overlapping live claims, excluding identity. Used as the advisory note."""
+    return overlapping_claims(claims, candidate)
+
+
+IdentityKey = tuple[str, int | str]
+
+
+def _identity_key(claim: ScopedClaim) -> IdentityKey:
+    """Hashable index key for one claim's identity: an issue number or a lane branch.
+
+    `LaneIdentity` instances all compare equal to each other, so indexing by
+    identity alone would merge every lane into one bucket; the branch already owned
+    by the claim record supplies the missing distinction without giving the
+    lane name a second owner.
+    """
+    if isinstance(claim.identity, LaneIdentity):
+        return (LANE_MARKER_KEY, claim.branch)
+    return ("issue", claim.identity.issue)
+
+
+@dataclass(frozen=True)
+class ClaimConflictIndex:
+    conflict_ids: set[str]
+    overlap_ids: set[str]
+    claims_by_identity: dict[IdentityKey, set[str]]
+    complete_paths: dict[tuple[str, ...], set[str]]
+    descendant_paths: dict[tuple[str, ...], set[str]]
+
+
+def claim_conflict_index(claims: tuple[ScopedClaim, ...]) -> ClaimConflictIndex:
+    """Index identities and paths once for status conflict and overlap notes."""
+    conflict_ids: set[str] = set()
+    overlap_ids: set[str] = set()
+    claims_by_identity: dict[IdentityKey, set[str]] = {}
+    complete_paths: dict[tuple[str, ...], set[str]] = {}
+    descendant_paths: dict[tuple[str, ...], set[str]] = {}
+
+    for claim in claims:
+        same_identity = claims_by_identity.setdefault(_identity_key(claim), set())
+        if same_identity:
+            conflict_ids.add(claim.claim_id)
+            conflict_ids.update(same_identity)
+        same_identity.add(claim.claim_id)
+
+        for path in claim.scope:
+            parts = PurePosixPath(path).parts
+            matches = set(descendant_paths.get(parts, ()))
+            for length in range(1, len(parts) + 1):
+                matches.update(complete_paths.get(parts[:length], ()))
+            matches.discard(claim.claim_id)
+            if matches:
+                overlap_ids.add(claim.claim_id)
+                overlap_ids.update(matches)
+
+            complete_paths.setdefault(parts, set()).add(claim.claim_id)
+            for length in range(1, len(parts) + 1):
+                descendant_paths.setdefault(parts[:length], set()).add(claim.claim_id)
+
+    return ClaimConflictIndex(
+        conflict_ids,
+        overlap_ids,
+        claims_by_identity,
+        complete_paths,
+        descendant_paths,
+    )
+
+
+def related_claim_ids(index: ClaimConflictIndex, selected: tuple[ScopedClaim, ...]) -> set[str]:
+    related = {claim.claim_id for claim in selected}
+    for claim in selected:
+        related.update(index.claims_by_identity[_identity_key(claim)])
+        related.update(overlap_peer_ids(index, claim))
+    return related
+
+
+def overlap_peer_ids(index: ClaimConflictIndex, claim: ScopedClaim) -> set[str]:
+    related: set[str] = set()
+    for path in claim.scope:
+        parts = PurePosixPath(path).parts
+        related.update(index.descendant_paths.get(parts, ()))
+        for length in range(1, len(parts) + 1):
+            related.update(index.complete_paths.get(parts[:length], ()))
+    related.discard(claim.claim_id)
+    return related
+
+
+def combined_scope(
+    current: tuple[str, ...], add: tuple[str, ...], drop: tuple[str, ...]
+) -> tuple[str, ...]:
+    current_set = set(current)
+    missing = next((path for path in drop if path not in current_set), None)
+    if missing is not None:
+        raise ClaimUnavailableError(f"cannot drop {missing!r}; it is not in this claim's scope")
+    drop_set = set(drop)
+    kept = tuple(path for path in current if path not in drop_set)
+    added = tuple(path for path in add if path not in kept)
+    if not kept and not added:
+        raise ClaimUnavailableError("rescope must leave a non-empty scope")
+    combined = kept + added
+    if combined == current:
+        raise ClaimUnavailableError("rescope does not change the claim scope")
+    return valid_scope(list(combined))
+
+
+COORDINATOR_ROLE = "coordinator"
+
+
+def require_coordinator_override(role: str | None) -> None:
+    if role != COORDINATOR_ROLE:
+        raise ClaimUnavailableError("a coordinator override requires --role coordinator")
+
+
+# --- refs/aco/state: the claim-state tree (issue #164, slice C1) ----------
+#
+# `store.py` owns the git transport (ls-remote, fetch, plumbing, push,
+# retry); this module stays pure and owns only the tree's types and its
+# `schema.toml` codec. C1 writes and reads exactly one file, `schema.toml`;
+# `claims/`, `ids/`, and `resources/` are C2's `apply`.
+
+SUPPORTED_STATE_SCHEMA_VERSION = 2
+
+
+class UnsupportedStateSchemaError(ClaimError):
+    """`schema.toml` names a version this client does not speak. Carries the
+    version and the tip it was read at, so `reset` (issue #341) can still
+    export and lease-delete a ledger this client cannot parse."""
+
+    def __init__(self, *, version: int, tip: ObjectId) -> None:
+        super().__init__(f"unsupported state schema version {version}")
+        self.version = version
+        self.tip = tip
+
+
+@dataclass(frozen=True)
+class UnreadableState:
+    """A `refs/aco/state` tip whose schema this client does not speak (issue
+    #341): its oid and version are known, its claims are not."""
+
+    tip: ObjectId
+    schema_version: int
+
+
+class MalformedStateTreeError(ClaimError):
+    """The fetched state tree is not a well-formed `schema.toml`-only tree."""
+
+
+class StateLineageError(ClaimError):
+    """A worktree's own last-observed tip is not an ancestor of the fetched tip.
+
+    Distinct from `MalformedStateTreeError`: the tree itself may parse fine --
+    it is this client's history of the ref that no longer lines up, which
+    `aco reset` (exporting the state first by default, never automatic) is
+    the only sanctioned way to cause.
+    """
+
+
+class PushRejectedError(ClaimError):
+    """The store's push boundary did not observably land the pushed commit.
+
+    Raised for an ordinary non-fast-forward rejection and for a lost response
+    after the remote actually advanced -- every caller in `store.py` handles
+    both by re-reading the ref, so the two causes need no separate types.
+    """
+
+
+class PushNotStartedError(ClaimError):
+    """The push process provably never started (git missing, or the start
+    refused), so nothing was sent and the write is no CAS-56 case."""
+
+
+class UncertainWriteError(ClaimUnavailableError):
+    """A sent write whose outcome the store cannot tell (issues #494, #498,
+    CAS-56): the push's answer, or the re-read after its rejection, was
+    lost, or the write's own bookkeeping failed once it landed. The remote
+    may hold the write or not; only a later read knows, so a caller keeps
+    what the write may name (START-25). A sent push the store saw rejected
+    and re-read without its own `operation_id` is no such write: its
+    refusal is the plain one, nothing written (CAS-57)."""
+
+
+class ObjectId(str):
+    """A runtime-validated 40-character lowercase hex git object id.
+
+    A plain `NewType` would still accept any string at runtime; every value
+    that reaches here comes from parsing git's own output or an untrusted
+    fetch, so the validation belongs on construction, not on trust.
+    """
+
+    def __new__(cls, value: str) -> ObjectId:
+        if COMMIT_PATTERN.fullmatch(value) is None:
+            raise MalformedStateTreeError(f"not a git object id: {value!r}")
+        return super().__new__(cls, value)
+
+
+class ClaimId(str):
+    """A runtime-validated claim id (`CLAIM_ID_PATTERN`), the store's own key.
+
+    Same rationale as `ObjectId`: every value reaching here comes from a CLI
+    argument, a generated `uuid4().hex`, or an untrusted fetched tree, never
+    from a value this module already trusts.
+    """
+
+    def __new__(cls, value: str) -> ClaimId:
+        if CLAIM_ID_PATTERN.fullmatch(value) is None:
+            raise ClaimError(f"not a valid claim id: {value!r}")
+        return super().__new__(cls, value)
+
+
+# The number is bounded so `int()` of a match can never meet Python's digit
+# limit: a longer one is no reference, whether a pattern in `board` or
+# `decimal_number_or_none` reads it.
+MAXIMUM_ISSUE_NUMBER_DIGITS = 18
+
+
+def decimal_number_or_none(text: str) -> int | None:
+    """The one reader of a decimal number the protocol takes from a key, a
+    trailer or the command line: ASCII digits only, at most
+    `MAXIMUM_ISSUE_NUMBER_DIGITS` of them. Leading zeros stay readable; a
+    caller that forbids them says so itself."""
+    if not (text.isascii() and text.isdigit() and len(text) <= MAXIMUM_ISSUE_NUMBER_DIGITS):
+        return None
+    return int(text)
+
+
+# --- Claim key codec (criterion 10, issue #176 slice C2) -------------------
+#
+# One path segment, no `/`, collision-free and reversible -- the only owner
+# of a claims/resources/ids tree entry's file name. `apply` is the codec's
+# first production caller; `store.py` calls `claim_key`/`parse_claim_key`
+# when it writes or reads a `claims/<key>.toml` tree entry.
+
+_ISSUE_KEY_PREFIX = "issue-"
+_LANE_KEY_PREFIX = "lane-"
+_LANE_KEY_UNRESERVED = frozenset(
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+)
+_PERCENT_ESCAPE_PATTERN = re.compile("[0-9A-Fa-f]{2}")
+
+
+def _percent_encode_branch(branch: str) -> str:
+    """RFC 3986 percent-encoding with an empty safe set: every byte but the
+    unreserved set becomes `%HH`, so `/` and `%` themselves are always
+    escaped and can never reappear literally in the encoded key."""
+    encoded = bytearray()
+    for byte in branch.encode("utf-8"):
+        if byte in _LANE_KEY_UNRESERVED:
+            encoded.append(byte)
+        else:
+            encoded.extend(f"%{byte:02X}".encode("ascii"))
+    return encoded.decode("ascii")
+
+
+def _percent_decode_branch(encoded: str) -> str:
+    """Invert `_percent_encode_branch`, refusing what it would never have
+    produced (issue #237 finding 23): a canonically encoded key never
+    carries a literal byte outside `_LANE_KEY_UNRESERVED`, so decode enforces
+    that same invariant instead of accepting any unescaped character -- one
+    validator owns "which bytes may appear literally", shared by both
+    directions of the codec.
+    """
+    raw = bytearray()
+    index = 0
+    while index < len(encoded):
+        character = encoded[index]
+        if character != "%":
+            character_bytes = character.encode("utf-8")
+            if len(character_bytes) != 1 or character_bytes[0] not in _LANE_KEY_UNRESERVED:
+                raise MalformedStateTreeError(
+                    f"claim key has an unescaped reserved character: {encoded!r}"
+                )
+            raw.extend(character_bytes)
+            index += 1
+            continue
+        hex_digits = encoded[index + 1 : index + 3]
+        if not _PERCENT_ESCAPE_PATTERN.fullmatch(hex_digits):
+            raise MalformedStateTreeError(f"claim key has a malformed percent-escape: {encoded!r}")
+        raw.append(int(hex_digits, 16))
+        index += 3
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise MalformedStateTreeError(f"claim key does not decode as utf-8: {encoded!r}") from error
+
+
+def claim_key(identity: ClaimIdentity, branch: str) -> str:
+    """The one collision-free, reversible tree-entry name for this identity.
+
+    `issue-{n}` for an issue claim; `lane-{percent-encoded branch}` for a
+    lane claim. The two prefixes can never collide with each other's payload
+    (`issue-1` vs a lane branch literally named `issue-1`, which encodes to
+    `lane-issue-1`), because `parse_claim_key` below dispatches on the
+    prefix alone before ever looking at the payload.
+    """
+    if isinstance(identity, IssueIdentity):
+        return f"{_ISSUE_KEY_PREFIX}{identity.issue}"
+    return f"{_LANE_KEY_PREFIX}{_percent_encode_branch(branch)}"
+
+
+def parse_claim_key(key: str) -> ClaimIdentity:
+    """Invert `claim_key`. Refuses any prefix but the two the codec writes."""
+    if key.startswith(_ISSUE_KEY_PREFIX):
+        digits = key[len(_ISSUE_KEY_PREFIX) :]
+        issue = decimal_number_or_none(digits)
+        if issue is None or digits[0] == "0":
+            raise MalformedStateTreeError(f"claim key has a malformed issue number: {key!r}")
+        return IssueIdentity(issue)
+    if key.startswith(_LANE_KEY_PREFIX):
+        # Validate only; the decoded branch itself lives in the claim file.
+        _percent_decode_branch(key[len(_LANE_KEY_PREFIX) :])
+        return LaneIdentity()
+    raise MalformedStateTreeError(f"claim key has neither the issue nor lane prefix: {key!r}")
+
+
+# --- Item file-name codec (head ruling 30.09.2026, issue #558) --------------
+#
+# The one owner of which `items/` entry is an item: `store` places and
+# reads back item blobs by it, `items` and `workboard` read ids by it. Every
+# other `items/` entry is foreign -- neither an item nor this codec's to
+# rename.
+
+
+def item_filename(item_id: str) -> str:
+    """The `items/` entry name item `item_id` lives at."""
+    return f"{item_id}{ITEM_FILENAME_SUFFIX}"
+
+
+def item_id_of_filename(filename: str) -> str | None:
+    """The item id `filename` names, or `None` for a foreign `items/` entry."""
+    if not filename.endswith(ITEM_FILENAME_SUFFIX):
+        return None
+    candidate = filename.removesuffix(ITEM_FILENAME_SUFFIX)
+    return candidate if ITEM_ID_PATTERN.fullmatch(candidate) is not None else None
+
+
+@dataclass(frozen=True)
+class ResourceRecord:
+    """`resources/<name>.toml`: the never-reuse set for one resource name.
+
+    `occupied` never shrinks: a released value stays in it forever (today's
+    contract), so neither an auto nor an explicit intent can ever reassign a
+    value this resource has already given out.
+    """
+
+    name: str
+    occupied: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class ActiveClaim:
+    """One live claim as the store's `apply` maintains it (issue #176, §1).
+
+    `opened_commit` is the state-ref commit this claim_id was first
+    introduced at; rescope never changes it.
+    """
+
+    identity: ClaimIdentity
+    claim_id: ClaimId
+    agent: str
+    role: str
+    base: ObjectId
+    branch: str
+    scope: tuple[str, ...]
+    opened_commit: ObjectId
+    resource: ResourceHold | None = None
+    whole_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ClaimState:
+    """The claim-state tree as observed at one `refs/aco/state` commit.
+
+    `tip` is `None` only for `EMPTY_STATE`, standing in for a ref that does
+    not exist yet. `claims`, `consumed_ids`, and `resources` are C2's
+    addition alongside `apply`: immutable collections (`MappingProxyType`,
+    `frozenset`) inside this frozen state, never mutated in place -- every
+    transition builds and returns a whole new `ClaimState`. `items` (issue
+    #248/#279) maps an item id to its blob oid alone, never its content --
+    content stays a lazy, separate read (`store.read_item_files`), which is
+    what keeps this state cheap to fetch regardless of item count.
+    """
+
+    tip: ObjectId | None
+    claims: Mapping[str, ActiveClaim] = field(default_factory=lambda: MappingProxyType({}))
+    consumed_ids: frozenset[ClaimId] = field(default_factory=frozenset)
+    resources: Mapping[str, ResourceRecord] = field(default_factory=lambda: MappingProxyType({}))
+    items: Mapping[str, ObjectId] = field(default_factory=lambda: MappingProxyType({}))
+
+
+EMPTY_STATE = ClaimState(tip=None)
+
+
+def serialize_empty_schema_toml() -> str:
+    """The only `schema.toml` content C1 ever writes."""
+    return f"version = {SUPPORTED_STATE_SCHEMA_VERSION}\n"
+
+
+def parse_schema_toml(content: str, *, tip: ObjectId) -> ClaimState:
+    """Parse one fetched commit's `schema.toml` blob into its `ClaimState`.
+
+    Raises `MalformedStateTreeError` for anything but exactly one integer
+    `version` key, and `UnsupportedStateSchemaError` for a version this
+    client does not speak -- kept distinct from a malformed tree because a
+    later, genuinely well-formed schema is a new cut, not a corrupt read.
+    """
+    try:
+        data = tomllib.loads(content)
+    except tomllib.TOMLDecodeError as error:
+        raise MalformedStateTreeError(f"malformed schema.toml at {tip}: {error}") from error
+    if set(data) != {"version"}:
+        raise MalformedStateTreeError(f"schema.toml at {tip} must contain exactly 'version'")
+    version = data["version"]
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise MalformedStateTreeError(f"schema.toml version must be an integer, got {version!r}")
+    if version != SUPPORTED_STATE_SCHEMA_VERSION:
+        raise UnsupportedStateSchemaError(version=version, tip=tip)
+    return ClaimState(tip=tip)
+
+
+# --- Claim transitions: intents and `apply` (issue #176, slice C2; item
+# writes, issue #279) ---------------------------------------------------
+#
+# `apply` is the sole writer of `ClaimState.claims`/`consumed_ids`/
+# `resources`/`items`. It is pure: no git, no clock, no randomness.
+# `store.py`'s commit loop is its one production caller, and refuses every
+# write-path command before this ever runs against `EMPTY_STATE` -- only
+# `bootstrap` may create the ref itself (done-when: a missing ref is never
+# created as a side effect of a claim/rescope/release/override/takeover/
+# resource/item-write call).
+
+
+@dataclass(frozen=True)
+class ItemPin:
+    """The item blob a write's checks judged (issue #496): a claim's item
+    judged open, an item write's parent judged a container (CAS-70). `oid` is
+    `items/<item_id>.md`'s blob in the very observation those checks read."""
+
+    item_id: str
+    oid: ObjectId
+
+
+@dataclass(frozen=True)
+class ClaimIntent:
+    """A `claim` transition: adds `claims/<key>.toml`, `ids/<claim_id>`, and
+    maybe creates or updates `resources/<name>.toml`. Any role may claim;
+    identity and resource uniqueness are enforced by `apply` itself.
+
+    `item_pin`, when set, must still name the item's current blob, checked
+    by `apply` on every attempt: a close -- or any other write -- that lands
+    between a rejected push and its retry refuses the claim instead of
+    leaving a live claim on an item nobody checked (issue #496). Only a
+    state-ref item has one; under `github` the forge holds the item's state
+    and the ledger no fact of it.
+
+    `exclusive_branch` (only `aco adopt` sets it) refuses the claim, on every
+    attempt, while any live claim holds its branch -- issue or lane -- which
+    CLAIM-10 otherwise lets share one. It is never stored in the claim
+    record."""
+
+    identity: ClaimIdentity
+    agent: str
+    role: str
+    base: ObjectId
+    branch: str
+    scope: tuple[str, ...]
+    claim_id: ClaimId
+    operation_id: str
+    whole_reason: str | None = None
+    resource_name: str | None = None
+    resource_value: int | None = None
+    item_pin: ItemPin | None = None
+    exclusive_branch: bool = False
+
+
+@dataclass(frozen=True)
+class RescopeIntent:
+    """Replaces `claims/<key>.toml`'s scope (and optionally its whole-reason).
+    Only the claimant `(agent, role)` may rescope its own claim."""
+
+    claim_id: ClaimId
+    agent: str
+    role: str
+    scope: tuple[str, ...]
+    operation_id: str
+    whole_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ReleaseIntent:
+    """Deletes `claims/<key>.toml`; `ids/` and `resources/` are unchanged (a
+    released claim id and a released resource value are both terminal:
+    never reused). The claimant may release its own claim; a coordinator may
+    release any claim with `coordinator_override=True`.
+
+    `outcome` (`MergedRelease` | `AbandonedRelease`) carries no tree effect
+    of its own -- `apply` never inspects it -- but is carried on the intent
+    for the commit message `store.py` builds from this transition, and for
+    `MergedRelease`'s own pre-`apply` forge verification (criterion 9,
+    unchanged from today: failure there never reaches `apply` at all).
+    """
+
+    claim_id: ClaimId
+    agent: str
+    role: str
+    outcome: ReleaseOutcome
+    operation_id: str
+    coordinator_override: bool = False
+
+
+@dataclass(frozen=True)
+class ItemWriteIntent:
+    """Replaces `items/<item_id>.md`'s stored blob oid via oid-based CAS
+    (issue #279). Create and edit are both "replace this blob" and differ
+    only in how the caller computed `new_oid`'s bytes, so they share this
+    one shape. A close is the same blob write wrapped in `ItemCloseIntent`,
+    which adds the live-claim check every attempt re-applies (issue #459).
+
+    `expected=None` means "this item must not exist yet"; any other value
+    must equal the item's current oid or the write refuses loud, never
+    overwriting. Needs no claim: an item write is plumbing straight to
+    `refs/aco/state`, never a worktree path.
+
+    `store_expected`, when set, is the whole `items/` map a caller checked
+    before writing (PIN-29, issue #447): any item written since refuses the
+    write too, so that check and this write land as one CAS instead of a
+    preflight another writer can slip past.
+
+    `parent_pin`, when set, must still name its item's current blob on every
+    attempt (CAS-70): a fresh child's parent changed since the command
+    checked it refuses the write, whatever else was written meanwhile.
+    """
+
+    item_id: str
+    expected: ObjectId | None
+    new_oid: ObjectId
+    operation_id: str
+    store_expected: Mapping[str, ObjectId] | None = None
+    parent_pin: ItemPin | None = None
+
+
+@dataclass(frozen=True)
+class ItemCloseIntent:
+    """`aco item close`'s own write (issue #459): `write` is the ordinary
+    item-blob CAS (`ItemWriteIntent`'s own discipline, unchanged), and
+    `issue` the item's claim identity, which must hold no live claim --
+    checked by `apply` on every attempt, so a claim that lands between a
+    rejected push and its retry refuses the close instead of the retry
+    re-applying a write that was checked against a stale state. Modelled on
+    `LandingIntent`, which re-checks its own claim on every attempt too."""
+
+    write: ItemWriteIntent
+    issue: IssueIdentity
+
+    @property
+    def item_id(self) -> str:
+        return self.write.item_id
+
+    @property
+    def operation_id(self) -> str:
+        return self.write.operation_id
+
+
+@dataclass(frozen=True)
+class LandingIntent:
+    """A `release --merged <sha|empty>` transition under `storage =
+    "state-ref"` (issue #359): closes one state-ref item's blob -- the same
+    oid-based CAS `ItemWriteIntent` uses -- and releases the claim that
+    names it -- the same authorization and CAS discipline `ReleaseIntent`
+    uses -- as one transition, one commit, one CAS, so a landing can never
+    close its item without releasing the claim, or release the claim while
+    leaving its item open. Replay-safe like every other intent, entirely
+    through `store.commit_transition`'s own generic `operation_id` replay
+    search: nothing further is needed here for that.
+    """
+
+    item_id: str
+    item_expected: ObjectId
+    item_new_oid: ObjectId
+    claim_id: ClaimId
+    agent: str
+    role: str
+    outcome: LandedRelease
+    operation_id: str
+    coordinator_override: bool = False
+
+
+ClaimTransitionIntent = (
+    ClaimIntent | RescopeIntent | ReleaseIntent | ItemWriteIntent | ItemCloseIntent | LandingIntent
+)
+
+
+def _same_identity(left: ClaimIdentity, right: ClaimIdentity) -> bool:
+    """Structural equality between two `ClaimIdentity` values: `IssueIdentity`
+    compares its `issue` number, and `LaneIdentity` carries no field of its
+    own, since every caller here compares branch separately."""
+    if isinstance(left, IssueIdentity) and isinstance(right, IssueIdentity):
+        return left.issue == right.issue
+    return isinstance(left, LaneIdentity) and isinstance(right, LaneIdentity)
+
+
+def held_by(claim: ActiveClaim, agent: str, role: str) -> bool:
+    """Whether `claim` is held by `agent` as `role`, compared as a tuple so
+    "same claimant" stays one named domain concept everywhere it is checked
+    (claim replay, rescope, release, a rerun of `adopt`)."""
+    return (claim.agent, claim.role) == (agent, role)
+
+
+def _same_claimant(
+    current: ActiveClaim, intent: ClaimIntent | RescopeIntent | ReleaseIntent | LandingIntent
+) -> bool:
+    """Whether `intent` names the same claimant as `current`."""
+    return held_by(current, intent.agent, intent.role)
+
+
+def claimant_text(agent: str, role: str) -> str:
+    """Render the `(agent, role)` tuple `_same_claimant` compares, for a
+    refusal that must name which two claimants disagreed."""
+    return f"{agent} ({role})"
+
+
+def _claim_matches_intent(claim: ActiveClaim, intent: ClaimIntent) -> bool:
+    """Whether `claim` is the exact live claim an interrupted, replayed
+    `intent` would have produced (criterion 2): same identity, claimant,
+    branch, and scope."""
+    return (
+        _same_identity(claim.identity, intent.identity)
+        and _same_claimant(claim, intent)
+        and claim.branch == intent.branch
+        and claim.scope == intent.scope
+    )
+
+
+def _auto_resource_value(occupied: set[int]) -> int:
+    value = 1
+    while value in occupied:
+        value += 1
+    return value
+
+
+def _resource_held_sentence(
+    name: str, value: int, holder: ActiveClaim, item_label: ItemLabel
+) -> str:
+    return (
+        f"{name} {value} is held by {holder.agent} ({holder.role}) on "
+        f"{identity_summary(holder.identity, holder.branch, item_label)}"
+    )
+
+
+def _explicit_resource_conflict(state: ClaimState, name: str, value: int) -> ClaimConflictError:
+    holder = next(
+        (claim for claim in state.claims.values() if claim.resource == ResourceHold(name, value)),
+        None,
+    )
+    if holder is not None:
+        return ClaimConflictError(naming=partial(_resource_held_sentence, name, value, holder))
+    return ClaimConflictError(f"{name} {value} was already consumed and cannot be reused")
+
+
+def _resolved_resource(
+    state: ClaimState, intent: ClaimIntent
+) -> tuple[ResourceHold | None, ResourceRecord | None]:
+    """The hold `intent` acquires and the updated record for its resource, or
+    `(None, None)` when it names no resource.
+
+    Auto intent (`resource_value` omitted): the least positive integer not
+    yet in `occupied`. Explicit intent: refuse when the value is already in
+    `occupied` -- live or released, since a released value is never reused
+    (§1 "one allocation owner: this file is the never-reuse set") -- naming
+    the current holder when there is one.
+    """
+    if intent.resource_name is None:
+        if intent.resource_value is not None:
+            raise ClaimError("resource value requires a resource name")
+        return None, None
+    name = intent.resource_name
+    record = state.resources.get(name, ResourceRecord(name=name, occupied=()))
+    occupied = set(record.occupied)
+    if intent.resource_value is None:
+        value = _auto_resource_value(occupied)
+    else:
+        value = intent.resource_value
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ClaimError("resource value must be a positive integer")
+        if value in occupied:
+            raise _explicit_resource_conflict(state, name, value)
+    return ResourceHold(name, value), ResourceRecord(name, tuple(sorted(occupied | {value})))
+
+
+def _live_claim_by_id(state: ClaimState, claim_id: ClaimId) -> tuple[str, ActiveClaim] | None:
+    """The `(tree key, claim)` pair for `claim_id`, or `None`.
+
+    `ClaimState.claims` is keyed by the claim-key codec (`issue-42`,
+    `lane-...`), not by `claim_id` -- at most one claim is ever live per
+    identity (an identity conflict refuses a second), so this linear scan
+    over the (small, live-claims-only) mapping is the one place that still
+    needs to go from a bare `claim_id`, which is all `RescopeIntent` and
+    `ReleaseIntent` carry, back to its tree key.
+    """
+    return next(
+        ((key, claim) for key, claim in state.claims.items() if claim.claim_id == claim_id), None
+    )
+
+
+def claimed_by_sentence(
+    identity: ClaimIdentity, branch: str, owner: ActiveClaim, item_label: ItemLabel
+) -> str:
+    return (
+        f"{identity_summary(identity, branch, item_label)} is claimed by "
+        f"{owner.agent} ({owner.role}) on "
+        f"{identity_summary(owner.identity, owner.branch, item_label)} branch {owner.branch}"
+    )
+
+
+def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
+    if state.tip is None:
+        # The one command allowed to turn `EMPTY_STATE` into real content is
+        # `bootstrap` itself, which never calls `apply` -- every other write
+        # path funnels through here, so this is the one place that must
+        # refuse instead of silently creating `refs/aco/state` as a side
+        # effect (issue #176 slice-review finding 1).
+        raise ClaimError(MISSING_STATE_REF)
+    if intent.item_pin is not None:
+        _require_item_unwritten(state, intent.item_pin.item_id, intent.item_pin.oid)
+    live = _live_claim_by_id(state, intent.claim_id)
+    if intent.claim_id in state.consumed_ids:
+        if live is not None and _claim_matches_intent(live[1], intent):
+            return state
+        raise ClaimConflictError(
+            f"claim id {intent.claim_id!r} is already on this ledger, active or "
+            "released; release it, then claim again with a fresh claim id"
+        )
+    blocked_by = blocking_claims(tuple(state.claims.values()), intent)
+    if intent.exclusive_branch:
+        blocked_by = branch_holders(state.claims, intent.branch)
+    if blocked_by:
+        raise ClaimConflictError(
+            naming=partial(claimed_by_sentence, intent.identity, intent.branch, blocked_by[0])
+        )
+    resource, resource_record = _resolved_resource(state, intent)
+    new_claim = ActiveClaim(
+        identity=intent.identity,
+        claim_id=intent.claim_id,
+        agent=intent.agent,
+        role=intent.role,
+        base=intent.base,
+        branch=intent.branch,
+        scope=intent.scope,
+        opened_commit=state.tip,
+        resource=resource,
+        whole_reason=intent.whole_reason,
+    )
+    new_claims = {**state.claims, claim_key(intent.identity, intent.branch): new_claim}
+    new_resources = dict(state.resources)
+    if resource_record is not None:
+        new_resources[resource_record.name] = resource_record
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType(new_claims),
+        consumed_ids=state.consumed_ids | {intent.claim_id},
+        resources=MappingProxyType(new_resources),
+    )
+
+
+def _apply_rescope_intent(state: ClaimState, intent: RescopeIntent) -> ClaimState:
+    found = _live_claim_by_id(state, intent.claim_id)
+    if found is None:
+        raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim to rescope")
+    key, current = found
+    if not _same_claimant(current, intent):
+        raise ClaimUnavailableError(
+            "only the original claimant may rescope "
+            f"(holder={claimant_text(current.agent, current.role)!r}, "
+            f"this session={claimant_text(intent.agent, intent.role)!r})"
+        )
+    whole_reason = current.whole_reason if intent.whole_reason is None else intent.whole_reason
+    new_claim = replace(current, scope=intent.scope, whole_reason=whole_reason)
+    new_claims = {**state.claims, key: new_claim}
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType(new_claims),
+    )
+
+
+def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingIntent) -> None:
+    """Raises unless `intent` may release `current`: the original claimant,
+    or an explicit coordinator override by role coordinator. Shared by
+    `ReleaseIntent` and `LandingIntent` (issue #359): a landing's own claim
+    release is authorized exactly the way an ordinary release is, never a
+    second rule. Delegates its own role check to `require_coordinator_override`
+    (issue #405 round-4 finding 2) -- the one printer for CLAIM-39's sentence,
+    never a second wording of the same refusal."""
+    if intent.coordinator_override:
+        require_coordinator_override(intent.role)
+        return
+    if not _same_claimant(current, intent):
+        raise ClaimUnavailableError(
+            "only the original claimant may release; use an explicit coordinator override "
+            f"(holder={claimant_text(current.agent, current.role)!r}, "
+            f"this session={claimant_text(intent.agent, intent.role)!r})"
+        )
+
+
+def _apply_release_intent(state: ClaimState, intent: ReleaseIntent) -> ClaimState:
+    found = _live_claim_by_id(state, intent.claim_id)
+    if found is None:
+        raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim to release")
+    key, current = found
+    _authorize_release(current, intent)
+    new_claims = {
+        existing_key: claim for existing_key, claim in state.claims.items() if existing_key != key
+    }
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType(new_claims),
+    )
+
+
+ITEMS_WRITTEN_SINCE_CHECKED = "items/ was written since this write checked it; re-read and retry"
+
+
+def _require_item_unwritten(state: ClaimState, item_id: str, read: ObjectId) -> None:
+    """Refuses unless `items/<item_id>.md` is still the blob `read` a caller
+    judged it by (CAS-20): an item write's own CAS, a claim's item pin, and
+    an item write's parent pin (CAS-70)."""
+    current = state.items.get(item_id)
+    if current != read:
+        raise ClaimUnavailableError(
+            f"item {item_id!r} was written since it was read "
+            f"(expected {read}, found {current!r}); re-read and retry"
+        )
+
+
+def _apply_item_write_intent(state: ClaimState, intent: ItemWriteIntent) -> ClaimState:
+    if state.tip is None:
+        raise ClaimError(MISSING_STATE_REF)
+    if intent.expected is None:
+        if intent.item_id in state.items:
+            raise ClaimUnavailableError(f"item {intent.item_id!r} already exists")
+    else:
+        _require_item_unwritten(state, intent.item_id, intent.expected)
+    if intent.parent_pin is not None:
+        _require_item_unwritten(state, intent.parent_pin.item_id, intent.parent_pin.oid)
+    if intent.store_expected is not None and dict(state.items) != dict(intent.store_expected):
+        raise ClaimUnavailableError(ITEMS_WRITTEN_SINCE_CHECKED)
+    new_items = {**state.items, intent.item_id: intent.new_oid}
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        items=MappingProxyType(new_items),
+    )
+
+
+def require_no_live_claim(state: ClaimState, issue: IssueIdentity) -> None:
+    """Refuses while `issue` still carries a live claim: a closed item with
+    a live claim on it is the `RECOVERY` anomaly the board guards against,
+    never a state `item close` creates (PIN-26). `apply` checks it on every
+    close attempt; `cmd_item._cmd_item_close` also checks it before every
+    item-state refusal (missing, malformed, already closed)."""
+    live_claim = state.claims.get(claim_key(issue, ""))
+    if live_claim is not None:
+        raise ClaimUnavailableError(naming=partial(_live_claim_sentence, issue, live_claim))
+
+
+def _live_claim_sentence(
+    issue: IssueIdentity, live_claim: ActiveClaim, item_label: ItemLabel
+) -> str:
+    return (
+        f"{item_label(issue.issue)} has a live claim "
+        f"({claimant_text(live_claim.agent, live_claim.role)}); release the claim first"
+    )
+
+
+def _apply_item_close_intent(state: ClaimState, intent: ItemCloseIntent) -> ClaimState:
+    require_no_live_claim(state, intent.issue)
+    return _apply_item_write_intent(state, intent.write)
+
+
+def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimState:
+    """Closes `intent.item_id`'s blob and releases `intent.claim_id`'s claim
+    in the one `ClaimState` transition a landing commits (issue #359): the
+    item write's own CAS (`ItemWriteIntent`'s discipline) and the claim
+    release's own authorization (`ReleaseIntent`'s discipline), never
+    letting one half succeed without the other since both land in the same
+    returned state, written to `refs/aco/state` as the one commit
+    `store.commit_transition` builds from it."""
+    if state.tip is None:
+        raise ClaimError(MISSING_STATE_REF)
+    found = _live_claim_by_id(state, intent.claim_id)
+    if found is None:
+        raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim to release")
+    key, current = found
+    _authorize_release(current, intent)
+    current_item_oid = state.items.get(intent.item_id)
+    if current_item_oid != intent.item_expected:
+        raise ClaimUnavailableError(
+            f"item {intent.item_id!r} was written since it was read "
+            f"(expected {intent.item_expected}, found {current_item_oid!r}); re-read and retry"
+        )
+    new_claims = {
+        existing_key: claim for existing_key, claim in state.claims.items() if existing_key != key
+    }
+    new_items = {**state.items, intent.item_id: intent.item_new_oid}
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType(new_claims),
+        items=MappingProxyType(new_items),
+    )
+
+
+def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
+    """The pure claim-state transition (issue #176 §1; item writes, issue
+    #279; atomic landings, issue #359; item closes, issue #459): the sole writer of
+    `ClaimState.claims`/`consumed_ids`/`resources`/`items`. Assumes
+    `state.tip` is already real -- `store.py` never calls this against
+    `EMPTY_STATE`."""
+    if isinstance(intent, ClaimIntent):
+        return _apply_claim_intent(state, intent)
+    if isinstance(intent, RescopeIntent):
+        return _apply_rescope_intent(state, intent)
+    if isinstance(intent, ReleaseIntent):
+        return _apply_release_intent(state, intent)
+    if isinstance(intent, LandingIntent):
+        return _apply_landing_intent(state, intent)
+    if isinstance(intent, ItemCloseIntent):
+        return _apply_item_close_intent(state, intent)
+    return _apply_item_write_intent(state, intent)
+
+
+# --- `claims/<key>.toml` and `resources/<name>.toml` codecs -----------------
+#
+# Hand-written, not a TOML-writing library: `toml_string` is this
+# repository's one TOML basic-string writer (issue #378), living here
+# because this module sits below `workboard` in the Layers contract --
+# `workboard.py`'s renderers import it rather than keeping a second escape
+# table and drifting from what `tomllib.loads` (the reader) accepts back.
+# It escapes every control character TOML's basic-string grammar forbids
+# unescaped (U+0000-U+001F and U+007F), not only backslash and quote: the
+# short escapes where TOML has one, `\uXXXX` for the rest. A value carrying
+# U+000B would otherwise round-trip into TOML that `tomllib.loads` (the
+# reader) refuses to parse back (#517).
+
+_TOML_STRING_ESCAPES = {
+    "\\": "\\\\",
+    '"': '\\"',
+    "\b": "\\b",
+    "\t": "\\t",
+    "\n": "\\n",
+    "\f": "\\f",
+    "\r": "\\r",
+}
+
+
+def toml_string(value: object) -> str:
+    """A TOML basic string for `value` -- the writer's one escaping path,
+    matching what `tomllib.loads` (the reader) accepts back unchanged."""
+    escaped = "".join(_toml_string_escape(char) for char in cast(str, value))
+    return f'"{escaped}"'
+
+
+# A multi-line basic string may hold a newline and a tab literally; every
+# other character keeps `toml_string`'s own escape.
+_TOML_MULTILINE_LITERALS = frozenset("\n\t")
+
+
+def toml_multiline_string(value: str) -> str:
+    """A TOML multi-line basic string for `value` -- an `[[expectation]]`
+    `picture`'s inline SVG (issue #295), which needs literal newlines a
+    single-line basic string cannot hold. Every other character takes
+    `toml_string`'s escape, so a quote run is never mistaken for the
+    closing `\"\"\"` and a control character the reader forbids literal
+    (issue #517) is written as `\\uXXXX`. `tomllib.loads` reads it back to
+    `value` unchanged -- the leading newline right after the opening
+    delimiter is the one TOML trims automatically, so none is added here."""
+    escaped = "".join(
+        char if char in _TOML_MULTILINE_LITERALS else _toml_string_escape(char) for char in value
+    )
+    return f'"""\n{escaped}"""'
+
+
+def _toml_string_escape(char: str) -> str:
+    if char in _TOML_STRING_ESCAPES:
+        return _TOML_STRING_ESCAPES[char]
+    if has_control_character(char):
+        return f"\\u{ord(char):04X}"
+    return char
+
+
+def _toml_string_array(values: tuple[str, ...]) -> str:
+    return "[" + ", ".join(toml_string(value) for value in values) + "]"
+
+
+def _toml_int_array(values: tuple[int, ...]) -> str:
+    return "[" + ", ".join(str(value) for value in values) + "]"
+
+
+def serialize_claim_toml(claim: ActiveClaim) -> str:
+    """The `claims/<key>.toml` content for one live claim (§1)."""
+    lines = [
+        f"claim_id = {toml_string(claim.claim_id)}",
+        f"agent = {toml_string(claim.agent)}",
+        f"role = {toml_string(claim.role)}",
+        f"base = {toml_string(claim.base)}",
+        f"branch = {toml_string(claim.branch)}",
+        f"scope = {_toml_string_array(claim.scope)}",
+        f"opened_commit = {toml_string(claim.opened_commit)}",
+    ]
+    if claim.whole_reason is not None:
+        lines.append(f"whole_reason = {toml_string(claim.whole_reason)}")
+    if claim.resource is not None:
+        lines.append(f"resource_name = {toml_string(claim.resource.name)}")
+        lines.append(f"resource_value = {claim.resource.value}")
+    return "\n".join(lines) + "\n"
+
+
+_CLAIM_TOML_REQUIRED_KEYS = frozenset(
+    {"claim_id", "agent", "role", "base", "branch", "scope", "opened_commit"}
+)
+_CLAIM_TOML_OPTIONAL_KEYS = frozenset({"whole_reason", "resource_name", "resource_value"})
+_CLAIM_TOML_KEYS = _CLAIM_TOML_REQUIRED_KEYS | _CLAIM_TOML_OPTIONAL_KEYS
+
+
+def _claim_toml_text(
+    data: Mapping[str, object], field_name: str, *, key: str, tip: ObjectId
+) -> str:
+    value = data.get(field_name)
+    if not isinstance(value, str) or not value:
+        raise MalformedStateTreeError(
+            f"claim file {key}.toml at {tip} field {field_name!r} must be non-empty text"
+        )
+    return value
+
+
+def _claim_toml_scope(data: Mapping[str, object], *, key: str, tip: ObjectId) -> tuple[str, ...]:
+    """`data`'s `scope` field, projected through the one canonicalizer
+    (`valid_scope`) every live claim's scope already passes through at
+    creation and rescope (issue #331 REVISE finding 1): a claim file
+    written before that canonical order existed can still carry its paths
+    in typed order, so a read here must sort it rather than compare
+    against it unsorted. Never rewrites the ref (this is a read), and
+    never refuses a valid-but-unsorted legacy record -- only content
+    `valid_scope` itself would refuse from a fresh request, such as a
+    non-repository-relative or duplicated path."""
+    raw = data.get("scope")
+    if not isinstance(raw, list) or not raw or any(not isinstance(entry, str) for entry in raw):
+        raise MalformedStateTreeError(
+            f"claim file {key}.toml at {tip} field 'scope' must be a non-empty list of text"
+        )
+    try:
+        return valid_scope(raw)
+    except InvalidClaimMarkerError as error:
+        raise MalformedStateTreeError(
+            f"claim file {key}.toml at {tip} has an invalid scope: {error}"
+        ) from error
+
+
+def _claim_toml_resource(
+    data: Mapping[str, object], *, key: str, tip: ObjectId
+) -> ResourceHold | None:
+    if "resource_name" not in data:
+        if "resource_value" in data:
+            raise MalformedStateTreeError(
+                f"claim file {key}.toml at {tip} has resource_value without resource_name"
+            )
+        return None
+    name = _claim_toml_text(data, "resource_name", key=key, tip=tip)
+    value = data.get("resource_value")
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise MalformedStateTreeError(
+            f"claim file {key}.toml at {tip} field 'resource_value' must be a positive integer"
+        )
+    return ResourceHold(name, value)
+
+
+def parse_claim_toml(content: str, *, key: str, tip: ObjectId) -> ActiveClaim:
+    """Parse one fetched `claims/<key>.toml` blob into its `ActiveClaim`.
+
+    A malformed claim file fails the whole read loud (ruling: a commit is
+    the unit a writer writes, so a broken tree is corrupt state, never a
+    single quarantinable claim).
+    """
+    try:
+        data = tomllib.loads(content)
+    except tomllib.TOMLDecodeError as error:
+        raise MalformedStateTreeError(
+            f"malformed claim file {key}.toml at {tip}: {error}"
+        ) from error
+    observed_keys = frozenset(data)
+    if not observed_keys <= _CLAIM_TOML_KEYS:
+        raise MalformedStateTreeError(
+            f"claim file {key}.toml at {tip} has unknown keys: "
+            f"{sorted(observed_keys - _CLAIM_TOML_KEYS)}"
+        )
+    missing = _CLAIM_TOML_REQUIRED_KEYS - observed_keys
+    if missing:
+        raise MalformedStateTreeError(
+            f"claim file {key}.toml at {tip} is missing {sorted(missing)}"
+        )
+    identity = parse_claim_key(key)
+    claim_id_text = _claim_toml_text(data, "claim_id", key=key, tip=tip)
+    if CLAIM_ID_PATTERN.fullmatch(claim_id_text) is None:
+        raise MalformedStateTreeError(f"claim file {key}.toml at {tip} has an invalid claim id")
+    base_text = _claim_toml_text(data, "base", key=key, tip=tip)
+    opened_commit_text = _claim_toml_text(data, "opened_commit", key=key, tip=tip)
+    commit_fields_valid = (
+        COMMIT_PATTERN.fullmatch(base_text) is not None
+        and COMMIT_PATTERN.fullmatch(opened_commit_text) is not None
+    )
+    if not commit_fields_valid:
+        raise MalformedStateTreeError(f"claim file {key}.toml at {tip} has a malformed commit id")
+    whole_reason = data.get("whole_reason")
+    if whole_reason is not None and not isinstance(whole_reason, str):
+        raise MalformedStateTreeError(
+            f"claim file {key}.toml at {tip} field 'whole_reason' must be text"
+        )
+    return ActiveClaim(
+        identity=identity,
+        claim_id=ClaimId(claim_id_text),
+        agent=_claim_toml_text(data, "agent", key=key, tip=tip),
+        role=_claim_toml_text(data, "role", key=key, tip=tip),
+        base=ObjectId(base_text),
+        branch=_claim_toml_text(data, "branch", key=key, tip=tip),
+        scope=_claim_toml_scope(data, key=key, tip=tip),
+        opened_commit=ObjectId(opened_commit_text),
+        resource=_claim_toml_resource(data, key=key, tip=tip),
+        whole_reason=whole_reason,
+    )
+
+
+def serialize_resource_toml(record: ResourceRecord) -> str:
+    """The `resources/<name>.toml` content for one resource's occupied set (§1)."""
+    return f"occupied = {_toml_int_array(record.occupied)}\n"
+
+
+def parse_resource_toml(content: str, *, name: str, tip: ObjectId) -> ResourceRecord:
+    try:
+        data = tomllib.loads(content)
+    except tomllib.TOMLDecodeError as error:
+        raise MalformedStateTreeError(
+            f"malformed resource file {name}.toml at {tip}: {error}"
+        ) from error
+    if set(data) != {"occupied"}:
+        raise MalformedStateTreeError(
+            f"resource file {name}.toml at {tip} must contain exactly 'occupied'"
+        )
+    occupied = data["occupied"]
+    if not isinstance(occupied, list) or any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in occupied
+    ):
+        raise MalformedStateTreeError(
+            f"resource file {name}.toml at {tip} field 'occupied' must be positive integers"
+        )
+    return ResourceRecord(name=name, occupied=tuple(occupied))
+
+
+def is_issueless_lane_branch(branch: str) -> bool:
+    return branch.startswith(ISSUELESS_LANE_BRANCH_PREFIXES)
+
+
+def claims_on_branch(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[ActiveClaim, ...]:
+    return tuple(claim for claim in claims.values() if claim.branch == branch)
+
+
+def branch_holders(claims: Mapping[str, ActiveClaim], branch: str) -> tuple[ActiveClaim, ...]:
+    """The live claims on `branch`, lane claims before issue claims: the first
+    is the holder CLAIM-71 names, and ADOPT-06 names the first that is not the
+    asking holder's own."""
+    holders = claims_on_branch(claims, branch)
+    return tuple(sorted(holders, key=lambda claim: not isinstance(claim.identity, LaneIdentity)))
+
+
+def lookup_identity(
+    issue: int | None,
+    branch: str,
+    *,
+    merged_rerun: bool,
+    holders: Callable[[], tuple[ActiveClaim, ...]],
+) -> ClaimIdentity:
+    """Resolve an existing lane without relaxing claim acquisition's prefix rule.
+
+    A branch outside the issue-less prefixes is a lane when a live lane claim
+    holds it, or when a github `--merged` rerun finds no claim on it at all:
+    the release that rerun resumes already removed the claim."""
+    if issue is None and not is_issueless_lane_branch(branch):
+        live = holders()
+        if any(isinstance(claim.identity, LaneIdentity) for claim in live) or (
+            merged_rerun and not live
+        ):
+            return LaneIdentity()
+    return resolved_identity(issue, branch)
+
+
+def _issueless_lane_refusal(branch: str) -> str:
+    prefixes = " or ".join(repr(prefix) for prefix in ISSUELESS_LANE_BRANCH_PREFIXES)
+    return (
+        f"branch {branch!r} is not an issueless lane; pass an issue number, or "
+        f"check out a branch prefixed {prefixes}"
+    )
+
+
+def resolved_identity(issue: int | None, branch: str) -> ClaimIdentity:
+    """Resolve the CLI's discriminated identity: an explicit issue, or a lane.
+
+    Omitting the positional issue number means lane mode, derived from `branch`
+    (the same checkout branch `--base`/`--branch` auto-fill and the release
+    branch-matching fallback already use). Lane mode is refused outright unless
+    `branch` follows the issueless-lane convention, so a builder who simply forgot
+    the issue number never gets a silent, unlabeled, non-projected lane claim.
+    """
+    if issue is not None:
+        return IssueIdentity(issue)
+    if not is_issueless_lane_branch(branch):
+        raise ClaimError(_issueless_lane_refusal(branch))
+    return LaneIdentity()
+
+
+def touch_json(claim: ScopedClaim) -> dict[str, object]:
+    return {
+        **identity_json(claim.identity),
+        "claim_id": claim.claim_id,
+        "agent": claim.agent,
+        "scope": list(claim.scope),
+    }
+
+
+def identity_json(identity: ClaimIdentity) -> dict[str, object]:
+    """`issue`/`lane` pair for one claim's discriminated identity, for JSON output.
+
+    A lane claim's name lives in the sibling `branch` field of the same JSON
+    object, so `lane` stays a bare marker instead of duplicating it.
+    """
+    if isinstance(identity, LaneIdentity):
+        return {"issue": None, "lane": True}
+    return {"issue": identity.issue, "lane": None}
+
+
+def resource_fields(resource: ResourceHold | None) -> dict[str, object]:
+    if resource is None:
+        return {"resource": None, "resource_value": None}
+    return {"resource": resource.name, "resource_value": resource.value}
+
+
+def claim_identity_fields(claim: ActiveClaim) -> dict[str, object]:
+    """The one claim-identity dict every `--json` view of a live claim
+    shares -- `status`, `status --path`, `claim`, and `rescope` (issue #406,
+    #390 finding 6) each spread this instead of typing the same seven
+    fields out by hand a fifth time with their own drifting order. A view
+    still projects its own remaining fields explicitly beside it: `resource`/
+    `resource_value` (every view but `rescope`, which names no `--resource`
+    flag of its own), `whole` (`status` and `status --path` alone), and
+    whatever else is that view's own (`overlaps`/`age`/`old` for `status`,
+    `versioned_files`/`touches`/`checks` for `claim`)."""
+    return {
+        **identity_json(claim.identity),
+        "claim_id": claim.claim_id,
+        "agent": claim.agent,
+        "role": claim.role,
+        "base": claim.base,
+        "branch": claim.branch,
+        "scope": list(claim.scope),
+    }
+
+
+def require_state_ref(state: ClaimState) -> None:
+    if state.tip is None:
+        raise ClaimError(MISSING_STATE_REF)
+
+
+def optional_issue_number(value: int | None) -> int | None:
+    return None if value is None else int(value)

@@ -20,7 +20,7 @@ from github_fixtures import (
     refusal_observations,
 )
 
-from agent_coordination import board, forge, process, protocol
+from aco import forge, process, protocol, workboard
 
 
 class TrailerKey(Enum):
@@ -50,7 +50,7 @@ class Message:
 @dataclass(frozen=True)
 class Landed:
     message: Message
-    method: board.MergeMethod = board.MergeMethod.MERGE
+    method: workboard.MergeMethod = workboard.MergeMethod.MERGE
     title: str = "Merge pull request #12"
     parents: int = 2
     closed: frozenset[int] = frozenset({72})
@@ -214,7 +214,7 @@ def world(
         assert observed == expected
         arrange_trailer_read(case, github_clone, monkeypatch)
 
-    method = case.outcome.method if isinstance(case.outcome, Landed) else board.MergeMethod.MERGE
+    method = case.outcome.method if isinstance(case.outcome, Landed) else Landed.method
     shared = lane_landing_world(
         github_clone,
         bare_remote,
@@ -261,7 +261,7 @@ class TestLandMessage:
                             "Closes #72\n\nCo-Authored-By: Ada <ada@example.com>\nWork-Item: #72\n",
                             ["Co-Authored-By", "Work-Item"],
                         ),
-                        method=board.MergeMethod.SQUASH,
+                        method=workboard.MergeMethod.SQUASH,
                         title="feat: land the lane (#12)",
                         parents=1,
                     ),
@@ -524,7 +524,7 @@ class TestLandMessage:
                             "Closes #72\n\nCo-Authored-By: Ada <ada@example.com>\nWork-Item: #72\n",
                             ["Co-Authored-By", "WORK-ITEM"],
                         ),
-                        method=board.MergeMethod.SQUASH,
+                        method=workboard.MergeMethod.SQUASH,
                         title="feat: land the lane (#12)",
                         parents=1,
                     ),

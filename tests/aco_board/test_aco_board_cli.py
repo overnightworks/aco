@@ -26,11 +26,11 @@ from aco_board_fixtures import (
     row,
 )
 
-from aco_board import cli, static
-from aco_board.aco_cli import AcoCli
-from aco_board.board import Boards
-from aco_board.ports import Decision, DecisionResult
-from aco_board.server import LOOPBACK_HOST
+from aco.board import cli, static
+from aco.board.aco_cli import AcoCli
+from aco.board.board import Boards
+from aco.board.ports import Decision, DecisionResult
+from aco.board.server import LOOPBACK_HOST
 
 _URL_WAIT_SECONDS = 30
 

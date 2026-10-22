@@ -21,9 +21,9 @@ from typing import Any, cast
 import pytest
 from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, row, serving
 
-from aco_board.aco_cli import AcoCli
-from aco_board.ports import Decision, DecisionResult, ExpectationLine
-from aco_board.server import LOOPBACK_HOST, read_before_deadline
+from aco.board.aco_cli import AcoCli
+from aco.board.ports import Decision, DecisionResult, ExpectationLine
+from aco.board.server import LOOPBACK_HOST, read_before_deadline
 
 
 def _post(body: bytes, length: bytes | None = None) -> bytes:

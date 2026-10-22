@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_coordination import cli, cmd_workspace, providers, terminal, workspace
+from aco import cli, cmd_workspace, providers, terminal, workspace
 
 
 def test_register_requires_the_explicit_stopped_handover() -> None:
@@ -255,8 +255,8 @@ def test_login_status_reports_an_owned_launcher_as_stale_when_its_current_interp
     desktop_path.parent.mkdir(parents=True, mode=0o700)
     desktop_path.write_text(
         "[Desktop Entry]\nType=Application\nName=ACO workspace recovery\n"
-        "Exec=/old/python -I -m agent_coordination.cli _run-at-login\n"
-        "X-Aco-Owner=agent-coordination/login-v1\n"
+        "Exec=/old/python -I -m aco.cli _run-at-login\n"
+        "X-Aco-Owner=aco/login-v1\n"
     )
 
     assert cli.main(["login", "status"]) == 0
@@ -456,8 +456,8 @@ def test_login_status_reports_a_malformed_attempt_without_echoing_its_contents(
     [
         (
             "[Desktop Entry]\nType=Application\nName=ACO workspace recovery\n"
-            "Exec=/old/python -I -m agent_coordination.cli _run-at-login\n"
-            "X-Aco-Owner=agent-coordination/login-v1\n",
+            "Exec=/old/python -I -m aco.cli _run-at-login\n"
+            "X-Aco-Owner=aco/login-v1\n",
             "stale",
         ),
         ("[Desktop Entry]\nType=Application\nExec=/bin/sh\n", "conflict"),

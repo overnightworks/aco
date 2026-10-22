@@ -30,7 +30,7 @@ from github_fixtures import (
     refusal_observations,
 )
 
-from agent_coordination import board, cmd_land, forge, protocol
+from aco import cmd_land, forge, protocol, workboard
 
 
 class ClaimHolder(Enum):
@@ -62,7 +62,7 @@ class DefaultBranch(Enum):
 
 @dataclass(frozen=True)
 class Landed:
-    method: board.MergeMethod = board.MergeMethod.MERGE
+    method: workboard.MergeMethod = workboard.MergeMethod.MERGE
     title: str = "Merge pull request #12"
     parents: int = 2
     trailer: str = "Work-Item: #72"
@@ -83,15 +83,15 @@ class MergeCase:
     arguments: tuple[str, ...] = ()
     trunk_config: str = ""
     head_config: str = ""
-    methods: frozenset[board.MergeMethod] | None = None
-    rules: tuple[frozenset[board.MergeMethod], ...] = ()
+    methods: frozenset[workboard.MergeMethod] | None = None
+    rules: tuple[frozenset[workboard.MergeMethod], ...] = ()
     error: forge.ForgeError | None = None
     oversized_foreign_text: bool = False
     distinct_detail: bool = False
     dependency_listing: bool = False
     invalid_configuration: bool = False
     default_branch: DefaultBranch = DefaultBranch.MAIN
-    decoy_rules: tuple[frozenset[board.MergeMethod], ...] = ()
+    decoy_rules: tuple[frozenset[workboard.MergeMethod], ...] = ()
     length: RefusalLength = RefusalLength.WITHIN_LIMIT
     unknown_reads_before_clean: int = 0
 
@@ -155,7 +155,7 @@ def world(
         if case.oversized_foreign_text:
             oversized = "1" * 4301
             client.board_open_pull_requests = (
-                board.PullRequest(300, "Foreign", f"Refs #{oversized}", "foreign/branch"),
+                workboard.PullRequest(300, "Foreign", f"Refs #{oversized}", "foreign/branch"),
             )
             landed_from_another_clone(
                 bare_remote.parent,
@@ -392,44 +392,46 @@ class TestLandMergeMethod:
                 MergeCase(
                     Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
-                    methods=frozenset({board.MergeMethod.MERGE, board.MergeMethod.SQUASH}),
+                    methods=frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH}),
                 ),
                 id="both",
             ),
             pytest.param(
                 MergeCase(
-                    Landed(board.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
                     lane_worktree=LaneWorktree.PRESENT,
-                    methods=frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),
+                    methods=frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
                 ),
                 id="squash-and-rebase-without-a-merge-commit",
             ),
             pytest.param(
                 MergeCase(
-                    Landed(board.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "squash"\n',
-                    methods=frozenset({board.MergeMethod.MERGE, board.MergeMethod.SQUASH}),
+                    methods=frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH}),
                 ),
                 id="pinned-squash-beats-the-default",
             ),
             pytest.param(
                 MergeCase(
-                    Landed(board.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
                     lane_worktree=LaneWorktree.PRESENT,
-                    methods=frozenset(board.MergeMethod),
-                    rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                    methods=frozenset(workboard.MergeMethod),
+                    rules=(
+                        frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                    ),
                 ),
                 id="ruleset-narrows-all-three-settings-to-a-squash",
             ),
             pytest.param(
                 MergeCase(
-                    Landed(board.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
                     lane_worktree=LaneWorktree.PRESENT,
                     rules=(
-                        frozenset({board.MergeMethod.MERGE, board.MergeMethod.SQUASH}),
-                        frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),
-                        frozenset({board.MergeMethod.MERGE, board.MergeMethod.SQUASH}),
+                        frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH}),
+                        frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                        frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH}),
                     ),
                 ),
                 id="withheld-settings-narrowed-by-every-ruleset",
@@ -439,7 +441,7 @@ class TestLandMergeMethod:
                     Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "merge"\n',
-                    methods=frozenset(board.MergeMethod),
+                    methods=frozenset(workboard.MergeMethod),
                 ),
                 id="pinned-merge-with-every-method-allowed",
             ),
@@ -447,17 +449,19 @@ class TestLandMergeMethod:
                 MergeCase(
                     Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
-                    methods=frozenset(board.MergeMethod),
+                    methods=frozenset(workboard.MergeMethod),
                 ),
                 id="all-three-settings-and-no-rule-pick-a-merge-commit",
             ),
             pytest.param(
                 MergeCase(
-                    Landed(board.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
                     lane_worktree=LaneWorktree.PRESENT,
                     default_branch=DefaultBranch.TRUNK_WITHOUT_MAIN,
-                    methods=frozenset(board.MergeMethod),
-                    rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                    methods=frozenset(workboard.MergeMethod),
+                    rules=(
+                        frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                    ),
                 ),
                 id="trunk-rule-narrows-the-method",
             ),
@@ -466,8 +470,10 @@ class TestLandMergeMethod:
                     Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
                     default_branch=DefaultBranch.TRUNK_WITH_REMOTE_MAIN,
-                    methods=frozenset(board.MergeMethod),
-                    decoy_rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                    methods=frozenset(workboard.MergeMethod),
+                    decoy_rules=(
+                        frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                    ),
                 ),
                 id="decoy-main-rule-is-ignored",
             ),
@@ -504,7 +510,7 @@ class TestLandMergeMethod:
                     "pull request #12 cannot land: this repository allows "
                     "neither a merge commit nor a squash merge",
                     lane_worktree=LaneWorktree.PRESENT,
-                    methods=frozenset({board.MergeMethod.REBASE}),
+                    methods=frozenset({workboard.MergeMethod.REBASE}),
                 ),
                 id="only-rebase-refuses-before-the-merge",
             ),
@@ -514,7 +520,9 @@ class TestLandMergeMethod:
                     "GitHub allows squash, rebase",
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "merge"\n',
-                    rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                    rules=(
+                        frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                    ),
                 ),
                 id="pinned-merge-a-ruleset-excludes-refuses-before-the-merge",
             ),
@@ -523,7 +531,7 @@ class TestLandMergeMethod:
                     "board.toml merge_method merge is not allowed on main: GitHub allows squash",
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "merge"\n',
-                    methods=frozenset({board.MergeMethod.SQUASH}),
+                    methods=frozenset({workboard.MergeMethod.SQUASH}),
                 ),
                 id="pinned-merge-the-settings-exclude-refuses-before-the-merge",
             ),
@@ -532,8 +540,8 @@ class TestLandMergeMethod:
                     "board.toml merge_method merge is not allowed on main: GitHub allows rebase",
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "merge"\n',
-                    methods=frozenset(board.MergeMethod),
-                    rules=(frozenset({board.MergeMethod.REBASE}),),
+                    methods=frozenset(workboard.MergeMethod),
+                    rules=(frozenset({workboard.MergeMethod.REBASE}),),
                 ),
                 id="pinned-merge-a-rebase-only-ruleset-excludes-refuses-before-the-merge",
             ),
@@ -541,8 +549,10 @@ class TestLandMergeMethod:
                 MergeCase(
                     "GitHub allows no merge method aco can use on main",
                     lane_worktree=LaneWorktree.PRESENT,
-                    methods=frozenset({board.MergeMethod.MERGE}),
-                    rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                    methods=frozenset({workboard.MergeMethod.MERGE}),
+                    rules=(
+                        frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                    ),
                 ),
                 id="ruleset-leaving-no-usable-method-refuses-before-the-merge",
             ),
@@ -551,8 +561,10 @@ class TestLandMergeMethod:
                     "GitHub allows no merge method aco can use on main",
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "squash"\n',
-                    methods=frozenset({board.MergeMethod.MERGE}),
-                    rules=(frozenset({board.MergeMethod.SQUASH, board.MergeMethod.REBASE}),),
+                    methods=frozenset({workboard.MergeMethod.MERGE}),
+                    rules=(
+                        frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
+                    ),
                 ),
                 id="pinned-squash-a-ruleset-leaving-no-method-refuses-before-the-merge",
             ),
@@ -562,7 +574,7 @@ class TestLandMergeMethod:
                     "neither a merge commit nor a squash merge",
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "merge"\n',
-                    methods=frozenset({board.MergeMethod.REBASE}),
+                    methods=frozenset({workboard.MergeMethod.REBASE}),
                 ),
                 id="pinned-merge-and-a-rebase-only-repository",
             ),
@@ -570,8 +582,8 @@ class TestLandMergeMethod:
                 MergeCase(
                     "GitHub allows no merge method aco can use on main",
                     lane_worktree=LaneWorktree.PRESENT,
-                    methods=frozenset(board.MergeMethod),
-                    rules=(frozenset({board.MergeMethod.REBASE}),),
+                    methods=frozenset(workboard.MergeMethod),
+                    rules=(frozenset({workboard.MergeMethod.REBASE}),),
                 ),
                 id="unpinned-land-a-rebase-only-ruleset",
             ),
@@ -650,7 +662,7 @@ class TestLandMergeForgeAnswer:
             {
                 "request.count": 1,
                 "request.head": world.head,
-                "request.method": board.MergeMethod.MERGE,
+                "request.method": workboard.MergeMethod.MERGE,
                 "entry.stamp": None,
                 "entry.anchor": None,
             }

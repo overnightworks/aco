@@ -1,6 +1,6 @@
 /**
  * The E2E launcher: starts the real board server
- * (`tests/aco_board/e2e_server.py`, the real `aco_board.server` behind a
+ * (`tests/aco_board/e2e_server.py`, the real `aco.board.server` behind a
  * fake `aco`) and points every spec straight at the port it prints -- it
  * serves the committed, built SPA itself, so no dev server and no proxy are
  * involved. Returning a teardown closure -- Playwright's own pattern --

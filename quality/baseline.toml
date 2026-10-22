@@ -1,94 +1,94 @@
 # Measured by `quality baseline write`. Entries only ever go down.
 
-[ccn."src/agent_coordination/board.py"]
-"build_board" = 33
-
-[ccn."src/agent_coordination/board_read.py"]
+[ccn."src/aco/board_read.py"]
 "build_board" = 16
 
-[ccn."src/agent_coordination/cmd_cut.py"]
+[ccn."src/aco/cmd_cut.py"]
 "_adopt_existing_child" = 19
 
-[ccn."src/agent_coordination/github.py"]
+[ccn."src/aco/github.py"]
 "GitHubForge._board_dependency" = 18
 "GitHubForge._board_issue" = 20
 "GitHubForge._landing" = 28
 
-[ccn."src/agent_coordination/protocol.py"]
+[ccn."src/aco/protocol.py"]
 "valid_scope" = 17
 
-[ccn."src/agent_coordination/terminal.py"]
+[ccn."src/aco/terminal.py"]
 "external_ownership" = 18
+
+[ccn."src/aco/workboard.py"]
+"build_board" = 33
 
 [ccn."tests/test_status.py"]
 "check_status.check" = 19
 
 [file_lines]
 "scripts/test_inventory.py" = 933
-"src/agent_coordination/board.py" = 3160
-"src/agent_coordination/body.py" = 1669
-"src/agent_coordination/checkout.py" = 2041
-"src/agent_coordination/cli.py" = 1062
-"src/agent_coordination/cmd_claim.py" = 1137
-"src/agent_coordination/cmd_release.py" = 925
-"src/agent_coordination/github.py" = 1765
-"src/agent_coordination/protocol.py" = 1881
-"src/agent_coordination/state_board.py" = 957
-"src/agent_coordination/store.py" = 2115
-"src/agent_coordination/workspace.py" = 1026
+"src/aco/body.py" = 1669
+"src/aco/checkout.py" = 2041
+"src/aco/cli.py" = 1061
+"src/aco/cmd_claim.py" = 1137
+"src/aco/cmd_release.py" = 925
+"src/aco/github.py" = 1765
+"src/aco/protocol.py" = 1881
+"src/aco/state_board.py" = 957
+"src/aco/store.py" = 2115
+"src/aco/workboard.py" = 3160
+"src/aco/workspace.py" = 1017
 "tests/aco_board/test_aco_board_api.py" = 1060
 "tests/cli_fixtures.py" = 969
 "tests/github_fixtures.py" = 839
 "tests/test_adopt.py" = 1650
-"tests/test_board.py" = 4456
+"tests/test_board.py" = 4444
 "tests/test_checkout.py" = 2085
-"tests/test_cli.py" = 17839
-"tests/test_cut.py" = 1125
+"tests/test_cli.py" = 17834
+"tests/test_cut.py" = 1124
 "tests/test_github.py" = 3250
 "tests/test_land_after_merge_rerun.py" = 884
 "tests/test_land_preflight_claim.py" = 858
-"tests/test_protocol.py" = 804
-"tests/test_release_cleanup.py" = 814
+"tests/test_protocol.py" = 802
+"tests/test_release_cleanup.py" = 807
 "tests/test_rescope_checkout.py" = 1088
 "tests/test_reset.py" = 954
-"tests/test_state_board.py" = 6121
+"tests/test_state_board.py" = 6118
 "tests/test_store.py" = 5526
 "tests/test_workspace.py" = 2017
 "tests/test_workspace_terminal.py" = 1269
 
-[function_lines."src/agent_coordination/board.py"]
-"_board_item" = 103
-"build_board" = 117
-
-[function_lines."src/agent_coordination/board_read.py"]
+[function_lines."src/aco/board_read.py"]
 "build_board" = 111
 
-[function_lines."src/agent_coordination/cli.py"]
+[function_lines."src/aco/cli.py"]
 "_add_item_parser" = 84
 
-[function_lines."src/agent_coordination/cmd_claim.py"]
+[function_lines."src/aco/cmd_claim.py"]
 "checked_claim" = 77
 
-[function_lines."src/agent_coordination/cmd_cut.py"]
+[function_lines."src/aco/cmd_cut.py"]
 "_adopt_existing_child" = 67
 
-[function_lines."src/agent_coordination/cmd_land.py"]
+[function_lines."src/aco/cmd_land.py"]
 "_land_preflight" = 72
 "run" = 78
 
-[function_lines."src/agent_coordination/cmd_release.py"]
+[function_lines."src/aco/cmd_release.py"]
 "_cmd_release_landed" = 98
 "release_transition" = 74
 
-[function_lines."src/agent_coordination/cmd_rescope.py"]
+[function_lines."src/aco/cmd_rescope.py"]
 "_rescope_write" = 69
 
-[function_lines."src/agent_coordination/github.py"]
+[function_lines."src/aco/github.py"]
 "GitHubForge._landing" = 60
 
-[function_lines."src/agent_coordination/store.py"]
+[function_lines."src/aco/store.py"]
 "claim_lifecycle" = 62
 "commit_transition" = 63
+
+[function_lines."src/aco/workboard.py"]
+"_board_item" = 103
+"build_board" = 117
 
 [function_lines."tests/github_fixtures.py"]
 "landed_observations" = 61
@@ -143,7 +143,7 @@
 "world" = 104
 
 [function_lines."tests/test_release_cleanup.py"]
-"verify_cleanup" = 88
+"verify_cleanup" = 85
 
 [function_lines."tests/test_reset.py"]
 "test_reset_bundle_restores_the_released_history" = 64

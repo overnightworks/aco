@@ -14,7 +14,8 @@ from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue, containe
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
-from agent_coordination import board, body, forge
+from aco import body, forge, workboard
+from aco.workboard import IssueReference, ParentIssue
 
 
 class ForgeEvent(Enum):
@@ -75,7 +76,7 @@ class CutObservation:
 
 @dataclass(frozen=True)
 class CutCase:
-    issues: tuple[board.Issue, ...]
+    issues: tuple[workboard.Issue, ...]
     arguments: tuple[str, ...]
     exit: int | str | None
     stdout: str
@@ -87,8 +88,8 @@ class CutCase:
     envelope: Mapping[str, object]
     linked_children: tuple[tuple[int, int], ...] = ()
     closed_issue_cutoffs: tuple[datetime, ...] = ()
-    parents: Mapping[int, board.ParentIssue] = field(default_factory=dict)
-    children: Mapping[int, tuple[board.ChildItem, ...]] = field(default_factory=dict)
+    parents: Mapping[int, ParentIssue] = field(default_factory=dict)
+    children: Mapping[int, tuple[workboard.ChildItem, ...]] = field(default_factory=dict)
     references: Mapping[int, forge.ItemReference] = field(default_factory=dict)
     recently_closed: tuple[forge.ClosedIssue, ...] = ()
     capabilities: Mapping[forge.ForgeOperation, forge.Capability] = field(default_factory=dict)
@@ -196,12 +197,12 @@ TWIN_SEARCH_START = FROZEN_CLI_NOW - timedelta(days=30)
 def refused(
     message: str,
     reason: str,
-    issues: tuple[board.Issue, ...],
+    issues: tuple[workboard.Issue, ...],
     arguments: tuple[str, ...],
     *,
     forge_read: bool = True,
     searched: bool = False,
-    parents: dict[int, board.ParentIssue] | None = None,
+    parents: dict[int, ParentIssue] | None = None,
     capabilities: dict[forge.ForgeOperation, forge.Capability] | None = None,
 ) -> CutCase:
     return CutCase(
@@ -252,7 +253,7 @@ def adopted(
     child: int,
     *,
     linked: bool,
-    issues: tuple[board.Issue, ...] = (),
+    issues: tuple[workboard.Issue, ...] = (),
     arguments: tuple[str, ...] = ("--title", "Slice A"),
 ) -> CutCase:
     return replace(
@@ -281,7 +282,7 @@ def child_issue(
     parent: int = 79,
     kind: body.ItemKind | None = body.ItemKind.TASK,
     labels: tuple[str, ...] = (),
-) -> board.Issue:
+) -> workboard.Issue:
     return board_issue(
         number,
         title,
@@ -292,21 +293,19 @@ def child_issue(
 
 
 def with_linked_child(
-    case: CutCase, number: int, state: board.ChildState, title: str = "Slice A"
+    case: CutCase, number: int, state: workboard.ChildState, title: str = "Slice A"
 ) -> CutCase:
-    open_child = (child_issue(number, title),) if state is board.ChildState.OPEN else ()
+    open_child = (child_issue(number, title),) if state is workboard.ChildState.OPEN else ()
     return replace(
         case,
         issues=(*case.issues, *open_child),
-        children={79: (board.ChildItem(number, state),)},
+        children={79: (workboard.ChildItem(number, state),)},
         references={
             number: forge.ItemReference(
                 forge.ItemState(state.value), title, CHILD_BODY.format("D", ""), False
             )
         },
-        parents={
-            number: board.ParentIssue(board.IssueReference("example/agent-coordination", 79), "")
-        },
+        parents={number: ParentIssue(IssueReference("example/agent-coordination", 79), "")},
     )
 
 
@@ -425,8 +424,8 @@ def no_twin(
                 ),
                 ("--title", "Slice A"),
                 parents={
-                    79: board.ParentIssue(
-                        board.IssueReference("example/agent-coordination", 1),
+                    79: ParentIssue(
+                        IssueReference("example/agent-coordination", 1),
                         "",
                         body.ItemKind.CONTAINER,
                     )
@@ -829,7 +828,7 @@ def test_cut_fills_inherits_or_refuses_the_scope(case: CutCase, cut_check: CutCh
     [
         *rendered(
             "linked-open-child",
-            with_linked_child(adopted(950, linked=False), 950, board.ChildState.OPEN),
+            with_linked_child(adopted(950, linked=False), 950, workboard.ChildState.OPEN),
         ),
         *rendered(
             "orphan-of-an-interrupted-cut",
@@ -857,7 +856,7 @@ def test_cut_fills_inherits_or_refuses_the_scope(case: CutCase, cut_check: CutCh
                     ROW_REMOVED,
                 ),
                 950,
-                board.ChildState.OPEN,
+                workboard.ChildState.OPEN,
                 "Slice B",
             ),
         ),
@@ -872,7 +871,7 @@ def test_cut_fills_inherits_or_refuses_the_scope(case: CutCase, cut_check: CutCh
                     ("--title", "Slice A"),
                 ),
                 950,
-                board.ChildState.CLOSED,
+                workboard.ChildState.CLOSED,
             ),
         ),
         *rendered(
@@ -886,7 +885,7 @@ def test_cut_fills_inherits_or_refuses_the_scope(case: CutCase, cut_check: CutCh
                     ("--title", "Slice A"),
                 ),
                 950,
-                board.ChildState.OPEN,
+                workboard.ChildState.OPEN,
             ),
         ),
     ],
@@ -898,7 +897,7 @@ def test_cut_adopts_the_open_child_instead_of_creating_one(
     cut_check(case)
 
 
-def created_beside(issue: board.Issue) -> CutCase:
+def created_beside(issue: workboard.Issue) -> CutCase:
     case = cut(
         ONE_ROW,
         ("--title", "Slice A", "--not-a-twin"),

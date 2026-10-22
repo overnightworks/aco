@@ -31,7 +31,7 @@ from store_fixtures import (
     twin_claim_key,
 )
 
-from agent_coordination import board, cmd_status, github, protocol, store
+from aco import cmd_status, github, protocol, store, workboard
 
 STATE_REF_PIN = 'storage = "state-ref"\n'
 Flags = list[str]
@@ -650,7 +650,7 @@ def check_status(
             assert (
                 real_git(clone, "config", "--get", "remote.origin.url").stdout == f"{bare_remote}\n"
             )
-        assert real_git(clone, "show", f"HEAD:{board.CONFIG_PATH}").stdout == (
+        assert real_git(clone, "show", f"HEAD:{workboard.CONFIG_PATH}").stdout == (
             world.board_configuration
         )
         base = head_sha(clone)

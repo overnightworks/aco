@@ -109,9 +109,8 @@ from store_fixtures import (
     unrelated_racer_commit,
 )
 
-from agent_coordination import (
+from aco import (
     __version__,
-    board,
     board_read,
     body,
     checkout,
@@ -132,15 +131,27 @@ from agent_coordination import (
     session,
     state_board,
     store,
+    workboard,
 )
-from agent_coordination import cli as issue_claim
-from agent_coordination.cmd_status import _status
-from agent_coordination.protocol import (
+from aco import cli as issue_claim
+from aco.cmd_status import _status
+from aco.protocol import (
     ClaimError,
     ClaimRequest,
     ClaimUnavailableError,
 )
-from agent_coordination.session import RunContext
+from aco.session import RunContext
+from aco.workboard import (
+    NEEDS_OPERATOR_LABEL,
+    BlockerState,
+    ChildItem,
+    ChildState,
+    Issue,
+    IssueDependency,
+    NoItemClassification,
+    NoItemKind,
+    TrunkWorkItemClassification,
+)
 
 GitHubForge = github.GitHubForge
 
@@ -164,7 +175,7 @@ TWELVE_VERSIONED_FILES = (
     "LICENSE",
     "README.md",
     "pyproject.toml",
-    "src/agent_coordination/__init__.py",
+    "src/aco/__init__.py",
     "src/a.py",
     "docs/b.md",
     "docs/c.md",
@@ -192,8 +203,8 @@ class _MinimalForgeReader:
     shared shape rather than three near-identical inline classes, each
     repeating the same `forge.ForgeReader` stub methods."""
 
-    open_issues: tuple[board.Issue, ...] = ()
-    children_by_number: dict[int, tuple[board.ChildItem, ...]] = field(default_factory=dict)
+    open_issues: tuple[Issue, ...] = ()
+    children_by_number: dict[int, tuple[ChildItem, ...]] = field(default_factory=dict)
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
     observed_children_lookups: list[int] = field(default_factory=list)
@@ -214,7 +225,7 @@ class _MinimalForgeReader:
     def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
         raise NotImplementedError
 
-    def parent_issue(self, number: int) -> board.ParentIssue | None:
+    def parent_issue(self, number: int) -> workboard.ParentIssue | None:
         return None
 
     def parent_number(self, number: int) -> int | None:
@@ -223,25 +234,25 @@ class _MinimalForgeReader:
     def default_branch(self) -> str:
         return "main"
 
-    def list_board_dependencies(self, number: int) -> tuple[board.IssueDependency, ...]:
+    def list_board_dependencies(self, number: int) -> tuple[IssueDependency, ...]:
         return ()
 
-    def list_open_board_issues(self) -> tuple[board.Issue, ...]:
+    def list_open_board_issues(self) -> tuple[Issue, ...]:
         return self.open_issues
 
-    def list_open_board_pull_requests(self) -> tuple[board.PullRequest, ...]:
+    def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
         return ()
 
     def list_recent_merged_board_pull_requests(
         self, since: datetime
-    ) -> tuple[board.PullRequest, ...]:
+    ) -> tuple[workboard.PullRequest, ...]:
         self.observed_merged_pull_request_floors.append(since)
         return ()
 
     def list_recently_closed_issues(self, since: datetime) -> tuple[forge.ClosedIssue, ...]:
         return ()
 
-    def list_children(self, number: int) -> tuple[board.ChildItem, ...]:
+    def list_children(self, number: int) -> tuple[ChildItem, ...]:
         self.observed_children_lookups.append(number)
         return self.children_by_number.get(number, ())
 
@@ -520,7 +531,7 @@ def test_board_shows_measured_estimates(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Proof 3 (issue #357), pinned through the CLI rather than only through
-    `board.build_board` directly: one `FakeForge` board build shows every
+    `workboard.build_board` directly: one `FakeForge` board build shows every
     estimate state -- a class with `n >= 3` measured lanes (two of them
     completed by items that have since closed, R2's own closed-item join),
     one with `n < 3` ("schwach"), and an item with no `size` at all ("keine
@@ -643,7 +654,7 @@ def test_board_marks_an_item_landed_by_a_trailer_carrying_trunk_commit_without_a
             checkout.TrunkLanding(
                 "trailersha",
                 datetime(2026, 8, 29, tzinfo=UTC),
-                board.TrunkWorkItemClassification((10,)),
+                TrunkWorkItemClassification((10,)),
                 ("#10",),
             ),
         ),
@@ -670,14 +681,14 @@ def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_req
         board_issue(11, "Squash landed", complete_contract("Ship #11.")),
     )
     client.board_merged_pull_requests = (
-        board.PullRequest(
+        workboard.PullRequest(
             number=89,
             title="New-style trailer landing",
             body="Work-Item: #10\n\nCloses #10",
             head_ref_name="codex/issue-10-fix",
             merged_at="2026-08-29T00:00:00Z",
         ),
-        board.PullRequest(
+        workboard.PullRequest(
             number=90,
             title="Old-style squash",
             body="Closes #11",
@@ -688,7 +699,7 @@ def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_req
     trailer_landing = checkout.TrunkLanding(
         "a" * 40,
         datetime(2026, 8, 29, tzinfo=UTC),
-        board.TrunkWorkItemClassification((10,)),
+        TrunkWorkItemClassification((10,)),
         ("#10",),
     )
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: (trailer_landing,))
@@ -772,11 +783,11 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
     )
     client = FakeForge()
     client.board_issues = issues
-    client.children[30] = (board.ChildItem(31, board.ChildState.OPEN),)
+    client.children[30] = (ChildItem(31, ChildState.OPEN),)
     observed_children_calls: list[int] = []
     original_list_children = client.list_children
 
-    def spy_list_children(number: int) -> tuple[board.ChildItem, ...]:
+    def spy_list_children(number: int) -> tuple[ChildItem, ...]:
         observed_children_calls.append(number)
         return original_list_children(number)
 
@@ -815,7 +826,7 @@ def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
     observed_dependency_calls: list[int] = []
     original_list_board_dependencies = client.list_board_dependencies
 
-    def spy_list_board_dependencies(number: int) -> tuple[board.IssueDependency, ...]:
+    def spy_list_board_dependencies(number: int) -> tuple[IssueDependency, ...]:
         observed_dependency_calls.append(number)
         return original_list_board_dependencies(number)
 
@@ -877,9 +888,9 @@ def _configured_board_client(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     *,
-    open_issues: tuple[board.Issue, ...] = (),
-    open_pull_requests: tuple[board.PullRequest, ...] = (),
-    dependencies: Mapping[int, tuple[board.IssueDependency, ...]] = MappingProxyType({}),
+    open_issues: tuple[Issue, ...] = (),
+    open_pull_requests: tuple[workboard.PullRequest, ...] = (),
+    dependencies: Mapping[int, tuple[IssueDependency, ...]] = MappingProxyType({}),
     standing: tuple[ClaimRequest, ...] = (),
 ) -> FakeForge:
     """A `FakeForge` client wired the way every board-reading claim test needs."""
@@ -947,16 +958,14 @@ _WAITING_AND_PULLABLE = (
         230,
         "Operator ruling",
         complete_contract("wait for session with the operator"),
-        labels=("security", board.NEEDS_OPERATOR_LABEL),
+        labels=("security", NEEDS_OPERATOR_LABEL),
     ),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
 
-def _childless_container(
-    number: int, body_text: str, *, labels: tuple[str, ...] = ()
-) -> board.Issue:
-    return board.Issue(
+def _childless_container(number: int, body_text: str, *, labels: tuple[str, ...] = ()) -> Issue:
+    return Issue(
         number,
         f"Epic {number}",
         labels,
@@ -976,10 +985,10 @@ _OPERATOR_HELD_CONTAINERS = (
     _childless_container(
         441,
         complete_contract("Cut it.", slice=slice_entries("Scheibe A")),
-        labels=(board.NEEDS_OPERATOR_LABEL,),
+        labels=(NEEDS_OPERATOR_LABEL,),
     ),
     _childless_container(442, complete_contract("Check it.", frozen_until=FROZEN_UNTIL)),
-    _childless_container(443, complete_contract("keiner"), labels=(board.NEEDS_OPERATOR_LABEL,)),
+    _childless_container(443, complete_contract("keiner"), labels=(NEEDS_OPERATOR_LABEL,)),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
@@ -993,7 +1002,7 @@ _SCOPE_UNKNOWN_NOTE_LINE = "scope unknown\n"
 _PARALLEL_UNKNOWN_TAIL = "parallel: unknown (first action names no scope)\nclose: none\n"
 _UNKNOWN_SCOPE_NEXT_TAIL = _SCOPE_UNKNOWN_NOTE_LINE + _PARALLEL_UNKNOWN_TAIL
 # The same tail once there is no first action to found a parallel set on at
-# all (`board.parallel_set` returns an empty, *not* first-scope-unknown, set).
+# all (`workboard.parallel_set` returns an empty, *not* first-scope-unknown, set).
 _NO_ACTION_NEXT_TAIL = "parallel: none\nscope unknown: none\nclose: none\n"
 _UNKNOWN_SCOPE_PARALLEL_JSON: dict[str, object] = {
     "first_scope_unknown": True,
@@ -1277,8 +1286,8 @@ def test_next_reports_the_highest_scored_actionable_item(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    issues: tuple[board.Issue, ...],
-    dependencies: dict[int, tuple[board.IssueDependency, ...]],
+    issues: tuple[Issue, ...],
+    dependencies: dict[int, tuple[IssueDependency, ...]],
     claims: tuple[ClaimRequest, ...],
     arguments: tuple[str, ...],
     expected_exit: int,
@@ -1385,7 +1394,7 @@ def test_next_reports_expectation_state(
     assert capsys.readouterr().out == expected_output
 
     projected = projected_board(
-        (issue,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (issue,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
     assert projected.items[0].expectation_state is expected_state
 
@@ -1472,7 +1481,7 @@ def _start_scenario(
     return repo
 
 
-def _start_item(body_text: str | None = None, *, kind: body.ItemKind | None = None) -> board.Issue:
+def _start_item(body_text: str | None = None, *, kind: body.ItemKind | None = None) -> Issue:
     """Item #314 as `start`'s scenarios know it: a scoped, complete body
     unless the scenario names another."""
     if body_text is None:
@@ -1480,7 +1489,7 @@ def _start_item(body_text: str | None = None, *, kind: body.ItemKind | None = No
     return board_issue(314, "Fresh Slug Title", body_text, kind=kind)
 
 
-def _serve_start_board(monkeypatch: pytest.MonkeyPatch, *issues: board.Issue) -> FakeForge:
+def _serve_start_board(monkeypatch: pytest.MonkeyPatch, *issues: Issue) -> FakeForge:
     """A fake forge listing `issues` as the open board, the first of them the
     open item `start` targets."""
     target = issues[0]
@@ -1610,9 +1619,9 @@ def test_start_from_a_linked_worktree_checks_against_the_main_checkouts_board_co
     repo = _start_scenario(monkeypatch, tmp_path)
     monkeypatch.chdir(repo)
     lane = stand_in_a_lane(monkeypatch, repo, tmp_path)
-    (lane / board.CONFIG_PATH).parent.mkdir()
-    (lane / board.CONFIG_PATH).write_text('priority_labels = ["cleanup"]\n')
-    real_git(lane, "add", str(board.CONFIG_PATH))
+    (lane / workboard.CONFIG_PATH).parent.mkdir()
+    (lane / workboard.CONFIG_PATH).write_text('priority_labels = ["cleanup"]\n')
+    real_git(lane, "add", str(workboard.CONFIG_PATH))
     real_git(lane, "commit", "-q", "-m", "lane changes its board config")
     security = board_issue(
         500,
@@ -2687,7 +2696,7 @@ def _real_state_ref_repository(
     write_repository_config(
         repo, f'storage = "state-ref"\ncanonical_remote = "{canonical_remote}"\n'
     )
-    real_git(repo, "add", board.CONFIG_PATH.as_posix())
+    real_git(repo, "add", workboard.CONFIG_PATH.as_posix())
     real_git(repo, "commit", "-q", "-m", "pin state-ref storage")
     push_repository_trunk(repo, canonical_remote)
     if canonical_remote != "origin":
@@ -2919,10 +2928,10 @@ def _lane_on_a_state_ref_board_with_registries(
     for registry in ("scripts/registry.txt", "src/x.py"):
         (repo / registry).parent.mkdir(exist_ok=True)
         (repo / registry).write_text("")
-    configuration = repo / board.CONFIG_PATH
+    configuration = repo / workboard.CONFIG_PATH
     pinned = configuration.read_text()
     configuration.write_text(f'{pinned}lane_shared = ["scripts/registry.txt", "src/x.py"]\n')
-    real_git(repo, "add", "scripts", "src", board.CONFIG_PATH.as_posix())
+    real_git(repo, "add", "scripts", "src", workboard.CONFIG_PATH.as_posix())
     real_git(repo, "commit", "-q", "-m", "registries")
     push_repository_trunk(repo, "origin")
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
@@ -3700,7 +3709,7 @@ def test_claim_refuses_an_open_dependency_before_mutation(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    dependencies: tuple[board.IssueDependency, ...],
+    dependencies: tuple[IssueDependency, ...],
     expected_blockers: str,
 ) -> None:
     issue, blocked_by = blocked_issue(10, "Work", *dependencies, labels=("security",))
@@ -3740,7 +3749,7 @@ def test_claim_ignores_a_closed_dependency(
     tmp_path: Path,
 ) -> None:
     closed = block_dependency(
-        9, state=board.BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
+        9, state=BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
     )
     issue, blocked_by = blocked_issue(10, "Work", closed, labels=("security",))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,), dependencies=blocked_by)
@@ -4275,7 +4284,7 @@ def test_claim_refuses_for_a_higher_priority_item_even_at_a_lower_score(
     )
     in_flight_unlabelled = board_issue(51, "In-flight, unlabelled", complete_contract("Ship it."))
     client.board_dependencies = dict(dependent_blockers)
-    open_pull_request = board.PullRequest(200, "Fixes #51", "", "branch")
+    open_pull_request = workboard.PullRequest(200, "Fixes #51", "", "branch")
     claimed_request = request("lower-priority", issue=51, scope=("src/lower.py",))
     monkeypatch.setattr(
         client, "list_open_board_issues", lambda: (blocker, dependent, in_flight_unlabelled)
@@ -4468,7 +4477,7 @@ def test_claim_refuses_a_container(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    container = board.Issue(
+    container = Issue(
         72,
         "Container work",
         (),
@@ -4602,7 +4611,7 @@ def _cuttable_slice_entries(*titles: str) -> list[dict[str, object]]:
     return [{**entry, "done_when": "D"} for entry in slice_entries(*titles)]
 
 
-def _one_slice_container() -> board.Issue:
+def _one_slice_container() -> Issue:
     return container_issue(CUT_CONTAINER, _cuttable_row_toml("Scheibe 1"))
 
 
@@ -4657,7 +4666,7 @@ def test_cut_never_adopts_an_orphan_that_is_not_this_containers_recovery_shape(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    orphan: board.Issue,
+    orphan: Issue,
     idea_label: str | None,
 ) -> None:
     """A title match alone is too weak to adopt an orphan (#260): a
@@ -4938,7 +4947,7 @@ def test_claim_does_not_corridor_on_a_slice_list(
         ),
         pytest.param(
             "Schema traegt den Titel (#79 Scheibe 21)",
-            {1017: board.ParentIssue(board.IssueReference(REPOSITORY, 79), "## Now\nCut.")},
+            {1017: workboard.ParentIssue(workboard.IssueReference(REPOSITORY, 79), "## Now\nCut.")},
             False,
             id="with_sub_issue_relation",
         ),
@@ -4950,7 +4959,7 @@ def test_claim_checks_a_slice_shaped_title_for_its_recorded_parent(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     title: str,
-    parents: dict[int, board.ParentIssue],
+    parents: dict[int, workboard.ParentIssue],
     expect_warning: bool,
 ) -> None:
     target = board_issue(1017, title, complete_contract("Claim #1017."))
@@ -5029,7 +5038,7 @@ def test_next_skips_a_frozen_item_and_names_it_as_such(
                 301,
                 "Highest scored",
                 complete_contract("wait for session with the operator"),
-                labels=("security", board.NEEDS_OPERATOR_LABEL),
+                labels=("security", NEEDS_OPERATOR_LABEL),
             ),
             id="waiting_on_the_operator",
         ),
@@ -5039,7 +5048,7 @@ def test_claim_does_not_warn_about_a_higher_scored_item_no_agent_can_pull(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    higher: board.Issue,
+    higher: Issue,
 ) -> None:
     client = FakeForge()
     lower = board_issue(10, "Lower work", complete_contract("Claim #10."))
@@ -5076,7 +5085,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
 ) -> None:
     toplevel = tmp_path / "checkout"
     write_repository_config(toplevel, 'priority_labels = ["ux", "security"]\n')
-    nested_directory = toplevel / "src" / "agent_coordination"
+    nested_directory = toplevel / "src" / "aco"
     nested_directory.mkdir(parents=True)
     monkeypatch.chdir(nested_directory)
     toplevel_read = ("rev-parse", "--show-toplevel")
@@ -5090,7 +5099,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
 
     client = _MinimalForgeReader(
         open_issues=(
-            board.Issue(
+            Issue(
                 20,
                 "Security issue",
                 ("security",),
@@ -5098,9 +5107,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
                 "2026-08-20T00:00:00Z",
                 "2026-08-20T00:00:00Z",
             ),
-            board.Issue(
-                21, "UX issue", ("ux",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
-            ),
+            Issue(21, "UX issue", ("ux",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"),
         )
     )
     monkeypatch.setattr(checkout, "git_output", git_output)
@@ -5116,7 +5123,7 @@ def test_next_names_a_cuttable_container_slice(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Exact `cut_slice #N: …` text, per #112's own body example."""
-    container = board.Issue(
+    container = Issue(
         180,
         "Epic",
         (),
@@ -5209,7 +5216,7 @@ def test_next_prints_a_cut_command_that_cut_accepts(
 ) -> None:
     """#151's own invariant, completed by #177: whatever `cut` command
     `next` prints for a childless container is one `cut` itself accepts."""
-    container = board.Issue(
+    container = Issue(
         case.container_number,
         "Epic",
         (),
@@ -5252,11 +5259,11 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
     `Next` line and first uncut row unnoticed, since only one container's
     printed command is ever checked per poll. This walks every container a
     real, multi-container board carries, deriving each one's own printed
-    `cut` command through the public `board.next_action` path -- each container
-    alone on its own board, so it is necessarily the one `board.next_action`
+    `cut` command through the public `workboard.next_action` path -- each container
+    alone on its own board, so it is necessarily the one `workboard.next_action`
     names -- and proves every one of them is a command `cut` itself accepts
     on a fresh fake, not only the board's own top-ranked pick."""
-    top_ranked = board.Issue(
+    top_ranked = Issue(
         130,
         "Epic ranked first",
         (),
@@ -5267,7 +5274,7 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
         children_closed=1,
         children_total=1,
     )
-    lower_ranked = board.Issue(
+    lower_ranked = Issue(
         145,
         "Epic ranked second",
         (),
@@ -5282,10 +5289,10 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
     containers_by_number = {issue.number: issue for issue in containers}
 
     projected = projected_board(
-        containers, (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        containers, (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
-    top_action = board.next_action(projected)
-    assert isinstance(top_action, board.CutSliceAction)
+    top_action = workboard.next_action(projected)
+    assert isinstance(top_action, workboard.CutSliceAction)
     assert top_action.container.number == 130
 
     for item in projected.items:
@@ -5296,11 +5303,11 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
             (),
             (),
             (),
-            board.BoardConfig(),
+            workboard.BoardConfig(),
             now=datetime(2026, 8, 21, tzinfo=UTC),
         )
-        action = board.next_action(isolated)
-        assert isinstance(action, board.CutSliceAction)
+        action = workboard.next_action(isolated)
+        assert isinstance(action, workboard.CutSliceAction)
 
         command_line = cmd_next._next_action_lines(
             action,
@@ -5380,7 +5387,7 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
     whatever its parent's type, state, or repository, so `next` never prints
     that `cut` -- it names the container's repair under `SKIPPED` instead,
     and `cut` keeps its refusal: the advice and the command agree."""
-    parent = board.Issue(
+    parent = Issue(
         298,
         "Epic",
         (),
@@ -5391,7 +5398,7 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
         children_closed=0 if parent_kind is body.ItemKind.CONTAINER else None,
         children_total=1 if parent_kind is body.ItemKind.CONTAINER else None,
     )
-    nested = board.Issue(
+    nested = Issue(
         299,
         "Nested epic",
         (),
@@ -5405,11 +5412,11 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
     board_parent = (parent,) if parent_open and parent_repository == REPOSITORY else ()
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(*board_parent, nested))
     client.children = {
-        298: (board.ChildItem(299, board.ChildState.OPEN),),
-        299: (board.ChildItem(300, board.ChildState.CLOSED),),
+        298: (ChildItem(299, ChildState.OPEN),),
+        299: (ChildItem(300, ChildState.CLOSED),),
     }
-    client.parents[299] = board.ParentIssue(
-        board.IssueReference(parent_repository, 298), parent.body, parent_kind
+    client.parents[299] = workboard.ParentIssue(
+        workboard.IssueReference(parent_repository, 298), parent.body, parent_kind
     )
     cut_arguments = ["--repo", REPOSITORY, "cut", "299", "--title", slice_titles[0]]
 
@@ -5456,7 +5463,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
         if top_level_scope is None
         else complete_contract("keiner", slice=row, scope=list(top_level_scope))
     )
-    nested = board.Issue(
+    nested = Issue(
         299,
         "Nested epic",
         (),
@@ -5468,9 +5475,9 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
         children_total=1,
     )
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(nested,))
-    client.children = {299: (board.ChildItem(300, board.ChildState.CLOSED),)}
-    client.parents[299] = board.ParentIssue(
-        board.IssueReference(REPOSITORY, 298), "", body.ItemKind.CONTAINER
+    client.children = {299: (ChildItem(300, ChildState.CLOSED),)}
+    client.parents[299] = workboard.ParentIssue(
+        workboard.IssueReference(REPOSITORY, 298), "", body.ItemKind.CONTAINER
     )
 
     next_exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
@@ -6101,8 +6108,8 @@ def _brief_step_under_brief_config(
     holding `content`."""
     item, _stored = _foreign_body_item(monkeypatch, tmp_path)
     repo = Path.cwd()
-    write_repository_config(repo, content, path=board.BRIEF_CONFIG_PATH)
-    real_git(repo, "add", board.BRIEF_CONFIG_PATH.as_posix())
+    write_repository_config(repo, content, path=workboard.BRIEF_CONFIG_PATH)
+    real_git(repo, "add", workboard.BRIEF_CONFIG_PATH.as_posix())
     monkeypatch.setattr(checkout, "path_is_tracked", _REAL_PATH_IS_TRACKED)
     return ["brief", item, "--step", "build"]
 
@@ -6204,7 +6211,7 @@ def test_brief_config_unknown_key_json_refusal_carries_the_escaped_key(
     unknown-key refusal is the `unavailable` envelope, its message and
     stderr naming the key as `next` escapes it (BRIEF-24, BRIEF-17)."""
     arguments = arrange(monkeypatch, tmp_path)
-    config = Path.cwd() / board.BRIEF_CONFIG_PATH
+    config = Path.cwd() / workboard.BRIEF_CONFIG_PATH
     key = "Hallo\\x1b[2J Welt\tÜber\\u202eRLO\\n\\u2060WJ Größe"
     sentence = f"brief configuration {config}{refusal_after_path}{key}"
 
@@ -6305,7 +6312,7 @@ def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_doe
         {
             10: _state_ref_item_body(
                 "Operator ruling",
-                labels=("security", board.NEEDS_OPERATOR_LABEL),
+                labels=("security", NEEDS_OPERATOR_LABEL),
                 scope=["docs/ruling.md"],
             ),
             11: _state_ref_item_body("Pullable work", scope=["docs/work.md"]),
@@ -6382,7 +6389,7 @@ def _next_json_item_references(
 def test_next_json_names_a_cuttable_container_slice(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = board.Issue(
+    container = Issue(
         181,
         "Epic",
         (),
@@ -6410,7 +6417,7 @@ def test_next_json_names_a_cuttable_container_slice(
 def test_next_names_a_closeable_container(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = board.Issue(
+    container = Issue(
         182,
         "Epic",
         (),
@@ -6435,7 +6442,7 @@ def test_next_names_a_closeable_container(
 def test_next_json_names_a_closeable_container(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = board.Issue(
+    container = Issue(
         183,
         "Epic",
         (),
@@ -6470,7 +6477,7 @@ def test_next_names_a_container_with_no_slice_row_by_its_own_next_line(
     nor list it under `close:` while that sentence names work (issue #503,
     the #418 shape after a slice landed): it names the container for a
     `done_when` check and its own sentence, and no command."""
-    container = board.Issue(
+    container = Issue(
         187,
         "Epic",
         (),
@@ -6500,7 +6507,7 @@ def test_next_json_names_a_container_with_no_slice_row_by_its_own_next_line(
     `check_container`, never `close_container` while the `Next` line names
     work; `next_step` carries that sentence, `close` stays empty, and no
     `command` or `cut_title` is invented from it."""
-    container = board.Issue(
+    container = Issue(
         188,
         "Epic",
         (),
@@ -6565,12 +6572,12 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """issue #348, Beweis 2: a cut proposal's own uncut-row scope is what
-    `board.parallel_set` occupies and checks disjointness against -- exactly like
+    `workboard.parallel_set` occupies and checks disjointness against -- exactly like
     a work item's top-level scope, never a second rule. `#82`'s row repeats
     `#80`'s own path and is dropped silently, the same way an overlapping
     work item would be; the scopeless-row collapse into `parallel: unknown`
     is `test_next_names_a_cuttable_container_slice`'s own proof."""
-    epic1 = board.Issue(
+    epic1 = Issue(
         80,
         "Epic1",
         (),
@@ -6583,7 +6590,7 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
         children_closed=0,
         children_total=0,
     )
-    epic2 = board.Issue(
+    epic2 = Issue(
         81,
         "Epic2",
         (),
@@ -6596,7 +6603,7 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
         children_closed=0,
         children_total=0,
     )
-    epic3 = board.Issue(
+    epic3 = Issue(
         82,
         "Epic3",
         (),
@@ -6649,7 +6656,7 @@ def test_next_lists_a_labelled_idea_with_a_merged_pull_request_only_under_ideas(
         client,
         "list_recent_merged_board_pull_requests",
         lambda _since: (
-            board.PullRequest(
+            workboard.PullRequest(
                 150, "Lands it", "Work-Item: #90\n\nCloses #90", "branch", "2026-08-20T00:00:00Z"
             ),
         ),
@@ -6680,7 +6687,7 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
         complete_contract("Ship it.", scope=["a"]),
         labels=("security",),
     )
-    closable_container = board.Issue(
+    closable_container = Issue(
         71,
         "Closable epic",
         (),
@@ -6695,7 +6702,7 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
         72,
         "Landed but open",
         complete_contract("Close it."),
-        labels=(board.NEEDS_OPERATOR_LABEL,),
+        labels=(NEEDS_OPERATOR_LABEL,),
     )
     client = _configured_board_client(
         monkeypatch, tmp_path, open_issues=(top_ranked, closable_container, landed_but_open)
@@ -6704,7 +6711,7 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
         client,
         "list_recent_merged_board_pull_requests",
         lambda _since: (
-            board.PullRequest(
+            workboard.PullRequest(
                 150, "Lands it", "Work-Item: #72\n\nCloses #72", "branch", "2026-08-20T00:00:00Z"
             ),
         ),
@@ -6714,8 +6721,8 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
 
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert out.startswith(f"RECOVERY\n#72: {board.RECOVERY_STEP}\n\n")
-    assert out.splitlines()[0:2] == ["RECOVERY", f"#72: {board.RECOVERY_STEP}"]
+    assert out.startswith(f"RECOVERY\n#72: {workboard.RECOVERY_STEP}\n\n")
+    assert out.splitlines()[0:2] == ["RECOVERY", f"#72: {workboard.RECOVERY_STEP}"]
     assert "#70 score" in out
     assert out.endswith("close: #71, #72\n")
 
@@ -6735,8 +6742,8 @@ _RECOVERY_SHARED_SCOPE = "b"
 def test_next_parallel_set_never_lets_a_recovery_item_occupy_or_candidate(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """issue #348 review (G1): a landed-but-open item is `board.zero_cost_closes`'
-    own domain, never `board.parallel_set`'s. `landed_but_open` (#71) and
+    """issue #348 review (G1): a landed-but-open item is `workboard.zero_cost_closes`'
+    own domain, never `workboard.parallel_set`'s. `landed_but_open` (#71) and
     `free_item` (#72) name the same scope, and board order visits #71
     first -- pre-fix, the walk occupied that scope for #71 and silently
     dropped #72 as "overlapping", even though #71 was never real work in
@@ -6758,7 +6765,7 @@ def test_next_parallel_set_never_lets_a_recovery_item_occupy_or_candidate(
         client,
         "list_recent_merged_board_pull_requests",
         lambda _since: (
-            board.PullRequest(
+            workboard.PullRequest(
                 150, "Lands it", "Work-Item: #71\n\nCloses #71", "branch", "2026-08-20T00:00:00Z"
             ),
         ),
@@ -6808,7 +6815,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    container = board.Issue(
+    container = Issue(
         90,
         "Container",
         (),
@@ -6822,7 +6829,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     plain = board_issue(91, "Plain", complete_contract("Ship it."))
     client = _MinimalForgeReader(
         open_issues=(container, plain),
-        children_by_number={90: (board.ChildItem(92, board.ChildState.OPEN),)},
+        children_by_number={90: (ChildItem(92, ChildState.OPEN),)},
     )
     _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
@@ -6832,7 +6839,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     assert client.observed_children_lookups == [90]
     container_item = next(item for item in projected.items if item.number == 90)
     assert container_item.container is not None
-    assert container_item.container.open_children == (board.ChildItem(92, board.ChildState.OPEN),)
+    assert container_item.container.open_children == (ChildItem(92, ChildState.OPEN),)
 
 
 def test_body_contract_checks_names_a_blockless_container_by_its_no_block_defect() -> None:
@@ -6848,12 +6855,12 @@ def test_body_contract_checks_names_a_blockless_container_by_its_no_block_defect
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
     item = next(item for item in projected.items if item.number == 201)
 
-    checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
+    checks = cmd_claim._body_checks(item, body.Storage.GITHUB)
 
     assert checks == (
         cmd_claim._SliceCheck("error", "body-contract", "body malformed: aco: no aco block"),
@@ -6868,12 +6875,12 @@ def test_body_contract_checks_names_a_malformed_body_by_its_first_defect() -> No
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
     item = next(item for item in projected.items if item.number == 202)
 
-    checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
+    checks = cmd_claim._body_checks(item, body.Storage.GITHUB)
 
     assert checks == (
         cmd_claim._SliceCheck(
@@ -6891,7 +6898,7 @@ def test_board_shows_freed_from_a_sole_closed_local_dependency_and_claim_reaches
     through the fake, not just a non-blocked projection."""
     closed_dependency = (
         block_dependency(
-            151, state=board.BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
+            151, state=BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
         ),
     )
     projected = projected_board(
@@ -6899,7 +6906,7 @@ def test_board_shows_freed_from_a_sole_closed_local_dependency_and_claim_reaches
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         dependencies={301: closed_dependency},
     )
@@ -6947,7 +6954,7 @@ def test_blocked_check_reports_a_foreign_dependency_and_the_out_of_order_warning
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         dependencies=dependencies,
     )
@@ -6968,7 +6975,7 @@ def test_blocked_check_reports_a_foreign_dependency_and_the_out_of_order_warning
 
 def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> None:
     """Issue #300 (Codex Terra review): a same-repository blocker prints
-    `board.item_label`'s own `aco-...` id under `storage = STATE_REF`, the
+    `workboard.item_label`'s own `aco-...` id under `storage = STATE_REF`, the
     same as everywhere else that pin already changes narrative output --
     never the bare `#n` GitHub uses."""
     issue = board_issue(304, "Local blocked", block_body(MINIMAL_BLOCK_TOML))
@@ -6978,7 +6985,7 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         dependencies=dependencies,
     )
@@ -6987,7 +6994,7 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
     check = cmd_claim._blocked_check(item, None, REPOSITORY, body.Storage.STATE_REF)
 
     assert check is not None
-    assert board.item_label(9, body.Storage.STATE_REF) in check.text
+    assert workboard.item_label(9, body.Storage.STATE_REF) in check.text
     assert "#9" not in check.text
 
 
@@ -7000,28 +7007,28 @@ class _MinimalBoardSource:
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
     capability_result: forge.Capability = forge.Capability.READ_ONLY
-    dependencies_fetcher: Callable[[int], tuple[board.IssueDependency, ...]] = lambda _number: ()
+    dependencies_fetcher: Callable[[int], tuple[IssueDependency, ...]] = lambda _number: ()
 
     def capability(self, operation: forge.ForgeOperation) -> forge.Capability:
         del operation
         return self.capability_result
 
-    def list_open_board_issues(self) -> tuple[board.Issue, ...]:
+    def list_open_board_issues(self) -> tuple[Issue, ...]:
         return ()
 
-    def list_board_dependencies(self, number: int) -> tuple[board.IssueDependency, ...]:
+    def list_board_dependencies(self, number: int) -> tuple[IssueDependency, ...]:
         return self.dependencies_fetcher(number)
 
-    def list_open_board_pull_requests(self) -> tuple[board.PullRequest, ...]:
+    def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
         return ()
 
     def list_recent_merged_board_pull_requests(
         self, since: datetime
-    ) -> tuple[board.PullRequest, ...]:
+    ) -> tuple[workboard.PullRequest, ...]:
         del since
         return ()
 
-    def list_children(self, number: int) -> tuple[board.ChildItem, ...]:
+    def list_children(self, number: int) -> tuple[ChildItem, ...]:
         del number
         return ()
 
@@ -7044,7 +7051,7 @@ def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
     lock = threading.Lock()
     exceeded = threading.Event()
 
-    def fetch(number: int) -> tuple[board.IssueDependency, ...]:
+    def fetch(number: int) -> tuple[IssueDependency, ...]:
         nonlocal active, peak
         del number
         with lock:
@@ -8693,7 +8700,7 @@ def test_selected_store_claim_refuses_a_lane_identity_without_a_branch() -> None
     identity = protocol.LaneIdentity()
     storage = body.Storage.GITHUB
     with pytest.raises(ClaimUnavailableError, match="lane release requires a non-empty"):
-        board.selected_store_claim(protocol.EMPTY_STATE, identity, "", None, storage)
+        workboard.selected_store_claim(protocol.EMPTY_STATE, identity, "", None, storage)
 
 
 def test_claim_scope_is_optional_at_the_argparse_layer_for_issue_mode() -> None:
@@ -9351,7 +9358,7 @@ def _stub_versioned_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             "LICENSE",
             "README.md",
             "pyproject.toml",
-            "src/agent_coordination/__init__.py",
+            "src/aco/__init__.py",
         ),
     )
 
@@ -9425,7 +9432,7 @@ def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> Non
             "LICENSE",
             "README.md",
             "pyproject.toml",
-            "src/agent_coordination/__init__.py",
+            "src/aco/__init__.py",
         ),
     )
     monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
@@ -9827,7 +9834,7 @@ def test_cli_claim_without_json_prints_the_claimed_line(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     scope_flags: tuple[str, ...],
-    board_issues: tuple[board.Issue, ...],
+    board_issues: tuple[Issue, ...],
 ) -> None:
     """Issue #337 proof 3 (REVISE finding 2): the human cost line prints
     identically whether the scope came from `--scope` or was derived from
@@ -10064,7 +10071,7 @@ def test_cli_claim_scope_derivation_against_the_items_own_body(
     board_reads: list[None] = []
     real_list_open_board_issues = client.list_open_board_issues
 
-    def _counted_list_open_board_issues() -> tuple[board.Issue, ...]:
+    def _counted_list_open_board_issues() -> tuple[Issue, ...]:
         board_reads.append(None)
         return real_list_open_board_issues()
 
@@ -10479,7 +10486,7 @@ def test_cli_claim_replay_of_a_wide_scope_without_whole_reads_only_its_own_item(
     assert issue_claim.main(argv) == 0
     capsys.readouterr()
 
-    def board_read_refused() -> tuple[board.Issue, ...]:
+    def board_read_refused() -> tuple[Issue, ...]:
         raise protocol.MalformedStateTreeError(
             "item aco-0a0a0a is referenced as a parent but does not exist"
         )
@@ -11423,7 +11430,7 @@ class _ScopeWidthRefusal:
     argv_tail: tuple[str, ...]
     directories: frozenset[str] = frozenset()
     versioned: tuple[str, ...] | None = None
-    board_issues: tuple[board.Issue, ...] = ()
+    board_issues: tuple[Issue, ...] = ()
     standing_scope: tuple[str, ...] | None = None
     exact_err: str | None = None
 
@@ -11757,7 +11764,7 @@ def _run_scope_width_command(
     directories: frozenset[str] = frozenset(),
     versioned: tuple[str, ...] | None = None,
     standing_scope: tuple[str, ...] | None = None,
-    board_issues: tuple[board.Issue, ...] = (),
+    board_issues: tuple[Issue, ...] = (),
 ) -> tuple[int, str, str]:
     """Run one `claim`/`rescope` scope-width case end to end and return its
     exit status, stdout, and stderr, for the refusal and acceptance tables
@@ -12583,7 +12590,7 @@ def test_cli_claim_json_transport_failure_reports_unavailable_not_conflict(
 def test_cli_module_entry_point_exits_with_mains_return_code(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`python -m agent_coordination.cli` and the installed console script run
+    """`python -m aco.cli` and the installed console script run
     the `if __name__ == "__main__":` guard, not `cli.main()` as a library call --
     exercise that guard directly rather than only ever calling `cli.main()`.
 
@@ -12593,10 +12600,10 @@ def test_cli_module_entry_point_exits_with_mains_return_code(
     monkeypatch.setattr(sys, "argv", ["aco", "no-such-command"])
 
     with (
-        pytest.warns(RuntimeWarning, match="agent_coordination.cli"),
+        pytest.warns(RuntimeWarning, match="aco.cli"),
         pytest.raises(SystemExit) as exited,
     ):
-        runpy.run_module("agent_coordination.cli", run_name="__main__")
+        runpy.run_module("aco.cli", run_name="__main__")
 
     assert exited.value.code == 2
     assert "invalid choice: 'no-such-command'" in capsys.readouterr().err
@@ -12775,8 +12782,8 @@ def test_next_names_an_old_ruling_when_the_item_is_pulled(
 
 
 def test_no_path_class_list_is_read_or_written() -> None:
-    assert not Path("src/agent_coordination").joinpath("single_writer.py").exists()
-    text = Path("src/agent_coordination/protocol.py").read_text()
+    assert not Path("src/aco").joinpath("single_writer.py").exists()
+    text = Path("src/aco/protocol.py").read_text()
     assert "single-writer" not in text
     assert "single_writer" not in text
 
@@ -12788,7 +12795,7 @@ _MERGE_COMMIT_COMMITTED_AT = datetime(2026, 9, 1, tzinfo=UTC)
 
 
 def _trunk_landing(
-    sha: str, classification: board.TrunkClassification | board.ClassificationDefect | None
+    sha: str, classification: workboard.TrunkClassification | workboard.ClassificationDefect | None
 ) -> checkout.TrunkLanding:
     """One walked trunk commit (issue #397): the shape
     `merged_release_client`'s own `checkout.trunk_landings` stub returns,
@@ -12797,7 +12804,7 @@ def _trunk_landing(
     trusts (`checkout._trunk_landing_defect`)."""
     work_item_values = (
         tuple(f"#{number}" for number in classification.numbers)
-        if isinstance(classification, board.TrunkWorkItemClassification)
+        if isinstance(classification, TrunkWorkItemClassification)
         else ()
     )
     return checkout.TrunkLanding(sha, _MERGE_COMMIT_COMMITTED_AT, classification, work_item_values)
@@ -12854,9 +12861,9 @@ def merged_release_client(
     )
     _patch_release_session(monkeypatch, client, standing, branch=branch)
     default_classification = (
-        board.NoItemClassification(board.NoItemKind.DOCS)
+        NoItemClassification(NoItemKind.DOCS)
         if lane
-        else board.TrunkWorkItemClassification((WORK_ITEM_ISSUE,))
+        else TrunkWorkItemClassification((WORK_ITEM_ISSUE,))
     )
     resolved = (
         landings
@@ -12882,14 +12889,14 @@ def test_release_merged_records_the_pull_request_that_landed_the_item(
 
 def _landed_dependency(
     closed_at: datetime = datetime(2026, 9, 10, tzinfo=UTC),
-) -> board.IssueDependency:
+) -> IssueDependency:
     """The now-closed `blocked_by` relation a dependent of `WORK_ITEM_ISSUE`
     carries once GitHub has recorded the landing (issue #256)."""
-    return block_dependency(WORK_ITEM_ISSUE, state=board.BlockerState.CLOSED, closed_at=closed_at)
+    return block_dependency(WORK_ITEM_ISSUE, state=BlockerState.CLOSED, closed_at=closed_at)
 
 
 def _two_dependants_freed_by_the_landing() -> tuple[
-    tuple[board.Issue, ...], dict[int, tuple[board.IssueDependency, ...]]
+    tuple[Issue, ...], dict[int, tuple[IssueDependency, ...]]
 ]:
     """Two open items whose only blocker was `WORK_ITEM_ISSUE`, one of which
     also unblocks a third, still-waiting item, plus a fourth item a foreign
@@ -12913,9 +12920,7 @@ def _two_dependants_freed_by_the_landing() -> tuple[
     freed_earlier, freed_earlier_dependencies = blocked_issue(
         84,
         "Freed by an earlier landing",
-        block_dependency(
-            60, state=board.BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)
-        ),
+        block_dependency(60, state=BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)),
     )
     issues = (lower, higher, waiting, still_foreign_blocked, freed_earlier)
     dependencies = {
@@ -12933,8 +12938,8 @@ class ReleaseFreedScenario:
     """One landing's currently open board and the `freed`/`next` release
     should report for it (issue #256)."""
 
-    issues: tuple[board.Issue, ...]
-    dependencies: dict[int, tuple[board.IssueDependency, ...]]
+    issues: tuple[Issue, ...]
+    dependencies: dict[int, tuple[IssueDependency, ...]]
     freed: list[int]
     next_number: int | None
 
@@ -13026,7 +13031,7 @@ def _released_last_child_client(
     Beweis 4): `WORK_ITEM_ISSUE` is `PARENT_OF_WORK_ITEM`'s only child when
     `sibling_open` is `False` -- its own close leaves the parent with no
     open children and no uncut `[[slice]]` row, exactly `next`'s own
-    `board.CloseContainerAction` branch -- or one still-open sibling when `True`,
+    `workboard.CloseContainerAction` branch -- or one still-open sibling when `True`,
     the parent hint's own negative case. `parent_closed` (G2 review) covers
     the third negative case: the parent itself already closed (by some
     other landing) before this release even runs -- a childless, uncut
@@ -13038,14 +13043,14 @@ def _released_last_child_client(
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
-    client.parents[WORK_ITEM_ISSUE] = board.ParentIssue(
-        board.IssueReference(REPOSITORY, PARENT_OF_WORK_ITEM),
+    client.parents[WORK_ITEM_ISSUE] = workboard.ParentIssue(
+        workboard.IssueReference(REPOSITORY, PARENT_OF_WORK_ITEM),
         complete_contract(parent_next, slice=slice_entries(*parent_slices)),
         body.ItemKind.CONTAINER,
     )
-    children = [board.ChildItem(WORK_ITEM_ISSUE, board.ChildState.CLOSED)]
+    children = [ChildItem(WORK_ITEM_ISSUE, ChildState.CLOSED)]
     if sibling_open:
-        children.append(board.ChildItem(999, board.ChildState.OPEN))
+        children.append(ChildItem(999, ChildState.OPEN))
     client.children[PARENT_OF_WORK_ITEM] = tuple(children)
     if parent_closed:
         client.closed_issues.add(PARENT_OF_WORK_ITEM)
@@ -13119,7 +13124,7 @@ def test_release_merged_beside_an_unreadable_parent_reports_freed_instead_of_a_h
     stands in for the report."""
     client = _released_last_child_client(monkeypatch, sibling_open=False)
     unreadable = client.parents[WORK_ITEM_ISSUE]
-    client.parents[WORK_ITEM_ISSUE] = board.ParentIssue(unreadable.reference, unreadable.body)
+    client.parents[WORK_ITEM_ISSUE] = workboard.ParentIssue(unreadable.reference, unreadable.body)
     readable_reference = client.item_reference
 
     def refusing_the_parent(number: int) -> forge.ItemReference:
@@ -13163,7 +13168,7 @@ def test_release_merged_fetches_each_candidates_dependencies_only_once(
 ) -> None:
     """The `freed` report and the projected `next` pick share one dependency
     fetch (issue #256 review): `board_read.build_board`'s own board build must not re-list
-    the same blocked-by candidates `board.freed_item_numbers` already read."""
+    the same blocked-by candidates `workboard.freed_item_numbers` already read."""
     client = merged_release_client(monkeypatch, body="Work-Item: #72\n\nCloses #72")
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
@@ -13171,7 +13176,7 @@ def test_release_merged_fetches_each_candidates_dependencies_only_once(
     observed_dependency_calls: list[int] = []
     original_list_board_dependencies = client.list_board_dependencies
 
-    def spy_list_board_dependencies(number: int) -> tuple[board.IssueDependency, ...]:
+    def spy_list_board_dependencies(number: int) -> tuple[IssueDependency, ...]:
         observed_dependency_calls.append(number)
         return original_list_board_dependencies(number)
 
@@ -13211,7 +13216,7 @@ def test_release_merged_prints_a_hint_instead_of_failing_when_the_board_is_unrea
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
-    def unreachable() -> tuple[board.Issue, ...]:
+    def unreachable() -> tuple[Issue, ...]:
         raise board_error
 
     monkeypatch.setattr(client, "list_open_board_issues", unreachable)
@@ -13236,7 +13241,7 @@ def test_release_merged_json_omits_freed_and_next_when_the_board_is_unreachable(
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
-    def unreachable() -> tuple[board.Issue, ...]:
+    def unreachable() -> tuple[Issue, ...]:
         raise forge.ForgeTransientError("gh: connection reset")
 
     monkeypatch.setattr(client, "list_open_board_issues", unreachable)
@@ -13263,7 +13268,7 @@ def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
         body=f"No-Item: {kind}",
         lane=True,
         landings=(
-            _trunk_landing(MERGE_COMMIT_SHA, board.trunk_commit_classification((), (kind,))),
+            _trunk_landing(MERGE_COMMIT_SHA, workboard.trunk_commit_classification((), (kind,))),
         ),
     )
 
@@ -13294,7 +13299,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Issue #405 CI coverage follow-up: `checkout._trunk_no_item_landing_defect`
-    surfaces the walked trunk's own `board.ClassificationDefect` message
+    surfaces the walked trunk's own `workboard.ClassificationDefect` message
     verbatim when the merge commit's own trailer is malformed, never a
     generic "no `No-Item:` trailer" refusal."""
     merged_release_client(
@@ -13303,7 +13308,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
         lane=True,
         landings=(
             _trunk_landing(
-                MERGE_COMMIT_SHA, board.ClassificationDefect("names two conflicting issues")
+                MERGE_COMMIT_SHA, workboard.ClassificationDefect("names two conflicting issues")
             ),
         ),
     )
@@ -13346,9 +13351,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
         pytest.param(
             ReleaseMergeScenario(
                 body="Work-Item: #72\n\nCloses #72",
-                landings=(
-                    _trunk_landing(MERGE_COMMIT_SHA, board.TrunkWorkItemClassification((99,))),
-                ),
+                landings=(_trunk_landing(MERGE_COMMIT_SHA, TrunkWorkItemClassification((99,))),),
             ),
             f"merge commit {MERGE_COMMIT_SHA} of pull request #12 does not name work item #72",
             id="another-item",
@@ -13356,11 +13359,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
         pytest.param(
             ReleaseMergeScenario(
                 body="Work-Item: #72\n\nCloses #72",
-                landings=(
-                    _trunk_landing(
-                        MERGE_COMMIT_SHA, board.NoItemClassification(board.NoItemKind.DOCS)
-                    ),
-                ),
+                landings=(_trunk_landing(MERGE_COMMIT_SHA, NoItemClassification(NoItemKind.DOCS)),),
             ),
             f"merge commit {MERGE_COMMIT_SHA} of pull request #12 does not name work item #72",
             id="trunk-declares-no-item",
@@ -13464,7 +13463,7 @@ def test_release_merged_refuses_a_lane_whose_merge_commit_names_a_work_item(
     squash_commit = checkout.TrunkLanding(
         MERGE_COMMIT_SHA,
         _MERGE_COMMIT_COMMITTED_AT,
-        board.trunk_commit_classification(trailer_values, ()),
+        workboard.trunk_commit_classification(trailer_values, ()),
         trailer_values,
     )
     merged_release_client(monkeypatch, body="No-Item: docs", lane=True, landings=(squash_commit,))
@@ -13676,9 +13675,7 @@ def test_release_merged_refuses_what_its_landing_does_not_back_and_keeps_every_c
     E-REL-25). An issue-less lane's claim is keyed by its branch, so an
     unclaimed lane says nothing about the claimed lane its pull request came
     from: REL-09 refuses as before."""
-    landing = _trunk_landing(
-        MERGE_COMMIT_SHA, board.TrunkWorkItemClassification((WORK_ITEM_ISSUE,))
-    )
+    landing = _trunk_landing(MERGE_COMMIT_SHA, TrunkWorkItemClassification((WORK_ITEM_ISSUE,)))
     client = merged_release_client(
         monkeypatch,
         body="No-Item: docs" if lane else "Work-Item: #72\n\nCloses #72",
@@ -13811,7 +13808,7 @@ def test_release_merged_by_sha_refuses_a_contradictory_trailer(
     reads the exact same classification `check <sha>` does (LAND-60) and
     refuses the same contradictory trailer by the same defect sentence,
     exit `2`, before any write -- `checkout._landed_commit_by_sha`'s own
-    `board.ClassificationDefect` branch."""
+    `workboard.ClassificationDefect` branch."""
     repo = _refused_trailer_repository(monkeypatch, tmp_path, trailer)
     _write_state_ref_pin(repo)
     sha = real_git(repo, "rev-parse", "main").stdout.strip()
@@ -13920,7 +13917,7 @@ def _release_cleanup_scenario(
         _LIVE_TRUNK_LANDINGS
         if landed_elsewhere
         else lambda *_args, **_kwargs: (
-            _trunk_landing(MERGE_COMMIT_SHA, board.TrunkWorkItemClassification((WORK_ITEM_ISSUE,))),
+            _trunk_landing(MERGE_COMMIT_SHA, TrunkWorkItemClassification((WORK_ITEM_ISSUE,))),
         ),
     )
     _patch_store_write(monkeypatch, store_claim_from_request(standing))
@@ -13938,7 +13935,7 @@ def test_release_merged_survives_an_open_pull_request_with_a_reference_past_the_
     cast(
         FakeForge, github.GitHubForge(github.repository_id(REPOSITORY))
     ).board_open_pull_requests = (
-        board.PullRequest(300, "Foreign", f"Refs #{number}\n\nsee #{number}", "foreign/branch"),
+        workboard.PullRequest(300, "Foreign", f"Refs #{number}\n\nsee #{number}", "foreign/branch"),
     )
 
     assert issue_claim.main(["--repo", REPOSITORY, "release", "72", "--merged", "12"]) == 0
@@ -14396,7 +14393,7 @@ def _land_repository(
     (repo / "base.txt").write_text("base\n")
     if board_config is not None:
         write_repository_config(repo, board_config)
-        real_git(repo, "add", str(board.CONFIG_PATH))
+        real_git(repo, "add", str(workboard.CONFIG_PATH))
     real_git(repo, "add", "base.txt")
     real_git(repo, "commit", "-q", "-m", "initial")
     if set_head:
@@ -14538,7 +14535,7 @@ def test_release_branch_selects_a_lane_claim_without_checking_out_that_branch(
             checkout,
             "trunk_landings",
             lambda *_args, **_kwargs: (
-                _trunk_landing(MERGE_COMMIT_SHA, board.NoItemClassification(board.NoItemKind.DOCS)),
+                _trunk_landing(MERGE_COMMIT_SHA, NoItemClassification(NoItemKind.DOCS)),
             ),
         )
     _patch_release_session(
@@ -14926,7 +14923,7 @@ def test_next_names_a_recovery_item_before_the_item_it_recommends(
         client,
         "list_recent_merged_board_pull_requests",
         lambda _since: (
-            board.PullRequest(
+            workboard.PullRequest(
                 140,
                 "Lands it",
                 "Work-Item: #90\n\nCloses #90",
@@ -14937,16 +14934,14 @@ def test_next_names_a_recovery_item_before_the_item_it_recommends(
     )
 
     assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 0
-    assert capsys.readouterr().out.startswith(f"RECOVERY\n#90: {board.RECOVERY_STEP}\n\n")
+    assert capsys.readouterr().out.startswith(f"RECOVERY\n#90: {workboard.RECOVERY_STEP}\n\n")
 
 
 CHECKED_ISSUE = 81
 
 
-def open_dependency(number: int, repository: str = REPOSITORY) -> board.IssueDependency:
-    return board.IssueDependency(
-        board.IssueReference(repository, number), board.BlockerState.OPEN, False
-    )
+def open_dependency(number: int, repository: str = REPOSITORY) -> IssueDependency:
+    return IssueDependency(workboard.IssueReference(repository, number), BlockerState.OPEN, False)
 
 
 def _check_trunk_repository(tmp_path: Path) -> Path:
@@ -14986,7 +14981,7 @@ def test_issue_check_labels_a_local_blocker_under_the_state_ref_pin() -> None:
     own `storage` pin for a local blocker exactly as `claim`'s
     `cmd_claim._blocked_check` does -- a foreign one (`other/repo#9`) is unaffected,
     since it is never local to this repository's own storage pin
-    (`board.open_blocker_label`)."""
+    (`workboard.open_blocker_label`)."""
     client = FakeForge(
         board_dependencies={CHECKED_ISSUE: (open_dependency(7), open_dependency(9, "other/repo"))}
     )
@@ -14999,8 +14994,8 @@ def test_issue_check_labels_a_local_blocker_under_the_state_ref_pin() -> None:
         storage=body.Storage.STATE_REF,
     )
 
-    checked_label = board.item_label(CHECKED_ISSUE, body.Storage.STATE_REF)
-    local_label = board.item_label(7, body.Storage.STATE_REF)
+    checked_label = workboard.item_label(CHECKED_ISSUE, body.Storage.STATE_REF)
+    local_label = workboard.item_label(7, body.Storage.STATE_REF)
     assert outcome.line == f"ISSUE {checked_label} blocked by {local_label}, other/repo#9"
 
 
@@ -15151,7 +15146,7 @@ def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_
             "LICENSE",
             "README.md",
             "pyproject.toml",
-            "src/agent_coordination/__init__.py",
+            "src/aco/__init__.py",
         ),
     )
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
@@ -15414,7 +15409,7 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
     real_git(repository, "branch", "lane")
     if lane_history.adopted:
         _write_untracked_board_config(repository)
-        real_git(repository, "add", board.CONFIG_PATH.as_posix())
+        real_git(repository, "add", workboard.CONFIG_PATH.as_posix())
         real_git(repository, "commit", "-q", "-m", "adopt aco")
     if lane_history.trunk_resolves:
         push_repository_trunk(repository, "origin")
@@ -15428,7 +15423,7 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
     real_git(repository, "worktree", "add", "-q", str(lane), "lane")
     if lane_history.merged_then_removed:
         real_git(lane, "merge", "-q", "origin/main")
-        real_git(lane, "rm", "-q", board.CONFIG_PATH.as_posix())
+        real_git(lane, "rm", "-q", workboard.CONFIG_PATH.as_posix())
         real_git(lane, "commit", "-q", "-m", "drop the pin")
     if lane_history.trunk_moved_on:
         _advance_origin_main(repository, lane)
@@ -15444,8 +15439,8 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
     assert real_git(remote, "for-each-ref", "refs/aco").stdout == ""
     if refusal == _RESTORE_BOARD_CONFIG_ERROR:
         _run_printed_restore_from_a_subdirectory(refusal, lane)
-        tracked = real_git(lane, "ls-files", board.CONFIG_PATH.as_posix()).stdout
-        assert tracked == f"{board.CONFIG_PATH.as_posix()}\n"
+        tracked = real_git(lane, "ls-files", workboard.CONFIG_PATH.as_posix()).stdout
+        assert tracked == f"{workboard.CONFIG_PATH.as_posix()}\n"
 
 
 @pytest.mark.parametrize("item", ["5", "16777216"], ids=["in-the-id-space", "past-the-id-space"])
@@ -15491,7 +15486,7 @@ def _scratch_lane_repository(
     real_git(repository, "add", "README.md")
     if board_config is not None:
         write_repository_config(repository, board_config)
-        real_git(repository, "add", "-f", board.CONFIG_PATH.as_posix())
+        real_git(repository, "add", "-f", workboard.CONFIG_PATH.as_posix())
     real_git(repository, "commit", "-q", "-m", "initial")
     base = real_git(repository, "rev-parse", "HEAD").stdout.strip()
     real_git(repository, "checkout", "-q", "-b", "codex/issue-258-brief")
@@ -15525,7 +15520,7 @@ def test_cli_brief_prints_body_claim_lane_tip_and_touched_files(
     repository, base, tip = _scratch_lane_repository(
         monkeypatch, tmp_path, board_config='lane_shared = ["scripts/registry.txt"]\n'
     )
-    (repository / board.CONFIG_PATH).write_text(
+    (repository / workboard.CONFIG_PATH).write_text(
         'lane_shared = ["scripts/registry.txt", "src/x.py"]\n'
     )
     monkeypatch.setattr(checkout, "file_at_revision", _LIVE_FILE_AT_REVISION)
@@ -15880,10 +15875,10 @@ def _write_repository_configs(
     `brief.toml` on disk outside git's index, for the genuine untracked-file
     refusal."""
     write_repository_config(toplevel)
-    real_git(toplevel, "add", board.CONFIG_PATH.as_posix())
-    write_repository_config(toplevel, brief_content, path=board.BRIEF_CONFIG_PATH)
+    real_git(toplevel, "add", workboard.CONFIG_PATH.as_posix())
+    write_repository_config(toplevel, brief_content, path=workboard.BRIEF_CONFIG_PATH)
     if brief_tracked:
-        real_git(toplevel, "add", board.BRIEF_CONFIG_PATH.as_posix())
+        real_git(toplevel, "add", workboard.BRIEF_CONFIG_PATH.as_posix())
 
 
 def _brief_step_scenario(
@@ -16120,7 +16115,7 @@ def test_cli_brief_reports_invalid_usage_when_repo_is_given_under_state_ref(
 )
 def test_rescope_parses_every_item_reference_syntax(value: str, number: int) -> None:
     """Issue #285 proof 5: `rescope`'s `issue` argument is wired to
-    `board.parse_item_reference` (moved from `cli._parse_item_ref` by issue
+    `workboard.parse_item_reference` (moved from `cli._parse_item_ref` by issue
     #304; that function's own grammar proof lives in `tests/test_board.py`)."""
     rescoped = issue_claim._parser().parse_args(["rescope", value, "--add", "src"])
 
@@ -16130,7 +16125,7 @@ def test_rescope_parses_every_item_reference_syntax(value: str, number: int) -> 
 def test_main_refuses_a_malformed_item_reference_before_ever_dispatching(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """`board.parse_item_reference` runs as an argparse `type=` inside
+    """`workboard.parse_item_reference` runs as an argparse `type=` inside
     `parse_args`, so its refusal must reach `cli.main`'s own error rendering
     rather than an argparse usage error or an unhandled exception
     (issue #285)."""
@@ -17183,7 +17178,7 @@ def _use_real_store(monkeypatch: pytest.MonkeyPatch) -> None:
 def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:
     """A real checkout with a real `origin` remote pointing at a real bare
     repository, and the run's toplevel redirected onto it. `board.toml` is
-    never written, so `board.load_config` falls back to its own default
+    never written, so `workboard.load_config` falls back to its own default
     `canonical_remote = "origin"` -- exactly this remote's name."""
     bare_remote = tmp_path / "remote.git"
     init_bare_repository(bare_remote)
@@ -17702,7 +17697,7 @@ def _arrange_lane_lookup_case(
             base_ref_name="main",
         )
         work_items = ("#42",) if case.trailer == "Work-Item: #42" else ()
-        classification = board.trunk_commit_classification(
+        classification = workboard.trunk_commit_classification(
             work_items, () if work_items else ("fix",)
         )
         monkeypatch.setattr(
