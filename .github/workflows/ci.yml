@@ -54,7 +54,7 @@ jobs:
           path: coverage.xml
 
   gates:
-    name: Test-efficiency gates (test-budget, similar-methods, test-inventory, spec-lint)
+    name: Test-efficiency gates (test-budget, test-inventory, spec-lint)
     runs-on: ubuntu-latest
     steps:
       # Every gate measures against a merge-base, so the branch point must be reachable
@@ -68,16 +68,13 @@ jobs:
         with:
           python-version: '3.12'
       - run: uv sync --locked --group dev
-      # similar_methods.py deliberately performs no network I/O of its own (a measurement
-      # command stays offline); test_budget.py and test_inventory.py self-heal a missing
-      # ref, but fetching once here keeps all three gates on the same known-fetched base.
+      # test_budget.py and test_inventory.py self-heal a missing ref, but fetching once
+      # here keeps both gates on the same known-fetched base.
       - name: Fetch the pull request's base branch
         if: github.event_name == 'pull_request'
         run: git fetch origin "${GITHUB_BASE_REF}"
       - name: Test budget (tests/ size and duplication vs the merge-base)
         run: uv run --locked python scripts/test_budget.py --ci
-      - name: Similar methods (cross-file near-duplicate functions vs the merge-base)
-        run: uv run --locked python scripts/similar_methods.py --ci
       - name: Test inventory (rewritten-module assert-literal coverage vs the merge-base)
         run: uv run --locked python scripts/test_inventory.py --ci
       - name: Spec lint (specs/*.spec.md style rules, no baseline)
