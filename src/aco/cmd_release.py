@@ -880,28 +880,24 @@ class _ReleaseReport:
     worktree: checkout.WorktreeCleanupOutcome | None
 
 
-def _print_release_result(release_report: _ReleaseReport, *, as_json: bool) -> None:
-    selected, landing = release_report.selected, release_report.landing
+def _print_release_result(result: _ReleaseReport, *, as_json: bool) -> None:
+    selected, landing = result.selected, result.landing
     if as_json:
-        _release_json(release_report)
+        _release_json(result)
         if isinstance(landing, str):
             board_read.print_board_read_hint(landing, as_json=True)
         return
-    print(
-        f"RELEASED {workboard.claim_subject(selected, release_report.storage)}: {selected.claim_id}"
-    )
+    print(f"RELEASED {workboard.claim_subject(selected, result.storage)}: {selected.claim_id}")
     if isinstance(landing, str):
         board_read.print_board_read_hint(landing, as_json=False)
     elif landing is not None:
-        print(workboard.release_freed_line(landing.freed, release_report.storage))
-        print(_release_next_line(landing.next_item, release_report.storage))
-        parent_line = workboard.parent_closable_line(
-            landing.parent_closable, release_report.storage
-        )
+        print(workboard.release_freed_line(landing.freed, result.storage))
+        print(_release_next_line(landing.next_item, result.storage))
+        parent_line = workboard.parent_closable_line(landing.parent_closable, result.storage)
         if parent_line is not None:
             print(parent_line)
-    if release_report.worktree is not None:
-        print(f"worktree: {_worktree_cleanup_outcome_text(release_report.worktree)}")
+    if result.worktree is not None:
+        print(f"worktree: {_worktree_cleanup_outcome_text(result.worktree)}")
 
 
 def _release_branch_for(parsed: argparse.Namespace) -> str | None:

@@ -15,6 +15,7 @@ from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, trac
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
 from aco import body, forge, workboard
+from aco.workboard import IssueReference, ParentIssue
 
 
 class ForgeEvent(Enum):
@@ -87,7 +88,7 @@ class CutCase:
     envelope: Mapping[str, object]
     linked_children: tuple[tuple[int, int], ...] = ()
     closed_issue_cutoffs: tuple[datetime, ...] = ()
-    parents: Mapping[int, workboard.ParentIssue] = field(default_factory=dict)
+    parents: Mapping[int, ParentIssue] = field(default_factory=dict)
     children: Mapping[int, tuple[workboard.ChildItem, ...]] = field(default_factory=dict)
     references: Mapping[int, forge.ItemReference] = field(default_factory=dict)
     recently_closed: tuple[forge.ClosedIssue, ...] = ()
@@ -201,7 +202,7 @@ def refused(
     *,
     forge_read: bool = True,
     searched: bool = False,
-    parents: dict[int, workboard.ParentIssue] | None = None,
+    parents: dict[int, ParentIssue] | None = None,
     capabilities: dict[forge.ForgeOperation, forge.Capability] | None = None,
 ) -> CutCase:
     return CutCase(
@@ -304,11 +305,7 @@ def with_linked_child(
                 forge.ItemState(state.value), title, CHILD_BODY.format("D", ""), False
             )
         },
-        parents={
-            number: workboard.ParentIssue(
-                workboard.IssueReference("example/agent-coordination", 79), ""
-            )
-        },
+        parents={number: ParentIssue(IssueReference("example/agent-coordination", 79), "")},
     )
 
 
@@ -427,8 +424,8 @@ def no_twin(
                 ),
                 ("--title", "Slice A"),
                 parents={
-                    79: workboard.ParentIssue(
-                        workboard.IssueReference("example/agent-coordination", 1),
+                    79: ParentIssue(
+                        IssueReference("example/agent-coordination", 1),
                         "",
                         body.ItemKind.CONTAINER,
                     )

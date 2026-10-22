@@ -364,10 +364,6 @@ def allow_squash(client: FakeForge, _head: str) -> None:
     client.allowed_methods = frozenset({workboard.MergeMethod.SQUASH})
 
 
-def no_premerge(_world: LandedWorld) -> None:
-    pass
-
-
 def merge_before_run(world: LandedWorld, *, method: workboard.MergeMethod) -> None:
     world.landing.forge.merge_landing(
         12,
@@ -746,13 +742,8 @@ def verify_cleanup(
         "initial.own-section.keys": Present(OWN_KEYS).format(lane=lane),
     }
     assert observed_initial == expected_initial
-    {
-        None: no_premerge,
-        workboard.MergeMethod.SQUASH: partial(
-            merge_before_run, method=workboard.MergeMethod.SQUASH
-        ),
-        workboard.MergeMethod.MERGE: partial(merge_before_run, method=workboard.MergeMethod.MERGE),
-    }[case.premerge](world)
+    if case.premerge is not None:
+        merge_before_run(world, method=case.premerge)
     observed_prepared = {
         "prepared.landing.merged": world.landing.forge.landings[12].merged,
         "prepared.merge.methods": tuple(call[2] for call in world.landing.forge.merge_calls),

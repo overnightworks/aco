@@ -141,6 +141,17 @@ from aco.protocol import (
     ClaimUnavailableError,
 )
 from aco.session import RunContext
+from aco.workboard import (
+    NEEDS_OPERATOR_LABEL,
+    BlockerState,
+    ChildItem,
+    ChildState,
+    Issue,
+    IssueDependency,
+    NoItemClassification,
+    NoItemKind,
+    TrunkWorkItemClassification,
+)
 
 GitHubForge = github.GitHubForge
 
@@ -192,8 +203,8 @@ class _MinimalForgeReader:
     shared shape rather than three near-identical inline classes, each
     repeating the same `forge.ForgeReader` stub methods."""
 
-    open_issues: tuple[workboard.Issue, ...] = ()
-    children_by_number: dict[int, tuple[workboard.ChildItem, ...]] = field(default_factory=dict)
+    open_issues: tuple[Issue, ...] = ()
+    children_by_number: dict[int, tuple[ChildItem, ...]] = field(default_factory=dict)
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
     observed_children_lookups: list[int] = field(default_factory=list)
@@ -223,10 +234,10 @@ class _MinimalForgeReader:
     def default_branch(self) -> str:
         return "main"
 
-    def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
+    def list_board_dependencies(self, number: int) -> tuple[IssueDependency, ...]:
         return ()
 
-    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
+    def list_open_board_issues(self) -> tuple[Issue, ...]:
         return self.open_issues
 
     def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
@@ -241,7 +252,7 @@ class _MinimalForgeReader:
     def list_recently_closed_issues(self, since: datetime) -> tuple[forge.ClosedIssue, ...]:
         return ()
 
-    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
+    def list_children(self, number: int) -> tuple[ChildItem, ...]:
         self.observed_children_lookups.append(number)
         return self.children_by_number.get(number, ())
 
@@ -643,7 +654,7 @@ def test_board_marks_an_item_landed_by_a_trailer_carrying_trunk_commit_without_a
             checkout.TrunkLanding(
                 "trailersha",
                 datetime(2026, 8, 29, tzinfo=UTC),
-                workboard.TrunkWorkItemClassification((10,)),
+                TrunkWorkItemClassification((10,)),
                 ("#10",),
             ),
         ),
@@ -688,7 +699,7 @@ def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_req
     trailer_landing = checkout.TrunkLanding(
         "a" * 40,
         datetime(2026, 8, 29, tzinfo=UTC),
-        workboard.TrunkWorkItemClassification((10,)),
+        TrunkWorkItemClassification((10,)),
         ("#10",),
     )
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: (trailer_landing,))
@@ -772,11 +783,11 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
     )
     client = FakeForge()
     client.board_issues = issues
-    client.children[30] = (workboard.ChildItem(31, workboard.ChildState.OPEN),)
+    client.children[30] = (ChildItem(31, ChildState.OPEN),)
     observed_children_calls: list[int] = []
     original_list_children = client.list_children
 
-    def spy_list_children(number: int) -> tuple[workboard.ChildItem, ...]:
+    def spy_list_children(number: int) -> tuple[ChildItem, ...]:
         observed_children_calls.append(number)
         return original_list_children(number)
 
@@ -815,7 +826,7 @@ def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
     observed_dependency_calls: list[int] = []
     original_list_board_dependencies = client.list_board_dependencies
 
-    def spy_list_board_dependencies(number: int) -> tuple[workboard.IssueDependency, ...]:
+    def spy_list_board_dependencies(number: int) -> tuple[IssueDependency, ...]:
         observed_dependency_calls.append(number)
         return original_list_board_dependencies(number)
 
@@ -877,9 +888,9 @@ def _configured_board_client(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     *,
-    open_issues: tuple[workboard.Issue, ...] = (),
+    open_issues: tuple[Issue, ...] = (),
     open_pull_requests: tuple[workboard.PullRequest, ...] = (),
-    dependencies: Mapping[int, tuple[workboard.IssueDependency, ...]] = MappingProxyType({}),
+    dependencies: Mapping[int, tuple[IssueDependency, ...]] = MappingProxyType({}),
     standing: tuple[ClaimRequest, ...] = (),
 ) -> FakeForge:
     """A `FakeForge` client wired the way every board-reading claim test needs."""
@@ -947,16 +958,14 @@ _WAITING_AND_PULLABLE = (
         230,
         "Operator ruling",
         complete_contract("wait for session with the operator"),
-        labels=("security", workboard.NEEDS_OPERATOR_LABEL),
+        labels=("security", NEEDS_OPERATOR_LABEL),
     ),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
 
-def _childless_container(
-    number: int, body_text: str, *, labels: tuple[str, ...] = ()
-) -> workboard.Issue:
-    return workboard.Issue(
+def _childless_container(number: int, body_text: str, *, labels: tuple[str, ...] = ()) -> Issue:
+    return Issue(
         number,
         f"Epic {number}",
         labels,
@@ -976,12 +985,10 @@ _OPERATOR_HELD_CONTAINERS = (
     _childless_container(
         441,
         complete_contract("Cut it.", slice=slice_entries("Scheibe A")),
-        labels=(workboard.NEEDS_OPERATOR_LABEL,),
+        labels=(NEEDS_OPERATOR_LABEL,),
     ),
     _childless_container(442, complete_contract("Check it.", frozen_until=FROZEN_UNTIL)),
-    _childless_container(
-        443, complete_contract("keiner"), labels=(workboard.NEEDS_OPERATOR_LABEL,)
-    ),
+    _childless_container(443, complete_contract("keiner"), labels=(NEEDS_OPERATOR_LABEL,)),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
@@ -1279,8 +1286,8 @@ def test_next_reports_the_highest_scored_actionable_item(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    issues: tuple[workboard.Issue, ...],
-    dependencies: dict[int, tuple[workboard.IssueDependency, ...]],
+    issues: tuple[Issue, ...],
+    dependencies: dict[int, tuple[IssueDependency, ...]],
     claims: tuple[ClaimRequest, ...],
     arguments: tuple[str, ...],
     expected_exit: int,
@@ -1474,9 +1481,7 @@ def _start_scenario(
     return repo
 
 
-def _start_item(
-    body_text: str | None = None, *, kind: body.ItemKind | None = None
-) -> workboard.Issue:
+def _start_item(body_text: str | None = None, *, kind: body.ItemKind | None = None) -> Issue:
     """Item #314 as `start`'s scenarios know it: a scoped, complete body
     unless the scenario names another."""
     if body_text is None:
@@ -1484,7 +1489,7 @@ def _start_item(
     return board_issue(314, "Fresh Slug Title", body_text, kind=kind)
 
 
-def _serve_start_board(monkeypatch: pytest.MonkeyPatch, *issues: workboard.Issue) -> FakeForge:
+def _serve_start_board(monkeypatch: pytest.MonkeyPatch, *issues: Issue) -> FakeForge:
     """A fake forge listing `issues` as the open board, the first of them the
     open item `start` targets."""
     target = issues[0]
@@ -3704,7 +3709,7 @@ def test_claim_refuses_an_open_dependency_before_mutation(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    dependencies: tuple[workboard.IssueDependency, ...],
+    dependencies: tuple[IssueDependency, ...],
     expected_blockers: str,
 ) -> None:
     issue, blocked_by = blocked_issue(10, "Work", *dependencies, labels=("security",))
@@ -3744,7 +3749,7 @@ def test_claim_ignores_a_closed_dependency(
     tmp_path: Path,
 ) -> None:
     closed = block_dependency(
-        9, state=workboard.BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
+        9, state=BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
     )
     issue, blocked_by = blocked_issue(10, "Work", closed, labels=("security",))
     _configured_board_client(monkeypatch, tmp_path, open_issues=(issue,), dependencies=blocked_by)
@@ -4472,7 +4477,7 @@ def test_claim_refuses_a_container(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    container = workboard.Issue(
+    container = Issue(
         72,
         "Container work",
         (),
@@ -4606,7 +4611,7 @@ def _cuttable_slice_entries(*titles: str) -> list[dict[str, object]]:
     return [{**entry, "done_when": "D"} for entry in slice_entries(*titles)]
 
 
-def _one_slice_container() -> workboard.Issue:
+def _one_slice_container() -> Issue:
     return container_issue(CUT_CONTAINER, _cuttable_row_toml("Scheibe 1"))
 
 
@@ -4661,7 +4666,7 @@ def test_cut_never_adopts_an_orphan_that_is_not_this_containers_recovery_shape(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    orphan: workboard.Issue,
+    orphan: Issue,
     idea_label: str | None,
 ) -> None:
     """A title match alone is too weak to adopt an orphan (#260): a
@@ -5033,7 +5038,7 @@ def test_next_skips_a_frozen_item_and_names_it_as_such(
                 301,
                 "Highest scored",
                 complete_contract("wait for session with the operator"),
-                labels=("security", workboard.NEEDS_OPERATOR_LABEL),
+                labels=("security", NEEDS_OPERATOR_LABEL),
             ),
             id="waiting_on_the_operator",
         ),
@@ -5043,7 +5048,7 @@ def test_claim_does_not_warn_about_a_higher_scored_item_no_agent_can_pull(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    higher: workboard.Issue,
+    higher: Issue,
 ) -> None:
     client = FakeForge()
     lower = board_issue(10, "Lower work", complete_contract("Claim #10."))
@@ -5094,7 +5099,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
 
     client = _MinimalForgeReader(
         open_issues=(
-            workboard.Issue(
+            Issue(
                 20,
                 "Security issue",
                 ("security",),
@@ -5102,9 +5107,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
                 "2026-08-20T00:00:00Z",
                 "2026-08-20T00:00:00Z",
             ),
-            workboard.Issue(
-                21, "UX issue", ("ux",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
-            ),
+            Issue(21, "UX issue", ("ux",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"),
         )
     )
     monkeypatch.setattr(checkout, "git_output", git_output)
@@ -5120,7 +5123,7 @@ def test_next_names_a_cuttable_container_slice(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Exact `cut_slice #N: …` text, per #112's own body example."""
-    container = workboard.Issue(
+    container = Issue(
         180,
         "Epic",
         (),
@@ -5213,7 +5216,7 @@ def test_next_prints_a_cut_command_that_cut_accepts(
 ) -> None:
     """#151's own invariant, completed by #177: whatever `cut` command
     `next` prints for a childless container is one `cut` itself accepts."""
-    container = workboard.Issue(
+    container = Issue(
         case.container_number,
         "Epic",
         (),
@@ -5260,7 +5263,7 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
     alone on its own board, so it is necessarily the one `workboard.next_action`
     names -- and proves every one of them is a command `cut` itself accepts
     on a fresh fake, not only the board's own top-ranked pick."""
-    top_ranked = workboard.Issue(
+    top_ranked = Issue(
         130,
         "Epic ranked first",
         (),
@@ -5271,7 +5274,7 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
         children_closed=1,
         children_total=1,
     )
-    lower_ranked = workboard.Issue(
+    lower_ranked = Issue(
         145,
         "Epic ranked second",
         (),
@@ -5384,7 +5387,7 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
     whatever its parent's type, state, or repository, so `next` never prints
     that `cut` -- it names the container's repair under `SKIPPED` instead,
     and `cut` keeps its refusal: the advice and the command agree."""
-    parent = workboard.Issue(
+    parent = Issue(
         298,
         "Epic",
         (),
@@ -5395,7 +5398,7 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
         children_closed=0 if parent_kind is body.ItemKind.CONTAINER else None,
         children_total=1 if parent_kind is body.ItemKind.CONTAINER else None,
     )
-    nested = workboard.Issue(
+    nested = Issue(
         299,
         "Nested epic",
         (),
@@ -5409,8 +5412,8 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
     board_parent = (parent,) if parent_open and parent_repository == REPOSITORY else ()
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(*board_parent, nested))
     client.children = {
-        298: (workboard.ChildItem(299, workboard.ChildState.OPEN),),
-        299: (workboard.ChildItem(300, workboard.ChildState.CLOSED),),
+        298: (ChildItem(299, ChildState.OPEN),),
+        299: (ChildItem(300, ChildState.CLOSED),),
     }
     client.parents[299] = workboard.ParentIssue(
         workboard.IssueReference(parent_repository, 298), parent.body, parent_kind
@@ -5460,7 +5463,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
         if top_level_scope is None
         else complete_contract("keiner", slice=row, scope=list(top_level_scope))
     )
-    nested = workboard.Issue(
+    nested = Issue(
         299,
         "Nested epic",
         (),
@@ -5472,7 +5475,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
         children_total=1,
     )
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(nested,))
-    client.children = {299: (workboard.ChildItem(300, workboard.ChildState.CLOSED),)}
+    client.children = {299: (ChildItem(300, ChildState.CLOSED),)}
     client.parents[299] = workboard.ParentIssue(
         workboard.IssueReference(REPOSITORY, 298), "", body.ItemKind.CONTAINER
     )
@@ -6309,7 +6312,7 @@ def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_doe
         {
             10: _state_ref_item_body(
                 "Operator ruling",
-                labels=("security", workboard.NEEDS_OPERATOR_LABEL),
+                labels=("security", NEEDS_OPERATOR_LABEL),
                 scope=["docs/ruling.md"],
             ),
             11: _state_ref_item_body("Pullable work", scope=["docs/work.md"]),
@@ -6386,7 +6389,7 @@ def _next_json_item_references(
 def test_next_json_names_a_cuttable_container_slice(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = workboard.Issue(
+    container = Issue(
         181,
         "Epic",
         (),
@@ -6414,7 +6417,7 @@ def test_next_json_names_a_cuttable_container_slice(
 def test_next_names_a_closeable_container(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = workboard.Issue(
+    container = Issue(
         182,
         "Epic",
         (),
@@ -6439,7 +6442,7 @@ def test_next_names_a_closeable_container(
 def test_next_json_names_a_closeable_container(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = workboard.Issue(
+    container = Issue(
         183,
         "Epic",
         (),
@@ -6474,7 +6477,7 @@ def test_next_names_a_container_with_no_slice_row_by_its_own_next_line(
     nor list it under `close:` while that sentence names work (issue #503,
     the #418 shape after a slice landed): it names the container for a
     `done_when` check and its own sentence, and no command."""
-    container = workboard.Issue(
+    container = Issue(
         187,
         "Epic",
         (),
@@ -6504,7 +6507,7 @@ def test_next_json_names_a_container_with_no_slice_row_by_its_own_next_line(
     `check_container`, never `close_container` while the `Next` line names
     work; `next_step` carries that sentence, `close` stays empty, and no
     `command` or `cut_title` is invented from it."""
-    container = workboard.Issue(
+    container = Issue(
         188,
         "Epic",
         (),
@@ -6574,7 +6577,7 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
     `#80`'s own path and is dropped silently, the same way an overlapping
     work item would be; the scopeless-row collapse into `parallel: unknown`
     is `test_next_names_a_cuttable_container_slice`'s own proof."""
-    epic1 = workboard.Issue(
+    epic1 = Issue(
         80,
         "Epic1",
         (),
@@ -6587,7 +6590,7 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
         children_closed=0,
         children_total=0,
     )
-    epic2 = workboard.Issue(
+    epic2 = Issue(
         81,
         "Epic2",
         (),
@@ -6600,7 +6603,7 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
         children_closed=0,
         children_total=0,
     )
-    epic3 = workboard.Issue(
+    epic3 = Issue(
         82,
         "Epic3",
         (),
@@ -6684,7 +6687,7 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
         complete_contract("Ship it.", scope=["a"]),
         labels=("security",),
     )
-    closable_container = workboard.Issue(
+    closable_container = Issue(
         71,
         "Closable epic",
         (),
@@ -6699,7 +6702,7 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
         72,
         "Landed but open",
         complete_contract("Close it."),
-        labels=(workboard.NEEDS_OPERATOR_LABEL,),
+        labels=(NEEDS_OPERATOR_LABEL,),
     )
     client = _configured_board_client(
         monkeypatch, tmp_path, open_issues=(top_ranked, closable_container, landed_but_open)
@@ -6812,7 +6815,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    container = workboard.Issue(
+    container = Issue(
         90,
         "Container",
         (),
@@ -6826,7 +6829,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     plain = board_issue(91, "Plain", complete_contract("Ship it."))
     client = _MinimalForgeReader(
         open_issues=(container, plain),
-        children_by_number={90: (workboard.ChildItem(92, workboard.ChildState.OPEN),)},
+        children_by_number={90: (ChildItem(92, ChildState.OPEN),)},
     )
     _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
@@ -6836,9 +6839,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     assert client.observed_children_lookups == [90]
     container_item = next(item for item in projected.items if item.number == 90)
     assert container_item.container is not None
-    assert container_item.container.open_children == (
-        workboard.ChildItem(92, workboard.ChildState.OPEN),
-    )
+    assert container_item.container.open_children == (ChildItem(92, ChildState.OPEN),)
 
 
 def test_body_contract_checks_names_a_blockless_container_by_its_no_block_defect() -> None:
@@ -6859,7 +6860,7 @@ def test_body_contract_checks_names_a_blockless_container_by_its_no_block_defect
     )
     item = next(item for item in projected.items if item.number == 201)
 
-    checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
+    checks = cmd_claim._body_checks(item, body.Storage.GITHUB)
 
     assert checks == (
         cmd_claim._SliceCheck("error", "body-contract", "body malformed: aco: no aco block"),
@@ -6879,7 +6880,7 @@ def test_body_contract_checks_names_a_malformed_body_by_its_first_defect() -> No
     )
     item = next(item for item in projected.items if item.number == 202)
 
-    checks = cmd_claim._body_contract_checks(item, body.Storage.GITHUB)
+    checks = cmd_claim._body_checks(item, body.Storage.GITHUB)
 
     assert checks == (
         cmd_claim._SliceCheck(
@@ -6897,7 +6898,7 @@ def test_board_shows_freed_from_a_sole_closed_local_dependency_and_claim_reaches
     through the fake, not just a non-blocked projection."""
     closed_dependency = (
         block_dependency(
-            151, state=workboard.BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
+            151, state=BlockerState.CLOSED, closed_at=datetime(2026, 8, 20, tzinfo=UTC)
         ),
     )
     projected = projected_board(
@@ -7006,16 +7007,16 @@ class _MinimalBoardSource:
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
     capability_result: forge.Capability = forge.Capability.READ_ONLY
-    dependencies_fetcher: Callable[[int], tuple[workboard.IssueDependency, ...]] = lambda _number: ()
+    dependencies_fetcher: Callable[[int], tuple[IssueDependency, ...]] = lambda _number: ()
 
     def capability(self, operation: forge.ForgeOperation) -> forge.Capability:
         del operation
         return self.capability_result
 
-    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
+    def list_open_board_issues(self) -> tuple[Issue, ...]:
         return ()
 
-    def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
+    def list_board_dependencies(self, number: int) -> tuple[IssueDependency, ...]:
         return self.dependencies_fetcher(number)
 
     def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
@@ -7027,7 +7028,7 @@ class _MinimalBoardSource:
         del since
         return ()
 
-    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
+    def list_children(self, number: int) -> tuple[ChildItem, ...]:
         del number
         return ()
 
@@ -7050,7 +7051,7 @@ def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
     lock = threading.Lock()
     exceeded = threading.Event()
 
-    def fetch(number: int) -> tuple[workboard.IssueDependency, ...]:
+    def fetch(number: int) -> tuple[IssueDependency, ...]:
         nonlocal active, peak
         del number
         with lock:
@@ -9833,7 +9834,7 @@ def test_cli_claim_without_json_prints_the_claimed_line(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     scope_flags: tuple[str, ...],
-    board_issues: tuple[workboard.Issue, ...],
+    board_issues: tuple[Issue, ...],
 ) -> None:
     """Issue #337 proof 3 (REVISE finding 2): the human cost line prints
     identically whether the scope came from `--scope` or was derived from
@@ -10070,7 +10071,7 @@ def test_cli_claim_scope_derivation_against_the_items_own_body(
     board_reads: list[None] = []
     real_list_open_board_issues = client.list_open_board_issues
 
-    def _counted_list_open_board_issues() -> tuple[workboard.Issue, ...]:
+    def _counted_list_open_board_issues() -> tuple[Issue, ...]:
         board_reads.append(None)
         return real_list_open_board_issues()
 
@@ -10485,7 +10486,7 @@ def test_cli_claim_replay_of_a_wide_scope_without_whole_reads_only_its_own_item(
     assert issue_claim.main(argv) == 0
     capsys.readouterr()
 
-    def board_read_refused() -> tuple[workboard.Issue, ...]:
+    def board_read_refused() -> tuple[Issue, ...]:
         raise protocol.MalformedStateTreeError(
             "item aco-0a0a0a is referenced as a parent but does not exist"
         )
@@ -11429,7 +11430,7 @@ class _ScopeWidthRefusal:
     argv_tail: tuple[str, ...]
     directories: frozenset[str] = frozenset()
     versioned: tuple[str, ...] | None = None
-    board_issues: tuple[workboard.Issue, ...] = ()
+    board_issues: tuple[Issue, ...] = ()
     standing_scope: tuple[str, ...] | None = None
     exact_err: str | None = None
 
@@ -11763,7 +11764,7 @@ def _run_scope_width_command(
     directories: frozenset[str] = frozenset(),
     versioned: tuple[str, ...] | None = None,
     standing_scope: tuple[str, ...] | None = None,
-    board_issues: tuple[workboard.Issue, ...] = (),
+    board_issues: tuple[Issue, ...] = (),
 ) -> tuple[int, str, str]:
     """Run one `claim`/`rescope` scope-width case end to end and return its
     exit status, stdout, and stderr, for the refusal and acceptance tables
@@ -12803,7 +12804,7 @@ def _trunk_landing(
     trusts (`checkout._trunk_landing_defect`)."""
     work_item_values = (
         tuple(f"#{number}" for number in classification.numbers)
-        if isinstance(classification, workboard.TrunkWorkItemClassification)
+        if isinstance(classification, TrunkWorkItemClassification)
         else ()
     )
     return checkout.TrunkLanding(sha, _MERGE_COMMIT_COMMITTED_AT, classification, work_item_values)
@@ -12860,9 +12861,9 @@ def merged_release_client(
     )
     _patch_release_session(monkeypatch, client, standing, branch=branch)
     default_classification = (
-        workboard.NoItemClassification(workboard.NoItemKind.DOCS)
+        NoItemClassification(NoItemKind.DOCS)
         if lane
-        else workboard.TrunkWorkItemClassification((WORK_ITEM_ISSUE,))
+        else TrunkWorkItemClassification((WORK_ITEM_ISSUE,))
     )
     resolved = (
         landings
@@ -12888,16 +12889,14 @@ def test_release_merged_records_the_pull_request_that_landed_the_item(
 
 def _landed_dependency(
     closed_at: datetime = datetime(2026, 9, 10, tzinfo=UTC),
-) -> workboard.IssueDependency:
+) -> IssueDependency:
     """The now-closed `blocked_by` relation a dependent of `WORK_ITEM_ISSUE`
     carries once GitHub has recorded the landing (issue #256)."""
-    return block_dependency(
-        WORK_ITEM_ISSUE, state=workboard.BlockerState.CLOSED, closed_at=closed_at
-    )
+    return block_dependency(WORK_ITEM_ISSUE, state=BlockerState.CLOSED, closed_at=closed_at)
 
 
 def _two_dependants_freed_by_the_landing() -> tuple[
-    tuple[workboard.Issue, ...], dict[int, tuple[workboard.IssueDependency, ...]]
+    tuple[Issue, ...], dict[int, tuple[IssueDependency, ...]]
 ]:
     """Two open items whose only blocker was `WORK_ITEM_ISSUE`, one of which
     also unblocks a third, still-waiting item, plus a fourth item a foreign
@@ -12921,9 +12920,7 @@ def _two_dependants_freed_by_the_landing() -> tuple[
     freed_earlier, freed_earlier_dependencies = blocked_issue(
         84,
         "Freed by an earlier landing",
-        block_dependency(
-            60, state=workboard.BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)
-        ),
+        block_dependency(60, state=BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)),
     )
     issues = (lower, higher, waiting, still_foreign_blocked, freed_earlier)
     dependencies = {
@@ -12941,8 +12938,8 @@ class ReleaseFreedScenario:
     """One landing's currently open board and the `freed`/`next` release
     should report for it (issue #256)."""
 
-    issues: tuple[workboard.Issue, ...]
-    dependencies: dict[int, tuple[workboard.IssueDependency, ...]]
+    issues: tuple[Issue, ...]
+    dependencies: dict[int, tuple[IssueDependency, ...]]
     freed: list[int]
     next_number: int | None
 
@@ -13051,9 +13048,9 @@ def _released_last_child_client(
         complete_contract(parent_next, slice=slice_entries(*parent_slices)),
         body.ItemKind.CONTAINER,
     )
-    children = [workboard.ChildItem(WORK_ITEM_ISSUE, workboard.ChildState.CLOSED)]
+    children = [ChildItem(WORK_ITEM_ISSUE, ChildState.CLOSED)]
     if sibling_open:
-        children.append(workboard.ChildItem(999, workboard.ChildState.OPEN))
+        children.append(ChildItem(999, ChildState.OPEN))
     client.children[PARENT_OF_WORK_ITEM] = tuple(children)
     if parent_closed:
         client.closed_issues.add(PARENT_OF_WORK_ITEM)
@@ -13179,7 +13176,7 @@ def test_release_merged_fetches_each_candidates_dependencies_only_once(
     observed_dependency_calls: list[int] = []
     original_list_board_dependencies = client.list_board_dependencies
 
-    def spy_list_board_dependencies(number: int) -> tuple[workboard.IssueDependency, ...]:
+    def spy_list_board_dependencies(number: int) -> tuple[IssueDependency, ...]:
         observed_dependency_calls.append(number)
         return original_list_board_dependencies(number)
 
@@ -13219,7 +13216,7 @@ def test_release_merged_prints_a_hint_instead_of_failing_when_the_board_is_unrea
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
-    def unreachable() -> tuple[workboard.Issue, ...]:
+    def unreachable() -> tuple[Issue, ...]:
         raise board_error
 
     monkeypatch.setattr(client, "list_open_board_issues", unreachable)
@@ -13244,7 +13241,7 @@ def test_release_merged_json_omits_freed_and_next_when_the_board_is_unreachable(
     client.closed_issues.add(WORK_ITEM_ISSUE)
     monkeypatch.setattr(board_read, "fetch_issue_reference", _LIVE_FETCH_ISSUE_REFERENCE)
 
-    def unreachable() -> tuple[workboard.Issue, ...]:
+    def unreachable() -> tuple[Issue, ...]:
         raise forge.ForgeTransientError("gh: connection reset")
 
     monkeypatch.setattr(client, "list_open_board_issues", unreachable)
@@ -13354,9 +13351,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
         pytest.param(
             ReleaseMergeScenario(
                 body="Work-Item: #72\n\nCloses #72",
-                landings=(
-                    _trunk_landing(MERGE_COMMIT_SHA, workboard.TrunkWorkItemClassification((99,))),
-                ),
+                landings=(_trunk_landing(MERGE_COMMIT_SHA, TrunkWorkItemClassification((99,))),),
             ),
             f"merge commit {MERGE_COMMIT_SHA} of pull request #12 does not name work item #72",
             id="another-item",
@@ -13364,11 +13359,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
         pytest.param(
             ReleaseMergeScenario(
                 body="Work-Item: #72\n\nCloses #72",
-                landings=(
-                    _trunk_landing(
-                        MERGE_COMMIT_SHA, workboard.NoItemClassification(workboard.NoItemKind.DOCS)
-                    ),
-                ),
+                landings=(_trunk_landing(MERGE_COMMIT_SHA, NoItemClassification(NoItemKind.DOCS)),),
             ),
             f"merge commit {MERGE_COMMIT_SHA} of pull request #12 does not name work item #72",
             id="trunk-declares-no-item",
@@ -13684,9 +13675,7 @@ def test_release_merged_refuses_what_its_landing_does_not_back_and_keeps_every_c
     E-REL-25). An issue-less lane's claim is keyed by its branch, so an
     unclaimed lane says nothing about the claimed lane its pull request came
     from: REL-09 refuses as before."""
-    landing = _trunk_landing(
-        MERGE_COMMIT_SHA, workboard.TrunkWorkItemClassification((WORK_ITEM_ISSUE,))
-    )
+    landing = _trunk_landing(MERGE_COMMIT_SHA, TrunkWorkItemClassification((WORK_ITEM_ISSUE,)))
     client = merged_release_client(
         monkeypatch,
         body="No-Item: docs" if lane else "Work-Item: #72\n\nCloses #72",
@@ -13928,9 +13917,7 @@ def _release_cleanup_scenario(
         _LIVE_TRUNK_LANDINGS
         if landed_elsewhere
         else lambda *_args, **_kwargs: (
-            _trunk_landing(
-                MERGE_COMMIT_SHA, workboard.TrunkWorkItemClassification((WORK_ITEM_ISSUE,))
-            ),
+            _trunk_landing(MERGE_COMMIT_SHA, TrunkWorkItemClassification((WORK_ITEM_ISSUE,))),
         ),
     )
     _patch_store_write(monkeypatch, store_claim_from_request(standing))
@@ -14548,9 +14535,7 @@ def test_release_branch_selects_a_lane_claim_without_checking_out_that_branch(
             checkout,
             "trunk_landings",
             lambda *_args, **_kwargs: (
-                _trunk_landing(
-                    MERGE_COMMIT_SHA, workboard.NoItemClassification(workboard.NoItemKind.DOCS)
-                ),
+                _trunk_landing(MERGE_COMMIT_SHA, NoItemClassification(NoItemKind.DOCS)),
             ),
         )
     _patch_release_session(
@@ -14955,10 +14940,8 @@ def test_next_names_a_recovery_item_before_the_item_it_recommends(
 CHECKED_ISSUE = 81
 
 
-def open_dependency(number: int, repository: str = REPOSITORY) -> workboard.IssueDependency:
-    return workboard.IssueDependency(
-        workboard.IssueReference(repository, number), workboard.BlockerState.OPEN, False
-    )
+def open_dependency(number: int, repository: str = REPOSITORY) -> IssueDependency:
+    return IssueDependency(workboard.IssueReference(repository, number), BlockerState.OPEN, False)
 
 
 def _check_trunk_repository(tmp_path: Path) -> Path:

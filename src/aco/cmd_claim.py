@@ -33,9 +33,8 @@ def _touch_line(
     """One overlapping claim, named with the paths where its scope meets
     `own_scope` -- the fact a claimant needs to know they hold both scopes
     at once, not only the other item's name (issue #206)."""
-    meeting = protocol.scope_overlap_paths(own_scope, claim.scope)
-    subject = workboard.claim_subject(claim, storage)
-    return f"{subject} on {protocol.named_with_overflow_count(meeting)}"
+    paths = protocol.named_with_overflow_count(protocol.scope_overlap_paths(own_scope, claim.scope))
+    return f"{workboard.claim_subject(claim, storage)} on {paths}"
 
 
 def _touch_summary(
@@ -303,8 +302,7 @@ def _blocked_check(
     if item is None or not item.open_blockers:
         return None
     blockers = ", ".join(
-        workboard.open_blocker_label(reference, repository, storage)
-        for reference in item.open_blockers
+        workboard.open_blocker_label(blocker, repository, storage) for blocker in item.open_blockers
     )
     return _SliceCheck(
         "warning" if out_of_order_reason is not None else "error",
@@ -322,22 +320,20 @@ def _parent_checks(
     match = workboard.slice_title_match(title)
     if match is None:
         return None
-    slice_number, parent_issue = match
-    if workboard.names_no_item(parent_issue, storage):
+    slice_number, parent_item = match
+    if workboard.names_no_item(parent_item, storage):
         return None
     parent = client.parent_issue(issue)
-    if parent is not None and parent.reference == workboard.IssueReference(
-        repository, parent_issue
-    ):
+    if parent is not None and parent.reference == workboard.IssueReference(repository, parent_item):
         return None
-    parent_label = workboard.item_label(parent_issue, storage)
+    parent_label = workboard.item_label(parent_item, storage)
     return _SliceCheck(
         "warning",
         "missing-parent",
         f"looks like slice {slice_number} of {parent_label} but is no sub-issue "
         f"of {parent_label}; the parent inherits nothing",
         slice=slice_number,
-        issue=parent_issue,
+        issue=parent_item,
     )
 
 
@@ -354,9 +350,7 @@ def _malformed_checks(item: workboard.BoardItem) -> tuple[_SliceCheck, ...] | No
     return None
 
 
-def _body_contract_checks(
-    item: workboard.BoardItem, storage: body.Storage
-) -> tuple[_SliceCheck, ...]:
+def _body_checks(item: workboard.BoardItem, storage: body.Storage) -> tuple[_SliceCheck, ...]:
     malformed = _malformed_checks(item)
     if malformed is not None:
         return malformed
@@ -421,7 +415,7 @@ def _slice_rule_checks(
             _SliceCheck("error", "missing-issue", f"issue {label} does not exist here", issue=issue)
         )
     if item is not None:
-        checks.extend(_body_contract_checks(item, storage))
+        checks.extend(_body_checks(item, storage))
     if title is not None:
         parent_check = _parent_checks(lookup.client, lookup.repository, issue, title, storage)
         if parent_check is not None:

@@ -1941,21 +1941,20 @@ def verify_landing_authority(
 
 
 def _newest_landed_commit(
-    landings: tuple[TrunkLanding, ...], number: int, storage: body.Storage
+    landings: tuple[TrunkLanding, ...], item: int, storage: body.Storage
 ) -> str:
     """The most recent first-parent trunk commit whose own trailer names
-    `number` (issue #359, LAND-47): the empty-value form of `release
+    `item` (issue #359, LAND-47): the empty-value form of `release
     --merged`'s own sha argument under `storage = "state-ref"`."""
     for landing in reversed(landings):
         classification = landing.classification
         if (
             isinstance(classification, workboard.TrunkWorkItemClassification)
-            and number in classification.numbers
+            and item in classification.numbers
         ):
             return landing.sha
     raise protocol.ClaimUnavailableError(
-        "no trunk commit carries a Work-Item: trailer naming "
-        f"{workboard.item_label(number, storage)}"
+        f"no trunk commit carries a Work-Item: trailer naming {workboard.item_label(item, storage)}"
     )
 
 

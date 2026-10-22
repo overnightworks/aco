@@ -1341,15 +1341,13 @@ class GitHubForge:
         )
         children: list[workboard.ChildItem] = []
         for value in self._json_lines(raw, "sub-issue"):
-            reference = self._issue_reference(value, "sub-issue")
-            if reference.repository != self.repository.path:
+            child = self._issue_reference(value, "sub-issue")
+            if child.repository != self.repository.path:
                 raise forge.ForgeMalformedResponseError(
                     "GitHub returned a sub-issue from another repository"
                 )
             state = self._issue_state(value, "sub-issue")
-            children.append(
-                workboard.ChildItem(reference.number, workboard.ChildState(state.value))
-            )
+            children.append(workboard.ChildItem(child.number, workboard.ChildState(state.value)))
         return tuple(children)
 
     def default_branch(self) -> str:

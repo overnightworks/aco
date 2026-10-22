@@ -473,9 +473,7 @@ class StateRefBoard:
         if kind is ItemKind.CONTAINER:
             children = self._children(item_id)
             children_total = len(children)
-            children_closed = sum(
-                1 for child in children if child.state is workboard.ChildState.CLOSED
-            )
+            children_closed = sum(child.state is workboard.ChildState.CLOSED for child in children)
         return workboard.Issue(
             record.number,
             record.title,
@@ -556,11 +554,9 @@ class StateRefBoard:
         kind = None if decoded is None else _item_kind(decoded.record.kind)
         return (
             *(
-                workboard.ChildItem(
-                    child.record.number, workboard.ChildState(child.record.state.value)
-                )
-                for child in self._items.values()
-                if child.record.parent == item_id
+                workboard.ChildItem(record.number, workboard.ChildState(record.state.value))
+                for record in (child.record for child in self._items.values())
+                if record.parent == item_id
             ),
             *(
                 workboard.ChildItem(items.item_number(child_id), workboard.ChildState.OPEN)

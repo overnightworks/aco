@@ -548,13 +548,8 @@ def test_a_claim_conflict_names_its_item_in_the_state_ref_form_the_cli_asks_for(
     with pytest.raises(protocol.ClaimConflictError) as refused:
         protocol.apply(claimed, second)
 
-    assert (
-        str(refused.value),
-        refused.value.named(workboard.item_labeller(Storage.STATE_REF)),
-    ) == (
-        forge_sentence,
-        named_sentence,
-    )
+    labeller = workboard.item_labeller(Storage.STATE_REF)
+    assert (str(refused.value), refused.value.named(labeller)) == (forge_sentence, named_sentence)
 
 
 @pytest.mark.parametrize("case", ["U1", "U2", "U3", "U4", "U5", "U5a", "U6", "U7", "U8"])

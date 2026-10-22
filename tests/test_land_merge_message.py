@@ -214,9 +214,7 @@ def world(
         assert observed == expected
         arrange_trailer_read(case, github_clone, monkeypatch)
 
-    method = (
-        case.outcome.method if isinstance(case.outcome, Landed) else workboard.MergeMethod.MERGE
-    )
+    method = case.outcome.method if isinstance(case.outcome, Landed) else Landed.method
     shared = lane_landing_world(
         github_clone,
         bare_remote,

@@ -88,6 +88,7 @@ from aco.body import (
 from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
 from aco.session import RunContext
 from aco.state_board import ItemWriter, StateRefBoard
+from aco.workboard import BlockerState, IssueDependency, IssueReference, board_payload
 
 REPOSITORY_PATH = "acme/items"
 REPOSITORY = forge.RepositoryId("file", ("acme",), "items")
@@ -246,11 +247,7 @@ GITHUB_CHILDREN = {
 }
 GITHUB_DEPENDENCIES = {
     CHILD_B_NUMBER: (
-        workboard.IssueDependency(
-            workboard.IssueReference(REPOSITORY_PATH, CHILD_A_NUMBER),
-            workboard.BlockerState.OPEN,
-            False,
-        ),
+        IssueDependency(IssueReference(REPOSITORY_PATH, CHILD_A_NUMBER), BlockerState.OPEN, False),
     )
 }
 
@@ -1135,7 +1132,7 @@ class TestStateRefBoardMethods:
 
         dependencies = adapter.list_board_dependencies(CHILD_B_NUMBER)
 
-        assert dependencies[0].state is workboard.BlockerState.CLOSED
+        assert dependencies[0].state is BlockerState.CLOSED
         assert dependencies[0].closed_at == datetime(2026, 9, 14, tzinfo=UTC)
 
     def test_list_recently_closed_issues_keeps_only_items_closed_at_or_after_the_cutoff(
@@ -1209,7 +1206,7 @@ class TestStateRefBoardAgainstARealStateTree:
     def test_reads_a_childs_parent(self, state_ref_board: StateRefBoard) -> None:
         parent = state_ref_board.parent_issue(CHILD_A_NUMBER)
         assert parent is not None
-        assert parent.reference == workboard.IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
+        assert parent.reference == IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
         assert parent.kind is ItemKind.CONTAINER
 
     def test_a_missing_number_is_missing(self, state_ref_board: StateRefBoard) -> None:
@@ -1323,7 +1320,7 @@ def _rulings_lines(
 
 
 _EXPECTED_BOARD = _projected(_github_fake(), storage=Storage.GITHUB)
-EXPECTED_BOARD_PAYLOAD = workboard.board_payload(_EXPECTED_BOARD)
+EXPECTED_BOARD_PAYLOAD = board_payload(_EXPECTED_BOARD)
 EXPECTED_NEXT_ACTION = workboard.next_action(_EXPECTED_BOARD)
 EXPECTED_RULINGS_LINES = _rulings_lines(_github_fake(), _EXPECTED_BOARD, storage=Storage.GITHUB)
 # `rulings`' own header line names the item under the pin (issue #292):
@@ -1344,7 +1341,7 @@ EXPECTED_RULINGS_LINES_BY_STORAGE = {
 # that text correctly; the two payloads otherwise agree apart from the
 # id-shaped pins, since this scenario carries no merged pull request at all
 # (issue #371 retired the one line that used to differ).
-EXPECTED_STATE_REF_BOARD_PAYLOAD = workboard.board_payload(
+EXPECTED_STATE_REF_BOARD_PAYLOAD = board_payload(
     _projected(_github_fake(), storage=Storage.STATE_REF)
 )
 EXPECTED_BOARD_PAYLOAD_BY_STORAGE = {
@@ -1365,8 +1362,8 @@ _EXPECTED_BOARD_WITH_LIVE_CLAIM = _projected(
     claims=(LIVE_CLAIM,),
 )
 EXPECTED_BOARD_WITH_LIVE_CLAIM_PAYLOAD_BY_STORAGE = {
-    Storage.GITHUB: workboard.board_payload(_EXPECTED_BOARD_WITH_LIVE_CLAIM),
-    Storage.STATE_REF: workboard.board_payload(
+    Storage.GITHUB: board_payload(_EXPECTED_BOARD_WITH_LIVE_CLAIM),
+    Storage.STATE_REF: board_payload(
         _projected(
             _github_fake(open_pull_requests=(LIVE_CLAIM_OPEN_PULL_REQUEST,)),
             storage=Storage.STATE_REF,
@@ -1419,7 +1416,7 @@ class TestTwoAdapterParity:
 
         built = _projected(client, storage=storage)
 
-        assert workboard.board_payload(built) == EXPECTED_BOARD_PAYLOAD_BY_STORAGE[storage]
+        assert board_payload(built) == EXPECTED_BOARD_PAYLOAD_BY_STORAGE[storage]
         assert workboard.next_action(built) == EXPECTED_NEXT_ACTION
         assert (
             _rulings_lines(client, built, storage=storage)
@@ -1455,10 +1452,7 @@ class TestTwoAdapterParity:
 
         built = _projected(client, storage=storage, claims=(LIVE_CLAIM,))
 
-        assert (
-            workboard.board_payload(built)
-            == EXPECTED_BOARD_WITH_LIVE_CLAIM_PAYLOAD_BY_STORAGE[storage]
-        )
+        assert board_payload(built) == EXPECTED_BOARD_WITH_LIVE_CLAIM_PAYLOAD_BY_STORAGE[storage]
 
 
 class TestStateRefBoardWrites:
@@ -1830,7 +1824,7 @@ class TestStateRefBoardWrites:
         assert reference.title == "Slice C"
         parent = adapter.parent_issue(child_number)
         assert parent is not None
-        assert parent.reference == workboard.IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
+        assert parent.reference == IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
         assert child_number in {child.number for child in adapter.list_children(CONTAINER_NUMBER)}
 
         adapter.link_child(CONTAINER_NUMBER, child_number)  # no-op: must not raise or change state
