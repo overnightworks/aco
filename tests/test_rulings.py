@@ -18,7 +18,7 @@ from board_fixtures import (
 from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
-from agent_coordination import board
+from agent_coordination import workboard
 
 
 @pytest.fixture(autouse=True)
@@ -120,7 +120,7 @@ def test_rulings_lists_items_and_lines(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     github_clone: Path,
-    issues: tuple[board.Issue, ...],
+    issues: tuple[workboard.Issue, ...],
     expected: str,
     config: str | None,
 ) -> None:
@@ -297,7 +297,7 @@ def test_rulings_lists_items_and_lines(
 def test_rulings_json(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    issues: tuple[board.Issue, ...],
+    issues: tuple[workboard.Issue, ...],
     expected: dict[str, object],
     raw: str | None,
 ) -> None:
@@ -447,7 +447,7 @@ def test_rulings_json(
 def test_rulings_orders_items(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    issues: tuple[board.Issue, ...],
+    issues: tuple[workboard.Issue, ...],
     as_json: bool,
     headers: list[str],
     numbers: list[int],
@@ -458,7 +458,7 @@ def test_rulings_orders_items(
         monkeypatch,
         FakeForge(
             board_issues=issues,
-            board_open_pull_requests=(board.PullRequest(200, "Fixes #50", "", "branch"),),
+            board_open_pull_requests=(workboard.PullRequest(200, "Fixes #50", "", "branch"),),
         ),
     )
     capsys.readouterr()
@@ -514,7 +514,7 @@ def test_rulings_orders_items(
 def test_rulings_preserves_json_content(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    issues: tuple[board.Issue, ...],
+    issues: tuple[workboard.Issue, ...],
     fields: tuple[str, ...],
     expected: tuple[object, ...],
 ) -> None:

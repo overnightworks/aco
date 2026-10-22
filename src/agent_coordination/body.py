@@ -1,12 +1,12 @@
 """The body-block codec (issue #419, audit #365 finding 3): parses, validates,
 renders, and names defects for one work-item body's typed `aco`
 fenced block -- the `[[expectation]]`/`[[slice]]` arrays, `scope`/`size`/
-`whole`, and the state-ref-only `[record]` table. `board.py` imports this
+`whole`, and the state-ref-only `[record]` table. `workboard.py` imports this
 codec for its own board-builder domain (`Contract`, `ParsedBody`,
 `BodyReadState`, `Storage`, `ItemKind`, ... are all board-domain field types
 too, read straight off a parsed body); `items.py` and `state_board.py`
-import it for the same one schema `board.py` used to own alone. This module
-never imports `board`, `items`, or `state_board` back (Layers contract):
+import it for the same one schema `workboard.py` used to own alone. This module
+never imports `workboard`, `items`, or `state_board` back (Layers contract):
 `items` may import this module, never the reverse, so a value both this
 codec and `items.py` need (`ORIGIN_PATTERN`) is owned here instead.
 """
@@ -29,7 +29,7 @@ from . import metrics, protocol
 # spaces/tabs are allowed after the run (` ``` `, never ` ```python `), so
 # `Closing`'s stricter pattern requires nothing but whitespace to follow.
 # A 4-space-indented code block (CommonMark's other fencing form) is not
-# modeled here; see `board.py`'s `_live_text` for why that gap is safe.
+# modeled here; see `workboard.py`'s `_live_text` for why that gap is safe.
 FENCE_OPENING_PATTERN = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})")
 FENCE_CLOSING_PATTERN = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})[ \t]*$")
 

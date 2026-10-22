@@ -29,7 +29,7 @@ from github_fixtures import (
 )
 from store_fixtures import claim_intent, state_ref_tip
 
-from agent_coordination import board, checkout, forge, protocol, store
+from agent_coordination import checkout, forge, protocol, store, workboard
 
 
 @dataclass(frozen=True)
@@ -95,7 +95,7 @@ def separate_world(
     case: SeparateCase = request.param
 
     def arrange(client: FakeForge, _head: str) -> None:
-        client.allowed_methods = frozenset({board.MergeMethod.SQUASH})
+        client.allowed_methods = frozenset({workboard.MergeMethod.SQUASH})
         client.closes_on_merge = True
 
     original = landed_world(
@@ -156,7 +156,7 @@ def separate_world(
         "landing.user.email": "lander@example.com\n",
         "original.user.name": "Original\n",
         "original.user.email": "original@example.com\n",
-        "allowed.methods": frozenset({board.MergeMethod.SQUASH}),
+        "allowed.methods": frozenset({workboard.MergeMethod.SQUASH}),
         "closes-on-merge": True,
         "toplevel": clone,
         "cwd": clone,
@@ -278,7 +278,7 @@ class RerunCase:
     identity: protocol.ClaimIdentity = field(default_factory=lambda: protocol.IssueIdentity(72))
     branch: str = "codex/issue-72-claims"
     body: str = "Work-Item: #72\n\nCloses #72"
-    method: board.MergeMethod = board.MergeMethod.MERGE
+    method: workboard.MergeMethod = workboard.MergeMethod.MERGE
     title: str = "feat: land the lane (#12)"
     merge_body: str = "Work-Item: #72"
     merge_trailers: str = "Work-Item: #72\n"
@@ -780,7 +780,7 @@ class TestLandAfterMergeRerun:
             ),
             pytest.param(
                 RerunCase(
-                    method=board.MergeMethod.SQUASH,
+                    method=workboard.MergeMethod.SQUASH,
                     merge_parents=1,
                     lane_ancestor=1,
                     arguments=("land", "12", "--head", "0000000"),

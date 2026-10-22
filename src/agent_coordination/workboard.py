@@ -18,7 +18,7 @@ from . import items, metrics, protocol
 # The body-block codec (issue #419, audit #365 finding 3): parsed, validated,
 # and rendered in `body.py`, one layer below this module. Every reader
 # imports the names it needs from `body` directly (operator ruling
-# 16.09.2026, audit #370 finding 10); `board.py` itself imports only what
+# 16.09.2026, audit #370 finding 10); `workboard.py` itself imports only what
 # its own board-builder code below actually calls.
 from .body import (
     BLOCK_FENCE_INFO,
@@ -623,7 +623,7 @@ class SizeClassMeasurement:
     """One size class's own row in the board's measurements section (issue
     #357): `metrics.SizeClassStats`' median/p80/n/weak, plus the first and
     last measured lane's own timestamp -- dates `metrics.py` never computes
-    (it holds no clock), so `board.py` joins them from the same lane events
+    (it holds no clock), so `workboard.py` joins them from the same lane events
     `metrics.measure` read to build `stats`."""
 
     stats: metrics.SizeClassStats
@@ -1802,7 +1802,7 @@ class BoardBuildInputs:
     dependencies: Mapping[int, tuple[IssueDependency, ...]] = field(default_factory=dict)
     requests: int = 0
     # Each live claim's age (issue #176, §1): a committer date the caller
-    # already read from the store's git history, since board.py's own build
+    # already read from the store's git history, since workboard.py's own build
     # stays pure and never reaches for git itself. Keyed by claim_id.
     claim_ages: Mapping[str, datetime] = field(default_factory=dict)
     # The board source's own capability (issue #248), never the storage

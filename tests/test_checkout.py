@@ -35,7 +35,7 @@ from cli_fixtures import (
     stub_one_git_call,
 )
 
-from agent_coordination import board, checkout, process, store
+from agent_coordination import checkout, process, store, workboard
 from agent_coordination import cli as issue_claim
 from agent_coordination.protocol import ClaimError, ClaimRequest
 
@@ -892,7 +892,7 @@ def test_versioned_paths_reads_nul_terminated_ls_files_without_stripping(
         pytest.param(_LIVE_VERSIONED_PATHS, "ls-files", id="versioned-paths"),
         pytest.param(lambda: checkout.remote_url("origin"), "config", id="remote-url"),
         pytest.param(
-            lambda: checkout.path_is_tracked(board.CONFIG_PATH.as_posix()),
+            lambda: checkout.path_is_tracked(workboard.CONFIG_PATH.as_posix()),
             "ls-files",
             id="path-is-tracked",
         ),
@@ -937,7 +937,7 @@ def test_checkout_git_calls_fail_loud_when_git_is_missing_or_times_out(
     [
         pytest.param(_LIVE_VERSIONED_PATHS, id="versioned-paths"),
         pytest.param(
-            lambda: checkout.path_is_tracked(board.CONFIG_PATH.as_posix()), id="path-is-tracked"
+            lambda: checkout.path_is_tracked(workboard.CONFIG_PATH.as_posix()), id="path-is-tracked"
         ),
     ],
 )
@@ -973,7 +973,7 @@ def test_path_is_tracked_reads_the_git_ls_files_exit_status(
     """`git ls-files --error-unmatch` exits 0 for a path git tracks and 1
     for any path it does not -- absent, merely untracked, and ignored alike
     (issue #315): the caller never has to tell those apart."""
-    board_config_path = board.CONFIG_PATH.as_posix()
+    board_config_path = workboard.CONFIG_PATH.as_posix()
     observed: list[list[str]] = []
 
     def run(arguments, **_kwargs):
@@ -1003,14 +1003,14 @@ def _ignored_board_config(repository: Path) -> None:
 
 def _tracked_board_config(repository: Path) -> None:
     _untracked_board_config(repository)
-    real_git(repository, "add", board.CONFIG_PATH.as_posix())
+    real_git(repository, "add", workboard.CONFIG_PATH.as_posix())
     real_git(repository, "commit", "-q", "-m", "add board config")
 
 
 def _tracked_but_ignored_board_config(repository: Path) -> None:
     _write_gitignore_for_dot_directories(repository)
     _untracked_board_config(repository)
-    real_git(repository, "add", "-f", board.CONFIG_PATH.as_posix())
+    real_git(repository, "add", "-f", workboard.CONFIG_PATH.as_posix())
     real_git(repository, "commit", "-q", "-m", "add board config despite ignore")
 
 
@@ -1042,7 +1042,7 @@ def test_path_is_tracked_reads_real_git_index_and_ignore_state(
     setup(repository)
     monkeypatch.chdir(repository)
 
-    assert checkout.path_is_tracked(board.CONFIG_PATH.as_posix()) is expected
+    assert checkout.path_is_tracked(workboard.CONFIG_PATH.as_posix()) is expected
 
 
 @pytest.mark.parametrize(
@@ -1115,7 +1115,7 @@ def test_trunk_landings_walk_the_trunk_ref_they_are_given_not_the_work_branch(
         checkout.TrunkLanding(
             "sha2",
             datetime(2026, 8, 30, tzinfo=UTC),
-            board.TrunkWorkItemClassification((10,)),
+            workboard.TrunkWorkItemClassification((10,)),
             ("#10",),
         ),
     )
@@ -1336,7 +1336,7 @@ def test_trunk_landings_classifies_a_control_byte_inside_a_trailer_value_as_one_
 
     [landing] = checkout.trunk_landings("refs/remotes/hub/main", 20, directory=repo)
 
-    assert landing.classification == board.ClassificationDefect(
+    assert landing.classification == workboard.ClassificationDefect(
         f"carries `Work-Item: {value}`; a trunk trailer names #n, aco-xxxxxx, or the bare number n"
     )
 
@@ -1418,9 +1418,9 @@ def test_trunk_landings_classify_merge_squash_and_rebase_commits_from_their_trai
 
     assert [landing.classification for landing in landings] == [
         None,  # the plain initial commit
-        board.TrunkWorkItemClassification((10,)),  # the merge commit
-        board.TrunkWorkItemClassification((11, 12)),  # the squash commit
-        board.NoItemClassification(board.NoItemKind.DOCS),  # the rebased commit
+        workboard.TrunkWorkItemClassification((10,)),  # the merge commit
+        workboard.TrunkWorkItemClassification((11, 12)),  # the squash commit
+        workboard.NoItemClassification(workboard.NoItemKind.DOCS),  # the rebased commit
         None,  # `Work-Item:` in prose, not a trailer (proof 2)
     ]
     side_sha = real_git(repo, "rev-parse", "sidebranch").stdout.strip()
@@ -1429,7 +1429,7 @@ def test_trunk_landings_classify_merge_squash_and_rebase_commits_from_their_trai
     # `depth` bounds the walk to the most recent commits, oldest of those first.
     walked = checkout.trunk_landings(trunk, 2, directory=repo)
     assert [landing.classification for landing in walked] == [
-        board.NoItemClassification(board.NoItemKind.DOCS),
+        workboard.NoItemClassification(workboard.NoItemKind.DOCS),
         None,
     ]
 

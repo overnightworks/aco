@@ -31,7 +31,7 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge
 
-from agent_coordination import board, body, checkout, forge, github, protocol, store
+from agent_coordination import body, checkout, forge, github, protocol, store, workboard
 from agent_coordination import cli as issue_claim
 
 
@@ -64,7 +64,7 @@ def _real_repository_with_worktree(
         for trunk_file in trunk_files:
             (main / trunk_file).parent.mkdir(parents=True, exist_ok=True)
             (main / trunk_file).write_text("tracked\n")
-        real_git(main, "add", "-f", "README.md", board.CONFIG_PATH.as_posix(), *trunk_files)
+        real_git(main, "add", "-f", "README.md", workboard.CONFIG_PATH.as_posix(), *trunk_files)
         real_git(main, "commit", "-q", "-m", "initial")
         real_git(main, "remote", "add", "origin", "https://example.invalid/example/repo.git")
         real_git(main, "update-ref", "refs/remotes/origin/main", "HEAD")
@@ -94,7 +94,7 @@ def _real_repository_with_nested_worktree(
     real_git(outer, "config", "user.email", "test@example.com")
     (outer / "README.md").write_text("hello\n")
     write_repository_config(outer)
-    real_git(outer, "add", "-f", "README.md", board.CONFIG_PATH.as_posix())
+    real_git(outer, "add", "-f", "README.md", workboard.CONFIG_PATH.as_posix())
     real_git(outer, "commit", "-q", "-m", "initial")
     real_git(outer, "remote", "add", "origin", "https://example.invalid/example/repo.git")
     real_git(outer, "update-ref", "refs/remotes/origin/main", "HEAD")

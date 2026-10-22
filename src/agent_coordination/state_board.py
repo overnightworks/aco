@@ -36,7 +36,7 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Protocol, cast
 
-from . import board, forge, items
+from . import forge, items, workboard
 from .body import (
     BLOCK_FENCE_INFO,
     RECORD_KEY,
@@ -465,7 +465,7 @@ class StateRefBoard:
         existence test behind PIN-16/PIN-17's "does not exist"."""
         return item_id in self._items or item_id in self._malformed
 
-    def _issue(self, item_id: str) -> board.Issue:
+    def _issue(self, item_id: str) -> workboard.Issue:
         decoded = self._items[item_id]
         record = decoded.record
         kind = _item_kind(record.kind)
@@ -473,8 +473,10 @@ class StateRefBoard:
         if kind is ItemKind.CONTAINER:
             children = self._children(item_id)
             children_total = len(children)
-            children_closed = sum(1 for child in children if child.state is board.ChildState.CLOSED)
-        return board.Issue(
+            children_closed = sum(
+                1 for child in children if child.state is workboard.ChildState.CLOSED
+            )
+        return workboard.Issue(
             record.number,
             record.title,
             record.labels,
@@ -525,7 +527,7 @@ class StateRefBoard:
             raise MalformedStateTreeError(_missing_parent_sentence(parent_id))
         return items.item_number(parent_id)
 
-    def parent_issue(self, number: int) -> board.ParentIssue | None:
+    def parent_issue(self, number: int) -> workboard.ParentIssue | None:
         """`number`'s parent as the board reads it; an unreadable parent
         (issue #517) is answered by its reference and whatever of its text
         still decodes, its kind unknown, so the child still reads as nested
@@ -534,18 +536,18 @@ class StateRefBoard:
         if parent_number is None:
             return None
         parent_id = self._by_number[parent_number]
-        reference = board.IssueReference(self.repository.path, parent_number)
+        reference = workboard.IssueReference(self.repository.path, parent_number)
         malformed = self._malformed.get(parent_id)
         if malformed is not None:
-            return board.ParentIssue(reference, malformed.text, None)
+            return workboard.ParentIssue(reference, malformed.text, None)
         parent = self._items[parent_id]
-        return board.ParentIssue(reference, parent.body, _item_kind(parent.record.kind))
+        return workboard.ParentIssue(reference, parent.body, _item_kind(parent.record.kind))
 
-    def list_children(self, number: int) -> tuple[board.ChildItem, ...]:
+    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
         item_id = self._by_number.get(number)
         return () if item_id is None else self._children(item_id)
 
-    def _children(self, item_id: str) -> tuple[board.ChildItem, ...]:
+    def _children(self, item_id: str) -> tuple[workboard.ChildItem, ...]:
         """`item_id`'s children, every unreadable item that may be one
         counted open (issues #517, #550): its state may not read, so its
         container never reads as childless past it, and the board offers no
@@ -554,12 +556,14 @@ class StateRefBoard:
         kind = None if decoded is None else _item_kind(decoded.record.kind)
         return (
             *(
-                board.ChildItem(child.record.number, board.ChildState(child.record.state.value))
+                workboard.ChildItem(
+                    child.record.number, workboard.ChildState(child.record.state.value)
+                )
                 for child in self._items.values()
                 if child.record.parent == item_id
             ),
             *(
-                board.ChildItem(items.item_number(child_id), board.ChildState.OPEN)
+                workboard.ChildItem(items.item_number(child_id), workboard.ChildState.OPEN)
                 for child_id, child in self._malformed.items()
                 if child.may_be_child_of(item_id, kind)
             ),
@@ -568,7 +572,7 @@ class StateRefBoard:
     def default_branch(self) -> str:
         return self._default_branch
 
-    def list_open_board_issues(self) -> tuple[board.Issue, ...]:
+    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
         """Every open item, plus every unreadable one as a row the board
         names by its defect (issue #517): its state may not read, so it
         counts as open, and one such item never hides the others."""
@@ -586,12 +590,12 @@ class StateRefBoard:
         )
 
     @staticmethod
-    def _unreadable_issue(item_id: str, malformed: _MalformedItem) -> board.Issue:
+    def _unreadable_issue(item_id: str, malformed: _MalformedItem) -> workboard.Issue:
         """`malformed`'s board row: only its id, its title when that alone
         still reads, and its defect are known -- its record's timestamps
         are not, so its age counts from this read."""
         read_at = items.format_record_timestamp(datetime.now(UTC))
-        return board.Issue(
+        return workboard.Issue(
             items.item_number(item_id),
             malformed.title or item_id,
             (),
@@ -601,7 +605,7 @@ class StateRefBoard:
             unreadable=malformed.defect,
         )
 
-    def open_issue(self, number: int) -> board.Issue | None:
+    def open_issue(self, number: int) -> workboard.Issue | None:
         """`number`'s item as the board reads it while it is open, else
         `None` -- `item new --parent`'s one look at its parent's kind (issue
         #503), which reads that one item alone, so another malformed item
@@ -630,12 +634,12 @@ class StateRefBoard:
             ),
         )
 
-    def list_board_dependencies(self, number: int) -> tuple[board.IssueDependency, ...]:
+    def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
         decoded = self._decoded(number)
         if decoded is None:
             return ()
         item_id = items.format_item_id(number)
-        dependencies: list[board.IssueDependency] = []
+        dependencies: list[workboard.IssueDependency] = []
         named: set[str] = set()
         for blocker_id in decoded.record.blocked_by:
             if blocker_id in named:
@@ -651,26 +655,26 @@ class StateRefBoard:
             if blocker.record.closed_at is not None:
                 closed_at = datetime.fromisoformat(blocker.record.closed_at).astimezone(UTC)
             dependencies.append(
-                board.IssueDependency(
-                    board.IssueReference(self.repository.path, blocker.record.number),
-                    board.BlockerState(blocker.record.state.value),
+                workboard.IssueDependency(
+                    workboard.IssueReference(self.repository.path, blocker.record.number),
+                    workboard.BlockerState(blocker.record.state.value),
                     False,
                     closed_at,
                 )
             )
         return tuple(dependencies)
 
-    def _unreadable_blocker(self, blocker_id: str) -> board.IssueDependency:
+    def _unreadable_blocker(self, blocker_id: str) -> workboard.IssueDependency:
         """An unreadable blocker (issue #517): its state does not read, so it
         keeps blocking until repaired, rather than refusing the whole board."""
-        return board.IssueDependency(
-            board.IssueReference(self.repository.path, items.item_number(blocker_id)),
-            board.BlockerState.OPEN,
+        return workboard.IssueDependency(
+            workboard.IssueReference(self.repository.path, items.item_number(blocker_id)),
+            workboard.BlockerState.OPEN,
             False,
             None,
         )
 
-    def list_open_board_pull_requests(self) -> tuple[board.PullRequest, ...]:
+    def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
         return ()
 
     def list_recently_closed_issues(self, since: datetime) -> tuple[forge.ClosedIssue, ...]:
@@ -685,7 +689,7 @@ class StateRefBoard:
 
     def list_recent_merged_board_pull_requests(
         self, since: datetime
-    ) -> tuple[board.PullRequest, ...]:
+    ) -> tuple[workboard.PullRequest, ...]:
         # `since` stays the `BoardSource` protocol's own parameter name
         # (positional identity matters for structural conformance) even
         # though this adapter never filters by it: `state-ref` cannot list

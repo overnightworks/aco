@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
 
-from . import board, body, checkout, forge, metrics, protocol, store
+from . import body, checkout, forge, metrics, protocol, store, workboard
 from .session import RunContext
 
 
@@ -21,7 +21,7 @@ def parent_closable_number(
     """The container `closed_child`'s own landing may just have completed
     (issue #348, the parent hint `release --merged`/`item close` share): its
     parent, read fresh, when every other child is already closed too and no
-    undispatched `[[slice]]` row is left to cut -- `board.closable_container_number`
+    undispatched `[[slice]]` row is left to cut -- `workboard.closable_container_number`
     is the one owner for that decision, reused rather than re-derived board-wide
     for one relation. `None` covers every non-container parent, one still
     holding another open child, an already-closed parent (a second close
@@ -33,7 +33,7 @@ def parent_closable_number(
     if parent is None:
         return None
     children = client.list_children(parent.reference.number)
-    closable = board.closable_container_number(parent, children, storage)
+    closable = workboard.closable_container_number(parent, children, storage)
     if closable is None:
         return None
     parent_is_open = client.item_reference(closable).state is forge.ItemState.OPEN
@@ -48,14 +48,14 @@ TRUNK_LANDING_DEPTH = 5000
 
 
 def validated_dependencies(
-    issues: tuple[board.Issue, ...], fetched: dict[int, tuple[board.IssueDependency, ...]]
-) -> dict[int, tuple[board.IssueDependency, ...]]:
+    issues: tuple[workboard.Issue, ...], fetched: dict[int, tuple[workboard.IssueDependency, ...]]
+) -> dict[int, tuple[workboard.IssueDependency, ...]]:
     """`fetched`, keyed by exactly the positive-`blocked_by_count` issues,
     each list checked against its own listing count (#150 §6): a length
     mismatch or a duplicated dependency is the same class of malformed
     forge response as a disagreeing container summary -- named loud rather
     than guessed through."""
-    validated: dict[int, tuple[board.IssueDependency, ...]] = {}
+    validated: dict[int, tuple[workboard.IssueDependency, ...]] = {}
     for issue in issues:
         if issue.blocked_by_count <= 0:
             continue
@@ -71,7 +71,7 @@ def validated_dependencies(
     return validated
 
 
-def load_board_config(client: forge.BoardSource, context: RunContext) -> board.BoardConfig:
+def load_board_config(client: forge.BoardSource, context: RunContext) -> workboard.BoardConfig:
     """`context`'s board configuration, validated against what `client`
     can actually do (#150 §3): reading a body's dependencies requires
     `list_board_dependencies` at read-only or better, and the typed block is
@@ -142,7 +142,7 @@ def missing_item_refusal(number: int, client: forge.ForgeReader, storage: body.S
     than typing it out again. The repository slot is the canonical remote's
     own path: `owner/repo` on a forge host, the bare remote's local path
     for a forge-less remote under `state-ref` (PIN-28)."""
-    return f"{board.item_label(number, storage)} does not exist in {client.repository.path}"
+    return f"{workboard.item_label(number, storage)} does not exist in {client.repository.path}"
 
 
 # A container's children are their own `gh list_children` subprocess call;
@@ -156,7 +156,7 @@ BOARD_CHILD_FETCH_CONCURRENCY = 4
 
 def _fetch_children(
     client: forge.BoardSource, container_numbers: tuple[int, ...]
-) -> dict[int, tuple[board.ChildItem, ...]]:
+) -> dict[int, tuple[workboard.ChildItem, ...]]:
     """Every container's children, at most `BOARD_CHILD_FETCH_CONCURRENCY`
     `gh` subprocesses at a time; excess containers queue behind it."""
     if not container_numbers:
@@ -171,7 +171,7 @@ def _fetch_children(
 
 def fetch_dependencies(
     client: forge.BoardSource, issue_numbers: tuple[int, ...]
-) -> dict[int, tuple[board.IssueDependency, ...]]:
+) -> dict[int, tuple[workboard.IssueDependency, ...]]:
     """Every named issue's `blocked_by` dependencies (#150), at most
     `BOARD_CHILD_FETCH_CONCURRENCY` `gh` subprocesses at a time -- run only
     after `build_board`'s base reads and children wave have already finished,
@@ -209,11 +209,11 @@ class ClaimHistory:
 class LandingReads:
     """What a merged release already read before its board report (issues
     #256, #492), bundled so `build_board` stays under the five-argument ceiling:
-    the dependency wave `board.freed_item_numbers` needed for the same candidate
+    the dependency wave `workboard.freed_item_numbers` needed for the same candidate
     set, and the trunk ref the release judged its landing on, which the
     board walks instead of the trunk as the last fetch left it."""
 
-    dependencies: dict[int, tuple[board.IssueDependency, ...]]
+    dependencies: dict[int, tuple[workboard.IssueDependency, ...]]
     trunk_ref: str
 
 
@@ -246,20 +246,20 @@ def build_board(
     context: RunContext,
     claims: tuple[protocol.ActiveClaim, ...],
     *,
-    issues: tuple[board.Issue, ...] | None = None,
+    issues: tuple[workboard.Issue, ...] | None = None,
     history: ClaimHistory | None = None,
     landing: LandingReads | None = None,
-) -> board.Board:
+) -> workboard.Board:
     history = history or ClaimHistory()
     now = datetime.now(UTC)
     client = context.forge
     config = load_board_config(client, context)
     if issues is None:
         issues = client.list_open_board_issues()
-    since = board.merged_pull_request_floor(issues, now)
+    since = workboard.merged_pull_request_floor(issues, now)
     # A container whose own summary already says 0 (or carries no summary at
     # all, `children_total is None`) can never own an open child either way:
-    # `board._container_progress` returns no progress at all without both numbers,
+    # `workboard._container_progress` returns no progress at all without both numbers,
     # and returns an empty open-children list when they're both 0 -- exactly
     # what an absent `children` entry already defaults to. Fetching its
     # detail list would cost a request `board` never needed (issue #168).
@@ -286,7 +286,7 @@ def build_board(
         closed_item_sizes_future = pool.submit(
             _closed_item_sizes,
             client,
-            board.closed_item_numbers(
+            workboard.closed_item_numbers(
                 history.lane_events, frozenset(issue.number for issue in issues)
             ),
             config.storage,
@@ -299,7 +299,7 @@ def build_board(
     # (issue #503), so `next` never proposes a `cut` that `cut` refuses.
     nesting_parents = {
         number: parent.reference
-        for number in board.childless_containers_with_uncut_rows(issues, config.storage)
+        for number in workboard.childless_containers_with_uncut_rows(issues, config.storage)
         if (parent := client.parent_issue(number)) is not None
     }
     if landing is None:
@@ -323,13 +323,13 @@ def build_board(
     # `Stage.CODE_LANDED`; `trunk_landings` below keeps only the timestamps,
     # also of commits that classify no work item.
     trunk_landing_items = tuple(
-        board.TrunkLandingItem(number, landing.sha, landing.committed_at)
+        workboard.TrunkLandingItem(number, landing.sha, landing.committed_at)
         for landing in trunk_landings
-        if isinstance(landing.classification, board.TrunkWorkItemClassification)
+        if isinstance(landing.classification, workboard.TrunkWorkItemClassification)
         for number in landing.classification.numbers
     )
-    return board.build_board(
-        board.BoardBuildInputs(
+    return workboard.build_board(
+        workboard.BoardBuildInputs(
             issues=issues,
             open_pull_requests=open_pull_request_rows,
             recent_merged_pull_requests=merged_pull_request_rows,
@@ -397,7 +397,7 @@ class _ObservedBoard:
     the one fetch that already read them, never a second store observation
     for the same run."""
 
-    board: board.Board
+    board: workboard.Board
     live_claims: tuple[protocol.ScopedClaim, ...]
 
 
@@ -412,7 +412,7 @@ class _StoreAndIssues:
     thread pays a round trip."""
 
     observed: protocol.ClaimState
-    issues: tuple[board.Issue, ...]
+    issues: tuple[workboard.Issue, ...]
 
 
 def _store_observation_and_issues(context: RunContext) -> _StoreAndIssues:
@@ -434,7 +434,7 @@ def _store_observation_and_issues(context: RunContext) -> _StoreAndIssues:
 def observed_board(
     context: RunContext,
     *,
-    issues: tuple[board.Issue, ...] | None = None,
+    issues: tuple[workboard.Issue, ...] | None = None,
 ) -> _ObservedBoard:
     """`board`/`rulings`/`next` share this: the store's live claims, projected
     onto forge board data (issue #176 -- claims no longer come from the
@@ -465,7 +465,9 @@ def item_body_or_refuse(
     keeps the forge's own `#n`."""
     reference = client.item_reference(number)
     if reference.state is forge.ItemState.MISSING:
-        raise protocol.ClaimUnavailableError(f"{board.item_label(number, storage)} does not exist")
+        raise protocol.ClaimUnavailableError(
+            f"{workboard.item_label(number, storage)} does not exist"
+        )
     if reference.is_landing:
         raise protocol.ClaimUnavailableError(
             f"#{number} is a pull request, not an issue; {command} needs an issue"
@@ -473,7 +475,7 @@ def item_body_or_refuse(
     return reference.body or ""
 
 
-def require_readable_item(client: forge.ForgeReader, issue: board.Issue | None) -> None:
+def require_readable_item(client: forge.ForgeReader, issue: workboard.Issue | None) -> None:
     """Refuses a board row the state-ref store set aside as unreadable with
     the store's own refusal for that item (PIN-14, PIN-15), the one sentence a
     single-item read of it prints. A row on any other storage is never

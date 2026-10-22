@@ -11,7 +11,6 @@ from enum import StrEnum
 from typing import cast
 
 from . import (
-    board,
     board_read,
     body,
     checkout,
@@ -21,6 +20,7 @@ from . import (
     report,
     state_board,
     store,
+    workboard,
 )
 from .session import RunContext
 
@@ -82,14 +82,14 @@ class _ReleaseLanding:
     made closable, if any (issue #348)."""
 
     freed: tuple[int, ...]
-    next_item: board.BoardItem | None
+    next_item: workboard.BoardItem | None
     parent_closable: int | None
 
 
 def _release_landing(
     context: RunContext,
     new_state: protocol.ClaimState,
-    landed: board.IssueReference | None,
+    landed: workboard.IssueReference | None,
     storage: body.Storage,
     trunk_ref: str,
 ) -> _ReleaseLanding:
@@ -98,7 +98,7 @@ def _release_landing(
     that transition already committed -- the caller wraps this in one broad
     `forge.ForgeError` catch, so a forge hiccup here can never undo or fail
     a release that already stood. The dependency fetch below is the one
-    round trip both `board.freed_item_numbers` and `board_read.build_board` need for
+    round trip both `workboard.freed_item_numbers` and `board_read.build_board` need for
     this same candidate set; passing it into `board_read.build_board` keeps this a
     single fetch rather than two (issue #256 review). The board walks `trunk_ref`, the ref the
     release judged its landing on (LANDCMD-21, issue #492)."""
@@ -108,7 +108,7 @@ def _release_landing(
     dependencies = board_read.validated_dependencies(
         issues, board_read.fetch_dependencies(client, candidates)
     )
-    freed = () if landed is None else board.freed_item_numbers(dependencies, landed)
+    freed = () if landed is None else workboard.freed_item_numbers(dependencies, landed)
     projected = board_read.build_board(
         context,
         tuple(new_state.claims.values()),
@@ -116,21 +116,21 @@ def _release_landing(
         history=board_read.ClaimHistory(ages=board_read.claim_ages(context.toplevel, new_state)),
         landing=board_read.LandingReads(dependencies, trunk_ref),
     )
-    action = board.next_action(projected)
+    action = workboard.next_action(projected)
     parent_closable = (
         None
         if landed is None
         else board_read.parent_closable_number(client, landed.number, storage)
     )
     return _ReleaseLanding(
-        freed, None if action is None else board.next_action_item(action), parent_closable
+        freed, None if action is None else workboard.next_action_item(action), parent_closable
     )
 
 
-def _release_next_line(item: board.BoardItem | None, storage: body.Storage) -> str:
+def _release_next_line(item: workboard.BoardItem | None, storage: body.Storage) -> str:
     if item is None:
         return "next: none"
-    label = board.item_label(item.number, storage)
+    label = workboard.item_label(item.number, storage)
     return f"next: {label} score {item.score}: {protocol.terminal_text(item.title)}"
 
 
@@ -313,7 +313,7 @@ def _refuse_a_claim_the_landing_did_not_land(
     worktree still standing, passes both: the residual #310 finding 356
     owns."""
     subject = protocol.identity_summary(
-        selected.identity, selected.branch, board.item_labeller(storage)
+        selected.identity, selected.branch, workboard.item_labeller(storage)
     )
     if selected.branch != landing_branch:
         raise protocol.ClaimUnavailableError(
@@ -334,7 +334,7 @@ def select_release_claim(
     release_branch: str | None,
     storage: body.Storage,
 ) -> protocol.ActiveClaim:
-    selected = board.selected_store_claim(
+    selected = workboard.selected_store_claim(
         observed, identity, release_branch, parsed.claim_id, storage
     )
     if (
@@ -557,7 +557,7 @@ def _report_merged_pull_request_left_nothing(
     storage = context.config.storage
     verified = _verify_merged_release(context, client, identity, merged)
     if isinstance(identity, protocol.LaneIdentity) and unclaimed_branch != verified.source_branch:
-        raise board.no_active_build_claim(identity, unclaimed_branch, storage)
+        raise workboard.no_active_build_claim(identity, unclaimed_branch, storage)
     _report_nothing_left_to_release(
         parsed,
         context,
@@ -652,9 +652,9 @@ def _landed_lane(
     item = (
         ()
         if isinstance(identity, protocol.LaneIdentity)
-        else (board.item_argument(identity.issue, storage),)
+        else (workboard.item_argument(identity.issue, storage),)
     )
-    rerun = board.advice_command("release", *item, "--merged", landing, "--branch", branch)
+    rerun = workboard.advice_command("release", *item, "--merged", landing, "--branch", branch)
     return _LandedLane(identity, branch, landed_head, rerun)
 
 
@@ -851,7 +851,7 @@ def _landing_report(
     hiccup here, or a state-ref store the board read refuses (issue #447),
     can only ever downgrade the report, never undo or fail that release."""
     landed = (
-        board.IssueReference(context.forge.repository.path, identity.issue)
+        workboard.IssueReference(context.forge.repository.path, identity.issue)
         if isinstance(identity, protocol.IssueIdentity)
         else None
     )
@@ -887,13 +887,17 @@ def _print_release_result(release_report: _ReleaseReport, *, as_json: bool) -> N
         if isinstance(landing, str):
             board_read.print_board_read_hint(landing, as_json=True)
         return
-    print(f"RELEASED {board.claim_subject(selected, release_report.storage)}: {selected.claim_id}")
+    print(
+        f"RELEASED {workboard.claim_subject(selected, release_report.storage)}: {selected.claim_id}"
+    )
     if isinstance(landing, str):
         board_read.print_board_read_hint(landing, as_json=False)
     elif landing is not None:
-        print(board.release_freed_line(landing.freed, release_report.storage))
+        print(workboard.release_freed_line(landing.freed, release_report.storage))
         print(_release_next_line(landing.next_item, release_report.storage))
-        parent_line = board.parent_closable_line(landing.parent_closable, release_report.storage)
+        parent_line = workboard.parent_closable_line(
+            landing.parent_closable, release_report.storage
+        )
         if parent_line is not None:
             print(parent_line)
     if release_report.worktree is not None:

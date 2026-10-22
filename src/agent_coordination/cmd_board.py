@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from enum import StrEnum
 
-from . import board, board_read, protocol, report
+from . import board_read, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -55,5 +55,5 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         return report.refuse(_BoardReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(_BoardReason.UNAVAILABLE, error, as_json=as_json)
-    report.emit_json(True, _BoardReason.PROJECTED, **board.board_payload(projected))
+    report.emit_json(True, _BoardReason.PROJECTED, **workboard.board_payload(projected))
     return 0

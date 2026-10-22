@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, cast
 
-from . import board, board_read, body, checkout, forge, policy, protocol, report
+from . import board_read, body, checkout, forge, policy, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -16,9 +16,9 @@ def _checked_classification(
     context: policy.LandingCheckContext,
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
-) -> board.Classification | board.ClassificationDefect:
+) -> workboard.Classification | workboard.ClassificationDefect:
     classification = policy.structural_classification(context, detail)
-    if isinstance(classification, board.ClassificationDefect):
+    if isinstance(classification, workboard.ClassificationDefect):
         return classification
     defect = policy.classification_defect(
         context, claims, detail, classification, expected_head=detail.head_sha
@@ -138,7 +138,7 @@ def _pull_request_check(
     detail = run.forge.landing(number)
     context = policy.LandingCheckContext(run, repository, storage)
     checked = _checked_classification(context, claims, detail)
-    if isinstance(checked, board.ClassificationDefect):
+    if isinstance(checked, workboard.ClassificationDefect):
         return _CheckOutcome(
             _NumberSubject(_CheckKind.PULL_REQUEST, detail.number),
             f"REFUSED: pull request #{detail.number} {checked.message}",
@@ -147,7 +147,7 @@ def _pull_request_check(
         )
     return _CheckOutcome(
         _NumberSubject(_CheckKind.PULL_REQUEST, detail.number),
-        board.pull_request_declaration(detail.number, detail.author, checked),
+        workboard.pull_request_declaration(detail.number, detail.author, checked),
         _CheckReason.VALID,
     )
 
@@ -158,7 +158,7 @@ def _missing_number(repository: str, number: int, storage: body.Storage) -> _Che
     finding = f"does not exist in {repository}"
     return _CheckOutcome(
         _NumberSubject(_CheckKind.MISSING, number),
-        f"REFUSED: {board.item_label(number, storage)} {finding}",
+        f"REFUSED: {workboard.item_label(number, storage)} {finding}",
         _CheckReason.MISSING,
         finding,
     )
@@ -166,7 +166,7 @@ def _missing_number(repository: str, number: int, storage: body.Storage) -> _Che
 
 def _issue_line(number: int, finding: str, storage: body.Storage) -> str:
     """The one shape every issue-mode answer takes."""
-    return f"ISSUE {board.item_label(number, storage)} {finding}"
+    return f"ISSUE {workboard.item_label(number, storage)} {finding}"
 
 
 def _refused_issue(
@@ -201,10 +201,12 @@ def _issue_check(
     shape = body.body_shape_check(raw_body, storage=storage)
     if shape.defects:
         return _refused_issue(number, shape.defects[0], _CheckReason(shape.verdict.value), storage)
-    blockers = board.open_dependency_blockers(client.list_board_dependencies(number), repository)
+    blockers = workboard.open_dependency_blockers(
+        client.list_board_dependencies(number), repository
+    )
     if blockers:
         labels = tuple(
-            board.open_blocker_label(blocker, repository, storage) for blocker in blockers
+            workboard.open_blocker_label(blocker, repository, storage) for blocker in blockers
         )
         return _refused_issue(
             number,
@@ -265,18 +267,18 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
 
 
 def _trunk_classification_text(
-    classification: board.TrunkClassification, storage: body.Storage
+    classification: workboard.TrunkClassification, storage: body.Storage
 ) -> str:
     """`classification`'s own display line, the trunk-trailer counterpart of
-    `board.WorkItemClassification`/`board.NoItemClassification`'s `__str__` (issue
+    `workboard.WorkItemClassification`/`workboard.NoItemClassification`'s `__str__` (issue
     #359): a trunk `Work-Item:` trailer names bare, repository-local
-    numbers (`board.TrunkWorkItemClassification.numbers`), never a qualified
-    `board.IssueReference` -- a commit's own trailer is always local -- so this
+    numbers (`workboard.TrunkWorkItemClassification.numbers`), never a qualified
+    `workboard.IssueReference` -- a commit's own trailer is always local -- so this
     lives here rather than reusing either PR-body type's `__str__`."""
-    if isinstance(classification, board.NoItemClassification):
+    if isinstance(classification, workboard.NoItemClassification):
         return f"No-Item: {classification.kind.value}"
     return "Work-Item: " + ", ".join(
-        board.item_label(number, storage) for number in classification.numbers
+        workboard.item_label(number, storage) for number in classification.numbers
     )
 
 
@@ -284,20 +286,22 @@ def _refused_trunk_commit(sha: str, finding: str, reason: _CheckReason) -> _Chec
     return _CheckOutcome(_TrunkSubject(sha), f"REFUSED: {sha} {finding}", reason, finding)
 
 
-_STATE_REF_TRAILER_PAST_THE_ID_SPACE = "carries `Work-Item:` {number}, which " + board.NAMES_NO_ITEM
+_STATE_REF_TRAILER_PAST_THE_ID_SPACE = (
+    "carries `Work-Item:` {number}, which " + workboard.NAMES_NO_ITEM
+)
 
 
 def _trailer_number_past_the_id_space(
-    classification: board.TrunkClassification, storage: body.Storage
+    classification: workboard.TrunkClassification, storage: body.Storage
 ) -> int | None:
     """LAND-68 (issue #467, #469 review): under `storage = "state-ref"` a
     trailer number past `aco-ffffff` names no item, and its label would be
-    an id `board.parse_item_reference` refuses back -- the first such
+    an id `workboard.parse_item_reference` refuses back -- the first such
     number, or `None` when every number names an item."""
-    if not isinstance(classification, board.TrunkWorkItemClassification):
+    if not isinstance(classification, workboard.TrunkWorkItemClassification):
         return None
     return next(
-        (number for number in classification.numbers if board.names_no_item(number, storage)),
+        (number for number in classification.numbers if workboard.names_no_item(number, storage)),
         None,
     )
 
@@ -321,7 +325,7 @@ def _trunk_commit_outcome(
             "carries no `Work-Item:` or `No-Item:` trailer",
             _CheckReason.INVALID_CLASSIFICATION,
         )
-    if isinstance(classification, board.ClassificationDefect):
+    if isinstance(classification, workboard.ClassificationDefect):
         return _refused_trunk_commit(
             sha, classification.message, _CheckReason.INVALID_CLASSIFICATION
         )

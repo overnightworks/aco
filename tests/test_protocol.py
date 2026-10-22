@@ -18,7 +18,7 @@ import pytest
 from board_fixtures import request, standing_active_claim
 from store_fixtures import STATE_WITH_TIP, claim_intent
 
-from agent_coordination import board, protocol
+from agent_coordination import protocol, workboard
 from agent_coordination.body import Storage
 from agent_coordination.protocol import (
     ClaimError,
@@ -150,7 +150,7 @@ def test_claim_scope_is_recorded_and_serialized_in_canonical_order() -> None:
     `cmd_claim._request` calls it at creation, `combined_scope` calls it again at
     rescope -- so a claim recorded from paths given in caller order still
     lands in `claims/<key>.toml` sorted (issue #331 R1): the body-scope
-    projection `board._canonical_scope` reuses this exact function, never a
+    projection `workboard._canonical_scope` reuses this exact function, never a
     second sort, so a body's own `scope` and a live claim's `scope` stay
     comparable as tuples no matter which order either was typed in."""
     scope = protocol.valid_scope(["scripts/issue_claim.py", "docs/COORDINATION.md"])
@@ -548,7 +548,10 @@ def test_a_claim_conflict_names_its_item_in_the_state_ref_form_the_cli_asks_for(
     with pytest.raises(protocol.ClaimConflictError) as refused:
         protocol.apply(claimed, second)
 
-    assert (str(refused.value), refused.value.named(board.item_labeller(Storage.STATE_REF))) == (
+    assert (
+        str(refused.value),
+        refused.value.named(workboard.item_labeller(Storage.STATE_REF)),
+    ) == (
         forge_sentence,
         named_sentence,
     )

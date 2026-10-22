@@ -30,7 +30,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import cast
 
-from . import board, body, checkout, forge, github, protocol, state_board, store
+from . import body, checkout, forge, github, protocol, state_board, store, workboard
 
 ForgeBuilder = Callable[["RunContext"], forge.ForgeReader]
 
@@ -150,9 +150,9 @@ class RepoMeaninglessUnderStateRefError(protocol.ClaimUnavailableError):
     generic `unavailable` bucket for every other forge-resolution refusal."""
 
 
-def board_config(toplevel: Path) -> board.BoardConfig:
+def board_config(toplevel: Path) -> workboard.BoardConfig:
     """The repository's board configuration, refused before
-    `board.load_config` ever runs when `.aco/board.toml` is not
+    `workboard.load_config` ever runs when `.aco/board.toml` is not
     actually tracked by git (#315): a `.gitignore` that ignores every
     dot-directory keeps a freshly written pin off every worktree unless it
     is force-added, and the prior silent `storage = github` default then
@@ -163,14 +163,14 @@ def board_config(toplevel: Path) -> board.BoardConfig:
     wrongly deny a valid config or bless an untracked one. A file absent
     altogether is no repair `git add -f` could make (issue #505):
     `_absent_board_config_refusal` names the repair instead."""
-    if not checkout.path_is_tracked(board.CONFIG_PATH.as_posix(), directory=toplevel):
-        if not (toplevel / board.CONFIG_PATH).exists():
+    if not checkout.path_is_tracked(workboard.CONFIG_PATH.as_posix(), directory=toplevel):
+        if not (toplevel / workboard.CONFIG_PATH).exists():
             raise protocol.ClaimUnavailableError(_absent_board_config_refusal(toplevel))
         raise protocol.ClaimUnavailableError(
-            f"{board.CONFIG_PATH} is not tracked in this checkout, so its "
-            f"storage pin cannot be trusted: git add -f {board.CONFIG_PATH}"
+            f"{workboard.CONFIG_PATH} is not tracked in this checkout, so its "
+            f"storage pin cannot be trusted: git add -f {workboard.CONFIG_PATH}"
         )
-    return board.load_config(toplevel / board.CONFIG_PATH)
+    return workboard.load_config(toplevel / workboard.CONFIG_PATH)
 
 
 @dataclass(frozen=True)
@@ -180,8 +180,8 @@ class _TrunkBoardConfiguration:
     trunk: str
     text: str
 
-    def parsed(self) -> board.BoardConfig:
-        return board.parse_config(self.text, Path(f"{self.trunk}:{board.CONFIG_PATH}"))
+    def parsed(self) -> workboard.BoardConfig:
+        return workboard.parse_config(self.text, Path(f"{self.trunk}:{workboard.CONFIG_PATH}"))
 
 
 def _trunk_board_configuration(remote: str, toplevel: Path) -> _TrunkBoardConfiguration | None:
@@ -194,7 +194,7 @@ def _trunk_board_configuration(remote: str, toplevel: Path) -> _TrunkBoardConfig
     except checkout.TrunkUnknownError:
         return None
     text = checkout.file_at_revision(
-        board.CONFIG_PATH.as_posix(), revision=trunk, directory=toplevel
+        workboard.CONFIG_PATH.as_posix(), revision=trunk, directory=toplevel
     )
     if text is None:
         return None
@@ -269,25 +269,25 @@ def _absent_board_config_refusal(toplevel: Path) -> str:
     the adoption and only needs the trunk merged in (issue #520). Otherwise --
     including a trunk that does not resolve, which tracks nothing -- the
     repository was never adopted (issue #505)."""
-    remote = board.BoardConfig().canonical_remote
+    remote = workboard.BoardConfig().canonical_remote
     unconfigured = checkout.unconfigured_remote_refusal(remote, directory=toplevel)
     if unconfigured is not None:
         return unconfigured
     trunk = _trunk_tracking_board_config(remote, toplevel)
     if trunk is None:
         return (
-            f"{board.CONFIG_PATH} does not exist in this checkout; merge a pull request "
-            f"adding only {board.CONFIG_PATH} into the default branch first, without aco "
+            f"{workboard.CONFIG_PATH} does not exist in this checkout; merge a pull request "
+            f"adding only {workboard.CONFIG_PATH} into the default branch first, without aco "
             "(fetch first if the default branch may already carry it)"
         )
     trunk_name = trunk.removeprefix("refs/remotes/")
     if _branch_removed_board_config(trunk, toplevel):
         return (
-            f"{board.CONFIG_PATH} was removed on this branch; restore it with "
-            f"git checkout {trunk_name} -- :/{board.CONFIG_PATH}"
+            f"{workboard.CONFIG_PATH} was removed on this branch; restore it with "
+            f"git checkout {trunk_name} -- :/{workboard.CONFIG_PATH}"
         )
     return (
-        f"{board.CONFIG_PATH} does not exist in this checkout, but {trunk_name} "
+        f"{workboard.CONFIG_PATH} does not exist in this checkout, but {trunk_name} "
         f"tracks it; merge {trunk_name} into this branch"
     )
 
@@ -297,7 +297,7 @@ def _branch_removed_board_config(trunk: str, toplevel: Path) -> bool:
     `trunk`: their merge base tracks it (issue #524)."""
     base = checkout.merge_base("HEAD", trunk, directory=toplevel)
     return base is not None and checkout.path_is_tracked(
-        board.CONFIG_PATH.as_posix(), directory=toplevel, revision=base
+        workboard.CONFIG_PATH.as_posix(), directory=toplevel, revision=base
     )
 
 
@@ -309,7 +309,9 @@ def _trunk_tracking_board_config(remote: str, toplevel: Path) -> str | None:
         trunk = checkout.trunk_ref(remote, directory=toplevel)
     except checkout.TrunkUnknownError:
         return None
-    if checkout.path_is_tracked(board.CONFIG_PATH.as_posix(), directory=toplevel, revision=trunk):
+    if checkout.path_is_tracked(
+        workboard.CONFIG_PATH.as_posix(), directory=toplevel, revision=trunk
+    ):
         return trunk
     return None
 
@@ -422,12 +424,12 @@ class RunContext:
         except protocol.ClaimError as error:
             raise protocol.ClaimUnavailableError(
                 "this command reads the repository's body contract from "
-                f"{board.CONFIG_PATH} and needs a checkout (a shallow one is "
+                f"{workboard.CONFIG_PATH} and needs a checkout (a shallow one is "
                 f"enough): {error}"
             ) from error
 
     @cached_property
-    def config(self) -> board.BoardConfig:
+    def config(self) -> workboard.BoardConfig:
         return board_config(self.toplevel)
 
     @property

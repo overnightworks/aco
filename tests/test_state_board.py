@@ -62,7 +62,6 @@ from store_fixtures import (
 )
 
 from agent_coordination import (
-    board,
     checkout,
     cmd_cut,
     cmd_rulings,
@@ -72,6 +71,7 @@ from agent_coordination import (
     protocol,
     session,
     store,
+    workboard,
 )
 from agent_coordination import cli as issue_claim
 from agent_coordination.body import (
@@ -205,7 +205,7 @@ CONTAINER_BODY = _github_body(_CONTAINER_PROJECTION)
 CHILD_A_BODY = _github_body(_CHILD_A_PROJECTION)
 CHILD_B_BODY = _github_body(_CHILD_B_PROJECTION)
 
-CONTAINER_ISSUE = board.Issue(
+CONTAINER_ISSUE = workboard.Issue(
     CONTAINER_NUMBER,
     "Epic",
     (),
@@ -217,7 +217,7 @@ CONTAINER_ISSUE = board.Issue(
     children_total=2,
     blocked_by_count=0,
 )
-CHILD_A_ISSUE = board.Issue(
+CHILD_A_ISSUE = workboard.Issue(
     CHILD_A_NUMBER,
     "Slice A",
     (),
@@ -227,7 +227,7 @@ CHILD_A_ISSUE = board.Issue(
     ItemKind.TASK,
     blocked_by_count=0,
 )
-CHILD_B_ISSUE = board.Issue(
+CHILD_B_ISSUE = workboard.Issue(
     CHILD_B_NUMBER,
     "Slice B",
     (),
@@ -240,14 +240,16 @@ CHILD_B_ISSUE = board.Issue(
 GITHUB_ISSUES = (CONTAINER_ISSUE, CHILD_A_ISSUE, CHILD_B_ISSUE)
 GITHUB_CHILDREN = {
     CONTAINER_NUMBER: (
-        board.ChildItem(CHILD_A_NUMBER, board.ChildState.OPEN),
-        board.ChildItem(CHILD_B_NUMBER, board.ChildState.OPEN),
+        workboard.ChildItem(CHILD_A_NUMBER, workboard.ChildState.OPEN),
+        workboard.ChildItem(CHILD_B_NUMBER, workboard.ChildState.OPEN),
     )
 }
 GITHUB_DEPENDENCIES = {
     CHILD_B_NUMBER: (
-        board.IssueDependency(
-            board.IssueReference(REPOSITORY_PATH, CHILD_A_NUMBER), board.BlockerState.OPEN, False
+        workboard.IssueDependency(
+            workboard.IssueReference(REPOSITORY_PATH, CHILD_A_NUMBER),
+            workboard.BlockerState.OPEN,
+            False,
         ),
     )
 }
@@ -740,7 +742,7 @@ def _store_item_writer(remote: Path, worktree_path: Path) -> ItemWriter:
 
     real_git(worktree_path, "config", "remote.canonical.url", str(remote))
     context = RunContext(None, build_forge=no_forge).for_directory(worktree_path, is_toplevel=True)
-    context.config = board.BoardConfig(canonical_remote="canonical", storage=Storage.STATE_REF)
+    context.config = workboard.BoardConfig(canonical_remote="canonical", storage=Storage.STATE_REF)
     return session._StoreItemWriter(context)
 
 
@@ -750,7 +752,7 @@ def state_ref_board(bare_remote: Path, worktree: Path) -> StateRefBoard:
     return _fetch_state_ref_board(bare_remote, worktree)
 
 
-def _github_fake(*, open_pull_requests: tuple[board.PullRequest, ...] = ()) -> FakeForge:
+def _github_fake(*, open_pull_requests: tuple[workboard.PullRequest, ...] = ()) -> FakeForge:
     return FakeForge(
         board_issues=GITHUB_ISSUES,
         board_open_pull_requests=open_pull_requests,
@@ -885,7 +887,7 @@ class TestMalformedItem:
         assert container is not None
         assert container.has_open_child
         assert adapter.list_children(CONTAINER_NUMBER) == (
-            board.ChildItem(MALFORMED_NUMBER, board.ChildState.OPEN),
+            workboard.ChildItem(MALFORMED_NUMBER, workboard.ChildState.OPEN),
         )
 
     @pytest.mark.parametrize(
@@ -1133,7 +1135,7 @@ class TestStateRefBoardMethods:
 
         dependencies = adapter.list_board_dependencies(CHILD_B_NUMBER)
 
-        assert dependencies[0].state is board.BlockerState.CLOSED
+        assert dependencies[0].state is workboard.BlockerState.CLOSED
         assert dependencies[0].closed_at == datetime(2026, 9, 14, tzinfo=UTC)
 
     def test_list_recently_closed_issues_keeps_only_items_closed_at_or_after_the_cutoff(
@@ -1169,8 +1171,8 @@ class TestStateRefBoardMethods:
 
         projected = _projected(adapter, storage=Storage.STATE_REF)
 
-        assert board.ideas(projected) == (CHILD_A_NUMBER,)
-        assert board.next_action(projected) is None
+        assert workboard.ideas(projected) == (CHILD_A_NUMBER,)
+        assert workboard.next_action(projected) is None
 
 
 class TestStateRefBoardAgainstARealStateTree:
@@ -1178,7 +1180,7 @@ class TestStateRefBoardAgainstARealStateTree:
         # `.body` deliberately differs between the two adapters (one carries
         # a `[record]` table, the other never does); every other field --
         # what actually drives `board`/`next` -- must still agree exactly.
-        def _identity_fields(issue: board.Issue) -> tuple[object, ...]:
+        def _identity_fields(issue: workboard.Issue) -> tuple[object, ...]:
             return (
                 issue.number,
                 issue.title,
@@ -1207,7 +1209,7 @@ class TestStateRefBoardAgainstARealStateTree:
     def test_reads_a_childs_parent(self, state_ref_board: StateRefBoard) -> None:
         parent = state_ref_board.parent_issue(CHILD_A_NUMBER)
         assert parent is not None
-        assert parent.reference == board.IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
+        assert parent.reference == workboard.IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
         assert parent.kind is ItemKind.CONTAINER
 
     def test_a_missing_number_is_missing(self, state_ref_board: StateRefBoard) -> None:
@@ -1267,7 +1269,7 @@ LIVE_CLAIM = protocol.ActiveClaim(
 # whose head matches the claim's branch. `state-ref` never sees this PR --
 # it cannot list pull requests at all -- and must still reach the identical
 # rendered stage from the claim alone.
-LIVE_CLAIM_OPEN_PULL_REQUEST = board.PullRequest(
+LIVE_CLAIM_OPEN_PULL_REQUEST = workboard.PullRequest(
     number=9001, title="", body="", head_ref_name=LIVE_CLAIM.branch
 )
 
@@ -1277,7 +1279,7 @@ def _projected(
     *,
     storage: Storage,
     claims: tuple[protocol.ScopedClaim, ...] = (),
-) -> board.Board:
+) -> workboard.Board:
     """`projected_board` fed entirely from `client`'s own read methods --
     the one assembly both parametrized cases below share, mirroring what
     `board_read.build_board` does at the CLI layer without that layer's filesystem and
@@ -1300,7 +1302,7 @@ def _projected(
         client.list_open_board_pull_requests(),
         client.list_recent_merged_board_pull_requests(OBSERVED_AT),
         claims,
-        board.BoardConfig(storage=storage),
+        workboard.BoardConfig(storage=storage),
         repository=REPOSITORY_PATH,
         now=OBSERVED_AT,
         children=children,
@@ -1313,7 +1315,7 @@ def _projected(
 
 
 def _rulings_lines(
-    client: forge.BoardSource, built: board.Board, *, storage: Storage
+    client: forge.BoardSource, built: workboard.Board, *, storage: Storage
 ) -> tuple[str, ...]:
     bodies = {issue.number: issue.body for issue in client.list_open_board_issues()}
     rows = cmd_rulings._rulings_rows(built, bodies, storage=storage)
@@ -1321,8 +1323,8 @@ def _rulings_lines(
 
 
 _EXPECTED_BOARD = _projected(_github_fake(), storage=Storage.GITHUB)
-EXPECTED_BOARD_PAYLOAD = board.board_payload(_EXPECTED_BOARD)
-EXPECTED_NEXT_ACTION = board.next_action(_EXPECTED_BOARD)
+EXPECTED_BOARD_PAYLOAD = workboard.board_payload(_EXPECTED_BOARD)
+EXPECTED_NEXT_ACTION = workboard.next_action(_EXPECTED_BOARD)
 EXPECTED_RULINGS_LINES = _rulings_lines(_github_fake(), _EXPECTED_BOARD, storage=Storage.GITHUB)
 # `rulings`' own header line names the item under the pin (issue #292):
 # `aco-xxxxxx` under state-ref, `#n` unchanged under github -- the same
@@ -1342,7 +1344,7 @@ EXPECTED_RULINGS_LINES_BY_STORAGE = {
 # that text correctly; the two payloads otherwise agree apart from the
 # id-shaped pins, since this scenario carries no merged pull request at all
 # (issue #371 retired the one line that used to differ).
-EXPECTED_STATE_REF_BOARD_PAYLOAD = board.board_payload(
+EXPECTED_STATE_REF_BOARD_PAYLOAD = workboard.board_payload(
     _projected(_github_fake(), storage=Storage.STATE_REF)
 )
 EXPECTED_BOARD_PAYLOAD_BY_STORAGE = {
@@ -1363,8 +1365,8 @@ _EXPECTED_BOARD_WITH_LIVE_CLAIM = _projected(
     claims=(LIVE_CLAIM,),
 )
 EXPECTED_BOARD_WITH_LIVE_CLAIM_PAYLOAD_BY_STORAGE = {
-    Storage.GITHUB: board.board_payload(_EXPECTED_BOARD_WITH_LIVE_CLAIM),
-    Storage.STATE_REF: board.board_payload(
+    Storage.GITHUB: workboard.board_payload(_EXPECTED_BOARD_WITH_LIVE_CLAIM),
+    Storage.STATE_REF: workboard.board_payload(
         _projected(
             _github_fake(open_pull_requests=(LIVE_CLAIM_OPEN_PULL_REQUEST,)),
             storage=Storage.STATE_REF,
@@ -1385,7 +1387,7 @@ class TestStateRefInFlightWithoutPullRequests:
         built = _projected(state_ref_board, storage=Storage.STATE_REF, claims=(LIVE_CLAIM,))
 
         item = next(item for item in built.items if item.number == CHILD_A_NUMBER)
-        assert item.stage is board.Stage.IN_FLIGHT
+        assert item.stage is workboard.Stage.IN_FLIGHT
 
 
 class TestTwoAdapterParity:
@@ -1417,8 +1419,8 @@ class TestTwoAdapterParity:
 
         built = _projected(client, storage=storage)
 
-        assert board.board_payload(built) == EXPECTED_BOARD_PAYLOAD_BY_STORAGE[storage]
-        assert board.next_action(built) == EXPECTED_NEXT_ACTION
+        assert workboard.board_payload(built) == EXPECTED_BOARD_PAYLOAD_BY_STORAGE[storage]
+        assert workboard.next_action(built) == EXPECTED_NEXT_ACTION
         assert (
             _rulings_lines(client, built, storage=storage)
             == EXPECTED_RULINGS_LINES_BY_STORAGE[storage]
@@ -1454,7 +1456,8 @@ class TestTwoAdapterParity:
         built = _projected(client, storage=storage, claims=(LIVE_CLAIM,))
 
         assert (
-            board.board_payload(built) == EXPECTED_BOARD_WITH_LIVE_CLAIM_PAYLOAD_BY_STORAGE[storage]
+            workboard.board_payload(built)
+            == EXPECTED_BOARD_WITH_LIVE_CLAIM_PAYLOAD_BY_STORAGE[storage]
         )
 
 
@@ -1827,7 +1830,7 @@ class TestStateRefBoardWrites:
         assert reference.title == "Slice C"
         parent = adapter.parent_issue(child_number)
         assert parent is not None
-        assert parent.reference == board.IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
+        assert parent.reference == workboard.IssueReference(REPOSITORY_PATH, CONTAINER_NUMBER)
         assert child_number in {child.number for child in adapter.list_children(CONTAINER_NUMBER)}
 
         adapter.link_child(CONTAINER_NUMBER, child_number)  # no-op: must not raise or change state
@@ -2381,7 +2384,7 @@ class TestCliStateRefForge:
         """Issue #292 proofs 1-2: `next`'s own pick, its `Run:` command
         (issue #300 residual 3), `rulings`' row header, and `status`'s
         claimed-issue line print `aco-xxxxxx` under `storage = "state-ref"`
-        -- the same id `board.parse_item_reference` already accepts right
+        -- the same id `workboard.parse_item_reference` already accepts right
         back -- never `#n`. `board --json`'s own payload carries the same
         id-shaped pin too (issue #300 residual 2):
         `EXPECTED_STATE_REF_BOARD_PAYLOAD` above proves it against
@@ -3260,7 +3263,7 @@ class TestCliStateRefForge:
         """Issue #291 proof 5: GitHub's own equivalent
         (`tests/test_cut.py::test_cut_requires_a_valid_block_for_the_row_it_cuts`
         with case `no-aco-block`) hits
-        `board.located_block_or_refuse`'s refusal only because a fetched GitHub
+        `workboard.located_block_or_refuse`'s refusal only because a fetched GitHub
         issue can carry any body at all. A state-ref item cannot: every
         item's `[record]` table is validated once, at read time, by
         `StateRefBoard`'s own decode (issue #283) -- so a container without
@@ -5840,7 +5843,7 @@ class TestCliStateRefForge:
             capsys,
         ).expect_success()
         # `claim`'s own success line now prints the state-ref id too
-        # (issue #300 residual 1: `board.claim_subject` takes `config.storage`).
+        # (issue #300 residual 1: `workboard.claim_subject` takes `config.storage`).
         assert claim_out.splitlines()[0] == f"CLAIMED issue {child_id}: state-ref-claim"
 
         assert f"CLAIMED issue {child_id}" in run_cli(["status", child_id], capsys).expect_success()

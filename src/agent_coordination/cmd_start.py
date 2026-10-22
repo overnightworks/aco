@@ -6,7 +6,7 @@ import argparse
 from dataclasses import asdict
 from pathlib import Path
 
-from . import board, body, checkout, cmd_claim, forge, protocol
+from . import body, checkout, cmd_claim, forge, protocol, workboard
 from .session import RunContext
 
 _MOVED_REFUSAL = "the trunk moved after start checked it; run start again"
@@ -98,7 +98,7 @@ def _print_start_resume(
     claim `run` already found in the store -- the same
     `observed.claims` lookup `status`/`release` use -- rather than minting a
     second, fresh id for an item that already has one."""
-    print(f"CLAIMED {board.claim_subject(live, storage)}: {live.claim_id}")
+    print(f"CLAIMED {workboard.claim_subject(live, storage)}: {live.claim_id}")
     touches = protocol.conflicting_claims(tuple(observed.claims.values()), live)
     print(
         cmd_claim.claim_cost_line(
@@ -117,7 +117,7 @@ def _start_branch_and_slug(parsed: argparse.Namespace, context: RunContext) -> t
     git write."""
     number = parsed.item
     item = context.forge.item_reference(number)
-    label = board.item_label(number, context.config.storage)
+    label = workboard.item_label(number, context.config.storage)
     if item.state is forge.ItemState.MISSING:
         raise protocol.ClaimUnavailableError(f"issue {label} does not exist here")
     if item.state is forge.ItemState.CLOSED:
@@ -219,7 +219,7 @@ def _claim_in_start_worktree(
         claim_command = argparse.Namespace(**asdict(_start_claim_arguments(parsed)), json=False)
         return cmd_claim.claim_write(claim_command, context, worktree=target.path)
     except protocol.UncertainWriteError as error:
-        named = board.named_refusal(error, context.config.storage)
+        named = workboard.named_refusal(error, context.config.storage)
         return cmd_claim.report_uncertain_worktree_claim(named, target, command=_START_COMMAND)
     except protocol.ClaimError as error:
         return cmd_claim.refuse_claim_error(error, context, as_json=False)

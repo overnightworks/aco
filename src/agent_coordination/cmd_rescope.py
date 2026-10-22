@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from . import board, board_read, body, checkout, policy, protocol, report, session, store
+from . import board_read, body, checkout, policy, protocol, report, session, store, workboard
 
 
 class _RescopeReason(StrEnum):
@@ -227,7 +227,7 @@ def _rescoped_item_body(
         text = board_read.item_body_or_refuse(
             client, number, command=_RESCOPE_COMMAND, storage=storage
         )
-        located = board.located_block_or_refuse(
+        located = workboard.located_block_or_refuse(
             number, text, command=_RESCOPE_COMMAND, storage=storage
         )
     except protocol.ClaimError as error:
@@ -265,7 +265,7 @@ def _rescope_item_and_claim(
     try:
         return context.transition(subject, intent)
     except protocol.ClaimError as error:
-        label = board.item_label(item.number, context.config.storage)
+        label = workboard.item_label(item.number, context.config.storage)
         raise protocol.ClaimUnavailableError(
             f"{label} body scope now reads {list(intent.scope)}, but the claim was not "
             f"rescoped: {error}; run the same rescope again"
@@ -281,7 +281,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
     observed = checkout_context.observation
     protocol.require_state_ref(observed)
     try:
-        selected = board.selected_store_claim(
+        selected = workboard.selected_store_claim(
             observed,
             requested.identity,
             requested.branch,
@@ -338,7 +338,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
     if parsed.json:
         _rescope_json(rescoped)
         return 0
-    subject = board.claim_subject(rescoped, checkout_context.config.storage)
+    subject = workboard.claim_subject(rescoped, checkout_context.config.storage)
     print(f"RESCOPED {subject}: {rescoped.claim_id}")
     return 0
 

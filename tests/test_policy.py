@@ -17,7 +17,7 @@ from cli_fixtures import (
 )
 from github_fixtures import MERGE_COMMIT_SHA, FakeForge
 
-from agent_coordination import board, body, forge, github, policy, protocol
+from agent_coordination import body, forge, github, policy, protocol, workboard
 
 
 @pytest.mark.parametrize(
@@ -41,7 +41,7 @@ def test_listed_paths_judge_only_a_complete_listing(
     )
     result = policy.listed_paths(changes, MERGE_COMMIT_SHA)
     assert (
-        result.message if isinstance(result, board.ClassificationDefect) else result
+        result.message if isinstance(result, workboard.ClassificationDefect) else result
     ) == expected
 
 
@@ -85,9 +85,9 @@ def test_listed_paths_judge_only_a_complete_listing(
 def test_dependency_paths_cover_only_canonical_paths_up_to_a_slash(
     entry: str, path: str, expected: str
 ) -> None:
-    config = board.BoardConfig(dependency_paths=(entry,))
+    config = workboard.BoardConfig(dependency_paths=(entry,))
     defect = policy.dependency_rule_defect(config, lambda: frozenset({path}))
-    assert defect == board.ClassificationDefect(expected)
+    assert defect == workboard.ClassificationDefect(expected)
 
 
 FIRST_HEAD = "1" * 40
@@ -103,7 +103,7 @@ class PreflightRow:
     refusal: str = ""
     planned_scope: tuple[str, ...] = ()
     resumed_claim: protocol.ActiveClaim | None = None
-    kind: board.NoItemKind = board.NoItemKind.FIX
+    kind: workboard.NoItemKind = workboard.NoItemKind.FIX
     agent: str = "Ada"
     role: str = "builder"
     pull_request: Callable[[forge.Landing], forge.Landing] = lambda landing: landing
@@ -193,7 +193,7 @@ _ADA_LANE_CLAIM = standing_active_claim("Ada", lane=True, branch=ADOPTED_BRANCH)
                 _pull_request_refusal(
                     "declares No-Item: deps, but .aco/board.toml names no dependency_paths"
                 ),
-                kind=board.NoItemKind.DEPS,
+                kind=workboard.NoItemKind.DEPS,
             ),
             id="R27-no-dependency-paths",
         ),
@@ -247,7 +247,7 @@ _ADA_LANE_CLAIM = standing_active_claim("Ada", lane=True, branch=ADOPTED_BRANCH)
         pytest.param(
             PreflightRow(
                 planned_scope=("uv.lock",),
-                kind=board.NoItemKind.DEPS,
+                kind=workboard.NoItemKind.DEPS,
                 changes=pull_request_listing(FIRST_HEAD, forge.ChangedFile("uv.lock", None)),
                 dependency_paths=("uv.lock",),
                 listing_reads=1,
@@ -285,7 +285,7 @@ _ADA_LANE_CLAIM = standing_active_claim("Ada", lane=True, branch=ADOPTED_BRANCH)
                 _pull_request_refusal(
                     "already carries No-Item: fix; adopt never changes a classification line"
                 ),
-                kind=board.NoItemKind.DEPS,
+                kind=workboard.NoItemKind.DEPS,
                 pull_request=lambda landing: replace(landing, body="No-Item: fix"),
                 claims=(_ADA_LANE_CLAIM,),
             ),
@@ -320,7 +320,7 @@ def test_adoption_preflight_refuses_or_plans_in_precedence_order(row: PreflightR
         issue_references={ADOPTED_PULL_REQUEST: forge.ItemReference(row.reference_state, "", "")},
     )
     run = run_context_over(pull_request_forge)
-    run.config = board.BoardConfig(dependency_paths=row.dependency_paths)
+    run.config = workboard.BoardConfig(dependency_paths=row.dependency_paths)
     claim_reads: list[None] = []
 
     def claims_provider() -> protocol.ClaimState:

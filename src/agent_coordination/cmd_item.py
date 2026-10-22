@@ -11,7 +11,6 @@ from enum import StrEnum
 from typing import cast
 
 from . import (
-    board,
     board_read,
     body,
     cmd_body,
@@ -21,6 +20,7 @@ from . import (
     protocol,
     report,
     state_board,
+    workboard,
 )
 from .session import RunContext
 
@@ -239,13 +239,13 @@ def _item_new_on_github(parsed: argparse.Namespace, context: RunContext) -> int:
             error, recovery="record that sub-issue relation on the forge by hand"
         ) from error
     _print_item_new_result(
-        board.item_label(number, body.Storage.GITHUB), number, as_json=parsed.json
+        workboard.item_label(number, body.Storage.GITHUB), number, as_json=parsed.json
     )
     return 0
 
 
 def _retype_task_parent(
-    client: forge.ForgeWriter, parent: board.Issue | None, storage: body.Storage
+    client: forge.ForgeWriter, parent: workboard.Issue | None, storage: body.Storage
 ) -> None:
     """Retype an open Task `--parent` to Container before it gets its first
     child (issue #503), under either storage, and say so on stderr, leaving
@@ -254,7 +254,7 @@ def _retype_task_parent(
     if parent is None or parent.kind is not body.ItemKind.TASK:
         return
     client.set_item_kind(parent.number, body.ItemKind.CONTAINER)
-    label = board.item_label(parent.number, storage)
+    label = workboard.item_label(parent.number, storage)
     print(f"retyped {label} to Container for its first child", file=sys.stderr)
 
 
@@ -279,7 +279,9 @@ def _item_new_on_state_ref(parsed: argparse.Namespace, context: RunContext) -> i
     storage = context.config.storage
     new_body = _item_new_body(parsed, storage)
     if parent is not None and client.item_reference(parent).state is forge.ItemState.MISSING:
-        raise protocol.ClaimUnavailableError(f"{board.item_label(parent, storage)} does not exist")
+        raise protocol.ClaimUnavailableError(
+            f"{workboard.item_label(parent, storage)} does not exist"
+        )
     if not parsed.not_a_twin:
         cmd_cut.refuse_possible_twin(
             client, parsed.title, client.open_item_titles(), parent=parsed.parent, storage=storage
@@ -401,7 +403,7 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
         current_body = board_read.item_body_or_refuse(
             client, number, command=_ITEM_EDIT_SIZE_COMMAND, storage=storage
         )
-        located = board.located_block_or_refuse(
+        located = workboard.located_block_or_refuse(
             number, current_body, command=_ITEM_EDIT_SIZE_COMMAND, storage=storage
         )
         new_data = {**located.data, "size": parsed.size}
@@ -439,7 +441,7 @@ def _print_item_edit_size_result(
     if as_json:
         report.emit_json(True, outcome, item=number, size=size)
     else:
-        print(f"{_narrow_edit_word(outcome)} {board.item_label(number, storage)} size={size}")
+        print(f"{_narrow_edit_word(outcome)} {workboard.item_label(number, storage)} size={size}")
 
 
 _ITEM_EDIT_WHOLE_COMMAND = "item edit --whole"
@@ -462,7 +464,7 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
         current_body = board_read.item_body_or_refuse(
             client, number, command=_ITEM_EDIT_WHOLE_COMMAND, storage=storage
         )
-        located = board.located_block_or_refuse(
+        located = workboard.located_block_or_refuse(
             number, current_body, command=_ITEM_EDIT_WHOLE_COMMAND, storage=storage
         )
         reason = body.bounded_whole_reason(parsed.whole)
@@ -480,7 +482,9 @@ def _print_item_edit_whole_result(
     if as_json:
         report.emit_json(True, outcome, item=number, whole=reason)
     else:
-        print(f"{_narrow_edit_word(outcome)} {board.item_label(number, storage)} whole={reason}")
+        print(
+            f"{_narrow_edit_word(outcome)} {workboard.item_label(number, storage)} whole={reason}"
+        )
 
 
 _ITEM_EDIT_KIND_COMMAND = "item edit --kind"
@@ -511,7 +515,7 @@ def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
                 (issue for issue in client.list_open_board_issues() if issue.number == number),
                 None,
             )
-        label = board.item_label(number, storage)
+        label = workboard.item_label(number, storage)
         if target is None:
             raise protocol.ClaimUnavailableError(f"{label} is not an open item")
         # The retype decides with the item and its children alone (issue
@@ -536,7 +540,7 @@ def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
 def _print_item_edit_kind_result(
     number: int, kind: body.ItemKind, storage: body.Storage, outcome: _ItemReason, *, as_json: bool
 ) -> None:
-    label = board.item_label(number, storage)
+    label = workboard.item_label(number, storage)
     if as_json:
         report.emit_json(True, outcome, item=label, number=number, kind=kind.value)
     else:
@@ -579,7 +583,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
     into a hint (issue #541). Prints one line, `CLOSED aco-xxxxxx` (`--json`:
     `{"item", "number", "closed_at", "parent_closable"}`), then `release
     --merged`'s own `freed:` line -- open items whose only open local
-    blocker was this one (`board.freed_item_numbers`, issue #256; nothing new) --
+    blocker was this one (`workboard.freed_item_numbers`, issue #256; nothing new) --
     and, when this close was its parent's last open child, `release
     --merged`'s own parent hint (issue #348). Every refusal reports through
     the shared envelope as `precondition_failed` (issue #425)."""
@@ -608,7 +612,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
         _print_item_close_result(result, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
-        named = board.named_refusal(error, body.Storage.STATE_REF)
+        named = workboard.named_refusal(error, body.Storage.STATE_REF)
         return report.refuse(_ItemReason.PRECONDITION_FAILED, named, as_json=as_json)
 
 
@@ -658,8 +662,8 @@ def _item_close_freed(client: forge.ForgeReader, number: int) -> tuple[int, ...]
     dependencies = board_read.validated_dependencies(
         issues, board_read.fetch_dependencies(client, candidates)
     )
-    landed = board.IssueReference(client.repository.path, number)
-    return board.freed_item_numbers(dependencies, landed)
+    landed = workboard.IssueReference(client.repository.path, number)
+    return workboard.freed_item_numbers(dependencies, landed)
 
 
 @dataclass(frozen=True)
@@ -696,8 +700,8 @@ def _print_item_close_result(result: _ItemCloseResult, *, as_json: bool) -> None
         # `item close` only ever runs under `storage = "state-ref"`
         # (`_cmd_item_close`'s own refusal otherwise), so `freed:`'s own id
         # chooser is fixed here rather than threaded as a further field.
-        print(board.release_freed_line(result.freed, body.Storage.STATE_REF))
-    parent_line = board.parent_closable_line(result.parent_closable, body.Storage.STATE_REF)
+        print(workboard.release_freed_line(result.freed, body.Storage.STATE_REF))
+    parent_line = workboard.parent_closable_line(result.parent_closable, body.Storage.STATE_REF)
     if parent_line is not None:
         print(parent_line)
 

@@ -31,7 +31,7 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import board, body, cmd_land, forge, github, protocol, store
+from agent_coordination import body, cmd_land, forge, github, protocol, store, workboard
 from agent_coordination.protocol import ClaimError
 
 WORK_ITEM_ISSUE = 72
@@ -98,7 +98,7 @@ def merge_on_the_forge(
     default_branch: str,
     source_branch: str,
     message: str,
-    method: board.MergeMethod,
+    method: workboard.MergeMethod,
 ) -> str:
     """The commit a forge's own merge of `source_branch` into
     `default_branch` with `method` pushes to the bare `remote` -- a merge
@@ -112,7 +112,7 @@ def merge_on_the_forge(
     real_git(clone, "config", "user.name", "Forge")
     real_git(clone, "config", "user.email", "forge@example.com")
     real_git(clone, "config", "commit.gpgsign", "false")
-    if method is board.MergeMethod.SQUASH:
+    if method is workboard.MergeMethod.SQUASH:
         real_git(clone, "merge", "-q", "--squash", f"origin/{source_branch}")
         real_git(clone, "commit", "-q", "-m", message)
     else:
@@ -125,10 +125,12 @@ def merge_on_the_forge(
 
 @dataclass
 class FakeForge:
-    board_issues: tuple[board.Issue, ...] = ()
-    board_open_pull_requests: tuple[board.PullRequest, ...] = ()
-    board_merged_pull_requests: tuple[board.PullRequest, ...] = ()
-    board_dependencies: dict[int, tuple[board.IssueDependency, ...]] = field(default_factory=dict)
+    board_issues: tuple[workboard.Issue, ...] = ()
+    board_open_pull_requests: tuple[workboard.PullRequest, ...] = ()
+    board_merged_pull_requests: tuple[workboard.PullRequest, ...] = ()
+    board_dependencies: dict[int, tuple[workboard.IssueDependency, ...]] = field(
+        default_factory=dict
+    )
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     default_branch_name: str = "main"
     default_branch_error: forge.ForgeError | None = None
@@ -137,8 +139,8 @@ class FakeForge:
         default_factory=dict
     )
     changes_reads: list[int] = field(default_factory=list)
-    parents: dict[int, board.ParentIssue] = field(default_factory=dict)
-    children: dict[int, tuple[board.ChildItem, ...]] = field(default_factory=dict)
+    parents: dict[int, workboard.ParentIssue] = field(default_factory=dict)
+    children: dict[int, tuple[workboard.ChildItem, ...]] = field(default_factory=dict)
     closed_issues: set[int] = field(default_factory=set)
     recently_closed_issues: tuple[forge.ClosedIssue, ...] = ()
     closed_issue_cutoffs: list[datetime] = field(default_factory=list)
@@ -167,16 +169,20 @@ class FakeForge:
         default_factory=dict
     )
     readiness_reads: dict[int, int] = field(default_factory=dict)
-    merge_calls: list[tuple[int, str, board.MergeMethod, str, str]] = field(default_factory=list)
-    merge_requests: list[tuple[str, board.MergeMethod]] = field(default_factory=list)
+    merge_calls: list[tuple[int, str, workboard.MergeMethod, str, str]] = field(
+        default_factory=list
+    )
+    merge_requests: list[tuple[str, workboard.MergeMethod]] = field(default_factory=list)
     merge_error: forge.ForgeError | None = None
     delete_error: forge.ForgeError | None = None
     close_error: forge.ForgeError | None = None
     merge_sha: str = MERGE_COMMIT_SHA
     merge_remote: Path | None = None
     closes_on_merge: bool = False
-    allowed_methods: frozenset[board.MergeMethod] | None = None
-    branch_rules: dict[str, tuple[frozenset[board.MergeMethod], ...]] = field(default_factory=dict)
+    allowed_methods: frozenset[workboard.MergeMethod] | None = None
+    branch_rules: dict[str, tuple[frozenset[workboard.MergeMethod], ...]] = field(
+        default_factory=dict
+    )
     deleted_branches: list[str] = field(default_factory=list)
     head_board_config: str | None = ""
     file_reads: list[tuple[Path, str]] = field(default_factory=list)
@@ -235,10 +241,10 @@ class FakeForge:
             raise ClaimError("relation POST failed (simulated)")
         self.children[parent] = (
             *self.children.get(parent, ()),
-            board.ChildItem(child, board.ChildState.OPEN),
+            workboard.ChildItem(child, workboard.ChildState.OPEN),
         )
-        self.parents[child] = board.ParentIssue(
-            board.IssueReference(self.repository.path, parent), ""
+        self.parents[child] = workboard.ParentIssue(
+            workboard.IssueReference(self.repository.path, parent), ""
         )
 
     def create_child(self, *, parent: int, title: str, body: str, kind: body.ItemKind) -> int:
@@ -306,13 +312,13 @@ class FakeForge:
             return later[min(reads - 1, len(later) - 1)]
         return readiness
 
-    def allowed_merge_methods(self) -> frozenset[board.MergeMethod] | None:
+    def allowed_merge_methods(self) -> frozenset[workboard.MergeMethod] | None:
         """This fake's mirror of `GitHubForge.allowed_merge_methods` (issue
         #578): `allowed_methods`, `None` -- settings withheld -- by default."""
         self._run()
         return self.allowed_methods
 
-    def branch_merge_rules(self, branch: str) -> tuple[frozenset[board.MergeMethod], ...]:
+    def branch_merge_rules(self, branch: str) -> tuple[frozenset[workboard.MergeMethod], ...]:
         """This fake's mirror of `GitHubForge.branch_merge_rules` (issue
         #615): `branch_rules` for `branch`, no rule by default."""
         self._run()
@@ -323,7 +329,7 @@ class FakeForge:
         number: int,
         *,
         head_sha: str,
-        method: board.MergeMethod,
+        method: workboard.MergeMethod,
         title: str,
         body: str,
     ) -> str:
@@ -382,7 +388,7 @@ class FakeForge:
         self.file_reads.append((path, sha))
         return self.head_board_config
 
-    def list_open_board_issues(self) -> tuple[board.Issue, ...]:
+    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
         self._run()
         return self.board_issues
 
@@ -444,7 +450,7 @@ class FakeForge:
             raise self.default_branch_error
         return self.default_branch_name
 
-    def parent_issue(self, number: int) -> board.ParentIssue | None:
+    def parent_issue(self, number: int) -> workboard.ParentIssue | None:
         self._run()
         return self.parents.get(number)
 
@@ -453,21 +459,21 @@ class FakeForge:
         parent = self.parents.get(number)
         return parent.reference.number if parent else None
 
-    def list_children(self, number: int) -> tuple[board.ChildItem, ...]:
+    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
         self._run()
         return self.children.get(number, ())
 
-    def list_board_dependencies(self, number: int) -> tuple[board.IssueDependency, ...]:
+    def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
         self._run()
         return self.board_dependencies.get(number, ())
 
-    def list_open_board_pull_requests(self) -> tuple[board.PullRequest, ...]:
+    def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
         self._run()
         return self.board_open_pull_requests
 
     def list_recent_merged_board_pull_requests(
         self, since: datetime
-    ) -> tuple[board.PullRequest, ...]:
+    ) -> tuple[workboard.PullRequest, ...]:
         self._run()
         return self.board_merged_pull_requests
 
@@ -502,7 +508,7 @@ class ReaderOnlyForge(FakeForge):
         pytest.fail("a read-only command must never close a landed item")
 
     def merge_landing(
-        self, number: int, *, head_sha: str, method: board.MergeMethod, title: str, body: str
+        self, number: int, *, head_sha: str, method: workboard.MergeMethod, title: str, body: str
     ) -> str:
         pytest.fail("a read-only command must never merge a pull request")
 
@@ -552,13 +558,13 @@ def lane_landing_world(
     identity: protocol.ClaimIdentity,
     branch: str,
     body: str,
-    methods: frozenset[board.MergeMethod] | None,
+    methods: frozenset[workboard.MergeMethod] | None,
     default_branch: str = LANDING_DEFAULT_BRANCH,
     holder: str = "Ada",
     role: str = "builder",
     distinct_detail: bool = False,
     error: forge.ForgeError | None = None,
-    rules: tuple[frozenset[board.MergeMethod], ...] = (),
+    rules: tuple[frozenset[workboard.MergeMethod], ...] = (),
     head_config: str = "",
     arrange: Callable[[FakeForge, str], None] | None = None,
 ) -> LaneLandingWorld:
@@ -606,7 +612,7 @@ def lane_landing_world(
     merge = client.merge_landing
 
     def observe_entry(
-        number: int, *, head_sha: str, method: board.MergeMethod, title: str, body: str
+        number: int, *, head_sha: str, method: workboard.MergeMethod, title: str, body: str
     ) -> str:
         entry.append(lineage_observation(clone))
         return merge(number, head_sha=head_sha, method=method, title=title, body=body)
@@ -739,7 +745,7 @@ def landed_observations(
     result: CliRun,
     *,
     branch: str,
-    method: board.MergeMethod,
+    method: workboard.MergeMethod,
     title: str,
     parents: int,
     closed: frozenset[int],

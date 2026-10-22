@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-from . import board, board_read, body, protocol, report
+from . import board_read, body, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -17,13 +17,13 @@ class _RulingsRow:
     its `[[expectation]]` lines (open and already-ruled alike) in block
     order -- the detail `rulings` prints beneath the item's own summary."""
 
-    item: board.BoardItem
+    item: workboard.BoardItem
     progress: body.ExpectationProgress
     lines: tuple[body.ExpectationLine, ...]
 
 
 def _rulings_rows(
-    projected: board.Board, bodies: Mapping[int, str], *, storage: body.Storage
+    projected: workboard.Board, bodies: Mapping[int, str], *, storage: body.Storage
 ) -> tuple[_RulingsRow, ...]:
     """Every open board item that carries at least one `[[expectation]]`
     line, fully ruled ones included (issue #379) -- items with an open line
@@ -41,7 +41,7 @@ def _rulings_rows(
         ),
         key=lambda entry: (
             0 if entry[1].open > 0 else 1,
-            *board.board_rank(entry[0])[:2],
+            *workboard.board_rank(entry[0])[:2],
             entry[1].open,
             entry[0].number,
         ),
@@ -81,14 +81,14 @@ def _rulings_line_text(line: body.ExpectationLine) -> str:
 
 
 def _rulings_row_text(row: _RulingsRow, storage: body.Storage) -> str:
-    label = board.item_label(row.item.number, storage)
+    label = workboard.item_label(row.item.number, storage)
     title = protocol.terminal_text(row.item.title)
     header = f"{label} {row.progress.open}/{row.progress.total}: {title}"
     return "\n".join((header, *(_rulings_line_text(line) for line in row.lines)))
 
 
 def _rulings(
-    projected: board.Board, bodies: Mapping[int, str], *, as_json: bool, storage: body.Storage
+    projected: workboard.Board, bodies: Mapping[int, str], *, as_json: bool, storage: body.Storage
 ) -> None:
     rows = _rulings_rows(projected, bodies, storage=storage)
     if as_json:

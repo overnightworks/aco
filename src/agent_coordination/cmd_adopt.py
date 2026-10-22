@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import board, body, checkout, cmd_claim, forge, github, policy, protocol, report
+from . import body, checkout, cmd_claim, forge, github, policy, protocol, report, workboard
 from .session import RunContext
 
 _ADOPT_COMMAND = "adopt"
@@ -44,7 +44,7 @@ class _Adoption:
 
     context: policy.LandingCheckContext
     detail: forge.Landing
-    kind: board.NoItemKind
+    kind: workboard.NoItemKind
 
     @property
     def run(self) -> RunContext:
@@ -131,8 +131,8 @@ def _write_and_read_back(adoption: _Adoption, left_body: str) -> None:
 
 def _print_declaration(adoption: _Adoption) -> None:
     detail = adoption.detail
-    classification = board.NoItemClassification(adoption.kind)
-    print(board.pull_request_declaration(detail.number, detail.author, classification))
+    classification = workboard.NoItemClassification(adoption.kind)
+    print(workboard.pull_request_declaration(detail.number, detail.author, classification))
 
 
 def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
@@ -150,7 +150,7 @@ def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
         adoption.kind,
         resumed=resumed,
     )
-    if isinstance(left_body, board.ClassificationDefect):
+    if isinstance(left_body, workboard.ClassificationDefect):
         raise protocol.ClaimUnavailableError(f"pull request #{number} {left_body.message}")
     if left_body is not None:
         _write_and_read_back(adoption, left_body)
@@ -195,7 +195,7 @@ def _resume(adoption: _Adoption, holder: policy.HolderResume) -> int:
     """ADOPT-26: the holder's rerun builds and claims nothing; it writes the
     line only when it is missing."""
     claim = holder.claim
-    print(f"CLAIMED {board.claim_subject(claim, adoption.context.storage)}: {claim.claim_id}")
+    print(f"CLAIMED {workboard.claim_subject(claim, adoption.context.storage)}: {claim.claim_id}")
     _leave_the_line(adoption, resumed=True)
     return 0
 
@@ -222,7 +222,7 @@ def _judge(parsed: argparse.Namespace, context: RunContext) -> int:
         raise protocol.ClaimUnavailableError(_GITHUB_ONLY_REFUSAL)
     number = parsed.pull_request
     agent = parsed.agent
-    kind = board.NoItemKind(parsed.no_item)
+    kind = workboard.NoItemKind(parsed.no_item)
     adoption = _Adoption(
         policy.LandingCheckContext(main, main.forge.repository.path, storage),
         main.forge.landing(number),

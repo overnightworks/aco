@@ -9,39 +9,39 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
-from . import board, board_read, body, forge, protocol, report
+from . import board_read, body, forge, protocol, report, workboard
 from .session import RunContext
 
 _CONTAINER_KINDS = frozenset({body.ItemKind.CONTAINER})
 
 
 def open_container(
-    open_issues: Iterable[board.Issue],
+    open_issues: Iterable[workboard.Issue],
     number: int,
     storage: body.Storage,
     accepted_kinds: frozenset[body.ItemKind] = _CONTAINER_KINDS,
-) -> board.Issue:
+) -> workboard.Issue:
     """`number`'s open issue when its type is one of `accepted_kinds` --
     `cut`'s own target and `item new --parent` (issue #444) -- or why it is
     not."""
     target = next((issue for issue in open_issues if issue.number == number), None)
     if target is None:
         raise protocol.ClaimUnavailableError(
-            f"{board.item_label(number, storage)} is not an open container"
+            f"{workboard.item_label(number, storage)} is not an open container"
         )
     if target.kind not in accepted_kinds:
         raise protocol.ClaimUnavailableError(
-            f"{board.item_label(number, storage)} is not a container"
+            f"{workboard.item_label(number, storage)} is not a container"
         )
     return target
 
 
 def _cut_target(
     client: forge.ForgeWriter,
-    open_issues: Iterable[board.Issue],
+    open_issues: Iterable[workboard.Issue],
     number: int,
     storage: body.Storage,
-) -> board.Issue:
+) -> workboard.Issue:
     """The open container `cut` targets, or why it refuses before any write."""
     open_issues = tuple(open_issues)
     board_read.require_readable_item(
@@ -50,9 +50,9 @@ def _cut_target(
     target = open_container(open_issues, number, storage)
     parent = client.parent_issue(number)
     if parent is not None:
-        parent_label = board.relation_label(parent.reference, storage)
+        parent_label = workboard.relation_label(parent.reference, storage)
         raise protocol.ClaimUnavailableError(
-            f"{board.item_label(number, storage)} is itself a child of {parent_label}; "
+            f"{workboard.item_label(number, storage)} is itself a child of {parent_label}; "
             "nested containers are not supported"
         )
     return target
@@ -135,8 +135,8 @@ def _print_cut_result(outcome: _CutOutcome, storage: body.Storage, *, as_json: b
         return
     suffix = "" if outcome.row_index is None else f" row {outcome.row_index}"
     verb = "ADOPTED" if outcome.adopted else "CUT"
-    container_label = board.item_label(outcome.container, storage)
-    print(f"{verb} {container_label}{suffix} -> {board.item_label(outcome.child, storage)}")
+    container_label = workboard.item_label(outcome.container, storage)
+    print(f"{verb} {container_label}{suffix} -> {workboard.item_label(outcome.child, storage)}")
 
 
 class PartialWriteError(protocol.ClaimError):
@@ -162,7 +162,7 @@ def requested_body_scope(raw: list[str] | None) -> tuple[str, ...] | None:
 
 # Fixed text naming no child number (issue #606 line 2), so the child is
 # written once, in the same create call that mints its number.
-_CUT_CHILD_NEXT = f"Build this slice; claim it with {board.advice_command('start')}."
+_CUT_CHILD_NEXT = f"Build this slice; claim it with {workboard.advice_command('start')}."
 
 
 def _cut_child_body(
@@ -182,7 +182,7 @@ def _cut_child_body(
     (`body.names_parent`) to tell `container`'s own orphan apart from
     an unrelated open issue that merely shares the row's title (#260)."""
     fields: dict[str, object] = {
-        "now": f"Cut from {board.item_label(container, storage)}",
+        "now": f"Cut from {workboard.item_label(container, storage)}",
         "next": _CUT_CHILD_NEXT,
     }
     if done_when is not None:
@@ -190,7 +190,7 @@ def _cut_child_body(
     if scope is not None:
         fields["scope"] = list(scope)
     return body.prose_above_fresh_block(
-        body.parent_line(board.item_label(container, storage)), fields
+        body.parent_line(workboard.item_label(container, storage)), fields
     )
 
 
@@ -198,9 +198,9 @@ def _adopt_existing_child(
     client: forge.ForgeWriter,
     container: int,
     title: str,
-    config: board.BoardConfig,
-    open_issues: Iterable[board.Issue],
-) -> board.ChildItem | None:
+    config: workboard.BoardConfig,
+    open_issues: Iterable[workboard.Issue],
+) -> workboard.ChildItem | None:
     """`container`'s already-open child titled exactly `title`, so a repeat
     `cut` after a partial failure (`forge.ForgePartialChildCreationError`)
     adopts the child GitHub already recorded instead of risking a second one
@@ -229,21 +229,21 @@ def _adopt_existing_child(
         for child in client.list_children(container)
         if client.item_reference(child.number).title == title
     ]
-    open_linked = [child.number for child in linked if child.state is board.ChildState.OPEN]
+    open_linked = [child.number for child in linked if child.state is workboard.ChildState.OPEN]
     orphans = [
         issue.number
         for issue in open_issues
         if issue.title == title
         and issue.number != container
         and issue.kind is body.ItemKind.TASK
-        and not board.has_label(issue.labels, config.idea_label)
-        and body.names_parent(issue.body, board.item_label(container, config.storage))
+        and not workboard.has_label(issue.labels, config.idea_label)
+        and body.names_parent(issue.body, workboard.item_label(container, config.storage))
         and client.parent_issue(issue.number) is None
     ]
     open_matches = open_linked + orphans
-    container_label = board.item_label(container, config.storage)
+    container_label = workboard.item_label(container, config.storage)
     if len(open_matches) > 1:
-        named = ", ".join(board.item_label(number, config.storage) for number in open_matches)
+        named = ", ".join(workboard.item_label(number, config.storage) for number in open_matches)
         raise protocol.ClaimUnavailableError(
             f"{container_label}'s row {title!r} matches more than one open issue ({named}); "
             "adopt the right one by hand and remove the row"
@@ -252,13 +252,13 @@ def _adopt_existing_child(
         [number] = open_matches
         if number in orphans:
             client.link_child(container, number)
-        return board.ChildItem(number, board.ChildState.OPEN)
-    closed = next((child for child in linked if child.state is board.ChildState.CLOSED), None)
+        return workboard.ChildItem(number, workboard.ChildState.OPEN)
+    closed = next((child for child in linked if child.state is workboard.ChildState.CLOSED), None)
     if closed is None:
         return None
     raise protocol.ClaimUnavailableError(
         f"{container_label} already has a closed child "
-        f"{board.item_label(closed.number, config.storage)} titled {title!r}; "
+        f"{workboard.item_label(closed.number, config.storage)} titled {title!r}; "
         "reopen it or remove the row by hand"
     )
 
@@ -291,7 +291,7 @@ def _title_overlap(title: str, other: str) -> float:
     return len(first & second) / len(combined) if combined else 0.0
 
 
-def numbered_titles(issues: Iterable[board.Issue]) -> tuple[tuple[int, str], ...]:
+def numbered_titles(issues: Iterable[workboard.Issue]) -> tuple[tuple[int, str], ...]:
     return tuple((issue.number, issue.title) for issue in issues)
 
 
@@ -328,7 +328,7 @@ def refuse_possible_twin(
     twin = _possible_twin(title, (entry for entry in candidates if entry[0] != parent))
     if twin is not None:
         raise protocol.ClaimUnavailableError(
-            f"possible twin {board.item_label(twin, storage)}; pass --not-a-twin"
+            f"possible twin {workboard.item_label(twin, storage)}; pass --not-a-twin"
         )
 
 
@@ -402,7 +402,7 @@ def _cut_row_done_when(
         return None
     defect = body.slice_done_when_defect(located, link)
     if defect is not None:
-        board.refuse_malformed_block(number, defect, "cut", storage)
+        workboard.refuse_malformed_block(number, defect, "cut", storage)
     return link.done_when
 
 
@@ -414,15 +414,15 @@ _CUT_TYPE_RECOVERY = f"set that type on the forge by hand, then {_CUT_RERUN_RECO
 
 def _cut_slice(
     client: forge.ForgeWriter,
-    target: board.Issue,
-    open_issues: Iterable[board.Issue],
+    target: workboard.Issue,
+    open_issues: Iterable[workboard.Issue],
     parsed: argparse.Namespace,
-    config: board.BoardConfig,
+    config: workboard.BoardConfig,
 ) -> int:
     number = target.number
     storage = config.storage
-    label = board.item_label(number, storage)
-    located = board.located_block_or_refuse(number, target.body, command="cut", storage=storage)
+    label = workboard.item_label(number, storage)
+    located = workboard.located_block_or_refuse(number, target.body, command="cut", storage=storage)
     link = _cut_link(label, located, parsed.row)
     title = _child_title(label, link, parsed.title)
     child_scope = _cut_row_scope(link, requested_body_scope(parsed.scope))

@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
 
-from . import board, body, checkout, protocol, store
+from . import body, checkout, protocol, store, workboard
 from .session import RunContext
 
 # A short, still-practically-unique prefix of an `ObjectId`'s 40 hex
@@ -133,7 +133,7 @@ def _abandoned_release_command(
     target = (
         ("--branch", claim.branch)
         if isinstance(claim.identity, protocol.LaneIdentity)
-        else (board.item_argument(claim.identity.issue, storage), "--claim-id", claim.claim_id)
+        else (workboard.item_argument(claim.identity.issue, storage), "--claim-id", claim.claim_id)
     )
     if running_agent is None:
         releaser: tuple[str, ...] = ("--agent", claim.agent)
@@ -141,14 +141,14 @@ def _abandoned_release_command(
         releaser = ()
     else:
         releaser = ("--role", protocol.COORDINATOR_ROLE, "--coordinator-override")
-    return f"{board.advice_command('release', *target, *releaser)} {_ABANDONED_PLACEHOLDER}"
+    return f"{workboard.advice_command('release', *target, *releaser)} {_ABANDONED_PLACEHOLDER}"
 
 
 def _reset_live_claims_sentence(
     claims: Iterable[protocol.ActiveClaim], storage: body.Storage, running_agent: str | None
 ) -> str:
     named = [
-        f"{board.claim_subject(claim, storage)} by {claim.agent} ({claim.role}) "
+        f"{workboard.claim_subject(claim, storage)} by {claim.agent} ({claim.role}) "
         f"branch={claim.branch} claim={claim.claim_id}, release: "
         + _abandoned_release_command(claim, storage, running_agent)
         for claim in claims

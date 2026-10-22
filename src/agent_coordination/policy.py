@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cache
 
-from . import board, body, checkout, forge, protocol
+from . import body, checkout, forge, protocol, workboard
 from .session import RunContext
 
 
@@ -123,7 +123,7 @@ def _claim_defect(
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
     identity: protocol.ClaimIdentity,
-) -> board.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | None:
     """A landing declares only what its own head branch holds a live store claim on."""
     matching = next(
         (
@@ -139,7 +139,7 @@ def _claim_defect(
             if isinstance(identity, protocol.IssueIdentity)
             else "issue-less lane claim"
         )
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"has no active {subject} on branch {detail.source_branch!r}"
         )
     return None
@@ -147,13 +147,13 @@ def _claim_defect(
 
 def listed_paths(
     changes: forge.PullRequestChanges, expected_head: str
-) -> board.ClassificationDefect | frozenset[str]:
+) -> workboard.ClassificationDefect | frozenset[str]:
     if changes.before != changes.after or changes.before.head_sha != expected_head:
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             "changed while aco listed its files; run the command again"
         )
     if len(changes.files) != changes.before.changed_files:
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"lists {len(changes.files)} of its {changes.before.changed_files} changed files; "
             "aco judges only a complete listing"
         )
@@ -166,24 +166,26 @@ def listed_paths(
 
 
 def dependency_rule_defect(
-    config: board.BoardConfig,
-    listed: Callable[[], board.ClassificationDefect | frozenset[str]],
-) -> board.ClassificationDefect | None:
+    config: workboard.BoardConfig,
+    listed: Callable[[], workboard.ClassificationDefect | frozenset[str]],
+) -> workboard.ClassificationDefect | None:
     if not config.dependency_paths:
-        return board.ClassificationDefect(
-            f"declares No-Item: deps, but {board.CONFIG_PATH.as_posix()} names no dependency_paths"
+        return workboard.ClassificationDefect(
+            f"declares No-Item: deps, but {workboard.CONFIG_PATH.as_posix()} names no dependency_paths"
         )
     paths = listed()
-    if isinstance(paths, board.ClassificationDefect):
+    if isinstance(paths, workboard.ClassificationDefect):
         return paths
     outside = sorted(path for path in paths if not config.covers_dependency_path(path))
     if outside:
         named = protocol.named_with_overflow_count(
-            tuple(board.truncated_display_name(protocol.terminal_text(path)) for path in outside)
+            tuple(
+                workboard.truncated_display_name(protocol.terminal_text(path)) for path in outside
+            )
         )
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"changes {named}, which dependency_paths in "
-            f"{board.CONFIG_PATH.as_posix()} does not name"
+            f"{workboard.CONFIG_PATH.as_posix()} does not name"
         )
     return None
 
@@ -192,9 +194,9 @@ def _no_item_defect(
     context: LandingCheckContext,
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
-    kind: board.NoItemKind,
+    kind: workboard.NoItemKind,
     expected_head: str,
-) -> board.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | None:
     """Why this repository does not accept an issue-less landing as declared.
 
     A `No-Item` lane owns no issue, so it needs its own lane claim and may
@@ -208,7 +210,7 @@ def _no_item_defect(
     closing_defect = closing_reference_defect(detail.body, context.repository)
     if closing_defect is not None:
         return closing_defect
-    if kind is board.NoItemKind.DEPS:
+    if kind is workboard.NoItemKind.DEPS:
         return dependency_rule_defect(
             context.run.config,
             lambda: listed_paths(context.client.pull_request_changes(detail.number), expected_head),
@@ -216,12 +218,12 @@ def _no_item_defect(
     return None
 
 
-def closing_reference_defect(body: str, repository: str) -> board.ClassificationDefect | None:
+def closing_reference_defect(body: str, repository: str) -> workboard.ClassificationDefect | None:
     """Why an issue-less body cannot close the items it names."""
-    closing = board.closing_references(body, repository)
+    closing = workboard.closing_references(body, repository)
     if closing:
         named = ", ".join(str(reference) for reference in sorted(closing, key=str))
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"declares no work item but closes {named}; name it as the work item"
         )
     return None
@@ -254,12 +256,12 @@ class _ParentRequirement:
     it, and `FORBIDDEN` holds whether or not this is the last child.
     """
 
-    reference: board.IssueReference
-    completion: board.ParentCompletion
+    reference: workboard.IssueReference
+    completion: workboard.ParentCompletion
     last_child: bool
 
 
-def _parent_body_finding(reference: board.IssueReference, parsed: body.ParsedBody) -> str:
+def _parent_body_finding(reference: workboard.IssueReference, parsed: body.ParsedBody) -> str:
     """Why a malformed parent body refuses the last-child rule before its
     `Next` line is ever consulted (#150)."""
     defect = parsed.contract.defects[0]
@@ -267,18 +269,18 @@ def _parent_body_finding(reference: board.IssueReference, parsed: body.ParsedBod
 
 
 def _parent_reference_defect(
-    parent: board.ParentIssue, repository: str
-) -> board.ClassificationDefect | None:
+    parent: workboard.ParentIssue, repository: str
+) -> workboard.ClassificationDefect | None:
     """Whether the parent itself is even a same-repository container --
     checked before its body is read at all."""
     if parent.reference.repository != repository:
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"has parent {parent.reference} in another repository, "
             "whose children this check cannot read"
         )
     if parent.kind is not body.ItemKind.CONTAINER:
         kind_text = parent.kind.value if parent.kind is not None else "unknown"
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"has parent {parent.reference} of kind {kind_text}, which is not a "
             "container; only a container holds children"
         )
@@ -287,8 +289,8 @@ def _parent_reference_defect(
 
 def _parent_requirement(
     context: LandingCheckContext,
-    item: board.IssueReference,
-) -> _ParentRequirement | board.ClassificationDefect | None:
+    item: workboard.IssueReference,
+) -> _ParentRequirement | workboard.ClassificationDefect | None:
     """The parent's demand, read from GitHub's sub-issue relation and its
     body under the repository's own pin (#150).
 
@@ -306,18 +308,18 @@ def _parent_requirement(
         return reference_defect
     parsed_parent = body.parse_body(parent.body, storage=context.storage)
     if parsed_parent.read_state is not body.BodyReadState.VALID:
-        return board.ClassificationDefect(_parent_body_finding(parent.reference, parsed_parent))
+        return workboard.ClassificationDefect(_parent_body_finding(parent.reference, parsed_parent))
     remaining = tuple(
         child
         for child in context.client.list_children(parent.reference.number)
-        if child.state is board.ChildState.OPEN and child.number != item.number
+        if child.state is workboard.ChildState.OPEN and child.number != item.number
     )
-    completion = board.parent_completion(parsed_parent)
+    completion = workboard.parent_completion(parsed_parent)
     if not remaining:
         return _ParentRequirement(parent.reference, completion, True)
     if not parsed_parent.contract.next:
         children = "child" if len(remaining) == 1 else "children"
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"leaves parent {parent.reference} open with {len(remaining)} other open "
             f"{children}, whose body carries no Next line"
         )
@@ -325,24 +327,24 @@ def _parent_requirement(
 
 
 def _parent_closing_defect(
-    closing: frozenset[board.IssueReference],
+    closing: frozenset[workboard.IssueReference],
     requirement: _ParentRequirement | None,
-) -> board.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | None:
     """Whether closing the parent, or leaving it open, contradicts its body (LAND-21, LAND-79)."""
     if requirement is None:
         return None
     parent_closed = requirement.reference in closing
-    if parent_closed and requirement.completion is board.ParentCompletion.FORBIDDEN:
-        return board.ClassificationDefect(
+    if parent_closed and requirement.completion is workboard.ParentCompletion.FORBIDDEN:
+        return workboard.ClassificationDefect(
             f"closes parent {requirement.reference} although its body still holds "
             "an uncut slice row; cut it or delete the row first"
         )
     if (
         requirement.last_child
-        and requirement.completion is board.ParentCompletion.REQUIRED
+        and requirement.completion is workboard.ParentCompletion.REQUIRED
         and not parent_closed
     ):
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"closes the last open child of parent {requirement.reference}; close the parent too"
         )
     return None
@@ -351,13 +353,15 @@ def _parent_closing_defect(
 def _closing_defect(
     detail: forge.Landing,
     repository: str,
-    item: board.IssueReference,
+    item: workboard.IssueReference,
     requirement: _ParentRequirement | None,
-) -> board.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | None:
     """Which issues this landing must close, and that it closes nothing else."""
-    closing = board.closing_references(detail.body, repository)
+    closing = workboard.closing_references(detail.body, repository)
     if item not in closing:
-        return board.ClassificationDefect(f"carries no closing reference for its work item {item}")
+        return workboard.ClassificationDefect(
+            f"carries no closing reference for its work item {item}"
+        )
     parent_defect = _parent_closing_defect(closing, requirement)
     if parent_defect is not None:
         return parent_defect
@@ -367,7 +371,7 @@ def _closing_defect(
     besides = tuple(sorted(closing - {item} - permitted_parent, key=str))
     if besides:
         named = ", ".join(str(reference) for reference in besides)
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"closes {named} besides its work item {item}; a pull request lands one item"
         )
     return None
@@ -377,28 +381,28 @@ def _work_item_defect(
     context: LandingCheckContext,
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
-    item: board.IssueReference,
-) -> board.ClassificationDefect | None:
+    item: workboard.IssueReference,
+) -> workboard.ClassificationDefect | None:
     """Why this repository does not accept `item` as the landing pull request's work item."""
     if item.repository != context.repository:
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"names work item {item} of another repository, which holds no claim here"
         )
     claim_defect = _claim_defect(claims, detail, protocol.IssueIdentity(item.number))
     if claim_defect is not None:
         return claim_defect
     requirement = _parent_requirement(context, item)
-    if isinstance(requirement, board.ClassificationDefect):
+    if isinstance(requirement, workboard.ClassificationDefect):
         return requirement
     return _closing_defect(detail, context.repository, item, requirement)
 
 
 def cross_repository_defect(
     repository: str, detail: forge.Landing
-) -> board.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | None:
     """Why a pull request from another repository's branch is never classified (LAND-12)."""
     if detail.source_repository.path != repository:
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"proposes a branch of {detail.source_repository}; cross-repository pull "
             "requests are not classified"
         )
@@ -407,10 +411,10 @@ def cross_repository_defect(
 
 def _target_branch_defect(
     context: LandingCheckContext, detail: forge.Landing
-) -> board.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | None:
     default_branch = context.run.default_branch
     if detail.target_branch != default_branch:
-        return board.ClassificationDefect(
+        return workboard.ClassificationDefect(
             f"targets {detail.target_branch!r}, not the default branch {default_branch!r}"
         )
     return None
@@ -418,7 +422,7 @@ def _target_branch_defect(
 
 def structural_classification(
     context: LandingCheckContext, detail: forge.Landing
-) -> board.Classification | board.ClassificationDefect:
+) -> workboard.Classification | workboard.ClassificationDefect:
     """The classification `check <pr>` and `land` both start from (issue
     #405): whether this pull request's own shape -- its source repository,
     its `Work-Item:`/`No-Item:` line, its target branch -- names one item at
@@ -429,8 +433,8 @@ def structural_classification(
     cross_repository = cross_repository_defect(context.repository, detail)
     if cross_repository is not None:
         return cross_repository
-    classification = board.parse_pull_request_classification(detail.body, context.repository)
-    if isinstance(classification, board.ClassificationDefect):
+    classification = workboard.parse_pull_request_classification(detail.body, context.repository)
+    if isinstance(classification, workboard.ClassificationDefect):
         return classification
     target_branch = _target_branch_defect(context, detail)
     if target_branch is not None:
@@ -442,16 +446,16 @@ def classification_defect(
     context: LandingCheckContext,
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
-    classification: board.Classification,
+    classification: workboard.Classification,
     *,
     expected_head: str,
-) -> board.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | None:
     """Whether `classification`'s own claim, parent, and closing rules hold
     (issue #405): the second half of `cmd_check._checked_classification`, split out so
     a caller needing a live-store read only for this half (`land`'s own
     preflight, which fetches store state no earlier than this) never pays
     for one just to read the pull request's own shape."""
-    if isinstance(classification, board.NoItemClassification):
+    if isinstance(classification, workboard.NoItemClassification):
         return _no_item_defect(context, claims, detail, classification.kind, expected_head)
     return _work_item_defect(context, claims, detail, classification.item)
 
@@ -459,7 +463,7 @@ def classification_defect(
 @dataclass(frozen=True)
 class AdoptionRequest:
     number: int
-    kind: board.NoItemKind
+    kind: workboard.NoItemKind
     agent: str
     role: str
 
@@ -486,7 +490,7 @@ class AdoptionRefusal:
     sentence: str
 
 
-def _adoption_refusal(number: int, defect: board.ClassificationDefect) -> AdoptionRefusal:
+def _adoption_refusal(number: int, defect: workboard.ClassificationDefect) -> AdoptionRefusal:
     return AdoptionRefusal(f"pull request #{number} {defect.message}")
 
 
@@ -516,30 +520,30 @@ def adoption_holder(
         return HolderResume(holders[0])
     return AdoptionRefusal(
         protocol.claimed_by_sentence(
-            protocol.LaneIdentity(), branch, foreign, board.item_labeller(storage)
+            protocol.LaneIdentity(), branch, foreign, workboard.item_labeller(storage)
         )
     )
 
 
 def _line_defect(
-    body_text: str, state: board.ClassificationLineState, *, resumed: bool
-) -> board.ClassificationDefect | None:
+    body_text: str, state: workboard.ClassificationLineState, *, resumed: bool
+) -> workboard.ClassificationDefect | None:
     """ADOPT-05, ADOPT-30: adopt never changes a classification line; only a
     resumed rerun keeps its own."""
-    if state is board.ClassificationLine.ABSENT or (
-        resumed and state is board.ClassificationLine.PRESENT
+    if state is workboard.ClassificationLine.ABSENT or (
+        resumed and state is workboard.ClassificationLine.PRESENT
     ):
         return None
-    if resumed and isinstance(state, board.MalformedClassificationLines):
-        return board.ClassificationDefect(
+    if resumed and isinstance(state, workboard.MalformedClassificationLines):
+        return workboard.ClassificationDefect(
             f"{state.defect.message}; adopt never changes a classification line"
         )
     live_line = (
         state.line
-        if isinstance(state, board.OtherClassificationLine)
-        else board.live_classification_line(body_text)
+        if isinstance(state, workboard.OtherClassificationLine)
+        else workboard.live_classification_line(body_text)
     )
-    return board.ClassificationDefect(
+    return workboard.ClassificationDefect(
         f"already carries {live_line}; adopt never changes a classification line"
     )
 
@@ -547,10 +551,10 @@ def _line_defect(
 def adoption_body(
     context: LandingCheckContext,
     detail: forge.Landing,
-    kind: board.NoItemKind,
+    kind: workboard.NoItemKind,
     *,
     resumed: bool,
-) -> board.ClassificationDefect | str | None:
+) -> workboard.ClassificationDefect | str | None:
     """The one decider of what `aco adopt` writes: the body it leaves on the
     pull request, `None` when `detail.body` already reads as adopt leaves it
     (a resumed rerun keeps its own line, ADOPT-26), or why it is no issue-less
@@ -558,18 +562,18 @@ def adoption_body(
     read `No-Item: <kind>` once the line is added (ADOPT-11), it targets
     another branch than the default (ADOPT-04), or it closes an item
     (ADOPT-07)."""
-    state = board.classification_line_state(detail.body, kind, context.repository)
+    state = workboard.classification_line_state(detail.body, kind, context.repository)
     line_defect = _line_defect(detail.body, state, resumed=resumed)
     if line_defect is not None:
         return line_defect
     prospective = (
         detail.body
-        if state is board.ClassificationLine.PRESENT
-        else board.body_with_classification(detail.body, kind)
+        if state is workboard.ClassificationLine.PRESENT
+        else workboard.body_with_classification(detail.body, kind)
     )
-    classification = board.parse_pull_request_classification(prospective, context.repository)
-    if isinstance(classification, board.ClassificationDefect):
-        return board.ClassificationDefect(
+    classification = workboard.parse_pull_request_classification(prospective, context.repository)
+    if isinstance(classification, workboard.ClassificationDefect):
+        return workboard.ClassificationDefect(
             f"body would not read No-Item: {kind} with the line added: {classification.message}"
         )
     defect = _target_branch_defect(context, detail) or closing_reference_defect(
@@ -577,38 +581,42 @@ def adoption_body(
     )
     if defect is not None:
         return defect
-    return None if state is board.ClassificationLine.PRESENT else prospective
+    return None if state is workboard.ClassificationLine.PRESENT else prospective
 
 
 def _adoption_scope(
-    context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind
-) -> board.ClassificationDefect | frozenset[str]:
+    context: LandingCheckContext, detail: forge.Landing, kind: workboard.NoItemKind
+) -> workboard.ClassificationDefect | frozenset[str]:
     """The listing's path set when the dependency rule (`deps`) and the
     listing's own completeness (LAND-73, LAND-75, LAND-76) hold and it names
     a file (ADOPT-16); the listing is read once, and only past the
     configuration check."""
 
     @cache
-    def listing() -> board.ClassificationDefect | frozenset[str]:
+    def listing() -> workboard.ClassificationDefect | frozenset[str]:
         return listed_paths(context.client.pull_request_changes(detail.number), detail.head_sha)
 
-    if kind is board.NoItemKind.DEPS:
+    if kind is workboard.NoItemKind.DEPS:
         dependency_defect = dependency_rule_defect(context.run.config, listing)
         if dependency_defect is not None:
             return dependency_defect
     listed = listing()
     if not listed:
-        return board.ClassificationDefect("changes no file; there is nothing to adopt")
+        return workboard.ClassificationDefect("changes no file; there is nothing to adopt")
     return listed
 
 
 def _judged_scope(
-    context: LandingCheckContext, detail: forge.Landing, kind: board.NoItemKind, *, resumed: bool
-) -> board.ClassificationDefect | frozenset[str]:
+    context: LandingCheckContext,
+    detail: forge.Landing,
+    kind: workboard.NoItemKind,
+    *,
+    resumed: bool,
+) -> workboard.ClassificationDefect | frozenset[str]:
     """The listing's path set, once the body adopt would leave passes its own
     checks: the listing is read only past them."""
     left_body = adoption_body(context, detail, kind, resumed=resumed)
-    if isinstance(left_body, board.ClassificationDefect):
+    if isinstance(left_body, workboard.ClassificationDefect):
         return left_body
     return _adoption_scope(context, detail, kind)
 
@@ -638,7 +646,7 @@ def adoption_preflight(
     if isinstance(holder, AdoptionRefusal):
         return holder
     scope = _judged_scope(context, detail, request.kind, resumed=holder is not None)
-    if isinstance(scope, board.ClassificationDefect):
+    if isinstance(scope, workboard.ClassificationDefect):
         return _adoption_refusal(request.number, scope)
     if holder is not None:
         return holder

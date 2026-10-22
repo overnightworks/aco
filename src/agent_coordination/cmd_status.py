@@ -9,11 +9,11 @@ from datetime import UTC, datetime
 from enum import StrEnum
 
 from . import (
-    board,
     board_read,
     body,
     protocol,
     report,
+    workboard,
 )
 from .session import (
     LaneSharedReading,
@@ -66,7 +66,7 @@ def _overlap_note(
     if not peers:
         return None
     return "overlaps " + ", ".join(
-        f"{board.claim_subject(claim, storage)} ({claim.claim_id})" for claim in peers
+        f"{workboard.claim_subject(claim, storage)} ({claim.claim_id})" for claim in peers
     )
 
 
@@ -90,9 +90,9 @@ def _print_claim_status_lines(
 ) -> None:
     state = "CONFLICT" if claim.claim_id in context.index.conflict_ids else "CLAIMED"
     print(
-        f"{state} {board.claim_subject(claim, context.storage)}: {claim.agent} ({claim.role}) "
+        f"{state} {workboard.claim_subject(claim, context.storage)}: {claim.agent} ({claim.role}) "
         f"base={claim.base} branch={claim.branch} claim={claim.claim_id}"
-        f"{board.claim_age_suffix(opened_at, observed_at)}"
+        f"{workboard.claim_age_suffix(opened_at, observed_at)}"
     )
     for path in claim.scope:
         print(f"  {path}")
@@ -138,7 +138,7 @@ def _status(
         if shared is not None:
             print(shared)
         return exit_code
-    subject = "repository" if issue is None else f"issue {board.item_label(issue, storage)}"
+    subject = "repository" if issue is None else f"issue {workboard.item_label(issue, storage)}"
     print(f"UNCLAIMED {subject}")
     return 0
 
@@ -164,7 +164,7 @@ def _status_claim_json(
     ages: Mapping[str, datetime],
     observed_at: datetime,
 ) -> dict[str, object]:
-    age, old = board.claim_age_fields(ages[claim.claim_id], observed_at)
+    age, old = workboard.claim_age_fields(ages[claim.claim_id], observed_at)
     return {
         **protocol.claim_identity_fields(claim),
         **protocol.resource_fields(claim.resource),
@@ -231,7 +231,7 @@ def _print_path_holders(
 ) -> None:
     for claim in holders:
         print(
-            f"CLAIMED {path} {board.claim_subject(claim, storage)}: {claim.agent} ({claim.role}) "
+            f"CLAIMED {path} {workboard.claim_subject(claim, storage)}: {claim.agent} ({claim.role}) "
             f"claim={claim.claim_id}"
         )
         if claim.whole_reason is not None:
@@ -240,7 +240,7 @@ def _print_path_holders(
         print(
             "overlap: "
             + ", ".join(
-                f"{board.claim_subject(claim, storage)} ({claim.claim_id})" for claim in holders
+                f"{workboard.claim_subject(claim, storage)} ({claim.claim_id})" for claim in holders
             )
         )
 

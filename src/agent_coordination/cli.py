@@ -13,7 +13,6 @@ from typing import Any, NoReturn
 
 from . import (
     __version__,
-    board,
     body,
     checkout,
     cmd_adopt,
@@ -43,6 +42,7 @@ from . import (
     providers,
     report,
     session,
+    workboard,
 )
 from .session import (
     RunContext,
@@ -52,9 +52,9 @@ NEXT_PULL_DESCRIPTION = (
     "Pulling is not dispatching: an item whose expectations are still unruled is "
     "named here with refining as its first step, while dispatching a builder onto "
     "it waits for the operator's ruling. An item labelled "
-    f"{board.NEEDS_OPERATOR_LABEL} waits on the operator and is never pulled; set or "
+    f"{workboard.NEEDS_OPERATOR_LABEL} waits on the operator and is never pulled; set or "
     f"remove the label with gh issue edit <n> --add-label/--remove-label "
-    f"{board.NEEDS_OPERATOR_LABEL}, or under storage = state-ref by piping a body whose "
+    f"{workboard.NEEDS_OPERATOR_LABEL}, or under storage = state-ref by piping a body whose "
     "[record] labels add or drop it to aco item edit <item-id>."
 )
 CLAIM_DESCRIPTION = (
@@ -149,7 +149,7 @@ def _add_status_parser(commands: _Subcommands, name: str) -> None:
     status = commands.add_parser(name, help="show repository-wide build claims")
     status.add_argument(
         "issue",
-        type=board.parse_item_reference,
+        type=workboard.parse_item_reference,
         nargs="?",
         help="show only this issue's claims and the ones they overlap",
     )
@@ -191,7 +191,7 @@ def _add_start_parser(commands: _Subcommands, name: str) -> None:
         help="create an item's linked worktree and branch, then claim it",
         description=START_DESCRIPTION,
     )
-    start.add_argument("item", type=board.parse_item_reference, help=ITEM_REF_HELP)
+    start.add_argument("item", type=workboard.parse_item_reference, help=ITEM_REF_HELP)
     start.add_argument(
         "--scope",
         action="append",
@@ -219,7 +219,7 @@ def _add_claim_parser(commands: _Subcommands, name: str) -> None:
     )
     claim.add_argument(
         "issue",
-        type=board.parse_item_reference,
+        type=workboard.parse_item_reference,
         nargs="?",
         help=LANE_ISSUE_HELP,
     )
@@ -270,7 +270,7 @@ def _add_release_parser(commands: _Subcommands, name: str) -> None:
     release = commands.add_parser(name, help="release a landed or abandoned claim")
     release.add_argument(
         "issue",
-        type=board.parse_item_reference,
+        type=workboard.parse_item_reference,
         nargs="?",
         help=LANE_RELEASE_HELP,
     )
@@ -375,7 +375,7 @@ def _add_adopt_parser(commands: _Subcommands, name: str) -> None:
     adopt.add_argument(
         "--no-item",
         required=True,
-        choices=[kind.value for kind in board.NoItemKind],
+        choices=[kind.value for kind in workboard.NoItemKind],
         help="the issue-less classification the pull request would declare",
     )
     adopt.add_argument("--agent", help=AGENT_HELP)
@@ -397,7 +397,7 @@ def _add_rescope_parser(commands: _Subcommands, name: str) -> None:
     rescope = commands.add_parser(name, help="add or drop paths on a live claim without releasing")
     rescope.add_argument(
         "issue",
-        type=board.parse_item_reference,
+        type=workboard.parse_item_reference,
         nargs="?",
         help=LANE_LOOKUP_HELP,
     )
@@ -427,7 +427,7 @@ def _add_rescope_parser(commands: _Subcommands, name: str) -> None:
 
 def _add_cut_parser(commands: _Subcommands, name: str) -> None:
     cut = commands.add_parser(name, help="create a container's next slice as a fresh child issue")
-    cut.add_argument("issue", type=board.parse_item_reference, help="the container to cut")
+    cut.add_argument("issue", type=workboard.parse_item_reference, help="the container to cut")
     cut.add_argument(
         "--title",
         type=_nonblank_title,
@@ -457,7 +457,9 @@ def _add_cut_parser(commands: _Subcommands, name: str) -> None:
 def _add_ask_parser(commands: _Subcommands, name: str) -> None:
     ask = commands.add_parser(name, help="append one proposed expectation line to an item's block")
     ask.add_argument(
-        "item", type=board.parse_item_reference, help="the item to append the expectation line to"
+        "item",
+        type=workboard.parse_item_reference,
+        help="the item to append the expectation line to",
     )
     ask.add_argument("--text", required=True, help="the expectation line's prose")
     ask.add_argument(
@@ -490,7 +492,7 @@ def _add_rule_parser(commands: _Subcommands, name: str) -> None:
         name, help="rule one proposed expectation line, transcribing the operator's word"
     )
     rule.add_argument(
-        "item", type=board.parse_item_reference, help="the item whose expectation line is ruled"
+        "item", type=workboard.parse_item_reference, help="the item whose expectation line is ruled"
     )
     rule.add_argument(
         "--line",
@@ -508,14 +510,14 @@ def _add_rule_parser(commands: _Subcommands, name: str) -> None:
 
 
 def _parse_check_subject(value: str) -> int | str:
-    """`check`'s one positional: a pull/issue reference (`board.parse_item_reference`),
+    """`check`'s one positional: a pull/issue reference (`workboard.parse_item_reference`),
     or -- issue #359, LAND-48 -- a full 40-character commit id, read as a trunk
     commit instead. The two grammars never collide: an item reference
     (`aco-xxxxxx`, `#n`, or the bare `n`) is always far shorter than a full
     git object id."""
     if protocol.COMMIT_PATTERN.fullmatch(value) is not None:
         return value
-    return board.parse_item_reference(value)
+    return workboard.parse_item_reference(value)
 
 
 def _add_check_parser(commands: _Subcommands, name: str) -> None:
@@ -557,12 +559,12 @@ def _add_brief_parser(commands: _Subcommands, name: str) -> None:
         name,
         help="print one item's body, live claim, lane tip and touched files for a dispatch",
     )
-    brief.add_argument("item", type=board.parse_item_reference, help="the work item to brief")
+    brief.add_argument("item", type=workboard.parse_item_reference, help="the work item to brief")
     brief.add_argument(
         "--step",
-        choices=[step.value for step in board.BriefStep],
+        choices=[step.value for step in workboard.BriefStep],
         default=None,
-        help=f"also print this lane step's own rules and checks from {board.BRIEF_CONFIG_PATH}",
+        help=f"also print this lane step's own rules and checks from {workboard.BRIEF_CONFIG_PATH}",
     )
     _add_json_flag(brief)
 
@@ -597,7 +599,7 @@ def _add_item_parser(commands: _Subcommands, name: str) -> None:
     )
     new.add_argument(
         "--parent",
-        type=board.parse_item_reference,
+        type=workboard.parse_item_reference,
         metavar="ITEM",
         help=f"the fresh item's parent, {ITEM_REF_HELP}",
     )
@@ -626,14 +628,14 @@ def _add_item_parser(commands: _Subcommands, name: str) -> None:
         " (--json keeps the body as stored)",
     )
     show.add_argument(
-        "item", type=board.parse_item_reference, help=f"the item to show, {ITEM_REF_HELP}"
+        "item", type=workboard.parse_item_reference, help=f"the item to show, {ITEM_REF_HELP}"
     )
     _add_json_flag(show)
     edit = item_commands.add_parser(
         "edit", help="replace one item's body from stdin, aco keeping its own record fields"
     )
     edit.add_argument(
-        "item", type=board.parse_item_reference, help=f"the item to edit, {ITEM_REF_HELP}"
+        "item", type=workboard.parse_item_reference, help=f"the item to edit, {ITEM_REF_HELP}"
     )
     one_field = edit.add_mutually_exclusive_group()
     refuses_stdin = "reads no stdin; a piped or redirected body is refused"
@@ -657,7 +659,7 @@ def _add_item_parser(commands: _Subcommands, name: str) -> None:
         "close", help="close a state-ref item; the file stays, next and board let it go"
     )
     close.add_argument(
-        "item", type=board.parse_item_reference, help=f"the item to close, {ITEM_REF_HELP}"
+        "item", type=workboard.parse_item_reference, help=f"the item to close, {ITEM_REF_HELP}"
     )
     _add_json_flag(close)
 
@@ -814,7 +816,7 @@ ITEM_EDIT_KINDS = (body.ItemKind.TASK.value, body.ItemKind.CONTAINER.value)
 DEFAULT_BODY_TEMPLATE_KIND = "task"
 
 
-STATE_REF_ITEM_PAST_THE_ID_SPACE = "{number} " + board.NAMES_NO_ITEM
+STATE_REF_ITEM_PAST_THE_ID_SPACE = "{number} " + workboard.NAMES_NO_ITEM
 
 
 class PreDispatchReason(StrEnum):
@@ -955,7 +957,7 @@ def _reached_levels(
 
 # Every argparse `type=` that reads an item reference. `check`'s subject also
 # reads a trunk commit id, which parses to a string and so names no item.
-_ITEM_ARGUMENT_TYPES = frozenset({board.parse_item_reference, _parse_check_subject})
+_ITEM_ARGUMENT_TYPES = frozenset({workboard.parse_item_reference, _parse_check_subject})
 
 
 def _item_arguments(
@@ -979,7 +981,7 @@ def _refuse_item_past_the_id_space(
 ) -> int | None:
     """PIN-31 (issue #467, #469 review): under `storage = "state-ref"` a
     number past `aco-ffffff` names no item, and `items.format_item_id` would
-    print it as an id `board.parse_item_reference` refuses back -- so it
+    print it as an id `workboard.parse_item_reference` refuses back -- so it
     refuses here, before any command looks it up or names it. The storage
     pin is read only for such a number; a pin that cannot be read is left to
     the command, which meets the same refusal and reports it in its own
@@ -988,7 +990,7 @@ def _refuse_item_past_the_id_space(
         (
             number
             for number in _item_arguments(root, given, parsed)
-            if board.names_no_item(number, body.Storage.STATE_REF)
+            if workboard.names_no_item(number, body.Storage.STATE_REF)
         ),
         None,
     )
@@ -1024,7 +1026,7 @@ def _run_repository_command(
 
 def main(arguments: list[str] | None = None) -> int:
     # Every refusal the parse itself raises -- argparse's own usage errors,
-    # and `board.parse_item_reference`, an argparse `type=` whose refusal is
+    # and `workboard.parse_item_reference`, an argparse `type=` whose refusal is
     # a `ClaimError` -- fires before any namespace carries `--json`, so the
     # mode is read back off the parsers this parse reached (issue #432).
     # Both report `invalid_usage` through the one envelope. Past the parse

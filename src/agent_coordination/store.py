@@ -662,7 +662,7 @@ def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
     Its `events` carry `metrics.LaneEvent`s with `size` `None`: this module
     reads no item content at all (the "claim-state store is git transport
     only" contract) -- joining an item's current size onto these is
-    `board.py`'s own composition, the one place it is already read for the
+    `workboard.py`'s own composition, the one place it is already read for the
     same board build. A claim still open when this walk ends keeps
     `released_at=None`, uncounted as measured but not discarded: the
     caller's own `metrics.measure` already reports it through

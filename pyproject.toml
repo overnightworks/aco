@@ -178,7 +178,7 @@ forbidden_modules = [
     "agent_coordination.github",
     "agent_coordination.state_board",
     "agent_coordination.forge",
-    "agent_coordination.board",
+    "agent_coordination.workboard",
     "agent_coordination.items",
     "agent_coordination.checkout",
 ]

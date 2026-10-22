@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from . import board, body, cmd_rule, protocol, report
+from . import body, cmd_rule, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -50,7 +50,7 @@ def _emit_ask_result(asked: _AskedLine, storage: body.Storage, *, as_json: bool)
             **card_fields,
         )
         return
-    print(f"ASKED {board.item_label(asked.item, storage)} line {asked.index}: {asked.text}")
+    print(f"ASKED {workboard.item_label(asked.item, storage)} line {asked.index}: {asked.text}")
 
 
 class _PictureFileError(protocol.ClaimError):

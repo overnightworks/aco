@@ -37,7 +37,7 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import board, body, forge, protocol, store
+from agent_coordination import body, forge, protocol, store, workboard
 
 
 class CheckoutState(Enum):
@@ -83,7 +83,7 @@ class ClaimCase:
     file_reads: tuple[tuple[str, str], ...] = ((".aco/board.toml", MERGE_COMMIT_SHA),)
     check_claims: bool = False
     claims_present: bool = False
-    parent: board.ParentIssue | None = None
+    parent: workboard.ParentIssue | None = None
     length: RefusalLength = RefusalLength.UNCHECKED
 
 
@@ -664,8 +664,8 @@ class TestLandItemAndClaim:
                     pull_request=landing_pull_request(
                         body="Work-Item: #72\n\nCloses #72\nCloses #79"
                     ),
-                    parent=board.ParentIssue(
-                        board.IssueReference(REPOSITORY, 79),
+                    parent=workboard.ParentIssue(
+                        workboard.IssueReference(REPOSITORY, 79),
                         complete_contract("keiner", slice=slice_entries("Scheibe 1")),
                         body.ItemKind.CONTAINER,
                     ),

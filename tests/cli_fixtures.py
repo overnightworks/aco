@@ -21,7 +21,6 @@ import pytest
 from board_fixtures import BASE, REPOSITORY, complete_contract, write_repository_config
 
 from agent_coordination import (
-    board,
     board_read,
     checkout,
     cli,
@@ -34,6 +33,7 @@ from agent_coordination import (
     github,
     process,
     store,
+    workboard,
 )
 from agent_coordination.protocol import ClaimState
 from agent_coordination.session import RunContext
@@ -352,10 +352,10 @@ def bare_remote(tmp_path: Path) -> Path:
 
 
 def track_board_config(repo: Path, text: str) -> None:
-    config = repo / board.CONFIG_PATH
+    config = repo / workboard.CONFIG_PATH
     config.parent.mkdir(parents=True, exist_ok=True)
     config.write_text(text)
-    real_git(repo, "add", str(board.CONFIG_PATH))
+    real_git(repo, "add", str(workboard.CONFIG_PATH))
     real_git(repo, "commit", "-q", "-m", "track board configuration")
 
 
@@ -644,7 +644,7 @@ def hub_canonical_worktree_file(
     real_git(main, "config", "user.name", "Test")
     real_git(main, "config", "user.email", "test@example.com")
     write_repository_config(main, f'canonical_remote = "{canonical}"\n')
-    real_git(main, "add", "-f", board.CONFIG_PATH.as_posix())
+    real_git(main, "add", "-f", workboard.CONFIG_PATH.as_posix())
     real_git(main, "commit", "-q", "-m", "initial")
     real_git(main, "branch", "trunk")
     for remote in ("origin", "hub"):
@@ -836,7 +836,7 @@ def count_context_reads(monkeypatch: pytest.MonkeyPatch) -> ContextReads:
     def counting_path_is_tracked(
         path: str, *, directory: Path | None = None, revision: str | None = None
     ) -> bool:
-        if path == board.CONFIG_PATH.as_posix():
+        if path == workboard.CONFIG_PATH.as_posix():
             reads.configs[directory] += 1
         return path_is_tracked(path, directory=directory, revision=revision)
 

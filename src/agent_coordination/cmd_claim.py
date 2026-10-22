@@ -11,7 +11,6 @@ from enum import StrEnum
 from pathlib import Path
 
 from . import (
-    board,
     board_read,
     body,
     checkout,
@@ -22,6 +21,7 @@ from . import (
     report,
     session,
     store,
+    workboard,
 )
 
 DEFAULT_CLAIM_ROLE = "builder"
@@ -34,7 +34,7 @@ def _touch_line(
     `own_scope` -- the fact a claimant needs to know they hold both scopes
     at once, not only the other item's name (issue #206)."""
     meeting = protocol.scope_overlap_paths(own_scope, claim.scope)
-    return f"{board.claim_subject(claim, storage)} on {protocol.named_with_overflow_count(meeting)}"
+    return f"{workboard.claim_subject(claim, storage)} on {protocol.named_with_overflow_count(meeting)}"
 
 
 def _touch_summary(
@@ -261,7 +261,7 @@ class _SliceCheck:
 
 def _issue_reference_state(
     client: forge.ForgeReader,
-    open_by_number: dict[int, board.Issue],
+    open_by_number: dict[int, workboard.Issue],
     number: int,
 ) -> tuple[forge.ItemState, str | None, str | None]:
     open_issue = open_by_number.get(number)
@@ -272,21 +272,21 @@ def _issue_reference_state(
 
 
 def _out_of_order_check(
-    projected: board.Board,
+    projected: workboard.Board,
     issue: int | None,
     out_of_order_reason: str | None,
     storage: body.Storage,
 ) -> _SliceCheck | None:
-    highest = board.highest_scored_actionable(projected)
+    highest = workboard.highest_scored_actionable(projected)
     if highest is None or issue is None:
         return None
     claimed_item = next((item for item in projected.items if item.number == issue), None)
-    if claimed_item is None or board.board_rank(highest) >= board.board_rank(claimed_item):
+    if claimed_item is None or workboard.board_rank(highest) >= workboard.board_rank(claimed_item):
         return None
     return _SliceCheck(
         "warning" if out_of_order_reason is not None else "error",
         "out-of-order",
-        f"higher-priority actionable item {board.item_label(highest.number, storage)} "
+        f"higher-priority actionable item {workboard.item_label(highest.number, storage)} "
         f"(score {highest.score}) is free: {highest.title}; "
         "use --out-of-order REASON to proceed",
         issue=highest.number,
@@ -294,7 +294,7 @@ def _out_of_order_check(
 
 
 def _blocked_check(
-    item: board.BoardItem | None,
+    item: workboard.BoardItem | None,
     out_of_order_reason: str | None,
     repository: str,
     storage: body.Storage,
@@ -302,12 +302,13 @@ def _blocked_check(
     if item is None or not item.open_blockers:
         return None
     blockers = ", ".join(
-        board.open_blocker_label(reference, repository, storage) for reference in item.open_blockers
+        workboard.open_blocker_label(reference, repository, storage)
+        for reference in item.open_blockers
     )
     return _SliceCheck(
         "warning" if out_of_order_reason is not None else "error",
         "blocked",
-        f"{board.item_label(item.number, storage)} is blocked by {blockers} (open); "
+        f"{workboard.item_label(item.number, storage)} is blocked by {blockers} (open); "
         "pass --out-of-order REASON to claim it anyway",
         issue=item.number,
     )
@@ -317,16 +318,18 @@ def _parent_checks(
     client: forge.ForgeReader, repository: str, issue: int, title: str, storage: body.Storage
 ) -> _SliceCheck | None:
     """Warn when a slice-shaped title names a parent GitHub does not record as one."""
-    match = board.slice_title_match(title)
+    match = workboard.slice_title_match(title)
     if match is None:
         return None
     slice_number, parent_issue = match
-    if board.names_no_item(parent_issue, storage):
+    if workboard.names_no_item(parent_issue, storage):
         return None
     parent = client.parent_issue(issue)
-    if parent is not None and parent.reference == board.IssueReference(repository, parent_issue):
+    if parent is not None and parent.reference == workboard.IssueReference(
+        repository, parent_issue
+    ):
         return None
-    parent_label = board.item_label(parent_issue, storage)
+    parent_label = workboard.item_label(parent_issue, storage)
     return _SliceCheck(
         "warning",
         "missing-parent",
@@ -337,7 +340,7 @@ def _parent_checks(
     )
 
 
-def _malformed_checks(item: board.BoardItem) -> tuple[_SliceCheck, ...] | None:
+def _malformed_checks(item: workboard.BoardItem) -> tuple[_SliceCheck, ...] | None:
     """The one refusal a malformed block body gets (#150) -- every other
     body-contract check (blocker state, completeness) never runs, since
     neither the parsed projections nor the blocker set can be trusted once
@@ -350,14 +353,16 @@ def _malformed_checks(item: board.BoardItem) -> tuple[_SliceCheck, ...] | None:
     return None
 
 
-def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple[_SliceCheck, ...]:
+def _body_contract_checks(
+    item: workboard.BoardItem, storage: body.Storage
+) -> tuple[_SliceCheck, ...]:
     malformed = _malformed_checks(item)
     if malformed is not None:
         return malformed
     contract = item.contract
     checks: list[_SliceCheck] = []
     # Read the two atomic facts directly rather than `item.actionable_reason`:
-    # that reason is the *first* one `board._actionable_reason` finds (frozen,
+    # that reason is the *first* one `workboard._actionable_reason` finds (frozen,
     # claimed, blocked, then incomplete), so an item that is both blocked and
     # incomplete would report only "blocked" there -- masking the incomplete
     # body this check exists to name. A freshly `cut` child (an incomplete
@@ -369,7 +374,7 @@ def _body_contract_checks(item: board.BoardItem, storage: body.Storage) -> tuple
             _SliceCheck(
                 "error",
                 "body-incomplete",
-                f"{board.item_label(item.number, storage)} body incomplete: {missing}",
+                f"{workboard.item_label(item.number, storage)} body incomplete: {missing}",
                 issue=item.number,
             )
         )
@@ -384,13 +389,13 @@ class _BoardReferenceLookup:
 
     client: forge.ForgeReader
     repository: str
-    open_by_number: dict[int, board.Issue]
+    open_by_number: dict[int, workboard.Issue]
 
 
 def _slice_rule_checks(
     lookup: _BoardReferenceLookup,
     issue: int,
-    projected: board.Board,
+    projected: workboard.Board,
     out_of_order_reason: str | None,
     storage: body.Storage,
 ) -> tuple[_SliceCheck, ...]:
@@ -398,7 +403,7 @@ def _slice_rule_checks(
     out_of_order = _out_of_order_check(projected, issue, out_of_order_reason, storage)
     if out_of_order is not None:
         checks.append(out_of_order)
-    label = board.item_label(issue, storage)
+    label = workboard.item_label(issue, storage)
     item = next((item for item in projected.items if item.number == issue), None)
     if item is not None and item.kind is body.ItemKind.CONTAINER:
         checks.append(
@@ -536,7 +541,7 @@ class _ClaimBodyInvalidError(protocol.ClaimError):
 
 def _item_target_body(
     client: forge.ForgeReader,
-    open_by_number: Mapping[int, board.Issue],
+    open_by_number: Mapping[int, workboard.Issue],
     number: int,
     storage: body.Storage,
 ) -> str:
@@ -563,7 +568,7 @@ def _item_target_body(
 
 def _read_item_body(
     client: forge.ForgeReader,
-    open_by_number: Mapping[int, board.Issue],
+    open_by_number: Mapping[int, workboard.Issue],
     number: int,
     *,
     storage: body.Storage,
@@ -574,14 +579,14 @@ def _read_item_body(
     if parsed.read_state is body.BodyReadState.MALFORMED:
         defect = parsed.contract.defects[0]
         raise _ClaimBodyInvalidError(
-            f"{board.item_label(number, storage)} {body.body_defect_text(defect)}"
+            f"{workboard.item_label(number, storage)} {body.body_defect_text(defect)}"
         )
     return parsed
 
 
 def _item_scope(
     client: forge.ForgeReader,
-    open_by_number: Mapping[int, board.Issue],
+    open_by_number: Mapping[int, workboard.Issue],
     number: int,
     *,
     storage: body.Storage,
@@ -591,7 +596,7 @@ def _item_scope(
 
 def _item_whole(
     client: forge.ForgeReader,
-    open_by_number: Mapping[int, board.Issue],
+    open_by_number: Mapping[int, workboard.Issue],
     number: int,
     *,
     storage: body.Storage,
@@ -603,7 +608,7 @@ def _whole_from_item_body(
     context: session.RunContext,
     identity: protocol.ClaimIdentity,
     *,
-    open_by_number: Mapping[int, board.Issue] | None,
+    open_by_number: Mapping[int, workboard.Issue] | None,
 ) -> Callable[[], str | None] | None:
     """Read only the target when a wide claim has no explicit reason.
 
@@ -629,7 +634,7 @@ def _resolved_issue_scope(
     observed: protocol.ClaimState,
     context: session.RunContext,
     storage: body.Storage,
-) -> tuple[tuple[str, ...], dict[int, board.Issue] | None]:
+) -> tuple[tuple[str, ...], dict[int, workboard.Issue] | None]:
     """The scope of an issue-mode claim that omitted `--scope`,
     paired with the open-board listing that resolving it cost -- `None` when
     it cost nothing, so `run` never fetches that board a second time for its
@@ -660,7 +665,7 @@ def _resolved_issue_scope(
 
 
 def _reject_scope_mismatch(
-    open_by_number: Mapping[int, board.Issue],
+    open_by_number: Mapping[int, workboard.Issue],
     target_issue: int,
     scope: tuple[str, ...],
     storage: body.Storage,
@@ -735,7 +740,7 @@ class _ClaimTargetContext:
 
     storage: body.Storage
     worktree: Path
-    open_by_number: dict[int, board.Issue] | None
+    open_by_number: dict[int, workboard.Issue] | None
 
 
 def _claim_target_checks(
@@ -813,7 +818,7 @@ def refuse_claim_error(
             # `protocol.ClaimError` and falls to `unavailable` below (CLM-27).
             return report.refuse(
                 ClaimReason.CLAIM_CONFLICT,
-                board.named_refusal(error, context.config.storage),
+                workboard.named_refusal(error, context.config.storage),
                 as_json=as_json,
             )
         case _:
@@ -887,7 +892,7 @@ def checked_claim(
     already stands); the session's own checkout otherwise."""
     if isinstance(requested.identity, protocol.LaneIdentity) and not requested.scope:
         raise protocol.ClaimUnavailableError(_LANE_CLAIM_SCOPE_REQUIRED)
-    open_by_number: dict[int, board.Issue] | None = None
+    open_by_number: dict[int, workboard.Issue] | None = None
     if requested.scope or not isinstance(requested.identity, protocol.IssueIdentity):
         # Scope already final (given, or a lane's own required value): the
         # local shape checks run first, exactly as before this field
@@ -962,7 +967,7 @@ def checked_lane_claim(
     try:
         plan = checked_claim(requested, context, revision=revision)
     except protocol.ClaimConflictError as error:
-        raise board.named_refusal(error, context.config.storage) from error
+        raise workboard.named_refusal(error, context.config.storage) from error
     if plan.refused:
         refuse_claim(False, plan.target_issue, plan.checks)
         return 2
@@ -1000,7 +1005,7 @@ def report_claim(
     touches = protocol.conflicting_claims(live, claimed)
     if as_json:
         return _claim_json(claimed, versioning=plan.versioning, touches=touches, checks=plan.checks)
-    print(f"CLAIMED {board.claim_subject(claimed, plan.storage)}: {claimed.claim_id}")
+    print(f"CLAIMED {workboard.claim_subject(claimed, plan.storage)}: {claimed.claim_id}")
     print(
         claim_cost_line(
             plan.versioning.versioned_files,
@@ -1129,9 +1134,9 @@ def claim_in_new_worktree(
         return committed_claim(plan, context.for_lane_worktree(worktree.path))
     except protocol.UncertainWriteError as error:
         return report_uncertain_worktree_claim(
-            board.named_refusal(error, context.config.storage), worktree, command=build.command
+            workboard.named_refusal(error, context.config.storage), worktree, command=build.command
         )
     except protocol.ClaimError as error:
         return refuse_built_worktree(
-            board.named_refusal(error, context.config.storage), worktree, command=build.command
+            workboard.named_refusal(error, context.config.storage), worktree, command=build.command
         )

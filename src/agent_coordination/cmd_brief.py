@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import cast
 
 from . import (
-    board,
     checkout,
     cmd_status,
     protocol,
     report,
     store,
+    workboard,
 )
 from .session import (
     LaneSharedReading,
@@ -77,7 +77,7 @@ def _print_brief_claim(
 ) -> None:
     print(
         f"{claim.agent} ({claim.role}) branch={claim.branch} base={claim.base}"
-        f"{board.claim_age_suffix(opened_at, observed_at)}"
+        f"{workboard.claim_age_suffix(opened_at, observed_at)}"
     )
     for path in claim.scope:
         print(f"  {path}")
@@ -88,7 +88,7 @@ def _print_brief_claim(
         print(f"  {shared}")
 
 
-def _print_brief_step_rules(step_rules: board.BriefStepRules) -> None:
+def _print_brief_step_rules(step_rules: workboard.BriefStepRules) -> None:
     """`RULES` and `CHECKS` (issue #324): two more sections after the four
     `_print_brief` always prints, only under `--step` -- the repository's own
     `.aco/brief.toml` entries for that lane step, one per line,
@@ -116,7 +116,7 @@ class _BriefComposition:
     observed_at: datetime
     tip: str | None
     touched: tuple[str, ...]
-    step_rules: board.BriefStepRules | None
+    step_rules: workboard.BriefStepRules | None
     lane_shared: LaneSharedReading
 
 
@@ -168,7 +168,7 @@ def _brief_claim_json(
         "base": claim.base,
         "scope": list(claim.scope),
         "whole": claim.whole_reason,
-        "age": board.claim_age_fields(live.opened_at, observed_at)[0],
+        "age": workboard.claim_age_fields(live.opened_at, observed_at)[0],
         **cmd_status.lane_shared_json(lane_shared),
     }
 
@@ -198,21 +198,21 @@ def _brief_json(composition: _BriefComposition) -> int:
     return 0
 
 
-def _brief_config(toplevel: Path) -> board.BriefConfig | None:
+def _brief_config(toplevel: Path) -> workboard.BriefConfig | None:
     """`.aco/brief.toml`'s own content, read only when the file is
     actually tracked by git (issue #324) -- the same tracked-file
     requirement `session.board_config` enforces for `board.toml`'s storage pin, so
     an ignored or not-yet-added file never quietly answers for the
-    repository. `None` either when it is untracked or when `board.load_brief_config`
+    repository. `None` either when it is untracked or when `workboard.load_brief_config`
     finds no such file at all."""
-    if not checkout.path_is_tracked(board.BRIEF_CONFIG_PATH.as_posix(), directory=toplevel):
+    if not checkout.path_is_tracked(workboard.BRIEF_CONFIG_PATH.as_posix(), directory=toplevel):
         return None
-    return board.load_brief_config(toplevel / board.BRIEF_CONFIG_PATH)
+    return workboard.load_brief_config(toplevel / workboard.BRIEF_CONFIG_PATH)
 
 
 def _brief_step_rules_or_refusal(
     step: str | None, context: RunContext
-) -> board.BriefStepRules | None:
+) -> workboard.BriefStepRules | None:
     """`--step`'s own rules and checks, or `None` when the brief carries no
     `--step` at all -- the one branch that must stay untouched by
     `.aco/brief.toml`'s presence or content (BRIEF-16)."""
@@ -220,8 +220,8 @@ def _brief_step_rules_or_refusal(
         return None
     config = _brief_config(context.toplevel)
     if config is None:
-        raise protocol.ClaimError(f"no {board.BRIEF_CONFIG_PATH} in the repository")
-    return config.for_step(board.BriefStep(step))
+        raise protocol.ClaimError(f"no {workboard.BRIEF_CONFIG_PATH} in the repository")
+    return config.for_step(workboard.BriefStep(step))
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:

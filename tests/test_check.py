@@ -21,7 +21,7 @@ from cli_fixtures import (
 from github_fixtures import ReaderOnlyForge, assert_github_world, serve_forge
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone, state_ref_tip
 
-from agent_coordination import board, forge, github, protocol
+from agent_coordination import forge, github, protocol, workboard
 from agent_coordination.github import GitHubForge
 
 ISSUE = 81
@@ -38,15 +38,17 @@ FORGE_FAILURE = "gh: simulated network failure"
 
 
 def dependency(
-    number: int, repository: str = REPOSITORY, state: board.BlockerState = board.BlockerState.OPEN
-) -> board.IssueDependency:
-    return board.IssueDependency(board.IssueReference(repository, number), state, False)
+    number: int,
+    repository: str = REPOSITORY,
+    state: workboard.BlockerState = workboard.BlockerState.OPEN,
+) -> workboard.IssueDependency:
+    return workboard.IssueDependency(workboard.IssueReference(repository, number), state, False)
 
 
 @dataclass(frozen=True)
 class IssueWorld:
     body: str = block_body(MINIMAL_BLOCK_TOML)
-    dependencies: tuple[board.IssueDependency, ...] = ()
+    dependencies: tuple[workboard.IssueDependency, ...] = ()
     state: forge.ItemState = forge.ItemState.OPEN
     reference_failure: forge.ForgeError | None = None
     config: str = ""
@@ -133,7 +135,9 @@ def incomplete(toml_text: str, empty_sections: str) -> NumberCase:
     )
 
 
-def blocked(dependencies: tuple[board.IssueDependency, ...], labels: tuple[str, ...]) -> NumberCase:
+def blocked(
+    dependencies: tuple[workboard.IssueDependency, ...], labels: tuple[str, ...]
+) -> NumberCase:
     return issue_answer(
         f"blocked by {', '.join(labels)}",
         "blocked",
@@ -211,7 +215,7 @@ def check_number(
         number = int(case.arguments[-1])
         if world.config:
             track_board_config(clone, world.config)
-        assert real_git(clone, "show", f"HEAD:{board.CONFIG_PATH}").stdout == world.config
+        assert real_git(clone, "show", f"HEAD:{workboard.CONFIG_PATH}").stdout == world.config
         if world.reference_failure is None:
             reference = forge.ItemReference(world.state, "Work", world.body)
             served = ReaderOnlyForge(
@@ -249,7 +253,7 @@ NO_BLOCK = "## Now\nReady.\n\n## Next\nLand it.\n\n## Done when\nMerged."
 ISSUES = {
     "sound-and-unblocked": sound(),
     "closed-blocker-is-ignored": sound(
-        IssueWorld(dependencies=(dependency(62, state=board.BlockerState.CLOSED),))
+        IssueWorld(dependencies=(dependency(62, state=workboard.BlockerState.CLOSED),))
     ),
 }
 MALFORMED = {
@@ -453,7 +457,7 @@ def assert_trunk_arranged(clone: Path, world: TrunkWorld) -> None:
     reachable = real_git(clone, "rev-list", "main").stdout.split()
     side = real_git(clone, "rev-parse", "side").stdout.strip()
     pushed = real_git(clone, "rev-parse", "origin/main").stdout.strip()
-    tracked = real_git(clone, "show", f"HEAD:{board.CONFIG_PATH}").stdout
+    tracked = real_git(clone, "show", f"HEAD:{workboard.CONFIG_PATH}").stdout
     expected_length = len(world.trailers) + (2 if world.config else 1)
     assert (len(trunk), side in trunk, side in reachable, pushed, tracked) == (
         expected_length,

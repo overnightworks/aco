@@ -16,7 +16,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TypeVar
 
-from . import board, forge, process, protocol
+from . import forge, process, protocol, workboard
 from .body import ItemKind
 from .protocol import REPOSITORY_PATTERN, ClaimError
 
@@ -57,9 +57,9 @@ GH_QUIET_ENVIRONMENT = {
     "NO_COLOR": "1",
     "GH_NO_UPDATE_NOTIFIER": "1",
 }
-API_ISSUE_STATES: dict[str, board.BlockerState] = {
-    "open": board.BlockerState.OPEN,
-    "closed": board.BlockerState.CLOSED,
+API_ISSUE_STATES: dict[str, workboard.BlockerState] = {
+    "open": workboard.BlockerState.OPEN,
+    "closed": workboard.BlockerState.CLOSED,
 }
 # The organization's native issue types (decision record 0001 ruling D3):
 # casefolded so an org's own casing of the type name never matters. An
@@ -704,7 +704,7 @@ class GitHubForge:
             return False
         return closed <= total
 
-    def _board_issue(self, value: object) -> board.Issue:
+    def _board_issue(self, value: object) -> workboard.Issue:
         if not isinstance(value, dict):
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed board issue")
         number = value.get("number")
@@ -736,7 +736,7 @@ class GitHubForge:
             or blocked_by_count < 0
         ):
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed board issue")
-        return board.Issue(
+        return workboard.Issue(
             number,
             title,
             tuple(labels),
@@ -749,7 +749,7 @@ class GitHubForge:
             blocked_by_count,
         )
 
-    def _board_pull_request(self, value: object) -> board.PullRequest:
+    def _board_pull_request(self, value: object) -> workboard.PullRequest:
         if not isinstance(value, dict):
             raise forge.ForgeMalformedResponseError(
                 "GitHub returned a malformed board pull request"
@@ -777,7 +777,7 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError(
                 "GitHub returned a malformed board pull request"
             )
-        return board.PullRequest(number, title, body, head_ref_name, merged_at)
+        return workboard.PullRequest(number, title, body, head_ref_name, merged_at)
 
     def _landing(self, value: object) -> forge.Landing:
         if not isinstance(value, dict):
@@ -1078,7 +1078,7 @@ class GitHubForge:
         checks = self._check_runs(head_sha) + self._combined_status_checks(head_sha)
         return forge.LandingReadiness(number, state == "open", head_sha, mergeable_state, checks)
 
-    def allowed_merge_methods(self) -> frozenset[board.MergeMethod] | None:
+    def allowed_merge_methods(self) -> frozenset[workboard.MergeMethod] | None:
         """Which merge methods this repository allows (issue #578), from its
         own `allow_merge_commit`/`allow_squash_merge`/`allow_rebase_merge`
         settings, or `None` where GitHub withholds them -- it reports them
@@ -1094,14 +1094,14 @@ class GitHubForge:
         values = self._json_lines(raw, "repository merge settings")
         if len(values) != 1 or not isinstance(values[0], dict):
             raise forge.ForgeMalformedResponseError(MALFORMED_MERGE_SETTINGS)
-        settings = {method: values[0].get(method.value) for method in board.MergeMethod}
+        settings = {method: values[0].get(method.value) for method in workboard.MergeMethod}
         if all(allowed is None for allowed in settings.values()):
             return None
         if not all(isinstance(allowed, bool) for allowed in settings.values()):
             raise forge.ForgeMalformedResponseError(MALFORMED_MERGE_SETTINGS)
         return frozenset(method for method, allowed in settings.items() if allowed)
 
-    def branch_merge_rules(self, branch: str) -> tuple[frozenset[board.MergeMethod], ...]:
+    def branch_merge_rules(self, branch: str) -> tuple[frozenset[workboard.MergeMethod], ...]:
         """The merge methods each rule on `branch` allows (issue #615), one
         set per rule, read through the branch-rules endpoint that resolves
         every ruleset applying to it: GitHub refuses a method any one rule
@@ -1131,12 +1131,12 @@ class GitHubForge:
         return tuple(allowed for allowed in allowed_per_rule if allowed is not None)
 
     @staticmethod
-    def _rule_merge_methods(rule: object) -> frozenset[board.MergeMethod] | None:
+    def _rule_merge_methods(rule: object) -> frozenset[workboard.MergeMethod] | None:
         """The methods one branch rule allows, or None where it restricts none."""
         if not isinstance(rule, dict):
             raise forge.ForgeMalformedResponseError(MALFORMED_BRANCH_RULES)
         if rule.get("type") == "required_linear_history":
-            return frozenset(board.MergeMethod) - {board.MergeMethod.MERGE}
+            return frozenset(workboard.MergeMethod) - {workboard.MergeMethod.MERGE}
         if rule.get("type") != "pull_request":
             return None
         parameters = rule.get("parameters")
@@ -1147,19 +1147,19 @@ class GitHubForge:
         methods = parameters.get("allowed_merge_methods")
         if methods is None:
             return None
-        known = {method.value for method in board.MergeMethod}
+        known = {method.value for method in workboard.MergeMethod}
         if not isinstance(methods, list) or not all(
             isinstance(method, str) and method in known for method in methods
         ):
             raise forge.ForgeMalformedResponseError(MALFORMED_BRANCH_RULES)
-        return frozenset(board.MergeMethod(method) for method in methods)
+        return frozenset(workboard.MergeMethod(method) for method in methods)
 
     def merge_landing(
         self,
         number: int,
         *,
         head_sha: str,
-        method: board.MergeMethod,
+        method: workboard.MergeMethod,
         title: str,
         body: str,
     ) -> str:
@@ -1262,7 +1262,7 @@ class GitHubForge:
                 return
             raise
 
-    def _issue_reference(self, value: object, description: str) -> board.IssueReference:
+    def _issue_reference(self, value: object, description: str) -> workboard.IssueReference:
         if not isinstance(value, dict):
             raise forge.ForgeMalformedResponseError(f"GitHub returned a malformed {description}")
         number = value.get("number")
@@ -1278,16 +1278,16 @@ class GitHubForge:
             or re.fullmatch(REPOSITORY_PATTERN, repository) is None
         ):
             raise forge.ForgeMalformedResponseError(f"GitHub returned a malformed {description}")
-        return board.IssueReference(repository, number)
+        return workboard.IssueReference(repository, number)
 
-    def _issue_state(self, value: object, description: str) -> board.BlockerState:
+    def _issue_state(self, value: object, description: str) -> workboard.BlockerState:
         state = value.get("state") if isinstance(value, dict) else None
         parsed = API_ISSUE_STATES.get(state) if isinstance(state, str) else None
         if parsed is None:
             raise forge.ForgeMalformedResponseError(f"GitHub returned a malformed {description}")
         return parsed
 
-    def parent_issue(self, number: int) -> board.ParentIssue | None:
+    def parent_issue(self, number: int) -> workboard.ParentIssue | None:
         """The issue GitHub records as `number`'s parent, or None when it has none."""
         try:
             raw = self._run(
@@ -1312,7 +1312,7 @@ class GitHubForge:
         kind_raw = value.get("kind")
         if not isinstance(body, str) or (kind_raw is not None and not isinstance(kind_raw, str)):
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed parent issue")
-        return board.ParentIssue(
+        return workboard.ParentIssue(
             self._issue_reference(value, "parent issue"), body, self._issue_kind(kind_raw)
         )
 
@@ -1320,14 +1320,14 @@ class GitHubForge:
         parent = self.parent_issue(number)
         return None if parent is None else parent.reference.number
 
-    def list_children(self, number: int) -> tuple[board.ChildItem, ...]:
+    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
         """Every sub-issue GitHub records under `number`, open or closed.
 
         Every child's state is read here rather than filtered by `--jq`: a
         state this adapter does not understand would otherwise vanish and make
         a parent look childless, which is exactly the landing this check must
         refuse. A child recorded in another repository is refused outright --
-        `board.ChildItem` has no field to hold that fact honestly, and
+        `workboard.ChildItem` has no field to hold that fact honestly, and
         containers and their children are same-repository only, for now.
         """
         raw = self._run(
@@ -1339,7 +1339,7 @@ class GitHubForge:
                 ".[] | {number,repository:.repository_url,state,type:(.type.name // null)}",
             ]
         )
-        children: list[board.ChildItem] = []
+        children: list[workboard.ChildItem] = []
         for value in self._json_lines(raw, "sub-issue"):
             reference = self._issue_reference(value, "sub-issue")
             if reference.repository != self.repository.path:
@@ -1347,7 +1347,9 @@ class GitHubForge:
                     "GitHub returned a sub-issue from another repository"
                 )
             state = self._issue_state(value, "sub-issue")
-            children.append(board.ChildItem(reference.number, board.ChildState(state.value)))
+            children.append(
+                workboard.ChildItem(reference.number, workboard.ChildState(state.value))
+            )
         return tuple(children)
 
     def default_branch(self) -> str:
@@ -1379,7 +1381,7 @@ class GitHubForge:
         )
         return self._json_lines(raw, "board issue")
 
-    def list_open_board_issues(self) -> tuple[board.Issue, ...]:
+    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
         values = self._fetch_pages(self._open_issue_page, per_page=ISSUES_PER_PAGE)
         return tuple(
             self._board_issue(value)
@@ -1389,7 +1391,7 @@ class GitHubForge:
 
     MALFORMED_BOARD_DEPENDENCY = "GitHub returned a malformed board blocked-by dependency"
 
-    def _board_dependency(self, value: object) -> board.IssueDependency:
+    def _board_dependency(self, value: object) -> workboard.IssueDependency:
         if not isinstance(value, dict):
             raise forge.ForgeMalformedResponseError(self.MALFORMED_BOARD_DEPENDENCY)
         number = value.get("number")
@@ -1411,7 +1413,7 @@ class GitHubForge:
                 isinstance(closed_at, str)
                 and protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(closed_at) is None
             )
-            or (blocker_state is board.BlockerState.CLOSED and closed_at is None)
+            or (blocker_state is workboard.BlockerState.CLOSED and closed_at is None)
         ):
             raise forge.ForgeMalformedResponseError(self.MALFORMED_BOARD_DEPENDENCY)
         parsed_closed_at = None
@@ -1421,14 +1423,14 @@ class GitHubForge:
             except ValueError as error:
                 raise forge.ForgeMalformedResponseError(self.MALFORMED_BOARD_DEPENDENCY) from error
             parsed_closed_at = parsed_closed_at.astimezone(UTC)
-        return board.IssueDependency(
-            board.IssueReference(repository, number),
+        return workboard.IssueDependency(
+            workboard.IssueReference(repository, number),
             blocker_state,
             is_pull_request,
             parsed_closed_at,
         )
 
-    def list_board_dependencies(self, number: int) -> tuple[board.IssueDependency, ...]:
+    def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
         raw = self._run(
             [
                 "api",
@@ -1444,7 +1446,7 @@ class GitHubForge:
             self._board_dependency(value) for value in self._json_lines(raw, "board dependency")
         )
 
-    def list_open_board_pull_requests(self) -> tuple[board.PullRequest, ...]:
+    def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
         raw = self._run(
             [
                 "pr",
@@ -1466,7 +1468,7 @@ class GitHubForge:
             for value in self._json_lines(raw, "open board pull request")
         )
 
-    def _merged_pull_requests_for_day(self, day: date) -> tuple[board.PullRequest, ...]:
+    def _merged_pull_requests_for_day(self, day: date) -> tuple[workboard.PullRequest, ...]:
         raw = self._run(
             [
                 "pr",
@@ -1492,7 +1494,7 @@ class GitHubForge:
 
     def list_recent_merged_board_pull_requests(
         self, since: datetime
-    ) -> tuple[board.PullRequest, ...]:
+    ) -> tuple[workboard.PullRequest, ...]:
         cutoff = since.astimezone(UTC)
         days = _query_days(cutoff.date(), datetime.now(UTC).date())
         with ThreadPoolExecutor(max_workers=min(len(days), PARALLEL_FETCH_CONCURRENCY)) as pool:
@@ -1518,7 +1520,7 @@ class GitHubForge:
                 "an older landing that day could be missing from a board/next stage",
                 file=sys.stderr,
             )
-        recent: list[board.PullRequest] = []
+        recent: list[workboard.PullRequest] = []
         for pull_request in (pr for shard in shards for pr in shard):
             if pull_request.merged_at is None:
                 continue

@@ -19,7 +19,7 @@ from cli_fixtures import (
 )
 from github_fixtures import LANDING_DEFAULT_BRANCH, FakeForge, LandedWorld, landed_world
 
-from agent_coordination import board, checkout, process
+from agent_coordination import checkout, process, workboard
 
 
 @dataclass(frozen=True)
@@ -148,7 +148,7 @@ LISTING_ARGUMENTS = ("config", "--local", "--null", "--name-only", "--get-regexp
 class CleanupCase:
     intervention: Intervention | LaunchIntervention = Intervention.NONE
     command: tuple[str, ...] = ("land", "12")
-    premerge: board.MergeMethod | None = None
+    premerge: workboard.MergeMethod | None = None
     stdout: str | JsonOutput = PREFIX + "worktree: removed\n"
     stderr: str = ""
     status: int = 0
@@ -361,14 +361,14 @@ class CleanupIntervention:
 
 
 def allow_squash(client: FakeForge, _head: str) -> None:
-    client.allowed_methods = frozenset({board.MergeMethod.SQUASH})
+    client.allowed_methods = frozenset({workboard.MergeMethod.SQUASH})
 
 
 def no_premerge(_world: LandedWorld) -> None:
     pass
 
 
-def merge_before_run(world: LandedWorld, *, method: board.MergeMethod) -> None:
+def merge_before_run(world: LandedWorld, *, method: workboard.MergeMethod) -> None:
     world.landing.forge.merge_landing(
         12,
         head_sha=world.landing.head,
@@ -420,11 +420,11 @@ def cleanup_check(
     [
         pytest.param(PAST_HEAD, id="land-with-the-lane-past-the-pinned-head"),
         pytest.param(
-            CleanupCase(command=RELEASE_COMMAND, premerge=board.MergeMethod.SQUASH),
+            CleanupCase(command=RELEASE_COMMAND, premerge=workboard.MergeMethod.SQUASH),
             id="release-rerun-on-the-recorded-head",
         ),
         pytest.param(
-            replace(PAST_HEAD, command=RELEASE_COMMAND, premerge=board.MergeMethod.SQUASH),
+            replace(PAST_HEAD, command=RELEASE_COMMAND, premerge=workboard.MergeMethod.SQUASH),
             id="release-rerun-past-the-recorded-head",
         ),
     ],
@@ -560,7 +560,7 @@ def test_a_squashed_lane_branch_goes_by_compare_and_delete(
     cleanup_check(case)
 
 
-MERGED = CleanupCase(command=RELEASE_COMMAND, premerge=board.MergeMethod.MERGE)
+MERGED = CleanupCase(command=RELEASE_COMMAND, premerge=workboard.MergeMethod.MERGE)
 MERGED_BRANCH_KEPT = replace(
     MERGED, branch=Present("{head}"), keys=Present(OWN_KEYS), own_section=Present(OWN_KEYS)
 )
@@ -707,7 +707,7 @@ NO_LINKED_WORKTREE = (
             replace(
                 PAST_HEAD,
                 command=RELEASE_COMMAND,
-                premerge=board.MergeMethod.MERGE,
+                premerge=workboard.MergeMethod.MERGE,
                 worktree_exists=True,
             ),
         ),
@@ -741,15 +741,17 @@ def verify_cleanup(
         "initial.own-section.keys": configuration_keys(github_clone),
     }
     expected_initial = {
-        "forge.allowed-methods": frozenset({board.MergeMethod.SQUASH}),
+        "forge.allowed-methods": frozenset({workboard.MergeMethod.SQUASH}),
         "initial.lane.head": head,
         "initial.own-section.keys": Present(OWN_KEYS).format(lane=lane),
     }
     assert observed_initial == expected_initial
     {
         None: no_premerge,
-        board.MergeMethod.SQUASH: partial(merge_before_run, method=board.MergeMethod.SQUASH),
-        board.MergeMethod.MERGE: partial(merge_before_run, method=board.MergeMethod.MERGE),
+        workboard.MergeMethod.SQUASH: partial(
+            merge_before_run, method=workboard.MergeMethod.SQUASH
+        ),
+        workboard.MergeMethod.MERGE: partial(merge_before_run, method=workboard.MergeMethod.MERGE),
     }[case.premerge](world)
     observed_prepared = {
         "prepared.landing.merged": world.landing.forge.landings[12].merged,

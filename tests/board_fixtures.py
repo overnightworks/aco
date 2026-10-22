@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from types import MappingProxyType
 
-from agent_coordination import board, metrics, protocol
+from agent_coordination import metrics, protocol, workboard
 from agent_coordination.body import (
     BLOCK_FENCE_INFO,
     ItemKind,
@@ -78,27 +78,27 @@ def request(
 
 
 def projected_board(
-    issues: tuple[board.Issue, ...],
-    open_pull_requests: tuple[board.PullRequest, ...],
-    recent_merged_pull_requests: tuple[board.PullRequest, ...],
+    issues: tuple[workboard.Issue, ...],
+    open_pull_requests: tuple[workboard.PullRequest, ...],
+    recent_merged_pull_requests: tuple[workboard.PullRequest, ...],
     claims: tuple[protocol.ScopedClaim, ...],
-    config: board.BoardConfig,
+    config: workboard.BoardConfig,
     *,
     repository: str = REPOSITORY,
     now: datetime | None = None,
     trunk_landings: tuple[datetime, ...] = (),
-    trunk_landing_items: tuple[board.TrunkLandingItem, ...] = (),
-    children: Mapping[int, tuple[board.ChildItem, ...]] = MappingProxyType({}),
-    dependencies: Mapping[int, tuple[board.IssueDependency, ...]] = MappingProxyType({}),
+    trunk_landing_items: tuple[workboard.TrunkLandingItem, ...] = (),
+    children: Mapping[int, tuple[workboard.ChildItem, ...]] = MappingProxyType({}),
+    dependencies: Mapping[int, tuple[workboard.IssueDependency, ...]] = MappingProxyType({}),
     open_pull_requests_supported: bool = True,
     lane_events: tuple[metrics.LaneEvent, ...] = (),
     closed_item_sizes: Mapping[int, metrics.Size | None] = MappingProxyType({}),
     unparsed_lifecycle_commits: int = 0,
-) -> board.Board:
-    """`board.build_board` for scenarios that do not turn on which repository is projected."""
+) -> workboard.Board:
+    """`workboard.build_board` for scenarios that do not turn on which repository is projected."""
     observed_at = now or datetime(2026, 8, 21, tzinfo=UTC)
-    return board.build_board(
-        board.BoardBuildInputs(
+    return workboard.build_board(
+        workboard.BoardBuildInputs(
             issues=issues,
             open_pull_requests=open_pull_requests,
             recent_merged_pull_requests=recent_merged_pull_requests,
@@ -183,8 +183,8 @@ def board_issue(
     labels: tuple[str, ...] = (),
     blocked_by_count: int = 0,
     kind: ItemKind | None = None,
-) -> board.Issue:
-    return board.Issue(
+) -> workboard.Issue:
+    return workboard.Issue(
         number,
         title,
         labels,
@@ -200,22 +200,22 @@ def block_dependency(
     number: int,
     *,
     repository: str = REPOSITORY,
-    state: board.BlockerState = board.BlockerState.OPEN,
+    state: workboard.BlockerState = workboard.BlockerState.OPEN,
     is_pull_request: bool = False,
     closed_at: datetime | None = None,
-) -> board.IssueDependency:
-    return board.IssueDependency(
-        board.IssueReference(repository, number), state, is_pull_request, closed_at
+) -> workboard.IssueDependency:
+    return workboard.IssueDependency(
+        workboard.IssueReference(repository, number), state, is_pull_request, closed_at
     )
 
 
 def blocked_issue(
     number: int,
     title: str,
-    *dependencies: board.IssueDependency,
+    *dependencies: workboard.IssueDependency,
     next_step: str | None = None,
     labels: tuple[str, ...] = (),
-) -> tuple[board.Issue, dict[int, tuple[board.IssueDependency, ...]]]:
+) -> tuple[workboard.Issue, dict[int, tuple[workboard.IssueDependency, ...]]]:
     """One item and the `blocked_by` dependencies GitHub records for it, with
     the listing count the forge would report for exactly those."""
     issue = board_issue(
@@ -241,8 +241,8 @@ def block_body(
     return f"{before}{fence}{BLOCK_FENCE_INFO}\n{toml_text}\n{fence}\n{after}"
 
 
-def container_issue(number: int, toml_text: str) -> board.Issue:
-    return board.Issue(
+def container_issue(number: int, toml_text: str) -> workboard.Issue:
+    return workboard.Issue(
         number,
         "Epic",
         (),
@@ -256,10 +256,10 @@ def container_issue(number: int, toml_text: str) -> board.Issue:
 
 
 def write_repository_config(
-    toplevel: Path, content: str = "", *, path: Path = board.CONFIG_PATH
+    toplevel: Path, content: str = "", *, path: Path = workboard.CONFIG_PATH
 ) -> None:
     """`content` written as the repository configuration file `path` under
-    `toplevel` -- the board's by default, `board.BRIEF_CONFIG_PATH` for the
+    `toplevel` -- the board's by default, `workboard.BRIEF_CONFIG_PATH` for the
     brief's -- its directory created when missing."""
     config = toplevel / path
     config.parent.mkdir(parents=True, exist_ok=True)

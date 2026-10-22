@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import TypeVar, cast
 
 from . import (
-    board,
     board_read,
     body,
     checkout,
@@ -21,6 +20,7 @@ from . import (
     protocol,
     report,
     store,
+    workboard,
 )
 from .session import RunContext
 
@@ -84,7 +84,7 @@ def _land_not_mergeable_refusal(number: int, state: str) -> str:
 
 def _land_pending_check_names(checks: tuple[forge.CheckRun, ...]) -> tuple[str, ...]:
     return tuple(
-        board.truncated_display_name(check.name) for check in checks if check.conclusion is None
+        workboard.truncated_display_name(check.name) for check in checks if check.conclusion is None
     )
 
 
@@ -124,7 +124,7 @@ def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str
         assert conclusion is not None  # `_land_failed_check` only returns a completed check.
         return report.bounded_refusal(
             f"pull request #{number} has non-successful checks: "
-            f"{board.truncated_display_name(failed.name)} ({conclusion}); "
+            f"{workboard.truncated_display_name(failed.name)} ({conclusion}); "
             "land only after every check succeeds"
         )
     return None
@@ -186,7 +186,7 @@ def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: st
     )
 
 
-def _land_governing_settings(config: board.BoardConfig) -> dict[str, object]:
+def _land_governing_settings(config: workboard.BoardConfig) -> dict[str, object]:
     """The settings that decide where `aco land`'s own release half writes
     (issue #505): a pull request may change any other setting and still
     land, but never one of these under its own landing."""
@@ -194,19 +194,19 @@ def _land_governing_settings(config: board.BoardConfig) -> dict[str, object]:
 
 
 def _land_head_config_refusal(
-    number: int, head_text: str | None, landed: board.BoardConfig
+    number: int, head_text: str | None, landed: workboard.BoardConfig
 ) -> str | None:
     """Why the pull request head's board configuration `head_text` refuses
     `aco land` against the default branch's own `landed` one (LANDCMD-22..24),
     or `None` when it keeps every governing setting. The head's copy is
     only checked, never obeyed: `landed` alone governs this run (issue
     #505 R1)."""
-    path = board.CONFIG_PATH
+    path = workboard.CONFIG_PATH
     cannot_release = "aco land cannot release its claim across that change"
     if head_text is None:
         return f"pull request #{number} removes {path}; {cannot_release}"
     try:
-        head = board.parse_config(head_text, path)
+        head = workboard.parse_config(head_text, path)
     except protocol.ClaimError as error:
         return report.bounded_refusal(f"pull request #{number} carries an invalid {path}: {error}")
     landed_settings = _land_governing_settings(landed)
@@ -224,9 +224,9 @@ def _land_head_config_refusal(
 
 
 def _refuse_land_head_config(
-    client: github.GitHubForge, readiness: forge.LandingReadiness, landed: board.BoardConfig
+    client: github.GitHubForge, readiness: forge.LandingReadiness, landed: workboard.BoardConfig
 ) -> None:
-    head_text = client.file_at_commit(board.CONFIG_PATH, readiness.head_sha)
+    head_text = client.file_at_commit(workboard.CONFIG_PATH, readiness.head_sha)
     refusal = _land_head_config_refusal(readiness.number, head_text, landed)
     if refusal is not None:
         raise protocol.ClaimUnavailableError(refusal)
@@ -238,7 +238,7 @@ def _land_preflight(
     context: policy.LandingCheckContext,
     number: int,
     parsed: argparse.Namespace,
-) -> tuple[forge.Landing, board.Classification, forge.LandingReadiness]:
+) -> tuple[forge.Landing, workboard.Classification, forge.LandingReadiness]:
     """Every read-only precondition `aco land` proves before its first write
     (issue #405): a green, open, mergeable pull request classifying exactly
     one open item, or declaring itself issue-less -- reusing `check <pr>`'s
@@ -269,10 +269,10 @@ def _land_preflight(
     _refuse_land_readiness(client, readiness, lambda: context.run.default_branch)
     detail = client.landing(number)
     structural = policy.structural_classification(context, detail)
-    if isinstance(structural, board.ClassificationDefect):
+    if isinstance(structural, workboard.ClassificationDefect):
         raise protocol.ClaimUnavailableError(f"pull request #{number} {structural.message}")
     _refuse_land_head_config(client, readiness, context.run.config)
-    if isinstance(structural, board.WorkItemClassification):
+    if isinstance(structural, workboard.WorkItemClassification):
         reference = board_read.fetch_issue_reference(client, structural.item.number)
         if reference.state is not forge.ItemState.OPEN:
             raise protocol.ClaimUnavailableError(
@@ -292,7 +292,7 @@ def _land_preflight(
         )
     identity: protocol.ClaimIdentity = (
         protocol.IssueIdentity(structural.item.number)
-        if isinstance(structural, board.WorkItemClassification)
+        if isinstance(structural, workboard.WorkItemClassification)
         else protocol.LaneIdentity()
     )
     selected = cmd_release.select_release_claim(
@@ -306,7 +306,7 @@ def _land_preflight(
     return detail, structural, readiness
 
 
-def _land_merge_body(title: str, body: str, classification: board.Classification) -> str:
+def _land_merge_body(title: str, body: str, classification: workboard.Classification) -> str:
     """The merge commit message `aco land` composes itself (issue #405,
     Befund 42 on #310): the pull request's own body with its classification
     line removed, then that classification, in the trunk's own trailer
@@ -322,8 +322,8 @@ def _land_merge_body(title: str, body: str, classification: board.Classification
     above it, but once joined that comment line no longer ends the message,
     and git reads it with the classification as the last paragraph instead
     (issue #594)."""
-    without_classification = board.body_without_classification(body)
-    trailer = board.land_trunk_trailer(classification)
+    without_classification = workboard.body_without_classification(body)
+    trailer = workboard.land_trunk_trailer(classification)
     if not without_classification:
         return f"{trailer}\n"
     joined = f"{without_classification}\n{trailer}"
@@ -339,8 +339,8 @@ def _land_merge_body(title: str, body: str, classification: board.Classification
 
 
 def _land_merge_method(
-    pinned: board.MergeMethod | None, client: github.GitHubForge, number: int, branch: str
-) -> board.MergeMethod:
+    pinned: workboard.MergeMethod | None, client: github.GitHubForge, number: int, branch: str
+) -> workboard.MergeMethod:
     """The method `aco land` merges pull request `number` into `branch` with
     (issues #578, #615): the board configuration's own pin, refused where
     the forge's allowed methods exclude it; otherwise a merge commit wherever
@@ -351,14 +351,14 @@ def _land_merge_method(
     if pinned is not None and allowed:
         if pinned not in allowed:
             allowed_list = ", ".join(
-                method.value for method in board.MergeMethod if method in allowed
+                method.value for method in workboard.MergeMethod if method in allowed
             )
             raise protocol.ClaimUnavailableError(
                 f"board.toml merge_method {pinned.value} is not allowed on {branch}: "
                 f"GitHub allows {allowed_list}"
             )
         return pinned
-    for method in (board.MergeMethod.MERGE, board.MergeMethod.SQUASH):
+    for method in (workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH):
         if method in allowed:
             return method
     raise protocol.ClaimUnavailableError(f"GitHub allows no merge method aco can use on {branch}")
@@ -366,15 +366,15 @@ def _land_merge_method(
 
 def _forge_allowed_merge_methods(
     client: github.GitHubForge, number: int, branch: str
-) -> frozenset[board.MergeMethod]:
+) -> frozenset[workboard.MergeMethod]:
     """Every method the forge allows on `branch`: the repository's own
     settings -- every method where it withholds them from a token without
     push rights, refused before any write unless they allow one `aco land`
     can use -- narrowed by each rule on `branch` (LANDCMD-42), since GitHub
     refuses a method any one of them excludes."""
     settings = client.allowed_merge_methods()
-    allowed = frozenset(board.MergeMethod) if settings is None else settings
-    if not allowed & board.LANDING_MERGE_METHODS:
+    allowed = frozenset(workboard.MergeMethod) if settings is None else settings
+    if not allowed & workboard.LANDING_MERGE_METHODS:
         raise protocol.ClaimUnavailableError(
             f"pull request #{number} cannot land: this repository allows neither a merge commit "
             "nor a squash merge"
@@ -384,10 +384,10 @@ def _forge_allowed_merge_methods(
     return allowed
 
 
-def _land_merge_title(method: board.MergeMethod, detail: forge.Landing) -> str:
+def _land_merge_title(method: workboard.MergeMethod, detail: forge.Landing) -> str:
     """A merge commit's own title, or a squash commit's: the pull request
     title plus `(#<n>)`, the convention a squash-only history reads."""
-    if method is board.MergeMethod.SQUASH:
+    if method is workboard.MergeMethod.SQUASH:
         return f"{detail.title} (#{detail.number})"
     return f"Merge pull request #{detail.number}"
 
@@ -396,8 +396,8 @@ def _land_merge(
     client: github.GitHubForge,
     detail: forge.Landing,
     readiness: forge.LandingReadiness,
-    classification: board.Classification,
-    method: board.MergeMethod,
+    classification: workboard.Classification,
+    method: workboard.MergeMethod,
 ) -> str:
     title = _land_merge_title(method, detail)
     try:
@@ -443,7 +443,7 @@ def _land_step(
 
 
 def _land_release_routing(
-    classification: board.Classification | None, merge_sha: str, context: RunContext
+    classification: workboard.Classification | None, merge_sha: str, context: RunContext
 ) -> int | None:
     """The issue `aco land`'s own delegated `release --merged` call routes
     to (issue #405 point 4): a fresh merge reuses the classification this
@@ -459,7 +459,7 @@ def _land_release_routing(
     commit's own history -- prints the ruled `MERGED ... follow-up
     incomplete: release; re-run aco land <n>` line, never a bare refusal."""
     if classification is not None:
-        if isinstance(classification, board.WorkItemClassification):
+        if isinstance(classification, workboard.WorkItemClassification):
             return classification.item.number
         return None
     landings = checkout.trunk_landings(
@@ -469,9 +469,9 @@ def _land_release_routing(
     )
     landing = next((entry for entry in landings if entry.sha == merge_sha), None)
     trunk_classification = None if landing is None else landing.classification
-    if isinstance(trunk_classification, board.TrunkWorkItemClassification):
+    if isinstance(trunk_classification, workboard.TrunkWorkItemClassification):
         return trunk_classification.numbers[0]
-    if isinstance(trunk_classification, board.NoItemClassification):
+    if isinstance(trunk_classification, workboard.NoItemClassification):
         return None
     raise protocol.ClaimUnavailableError(
         f"merge commit {merge_sha} carries no `Work-Item:` or `No-Item:` trailer"
@@ -554,7 +554,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     number = parsed.pull_request
     repository = client.repository.path
     detail = client.landing(number)
-    classification: board.Classification | None
+    classification: workboard.Classification | None
     if detail.merged:
         assert detail.merge_commit is not None  # `merged` is true; github.py guarantees this.
         merge_sha = detail.merge_commit

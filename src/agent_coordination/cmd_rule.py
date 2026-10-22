@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import cast
 
-from . import board, board_read, body, forge, protocol, report
+from . import board_read, body, forge, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -26,7 +26,7 @@ class InvalidTargetError(protocol.ClaimError):
 
 def require_writable_target(
     client: forge.ForgeWriter, context: RunContext, number: int, *, command: str
-) -> tuple[str, board.BoardConfig]:
+) -> tuple[str, workboard.BoardConfig]:
     """`ask` and `rule`'s shared target gate (RULE-06..08, cited verbatim by
     `specs/ask.spec.md`): the forge must accept a body write, the item must
     exist and not be a pull request, and its body must parse -- in that
@@ -42,7 +42,7 @@ def require_writable_target(
         body = board_read.item_body_or_refuse(
             client, number, command=command, storage=config.storage
         )
-        board.located_block_or_refuse(number, body, command=command, storage=config.storage)
+        workboard.located_block_or_refuse(number, body, command=command, storage=config.storage)
     except protocol.ClaimError as error:
         raise InvalidTargetError(str(error)) from error
     return body, config
@@ -88,7 +88,7 @@ def _emit_rule_result(
         )
         return
     print(
-        f"RULED {board.item_label(number, storage)} line {line.index} {ruling}; "
+        f"RULED {workboard.item_label(number, storage)} line {line.index} {ruling}; "
         f"{open_remaining} line(s) still open"
     )
 

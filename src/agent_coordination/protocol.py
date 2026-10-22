@@ -43,7 +43,7 @@ REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1
 # RFC 3339 UTC, second precision -- the one timestamp shape a forge issue's
 # `created_at`/`updated_at`, a state-ref item's `[record]` fields, and this
 # repository's git-object clock all share (issue #378). Owned here, the one
-# module `github`, `board`, and `items` can each import without breaking
+# module `github`, `workboard`, and `items` can each import without breaking
 # the Layers contract.
 RFC3339_TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 RFC3339_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -394,7 +394,7 @@ def valid_scope(scope: object) -> tuple[str, ...]:
     every entry a validated repository-relative path. Every claim's scope
     passes through here at creation (`cmd_claim._request`) and at rescope
     (`combined_scope`), so a live claim's scope is always already this
-    exact form; `board._canonical_scope` calls this same function to
+    exact form; `workboard._canonical_scope` calls this same function to
     project a body's own `scope = [...]`, rather than sorting a second
     time, so the two stay comparable as tuples regardless of the order
     either was typed in."""
@@ -928,7 +928,7 @@ def parse_claim_key(key: str) -> ClaimIdentity:
 # --- Item file-name codec (head ruling 30.09.2026, issue #558) --------------
 #
 # The one owner of which `items/` entry is an item: `store` places and
-# reads back item blobs by it, `items` and `board` read ids by it. Every
+# reads back item blobs by it, `items` and `workboard` read ids by it. Every
 # other `items/` entry is foreign -- neither an item nor this codec's to
 # rename.
 
@@ -1542,8 +1542,8 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
 #
 # Hand-written, not a TOML-writing library: `toml_string` is this
 # repository's one TOML basic-string writer (issue #378), living here
-# because this module sits below `board` in the Layers contract --
-# `board.py`'s renderers import it rather than keeping a second escape
+# because this module sits below `workboard` in the Layers contract --
+# `workboard.py`'s renderers import it rather than keeping a second escape
 # table and drifting from what `tomllib.loads` (the reader) accepts back.
 # It escapes every control character TOML's basic-string grammar forbids
 # unescaped (U+0000-U+001F and U+007F), not only backslash and quote: the

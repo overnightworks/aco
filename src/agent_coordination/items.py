@@ -10,9 +10,9 @@ already validates that table's shape before this module ever sees it; this
 module turns the validated raw values into `ItemRecord`, and turns an item
 file's own name into its id and number.
 
-This module sits below `board.py` and `body.py` in the Layers contract
-(`items` may import `body`, never `board`, and never the reverse of either).
-`state_board.py`, the adapter that assembles `board.Issue`/`IssueDependency`/
+This module sits below `workboard.py` and `body.py` in the Layers contract
+(`items` may import `body`, never `workboard`, and never the reverse of either).
+`state_board.py`, the adapter that assembles `workboard.Issue`/`IssueDependency`/
 `ChildItem`/`ParentIssue` from several `ItemRecord`s at once, sits above all
 three.
 """
@@ -50,7 +50,7 @@ _OptionalStr: TypeAlias = str | None
 class RecordState(StrEnum):
     """An item's own `[record].state` (issue #248): `body.py`'s schema
     already restricts the raw value to these two; this is the typed read of
-    it, distinct from `board.BlockerState`/`board.ChildState`, which name a
+    it, distinct from `workboard.BlockerState`/`workboard.ChildState`, which name a
     *relation's target* state, not an item's own."""
 
     OPEN = "open"
@@ -64,7 +64,7 @@ class ItemRecord:
     `number` is read from the item's file name, never a block key (issue
     #248): the id's hex suffix read as an integer -- deterministic,
     reversible, and never a counter -- so this record fits
-    `board.Issue.number` and every other port type keyed by `int` without
+    `workboard.Issue.number` and every other port type keyed by `int` without
     widening them. The id itself has exactly one owner, the file name
     (`state_board.py` keys its items by it); this record never carries a
     second copy.
@@ -85,7 +85,7 @@ class ItemRecord:
 
 def item_number(item_id: str) -> int:
     """`item_id`'s hex suffix, read as an integer -- the value every port
-    type keyed by `int` (`board.Issue.number`, `board.IssueReference.number`,
+    type keyed by `int` (`workboard.Issue.number`, `workboard.IssueReference.number`,
     ...) uses for a state-ref item. Raises `MalformedStateTreeError` for
     anything that is not a well-formed `aco-` id: called only for an item
     file's own name (`parse_item_record`'s `number` field below), never for
@@ -102,7 +102,7 @@ def format_item_id(number: int) -> str:
     """`number`, encoded the way `item_number` decodes it back (issue
     #285): the one display id `aco item show`'s header prints under every
     storage pin, `github` included -- so an id this tool prints is always a
-    valid reference back into `board.parse_item_reference`, regardless of
+    valid reference back into `workboard.parse_item_reference`, regardless of
     which forge actually owns the number (decision D4, #230 cut 16.09.2026:
     an id is identity, not just display)."""
     return f"aco-{number:06x}"
@@ -130,7 +130,7 @@ def item_id_from_filename(filename: str) -> str:
 def parse_origin(value: str) -> str:
     """`--origin`'s argparse `type=` (issue #316): `value` unchanged when it
     matches `ORIGIN_PATTERN`, a loud refusal before any write otherwise --
-    the same `protocol.ClaimError` `board.parse_item_reference` already
+    the same `protocol.ClaimError` `workboard.parse_item_reference` already
     raises from an argparse `type=`, so `main`'s existing `parse_args` guard
     catches this one too without a second exception class to catch."""
     if ORIGIN_PATTERN.fullmatch(value) is None:

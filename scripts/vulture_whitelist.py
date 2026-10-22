@@ -51,7 +51,8 @@ writes.
 from datetime import UTC, date, datetime
 
 from aco_board.server import _BoardRequestHandler as _BoardApiRequestHandler
-from agent_coordination.board import (
+from agent_coordination.metrics import Size, SizeClassStats
+from agent_coordination.workboard import (
     Board,
     BoardItem,
     BodyReadState,
@@ -64,7 +65,6 @@ from agent_coordination.board import (
     SizeClassMeasurement,
     Stage,
 )
-from agent_coordination.metrics import Size, SizeClassStats
 
 _size_class_stats_for_vulture = SizeClassStats(
     size=Size.SMALL, n=0, median_hours=0.0, p80_hours=0.0, weak=False

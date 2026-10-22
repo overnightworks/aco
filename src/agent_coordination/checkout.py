@@ -13,7 +13,7 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
-from . import board, body, process, protocol
+from . import body, process, protocol, workboard
 from .protocol import (
     AGENT_MAX_LENGTH,
     ClaimError,
@@ -1199,7 +1199,7 @@ class TrunkLanding:
 
     sha: str
     committed_at: datetime
-    classification: board.TrunkClassification | board.ClassificationDefect | None
+    classification: workboard.TrunkClassification | workboard.ClassificationDefect | None
     work_item_values: tuple[str, ...]
 
 
@@ -1216,7 +1216,7 @@ def _parsed_trunk_landing(fields: tuple[str, str, str, str]) -> TrunkLanding:
     if committed_at.tzinfo is None:
         raise ClaimError("git returned a malformed trunk landing timestamp")
     work_item_values = _trailer_values(work_item_field)
-    classification = board.trunk_commit_classification(
+    classification = workboard.trunk_commit_classification(
         work_item_values, _trailer_values(no_item_field)
     )
     return TrunkLanding(sha, committed_at.astimezone(UTC), classification, work_item_values)
@@ -1614,7 +1614,7 @@ def _attach_command(path: Path, branch: str) -> str:
     `switch -c` creates a branch that does not exist yet, plain `switch`
     checks out one that does."""
     create = () if branch_exists(branch) else ("-c",)
-    return board.shell_command("git", "-C", str(path), "switch", *create, branch)
+    return workboard.shell_command("git", "-C", str(path), "switch", *create, branch)
 
 
 def worktree_on_branch(paths: tuple[Path, ...], branch: str) -> Path | None:
@@ -1895,7 +1895,7 @@ def _trunk_no_item_landing_defect(
     classification = landing.classification
     if classification is None:
         return "carries no `Work-Item:` or `No-Item:` trailer"
-    if isinstance(classification, board.ClassificationDefect):
+    if isinstance(classification, workboard.ClassificationDefect):
         return classification.message
     return None
 
@@ -1907,7 +1907,7 @@ def _lane_work_item_trailer_defect(work_item_values: tuple[str, ...], pull_reque
     values = ", ".join(work_item_values)
     return (
         f"carries `Work-Item: {values}`; an issue-less lane needs a "
-        f"`No-Item: <{board.NO_ITEM_KINDS_TRAILER}>` "
+        f"`No-Item: <{workboard.NO_ITEM_KINDS_TRAILER}>` "
         f'trailer; release it with --abandoned "landed as PR #{pull_request} '
         'with a malformed trailer"'
     )
@@ -1949,12 +1949,12 @@ def _newest_landed_commit(
     for landing in reversed(landings):
         classification = landing.classification
         if (
-            isinstance(classification, board.TrunkWorkItemClassification)
+            isinstance(classification, workboard.TrunkWorkItemClassification)
             and number in classification.numbers
         ):
             return landing.sha
     raise protocol.ClaimUnavailableError(
-        f"no trunk commit carries a Work-Item: trailer naming {board.item_label(number, storage)}"
+        f"no trunk commit carries a Work-Item: trailer naming {workboard.item_label(number, storage)}"
     )
 
 
@@ -1969,7 +1969,7 @@ def _trunk_landing_defect(
     walked first-parent trunk (issue #359 LAND-52), or `None` when it does:
     `sha` must sit on that trunk and carry a `Work-Item:` trailer naming
     exactly `number`. One reader (`trunk_landings`) and one grammar
-    (`board.trunk_commit_classification`) for both `release --merged
+    (`workboard.trunk_commit_classification`) for both `release --merged
     <sha|empty>` under `storage = state-ref` and, since issue #397 (Befund
     41), `release --merged <pr>` under `storage = github`'s own merge-commit
     verification -- neither trusts a different notion of "landed"."""
@@ -1979,13 +1979,13 @@ def _trunk_landing_defect(
     classification = landing.classification
     if classification is None:
         return NO_WORK_ITEM_TRAILER_DEFECT
-    if isinstance(classification, board.ClassificationDefect):
+    if isinstance(classification, workboard.ClassificationDefect):
         return classification.message
     if (
-        not isinstance(classification, board.TrunkWorkItemClassification)
+        not isinstance(classification, workboard.TrunkWorkItemClassification)
         or number not in classification.numbers
     ):
-        return f"does not name work item {board.item_label(number, storage)}"
+        return f"does not name work item {workboard.item_label(number, storage)}"
     return None
 
 
@@ -2020,7 +2020,7 @@ def _verify_merge_commit_authority(
     if defect == NO_WORK_ITEM_TRAILER_DEFECT:
         refusal += (
             f'; release it with --abandoned "landed as PR #{pull_request} without a '
-            f'Work-Item: trailer" and close {board.item_label(number, storage)} by hand'
+            f'Work-Item: trailer" and close {workboard.item_label(number, storage)} by hand'
         )
     raise protocol.ClaimUnavailableError(refusal)
 

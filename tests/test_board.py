@@ -36,7 +36,7 @@ from board_fixtures import (
     unfilled_block_body,
 )
 
-from agent_coordination import board, body, checkout, metrics, protocol
+from agent_coordination import body, checkout, metrics, protocol, workboard
 from agent_coordination.body import (
     BLOCK_FENCE_INFO,
     EXPECTATION_LINE_TEXT_MAXIMUM,
@@ -685,7 +685,7 @@ def test_render_block_round_trips_every_field() -> None:
         '[[expectation]]\ntext = "Proposed"\ndefault = "later"\n'
         '[[expectation]]\ntext = "Ruled"\nruling = "yes"\nruled_on = 2026-09-05\n'
         '[[slice]]\nindex = 4\ntitle = "Block contract in issue bodies"\n'
-        'scope = ["src/agent_coordination/board.py"]\n'
+        'scope = ["src/agent_coordination/workboard.py"]\n'
     )
     located = locate_block(block_body(toml_text))
 
@@ -760,7 +760,7 @@ def test_render_block_re_renders_a_canonical_scope_body_byte_exact() -> None:
     body = complete_contract(
         "Next step.",
         scope=["docs/plan.md", "src/widget.py"],
-        slice=[{"index": 1, "title": "Row", "scope": ["src/agent_coordination/board.py"]}],
+        slice=[{"index": 1, "title": "Row", "scope": ["src/agent_coordination/workboard.py"]}],
     )
     located = locate_block(body)
     interior = body[located.content_start : located.content_end]
@@ -817,7 +817,7 @@ def test_render_block_keeps_an_emptied_slice_array_a_top_level_key(
 
 
 def test_uncut_is_empty_when_the_block_carries_no_slice_entry() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         79,
         "Container",
         (),
@@ -830,7 +830,7 @@ def test_uncut_is_empty_when_the_block_carries_no_slice_entry() -> None:
     )
 
     projected = projected_board(
-        (container,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
     assert projected.uncut == ()
@@ -849,10 +849,10 @@ def test_uncut_is_empty_when_the_block_carries_no_slice_entry() -> None:
     ],
 )
 def test_has_further_work(next_line: str | None, expected: bool) -> None:
-    assert board.has_further_work(next_line) is expected
+    assert workboard.has_further_work(next_line) is expected
 
 
-def issues_created_at(*created_ats: str) -> tuple[board.Issue, ...]:
+def issues_created_at(*created_ats: str) -> tuple[workboard.Issue, ...]:
     return tuple(
         replace(board_issue(number, "Item", ""), created_at=created_at)
         for number, created_at in enumerate(created_ats, start=1)
@@ -870,7 +870,7 @@ def issues_created_at(*created_ats: str) -> tuple[board.Issue, ...]:
 def test_oldest_created_at_fails_loud_on_a_malformed_github_timestamp(raw_timestamp: str) -> None:
     issues = issues_created_at(raw_timestamp)
     with pytest.raises(ClaimError, match="GitHub returned a malformed board timestamp"):
-        board.oldest_created_at(issues)
+        workboard.oldest_created_at(issues)
 
 
 @pytest.mark.parametrize(
@@ -892,7 +892,7 @@ def test_oldest_created_at_fails_loud_on_a_malformed_github_timestamp(raw_timest
 def test_oldest_created_at_is_the_earliest_filing_in_utc(
     created_ats: tuple[str, ...], expected: datetime | None
 ) -> None:
-    oldest = board.oldest_created_at(issues_created_at(*created_ats))
+    oldest = workboard.oldest_created_at(issues_created_at(*created_ats))
 
     assert oldest == expected
     assert oldest is None or oldest.utcoffset() == timedelta(0)
@@ -938,7 +938,7 @@ def test_a_fresh_unfilled_block_is_an_incomplete_contract_with_no_defects() -> N
             (
                 block_dependency(
                     9,
-                    state=board.BlockerState.CLOSED,
+                    state=workboard.BlockerState.CLOSED,
                     closed_at=datetime(2026, 8, 20, tzinfo=UTC),
                 ),
             ),
@@ -984,9 +984,9 @@ def test_a_fresh_unfilled_block_is_an_incomplete_contract_with_no_defects() -> N
     ],
 )
 def test_board_reports_each_item_actionability_reason(
-    issue: board.Issue,
+    issue: workboard.Issue,
     claims: tuple[ClaimRequest, ...],
-    dependencies: tuple[board.IssueDependency, ...],
+    dependencies: tuple[workboard.IssueDependency, ...],
     expected: tuple[bool, str | None],
 ) -> None:
     blocker = board_issue(9, "Blocker", complete_contract("Claim #9."))
@@ -995,7 +995,7 @@ def test_board_reports_each_item_actionability_reason(
         (),
         (),
         tuple(store_claim_from_request(request_value) for request_value in claims),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies={issue.number: dependencies},
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
@@ -1016,15 +1016,15 @@ def test_board_names_every_open_dependency_in_order() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies=blocked_by,
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
     item = next(item for item in projected.items if item.number == 10)
 
     assert item.open_blockers == (
-        board.IssueReference(REPOSITORY, 642),
-        board.IssueReference(REPOSITORY, 790),
+        workboard.IssueReference(REPOSITORY, 642),
+        workboard.IssueReference(REPOSITORY, 790),
     )
     assert item.actionable is False
     assert item.actionable_reason == "blocked by #642, #790"
@@ -1037,7 +1037,7 @@ def test_board_treats_an_item_with_no_dependency_as_unblocked() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
@@ -1057,7 +1057,7 @@ def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() ->
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 31, tzinfo=UTC),
     )
     item = projected_while_frozen.items[0]
@@ -1066,7 +1066,7 @@ def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() ->
     assert item.actionable_reason == f"frozen: {FROZEN_TRIGGER}"
     assert item.frozen_trigger == FROZEN_TRIGGER
     assert item not in projected_while_frozen.ready_now
-    assert board.highest_scored_actionable(projected_while_frozen) is None
+    assert workboard.highest_scored_actionable(projected_while_frozen) is None
 
     thawed = board_issue(
         301, "Highest scored", complete_contract("Claim #301.", scope=["src/widget.py"])
@@ -1076,7 +1076,7 @@ def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() ->
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 31, tzinfo=UTC),
     )
     thawed_item = projected_after_thaw.items[0]
@@ -1085,7 +1085,7 @@ def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() ->
     assert thawed_item.actionable_reason is None
     assert thawed_item.frozen_trigger is None
     assert thawed_item in projected_after_thaw.ready_now
-    assert board.highest_scored_actionable(projected_after_thaw) is thawed_item
+    assert workboard.highest_scored_actionable(projected_after_thaw) is thawed_item
     # The frozen marker alone changes actionability, never the score itself.
     assert item.score == thawed_item.score
 
@@ -1115,10 +1115,10 @@ def test_a_second_block_fence_inside_a_documentation_fence_is_not_read() -> None
 def test_board_marks_text_only_items_stale_only_after_seven_idle_days(
     updated_at: str, expected_stale: bool
 ) -> None:
-    issue = board.Issue(22, "Idle issue", (), "", "2026-08-01T00:00:00Z", updated_at)
+    issue = workboard.Issue(22, "Idle issue", (), "", "2026-08-01T00:00:00Z", updated_at)
 
     projected = projected_board(
-        (issue,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (issue,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
     assert [item.number for item in projected.stale] == ([22] if expected_stale else [])
@@ -1126,7 +1126,7 @@ def test_board_marks_text_only_items_stale_only_after_seven_idle_days(
 
 def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
     now = datetime(2026, 8, 21, tzinfo=UTC)
-    blocker = board.Issue(
+    blocker = workboard.Issue(
         20,
         "Unlabelled prerequisite",
         (),
@@ -1134,7 +1134,7 @@ def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
         "2026-08-20T00:00:00Z",
         "2026-08-20T00:00:00Z",
     )
-    product = board.Issue(
+    product = workboard.Issue(
         21,
         "Product work",
         ("product",),
@@ -1149,14 +1149,14 @@ def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies={21: (block_dependency(20),)},
         now=now,
     )
 
     assert [item.number for item in projected.items] == [20, 21]
     assert projected.items[0].unblocks_count == 1
-    assert projected.items[1].open_blockers == (board.IssueReference(REPOSITORY, 20),)
+    assert projected.items[1].open_blockers == (workboard.IssueReference(REPOSITORY, 20),)
 
 
 @pytest.mark.parametrize(
@@ -1166,7 +1166,7 @@ def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
             (
                 block_dependency(
                     10,
-                    state=board.BlockerState.CLOSED,
+                    state=workboard.BlockerState.CLOSED,
                     closed_at=datetime(2026, 9, 1, tzinfo=UTC),
                 ),
                 block_dependency(11),
@@ -1178,12 +1178,12 @@ def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
             (
                 block_dependency(
                     10,
-                    state=board.BlockerState.CLOSED,
+                    state=workboard.BlockerState.CLOSED,
                     closed_at=datetime(2026, 9, 1, tzinfo=UTC),
                 ),
                 block_dependency(
                     11,
-                    state=board.BlockerState.CLOSED,
+                    state=workboard.BlockerState.CLOSED,
                     closed_at=datetime(2026, 9, 3, tzinfo=UTC),
                 ),
             ),
@@ -1193,7 +1193,7 @@ def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
     ],
 )
 def test_board_records_the_latest_closed_dependency(
-    dependencies: tuple[board.IssueDependency, ...], expected_freed_on: datetime | None
+    dependencies: tuple[workboard.IssueDependency, ...], expected_freed_on: datetime | None
 ) -> None:
     freed, blocked_by = blocked_issue(20, "Freed", *dependencies)
     unblocked = board_issue(21, "Never blocked", complete_contract("Ship it."))
@@ -1203,7 +1203,7 @@ def test_board_records_the_latest_closed_dependency(
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies=blocked_by,
         now=datetime(2026, 9, 5, tzinfo=UTC),
     )
@@ -1236,10 +1236,10 @@ def test_board_reports_when_the_last_stale_dependency_closed() -> None:
         20,
         "Freed",
         block_dependency(
-            10, state=board.BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)
+            10, state=workboard.BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)
         ),
         block_dependency(
-            11, state=board.BlockerState.CLOSED, closed_at=datetime(2026, 9, 3, tzinfo=UTC)
+            11, state=workboard.BlockerState.CLOSED, closed_at=datetime(2026, 9, 3, tzinfo=UTC)
         ),
     )
 
@@ -1248,12 +1248,12 @@ def test_board_reports_when_the_last_stale_dependency_closed() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies=blocked_by,
         now=datetime(2026, 9, 5, tzinfo=UTC),
     )
 
-    item = _payload_items(board.board_payload(projected))[0]
+    item = _payload_items(workboard.board_payload(projected))[0]
     assert item["freed_on"] == "2026-09-03"
     assert item["freed_days"] == 2
 
@@ -1263,7 +1263,7 @@ def test_board_json_shows_freed_on_and_freed_days() -> None:
         20,
         "Freed",
         block_dependency(
-            10, state=board.BlockerState.CLOSED, closed_at=datetime(2026, 9, 3, tzinfo=UTC)
+            10, state=workboard.BlockerState.CLOSED, closed_at=datetime(2026, 9, 3, tzinfo=UTC)
         ),
     )
     blocked, blocked_dependencies = blocked_issue(21, "Blocked", block_dependency(11))
@@ -1274,12 +1274,12 @@ def test_board_json_shows_freed_on_and_freed_days() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies={**freed_dependencies, **blocked_dependencies},
         now=datetime(2026, 9, 5, tzinfo=UTC),
     )
 
-    items = {item["number"]: item for item in _payload_items(board.board_payload(projected))}
+    items = {item["number"]: item for item in _payload_items(workboard.board_payload(projected))}
     assert items[20]["freed_on"] == "2026-09-03"
     assert items[20]["freed_days"] == 2
     assert items[21]["freed_on"] is None
@@ -1295,15 +1295,15 @@ class _Ranking:
     the first (1), ties it (0) or trails it (-1) -- the premise that category, not score or
     issue number, decided the order."""
 
-    issues: tuple[board.Issue, ...]
-    pull_requests: tuple[board.PullRequest, ...]
-    dependencies: dict[int, tuple[board.IssueDependency, ...]]
+    issues: tuple[workboard.Issue, ...]
+    pull_requests: tuple[workboard.PullRequest, ...]
+    dependencies: dict[int, tuple[workboard.IssueDependency, ...]]
     order: list[tuple[int, str]]
     categories: list[int]
     second_against_first_score: int
 
 
-def _bug(number: int) -> board.Issue:
+def _bug(number: int) -> workboard.Issue:
     return board_issue(number, "A fresh bug", "", kind=ItemKind.BUG)
 
 
@@ -1315,7 +1315,7 @@ _RANKINGS = {
             board_issue(31, "Blocker", ""),
             board_issue(32, "Dependent", "", blocked_by_count=1),
         ),
-        (board.PullRequest(90, "Fixes #31", "", "branch"),),
+        (workboard.PullRequest(90, "Fixes #31", "", "branch"),),
         {32: (block_dependency(31),)},
         [(30, "ci"), (31, "blocker"), (32, "unlabelled")],
         [0, 1, 6],
@@ -1349,7 +1349,7 @@ _RANKINGS = {
     # Category always wins over score, and the product item has the lower number too.
     "a-bug-ahead-of-a-higher-scoring-product-item": _Ranking(
         (board_issue(2, "Product work", "", labels=("product",)), _bug(40)),
-        (board.PullRequest(90, "Fixes #2", "", "branch"),),
+        (workboard.PullRequest(90, "Fixes #2", "", "branch"),),
         {},
         [(40, "bug"), (2, "product")],
         [0, 3],
@@ -1361,7 +1361,12 @@ _RANKINGS = {
 @pytest.mark.parametrize("case", _RANKINGS.values(), ids=_RANKINGS.keys())
 def test_board_ranks_by_category_before_score_and_issue_number(case: _Ranking) -> None:
     projected = projected_board(
-        case.issues, case.pull_requests, (), (), board.BoardConfig(), dependencies=case.dependencies
+        case.issues,
+        case.pull_requests,
+        (),
+        (),
+        workboard.BoardConfig(),
+        dependencies=case.dependencies,
     )
 
     first, second = projected.items[:2]
@@ -1375,7 +1380,7 @@ def test_board_ranks_by_category_before_score_and_issue_number(case: _Ranking) -
 def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
     """The completion boost (category 2) never outranks a real blocker (1)."""
     now = datetime(2026, 8, 21, tzinfo=UTC)
-    container = board.Issue(
+    container = workboard.Issue(
         100,
         "Container",
         (),
@@ -1386,13 +1391,13 @@ def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
         children_closed=1,
         children_total=2,
     )
-    last_child = board.Issue(
+    last_child = workboard.Issue(
         101, "Last open child", (), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
     )
-    blocker = board.Issue(
+    blocker = workboard.Issue(
         102, "Unblocks other work", (), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
     )
-    dependent = board.Issue(
+    dependent = workboard.Issue(
         103,
         "Depends on the blocker",
         (),
@@ -1407,10 +1412,10 @@ def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies={103: (block_dependency(102),)},
         now=now,
-        children={100: (board.ChildItem(101, board.ChildState.OPEN),)},
+        children={100: (workboard.ChildItem(101, workboard.ChildState.OPEN),)},
     )
     by_number = {item.number: item for item in projected.items}
 
@@ -1420,7 +1425,7 @@ def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
 
 
 def test_completion_boost_requires_at_least_one_closed_sibling() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         110,
         "Container",
         (),
@@ -1431,7 +1436,7 @@ def test_completion_boost_requires_at_least_one_closed_sibling() -> None:
         children_closed=0,
         children_total=1,
     )
-    only_child = board.Issue(
+    only_child = workboard.Issue(
         111, "Only child", (), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
     )
 
@@ -1440,9 +1445,9 @@ def test_completion_boost_requires_at_least_one_closed_sibling() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={110: (board.ChildItem(111, board.ChildState.OPEN),)},
+        children={110: (workboard.ChildItem(111, workboard.ChildState.OPEN),)},
     )
 
     child_item = next(item for item in projected.items if item.number == 111)
@@ -1450,7 +1455,7 @@ def test_completion_boost_requires_at_least_one_closed_sibling() -> None:
 
 
 def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         120,
         "Container",
         (),
@@ -1468,20 +1473,20 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={120: (board.ChildItem(121, board.ChildState.OPEN),)},
+        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN),)},
     )
 
     container_item = next(item for item in projected.items if item.number == 120)
     assert container_item.actionable is False
     assert container_item.actionable_reason == "container; claim a child"
     assert container_item not in projected.ready_now
-    assert container_item.container == board.ContainerProgress(
-        1, 2, (board.ChildItem(121, board.ChildState.OPEN, blocked_by=()),)
+    assert container_item.container == workboard.ContainerProgress(
+        1, 2, (workboard.ChildItem(121, workboard.ChildState.OPEN, blocked_by=()),)
     )
 
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     child_json = next(item for item in _payload_items(payload) if item["number"] == 121)
     assert container_json["kind"] == "container"
@@ -1501,7 +1506,7 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
 def test_board_shows_a_container_child_blocked_by_another_open_issue() -> None:
     """An open container child can itself be blocked; the container's own
     open-children note must show that, not just the bare child number."""
-    container = board.Issue(
+    container = workboard.Issue(
         120,
         "Container",
         (),
@@ -1522,13 +1527,13 @@ def test_board_shows_a_container_child_blocked_by_another_open_issue() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies=child_dependencies,
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={120: (board.ChildItem(121, board.ChildState.OPEN),)},
+        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN),)},
     )
 
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     assert _as_dict(container_json["container"])["open_children"] == [
         {"number": 121, "state": "open", "blocked_by": [130], "foreign_blockers": []}
@@ -1539,7 +1544,7 @@ def test_board_shows_a_container_child_blocked_by_another_open_issue() -> None:
     ("storage", "blocker_label"),
     [
         pytest.param(Storage.GITHUB, "#9", id="github"),
-        pytest.param(Storage.STATE_REF, board.item_label(9, Storage.STATE_REF), id="state-ref"),
+        pytest.param(Storage.STATE_REF, workboard.item_label(9, Storage.STATE_REF), id="state-ref"),
     ],
 )
 def test_a_blocked_items_reason_names_the_blocker_by_the_id_under_the_pin(
@@ -1556,7 +1561,7 @@ def test_a_blocked_items_reason_names_the_blocker_by_the_id_under_the_pin(
         (),
         (),
         (),
-        board.BoardConfig(storage=storage),
+        workboard.BoardConfig(storage=storage),
         dependencies=dependencies,
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
@@ -1569,7 +1574,7 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
     """`board --json`'s `container.open_children[].blocked_by` projects the
     same way `BoardItem.open_blockers` does (#150 A2): local ints, with the
     qualified foreign references in a sibling `foreign_blockers` key."""
-    container = board.Issue(
+    container = workboard.Issue(
         120,
         "Container",
         (),
@@ -1580,7 +1585,7 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
         children_closed=0,
         children_total=1,
     )
-    open_child = board.Issue(
+    open_child = workboard.Issue(
         121,
         "Open child",
         (),
@@ -1598,13 +1603,13 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={120: (board.ChildItem(121, board.ChildState.OPEN),)},
+        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN),)},
         dependencies=dependencies,
     )
 
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     open_children = _as_dict(container_json["container"])["open_children"]
 
@@ -1619,10 +1624,10 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
 
 
 def test_board_json_carries_a_nonzero_priority_order_for_a_critical_label() -> None:
-    security_item = board.Issue(
+    security_item = workboard.Issue(
         60, "Security work", ("security",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
     )
-    ux_item = board.Issue(
+    ux_item = workboard.Issue(
         61, "UX work", ("ux",), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
     )
 
@@ -1631,10 +1636,10 @@ def test_board_json_carries_a_nonzero_priority_order_for_a_critical_label() -> N
         (),
         (),
         (),
-        board.BoardConfig(priority_labels=("ux", "security")),
+        workboard.BoardConfig(priority_labels=("ux", "security")),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     by_number = {item["number"]: item for item in _payload_items(payload)}
 
     assert by_number[60]["priority_order"] == 1
@@ -1644,12 +1649,12 @@ def test_board_json_carries_a_nonzero_priority_order_for_a_critical_label() -> N
 def test_next_action_names_the_top_actionable_work_item() -> None:
     item = board_issue(10, "Top work", complete_contract("Claim #10."))
     projected = projected_board(
-        (item,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (item,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    action = board.next_action(projected)
+    action = workboard.next_action(projected)
 
-    assert isinstance(action, board.WorkItemAction)
+    assert isinstance(action, workboard.WorkItemAction)
     assert action.item.number == 10
 
 
@@ -1661,7 +1666,7 @@ def test_next_action_never_cuts_a_container_whose_slice_table_is_empty() -> None
     that prose -- nor offer to close it while that sentence names work
     (issue #503, the #418 shape between two slices): it names the container
     and its own sentence through `CheckContainerAction` instead."""
-    container = board.Issue(
+    container = workboard.Issue(
         130,
         "Container",
         (),
@@ -1673,19 +1678,19 @@ def test_next_action_never_cuts_a_container_whose_slice_table_is_empty() -> None
         children_total=2,
     )
     projected = projected_board(
-        (container,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    action = board.next_action(projected)
+    action = workboard.next_action(projected)
 
-    assert isinstance(action, board.CheckContainerAction)
+    assert isinstance(action, workboard.CheckContainerAction)
     assert (action.container.number, action.next_step) == (130, "Cut the next slice.")
-    assert board.zero_cost_closes(projected) == ()
-    assert action.container.actionable_reason == board.CHECK_DONE_WHEN
+    assert workboard.zero_cost_closes(projected) == ()
+    assert action.container.actionable_reason == workboard.CHECK_DONE_WHEN
 
 
 def test_next_action_closes_a_container_with_no_open_child_and_no_further_work() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         140,
         "Container",
         (),
@@ -1697,18 +1702,18 @@ def test_next_action_closes_a_container_with_no_open_child_and_no_further_work()
         children_total=3,
     )
     projected = projected_board(
-        (container,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    action = board.next_action(projected)
+    action = workboard.next_action(projected)
 
-    assert isinstance(action, board.CloseContainerAction)
+    assert isinstance(action, workboard.CloseContainerAction)
     assert action.container.number == 140
-    assert action.container_progress == board.ContainerProgress(3, 3, ())
+    assert action.container_progress == workboard.ContainerProgress(3, 3, ())
 
 
 def test_zero_cost_closes_names_a_closable_container_that_also_landed_once() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         140,
         "Container",
         (),
@@ -1719,20 +1724,25 @@ def test_zero_cost_closes_names_a_closable_container_that_also_landed_once() -> 
         children_closed=3,
         children_total=3,
     )
-    landing = board.PullRequest(
+    landing = workboard.PullRequest(
         150, "Lands it", "Work-Item: #140\n\nCloses #140", "branch", "2026-08-20T00:00:00Z"
     )
     projected = projected_board(
-        (container,), (), (landing,), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,),
+        (),
+        (landing,),
+        (),
+        workboard.BoardConfig(),
+        now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
-    assert board.zero_cost_closes(projected) == (140,)
+    assert workboard.zero_cost_closes(projected) == (140,)
 
 
 def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work() -> None:
     """An empty `Next` line alone must not close a container that still has
     an undispatched `[[slice]]` entry (#112 finding 1)."""
-    container = board.Issue(
+    container = workboard.Issue(
         141,
         "Container",
         (),
@@ -1744,18 +1754,18 @@ def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work
         children_total=1,
     )
     projected = projected_board(
-        (container,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    action = board.next_action(projected)
+    action = workboard.next_action(projected)
 
-    assert isinstance(action, board.CutSliceAction)
+    assert isinstance(action, workboard.CutSliceAction)
     assert action.container.number == 141
     assert action.next_step == "Scheibe C"
 
 
 def test_container_progress_raises_when_an_open_child_contradicts_a_closed_summary() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         190,
         "Container",
         (),
@@ -1766,9 +1776,9 @@ def test_container_progress_raises_when_an_open_child_contradicts_a_closed_summa
         children_closed=2,
         children_total=2,
     )
-    raised_argument_1 = board.BoardConfig()
+    raised_argument_1 = workboard.BoardConfig()
     raised_argument_2 = datetime(2026, 8, 21, tzinfo=UTC)
-    raised_argument_3 = {190: (board.ChildItem(191, board.ChildState.OPEN),)}
+    raised_argument_3 = {190: (workboard.ChildItem(191, workboard.ChildState.OPEN),)}
 
     with pytest.raises(protocol.ClaimError, match=r"malformed board container #190"):
         projected_board(
@@ -1783,7 +1793,7 @@ def test_container_progress_raises_when_an_open_child_contradicts_a_closed_summa
 
 
 def test_container_progress_raises_when_no_open_child_contradicts_an_unclosed_summary() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         191,
         "Container",
         (),
@@ -1794,7 +1804,7 @@ def test_container_progress_raises_when_no_open_child_contradicts_an_unclosed_su
         children_closed=1,
         children_total=2,
     )
-    raised_argument_1 = board.BoardConfig()
+    raised_argument_1 = workboard.BoardConfig()
     raised_argument_2 = datetime(2026, 8, 21, tzinfo=UTC)
 
     with pytest.raises(protocol.ClaimError, match=r"malformed board container #191"):
@@ -1802,7 +1812,7 @@ def test_container_progress_raises_when_no_open_child_contradicts_an_unclosed_su
 
 
 def test_board_json_reports_an_uncut_slice_entry() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         160,
         "Container",
         (),
@@ -1814,11 +1824,11 @@ def test_board_json_reports_an_uncut_slice_entry() -> None:
         children_total=0,
     )
     projected = projected_board(
-        (container,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    assert projected.uncut == (board.UncutSlices(160, (SliceRow(1, "Undispatched slice"),)),)
-    payload = board.board_payload(projected)
+    assert projected.uncut == (workboard.UncutSlices(160, (SliceRow(1, "Undispatched slice"),)),)
+    payload = workboard.board_payload(projected)
     assert payload["uncut"] == [
         {"item": 160, "rows": [{"index": 1, "title": "Undispatched slice"}]}
     ]
@@ -1833,7 +1843,7 @@ def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
     entirely -- the public shape before this lane, proven by the sibling
     test above. The row's own `done_when` (issue #606) is `cut`'s to read
     and never joins the JSON row."""
-    container = board.Issue(
+    container = workboard.Issue(
         160,
         "Container",
         (),
@@ -1855,11 +1865,11 @@ def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
         children_total=0,
     )
     projected = projected_board(
-        (container,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
     assert projected.uncut == (
-        board.UncutSlices(
+        workboard.UncutSlices(
             160,
             (
                 SliceRow(
@@ -1871,7 +1881,7 @@ def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
             ),
         ),
     )
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     assert payload["uncut"] == [
         {
             "item": 160,
@@ -1889,7 +1899,7 @@ def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
 def test_board_json_names_several_uncut_rows_by_index() -> None:
     """`#122`'s own shape (06.09.2026): several still-open rows are named
     by index, not by re-deriving it from a name string."""
-    container = board.Issue(
+    container = workboard.Issue(
         122,
         "Container",
         (),
@@ -1904,11 +1914,11 @@ def test_board_json_names_several_uncut_rows_by_index() -> None:
         children_total=0,
     )
     projected = projected_board(
-        (container,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
     assert projected.uncut == (
-        board.UncutSlices(
+        workboard.UncutSlices(
             122,
             (
                 SliceRow(5, "Fifth slice"),
@@ -1917,7 +1927,7 @@ def test_board_json_names_several_uncut_rows_by_index() -> None:
             ),
         ),
     )
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     assert payload["uncut"] == [
         {
             "item": 122,
@@ -1931,7 +1941,7 @@ def test_board_json_names_several_uncut_rows_by_index() -> None:
 
 
 def test_next_action_skips_a_container_that_still_holds_an_open_child() -> None:
-    container = board.Issue(
+    container = workboard.Issue(
         150,
         "Container",
         (),
@@ -1947,12 +1957,12 @@ def test_next_action_skips_a_container_that_still_holds_an_open_child() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={150: (board.ChildItem(151, board.ChildState.OPEN),)},
+        children={150: (workboard.ChildItem(151, workboard.ChildState.OPEN),)},
     )
 
-    assert board.next_action(projected) is None
+    assert workboard.next_action(projected) is None
 
 
 def test_next_names_the_boards_top_row_even_when_it_is_not_the_highest_score() -> None:
@@ -1966,14 +1976,14 @@ def test_next_names_the_boards_top_row_even_when_it_is_not_the_highest_score() -
     dependent, dependent_blockers = blocked_issue(
         52, "Depends on the prerequisite", block_dependency(51), next_step="Ship it."
     )
-    open_pull_request = board.PullRequest(200, "Fixes #50", "", "branch")
+    open_pull_request = workboard.PullRequest(200, "Fixes #50", "", "branch")
 
     projected = projected_board(
         (in_flight_unlabelled, blocker, dependent),
         (open_pull_request,),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies=dependent_blockers,
         now=now,
     )
@@ -1985,7 +1995,7 @@ def test_next_names_the_boards_top_row_even_when_it_is_not_the_highest_score() -
     assert by_number[50].score > by_number[51].score
     assert projected.items[0].number == 51
 
-    recommended = board.highest_scored_actionable(projected)
+    recommended = workboard.highest_scored_actionable(projected)
     assert recommended is not None
     assert recommended.number == 51
 
@@ -1995,15 +2005,15 @@ def test_an_epic_inherits_the_landed_stage_of_a_slice_that_did_not_close_it() ->
     epic = board_issue(
         60, "Epic cut into dispatched slices", complete_contract("Cut the next slice.")
     )
-    slice_pull_request = board.PullRequest(
+    slice_pull_request = workboard.PullRequest(
         120, "Slice 1", _slice_pull_request_body(60), "branch", merged_at="2026-08-19T00:00:00Z"
     )
 
     projected = projected_board(
-        (epic,), (), (slice_pull_request,), (), board.BoardConfig(), now=now
+        (epic,), (), (slice_pull_request,), (), workboard.BoardConfig(), now=now
     )
 
-    assert projected.items[0].stage is board.Stage.CODE_LANDED
+    assert projected.items[0].stage is workboard.Stage.CODE_LANDED
 
 
 def test_landing_rows_refuses_a_recently_merged_pull_request_with_no_merge_date() -> None:
@@ -2012,8 +2022,8 @@ def test_landing_rows_refuses_a_recently_merged_pull_request_with_no_merge_date(
     listing it does not honor, refused loud rather than silently dropped or
     dated with a guess."""
     epic = board_issue(70, "Epic", complete_contract("Cut the next slice."))
-    closing_pull_request = board.PullRequest(130, "Closes it", "Closes #70.", "branch")
-    config = board.BoardConfig()
+    closing_pull_request = workboard.PullRequest(130, "Closes it", "Closes #70.", "branch")
+    config = workboard.BoardConfig()
 
     with pytest.raises(protocol.ClaimError, match="no merge date"):
         projected_board((epic,), (), (closing_pull_request,), (), config)
@@ -2027,11 +2037,11 @@ def test_landing_rows_leaves_a_touched_but_not_closed_epic_unattributed() -> Non
     A slice pull request that only touches its epic must therefore leave the
     epic with no landing row at all, never a guessed `PullRequestLandingEvidence`."""
     epic = board_issue(71, "Epic touched but not closed", complete_contract("Cut the next slice."))
-    slice_pull_request = board.PullRequest(
+    slice_pull_request = workboard.PullRequest(
         131, "Slice 1", _slice_pull_request_body(71), "branch", merged_at="2026-08-19T00:00:00Z"
     )
 
-    projected = projected_board((epic,), (), (slice_pull_request,), (), board.BoardConfig())
+    projected = projected_board((epic,), (), (slice_pull_request,), (), workboard.BoardConfig())
 
     assert projected.landings == ()
 
@@ -2043,19 +2053,19 @@ def test_landing_rows_credits_the_earliest_merged_pull_request_regardless_of_lis
     close the same item -- the one that actually landed it first (the
     earlier `merged_at`) must win the row every time, never whichever the
     adapter happens to list first."""
-    earlier = board.PullRequest(
+    earlier = workboard.PullRequest(
         201, "First fix", "Closes #90.", "branch-a", merged_at="2026-08-10T00:00:00Z"
     )
-    later = board.PullRequest(
+    later = workboard.PullRequest(
         202, "Follow-up fix", "Closes #90.", "branch-b", merged_at="2026-08-15T00:00:00Z"
     )
 
-    listed_late_first = board.landing_rows((), (later, earlier), REPOSITORY, Storage.GITHUB)
-    listed_early_first = board.landing_rows((), (earlier, later), REPOSITORY, Storage.GITHUB)
+    listed_late_first = workboard.landing_rows((), (later, earlier), REPOSITORY, Storage.GITHUB)
+    listed_early_first = workboard.landing_rows((), (earlier, later), REPOSITORY, Storage.GITHUB)
 
     assert listed_late_first == listed_early_first
     (row,) = listed_late_first
-    assert row.evidence == board.PullRequestLandingEvidence(201)
+    assert row.evidence == workboard.PullRequestLandingEvidence(201)
 
 
 def test_landing_rows_orders_equal_timestamp_rows_by_item_number() -> None:
@@ -2064,10 +2074,10 @@ def test_landing_rows_orders_equal_timestamp_rows_by_item_number() -> None:
     would depend on the trunk walk's own dict iteration. The lower item
     number sorts first among equal timestamps."""
     landed_at = datetime(2026, 8, 29, tzinfo=UTC)
-    higher = board.TrunkLandingItem(82, "b" * 40, landed_at)
-    lower = board.TrunkLandingItem(81, "a" * 40, landed_at)
+    higher = workboard.TrunkLandingItem(82, "b" * 40, landed_at)
+    lower = workboard.TrunkLandingItem(81, "a" * 40, landed_at)
 
-    rows = board.landing_rows((higher, lower), (), REPOSITORY, Storage.GITHUB)
+    rows = workboard.landing_rows((higher, lower), (), REPOSITORY, Storage.GITHUB)
 
     assert tuple(row.item for row in rows) == (81, 82)
 
@@ -2077,15 +2087,15 @@ def test_an_epic_is_in_flight_while_an_open_slice_touches_it_without_closing_it(
     epic = board_issue(
         62, "Epic cut into dispatched slices", complete_contract("Cut the next slice.")
     )
-    open_slice_pull_request = board.PullRequest(
+    open_slice_pull_request = workboard.PullRequest(
         122, "Slice 1", _slice_pull_request_body(62), "branch"
     )
 
     projected = projected_board(
-        (epic,), (open_slice_pull_request,), (), (), board.BoardConfig(), now=now
+        (epic,), (open_slice_pull_request,), (), (), workboard.BoardConfig(), now=now
     )
 
-    assert projected.items[0].stage is board.Stage.IN_FLIGHT
+    assert projected.items[0].stage is workboard.Stage.IN_FLIGHT
 
 
 def test_a_pull_request_merely_mentioning_the_epic_number_confers_no_stage() -> None:
@@ -2093,7 +2103,7 @@ def test_a_pull_request_merely_mentioning_the_epic_number_confers_no_stage() -> 
     epic = board_issue(
         61, "Epic untouched by this pull request", complete_contract("Cut the next slice.")
     )
-    unrelated_pull_request = board.PullRequest(
+    unrelated_pull_request = workboard.PullRequest(
         121,
         "Unrelated fix",
         "This closes a bug that was discovered while reading #61's plan.",
@@ -2101,10 +2111,10 @@ def test_a_pull_request_merely_mentioning_the_epic_number_confers_no_stage() -> 
     )
 
     projected = projected_board(
-        (epic,), (), (unrelated_pull_request,), (), board.BoardConfig(), now=now
+        (epic,), (), (unrelated_pull_request,), (), workboard.BoardConfig(), now=now
     )
 
-    assert projected.items[0].stage is board.Stage.TEXT_ONLY
+    assert projected.items[0].stage is workboard.Stage.TEXT_ONLY
 
 
 def test_a_dedicated_reference_line_without_corroboration_confers_no_stage() -> None:
@@ -2119,13 +2129,13 @@ def test_a_dedicated_reference_line_without_corroboration_confers_no_stage() -> 
     epic = board_issue(
         63, "Epic named only once, in passing", complete_contract("Cut the next slice.")
     )
-    drive_by_pull_request = board.PullRequest(123, "Unrelated cleanup", "Refs #63.", "branch")
+    drive_by_pull_request = workboard.PullRequest(123, "Unrelated cleanup", "Refs #63.", "branch")
 
     projected = projected_board(
-        (epic,), (), (drive_by_pull_request,), (), board.BoardConfig(), now=now
+        (epic,), (), (drive_by_pull_request,), (), workboard.BoardConfig(), now=now
     )
 
-    assert projected.items[0].stage is board.Stage.TEXT_ONLY
+    assert projected.items[0].stage is workboard.Stage.TEXT_ONLY
 
 
 def test_a_reference_line_inside_a_fenced_code_block_confers_no_stage() -> None:
@@ -2133,7 +2143,7 @@ def test_a_reference_line_inside_a_fenced_code_block_confers_no_stage() -> None:
     epic = board_issue(
         64, "Epic quoted inside an example, not touched", complete_contract("Cut the next slice.")
     )
-    fenced_pull_request = board.PullRequest(
+    fenced_pull_request = workboard.PullRequest(
         124,
         "Documents the marker syntax",
         "Example of the convention:\n\n```\nPart of #64.\n```\n\nSee also #64 above.",
@@ -2141,10 +2151,10 @@ def test_a_reference_line_inside_a_fenced_code_block_confers_no_stage() -> None:
     )
 
     projected = projected_board(
-        (epic,), (), (fenced_pull_request,), (), board.BoardConfig(), now=now
+        (epic,), (), (fenced_pull_request,), (), workboard.BoardConfig(), now=now
     )
 
-    assert projected.items[0].stage is board.Stage.TEXT_ONLY
+    assert projected.items[0].stage is workboard.Stage.TEXT_ONLY
 
 
 def test_a_fenced_closing_keyword_confers_no_stage() -> None:
@@ -2156,7 +2166,7 @@ def test_a_fenced_closing_keyword_confers_no_stage() -> None:
     issue = board_issue(
         65, "Issue documented, never actually closed", complete_contract("Cut the next slice.")
     )
-    fenced_pull_request = board.PullRequest(
+    fenced_pull_request = workboard.PullRequest(
         125,
         "Documents the closing-keyword syntax",
         "Example of the convention:\n\n```\nFixes #65.\n```\n\nNot itself a closing PR.",
@@ -2164,20 +2174,20 @@ def test_a_fenced_closing_keyword_confers_no_stage() -> None:
     )
 
     projected = projected_board(
-        (issue,), (), (fenced_pull_request,), (), board.BoardConfig(), now=now
+        (issue,), (), (fenced_pull_request,), (), workboard.BoardConfig(), now=now
     )
 
-    assert projected.items[0].stage is board.Stage.TEXT_ONLY
+    assert projected.items[0].stage is workboard.Stage.TEXT_ONLY
 
 
 def test_board_configuration_requires_unique_ordered_labels(tmp_path: Path) -> None:
     config_path = tmp_path / "board.toml"
     config_path.write_text('priority_labels = ["ux", "security"]\n')
-    assert board.load_config(config_path).priority_labels == ("ux", "security")
+    assert workboard.load_config(config_path).priority_labels == ("ux", "security")
 
     config_path.write_text("priority_labels = []\n")
     with pytest.raises(ClaimError, match="priority_labels"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
 
 @pytest.mark.parametrize(
@@ -2198,22 +2208,22 @@ def test_board_configuration_fails_loud_on_an_unreadable_file(
     write_unreadable(config_path)
 
     with pytest.raises(ClaimError, match=f"cannot read board configuration {config_path}"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
 
 def test_board_configuration_reads_and_validates_the_idea_label(tmp_path: Path) -> None:
     config_path = tmp_path / "board.toml"
     config_path.write_text('priority_labels = ["ux", "security"]\nidea_label = "idea"\n')
 
-    assert board.load_config(config_path) == board.BoardConfig(("ux", "security"), "idea")
+    assert workboard.load_config(config_path) == workboard.BoardConfig(("ux", "security"), "idea")
 
     config_path.write_text('priority_labels = ["ux"]\n')
-    assert board.load_config(config_path).idea_label == "idea"
-    assert board.load_config(tmp_path / "absent.toml").idea_label == "idea"
+    assert workboard.load_config(config_path).idea_label == "idea"
+    assert workboard.load_config(tmp_path / "absent.toml").idea_label == "idea"
 
     config_path.write_text('idea_label = ""\n')
     with pytest.raises(ClaimError, match="idea_label"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
 
 def test_board_configuration_keeps_body_contract_as_a_known_block_only_key(
@@ -2224,14 +2234,14 @@ def test_board_configuration_keeps_body_contract_as_a_known_block_only_key(
     `"prose"` is refused by name -- never as an unknown key, which would
     refuse every store command in the repositories that still pin it."""
     config_path = tmp_path / "board.toml"
-    assert board.load_config(config_path) == board.BoardConfig()
+    assert workboard.load_config(config_path) == workboard.BoardConfig()
 
     config_path.write_text('body_contract = "block"\n')
-    assert board.load_config(config_path) == board.BoardConfig()
+    assert workboard.load_config(config_path) == workboard.BoardConfig()
 
     config_path.write_text('body_contract = "prose"\n')
     with pytest.raises(ClaimError) as refused_prose:
-        board.load_config(config_path)
+        workboard.load_config(config_path)
     assert str(refused_prose.value) == (
         f"board configuration {config_path} pins body_contract 'prose': "
         "prose bodies are no longer supported"
@@ -2241,39 +2251,39 @@ def test_board_configuration_keeps_body_contract_as_a_known_block_only_key(
     with pytest.raises(
         ClaimError, match=f"{re.escape(str(config_path))} body_contract must be 'block'"
     ):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
     config_path.write_text("body_contract = true\n")
     with pytest.raises(ClaimError, match="body_contract must be 'block'"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
 
 def test_board_configuration_reads_and_validates_canonical_remote(tmp_path: Path) -> None:
     config_path = tmp_path / "board.toml"
-    assert board.load_config(config_path).canonical_remote == "origin"
+    assert workboard.load_config(config_path).canonical_remote == "origin"
 
     config_path.write_text('canonical_remote = "upstream"\n')
-    assert board.load_config(config_path).canonical_remote == "upstream"
+    assert workboard.load_config(config_path).canonical_remote == "upstream"
 
     config_path.write_text('canonical_remote = ""\n')
     with pytest.raises(ClaimError, match="canonical_remote must be a non-empty remote name"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
     config_path.write_text("canonical_remote = true\n")
     with pytest.raises(ClaimError, match="canonical_remote must be a non-empty remote name"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
 
 def test_board_configuration_reads_and_validates_storage(tmp_path: Path) -> None:
     config_path = tmp_path / "board.toml"
-    assert board.load_config(config_path).storage is Storage.GITHUB
+    assert workboard.load_config(config_path).storage is Storage.GITHUB
 
     config_path.write_text('storage = "state-ref"\n')
-    assert board.load_config(config_path).storage is Storage.STATE_REF
+    assert workboard.load_config(config_path).storage is Storage.STATE_REF
 
     config_path.write_text('storage = "gitlab"\n')
     with pytest.raises(ClaimError, match="storage must be 'github' or 'state-ref'"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
 
 def test_board_configuration_refuses_an_unknown_key_by_name(tmp_path: Path) -> None:
@@ -2283,7 +2293,7 @@ def test_board_configuration_refuses_an_unknown_key_by_name(tmp_path: Path) -> N
     config_path.write_text('body_contarct = "block"\n')
 
     with pytest.raises(ClaimError) as refused:
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
     assert str(refused.value) == (
         f"board configuration {config_path} has unknown top-level key body_contarct"
@@ -2291,7 +2301,7 @@ def test_board_configuration_refuses_an_unknown_key_by_name(tmp_path: Path) -> N
 
     config_path.write_text('bodies = "block"\nannotation = "x"\n')
     with pytest.raises(ClaimError, match="unknown top-level key annotation, bodies"):
-        board.load_config(config_path)
+        workboard.load_config(config_path)
 
 
 def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> None:
@@ -2303,7 +2313,7 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
         'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
     )
 
-    assert board.load_config(config_path) == board.BoardConfig(
+    assert workboard.load_config(config_path) == workboard.BoardConfig(
         ("ux",),
         "idea",
         "upstream",
@@ -2352,9 +2362,9 @@ def test_board_configuration_refuses_a_lane_shared_entry_that_is_no_repository_p
     configuration. Only the syntax is judged, so `land` and every reader
     judge alike."""
     with pytest.raises(ClaimError) as refused:
-        board.parse_config(f"lane_shared = {lane_shared}\n", board.CONFIG_PATH)
+        workboard.parse_config(f"lane_shared = {lane_shared}\n", workboard.CONFIG_PATH)
 
-    assert str(refused.value) == f"board configuration {board.CONFIG_PATH} {refusal}"
+    assert str(refused.value) == f"board configuration {workboard.CONFIG_PATH} {refusal}"
 
 
 def test_load_brief_config_returns_none_when_the_file_does_not_exist(tmp_path: Path) -> None:
@@ -2362,7 +2372,7 @@ def test_load_brief_config_returns_none_when_the_file_does_not_exist(tmp_path: P
     for `board.toml` -- `aco brief --step` reads `None` as "the repository
     tracks no rules" and refuses on it, so this must stay tellable apart
     from "the file exists but names no rules for this step"."""
-    assert board.load_brief_config(tmp_path / "brief.toml") is None
+    assert workboard.load_brief_config(tmp_path / "brief.toml") is None
 
 
 def test_load_brief_config_reads_rules_and_checks_per_step(tmp_path: Path) -> None:
@@ -2372,14 +2382,14 @@ def test_load_brief_config_reads_rules_and_checks_per_step(tmp_path: Path) -> No
         '[review]\nrules = ["Stay read-only."]\n'
     )
 
-    config = board.load_brief_config(config_path)
+    config = workboard.load_brief_config(config_path)
 
     assert config is not None
-    assert config == board.BriefConfig(
-        build=board.BriefStepRules(rules=("Stay in scope.",), checks=("ruff check .",)),
-        review=board.BriefStepRules(rules=("Stay read-only.",)),
+    assert config == workboard.BriefConfig(
+        build=workboard.BriefStepRules(rules=("Stay in scope.",), checks=("ruff check .",)),
+        review=workboard.BriefStepRules(rules=("Stay read-only.",)),
     )
-    assert config.for_step(board.BriefStep.FIX) == board.BriefStepRules()
+    assert config.for_step(workboard.BriefStep.FIX) == workboard.BriefStepRules()
 
 
 def test_load_brief_config_fails_loud_on_unparsable_toml(tmp_path: Path) -> None:
@@ -2387,7 +2397,7 @@ def test_load_brief_config_fails_loud_on_unparsable_toml(tmp_path: Path) -> None
     config_path.write_text("this is not valid toml =\n")
 
     with pytest.raises(ClaimError, match=f"cannot read brief configuration {config_path}"):
-        board.load_brief_config(config_path)
+        workboard.load_brief_config(config_path)
 
 
 def test_load_brief_config_refuses_a_step_section_that_is_not_a_table(tmp_path: Path) -> None:
@@ -2395,7 +2405,7 @@ def test_load_brief_config_refuses_a_step_section_that_is_not_a_table(tmp_path: 
     config_path.write_text('build = "not a table"\n')
 
     with pytest.raises(ClaimError, match=r"\[build\] must be a table"):
-        board.load_brief_config(config_path)
+        workboard.load_brief_config(config_path)
 
 
 @pytest.mark.parametrize(
@@ -2413,7 +2423,7 @@ def test_load_brief_config_refuses_an_unknown_key_by_name(
     config_path.write_text(content)
 
     with pytest.raises(ClaimError) as refused:
-        board.load_brief_config(config_path)
+        workboard.load_brief_config(config_path)
 
     assert str(refused.value) == f"brief configuration {config_path} {suffix}"
 
@@ -2426,7 +2436,7 @@ def test_load_brief_config_refuses_a_malformed_rules_or_checks_list(
     config_path.write_text(f"[build]\nrules = {json.dumps(value)}\n")
 
     with pytest.raises(ClaimError, match=r"\[build\] rules must be a list of non-empty strings"):
-        board.load_brief_config(config_path)
+        workboard.load_brief_config(config_path)
 
 
 def test_parse_body_reads_a_valid_minimal_block() -> None:
@@ -2918,12 +2928,15 @@ def test_next_action_skips_a_childless_container_whose_body_is_unreadable(
         children_total=0,
     )
 
-    projected = projected_board((container,), (), (), (), board.BoardConfig())
+    projected = projected_board((container,), (), (), (), workboard.BoardConfig())
 
-    assert (board.next_action(projected), projected.items[0].actionable_reason) == (None, reason)
+    assert (workboard.next_action(projected), projected.items[0].actionable_reason) == (
+        None,
+        reason,
+    )
 
 
-PARENT_ISSUE_REFERENCE = board.IssueReference(REPOSITORY, 79)
+PARENT_ISSUE_REFERENCE = workboard.IssueReference(REPOSITORY, 79)
 STATE_REF_RECORD: dict[str, object] = {
     "title": "Parent",
     "state": "open",
@@ -2948,35 +2961,35 @@ STATE_REF_RECORD: dict[str, object] = {
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (board.ChildItem(80, board.ChildState.OPEN),),
+            (workboard.ChildItem(80, workboard.ChildState.OPEN),),
             complete_contract("keiner"),
             None,
             id="an_open_child_keeps_the_parent_un_closable",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (board.ChildItem(80, board.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
             complete_contract("Cut it.", slice=slice_entries("Scheibe 1")),
             None,
             id="an_uncut_slice_row_keeps_the_parent_un_closable",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (board.ChildItem(80, board.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
             complete_contract("Cut slice 2."),
             None,
             id="a_next_line_naming_work_keeps_the_parent_un_closable",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (board.ChildItem(80, board.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
             block_body('version = 2\nnow = "N"\nnext = "keiner"\ndone_when = "D"\n'),
             None,
             id="a_malformed_parent_body_is_never_named",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (board.ChildItem(80, board.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
             complete_contract("keiner"),
             79,
             id="no_open_children_and_no_uncut_row_names_the_parent",
@@ -2985,15 +2998,15 @@ STATE_REF_RECORD: dict[str, object] = {
 )
 def test_closable_container_number_decides_by_kind_children_uncut_rows_next_line_and_body_shape(
     kind: ItemKind,
-    children: tuple[board.ChildItem, ...],
+    children: tuple[workboard.ChildItem, ...],
     body: str,
     expected: int | None,
 ) -> None:
     """issue #348: `release --merged`/`item close`'s own parent hint shares
     this one decision with `next`'s `CloseContainerAction` branch."""
-    parent = board.ParentIssue(PARENT_ISSUE_REFERENCE, body, kind)
+    parent = workboard.ParentIssue(PARENT_ISSUE_REFERENCE, body, kind)
 
-    assert board.closable_container_number(parent, children, Storage.GITHUB) == expected
+    assert workboard.closable_container_number(parent, children, Storage.GITHUB) == expected
 
 
 @pytest.mark.parametrize(
@@ -3024,10 +3037,10 @@ def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_
     storage: Storage, body: str, expected: int | None
 ) -> None:
     """Issue #214: with `Next` naming no work, only the uncut row decides."""
-    parent = board.ParentIssue(PARENT_ISSUE_REFERENCE, body, ItemKind.CONTAINER)
-    children = (board.ChildItem(80, board.ChildState.CLOSED),)
+    parent = workboard.ParentIssue(PARENT_ISSUE_REFERENCE, body, ItemKind.CONTAINER)
+    children = (workboard.ChildItem(80, workboard.ChildState.CLOSED),)
 
-    assert board.closable_container_number(parent, children, storage) == expected
+    assert workboard.closable_container_number(parent, children, storage) == expected
 
 
 @pytest.mark.parametrize(
@@ -3035,42 +3048,42 @@ def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_
     [
         pytest.param(
             complete_contract("keiner"),
-            board.ParentCompletion.REQUIRED,
+            workboard.ParentCompletion.REQUIRED,
             id="no_row_and_no_next_work_requires_closing",
         ),
         pytest.param(
             complete_contract(""),
-            board.ParentCompletion.REQUIRED,
+            workboard.ParentCompletion.REQUIRED,
             id="no_row_and_an_empty_next_line_requires_closing",
         ),
         pytest.param(
             complete_contract("Cut slice 2."),
-            board.ParentCompletion.PERMITTED,
+            workboard.ParentCompletion.PERMITTED,
             id="no_row_and_next_work_permits_closing",
         ),
         pytest.param(
             complete_contract("keiner", slice=slice_entries("Scheibe 1")),
-            board.ParentCompletion.FORBIDDEN,
+            workboard.ParentCompletion.FORBIDDEN,
             id="an_uncut_row_forbids_closing_although_next_names_no_work",
         ),
         pytest.param(
             complete_contract("Cut slice 2.", slice=slice_entries("Scheibe 1")),
-            board.ParentCompletion.FORBIDDEN,
+            workboard.ParentCompletion.FORBIDDEN,
             id="an_uncut_row_forbids_closing_with_next_work",
         ),
         pytest.param(
             complete_contract("keiner", slice=slice_entries("Scheibe\nzwei")),
-            board.ParentCompletion.FORBIDDEN,
+            workboard.ParentCompletion.FORBIDDEN,
             id="an_unprintable_uncut_row_forbids_closing",
         ),
     ],
 )
 def test_parent_completion_reads_uncut_rows_before_the_next_line(
-    parent_body: str, expected: board.ParentCompletion
+    parent_body: str, expected: workboard.ParentCompletion
 ) -> None:
     parsed = parse_body(parent_body, storage=Storage.GITHUB)
 
-    assert board.parent_completion(parsed) is expected
+    assert workboard.parent_completion(parsed) is expected
 
 
 def test_a_complete_block_item_is_body_complete_with_no_dependency_projection() -> None:
@@ -3080,7 +3093,7 @@ def test_a_complete_block_item_is_body_complete_with_no_dependency_projection() 
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
@@ -3103,7 +3116,7 @@ def test_board_reports_open_local_and_foreign_dependencies_as_blockers() -> None
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         dependencies=dependencies,
     )
@@ -3111,8 +3124,8 @@ def test_board_reports_open_local_and_foreign_dependencies_as_blockers() -> None
     item = next(item for item in projected.items if item.number == 300)
 
     assert item.open_blockers == (
-        board.IssueReference(REPOSITORY, 3),
-        board.IssueReference("overnightworks/other-repo", 7),
+        workboard.IssueReference(REPOSITORY, 3),
+        workboard.IssueReference("overnightworks/other-repo", 7),
     )
     assert item.actionable_reason == "blocked by #3, overnightworks/other-repo#7"
 
@@ -3132,12 +3145,12 @@ def test_board_json_splits_local_and_foreign_blockers_only_in_block_mode() -> No
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         dependencies=dependencies,
     )
 
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     item = next(item for item in _payload_items(payload) if item["number"] == 300)
 
     assert item["open_blockers"] == [3]
@@ -3152,12 +3165,12 @@ def test_board_json_carries_an_empty_foreign_blockers_list_without_a_foreign_dep
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         dependencies=blocked_by,
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     item = next(item for item in _payload_items(payload) if item["number"] == 10)
 
     assert item["open_blockers"] == [642]
@@ -3171,7 +3184,7 @@ def test_board_never_frees_on_a_closed_foreign_dependency_alone() -> None:
             block_dependency(
                 9,
                 repository="overnightworks/other-repo",
-                state=board.BlockerState.CLOSED,
+                state=workboard.BlockerState.CLOSED,
                 closed_at=datetime(2026, 8, 20, tzinfo=UTC),
             ),
         )
@@ -3181,7 +3194,7 @@ def test_board_never_frees_on_a_closed_foreign_dependency_alone() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         dependencies=dependencies,
     )
@@ -3202,14 +3215,14 @@ def test_board_treats_a_same_repository_pull_request_dependency_like_any_other()
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         dependencies=dependencies,
     )
 
     item = next(item for item in projected.items if item.number == 303)
 
-    assert item.open_blockers == (board.IssueReference(REPOSITORY, 88),)
+    assert item.open_blockers == (workboard.IssueReference(REPOSITORY, 88),)
 
 
 @pytest.mark.parametrize(
@@ -3223,7 +3236,7 @@ def test_board_treats_a_same_repository_pull_request_dependency_like_any_other()
 def test_the_idea_label_alone_decides_over_freeze_claim_and_blocker(
     frozen_until: dict[str, object] | None,
     claims: tuple[ClaimRequest, ...],
-    dependencies: tuple[board.IssueDependency, ...],
+    dependencies: tuple[workboard.IssueDependency, ...],
 ) -> None:
     wish = "## Wunsch\nMake the board clearer.\n\n"
     block_entries: dict[str, object] = (
@@ -3242,15 +3255,15 @@ def test_the_idea_label_alone_decides_over_freeze_claim_and_blocker(
         (),
         (),
         tuple(store_claim_from_request(claim_request) for claim_request in claims),
-        board.BoardConfig(idea_label="idea"),
+        workboard.BoardConfig(idea_label="idea"),
         dependencies={idea.number: dependencies},
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
     item = next(item for item in projected.items if item.number == idea.number)
 
     assert item not in projected.ready_now
-    assert (item.idea, item.actionable_reason) == (True, board.IDEA_REASON)
-    assert board.ideas(projected) == (idea.number,)
+    assert (item.idea, item.actionable_reason) == (True, workboard.IDEA_REASON)
+    assert workboard.ideas(projected) == (idea.number,)
 
 
 def test_an_idea_without_a_priority_label_follows_the_regular_score_order() -> None:
@@ -3264,14 +3277,14 @@ def test_an_idea_without_a_priority_label_follows_the_regular_score_order() -> N
         (),
         (),
         (),
-        board.BoardConfig(idea_label="idea"),
+        workboard.BoardConfig(idea_label="idea"),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
     assert [item.number for item in projected.items] == [regular_work.number, idea.number]
     assert [item.priority_bucket for item in projected.items] == ["unlabelled", "unlabelled"]
     assert [item.score for item in projected.items] == [-10, -20]
-    assert board.highest_scored_actionable(projected) == projected.items[0]
+    assert workboard.highest_scored_actionable(projected) == projected.items[0]
 
 
 def test_highest_scored_actionable_skips_a_scopeless_sliceless_item() -> None:
@@ -3288,13 +3301,13 @@ def test_highest_scored_actionable_skips_a_scopeless_sliceless_item() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
     assert [item.number for item in projected.items] == [unscoped_epic.number, scoped_work.number]
-    assert board.next_action(projected) == board.WorkItemAction(projected.items[0], None)
-    recommended = board.highest_scored_actionable(projected)
+    assert workboard.next_action(projected) == workboard.WorkItemAction(projected.items[0], None)
+    recommended = workboard.highest_scored_actionable(projected)
     assert recommended is not None
     assert recommended.number == scoped_work.number
 
@@ -3312,11 +3325,11 @@ def test_highest_scored_actionable_accepts_a_scopeless_item_with_a_slice_row() -
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
-    recommended = board.highest_scored_actionable(projected)
+    recommended = workboard.highest_scored_actionable(projected)
     assert recommended is not None
     assert recommended.number == sliced.number
 
@@ -3326,11 +3339,11 @@ def test_claim_age_old_compares_real_age_against_the_threshold() -> None:
     exactly_one_hour = timedelta(hours=1)
     sixty_one_minutes = timedelta(seconds=3660)
 
-    assert board.format_claim_age(just_over_an_hour) == "1h 0m"
-    assert board.claim_is_old(just_over_an_hour) is True
-    assert board.format_claim_age(sixty_one_minutes) == "1h 1m"
-    assert board.claim_is_old(sixty_one_minutes) is True
-    assert board.claim_is_old(exactly_one_hour) is False
+    assert workboard.format_claim_age(just_over_an_hour) == "1h 0m"
+    assert workboard.claim_is_old(just_over_an_hour) is True
+    assert workboard.format_claim_age(sixty_one_minutes) == "1h 1m"
+    assert workboard.claim_is_old(sixty_one_minutes) is True
+    assert workboard.claim_is_old(exactly_one_hour) is False
 
 
 def test_proposed_expectations_have_neither_fresh_nor_old() -> None:
@@ -3340,7 +3353,7 @@ def test_proposed_expectations_have_neither_fresh_nor_old() -> None:
         complete_contract("Claim #10.", expectation=[proposed_expectation("Name it.")]),
     )
     projected = projected_board(
-        (issue,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (issue,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
     assert projected.items[0].expectation_state is ExpectationState.PROPOSED
@@ -3362,7 +3375,7 @@ def test_one_unruled_entry_among_ruled_ones_keeps_the_item_proposed() -> None:
         ),
     )
     projected = projected_board(
-        (issue,), (), (), (), board.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (issue,), (), (), (), workboard.BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
     assert projected.items[0].expectation_state is ExpectationState.PROPOSED
@@ -3428,7 +3441,7 @@ def test_ruling_freshness_counts_trunk_landings_after_the_ruled_on_date(
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=now,
         trunk_landings=trunk_landings,
     )
@@ -3458,7 +3471,7 @@ def test_each_item_carries_its_own_ruling_age() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 30, tzinfo=UTC),
         trunk_landings=landings,
     )
@@ -3484,14 +3497,14 @@ def test_each_item_carries_its_own_ruling_age() -> None:
     ],
 )
 def test_a_closing_reference_follows_githubs_own_syntax(body: str, closed: tuple[int, ...]) -> None:
-    assert board.closing_references(body, REPOSITORY) == frozenset(
-        board.IssueReference(REPOSITORY, number) for number in closed
+    assert workboard.closing_references(body, REPOSITORY) == frozenset(
+        workboard.IssueReference(REPOSITORY, number) for number in closed
     )
 
 
 def test_a_closing_reference_to_another_repository_confers_no_stage() -> None:
     issue = board_issue(65, "Same number, other repository", complete_contract("Cut it."))
-    foreign = board.PullRequest(
+    foreign = workboard.PullRequest(
         130, "Lands elsewhere", "Fixes other/repo#65", "branch", "2026-08-20T00:00:00Z"
     )
 
@@ -3500,24 +3513,24 @@ def test_a_closing_reference_to_another_repository_confers_no_stage() -> None:
         (),
         (foreign,),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
-    assert projected.items[0].stage is board.Stage.TEXT_ONLY
+    assert projected.items[0].stage is workboard.Stage.TEXT_ONLY
 
 
 def test_board_recovers_an_open_item_a_merged_pull_request_already_landed() -> None:
     landed = board_issue(90, "Landed but open", complete_contract("Close it."))
     also_landed = board_issue(91, "Also landed but open", "")
-    merged = board.PullRequest(
+    merged = workboard.PullRequest(
         140,
         "Lands the slice",
         "Work-Item: #90\n\nCloses #90",
         "branch",
         "2026-08-20T00:00:00Z",
     )
-    also_merged = board.PullRequest(
+    also_merged = workboard.PullRequest(
         141,
         "Lands the other slice",
         "Work-Item: #91\n\nCloses #91",
@@ -3530,7 +3543,7 @@ def test_board_recovers_an_open_item_a_merged_pull_request_already_landed() -> N
         (),
         (merged, also_merged),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
@@ -3538,23 +3551,24 @@ def test_board_recovers_an_open_item_a_merged_pull_request_already_landed() -> N
 
 
 def test_a_non_ascii_digit_in_a_hash_reference_is_not_an_issue_number() -> None:
-    qualified = board.closing_references(f"Closes {REPOSITORY}#٣", REPOSITORY)
-    work_item = board.parse_pull_request_classification("Work-Item: #٣", REPOSITORY)
+    qualified = workboard.closing_references(f"Closes {REPOSITORY}#٣", REPOSITORY)
+    work_item = workboard.parse_pull_request_classification("Work-Item: #٣", REPOSITORY)
     assert qualified == frozenset()
-    assert isinstance(work_item, board.ClassificationDefect)
+    assert isinstance(work_item, workboard.ClassificationDefect)
 
 
 def test_an_issue_number_past_the_int_digit_limit_is_no_issue_number() -> None:
     number = "1" * 4301
     line = f"Work-Item: #{number}"
 
-    assert board.closing_references(f"Closes #{number}", REPOSITORY) == frozenset()
+    assert workboard.closing_references(f"Closes #{number}", REPOSITORY) == frozenset()
     assert isinstance(
-        board.parse_pull_request_classification(line, REPOSITORY), board.ClassificationDefect
+        workboard.parse_pull_request_classification(line, REPOSITORY),
+        workboard.ClassificationDefect,
     )
-    assert board.classification_line_state(
-        line, board.NoItemKind.DEPS, REPOSITORY
-    ) == board.OtherClassificationLine(line)
+    assert workboard.classification_line_state(
+        line, workboard.NoItemKind.DEPS, REPOSITORY
+    ) == workboard.OtherClassificationLine(line)
 
 
 @pytest.mark.parametrize(
@@ -3572,10 +3586,10 @@ def test_a_number_past_the_digit_bound_is_no_slice_title_number_on_either_side(
     parent_side = (4, int(number)) if is_reference else None
     slice_side = (int(number), 5) if is_reference else None
 
-    assert board.slice_title_match(f"Title (#{number} Scheibe 4)") == parent_side
-    assert board.slice_title_match(f"Scheibe 4 von #{number}") == parent_side
-    assert board.slice_title_match(f"Title (#5 Scheibe {number})") == slice_side
-    assert board.slice_title_match(f"Scheibe {number} von #5") == slice_side
+    assert workboard.slice_title_match(f"Title (#{number} Scheibe 4)") == parent_side
+    assert workboard.slice_title_match(f"Scheibe 4 von #{number}") == parent_side
+    assert workboard.slice_title_match(f"Title (#5 Scheibe {number})") == slice_side
+    assert workboard.slice_title_match(f"Scheibe {number} von #5") == slice_side
 
 
 @pytest.mark.parametrize(
@@ -3592,7 +3606,9 @@ def test_a_number_past_the_digit_bound_is_no_slice_title_number_on_either_side(
 def test_a_trunk_trailer_number_past_the_digit_bound_is_a_classification_defect(
     value: str,
 ) -> None:
-    assert isinstance(board.trunk_commit_classification((value,), ()), board.ClassificationDefect)
+    assert isinstance(
+        workboard.trunk_commit_classification((value,), ()), workboard.ClassificationDefect
+    )
 
 
 @pytest.mark.parametrize(
@@ -3600,7 +3616,7 @@ def test_a_trunk_trailer_number_past_the_digit_bound_is_a_classification_defect(
     ["#" + "7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS, "7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS],
 )
 def test_parse_item_reference_accepts_a_number_at_the_digit_bound(value: str) -> None:
-    assert board.parse_item_reference(value) == int("7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS)
+    assert workboard.parse_item_reference(value) == int("7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS)
 
 
 def test_body_defect_text_is_the_shared_renderer() -> None:
@@ -3631,7 +3647,7 @@ def test_parse_item_reference_accepts_every_reference_syntax(value: str, number:
     `aco-xxxxxx` (hex-decoded), `#n`, and the bare number `n` are all one
     item reference -- the one grammar every CLI argparse slot that means an
     item shares with a trunk commit's `Work-Item:` trailer value."""
-    assert board.parse_item_reference(value) == number
+    assert workboard.parse_item_reference(value) == number
 
 
 @pytest.mark.parametrize("value", ["foo", "aco-xyz", "#"])
@@ -3639,25 +3655,25 @@ def test_parse_item_reference_refuses_anything_else(value: str) -> None:
     """Issue #285 proof 5: anything that is none of the three forms refuses
     by name rather than guessing."""
     with pytest.raises(protocol.ClaimUnavailableError, match="is not an item reference"):
-        board.parse_item_reference(value)
+        workboard.parse_item_reference(value)
 
 
 def test_trunk_commit_classification_reads_a_single_work_item_trailer() -> None:
-    classification = board.trunk_commit_classification(("#10",), ())
-    assert classification == board.TrunkWorkItemClassification((10,))
+    classification = workboard.trunk_commit_classification(("#10",), ())
+    assert classification == workboard.TrunkWorkItemClassification((10,))
 
 
 def test_trunk_commit_classification_lands_every_item_a_repeated_trailer_names() -> None:
     """Issue #304: a trailer block that repeats `Work-Item:` lands every
     item it names, unlike a pull request body's single-item rule."""
-    classification = board.trunk_commit_classification(("#10", "#11"), ())
-    assert classification == board.TrunkWorkItemClassification((10, 11))
+    classification = workboard.trunk_commit_classification(("#10", "#11"), ())
+    assert classification == workboard.TrunkWorkItemClassification((10, 11))
 
 
 @pytest.mark.parametrize("kind", ["docs", "fix", "deps"])
 def test_trunk_commit_classification_reads_a_no_item_trailer(kind: str) -> None:
-    classification = board.trunk_commit_classification((), (kind,))
-    assert isinstance(classification, board.NoItemClassification)
+    classification = workboard.trunk_commit_classification((), (kind,))
+    assert isinstance(classification, workboard.NoItemClassification)
     assert classification.kind.value == kind
 
 
@@ -3671,7 +3687,7 @@ def test_trunk_commit_classification_reads_a_no_item_trailer(kind: str) -> None:
 def test_trunk_commit_classification_is_none_without_a_recognized_trailer(
     work_item_values: tuple[str, ...], no_item_values: tuple[str, ...]
 ) -> None:
-    assert board.trunk_commit_classification(work_item_values, no_item_values) is None
+    assert workboard.trunk_commit_classification(work_item_values, no_item_values) is None
 
 
 @pytest.mark.parametrize(
@@ -3681,7 +3697,9 @@ def test_trunk_commit_classification_is_none_without_a_recognized_trailer(
 def test_trunk_commit_classification_reports_a_malformed_work_item_as_a_defect(
     work_item_values: tuple[str, ...],
 ) -> None:
-    assert board.trunk_commit_classification(work_item_values, ()) == board.ClassificationDefect(
+    assert workboard.trunk_commit_classification(
+        work_item_values, ()
+    ) == workboard.ClassificationDefect(
         "carries `Work-Item: fix/x`; a trunk trailer names #n, aco-xxxxxx, or the bare number n"
     )
 
@@ -3700,8 +3718,8 @@ def test_trunk_log_classifies_valid_neighbors_of_a_malformed_work_item(
     walked = checkout.trunk_landings("refs/remotes/origin/main", 2, directory=tmp_path)
     landings = {landing.sha: landing.classification for landing in walked}
 
-    assert isinstance(landings["bad-sha"], board.ClassificationDefect)
-    assert landings["good-sha"] == board.TrunkWorkItemClassification((10, 11))
+    assert isinstance(landings["bad-sha"], workboard.ClassificationDefect)
+    assert landings["good-sha"] == workboard.TrunkWorkItemClassification((10, 11))
 
 
 @pytest.mark.parametrize(
@@ -3719,8 +3737,8 @@ def test_trunk_commit_classification_refuses_a_contradictory_trailer_block(
     `ClassificationDefect` -- the same contradiction `check <pr>` already
     refuses for a pull request body -- rather than letting `Work-Item:` win
     by ordering."""
-    defect = board.trunk_commit_classification(work_item_values, no_item_values)
-    assert isinstance(defect, board.ClassificationDefect)
+    defect = workboard.trunk_commit_classification(work_item_values, no_item_values)
+    assert isinstance(defect, workboard.ClassificationDefect)
 
 
 # --- Board estimates and measurements (issue #357) --------------------------
@@ -3746,7 +3764,7 @@ def _lane_event(
     )
 
 
-def _sized_item(number: int, size: str | None) -> board.Issue:
+def _sized_item(number: int, size: str | None) -> workboard.Issue:
     entries = {} if size is None else {"size": size}
     return board_issue(number, f"Item {number}", complete_contract("Do it.", **entries))
 
@@ -3757,7 +3775,7 @@ def test_build_board_reports_no_size_as_the_keine_groesse_cell() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
@@ -3783,7 +3801,7 @@ def test_build_board_reports_a_weak_estimate_below_three_measured_lanes(
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
     )
@@ -3815,7 +3833,7 @@ def test_build_board_reports_a_measured_estimate_with_median_and_count() -> None
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
     )
@@ -3853,7 +3871,7 @@ def test_build_board_leaves_a_lane_claims_own_event_unjoined_to_any_size_class()
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
     )
@@ -3873,7 +3891,7 @@ def test_closed_item_numbers_reads_only_ascii_numbers_up_to_the_bound() -> None:
         _lane_event(item, claimed_at=claimed, released_at=None) for item in (*readable, *unreadable)
     )
 
-    assert board.closed_item_numbers(lane_events, frozenset()) == frozenset(
+    assert workboard.closed_item_numbers(lane_events, frozenset()) == frozenset(
         {7, int("7" * protocol.MAXIMUM_ISSUE_NUMBER_DIGITS)}
     )
 
@@ -3907,7 +3925,7 @@ def test_build_board_gives_an_unreadable_trailer_item_no_size_class(item: str) -
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
     )
@@ -3930,7 +3948,7 @@ def test_build_board_still_joins_a_trailer_item_with_leading_zeros() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
     )
@@ -3960,7 +3978,7 @@ def test_build_board_sums_multiple_claims_of_one_item_into_one_sample() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
     )
@@ -3989,7 +4007,7 @@ def test_build_board_measurements_section_reports_classes_dates_and_unfinished()
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=completed + unfinished,
     )
@@ -4032,12 +4050,12 @@ def test_board_json_carries_estimate_and_measurements(
         (),
         (),
         (),
-        board.BoardConfig(storage=storage),
+        workboard.BoardConfig(storage=storage),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
     )
 
-    payload = board.board_payload(projected)
+    payload = workboard.board_payload(projected)
     item = next(entry for entry in _payload_items(payload) if entry["number"] == 206)
     assert item["size"] == "M"
     assert item["estimate"] == {
@@ -4080,7 +4098,7 @@ def test_build_board_counts_a_closed_items_own_completed_lane_into_its_size_clas
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=lane_events,
         closed_item_sizes={221: metrics.Size.MEDIUM, 222: metrics.Size.MEDIUM},
@@ -4100,7 +4118,7 @@ def test_measurements_counts_an_unparsed_lifecycle_commit() -> None:
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=(
             _lane_event(
@@ -4124,7 +4142,7 @@ def test_measurements_counts_an_unparsed_commit_even_with_no_measured_class() ->
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         unparsed_lifecycle_commits=3,
     )
@@ -4160,7 +4178,7 @@ def test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change() 
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=baseline_m_lanes,
     )
@@ -4169,7 +4187,7 @@ def test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change() 
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=baseline_m_lanes + l_lanes,
     )
@@ -4189,7 +4207,7 @@ def test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change() 
         (),
         (),
         (),
-        board.BoardConfig(),
+        workboard.BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
         lane_events=more_m_lanes,
     )
@@ -4226,7 +4244,7 @@ def test_cuttable_rows_preserves_validated_order_and_raw_text_with_canonical_sco
         MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 7\ntitle = " Later "\nscope = ["z", "a"]\n'
         'done_when = " Proven "\n[[slice]]\nindex = 2\ntitle = "Earlier"\n'
     )
-    located = board.located_block_or_refuse(121, raw, command="cut")
+    located = workboard.located_block_or_refuse(121, raw, command="cut")
 
     assert cuttable_rows(located) == (
         SliceRow(7, " Later ", ("a", "z"), " Proven "),
@@ -4306,75 +4324,83 @@ def test_names_parent_requires_an_exact_first_line(raw: str, label: str, expecte
 )
 def test_board_configuration_refuses_invalid_dependency_paths(value: str, reason: str) -> None:
     with pytest.raises(ClaimError) as refused:
-        board.parse_config(f"dependency_paths = {value}\n", board.CONFIG_PATH)
+        workboard.parse_config(f"dependency_paths = {value}\n", workboard.CONFIG_PATH)
     assert str(refused.value) == f"board configuration .aco/board.toml dependency_paths {reason}"
 
 
 @pytest.mark.parametrize("text", ["", "dependency_paths = []"])
 def test_board_configuration_has_no_dependency_paths_unless_named(text: str) -> None:
-    assert board.parse_config(text, board.CONFIG_PATH).dependency_paths == ()
+    assert workboard.parse_config(text, workboard.CONFIG_PATH).dependency_paths == ()
 
 
 @pytest.mark.parametrize(
     ("pull_request_body", "live_line", "appended", "reads_as"),
     [
         pytest.param(
-            "", None, "No-Item: deps", board.NoItemClassification(board.NoItemKind.DEPS), id="B1"
+            "",
+            None,
+            "No-Item: deps",
+            workboard.NoItemClassification(workboard.NoItemKind.DEPS),
+            id="B1",
         ),
         pytest.param(
             "Bump x",
             None,
             "\n\nNo-Item: deps",
-            board.NoItemClassification(board.NoItemKind.DEPS),
+            workboard.NoItemClassification(workboard.NoItemKind.DEPS),
             id="B2",
         ),
         pytest.param(
             "Bump x\n",
             None,
             "\nNo-Item: deps",
-            board.NoItemClassification(board.NoItemKind.DEPS),
+            workboard.NoItemClassification(workboard.NoItemKind.DEPS),
             id="B3",
         ),
         pytest.param(
             "Bump x\n\n",
             None,
             "No-Item: deps",
-            board.NoItemClassification(board.NoItemKind.DEPS),
+            workboard.NoItemClassification(workboard.NoItemKind.DEPS),
             id="B4",
         ),
         pytest.param(
             "Bump x\r\n",
             None,
             "\nNo-Item: deps",
-            board.NoItemClassification(board.NoItemKind.DEPS),
+            workboard.NoItemClassification(workboard.NoItemKind.DEPS),
             id="B5-crlf",
         ),
         pytest.param(
             "```\nNo-Item: deps\n```",
             None,
             "\n\nNo-Item: deps",
-            board.NoItemClassification(board.NoItemKind.DEPS),
+            workboard.NoItemClassification(workboard.NoItemKind.DEPS),
             id="B6-fenced",
         ),
         pytest.param(
             "```\nfoo",
             None,
             "\n\nNo-Item: deps",
-            board.ClassificationDefect("carries no `Work-Item:` or `No-Item:` line"),
+            workboard.ClassificationDefect("carries no `Work-Item:` or `No-Item:` line"),
             id="B7-unclosed-fence",
         ),
         pytest.param(
             f"Bump x\n\nNo-Item: dep{chr(0x202E)}s",
             "No-Item: dep\\u202es",
             "\n\nNo-Item: deps",
-            board.ClassificationDefect("carries 2 classification lines; exactly one is required"),
+            workboard.ClassificationDefect(
+                "carries 2 classification lines; exactly one is required"
+            ),
             id="B15-display-control",
         ),
         pytest.param(
             "Work-Item: #5\nNo-Item: fix",
             "Work-Item: #5",
             "\n\nNo-Item: deps",
-            board.ClassificationDefect("carries 3 classification lines; exactly one is required"),
+            workboard.ClassificationDefect(
+                "carries 3 classification lines; exactly one is required"
+            ),
             id="first-of-two",
         ),
     ],
@@ -4383,14 +4409,14 @@ def test_live_classification_line_and_composition_read_the_whole_body(
     pull_request_body: str,
     live_line: str | None,
     appended: str,
-    reads_as: board.Classification | board.ClassificationDefect,
+    reads_as: workboard.Classification | workboard.ClassificationDefect,
 ) -> None:
     """Spec: ADOPT-05, ADOPT-11, ADOPT-12 -- first live line escaped, body kept."""
-    composed = board.body_with_classification(pull_request_body, board.NoItemKind.DEPS)
+    composed = workboard.body_with_classification(pull_request_body, workboard.NoItemKind.DEPS)
 
-    assert board.live_classification_line(pull_request_body) == live_line
+    assert workboard.live_classification_line(pull_request_body) == live_line
     assert composed == pull_request_body + appended
-    assert board.parse_pull_request_classification(composed, REPOSITORY) == reads_as
+    assert workboard.parse_pull_request_classification(composed, REPOSITORY) == reads_as
 
 
 @pytest.mark.parametrize(
@@ -4398,25 +4424,27 @@ def test_live_classification_line_and_composition_read_the_whole_body(
     [
         pytest.param(
             "Bump x\n\nNo-Item: fix",
-            lambda: board.OtherClassificationLine("No-Item: fix"),
+            lambda: workboard.OtherClassificationLine("No-Item: fix"),
             id="B8-another-kind",
         ),
         pytest.param(
             "Work-Item: #5",
-            lambda: board.OtherClassificationLine("Work-Item: #5"),
+            lambda: workboard.OtherClassificationLine("Work-Item: #5"),
             id="B9-a-work-item",
         ),
         pytest.param(
             "No-Item: chore",
-            lambda: board.OtherClassificationLine("No-Item: chore"),
+            lambda: workboard.OtherClassificationLine("No-Item: chore"),
             id="B10-an-unknown-kind",
         ),
-        pytest.param("Bump x\n\nNo-Item: deps", lambda: board.ClassificationLine.PRESENT, id="B11"),
-        pytest.param("no-item: DEPS", lambda: board.ClassificationLine.PRESENT, id="B12-case"),
+        pytest.param(
+            "Bump x\n\nNo-Item: deps", lambda: workboard.ClassificationLine.PRESENT, id="B11"
+        ),
+        pytest.param("no-item: DEPS", lambda: workboard.ClassificationLine.PRESENT, id="B12-case"),
         pytest.param(
             "No-Item: deps\nWork-Item: #5",
-            lambda: board.MalformedClassificationLines(
-                board.ClassificationDefect(
+            lambda: workboard.MalformedClassificationLines(
+                workboard.ClassificationDefect(
                     "carries 2 classification lines; exactly one is required"
                 )
             ),
@@ -4425,11 +4453,13 @@ def test_live_classification_line_and_composition_read_the_whole_body(
     ],
 )
 def test_classification_line_state_tells_the_line_a_rerun_may_keep(
-    pull_request_body: str, expected_state: Callable[[], board.ClassificationLineState]
+    pull_request_body: str, expected_state: Callable[[], workboard.ClassificationLineState]
 ) -> None:
     """Spec: ADOPT-05, ADOPT-26, ADOPT-30 -- the one live line is the kind's own (kept), another
     line (refused), or more than one (the parser's defect, refused)."""
-    state = board.classification_line_state(pull_request_body, board.NoItemKind.DEPS, REPOSITORY)
+    state = workboard.classification_line_state(
+        pull_request_body, workboard.NoItemKind.DEPS, REPOSITORY
+    )
 
     assert state == expected_state()
 
@@ -4438,19 +4468,19 @@ def test_classification_line_state_tells_the_line_a_rerun_may_keep(
     ("classification", "expected"),
     [
         pytest.param(
-            board.WorkItemClassification(board.IssueReference(REPOSITORY, 72)),
+            workboard.WorkItemClassification(workboard.IssueReference(REPOSITORY, 72)),
             "Work-Item: #72",
             id="work-item",
         ),
         pytest.param(
-            board.NoItemClassification(board.NoItemKind.DOCS), "No-Item: docs", id="no-item"
+            workboard.NoItemClassification(workboard.NoItemKind.DOCS), "No-Item: docs", id="no-item"
         ),
     ],
 )
 def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications(
-    classification: board.Classification,
+    classification: workboard.Classification,
     expected: str,
 ) -> None:
     """Spec: LANDCMD-13. Trunk trailers use local issue references or the no-item kind."""
-    observed = board.land_trunk_trailer(classification)
+    observed = workboard.land_trunk_trailer(classification)
     assert observed == expected
