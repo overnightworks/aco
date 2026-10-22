@@ -1,0 +1,8 @@
+claim_id = "87dbb268fcd647dbbbc865be3743b2d5"
+agent = "claude"
+role = "builder"
+base = "d91ff3af4f9890a95e6729fc50b7fcdd6b8ff1ff"
+branch = "docs/cleanup-pass"
+scope = ["AGENTS.md", "README.md", "docs/board/README.md", "docs/decisions/0001-claim-state-without-a-ledger-issue.md"]
+opened_commit = "6391358c091763af33be33316d2b0c55f9054fef"
+whole_reason = "one docs-cleanup pass the operator asked of every head; AGENTS.md points into the README section this pass cuts, so the four documents land together"
