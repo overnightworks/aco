@@ -1,0 +1,7 @@
+claim_id = "a95bd0ca9902465d9847ea48b3a14a8f"
+agent = "claude"
+role = "builder"
+base = "1aca74a2839734756370af8277c69538657e7c3d"
+branch = "claude/issue-311-repo-and-sonar-key"
+scope = [".aco/brief.toml", "README.md", "sonar-project.properties"]
+opened_commit = "a65b008228634c2eb69820027ca872e539161ad4"
