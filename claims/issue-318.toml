@@ -1,0 +1,8 @@
+claim_id = "146ad93cfd4c4e4dbcaea8ef1319589c"
+agent = "claude"
+role = "builder"
+base = "8fa5e2cc3e44447699fdf84b49e2df42e91052e3"
+branch = "claude/issue-318-clone-ratchet"
+scope = [".aco/brief.toml", ".github/workflows/ci.yml", "quality/baseline.toml", "quality/config.toml", "scripts/similar_methods.py", "scripts/similar_methods_exemptions.txt", "scripts/test_inventory.py"]
+opened_commit = "d68d24c33e35ce9e276755b8afa02c4299246128"
+whole_reason = "Der Prüfer zieht mit CI-Schritt, Jobname, Brief-Zeile und Verweisen zusammen um; einzeln bliebe ein toter Schritt oder ein abweichender Jobname."
