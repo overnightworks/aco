@@ -25,7 +25,7 @@ Five costs are measured or read from the v0.9.0 source, not assumed.
 
 ## 2. Decision
 
-**One state ref.** `refs/aco/state` (named by ruling, issue #176) on one configured canonical
+**One state ref.** `refs/aco/state` (named by ruling) on one configured canonical
 remote points at a
 commit whose tree *is* the current state: `claims/<key>.toml`, `resources/<name>.toml`, a
 schema `version`. The tree owns current state; the commit message owns the transition. A
@@ -54,12 +54,12 @@ only shape whose cross-key invariant does not rest on an unverified server capab
 **A typed fenced TOML block replaces regex prose in item bodies.** One `agent-claim` fenced
 region parsed by `tomllib`. **Keys are protocol and are always English; values are the
 operator's prose and are never parsed.** This retires the German markers, the slice table,
-and both malformed-input defect classes. Issue #150 (step 4) draws that line concretely:
+and both malformed-input defect classes. Step 4 draws that line concretely:
 human projection (`now`/`next`/`done_when`), freeze, expectation `text`, and slice `title`
 are the operator's own words; `version` and an expectation's `default`/`ruling` values are
 protocol tokens. `next` keeps its non-parsed vocabulary (`keiner | keine | nichts | none |
 -`, owned by `has_further_work`, plus `tbd | todo | unknown` concreteness) as the explicit
-exception to "values are never parsed". Issue #204 completed the replacement on 08.09.2026:
+exception to "values are never parsed". The replacement was completed on 08.09.2026:
 the regex reader is deleted, so the block is not one grammar among two but the only one.
 
 **Blockers and parentage live on the forge's structured relations where the pinned storage
@@ -67,7 +67,7 @@ configuration says so.** Capabilities *validate* the pin; they never *choose* th
 round-2 counter-check named runtime capability selection as an unresolved defect in the
 concept: a forge plan change must never silently move a fact's owner without a migration.
 
-**Addendum (16.09.2026, issue #260).** `cut` writes `Parent: #<container>` as the first prose
+**Addendum (16.09.2026).** `cut` writes `Parent: #<container>` as the first prose
 line of every fresh child body. It is a recovery marker, not a parentage source: only `cut`'s
 own orphan adoption reads it back, so a repeat `cut` after a failed relation write can finish
 the same relation instead of creating a second child. No reader derives parentage from the
@@ -80,8 +80,8 @@ capability. Forge failures are typed (`ForgeUnsupported`, `ForgePermissionDenied
 `ForgeNotFound`, `ForgeTransient`, `ForgeMalformedResponse`) instead of substring-matched.
 
 **Configuration stays in `.agent-claim/board.toml`,** extended only with settings that have a
-caller today: the pinned body contract (`body_contract`, issue #150) and `canonical_remote`
-(default `origin`, issue #176) naming the remote `refs/aco/state` lives on — every store and
+caller today: the pinned body contract (`body_contract`) and `canonical_remote`
+(default `origin`) naming the remote `refs/aco/state` lives on — every store and
 import refusal is worded in its terms. No separate state-storage-strategy key was ever added;
 the ref and its tree shape are the only storage decision, and both are named above. Renaming
 the file is rejected — it would cost a migration to buy a better name.
@@ -97,7 +97,7 @@ the file is rejected — it would cost a migration to buy a better name.
 
 ## 4–5. Acceptance criteria and migration order
 
-The round-2 counter-check listed eleven acceptance criteria and a six-step migration order. They were resolved by the state-ref cut, the port extraction, the typed body block and the GitHub custom-ref probe (§6). Two leftovers were dropped for lack of a caller: the GitLab state-transport preflight (criterion 7), to be re-run if a GitLab adapter is ever wanted, and the optional receipt (step 6, D1).
+The round-2 counter-check listed eleven acceptance criteria and a six-step migration order. The state-ref cut, the forge port with typed errors, the typed body block and the GitHub custom-ref probe (§6) are implemented. The GitLab state-transport preflight (criterion 7) and the optional receipt (step 6, D1) are decided but not implemented, and no open item carries them; D1 stands.
 
 ## 6. Measured facts
 

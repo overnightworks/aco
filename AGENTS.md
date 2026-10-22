@@ -1,4 +1,4 @@
-- `README.md`'s command table links each command to the owning `specs/*.spec.md` for behaviour, printed literals, exit codes and `--json` shapes.
+- `specs/<command>.spec.md` owns each command's behaviour, printed literals, exit codes and `--json` shapes; `aco --help` lists the commands.
 - `pyproject.toml` owns Python compatibility and the `dev` dependency group; `src/agent_coordination/__init__.py` owns the package version (`__version__`).
 - `.github/workflows/ci.yml` owns verification; its `quality` job calls overnightworks/quality's `gate.yml`, and `quality/config.toml` lists the mandatory jobs (required check `quality / verdict`).
 - `quality/baseline.toml` is written by `quality baseline write` from the quality version `.github/workflows/ci.yml` pins (`uv run --locked --project <quality checkout at that commit> quality baseline write .`), not by the installed `quality` CLI. A lane that shrinks a listed file or function must rewrite it; growing one turns `quality / hygiene` red.

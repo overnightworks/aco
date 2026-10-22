@@ -13,8 +13,9 @@ repository, holds what an agent would forget or cannot know alone (who holds
 what, what a landing freed, what is disjoint), and no native tool does it
 better. Git, `gh` and the forge own commits, branches, pull requests and issue
 text. aco runs no lease server and writes no provider configuration. GitHub
-through `gh` is the one forge adapter; `status`, `bootstrap`, `reset` and lane
-`claim`/`rescope`/`release` read and write only `refs/aco/state` and need no forge.
+through `gh` is the one forge adapter; `status`, `bootstrap`, `reset`, lane
+`claim`/`rescope` and `release --abandoned` read and write only `refs/aco/state`
+and need no forge. `release --merged` needs it under `storage = "github"`.
 
 ## Install
 
@@ -52,13 +53,14 @@ reviewers saw and releases the claim (`specs/start.spec.md`,
 
 - **Issueless lanes.** On a `docs/` or `fix/` branch, `aco claim --scope PATH`
   claims without an issue; the pull request carries `No-Item: docs|fix|deps`
-  and `aco release --merged <pull request>` ends the claim
-  (`specs/claim.spec.md`, `specs/landing-grammar.spec.md`).
+  and `aco release --merged <pull request>` ends the claim once the forge shows
+  the merge (`specs/claim.spec.md`, `specs/landing-grammar.spec.md`).
 - **Foreign pull requests.** `aco adopt <pull request> --no-item <kind>` turns
   a bot's pull request into such a lane (`specs/adopt.spec.md`).
 - **No forge.** Pinning `storage = "state-ref"` keeps items as files; use
   `aco item new/show/edit/close` and land with a `Work-Item:` trailer on the
-  trunk commit (`specs/storage-pin.spec.md`, `specs/item.spec.md`).
+  trunk commit; `aco release --merged <sha>` checks the local trunk, not a forge
+  (`specs/storage-pin.spec.md`, `specs/item.spec.md`, `specs/release.spec.md`).
 - **Workspace recovery.** `aco register`, `aco run` and `aco login` map projects
   to provider conversations and resume them (`specs/workspace.spec.md`).
 
@@ -95,36 +97,13 @@ never on prose (`specs/output.spec.md`).
 
 ## Commands and their specs
 
-Every command's flags, outputs, exit codes and refusal sentences belong to one
-spec; this table is the map.
-
-| Command / contract | Spec | What it covers |
-|---|---|---|
-| `aco bootstrap` | `specs/bootstrap.spec.md` | creates or reports the state ref |
-| `aco start` | `specs/start.spec.md` | creates an item's worktree and branch, then claims it |
-| `aco claim` | `specs/claim.spec.md` | opens a claim on an issue or an issueless lane |
-| `aco rescope` | `specs/rescope.spec.md` | adds or drops paths on a live claim |
-| `aco release` | `specs/release.spec.md` | ends a claim as merged or abandoned |
-| `aco land` | `specs/land.spec.md` | merges a green pull request, then releases its claim |
-| `aco adopt` | `specs/adopt.spec.md` | makes a foreign pull request an issueless lane |
-| `aco status` | `specs/status.spec.md` | reads every live claim, repository-wide or by path |
-| `aco reset` | `specs/reset.spec.md` | rebuilds a broken or rewritten state ref |
-| `aco check` | `specs/check.spec.md` | answers whether a pull request, issue or trunk commit is sound |
-| `aco brief` | `specs/brief.spec.md` | composes an item's body, claim, tip and touched files |
-| `aco board` | `specs/board.spec.md` | projects the open board (`--json` only) |
-| `aco ask` | `specs/ask.spec.md` | proposes one expectation line on an item |
-| `aco rule` | `specs/rule.spec.md` | rules one proposed expectation line |
-| `aco rulings` | `specs/rulings.spec.md` | lists every item with an open expectation line |
-| `aco next` | `specs/next.spec.md` | names the one action the board recommends pulling now |
-| `aco cut` | `specs/cut.spec.md` | dispatches a container's next slice as a fresh child item |
-| `aco item new/show/edit/close` | `specs/item.spec.md` | the state-ref item lifecycle, and `item new` of a GitHub issue |
-| `aco body --check` | `specs/body.spec.md` | validates a piped body offline |
-| `aco register/run/login` | `specs/workspace.spec.md` | records, resumes and autostarts a provider workspace mapping |
-| `aco` block grammar | `specs/body-block.spec.md` | the fenced TOML block every item-reading command parses |
-| claim record | `specs/claim-record.spec.md` | the stored claim fields the claim commands share |
-| state ref transport | `specs/ref-store-cas.spec.md` | the compare-and-swap `refs/aco/state` every store command uses |
-| landing grammar | `specs/landing-grammar.spec.md` | what counts as a landing |
-| storage pin | `specs/storage-pin.spec.md` | the `storage` key gating GitHub versus state-ref item storage |
+`aco --help` lists the commands and `aco <command> --help` their flags. Each
+command's behaviour, printed literals, exit codes and `--json` shapes are in
+`specs/<command>.spec.md`; `register`, `run` and `login` share
+`specs/workspace.spec.md`, and `aco-board` has `specs/aco-board.spec.md`. The
+rules several commands share (output envelope, body block, claim record,
+landing grammar, storage pin, state ref transport) are in
+[`specs/`](specs/) too.
 
 ## Documentation
 
