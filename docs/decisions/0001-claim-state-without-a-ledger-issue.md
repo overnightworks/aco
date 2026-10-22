@@ -1,17 +1,10 @@
 # 0001 — Claim state without a ledger issue
 
-Names in this record are those in use when it was decided. The repository was renamed to agent-coordination on 26.09.2026 (issue #439); the configuration directory and the body-block fence keep their old names until issue #441.
+Names in this record are those in use when it was decided; the package and command were later renamed to `agent-coordination` and `aco` (D7).
 
-Status: accepted as direction, not yet implementable. Each §4 criterion is gated by the §5
-step that resolves it: the state-ref cut (step 5) resolves criteria 1–6 and 10 (criterion 8
-is already tied there to fencing v0.9 clients); port extraction (step 3) resolves criterion 9,
-the complete Landing candidate (already tied there); criterion 7, the GitLab
-state-transport preflight, must be re-run before the first GitLab adapter; criterion 11, the
-live GitHub custom-ref probe, is satisfied (re-run by the head 05.09.2026, results on #131).
-No slice may be dispatched before its gating step's criteria are satisfied.
+Status: accepted and implemented. The state ref shipped with 1.0.0 (07.09.2026); the ledger issue and its import code are gone.
 
-Date: 05.09.2026. Baseline: `origin/main` = `2bcf3f3` (v0.9.0 plus the #109/#110 Sonar
-cleanup, which changed no contract), tag `v0.9.0`.
+Date: 05.09.2026. Baseline: `origin/main` = `2bcf3f3` (v0.9.0 plus a Sonar cleanup that changed no contract), tag `v0.9.0`.
 
 Source: a two-round architecture concept and two independent counter-checks, both
 returning REBUILD. This record harvests them. Where a counter-check contradicts the
@@ -102,152 +95,28 @@ the file is rejected — it would cost a migration to buy a better name.
 | Projects v2 fields | No demonstrated CAS, an extra item-synchronization step, GraphQL coupling, and no GitLab Free equivalent (the concept's original reason — a missing token scope — is not architectural, since a scope can be granted) |
 | Per-key refs plus a resources ref | A resource-holding claim would have its hold in `claims/<key>` and its integer in `resources`, two owners that can disagree, and making them one transition needs `git push --atomic` across refs, whose support on both SaaS hosts is unverified |
 
-## 4. Unresolved before the first slice may be dispatched
+## 4–5. Acceptance criteria and migration order
 
-Every remaining defect from the round-2 counter-check, as acceptance criteria the slice's
-plan review must satisfy. The direction in §2 is ruled; these are not.
-
-1. **Lost lineage.** An ancestry check against a cached OID does not detect a forced replace
-   that branched before the cached point, and a fresh clone has no comparison point at all.
-   The stamp does not keep the old OID reachable, so a lost suffix may be unrecoverable.
-   Required: a detection rule that states what it cannot see, and a written recovery
-   procedure (quiesce writers, collect surviving tips, validate trees and ancestry, restore
-   with an explicit expected old OID).
-2. **ABA and claim generation.** v0.9.0 owns a public `claim_id` and uses it for interrupted
-   replay. The concept removed it, so a retry cannot distinguish its own replay from a
-   successor claim on the same key. Required: a typed `ClaimId` generation carried by every
-   transition and revalidated on every retry.
-3. **Ambiguous push completion.** "Push accepted, response lost" is unspecified. Required: an
-   operation id written into the commit so a client can re-read and recognize its own
-   transition before deciding to retry.
-4. **Clock policy for stale takeover.** `opened_at` moves from GitHub's server timestamp to
-   the claimant's clock; a slow clock makes a fresh claim instantly takeable and a fast clock
-   blocks takeover indefinitely. `apply` also has no `now` input. Required: either a
-   provider-neutral authoritative-time contract or stale takeover as an explicit coordinator
-   action only.
-5. **Retry exhaustion under ten writers.** The two-racer experiment does not prove the
-   ten-lane estimate; the collision window opens when state is *observed*, not when the push
-   starts. Required: a ten-process contention test and explicit exhaustion semantics —
-   including that a different-key loser must not fail by "naming the current holder", because
-   no conflicting holder exists.
-6. **Bootstrap only from a proven-empty remote.** `fetch` exit 128 also covers auth and
-   transport failure. Only a successful `ls-remote --exit-code` with its documented
-   no-matching-ref result may become `EmptyState`; a ref absent after a client once observed
-   it is deletion or corruption, never fresh bootstrap.
-7. **GitLab state-transport preflight.** Custom-ref pushability on GitLab is unverified, and
-   `ForgeCapabilities` has no state-transport capability at all. Required, before the first
-   GitLab adapter: a preflight covering custom-ref create, fetch, fast-forward update,
-   concurrent rejection, non-fast-forward rejection, absence, permission failure, and nested
-   namespace URLs.
-8. **Migration that loses nothing and fences old clients.** Resolved for the item body by
-   issue #150 as hand migration, not a command: one reviewed AI session per repository
-   transcribes body values and structured relations, refuses anything not derivable rather
-   than inventing it, and leaves the operator's own words in the body — GitHub's own edit
-   history is the undo, so no migration command, module, or receipt is added. Every
-   supported repository was migrated and validated by 08.09.2026, and issue #204 then
-   deleted the regex reader; the `body_contract` key stays known and accepts only `"block"`,
-   so a repository still carrying the old value is refused by name rather than read with a
-   reader that no longer exists. The old-client tombstone remains open for step 5: v0.9.0 silently ignores unknown
-   `board.toml` keys, so a pinned config alone does not fence it; the state cut needs a
-   tombstone the *old* client reads and refuses on.
-9. **A complete `Landing` candidate.** The proposed
-   `Landing(number, merged_at, work_item, head_branch, merge_commit)` cannot carry #108's
-   `pr-check` and merged-release verification contract, which also reads an author, PR body
-   and classification, target and default branch, source repository, closing references, and
-   the no-item case. The port must preserve that contract before anything is rewired to it.
-10. **The typed-model gaps — mapped, not wholesale (resolved 07.09.2026, issue #176 C1+C2).**
-    A collision-free reversible codec for `LaneKey.branch` as a
-    file name; a claim transition carrying a resource *intent* rather than a preallocated
-    allocation, with one allocation owner instead of the hold appearing in both the claim and
-    the ledger; an acting identity carrying agent *and* validated role, since `apply` must
-    preserve today's `(agent, role)` authorization; a runtime-validating OID type (`NewType`
-    validates nothing); immutable collections inside the frozen state; item created/updated
-    timestamps the board needs; a body-update operation the migration needs; a
-    provider-neutral kind mapping — `idea_label` is still a competing owner of kind;
-    a typed failure for a malformed or unsupported state-tree schema, distinct from a stale
-    rejection and from ambiguous push completion. The item-body portion of this criterion is
-    resolved by issue #150 (step 4): each expectation is an exclusive union, `default: yes |
-    no | later` (proposed) *or* `ruling: yes | no` with `ruled_on` (ruled), never both and
-    never neither — the typed `RuledExpectation.default` gap above is this union.
-    The state-model remainder: six of the ten sub-items above are resolved by the state-ref
-    cut (C1+C2) and no others — do not read this criterion as satisfied wholesale. Resolved:
-    the claim-key codec (`store.claim_key`/`parse_claim_key`), the resource intent with one
-    allocation owner (`apply` plus `resources/<name>.toml`), acting identity carrying agent and
-    role (`protocol.ClaimIntent` and its siblings), the runtime-validating OID type
-    (`protocol.ObjectId`), immutable collections inside the frozen state
-    (`ClaimState.claims`/`consumed_ids`/`resources`), and the typed schema-failure pair
-    (`MalformedStateTreeError` / `UnsupportedStateSchemaError`). Still open, each with its
-    current owner: item created/updated timestamps (GitHub issue timestamps via the port, not
-    claim state); the body-update operation the migration needs (`UPDATE_ITEM_BODY` on the
-    port; `cut` is its caller; D6 killed `migrate-body`); the provider-neutral kind mapping
-    (`board.py`'s `idea_label` still competes with the native issue type — leftover of #112,
-    not this cut); and a typed `RuledExpectation.default` (`board.py` still carries only
-    `ExpectationState`'s `NONE`/`PROPOSED`/`RULED` — step 7 or a later item).
-11. **GitHub custom-ref probe re-run — satisfied for GitHub.** The live re-run of the
-    custom-ref push/fetch/CAS probe against GitHub — create-if-absent, fast-forward update,
-    non-fast-forward rejection, concurrent rejection, and delete — landed 05.09.2026 (results
-    on #131); §6 now marks the GitHub custom-ref facts verified. The GitLab equivalent
-    (criterion 7) stays open.
-
-Removed until a caller exists: chain-length reporting, a public `capabilities()` if only
-adapters consume it, nonzero gate freshness, and the receipt unless phone visibility is
-explicitly selected.
-
-## 5. Migration order
-
-As ruled by the round-2 counter-check. Strictly sequential.
-
-1. **#113 revalidated** — one wide-scope predicate on `claim` and `rescope`. It keeps
-   `parse_slice_table` alive until step 4 has converted the existing slice data.
-2. **#112 re-cut around item kind** — D3 is ruled; dispatchable once the cross-forge kind
-   mapping exists.
-3. **Port extraction** — `ForgeReader` / `ForgeWriter`, the GitHub adapter, typed errors. A
-   pure extraction against the current call set, with no behaviour change, and it must
-   already satisfy criterion 9. Criterion 11's live GitHub custom-ref probe is satisfied
-   (re-run 05.09.2026, results on #131).
-4. **One body and relation migration (issue #150)** — the typed reader/writer, the
-   `body_contract` pin, the bounded dependency reader, loud legacy/malformed findings, and a
-   per-repository hand migration (D6), in one slice; no conversion command, module, or
-   receipt. Blockers never pass through the body on GitHub; parentage remains on sub-issues.
-   This resolves the item-body portion of criterion 10; step 5 still resolves the state-model
-   remainder.
-5. **One state-ref cut** — claim, rescope, both release outcomes, coordinator override, stale
-   takeover, resource allocation and `protect`, together. It must import active claims, claim
-   ids and every consumed released allocation value, and fence v0.9 clients (criterion 8). It
-   retires `reconcile` and `supersede` and the projection comments they exist to repair or
-   duplicate, since the ledger issue they read and reconcile against is gone; `bootstrap`
-   shrinks to creating the state ref, its only remaining job once there is no ledger issue left
-   to seed from. The import ran on 07.09.2026 and its code was deleted afterwards (issue #187),
-   so `bootstrap` today only creates or reports the ref.
-6. **The receipt, last** — optional and additive; its absence costs visibility, never
-   correctness.
+The round-2 counter-check listed eleven acceptance criteria and a six-step migration order. They were resolved by the state-ref cut, the port extraction, the typed body block and the GitHub custom-ref probe (§6). Two leftovers were dropped for lack of a caller: the GitLab state-transport preflight (criterion 7), to be re-run if a GitLab adapter is ever wanted, and the optional receipt (step 6, D1).
 
 ## 6. Measured facts
 
-Judged as the counter-checks judged them. "Reported live" means the concept author ran it on
-05.09.2026 against `overnightworks/agent-claim` and neither counter-check could reproduce it
-(both lost network access to `api.github.com`); a fact still marked "Reported live,
-unverified" below is therefore not independently verified and no slice may depend on it
-without re-running the probe. The GitHub custom-ref probe was re-run live by the head on
-05.09.2026 (results on #131) and is marked verified below; the org-plan and issue-type
-probes remain unverified.
+Judged as the counter-checks judged them. "Reported live" means the concept author ran it on 05.09.2026 against `overnightworks/agent-claim` and neither counter-check could reproduce it (both lost network access to `api.github.com`). The GitHub custom-ref probe was re-run live by the head on 05.09.2026 and is marked verified below; the org-plan and issue-type probes remain unverified.
 
 | Fact | Standing | Source |
 |---|---|---|
-| GitHub accepts pushes to `refs/agent-claim/*`; create-if-absent, fast-forward update, non-fast-forward rejection, concurrent rejection (two parallel pushes of different children from two clones → exactly one winner, the other "cannot lock ref"), a stale-lease create rejected, and delete all behave as required; the REST endpoint `git/refs/agent-claim` returns 200 while the ref is present and 404 after deletion; the ref is invisible in the normal GitHub UI | Verified 05.09.2026 (re-run by the head, results on #131) | Head's live re-run, 05.09.2026, `overnightworks/agent-claim`, namespace `refs/agent-claim/probe-1788623638` (deleted afterwards) |
+| GitHub accepts pushes to `refs/agent-claim/*`; create-if-absent, fast-forward update, non-fast-forward rejection, concurrent rejection (two parallel pushes of different children from two clones → exactly one winner, the other "cannot lock ref"), a stale-lease create rejected, and delete all behave as required; the REST endpoint `git/refs/agent-claim` returns 200 while the ref is present and 404 after deletion; the ref is invisible in the normal GitHub UI | Verified 05.09.2026 | Head's live re-run, 05.09.2026, `overnightworks/agent-claim`, namespace `refs/agent-claim/probe-1788623638` (deleted afterwards) |
 | Push to a custom ref: plain push is fast-forward-only; a matching lease still permits a non-fast-forward replacement | Verified (documentation) | `git push` documentation; the reason §2 rejects the lease |
 | Two racers on one expected OID: at most one lands; the loser re-reads and retries | Verified in a throwaway bare repo; "exactly one" corrected to "at most one" (permissions, hooks or transport can fail every racer) | Concept local experiment; round-1 counter-check |
-| Custom-ref create-if-absent 1.9 s, fast-forward update 1.9 s, `ls-remote` 1.4 s, single-ref fetch 1.4 s, delete 1.9 s; today's gate ~2.4 s per write | Verified 05.09.2026 (re-run by the head, results on #131); environment-specific and not to be projected onto other repositories | Head's live re-run, 05.09.2026 |
+| Custom-ref create-if-absent 1.9 s, fast-forward update 1.9 s, `ls-remote` 1.4 s, single-ref fetch 1.4 s, delete 1.9 s; today's gate ~2.4 s per write | Verified 05.09.2026; environment-specific and not to be projected onto other repositories | Head's live re-run, 05.09.2026 |
 | `overnightworks` plan free, repository public; org issue types are `Task, Bug, Feature` with no `Container` | Reported live, unverified; token scopes never evidenced | Concept probes, 05.09.2026 |
 | GitHub issue dependencies are available on Free; sub-issues allow 100 direct children and 8 nesting levels | Verified (documentation) | GitHub docs |
 | GitHub rulesets and branch protection target branches and tags only, never `refs/agent-claim/*` | Verified (documentation) | GitHub docs. Accepted: the threat model is cooperating clients |
 | GitHub supports organization-owned custom issue types | Verified (documentation) | GitHub issue-type API |
 | `refs/agent-claim/*` is pushable on GitLab | **Unverified** — the Branches API proves only `refs/heads` creation, and Gitaly's note about other namespaces certifies neither GitLab.com nor every installation | Round-2 counter-check |
 | GitLab Free: one assignee (replacing, not union); `blocks` is paid; child items exist; configurable work-item types are paid | Verified (documentation) | GitLab docs |
-| The landed #108 release union `MergedRelease \| AbandonedRelease` | Verified from `eb384b1` | `protocol.py` |
+| The landed release union `MergedRelease \| AbandonedRelease` | Verified from `eb384b1` | `protocol.py` |
 | v0.9.0 reads only `priority_labels` and `idea_label` from `board.toml` and silently ignores every other key | Verified from `eb384b1` | `board.py` — the reason criterion 8 needs a tombstone, not a pin |
-| 0.13.0's typed body block (D6) was green in the owner repository — passed final gate, four counter-check rounds — before atelier-2 pinned it in PR #1377 (06.09.2026 18:37 UTC). Two regressions followed: `next` printed a cut title `cut` refused on seven of twenty-one containers, found in that PR's required review 18:38–19:05 UTC; and that PR's CI job "Landing classification" — which runs `pr-check` without a checkout — failed with git's raw error (`fatal: not a git repository`, exit 2) at the pin, because every contract-resolving command now resolves its config from the working tree; fixed on their side with a checkout step, green again at 18:54:35 UTC | Owner side (green, final gate, four counter-check rounds) measured in this repository; consumer side (both findings and their timing) measured, atelier-2's own account | Owner side: PR #162, PR #165, #150's counter-check reports. Consumer side: atelier-2's record of PR #1377 |
-| No rule followed from that finding: the divergent cut-title shape already sat on agent-claim's own board, hidden behind a child that was still open; the round-trip test suite's 2×2 matrix over {`next`-line present} × {uncut `[[slice]]` row present} left empty exactly the cell where both are present and disagree; the autouse toplevel-resolution test fixture made a missing working tree unobservable in every test — the blindness was local and testable, not structural. What owns a fix instead of a rule: that empty matrix cell and the next/cut title invariant over every container (#177); the fixture's counterpart (#178); per-command README preconditions (step-5 plan, slice F); and keeping "which consumer shape went unexercised" a dispatch-brief practice, not a tracked item | Measured; proposed rule rejected by independent counter-check | Independent counter-check, 06.09.2026; #177; #178 |
 
 ## 7. Operator rulings, 05.09.2026
 
