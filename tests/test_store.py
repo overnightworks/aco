@@ -49,8 +49,8 @@ from store_fixtures import (
     unrelated_racer_commit,
 )
 
-from agent_coordination import cli as issue_claim
-from agent_coordination import github, process, protocol, store
+from aco import cli as issue_claim
+from aco import github, process, protocol, store
 
 # Syntactically valid but locally unresolvable object ids, for tests that
 # exercise a failure path where the actual value never reaches an assertion.
@@ -3976,7 +3976,7 @@ def test_apply_claim_intent_adds_a_live_claim_and_consumes_its_id() -> None:
     assert claim.role == "builder"
     assert claim.base == CLAIM_BASE
     assert claim.branch == "claude/issue-42-cut"
-    assert claim.scope == ("src/agent_coordination/store.py",)
+    assert claim.scope == ("src/aco/store.py",)
     assert claim.opened_commit == TIP
     assert claim.resource is None
     assert claim.whole_reason is None
@@ -4511,7 +4511,7 @@ def test_parse_claim_key_accepts_an_issue_number_at_the_digit_bound() -> None:
 
 def _sample_claim(
     *,
-    scope: tuple[str, ...] = ("src/agent_coordination/store.py",),
+    scope: tuple[str, ...] = ("src/aco/store.py",),
     resource: protocol.ResourceHold | None = None,
     whole_reason: str | None = None,
 ) -> protocol.ActiveClaim:

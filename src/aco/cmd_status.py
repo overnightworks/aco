@@ -231,7 +231,8 @@ def _print_path_holders(
 ) -> None:
     for claim in holders:
         print(
-            f"CLAIMED {path} {workboard.claim_subject(claim, storage)}: {claim.agent} ({claim.role}) "
+            f"CLAIMED {path} {workboard.claim_subject(claim, storage)}: "
+            f"{claim.agent} ({claim.role}) "
             f"claim={claim.claim_id}"
         )
         if claim.whole_reason is not None:

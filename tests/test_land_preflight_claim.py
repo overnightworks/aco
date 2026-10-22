@@ -37,7 +37,7 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import body, forge, protocol, store, workboard
+from aco import body, forge, protocol, store, workboard
 
 
 class CheckoutState(Enum):

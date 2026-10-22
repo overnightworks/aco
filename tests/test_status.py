@@ -31,7 +31,7 @@ from store_fixtures import (
     twin_claim_key,
 )
 
-from agent_coordination import cmd_status, github, protocol, store, workboard
+from aco import cmd_status, github, protocol, store, workboard
 
 STATE_REF_PIN = 'storage = "state-ref"\n'
 Flags = list[str]

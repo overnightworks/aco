@@ -35,9 +35,9 @@ from cli_fixtures import (
     stub_one_git_call,
 )
 
-from agent_coordination import checkout, process, store, workboard
-from agent_coordination import cli as issue_claim
-from agent_coordination.protocol import ClaimError, ClaimRequest
+from aco import checkout, process, store, workboard
+from aco import cli as issue_claim
+from aco.protocol import ClaimError, ClaimRequest
 
 _LIVE_VERSIONED_PATHS = checkout.versioned_paths
 _LIVE_TRUNK_LANDINGS = checkout.trunk_landings

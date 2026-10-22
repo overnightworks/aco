@@ -27,8 +27,8 @@ from .session import RunContext
 _LAND_GITHUB_ONLY_REFUSAL = (
     "aco land is a github command; storage = state-ref has no pull requests to land"
 )
-_LAND_SELF_PACKAGE_NAME = "agent-coordination"
-_LAND_REINSTALL_LINE = "reinstall: uv tool install --force --from . agent-coordination"
+_LAND_SELF_PACKAGE_NAME = "overnightworks-aco"
+_LAND_REINSTALL_LINE = f"reinstall: uv tool install --force --from . {_LAND_SELF_PACKAGE_NAME}"
 
 
 def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:

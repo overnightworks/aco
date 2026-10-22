@@ -21,7 +21,7 @@ from github_fixtures import (
 )
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
-from agent_coordination import body, forge, protocol, workboard
+from aco import body, forge, protocol, workboard
 
 ITEM_CLAIM = claim_intent(identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH)
 LANE_BRANCH = "docs/tidy-readme"

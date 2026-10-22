@@ -20,7 +20,7 @@ from typing import TextIO
 import pytest
 from board_fixtures import BASE, REPOSITORY, complete_contract, write_repository_config
 
-from agent_coordination import (
+from aco import (
     board_read,
     checkout,
     cli,
@@ -35,8 +35,8 @@ from agent_coordination import (
     store,
     workboard,
 )
-from agent_coordination.protocol import ClaimState
-from agent_coordination.session import RunContext
+from aco.protocol import ClaimState
+from aco.session import RunContext
 
 # Captured at import, before any test's stub replaces it.
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked

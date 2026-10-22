@@ -30,7 +30,7 @@ from github_fixtures import (
     refusal_observations,
 )
 
-from agent_coordination import cmd_land, forge, protocol, workboard
+from aco import cmd_land, forge, protocol, workboard
 
 
 class ClaimHolder(Enum):

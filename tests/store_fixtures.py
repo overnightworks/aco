@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 from cli_fixtures import fresh_observation, real_git
 
-from agent_coordination import protocol, store
+from aco import protocol, store
 
 TIP = protocol.ObjectId("a" * 40)
 CLAIM_BASE = protocol.ObjectId("c" * 40)
@@ -121,7 +121,7 @@ def claim_intent(
     role: str = "builder",
     base: protocol.ObjectId = CLAIM_BASE,
     branch: str = "claude/issue-42-cut",
-    scope: tuple[str, ...] = ("src/agent_coordination/store.py",),
+    scope: tuple[str, ...] = ("src/aco/store.py",),
     claim_id: str = "a1",
     operation_id: str = "op-1",
     whole_reason: str | None = None,

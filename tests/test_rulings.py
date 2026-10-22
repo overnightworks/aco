@@ -18,7 +18,7 @@ from board_fixtures import (
 from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
-from agent_coordination import workboard
+from aco import workboard
 
 
 @pytest.fixture(autouse=True)

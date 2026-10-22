@@ -24,14 +24,12 @@ _PROJECT_KEY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 _LIVE_PROJECT_FIELDS = frozenset(
     {"path", "session_id", "agent", "model", "provider", "external_process"}
 )
-_LOGIN_OWNER = "agent-coordination/login-v1"
+_LOGIN_OWNER = "aco/login-v1"
 _LOGIN_DESKTOP_NAME = "aco-workspace.desktop"
 _LOGIN_ATTEMPT_NAME = "login-attempt.json"
 _LOGIN_ENTRY_KEYS = frozenset({"Type", "Name", "Exec", "X-Aco-Owner"})
 _DESKTOP_RESERVED_CHARACTERS = frozenset(" \t\n\"'\\><~|&;$*?#()`")
-_ASCII_CONTROL_LIMIT = 32
-_ASCII_DELETE = 127
-_LOGIN_EXEC_ARGUMENTS = ("-I", "-m", "agent_coordination.cli", "_run-at-login")
+_LOGIN_EXEC_ARGUMENTS = ("-I", "-m", "aco.cli", "_run-at-login")
 _LOGIN_WORKSPACE_FAILURE = "workspace failure"
 _LOGIN_MALFORMED_RECORD = "login attempt record is malformed"
 _LOGIN_MALFORMED_LAUNCHER = "login launcher is malformed"
@@ -809,7 +807,7 @@ def _login_executable(executable: Path) -> Path:
     if (
         "=" in str(lexical)
         or "%" in str(lexical)
-        or _unsafe_desktop_text(str(lexical))
+        or protocol.has_control_character(str(lexical))
         or re.fullmatch(r"python(?:\d+(?:\.\d+)*)?", lexical.name, flags=re.ASCII) is None
     ):
         raise WorkspaceError("login executable must be an absolute safe path")
@@ -838,13 +836,6 @@ def _desktop_argument(argument: str) -> str:
         )
         return '"' + quoted.replace("\\", "\\\\") + '"'
     return argument
-
-
-def _unsafe_desktop_text(value: str) -> bool:
-    return any(
-        ord(character) < _ASCII_CONTROL_LIMIT or ord(character) == _ASCII_DELETE
-        for character in value
-    )
 
 
 def _owned_launcher_executable(path: Path) -> Path | None:

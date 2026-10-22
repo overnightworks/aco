@@ -34,7 +34,8 @@ def _touch_line(
     `own_scope` -- the fact a claimant needs to know they hold both scopes
     at once, not only the other item's name (issue #206)."""
     meeting = protocol.scope_overlap_paths(own_scope, claim.scope)
-    return f"{workboard.claim_subject(claim, storage)} on {protocol.named_with_overflow_count(meeting)}"
+    subject = workboard.claim_subject(claim, storage)
+    return f"{subject} on {protocol.named_with_overflow_count(meeting)}"
 
 
 def _touch_summary(

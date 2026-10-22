@@ -48,8 +48,8 @@ def _next_action_command(
     exactly those; only an item naming neither still prints the
     placeholder, alongside `_SCOPE_UNKNOWN_NOTE`. A scope the width gate
     calls wide in this checkout, with no `whole` in the body, adds
-    `--whole <reason>` (issue #566). All render through `workboard.advice_command`, so the line runs as
-    printed (issue #510).
+    `--whole <reason>` (issue #566). All render through `workboard.advice_command`, so the line
+    runs as printed (issue #510).
     """
     if isinstance(action, workboard.CutSliceAction):
         return workboard.cut_command(action.container.number, storage)

@@ -61,7 +61,7 @@ from store_fixtures import (
     state_ref_listing,
 )
 
-from agent_coordination import (
+from aco import (
     checkout,
     cmd_cut,
     cmd_rulings,
@@ -73,8 +73,8 @@ from agent_coordination import (
     store,
     workboard,
 )
-from agent_coordination import cli as issue_claim
-from agent_coordination.body import (
+from aco import cli as issue_claim
+from aco.body import (
     BLOCK_FENCE_INFO,
     CONTAINER_SKELETON_PROSE,
     ExpectationLine,
@@ -85,9 +85,9 @@ from agent_coordination.body import (
     parse_body,
     render_block,
 )
-from agent_coordination.protocol import ClaimUnavailableError, MalformedStateTreeError
-from agent_coordination.session import RunContext
-from agent_coordination.state_board import ItemWriter, StateRefBoard
+from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
+from aco.session import RunContext
+from aco.state_board import ItemWriter, StateRefBoard
 
 REPOSITORY_PATH = "acme/items"
 REPOSITORY = forge.RepositoryId("file", ("acme",), "items")

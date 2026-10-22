@@ -22,8 +22,8 @@ and need no forge. `release --merged` needs it under `storage = "github"`.
 ```bash
 uv tool install git+https://github.com/overnightworks/agent-coordination.git
 # or: pipx install git+https://github.com/overnightworks/agent-coordination.git
-uv tool upgrade agent-coordination
-uv tool uninstall agent-coordination
+uv tool upgrade overnightworks-aco
+uv tool uninstall overnightworks-aco
 ```
 
 The supported Python range is in `pyproject.toml`.
@@ -87,7 +87,7 @@ scripts. `aco-board serve [--port N] [--repo PATH]...` serves the open
 expectation lines of one or more repositories as yes/no cards on 127.0.0.1; the
 access token travels only in the printed URL's `#` fragment
 (`specs/aco-board.spec.md`). The browser app lives in `frontend/`; its build
-output is committed under `src/aco_board/static/`.
+output is committed under `src/aco/board/static/`.
 
 ## Machine output
 

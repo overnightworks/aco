@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_coordination import process, providers, terminal
+from aco import process, providers, terminal
 
 
 @pytest.mark.parametrize(

@@ -18,9 +18,9 @@ import pytest
 from board_fixtures import request, standing_active_claim
 from store_fixtures import STATE_WITH_TIP, claim_intent
 
-from agent_coordination import protocol, workboard
-from agent_coordination.body import Storage
-from agent_coordination.protocol import (
+from aco import protocol, workboard
+from aco.body import Storage
+from aco.protocol import (
     ClaimError,
     ClaimRequest,
     ClaimUnavailableError,

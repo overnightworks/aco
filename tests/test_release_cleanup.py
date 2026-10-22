@@ -19,7 +19,7 @@ from cli_fixtures import (
 )
 from github_fixtures import LANDING_DEFAULT_BRANCH, FakeForge, LandedWorld, landed_world
 
-from agent_coordination import checkout, process, workboard
+from aco import checkout, process, workboard
 
 
 @dataclass(frozen=True)

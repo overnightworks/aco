@@ -1,4 +1,4 @@
-"""Behaviour of `agent_coordination.session.RunContext` (issue #457): one
+"""Behaviour of `aco.session.RunContext` (issue #457): one
 command run's static repository facts, read lazily, held once read, and
 answered per directory."""
 
@@ -24,7 +24,7 @@ from cli_fixtures import (
     trunk_git_calls,
 )
 
-from agent_coordination import (
+from aco import (
     checkout,
     cmd_claim,
     cmd_workspace,
@@ -34,8 +34,8 @@ from agent_coordination import (
     session,
     store,
 )
-from agent_coordination.protocol import ClaimError, ClaimState, ClaimUnavailableError
-from agent_coordination.session import RunContext
+from aco.protocol import ClaimError, ClaimState, ClaimUnavailableError
+from aco.session import RunContext
 
 
 @pytest.fixture(autouse=True)

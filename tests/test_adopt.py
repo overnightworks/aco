@@ -36,8 +36,8 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import checkout, cmd_claim, forge, github, protocol, store
-from agent_coordination.github import GitHubForge
+from aco import checkout, cmd_claim, forge, github, protocol, store
+from aco.github import GitHubForge
 
 DEPENDENCY_PATHS_CONFIG = 'dependency_paths = ["uv.lock", "pyproject.toml"]\n'
 ADOPTED_BODY = "Bump x\n\nNo-Item: deps"

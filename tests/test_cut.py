@@ -14,7 +14,7 @@ from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue, containe
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
-from agent_coordination import body, forge, workboard
+from aco import body, forge, workboard
 
 
 class ForgeEvent(Enum):

@@ -29,10 +29,10 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from aco_board.aco_cli import AcoCli
-from aco_board.board import Board, Boards
-from aco_board.ports import DecisionPort
-from aco_board.server import TOKEN_HEADER, start_board
+from aco.board.aco_cli import AcoCli
+from aco.board.board import Board, Boards
+from aco.board.ports import DecisionPort
+from aco.board.server import TOKEN_HEADER, start_board
 
 DEFAULT_LABEL = "repo"
 """The one repo label a single-repo test gets when it does not name its own."""

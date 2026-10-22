@@ -33,7 +33,7 @@ checks = [
   "uv run --locked vulture src scripts/vulture_whitelist.py --min-confidence 60",
   "uv run --locked python scripts/check_root_layout.py",
   "uv run --locked lint-imports",
-  "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=agent_coordination --cov-report=term-missing",
+  "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=aco --cov-report=term-missing",
   "uv run --locked python scripts/test_budget.py --ci --target origin/main",
   "uv run --locked python scripts/similar_methods.py --ci",
   "uv run --locked python scripts/test_inventory.py --ci",
@@ -69,7 +69,7 @@ checks = [
   "uv run --locked ruff check .",
   "uv run --locked ruff format --check .",
   "uv run --locked pyright src tests scripts",
-  "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=agent_coordination --cov-report=term-missing",
+  "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=aco --cov-report=term-missing",
 ]
 
 [land]
@@ -83,5 +83,5 @@ rules = [
 checks = [
   "gh pr checks <pr> --watch --interval 60",
   "git fetch origin && git log --oneline origin/main..<branch>",
-  "uv tool install --force --from . aco",
+  "uv tool install --force --from . overnightworks-aco",
 ]

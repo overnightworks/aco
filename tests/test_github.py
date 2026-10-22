@@ -1,4 +1,4 @@
-"""Behavior of the GitHub adapter (`agent_coordination.github`): `GitHubForge`'s
+"""Behavior of the GitHub adapter (`aco.github`): `GitHubForge`'s
 reader/writer methods, repository discovery, and the `gh` process boundary it
 wraps. CLI wiring that merely drives a forge through `cli.py` -- including
 tests that build a `GitHubForge` only to hand it to `board_read.build_board`/
@@ -21,9 +21,9 @@ from board_fixtures import REPOSITORY
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
 from process_fixtures import UnstoppableProcess, reap
 
-from agent_coordination import forge, github, process, workboard
-from agent_coordination.body import ItemKind
-from agent_coordination.protocol import ClaimError
+from aco import forge, github, process, workboard
+from aco.body import ItemKind
+from aco.protocol import ClaimError
 
 GitHubForge = github.GitHubForge
 
@@ -49,7 +49,7 @@ def test_only_the_github_adapter_speaks_gh_argv() -> None:
     grepping every other module for the literal command name instead. Every
     module in the package is enumerated, not a fixed list, so a new module
     is covered the day it is added."""
-    package = Path("src/agent_coordination")
+    package = Path("src/aco")
     other_modules = sorted(p for p in package.glob("*.py") if p.name != "github.py")
     assert len(other_modules) >= 7
     for module in other_modules:

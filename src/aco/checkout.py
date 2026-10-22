@@ -1954,7 +1954,8 @@ def _newest_landed_commit(
         ):
             return landing.sha
     raise protocol.ClaimUnavailableError(
-        f"no trunk commit carries a Work-Item: trailer naming {workboard.item_label(number, storage)}"
+        "no trunk commit carries a Work-Item: trailer naming "
+        f"{workboard.item_label(number, storage)}"
     )
 
 

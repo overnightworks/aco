@@ -26,7 +26,7 @@ from github_fixtures import (
     landed_world,
 )
 
-from agent_coordination import checkout, store
+from aco import checkout, store
 
 
 class TrunkState(Enum):
@@ -95,11 +95,11 @@ class TrunkWorld:
 
 
 class PackageFile(Enum):
-    OWN = '[project]\nname = "agent-coordination"\n'
+    OWN = '[project]\nname = "overnightworks-aco"\n'
     OTHER = '[project]\nname = "other-package"\n'
     ABSENT = None
     INVALID = "[\n"
-    PROJECT_SCALAR = 'project = "agent-coordination"\n'
+    PROJECT_SCALAR = 'project = "overnightworks-aco"\n'
 
 
 @dataclass(frozen=True)
@@ -360,7 +360,7 @@ class TestLandAfterMerge:
                 PackageCase(
                     PackageFile.OWN,
                     "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
-                    "reinstall: uv tool install --force --from . agent-coordination\n",
+                    "reinstall: uv tool install --force --from . overnightworks-aco\n",
                 ),
                 id="this-package",
             ),

@@ -16,7 +16,7 @@ from cli_fixtures import (
 )
 from store_fixtures import claim_intent, state_ref_listing, state_ref_tip
 
-from agent_coordination import protocol, store
+from aco import protocol, store
 
 BOOTSTRAP_REPOSITORY = "example/agent-coordination"
 

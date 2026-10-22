@@ -45,7 +45,7 @@ jobs:
         run: uv run --locked pytest -n auto
       - if: matrix.python == '3.12'
         run: >-
-          uv run --locked pytest -n auto --cov=agent_coordination --cov=aco_board --cov-branch
+          uv run --locked pytest -n auto --cov=aco --cov-branch
           --cov-report=xml:coverage.xml --cov-report=term-missing:skip-covered --cov-fail-under=100
       - if: ${{ !cancelled() && matrix.python == '3.12' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
@@ -125,7 +125,7 @@ jobs:
         run: pnpm knip
       - name: Tests with coverage
         run: pnpm test:coverage
-      - name: Build into src/aco_board/static
+      - name: Build into src/aco/board/static
         run: pnpm build
       # The board's assets are committed so a Python-only install needs no
       # Node; this gate proves the committed files are exactly what frontend/
@@ -135,8 +135,8 @@ jobs:
         working-directory: .
         run: |
           set -euo pipefail
-          git ls-files --error-unmatch src/aco_board/static/index.html
-          changed="$(git status --porcelain --untracked-files=all -- src/aco_board/static)"
+          git ls-files --error-unmatch src/aco/board/static/index.html
+          changed="$(git status --porcelain --untracked-files=all -- src/aco/board/static)"
           test -z "$changed" || { printf '%s\n' "$changed"; echo "::error::static assets differ from frontend/ build"; exit 1; }
       - name: Audit production dependencies
         run: pnpm audit --prod

@@ -109,7 +109,7 @@ from store_fixtures import (
     unrelated_racer_commit,
 )
 
-from agent_coordination import (
+from aco import (
     __version__,
     board_read,
     body,
@@ -133,14 +133,14 @@ from agent_coordination import (
     store,
     workboard,
 )
-from agent_coordination import cli as issue_claim
-from agent_coordination.cmd_status import _status
-from agent_coordination.protocol import (
+from aco import cli as issue_claim
+from aco.cmd_status import _status
+from aco.protocol import (
     ClaimError,
     ClaimRequest,
     ClaimUnavailableError,
 )
-from agent_coordination.session import RunContext
+from aco.session import RunContext
 
 GitHubForge = github.GitHubForge
 
@@ -164,7 +164,7 @@ TWELVE_VERSIONED_FILES = (
     "LICENSE",
     "README.md",
     "pyproject.toml",
-    "src/agent_coordination/__init__.py",
+    "src/aco/__init__.py",
     "src/a.py",
     "docs/b.md",
     "docs/c.md",
@@ -5080,7 +5080,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
 ) -> None:
     toplevel = tmp_path / "checkout"
     write_repository_config(toplevel, 'priority_labels = ["ux", "security"]\n')
-    nested_directory = toplevel / "src" / "agent_coordination"
+    nested_directory = toplevel / "src" / "aco"
     nested_directory.mkdir(parents=True)
     monkeypatch.chdir(nested_directory)
     toplevel_read = ("rev-parse", "--show-toplevel")
@@ -9357,7 +9357,7 @@ def _stub_versioned_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             "LICENSE",
             "README.md",
             "pyproject.toml",
-            "src/agent_coordination/__init__.py",
+            "src/aco/__init__.py",
         ),
     )
 
@@ -9431,7 +9431,7 @@ def _patch_status_cli(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> Non
             "LICENSE",
             "README.md",
             "pyproject.toml",
-            "src/agent_coordination/__init__.py",
+            "src/aco/__init__.py",
         ),
     )
     monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
@@ -12589,7 +12589,7 @@ def test_cli_claim_json_transport_failure_reports_unavailable_not_conflict(
 def test_cli_module_entry_point_exits_with_mains_return_code(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`python -m agent_coordination.cli` and the installed console script run
+    """`python -m aco.cli` and the installed console script run
     the `if __name__ == "__main__":` guard, not `cli.main()` as a library call --
     exercise that guard directly rather than only ever calling `cli.main()`.
 
@@ -12599,10 +12599,10 @@ def test_cli_module_entry_point_exits_with_mains_return_code(
     monkeypatch.setattr(sys, "argv", ["aco", "no-such-command"])
 
     with (
-        pytest.warns(RuntimeWarning, match="agent_coordination.cli"),
+        pytest.warns(RuntimeWarning, match="aco.cli"),
         pytest.raises(SystemExit) as exited,
     ):
-        runpy.run_module("agent_coordination.cli", run_name="__main__")
+        runpy.run_module("aco.cli", run_name="__main__")
 
     assert exited.value.code == 2
     assert "invalid choice: 'no-such-command'" in capsys.readouterr().err
@@ -12781,8 +12781,8 @@ def test_next_names_an_old_ruling_when_the_item_is_pulled(
 
 
 def test_no_path_class_list_is_read_or_written() -> None:
-    assert not Path("src/agent_coordination").joinpath("single_writer.py").exists()
-    text = Path("src/agent_coordination/protocol.py").read_text()
+    assert not Path("src/aco").joinpath("single_writer.py").exists()
+    text = Path("src/aco/protocol.py").read_text()
     assert "single-writer" not in text
     assert "single_writer" not in text
 
@@ -15163,7 +15163,7 @@ def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_
             "LICENSE",
             "README.md",
             "pyproject.toml",
-            "src/agent_coordination/__init__.py",
+            "src/aco/__init__.py",
         ),
     )
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)

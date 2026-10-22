@@ -28,9 +28,9 @@ from aco_board_fixtures import (
     serving_two,
 )
 
-from aco_board.aco_cli import AcoCli
-from aco_board.board import LINE_CHANGED
-from aco_board.ports import (
+from aco.board.aco_cli import AcoCli
+from aco.board.board import LINE_CHANGED
+from aco.board.ports import (
     NOTE_MAX_LENGTH,
     Decision,
     DecisionResult,

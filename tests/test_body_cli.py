@@ -11,7 +11,7 @@ import pytest
 from board_fixtures import BIDI_AND_ZERO_WIDTH_CONTROLS, MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import forbid_forge_resolution, real_git, run_cli, track_board_config
 
-from agent_coordination import body, cli, cmd_body, process, store
+from aco import body, cli, cmd_body, process, store
 
 
 @pytest.fixture

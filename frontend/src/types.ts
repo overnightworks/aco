@@ -49,7 +49,7 @@ export interface DecisionRequest {
 }
 
 export interface DecisionResult {
-	/** `aco_board.ports.DecisionStatus`'s three values, the only ones `POST
+	/** `aco.board.ports.DecisionStatus`'s three values, the only ones `POST
 	 * /api/rule` ever answers with a 200. */
 	status: 'ruled' | 'already_ruled' | 'failed';
 	message: string | null;

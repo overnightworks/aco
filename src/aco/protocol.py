@@ -278,7 +278,7 @@ def terminal_block(text: str) -> str:
     return "\n".join(terminal_text(line) for line in text.split("\n"))
 
 
-def _has_control_character(text: str) -> bool:
+def has_control_character(text: str) -> bool:
     return any(
         ord(character) < ASCII_PRINTABLE_MIN or ord(character) == ASCII_DEL for character in text
     )
@@ -293,7 +293,7 @@ def _required_text(payload: dict[str, object], key: str, *, maximum: int = 512) 
         not normalized
         or normalized != value
         or len(normalized) > maximum
-        or _has_control_character(normalized)
+        or has_control_character(normalized)
     ):
         raise InvalidClaimMarkerError(
             f"claim marker field {key!r} must be one bounded non-empty line"
@@ -309,7 +309,7 @@ def outbound_text(value: object, field: str, *, maximum: int) -> str:
         not normalized
         or normalized != value
         or len(normalized) > maximum
-        or _has_control_character(normalized)
+        or has_control_character(normalized)
     ):
         raise ClaimError(f"{field} must be one bounded non-empty line")
     return normalized
@@ -1592,7 +1592,7 @@ def toml_multiline_string(value: str) -> str:
 def _toml_string_escape(char: str) -> str:
     if char in _TOML_STRING_ESCAPES:
         return _TOML_STRING_ESCAPES[char]
-    if _has_control_character(char):
+    if has_control_character(char):
         return f"\\u{ord(char):04X}"
     return char
 

@@ -21,8 +21,8 @@ from cli_fixtures import (
 from github_fixtures import ReaderOnlyForge, assert_github_world, serve_forge
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone, state_ref_tip
 
-from agent_coordination import forge, github, protocol, workboard
-from agent_coordination.github import GitHubForge
+from aco import forge, github, protocol, workboard
+from aco.github import GitHubForge
 
 ISSUE = 81
 Flags = list[str]

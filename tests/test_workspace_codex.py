@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_coordination import providers
+from aco import providers
 
 SESSION_ID = "123e4567-e89b-12d3-a456-426614174000"
 PROJECT_DIRECTORY = Path("/canonical/project")

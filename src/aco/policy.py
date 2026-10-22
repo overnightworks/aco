@@ -171,7 +171,8 @@ def dependency_rule_defect(
 ) -> workboard.ClassificationDefect | None:
     if not config.dependency_paths:
         return workboard.ClassificationDefect(
-            f"declares No-Item: deps, but {workboard.CONFIG_PATH.as_posix()} names no dependency_paths"
+            f"declares No-Item: deps, but {workboard.CONFIG_PATH.as_posix()} "
+            "names no dependency_paths"
         )
     paths = listed()
     if isinstance(paths, workboard.ClassificationDefect):

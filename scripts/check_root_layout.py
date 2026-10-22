@@ -31,7 +31,7 @@ ALLOWED_ROOT_FILES = frozenset(
 
 # `frontend/` is the board's pnpm project: pnpm, Vite and their plugins find
 # their configuration in the project directory, and its build lands in
-# src/aco_board/static/, so the project itself cannot move under src/.
+# src/aco/board/static/, so the project itself cannot move under src/.
 ALLOWED_ROOT_DIRECTORIES = frozenset(
     {".aco", ".github", "docs", "frontend", "quality", "scripts", "specs", "src", "tests"}
 )

@@ -31,8 +31,8 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge
 
-from agent_coordination import body, checkout, forge, github, protocol, store, workboard
-from agent_coordination import cli as issue_claim
+from aco import body, checkout, forge, github, protocol, store, workboard
+from aco import cli as issue_claim
 
 
 def _real_repository_with_worktree(

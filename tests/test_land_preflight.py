@@ -21,7 +21,7 @@ from github_fixtures import (
     serve_forge,
 )
 
-from agent_coordination import cli, cmd_land, forge
+from aco import cli, cmd_land, forge
 
 
 @dataclass(frozen=True)

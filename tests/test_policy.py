@@ -17,7 +17,7 @@ from cli_fixtures import (
 )
 from github_fixtures import MERGE_COMMIT_SHA, FakeForge
 
-from agent_coordination import body, forge, github, policy, protocol, workboard
+from aco import body, forge, github, policy, protocol, workboard
 
 
 @pytest.mark.parametrize(

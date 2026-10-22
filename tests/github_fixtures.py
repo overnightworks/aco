@@ -31,8 +31,8 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from agent_coordination import body, cmd_land, forge, github, protocol, store, workboard
-from agent_coordination.protocol import ClaimError
+from aco import body, cmd_land, forge, github, protocol, store, workboard
+from aco.protocol import ClaimError
 
 WORK_ITEM_ISSUE = 72
 LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"

@@ -6,7 +6,7 @@ from typing import TextIO
 import pytest
 from cli_fixtures import run_cli
 
-from agent_coordination import cli
+from aco import cli
 
 
 @pytest.mark.parametrize(

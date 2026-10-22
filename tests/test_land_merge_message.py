@@ -20,7 +20,7 @@ from github_fixtures import (
     refusal_observations,
 )
 
-from agent_coordination import forge, process, protocol, workboard
+from aco import forge, process, protocol, workboard
 
 
 class TrailerKey(Enum):

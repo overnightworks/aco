@@ -29,7 +29,7 @@ from github_fixtures import (
 )
 from store_fixtures import claim_intent, state_ref_tip
 
-from agent_coordination import checkout, forge, protocol, store, workboard
+from aco import checkout, forge, protocol, store, workboard
 
 
 @dataclass(frozen=True)

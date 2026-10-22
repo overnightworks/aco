@@ -13,7 +13,7 @@ export const UNDO_SECONDS = 8;
  * SPA is this value's one owner. */
 
 export const NOTE_MAX_LENGTH = 280;
-/** Mirrors `NOTE_MAX_LENGTH` in `src/aco_board/ports.py` (ABRD-05); the
+/** Mirrors `NOTE_MAX_LENGTH` in `src/aco/board/ports.py` (ABRD-05); the
  * server stays the authority, this only keeps the field from inviting a
  * refusal. */
 
@@ -44,7 +44,7 @@ export function decisionRequest(
 	return { repo, item, line: line.index, fingerprint: line.fingerprint, outcome, note };
 }
 
-/** A blank note, trimmed, is no note (mirrors `aco_board.api._note`). */
+/** A blank note, trimmed, is no note (mirrors `aco.board.api._note`). */
 export function noteOrNull(raw: string): string | null {
 	const trimmed = raw.trim();
 	return trimmed === '' ? null : trimmed;

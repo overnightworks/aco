@@ -36,8 +36,8 @@ from board_fixtures import (
     unfilled_block_body,
 )
 
-from agent_coordination import body, checkout, metrics, protocol, workboard
-from agent_coordination.body import (
+from aco import body, checkout, metrics, protocol, workboard
+from aco.body import (
     BLOCK_FENCE_INFO,
     EXPECTATION_LINE_TEXT_MAXIMUM,
     EXPECTATION_PICTURE_MAXIMUM_BYTES,
@@ -70,7 +70,7 @@ from agent_coordination.body import (
     replace_block,
     rule_expectation,
 )
-from agent_coordination.protocol import ClaimError, ClaimRequest
+from aco.protocol import ClaimError, ClaimRequest
 
 # A real expectation sentence from this repository's own issue #230 (#240's
 # brief: take a real body as the fixture template rather than a synthetic
@@ -685,7 +685,7 @@ def test_render_block_round_trips_every_field() -> None:
         '[[expectation]]\ntext = "Proposed"\ndefault = "later"\n'
         '[[expectation]]\ntext = "Ruled"\nruling = "yes"\nruled_on = 2026-09-05\n'
         '[[slice]]\nindex = 4\ntitle = "Block contract in issue bodies"\n'
-        'scope = ["src/agent_coordination/workboard.py"]\n'
+        'scope = ["src/aco/workboard.py"]\n'
     )
     located = locate_block(block_body(toml_text))
 
@@ -760,7 +760,7 @@ def test_render_block_re_renders_a_canonical_scope_body_byte_exact() -> None:
     body = complete_contract(
         "Next step.",
         scope=["docs/plan.md", "src/widget.py"],
-        slice=[{"index": 1, "title": "Row", "scope": ["src/agent_coordination/workboard.py"]}],
+        slice=[{"index": 1, "title": "Row", "scope": ["src/aco/workboard.py"]}],
     )
     located = locate_block(body)
     interior = body[located.content_start : located.content_end]

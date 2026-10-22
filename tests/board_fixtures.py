@@ -13,14 +13,14 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from types import MappingProxyType
 
-from agent_coordination import metrics, protocol, workboard
-from agent_coordination.body import (
+from aco import metrics, protocol, workboard
+from aco.body import (
     BLOCK_FENCE_INFO,
     ItemKind,
     prose_above_fresh_block,
     render_block,
 )
-from agent_coordination.protocol import ClaimRequest
+from aco.protocol import ClaimRequest
 
 # Issue #538: display controls a slice title refuses beside the Cc set --
 # the bidi override and isolate and the zero-width space -- with the code
