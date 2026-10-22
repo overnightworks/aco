@@ -456,9 +456,8 @@ def _add_cut_parser(commands: _Subcommands, name: str) -> None:
 
 def _add_ask_parser(commands: _Subcommands, name: str) -> None:
     ask = commands.add_parser(name, help="append one proposed expectation line to an item's block")
-    ask.add_argument(
-        "item", type=workboard.parse_item_reference, help="the item to append the expectation to"
-    )
+    item_help = "the item to append the expectation line to"
+    ask.add_argument("item", type=workboard.parse_item_reference, help=item_help)
     ask.add_argument("--text", required=True, help="the expectation line's prose")
     ask.add_argument(
         "--default",

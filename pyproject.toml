@@ -140,8 +140,8 @@ allow_indirect_imports = false
 [[tool.importlinter.contracts]]
 name = "aco does not import the decision board"
 type = "protected"
-# The Layers contract holds board -> core only one way (a sibling layer may
-# import a layer above it); this contract holds core -> board and
+# The Layers contract holds board -> core only one way (a layer may import
+# the layers below it, never one above); this contract holds core -> board and
 # `aco/__init__` -> board, which a forbidden contract over overlapping source
 # and forbidden sets would silently keep.
 protected_modules = ["aco.board"]
