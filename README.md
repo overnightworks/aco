@@ -1,4 +1,4 @@
-# agent-coordination
+# aco
 
 `aco` gives coding agents and the people steering them one claim state per
 repository: a compare-and-swap git ref, `refs/aco/state`, on the repository's
@@ -20,8 +20,8 @@ and need no forge. `release --merged` needs it under `storage = "github"`.
 ## Install
 
 ```bash
-uv tool install git+https://github.com/overnightworks/agent-coordination.git
-# or: pipx install git+https://github.com/overnightworks/agent-coordination.git
+uv tool install git+https://github.com/overnightworks/aco.git
+# or: pipx install git+https://github.com/overnightworks/aco.git
 uv tool upgrade overnightworks-aco
 uv tool uninstall overnightworks-aco
 ```
