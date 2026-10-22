@@ -1,8 +1,0 @@
-claim_id = "fcb8f48fa8c44ca9b05dadb8d4e01f04"
-agent = "claude"
-role = "builder"
-base = "1aca74a2839734756370af8277c69538657e7c3d"
-branch = "claude/issue-309-rename-to-aco"
-scope = [".aco/brief.toml", ".github/workflows/ci.yml", ".github/workflows/codeql.yml", "AGENTS.md", "README.md", "frontend/e2e/consoleGuard.ts", "frontend/e2e/global-setup.ts", "frontend/src/app/model/decision.ts", "frontend/src/types.ts", "frontend/vite.config.ts", "pyproject.toml", "quality/baseline.toml", "scripts/check_root_layout.py", "scripts/package_smoke.sh", "scripts/vulture_whitelist.py", "sonar-project.properties", "specs/land.spec.md", "src", "tests", "uv.lock"]
-opened_commit = "5c491bd2a474a5adb02cd4fc2cfd5c8c3e5603cd"
-whole_reason = "Ein Paket lässt sich nur atomar umbenennen: halb umbenannt brechen Imports, Entry-Points, Baseline-Schlüssel und CI zugleich."
