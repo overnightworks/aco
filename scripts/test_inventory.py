@@ -52,7 +52,7 @@ member -- the copies, not the original.
 CI rewrite gate (issue #319)
 -----------------------------
 ``--ci`` runs over the whole ``tests/`` tree instead of one file. The base ladder is the same
-as ``test_budget.py``'s and ``similar_methods.py``'s: a pull request compares against the
+as ``test_budget.py``'s: a pull request compares against the
 merge-base with ``origin/$GITHUB_BASE_REF``; a push to ``main`` (no base ref,
 ``GITHUB_EVENT_NAME=push``) compares against ``HEAD^1``; outside CI, ``origin/main``.
 
@@ -82,7 +82,7 @@ the base held that HEAD does not is a dropped literal. A dropped literal blocks 
 exit 1) unless it is listed in ``scripts/test_inventory_dropped.txt`` (module path, literal
 ``repr()``, reason -- tab separated, one per line, written by hand in the same change that drops
 it, the same "a reviewer reads the reason" exception ``test_budget.py``'s ``# budget:`` ledger
-and ``similar_methods.py``'s exemption ledger use); for a family move a line under any involved
+uses); for a family move a line under any involved
 module covers the union. Spec IDs are not compared here; ``test_budget.py`` ratchets them.
 
 Usage:
@@ -711,7 +711,7 @@ class TargetError(Exception):
 
 
 def default_target() -> str:
-    """The base ladder (issue #319), shared with ``test_budget.py``/``similar_methods.py``."""
+    """The base ladder (issue #319), shared with ``test_budget.py``."""
     base_ref = os.environ.get(BASE_REF_ENV)
     if base_ref:
         return f"{REMOTE}/{base_ref}"

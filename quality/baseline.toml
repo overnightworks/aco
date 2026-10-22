@@ -172,3 +172,10 @@
 [function_lines."tests/test_workspace_terminal.py"]
 "test_initial_and_retried_codex_children_receive_the_sanitized_environment" = 125
 "test_open_viewer_acceptance_keeps_a_newer_attempt_token_after_its_condition_runs" = 112
+
+[clones."scripts/test_budget.py"]
+_callee_name = [["scripts/test_inventory.py", "_callee_name"]]
+_commit_of = [["scripts/test_inventory.py", "_commit_of"]]
+default_target = [["scripts/test_inventory.py", "default_target"]]
+merge_base = [["scripts/test_inventory.py", "merge_base"]]
+resolve_target = [["scripts/test_inventory.py", "resolve_target"]]

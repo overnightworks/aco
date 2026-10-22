@@ -35,7 +35,6 @@ checks = [
   "uv run --locked lint-imports",
   "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=aco --cov-report=term-missing",
   "uv run --locked python scripts/test_budget.py --ci --target origin/main",
-  "uv run --locked python scripts/similar_methods.py --ci",
   "uv run --locked python scripts/test_inventory.py --ci",
 ]
 

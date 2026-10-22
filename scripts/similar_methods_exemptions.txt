@@ -1,5 +1,0 @@
-# Ledger for scripts/similar_methods.py. One "relpath:qualname — reason" per line, either
-# side of an accepted pair (issue #319). Written by hand when a pair is reviewed and
-# deliberately accepted as a duplicate shape.
-tests/test_checkout.py:test_validate_slug_refuses_a_value_the_derived_rule_would_never_produce — a parametrized "refuses a malformed value" shape shared with test_board.py's test_timestamp_fails_loud_on_a_malformed_github_timestamp (issue #322); the two domains (slug shape, GitHub timestamp shape) are unrelated, so unifying them would trade domain clarity for a few shared lines
-tests/test_protocol.py:test_issue_identity_requires_a_positive_integer — the same "refuses a malformed value" shape shared with test_checkout.py's test_validate_slug_refuses_a_value_the_derived_rule_would_never_produce (issue #322); the two domains (issue identity, slug shape) are unrelated, so unifying them would trade domain clarity for a few shared lines
