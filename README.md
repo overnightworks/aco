@@ -99,7 +99,7 @@ never on prose (`specs/output.spec.md`).
 
 `aco --help` lists the commands and `aco <command> --help` their flags. Each
 command's behaviour, printed literals, exit codes and `--json` shapes are in
-`specs/<command>.spec.md`; `register`, `run` and `login` share
+`specs/<command>.spec.md`; `register`, `run`, `login` and `_run-at-login` share
 `specs/workspace.spec.md`, and `aco-board` has `specs/aco-board.spec.md`. The
 rules several commands share (output envelope, body block, claim record,
 landing grammar, storage pin, state ref transport) are in
