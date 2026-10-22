@@ -54,7 +54,7 @@ jobs:
           path: coverage.xml
 
   gates:
-    name: Test-efficiency gates (test-budget, test-inventory, spec-lint)
+    name: Test-efficiency gates (test-budget, similar-methods, test-inventory, spec-lint)
     runs-on: ubuntu-latest
     steps:
       # Every gate measures against a merge-base, so the branch point must be reachable
