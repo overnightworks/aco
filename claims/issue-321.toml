@@ -1,8 +1,0 @@
-claim_id = "2fcbc9be605e4616b979fc4ab2ffb61c"
-agent = "claude"
-role = "builder"
-base = "5a0fa6148b6949e42069740beddbdb3381499b15"
-branch = "claude/issue-321-drop-workspace"
-scope = ["README.md", "pyproject.toml", "quality/baseline.toml", "scripts/test_inventory_dropped.txt", "specs/bootstrap.spec.md", "specs/output.spec.md", "specs/workspace.spec.md", "src/aco", "tests"]
-opened_commit = "fb8cc65a2100e08934ecce6cac76f8cc075eefdd"
-whole_reason = "Fast nur Löschen: Module, Spec, Tests, Verträge und Baseline gehen zusammen; einzeln blieben Module ohne Aufrufer oder Befehle ohne Code."
