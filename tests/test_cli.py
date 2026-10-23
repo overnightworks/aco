@@ -4039,10 +4039,6 @@ def test_help_lists_commands_in_their_stable_registration_order() -> None:
         "body",
         "brief",
         "item",
-        "register",
-        "run",
-        "login",
-        "_run-at-login",
     ]
 
 
@@ -14825,9 +14821,6 @@ def test_a_dash_dash_before_the_command_follows_the_parse_argparse_made(
     "arguments",
     [
         pytest.param(["bootstrap", "--json"], id="bootstrap-declaring-no-json-mode"),
-        pytest.param(
-            ["register", "--provider", "nope", "--json"], id="register-naming-an-unknown-provider"
-        ),
         pytest.param(["item", "--json"], id="item-naming-no-subcommand"),
         pytest.param(["nope", "--json"], id="a-command-name-the-parser-does-not-know"),
         pytest.param(["--json"], id="no-command-at-all"),
@@ -14837,7 +14830,7 @@ def test_a_json_flag_no_command_declares_never_reaches_the_envelope(
     arguments: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
     """OUT-06's envelope belongs to the commands that declare `--json`
-    (issue #432): `bootstrap` and `register` never offered the mode, and a
+    (issue #432): `bootstrap` never offered the mode, and a
     missing subcommand, an unknown command name, or no command at all never
     chose one, so each keeps argparse's own usage block with stdout empty --
     no object a script could mistake for an answer."""

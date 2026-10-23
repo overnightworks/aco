@@ -140,7 +140,7 @@ def _build_forge(context: RunContext) -> forge.ForgeReader:
 
 def run_context(repo: forge.RepositoryId | None) -> RunContext:
     """This run's root context, built once the command is known to need a
-    repository at all (after the workspace dispatch)."""
+    repository at all."""
     return RunContext(repo, build_forge=_build_forge)
 
 

@@ -34,12 +34,10 @@ from . import (
     cmd_rulings,
     cmd_start,
     cmd_status,
-    cmd_workspace,
     github,
     items,
     metrics,
     protocol,
-    providers,
     report,
     session,
     workboard,
@@ -661,54 +659,6 @@ def _add_item_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(close)
 
 
-def _add_register_parser(commands: _Subcommands, name: str) -> None:
-    register = commands.add_parser(
-        name,
-        help="record one stopped or validated live provider session for workspace recovery",
-    )
-    register.add_argument("project", metavar="PROJECT", help="a stable local project key")
-    register.add_argument(
-        "--path", required=True, type=Path, help="the project's canonical directory"
-    )
-    register.add_argument("--session-id", required=True, help="the exact provider session UUID")
-    register.add_argument("--agent", required=True, help="the inherited logical claim identity")
-    register.add_argument(
-        "--provider",
-        choices=tuple(provider.value for provider in providers.Provider),
-        default=providers.Provider.CODEX.value,
-        help="the conversation provider (default: codex)",
-    )
-    register.add_argument("--model", help="optional provider model override")
-    handover = register.add_mutually_exclusive_group(required=True)
-    handover.add_argument(
-        "--stopped",
-        action="store_true",
-        help="acknowledge that the existing provider session was checkpointed and stopped",
-    )
-    handover.add_argument(
-        "--live-pid", type=int, help="the exact running native Codex or Claude process ID"
-    )
-
-
-def _add_run_parser(commands: _Subcommands, name: str) -> None:
-    run = commands.add_parser(name, help="open the registered provider workspace consoles")
-    run.add_argument("project", metavar="PROJECT", nargs="?", help="one registered project")
-
-
-def _add_login_parser(commands: _Subcommands, name: str) -> None:
-    login = commands.add_parser(name, help="manage configured workspace recovery at desktop login")
-    login_commands = _add_subcommands(login, "login_command")
-    login_commands.add_parser("enable", help="install the owned desktop login launcher")
-    login_commands.add_parser("disable", help="remove the owned desktop login launcher")
-    login_commands.add_parser(
-        "status", help="show launcher, configuration, and latest attempt state"
-    )
-
-
-def _add_run_at_login_parser(commands: _Subcommands, name: str) -> None:
-    commands.add_parser(name, help=argparse.SUPPRESS)
-
-
 class _UsageError(protocol.ClaimError):
     """One refusal the argument parser itself raises -- an unknown flag, a
     missing required option, a mutually exclusive pair -- carried out of the
@@ -838,33 +788,14 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
 
 @dataclass(frozen=True)
 class _RepositoryCommand:
-    """A context-taking type keeps repository setup out of local commands."""
+    """One subcommand: how it adds its parser and how it runs against the repository context."""
 
     add_parser: Callable[[_Subcommands, str], None]
     run: Callable[[argparse.Namespace, RunContext], int]
     resolves_agent: bool = False
 
 
-@dataclass(frozen=True)
-class _LocalCommand:
-    """A namespace-only type makes local execution independent of repository setup."""
-
-    add_parser: Callable[[_Subcommands, str], None]
-    run: Callable[[argparse.Namespace], int]
-
-
-@dataclass(frozen=True)
-class _NoArgumentsCommand:
-    """A distinct type lets the hidden login runner execute without reading a namespace."""
-
-    add_parser: Callable[[_Subcommands, str], None]
-    run: Callable[[], int]
-
-
-_Command = _RepositoryCommand | _LocalCommand | _NoArgumentsCommand
-
-
-_COMMANDS: dict[str, _Command] = {
+_COMMANDS: dict[str, _RepositoryCommand] = {
     "bootstrap": _RepositoryCommand(
         _add_bootstrap_parser, lambda _parsed, context: cmd_bootstrap.run(context)
     ),
@@ -886,10 +817,6 @@ _COMMANDS: dict[str, _Command] = {
     "body": _RepositoryCommand(_add_body_parser, cmd_body.run),
     "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),
     "item": _RepositoryCommand(_add_item_parser, cmd_item.run),
-    "register": _LocalCommand(_add_register_parser, cmd_workspace.register_workspace),
-    "run": _LocalCommand(_add_run_parser, cmd_workspace.run_workspace),
-    "login": _LocalCommand(_add_login_parser, cmd_workspace.manage_login),
-    "_run-at-login": _NoArgumentsCommand(_add_run_at_login_parser, cmd_workspace.run_at_login),
 }
 
 
@@ -1047,11 +974,6 @@ def main(arguments: list[str] | None = None) -> int:
         )
     try:
         command = _COMMANDS[parsed.command]
-        match command:
-            case _NoArgumentsCommand():
-                return command.run()
-            case _LocalCommand():
-                return command.run(parsed)
         return _run_repository_command(command, parser, given, parsed)
     except protocol.ClaimError as error:
         return report.render_error(error)
