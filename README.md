@@ -61,8 +61,6 @@ reviewers saw and releases the claim (`specs/start.spec.md`,
   `aco item new/show/edit/close` and land with a `Work-Item:` trailer on the
   trunk commit; `aco release --merged <sha>` checks the local trunk, not a forge
   (`specs/storage-pin.spec.md`, `specs/item.spec.md`, `specs/release.spec.md`).
-- **Workspace recovery.** `aco register`, `aco run` and `aco login` map projects
-  to provider conversations and resume them (`specs/workspace.spec.md`).
 
 ## Configuration
 
@@ -99,8 +97,7 @@ never on prose (`specs/output.spec.md`).
 
 `aco --help` lists the commands and `aco <command> --help` their flags. Each
 command's behaviour, printed literals, exit codes and `--json` shapes are in
-`specs/<command>.spec.md`; `register`, `run`, `login` and `_run-at-login` share
-`specs/workspace.spec.md`, and `aco-board` has `specs/aco-board.spec.md`. The
+`specs/<command>.spec.md`, and `aco-board` has `specs/aco-board.spec.md`. The
 rules several commands share (output envelope, body block, claim record,
 landing grammar, storage pin, state ref transport) are in
 [`specs/`](specs/) too.

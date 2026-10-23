@@ -72,12 +72,9 @@ containers = ["aco"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_adopt | cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_start | cmd_status | cmd_workspace",
+    "cmd_adopt | cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_start | cmd_status",
     "board_read | policy | report",
     "session",
-    "workspace",
-    "terminal",
-    "providers",
     "checkout | store",
     "github | state_board",
     "forge",
@@ -197,34 +194,6 @@ allow_indirect_imports = false
 as_packages = false
 
 [[tool.importlinter.contracts]]
-name = "Workspace recovery does not reach repository coordination"
-type = "forbidden"
-source_modules = [
-    "aco.cmd_workspace",
-    "aco.workspace",
-    "aco.terminal",
-    "aco.providers",
-]
-forbidden_modules = [
-    "aco.store",
-    "aco.checkout",
-    "aco.github",
-    "aco.state_board",
-    "aco.forge",
-    "aco.items",
-]
-allow_indirect_imports = false
-as_packages = false
-
-[[tool.importlinter.contracts]]
-name = "Provider definitions do not drive workspace orchestration"
-type = "forbidden"
-source_modules = ["aco.providers"]
-forbidden_modules = ["aco.workspace", "aco.terminal"]
-allow_indirect_imports = false
-as_packages = false
-
-[[tool.importlinter.contracts]]
 name = "Only the process boundary imports subprocess"
 type = "forbidden"
 # "aco.**" (recursive), not "aco.*": the
@@ -244,12 +213,12 @@ as_packages = false
 ignore_imports = ["aco.process -> subprocess", "aco.board.aco_cli -> subprocess"]
 
 [[tool.importlinter.contracts]]
-name = "Only the gh, git, and terminal owners run commands"
+name = "Only the gh and git owners run commands"
 type = "forbidden"
 source_modules = ["aco", "aco.**"]
 forbidden_modules = ["aco.process"]
 # true checks only the direct edge: many modules legitimately depend on an
-# allowed process caller (github, checkout, store, terminal) further up
+# allowed process caller (github, checkout, store) further up
 # their own chain, so checking indirectly would flag every one of those
 # callers too instead of only the module that itself imports process.
 allow_indirect_imports = true
@@ -258,7 +227,6 @@ ignore_imports = [
     "aco.github -> aco.process",
     "aco.checkout -> aco.process",
     "aco.store -> aco.process",
-    "aco.terminal -> aco.process",
 ]
 
 [tool.pyright]

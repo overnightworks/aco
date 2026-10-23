@@ -27,7 +27,6 @@ from cli_fixtures import (
 from aco import (
     checkout,
     cmd_claim,
-    cmd_workspace,
     forge,
     github,
     process,
@@ -597,25 +596,18 @@ def _forbid_context_reads(monkeypatch: pytest.MonkeyPatch) -> None:
     [
         pytest.param(["claim", "--no-such-flag"], "", 2, id="parse-error"),
         pytest.param(["body"], "", 2, id="body-without-its-mode"),
-        pytest.param(["--repo", "owner/repo", "run"], "", 2, id="workspace-run"),
-        pytest.param(["run"], "", 2, id="workspace-run-without-a-configuration"),
     ],
 )
 def test_a_command_that_needs_no_repository_reads_no_context(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
     command: list[str],
     stdin: str,
     exit_code: int,
 ) -> None:
-    """Issue #457 proof 2: the run's context is built only after the
-    workspace dispatch, and lazily, so a parse refusal and a workspace
-    command never read the repository a context would answer for."""
+    """Issue #457 proof 2: the run's context is built lazily, so a parse
+    refusal never reads the repository a context would answer for."""
     _forbid_context_reads(monkeypatch)
-    monkeypatch.setattr(
-        cmd_workspace, "_workspace_config_path", lambda: tmp_path / "workspace.toml"
-    )
     monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
 
     assert run_cli(command, capsys).status == exit_code

@@ -14,9 +14,6 @@
 [ccn."src/aco/protocol.py"]
 "valid_scope" = 17
 
-[ccn."src/aco/terminal.py"]
-"external_ownership" = 18
-
 [ccn."src/aco/workboard.py"]
 "build_board" = 33
 
@@ -27,7 +24,7 @@
 "scripts/test_inventory.py" = 933
 "src/aco/body.py" = 1669
 "src/aco/checkout.py" = 2041
-"src/aco/cli.py" = 1061
+"src/aco/cli.py" = 983
 "src/aco/cmd_claim.py" = 1137
 "src/aco/cmd_release.py" = 925
 "src/aco/github.py" = 1765
@@ -35,14 +32,13 @@
 "src/aco/state_board.py" = 957
 "src/aco/store.py" = 2115
 "src/aco/workboard.py" = 3160
-"src/aco/workspace.py" = 1017
 "tests/aco_board/test_aco_board_api.py" = 1060
 "tests/cli_fixtures.py" = 969
 "tests/github_fixtures.py" = 839
 "tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4444
 "tests/test_checkout.py" = 2085
-"tests/test_cli.py" = 17834
+"tests/test_cli.py" = 17827
 "tests/test_cut.py" = 1124
 "tests/test_github.py" = 3250
 "tests/test_land_after_merge_rerun.py" = 884
@@ -53,8 +49,6 @@
 "tests/test_reset.py" = 954
 "tests/test_state_board.py" = 6118
 "tests/test_store.py" = 5526
-"tests/test_workspace.py" = 2017
-"tests/test_workspace_terminal.py" = 1269
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 111
@@ -168,10 +162,6 @@
 "test_commit_transition_preserves_items_across_claim_rescope_and_release" = 63
 "test_commit_transition_ten_thread_contention_lands_every_distinct_key" = 66
 "test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the_ref" = 74
-
-[function_lines."tests/test_workspace_terminal.py"]
-"test_initial_and_retried_codex_children_receive_the_sanitized_environment" = 125
-"test_open_viewer_acceptance_keeps_a_newer_attempt_token_after_its_condition_runs" = 112
 
 [clones."scripts/test_budget.py"]
 _callee_name = [["scripts/test_inventory.py", "_callee_name"]]
