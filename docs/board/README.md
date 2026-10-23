@@ -1,6 +1,6 @@
 # Decision board: picture
 
-[`mockup.html`](mockup.html) is the frozen picture owner of the `aco-board`
+[`mockup.html`](mockup.html) is the frozen picture owner of the `aco serve`
 surface: the card (question, example, picture, yes, no, note, undo), the history
 of decided lines, the "access missing" state, the filter bar and the phone
 variant. It is a static page with sample data; it talks to no aco and stores

@@ -2,7 +2,7 @@
 
 Each test drives the real server, wire form, and `aco` adapter; only the
 `aco` executable is a fake whose state and call log the test reads (issue
-#631, specs/aco-board.spec.md).
+#631, specs/serve.spec.md).
 """
 
 from __future__ import annotations

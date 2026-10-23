@@ -99,8 +99,7 @@ echo "wheel and sdist carry exactly the committed board assets"
 UV_TOOL_DIR="$scratch/tools" UV_TOOL_BIN_DIR="$scratch/bin" \
     uv tool install --force "$wheel"
 "$scratch/bin/aco" --help >/dev/null
-"$scratch/bin/aco-board" --help >/dev/null
-echo "installed aco and aco-board run"
+echo "installed aco runs"
 
 uv run --isolated --no-project --with "$wheel" python -c "
 import sys
@@ -111,9 +110,9 @@ echo "importlib.resources finds aco/board/static/index.html"
 
 # Proves the installed tool actually answers the shell over HTTP -- the
 # importlib.resources check above only proves the file ships, not that
-# `aco-board serve` can reach it.
+# `aco serve` can reach it.
 serve_log="$scratch/serve.log"
-"$scratch/bin/aco-board" serve --port 0 --repo "$scratch" >"$serve_log" 2>&1 &
+"$scratch/bin/aco" serve --port 0 --repo "$scratch" >"$serve_log" 2>&1 &
 serve_pid=$!
 for ((attempt = 0; attempt < 50; attempt++)); do
     [[ -s "$serve_log" ]] && break
@@ -121,7 +120,7 @@ for ((attempt = 0; attempt < 50; attempt++)); do
 done
 served_url="$(head -n1 "$serve_log")"
 if [[ -z "$served_url" ]]; then
-    echo "ERROR: aco-board serve printed no URL; log:" >&2
+    echo "ERROR: aco serve printed no URL; log:" >&2
     cat "$serve_log" >&2
     exit 1
 fi
@@ -135,4 +134,4 @@ with urllib.request.urlopen(url, timeout=5) as response:
 "
 kill "$serve_pid" 2>/dev/null || true
 serve_pid=""
-echo "aco-board serve answers / over HTTP"
+echo "aco serve answers / over HTTP"

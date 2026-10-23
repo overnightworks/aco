@@ -34,7 +34,7 @@
 </script>
 
 <main>
-	<h1>aco-board</h1>
+	<h1>aco</h1>
 	{#if board.status === 'no-access'}
 		<p role="alert">Zugang fehlt. Starte das Board im Repo und öffne den Link, den es ausgibt.</p>
 	{:else if board.status === 'loading'}

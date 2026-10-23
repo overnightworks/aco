@@ -1186,7 +1186,7 @@ function renderGate(){
   document.getElementById('gateBody').innerHTML = state.sim === 'noaccess'
     ? `<span class="gate-ic">${ICON.lock}</span><h1>Zugang fehlt</h1>
        <p>Diesem Tab fehlt der Schlüssel. Starte das Board im Repo und öffne den Link, den es ausgibt.</p>
-       <pre><span class="dim">$</span> aco-board serve
+       <pre><span class="dim">$</span> aco serve
 <span class="dim">Board: http://127.0.0.1:8765/#t=…</span></pre>
        <small>Der Schlüssel steht nur im Link. Ein Lesezeichen ohne ihn führt hierher.</small>`
     : `<span class="gate-ic">${ICON.wait}</span><h1>aco antwortet nicht</h1>

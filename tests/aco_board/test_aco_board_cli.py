@@ -1,4 +1,4 @@
-"""`aco-board serve` driven in-process through its real entry point, `cli.main`.
+"""`aco serve` driven in-process through its real entry point, `aco.cli.main`.
 
 `main` serves until interrupted, so a helper thread drives the printed URL and
 then interrupts the main thread the way Ctrl-C does.
@@ -26,7 +26,9 @@ from aco_board_fixtures import (
     row,
 )
 
-from aco.board import cli, static
+from aco import cli
+from aco.board import cli as board_cli
+from aco.board import static
 from aco.board.aco_cli import AcoCli
 from aco.board.board import Boards
 from aco.board.ports import Decision, DecisionResult
@@ -58,7 +60,7 @@ def _serve_until_done(
     scenario: Callable[[BoardClient], None],
     *extra_arguments: str,
 ) -> int:
-    """Run `aco-board serve` in `directory`, drive `scenario`, then press Ctrl-C."""
+    """Run `aco serve` in `directory`, drive `scenario`, then press Ctrl-C."""
     printed = _PrintedLines()
     monkeypatch.chdir(directory)
     monkeypatch.setattr(sys, "stdout", printed)
@@ -67,7 +69,7 @@ def _serve_until_done(
     def drive() -> None:
         try:
             if not printed.first_line_printed.wait(_URL_WAIT_SECONDS):
-                raise TimeoutError(f"aco-board serve printed no URL within {_URL_WAIT_SECONDS}s")
+                raise TimeoutError(f"aco serve printed no URL within {_URL_WAIT_SECONDS}s")
             # Every scenario requests at least once, so serving has begun
             # before the interrupt arrives.
             scenario(BoardClient.from_url(printed.first_line()))
@@ -226,8 +228,8 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
             shutdown_waits.set()
             super().close_writes()
 
-    monkeypatch.setattr(cli, "AcoCli", HeldRuling)
-    monkeypatch.setattr(cli, "Boards", ShutdownWatchedBoards)
+    monkeypatch.setattr(board_cli, "AcoCli", HeldRuling)
+    monkeypatch.setattr(board_cli, "Boards", ShutdownWatchedBoards)
     seen_while_shutdown_waited: list[list[list[str]]] = []
 
     def release_once_shutdown_waits() -> None:
@@ -261,6 +263,8 @@ _NOT_A_PORT = "is not a port between 0 and 65535"
     ("arguments", "refusal"),
     [
         pytest.param(["--host", "0.0.0.0"], "--host", id="no-way-to-listen-beyond-loopback"),
+        pytest.param(["--json"], "unrecognized arguments: --json", id="no-json-mode"),
+        pytest.param(["--po", "1"], "unrecognized arguments: --po 1", id="no-abbreviated-flag"),
         pytest.param(["--port", "65536"], _NOT_A_PORT, id="port-above-65535"),
         pytest.param(["--port", "-1"], _NOT_A_PORT, id="negative-port"),
         pytest.param(["--port", "eighty"], _NOT_A_PORT, id="port-not-a-number"),
@@ -273,7 +277,21 @@ def test_serve_refuses_an_argument_outside_its_contract_as_a_usage_error(
         cli.main(["serve", *arguments])
 
     assert refused.value.code == 2
-    assert refusal in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert refusal in captured.err
+
+
+def test_serve_refuses_the_global_repo_naming_a_forge_repository(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert cli.main(["--repo", "overnightworks/aco", "serve"]) == 2
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH\n"
+    )
 
 
 def test_serve_refuses_a_port_already_in_use(capsys: pytest.CaptureFixture[str]) -> None:

@@ -3,7 +3,7 @@
 Each test calls `Board` or `Boards` over the real `aco` adapter against a
 fake `aco` on PATH whose state the test sets, or over a held in-memory
 `DecisionPort` where the order of concurrent decisions is the behaviour; no
-server is started. The served board and `aco-board serve` itself also prove
+server is started. The served board and `aco serve` itself also prove
 one write at a time and the shutdown drain end-to-end (test_aco_board_server,
 test_aco_board_cli).
 """

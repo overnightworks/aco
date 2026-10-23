@@ -21,7 +21,7 @@ afterEach(() => {
 test('the shell names the board in its heading, whatever the state', () => {
 	render(App, { token: null });
 
-	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('aco-board');
+	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('aco');
 });
 
 test('without a token in this tab, the shell shows access is missing and makes no request', () => {

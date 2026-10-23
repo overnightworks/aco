@@ -88,3 +88,5 @@
 # budget: temporary protect/rescope twins while protect still exists (#275); #254 slice 2 deletes the protect side [RESC-31, RESC-32]
 
 # budget: issue #277 deletes `aco protect` together with tests/test_protect.py, tests/test_hook_input.py and tests/test_sed_script.py; those modules were more parametrized than the rest of the suite, so removing them lowers parametrized_share_pct without any remaining test changing shape [#277]
+
+# budget: issue #313 replaces a parametrized text/json `aco board --serve` refusal test with one plain argparse unknown-argument test (the flag is no longer declared, so there is no per-mode refusal left to parametrize) and adds one distinct `aco serve` refusal of the global `--repo` forge slug; this lowers parametrized_share_pct by one test without any remaining test changing shape [#313, BOARD-55]
