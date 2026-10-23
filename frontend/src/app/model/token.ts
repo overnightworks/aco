@@ -1,6 +1,6 @@
 /**
  * The access token lives only in the URL's fragment (`#t=…`), never in the
- * path or query a server ever sees (`specs/aco-board.spec.md` ABRD-10).
+ * path or query a server ever sees (`specs/serve.spec.md` ABRD-10).
  */
 
 export function tokenFromHash(hash: string): string | null {

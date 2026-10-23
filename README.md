@@ -81,10 +81,10 @@ other key is refused by name (`specs/storage-pin.spec.md`).
 ## Board
 
 `aco board --json` projects the open work board read-only for agents and
-scripts. `aco-board serve [--port N] [--repo PATH]...` serves the open
+scripts. `aco serve [--port N] [--repo PATH]...` serves the open
 expectation lines of one or more repositories as yes/no cards on 127.0.0.1; the
 access token travels only in the printed URL's `#` fragment
-(`specs/aco-board.spec.md`). The browser app lives in `frontend/`; its build
+(`specs/serve.spec.md`). The browser app lives in `frontend/`; its build
 output is committed under `src/aco/board/static/`.
 
 ## Machine output
@@ -97,7 +97,7 @@ never on prose (`specs/output.spec.md`).
 
 `aco --help` lists the commands and `aco <command> --help` their flags. Each
 command's behaviour, printed literals, exit codes and `--json` shapes are in
-`specs/<command>.spec.md`, and `aco-board` has `specs/aco-board.spec.md`. The
+`specs/<command>.spec.md`. The
 rules several commands share (output envelope, body block, claim record,
 landing grammar, storage pin, state ref transport) are in
 [`specs/`](specs/) too.

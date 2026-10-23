@@ -1,6 +1,6 @@
 /**
  * The decision wire contract, free of any state or transport: building the
- * request a card as shown sends (`specs/aco-board.spec.md` ABRD-09/21), and
+ * request a card as shown sends (`specs/serve.spec.md` ABRD-09/21), and
  * reading its `DecisionResult` into what the stage shows next. Holding no
  * state of its own, this is `DecisionStore`'s (`../state/decision.svelte.ts`)
  * only source for "what just happened" (issue #649).
@@ -24,7 +24,7 @@ export const ALREADY_RULED_MESSAGE =
 
 export const LINE_CHANGED_MESSAGE = 'Diese Zeile hat sich geändert, bitte neu laden';
 /** The exact refusal `board.py`'s `LINE_CHANGED` sends for ABRD-02: a public
- * contract sentence (`specs/aco-board.spec.md`), not an adapter detail, so
+ * contract sentence (`specs/serve.spec.md`), not an adapter detail, so
  * recognising it here to tell "changed" from any other failure is reading
  * the contract, not duplicating an implementation value. */
 

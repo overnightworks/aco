@@ -1,5 +1,5 @@
 /**
- * The board's JSON wire form (`specs/aco-board.spec.md` ABRD-08/09/21): one
+ * The board's JSON wire form (`specs/serve.spec.md` ABRD-08/09/21): one
  * mirror of `GET /api/board`'s shape, field names included, so no codec
  * stands between this file and the server's own contract.
  */
@@ -36,7 +36,7 @@ export interface BoardResponse {
 	repos: RepoReading[];
 }
 
-/** `POST /api/rule`'s body (`specs/aco-board.spec.md` ABRD-09): `fingerprint`
+/** `POST /api/rule`'s body (`specs/serve.spec.md` ABRD-09): `fingerprint`
  * is the card's own, bound to `repo` as read (ABRD-21) -- never the line's
  * bare fingerprint. */
 export interface DecisionRequest {

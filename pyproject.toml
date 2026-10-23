@@ -14,7 +14,6 @@ dependencies = []
 
 [project.scripts]
 aco = "aco.cli:main"
-aco-board = "aco.board.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -72,7 +71,7 @@ containers = ["aco"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_adopt | cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_start | cmd_status",
+    "cmd_adopt | cmd_ask | cmd_board | cmd_body | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_status",
     "board_read | policy | report",
     "session",
     "checkout | store",
@@ -143,6 +142,8 @@ type = "protected"
 # and forbidden sets would silently keep.
 protected_modules = ["aco.board"]
 allowed_importers = ["aco.board"]
+# `aco serve` starts the board; `cmd_serve` imports it lazily at call time.
+ignore_imports = ["aco.cmd_serve -> aco.board.cli"]
 
 [[tool.importlinter.contracts]]
 name = "The decision board reaches aco only through its command line"

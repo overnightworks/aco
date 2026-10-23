@@ -1,6 +1,6 @@
 /**
  * The board's HTTP client. The access token travels only as the
- * `X-Board-Token` header (`specs/aco-board.spec.md` ABRD-10): never appended
+ * `X-Board-Token` header (`specs/serve.spec.md` ABRD-10): never appended
  * to the request path, never logged.
  */
 

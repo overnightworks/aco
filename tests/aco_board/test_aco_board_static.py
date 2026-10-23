@@ -4,7 +4,7 @@
 if any") it is; `asset`/`shell`/`ensure_built` add the filesystem read and
 the committed build's own content types; the routing and guard-header
 tests drive the real server, token-free, the way a browser loading the
-shell does (`specs/aco-board.spec.md` ABRD-12).
+shell does (`specs/serve.spec.md` ABRD-12).
 """
 
 from __future__ import annotations

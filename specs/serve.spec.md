@@ -1,6 +1,6 @@
-# `aco-board serve`
+# `aco serve`
 
-`aco-board serve --repo PFAD...` (issues #617, #620, #637, #652) shows one or
+`aco serve --repo PATH...` (issues #617, #620, #637, #652) shows one or
 more repositories' open expectation lines in a browser SPA and writes each
 decision through the installed `aco` command line, never through aco's own
 modules; without `--repo`, the current directory is the one repository
@@ -32,6 +32,8 @@ resolved directory's name.
 | an `/api/` request without the right token | ABRD-10 | ABRD-10 |
 | a decision naming a repo outside the configured ones | — | ABRD-16 |
 | a card's fingerprint submitted against a different configured repo | — | ABRD-21 |
+| `aco serve --json` | ABRD-26 | — |
+| the global `aco --repo OWNER/REPO` before `serve` | ABRD-27 | — |
 
 ## Writing a decision
 
@@ -48,7 +50,7 @@ resolved directory's name.
 
 ## Multiple repositories
 
-- [ ] [ABRD-14] `aco-board serve --repo PFAD` (repeatable) configures the repos served, labelled `<repo>` by each resolved directory's name; without `--repo`, the current directory is the one repository.
+- [ ] [ABRD-14] `aco serve --repo PATH` (repeatable) configures the repos served, labelled `<repo>` by each resolved directory's name; without `--repo`, the current directory is the one repository.
 - [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a failed repo carries its own error sentence and no items or cards, others unaffected (see E-ABRD-06).
 - [ ] [ABRD-16] A decision naming a `repo` outside the configured labels is refused `bad request: decision` before any `aco` call (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
@@ -71,7 +73,9 @@ resolved directory's name.
 - [ ] [ABRD-22] `GET /` answers the committed shell and `GET /assets/**` its committed built files, no token needed; each refuses a method other than `GET` with 405 and `Allow: GET` (see E-ABRD-08).
 - [ ] [ABRD-23] `GET /assets/**` answers only a regular file under the committed `static/` directory: a `..` segment, encoded or not, or an in-between symlink answers `not found`, like a missing file.
 - [ ] [ABRD-24] The CSP on the shell and its assets carries no nonce: `script-src 'self'` (its one script loads from `/assets/`) and `img-src data:`, alongside ABRD-12's own directives.
-- [ ] [ABRD-25] `aco-board serve` refuses to start with `ERROR: <path> is missing; build the frontend first (...)` once the committed shell is absent, never binding a board that could only answer its API.
+- [ ] [ABRD-25] `aco serve` refuses to start with `ERROR: <path> is missing; build the frontend first (...)` once the committed shell is absent, never binding a board that could only answer its API.
+- [ ] [ABRD-26] `aco serve --json` is refused by the argument parser as plain text, never in the envelope: `aco: error: unrecognized arguments: --json`, exit `2` (see E-ABRD-09).
+- [ ] [ABRD-27] The global `aco --repo OWNER/REPO` before `serve` is refused `ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH`, exit `2` (see E-ABRD-10).
 
 ## Never
 
@@ -85,7 +89,7 @@ resolved directory's name.
 
 `Setup: fake-aco` is a repository directory whose `aco` on PATH is a fake
 answering `aco rulings --json` from a stored list and applying `aco rule`
-to it with aco's own refusals, logging every call; `aco-board serve` runs
+to it with aco's own refusals, logging every call; `aco serve` runs
 in that directory (E-ABRD-01 through E-ABRD-05: `--repo` not given, so the
 one repo is labelled by that directory's name) and each example posts one
 decision to it.
@@ -147,7 +151,7 @@ answer 403: {"error": "forbidden: missing or wrong token"}
 
 ### E-ABRD-06 -- two repos, one down
 
-Setup: `aco-board serve --repo a --repo b`; repo `a`'s fake-aco lists item `#42` with one open line `Guests?`; repo `b`'s fake-aco fails `aco rulings` with `ERROR: no forge adapter for host`
+Setup: `aco serve --repo a --repo b`; repo `a`'s fake-aco lists item `#42` with one open line `Guests?`; repo `b`'s fake-aco fails `aco rulings` with `ERROR: no forge adapter for host`
 
 ```text
 request: GET /api/board, header X-Board-Token: <start token>
@@ -163,7 +167,7 @@ Had `a`'s fake-aco failed too, the answer would be 502 with the same two-entry `
 
 ### E-ABRD-07 -- a decision routes only into its named repo
 
-Setup: `aco-board serve --repo a --repo b`; repo `a` and repo `b`'s fake-acos each list an identical item `#42` with one open line `Guests?`
+Setup: `aco serve --repo a --repo b`; repo `a` and repo `b`'s fake-acos each list an identical item `#42` with one open line `Guests?`
 
 ```text
 request: POST /api/rule, header X-Board-Token: <start token>
@@ -192,4 +196,27 @@ answer 200: the committed `static/assets/index.js`, Content-Type text/javascript
 request: GET /assets/../server.py (a traversal attempt, literal or percent-encoded)
 aco calls: none
 answer 404: not found (text/plain) -- the same answer a missing asset gets (ABRD-23)
+```
+
+### E-ABRD-09 -- `--json` is no mode of this command
+
+Setup: none
+
+```console
+$ aco serve --json
+2> usage: aco [-h] [--version] [--repo REPO]
+2>            {bootstrap,reset,status,board,serve,rulings,next,start,claim,release,land,adopt,rescope,cut,ask,rule,check,body,brief,item}
+2>            ...
+2> aco: error: unrecognized arguments: --json
+exit 2
+```
+
+### E-ABRD-10 -- the global `--repo` names a forge repository, not a checkout
+
+Setup: none
+
+```console
+$ aco --repo overnightworks/aco serve
+2> ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH
+exit 2
 ```

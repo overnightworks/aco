@@ -1,11 +1,9 @@
 # `aco board`
 
 `aco board` projects the open work board read-only, `--json` the one
-output mode (issue #624 moved the operator-facing page to `aco-board`,
-`specs/aco-board.spec.md`); a bare `aco board` naming no `--json` refuses
-instead (BOARD-44), and `--serve` -- the loopback HTTP page this command
-used to print a link for (issue #280) -- refuses by name instead of
-starting a server (BOARD-55, issue #644). This file owns `--json`'s own
+output mode (issue #624 moved the operator-facing page to `aco serve`,
+`specs/serve.spec.md`); a bare `aco board` naming no `--json` refuses
+instead (BOARD-44). This file owns `--json`'s own
 shape -- its keys -- and the one forge-resolution precondition `aco
 next`/`aco rulings` share with it before either ever reads an issue (`##
 The shared forge precondition`, cited rather than restated by
@@ -24,30 +22,30 @@ reason text.
 
 ## Behavior table
 
-| state \ trigger | `aco board` (no `--json`, no `--serve`) | `--json` | `--serve` |
-|---|---|---|---|
-| any state, before any other read | BOARD-44 | — | BOARD-55 |
-| unsupported canonical-remote host | — | BOARD-02, BOARD-43 | — |
-| canonical remote with no URL configured | — | BOARD-53, BOARD-43 | — |
-| `.aco/board.toml` absent | — | PIN-32 (cited) | — |
-| `.aco/board.toml` present but untracked or ignored | — | PIN-01 (cited) | — |
-| `--repo` under `storage = "state-ref"` | — | BOARD-42, BOARD-43 | — |
-| the Landungen view's own rows | — | BOARD-12 | — |
-| an item with no recognized `kind` | — | BOARD-08 | — |
-| a state-ref item the store cannot read | — | BOARD-54 | — |
-| an uncut `[[slice]]` row | — | BOARD-14 | — |
-| a completed run | — | BOARD-11, BOARD-13 | — |
-| `--json`'s success/refusal envelope | — | BOARD-11, BOARD-43 (OUT-nn cited) | — |
-| an item with a `size`, measured or not | — | BOARD-26, BOARD-27, BOARD-31 | — |
-| a claim commit whose `item:` trailer is no ASCII number of at most 18 digits | — | BOARD-56 | — |
-| an item carries the idea label | — | BOARD-57 | — |
+| state \ trigger | `aco board` (no `--json`) | `--json` |
+|---|---|---|
+| any state, before any other read | BOARD-44 | — |
+| unsupported canonical-remote host | — | BOARD-02, BOARD-43 |
+| canonical remote with no URL configured | — | BOARD-53, BOARD-43 |
+| `.aco/board.toml` absent | — | PIN-32 (cited) |
+| `.aco/board.toml` present but untracked or ignored | — | PIN-01 (cited) |
+| `--repo` under `storage = "state-ref"` | — | BOARD-42, BOARD-43 |
+| the Landungen view's own rows | — | BOARD-12 |
+| an item with no recognized `kind` | — | BOARD-08 |
+| a state-ref item the store cannot read | — | BOARD-54 |
+| an uncut `[[slice]]` row | — | BOARD-14 |
+| a completed run | — | BOARD-11, BOARD-13 |
+| `--json`'s success/refusal envelope | — | BOARD-11, BOARD-43 (OUT-nn cited) |
+| an item with a `size`, measured or not | — | BOARD-26, BOARD-27, BOARD-31 |
+| a claim commit whose `item:` trailer is no ASCII number of at most 18 digits | — | BOARD-56 |
+| an item carries the idea label | — | BOARD-57 |
 
-## No `--json`, and the retired `--serve`
+## No `--json`
 
-- BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52 (retired 04.10.2026, issue #644, operator ruling #617 line 4): `--html`'s static page and `--serve`'s loopback server -- the page itself, its token subsystem, and its request/response wire contract -- no longer exist; `aco-board` (issue #624, `specs/aco-board.spec.md`) is the one decision board now, reading its own rulings through `aco rulings --json` and writing through `aco rule` instead of this command's `--json`.
+- BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52, BOARD-55 (retired 04.10.2026, issue #644, operator ruling #617 line 4): `--html`'s static page and `--serve`'s loopback server (BOARD-55's own `--serve` refusal went with the flag, issue #313) -- the page itself, its token subsystem, and its request/response wire contract -- no longer exist; `aco serve` (issue #624, `specs/serve.spec.md`) is the one decision board now, reading its own rulings through `aco rulings --json` and writing through `aco rule` instead of this command's `--json`.
 
-- [ ] [BOARD-44] `aco board` naming no `--json` (and no `--serve`) refuses `aco board requires --json`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
-- [ ] [BOARD-55] `aco board --serve` refuses `--serve was removed; run aco-board serve instead`, exit `2`, before any forge, pin, or repository read, whether or not `--json` is also given (see E-BOARD-21).
+- [ ] [BOARD-44] `aco board` naming no `--json` refuses `aco board requires --json`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
+
 
 ## The shared forge precondition
 
@@ -64,7 +62,7 @@ does, before either reads a single issue -- cited there, not restated.
 ## `--json`
 
 - [ ] [BOARD-11] `board --json` wraps OUT-nn (`reason: "projected"`) around `items`, `ready_now`, `stale`, `recovery`, `landings`, `uncut`, `requests`, `measurements` only, never `repository` (E-BOARD-04).
-- [ ] [BOARD-43] `--json` on a dispatched refusal (BOARD-02, BOARD-42, BOARD-53, BOARD-55) prints that envelope with the sentence as `message` and `reason` below, exit `2` (see E-BOARD-15).
+- [ ] [BOARD-43] `--json` on a dispatched refusal (BOARD-02, BOARD-42, BOARD-53) prints that envelope with the sentence as `message` and `reason` below, exit `2` (see E-BOARD-15).
 - [ ] [BOARD-08] An item the forge reports no `kind` for, or a non-`container` `kind`, carries `"container": null` even with child counts of its own (#309): never guessed at (see E-BOARD-03).
 - [ ] [BOARD-54] A state-ref item PIN-14/PIN-15 refuses is listed, open, with BODY-50's reason and its read defect, e.g. `body malformed: record: no [record] table`; every other item reads as before (NEXT-36).
 
@@ -72,7 +70,7 @@ does, before either reads a single issue -- cited there, not restated.
 
 | refusal | `reason` |
 |---|---|
-| PIN-04 (`--repo` under `storage = state-ref`), BOARD-55 (`--serve` removed) | `invalid_usage` |
+| PIN-04 (`--repo` under `storage = state-ref`) | `invalid_usage` |
 | BOARD-02 (no forge adapter for host), BOARD-53 (canonical remote with no URL configured), PIN-05 (no resolvable default branch) | `unavailable` |
 - [ ] [BOARD-12] Each `landings` row carries `{"item", "committed_at", "sha", "pull_request"}`, exactly one of `sha`/`pull_request` non-`null` (LAND-54).
 - [ ] [BOARD-13] Each item's `open_blockers` is split into a same-repository `int` list plus a sibling `foreign_blockers` list of `"<repository>#<n>"` strings, never one mixed list.
@@ -92,7 +90,7 @@ does, before either reads a single issue -- cited there, not restated.
 
 - A container whose own child-count summary disagrees with its open-children list (a stale summary, a lost paginated row) is never silently reconciled into its own `container`/`--json` field: the board build refuses by name instead of rendering a guess.
 - `board`'s `--json` never carries a `read_state` key on any item, and never a bare `null` in place of an absent `foreign_blockers`/`uncut` `scope` entry.
-- `aco board` never regains an `--html`/`--serve` output mode of its own: `aco-board` (`specs/aco-board.spec.md`) is the one decision board going forward (issue #644).
+- `aco board` never regains an `--html`/`--serve` output mode of its own: `aco serve` (`specs/serve.spec.md`) is the one decision board going forward (issue #644).
 
 ## Examples
 
@@ -164,15 +162,5 @@ Setup: none -- a directory outside any git repository
 ```console
 $ aco board
 2> ERROR: aco board requires --json
-exit 2
-```
-
-### E-BOARD-21 — `aco board --serve` refuses, naming `aco-board serve` instead
-
-Setup: bare-remote, fake `gh`
-
-```console
-$ aco board --serve
-2> ERROR: --serve was removed; run aco-board serve instead
 exit 2
 ```

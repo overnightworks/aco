@@ -20,7 +20,7 @@ test('starting the page mounts the board shell into #app', async () => {
 
 	await import('./main');
 
-	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('aco-board');
+	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('aco');
 });
 
 test('starting a page without #app fails loud', async () => {
