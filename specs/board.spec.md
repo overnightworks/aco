@@ -42,7 +42,9 @@ reason text.
 
 ## No `--json`
 
-- BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52, BOARD-55 (retired 04.10.2026, issue #644, operator ruling #617 line 4): `--html`'s static page and `--serve`'s loopback server (BOARD-55's own `--serve` refusal went with the flag, issue #313) -- the page itself, its token subsystem, and its request/response wire contract -- no longer exist; `aco serve` (issue #624, `specs/serve.spec.md`) is the one decision board now, reading its own rulings through `aco rulings --json` and writing through `aco rule` instead of this command's `--json`.
+- BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52 (retired 04.10.2026, issue #644, operator ruling #617 line 4): `--html`'s static page and `--serve`'s loopback server -- the page itself, its token subsystem, and its request/response wire contract -- no longer exist; `aco serve` (issue #624, `specs/serve.spec.md`) is the one decision board now, reading its own rulings through `aco rulings --json` and writing through `aco rule` instead of this command's `--json`.
+
+- BOARD-55 (retired 23.10.2026, issue #313): the `--serve` refusal pointing at `aco-board serve` went with the flag itself; `aco board --serve` is now an unknown argument like any other.
 
 - [ ] [BOARD-44] `aco board` naming no `--json` refuses `aco board requires --json`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
 
