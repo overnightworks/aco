@@ -1,8 +1,0 @@
-claim_id = "dbb5d6c158ba441db48e2ab53f21ef2f"
-agent = "claude"
-role = "builder"
-base = "34adc317aa21c84fd3d498fe91e7df8d0aa4db72"
-branch = "claude/issue-313-aco-serve"
-scope = ["README.md", "docs/board", "frontend", "pyproject.toml", "quality/baseline.toml", "scripts/package_smoke.sh", "scripts/test_inventory_dropped.txt", "scripts/vulture_whitelist.py", "specs", "src/aco", "tests"]
-opened_commit = "880966b7aeddfebc800733979be84e28a8c2f372"
-whole_reason = "Parser, Dispatch und das Entfernen des Entry-Points ändern sich nur zusammen; Tests, Specs und Frontend folgen dem Befehl."
