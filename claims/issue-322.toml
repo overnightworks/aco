@@ -1,8 +1,0 @@
-claim_id = "071f995619e2404b8d7884502a2ff3f8"
-agent = "claude"
-role = "builder"
-base = "5a7f591781d65abd40ded1a30096dd24ec623ded"
-branch = "claude/issue-322-aco-check-stdin"
-scope = ["pyproject.toml", "quality/baseline.toml", "scripts/test_budget_ratchet.txt", "scripts/test_inventory_dropped.txt", "specs", "src/aco", "tests"]
-opened_commit = "fbb64e8b4caa572e38a3caffcc1072d774250397"
-whole_reason = "Parser, Owner-Umzug und Spec-Umzug hängen zusammen; einzeln gäbe es zwei Befehle oder keinen."
