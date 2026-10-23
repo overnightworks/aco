@@ -1,4 +1,5 @@
-"""The CLI's output envelope and refusal rendering (`specs/output.spec.md`)."""
+"""The CLI's output envelope, refusal rendering (`specs/output.spec.md`) and
+the piped-body reader every stdin-fed command shares."""
 
 from __future__ import annotations
 
@@ -13,6 +14,18 @@ REFUSAL_LINE_LENGTH_LIMIT = 200
 _REFUSAL_SENTENCE_LENGTH_LIMIT = REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
 
 JSON_FLAG = "--json"
+
+
+def read_piped_body() -> str:
+    """The body text a command reads from stdin only: an agent pipes the file
+    in (`aco check - < body.md`) rather than naming a path the CLI would have
+    to trust."""
+    try:
+        return sys.stdin.read()
+    except UnicodeDecodeError as error:
+        raise protocol.ClaimError(
+            f"stdin is not valid UTF-8: {error}; pipe the body as UTF-8 text"
+        ) from error
 
 
 def emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:

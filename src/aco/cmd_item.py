@@ -13,7 +13,6 @@ from typing import cast
 from . import (
     board_read,
     body,
-    cmd_body,
     cmd_cut,
     forge,
     items,
@@ -38,7 +37,7 @@ def _body_shape_defects(
 ) -> tuple[str, ...]:
     """`item edit`'s own accessor (issue #287) onto `body.body_shape_check`
     (issue #404): only the defect sentences, never the verdict `check
-    <item>` and `body --check` read for their own `--json` `reason`."""
+    <item>` and `check -` read for their own `--json` `reason`."""
     return body.body_shape_check(raw_body, storage=storage).defects
 
 
@@ -89,8 +88,8 @@ class _ItemReason(StrEnum):
     `item edit --size/--whole/--kind` whose value is already set, which
     writes nothing (issue #572). `body_invalid`
     covers only `item new`'s and `item edit`'s own piped-body shape check
-    (`_body_shape_defects`, the same check `body --check` runs), carrying
-    `defects` the same way (`cmd_body._BodyCheckReason`, issue #404); `partial_write`
+    (`_body_shape_defects`, the same check `check -` runs), carrying
+    `defects` the same way (`cmd_check._CheckReason`, issue #404); `partial_write`
     only a GitHub issue `item new` created but could not type or record under
     its `--parent` (issue #444), `cut`'s own shape. Every other refusal -- a
     `storage = "github"` command, a missing item or parent, a possible twin,
@@ -146,7 +145,7 @@ class _ItemBodyInvalidError(protocol.ClaimError):
 def _read_item_new_input() -> str:
     """`item new`'s piped body under either storage, or `""` when stdin
     carries none (`_stdin_carries_a_body`)."""
-    return cmd_body.read_body_check_input() if _stdin_carries_a_body() else ""
+    return report.read_piped_body() if _stdin_carries_a_body() else ""
 
 
 def _item_new_block_fields(parsed: argparse.Namespace) -> dict[str, object]:
@@ -319,7 +318,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
     `_cmd_item_edit_whole`/`_cmd_item_edit_kind`, both storages); with none,
     the state-ref item's own body, replaced from
     stdin only -- refused before any write when the piped body carries no
-    valid `aco` block (`body --check`'s own sentences,
+    valid `aco` block (`check -`'s own sentences,
     `_body_shape_defects`). The CAS `expected` oid is this process's own
     already-read snapshot (`StateRefBoard.update_item_body`'s
     `current.oid`, set once at `session._state_ref_forge` construction): a second
@@ -337,7 +336,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
     `storage = "github"`: forge issues are edited on the forge, never
     governed by aco. Narrows the context's forge to the state-ref board,
     as `item new`'s state-ref path does. A malformed piped body reports through
-    the shared envelope as `body_invalid`, with `body --check`'s own
+    the shared envelope as `body_invalid`, with `check -`'s own
     `defects`; every other refusal is `precondition_failed` (issue #425)."""
     if parsed.size is not None:
         return _cmd_item_edit_size(parsed, context)
@@ -378,7 +377,7 @@ def _read_item_edit_body(number: int) -> str:
         raise protocol.ClaimUnavailableError(
             f"item edit {item_id} needs the new body on stdin: aco item edit {item_id} < body.md"
         )
-    return cmd_body.read_body_check_input()
+    return report.read_piped_body()
 
 
 _ITEM_EDIT_SIZE_COMMAND = "item edit --size"

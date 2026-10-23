@@ -4014,7 +4014,6 @@ def test_help_lists_commands_in_their_stable_registration_order() -> None:
         "ask",
         "rule",
         "check",
-        "body",
         "brief",
         "item",
     ]
@@ -4593,12 +4592,12 @@ def _write_block_pin(tmp_path: Path) -> None:
     write_repository_config(tmp_path, 'body_contract = "block"\n')
 
 
-def test_the_container_a_cut_empties_of_rows_still_passes_body_check(
+def test_the_container_a_cut_empties_of_rows_still_passes_check_stdin(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Spec: BODY-49, BODY-67, E-BODY-08.
 
-    The emptied container with a ruled expectation still passes body --check.
+    The emptied container with a ruled expectation still passes check -.
     """
     container = container_issue(
         CUT_CONTAINER,
@@ -4614,9 +4613,7 @@ def test_the_container_a_cut_empties_of_rows_still_passes_body_check(
     assert exit_code == 0
     capsys.readouterr()
     assert (
-        run_cli(
-            ["body", "--check"], capsys, stdin=client.item_bodies[CUT_CONTAINER]
-        ).expect_success()
+        run_cli(["check", "-"], capsys, stdin=client.item_bodies[CUT_CONTAINER]).expect_success()
         == "body ok\n"
     )
 
@@ -10074,7 +10071,7 @@ def test_cli_claim_without_scope_names_a_malformed_body_before_no_scope(
 ) -> None:
     """Issue #310 finding 43: a target whose `aco` block is
     malformed refuses by naming that defect -- reusing the same block-
-    defect reader `body --check` uses -- before scope derivation ever gets
+    defect reader `check -` uses -- before scope derivation ever gets
     to name the less specific "item names no scope"."""
     client = _arranged_claim_client(monkeypatch)
     client.board_issues = (
@@ -17112,7 +17109,7 @@ def test_item_edit_json_reports_body_invalid_with_defects(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """Issue #425: `item edit`'s own malformed piped body reports
-    `reason: "body_invalid"`, with `body --check`'s own `defects` list as a
+    `reason: "body_invalid"`, with `check -`'s own `defects` list as a
     structured sibling, before any forge is ever resolved."""
     _write_state_ref_pin(tmp_path)
     result = run_cli(["item", "edit", "42", "--json"], capsys, stdin="no block")
@@ -17267,19 +17264,10 @@ def _claim_comma_scope_refusal_command(
     return _CountedRun(_claim_argv("--scope", "a,b"), {}, {}, observations={}, exit_code=2)
 
 
-def _body_check_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
-    """`body --check` judges a piped body without the state ref (#420 retired
-    `--template`, the mode #477 names for this proof)."""
+def _check_stdin_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
+    """`check -` judges a piped body without the state ref."""
     monkeypatch.setattr(sys, "stdin", io.StringIO(complete_contract("Check #10.")))
-    return _read_once(["body", "--check"], toplevel=tmp_path, observes=False)
-
-
-def _retired_body_template_command(
-    _monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
-) -> _CountedRun:
-    """`body --template`, the mode #477 names for this proof, was retired by
-    #420: argparse refuses it before anything of the repository is read."""
-    return _CountedRun(["body", "--template"], {}, {}, observations={}, exit_code=2)
+    return _read_once(["check", "-"], toplevel=tmp_path, observes=False)
 
 
 def _rule_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
@@ -17431,8 +17419,7 @@ def _start_lost_answer_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
         pytest.param(_land_command, id="land-rereads-after-its-fast-forward"),
         pytest.param(_github_item_close_refusal_command, id="item-close-github-refusal"),
         pytest.param(_claim_comma_scope_refusal_command, id="claim-scope-shape-refusal"),
-        pytest.param(_body_check_command, id="body-check"),
-        pytest.param(_retired_body_template_command, id="retired-body-template"),
+        pytest.param(_check_stdin_command, id="check-stdin"),
     ],
 )
 def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(

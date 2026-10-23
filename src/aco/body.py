@@ -1564,7 +1564,7 @@ def missing_or_empty_sections(contract: Contract) -> tuple[str, ...]:
 
 
 def _slice_line_defects(slices: tuple[SliceRow, ...]) -> tuple[ContractDefect, ...]:
-    """The rule wherever a body's shape is judged -- `body --check`,
+    """The rule wherever a body's shape is judged -- `check -`,
     `check`, `item new`/`item edit` (issue #517 line 2): a slice title is
     one line, since `next` prints it inside a runnable `cut`, so every
     `protocol.is_display_control` character is a defect (issue #538); a
@@ -1614,7 +1614,7 @@ def _slice_line_defect(
 
 def slice_done_when_defect(located: LocatedBlock, row: SliceRow) -> str | None:
     """BODY-66 for the one row of `located` that `cut` selects (issue #606
-    line 3), in the sentence `body --check` prints for it: `cut` copies only
+    line 3), in the sentence `check -` prints for it: `cut` copies only
     that row's `done_when` into a child, so no other row's line can refuse
     the cut."""
     position = _block_slices(located.data).index(row)
@@ -1626,7 +1626,7 @@ class BodyShapeVerdict(StrEnum):
     """Whether a body's own shape is one a builder can start from (issue
     #404): the third state beyond `BodyReadState.VALID`/`MALFORMED` -- a
     schema-valid block that still leaves a required section unfilled.
-    `check <item>` and `body --check` both need to tell `malformed` from
+    `check <item>` and `check -` both need to tell `malformed` from
     `incomplete` apart for their own `--json` `reason`, never by sniffing a
     defect sentence's own prefix."""
 
@@ -1638,7 +1638,7 @@ class BodyShapeVerdict(StrEnum):
 @dataclass(frozen=True)
 class BodyShapeCheck:
     """One body's own shape verdict and defect sentences (issue #404): the
-    single read `check <item>` and `body --check` both share, so neither
+    single read `check <item>` and `check -` both share, so neither
     writes a second rendering of `body_defect_text`'s or the incomplete
     sentence's own text."""
 

@@ -146,7 +146,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-54] A `--scope` set differing from the item's own `scope` refuses `claim scope differs from the item's scope; correct the item first`, exit `2`, so no reader claims a false disjointness.
 - [ ] [CLAIM-55] An item naming no `scope` refuses issue-mode `aco claim 42` without `--scope` with `item names no scope; pass --scope`, exit `2`.
 - [ ] [CLAIM-67] An explicit `--scope` matching the item's own `scope` as a set, reordered, still claims: CLAIM-54 refuses only a genuine mismatch, never a reordering.
-- [ ] [CLAIM-68] Deriving scope from a malformed `aco` block names that block's own defect (the family `aco body --check` reports) before it ever refuses CLAIM-55's less specific "item names no scope".
+- [ ] [CLAIM-68] Deriving scope from a malformed `aco` block names that block's own defect (the family `aco check -` reports) before it ever refuses CLAIM-55's less specific "item names no scope".
 - [ ] [CLAIM-73] Under `storage = "state-ref"`, an issue claim, whatever its scope, on an item PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CLAIM-68's, before any write.
 
 ## One claim's own `--json` field order

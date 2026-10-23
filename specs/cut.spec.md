@@ -74,7 +74,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 ## The body precondition
 
 - [ ] [CUT-05] `<n>` with a malformed body (BODY-50) refuses `#<n> body malformed: <field>: <message>; cut needs a valid aco block`, exit `2`; an incomplete body (BODY-51) is accepted.
-- [ ] [CUT-39] If the row cut selects has a `done_when` with a display control (BODY-66), `cut` refuses in CUT-05's form with `body --check`'s sentence before any write; no other row refuses (issue #606, E-CUT-03).
+- [ ] [CUT-39] If the row cut selects has a `done_when` with a display control (BODY-66), `cut` refuses in CUT-05's form with `check -`'s sentence before any write; no other row refuses (issue #606, E-CUT-03).
 - [ ] [CUT-40] Under `storage = "state-ref"`, an `<n>` PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CUT-05's, exit `2`, before any write (see E-CUT-10).
 
 ## Row selection

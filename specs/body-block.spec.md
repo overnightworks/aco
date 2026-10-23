@@ -8,14 +8,14 @@ defect sentences, and the two verdicts a body can carry (`malformed`,
 visible; each command's own spec owns its flags and its other output and cites
 these IDs instead of restating them.
 
-Every defect sentence below is printed by `aco body --check` on stderr, one
+Every defect sentence below is printed by `aco check -` on stderr, one
 line per defect, and by a reader as the item's own reason (BODY-50..BODY-52).
 `<n>` is an item number, `<path>` a repository-relative path, `<keys>` the
 empty projection keys, comma-joined in the order `Now, Next, Done when`.
 
 ## Behavior table
 
-| body state \ trigger | `aco body --check` | `aco board` | `aco claim <n>` |
+| body state \ trigger | `aco check -` | `aco board` | `aco claim <n>` |
 |---|---|---|---|
 | no `aco` fence | BODY-01 | BODY-50 | BODY-52 |
 | fence opened, never closed | BODY-02 | BODY-50 | BODY-52 |
@@ -45,10 +45,10 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 
 ## Fence and surroundings
 
-- [ ] [BODY-01] A body with no `aco` fence makes `aco body --check` print `body malformed: aco: no aco block` on stderr, exit `2` — never a sentence about another grammar.
-- [ ] [BODY-02] A body whose `aco` fence is opened and never closed makes `aco body --check` print `body malformed: aco: unclosed aco block` on stderr, exit `2`.
-- [ ] [BODY-03] A body with two `aco` fences makes `aco body --check` print `body malformed: aco: multiple aco blocks; exactly one is allowed` on stderr, exit `2`.
-- [ ] [BODY-04] A fence whose content is not TOML makes `aco body --check` print `body malformed: aco: aco block is not valid TOML: <reason>` on stderr, exit `2`.
+- [ ] [BODY-01] A body with no `aco` fence makes `aco check -` print `body malformed: aco: no aco block` on stderr, exit `2` — never a sentence about another grammar.
+- [ ] [BODY-02] A body whose `aco` fence is opened and never closed makes `aco check -` print `body malformed: aco: unclosed aco block` on stderr, exit `2`.
+- [ ] [BODY-03] A body with two `aco` fences makes `aco check -` print `body malformed: aco: multiple aco blocks; exactly one is allowed` on stderr, exit `2`.
+- [ ] [BODY-04] A fence whose content is not TOML makes `aco check -` print `body malformed: aco: aco block is not valid TOML: <reason>` on stderr, exit `2`.
 - [ ] [BODY-05] An `aco` fence quoted inside a longer documentation fence is not the item's block, so a body carrying only that one prints `body malformed: aco: no aco block`, exit `2`.
 - [ ] [BODY-06] Prose beside the block — headings, a `Blocked by: nichts` line, another tool's own section — carries no contract, so a body of prose plus one complete block prints `body ok`, exit `0`.
 - [ ] [BODY-07] A block whose lines end in CRLF is read like any other: a complete CRLF body prints `body ok`, exit `0`; a rewrite keeps CRLF but re-renders the block's fields canonically, not byte-for-byte.
@@ -59,14 +59,14 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-09] A block whose `version` is any value but the integer `1` prints `body malformed: version: version must be exactly 1` on stderr, exit `2`.
 - [ ] [BODY-10] A block missing `now`, `next` or `done_when` prints one `body malformed: <key>: <key> is required` line per missing key on stderr, exit `2`.
 - [ ] [BODY-11] A block whose `now`, `next` or `done_when` is not a string prints `body malformed: <key>: <key> must be a string` on stderr, exit `2`.
-- [ ] [BODY-12] A block whose projection keys are present but not all filled is valid but unfilled: `aco body --check` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
+- [ ] [BODY-12] A block whose projection keys are present but not all filled is valid but unfilled: `aco check -` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
 - [ ] [BODY-13] A top-level key outside `version`, `now`, `next`, `done_when`, `frozen_until`, `scope`, `size`, `whole`, `expectation`, `slice` prints `body malformed: <key>: unknown top-level key <key>`, exit `2`.
 - [ ] [BODY-14] A block whose three projection keys are all non-empty and whose optional tables are valid prints `body ok` on stdout, exit `0`, with nothing on stderr (see E-BODY-01).
 
 ## `[record]`, the state-ref item identity
 
-- [ ] [BODY-15] Under `storage = "github"` a `[record]` table is an unknown key: `aco body --check` prints `body malformed: record: unknown top-level key record` on stderr, exit `2`.
-- [ ] [BODY-16] Under `storage = "state-ref"` a `[record]` carrying `title`, `state`, `created_at`, `updated_at` is valid: `aco body --check` prints `body ok`, exit `0` (see E-BODY-05).
+- [ ] [BODY-15] Under `storage = "github"` a `[record]` table is an unknown key: `aco check -` prints `body malformed: record: unknown top-level key record` on stderr, exit `2`.
+- [ ] [BODY-16] Under `storage = "state-ref"` a `[record]` carrying `title`, `state`, `created_at`, `updated_at` is valid: `aco check -` prints `body ok`, exit `0` (see E-BODY-05).
 - [ ] [BODY-17] A `[record]` whose `state` is neither `open` nor `closed` prints `body malformed: record.state: record.state must be open or closed` on stderr, exit `2`.
 - [ ] [BODY-18] A `[record]` with `state = "closed"` and no `closed_at` prints `body malformed: record.closed_at: record.closed_at is required when record.state is closed`, exit `2`.
 - [ ] [BODY-19] A `[record]` timestamp that is not an RFC 3339 UTC instant prints `body malformed: record.created_at: record.created_at must be an RFC 3339 UTC timestamp`, exit `2`.
@@ -94,7 +94,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 ## The card fields `question`, `example`, `picture`
 
 - [ ] [BODY-34] A `question` longer than 160 characters prints `body malformed: expectation[0].question: expectation[0].question must be at most 160 characters` on stderr, exit `2`.
-- [ ] [BODY-35] A `question` of exactly 160 characters is inside the bound: `aco body --check` prints `body ok` on stdout, exit `0`.
+- [ ] [BODY-35] A `question` of exactly 160 characters is inside the bound: `aco check -` prints `body ok` on stdout, exit `0`.
 - [ ] [BODY-36] An `example` that is blank or not a string prints `body malformed: expectation[0].example: expectation[0].example must be a non-empty string` on stderr, exit `2`.
 - [ ] [BODY-37] A `picture` whose text does not start with `<svg` prints `body malformed: expectation[0].picture: expectation[0].picture must be inline SVG rooted at <svg>`, exit `2`.
 - [ ] [BODY-38] A `picture` over 8192 bytes prints `body malformed: expectation[0].picture: expectation[0].picture must be at most 8192 bytes` on stderr, exit `2`.
@@ -111,11 +111,11 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-46] A second entry repeating an earlier `index` prints `body malformed: slice[1].index: slice[1].index duplicates slice index 4` on stderr, exit `2`.
 - [ ] [BODY-47] An entry whose `title` is missing, blank or not a string prints `body malformed: slice[0].title: slice[0].title must be a non-empty string`, exit `2`; one line only (BODY-63).
 - [ ] [BODY-63] A title holding a display control (NEXT-37) prints `body malformed: slice[0].title: slice[0].title of row <i> holds U+000B; a slice title stays on one line`, exit `2` (see E-BODY-06).
-- [ ] [BODY-64] BODY-63 applies wherever a body's shape is judged — `aco body --check`, `aco check <n>`, `aco item new`, `aco item edit`; `board`/`next` keep reading a stored body, `next` naming its row (NEXT-32).
+- [ ] [BODY-64] BODY-63 applies wherever a body's shape is judged — `aco check -`, `aco check <n>`, `aco item new`, `aco item edit`; `board`/`next` keep reading a stored body, `next` naming its row (NEXT-32).
 - [ ] [BODY-48] An entry key outside `index`, `title`, `done_when` and `scope` prints `body malformed: slice[0].<key>: unknown key slice[0].<key>`, exit `2`; per-slice dependencies stay in the prose.
 - [ ] [BODY-65] An entry may carry `done_when`, its child's done-when (CUT-25); a blank or non-string one prints `body malformed: slice[0].done_when: slice[0].done_when must be a non-empty string` (E-BODY-07).
 - [ ] [BODY-66] A row `done_when` holding a display control prints `body malformed: slice[0].done_when: slice[0].done_when of row <i> holds U+000B; a slice done_when stays on one line`, exit `2`, as BODY-64.
-- [ ] [BODY-49] A block carrying `slice = []` is valid with nothing left to cut: `aco body --check` prints `body ok`, exit `0`, and the empty table stays present in the body.
+- [ ] [BODY-49] A block carrying `slice = []` is valid with nothing left to cut: `aco check -` prints `body ok`, exit `0`, and the empty table stays present in the body.
 - [ ] [BODY-67] A rewrite keeps `slice = []` among the top-level keys, ahead of the first `[[expectation]]` table, so a body whose last row was cut still prints `body ok` (see E-BODY-08).
 
 ## What a reader does with a defect
@@ -127,15 +127,15 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 
 ## `scope`, the item's own files
 
-- [ ] [BODY-53] A block carrying `scope = ["README.md", "docs"]` is valid, and a `[[slice]]` row may carry its own `scope = ["docs"]` under the same grammar: `aco body --check` prints `body ok`, exit `0`.
+- [ ] [BODY-53] A block carrying `scope = ["README.md", "docs"]` is valid, and a `[[slice]]` row may carry its own `scope = ["docs"]` under the same grammar: `aco check -` prints `body ok`, exit `0`.
 - [ ] [BODY-54] `scope = []` prints `body malformed: scope: scope must name at least one path`, exit `2`; an empty `[[slice]]` row `scope` prints the `slice[0].scope` form. Absent `scope` means unknown, never empty.
 - [ ] [BODY-55] A `scope = ["/etc/passwd"]` entry fails the same way `claim --scope` would: `body malformed: scope: claim scope must be repository-relative: '/etc/passwd'`.
 - [ ] [BODY-56] A valid `scope` renders sorted, deduplicated, ahead of the first `[[expectation]]`/`[[slice]]` table — else TOML binds a bare key to the prior table — so a re-read names the same canonical `scope`.
 
 ## `size`, the item's own estimate class
 
-- [ ] [BODY-57] A block with no `size` key is valid: absence means "no estimate", never a default class, and `aco body --check` prints `body ok`, exit `0`.
-- [ ] [BODY-58] `size = "S"`, `"M"`, or `"L"` is valid: `aco body --check` prints `body ok`, exit `0`.
+- [ ] [BODY-57] A block with no `size` key is valid: absence means "no estimate", never a default class, and `aco check -` prints `body ok`, exit `0`.
+- [ ] [BODY-58] `size = "S"`, `"M"`, or `"L"` is valid: `aco check -` prints `body ok`, exit `0`.
 - [ ] [BODY-59] A `size` outside `S`/`M`/`L` prints `body malformed: size: size must be S, M, or L`, exit `2`, the same sentence for every invalid shape.
 
   ```
@@ -146,8 +146,8 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 
 ## `whole`, the item's own wide-scope justification
 
-- [ ] [BODY-60] A block with no `whole` key is valid: absence means no stored reason, never a default one, and `aco body --check` prints `body ok`, exit `0`.
-- [ ] [BODY-61] `whole = "<reason>"` is valid when the reason is one non-empty line of at most 512 characters, no surrounding whitespace, no control character: `aco body --check` prints `body ok`, exit `0`.
+- [ ] [BODY-60] A block with no `whole` key is valid: absence means no stored reason, never a default one, and `aco check -` prints `body ok`, exit `0`.
+- [ ] [BODY-61] `whole = "<reason>"` is valid when the reason is one non-empty line of at most 512 characters, no surrounding whitespace, no control character: `aco check -` prints `body ok`, exit `0`.
 - [ ] [BODY-62] A `whole` outside BODY-61, or not a string, prints `body malformed: whole: whole reason must be one bounded non-empty line`, exit `2`, the same sentence for every invalid shape.
 
   ```
@@ -162,7 +162,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 
 ## Never
 
-- `aco body --check` never reads a file path, a live item, a dependency, the forge, or the state ref; it reads stdin and the repository's own storage pin only.
+- `aco check -` never reads a file path, a live item, a dependency, the forge, or the state ref; it reads stdin and the repository's own storage pin only.
 - No reader ever derives a blocker or a parent from the body: `Blocked by:` prose beside the block is documentation, and the `Parent: #<n>` line is read back by `aco cut`'s own orphan adoption alone.
 - A rewrite of one block field never changes a byte outside the fence, but it does re-render the whole block interior canonically: schema key order, TOML-safe quoting, the fence's own newline convention.
 - No reader guesses through a defect: a malformed body is refused by name, never treated as an empty or partial block.
@@ -179,7 +179,7 @@ Sessions whose stdin carries a fenced block use a four-backtick console fence.
 Setup: bare-remote, `storage = "github"` in a tracked `.aco/board.toml`
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 Prose a reader may write freely.
 
 ```aco
@@ -198,7 +198,7 @@ exit 0
 Setup: bare-remote, `storage = "github"`
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = ""
@@ -214,7 +214,7 @@ A block with only `done_when` left empty, as an untied cut writes it
 (`specs/cut.spec.md` CUT-37), names that one key:
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = "Cut from #90"
@@ -231,7 +231,7 @@ exit 2
 Setup: bare-remote, `storage = "github"`, issue `#42` carrying that same body
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ## Ziel
 Prose only, no typed block.
 BODY
@@ -247,7 +247,7 @@ exit 2
 Setup: bare-remote, `storage = "github"`
 
 ````console
-$ aco body --check --json <<'BODY'
+$ aco check - --json <<'BODY'
 ```aco
 version = 2
 now = "Something"
@@ -265,7 +265,7 @@ exit 2
 Setup: bare-remote, `storage = "state-ref"` in a tracked `.aco/board.toml`
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = "Open."
@@ -290,7 +290,7 @@ exit 0
 Setup: bare-remote, `storage = "github"`
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = "Open."
@@ -311,7 +311,7 @@ exit 2
 Setup: bare-remote, `storage = "github"`
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = "Open."
@@ -326,7 +326,7 @@ done_when = "The parser reads the new key."
 BODY
 body ok
 exit 0
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = "Open."
@@ -350,7 +350,7 @@ ruled `[[expectation]]` and one `[[slice]]` row, `index = 1` titled `Slice A`
 with a `done_when`; after `aco cut 90` its block reads:
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = "Open."
@@ -374,7 +374,7 @@ exit 0
 Setup: bare-remote, `storage = "github"`
 
 ````console
-$ aco body --check <<'BODY'
+$ aco check - <<'BODY'
 ```aco
 version = 1
 now = "Open."
