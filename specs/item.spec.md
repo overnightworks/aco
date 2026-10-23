@@ -191,7 +191,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 
 - [ ] [ITEM-17] Every other runtime refusal from `item new`/`show`/`edit`/`close`, reached with `--json`, prints `specs/output.spec.md`'s envelope, `reason: "precondition_failed"`, exit `2`.
 - [ ] [ITEM-18] An argparse-level refusal — a malformed `--origin`, a blank `--title`, or an item argument PIN-08 refuses — prints the `ERROR:` line, exit `2`, and under `--json` OUT-06's envelope.
-- [ ] [ITEM-25] A malformed piped body (`item edit`'s PIN-24, `item new`'s ITEM-27) reports `reason: "body_invalid"` instead, `defects` the same list `body --check`'s own `--json` carries, exit `2`.
+- [ ] [ITEM-25] A malformed piped body (`item edit`'s PIN-24, `item new`'s ITEM-27) reports `reason: "body_invalid"` instead, `defects` the same list `check -`'s own `--json` carries, exit `2`.
 
 ## Never
 

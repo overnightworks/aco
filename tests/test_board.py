@@ -2800,7 +2800,7 @@ def test_parse_body_refuses_scope_as_an_unknown_expectation_key() -> None:
 
 
 def test_parse_body_scope_defects_surface_through_the_body_check_rendering_path() -> None:
-    """`body.body_shape_check`, called directly by both `aco body --check`
+    """`body.body_shape_check`, called directly by both `aco check -`
     and `check <item>`, renders `parse_body` defects through
     `body_defect_text`; verify that shared codec behavior here."""
     body = block_body(f"{MINIMAL_BLOCK_TOML}scope = []\n")

@@ -12,9 +12,9 @@ from aco import cli
 @pytest.mark.parametrize(
     ("outcome", "argv"),
     [
-        pytest.param("returned", ["body", "--check"], id="returned"),
-        pytest.param("argparse exit", ["body", "--check", "--no-such-flag"], id="argparse-exit"),
-        pytest.param("raised", ["body", "--check"], id="raised"),
+        pytest.param("returned", ["check", "-"], id="returned"),
+        pytest.param("argparse exit", ["check", "-", "--no-such-flag"], id="argparse-exit"),
+        pytest.param("raised", ["check", "-"], id="raised"),
     ],
 )
 def test_run_cli_restores_stdin_after_the_run(

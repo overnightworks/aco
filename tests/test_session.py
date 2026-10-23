@@ -595,7 +595,6 @@ def _forbid_context_reads(monkeypatch: pytest.MonkeyPatch) -> None:
     ("command", "stdin", "exit_code"),
     [
         pytest.param(["claim", "--no-such-flag"], "", 2, id="parse-error"),
-        pytest.param(["body"], "", 2, id="body-without-its-mode"),
     ],
 )
 def test_a_command_that_needs_no_repository_reads_no_context(

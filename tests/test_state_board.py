@@ -1911,7 +1911,7 @@ def _filled_body(template: str, *, now: str, next_step: str, done_when: str) -> 
     """A fresh child or container skeleton body
     with its three blank projection keys filled -- the one substitution the
     README's "fill Now/Next/Done when" step performs before
-    `body --check`/`item edit`."""
+    `check -`/`item edit`."""
     return (
         template.replace('now = ""', f'now = "{now}"')
         .replace('next = ""', f'next = "{next_step}"')
@@ -2836,7 +2836,7 @@ class TestCliStateRefForge:
         the fixed `next`, and takes the row's own `done_when`, empty when the
         row carries none -- never a refusal; the container whose last row was
         cut, a ruled `[[expectation]]` beside it, still passes
-        `aco body --check`."""
+        `aco check -`."""
         item_files = _item_files_with_container_block(
             {
                 "expectation": [
@@ -2866,7 +2866,7 @@ class TestCliStateRefForge:
         )
         container_body = files_after[f"{CONTAINER_ID}.md"].decode()
         monkeypatch.setattr(sys, "stdin", io.StringIO(container_body))
-        assert run_cli(["body", "--check"], capsys).expect_success() == "body ok\n"
+        assert run_cli(["check", "-"], capsys).expect_success() == "body ok\n"
 
     def _nested_container_files(
         self, slice_rows: tuple[tuple[int, str], ...]
@@ -4951,7 +4951,7 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         """Issue #287 proof 5: a piped body with no recognized `aco`
-        block refuses with `body --check`'s own sentence, before any write
+        block refuses with `check -`'s own sentence, before any write
         -- the remote's tip stays exactly what it was."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         remote_url = f"file://{bare_remote}"
@@ -5781,7 +5781,7 @@ class TestCliStateRefForge:
         )
 
         monkeypatch.setattr(sys, "stdin", io.StringIO(container_body))
-        assert run_cli(["body", "--check"], capsys).expect_success() == "body ok\n"
+        assert run_cli(["check", "-"], capsys).expect_success() == "body ok\n"
 
         edit_container = ["item", "edit", container_id]
         edited_container = run_cli(edit_container, capsys, stdin=container_body)
@@ -5804,7 +5804,7 @@ class TestCliStateRefForge:
         )
 
         monkeypatch.setattr(sys, "stdin", io.StringIO(child_body))
-        assert run_cli(["body", "--check"], capsys).expect_success() == "body ok\n"
+        assert run_cli(["check", "-"], capsys).expect_success() == "body ok\n"
 
         edited_child = run_cli(["item", "edit", child_id], capsys, stdin=child_body)
         assert edited_child.status == 0

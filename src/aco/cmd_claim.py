@@ -528,7 +528,7 @@ class _ClaimBodyInvalidError(protocol.ClaimError):
     """The item a claim's scope is being *derived* from has a body that
     cannot supply or confirm one -- a malformed `aco` block (issue
     #310 finding 43: named *before* "item names no scope", reusing the same
-    block-defect reader `body --check` uses), no `scope` field at all, or
+    block-defect reader `check -` uses), no `scope` field at all, or
     one differing from an explicit `--scope` (issue #406). Named so
     `--json` can choose `body_invalid`. Also covers CLM-37: a malformed
     body on the whole fallback for an explicit or replayed wide scope."""

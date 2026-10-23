@@ -18,7 +18,6 @@ from . import (
     cmd_adopt,
     cmd_ask,
     cmd_board,
-    cmd_body,
     cmd_bootstrap,
     cmd_brief,
     cmd_check,
@@ -503,12 +502,14 @@ def _add_rule_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(rule)
 
 
-def _parse_check_subject(value: str) -> int | str:
+def _parse_check_subject(value: str) -> int | str | cmd_check.CheckInput:
     """`check`'s one positional: a pull/issue reference (`workboard.parse_item_reference`),
     or -- issue #359, LAND-48 -- a full 40-character commit id, read as a trunk
-    commit instead. The two grammars never collide: an item reference
-    (`aco-xxxxxx`, `#n`, or the bare `n`) is always far shorter than a full
-    git object id."""
+    commit instead, or `-`, a body piped on stdin. The grammars never collide:
+    an item reference (`aco-xxxxxx`, `#n`, or the bare `n`) is always far
+    shorter than a full git object id."""
+    if value == cmd_check.STDIN_SUBJECT:
+        return cmd_check.CheckInput.STDIN
     if protocol.COMMIT_PATTERN.fullmatch(value) is not None:
         return value
     return workboard.parse_item_reference(value)
@@ -520,32 +521,19 @@ def _add_check_parser(commands: _Subcommands, name: str) -> None:
         help=(
             "read one number or trunk commit -- a pull request's work-item "
             "classification, a trunk commit's (LAND-48), or an issue's body "
-            "contract; claims, labels and writes nothing"
+            f"contract -- or, with {cmd_check.STDIN_SUBJECT}, a body piped on stdin; "
+            "claims, labels and writes nothing"
         ),
     )
     check.add_argument(
         "number",
         type=_parse_check_subject,
-        help="the pull request, issue, or trunk commit to read",
-    )
-    _add_json_flag(check)
-
-
-def _add_body_parser(commands: _Subcommands, name: str) -> None:
-    body_parser = commands.add_parser(
-        name,
         help=(
-            f"check a piped body's fenced {body.BLOCK_FENCE_INFO} block for defects "
-            "before the forge"
+            "the pull request, issue, or trunk commit to read; "
+            f"{cmd_check.STDIN_SUBJECT} reads a body from stdin"
         ),
     )
-    body_parser.add_argument(
-        "--check",
-        action="store_true",
-        required=True,
-        help="read a body from stdin and report its defects",
-    )
-    _add_json_flag(body_parser)
+    _add_json_flag(check)
 
 
 def _add_brief_parser(commands: _Subcommands, name: str) -> None:
@@ -814,7 +802,6 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "ask": _RepositoryCommand(_add_ask_parser, cmd_ask.run),
     "rule": _RepositoryCommand(_add_rule_parser, cmd_rule.run),
     "check": _RepositoryCommand(_add_check_parser, cmd_check.run),
-    "body": _RepositoryCommand(_add_body_parser, cmd_body.run),
     "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),
     "item": _RepositoryCommand(_add_item_parser, cmd_item.run),
 }

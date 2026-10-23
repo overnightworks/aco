@@ -90,3 +90,5 @@
 # budget: issue #277 deletes `aco protect` together with tests/test_protect.py, tests/test_hook_input.py and tests/test_sed_script.py; those modules were more parametrized than the rest of the suite, so removing them lowers parametrized_share_pct without any remaining test changing shape [#277]
 
 # budget: issue #313 replaces a parametrized text/json `aco board --serve` refusal test with one plain argparse unknown-argument test (the flag is no longer declared, so there is no per-mode refusal left to parametrize) and adds one distinct `aco serve` refusal of the global `--repo` forge slug; this lowers parametrized_share_pct by one test without any remaining test changing shape [#313, BOARD-55]
+
+# budget: BDY-07..BDY-13 are retired (issue #322): `aco body --check` became `aco check -`, so no test cites the BDY IDs any more; their successors CHECK-17 (BDY-07), CHECK-18 (BDY-08), CHECK-19 (BDY-09), CHECK-20 (BDY-10), CHECK-21 (BDY-11), CHECK-22 (BDY-12) and CHECK-16 (BDY-13, now `aco body` is an unknown command) carry the same tests [BDY-07, BDY-08, BDY-09, BDY-10, BDY-11, BDY-12, BDY-13]

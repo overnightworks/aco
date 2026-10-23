@@ -1,9 +1,8 @@
-"""Real-pipe CLI proofs for specs/body.spec.md; field grammar lives in test_board."""
+"""Real-pipe CLI proofs for `aco check -`; field grammar lives in test_board."""
 
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from pathlib import Path
 from typing import NamedTuple
 
@@ -11,7 +10,7 @@ import pytest
 from board_fixtures import BIDI_AND_ZERO_WIDTH_CONTROLS, MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import forbid_forge_resolution, real_git, run_cli, track_board_config
 
-from aco import body, cli, cmd_body, process, store
+from aco import body, process, report, store
 
 
 @pytest.fixture
@@ -213,7 +212,7 @@ class TestBodyCheck:
             ),
         ],
     )
-    def test_body_check_judges_a_piped_body(
+    def test_check_stdin_judges_a_piped_body(
         self,
         capsys: pytest.CaptureFixture[str],
         as_json: bool,
@@ -223,10 +222,8 @@ class TestBodyCheck:
         exit_code: int,
         wire: str,
     ) -> None:
-        """Spec: BDY-07, BDY-08, BDY-09, BODY-12, BODY-14, BODY-68, OUT-01."""
-        result = run_cli(
-            ["body", "--check", *(["--json"] if as_json else [])], capsys, stdin=raw_body
-        )
+        """Spec: CHECK-17, CHECK-18, CHECK-19, BODY-12, BODY-14, BODY-68, OUT-01."""
+        result = run_cli(["check", "-", *(["--json"] if as_json else [])], capsys, stdin=raw_body)
         if as_json:
             payload = json.loads(result.stdout)
             assert payload.get("defects") == defects
@@ -243,11 +240,11 @@ class TestBodyCheck:
         assert result.status == exit_code
 
     @pytest.mark.parametrize("raw_body", [pytest.param("", id="empty-text")])
-    def test_body_check_judges_an_empty_pipe(
+    def test_check_stdin_judges_an_empty_pipe(
         self, capsys: pytest.CaptureFixture[str], raw_body: str
     ) -> None:
-        """Spec: BDY-08; an explicitly empty pipe is still supplied stdin."""
-        result = run_cli(["body", "--check"], capsys, stdin=raw_body)
+        """Spec: CHECK-18; an explicitly empty pipe is still supplied stdin."""
+        result = run_cli(["check", "-"], capsys, stdin=raw_body)
         assert result.stderr == "body malformed: aco: no aco block\n"
         assert result.status == 2
 
@@ -325,30 +322,36 @@ class TestBodyCheck:
             ),
         ],
     )
-    def test_body_check_judges_block_fields(
+    def test_check_stdin_judges_block_fields(
         self,
         capsys: pytest.CaptureFixture[str],
         toml_text: str,
         reason: str,
     ) -> None:
-        """Spec: BDY-07, BDY-08, BODY-58, BODY-59, BODY-61, BODY-62, BODY-63,
+        """Spec: CHECK-17, CHECK-18, BODY-58, BODY-59, BODY-61, BODY-62, BODY-63,
         BODY-65, BODY-66, BODY-67."""
-        result = run_cli(["body", "--check"], capsys, stdin=block_body(toml_text))
+        result = run_cli(["check", "-"], capsys, stdin=block_body(toml_text))
         if reason:
             assert result.stderr == f"body malformed: {reason}\n"
         else:
             assert result.stdout == "body ok\n"
         assert result.status == (2 if reason else 0)
 
-    def test_body_check_uses_the_storage_pin(
+    @pytest.mark.parametrize(
+        "global_options",
+        [pytest.param([], id="no-repo"), pytest.param(["--repo", "acme/items"], id="repo-ignored")],
+    )
+    def test_check_stdin_uses_the_storage_pin(
         self,
         capsys: pytest.CaptureFixture[str],
         as_json: bool,
         storage_pin: StoragePin,
+        global_options: list[str],
     ) -> None:
-        """Spec: BDY-12, BODY-15, BODY-16; the fixture verifies the tracked pin."""
+        """Spec: CHECK-22, CHECK-23, BODY-15, BODY-16; the fixture verifies the tracked pin,
+        and `--repo` is neither read nor refused under either storage."""
         result = run_cli(
-            ["body", "--check", *(["--json"] if as_json else [])],
+            [*global_options, "check", "-", *(["--json"] if as_json else [])],
             capsys,
             stdin=block_body(MINIMAL_BLOCK_TOML + _RECORD_TOML),
         )
@@ -362,20 +365,18 @@ class TestBodyCheck:
         assert result.status == storage_pin.exit_code
 
     @pytest.mark.parametrize("raw_body", [pytest.param(b"\xff", id="invalid-utf8")])
-    def test_body_check_refuses_undecodable_input(
+    def test_check_stdin_refuses_undecodable_input(
         self,
         capsys: pytest.CaptureFixture[str],
         as_json: bool,
         raw_body: bytes,
     ) -> None:
-        """Spec: BDY-10, BDY-09 unavailable; real bytes cross the strict decoder."""
+        """Spec: CHECK-20, CHECK-19 unavailable; real bytes cross the strict decoder."""
         message = (
             "stdin is not valid UTF-8: 'utf-8' codec can't decode byte 0xff in position 0: "
             "invalid start byte; pipe the body as UTF-8 text"
         )
-        result = run_cli(
-            ["body", "--check", *(["--json"] if as_json else [])], capsys, stdin=raw_body
-        )
+        result = run_cli(["check", "-", *(["--json"] if as_json else [])], capsys, stdin=raw_body)
         if as_json:
             payload = json.loads(result.stdout)
             assert payload.get("message") == message
@@ -384,15 +385,15 @@ class TestBodyCheck:
         assert result.stderr == f"ERROR: {message}\n"
         assert result.status == 2
 
-    def test_body_check_refuses_an_untrusted_pin(
+    def test_check_stdin_refuses_an_untrusted_pin(
         self,
         capsys: pytest.CaptureFixture[str],
         as_json: bool,
         untrusted_pin: str,
     ) -> None:
-        """Spec: BDY-11, PIN-01, PIN-32; trust refusal, independent of read ordering."""
+        """Spec: CHECK-21, PIN-01, PIN-32; trust refusal, independent of read ordering."""
         result = run_cli(
-            ["body", "--check", *(["--json"] if as_json else [])],
+            ["check", "-", *(["--json"] if as_json else [])],
             capsys,
             stdin=block_body(MINIMAL_BLOCK_TOML),
         )
@@ -405,82 +406,75 @@ class TestBodyCheck:
         assert result.status == 2
 
     @pytest.mark.usefixtures("untrusted_pin")
-    def test_body_check_checks_the_pin_before_reading_stdin(
+    def test_check_stdin_checks_the_pin_before_reading_stdin(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
         as_json: bool,
     ) -> None:
-        """Spec: BDY-11; the pin refusal precedes any stdin read."""
+        """Spec: CHECK-21; the pin refusal precedes any stdin read."""
 
         def forbidden_read() -> str:
-            pytest.fail("body --check must trust the pin before reading stdin")
+            pytest.fail("check - must trust the pin before reading stdin")
 
-        monkeypatch.setattr(cmd_body, "read_body_check_input", forbidden_read)
+        monkeypatch.setattr(report, "read_piped_body", forbidden_read)
         run_cli(
-            ["body", "--check", *(["--json"] if as_json else [])],
+            ["check", "-", *(["--json"] if as_json else [])],
             capsys,
             stdin=block_body(MINIMAL_BLOCK_TOML),
         )
 
     @pytest.mark.parametrize("raw_body", [pytest.param(b"\xff", id="invalid-utf8")])
-    def test_body_check_decodes_before_parsing(
+    def test_check_stdin_decodes_before_parsing(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
         as_json: bool,
         raw_body: bytes,
     ) -> None:
-        """Spec: BDY-10; decoding refusal precedes any body parse."""
+        """Spec: CHECK-20; decoding refusal precedes any body parse."""
 
         def forbidden_parse(*args: object, **kwargs: object) -> None:
-            pytest.fail("body --check must decode before parsing")
+            pytest.fail("check - must decode before parsing")
 
         monkeypatch.setattr(body, "body_shape_check", forbidden_parse)
-        run_cli(["body", "--check", *(["--json"] if as_json else [])], capsys, stdin=raw_body)
+        run_cli(["check", "-", *(["--json"] if as_json else [])], capsys, stdin=raw_body)
 
     @pytest.mark.parametrize(
         "argv",
         [
-            pytest.param(["body"], id="missing-check"),
-            pytest.param(["body", "--check", "body.md"], id="file-argument"),
-            pytest.param(["body", "--check", "42"], id="item-argument"),
+            pytest.param(["body"], id="bare"),
+            pytest.param(["body", "--check"], id="check-flag"),
         ],
     )
-    def test_body_rejects_an_invalid_invocation(
-        self, capsys: pytest.CaptureFixture[str], argv: list[str], monkeypatch: pytest.MonkeyPatch
+    def test_body_is_an_unknown_command(
+        self, capsys: pytest.CaptureFixture[str], argv: list[str]
     ) -> None:
-        """Spec: BDY-13, Never 2; no file or live-item positional interface."""
-
-        def forbidden_run(*args: object, **kwargs: object) -> int:
-            pytest.fail("the parser must refuse before the body command runs")
-
-        monkeypatch.setattr(cmd_body, "run", forbidden_run)
-        # The command table captures the callable when cli is imported.
-        monkeypatch.setitem(cli._COMMANDS, "body", replace(cli._COMMANDS["body"], run=cmd_body.run))
+        """Spec: CHECK-16; no alias is left behind."""
         result = run_cli(argv, capsys, stdin=block_body(MINIMAL_BLOCK_TOML))
+        assert "invalid choice: 'body'" in result.stderr
         assert result.status == 2
 
-    def test_body_check_never_touches_a_forge_the_store_or_gh(
+    def test_check_stdin_never_touches_a_forge_the_store_or_gh(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """Spec: body Never 1; each forbidden boundary has its own injected fault."""
+        """Spec: CHECK-17, check - Never; each forbidden boundary has its own injected fault."""
         forbid_forge_resolution(monkeypatch)
 
         def forbidden_store(*args: object, **kwargs: object) -> None:
-            pytest.fail("body --check must not fetch the store")
+            pytest.fail("check - must not fetch the store")
 
         monkeypatch.setattr(store, "fetch_state", forbidden_store)
         for name in ("run_captured", "run_bounded", "run_bounded_captured"):
             launch = getattr(process, name)
 
             def without_gh(arguments, *, _launch=launch, **kwargs):
-                assert arguments[0] != "gh", "body --check must not launch gh"
+                assert arguments[0] != "gh", "check - must not launch gh"
                 return _launch(arguments, **kwargs)
 
             monkeypatch.setattr(process, name, without_gh)
-        result = run_cli(["body", "--check"], capsys, stdin=block_body(MINIMAL_BLOCK_TOML))
+        result = run_cli(["check", "-"], capsys, stdin=block_body(MINIMAL_BLOCK_TOML))
         assert result.stdout == "body ok\n"
         assert result.status == 0

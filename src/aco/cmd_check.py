@@ -5,11 +5,21 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum, StrEnum
 from typing import Literal, cast
 
 from . import board_read, body, checkout, forge, policy, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
+
+STDIN_SUBJECT = "-"
+
+
+class CheckInput(Enum):
+    """The one non-reference subject `check` reads: a body piped on stdin. A
+    plain `Enum` member, never a `str`, because `run` tells a trunk commit
+    from every other subject by `isinstance(..., str)`."""
+
+    STDIN = STDIN_SUBJECT
 
 
 def _checked_classification(
@@ -77,7 +87,7 @@ class _CheckReason(StrEnum):
     (a valid, complete issue with an open dependency); every other member
     exits `2`. `valid`/`malformed`/`incomplete` mirror
     `body.BodyShapeVerdict`'s own three values -- the body-shape decision
-    `check` and `body --check` both read, never re-derived from a defect
+    `check` and `check -` both read, never re-derived from a defect
     sentence's own prefix. `not_on_trunk` is the trunk form's own member: a
     commit the first-parent walk does not hold may well exist in this
     repository, so it is never `missing`."""
@@ -222,15 +232,46 @@ def _issue_check(
     )
 
 
+def _body_check_report(check: body.BodyShapeCheck, *, as_json: bool) -> int:
+    """The one rendering of a `check -` answer: `body.body_shape_check`'s
+    own sentences, never truncated to the first, since there is no live
+    item here to refuse a single verdict about."""
+    ok = check.verdict is body.BodyShapeVerdict.VALID
+    if as_json:
+        report.emit_json(ok, _CheckReason(check.verdict.value), defects=list(check.defects))
+    elif check.defects:
+        for defect in check.defects:
+            print(defect, file=sys.stderr)
+    else:
+        print("body ok")
+    return 0 if ok else 2
+
+
+def _check_piped_body(parsed: argparse.Namespace, context: RunContext) -> int:
+    """`check -` is forge-free, the same way `status` and `bootstrap` are: it
+    reads stdin only, never an issue, a live claim, a filesystem path, or the
+    forge's own `blocked_by` relation, so it never asks the `RunContext` for
+    its forge. It still reads the repository's own storage pin: `[record]` is
+    a known key under `storage = "state-ref"` and an unknown one under
+    `storage = "github"`, the same gate `session._state_ref_forge`'s own items
+    already read through `state_board._decode_item`."""
+    storage = context.config.storage
+    check = body.body_shape_check(report.read_piped_body(), storage=storage)
+    return _body_check_report(check, as_json=parsed.json)
+
+
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """One number or trunk commit, one dispatch request into one of four
     answers: a pull request to classify, an issue whose body contract to
     read, a trunk commit to classify from its own trailer block (issue
     #359, LAND-48), or a number that is in neither number space. Only the
     pull-request side needs the live claims, so the issue side never
-    fetches the state ref."""
+    fetches the state ref. `-` is a fifth: a body piped on stdin, judged
+    without any read of the forge."""
     as_json = parsed.json
     try:
+        if parsed.number is CheckInput.STDIN:
+            return _check_piped_body(parsed, context)
         if isinstance(parsed.number, str):
             return _check_trunk_commit(parsed, context)
         number = int(parsed.number)
