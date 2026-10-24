@@ -64,7 +64,7 @@
 
 [function_lines."src/aco/cmd_land.py"]
 "_land_preflight" = 72
-"run" = 78
+"run" = 71
 
 [function_lines."src/aco/cmd_release.py"]
 "_cmd_release_landed" = 98
