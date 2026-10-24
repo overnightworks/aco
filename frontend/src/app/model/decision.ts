@@ -3,7 +3,7 @@
  * request a card as shown sends (`specs/serve.spec.md` ABRD-09/21), and
  * reading its `DecisionResult` into what the stage shows next. Holding no
  * state of its own, this is `DecisionStore`'s (`../state/decision.svelte.ts`)
- * only source for "what just happened" (issue #649).
+ * only source for "what just happened".
  */
 
 import type { DecisionRequest, DecisionResult, ExpectationLine, Outcome } from '../../types';

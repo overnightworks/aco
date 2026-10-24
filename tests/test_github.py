@@ -2726,8 +2726,8 @@ def test_bounded_command_classifies_every_forge_failure_signal(
 ) -> None:
     """Adapter-boundary proof, driven through `GitHubForge.default_branch`
     (the real caller of `_gh` -> `_bounded_command`) with `process.run_bounded`
-    faked: every nonzero-exit signal (#4.2) and every process failure that
-    reaches no forge response (#4.1) becomes the exact typed `ForgeError`
+    faked: every nonzero-exit signal and every process failure that
+    reaches no forge response becomes the exact typed `ForgeError`
     subclass with the exact message -- not just some `ClaimError`."""
 
     def fake_run_bounded(*args, **kwargs):

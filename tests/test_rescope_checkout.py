@@ -49,7 +49,7 @@ def _real_repository_with_worktree(
     `board_config`, empty by default, beside the `trunk_files` it tracks: every worktree shares
     `main`'s history, so
     `path_is_tracked` reads a real "tracked" answer for it from any of them.
-    `main` also carries a real, resolvable `origin/HEAD` (gate G4): every
+    `main` also carries a real, resolvable `origin/HEAD`: every
     worktree's own feature branch reads a real default-branch name through
     it, rather than refusing "default branch unknown" -- a repository with
     no recorded `origin/HEAD` at all is its own dedicated proof."""
@@ -705,7 +705,7 @@ def test_rescope_denies_before_touching_the_store(
     checkout-resolution paths:
     a second `--add`/`--drop` path outside the first path's own checkout
     (`cmd_rescope._rescope_scope_entries`) refuses rather than silently
-    mis-scoping; a location outside every repository, and gate G3's no-commit
+    mis-scoping; a location outside every repository, and a no-commit
     checkout (`cmd_rescope._rescope_checkout`); and a relative `--drop` entry
     beside an absolute `--add` that names a real checkout, run from a cwd
     outside every repository, which has no checkout to read it against --

@@ -14,7 +14,7 @@ from . import protocol
 class UsageError(protocol.ClaimError):
     """One refusal the argument parser itself raises -- an unknown flag, a
     missing required option, a mutually exclusive pair -- carried out of the
-    parse instead of exiting inside it (issue #432), so a `--json` caller
+    parse instead of exiting inside it, so a `--json` caller
     still gets the shared envelope. `parser` is the one that refused, a
     subcommand's own rather than the root's, because only it can print the
     usage block the plain-text path still prints byte for byte."""
@@ -49,11 +49,11 @@ class UsageErrorParser(argparse.ArgumentParser):
     inside the parse, before `--json` was ever read off a namespace, so this
     raises instead and lets one place decide the refusal's shape.
 
-    No parser reads an abbreviated long option (issue #502, OUT-09): a
+    No parser reads an abbreviated long option (OUT-09): a
     prefix unique today targets another option once one is added, and
     `reset --conf --f` must never stand for a destructive flag pair.
 
-    It also remembers what a refused parse would otherwise lose (issue #432):
+    It also remembers what a refused parse would otherwise lose:
     Python parses a subcommand into a throwaway namespace and copies the
     values back only once that parse succeeds, yet `--json` is exactly the
     flag the refusal's own shape depends on. So each parser keeps the tokens

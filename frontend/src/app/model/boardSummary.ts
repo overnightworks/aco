@@ -1,7 +1,7 @@
 /**
  * Pure read-only projections over a `BoardResponse`, shared by `App.svelte`,
  * `TrackList.svelte` and `Stage.svelte` so none of them carries decision
- * logic of its own (SonarCloud does not analyse `.svelte`, issue #368: this
+ * logic of its own (SonarCloud does not analyse `.svelte`: this
  * is where the behaviour lives instead).
  */
 

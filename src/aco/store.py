@@ -227,12 +227,10 @@ _STATE_FETCH_OPTIONS = (
 _FETCH_ANCHOR_REF = "refs/worktree/aco/state"
 
 # `export_state_bundle` points this at the leased tip and bundles it:
-# the previous implementation
-# pointed the *shared* `STATE_REF` at `tip` to give the bundle a name, but
-# that ref is shared across every linked worktree of this repository --
-# a concurrent reset elsewhere could repoint or delete it between this
-# write and the lease-guarded remote delete that follows, and a failed
-# export left it mutated with no restore of its previous value. This name
+# Using the shared `STATE_REF` would let a concurrent reset in another
+# linked worktree repoint or delete it between the bundle write and the
+# lease-guarded remote delete that follows, and a failed
+# export could leave it mutated with no restore of its previous value. This name
 # lives in the same worktree-private `refs/worktree/*` namespace
 # `_FETCH_ANCHOR_REF` already relies on, so no linked worktree ever
 # observes, races, or clobbers it, and nothing shared is written by an
@@ -1132,7 +1130,7 @@ def peek_state(*, worktree: Path, remote: str) -> ClaimState:
     tip is on `remote` right now, never against this worktree's history.
     `land`'s preflight uses it to observe a live claim before its first
     write: a pull request this preflight goes on to refuse must never have
-    anchored a ref or stamped a lineage the merge itself never happens. Both
+    anchored a ref or stamped a lineage when the merge never happens. Both
     callers share the same requirement -- a dry run, a live-claim refusal, a
     failed export, or a refused merge must change nothing durable -- so this
     performs no per-worktree write at all: no anchor write, no
@@ -1805,8 +1803,8 @@ def local_state_ref_exists(worktree: Path) -> bool:
     lands fetched objects in its own per-worktree anchor, `peek_state` in
     this worktree's object store alone), nor does `export_state_bundle` below,
     which bundles its own private
-    `EXPORT_BUNDLE_REF` instead of `STATE_REF` (19.09.2026 REVISE findings
-    1+2) -- but a foreign tool might still leave a local `STATE_REF`, and
+    `EXPORT_BUNDLE_REF` instead of `STATE_REF` -- but a foreign tool might
+    still leave a local `STATE_REF`, and
     `delete_state_ref`, the reset step right after export, deletes it only
     when this is true.
     """

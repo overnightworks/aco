@@ -8,7 +8,7 @@ on:
     branches:
       - main
 
-# The token can never push, whatever the repository's default says (#530):
+# The token can never push, whatever the repository's default says:
 # a test that escapes its store fakes must not reach the live claim store.
 permissions:
   contents: read

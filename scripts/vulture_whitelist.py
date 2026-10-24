@@ -6,7 +6,7 @@ attribute access; the code reaches them only by dynamic construction
 to vulture's static analysis. Naming them here is the whole fix -- this file
 is never imported by the package itself.
 
-`_BoardApiRequestHandler.do_GET`/`do_POST`/`log_message` (issue #631) are
+`_BoardApiRequestHandler.do_GET`/`do_POST`/`log_message` are
 `http.server`'s own dispatch and logging surface: `handle_one_request` calls
 `do_GET`/`do_POST` by `getattr(self, "do_" + self.command)`, and every stdlib
 logging call reaches the override through `BaseHTTPRequestHandler`'s own
@@ -23,29 +23,24 @@ iteration over `Size`), and `SizeClassStats.p80_hours` is read only through
 `asdict` when `board_payload` serializes the `--json` output; vulture sees
 no literal access for any of the three.
 
-`BoardItem.priority_bucket`/`age_days` and `Board.stale` (issue #420) lost
-their one literal reader when `board.render` -- the text table `--json`
-never needed -- was deleted: each is still part of `board_payload`'s
+`BoardItem.priority_bucket`/`age_days` and `Board.stale` are part of `board_payload`'s
 own `--json` contract (`asdict` serializes every dataclass field whether or
 not any function reads it back by name), and tests already pin all three by
 name (`tests/test_board.py`'s `priority_bucket`/`stale` attribute
 assertions, `tests/test_cli.py`'s `"age_days"` envelope pin).
 `BoardItem.claim_age`, `SizeClassMeasurement.first_event_at`/`last_event_at`,
-and `Measurements.unfinished`/`as_of` (issue #644) lost their own literal
-readers the same way when the old board page module -- the last caller of the served
-and static board pages, and of the text `measurements_lines`/`estimate_cell`
-formatters deleted alongside it -- went too: each is still part of
+and `Measurements.unfinished`/`as_of` are likewise part of
 `board_payload`'s own `--json` contract, exercised by
 `tests/test_cli.py`'s `"claim_age"` envelope pin and
 `tests/test_board.py`'s own `measurements`/`classes` payload assertions.
 
-`MergeMethod.REBASE` (issue #578) is reached the same way as
+`MergeMethod.REBASE` is reached the same way as
 `NoItemKind.DOCS`: `GitHubForge.allowed_merge_methods` iterates `MergeMethod`
 to read each of GitHub's merge settings, and no code names the one method
 `aco land` never merges with.
 
 `aco.board.server._BoardRequestHandler.send_error` and its
-`close_connection` and `request_version` assignments (issue #631) are
+`close_connection` and `request_version` assignments are
 `http.server`'s own hooks: the stdlib calls `self.send_error(...)` for a
 request it cannot parse, its `handle` loop reads `self.close_connection` to
 end the connection, and `send_response` reads `self.request_version` to

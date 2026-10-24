@@ -340,7 +340,7 @@ def is_safe_branch_name(branch: str) -> bool:
     the same `BRANCH_NAME_MAX_LENGTH` bound, not a shape check that merely
     happened to cap length the same way through an unrelated regex quantifier
     -- before its first `git worktree add`, never a second, drifted copy of
-    the same shape (review finding: the pre-write check omitted the bound)."""
+    the same shape."""
     segments = branch.split("/")
     return not (
         len(branch) > BRANCH_NAME_MAX_LENGTH

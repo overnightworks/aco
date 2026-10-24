@@ -120,7 +120,7 @@ def _outside_checkout_reason(flag: str, path: str, toplevel: Path) -> str:
 def _rescope_checkout(paths: _RescopePaths) -> checkout.PathCheckout:
     """`rescope`'s checkout, resolved from its first entry whenever one
     names a location, else from the process's own cwd. A
-    checkout with no commit yet refuses (gate G3). A checkout root resolves
+    checkout with no commit yet refuses. A checkout root resolves
     as its own checkout, a file in a directory not created yet from its
     nearest existing ancestor."""
     named = paths.named()
