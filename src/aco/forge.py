@@ -7,7 +7,7 @@ all. The GitHub adapter never itself refuses an operation. `cmd_land`,
 `cmd_release` and `cmd_item` depend on `GitHubForge` or `StateRefBoard`
 directly, so a second forge needs its own contract for them first.
 `board_read.load_board_config` is the one caller that branches on a capability
-answer -- reading a work-item body's dependencies (#150) requires
+answer -- reading a work-item body's dependencies requires
 `LIST_BOARD_DEPENDENCIES` at `READ_ONLY` or better, so a forge without it
 cannot serve a board at all.
 """
@@ -57,8 +57,8 @@ class ForgeMergeConflictError(ForgeError):
 
 
 class ForgeMergeRefusedError(ForgeError):
-    """`merge_landing`'s pinned merge was refused outright (HTTP 405, issue
-    #603) -- a rule, a required review, an unmergeable state: the forge's
+    """`merge_landing`'s pinned merge was refused outright (HTTP 405)
+    -- a rule, a required review, an unmergeable state: the forge's
     own message is the reason, kept apart from a moved head, whose repair
     is a re-run."""
 
@@ -67,7 +67,7 @@ class ForgePartialCreationError(ForgeError):
     """The forge created issue `created`, but `step` did not finish it.
 
     The issue already exists, so a caller's refusal must name it and what is
-    left (issue #444) rather than read as "nothing created". `step` is the
+    left rather than read as "nothing created". `step` is the
     failed step as a verb phrase, `partial_write`'s own `failed` value.
     """
 
@@ -80,7 +80,7 @@ class ForgePartialCreationError(ForgeError):
 class ForgeIssueTypeNotSetError(ForgePartialCreationError):
     """GitHub created issue `created` without the organization's issue type
     `type_name` it was asked for: its REST create drops the type silently
-    when the caller lacks push access (issue #444)."""
+    when the caller lacks push access."""
 
     def __init__(self, *, created: int, type_name: str) -> None:
         self.type_name = type_name
@@ -97,7 +97,7 @@ class ForgePartialChildCreationError(ForgePartialCreationError):
 
     Not atomic across `create_child`'s own two writes (the issue and its
     sub-issue relation), nor across `create_child` and the later block
-    rewrite -- but a repeat is safe (#260): re-run the same cut and it
+    rewrite -- but a repeat is safe: re-run the same cut and it
     adopts the child -- an orphan open issue with no recorded parent, exactly
     what a failed relation write leaves behind -- instead of risking a
     second one, finishing whichever `step` failed. Raised by the GitHub
@@ -159,7 +159,7 @@ class ItemReference:
     distributes on this single read instead of probing with `landing`, which
     fails unclassified for an issue number. A number that does not exist is
     `MISSING` and no landing. `origin` is the foreign issue this item binds
-    to (`FORGE#N`, issue #316, parent #230): populated from `record.origin`
+    to (`FORGE#N`): populated from `record.origin`
     under `state-ref`, always `None` under `github` -- a GitHub issue is
     never itself bound to another forge's issue.
     """
@@ -174,7 +174,7 @@ class ItemReference:
 @dataclass(frozen=True)
 class ClosedIssue:
     """One issue closed at or after a caller's cutoff: only the number and
-    title `item new`'s and `cut`'s twin search compares (issue #444)."""
+    title `item new`'s and `cut`'s twin search compares."""
 
     number: int
     title: str
@@ -205,13 +205,13 @@ class Landing:
 
     `merge_commit` is the sha GitHub itself recorded as the merge (`None`
     until `merged` is true): `release --merged`'s own authority for what
-    this landing closes (issue #397) is that commit's own trailer block,
+    this landing closes is that commit's own trailer block,
     never this same read's mutable `body` -- a fixer can (and once did,
     Befund 41) edit the body after the merge without touching what actually
-    landed. `title` heads the squash commit `aco land` composes (issue
-    #578). `head_sha` is the pull request's head commit; once `merged`, the
+    landed. `title` heads the squash commit `aco land` composes.
+    `head_sha` is the pull request's head commit; once `merged`, the
     forge keeps it at the head that landed, the one tip a squashed lane is
-    cleaned up by (issue #590).
+    cleaned up by.
     """
 
     number: int
@@ -227,7 +227,7 @@ class Landing:
 
 
 # GitHub's own open vocabularies for a pull request's `mergeable_state` and a
-# completed check run's `conclusion` (`aco land`'s preflight, issue #405):
+# completed check run's `conclusion` (`aco land`'s preflight):
 # each is owned by GitHub, can grow a new value without this tool's notice,
 # and every value but the one this tool branches on is only ever echoed
 # verbatim into a refusal -- never enumerated as a closed `StrEnum`, which
@@ -240,7 +240,7 @@ CHECK_CONCLUSION_SUCCESS = "success"
 @dataclass(frozen=True)
 class CheckRun:
     """One CI check GitHub reports against a pull request's pinned head
-    commit (`landing_readiness`, issue #405): `conclusion` is `None` while
+    commit (`landing_readiness`): `conclusion` is `None` while
     the check has not reached `status: "completed"`, GitHub's own
     conclusion string (`CHECK_CONCLUSION_SUCCESS` or another) once it has."""
 
@@ -250,8 +250,8 @@ class CheckRun:
 
 @dataclass(frozen=True)
 class LandingReadiness:
-    """Every fact `aco land`'s preflight judges before its first write
-    (issue #405), read once so a race between this read and the merge
+    """Every fact `aco land`'s preflight judges before its first write,
+    read once so a race between this read and the merge
     itself is caught by the pinned `head_sha` rather than assumed away.
     `mergeable_state` is GitHub's own string (compare against
     `MERGEABLE_STATE_CLEAN`)."""
@@ -307,7 +307,7 @@ class BoardSource(Protocol):
         """Every call this adapter has made so far through its one counted
         chokepoint (`GitHubForge._run`; a fake's own equivalent) -- read once
         a `board` run's reads are all in, never reset mid-run, so it always
-        answers "how many round trips did this cost" (issue #168)."""
+        answers "how many round trips did this cost"."""
         ...
 
     def capability(self, operation: ForgeOperation) -> Capability: ...
@@ -340,7 +340,7 @@ class ForgeReader(Protocol):
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, ItemReference]:
         """Every one of `numbers`, read in as few round trips as the adapter
-        can manage rather than one per number (issue #440): a closed item's
+        can manage rather than one per number: a closed item's
         own board-estimate size is the one caller today (`cli._closed_item_
         sizes`), and its own history only ever grows, so a per-number round
         trip there stays the board's dominant cost as a repository ages. A
@@ -358,7 +358,7 @@ class ForgeReader(Protocol):
     def parent_number(self, number: int) -> int | None:
         """The number of `number`'s parent without decoding that parent
         -- all `item show`'s header names, so a parent no other read
-        can decode never stops it (issue #447)."""
+        can decode never stops it."""
         ...
 
     def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]: ...
@@ -377,7 +377,7 @@ class ForgeReader(Protocol):
 
     def list_recently_closed_issues(self, since: datetime) -> tuple[ClosedIssue, ...]:
         """Every issue closed at or after `since`, never a pull request --
-        the closed half of the twin search (issue #444)."""
+        the closed half of the twin search."""
         ...
 
 
@@ -387,8 +387,8 @@ class ForgeWriter(ForgeReader, Protocol):
     def link_child(self, parent: int, child: int) -> None: ...
 
     def create_issue(self, *, title: str, body: str, kind: ItemKind) -> int:
-        """A fresh issue of `kind`, linked to no parent (`item new`, issue
-        #444); `create_child` is the same write plus the parent relation."""
+        """A fresh issue of `kind`, linked to no parent (`item new`);
+        `create_child` is the same write plus the parent relation."""
         ...
 
     def create_child(self, *, parent: int, title: str, body: str, kind: ItemKind) -> int: ...
@@ -398,6 +398,6 @@ class ForgeWriter(ForgeReader, Protocol):
     def set_item_kind(self, number: int, kind: ItemKind) -> None:
         """Retype existing item `number` to `kind` -- `item new --parent`
         turning the Task it is about to give a first child into a Container,
-        and `item edit --kind` (issue #503); raises when the forge did not
+        and `item edit --kind`; raises when the forge did not
         take the type."""
         ...

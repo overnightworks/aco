@@ -14,7 +14,7 @@ from types import MappingProxyType
 from typing import Protocol, TypeVar, cast
 
 # Named refusal when a write-path command would otherwise create
-# `refs/aco/state` as a side effect (issue #176 done-when 1). One owner so
+# `refs/aco/state` as a side effect. One owner so
 # `apply` and `store.commit_transition` cannot drift.
 MISSING_STATE_REF = (
     "the claim state ref does not exist yet; run bootstrap before claim, rescope, "
@@ -25,8 +25,8 @@ MISSING_STATE_REF = (
 # non-projected claim instead of a loud refusal.
 ISSUELESS_LANE_BRANCH_PREFIXES = ("docs/", "fix/")
 CLAIM_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
-# `aco-` plus six lowercase hex characters (issue #248, parent #230 ruling
-# 15.09.2026): a short random id, never a counter, never reused. An item
+# `aco-` plus six lowercase hex characters:
+# a short random id, never a counter, never reused. An item
 # lives at exactly this id plus `.md` under `items/` (`item_filename`), so a
 # rename of the file is the only way its id ever changes.
 ITEM_ID_PATTERN = re.compile(r"aco-[0-9a-f]{6}")
@@ -42,7 +42,7 @@ BRANCH_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
 REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}")
 # RFC 3339 UTC, second precision -- the one timestamp shape a forge issue's
 # `created_at`/`updated_at`, a state-ref item's `[record]` fields, and this
-# repository's git-object clock all share (issue #378). Owned here, the one
+# repository's git-object clock all share. Owned here, the one
 # module `github`, `workboard`, and `items` can each import without breaking
 # the Layers contract.
 RFC3339_TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
@@ -70,7 +70,7 @@ ItemNaming = Callable[[ItemLabel], str]
 
 def forge_item_label(number: int) -> str:
     """An item as the forge names it, `#<n>` -- a claim-ledger refusal's own
-    text, since this layer never reads the storage pin (issue #471)."""
+    text, since this layer never reads the storage pin."""
     return f"#{number}"
 
 
@@ -78,7 +78,7 @@ class ClaimError(RuntimeError):
     """A claim-ledger refusal. One that names an item keeps its sentence as
     `naming`, a function of how the caller names an item: its own text is
     the forge form, and a caller that knows the storage pin asks `named`
-    for that storage's form (issue #471)."""
+    for that storage's form."""
 
     def __init__(self, message: str = "", *, naming: ItemNaming | None = None) -> None:
         super().__init__(message if naming is None else naming(forge_item_label))
@@ -95,7 +95,7 @@ class ClaimUnavailableError(ClaimError):
 class ClaimConflictError(ClaimUnavailableError):
     """`apply()`'s own refusal to write a claim intent because another live
     claim, a consumed claim id, or a resource hold already occupies the
-    value (issue #406, CLM-25) -- distinct from every other
+    value (CLM-25) -- distinct from every other
     `ClaimUnavailableError` (a transport, git, lineage, or
     retry-exhaustion failure surfacing through `store.commit_transition`)
     so `cmd_claim.run` can choose `claim_conflict` over the broader
@@ -132,7 +132,7 @@ ClaimIdentity = IssueIdentity | LaneIdentity
 
 def transition_item_identifier(identity: ClaimIdentity, branch: str) -> str:
     """The bare work item a claim/rescope/release transition names -- an
-    issue number as text, or a lane's own branch (issue #357 R1): computed
+    issue number as text, or a lane's own branch: computed
     once from the identity/branch every caller already has, and stored
     verbatim in the commit's own `item:` trailer (`store._transition_message`)
     for `claim_lifecycle` to read back unparsed, matching
@@ -178,8 +178,8 @@ class AbandonedRelease:
 
 @dataclass(frozen=True)
 class LandedRelease:
-    """A claim released because its item's own trunk commit named it (issue
-    #359): the `storage = "state-ref"` counterpart of `MergedRelease` for a
+    """A claim released because its item's own trunk commit named it:
+    the `storage = "state-ref"` counterpart of `MergedRelease` for a
     repository with no forge pull request to verify -- `commit` is the
     first-parent trunk commit `release --merged <sha|empty>` resolved
     (LAND-47/LAND-52, `specs/landing-grammar.spec.md`)."""
@@ -226,7 +226,7 @@ class RescopeRequest:
 # Characters that `unicodedata` files as separators (Zl/Zp) or formats (Cf)
 # rather than controls, yet end a line, reorder the text around them (the
 # Trojan Source bidi controls and the Arabic letter mark), or hide inside it
-# (the zero-width ones, the word joiner and the tag characters, issue #540).
+# (the zero-width ones, the word joiner and the tag characters).
 _INVISIBLE_DISPLAY_CONTROLS = frozenset(
     {
         "\N{LINE SEPARATOR}",
@@ -248,7 +248,7 @@ _INVISIBLE_DISPLAY_CONTROLS = frozenset(
 
 def is_display_control(character: str) -> bool:
     """Whether `character` must never reach a terminal or a one-line field
-    as itself (issues #538, #540): every control character but TAB -- C0,
+    as itself: every control character but TAB -- C0,
     DEL and C1 -- plus the line and paragraph separators, the bidi controls,
     the Arabic letter mark, the zero-width characters, the word joiner and
     the tag characters. NBSP and every other printable space are text."""
@@ -258,8 +258,8 @@ def is_display_control(character: str) -> bool:
 
 
 def terminal_text(text: str) -> str:
-    """Foreign `text` -- a title, a `Next` line -- as it may reach a terminal
-    (issues #532, #538): every `is_display_control` character shown
+    """Foreign `text` -- a title, a `Next` line -- as it may reach a terminal:
+    every `is_display_control` character shown
     as its printable escape (ESC as `\\x1b`, U+202E as `\\u202e`), so a
     title can neither retitle the window, clear the screen, nor reorder the
     text around it; printable text, `Größe`, TAB and NBSP included, stays as
@@ -272,7 +272,7 @@ def terminal_text(text: str) -> str:
 
 def terminal_block(text: str) -> str:
     """Foreign multi-line `text` -- a stored body -- as it may reach a
-    terminal (issue #544): each line as `terminal_text` shows it, so its
+    terminal: each line as `terminal_text` shows it, so its
     line feeds still break lines while every other display control, the
     carriage return included, prints as its escape."""
     return "\n".join(terminal_text(line) for line in text.split("\n"))
@@ -327,7 +327,7 @@ LANE_MARKER_KEY = "lane"
 
 def identity_summary(identity: ClaimIdentity, branch: str, item_label: ItemLabel) -> str:
     """The subject a claim-ledger refusal names: `lane '<branch>'`, or
-    `issue <label>` in `item_label`'s form (issue #471)."""
+    `issue <label>` in `item_label`'s form."""
     if isinstance(identity, LaneIdentity):
         return f"lane {branch!r}"
     return f"issue {item_label(identity.issue)}"
@@ -335,7 +335,7 @@ def identity_summary(identity: ClaimIdentity, branch: str, item_label: ItemLabel
 
 def is_safe_branch_name(branch: str) -> bool:
     """Whether `branch` is a safe Git ref name: the one rule `valid_branch`
-    enforces on a stored claim marker, factored out so `start` (issue #322)
+    enforces on a stored claim marker, factored out so `start`
     can hold a freshly built branch name to the identical rule -- including
     the same `BRANCH_NAME_MAX_LENGTH` bound, not a shape check that merely
     happened to cap length the same way through an unrelated regex quantifier
@@ -390,7 +390,7 @@ def _scope_list_entries(scope: object) -> list[str]:
 
 
 def valid_scope(scope: object) -> tuple[str, ...]:
-    """The one canonical scope form (issue #331): sorted, deduplicated,
+    """The one canonical scope form: sorted, deduplicated,
     every entry a validated repository-relative path. Every claim's scope
     passes through here at creation (`cmd_claim._request`) and at rescope
     (`combined_scope`), so a live claim's scope is always already this
@@ -531,7 +531,7 @@ class ScopedClaim(Protocol):
     """The structural shape the conflict/overlap helpers need.
 
     Satisfied by both the CLI's `ClaimRequest` and the store's
-    `ActiveClaim`/`ClaimIntent` pair (issue #176, slice C2), so one set of
+    `ActiveClaim`/`ClaimIntent` pair, so one set of
     pure functions serves all of them instead of a nominal union that would
     grow every time a new claim-shaped record is added. Read-only
     properties, not plain attributes: a frozen dataclass field is itself
@@ -724,7 +724,7 @@ def require_coordinator_override(role: str | None) -> None:
         raise ClaimUnavailableError("a coordinator override requires --role coordinator")
 
 
-# --- refs/aco/state: the claim-state tree (issue #164, slice C1) ----------
+# --- refs/aco/state: the claim-state tree ----------
 #
 # `store.py` owns the git transport (ls-remote, fetch, plumbing, push,
 # retry); this module stays pure and owns only the tree's types and its
@@ -736,7 +736,7 @@ SUPPORTED_STATE_SCHEMA_VERSION = 2
 
 class UnsupportedStateSchemaError(ClaimError):
     """`schema.toml` names a version this client does not speak. Carries the
-    version and the tip it was read at, so `reset` (issue #341) can still
+    version and the tip it was read at, so `reset` can still
     export and lease-delete a ledger this client cannot parse."""
 
     def __init__(self, *, version: int, tip: ObjectId) -> None:
@@ -747,8 +747,8 @@ class UnsupportedStateSchemaError(ClaimError):
 
 @dataclass(frozen=True)
 class UnreadableState:
-    """A `refs/aco/state` tip whose schema this client does not speak (issue
-    #341): its oid and version are known, its claims are not."""
+    """A `refs/aco/state` tip whose schema this client does not speak:
+    its oid and version are known, its claims are not."""
 
     tip: ObjectId
     schema_version: int
@@ -783,8 +783,8 @@ class PushNotStartedError(ClaimError):
 
 
 class UncertainWriteError(ClaimUnavailableError):
-    """A sent write whose outcome the store cannot tell (issues #494, #498,
-    CAS-56): the push's answer, or the re-read after its rejection, was
+    """A sent write whose outcome the store cannot tell (CAS-56):
+    the push's answer, or the re-read after its rejection, was
     lost, or the write's own bookkeeping failed once it landed. The remote
     may hold the write or not; only a later read knows, so a caller keeps
     what the write may name (START-25). A sent push the store saw rejected
@@ -836,7 +836,7 @@ def decimal_number_or_none(text: str) -> int | None:
     return int(text)
 
 
-# --- Claim key codec (criterion 10, issue #176 slice C2) -------------------
+# --- Claim key codec -------------------
 #
 # One path segment, no `/`, collision-free and reversible -- the only owner
 # of a claims/resources/ids tree entry's file name. `apply` is the codec's
@@ -866,7 +866,7 @@ def _percent_encode_branch(branch: str) -> str:
 
 def _percent_decode_branch(encoded: str) -> str:
     """Invert `_percent_encode_branch`, refusing what it would never have
-    produced (issue #237 finding 23): a canonically encoded key never
+    produced: a canonically encoded key never
     carries a literal byte outside `_LANE_KEY_UNRESERVED`, so decode enforces
     that same invariant instead of accepting any unescaped character -- one
     validator owns "which bytes may appear literally", shared by both
@@ -925,7 +925,7 @@ def parse_claim_key(key: str) -> ClaimIdentity:
     raise MalformedStateTreeError(f"claim key has neither the issue nor lane prefix: {key!r}")
 
 
-# --- Item file-name codec (head ruling 30.09.2026, issue #558) --------------
+# --- Item file-name codec --------------
 #
 # The one owner of which `items/` entry is an item: `store` places and
 # reads back item blobs by it, `items` and `workboard` read ids by it. Every
@@ -961,7 +961,7 @@ class ResourceRecord:
 
 @dataclass(frozen=True)
 class ActiveClaim:
-    """One live claim as the store's `apply` maintains it (issue #176, §1).
+    """One live claim as the store's `apply` maintains it.
 
     `opened_commit` is the state-ref commit this claim_id was first
     introduced at; rescope never changes it.
@@ -987,8 +987,8 @@ class ClaimState:
     not exist yet. `claims`, `consumed_ids`, and `resources` are C2's
     addition alongside `apply`: immutable collections (`MappingProxyType`,
     `frozenset`) inside this frozen state, never mutated in place -- every
-    transition builds and returns a whole new `ClaimState`. `items` (issue
-    #248/#279) maps an item id to its blob oid alone, never its content --
+    transition builds and returns a whole new `ClaimState`. `items`
+    maps an item id to its blob oid alone, never its content --
     content stays a lazy, separate read (`store.read_item_files`), which is
     what keeps this state cheap to fetch regardless of item count.
     """
@@ -1030,8 +1030,7 @@ def parse_schema_toml(content: str, *, tip: ObjectId) -> ClaimState:
     return ClaimState(tip=tip)
 
 
-# --- Claim transitions: intents and `apply` (issue #176, slice C2; item
-# writes, issue #279) ---------------------------------------------------
+# --- Claim transitions: intents and `apply` ---------------------------------------------------
 #
 # `apply` is the sole writer of `ClaimState.claims`/`consumed_ids`/
 # `resources`/`items`. It is pure: no git, no clock, no randomness.
@@ -1044,7 +1043,7 @@ def parse_schema_toml(content: str, *, tip: ObjectId) -> ClaimState:
 
 @dataclass(frozen=True)
 class ItemPin:
-    """The item blob a write's checks judged (issue #496): a claim's item
+    """The item blob a write's checks judged: a claim's item
     judged open, an item write's parent judged a container (CAS-70). `oid` is
     `items/<item_id>.md`'s blob in the very observation those checks read."""
 
@@ -1061,7 +1060,7 @@ class ClaimIntent:
     `item_pin`, when set, must still name the item's current blob, checked
     by `apply` on every attempt: a close -- or any other write -- that lands
     between a rejected push and its retry refuses the claim instead of
-    leaving a live claim on an item nobody checked (issue #496). Only a
+    leaving a live claim on an item nobody checked. Only a
     state-ref item has one; under `github` the forge holds the item's state
     and the ledger no fact of it.
 
@@ -1122,11 +1121,11 @@ class ReleaseIntent:
 
 @dataclass(frozen=True)
 class ItemWriteIntent:
-    """Replaces `items/<item_id>.md`'s stored blob oid via oid-based CAS
-    (issue #279). Create and edit are both "replace this blob" and differ
+    """Replaces `items/<item_id>.md`'s stored blob oid via oid-based CAS.
+    Create and edit are both "replace this blob" and differ
     only in how the caller computed `new_oid`'s bytes, so they share this
     one shape. A close is the same blob write wrapped in `ItemCloseIntent`,
-    which adds the live-claim check every attempt re-applies (issue #459).
+    which adds the live-claim check every attempt re-applies.
 
     `expected=None` means "this item must not exist yet"; any other value
     must equal the item's current oid or the write refuses loud, never
@@ -1134,7 +1133,7 @@ class ItemWriteIntent:
     `refs/aco/state`, never a worktree path.
 
     `store_expected`, when set, is the whole `items/` map a caller checked
-    before writing (PIN-29, issue #447): any item written since refuses the
+    before writing (PIN-29): any item written since refuses the
     write too, so that check and this write land as one CAS instead of a
     preflight another writer can slip past.
 
@@ -1153,7 +1152,7 @@ class ItemWriteIntent:
 
 @dataclass(frozen=True)
 class ItemCloseIntent:
-    """`aco item close`'s own write (issue #459): `write` is the ordinary
+    """`aco item close`'s own write: `write` is the ordinary
     item-blob CAS (`ItemWriteIntent`'s own discipline, unchanged), and
     `issue` the item's claim identity, which must hold no live claim --
     checked by `apply` on every attempt, so a claim that lands between a
@@ -1176,7 +1175,7 @@ class ItemCloseIntent:
 @dataclass(frozen=True)
 class LandingIntent:
     """A `release --merged <sha|empty>` transition under `storage =
-    "state-ref"` (issue #359): closes one state-ref item's blob -- the same
+    "state-ref"`: closes one state-ref item's blob -- the same
     oid-based CAS `ItemWriteIntent` uses -- and releases the claim that
     names it -- the same authorization and CAS discipline `ReleaseIntent`
     uses -- as one transition, one commit, one CAS, so a landing can never
@@ -1330,7 +1329,7 @@ def _apply_claim_intent(state: ClaimState, intent: ClaimIntent) -> ClaimState:
         # `bootstrap` itself, which never calls `apply` -- every other write
         # path funnels through here, so this is the one place that must
         # refuse instead of silently creating `refs/aco/state` as a side
-        # effect (issue #176 slice-review finding 1).
+        # effect.
         raise ClaimError(MISSING_STATE_REF)
     if intent.item_pin is not None:
         _require_item_unwritten(state, intent.item_pin.item_id, intent.item_pin.oid)
@@ -1397,10 +1396,10 @@ def _apply_rescope_intent(state: ClaimState, intent: RescopeIntent) -> ClaimStat
 def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingIntent) -> None:
     """Raises unless `intent` may release `current`: the original claimant,
     or an explicit coordinator override by role coordinator. Shared by
-    `ReleaseIntent` and `LandingIntent` (issue #359): a landing's own claim
+    `ReleaseIntent` and `LandingIntent`: a landing's own claim
     release is authorized exactly the way an ordinary release is, never a
     second rule. Delegates its own role check to `require_coordinator_override`
-    (issue #405 round-4 finding 2) -- the one printer for CLAIM-39's sentence,
+    -- the one printer for CLAIM-39's sentence,
     never a second wording of the same refusal."""
     if intent.coordinator_override:
         require_coordinator_override(intent.role)
@@ -1489,7 +1488,7 @@ def _apply_item_close_intent(state: ClaimState, intent: ItemCloseIntent) -> Clai
 
 def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimState:
     """Closes `intent.item_id`'s blob and releases `intent.claim_id`'s claim
-    in the one `ClaimState` transition a landing commits (issue #359): the
+    in the one `ClaimState` transition a landing commits: the
     item write's own CAS (`ItemWriteIntent`'s discipline) and the claim
     release's own authorization (`ReleaseIntent`'s discipline), never
     letting one half succeed without the other since both land in the same
@@ -1520,8 +1519,7 @@ def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimStat
 
 
 def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
-    """The pure claim-state transition (issue #176 §1; item writes, issue
-    #279; atomic landings, issue #359; item closes, issue #459): the sole writer of
+    """The pure claim-state transition: the sole writer of
     `ClaimState.claims`/`consumed_ids`/`resources`/`items`. Assumes
     `state.tip` is already real -- `store.py` never calls this against
     `EMPTY_STATE`."""
@@ -1541,7 +1539,7 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
 # --- `claims/<key>.toml` and `resources/<name>.toml` codecs -----------------
 #
 # Hand-written, not a TOML-writing library: `toml_string` is this
-# repository's one TOML basic-string writer (issue #378), living here
+# repository's one TOML basic-string writer, living here
 # because this module sits below `workboard` in the Layers contract --
 # `workboard.py`'s renderers import it rather than keeping a second escape
 # table and drifting from what `tomllib.loads` (the reader) accepts back.
@@ -1549,7 +1547,7 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
 # unescaped (U+0000-U+001F and U+007F), not only backslash and quote: the
 # short escapes where TOML has one, `\uXXXX` for the rest. A value carrying
 # U+000B would otherwise round-trip into TOML that `tomllib.loads` (the
-# reader) refuses to parse back (#517).
+# reader) refuses to parse back.
 
 _TOML_STRING_ESCAPES = {
     "\\": "\\\\",
@@ -1576,11 +1574,11 @@ _TOML_MULTILINE_LITERALS = frozenset("\n\t")
 
 def toml_multiline_string(value: str) -> str:
     """A TOML multi-line basic string for `value` -- an `[[expectation]]`
-    `picture`'s inline SVG (issue #295), which needs literal newlines a
+    `picture`'s inline SVG, which needs literal newlines a
     single-line basic string cannot hold. Every other character takes
     `toml_string`'s escape, so a quote run is never mistaken for the
     closing `\"\"\"` and a control character the reader forbids literal
-    (issue #517) is written as `\\uXXXX`. `tomllib.loads` reads it back to
+    is written as `\\uXXXX`. `tomllib.loads` reads it back to
     `value` unchanged -- the leading newline right after the opening
     delimiter is the one TOML trims automatically, so none is added here."""
     escaped = "".join(
@@ -1645,7 +1643,7 @@ def _claim_toml_text(
 def _claim_toml_scope(data: Mapping[str, object], *, key: str, tip: ObjectId) -> tuple[str, ...]:
     """`data`'s `scope` field, projected through the one canonicalizer
     (`valid_scope`) every live claim's scope already passes through at
-    creation and rescope (issue #331 REVISE finding 1): a claim file
+    creation and rescope: a claim file
     written before that canonical order existed can still carry its paths
     in typed order, so a read here must sort it rather than compare
     against it unsorted. Never rewrites the ref (this is a read), and
@@ -1853,8 +1851,8 @@ def resource_fields(resource: ResourceHold | None) -> dict[str, object]:
 
 def claim_identity_fields(claim: ActiveClaim) -> dict[str, object]:
     """The one claim-identity dict every `--json` view of a live claim
-    shares -- `status`, `status --path`, `claim`, and `rescope` (issue #406,
-    #390 finding 6) each spread this instead of typing the same seven
+    shares -- `status`, `status --path`, `claim`, and `rescope`
+    each spread this instead of typing the same seven
     fields out by hand a fifth time with their own drifting order. A view
     still projects its own remaining fields explicitly beside it: `resource`/
     `resource_value` (every view but `rescope`, which names no `--resource`
