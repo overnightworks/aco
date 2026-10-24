@@ -1,0 +1,8 @@
+claim_id = "244f1eb281d9462a9531143878bdf52e"
+agent = "claude"
+role = "builder"
+base = "b72889e65223bd9809acc9398d2804354432d999"
+branch = "claude/issue-353-refs-t8"
+scope = ["quality/baseline.toml", "tests/test_checkout.py", "tests/test_github.py", "tests/test_store.py"]
+opened_commit = "b2313f7858d31da3909152a846b5456bae262e28"
+whole_reason = "Drei Testdateien derselben Kommentar-Säuberung und die Baseline, die jede Scheibe nach dem Merge von main neu schreibt."
