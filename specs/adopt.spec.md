@@ -109,7 +109,7 @@ list reads nothing after it.
 - [ ] [ADOPT-16] A pull request whose listing names no file refuses `pull request #<n> changes no file; there is nothing to adopt`, exit `2`.
 - [ ] [ADOPT-17] A head branch name the claim store refuses as unsafe refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2`, before any write.
 - [ ] [ADOPT-19] Every refusal from adopt's own checks is one line of at most 200 characters with `ERROR: `, foreign text (agent names, paths) shown with display controls escaped, a longer one cut to end in `…`.
-- ADOPT-18 (retired 18.10.2026, issue #173): "passes every adoption check; this aco does not build adoptions yet" no longer exists; a pull request that passes every check is adopted (ADOPT-20).
+- ADOPT-18 (retired 18.10.2026): "passes every adoption check; this aco does not build adoptions yet" no longer exists; a pull request that passes every check is adopted (ADOPT-20).
 - [ ] [ADOPT-20] `aco adopt <n> --no-item <kind>` on an open same-repository pull request nobody claims prints E-ADOPT-01's lines, exit `0`; the lane claim names this session's agent as builder.
 - [ ] [ADOPT-21] A claim refused after the build drops both: `removed worktree <path> and branch '<branch>' this adopt created`, exit `2`; START-21 and START-23 hold with `adopt`.
 - [ ] [ADOPT-22] A claim push of unknown outcome keeps both: `the claim's push was sent, its outcome unknown; worktree <path> and branch '<branch>' kept; run adopt again to resume it`, exit `2`.

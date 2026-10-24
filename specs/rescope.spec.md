@@ -1,9 +1,9 @@
 # `aco rescope`
 
 `aco rescope` adds or drops paths on a live claim without releasing it, and
-writes the same scope into the claimed item's own body (issue #554). This
+writes the same scope into the claimed item's own body. This
 file owns the command's own location resolution (`--add`/`--drop` absolute
-or repository-relative, issues #314, #554), its checkout preconditions, the
+or repository-relative), its checkout preconditions, the
 scope-combining refusals, its own lookup of the store claim it rescopes (RESC-14),
 the item-body write beside the claim (RESC-22..25), the
 `RESCOPED ...`/`--json` report, and its own `--json` `reason` vocabulary.

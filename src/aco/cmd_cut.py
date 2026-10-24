@@ -22,7 +22,7 @@ def open_container(
     accepted_kinds: frozenset[body.ItemKind] = _CONTAINER_KINDS,
 ) -> workboard.Issue:
     """`number`'s open issue when its type is one of `accepted_kinds` --
-    `cut`'s own target and `item new --parent` (issue #444) -- or why it is
+    `cut`'s own target and `item new --parent` -- or why it is
     not."""
     target = next((issue for issue in open_issues if issue.number == number), None)
     if target is None:
@@ -93,10 +93,10 @@ def _link_created_child(
 
 
 class _CutReason(StrEnum):
-    """`aco cut`'s own `--json` `reason` vocabulary (issue #425,
+    """`aco cut`'s own `--json` `reason` vocabulary (
     `specs/cut.spec.md`): `cut`/`adopted` mirror the text form's own
     `CUT`/`ADOPTED` verb -- whether `child` was freshly created or an
-    already-open child GitHub already recorded (#260). Every refusal
+    already-open child GitHub already recorded. Every refusal
     before any write is `precondition_failed`; a write that created the
     child but failed to finish recording it
     (`forge.ForgePartialChildCreationError`) is `partial_write` instead,
@@ -122,7 +122,7 @@ class _CutOutcome:
 
 def _print_cut_result(outcome: _CutOutcome, storage: body.Storage, *, as_json: bool) -> None:
     """Print `cut`'s result: the text form's `CUT`/`ADOPTED` verb becomes
-    `--json`'s own `reason` (issue #425) -- `adopted` no longer needs its
+    `--json`'s own `reason` -- `adopted` no longer needs its
     own boolean sibling once the envelope's `reason` already names it."""
     if as_json:
         report.emit_json(
@@ -143,8 +143,8 @@ class PartialWriteError(protocol.ClaimError):
     """Wraps `forge.ForgePartialCreationError` so `cut` and `item new`
     can choose `partial_write`'s own structured `--json` shape (`written`,
     `failed`) without parsing the wrapped error's prose (mirrors `ask`/
-    `rule`'s own `cmd_rule.TargetUnavailableError`/`cmd_rule.InvalidTargetError`, issue
-    #396); `recovery` is the caller's own way to finish the write."""
+    `rule`'s own `cmd_rule.TargetUnavailableError`/`cmd_rule.InvalidTargetError`);
+    `recovery` is the caller's own way to finish the write."""
 
     def __init__(self, error: forge.ForgePartialCreationError, *, recovery: str) -> None:
         self.written = error.created
@@ -154,13 +154,13 @@ class PartialWriteError(protocol.ClaimError):
 
 def requested_body_scope(raw: list[str] | None) -> tuple[str, ...] | None:
     """A repeated `--scope` flag's canonical value, or `None` when it was
-    never given -- `item new` and `cut` (issue #337) both take an optional
+    never given -- `item new` and `cut` both take an optional
     `--scope`, so this is the one place either turns the raw flag list into
     the same canonical form `protocol.valid_scope` produces for `claim`."""
     return None if raw is None else protocol.valid_scope(raw)
 
 
-# Fixed text naming no child number (issue #606 line 2), so the child is
+# Fixed text naming no child number, so the child is
 # written once, in the same create call that mints its number.
 _CUT_CHILD_NEXT = f"Build this slice; claim it with {workboard.advice_command('start')}."
 
@@ -173,14 +173,14 @@ def _cut_child_body(
 ) -> str:
     """The body `cut` writes for a fresh child: `body.parent_line` above a fresh
     block whose `now` names the container it was cut from, whose `next` is
-    `_CUT_CHILD_NEXT`, and whose `done_when` is the linked row's own (issue
-    #606), plus the cut slice's own top-level `scope = [...]` (issue #337)
+    `_CUT_CHILD_NEXT`, and whose `done_when` is the linked row's own,
+    plus the cut slice's own top-level `scope = [...]`
     when the cut carries one -- the linked row's own scope, or a filled
     `--scope`. With no row `done_when` to take -- the row carries none, or
     the cut is untied -- that key stays empty, never a refusal. A repeat
     `cut` after a partial failure reads the parent line back
     (`body.names_parent`) to tell `container`'s own orphan apart from
-    an unrelated open issue that merely shares the row's title (#260)."""
+    an unrelated open issue that merely shares the row's title."""
     fields: dict[str, object] = {
         "now": f"Cut from {workboard.item_label(container, storage)}",
         "next": _CUT_CHILD_NEXT,
@@ -203,8 +203,8 @@ def _adopt_existing_child(
 ) -> workboard.ChildItem | None:
     """`container`'s already-open child titled exactly `title`, so a repeat
     `cut` after a partial failure (`forge.ForgePartialChildCreationError`)
-    adopts the child GitHub already recorded instead of risking a second one
-    (#260). Two sources can carry that child: already linked under
+    adopts the child GitHub already recorded instead of risking a second one.
+    Two sources can carry that child: already linked under
     `container` (`list_children`), or an orphan -- one of the caller's own
     `open_issues` snapshot with no recorded parent at all, exactly the shape
     a failed `link_child` POST leaves behind. A title match alone is too
@@ -214,7 +214,7 @@ def _adopt_existing_child(
     never an idea-labelled item) and its body still names `container` as the
     parent `_cut_child_body` wrote for it; a recovery orphan is always
     exactly that shape, and nothing else can fake it. An untyped orphan
-    (`forge.ForgeIssueTypeNotSetError`, issue #444) is never adopted: the
+    (`forge.ForgeIssueTypeNotSetError`) is never adopted: the
     twin search names it instead. An orphan match is linked under
     `container` right here before it is returned, so the caller's remaining steps treat it exactly
     like an already-linked child; the container's own issue is never created
@@ -263,13 +263,13 @@ def _adopt_existing_child(
     )
 
 
-# How far back a closed issue still counts for the twin search (issue #444):
+# How far back a closed issue still counts for the twin search:
 # a duplicate usually repeats an item closed weeks, not months, ago.
 _TWIN_SEARCH_CLOSED_WINDOW = timedelta(days=30)
 
 
 # Two titles are possible twins when at least this share of their combined
-# distinct casefolded words appears in both (issue #444).
+# distinct casefolded words appears in both.
 _TWIN_TITLE_WORD_OVERLAP = 0.6
 
 
@@ -316,7 +316,7 @@ def refuse_possible_twin(
     storage: body.Storage,
 ) -> None:
     """The one twin search `item new` and `cut` run before they create an
-    issue (issue #444): `open_titles` -- every open issue's number and title
+    issue: `open_titles` -- every open issue's number and title
     -- and the titles of every issue closed within `_TWIN_SEARCH_CLOSED_WINDOW`,
     never the new issue's own `parent`. A hit refuses by number;
     `--not-a-twin` is the caller's way past it."""
@@ -335,7 +335,7 @@ def refuse_possible_twin(
 def _cut_link(
     label: str, located: body.LocatedBlock, row_number: int | None
 ) -> body.SliceRow | None:
-    """Which `[[slice]]` entry `cut` links its fresh child to (#150 §7):
+    """Which `[[slice]]` entry `cut` links its fresh child to:
     without `--row`, the first entry when the block carries one; with `--row
     N`, the entry `N` names, refusing by name when the block has no `slice`
     key at all or no such row left (every remaining entry is cuttable: a
@@ -358,7 +358,7 @@ def _cut_link(
 
 
 def _child_title(label: str, link: body.SliceRow | None, title: str | None) -> str:
-    """The title `cut`'s child gets (issue #604): the linked row's own title,
+    """The title `cut`'s child gets: the linked row's own title,
     which a given `--title` must match exactly; with no linked row, `--title`
     itself, which is then required."""
     if link is None:
@@ -378,7 +378,7 @@ _CUT_ROW_SCOPE_ALREADY_SET = "slice {index} already names a scope; edit the cont
 def _cut_row_scope(
     link: body.SliceRow | None, requested: tuple[str, ...] | None
 ) -> tuple[str, ...] | None:
-    """The scope `cut`'s fresh child inherits (issue #337): the linked
+    """The scope `cut`'s fresh child inherits: the linked
     row's own scope when it already has one -- `--scope` then refuses by
     name, since the row is the one place to change it -- else `--scope`
     fills the (still empty) row and becomes the child's scope; with no
@@ -395,7 +395,7 @@ def _cut_row_scope(
 def _cut_row_done_when(
     number: int, located: body.LocatedBlock, link: body.SliceRow | None, storage: body.Storage
 ) -> str | None:
-    """The `done_when` `cut`'s fresh child inherits (issue #606 line 2):
+    """The `done_when` `cut`'s fresh child inherits:
     the linked row's own, refused in CUT-05's form before any write when it
     breaks BODY-66 (CUT-39)."""
     if link is None:
@@ -470,7 +470,7 @@ def refuse_partial_write(error: PartialWriteError, reason: StrEnum, *, as_json: 
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`cut`'s own `--json` envelope (issue #425): a partial write reports
+    """`cut`'s own `--json` envelope: a partial write reports
     through `refuse_partial_write`'s own structured shape; every other
     refusal past the parser is `precondition_failed`, matching this
     command's single generic refusal bucket."""
