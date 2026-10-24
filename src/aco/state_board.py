@@ -1,4 +1,4 @@
-"""Forge adapter over `refs/aco/state`'s `items/` tree (issues #248, #283).
+"""Forge adapter over `refs/aco/state`'s `items/` tree.
 
 `StateRefBoard` sits beside `github.GitHubForge` behind the same `forge`
 port: both talk to a different backend for the same board data, and
@@ -12,8 +12,8 @@ already-fetched data. Every write (`create_item`, `create_child`,
 port: one
 compare-and-swap write to `items/<id>.md`, implemented in `session._StoreItemWriter` over
 `store` (hash-object once, then one `commit_transition` with an
-`ItemWriteIntent`, issue #279; `close_item` through the port's own
-`close_item` and an `ItemCloseIntent`, issue #459) -- so this module still
+`ItemWriteIntent`; `close_item` through the port's own
+`close_item` and an `ItemCloseIntent`) -- so this module still
 never imports `store` itself.
 
 `LANDING` and the two pull-request listings answer `Capability.UNSUPPORTED`:
@@ -24,7 +24,7 @@ this adapter's honest answer, not a refusal. `Board.recovery` -- purely
 pull-request-body-declared -- stays empty from that same emptiness.
 `Stage.CODE_LANDED` and the board's own Landungen view do not: both read
 `checkout.trunk_landings`'s trailer block straight from local git history
-instead (issues #304, #371), independent of this adapter's own missing
+instead, independent of this adapter's own missing
 pull-request data.
 """
 
@@ -88,14 +88,14 @@ STATE_REF_CAPABILITIES: Mapping[forge.ForgeOperation, forge.Capability] = Mappin
 
 class ItemWriter(Protocol):
     """The write port every mutating `StateRefBoard` operation composes onto
-    (issue #283): one CAS write to `items/<item_id>.md` -- `expected` the
+    `ItemWriter`: one CAS write to `items/<item_id>.md` -- `expected` the
     oid the caller's own already-read snapshot carries (`None` for "must not
     exist yet"), `content` the item's finished new bytes -- returning the
     freshly written blob's oid, so the caller can update its own in-memory
     state without a re-fetch. Implemented in `session._StoreItemWriter`, over `store`
     (hash-object once, then one `commit_transition` with an
-    `ItemWriteIntent`, issue #279, or for a close an `ItemCloseIntent`,
-    issue #459): this module may not import `store` itself (Layers
+    `ItemWriteIntent`, or for a close an `ItemCloseIntent`):
+    this module may not import `store` itself (Layers
     contract), so every actual git call for an item write stays behind
     this port's two methods.
     """
@@ -119,7 +119,7 @@ class ItemWriter(Protocol):
         content: bytes,
         store_expected: Mapping[str, ObjectId] | None,
     ) -> ObjectId:
-        """`write_item`'s own CAS for `item close` (issue #459), refused on
+        """`write_item`'s own CAS for `item close`, refused on
         every attempt while item `number` still carries a live claim."""
         ...
 
@@ -144,13 +144,13 @@ def _missing_parent_sentence(parent_id: str) -> str:
 def _missing_blocker_sentence(item_id: str, blocker_id: str) -> str:
     """PIN-17's sentence, naming the item that lists the missing blocker
     as ITEM-43's names the one repeating it, so the repair needs no
-    search (issue #548)."""
+    search."""
     return f"item {item_id} lists blocker {blocker_id}, which does not exist"
 
 
 def _repeated_blocker_sentence(item_id: str, blocker_id: str) -> str:
     """ITEM-43's sentence, shared by the write that refuses a delivered
-    repeat and the read that refuses a stored one (issue #546)."""
+    repeat and the read that refuses a stored one."""
     return f"item {item_id} lists blocker {blocker_id} more than once"
 
 
@@ -164,10 +164,10 @@ class _DecodedItem:
 @dataclass(frozen=True)
 class _MalformedItem:
     """An item file whose bytes decode to no valid `aco` block with
-    a `[record]` table (issue #447): kept aside rather than refusing the
+    a `[record]` table: kept aside rather than refusing the
     store at decode, so a read of any other item still answers while this
     item's own read refuses, and `board`/`next` list it by `defect` rather
-    than refusing the whole store (issue #517). `problem` completes the
+    than refusing the whole store. `problem` completes the
     sentence `item <id> ...`; `oid` is the CAS `expected` a repairing
     `update_item_body` writes over; `text` is whatever of the file still
     decodes; `title` is the record's title when it alone still reads, for
@@ -188,22 +188,22 @@ class _MalformedItem:
         `item_id`'s own: its readable parent names it, or its parent does not
         read and `item_id` is a Container, the one kind that takes children
         (ITEM-45, ITEM-54). The one answer the board's child count and a
-        close or retype's refusal both ask (issue #550)."""
+        close or retype's refusal both ask."""
         if self.parent is UnreadParent.UNREAD:
             return kind is ItemKind.CONTAINER
         return self.parent == item_id
 
 
 # The defects an item file the block grammar never reached is named by
-# (issue #517): its bytes are no UTF-8, or its valid block has no record.
+# the board: its bytes are no UTF-8, or its valid block has no record.
 _NOT_UTF8 = ContractDefect("item", "item file is not valid UTF-8")
 _NO_RECORD = ContractDefect(RECORD_KEY, "no [record] table")
 
 
 @dataclass(frozen=True)
 class LandingWrite:
-    """One item's own close write, composed but not yet applied (issue
-    #359): `item_id`/`expected`/`content` are exactly the CAS write
+    """One item's own close write, composed but not yet applied:
+    `item_id`/`expected`/`content` are exactly the CAS write
     `close_item` performs immediately today, staged instead so `release
     --merged <sha|empty>` can hash `content` into a blob itself and fold
     the result into one atomic `protocol.LandingIntent` alongside the claim
@@ -220,7 +220,7 @@ class LandingWrite:
 @dataclass(frozen=True)
 class NewItemWrite:
     """A fresh item's write, composed and checked readable but not yet
-    applied (issue #517): `compose_item` builds it, `create_item` writes
+    applied: `compose_item` builds it, `create_item` writes
     it."""
 
     item_id: str
@@ -238,8 +238,8 @@ def _valid_record(text: str) -> Mapping[str, object] | None:
 
 def _readable_content(text: str) -> bytes:
     """`text`, a body `_with_record` composed for a write, as the bytes to
-    store -- refused before any write when the read would set it aside
-    (issue #517): the composed `[record]` is always present, so the parse's
+    store -- refused before any write when the read would set it aside:
+    the composed `[record]` is always present, so the parse's
     own first defect is the whole reason. A text holding a lone surrogate
     (an argv byte that was no UTF-8) has no UTF-8 bytes at all, so it is
     refused with the read's own not-UTF-8 defect."""
@@ -263,7 +263,7 @@ def _unreadable_body_refusal(defect: ContractDefect) -> ClaimUnavailableError:
 
 def _decode_item(item_id: str, content: bytes, oid: ObjectId) -> _DecodedItem | _MalformedItem:
     """`content` turned into a `_DecodedItem`, or set aside as a
-    `_MalformedItem` (issue #447): every item file must be UTF-8 text whose
+    `_MalformedItem`: every item file must be UTF-8 text whose
     block parses VALID with a `[record]` table; one that does not refuses
     its own read, never another item's."""
     try:
@@ -310,7 +310,7 @@ def _delivered_content_fields(
     body: str, stored: items.ItemRecord
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     """`update_item_body`'s own owner split for `title`, `labels`,
-    `blocked_by` (issue #287, `aco item edit`'s ruled record merge): taken
+    `blocked_by` (`aco item edit`'s ruled record merge): taken
     from `body`'s own `[record]` table when the delivered body carries one
     valid -- read off the table's raw TOML presence, never
     `items.parse_item_record`'s own `.get(key, [])` default, which would
@@ -376,7 +376,7 @@ class StateRefBoard:
     @property
     def requests(self) -> int:
         """Always zero: every byte this adapter reads was already fetched
-        by `session._state_ref_forge` before construction (issue #248) -- no
+        by `session._state_ref_forge` before construction -- no
         method below costs a further round trip."""
         return 0
 
@@ -391,7 +391,7 @@ class StateRefBoard:
 
     def _refuse_a_foreign_entry(self) -> None:
         """PIN-13's refusal by the lowest name while `items/` holds an entry
-        whose file name names no item (issue #565): a read of the whole store
+        whose file name names no item: a read of the whole store
         cannot say what such an entry is, so leaving it out would let the
         board lie. A write to one item never reads it, and the store carries
         it byte for byte (CAS-61), so such a write goes past it."""
@@ -400,7 +400,7 @@ class StateRefBoard:
 
     def hold_items(self) -> None:
         """Every later write of this instance commits only onto the very
-        `items/` this instance read (issue #447), so an item written or gone
+        `items/` this instance read, so an item written or gone
         bad after the caller's check refuses the write instead of landing
         beside it."""
         self._holds_items = True
@@ -433,7 +433,7 @@ class StateRefBoard:
 
     def _store_expected(self) -> Mapping[str, ObjectId] | None:
         """The whole `items/` map every write of a `hold_items`
-        instance commits onto (issue #447), else `None`."""
+        instance commits onto, else `None`."""
         if not self._holds_items:
             return None
         return {
@@ -451,7 +451,7 @@ class StateRefBoard:
 
     def _related(self, item_id: str, *, missing: str) -> _DecodedItem:
         """`item_id`'s decoded item, or a refusal by name: a malformed one
-        names its repair (issue #447), an unknown one refuses the sentence
+        names its repair, an unknown one refuses the sentence
         `missing`."""
         if not self._carries(item_id):
             raise MalformedStateTreeError(missing)
@@ -502,7 +502,7 @@ class StateRefBoard:
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
         """Every one of `numbers`, read straight from the already-fetched
-        `items/` tree (issue #440): this adapter performs no IO of its own at
+        `items/` tree: this adapter performs no IO of its own at
         all (module docstring), so there is no round trip here to batch --
         `item_reference` per number costs the same as this already does."""
         return {number: self.item_reference(number) for number in numbers}
@@ -515,8 +515,8 @@ class StateRefBoard:
 
     def parent_number(self, number: int) -> int | None:
         """`number`'s recorded parent, off its own record alone: never
-        decoding that parent, so `item show` still names a malformed one
-        (issue #447), while PIN-16 still refuses one `items/` lacks."""
+        decoding that parent, so `item show` still names a malformed one,
+        while PIN-16 still refuses one `items/` lacks."""
         decoded = self._decoded(number)
         if decoded is None or decoded.record.parent is None:
             return None
@@ -527,7 +527,7 @@ class StateRefBoard:
 
     def parent_issue(self, number: int) -> workboard.ParentIssue | None:
         """`number`'s parent as the board reads it; an unreadable parent
-        (issue #517) is answered by its reference and whatever of its text
+        is answered by its reference and whatever of its text
         still decodes, its kind unknown, so the child still reads as nested
         rather than refusing the whole board."""
         parent_number = self.parent_number(number)
@@ -547,7 +547,7 @@ class StateRefBoard:
 
     def _children(self, item_id: str) -> tuple[workboard.ChildItem, ...]:
         """`item_id`'s children, every unreadable item that may be one
-        counted open (issues #517, #550): its state may not read, so its
+        counted open: its state may not read, so its
         container never reads as childless past it, and the board offers no
         close that `item close` would refuse by it (ITEM-54)."""
         decoded = self._items.get(item_id)
@@ -570,7 +570,7 @@ class StateRefBoard:
 
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
         """Every open item, plus every unreadable one as a row the board
-        names by its defect (issue #517): its state may not read, so it
+        names by its defect: its state may not read, so it
         counts as open, and one such item never hides the others."""
         self._refuse_a_foreign_entry()
         return (
@@ -603,8 +603,8 @@ class StateRefBoard:
 
     def open_issue(self, number: int) -> workboard.Issue | None:
         """`number`'s item as the board reads it while it is open, else
-        `None` -- `item new --parent`'s one look at its parent's kind (issue
-        #503), which reads that one item alone, so another malformed item
+        `None` -- `item new --parent`'s one look at its parent's kind,
+        which reads that one item alone, so another malformed item
         never refuses it (ITEM-37)."""
         decoded = self._decoded(number)
         if decoded is None or decoded.record.state is not items.RecordState.OPEN:
@@ -613,8 +613,8 @@ class StateRefBoard:
 
     def open_item_titles(self) -> tuple[tuple[int, str], ...]:
         """Every open item's number and title, the open half of `item new`'s
-        twin search: `item new` still runs beside a malformed item (issue
-        #447), and one whose title still reads counts as open, since its
+        twin search: `item new` still runs beside a malformed item,
+        and one whose title still reads counts as open, since its
         state may not."""
         self._refuse_a_foreign_entry()
         return (
@@ -661,7 +661,7 @@ class StateRefBoard:
         return tuple(dependencies)
 
     def _unreadable_blocker(self, blocker_id: str) -> workboard.IssueDependency:
-        """An unreadable blocker (issue #517): its state does not read, so it
+        """An unreadable blocker: its state does not read, so it
         keeps blocking until repaired, rather than refusing the whole board."""
         return workboard.IssueDependency(
             workboard.IssueReference(self.repository.path, items.item_number(blocker_id)),
@@ -693,12 +693,12 @@ class StateRefBoard:
         # adapter's own honest answer -- `Board.recovery` (purely
         # pull-request-declared) stays empty from it, while `Stage.CODE_LANDED`
         # and the board's own Landungen view read the trunk walk instead
-        # (issue #371) and never depend on this listing at all.
+        # and never depend on this listing at all.
         del since
         return ()
 
     def link_child(self, parent: int, child: int) -> None:
-        """A no-op (issue #283): parentage has exactly one owner here,
+        """A no-op: parentage has exactly one owner here,
         `record.parent`, already set by `create_child`'s own single write.
         GitHub's `link_child` recovers an orphan its own two-write
         `create_child` could leave behind (a created issue with no recorded
@@ -716,12 +716,12 @@ class StateRefBoard:
         parent: int | None,
         origin: str | None = None,
     ) -> NewItemWrite:
-        """A fresh state-ref item's one write (issues #283, #285, #316),
+        """A fresh state-ref item's one write,
         composed -- its id minted, its `[record]` filled -- and refused
-        before any write when the read would set it aside (issue #517), but
+        before any write when the read would set it aside, but
         not yet applied. `origin` binds the item to a foreign forge issue
         (`--origin FORGE#N`, already grammar-checked by `items.parse_origin`)
-        without aco governing that forge at all -- #230's own concept, "the
+        without aco governing that forge at all -- the principle that "the
         forge is pulled, never governed." `item new` composes before it
         retypes a Task parent, so a refused item leaves the store untouched.
         Minting an id decides over the whole store, so it refuses beside an
@@ -767,7 +767,7 @@ class StateRefBoard:
         raise forge.ForgeUnsupportedError(NO_BARE_ISSUE)
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:
-        """`number`'s `record.kind` moved to `kind` (issue #503) -- `item new
+        """`number`'s `record.kind` moved to `kind` -- `item new
         --parent` retyping a Task it gives a first child, `item edit --kind`
         -- in one CAS write over this instance's own already-read oid, as
         `update_item_body` writes; `updated_at` moves to now, every other
@@ -790,7 +790,7 @@ class StateRefBoard:
         return items.item_number(item_id)
 
     def update_item_body(self, number: int, body: str) -> None:
-        """`body`, written back to `number`'s item file (issues #283, #287):
+        """`body`, written back to `number`'s item file:
         `title`, `labels`, `blocked_by` come from `body`'s own `[record]`
         table when it carries one (`_delivered_content_fields`'s own owner
         split -- `aco item edit`'s ruled record merge); every other record
@@ -798,13 +798,13 @@ class StateRefBoard:
         `updated_at` always moves to now. The CAS write's `expected` is
         `current.oid`, this instance's own already-read snapshot -- never a
         re-read -- so a second writer holding the same stale oid refuses
-        with issue #279's own sentence rather than merging or overwriting.
+        with the stale-oid sentence rather than merging or overwriting.
         Every blocker the write adds must resolve to another readable item,
-        and none may repeat, before the write (issue #450): a missing one
+        and none may repeat, before the write: a missing one
         would stop every later `board`/`next` (PIN-17), a repeated one trip
         `board_read.validated_dependencies`' malformed blocked-by list refusal; a
         write that carries the stored record through never re-judges it.
-        A malformed item (issue #447) has no stored record to merge into:
+        A malformed item has no stored record to merge into:
         `body`'s own complete `[record]` repairs it once its relations
         resolve (`_refuse_unresolved_repair`), else it refuses by name."""
         item_id = self._by_number[number]
@@ -831,7 +831,7 @@ class StateRefBoard:
         self._items[item_id] = _DecodedItem(record=updated_record, body=new_body, oid=new_oid)
 
     def _refuse_unresolved_repair(self, record: items.ItemRecord) -> None:
-        """A repair's own `[record]` is written whole (issue #447), so its
+        """A repair's own `[record]` is written whole, so its
         relations must resolve first: its parent and every blocker name a
         readable item -- never a missing one (PIN-16/PIN-17's sentences), a
         malformed one, or itself -- and it stays open, since only `item close`
@@ -850,8 +850,8 @@ class StateRefBoard:
         self, item_id: str, blocked_by: tuple[str, ...], *, stored: tuple[str, ...] = ()
     ) -> None:
         """`blocked_by` names each blocker once, and every one not in
-        `stored` names a readable item other than `item_id` (issues #447,
-        #450): a repeated one refuses by name, since a board read refuses
+        `stored` names a readable item other than `item_id`:
+        a repeated one refuses by name, since a board read refuses
         a repeated dependency; a missing one PIN-17's sentence, a malformed
         one its repair, `item_id` itself by name. Carrying `stored` through
         unchanged is never re-judged."""
@@ -869,8 +869,8 @@ class StateRefBoard:
                 raise ClaimUnavailableError(f"item {item_id} {_BLOCKER_ITSELF}")
 
     def _closing_write(self, number: int) -> LandingWrite:
-        """`number`'s own close write, composed but not written (issues
-        #289, #359): `state` moves to `CLOSED`, `closed_at` and `updated_at`
+        """`number`'s own close write, composed but not written:
+        `state` moves to `CLOSED`, `closed_at` and `updated_at`
         both move to now, and every other field -- the body included --
         stays byte-identical. Refuses loud, before any write, when the
         record already carries `state = CLOSED`: a second close on the same
@@ -878,7 +878,7 @@ class StateRefBoard:
         named date rather than a generic conflict. Shared by `close_item`
         (which writes this immediately, on its own) and `prepare_landing`
         (which hands it to `release --merged <sha>`'s own atomic
-        `protocol.LandingIntent` instead, issue #359)."""
+        `protocol.LandingIntent` instead)."""
         item_id = self._by_number[number]
         current = self._items[item_id]
         if current.record.state is items.RecordState.CLOSED:
@@ -898,11 +898,11 @@ class StateRefBoard:
         )
 
     def close_item(self, number: int) -> str:
-        """Closes `number`'s item record (issue #289) in one CAS write over
+        """Closes `number`'s item record in one CAS write over
         this instance's own already-read `current.oid` (the same oid
-        discipline `update_item_body` uses, issue #279), through the
+        discipline `update_item_body` uses), through the
         writer's own `close_item`, which also refuses a live claim on every
-        attempt (issue #459) -- the one place
+        attempt -- the one place
         `state`/`closed_at` are ever composed for an immediate close;
         `cmd_item._cmd_item_close` delegates the whole write here rather than
         building its own record. Returns the fresh `closed_at` for the
@@ -922,7 +922,7 @@ class StateRefBoard:
         return write.record.closed_at
 
     def prepare_landing(self, number: int) -> LandingWrite:
-        """`number`'s own close write, staged but not applied (issue #359):
+        """`number`'s own close write, staged but not applied:
         `release --merged <sha|empty>` under `storage = "state-ref"` hashes
         `content` into a blob itself (`store.hash_blob` -- this module may
         not import `store`, the Layers contract) and folds the resulting
@@ -932,12 +932,12 @@ class StateRefBoard:
         transition actually commits, to fold it into this instance's own
         in-memory view -- this method itself writes nothing. Unlike
         `close_item`, it refuses beside an entry that names no item, before
-        any write (PIN-13; head ruling 01.10.2026, issue #565)."""
+        any write (PIN-13; head ruling 01.10.2026)."""
         self._refuse_a_foreign_entry()
         return self._closing_write(number)
 
     def mark_landed(self, write: LandingWrite, oid: ObjectId) -> None:
-        """Folds an atomic landing's already-committed close (issue #359)
+        """Folds an atomic landing's already-committed close
         into this instance's own in-memory view, the same update
         `close_item` performs after its own separate write -- but writes
         nothing itself: `release --merged <sha>`'s own transition already
@@ -949,7 +949,7 @@ class StateRefBoard:
 
     def item_oid(self, number: int) -> ObjectId:
         """This item's own current blob oid, straight off this adapter's
-        already-read state (issue #287): `aco item edit --json`'s own
+        already-read state: `aco item edit --json`'s own
         output is the one caller that needs it -- never part of the generic
         `ForgeWriter` port, since no other forge in this repository stores
         one blob per item."""
