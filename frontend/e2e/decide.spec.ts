@@ -140,12 +140,87 @@ test('advancing after phone list return and desktop resize focuses the next ques
 	await page.screenshot({ path: testInfo.outputPath('resized-advance.png') });
 });
 
+for (const scenario of ['next question', 'exhausted list', 'focus elsewhere']) {
+	test(`phone list completion keeps visible focus: ${scenario}`, async ({ page }, testInfo) => {
+		const { appUrl, token, repoDirectory } = readBoardRuntime();
+		await page.setViewportSize({ width: 390, height: 844 });
+		const lines = [line(1, 'First sentence', { question: 'First?', default: 'yes' })];
+		if (scenario !== 'exhausted list') {
+			lines.push(line(2, 'Second sentence', { question: 'Second?' }));
+		}
+		writeRulings(repoDirectory, [row(952, 'List completion', ...lines)]);
+		await page.clock.install();
+		await page.goto(`${appUrl}#t=${token}`);
+		const first = page.getByRole('button', { name: /First sentence/ });
+		await first.click();
+		await choices(page).getByRole('button', { name: /Ja/ }).click();
+		await page.getByRole('button', { name: '← Liste' }).click();
+		await expect(first).toBeFocused();
+		const target =
+			scenario === 'focus elsewhere'
+				? page.getByRole('button', { name: /Second sentence/ })
+				: page.locator('.tracks');
+		if (scenario === 'focus elsewhere') await target.focus();
+		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+		await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
+		await expect(first).toHaveCount(0);
+		await expect(page.locator('.question-pane')).not.toBeVisible();
+		await expect(target).toBeFocused();
+		await expect(target).toBeInViewport();
+		await page.screenshot({ path: testInfo.outputPath('list-completed.png') });
+	});
+}
+
 for (const viewport of [
 	{ width: 1280, height: 900 },
 	{ width: 390, height: 844 }
 ]) {
 	test.describe(`${viewport.width}px selection flow`, () => {
 		test.use({ viewport });
+
+		test('selection during a background reload reaches the question without stale actions', async ({
+			page
+		}, testInfo) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			writeRulings(repoDirectory, [
+				row(
+					953,
+					'Background reload',
+					line(1, 'First sentence', { question: 'First?', default: 'yes' }),
+					line(2, 'Second sentence', { question: 'Second?' })
+				)
+			]);
+			await page.clock.install();
+			await page.goto(`${appUrl}#t=${token}`);
+			await page.getByRole('button', { name: /First sentence/ }).click();
+			let release: (() => void) | undefined;
+			const held = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			await page.route('**/api/board', async (route) => {
+				await held;
+				await route.continue();
+			});
+			try {
+				await choices(page).getByRole('button', { name: /Ja/ }).click();
+				if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
+				const second = page.getByRole('button', { name: /Second sentence/ });
+				await second.focus();
+				const reload = page.waitForRequest('**/api/board');
+				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+				await reload;
+				await expect(second).toBeFocused();
+				await second.press('Enter');
+				await expect(page.getByRole('status')).toHaveText('Lädt…');
+				await expect(choices(page)).toHaveCount(0);
+				await page.screenshot({ path: testInfo.outputPath('background-loading.png') });
+			} finally {
+				release?.();
+			}
+			await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeVisible();
+			await expect(page.locator('.stage')).toBeFocused();
+			await page.screenshot({ path: testInfo.outputPath('background-selected.png') });
+		});
 
 		test('access, loading, empty and error messages remain readable', async ({
 			page

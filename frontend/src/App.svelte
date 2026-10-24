@@ -17,7 +17,7 @@
 	let question: HTMLDivElement | undefined = $state();
 
 	function focusQuestion() {
-		question?.querySelector<HTMLElement>('.stage')?.focus({ preventScroll: true });
+		(question?.querySelector<HTMLElement>('.stage') ?? question)?.focus({ preventScroll: true });
 	}
 
 	async function resetQuestion() {
@@ -25,6 +25,8 @@
 		if (question && question.getClientRects().length > 0) {
 			question.scrollTop = 0;
 			focusQuestion();
+		} else {
+			keepFocusVisible();
 		}
 	}
 
@@ -46,6 +48,15 @@
 			else tracks?.focus({ preventScroll: true });
 		}
 	}
+
+	$effect(() => {
+		if (board.status === 'ready') {
+			void tick().then(() => {
+				if (document.activeElement === question) focusQuestion();
+				else keepFocusVisible();
+			});
+		}
+	});
 
 	$effect(() => {
 		if (token === null) {
@@ -75,7 +86,7 @@
 	<h1>aco</h1>
 	{#if board.status === 'no-access'}
 		<p role="alert">Zugang fehlt. Starte das Board im Repo und öffne den Link, den es ausgibt.</p>
-	{:else if board.status === 'loading'}
+	{:else if board.status === 'loading' && isBoardEmpty(board.repos)}
 		<p role="status">Lädt…</p>
 	{:else if board.status === 'unavailable'}
 		<p role="alert">aco antwortet nicht. {board.error}</p>
@@ -94,9 +105,13 @@
 					}}
 				/>
 			</div>
-			<div class="question-pane" bind:this={question}>
+			<div class="question-pane" bind:this={question} tabindex="-1">
 				<button class="back" type="button" onclick={showList}>← {LIST_LABEL}</button>
-				<Stage repos={board.repos} {selectedKey} {decisions} />
+				{#if board.status === 'loading'}
+					<p role="status">Lädt…</p>
+				{:else}
+					<Stage repos={board.repos} {selectedKey} {decisions} />
+				{/if}
 			</div>
 		</div>
 		<div class="toasts" aria-live="polite">
