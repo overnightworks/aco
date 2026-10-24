@@ -75,10 +75,9 @@ def _refuse_head_branch_collisions(adoption: _Adoption) -> None:
     tip must still be the head the checks read."""
     context, number = adoption.run, adoption.number
     branch = adoption.detail.source_branch
-    if not protocol.is_safe_branch_name(branch):
-        raise protocol.ClaimUnavailableError(
-            f"pull request #{number} head branch {branch!r} is no safe branch name"
-        )
+    unsafe_head = policy.unsafe_head_branch_defect(adoption.detail)
+    if unsafe_head is not None:
+        raise protocol.ClaimUnavailableError(f"pull request #{number} {unsafe_head.message}")
     worktree = _pull_request_worktree(context, number)
     if os.path.lexists(worktree):
         raise _collision_refusal(f"{worktree} already exists", number)
