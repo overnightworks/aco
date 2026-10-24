@@ -83,7 +83,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 
 - [ ] [LANDCMD-50] On a first run and a rerun alike, a head branch that is no safe branch name refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2` (E-LANDCMD-50).
 - [ ] [LANDCMD-51] A merged pull request proposing a branch of another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, nothing written.
-- [ ] [LANDCMD-52] The head-branch check (LANDCMD-50) and the cross-repository check (LANDCMD-51) both refuse right after the first read of the pull request, before LANDCMD-02. LANDCMD-50 shows `<branch>` escaped and cuts the refusal to 200 characters; ADOPT-17 has the same sentence.
+- [ ] [LANDCMD-52] The head-branch check (LANDCMD-50) and the cross-repository check LANDCMD-51 refuse right after the first read, before LANDCMD-02; LANDCMD-50 shows `<branch>` escaped, cut to 200 characters.
 - [ ] [LANDCMD-53] LANDCMD-51 comes before LANDCMD-11 and after LANDCMD-50; a first run meets the same sentence at LANDCMD-07 (LAND-12).
 - [ ] [LANDCMD-33] A `--head` that is not 7 to 40 hex digits refuses `--head must be 7 to 40 hex digits`, exit `2`, at the argument parse: before any read, PIN-32, or LANDCMD-01, on a rerun too (E-LANDCMD-33).
 - [ ] [LANDCMD-44] An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
