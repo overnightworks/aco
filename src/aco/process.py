@@ -27,7 +27,7 @@ _STDOUT_KEY = "stdout"
 _STDERR_KEY = "stderr"
 
 # Fallback when a failed git invocation left nothing readable on either
-# stream (issue #372: one owner instead of a `checkout.py`/`store.py` copy).
+# stream: one owner instead of a `checkout.py`/`store.py` copy.
 UNKNOWN_GIT_FAILURE = "unknown git failure"
 
 
@@ -349,8 +349,8 @@ def run_captured(
 
 def git_command(arguments: list[str], *, directory: Path | None = None) -> list[str]:
     """Build a `git arguments` command, `-C directory` prefixed when given --
-    the one argv shape `checkout` and `store` each assembled by hand
-    (issue #372), on two layers that may not import each other."""
+    the one argv shape `checkout` and `store` each assembled by hand, on two layers that may not
+    import each other."""
     return ["git", *(["-C", str(directory)] if directory is not None else []), *arguments]
 
 
@@ -388,7 +388,7 @@ def run_git(
     Raises `ExecutableMissingError` or
     `ProcessTimedOutError`; whether an unlisted `OSError` should also fail
     closed is each caller's own call to make around this one, since callers
-    disagree (issue #372)."""
+    disagree."""
     command = git_command(arguments, directory=directory)
     if literal_pathspecs:
         return run_captured(command, env=_literal_pathspec_environment())
@@ -396,8 +396,8 @@ def run_git(
 
 
 def _git_failure_detail(stderr: bytes, stdout: bytes, *, errors: str = "strict") -> str:
-    """The bytes-level core every git failure-detail reader below shares
-    (issue #392 review round 2): decode-and-strip `stderr`, falling back to
+    """The bytes-level core every git failure-detail reader below shares:
+    decode-and-strip `stderr`, falling back to
     the same treatment of `stdout`, falling back to `UNKNOWN_GIT_FAILURE`
     when neither carried anything. Each public reader below is a thin
     adapter feeding this the two streams its own result shape actually
@@ -406,7 +406,7 @@ def _git_failure_detail(stderr: bytes, stdout: bytes, *, errors: str = "strict")
     `errors` defaults to strict, matching `git_failure_detail`'s and
     `git_failure_detail_from_stderr`'s long-standing contract: invalid UTF-8
     in git's own stderr raises `UnicodeDecodeError` rather than silently
-    replacing it, since `store._delete_export_ref` (issue #298) relies on
+    replacing it, since `store._delete_export_ref` relies on
     that raise reaching its own `(ClaimError, OSError, ValueError)` catch
     and carrying the decode failure itself into the leftover description it
     returns. `git_failure_detail_lossy` opts into `errors="replace"`
@@ -428,14 +428,14 @@ def git_failure_detail(result: CapturedResult) -> str:
     `git_failure_detail_from_stderr` instead for a command whose stdout never
     carries the result -- `fetch`, `update-ref`, and the like -- where
     falling back to it would report unrelated stdout content, not the
-    failure (issue #372 R1)."""
+    failure."""
     return _git_failure_detail(result.stderr, result.stdout)
 
 
 def git_failure_detail_from_stderr(result: CapturedResult) -> str:
     """A finished `git` invocation's stderr alone, falling back to
     `UNKNOWN_GIT_FAILURE` when it carried nothing -- stdout is never read,
-    unlike `git_failure_detail` (issue #372 R1); see that function's
+    unlike `git_failure_detail`; see that function's
     docstring for which of the two modes a caller wants."""
     return _git_failure_detail(result.stderr, b"")
 
@@ -443,6 +443,5 @@ def git_failure_detail_from_stderr(result: CapturedResult) -> str:
 def git_failure_detail_lossy(result: CapturedResult) -> str:
     """`git_failure_detail` for a command run with piped stdin (`hash-object`,
     `mktree`), decoding with replacement instead of raising: the claim store
-    surfaces such a failure as a `ClaimError`, never as a decode error (issue
-    #390 finding 7)."""
+    surfaces such a failure as a `ClaimError`, never as a decode error."""
     return _git_failure_detail(result.stderr, result.stdout, errors="replace")

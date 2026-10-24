@@ -13,7 +13,7 @@ from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 @dataclass(frozen=True)
 class _AskedLine:
-    """One `aco ask` write's result (issue #295): the item, the fresh
+    """One `aco ask` write's result: the item, the fresh
     line's 1-based index, its `text`/`default`, and whichever card fields
     were given -- bundled so `_emit_ask_result` takes one value instead of
     five loose ones."""
@@ -26,8 +26,8 @@ class _AskedLine:
 
 
 class _AskReason(StrEnum):
-    """`aco ask`'s own `--json` `reason` vocabulary (`specs/ask.spec.md`,
-    issue #396): `asked` the only success."""
+    """`aco ask`'s own `--json` `reason` vocabulary (`specs/ask.spec.md`):
+    `asked` the only success."""
 
     ASKED = "asked"
     INVALID_ITEM = "invalid_item"
@@ -54,13 +54,13 @@ def _emit_ask_result(asked: _AskedLine, storage: body.Storage, *, as_json: bool)
 
 
 class _PictureFileError(protocol.ClaimError):
-    """`_read_picture_file`'s own unreadable-file refusal (issue #396),
+    """`_read_picture_file`'s own unreadable-file refusal,
     typed so `aco ask`'s `--json` can choose `invalid_picture` without
     parsing prose."""
 
 
 def _read_picture_file(path: str) -> str:
-    """`--picture FILE.svg`'s own filesystem boundary (issue #295): read
+    """`--picture FILE.svg`'s own filesystem boundary: read
     before any forge call, so a missing file refuses before the item body
     is even fetched. Content validation (size, `<svg>` root, no `<script>`,
     no external `href`) is `body.append_expectation`'s -- one owner, shared
@@ -75,7 +75,7 @@ def _ask_target_reason(
     error: cmd_rule.TargetUnavailableError | cmd_rule.InvalidTargetError,
 ) -> _AskReason:
     """`run`'s own mapping from `cmd_rule.require_writable_target`'s two
-    target refusals to their `--json` `reason` (issue #396)."""
+    target refusals to their `--json` `reason`."""
     if isinstance(error, cmd_rule.TargetUnavailableError):
         return _AskReason.UNAVAILABLE
     return _AskReason.INVALID_ITEM
@@ -85,7 +85,7 @@ def _ask_expectation_reason(
     error: body.ExpectationTextError | body.ExpectationFieldError,
 ) -> _AskReason:
     """`run`'s own mapping from `append_expectation`'s two card-content
-    refusals (issue #396) to their `--json` `reason`: a blank `--text`
+    refusals to their `--json` `reason`: a blank `--text`
     (`ExpectationTextError`) and a `--question`/`--example` failing its own
     rule both name `invalid_expectation`; only a refused `--picture`
     (`ExpectationFieldError` whose `field` is `picture`) names
@@ -117,8 +117,8 @@ def _append_expectation_card(parsed: argparse.Namespace, context: RunContext) ->
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`ask`'s own `--json` refusals (issue #396), for the whole command and
-    not only its first steps (issue #432): the body write this command ends
+    """`ask`'s own `--json` refusals, for the whole command and
+    not only its first steps: the body write this command ends
     with can fail like any other forge call, and a failure there names this
     command's own `unavailable` rather than escaping the envelope."""
     as_json = parsed.json

@@ -12,8 +12,8 @@ from . import board_read, body, checkout, policy, protocol, report, session, sto
 
 
 class _RescopeReason(StrEnum):
-    """`aco rescope`'s own `--json` `reason` vocabulary (issue #406,
-    `specs/rescope.spec.md`): `rescoped` the only success. `invalid_usage`
+    """`aco rescope`'s own `--json` `reason` vocabulary
+    (`specs/rescope.spec.md`): `rescoped` the only success. `invalid_usage`
     covers a malformed `--add`/`--drop` value (a relative entry, one outside
     the checkout, a comma-bearing entry matching no versioned file, or a
     combination `protocol.combined_scope` refuses); `precondition_failed`
@@ -36,8 +36,8 @@ def _rescope_json(claimed: protocol.ActiveClaim) -> None:
 
 @dataclass(frozen=True)
 class _RescopePaths:
-    """`rescope`'s own `--add`/`--drop` entries, each made absolute (issue
-    #554): an absolute entry as given, a relative one joined to the toplevel
+    """`rescope`'s own `--add`/`--drop` entries, each made absolute: an absolute entry as given, a
+    relative one joined to the toplevel
     of the checkout the command runs in -- the repository-relative form an
     item body's own `scope` list prints, so an entry copied from it works as
     typed from anywhere inside that checkout."""
@@ -98,8 +98,7 @@ def _rescope_scope_entries(
 ) -> tuple[str, ...]:
     """One `--add`/`--drop` list, already absolute (`_RescopePaths`),
     canonicalized to repository-relative scope entries against `toplevel`.
-    A path no claim could ever cover refuses with RESC-19's sentence (issue
-    #483)."""
+    A path no claim could ever cover refuses with RESC-19's sentence."""
     if not absolute_paths:
         return ()
     canonical: list[str] = []
@@ -120,10 +119,10 @@ def _outside_checkout_reason(flag: str, path: str, toplevel: Path) -> str:
 
 def _rescope_checkout(paths: _RescopePaths) -> checkout.PathCheckout:
     """`rescope`'s checkout, resolved from its first entry whenever one
-    names a location (issue #314), else from the process's own cwd. A
+    names a location, else from the process's own cwd. A
     checkout with no commit yet refuses (gate G3). A checkout root resolves
     as its own checkout, a file in a directory not created yet from its
-    nearest existing ancestor (issues #474, #483)."""
+    nearest existing ancestor."""
     named = paths.named()
     location = Path(named[0][1]) if named else Path.cwd()
     path_checkout = checkout.resolve_named_path_checkout(location)
@@ -136,7 +135,7 @@ def _rescope_checkout(paths: _RescopePaths) -> checkout.PathCheckout:
 
 def _outside_every_repository_reason(named: tuple[tuple[str, str], ...]) -> str:
     """RESC-26's sentence, naming the entry that located no checkout
-    whenever an entry did the locating (issue #554)."""
+    whenever an entry did the locating."""
     if not named:
         return checkout.NOT_IN_A_REPOSITORY_REASON
     flag, path = named[0]
@@ -150,7 +149,7 @@ def _rescope_command(
     checkout_context: session.RunContext,
 ) -> protocol.RescopeRequest:
     """The rescope `parsed` asks for in `path_checkout`, judged against the
-    resolved checkout's own recorded default branch (issue #490)."""
+    resolved checkout's own recorded default branch."""
     branch = path_checkout.branch
     if not branch:
         raise protocol.ClaimUnavailableError(
@@ -183,8 +182,8 @@ def _rescope_command(
 class _RescopeInvalidUsageError(protocol.ClaimError):
     """A rescope `--add`/`--drop` value itself is malformed or contradictory
     -- relative, outside the checkout, a comma-bearing entry matching no
-    versioned file, or a combination `protocol.combined_scope` refuses
-    (issue #406) -- named so `--json` can choose `invalid_usage` over the
+    versioned file, or a combination `protocol.combined_scope` refuses -- named so `--json` can
+    choose `invalid_usage` over the
     broad `unavailable` every checkout- or store-level refusal falls to."""
 
 
@@ -192,7 +191,7 @@ class _RescopePreconditionError(protocol.ClaimError):
     """The rescope cannot proceed given this claim's own current state: no
     live claim on the target identity/branch, a different agent than the
     one holding it, or a scope too wide for the width gate without
-    `--whole` (issue #406) -- named so `--json` can choose
+    `--whole` -- named so `--json` can choose
     `precondition_failed`."""
 
 
@@ -201,7 +200,7 @@ _RESCOPE_COMMAND = "rescope"
 
 @dataclass(frozen=True)
 class _RescopedItemBody:
-    """The item body a rescope keeps in step with its claim (issue #554):
+    """The item body a rescope keeps in step with its claim:
     the body as read, its located `aco` block, and the `whole`
     reason the block names."""
 
@@ -256,7 +255,7 @@ def _rescope_item_and_claim(
     item: _RescopedItemBody,
     whole: str | None,
 ) -> protocol.ClaimState:
-    """The body first, then the claim's own transition (issue #554): a
+    """The body first, then the claim's own transition: a
     refused body write leaves the claim as it stood, and a claim write that
     fails after it says the body already names the new scope and how to
     bring the claim in step -- the body write is not undone, and the same
@@ -344,7 +343,7 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
 
 
 def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
-    """`rescope`'s own `--json` refusals (issue #406, `_RescopeReason`):
+    """`rescope`'s own `--json` refusals (`_RescopeReason`):
     `_rescope_write`'s two typed exceptions choose `invalid_usage`/
     `precondition_failed`; every other `protocol.ClaimError` -- an
     unresolved checkout, a missing state ref, a corrupted claim record --

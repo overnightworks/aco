@@ -72,7 +72,7 @@ def _overlap_note(
 
 @dataclass(frozen=True)
 class _ClaimReportContext:
-    """`index` and `storage` together (issue #292): the two facts every
+    """`index` and `storage` together: the two facts every
     claim in one `status` read shares -- bundled so adding `storage`
     beside the pre-existing `index` never pushes a caller past PLR0913's
     five-argument ceiling."""
@@ -127,8 +127,8 @@ def _status(
     storage: body.Storage,
     lane_shared: LaneSharedReading = (),
 ) -> int:
-    """Every related claim's block, then the lane-shared files once (issue
-    #575), named only beside a claim that may write them."""
+    """Every related claim's block, then the lane-shared files once, named only beside a claim that
+    may write them."""
     observed_at = datetime.now(UTC)
     related, index = _status_claims(claims, issue)
     if related:
@@ -144,8 +144,8 @@ def _status(
 
 
 class _StatusReason(StrEnum):
-    """`aco status`'s own `--json` `reason` vocabulary (issue #406,
-    `specs/status.spec.md` STAT-03/STAT-05): `claimed`, `unclaimed`, and
+    """`aco status`'s own `--json` `reason` vocabulary
+    (`specs/status.spec.md` STAT-03/STAT-05): `claimed`, `unclaimed`, and
     `conflict` are its own three read states. `status` is forge-free
     (STAT-16) and never resolves a repository target, so it names no
     `invalid_usage` of its own -- only `unavailable`, reached when
@@ -213,7 +213,7 @@ def _status_path(
     lane_shared: LaneSharedReading,
 ) -> None:
     """`path`'s holders; with none, `LANE-SHARED` for a file the trunk's
-    `lane_shared` names, which any claim may write (issue #586), else
+    `lane_shared` names, which any claim may write, else
     `UNCLAIMED`. A defective trunk configuration adds its own line."""
     holders = protocol.claims_holding_path(claims, path)
     if holders:
@@ -252,10 +252,10 @@ def _lane_shared_unavailable_line(unavailable: LaneSharedUnavailable) -> str:
 
 def lane_shared_line(lane_shared: LaneSharedReading) -> str | None:
     """The one line `status` and `brief` name the repository's lane-shared
-    registry files with (issue #575), so a builder comparing its changes
+    registry files with, so a builder comparing its changes
     with its claim scope counts them as allowed: an entry naming no file the
     trunk tracks is marked so, never shown as a grant, and a defective trunk
-    configuration names its defect (issue #586); `None` when none is
+    configuration names its defect; `None` when none is
     configured."""
     if isinstance(lane_shared, LaneSharedUnavailable):
         return _lane_shared_unavailable_line(lane_shared)
@@ -269,7 +269,7 @@ def lane_shared_line(lane_shared: LaneSharedReading) -> str | None:
 
 def lane_shared_json(lane_shared: LaneSharedReading) -> dict[str, object]:
     """`lane_shared` and `lane_shared_unavailable`, the `--json` form of
-    `lane_shared_line` (issue #586): the entries with whether each names a
+    `lane_shared_line`: the entries with whether each names a
     trunk-tracked file, or `null` beside the defect that hides them."""
     if isinstance(lane_shared, LaneSharedUnavailable):
         return {"lane_shared": None, "lane_shared_unavailable": lane_shared.defect}
@@ -302,13 +302,13 @@ def _status_path_json(
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`status` reads live claims from the store directly (issue #176),
+    """`status` reads live claims from the store directly,
     routed by `cli._COMMANDS` without forge resolution (a cut-over
     repository may have no ledger issue left at all).
-    It is forge-free (issue #245): `--repo` is meaningless here and unused.
+    It is forge-free: `--repo` is meaningless here and unused.
     Every `protocol.ClaimError` `_status_read` can raise -- a rewritten or
-    malformed state ref -- reports through `report.refuse` as `unavailable` (issue
-    #406): `status` names no `invalid_usage` of its own (see `_StatusReason`).
+    malformed state ref -- reports through `report.refuse` as `unavailable`: `status` names no
+    `invalid_usage` of its own (see `_StatusReason`).
     """
     try:
         return _status_read(parsed, context)
