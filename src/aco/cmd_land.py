@@ -101,17 +101,17 @@ def _land_failed_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | N
 
 def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str | None:
     """Why `aco land`'s preflight refuses on `checks` alone, or `None` when
-    every one of them proves green (issue #405): no checks at all, a check
+    every one of them proves green: no checks at all, a check
     still running, then a check that finished without success -- in that
     order, since a still-running check is not yet a failure."""
     if not checks:
         return f"pull request #{number} exposes no CI checks; cannot verify green CI"
     pending = _land_pending_check_names(checks)
     if pending:
-        # Capped the same way `next`'s own `parallel:` line is (issue #348,
-        # `protocol.named_with_overflow_count`): a pull request with many
+        # Capped the same way `next`'s own `parallel:` line is
+        # (`protocol.named_with_overflow_count`): a pull request with many
         # still-running checks must never print a refusal past 200
-        # characters (issue #405 review/gate finding) -- each name already
+        # characters -- each name already
         # truncated by `_land_pending_check_names` before this grammar sees
         # it, `report.bounded_refusal` a final backstop on the whole line.
         return report.bounded_refusal(
@@ -175,7 +175,7 @@ def _refuse_land_readiness(
 
 
 def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: str | None) -> None:
-    """`land --head` (issue #590): the head this preflight read -- the one
+    """`land --head`: the head this preflight read -- the one
     the merge pins -- must be the commit the reviewers saw, so a push after
     their review never lands unseen."""
     if reviewed_head is None or readiness.head_sha.startswith(reviewed_head):
@@ -187,8 +187,8 @@ def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: st
 
 
 def _land_governing_settings(config: workboard.BoardConfig) -> dict[str, object]:
-    """The settings that decide where `aco land`'s own release half writes
-    (issue #505): a pull request may change any other setting and still
+    """The settings that decide where `aco land`'s own release half writes: a pull request may
+    change any other setting and still
     land, but never one of these under its own landing."""
     return {"storage": config.storage, "canonical_remote": config.canonical_remote}
 
@@ -199,8 +199,7 @@ def _land_head_config_refusal(
     """Why the pull request head's board configuration `head_text` refuses
     `aco land` against the default branch's own `landed` one (LANDCMD-22..24),
     or `None` when it keeps every governing setting. The head's copy is
-    only checked, never obeyed: `landed` alone governs this run (issue
-    #505 R1)."""
+    only checked, never obeyed: `landed` alone governs this run."""
     path = workboard.CONFIG_PATH
     cannot_release = "aco land cannot release its claim across that change"
     if head_text is None:
@@ -239,8 +238,8 @@ def _land_preflight(
     number: int,
     parsed: argparse.Namespace,
 ) -> tuple[forge.Landing, workboard.Classification, forge.LandingReadiness]:
-    """Every read-only precondition `aco land` proves before its first write
-    (issue #405): a green, open, mergeable pull request classifying exactly
+    """Every read-only precondition `aco land` proves before its first write: a green, open,
+    mergeable pull request classifying exactly
     one open item, or declaring itself issue-less -- reusing `check <pr>`'s
     own classification/claim/parent/closing rules (`policy.structural_classification`/
     `policy.classification_defect`) rather than a second copy of them. Dependency
@@ -249,18 +248,18 @@ def _land_preflight(
     In order: the reviewed head `--head` names, readiness (neither a local
     git read), the pull request's own
     shape, its head's board configuration against this checkout's own
-    (LANDCMD-22..24, issue #505), then the named item's live open state --
-    LANDCMD-08 before claim validation (issue #405 review/gate finding) --
+    (LANDCMD-22..24), then the named item's live open state --
+    LANDCMD-08 before claim validation --
     then `claims_provider`,
     the one step that reads `refs/aco/state` locally, so a pull request this
     preflight would refuse on GitHub's own answers alone never pays for that
     read at all, and finally this session's own authorization against the
     exact claim just proven to exist (`cmd_release.authorize_releaser`, `release`'s
-    own claimant/coordinator-override check, issue #405 review finding): a
+    own claimant/coordinator-override check): a
     claim held by another agent or role refuses here, before the merge,
     rather than only once the delegated `release --merged` step runs after
     it. `run`'s own entry already validated `--coordinator-override`'s
-    role (issue #405 round-4 finding 1) -- before this preflight, and before
+    role -- before this preflight, and before
     the fresh/rerun split that skips it entirely on a rerun -- so this
     function itself never repeats that check.
     """
@@ -307,8 +306,8 @@ def _land_preflight(
 
 
 def _land_merge_body(title: str, body: str, classification: workboard.Classification) -> str:
-    """The merge commit message `aco land` composes itself (issue #405,
-    Befund 42 on #310): the pull request's own body with its classification
+    """The merge commit message `aco land` composes itself: the pull request's own body with its
+    classification
     line removed, then that classification, in the trunk's own trailer
     grammar, as the message's own last line -- so the trailer a later trunk
     walk reads through git's own trailer parsing is never wherever the pull
@@ -320,8 +319,7 @@ def _land_merge_body(title: str, body: str, classification: workboard.Classifica
     question asked of the composed message itself: git reading the body
     alone skips a trailing comment line and still finds the trailer block
     above it, but once joined that comment line no longer ends the message,
-    and git reads it with the classification as the last paragraph instead
-    (issue #594)."""
+    and git reads it with the classification as the last paragraph instead."""
     without_classification = workboard.body_without_classification(body)
     trailer = workboard.land_trunk_trailer(classification)
     if not without_classification:
@@ -341,8 +339,8 @@ def _land_merge_body(title: str, body: str, classification: workboard.Classifica
 def _land_merge_method(
     pinned: workboard.MergeMethod | None, client: github.GitHubForge, number: int, branch: str
 ) -> workboard.MergeMethod:
-    """The method `aco land` merges pull request `number` into `branch` with
-    (issues #578, #615): the board configuration's own pin, refused where
+    """The method `aco land` merges pull request `number` into `branch` with: the board
+    configuration's own pin, refused where
     the forge's allowed methods exclude it; otherwise a merge commit wherever
     the forge allows one, and a squash where it allows a squash but no merge
     commit -- never a rebase, so a forge allowing no method at all, or only a
@@ -471,8 +469,8 @@ def _land_read(number: int, what: str, read: Callable[[], _LandStepResult]) -> _
 def _land_step(
     number: int, sha: str, step: str, action: Callable[[], _LandStepResult]
 ) -> _LandStepResult:
-    """Every step `aco land` runs once its merge already landed (issue
-    #405): a failure here never means "not merged" -- the merge already
+    """Every step `aco land` runs once its merge already landed: a failure here never means "not
+    merged" -- the merge already
     happened -- so it reports the one ruled recovery line instead of the
     generic refusal an earlier precondition would print. A rerun starts
     `run` over from the top, finds the pull request already merged,
@@ -492,15 +490,15 @@ def _land_release_routing(
     classification: workboard.Classification | None, merge_sha: str, context: RunContext
 ) -> int | None:
     """The issue `aco land`'s own delegated `release --merged` call routes
-    to (issue #405 point 4): a fresh merge reuses the classification this
+    to: a fresh merge reuses the classification this
     same run's own preflight already verified, never a re-read of the pull
     request's own mutable body. `classification` is `None` only for a rerun
     against a pull request `run` found already merged -- preflight
     never ran this time -- so this reads the merge commit's own trailer
-    instead, exactly as `cmd_release._verify_merged_release` does (issue #397, Befund
-    41): the same authority a lane release itself checks, never the pull
+    instead, exactly as `cmd_release._verify_merged_release` does: the same authority a lane
+    release itself checks, never the pull
     request's `body`, which stays mutable long after the merge. Runs inside
-    the `release` step's own `_land_step` (issue #405 review finding), so a
+    the `release` step's own `_land_step`, so a
     defect here -- an edited body's classification long gone from the merge
     commit's own history -- prints the ruled `MERGED ... follow-up
     incomplete: release; re-run aco land <n>` line, never a bare refusal."""
@@ -531,16 +529,16 @@ def _land_release(
     branch: str,
 ) -> cmd_release.ReleaseEnding:
     """`aco land`'s own delegated call into the existing `release --merged`
-    path (issue #405): never a second copy of its close/release/report/
+    path: never a second copy of its close/release/report/
     cleanup -- `--branch` selects the lane by name without requiring this
     checkout to be on it: the release may run from the coordinator's primary
     checkout, exactly where `land` runs from. Calls `cmd_release.release_transition` directly, never
-    `cmd_release.run` (issue #425): `land` needs a raised `ClaimError` here so
+    `cmd_release.run`: `land` needs a raised `ClaimError` here so
     `_land_step` can convert it into its own ruled `MERGED ... follow-up
     incomplete: release` line, not `cmd_release.run`'s own caught-and-printed
     `--json` refusal, which `land` never uses (`json=False` above) and
     would otherwise print its sentence a second time. The release reads
-    through a fresh `context` (issue #457 proof 6): the fast-forward just
+    through a fresh `context`: the fast-forward just
     wrote the landed trunk into this very checkout, so the configuration
     and forge read before it no longer answer for it."""
     release_parsed = argparse.Namespace(
@@ -563,8 +561,8 @@ def _land_release(
 
 
 def _land_is_own_repository(toplevel: Path) -> bool:
-    """Whether `toplevel` is this very package's own repository (issue
-    #405): `land`'s own reinstall reminder applies only there -- landing in
+    """Whether `toplevel` is this very package's own repository: `land`'s own reinstall reminder
+    applies only there -- landing in
     any other repository this tool coordinates leaves nothing to
     reinstall."""
     try:
@@ -578,7 +576,7 @@ def _land_is_own_repository(toplevel: Path) -> bool:
 
 def _land_peek_claims(context: RunContext) -> protocol.ClaimState:
     # `store.peek_state`, never `RunContext.observation`'s
-    # `fetch_state` (issue #405 review/gate finding): a pull
+    # `fetch_state`: a pull
     # request this preflight goes on to refuse must anchor no ref
     # and stamp no lineage -- the same read-only requirement
     # `cmd_reset._reset_observation` already carries for `reset`.
@@ -588,7 +586,7 @@ def _land_peek_claims(context: RunContext) -> protocol.ClaimState:
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco land <pr>` (issue #405): preflight every ruled precondition
+    """`aco land <pr>`: preflight every ruled precondition
     read-only, merge with a pinned head sha and a commit message this tool
     composes itself, delete the merged branch, fast-forward this checkout's
     own default branch, then run the existing `release --merged` path
@@ -596,8 +594,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     run after an earlier step failed -- skips preflight and the merge
     itself entirely: `merge_landing` never runs twice for the same pull
     request. `--coordinator-override`'s own role is validated here, at
-    entry, before that fresh/rerun split and before any read (issue #405
-    round-4 finding 1): a rerun skips `_land_preflight` entirely, so a
+    entry, before that fresh/rerun split and before any read: a rerun skips `_land_preflight`
+    entirely, so a
     check placed only there left a rerun free to delete the branch and
     fast-forward -- and `cmd_release.release_transition` free to close the item -- on a bare
     `--coordinator-override` with no coordinator role behind it."""
@@ -618,7 +616,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         checkout.refuse_unlandable_checkout(context.default_branch, directory=toplevel)
         # A rerun: this run's own preflight never ran, so it never verified a
         # classification -- `_land_release_routing` reads the merge commit's
-        # own trailer instead (issue #405 point 4).
+        # own trailer instead.
         classification = None
     else:
         check_context = policy.LandingCheckContext(context, repository, config.storage)
