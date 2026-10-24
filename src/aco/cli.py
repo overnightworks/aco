@@ -75,7 +75,7 @@ START_DESCRIPTION = (
     "when neither exists yet, then claims it exactly as aco claim would; a second call "
     "against the same worktree only claims, or reports the live claim."
 )
-# Shared by `claim` and `start` (issue #322 review finding): CLM-09's own contract, spelled
+# Shared by `claim` and `start`: CLM-09's own contract, spelled
 # once so `start`'s pass-through help text can never drift from what `claim` itself does with
 # the flag -- specs/claim.spec.md:62's "the reason is never stored" holds for both.
 OUT_OF_ORDER_HELP = (
@@ -136,7 +136,7 @@ def _add_reset_parser(commands: usage.Subcommands, name: str) -> None:
 
 
 def _add_json_flag(container: argparse.ArgumentParser) -> None:
-    """The one place `--json` is declared (issue #432): a command that never
+    """The one place `--json` is declared: a command that never
     calls this has no JSON mode at all, and `main` matches this same
     spelling when argparse refuses before any namespace is filled, so the
     flag needs a single owner."""
@@ -382,7 +382,7 @@ REVIEWED_HEAD_PATTERN = re.compile(r"[0-9a-fA-F]{7,40}")
 
 
 def _reviewed_head(value: str) -> str:
-    """`land --head`'s argparse `type=` (issue #590): the sha its reviewers
+    """`land --head`'s argparse `type=`: the sha its reviewers
     saw, lowercased as git prints it, refused before anything is read."""
     if REVIEWED_HEAD_PATTERN.fullmatch(value) is None:
         raise protocol.ClaimUnavailableError("--head must be 7 to 40 hex digits")
@@ -504,7 +504,7 @@ def _add_rule_parser(commands: usage.Subcommands, name: str) -> None:
 
 def _parse_check_subject(value: str) -> int | str | cmd_check.CheckInput:
     """`check`'s one positional: a pull/issue reference (`workboard.parse_item_reference`),
-    or -- issue #359, LAND-48 -- a full 40-character commit id, read as a trunk
+    or -- LAND-48 -- a full 40-character commit id, read as a trunk
     commit instead, or `-`, a body piped on stdin. The grammars never collide:
     an item reference (`aco-xxxxxx`, `#n`, or the bare `n`) is always far
     shorter than a full git object id."""
@@ -552,7 +552,7 @@ def _add_brief_parser(commands: usage.Subcommands, name: str) -> None:
 
 
 def _nonblank_title(value: str) -> str:
-    """`item new`'s and `cut`'s `--title` argparse `type=` (issue #447):
+    """`item new`'s and `cut`'s `--title` argparse `type=`:
     `value` unchanged unless `body.is_valid_title` -- the rule `record.title`
     is read by -- refuses it, before anything is read, created, or minted."""
     if not body.is_valid_title(value):
@@ -663,7 +663,7 @@ def _parser() -> usage.UsageErrorParser:
 
 BODY_TEMPLATE_KINDS = ("task", "feature", "container")
 # `item edit --kind`'s targets: an item turns container with its first
-# child and back to task once none is open (issue #503).
+# child and back to task once none is open.
 ITEM_EDIT_KINDS = (body.ItemKind.TASK.value, body.ItemKind.CONTAINER.value)
 DEFAULT_BODY_TEMPLATE_KIND = "task"
 
@@ -682,7 +682,7 @@ class PreDispatchReason(StrEnum):
 
 def _refuse_usage(error: usage.UsageError, *, as_json: bool) -> int:
     """The argument parser's own refusal, in the shape this invocation asked
-    for (issue #432): without `--json` argparse's own usage block and
+    for: without `--json` argparse's own usage block and
     sentence, printed by the implementation `usage.UsageErrorParser` overrode, so
     the bytes stay exactly what they were; with `--json` the shared envelope
     instead, `invalid_usage`, argparse's own sentence as `message`."""
@@ -758,7 +758,7 @@ def _level_options(tokens: tuple[str, ...]) -> tuple[str, ...]:
 
 def _asked_for_json(root: usage.UsageErrorParser, given: list[str]) -> bool:
     """Whether this invocation asked for JSON, answered by the parsers it
-    reached rather than by the raw tokens alone (issue #432): only a command
+    reached rather than by the raw tokens alone: only a command
     declaring `--json` can answer in the envelope, so `aco bootstrap --json`
     stays argparse's own text, and so does `aco release --jso`, an
     abbreviation no parser reads (OUT-09). Each level is asked about its own tokens,
@@ -774,7 +774,7 @@ def _reached_levels(
     root: usage.UsageErrorParser, given: list[str]
 ) -> Iterator[tuple[usage.UsageErrorParser, tuple[str, ...]]]:
     """Each parser this invocation's parse reached, root first, with the
-    tokens argparse handed that level (issue #432)."""
+    tokens argparse handed that level."""
     parser, tokens = root, tuple(given)
     while True:
         yield parser, tokens
@@ -808,7 +808,7 @@ def _refuse_item_past_the_id_space(
     parsed: argparse.Namespace,
     context: RunContext,
 ) -> int | None:
-    """PIN-31 (issue #467, #469 review): under `storage = "state-ref"` a
+    """PIN-31: under `storage = "state-ref"` a
     number past `aco-ffffff` names no item, and `items.format_item_id` would
     print it as an id `workboard.parse_item_reference` refuses back -- so it
     refuses here, before any command looks it up or names it. The storage
@@ -857,11 +857,10 @@ def main(arguments: list[str] | None = None) -> int:
     # Every refusal the parse itself raises -- argparse's own usage errors,
     # and `workboard.parse_item_reference`, an argparse `type=` whose refusal is
     # a `ClaimError` -- fires before any namespace carries `--json`, so the
-    # mode is read back off the parsers this parse reached (issue #432).
+    # mode is read back off the parsers this parse reached.
     # Both report `invalid_usage` through the one envelope. Past the parse
     # the plain sentence alone still stands: a refusal a command raises
-    # outside its own reported vocabulary must not be dressed as one
-    # (issue #425).
+    # outside its own reported vocabulary must not be dressed as one.
     given = sys.argv[1:] if arguments is None else arguments
     parser = _parser()
     try:
@@ -869,7 +868,7 @@ def main(arguments: list[str] | None = None) -> int:
         # Judged after the parse, not as an argparse `type=`: `--repo`
         # precedes the subcommand, so a refusal raised while argparse reads
         # it would fire before the parse reached the command that decides
-        # whether this run asked for JSON (issue #465).
+        # whether this run asked for JSON.
         parsed.repo = None if parsed.repo is None else github.repository_id(parsed.repo)
     except usage.UsageError as error:
         return _refuse_usage(error, as_json=_asked_for_json(parser, given))

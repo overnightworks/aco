@@ -69,8 +69,7 @@ def _reset_bundle_name(repository: str, today: date, tip: protocol.ObjectId) -> 
 
 def _reset_restore_command(destination: Path) -> str:
     """`store.export_state_bundle` bundles `store.EXPORT_BUNDLE_REF`, never the
-    shared `store.STATE_REF` (issue #298, 19.09.2026 REVISE findings 1+2)
-    -- the bundle's own head therefore carries that name (`git bundle
+    shared `store.STATE_REF` -- the bundle's own head therefore carries that name (`git bundle
     list-heads` shows it), and the fetch renames it to `STATE_REF` on the
     way in.
     """
@@ -79,7 +78,7 @@ def _reset_restore_command(destination: Path) -> str:
 
 @dataclass(frozen=True)
 class _ResetExportConfig:
-    """`--no-export`/`--export-dir`, resolved once (issue #298): keeps
+    """`--no-export`/`--export-dir`, resolved once: keeps
     `_build_reset_plan` under the five-argument ceiling without folding an
     unrelated pair of facts into `worktree` or `remote`."""
 
@@ -122,7 +121,7 @@ _ABANDONED_PLACEHOLDER = "--abandoned <reason>"
 def _abandoned_release_command(
     claim: protocol.ActiveClaim, storage: body.Storage, running_agent: str | None
 ) -> str:
-    """The `release --abandoned` advice that ends live `claim` (issue #582):
+    """The `release --abandoned` advice that ends live `claim`:
     an item claim by its item and claim id (so no attached branch is
     needed, as reset needs none), a docs/ or fix/ lane claim by `--branch`;
     from a session that names no identity, as its holder by `--agent`,
@@ -224,8 +223,8 @@ def _print_reset_dry_run(plan: _ResetPlan) -> None:
 
 
 def _execute_reset(*, worktree: Path, remote: str, plan: _ResetPlan) -> None:
-    """Export -> delete remote -> delete local -> clear stamps -> bootstrap
-    (issue #298), each step printed the moment it completes. An export
+    """Export -> delete remote -> delete local -> clear stamps -> bootstrap, each step printed the
+    moment it completes. An export
     failure raises before anything else runs; a remote-deletion failure
     (rejected, or the lease gone stale) raises with the local ref left
     exactly as it was, and whatever export ran left on disk."""
@@ -250,13 +249,12 @@ def _execute_reset(*, worktree: Path, remote: str, plan: _ResetPlan) -> None:
 def _reset_observation(
     context: RunContext,
 ) -> tuple[Path, str, protocol.ClaimState | protocol.UnreadableState]:
-    """`reset`'s own state read (issue #298, 19.09.2026 gate finding 1):
+    """`reset`'s own state read:
     `store.peek_state_for_reset` instead of `RunContext.observation`'s ordinary
     `store.fetch_state`, so a broken lineage -- exactly what `reset` exists to
     recover from -- never blocks it, and so a dry run, a live-claim
-    refusal, or a failed export writes no per-worktree stamp or anchor
-    (finding 2). A canonical remote with no URL refuses before that read
-    (issue #516)."""
+    refusal, or a failed export writes no per-worktree stamp or anchor.
+    A canonical remote with no URL refuses before that read."""
     canonical_remote = context.configured_canonical_remote
     worktree = context.toplevel
     state = store.peek_state_for_reset(worktree=worktree, remote=canonical_remote)
@@ -264,14 +262,14 @@ def _reset_observation(
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`reset` (issue #298): exports `STATE_REF`, deletes it on the remote
+    """`reset`: exports `STATE_REF`, deletes it on the remote
     with a lease and locally if present, clears every worktree's lineage
     stamp and fetch anchor, and bootstraps a fresh empty state. Forge-free,
     like `bootstrap`. A live claim always refuses -- `--confirm` or not --
     naming every live claim instead of touching anything: a reset over live
     work is data loss with no owner. A state whose schema this aco cannot
     read has unknown live claims, so executing over it additionally needs
-    `--force-unreadable` (issue #341); its bundle is still exported.
+    `--force-unreadable`; its bundle is still exported.
     """
     worktree, remote, state = _reset_observation(context)
     if isinstance(state, protocol.ClaimState) and state.claims:

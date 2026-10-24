@@ -26,12 +26,12 @@ def _rulings_rows(
     projected: workboard.Board, bodies: Mapping[int, str], *, storage: body.Storage
 ) -> tuple[_RulingsRow, ...]:
     """Every open board item that carries at least one `[[expectation]]`
-    line, fully ruled ones included (issue #379) -- items with an open line
-    first, board-ranked then by fewer open lines then issue number
-    (unchanged from before #240), then the fully ruled items in that same
+    line, fully ruled ones included -- items with an open line
+    first, board-ranked then by fewer open lines then issue number,
+    then the fully ruled items in that same
     order. Each row is paired with its lines read fresh from `bodies` --
     `projected.items` itself carries only the open/total counters. `storage`
-    is forwarded to `body.expectation_lines` unchanged (issue #248): a state-ref
+    is forwarded to `body.expectation_lines` unchanged: a state-ref
     body's `[record]` table must read as a known key, not a malformed one."""
     ranked = sorted(
         (
@@ -114,8 +114,8 @@ def _rulings(
 
 
 class _RulingsReason(StrEnum):
-    """`aco rulings`' own `--json` `reason` vocabulary (issue #412,
-    `specs/rulings.spec.md`): `listed` the only success. `invalid_usage`
+    """`aco rulings`' own `--json` `reason` vocabulary
+    (`specs/rulings.spec.md`): `listed` the only success. `invalid_usage`
     covers `--repo` under `storage = state-ref` (PIN-04); every other
     refusal -- an unsupported forge host (BOARD-02), a state-ref checkout
     with no resolvable default branch (PIN-05) -- falls to `unavailable`,
