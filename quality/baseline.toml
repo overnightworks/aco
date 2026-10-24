@@ -37,7 +37,7 @@
 "tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4443
 "tests/test_checkout.py" = 2082
-"tests/test_cli.py" = 17788
+"tests/test_cli.py" = 17774
 "tests/test_cut.py" = 1124
 "tests/test_github.py" = 3249
 "tests/test_land_after_merge_rerun.py" = 884
