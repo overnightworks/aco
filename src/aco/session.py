@@ -1,4 +1,4 @@
-"""One command run's static repository facts (issue #457, slice A of #418).
+"""One command run's static repository facts.
 
 `session` owns the composition root: `run_context` and its forge builders.
 
@@ -6,7 +6,7 @@ A `RunContext` answers the questions every store and forge command asks
 about the checkout it runs in -- its toplevel, its tracked board
 configuration, the canonical remote and where that remote points, the forge
 repository it names, the default branch, the trunk, the forge itself, and
-its one observation of `refs/aco/state` (issue #477). Each fact is
+its one observation of `refs/aco/state`. Each fact is
 read the first time a command asks for it and held for the rest of that run,
 never before: a command that refuses early, or never needs a fact, never
 pays the git, filesystem, or `gh` read behind it.
@@ -37,10 +37,10 @@ ForgeBuilder = Callable[["RunContext"], forge.ForgeReader]
 
 @dataclass(frozen=True)
 class _StoreItemWriter:
-    """`state_board.ItemWriter`, implemented over `store` (issue #283): the
+    """`state_board.ItemWriter`, implemented over `store`: the
     one place this tool hashes an item's finished bytes into a blob and
-    writes it through one CAS transition -- an `ItemWriteIntent` (issue
-    #279), or for a close an `ItemCloseIntent` (issue #459).
+    writes it through one CAS transition -- an `ItemWriteIntent`,
+    or for a close an `ItemCloseIntent`.
     `state_board.py` itself may not import `store` (Layers contract), so
     this class owns both git steps of a state-ref item write: `_item_write`
     hashes the blob, `_commit` publishes it through the CAS transition.
@@ -102,17 +102,17 @@ class _StoreItemWriter:
 
 
 def _state_ref_forge(context: RunContext) -> state_board.StateRefBoard:
-    """The `state-ref` storage pin's forge (issues #248, #283): repository
+    """The `state-ref` storage pin's forge: repository
     identity and default branch from `context` (host-neutral, the canonical
     remote's recorded `HEAD`),
     item content and blob oids read once through
     `store.read_item_files`/`ClaimState.items` of `context.observation` --
-    the very snapshot the command's own checks read (issue #477) -- and a
+    the very snapshot the command's own checks read -- and a
     write port over that same `store` (`_StoreItemWriter`) -- this is the
     one place `state_board.StateRefBoard` is ever handed live data or a way
     to write it, since the Layers contract keeps that module from reaching
     `store` itself. It reads and writes through `context`'s own worktree:
-    `start` (issue #322 review finding 2) hands it a context for the freshly
+    `start` hands it a context for the freshly
     created worktree, so the worktree-scoped claim never reads a
     caller-checkout snapshot observed before that worktree existed."""
     repository = context.repository_id
@@ -129,7 +129,7 @@ def _state_ref_forge(context: RunContext) -> state_board.StateRefBoard:
 
 
 def _build_forge(context: RunContext) -> forge.ForgeReader:
-    """The forge adapter for `context`'s own `storage` pin (issue #248),
+    """The forge adapter for `context`'s own `storage` pin,
     never chosen by the canonical remote's host: `github` (the default)
     builds `github.GitHubForge`; `state-ref` builds
     `state_board.StateRefBoard` from the state ref's own `items/` tree."""
@@ -145,7 +145,7 @@ def run_context(repo: forge.RepositoryId | None) -> RunContext:
 
 
 class RepoMeaninglessUnderStateRefError(protocol.ClaimUnavailableError):
-    """`--repo` under `storage = "state-ref"`, typed (issue #396) so
+    """`--repo` under `storage = "state-ref"`, typed so
     `aco brief`'s `--json` can report `invalid_usage` instead of its own
     generic `unavailable` bucket for every other forge-resolution refusal."""
 
@@ -153,15 +153,15 @@ class RepoMeaninglessUnderStateRefError(protocol.ClaimUnavailableError):
 def board_config(toplevel: Path) -> workboard.BoardConfig:
     """The repository's board configuration, refused before
     `workboard.load_config` ever runs when `.aco/board.toml` is not
-    actually tracked by git (#315): a `.gitignore` that ignores every
+    actually tracked by git: a `.gitignore` that ignores every
     dot-directory keeps a freshly written pin off every worktree unless it
     is force-added, and the prior silent `storage = github` default then
     surfaced as the unrelated "no forge adapter for host ..." the moment a
     forge command resolved a non-GitHub canonical remote. Reads `toplevel`
-    explicitly (issue #314 gate B3), never the calling process's own cwd:
+    explicitly, never the calling process's own cwd:
     `rescope` passes its own resolved checkout, so a foreign cwd can never
     wrongly deny a valid config or bless an untracked one. A file absent
-    altogether is no repair `git add -f` could make (issue #505):
+    altogether is no repair `git add -f` could make:
     `_absent_board_config_refusal` names the repair instead."""
     if not checkout.path_is_tracked(workboard.CONFIG_PATH.as_posix(), directory=toplevel):
         if not (toplevel / workboard.CONFIG_PATH).exists():
@@ -204,7 +204,7 @@ def _trunk_board_configuration(remote: str, toplevel: Path) -> _TrunkBoardConfig
 @dataclass(frozen=True)
 class LaneSharedEntry:
     """One `lane_shared` entry, and whether it names a file the trunk tracks
-    (issue #586): a directory or a missing file grants nothing."""
+    a directory or a missing file grants nothing."""
 
     path: str
     names_a_file: bool
@@ -212,7 +212,7 @@ class LaneSharedEntry:
 
 @dataclass(frozen=True)
 class LaneSharedUnavailable:
-    """The trunk's committed board configuration is defective (issue #586):
+    """The trunk's committed board configuration is defective:
     a newer aco's key, an invalid value. Only the lane-shared answer is lost."""
 
     defect: str
@@ -222,9 +222,9 @@ LaneSharedReading = tuple[LaneSharedEntry, ...] | LaneSharedUnavailable
 
 
 def trunk_lane_shared_reading(remote: str, toplevel: Path) -> LaneSharedReading:
-    """The lane-shared registry files (issue #575) the trunk's committed
+    """The lane-shared registry files the trunk's committed
     board configuration names (`_trunk_board_configuration`), as `status` and
-    `brief` show them (issue #586): each entry beside whether the trunk
+    `brief` show them: each entry beside whether the trunk
     tracks it as a file, or the defect that keeps the trunk's configuration
     from naming any -- reported by these orientation reads rather than
     stopping them. Only the trunk's copy is read, so a lane cannot change
@@ -261,14 +261,14 @@ def _lane_shared_entries(
 def _absent_board_config_refusal(toplevel: Path) -> str:
     """The repair for a checkout at `toplevel` with no board configuration
     at all. With none to name it, the canonical remote is the default one:
-    unconfigured, it refuses by name (issue #516). When its trunk tracks the
+    unconfigured, it refuses by name. When its trunk tracks the
     configuration, a branch whose merge base with that trunk tracks it too
-    removed the file itself and restores it (issue #522) -- also after a
+    removed the file itself and restores it -- also after a
     newer trunk was fetched, which a merge could not restore, since the
-    branch's own removal wins (issue #524); any other branch was cut before
-    the adoption and only needs the trunk merged in (issue #520). Otherwise --
+    branch's own removal wins; any other branch was cut before
+    the adoption and only needs the trunk merged in. Otherwise --
     including a trunk that does not resolve, which tracks nothing -- the
-    repository was never adopted (issue #505)."""
+    repository was never adopted."""
     remote = workboard.BoardConfig().canonical_remote
     unconfigured = checkout.unconfigured_remote_refusal(remote, directory=toplevel)
     if unconfigured is not None:
@@ -294,7 +294,7 @@ def _absent_board_config_refusal(toplevel: Path) -> str:
 
 def _branch_removed_board_config(trunk: str, toplevel: Path) -> bool:
     """Whether the checkout's branch once held the board configuration from
-    `trunk`: their merge base tracks it (issue #524)."""
+    `trunk`: their merge base tracks it."""
     base = checkout.merge_base("HEAD", trunk, directory=toplevel)
     return base is not None and checkout.path_is_tracked(
         workboard.CONFIG_PATH.as_posix(), directory=toplevel, revision=base
@@ -320,7 +320,7 @@ def refuse_unsupported_forge_host(location: checkout.RemoteLocation) -> None:
     """The GitHub-storage forge target's precondition beyond Erwartung 6:
     GitHub is the one forge adapter reached by host, so a canonical remote
     on any other host refuses by name here, before ever asking `gh`. Never
-    reached under `storage = "state-ref"` (issue #248), where a non-GitHub
+    reached under `storage = "state-ref"`, where a non-GitHub
     canonical remote is no error."""
     if location.host != github.GITHUB_HOST:
         raise protocol.ClaimUnavailableError(f"no forge adapter for host {location.host}")
@@ -347,8 +347,7 @@ _OBSERVATION_BOUND_FACTS = frozenset({"observation", "forge"})
 
 # The facts a `RunContext` resolves from the canonical remote's recorded
 # `HEAD`: a fetch may record or move it, so `_fetch_canonical_remote_once`
-# drops these once it fetched and never keeps one read before (issue #484
-# ruling).
+# drops these once it fetched and never keeps one read before.
 _RECORDED_HEAD_FACTS = frozenset({"trunk_ref", "recorded_default_branch"})
 
 
@@ -390,7 +389,7 @@ class RunContext:
         remote it fetched, so
         the fresh context resolves the trunk anew without fetching that
         remote a second time, yet fetches the canonical remote its reread
-        configuration names when that is another (issue #488)."""
+        configuration names when that is another."""
         child = RunContext(self.repo, build_forge=self._build_forge, directory=self.directory)
         child._fetched_trunk_remote = self._fetched_trunk_remote
         return child
@@ -414,9 +413,9 @@ class RunContext:
         """The checkout's toplevel, and the directory every store read runs
         git in: git lists and archives a state tree relative to its own
         working directory, so a read from a subdirectory would see an empty
-        tree (#460). Without a working tree there is no configuration to
+        tree. Without a working tree there is no configuration to
         read, so the command refuses rather than running on guessed
-        defaults (#178)."""
+        defaults."""
         try:
             return Path(
                 checkout.git_output(["rev-parse", "--show-toplevel"], directory=self.directory)
@@ -438,15 +437,15 @@ class RunContext:
 
     @cached_property
     def remote_location(self) -> checkout.RemoteLocation:
-        """The canonical remote's configured URL, parsed host-neutrally
-        (issue #245) -- read only when a forge target is resolved, so a
+        """The canonical remote's configured URL, parsed host-neutrally --
+        read only when a forge target is resolved, so a
         forge-free command never errs on a non-GitHub canonical remote."""
         return checkout.parse_remote_location(self.canonical_remote_url)
 
     @cached_property
     def _unconfigured_canonical_remote_refusal(self) -> str | None:
         """`checkout.unconfigured_remote_refusal`'s answer for the canonical
-        remote, asked once per context (issues #508, #512, #516).
+        remote, asked once per context.
         `configured_canonical_remote` refuses on it before the remote's URL,
         state ref, trunk, fetch, `default_branch`, `claim`'s checkout check,
         `bootstrap` and `reset`; `recorded_default_branch`, the offline
@@ -457,13 +456,13 @@ class RunContext:
     @property
     def configured_canonical_remote(self) -> str:
         """The canonical remote's name, refused by name when the checkout
-        does not configure it (issue #508)."""
+        does not configure it."""
         self.refuse_unconfigured_canonical_remote()
         return self.canonical_remote
 
     def refuse_unconfigured_canonical_remote(self) -> None:
         """Refuse by name when the checkout does not configure the
-        canonical remote (issues #508, #512)."""
+        canonical remote."""
         refusal = self._unconfigured_canonical_remote_refusal
         if refusal is not None:
             raise protocol.ClaimError(refusal)
@@ -471,14 +470,13 @@ class RunContext:
     @cached_property
     def canonical_remote_url(self) -> str:
         """The canonical remote's configured URL, as git records it: the
-        URL a forge target is compared against and discovered from (#310
-        finding 138)."""
+        URL a forge target is compared against and discovered from."""
         return checkout.remote_url(self.configured_canonical_remote, directory=self.directory)
 
     @cached_property
     def repository_id(self) -> forge.RepositoryId:
         """The repository this run's forge talks to, refused by name before
-        any forge is built (issues #176, #245, #248): under `state-ref` the
+        any forge is built: under `state-ref` the
         canonical remote's own host and path, with `--repo` meaningless;
         under `github` `--repo` or the discovered repository, which must
         match the canonical remote."""
@@ -503,9 +501,9 @@ class RunContext:
     def default_branch(self) -> str:
         """The default branch by provider: the canonical remote's recorded
         default branch under `state-ref`, where that remote is the forge,
-        the forge's own answer under `github` (issue #484 rulings). Under
+        the forge's own answer under `github`. Under
         `state-ref` it holds nothing of its own, so the fetch that drops the
-        recorded default branch drops this answer with it (issue #492)."""
+        recorded default branch drops this answer with it."""
         remote = self.configured_canonical_remote
         if self.config.storage is not body.Storage.STATE_REF:
             return self._forge_default_branch
@@ -523,9 +521,9 @@ class RunContext:
     @cached_property
     def recorded_default_branch(self) -> str | None:
         """The canonical remote's recorded default branch in this checkout,
-        or `None` when none is recorded, it dangles (issue #490), or the
+        or `None` when none is recorded, it dangles, or the
         checkout does not configure that remote, whose leftover `HEAD`
-        records nothing (issue #508): the offline checks' default branch,
+        records nothing: the offline checks' default branch,
         each check keeping its own rule for `None` -- `rescope`'s names the
         unconfigured remote itself (RESC-21)."""
         if self._unconfigured_canonical_remote_refusal is not None:
@@ -535,13 +533,13 @@ class RunContext:
     @cached_property
     def trunk_ref(self) -> str:
         """The canonical remote's trunk ref in this checkout, as the last
-        fetch left it, without fetching (issue #488): the ref a command
+        fetch left it, without fetching: the ref a command
         walks for landings or diffs a lane against."""
         return self._resolved_trunk_ref()
 
     def fetched_trunk_ref(self) -> str:
         """The canonical remote's trunk ref once this checkout fetched that
-        remote -- at most once per run and remote (issue #488): the ref `start` builds
+        remote -- at most once per run and remote: the ref `start` builds
         from and a `state-ref` landing's worktree cleanup judges. The
         recorded `HEAD` is read again after the fetch, never one held from
         before it, since a fetch may record or move it: the held trunk and
@@ -553,7 +551,7 @@ class RunContext:
     def fetched_default_branch_ref(self) -> str:
         """The default branch's tracking ref of the canonical remote once
         this checkout fetched that remote, sharing `fetched_trunk_ref`'s one
-        fetch per run and remote (issue #492): the ref `land` fast-forwards
+        fetch per run and remote: the ref `land` fast-forwards
         to and `release --merged` walks under `github`, named by the same
         `default_branch` their pull request checks compare against, so the
         forge's default branch counts even where the remote records no `HEAD`."""
@@ -578,8 +576,8 @@ class RunContext:
 
     @property
     def forge_writer(self) -> forge.ForgeWriter:
-        """The same resolved forge, narrowed to its writing surface (issue
-        #248, #283). The cast is honest, not a suppression: every adapter
+        """The same resolved forge, narrowed to its writing surface.
+        The cast is honest, not a suppression: every adapter
         this tool builds -- `github.GitHubForge`, `state_board.StateRefBoard`
         (its `ItemWriter` injected by `_state_ref_forge`), and every test
         fake standing in for either -- already implements the full
@@ -590,7 +588,7 @@ class RunContext:
 
     @cached_property
     def observation(self) -> protocol.ClaimState:
-        """This directory's one fetch of `refs/aco/state` (issue #477), from
+        """This directory's one fetch of `refs/aco/state`, from
         its toplevel over the canonical remote: the state-ref board, every
         CLI check, and the run's first transition read this same snapshot. A
         failed fetch raises and is not held. After a transition it holds the
@@ -615,7 +613,7 @@ class RunContext:
         intent: protocol.ClaimTransitionIntent,
     ) -> protocol.ClaimState:
         """Write one transition onto this run's observation of the state ref
-        (issue #494) and hold the state it wrote as the new observation, so
+        and hold the state it wrote as the new observation, so
         a second write of the same run (`cut`) applies to the first one's
         result instead of refusing against a snapshot it already moved."""
         written = store.commit_transition(
