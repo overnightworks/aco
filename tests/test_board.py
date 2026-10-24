@@ -1979,8 +1979,8 @@ def test_next_names_the_boards_top_row_even_when_it_is_not_the_highest_score() -
     )
     by_number = {item.number: item for item in projected.items}
 
-    # Item 50 outscores item 51 on raw score alone; item 51 still leads because it carries
-    # the higher-priority "blocker" bucket (it unblocks item 52) that `board`
+    # #50 outscores #51 on raw score alone; #51 still leads because it carries
+    # the higher-priority "blocker" bucket (it unblocks #52) that `board`
     # already sorts on ahead of score.
     assert by_number[50].score > by_number[51].score
     assert projected.items[0].number == 51
@@ -2140,7 +2140,7 @@ def test_a_reference_line_inside_a_fenced_code_block_confers_no_stage() -> None:
 def test_a_fenced_closing_keyword_confers_no_stage() -> None:
     """The closing-keyword path (`_associated_issues`) must read the body the
     same way `_touched_without_closing` already does: a fenced example of the
-    `Fixes #N` convention documents the syntax, it does not close item 65.
+    `Fixes #N` convention documents the syntax, it does not close #65.
     """
     now = datetime(2026, 8, 21, tzinfo=UTC)
     issue = board_issue(

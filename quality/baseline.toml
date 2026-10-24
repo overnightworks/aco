@@ -22,7 +22,7 @@
 
 [file_lines]
 "src/aco/body.py" = 1669
-"src/aco/checkout.py" = 2041
+"src/aco/checkout.py" = 2033
 "src/aco/cli.py" = 887
 "src/aco/cmd_claim.py" = 1137
 "src/aco/cmd_release.py" = 925
@@ -46,7 +46,7 @@
 "tests/test_release_cleanup.py" = 807
 "tests/test_rescope_checkout.py" = 1088
 "tests/test_reset.py" = 954
-"tests/test_state_board.py" = 6114
+"tests/test_state_board.py" = 6113
 "tests/test_store.py" = 5526
 
 [function_lines."src/aco/board_read.py"]

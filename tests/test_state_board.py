@@ -2794,8 +2794,7 @@ class TestCliStateRefForge:
         row: list[str],
         refusal: str,
     ) -> None:
-        """Refusals:
-        `--row 9` naming no entry, a container that is itself a child, or a
+        """`--row 9` naming no entry, a container that is itself a child, or a
         row whose `done_when` holds a display control (BODY-66, CUT-05)
         refuses by the item id -- the same by-name refusals GitHub's own
         cut tests prove -- and nothing reaches the remote. A readable
@@ -3775,7 +3774,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """`--origin FORGE#N` writes `record.origin`
+        """`--origin gitlab#42` writes `record.origin`
         straight into `items/<id>.md` over a real `file://` remote through
         `main`, and a fresh `item show` (its own fetch, standing in for a
         second process) prints it in the header; `claim` then runs on that
@@ -5611,7 +5610,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """CLM-28: a title's `#` number past the id space names no
+        """CLM-28: a title's `#16777216` names no
         state-ref item -- six hex digits end at 16777215 -- so `claim` has no
         parent to warn about and never prints an id it cannot take back."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
