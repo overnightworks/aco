@@ -1,8 +1,0 @@
-claim_id = "fb0c6378fbbe45e48dee87fb8c5a07a8"
-agent = "Codex 01a16e6e-894a-7692-929e-d605748ac260"
-role = "builder"
-base = "f54f4e19426896b0838cd6eaff60891e5fdb7406"
-branch = "codex/issue-359-refs-s6"
-scope = ["quality/baseline.toml", "src/aco/cmd_claim.py", "src/aco/cmd_cut.py", "src/aco/cmd_item.py", "src/aco/cmd_release.py"]
-opened_commit = "b06e21c3006214ed512cabc442c204646ce62042"
-whole_reason = "Die vier zusammengehörigen Befehlsdateien werden im selben verhaltensneutralen Kommentardurchgang geprüft; kleinere Scheiben vervielfachen nur Claim-, Review- und Baseline-Läufe."
