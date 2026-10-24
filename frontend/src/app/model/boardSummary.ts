@@ -9,6 +9,8 @@ import type { BoardItem, ExpectationLine, Outcome, RepoReading } from '../../typ
 import { lineKey } from './decision';
 
 export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
+export const LIST_LABEL = 'Liste';
+export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
 
 const OUTCOME_LABEL: Record<Outcome, string> = {
 	yes: 'Ja',

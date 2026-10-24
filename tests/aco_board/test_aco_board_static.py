@@ -27,6 +27,7 @@ def static_root(tmp_path: Path) -> Path:
     (root / "assets").mkdir(parents=True)
     (root / "index.html").write_text("<html>shell</html>", encoding="utf-8")
     (root / "assets" / "index.js").write_text("console.log(1)", encoding="utf-8")
+    (root / "assets" / "index.css").write_text("body { margin: 0 }", encoding="utf-8")
     return root
 
 
@@ -142,12 +143,21 @@ def test_asset_refuses_an_unrecognized_extension(static_root: Path) -> None:
     assert static.asset("/assets/notes.txt", static_root) is None
 
 
-def test_asset_reads_a_recognized_file_with_its_content_type(static_root: Path) -> None:
-    served = static.asset("/assets/index.js", static_root)
+@pytest.mark.parametrize(
+    ("filename", "content", "content_type"),
+    [
+        ("index.js", b"console.log(1)", "text/javascript; charset=utf-8"),
+        ("index.css", b"body { margin: 0 }", "text/css; charset=utf-8"),
+    ],
+)
+def test_asset_reads_a_recognized_file_with_its_content_type(
+    static_root: Path, filename: str, content: bytes, content_type: str
+) -> None:
+    served = static.asset(f"/assets/{filename}", static_root)
 
     assert served is not None
-    assert served.content == b"console.log(1)"
-    assert served.content_type == "text/javascript; charset=utf-8"
+    assert served.content == content
+    assert served.content_type == content_type
 
 
 def test_shell_reads_the_committed_index_html(static_root: Path) -> None:
@@ -186,8 +196,9 @@ def test_start_board_refuses_to_bind_once_the_shell_is_missing(
         ("/assets/index.js", "text/javascript; charset=utf-8"),
         ("/assets/index.js?v=1", "text/javascript; charset=utf-8"),
         ("/assets/index.js#ignored", "text/javascript; charset=utf-8"),
+        ("/assets/index.css", "text/css; charset=utf-8"),
     ],
-    ids=["shell", "asset", "asset-with-query", "asset-with-fragment"],
+    ids=["shell", "asset", "asset-with-query", "asset-with-fragment", "stylesheet"],
 )
 def test_the_shell_and_its_assets_need_no_token(
     repository: FakeAcoRepository, path: str, content_type: str
@@ -227,7 +238,7 @@ def test_posting_to_an_unknown_path_answers_404(repository: FakeAcoRepository) -
     assert response.status == 404
 
 
-@pytest.mark.parametrize("path", ["/", "/assets/index.js"], ids=["shell", "asset"])
+@pytest.mark.parametrize("path", ["/", "/assets/index.js", "/assets/index.css"])
 @pytest.mark.parametrize("method", ["PUT", "POST", "HEAD"])
 def test_a_method_the_shell_or_an_asset_does_not_serve_is_refused(
     repository: FakeAcoRepository, method: str, path: str
@@ -239,7 +250,7 @@ def test_a_method_the_shell_or_an_asset_does_not_serve_is_refused(
     assert response.headers["Allow"] == "GET"
 
 
-@pytest.mark.parametrize("path", ["/", "/assets/index.js"], ids=["shell", "asset"])
+@pytest.mark.parametrize("path", ["/", "/assets/index.js", "/assets/index.css"])
 def test_every_shell_and_asset_answer_carries_the_guard_headers(
     repository: FakeAcoRepository, path: str
 ) -> None:
@@ -250,6 +261,10 @@ def test_every_shell_and_asset_answer_carries_the_guard_headers(
     assert response.headers["Referrer-Policy"] == "no-referrer"
     policy = response.content_security_policy or ""
     assert "script-src 'self'" in policy
+    assert "style-src 'self'" in policy
+    assert "default-src 'none'" in policy
+    assert "unsafe-inline" not in policy
+    assert "https:" not in policy
     assert "img-src data:" in policy
     assert "'nonce-" not in policy
     assert not any(name.lower().startswith("access-control-") for name in response.headers)

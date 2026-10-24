@@ -23,7 +23,10 @@ _ASSETS_DIRNAME = "assets"
 level down from `STATIC_ROOT`, under this name."""
 
 _SHELL_CONTENT_TYPE = "text/html; charset=utf-8"
-_ASSET_CONTENT_TYPES = {".js": "text/javascript; charset=utf-8"}
+_ASSET_CONTENT_TYPES = {
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+}
 """Every extension `frontend/vite.config.ts` actually emits into `static/assets/`
 (fixed filenames, no content hash -- see that file's own docstring); a request
 for any other extension is refused rather than guessed."""

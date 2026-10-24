@@ -4,6 +4,7 @@
 		cardSentence,
 		findSelectedLine,
 		lineStatusText,
+		NO_SELECTION_MESSAGE,
 		pictureDataUri
 	} from '../app/model/boardSummary';
 	import { NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
@@ -22,9 +23,14 @@
 	const selected = $derived(findSelectedLine(repos, selectedKey));
 </script>
 
-<section class="stage" aria-live="polite">
+<section
+	class="stage"
+	aria-live="polite"
+	tabindex="-1"
+	aria-label={selected === null ? NO_SELECTION_MESSAGE : cardHeading(selected.line)}
+>
 	{#if selected === null}
-		<p>Alles entschieden. Neue Fragen erscheinen links, sobald ein Agent eine stellt.</p>
+		<p>{NO_SELECTION_MESSAGE}</p>
 	{:else}
 		{@const activeKey = lineKey(selected.repo, selected.item.number, selected.line)}
 		{@const ruled = selected.line.ruling !== null}

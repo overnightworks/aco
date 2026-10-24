@@ -72,7 +72,7 @@ resolved directory's name.
 
 - [ ] [ABRD-22] `GET /` answers the committed shell and `GET /assets/**` its committed built files, no token needed; each refuses a method other than `GET` with 405 and `Allow: GET` (see E-ABRD-08).
 - [ ] [ABRD-23] `GET /assets/**` answers only a regular file under the committed `static/` directory: a `..` segment, encoded or not, or an in-between symlink answers `not found`, like a missing file.
-- [ ] [ABRD-24] The CSP on the shell and its assets carries no nonce: `script-src 'self'` (its one script loads from `/assets/`) and `img-src data:`, alongside ABRD-12's own directives.
+- [ ] [ABRD-24] Shell/assets CSP adds `script-src 'self'`, `style-src 'self'`, `img-src data:` to ABRD-12, no nonce/inline/external styles; built CSS is `text/css; charset=utf-8` (E-ABRD-08).
 - [ ] [ABRD-25] `aco serve` refuses to start with `ERROR: <path> is missing; build the frontend first (...)` once the committed shell is absent, never binding a board that could only answer its API.
 - [ ] [ABRD-26] `aco serve --json` is refused by the argument parser as plain text, never in the envelope: `aco: error: unrecognized arguments: --json`, exit `2` (see E-ABRD-09).
 - [ ] [ABRD-27] The global `aco --repo OWNER/REPO` before `serve` is refused `ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH`, exit `2` (see E-ABRD-10).
@@ -192,6 +192,10 @@ answer 200: the committed `static/index.html`, Content-Type text/html
 request: GET /assets/index.js
 aco calls: none
 answer 200: the committed `static/assets/index.js`, Content-Type text/javascript
+
+request: GET /assets/index.css
+aco calls: none
+answer 200: the committed stylesheet, Content-Type text/css; charset=utf-8
 
 request: GET /assets/../server.py (a traversal attempt, literal or percent-encoded)
 aco calls: none

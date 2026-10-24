@@ -23,14 +23,14 @@ function storeAnswering(result: DecisionResult, reload: () => Promise<void> = as
 	);
 }
 
-test('with nothing selected, the stage says everything is decided', () => {
+test('with nothing selected, the stage says no question is selected', () => {
 	render(Stage, {
 		repos: [],
 		selectedKey: null,
 		decisions: storeAnswering({ status: 'ruled', message: null })
 	});
 
-	expect(screen.getByText(/Alles entschieden/)).toBeInTheDocument();
+	expect(screen.getByText('Keine Frage ausgewählt.')).toBeInTheDocument();
 });
 
 test('a selected line shows only its own question, example, sentence and recommendation', () => {
