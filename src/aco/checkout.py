@@ -875,7 +875,7 @@ def refuse_shared_checkout(
     invariant `_validate_worktree_branch` enforces for `claim`, judged from
     an already path-resolved checkout and `default_branch`, the recorded
     default branch of that checkout's `canonical_remote`,
-    instead of a fresh git read in the calling process's own cwd (gate G4).
+    instead of a fresh git read in the calling process's own cwd.
 
     Unlike `claim`'s own `is_default_branch`, which falls back to guessing
     `{main, master}` when no default branch is recorded, this denies
