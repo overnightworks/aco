@@ -74,8 +74,8 @@ parenthesis names that fetch, since no fetch runs here (see E-PIN-35).
 ## `lane_shared`, the registries a lane may change beyond its scope
 
 `lane_shared` names repository files that follow every code change
-mechanically -- a dead-code whitelist, a test-budget ledger -- so no lane
-can know in advance whether it needs one. `status` and `brief` list them.
+mechanically -- a dead-code whitelist -- so no lane can know in advance
+whether it needs one. `status` and `brief` list them.
 
 - [ ] [PIN-37] A tracked `.aco/board.toml` may name `lane_shared = ["<file>", ...]`, each a repository-relative file path; absent, no file is lane-shared.
 - [ ] [PIN-38] A `lane_shared` value that is no list of unique strings refuses `board configuration <path> lane_shared must be a list of unique repository file paths` (see E-PIN-40).

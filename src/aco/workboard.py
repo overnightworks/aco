@@ -504,8 +504,8 @@ class BoardConfig:
     storage: Storage = Storage.GITHUB
     # Repository files a lane may change beyond its scope (issue #575):
     # registries that follow every code change mechanically -- a dead-code
-    # whitelist, a test-budget ledger -- so no lane can know in advance
-    # whether it will need one. Only the trunk's committed copy is read
+    # whitelist -- so no lane can know in advance whether it will need
+    # one. Only the trunk's committed copy is read
     # (`session.trunk_lane_shared_reading`).
     lane_shared: tuple[str, ...] = ()
     # The repository's own history convention for `aco land` (issue #578):

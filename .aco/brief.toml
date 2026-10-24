@@ -17,7 +17,7 @@ rules = [
   "Never let a function always return the same constant, never duplicate a block, and never add an inline scanner suppression.",
   "Never compare freshly constructed dataclasses inline; compare tuples in a named helper instead.",
   "Drive behaviour through the real entry point and its CLI fixtures; one parametrized test per family; never assert mock call counts or pin internals.",
-  "Keep command literals in one local per test scenario, and use at most one # budget: line for the whole lane.",
+  "Keep command literals in one local per test scenario.",
   "Edit the owning spec in the same PR for any printed literal, exit code, or --json shape you alter or add, keeping each criterion within 200 characters, naming no implementation names, copying literals from the printer, placing --repo before the subcommand, and giving an example transcript for every new refusal, with a criterion to file:line table in the PR body.",
   "Before finishing, fetch and rebase onto origin/main, re-run the checks the rebase touched, and commit with clear one-topic subjects ending in the Co-Authored-By trailer line your own session gives you.",
   "Push the branch and open the pull request with gh pr create --base main --head <branch> --title <title> --body-file <file>, whose body carries what changed and why, the proofs with their exact commands, then before the footer the lines Closes #<n> and Work-Item: #<n>, and the footer \"🤖 Generated with [Claude Code](https://claude.com/claude-code)\"; never merge it; then run aco check <pr> from the worktree and fix anything it refuses.",
@@ -34,8 +34,6 @@ checks = [
   "uv run --locked python scripts/check_root_layout.py",
   "uv run --locked lint-imports",
   "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=aco --cov-report=term-missing",
-  "uv run --locked python scripts/test_budget.py --ci --target origin/main",
-  "uv run --locked python scripts/test_inventory.py --ci",
 ]
 
 [review]

@@ -21,7 +21,6 @@
 "check_status.check" = 19
 
 [file_lines]
-"scripts/test_inventory.py" = 933
 "src/aco/body.py" = 1669
 "src/aco/checkout.py" = 2041
 "src/aco/cli.py" = 888
@@ -163,9 +162,4 @@
 "test_commit_transition_ten_thread_contention_lands_every_distinct_key" = 66
 "test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the_ref" = 74
 
-[clones."scripts/test_budget.py"]
-_callee_name = [["scripts/test_inventory.py", "_callee_name"]]
-_commit_of = [["scripts/test_inventory.py", "_commit_of"]]
-default_target = [["scripts/test_inventory.py", "default_target"]]
-merge_base = [["scripts/test_inventory.py", "merge_base"]]
-resolve_target = [["scripts/test_inventory.py", "resolve_target"]]
+[clones]

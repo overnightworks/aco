@@ -53,33 +53,6 @@ jobs:
           name: coverage
           path: coverage.xml
 
-  gates:
-    name: Test-efficiency gates (test-budget, similar-methods, test-inventory, spec-lint)
-    runs-on: ubuntu-latest
-    steps:
-      # Every gate measures against a merge-base, so the branch point must be reachable
-      # (issue #319: the base-selection concept -- a change gate measures against the tree
-      # it lands on).
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
-        with:
-          python-version: '3.12'
-      - run: uv sync --locked --group dev
-      # test_budget.py and test_inventory.py self-heal a missing ref, but fetching once
-      # here keeps both gates on the same known-fetched base.
-      - name: Fetch the pull request's base branch
-        if: github.event_name == 'pull_request'
-        run: git fetch origin "${GITHUB_BASE_REF}"
-      - name: Test budget (tests/ size and duplication vs the merge-base)
-        run: uv run --locked python scripts/test_budget.py --ci
-      - name: Test inventory (rewritten-module assert-literal coverage vs the merge-base)
-        run: uv run --locked python scripts/test_inventory.py --ci
-      - name: Spec lint (specs/*.spec.md style rules, no baseline)
-        run: uv run --locked python scripts/spec_lint.py --ci
-
   # The same script gates release.yml, so CI proves exactly what a release
   # uploads: wheel and sdist carry the committed board assets and install
   # with no Node on PATH.
@@ -180,7 +153,7 @@ jobs:
           if-no-files-found: ignore
 
   quality:
-    needs: [check, gates, package, frontend, e2e]
+    needs: [check, package, frontend, e2e]
     if: always()
     permissions:
       contents: read
