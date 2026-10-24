@@ -22,7 +22,7 @@ from dataclasses import replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import pytest
 from cli_fixtures import (
@@ -1246,11 +1246,11 @@ def _fail_every_read_after_the_first(monkeypatch: pytest.MonkeyPatch) -> None:
     real_fetch_state = store.fetch_state
     reads: list[None] = []
 
-    def fetch_state_failing_after_the_first(**kwargs: Any) -> protocol.ClaimState:
+    def fetch_state_failing_after_the_first(*, worktree: Path, remote: str) -> protocol.ClaimState:
         if reads:
             raise protocol.ClaimError("cannot reach origin refs/aco/state")
         reads.append(None)
-        return real_fetch_state(**kwargs)
+        return real_fetch_state(worktree=worktree, remote=remote)
 
     monkeypatch.setattr(store, "fetch_state", fetch_state_failing_after_the_first)
 
@@ -1330,17 +1330,17 @@ class _PushProcessProbe:
         if self._controlling:
             return
         self._controlling = True
-        real_popen = subprocess.Popen
+        real_popen = cast(Callable[..., subprocess.Popen[Any]], subprocess.Popen)
 
-        def popen(command: list[str], *args: Any, **kwargs: Any) -> Any:
+        def popen(command: list[str], *args: object, **options: object) -> object:
             if "push" not in command:
-                return real_popen(command, *args, **kwargs)
+                return real_popen(command, *args, **options)
             self.started += 1
             if self._start_failure is not None:
                 raise self._start_failure
             if self._replacement_command is not None:
                 command = self._replacement_command
-            started = real_popen(command, *args, **kwargs)
+            started = real_popen(command, *args, **options)
             if self._stoppable:
                 return started
             self.unstoppable_children.append(started)
@@ -1357,12 +1357,12 @@ class _PushProcessProbe:
         self._replacement_command = command
 
     def expires_the_push_at_once(self) -> None:
-        run_without_limit = process.run_bounded_captured
+        unlimited = cast(Callable[..., process.CapturedResult], process.run_bounded_captured)
 
-        def bounded(command: list[str], **kwargs: Any) -> Any:
+        def bounded(command: list[str], **options: object) -> process.CapturedResult:
             if "push" in command:
-                kwargs["timeout"] = 0
-            return run_without_limit(command, **kwargs)
+                options["timeout"] = 0
+            return unlimited(command, **options)
 
         self._monkeypatch.setattr(process, "run_bounded_captured", bounded)
 

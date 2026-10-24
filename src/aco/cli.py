@@ -5,11 +5,10 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, NoReturn
 
 from . import (
     __version__,
@@ -40,6 +39,7 @@ from . import (
     protocol,
     report,
     session,
+    usage,
     workboard,
 )
 from .session import (
@@ -107,11 +107,11 @@ ROLE_ON_LIVE_CLAIM_HELP = (
 ITEM_REF_HELP = "an item, as aco-xxxxxx, #n, or the bare number n"
 
 
-def _add_bootstrap_parser(commands: _Subcommands, name: str) -> None:
+def _add_bootstrap_parser(commands: usage.Subcommands, name: str) -> None:
     commands.add_parser(name, help="create refs/aco/state if it does not exist yet")
 
 
-def _add_reset_parser(commands: _Subcommands, name: str) -> None:
+def _add_reset_parser(commands: usage.Subcommands, name: str) -> None:
     reset = commands.add_parser(
         name,
         help="export refs/aco/state, delete it remotely and locally, and bootstrap fresh",
@@ -143,7 +143,7 @@ def _add_json_flag(container: argparse.ArgumentParser) -> None:
     container.add_argument(report.JSON_FLAG, action="store_true", help=JSON_HELP)
 
 
-def _add_status_parser(commands: _Subcommands, name: str) -> None:
+def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
     status = commands.add_parser(name, help="show repository-wide build claims")
     status.add_argument(
         "issue",
@@ -157,22 +157,22 @@ def _add_status_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(status)
 
 
-def _add_board_parser(commands: _Subcommands, name: str) -> None:
+def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
     _add_json_flag(commands.add_parser(name, help="project the open work board, read-only"))
 
 
-def _add_serve_parser(commands: _Subcommands, name: str) -> None:
+def _add_serve_parser(commands: usage.Subcommands, name: str) -> None:
     cmd_serve.add_arguments(commands.add_parser(name, help="serve the decision board"))
 
 
-def _add_rulings_parser(commands: _Subcommands, name: str) -> None:
+def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
     rulings_command = commands.add_parser(
         name, help="list expectation lines, open and ruled, without writes"
     )
     _add_json_flag(rulings_command)
 
 
-def _add_next_parser(commands: _Subcommands, name: str) -> None:
+def _add_next_parser(commands: usage.Subcommands, name: str) -> None:
     next_command = commands.add_parser(
         name,
         help="name the board's top-priority item to pull",
@@ -181,7 +181,7 @@ def _add_next_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(next_command)
 
 
-def _add_start_parser(commands: _Subcommands, name: str) -> None:
+def _add_start_parser(commands: usage.Subcommands, name: str) -> None:
     start = commands.add_parser(
         name,
         help="create an item's linked worktree and branch, then claim it",
@@ -207,7 +207,7 @@ def _add_start_parser(commands: _Subcommands, name: str) -> None:
     start.add_argument("--out-of-order", metavar="REASON", help=OUT_OF_ORDER_HELP)
 
 
-def _add_claim_parser(commands: _Subcommands, name: str) -> None:
+def _add_claim_parser(commands: usage.Subcommands, name: str) -> None:
     claim = commands.add_parser(
         name,
         help="claim an issue and scope before editing",
@@ -262,7 +262,7 @@ def _add_claim_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(claim)
 
 
-def _add_release_parser(commands: _Subcommands, name: str) -> None:
+def _add_release_parser(commands: usage.Subcommands, name: str) -> None:
     release = commands.add_parser(name, help="release a landed or abandoned claim")
     release.add_argument(
         "issue",
@@ -314,7 +314,7 @@ def _add_release_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(release)
 
 
-def _add_land_parser(commands: _Subcommands, name: str) -> None:
+def _add_land_parser(commands: usage.Subcommands, name: str) -> None:
     land = commands.add_parser(
         name,
         help="merge a green pull request with its pinned head sha and run its release path",
@@ -357,7 +357,7 @@ def positive_int(text: str) -> int:
     return number
 
 
-def _add_adopt_parser(commands: _Subcommands, name: str) -> None:
+def _add_adopt_parser(commands: usage.Subcommands, name: str) -> None:
     adopt = commands.add_parser(
         name,
         help=(
@@ -389,7 +389,7 @@ def _reviewed_head(value: str) -> str:
     return value.lower()
 
 
-def _add_rescope_parser(commands: _Subcommands, name: str) -> None:
+def _add_rescope_parser(commands: usage.Subcommands, name: str) -> None:
     rescope = commands.add_parser(name, help="add or drop paths on a live claim without releasing")
     rescope.add_argument(
         "issue",
@@ -421,7 +421,7 @@ def _add_rescope_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(rescope)
 
 
-def _add_cut_parser(commands: _Subcommands, name: str) -> None:
+def _add_cut_parser(commands: usage.Subcommands, name: str) -> None:
     cut = commands.add_parser(name, help="create a container's next slice as a fresh child issue")
     cut.add_argument("issue", type=workboard.parse_item_reference, help="the container to cut")
     cut.add_argument(
@@ -450,7 +450,7 @@ def _add_cut_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(cut)
 
 
-def _add_ask_parser(commands: _Subcommands, name: str) -> None:
+def _add_ask_parser(commands: usage.Subcommands, name: str) -> None:
     ask = commands.add_parser(name, help="append one proposed expectation line to an item's block")
     item_help = "the item to append the expectation line to"
     ask.add_argument("item", type=workboard.parse_item_reference, help=item_help)
@@ -480,7 +480,7 @@ def _add_ask_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(ask)
 
 
-def _add_rule_parser(commands: _Subcommands, name: str) -> None:
+def _add_rule_parser(commands: usage.Subcommands, name: str) -> None:
     rule = commands.add_parser(
         name, help="rule one proposed expectation line, transcribing the operator's word"
     )
@@ -515,7 +515,7 @@ def _parse_check_subject(value: str) -> int | str | cmd_check.CheckInput:
     return workboard.parse_item_reference(value)
 
 
-def _add_check_parser(commands: _Subcommands, name: str) -> None:
+def _add_check_parser(commands: usage.Subcommands, name: str) -> None:
     check = commands.add_parser(
         name,
         help=(
@@ -536,7 +536,7 @@ def _add_check_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(check)
 
 
-def _add_brief_parser(commands: _Subcommands, name: str) -> None:
+def _add_brief_parser(commands: usage.Subcommands, name: str) -> None:
     brief = commands.add_parser(
         name,
         help="print one item's body, live claim, lane tip and touched files for a dispatch",
@@ -560,7 +560,7 @@ def _nonblank_title(value: str) -> str:
     return value
 
 
-def _add_item_parser(commands: _Subcommands, name: str) -> None:
+def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
     item = commands.add_parser(name, help="create, show, edit, or close one work item")
     item_commands = _add_subcommands(item, "item_command")
     new = item_commands.add_parser(
@@ -646,95 +646,13 @@ def _add_item_parser(commands: _Subcommands, name: str) -> None:
     _add_json_flag(close)
 
 
-class _UsageError(protocol.ClaimError):
-    """One refusal the argument parser itself raises -- an unknown flag, a
-    missing required option, a mutually exclusive pair -- carried out of the
-    parse instead of exiting inside it (issue #432), so a `--json` caller
-    still gets the shared envelope. `parser` is the one that refused, a
-    subcommand's own rather than the root's, because only it can print the
-    usage block the plain-text path still prints byte for byte."""
-
-    def __init__(self, parser: argparse.ArgumentParser, message: str) -> None:
-        super().__init__(message)
-        self.parser = parser
-
-
-class _UsageErrorParser(argparse.ArgumentParser):
-    """Every `aco` parser and subparser -- argparse hands this class down to
-    each subparser it builds. Its own refusal path prints usage and exits
-    inside the parse, before `--json` was ever read off a namespace, so this
-    raises instead and lets one place decide the refusal's shape.
-
-    No parser reads an abbreviated long option (issue #502, OUT-09): a
-    prefix unique today targets another option once one is added, and
-    `reset --conf --f` must never stand for a destructive flag pair.
-
-    It also remembers what a refused parse would otherwise lose (issue #432):
-    Python parses a subcommand into a throwaway namespace and copies the
-    values back only once that parse succeeds, yet `--json` is exactly the
-    flag the refusal's own shape depends on. So each parser keeps the tokens
-    it was handed and the arguments declared on it, and `subcommands` names
-    the parsers one level down."""
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.declared_actions: list[argparse.Action] = []
-        self.received_tokens: tuple[str, ...] | None = None
-        self.subcommands: _Subcommands | None = None
-        super().__init__(*args, allow_abbrev=False, **kwargs)
-
-    def add_argument(self, *args: Any, **kwargs: Any) -> argparse.Action:
-        action = super().add_argument(*args, **kwargs)
-        self.declared_actions.append(action)
-        return action
-
-    def parse_known_args(
-        self, args: Iterable[str] | None = None, *rest: Any, **keywords: Any
-    ) -> tuple[Any, list[str]]:
-        if self.subcommands:
-            self.subcommands.forget_received_tokens()
-        self.received_tokens = tuple(sys.argv[1:] if args is None else args)
-        return super().parse_known_args(self.received_tokens, *rest, **keywords)
-
-    def error(self, message: str) -> NoReturn:
-        raise _UsageError(self, message)
-
-
-class _Subcommands:
-    """The subcommand level of one `aco` parser: builders add their command
-    through it, and a refused parse can ask which command was chosen (the
-    one that was handed tokens)."""
-
-    def __init__(self, parent: _UsageErrorParser, dest: str) -> None:
-        self._action = parent.add_subparsers(dest=dest, required=True)
-
-    def add_parser(self, name: str, **kwargs: Any) -> _UsageErrorParser:
-        return self._action.add_parser(name, **kwargs)
-
-    def chosen(self) -> tuple[_UsageErrorParser, tuple[str, ...]] | None:
-        return next(
-            (
-                (parser, parser.received_tokens)
-                for parser in self._action.choices.values()
-                if parser.received_tokens is not None
-            ),
-            None,
-        )
-
-    def forget_received_tokens(self) -> None:
-        """A reused parser must not report the command an earlier parse chose."""
-        for parser in self._action.choices.values():
-            parser.received_tokens = None
-            if parser.subcommands:
-                parser.subcommands.forget_received_tokens()
-
-
-def _add_subcommands(parser: _UsageErrorParser, dest: str) -> _Subcommands:
-    parser.subcommands = _Subcommands(parser, dest)
+def _add_subcommands(parser: usage.UsageErrorParser, dest: str) -> usage.Subcommands:
+    parser.subcommands = usage.Subcommands(parser, dest)
     return parser.subcommands
 
 
-def _parser() -> _UsageErrorParser:
-    parser = _UsageErrorParser(prog="aco", description=__doc__)
+def _parser() -> usage.UsageErrorParser:
+    parser = usage.UsageErrorParser(prog="aco", description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--repo", help="GitHub repository as OWNER/REPO")
     commands = _add_subcommands(parser, "command")
@@ -762,10 +680,10 @@ class PreDispatchReason(StrEnum):
     PRECONDITION_FAILED = "precondition_failed"
 
 
-def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
+def _refuse_usage(error: usage.UsageError, *, as_json: bool) -> int:
     """The argument parser's own refusal, in the shape this invocation asked
     for (issue #432): without `--json` argparse's own usage block and
-    sentence, printed by the implementation `_UsageErrorParser` overrode, so
+    sentence, printed by the implementation `usage.UsageErrorParser` overrode, so
     the bytes stay exactly what they were; with `--json` the shared envelope
     instead, `invalid_usage`, argparse's own sentence as `message`."""
     if not as_json:
@@ -777,7 +695,7 @@ def _refuse_usage(error: _UsageError, *, as_json: bool) -> int:
 class _RepositoryCommand:
     """One subcommand: how it adds its parser and how it runs against the repository context."""
 
-    add_parser: Callable[[_Subcommands, str], None]
+    add_parser: Callable[[usage.Subcommands, str], None]
     run: Callable[[argparse.Namespace, RunContext], int]
     resolves_agent: bool = False
 
@@ -820,7 +738,7 @@ def _resolve_agent_or_refuse(parsed: argparse.Namespace) -> int | None:
     return None
 
 
-def _spells_json_flag(token: str, parser: _UsageErrorParser) -> bool:
+def _spells_json_flag(token: str, parser: usage.UsageErrorParser) -> bool:
     """Whether `parser` itself would read `token` as its own `--json`: the
     exact spelling on a parser that declares it, never an abbreviation, since
     no `aco` parser reads one (OUT-09)."""
@@ -838,7 +756,7 @@ def _level_options(tokens: tuple[str, ...]) -> tuple[str, ...]:
     return tokens[: tokens.index(LONG_OPTION_PREFIX)] if LONG_OPTION_PREFIX in tokens else tokens
 
 
-def _asked_for_json(root: _UsageErrorParser, given: list[str]) -> bool:
+def _asked_for_json(root: usage.UsageErrorParser, given: list[str]) -> bool:
     """Whether this invocation asked for JSON, answered by the parsers it
     reached rather than by the raw tokens alone (issue #432): only a command
     declaring `--json` can answer in the envelope, so `aco bootstrap --json`
@@ -853,8 +771,8 @@ def _asked_for_json(root: _UsageErrorParser, given: list[str]) -> bool:
 
 
 def _reached_levels(
-    root: _UsageErrorParser, given: list[str]
-) -> Iterator[tuple[_UsageErrorParser, tuple[str, ...]]]:
+    root: usage.UsageErrorParser, given: list[str]
+) -> Iterator[tuple[usage.UsageErrorParser, tuple[str, ...]]]:
     """Each parser this invocation's parse reached, root first, with the
     tokens argparse handed that level (issue #432)."""
     parser, tokens = root, tuple(given)
@@ -872,7 +790,7 @@ _ITEM_ARGUMENT_TYPES = frozenset({workboard.parse_item_reference, _parse_check_s
 
 
 def _item_arguments(
-    root: _UsageErrorParser, given: list[str], parsed: argparse.Namespace
+    root: usage.UsageErrorParser, given: list[str], parsed: argparse.Namespace
 ) -> Iterator[int]:
     """Every item number this invocation named: the parsed integer of each
     argument an `_ITEM_ARGUMENT_TYPES` parser types, on every parser the
@@ -885,7 +803,7 @@ def _item_arguments(
 
 
 def _refuse_item_past_the_id_space(
-    root: _UsageErrorParser,
+    root: usage.UsageErrorParser,
     given: list[str],
     parsed: argparse.Namespace,
     context: RunContext,
@@ -924,7 +842,7 @@ def _pins_state_ref(context: RunContext) -> bool:
 
 def _run_repository_command(
     command: _RepositoryCommand,
-    parser: _UsageErrorParser,
+    parser: usage.UsageErrorParser,
     given: list[str],
     parsed: argparse.Namespace,
 ) -> int:
@@ -953,7 +871,7 @@ def main(arguments: list[str] | None = None) -> int:
         # it would fire before the parse reached the command that decides
         # whether this run asked for JSON (issue #465).
         parsed.repo = None if parsed.repo is None else github.repository_id(parsed.repo)
-    except _UsageError as error:
+    except usage.UsageError as error:
         return _refuse_usage(error, as_json=_asked_for_json(parser, given))
     except protocol.ClaimError as error:
         return report.refuse(

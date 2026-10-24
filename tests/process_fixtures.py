@@ -13,7 +13,7 @@ class UnstoppableProcess:
     def __init__(self, started: subprocess.Popen[Any]) -> None:
         self._started = started
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> object:
         return getattr(self._started, name)
 
     def poll(self) -> None:

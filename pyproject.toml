@@ -48,7 +48,7 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "PL", "FURB", "N", "SLF001"]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "PL", "FURB", "N", "SLF001", "ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
 # Test literals are scenario data, not domain magic numbers; a pytest test
@@ -81,6 +81,7 @@ layers = [
     "items",
     "body",
     "metrics",
+    "usage",
     "protocol | process | board",
 ]
 # `metrics` moved below `body` (issue #419): it has no `aco`
