@@ -2,7 +2,7 @@
  * Carries the access token from the URL fragment into this tab's session
  * storage, then strips the fragment -- before anything else runs, so the
  * token never sits in browser history, a referrer, or a later log
- * (`specs/serve.spec.md` ABRD-10; issue #617 line 3).
+ * (`specs/serve.spec.md` ABRD-10).
  *
  * A reload in the same tab carries no fragment any more, so a missing hash
  * falls back to whatever this tab already stored; a tab that never saw the

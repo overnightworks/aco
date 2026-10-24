@@ -95,7 +95,7 @@ MALFORMED_CLOSED_ISSUE = "GitHub returned a malformed closed issue"
 # unnamed non-passing verdict prints this stand-in rather than reading as
 # "no checks" and passing silently.
 EXTERNAL_STATUS_FALLBACK_NAME = "external status checks"
-# `HTTP 5xx` in #4.2's signal table: gh's combined output names the status
+# For `HTTP 5xx`, gh's combined output names the status
 # code but never its class, so any 5xx is matched by digit rather than by an
 # enumerated list of codes that would need to grow with the API.
 _HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
@@ -405,7 +405,7 @@ def _is_transient_signal(decoded: str) -> bool:
 
 
 def _nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.ForgeError:
-    """Classify a nonzero `gh` exit from its decoded combined output (#4.2).
+    """Classify a nonzero `gh` exit from its decoded combined output.
 
     `gh`'s own exit code never carries the HTTP status, so this reads the
     same prose a human would; the fallback stays an unclassified `ForgeError`
@@ -1300,7 +1300,7 @@ class GitHubForge:
             )
         except forge.ForgeNotFoundError:
             # The sub-issue endpoint answers "no parent" with an HTTP 404,
-            # which the nonzero-exit classification (#4.2) reports as
+            # which the nonzero-exit classification reports as
             # `ForgeNotFoundError` -- that is an answer, not a failure.
             return None
         values = self._json_lines(raw, "parent issue")

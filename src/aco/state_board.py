@@ -798,7 +798,7 @@ class StateRefBoard:
         `updated_at` always moves to now. The CAS write's `expected` is
         `current.oid`, this instance's own already-read snapshot -- never a
         re-read -- so a second writer holding the same stale oid refuses
-        with the stale-oid sentence rather than merging or overwriting.
+        with the CAS-20 refusal rather than merging or overwriting.
         Every blocker the write adds must resolve to another readable item,
         and none may repeat, before the write: a missing one
         would stop every later `board`/`next` (PIN-17), a repeated one trip

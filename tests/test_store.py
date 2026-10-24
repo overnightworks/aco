@@ -779,10 +779,9 @@ def test_fetch_state_refuses_an_entry_whose_name_its_directory_does_not_accept(
 def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the_ref(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """A claim file written before every scope was sorted at
-    creation can still carry its paths in typed order on the real ref:
+    """A stored claim file can carry its paths in typed order on the real ref:
     `parse_claim_toml` must project it through `protocol.valid_scope` on
-    read (REVISE finding 1) rather than expose the stored order verbatim.
+    read rather than expose the stored order verbatim.
     `status`/`status --json` (`cmd_status._print_claim_status_lines`,
     `cmd_status._status_json`) print straight from this same `ActiveClaim.scope`,
     so canonicalizing it here is their canonical-order proof too -- there
@@ -4799,8 +4798,7 @@ def test_export_state_bundle_refuses_to_overwrite_an_existing_destination(
         store.export_state_bundle(worktree=worktree, tip=tip, destination=destination)
 
     assert destination.read_bytes() == b"an earlier export"
-    # The temporary file the bundle was actually written to (19.09.2026
-    # REVISE finding 4) must not survive a refused publish either.
+    # The temporary file the bundle was written to must not survive a refused publish either.
     assert not list(destination.parent.glob(f".{destination.name}.*"))
 
 
@@ -4822,8 +4820,7 @@ def _break_export_via_a_failed_bundle_create(
     publish -- `git bundle create - EXPORT_BUNDLE_REF` -- can fail on its
     own even though the preceding `update-ref` already proved `tip`
     reachable; the claimed temporary file must be removed rather than left
-    behind empty, and `destination` itself must never come to exist at all
-    (19.09.2026 REVISE finding 4)."""
+    behind empty, and `destination` itself must never come to exist at all."""
     tip = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
     assert tip is not None
     real_run_captured = process.run_captured
@@ -5355,7 +5352,7 @@ def _fake_failed_remote_delete(
 def test_delete_state_ref_treats_a_lost_leased_push_as_success_when_the_ref_is_already_gone(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
-    """The exact race finding 5 names: the server accepts the deletion, then
+    """The server accepts the deletion, then
     the push's own response is lost. A re-probe finds the ref honestly
     gone, so `delete_state_ref` must not report failure for it."""
     tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))

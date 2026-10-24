@@ -68,7 +68,7 @@ def _checked_start_resume(
 ) -> cmd_claim.ScopeVersioning:
     """Every refusal `start`'s resume of `live` can meet, run before anything
     is printed or built: an explicit `--scope` that disagrees
-    with the live claim's own stored scope (review/gate finding: resume must
+    with the live claim's own stored scope (resume must
     not silently ignore it), then the stored scope's own shape and width
     against `context`'s checkout -- or `revision`, the fetched trunk a gone
     worktree is rebuilt from. `--whole` is never required here even when the

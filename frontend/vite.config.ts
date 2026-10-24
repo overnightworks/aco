@@ -9,7 +9,7 @@ const STATIC_DIRECTORY = '../src/aco/board/static';
 
 // `pnpm dev` proxies the API to a board already running on its default
 // loopback port; the E2E harness (frontend/e2e/global-setup.ts) overrides
-// this with its own ephemeral server instead. First used with issue #643.
+// this with its own ephemeral server instead.
 const DEFAULT_BOARD_API_TARGET = 'http://127.0.0.1:8765';
 
 export default defineConfig({
@@ -43,7 +43,7 @@ export default defineConfig({
 			reporter: ['text', 'lcov'],
 			reportsDirectory: '../reports/frontend-coverage',
 			// `.svelte` carries no logic (see app/model and app/state's own
-			// docstrings, issue #368), so its owners are held to full coverage.
+			// docstrings), so its owners are held to full coverage.
 			thresholds: {
 				'src/app/model/**': { statements: 100, branches: 100, functions: 100, lines: 100 },
 				'src/app/state/**': { statements: 100, branches: 100, functions: 100, lines: 100 }

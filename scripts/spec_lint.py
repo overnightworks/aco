@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
-"""Mechanical style lint for ``specs/*.spec.md`` (issue #385).
+"""Mechanical style lint for ``specs/*.spec.md``.
 
-Ported from an earlier internal blueprint (``gates/spec_lint.py``, copied into
-a local handover folder). That gate's rules are
-shaped for its own repository's spec dialect (a ratchet of accepted debt, a ``{types: ...}``
-axis marker, a ``$ <tool>`` transcript check, a SPEC-2/SPEC-15 result-before-trigger ordering
-rule) which aco's house format does not use; ``missing_transcript`` in particular would fire on
-every aco spec, since aco's example transcripts open ``$ aco``, not ``$ <tool>``, inside a fenced
-block introduced by its own ``Setup:`` line rather than a bare ``$ <tool>`` opener. This gate keeps
-only the rules that survive calibration against aco's 23 ``specs/*.spec.md`` files and adapts
-them to the house shape: a ``- [ ] [ID] ...`` criterion is always exactly one physical line (no
+The house shape uses a ``- [ ] [ID] ...`` criterion on exactly one physical line (no
 continuation-line joining is needed here), a behaviour table cites criterion IDs by their bare
 token, and a named example is a ``### E-<PREFIX>-nn`` heading followed by a ``Setup:`` line
 before its first fenced block.

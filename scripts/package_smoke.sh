@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Package smoke (issue #628): build the wheel and sdist with no Node on PATH and
+# Package smoke: build the wheel and sdist with no Node on PATH and
 # prove they carry the board's committed assets and install as working tools.
 # CI's `package` job and release.yml both run it, so the release uploads only
 # distributions this script has proven.

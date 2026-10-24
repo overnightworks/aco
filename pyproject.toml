@@ -28,7 +28,7 @@ version = {attr = "aco.__version__"}
 
 # uv invalidates builds of path sources only via pyproject.toml's mtime by
 # default, so `uv tool install --from .` can silently reinstall a cached wheel
-# from an older commit (issue #70). Keying the cache on the git commit makes
+# from an older commit. Keying the cache on the git commit makes
 # every landing invalidate it.
 [tool.uv]
 cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true } }]
@@ -84,13 +84,10 @@ layers = [
     "usage",
     "protocol | process | board",
 ]
-# `metrics` moved below `body` (issue #419): it has no `aco`
-# import of its own, so nothing above
-# depended on its old position ahead of `items`/`body` -- moving it lets
-# `body` (the body-block codec) reach `metrics.Size` for its own
+# `metrics` sits below `body` so the body-block codec can reach `metrics.Size` for its own
 # `size`/`[[expectation]]` schema, while `items` may still import `body`,
 # never the reverse.
-# The six cmd_* -> cmd_* edges: land.spec cites the release rules (#2, section 2);
+# The six cmd_* -> cmd_* edges: land.spec cites the release rules;
 # start.spec cites the claim rules CLM-05/06/18; adopt.spec ADOPT-14 cites CLM-18
 # and CLAIM-31; brief.spec BRIEF-26 cites
 # STAT-19..21 and BRIEF-10 cites STAT-22; item.spec ITEM-32/34 cite CUT-17/28
@@ -110,11 +107,11 @@ name = "Decision board layers"
 type = "layers"
 containers = ["aco.board"]
 exhaustive = true
-# Issue #617: the board's rules (`board`) know only the port, never the aco
+# The board's rules (`board`) know only the port, never the aco
 # adapter; the two are independent neighbours that `cli` wires together, and
 # the transport (`server`, `static`, `api`) reaches the rules only through
 # `board`. `static` (the built SPA shell) and `api` (JSON wire form) are
-# independent (issue #652).
+# independent.
 layers = [
     "cli",
     "server",
@@ -127,8 +124,7 @@ layers = [
 name = "Decision board transport does not reach the aco adapter"
 type = "forbidden"
 # The layers contract alone lets `server`, `static`, and `api` import
-# `aco_cli`, which sits below them; only `cli` may wire the adapter in
-# (issue #617).
+# `aco_cli`, which sits below them; only `cli` may wire the adapter in.
 source_modules = ["aco.board.server", "aco.board.static", "aco.board.api"]
 forbidden_modules = ["aco.board.aco_cli"]
 allow_indirect_imports = false
@@ -148,7 +144,7 @@ ignore_imports = ["aco.cmd_serve -> aco.board.cli"]
 [[tool.importlinter.contracts]]
 name = "The decision board reaches aco only through its command line"
 type = "forbidden"
-# Issue #617: the board talks to aco through the installed `aco` CLI and its
+# The board talks to aco through the installed `aco` CLI and its
 # specified JSON, never through aco's internal modules.
 # `as_packages = false` lists every module of the board as its own source, so
 # the overlap with the forbidden `aco` package does not make the contract

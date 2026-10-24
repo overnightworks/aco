@@ -4,8 +4,7 @@
  * one `POST /api/rule`. `Stage.svelte` reads whether a line is mid-undo or
  * refused; `App.svelte` renders one `UndoToast` per still-pending entry.
  * `reload` is `BoardStore.load` (`board.svelte.ts`): the one source of
- * truth this re-reads from after a write, rather than mutating a copy
- * (issue #649).
+ * truth this re-reads from after a write, rather than mutating a copy.
  */
 
 import { postDecision } from '../../client';
