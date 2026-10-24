@@ -116,6 +116,12 @@ def lane(
         ),
         pytest.param(
             ReadFailure(
+                "landing_readiness", forge.ForgeUnsupportedError("not supported here"), None
+            ),
+            id="unsupported-keeps-its-text",
+        ),
+        pytest.param(
+            ReadFailure(
                 "allowed_merge_methods",
                 forge.ForgeError(LONG_CONTROLS),
                 MERGE_RULES_STEP,
@@ -131,8 +137,8 @@ def test_a_failed_read_refuses_naming_what_was_read(
     capsys: pytest.CaptureFixture[str],
     failure: ReadFailure,
 ) -> None:
-    """Spec: LANDCMD-46 -- the refusal names what was read and advises a re-run; the failed
-    read ran once, and nothing was written."""
+    """Spec: LANDCMD-46, LANDCMD-47, LANDCMD-48, LANDCMD-49 -- the refusal names what was read
+    and advises a re-run; the failed read ran once, and nothing was written."""
     if failure.rerun:
         merged = replace(lane.forge.landings[12], merged=True, merge_commit=MERGE_COMMIT_SHA)
         lane.forge.landings[12] = merged

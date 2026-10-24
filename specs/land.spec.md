@@ -51,7 +51,7 @@ order `merge`, `squash`, `rebase`.
 | the default branch adopts the quality gate and the completed checks hold no `quality / verdict` | LANDCMD-43 |
 | not mergeable | LANDCMD-03 |
 | `mergeable_state` is `unknown` | LANDCMD-45 |
-| a GitHub read before the merge fails | LANDCMD-46, LANDCMD-47, LANDCMD-48 |
+| a GitHub read before the merge fails | LANDCMD-46, LANDCMD-47, LANDCMD-48, LANDCMD-49 |
 | no CI checks at all | LANDCMD-04 |
 | a check still running | LANDCMD-05 |
 | a check finished without success | LANDCMD-06 |
@@ -91,6 +91,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
 - [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n>`, exit `2`.
+- [ ] [LANDCMD-49] `was not merged` means this run merged nothing: it also holds when an earlier run merged the pull request and a read of this rerun fails (LANDCMD-18).
 - [ ] [LANDCMD-47] `<what>` is `the pull request`, `its landing preconditions` or `its merge rules`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
 - [ ] [LANDCMD-48] `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable `quality/config.toml` takes LANDCMD-46).
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
@@ -212,7 +213,7 @@ $ aco land 57
 exit 2
 ```
 
-The adoption read of LANDCMD-43 is one contents read of `quality/config.toml` on `<branch>`, the default branch -- never the pull request head, so a head that deletes the file is still refused and the pull request that adds it is not. Only HTTP 200 (adopted) and 404 (not adopted) decide; any other answer refuses as LANDCMD-46 (reading `its landing preconditions` failed) and never counts as not adopted. A check still running defers the refusal, the read runs only after LANDCMD-02 (a not-open pull request never reads it), and a rerun after the merge (LANDCMD-18) never reads it. The refusal stays within the 200-character bound like every other.
+The adoption read of LANDCMD-43 is one contents read of `quality/config.toml` on `<branch>`, the default branch -- never the pull request head, so a head that deletes the file is still refused and the pull request that adds it is not. Only HTTP 200 (adopted) and 404 (not adopted) decide; an unreadable, empty, unparseable or transient answer refuses as LANDCMD-46 (reading `its landing preconditions` failed), and none of them counts as not adopted; a permission or other error keeps the forge's own text. A check still running defers the refusal, the read runs only after LANDCMD-02 (a not-open pull request never reads it), and a rerun after the merge (LANDCMD-18) never reads it. The refusal stays within the 200-character bound like every other.
 
 ### E-LANDCMD-05 — a pull request with a check still running refuses
 
