@@ -1,8 +1,0 @@
-claim_id = "287098b91c304ae5a5d4ab770a8b9b4a"
-agent = "claude"
-role = "builder"
-base = "e4f796e69d349357d6bc5cbde28d241922f4b0f9"
-branch = "claude/issue-328-land-read-failure"
-scope = ["quality/baseline.toml", "scripts/test_budget_ratchet.txt", "scripts/test_inventory_dropped.txt", "specs/land.spec.md", "src/aco/cmd_land.py", "tests/test_land_preflight.py", "tests/test_land_read_failure.py"]
-opened_commit = "54336741fd8346568c166e51b1e673b92879b888"
-whole_reason = "Ein Helfer, seine Spec-Kriterien und ihre Tests hängen zusammen; die beiden Ledger und das Baseline werden nur angefasst, wenn ihre Prüfungen es verlangen."
