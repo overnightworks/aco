@@ -1,8 +1,0 @@
-claim_id = "a14e99dc992c4cf38c80874f2f352efc"
-agent = "claude"
-role = "builder"
-base = "af4c9efb9ec920278af1cb71c2b94c19d709343f"
-branch = "claude/issue-338-python-314"
-scope = [".github/workflows/ci.yml", "pyproject.toml", "quality/baseline.toml", "quality/config.toml", "src/aco/usage.py", "uv.lock"]
-opened_commit = "d4f97b353755bf493a22ed800a436d9a64ce0ecd"
-whole_reason = "Der Parser-Fix, die Versionsgrenze, der Lock und der CI-Job gehören zusammen: ohne den Job beweist nichts den Fix, ohne den Fix wird der Job rot."
