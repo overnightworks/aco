@@ -4,8 +4,8 @@
 child, remove that slice's own `[[slice]]` row from the container's block,
 and recover instead of duplicating when a prior run already got partway.
 This file owns the command's own target precondition, row selection,
-`--scope` inheritance (issue #337), the twin search `cut` and `item new`
-share before either creates an issue (issue #444), the fresh child's own body, the printed
+`--scope` inheritance, the twin search `cut` and `item new`
+share before either creates an issue, the fresh child's own body, the printed
 `CUT`/`ADOPTED` line and `--json` shape, and the two ways a partial failure
 recovers. `specs/body-block.spec.md` owns the `[[slice]]` schema (BODY-43..
 BODY-49) and a malformed body's own defect sentences (BODY-01..BODY-52);
@@ -62,7 +62,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 ## The target
 
 - [ ] [CUT-01] `aco cut <n> --title T` against an `<n>` that names no open issue on the board refuses `#<n> is not an open container`, exit `2`, before any write.
-- [ ] [CUT-33] An empty or whitespace-only `--title` refuses `--title must be a non-empty string`, exit `2`, before anything is read or written; `--json` prints OUT-06's envelope (issue #447).
+- [ ] [CUT-33] An empty or whitespace-only `--title` refuses `--title must be a non-empty string`, exit `2`, before anything is read or written; `--json` prints OUT-06's envelope.
 - [ ] [CUT-02] The same against an open issue that is not a container refuses `#<n> is not a container`, exit `2`.
 - [ ] [CUT-03] The same against a container that is itself a child of another item refuses `#<n> is itself a child of <ref>; nested containers are not supported`, exit `2`.
 - [ ] [CUT-34] `aco next` never proposes a cut CUT-03 refuses: it names a nested container's repair under `SKIPPED` instead (`specs/next.spec.md` NEXT-25, E-NEXT-09).
@@ -74,7 +74,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 ## The body precondition
 
 - [ ] [CUT-05] `<n>` with a malformed body (BODY-50) refuses `#<n> body malformed: <field>: <message>; cut needs a valid aco block`, exit `2`; an incomplete body (BODY-51) is accepted.
-- [ ] [CUT-39] If the row cut selects has a `done_when` with a display control (BODY-66), `cut` refuses in CUT-05's form with `check -`'s sentence before any write; no other row refuses (issue #606, E-CUT-03).
+- [ ] [CUT-39] If the row cut selects has a `done_when` with a display control (BODY-66), `cut` refuses in CUT-05's form with `check -`'s sentence before any write; no other row refuses (E-CUT-03).
 - [ ] [CUT-40] Under `storage = "state-ref"`, an `<n>` PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CUT-05's, exit `2`, before any write (see E-CUT-10).
 
 ## Row selection
@@ -92,7 +92,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-12] `aco cut ... --json` prints `specs/output.spec.md`'s envelope, `reason` `cut` or `adopted` (CUT-13), then `container`, `row`, `child` (see E-CUT-02).
 - [ ] [CUT-25] A fresh child's block: `now = "Cut from <label>"`, `next = "Build this slice; claim it with aco start."`, the row's `done_when` or `""`, `scope` (CUT-20), below a `Parent: <label>` line (E-CUT-07).
 - [ ] [CUT-37] With no linked row (CUT-10) the child's block keeps CUT-25's `now` and `next`, and its `done_when` stays `""` -- no row to take one from -- so `next` skips it (BODY-51) until it is filled.
-- CUT-36 (removed 02.10.2026, issue #606): its refusal of a linked row without `done_when` never landed; such a row cuts, and its child's `done_when` stays `""` (CUT-25).
+- CUT-36 (removed 02.10.2026): its refusal of a linked row without `done_when` never landed; such a row cuts, and its child's `done_when` stays `""` (CUT-25).
 
 ## Adopting instead of duplicating
 
@@ -101,7 +101,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-15] Two or more open matches refuses `#<n>'s row '<title>' matches more than one open issue (#a, #b); adopt the right one by hand and remove the row`, exit `2`, naming every match.
 - [ ] [CUT-16] An open issue sharing the child's title is adopted only in CUT-13's recovery shape -- never the container itself, idea-labelled, non-`task`, or naming a different `Parent:` (see E-CUT-05).
 
-## The twin search (issue #444)
+## The twin search
 
 - [ ] [CUT-29] Before a fresh child exists, `aco cut` compares the child's title (CUT-06) with the titles of every open issue and every issue closed within the last 30 days, the container itself excepted.
 - [ ] [CUT-30] Titles sharing at least 60 % of their combined distinct casefolded words (3 of 5 twin, 2 of 4 not) refuse `possible twin #<n>; pass --not-a-twin`, exit `2`, before any write (see E-CUT-05, E-CUT-09).
@@ -116,7 +116,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-32] A child created without its `Task` type refuses `created #<child> but GitHub did not set its type Task; set that type on the forge by hand, then re-run the same cut -- it adopts the child`, exit `2`.
 - [ ] [CUT-28] CUT-17/CUT-18/CUT-32's partial write reports `reason: "partial_write"`, `written` (`<child>`) and `failed` (the step) as siblings, exit `2` (see E-CUT-08).
 
-## `--scope` (issue #337)
+## `--scope`
 
 - [ ] [CUT-20] `--scope P` with a linked row that carries none becomes the fresh child's own top-level `scope`; the row is removed along with the rest, never rewritten to carry it.
 - [ ] [CUT-21] `--scope P` against a linked row that already names one refuses `slice <idx> already names a scope; edit the container instead`, exit `2` -- the row is the one place to change it.

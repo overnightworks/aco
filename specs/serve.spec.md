@@ -1,6 +1,6 @@
 # `aco serve`
 
-`aco serve --repo PATH...` (issues #617, #620, #637, #652) shows one or
+`aco serve --repo PATH...` shows one or
 more repositories' open expectation lines in a browser SPA and writes each
 decision through the installed `aco` command line, never through aco's own
 modules; without `--repo`, the current directory is the one repository

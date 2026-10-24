@@ -60,7 +60,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
   intent: claim
   ```
   an item write carries `item_id: <id>` and no `item:` line instead. A
-  landing (issue #359) carries both ids and `item:` together:
+  landing carries both ids and `item:` together:
   ```
   operation_id: <uuid>
   item_id: <id>
@@ -72,7 +72,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 ## Fetch anchor and lineage stamp, one per worktree
 
 - [ ] [CAS-07] A fetch of a present ref never creates the shared local `refs/aco/state`; the tip lands only in `refs/worktree/aco/state`, never read back from `FETCH_HEAD` (see E-CAS-02).
-- CAS-08 (retired 20.09.2026, issue #426): the anchor write it named is no longer a step of its own; the fetch that lands the tip in `refs/worktree/aco/state` (CAS-07) fails as one `cannot fetch` refusal.
+- CAS-08 (retired 20.09.2026): the anchor write it named is no longer a step of its own; the fetch that lands the tip in `refs/worktree/aco/state` (CAS-07) fails as one `cannot fetch` refusal.
 - [ ] [CAS-50] A fetch that lands the tip but cannot read it back from `refs/worktree/aco/state` refuses `cannot read the fetched tip at refs/worktree/aco/state: <detail>`.
 - [ ] [CAS-09] This worktree's own last-observed tip is stamped at `<git-dir>/aco/last-oid` -- private to it, never shared with another linked worktree of the same checkout.
 - [ ] [CAS-10] A worktree with no stamp yet at `<git-dir>/aco/last-oid` accepts any tip its first fetch reads, never refusing `... the ref may have been rewritten` (CAS-11).
@@ -170,7 +170,7 @@ tree's structural shape before that content is ever parsed.
 
 ## `aco reset`
 
-`aco reset` (issue #298, operator-ruled 15.09.2026/16.09.2026) is the one
+`aco reset` (operator-ruled 15.09.2026/16.09.2026) is the one
 recovery path over a broken or rewritten `refs/aco/state`: a mandatory
 export, no silent data loss, and a live claim in a state this aco can read
 always refuses it outright, `--confirm` or not; a state whose schema it
@@ -195,7 +195,7 @@ cannot read needs `--force-unreadable` besides (`specs/reset.spec.md`).
 - No refusal advises deleting or force-pushing `refs/aco/state` by hand: a stuck ref names only `aco reset`, which exports the state into a bundle by default before it deletes anything (CAS-15).
 - A worktree's own lineage stamp and fetch anchor are never shared with another linked worktree of the same checkout: each has its own git-dir.
 - A malformed fetched tree is never partially trusted: the whole read fails loud (CAS-22..38), never a single quarantined claim or resource; a malformed item file alone is refused only by its own read (`specs/item.spec.md` ITEM-38) and the writes `specs/storage-pin.spec.md` PIN-29 names, every board read lists it (`specs/board.spec.md` BOARD-54), and ITEM-42 alone reads its still-valid `record.title`.
-- No state-store fetch ever lands a tag or `FETCH_HEAD` or starts git maintenance: each carries `--no-tags --no-write-fetch-head --no-auto-maintenance`, and `--refmap=` sets aside the remote's configured fetch refspecs, so it writes only objects and the ref its own refspec names (issue #298 finding 2), and never repacks the object store linked worktrees share under another agent's concurrent object write (issue #22).
+- No state-store fetch ever lands a tag or `FETCH_HEAD` or starts git maintenance: each carries `--no-tags --no-write-fetch-head --no-auto-maintenance`, and `--refmap=` sets aside the remote's configured fetch refspecs, so it writes only objects and the ref its own refspec names, and never repacks the object store linked worktrees share under another agent's concurrent object write.
 - A read that does not advance local state (CAS-49) never writes this worktree's fetch anchor or lineage stamp; only an anchoring fetch (CAS-07) moves `refs/worktree/aco/state` and that stamp.
 
 ## Examples

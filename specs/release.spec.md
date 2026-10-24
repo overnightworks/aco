@@ -115,7 +115,7 @@ again for that claim.
 
 Both storages judge REL-48 and REL-53 alike, before anything is written, closed or removed.
 
-Residual, owned by #310 finding 356: a same-branch claim based off the trunk, such as START-11 or
+Residual, owned by agent-coordination#310 finding 356: a same-branch claim based off the trunk, such as START-11 or
 `aco claim` in a lane worktree still standing, passes both REL-48 and REL-53; a rerun releases that
 claim and closes its reopened item.
 
@@ -149,7 +149,7 @@ instead.
 
 ## `--merged`'s own worktree/branch cleanup
 
-A successful `--merged` outcome (issue #322) removes the lane's own linked worktree and local
+A successful `--merged` outcome removes the lane's own linked worktree and local
 branch when both are safe to remove -- after the release's own store transition already
 committed, so a cleanup problem never turns a released claim back into a live one. The remote
 branch stays the forge merge's own business: only the local worktree and the local branch move

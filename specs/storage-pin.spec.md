@@ -110,10 +110,10 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 ## Commands refused by the wrong pin
 
-- PIN-09 (retired 26.09.2026, issue #444): `aco item new` under `storage = "github"` no longer refuses; it creates the GitHub issue itself (`specs/item.spec.md` ITEM-26..ITEM-35).
+- PIN-09 (retired 26.09.2026): `aco item new` under `storage = "github"` no longer refuses; it creates the GitHub issue itself (`specs/item.spec.md` ITEM-26..ITEM-35).
 - [ ] [PIN-10] `aco item edit ITEM` under `storage = "github"` refuses `forge issues are edited on the forge; aco never governs them`.
 - [ ] [PIN-11] `aco item close ITEM` under `storage = "github"` refuses `the forge closes its issues; aco never governs them`.
-- PIN-12 (retired 19.09.2026, issue #359): the outright `release --merged` refusal it named under `storage = "state-ref"` no longer exists; `--merged <sha|empty>` verifies and closes the named issue itself (`specs/landing-grammar.spec.md` LAND-47/LAND-52/LAND-59), and only an issue-less lane still refuses (LAND-56).
+- PIN-12 (retired 19.09.2026): the outright `release --merged` refusal it named under `storage = "state-ref"` no longer exists; `--merged <sha|empty>` verifies and closes the named issue itself (`specs/landing-grammar.spec.md` LAND-47/LAND-52/LAND-59), and only an issue-less lane still refuses (LAND-56).
 
 ## The state-ref item file, one layer above the block
 
