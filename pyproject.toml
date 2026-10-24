@@ -7,7 +7,7 @@ name = "overnightworks-aco"
 dynamic = ["version"]
 description = "Repository-neutral GitHub issue claims for coding agents"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 license = "MIT"
 authors = [{name = "aco contributors"}]
 dependencies = []
