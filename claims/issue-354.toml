@@ -1,0 +1,7 @@
+claim_id = "9038038913a343bdb1aaf34fbeeb8926"
+agent = "claude"
+role = "builder"
+base = "b72889e65223bd9809acc9398d2804354432d999"
+branch = "claude/issue-354-refs-t9"
+scope = ["quality/baseline.toml", "tests/test_board.py", "tests/test_state_board.py"]
+opened_commit = "44a11e87c56a233902bc577bffbd30d3ef11e188"
