@@ -13,6 +13,10 @@ logging call reaches the override through `BaseHTTPRequestHandler`'s own
 `self.log_message(...)` -- never by a literal call this package writes, so
 vulture never sees a caller for any of the three.
 
+`_ArgumentOptions.nargs`/`const`/`metavar` are `TypedDict` keys that `add_argument` receives
+through `**options`; vulture sees no attribute access for them, and pyright
+rejects attribute access on a `TypedDict`, so the lines carry its marker.
+
 `Size.MEDIUM` and `Size.LARGE` are built only dynamically (`Size(value)`,
 iteration over `Size`), and `SizeClassStats.p80_hours` is read only through
 `asdict` when `board_payload` serializes the `--json` output; vulture sees
@@ -52,6 +56,7 @@ from datetime import UTC, date, datetime
 
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
 from aco.metrics import Size, SizeClassStats
+from aco.usage import _ArgumentOptions
 from aco.workboard import (
     Board,
     BoardItem,
@@ -152,4 +157,7 @@ _referenced_only_for_vulture = (
     _board_for_vulture.measurements.as_of,
     _size_class_measurement_for_vulture.first_event_at,
     _size_class_measurement_for_vulture.last_event_at,
+    _ArgumentOptions.nargs,  # pyright: ignore[reportAttributeAccessIssue]
+    _ArgumentOptions.const,  # pyright: ignore[reportAttributeAccessIssue]
+    _ArgumentOptions.metavar,  # pyright: ignore[reportAttributeAccessIssue]
 )
