@@ -29,7 +29,7 @@
 "src/aco/github.py" = 1765
 "src/aco/protocol.py" = 1881
 "src/aco/state_board.py" = 957
-"src/aco/store.py" = 2115
+"src/aco/store.py" = 2104
 "src/aco/workboard.py" = 3160
 "tests/aco_board/test_aco_board_api.py" = 1060
 "tests/cli_fixtures.py" = 969
@@ -77,7 +77,7 @@
 
 [function_lines."src/aco/store.py"]
 "claim_lifecycle" = 62
-"commit_transition" = 63
+"commit_transition" = 62
 
 [function_lines."src/aco/workboard.py"]
 "_board_item" = 103
