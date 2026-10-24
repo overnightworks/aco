@@ -13,6 +13,11 @@ logging call reaches the override through `BaseHTTPRequestHandler`'s own
 `self.log_message(...)` -- never by a literal call this package writes, so
 vulture never sees a caller for any of the three.
 
+`argparse.Action.nargs`/`const`/`metavar` stand for the `_ArgumentOptions`
+keys that `add_argument` receives through `**options`: vulture matches by
+attribute name, and argparse stores each of those keywords as the `Action`
+attribute of the same name, so the names are used.
+
 `Size.MEDIUM` and `Size.LARGE` are built only dynamically (`Size(value)`,
 iteration over `Size`), and `SizeClassStats.p80_hours` is read only through
 `asdict` when `board_payload` serializes the `--json` output; vulture sees
@@ -48,6 +53,7 @@ decide whether to write headers -- none through a call or read this package
 writes.
 """
 
+import argparse
 from datetime import UTC, date, datetime
 
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
@@ -152,4 +158,7 @@ _referenced_only_for_vulture = (
     _board_for_vulture.measurements.as_of,
     _size_class_measurement_for_vulture.first_event_at,
     _size_class_measurement_for_vulture.last_event_at,
+    argparse.Action.nargs,
+    argparse.Action.const,
+    argparse.Action.metavar,
 )

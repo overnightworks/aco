@@ -433,6 +433,24 @@ _LAND_READ_FAILURE_REFUSAL = (
 )
 
 
+def _land_read_head_checked(
+    client: github.GitHubForge, number: int, repository: str
+) -> forge.Landing:
+    """The pull request, read once and refused before anything else runs when
+    its head is a branch `land` must not act on (LANDCMD-50): an unsafe name on
+    either path, a merged pull request of another repository on a rerun -- the
+    first run's own preflight refuses that one before the merge."""
+    detail = _land_read(number, "the pull request", lambda: client.landing(number))
+    defect = policy.unsafe_head_branch_defect(detail)
+    if defect is None and detail.merged:
+        defect = policy.cross_repository_defect(repository, detail)
+    if defect is not None:
+        raise protocol.ClaimUnavailableError(
+            report.bounded_refusal(f"pull request #{number} {defect.message}")
+        )
+    return detail
+
+
 def _land_read(number: int, what: str, read: Callable[[], _LandStepResult]) -> _LandStepResult:
     """A read `aco land` runs before its merge: a forge failure
     of exactly the unclassified, transient or malformed kind refuses naming
@@ -592,7 +610,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     client = cast(github.GitHubForge, context.forge)
     number = parsed.pull_request
     repository = client.repository.path
-    detail = _land_read(number, "the pull request", lambda: client.landing(number))
+    detail = _land_read_head_checked(client, number, repository)
     classification: workboard.Classification | None
     if detail.merged:
         assert detail.merge_commit is not None  # `merged` is true; github.py guarantees this.

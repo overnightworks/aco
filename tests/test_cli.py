@@ -14826,7 +14826,7 @@ def test_a_parse_without_arguments_reads_the_process_arguments(
     parser = issue_claim._parser()
     monkeypatch.setattr(sys, "argv", ["aco", "status", "--json", "--nope"])
 
-    with pytest.raises(issue_claim._UsageError) as refused:
+    with pytest.raises(issue_claim.usage.UsageError) as refused:
         parser.parse_args()
 
     assert str(refused.value) == "unrecognized arguments: --nope"
@@ -14855,9 +14855,9 @@ def test_a_reused_parser_reports_only_the_command_of_its_latest_parse(
     """Descendant state from an earlier refused parse must not leak into the
     next one, or its `--json` would be read off the wrong command."""
     parser = issue_claim._parser()
-    with pytest.raises(issue_claim._UsageError):
+    with pytest.raises(issue_claim.usage.UsageError):
         parser.parse_args(earlier)
-    with pytest.raises(issue_claim._UsageError):
+    with pytest.raises(issue_claim.usage.UsageError):
         parser.parse_args(later)
 
     assert issue_claim._asked_for_json(parser, later) is asked_for_json
@@ -14875,7 +14875,7 @@ def test_every_item_or_json_argument_is_recorded_as_declared() -> None:
             report.JSON_FLAG in action.option_strings
             or action.type in issue_claim._ITEM_ARGUMENT_TYPES
         )
-        and action not in cast(issue_claim._UsageErrorParser, each).declared_actions
+        and action not in cast(issue_claim.usage.UsageErrorParser, each).declared_actions
     ]
 
     assert unrecorded == []
