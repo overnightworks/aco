@@ -410,6 +410,15 @@ def cross_repository_defect(
     return None
 
 
+def unsafe_head_branch_defect(detail: forge.Landing) -> workboard.ClassificationDefect | None:
+    """Why a pull request with an unsafe head branch name is never acted on (ADOPT-17)."""
+    if not protocol.is_safe_branch_name(detail.source_branch):
+        return workboard.ClassificationDefect(
+            f"head branch {detail.source_branch!r} is no safe branch name"
+        )
+    return None
+
+
 def _target_branch_defect(
     context: LandingCheckContext, detail: forge.Landing
 ) -> workboard.ClassificationDefect | None:
