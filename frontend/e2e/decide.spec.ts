@@ -70,6 +70,76 @@ async function expectReturnAndResizeFocus(
 	}
 }
 
+test('reactivating the selected desktop row restores the question heading and focus', async ({
+	page
+}, testInfo) => {
+	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	await page.setViewportSize({ width: 1280, height: 900 });
+	writeRulings(repoDirectory, [
+		row(
+			950,
+			'Reselection',
+			line(1, 'First sentence', {
+				question: 'First?',
+				example: 'Long example. '.repeat(500),
+				default: 'yes'
+			})
+		)
+	]);
+	await page.goto(`${appUrl}#t=${token}`);
+	const selected = page.getByRole('button', { name: /First sentence/ });
+	await selected.click();
+	await expect(page.locator('.stage')).toBeFocused();
+	await page.keyboard.press('Tab');
+	await page.keyboard.press('Tab');
+	await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeFocused();
+	await expect
+		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
+		.toBeGreaterThan(0);
+	await selected.focus();
+	await page.keyboard.press('Enter');
+	await expect(page.locator('.stage')).toBeFocused();
+	await expect(page.getByRole('heading', { name: 'First?', exact: true })).toBeInViewport();
+	await expect
+		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
+		.toBe(0);
+	await page.screenshot({ path: testInfo.outputPath('reselected.png') });
+});
+
+test('advancing after phone list return and desktop resize focuses the next question', async ({
+	page
+}, testInfo) => {
+	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	await page.setViewportSize({ width: 390, height: 844 });
+	writeRulings(repoDirectory, [
+		row(
+			951,
+			'Resize',
+			line(1, 'First sentence', {
+				question: 'First?',
+				example: 'Long example. '.repeat(500),
+				default: 'yes'
+			}),
+			line(2, 'Second sentence', {
+				question: 'Second?',
+				example: 'Long example. '.repeat(500),
+				default: 'yes'
+			})
+		)
+	]);
+	await page.clock.install();
+	await page.goto(`${appUrl}#t=${token}`);
+	await page.getByRole('button', { name: /First sentence/ }).click();
+	await page.getByRole('button', { name: '← Liste' }).click();
+	await page.screenshot({ path: testInfo.outputPath('phone-return.png') });
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await choices(page).getByRole('button', { name: /Ja/ }).click();
+	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+	await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeInViewport();
+	await expect(page.locator('.stage')).toBeFocused();
+	await page.screenshot({ path: testInfo.outputPath('resized-advance.png') });
+});
+
 for (const viewport of [
 	{ width: 1280, height: 900 },
 	{ width: 390, height: 844 }

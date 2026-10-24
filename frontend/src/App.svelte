@@ -20,6 +20,14 @@
 		question?.querySelector<HTMLElement>('.stage')?.focus({ preventScroll: true });
 	}
 
+	async function resetQuestion() {
+		await tick();
+		if (question && question.getClientRects().length > 0) {
+			question.scrollTop = 0;
+			focusQuestion();
+		}
+	}
+
 	async function showList() {
 		showQuestion = false;
 		await tick();
@@ -40,17 +48,6 @@
 	}
 
 	$effect(() => {
-		// A newly selected or automatically advanced question begins at its heading.
-		void selectedKey;
-		if (showQuestion) {
-			void tick().then(() => {
-				if (question) question.scrollTop = 0;
-				focusQuestion();
-			});
-		}
-	});
-
-	$effect(() => {
 		if (token === null) {
 			board.setNoAccess();
 			decisions = null;
@@ -67,6 +64,7 @@
 	$effect(() => {
 		if (decisions !== null && decisions.justRuled !== null && decisions.justRuled === selectedKey) {
 			selectedKey = nextOpenAfter(board.repos, decisions.justRuled);
+			void resetQuestion();
 		}
 	});
 </script>
@@ -92,6 +90,7 @@
 					onSelect={(key) => {
 						selectedKey = key;
 						showQuestion = true;
+						void resetQuestion();
 					}}
 				/>
 			</div>
