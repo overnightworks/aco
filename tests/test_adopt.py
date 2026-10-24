@@ -66,7 +66,7 @@ class Effects:
 
 @dataclass
 class AdoptionWorld:
-    """A pull request of a GitHub-form repository whose head branch sits on
+    """Pull request #45 of a GitHub-form repository whose head branch sits on
     the bare remote, and the fake forge that serves it."""
 
     clone: Path
@@ -102,8 +102,8 @@ def world(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> AdoptionWorld:
-    """Bootstrapped state, a tracked dependency configuration, and an open pull
-    request changing `uv.lock` and `pyproject.toml` from `dependabot/uv/x`."""
+    """Bootstrapped state, a tracked dependency configuration, and open pull
+    request #45 changing `uv.lock` and `pyproject.toml` from `dependabot/uv/x`."""
     track_board_config(github_clone, DEPENDENCY_PATHS_CONFIG)
     push_repository_trunk(github_clone, "origin")
     run_cli(["bootstrap"], capsys).expect_success()

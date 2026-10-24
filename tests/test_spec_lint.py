@@ -95,7 +95,7 @@ def _analyze_text(tmp_path: Path, text: str) -> list[Any]:
 
 def test_unresolved_behavior_table_cell_is_caught(tmp_path: Path) -> None:
     """A blank line always separates ``## Behavior table`` from its rows in real specs; the
-    row scan must not stop there before ever reaching a cell (regression)."""
+    row scan must not stop there before ever reaching a cell."""
     red_text = GREEN_SPEC.replace("| default | SAMPLE-01 |", "| default | SAMPLE-99 |")
     assert red_text != GREEN_SPEC
     expected_line = _line_number(red_text, "| default | SAMPLE-99 |")

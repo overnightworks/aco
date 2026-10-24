@@ -708,7 +708,7 @@ ADOPTED_BRANCH = "dependabot/uv/x"
 
 
 def dependabot_pull_request(head_sha: str) -> forge.Landing:
-    """An open pull request of `REPOSITORY` from the bot's own branch, aimed
+    """Open pull request #45 of `REPOSITORY` from the bot's own branch, aimed
     at `main` and carrying no classification line, whose head is `head_sha`."""
     return forge.Landing(
         number=ADOPTED_PULL_REQUEST,

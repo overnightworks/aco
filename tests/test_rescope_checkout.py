@@ -466,7 +466,7 @@ _GIT_DIRECTORY_RECOGNITION_ROWS = [
 
 
 def _serve_item_72_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
-    """An item body, with the `aco` block a rescope keeps in
+    """Issue #72's own body, with the `aco` block a rescope keeps in
     step with its claim, on a GitHub fake the checkout's
     canonical remote names -- so no rescope here ever reaches a real forge."""
     client = FakeForge()
@@ -481,7 +481,7 @@ def _serve_item_72_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
 
 
 def _serve_the_claim_on_the_widget_branch(monkeypatch: pytest.MonkeyPatch) -> protocol.ActiveClaim:
-    """A live builder claim of `Codex Sol` scoping `src/widget.py`,
+    """A live builder claim of `Codex Sol` on issue #72 scoping `src/widget.py`,
     served as the store's state; a commit applies its transition in memory."""
     claimed = standing_active_claim(
         "Codex Sol", scope=("src/widget.py",), branch="codex/issue-72-widget"
