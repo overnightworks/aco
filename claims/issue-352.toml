@@ -1,0 +1,8 @@
+claim_id = "0dbd2bf1602547f6bdaf465c21cb565c"
+agent = "claude"
+role = "builder"
+base = "b72889e65223bd9809acc9398d2804354432d999"
+branch = "claude/issue-352-refs-t7"
+scope = ["quality/baseline.toml", "tests/aco_board/test_aco_board_api.py", "tests/aco_board/test_aco_board_cli.py", "tests/board_fixtures.py", "tests/cli_fixtures.py", "tests/conftest.py", "tests/github_fixtures.py", "tests/network_guard.py", "tests/store_fixtures.py", "tests/test_adopt.py", "tests/test_ask.py", "tests/test_check.py", "tests/test_check_pull_request.py", "tests/test_check_stdin.py", "tests/test_cut.py", "tests/test_items.py", "tests/test_land_after_merge.py", "tests/test_land_after_merge_rerun.py", "tests/test_land_head_safety.py", "tests/test_land_merge.py", "tests/test_land_merge_message.py", "tests/test_land_preflight.py", "tests/test_land_preflight_claim.py", "tests/test_land_read_failure.py", "tests/test_metrics.py", "tests/test_network_guard.py", "tests/test_policy.py", "tests/test_process.py", "tests/test_protocol.py", "tests/test_release_cleanup.py", "tests/test_rescope_checkout.py", "tests/test_reset.py", "tests/test_rule.py", "tests/test_rulings.py", "tests/test_session.py", "tests/test_spec_lint.py", "tests/test_status.py"]
+opened_commit = "48665e131a16985b49af6f50c51b6f8b844ffd67"
+whole_reason = "Die kleinen Testmodule derselben Kommentar-Säuberung und die Baseline; jede Datei trägt nur wenige Treffer, eine Teilung kostet mehr Landungen als sie spart."
