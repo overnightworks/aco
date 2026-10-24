@@ -1,8 +1,0 @@
-claim_id = "ea6c241a33c94a4d8ed0d64680191240"
-agent = "Codex 01a16e6e-894a-7692-929e-d605748ac260"
-role = "builder"
-base = "8537fac0259cba2bf5be1d3daa6eac6bf31731ea"
-branch = "codex/issue-363-refs-sp11"
-scope = ["specs"]
-opened_commit = "3a6b825ab7d102d638fe32668792c27a110f29a8"
-whole_reason = "Dieselbe Herkunftsbereinigung durch alle Befehlsreferenzen bewahrt eine einheitliche Notation; die geschützten Daten werden gemeinsam gegen die Basis geprüft."
