@@ -1,4 +1,4 @@
-"""Behavioral tests for `scripts/spec_lint.py` (issue #385).
+"""Behavioral tests for `scripts/spec_lint.py`.
 
 Each parametrized case drives `analyze` -- the module's own real entry point for one
 rule -- against a minimal fixture spec built from `GREEN_SPEC` by flipping exactly the
@@ -78,7 +78,7 @@ RED_IMPLEMENTATION_NAME = GREEN_SPEC.replace(
 )
 RED_MISSING_SETUP = GREEN_SPEC.replace("Setup: bare-remote\n\n", "")
 
-# `see` reference shorthand (issue #385 review): a keyword anywhere in the line, a `/`
+# `see` reference shorthand: a keyword anywhere in the line, a `/`
 # shorthand sharing a prefix, a `..` range, and a comma list, each proven against the
 # criterion's own valid `SAMPLE-01` alongside one deliberately unresolved id.
 RED_SEE_ANYWHERE_IN_LINE = GREEN_SPEC.replace("(see E-SAMPLE-01)", "(context; see E-SAMPLE-99)")
@@ -95,7 +95,7 @@ def _analyze_text(tmp_path: Path, text: str) -> list[Any]:
 
 def test_unresolved_behavior_table_cell_is_caught(tmp_path: Path) -> None:
     """A blank line always separates ``## Behavior table`` from its rows in real specs; the
-    row scan must not stop there before ever reaching a cell (regression for issue #385)."""
+    row scan must not stop there before ever reaching a cell."""
     red_text = GREEN_SPEC.replace("| default | SAMPLE-01 |", "| default | SAMPLE-99 |")
     assert red_text != GREEN_SPEC
     expected_line = _line_number(red_text, "| default | SAMPLE-99 |")
@@ -174,7 +174,7 @@ def _criterion_with_snippet(snippet: str) -> str:
     )
 
 
-# The `implementation_name` detector table from the issue #385 review: seven bare
+# The `implementation_name` detector table: seven bare
 # implementation shapes that must be flagged, and five backtick-quoted house-style
 # literals that must not be.
 DETECTOR_TABLE: tuple[tuple[str, str, bool], ...] = (

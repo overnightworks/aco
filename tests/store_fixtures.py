@@ -83,8 +83,7 @@ def push_raw_state_tree(
 def lineage_observation(repository: Path) -> tuple[protocol.ObjectId | None, str | None]:
     """This worktree's lineage stamp and fetch anchor -- the two
     per-worktree values a reset dry run, a live-claim refusal, or a failed
-    export must leave byte-identical to whatever `fetch_state` last wrote
-    (issue #298, 19.09.2026 gate finding 2)."""
+    export must leave byte-identical to whatever `fetch_state` last wrote."""
     stamp = store._read_lineage_stamp(repository)
     anchor = store._run_git(repository, ["rev-parse", store._FETCH_ANCHOR_REF])
     return stamp, anchor.stdout.decode().strip() if anchor.exit_status == 0 else None
@@ -148,7 +147,7 @@ def claim_intent(
 class RaceOnceTransport:
     """A `store.PushTransport` that lets one other writer land on
     `refs/aco/state` between this transition's own read and its first real
-    push attempt (issues #359 R3, #459): `race` performs that genuine second
+    push attempt: `race` performs that genuine second
     `git push` -- not a monkeypatched rejection -- so the ordinary
     `commit_transition` retry loop meets a real non-fast-forward rejection
     and must actually refetch and reapply."""

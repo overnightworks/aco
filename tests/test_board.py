@@ -1,5 +1,5 @@
 """Behavioral tests for the pure `aco` block write path `body.py`
-owns (#240, moved from `board.py` by #419): `rule_expectation`,
+owns (moved from `board.py`): `rule_expectation`,
 `append_expectation`, and the `expectation_lines` projection `rule --line`,
 `ask`, and `rulings` all share. CLI wiring lives in `tests/test_ask.py` for `ask`,
 `tests/test_rule.py` for `rule`, and `tests/test_rulings.py` for `rulings`."""
@@ -73,7 +73,7 @@ from aco.body import (
 from aco.protocol import ClaimError, ClaimRequest
 from aco.workboard import BoardConfig, ClassificationDefect, NoItemClassification, NoItemKind
 
-# A real expectation sentence from this repository's own issue #230 (#240's
+# A real expectation sentence from this repository's own issues (the
 # brief: take a real body as the fixture template rather than a synthetic
 # one) -- German prose, an em dash, and multiple sentences, none of which
 # need TOML escaping. The block interior itself is rendered through
@@ -94,7 +94,7 @@ ISSUE_230_PROSE = (
 
 
 def issue_230_body(*, default: str = "later") -> str:
-    """A realistic excerpt of issue #230's own body: its real prose and
+    """A realistic excerpt of that issue's own body: its real prose and
     `Blocked by` line, then a block carrying one still-*proposed* line built
     from its real (later-ruled) expectation text -- `default` lets a test
     ask for a body that is already fully ruled instead."""
@@ -248,7 +248,7 @@ VALID_SVG_PICTURE = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="
 
 
 def test_append_expectation_writes_the_card_fields() -> None:
-    """Issue #295: `question`/`example`/`picture` land on the appended
+    """`question`/`example`/`picture` land on the appended
     line, `expectation_lines` surfaces all three, and a body with none of
     them (every earlier `append_expectation` test) keeps reading `None` --
     absent keys leave the line unchanged."""
@@ -401,7 +401,7 @@ def test_append_expectation_writes_the_card_fields() -> None:
 def test_expectation_picture_is_refused_by_both_the_parser_and_the_writer(
     picture: str, match: str
 ) -> None:
-    """One rule, two callers (issue #295): a body already carrying the bad
+    """One rule, two callers: a body already carrying the bad
     picture reads MALFORMED at `expectation[0].picture`, and
     `append_expectation` refuses the same picture before any write --
     `_expectation_picture_defect` is the one owner both share."""
@@ -432,8 +432,7 @@ def test_expectation_picture_allows_an_internal_anchor_href_with_surrounding_spa
     """`href = "#x"` (space around `=`) targets the same document -- the
     external-href regex's final, unquoted-value alternative is a zero-width
     lookahead, so a greedy `\\s*` must not be free to backtrack onto that
-    whitespace and misread it as an external value's first character (issue
-    #300 residual 5, #234's own rule)."""
+    whitespace and misread it as an external value's first character."""
     picture = '<svg><a href = "#x"><circle cx="5" cy="5" r="4"/></a></svg>'
     assert _expectation_picture_defect(picture) is None
 
@@ -445,8 +444,8 @@ def test_expectation_picture_allows_an_internal_anchor_href_with_surrounding_spa
 
 
 def test_expectation_picture_allows_an_unrelated_animation_to_an_external_url() -> None:
-    """`attributeName` and `to` are bound to the same SMIL element (issue
-    #300, Codex Terra review): an `<animate>` that retargets `href` to an
+    """`attributeName` and `to` are bound to the same SMIL element:
+    an `<animate>` that retargets `href` to an
     internal anchor and a *different* `<animate>` that points an unrelated
     attribute (`x`) at an external URL are two separate, independently
     harmless elements, not the href-hijack the rule refuses."""
@@ -458,7 +457,7 @@ def test_expectation_picture_allows_an_unrelated_animation_to_an_external_url() 
 
 
 def test_expectation_picture_allows_an_animated_href_with_every_values_segment_internal() -> None:
-    """`values` lists every keyframe `;`-separated (issue #300 residual):
+    """`values` lists every keyframe `;`-separated:
     two internal anchors are as harmless as one, so a picture must not be
     refused just because `values` contains a semicolon."""
     picture = '<svg><animate attributeName="href" values="#a;#b"/></svg>'
@@ -482,7 +481,7 @@ def test_append_expectation_refuses_an_empty_example() -> None:
 
 
 def test_parse_body_still_refuses_an_unknown_expectation_key() -> None:
-    """Issue #295 only widens the allowed set by `question`/`example`/
+    """The expectation entry only widens the allowed set by `question`/`example`/
     `picture`; any other key stays refused by name, unchanged."""
     toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "yes"\nnote = "x"\n'
 
@@ -495,7 +494,7 @@ def test_parse_body_still_refuses_an_unknown_expectation_key() -> None:
 
 
 def test_parse_body_refuses_a_non_string_expectation_question() -> None:
-    """`question` must be a string (issue #295); a stored non-string value
+    """`question` must be a string; a stored non-string value
     -- an integer, say -- is refused by the same defect the empty-string
     case uses, not a TOML type error."""
     toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "yes"\nquestion = 1\n'
@@ -511,7 +510,7 @@ def test_parse_body_refuses_a_non_string_expectation_question() -> None:
 
 
 def test_parse_body_refuses_a_non_string_expectation_picture() -> None:
-    """`picture` must be a string (issue #295); a stored non-string value
+    """`picture` must be a string; a stored non-string value
     is refused before any SVG-shape check runs."""
     toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "yes"\npicture = 1\n'
 
@@ -524,7 +523,7 @@ def test_parse_body_refuses_a_non_string_expectation_picture() -> None:
 
 
 def test_render_block_round_trips_question_example_and_a_multiline_picture() -> None:
-    """The picture round trip (issue #295) needs its own case: a multi-line
+    """The picture round trip needs its own case: a multi-line
     SVG with embedded quotes and a backslash, a literal `\"\"\"` run that
     must not be mistaken for the closing delimiter, and a value ending in a
     trailing `"` right before the writer's own closing `\"\"\"` -- only a
@@ -563,7 +562,7 @@ def test_render_block_round_trips_question_example_and_a_multiline_picture() -> 
 def test_render_block_round_trips_a_picture_carrying_any_control_character(
     control_character: str,
 ) -> None:
-    """Issue #517: the picture writer escapes every control character the
+    """The picture writer escapes every control character the
     reader forbids literal in a multi-line basic string, so a picture the
     reader accepted -- an escaped U+000B, say -- is written back readable
     rather than as TOML `tomllib.loads` refuses."""
@@ -669,7 +668,7 @@ def test_expectation_line_summary_keeps_short_text_unchanged() -> None:
 
 def _slice_pull_request_body(epic: int) -> str:
     """A genuine slice-to-epic pull request body, in the shape observed
-    verbatim in atelier-2's #848 and #960: the epic is named twice, once in
+    verbatim in atelier-2: the epic is named twice, once in
     substantive prose and again in a dedicated, non-closing trailer line.
     Both mentions are required — see
     `test_a_dedicated_reference_line_without_corroboration_confers_no_stage`
@@ -697,7 +696,7 @@ def test_render_block_round_trips_every_field() -> None:
 
 def test_render_block_places_scope_before_expectation_and_slice_tables() -> None:
     """`render_block` reads its own fixed key order, never `data`'s
-    insertion order (issue #331): a `scope` value that would land after
+    insertion order: a `scope` value that would land after
     `[[expectation]]`/`[[slice]]` if TOML bound bare keys to the previous
     table (it would -- `tomllib` attaches a bare `key = value` line to the
     last open array-of-tables entry) still renders ahead of both, because
@@ -736,8 +735,8 @@ def test_render_block_renders_scope_sorted() -> None:
 
 
 def test_render_block_refuses_a_duplicate_scope_entry() -> None:
-    """`_render_scope_array` routes through `protocol.valid_scope` (issue
-    #331 REVISE finding 2), the one scope canonicalizer, rather than
+    """`_render_scope_array` routes through `protocol.valid_scope`,
+    the one scope canonicalizer, rather than
     silently deduplicating a second time: a duplicate it is ever handed --
     never a real `cut`/`rule`/`ask` write, which all reuse an
     already-validated body's own scope -- fails loud instead of vanishing."""
@@ -1094,7 +1093,7 @@ def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() ->
 def test_a_second_block_fence_inside_a_documentation_fence_is_not_read() -> None:
     """A body may document the block grammar in a fenced example; only one
     fence is ever open at a time, so the inner delimiter never opens a second
-    recognized block and the real one stays the only read (#150 §4)."""
+    recognized block and the real one stays the only read."""
     body = (
         block_body(MINIMAL_BLOCK_TOML)
         + f'\n~~~\n```{BLOCK_FENCE_INFO}\nversion = 1\nnow = "Example only."\n```\n~~~\n'
@@ -1216,7 +1215,7 @@ def test_board_records_the_latest_closed_dependency(
 
 def _payload_items(payload: dict[str, object]) -> list[dict[str, object]]:
     """`board_payload`'s own `items` array, cast back from the envelope's
-    declared `dict[str, object]` (issue #412) so a test can index one row
+    declared `dict[str, object]` so a test can index one row
     without every nested key losing its type to `object`."""
     return cast("list[dict[str, object]]", payload["items"])
 
@@ -1547,8 +1546,8 @@ def test_a_blocked_items_reason_names_the_blocker_by_the_id_under_the_pin(
     storage: Storage, blocker_label: str
 ) -> None:
     """`item.actionable_reason` (`_claim_or_completeness_reason`) names an
-    open blocker by `open_blocker_label`'s own `storage`-gated id (issue
-    #300 residual 2, #292's own rule) -- unchanged `#n` under the default
+    open blocker by `open_blocker_label`'s own `storage`-gated id --
+    unchanged `#n` under the default
     `Storage.GITHUB`."""
     blocked, dependencies = blocked_issue(10, "Blocked", block_dependency(9))
     blocker = board_issue(9, "Blocker", complete_contract("Resolve it."))
@@ -1568,7 +1567,7 @@ def test_a_blocked_items_reason_names_the_blocker_by_the_id_under_the_pin(
 
 def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
     """`board --json`'s `container.open_children[].blocked_by` projects the
-    same way `BoardItem.open_blockers` does (#150 A2): local ints, with the
+    same way `BoardItem.open_blockers` does: local ints, with the
     qualified foreign references in a sibling `foreign_blockers` key."""
     container = workboard.Issue(
         120,
@@ -1655,12 +1654,12 @@ def test_next_action_names_the_top_actionable_work_item() -> None:
 
 
 def test_next_action_never_cuts_a_container_whose_slice_table_is_empty() -> None:
-    """Issue #208: an empty `[[slice]]` table is the typed statement that
+    """An empty `[[slice]]` table is the typed statement that
     there is nothing here to cut, even when the container's own `Next` line
     still names real work. `next_action` must not fall back to building a
     `CutSliceAction` (and an unrunnable `cut --title "<paragraph>"`) out of
-    that prose -- nor offer to close it while that sentence names work
-    (issue #503, the #418 shape between two slices): it names the container
+    that prose -- nor offer to close it while that sentence names work:
+    it names the container
     and its own sentence through `CheckContainerAction` instead."""
     container = workboard.Issue(
         130,
@@ -1732,7 +1731,7 @@ def test_zero_cost_closes_names_a_closable_container_that_also_landed_once() -> 
 
 def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work() -> None:
     """An empty `Next` line alone must not close a container that still has
-    an undispatched `[[slice]]` entry (#112 finding 1)."""
+    an undispatched `[[slice]]` entry."""
     container = workboard.Issue(
         141,
         "Container",
@@ -1826,13 +1825,13 @@ def test_board_json_reports_an_uncut_slice_entry() -> None:
 
 
 def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
-    """R2 (issue #331 review): the only prior `board --json` uncut-row
+    """The only prior `board --json` uncut-row
     coverage passed `scope: null` throughout, so a `[[slice]]` row that
     carries its own `scope = [...]` had never been driven through parse ->
     board projection -> JSON. Here it survives as that row's canonical
     (sorted, deduplicated) array; a row without one still omits the key
     entirely -- the public shape before this lane, proven by the sibling
-    test above. The row's own `done_when` (issue #606) is `cut`'s to read
+    test above. The row's own `done_when` is `cut`'s to read
     and never joins the JSON row."""
     container = workboard.Issue(
         160,
@@ -1888,7 +1887,7 @@ def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
 
 
 def test_board_json_names_several_uncut_rows_by_index() -> None:
-    """`#122`'s own shape (06.09.2026): several still-open rows are named
+    """The ruled shape (06.09.2026): several still-open rows are named
     by index, not by re-deriving it from a name string."""
     container = workboard.Issue(
         122,
@@ -2006,7 +2005,7 @@ def test_an_epic_inherits_the_landed_stage_of_a_slice_that_did_not_close_it() ->
 
 
 def test_landing_rows_refuses_a_recently_merged_pull_request_with_no_merge_date() -> None:
-    """Issue #371: `recent_merged_pull_requests` names only already-merged
+    """`recent_merged_pull_requests` names only already-merged
     pull requests -- a `None` `merged_at` there is the forge answering a
     listing it does not honor, refused loud rather than silently dropped or
     dated with a guess."""
@@ -2019,7 +2018,7 @@ def test_landing_rows_refuses_a_recently_merged_pull_request_with_no_merge_date(
 
 
 def test_landing_rows_leaves_a_touched_but_not_closed_epic_unattributed() -> None:
-    """Issue #371 review finding R2: LAND-41/45 credit a Landungen row only
+    """LAND-41/45 credit a Landungen row only
     to a closing or landing keyword, never to a bare `Refs`/`Part of` touch
     -- unlike `Stage.CODE_LANDED`, which does credit a corroborated touch
     (`test_an_epic_inherits_the_landed_stage_of_a_slice_that_did_not_close_it`).
@@ -2038,7 +2037,7 @@ def test_landing_rows_leaves_a_touched_but_not_closed_epic_unattributed() -> Non
 def test_landing_rows_credits_the_earliest_merged_pull_request_regardless_of_listing_order() -> (
     None
 ):
-    """Issue #371 review finding R1: two merged pull requests both plainly
+    """Two merged pull requests both plainly
     close the same item -- the one that actually landed it first (the
     earlier `merged_at`) must win the row every time, never whichever the
     adapter happens to list first."""
@@ -2058,7 +2057,7 @@ def test_landing_rows_credits_the_earliest_merged_pull_request_regardless_of_lis
 
 
 def test_landing_rows_orders_equal_timestamp_rows_by_item_number() -> None:
-    """Issue #371 review finding R1: two items landed by the same trunk
+    """Two items landed by the same trunk
     commit share one `committed_at` -- with no tie-break, their row order
     would depend on the trunk walk's own dict iteration. The lower item
     number sorts first among equal timestamps."""
@@ -2208,7 +2207,7 @@ def test_board_configuration_reads_and_validates_the_idea_label(tmp_path: Path) 
 def test_board_configuration_keeps_body_contract_as_a_known_block_only_key(
     tmp_path: Path,
 ) -> None:
-    """Issue #204: the pin survives with one legal value. A repository that
+    """The pin survives with one legal value. A repository that
     carries `"block"` loads unchanged, an absent key means the block, and
     `"prose"` is refused by name -- never as an unknown key, which would
     refuse every store command in the repositories that still pin it."""
@@ -2336,7 +2335,7 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
 def test_board_configuration_refuses_a_lane_shared_entry_that_is_no_repository_path(
     lane_shared: str, refusal: str
 ) -> None:
-    """Issue #575 line 4: a registry every lane may write is named by its
+    """A registry every lane may write is named by its
     canonical path inside the repository; anything else is a defective
     configuration. Only the syntax is judged, so `land` and every reader
     judge alike."""
@@ -2347,7 +2346,7 @@ def test_board_configuration_refuses_a_lane_shared_entry_that_is_no_repository_p
 
 
 def test_load_brief_config_returns_none_when_the_file_does_not_exist(tmp_path: Path) -> None:
-    """Issue #324: absence is not `BriefConfig()`'s own default the way it is
+    """Absence is not `BriefConfig()`'s own default the way it is
     for `board.toml` -- `aco brief --step` reads `None` as "the repository
     tracks no rules" and refuses on it, so this must stay tellable apart
     from "the file exists but names no rules for this step"."""
@@ -2626,7 +2625,7 @@ def test_parse_body_refuses_an_invalid_top_level_scope(
     """An empty `scope` list is this module's own defect sentence; every
     other refusal (absolute, `..`, an empty entry) is `protocol.valid_scope`'s
     own sentence, forwarded verbatim -- the one path grammar `claim` already
-    owns, never a second one (issue #331)."""
+    owns, never a second one."""
     parsed = parse_body(block_body(f"{MINIMAL_BLOCK_TOML}{scope_toml}"))
 
     assert parsed.read_state is BodyReadState.MALFORMED
@@ -2649,7 +2648,7 @@ def test_parse_body_refuses_an_invalid_slice_scope(
 ) -> None:
     """A `[[slice]]` row's own `scope` goes through the exact same grammar
     and the exact same empty-list sentence as the block's top-level one,
-    only prefixed with the row (issue #331)."""
+    only prefixed with the row."""
     toml_text = f'{MINIMAL_BLOCK_TOML}[[slice]]\nindex = 1\ntitle = "Row"\n{scope_toml}'
 
     parsed = parse_body(block_body(toml_text))
@@ -2662,7 +2661,7 @@ def test_parse_body_refuses_an_invalid_slice_scope(
 
 @pytest.mark.parametrize("size", ["S", "M", "L"])
 def test_parse_body_reads_a_valid_size(size: str) -> None:
-    """Issue #357: `size` is a plain top-level block field -- valid under
+    """`size` is a plain top-level block field -- valid under
     every storage, never nested under `[record]` (a `state-ref`-only table,
     BODY-15), since a GitHub-stored item has no such table at all."""
     parsed = parse_body(block_body(f'{MINIMAL_BLOCK_TOML}size = "{size}"\n'))
@@ -2687,7 +2686,7 @@ def test_parse_body_refuses_an_invalid_size() -> None:
 
 def test_parse_body_refuses_a_non_scalar_size_without_crashing() -> None:
     """A list or table `size` value must never reach the `in SIZE_VALUES`
-    membership test unchecked (issue #357 G1): a type check ahead of it
+    membership test unchecked: a type check ahead of it
     reports the same defect sentence instead of raising `TypeError`."""
     parsed = parse_body(block_body(f'{MINIMAL_BLOCK_TOML}size = ["M"]\n'))
 
@@ -2731,7 +2730,7 @@ def test_bounded_whole_reason_accepts_the_boundary() -> None:
 
 
 def test_parse_body_reads_a_valid_whole() -> None:
-    """Issue #399: `whole` is a plain top-level block field -- `claim`/
+    """`whole` is a plain top-level block field -- `claim`/
     `start`'s own fallback for `--whole` when the call itself names none."""
     reason = "the four adapters share one lock"
     parsed = parse_body(block_body(f'{MINIMAL_BLOCK_TOML}whole = "{reason}"\n'))
@@ -2785,8 +2784,8 @@ def test_render_block_places_whole_before_expectation_and_slice_tables() -> None
 def test_parse_body_refuses_scope_as_an_unknown_expectation_key() -> None:
     """`scope` is a field of the block's top level and of `[[slice]]` rows
     only -- an `[[expectation]]` entry never grew it, so writing one there
-    still refuses by name (issue #331 does not widen
-    `_EXPECTATION_KNOWN_KEYS`)."""
+    still refuses by name (the key set of
+    `_EXPECTATION_KNOWN_KEYS` is not widened)."""
     toml_text = (
         f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "later"\nscope = ["src"]\n'
     )
@@ -2854,7 +2853,7 @@ def test_parse_body_reads_slice_entries_as_still_uncut() -> None:
 
 def test_parse_body_projects_scope_top_level_and_per_slice_canonically() -> None:
     """Both the block's own `scope` and a `[[slice]]` row's `scope` project
-    sorted regardless of the order they were written in (issue #331) -- the
+    sorted regardless of the order they were written in: the
     same normalisation `render_block` renders them in. A duplicate entry is
     never silently dropped here; `protocol.valid_scope` already refuses one
     as a defect before this projection is ever built (proven for `claim` in
@@ -2981,7 +2980,7 @@ def test_closable_container_number_decides_by_kind_children_uncut_rows_next_line
     body: str,
     expected: int | None,
 ) -> None:
-    """issue #348: `release --merged`/`item close`'s own parent hint shares
+    """`release --merged`/`item close`'s own parent hint shares
     this one decision with `next`'s `CloseContainerAction` branch."""
     parent = workboard.ParentIssue(PARENT_ISSUE_REFERENCE, body, kind)
 
@@ -3015,7 +3014,7 @@ def test_closable_container_number_decides_by_kind_children_uncut_rows_next_line
 def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_every_storage(
     storage: Storage, body: str, expected: int | None
 ) -> None:
-    """Issue #214: with `Next` naming no work, only the uncut row decides."""
+    """With `Next` naming no work, only the uncut row decides."""
     parent = workboard.ParentIssue(PARENT_ISSUE_REFERENCE, body, ItemKind.CONTAINER)
     children = (workboard.ChildItem(80, workboard.ChildState.CLOSED),)
 
@@ -3110,7 +3109,7 @@ def test_board_reports_open_local_and_foreign_dependencies_as_blockers() -> None
 
 
 def test_board_json_splits_local_and_foreign_blockers_only_in_block_mode() -> None:
-    """A2 (#150): `open_blockers` keeps its pre-#150 local-int-only shape;
+    """`open_blockers` keeps its local-int-only shape;
     `foreign_blockers` is a separate key, present only under the block pin."""
     issue = board_issue(300, "Depends on two", block_body(MINIMAL_BLOCK_TOML))
     dependencies = {
@@ -3267,7 +3266,7 @@ def test_an_idea_without_a_priority_label_follows_the_regular_score_order() -> N
 
 
 def test_highest_scored_actionable_skips_a_scopeless_sliceless_item() -> None:
-    """Issue #399 (finding 40 on #310): a higher-ranked, actionable item
+    """A higher-ranked, actionable item
     naming neither `scope` nor a `[[slice]]` row is still `next`'s own top
     action (`scope unknown` and all), but `claim`/`start`'s own precedence
     check never stops on it -- it walks on to the highest-ranked *buildable*
@@ -3292,7 +3291,7 @@ def test_highest_scored_actionable_skips_a_scopeless_sliceless_item() -> None:
 
 
 def test_highest_scored_actionable_accepts_a_scopeless_item_with_a_slice_row() -> None:
-    """Issue #399: an item naming no top-level `scope` but at least one
+    """An item naming no top-level `scope` but at least one
     `[[slice]]` row still names a path to cut one from, so it is buildable
     -- unlike a scopeless item with no rows at all."""
     sliced = board_issue(
@@ -3619,7 +3618,7 @@ def test_body_defect_text_shows_display_controls_as_escapes(text: str, shown: st
     [("aco-3f9a2c", 0x3F9A2C), ("#42", 42), ("42", 42)],
 )
 def test_parse_item_reference_accepts_every_reference_syntax(value: str, number: int) -> None:
-    """Issue #285 proof 5, moved from `cli._parse_item_ref` by issue #304:
+    """Moved from `cli._parse_item_ref`:
     `aco-xxxxxx` (hex-decoded), `#n`, and the bare number `n` are all one
     item reference -- the one grammar every CLI argparse slot that means an
     item shares with a trunk commit's `Work-Item:` trailer value."""
@@ -3628,7 +3627,7 @@ def test_parse_item_reference_accepts_every_reference_syntax(value: str, number:
 
 @pytest.mark.parametrize("value", ["foo", "aco-xyz", "#"])
 def test_parse_item_reference_refuses_anything_else(value: str) -> None:
-    """Issue #285 proof 5: anything that is none of the three forms refuses
+    """Anything that is none of the three forms refuses
     by name rather than guessing."""
     with pytest.raises(protocol.ClaimUnavailableError, match="is not an item reference"):
         workboard.parse_item_reference(value)
@@ -3640,7 +3639,7 @@ def test_trunk_commit_classification_reads_a_single_work_item_trailer() -> None:
 
 
 def test_trunk_commit_classification_lands_every_item_a_repeated_trailer_names() -> None:
-    """Issue #304: a trailer block that repeats `Work-Item:` lands every
+    """A trailer block that repeats `Work-Item:` lands every
     item it names, unlike a pull request body's single-item rule."""
     classification = workboard.trunk_commit_classification(("#10", "#11"), ())
     assert classification == workboard.TrunkWorkItemClassification((10, 11))
@@ -3706,7 +3705,7 @@ def test_trunk_log_classifies_valid_neighbors_of_a_malformed_work_item(
 def test_trunk_commit_classification_refuses_a_contradictory_trailer_block(
     work_item_values: tuple[str, ...], no_item_values: tuple[str, ...]
 ) -> None:
-    """Issue #304 review, finding B2: a block naming both `Work-Item:` and
+    """A block naming both `Work-Item:` and
     `No-Item:`, or repeating `No-Item:`, refuses with a typed
     `ClassificationDefect` -- the same contradiction `check <pr>` already
     refuses for a pull request body -- rather than letting `Work-Item:` win
@@ -3715,7 +3714,7 @@ def test_trunk_commit_classification_refuses_a_contradictory_trailer_block(
     assert isinstance(defect, ClassificationDefect)
 
 
-# --- Board estimates and measurements (issue #357) --------------------------
+# --- Board estimates and measurements --------------------------
 
 
 def _lane_event(
@@ -3791,7 +3790,7 @@ def test_build_board_reports_a_weak_estimate_below_three_measured_lanes(
 
 def test_build_board_reports_a_measured_estimate_with_median_and_count() -> None:
     """Three distinct items' own single completed claim each contribute
-    exactly one measured sample to the `M` class (issue #357 R2): `n` counts
+    exactly one measured sample to the `M` class: `n` counts
     items, never `len(claims)` from one item claimed and released three
     times."""
     lane_events = tuple(
@@ -3820,7 +3819,7 @@ def test_build_board_reports_a_measured_estimate_with_median_and_count() -> None
 
 def test_build_board_leaves_a_lane_claims_own_event_unjoined_to_any_size_class() -> None:
     """A `docs/`/`fix/` lane claim's own lifecycle event carries no issue
-    number at all (issue #357 R2): `_joined_lane_event` returns it
+    number at all: `_joined_lane_event` returns it
     unchanged rather than joining it against `size_by_number`, so it can
     never be sorted into a size class -- mixing one into an otherwise-clean
     `M` measurement leaves that class's own `n` exactly at the number of
@@ -3932,8 +3931,8 @@ def test_build_board_still_joins_a_trailer_item_with_leading_zeros() -> None:
 
 def test_build_board_sums_multiple_claims_of_one_item_into_one_sample() -> None:
     """One item claimed, released, and reclaimed -- a builder then a fixer --
-    contributes exactly one measured sample, its wall-clock durations added
-    (issue #357 R2): never two independent samples that would double-count
+    contributes exactly one measured sample, its wall-clock durations added --
+    never two independent samples that would double-count
     `n` and average away the real total."""
     lane_events = (
         _lane_event(
@@ -4008,8 +4007,8 @@ def test_build_board_measurements_section_reports_classes_dates_and_unfinished()
 def test_board_json_carries_estimate_and_measurements(
     storage: Storage, estimated_item: str
 ) -> None:
-    """The estimate names its item the way a command takes it back (issue
-    #467): the bare number under `github`, the item id under `state-ref`,
+    """The estimate names its item the way a command takes it back:
+    the bare number under `github`, the item id under `state-ref`,
     never the id's decimal value."""
     lane_events = tuple(
         _lane_event(
@@ -4055,8 +4054,8 @@ def test_board_json_carries_estimate_and_measurements(
 
 def test_build_board_counts_a_closed_items_own_completed_lane_into_its_size_class() -> None:
     """A completed lane whose item is no longer among the board's own open
-    `issues` still joins its size class through `closed_item_sizes` (issue
-    #357 R2) -- the caller's own once-read lookup for exactly the numbers a
+    `issues` still joins its size class through `closed_item_sizes`
+    -- the caller's own once-read lookup for exactly the numbers a
     lane names outside the open set -- so a class is never blind to every
     item that actually closed."""
     lane_events = tuple(
@@ -4086,7 +4085,7 @@ def test_build_board_counts_a_closed_items_own_completed_lane_into_its_size_clas
 
 def test_measurements_counts_an_unparsed_lifecycle_commit() -> None:
     """A claim-shaped `refs/aco/state` commit `store.claim_lifecycle` could
-    not read is counted, never silently dropped (issue #357 R1)."""
+    not read is counted, never silently dropped."""
     projected = projected_board(
         (_sized_item(223, "M"),),
         (),
@@ -4108,8 +4107,8 @@ def test_measurements_counts_an_unparsed_lifecycle_commit() -> None:
 
 
 def test_measurements_counts_an_unparsed_commit_even_with_no_measured_class() -> None:
-    """`unparsed` never hides behind `classes` being empty (BOARD-27, issue
-    #357 R2): a board with no measured lane at all still surfaces every
+    """`unparsed` never hides behind `classes` being empty (BOARD-27):
+    a board with no measured lane at all still surfaces every
     unparsed commit."""
     projected = projected_board(
         (_sized_item(224, "M"),),
@@ -4126,7 +4125,7 @@ def test_measurements_counts_an_unparsed_commit_even_with_no_measured_class() ->
 
 
 def test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change() -> None:
-    """Proof 4 (issue #357), parametrized without git: two open items, `M`
+    """Proof 4, parametrized without git: two open items, `M`
     and `L`. Adding measured `L` lanes never moves the `M` item's estimate;
     only adding measured `M` lanes does."""
     items = (_sized_item(207, "M"), _sized_item(208, "L"))
