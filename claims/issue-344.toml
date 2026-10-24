@@ -1,0 +1,8 @@
+claim_id = "04e241c7bbe447c1afa86eb7422ddb42"
+agent = "claude"
+role = "builder"
+base = "beeba89da0561bfae54b3e02ed92dfac563a6ef2"
+branch = "claude/issue-344-refs-s3"
+scope = ["quality/baseline.toml", "src/aco/checkout.py", "src/aco/cmd_land.py"]
+opened_commit = "eb6b6c38ebb49b0764fd6cad62746e38ee9b1c31"
+whole_reason = "Die Dateien dieser Scheibe tragen dieselbe mechanische, AST-gleiche Kommentarbereinigung; ein feinerer Schnitt vervielfacht nur Claims, Reviews und Baseline-Läufe."
