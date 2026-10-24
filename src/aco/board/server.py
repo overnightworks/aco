@@ -58,7 +58,7 @@ under a method the board serves at all, so it advertises every method
 (`_DEFAULT_ALLOW`)."""
 _TEXT_CONTENT_TYPE = "text/plain; charset=utf-8"
 CONTENT_SECURITY_POLICY = (
-    "default-src 'none'; script-src 'self'; img-src data:; connect-src 'self'; "
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; connect-src 'self'; "
     "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 """The shell's one script loads from `/assets/index.js`, never inline, and a
