@@ -157,10 +157,10 @@ GitHubForge = github.GitHubForge
 
 # Captured before the autouse `_stub_trunk` fixture (below) ever
 # monkeypatches `checkout.trunk_landings` to `()`: the atomic-landing tests
-# (issue #359) need the real first-parent walk against a real repository,
+# need the real first-parent walk against a real repository,
 # the same way `test_checkout.py`'s own `_LIVE_TRUNK_LANDINGS` does. A test
 # on a real repository (`redirect_toplevel`) resolves and fetches its trunk
-# for real as well (issue #488).
+# for real as well.
 _LIVE_TRUNK_LANDINGS = checkout.trunk_landings
 _LIVE_UNCONFIGURED_REMOTE_REFUSAL = checkout.unconfigured_remote_refusal
 _LIVE_PATH_IS_TRACKED = checkout.path_is_tracked
@@ -170,7 +170,7 @@ LANDED = protocol.MergedRelease(12)
 
 # Exactly `protocol.WIDE_SCOPE_SHARE_FLOOR` versioned files: three named scope
 # paths (LICENSE, README.md, src) cover four of them (src holds two), the
-# minimal fixture that still trips the share condition (issue #163).
+# minimal fixture that still trips the share condition.
 TWELVE_VERSIONED_FILES = (
     "LICENSE",
     "README.md",
@@ -530,7 +530,7 @@ def _lane(item: str, day: int, hours: int) -> metrics.LaneEvent:
 def test_board_shows_measured_estimates(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Proof 3 (issue #357), pinned through the CLI rather than only through
+    """Pinned through the CLI rather than only through
     `workboard.build_board` directly: one `FakeForge` board build shows every
     estimate state -- a class with `n >= 3` measured lanes (two of them
     completed by items that have since closed, R2's own closed-item join),
@@ -577,7 +577,7 @@ def test_board_shows_measured_estimates(
     assert thirty_two["size"] is None
     assert thirty_two["estimate"] is None
     assert payload["measurements"]["classes"]
-    # Issue #440: both closed items come from one batched read -- open
+    # Both closed items come from one batched read -- open
     # issues, open PRs, merged PRs, and that one batch, never one per item.
     assert sorted(client.issue_reference_lookups) == [33, 34]
     assert payload["requests"] == client.requests == 4
@@ -586,7 +586,7 @@ def test_board_shows_measured_estimates(
 def test_board_shows_the_empty_measurements_sentence_with_nothing_measured(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """The fourth estimate/Messungen state (issue #357 proof 3): with no
+    """The fourth estimate/Messungen state: with no
     lifecycle data read at all, `--json` shows the board's own
     empty-measurements sentinel (`since: null`), never a fabricated
     estimate."""
@@ -602,7 +602,7 @@ def test_board_projects_with_no_state_ref_bootstrapped_at_all(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """A repository that has never bootstrapped `refs/aco/state` still boards
-    cleanly (issue #357): `board_read.claim_ages`/`board_read._claim_lifecycle` both read a missing
+    cleanly: `board_read.claim_ages`/`board_read._claim_lifecycle` both read a missing
     ref as empty rather than crashing, so `measurements` shows the
     empty-measurements sentence and no claim ages are read at all."""
     _single_item_board_environment(monkeypatch, tmp_path)
@@ -616,7 +616,7 @@ def test_board_projects_with_no_state_ref_bootstrapped_at_all(
 def test_board_reports_requests_equal_to_the_adapters_own_invocation_count(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Issue #168: `observed` is the fixture's own independent tally of every
+    """`observed` is the fixture's own independent tally of every
     `gh` call the injected `run` actually received -- never read from the
     counter under test -- so a matching `requests` field is real evidence,
     not a tautology."""
@@ -640,7 +640,7 @@ def _single_item_board_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 def test_board_marks_an_item_landed_by_a_trailer_carrying_trunk_commit_without_a_pull_request(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #304 review finding B2's "lane 2": a trunk commit's own
+    """A trunk commit's own
     `Work-Item:` trailer lands an item even when no merged pull request body
     names it -- `landed_references` unions the trunk-derived set
     (`entry.item` of each `BoardBuildInputs.trunk_landing_items` entry)
@@ -669,7 +669,7 @@ def test_board_marks_an_item_landed_by_a_trailer_carrying_trunk_commit_without_a
 def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_request(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #371, Beweis 2: under `github`, a trunk-trailer landing (#10)
+    """Under `github`, a trunk-trailer landing (#10)
     and an older-style squash pull request with no trailer of its own (#11)
     both show as one row each in `board --json`'s `landings` array -- the
     trailer path winning for #10 even though pull request #89 also plainly
@@ -718,7 +718,7 @@ def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_req
 def test_board_naming_no_output_mode_refuses_before_any_read(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """BOARD-44 (issue #420): the retired text table left `board` with no
+    """BOARD-44: the retired text table left `board` with no
     default mode, so a bare `aco board` must name `--json` instead of
     reading a forge, a pin, or a repository just to guess."""
     status = issue_claim.main(["board"])
@@ -729,7 +729,7 @@ def test_board_naming_no_output_mode_refuses_before_any_read(
 
 def test_board_serve_flag_is_an_unknown_argument(capsys: pytest.CaptureFixture[str]) -> None:
     """The retired `aco board --serve` is no longer declared, so argparse
-    refuses it like any unknown flag (BOARD-44's neighbour, issue #313)."""
+    refuses it like any unknown flag (BOARD-44's neighbour)."""
     with pytest.raises(SystemExit) as refused:
         issue_claim.main(["board", "--serve"])
 
@@ -740,7 +740,7 @@ def test_board_serve_flag_is_an_unknown_argument(capsys: pytest.CaptureFixture[s
 def test_board_skips_the_children_list_for_a_container_with_zero_children(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #168: a container whose own summary already says 0/0 must never
+    """A container whose own summary already says 0/0 must never
     pay for `list_children` -- there is no open child either way -- while a
     container that does carry children still gets its detail list."""
     issues = (
@@ -779,8 +779,8 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
 
     assert observed_children_calls == [30]
     # Open issues, open PRs, merged PRs, and exactly one `list_children`
-    # call (for #30, never #20) -- claims come from the store now (issue
-    # #176), never from a ledger-comments request. No issue here names a
+    # call (for #30, never #20) -- claims come from the store now,
+    # never from a ledger-comments request. No issue here names a
     # blocker, so `list_board_blockers` never runs -- an empty numbers set
     # costs no request, on the fake exactly as on the real adapter.
     assert payload["requests"] == client.requests == 4
@@ -789,7 +789,7 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
 def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #168: the pattern #150 started with `total_blocked_by` -- an
+    """An
     item whose own count already says 0 must never pay for its dependency
     list, only the one that actually carries a blocker."""
     write_repository_config(tmp_path, 'body_contract = "block"\n')
@@ -819,7 +819,7 @@ def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
     assert observed_dependency_calls == [11]
     # Open issues, open PRs, merged PRs, and exactly one dependency lookup
     # (for #11, never #10) -- block mode never calls `list_board_blockers`,
-    # and claims come from the store now (issue #176), never a ledger
+    # and claims come from the store now, never a ledger
     # comments request.
     assert payload["requests"] == client.requests == 4
 
@@ -928,7 +928,7 @@ _TOP_AND_BLOCKED = (
     board_issue(12, "Depends on top", complete_contract("Claim #12."), blocked_by_count=1),
 )
 _BLOCKED_BY_ELEVEN = {12: (block_dependency(11),)}
-# Issue #553: a security item outranks every other one, but it waits on the
+# A security item outranks every other one, but it waits on the
 # operator's ruling, so no agent can pull it.
 _WAITING_AND_PULLABLE = (
     board_issue(
@@ -955,7 +955,7 @@ def _childless_container(number: int, body_text: str, *, labels: tuple[str, ...]
     )
 
 
-# Issue #604 line 1: containers the operator holds -- one labelled with an
+# Containers the operator holds -- one labelled with an
 # uncut row, one frozen whose `Next` still names work, one labelled but
 # closable -- beside one pullable item.
 _OPERATOR_HELD_CONTAINERS = (
@@ -969,7 +969,7 @@ _OPERATOR_HELD_CONTAINERS = (
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
-# issue #348: every `next` golden below a scopeless `WorkItemAction` needs
+# Every `next` golden below a scopeless `WorkItemAction` needs
 # this note right after its `Run:` line -- the item's own body names no
 # scope, so `claim` cannot derive one either -- and this tail once the
 # action's own lines end: a scopeless first action leaves `parallel_set`
@@ -992,7 +992,7 @@ _EMPTY_PARALLEL_JSON: dict[str, object] = {
     "scope_unknown": [],
 }
 
-# issue #348, Beweis 1: five free items -- Beta and Gamma name the same
+# Five free items -- Beta and Gamma name the same
 # path (the "two overlapping each other" pair), Delta names no scope at
 # all, Epsilon names a path under claim-live-1's own directory scope (the
 # "excluded by a live claim, not by another candidate" case; R1 review) --
@@ -1442,7 +1442,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
 def _start_scenario(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, agent: str = "Codex Sol"
 ) -> Path:
-    """A real bare-remote-backed repository (issue #322), item #314 open
+    """A real bare-remote-backed repository, item #314 open
     with a titled, scoped body, and this test's own toplevel redirected onto
     it -- `start`'s own worktree creation runs real git, unlike every other
     claim test in this module, which never builds one at all."""
@@ -1484,8 +1484,8 @@ _CLAIM_ID_PATTERN = r"[0-9a-f]{32}"
 
 
 def _claimed_line_id(out: str, subject: str) -> str:
-    """The claim id `CLAIMED <subject>: <id>` printed in `out` (issue #322
-    review finding 1): `start` mints a fresh id exactly as a bare `aco
+    """The claim id `CLAIMED <subject>: <id>` printed in `out`:
+    `start` mints a fresh id exactly as a bare `aco
     claim` does, so a test proving it never pins one -- only that a create
     prints a real one and a resume reprints the same one."""
     match = re.search(rf"CLAIMED {re.escape(subject)}: ({_CLAIM_ID_PATTERN})\n", out)
@@ -1540,7 +1540,7 @@ def test_start_resumes_an_existing_worktree_by_only_claiming(
 def test_start_from_a_linked_worktree_builds_beside_the_main_checkout(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #479 proof 2: the worktree's place comes from the main
+    """The worktree's place comes from the main
     checkout, never nested under the linked worktree the call runs in."""
     repo = _start_scenario(monkeypatch, tmp_path)
     _stand_in_another_lane(monkeypatch, repo, tmp_path)
@@ -1587,7 +1587,7 @@ def test_start_from_a_linked_worktree_checks_against_the_main_checkouts_board_co
     tmp_path: Path,
     stand_in_a_lane: Callable[[pytest.MonkeyPatch, Path, Path], Path],
 ) -> None:
-    """Issue #479 (head ruling 27.09.2026): the claim's checks read the main
+    """The claim's checks read the main
     checkout's `board.toml`, never the one a lane the caller stands in has
     committed -- whether `start` builds a new worktree or claims afresh in
     the item's own released lane -- so a lane that drops `security` from the
@@ -1619,7 +1619,7 @@ def test_start_from_a_linked_worktree_checks_against_the_main_checkouts_board_co
 def test_start_inside_its_own_lane_worktree_reprints_the_live_claim(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #479 proof 2: `start` run inside the item's own lane worktree
+    """`start` run inside the item's own lane worktree
     -- its branch the live claim's, its slug not the title's, work in
     progress in it -- reprints that claim instead of building another."""
     repo = _start_scenario(monkeypatch, tmp_path)
@@ -1658,7 +1658,7 @@ def test_start_refuses_a_slug_the_derived_rule_would_never_produce(
 def test_start_refuses_an_unsafe_identity_prefix_before_any_git_write(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #322 review/gate: an unsafe `ACO_AGENT` first word must never
+    """An unsafe `ACO_AGENT` first word must never
     reach `git worktree add` -- the branch it would build is refused first,
     by name, and no worktree is ever created."""
     repo = _start_scenario(monkeypatch, tmp_path, agent="-bad")
@@ -1679,7 +1679,7 @@ def _serve_an_item_without_scope(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _serve_a_malformed_body(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Issue #310 finding 43: the block defect is named, never the less
+    """The block defect is named, never the less
     specific "item names no scope"."""
     _serve_start_board(
         monkeypatch, _start_item(block_body(f'{MINIMAL_BLOCK_TOML}owner = "someone"\n'))
@@ -1714,13 +1714,13 @@ def _serve_a_higher_priority_item(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _hold_a_claim_by_another_agent(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Issue #322 review/gate: `protocol.claim_key` never folds in `branch`, so
+    """`protocol.claim_key` never folds in `branch`, so
     another agent's claim on #314 is never resumed as this session's own."""
     _hold_a_claim_on_the_item(monkeypatch, "Grok sess-9", branch="grok/issue-314-other")
 
 
 def _hold_a_reviewer_claim_on_the_lane_branch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Issue #322 review/gate finding 3: this agent's own claim on the lane
+    """This agent's own claim on the lane
     branch, but as `reviewer`, is never resumed as `start`'s build claim."""
     _hold_a_claim_on_the_item(monkeypatch, "Codex Sol", branch=_START_BRANCH, role="reviewer")
 
@@ -1830,7 +1830,7 @@ def test_a_refused_start_leaves_no_worktree_and_no_branch_behind(
 ) -> None:
     """Spec: CLM-36, CLM-37, BODY-52. T5: matrix 13, 15.
 
-    Issue #479 proof 1: every check that can refuse the claim runs
+    Every check that can refuse the claim runs
     before `start` builds, so a refusal builds nothing -- no worktree, no
     branch, no `worktree:` line -- and has nothing to undo."""
     repo = _start_scenario(monkeypatch, tmp_path)
@@ -1878,7 +1878,7 @@ def test_a_detached_head_is_named_and_nothing_is_written(
     tmp_path: Path,
     arguments: list[str],
 ) -> None:
-    """Issue #526 (CLM-33): `claim` in a linked worktree on a detached HEAD
+    """CLM-33: `claim` in a linked worktree on a detached HEAD
     refuses by naming its own detached HEAD -- never a claim marker field
     -- and writes no claim, worktree, or branch."""
     repo, worktree, fake = _detached_start_worktree(monkeypatch, tmp_path)
@@ -1925,7 +1925,7 @@ def test_start_names_a_runnable_command_for_a_detached_worktree(
     branch_exists: bool,
     switch: tuple[str, ...],
 ) -> None:
-    """Issues #526 (START-29), #528: `start` run from main names the
+    """START-29: `start` run from main names the
     detached worktree at its computed path and the git command that
     attaches it to the lane branch, writes nothing, and that command runs
     as printed in bash -- its path shell-quoted even under a parent
@@ -2100,14 +2100,14 @@ def test_a_claim_refused_after_the_build_removes_what_start_built(
     refusal: str,
     removal: str,
 ) -> None:
-    """Issue #479 (START-18, START-21, START-26): a claim refused between
+    """START-18, START-21, START-26: a claim refused between
     the build and its push -- by the ledger, by the new worktree's own
     checkout preconditions, or by a trunk that moved after the checks, a
     live claim's rebuilt worktree included -- removes exactly the worktree
     and branch this call built, and says so; when git
     will not delete the branch the safe way, it says which branch stays and
     why, and a delete that timed out reads the branch unknown with the check
-    that tells (issue #603, START-30)."""
+    that tells (START-30)."""
     repo = _start_scenario(monkeypatch, tmp_path)
     arrange(monkeypatch, repo)
     monkeypatch.chdir(repo)
@@ -2124,7 +2124,7 @@ def test_a_claim_refused_after_the_build_removes_what_start_built(
 def test_a_refused_start_git_cannot_undo_keeps_the_refusal_and_names_what_stays(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #479 (START-23): when git will not remove the worktree a
+    """START-23: when git will not remove the worktree a
     refused call built, the refusal and its exit stay, and a line names the
     worktree and branch left standing and git's reason."""
     repo = _start_scenario(monkeypatch, tmp_path)
@@ -2157,7 +2157,7 @@ class _ClosedPipe(io.StringIO):
 def test_start_removes_what_it_built_even_when_its_refusal_cannot_be_written(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #479 (START-18): a claim refused after the build removes the
+    """START-18: a claim refused after the build removes the
     worktree and branch this call built even when stderr is a closed pipe
     and the refusal itself cannot be written."""
     repo = _start_scenario(monkeypatch, tmp_path)
@@ -2175,7 +2175,7 @@ def test_start_removes_what_it_built_even_when_its_refusal_cannot_be_written(
 def test_start_keeps_its_worktree_when_the_report_fails_after_the_claim(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #479 review finding 2: only a refused claim undoes the build; a
+    """Only a refused claim undoes the build; a
     failure printing the report of a claim already written leaves the
     worktree and branch that claim names."""
     repo = _start_scenario(monkeypatch, tmp_path)
@@ -2294,7 +2294,7 @@ def test_start_refuses_with_gits_text_and_leaves_its_state_when_a_trunk_read_fai
 def test_start_rebuilds_the_gone_worktree_of_its_live_claim_and_reprints_that_claim(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #479: a live claim of this session whose worktree and branch
+    """A live claim of this session whose worktree and branch
     are both gone gets its worktree built again at the computed path and the
     same claim reprinted, never a second id minted."""
     repo = _start_scenario(monkeypatch, tmp_path)
@@ -2329,7 +2329,7 @@ _REAL_VERSIONED_PATHS = checkout.versioned_paths
 def test_start_refuses_to_rebuild_a_live_claim_whose_scope_the_trunk_no_longer_grounds(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #479 (START-22): the live claim's scope is measured against the
+    """START-22: the live claim's scope is measured against the
     fetched trunk before its gone worktree is built again, so a comma path
     the trunk has since deleted refuses with nothing built."""
     repo = _start_scenario(monkeypatch, tmp_path)
@@ -2368,9 +2368,9 @@ def test_start_resume_refuses_a_scope_that_differs_from_the_live_claim(
     tmp_path: Path,
     arrange: Callable[[Path], None],
 ) -> None:
-    """Issue #322 review/gate: an explicit `--scope` on resume that disagrees
+    """An explicit `--scope` on resume that disagrees
     with the live claim's own stored scope is refused rather than silently
-    ignored, and with the worktree gone nothing is built again (issue #479);
+    ignored, and with the worktree gone nothing is built again;
     the identical scope is accepted (covered by
     `test_start_resumes_an_existing_worktree_by_only_claiming`'s bare
     resume, which passes no `--scope` at all)."""
@@ -2392,7 +2392,7 @@ def test_start_resume_refuses_a_scope_that_differs_from_the_live_claim(
 def test_start_resumes_a_wide_claim_without_repeating_whole(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #322 review/gate: the stored claim's own `whole_reason` already
+    """The stored claim's own `whole_reason` already
     justifies a wide scope once; resuming it must not re-demand `--whole`."""
     repo, _remote = real_repository_with_bare_remote(tmp_path)
     for name in ("a.py", "b.py", "c.py", "d.py"):
@@ -2460,7 +2460,7 @@ def test_start_resume_refuses_when_the_worktree_toplevel_read_exits_nonzero(
 def test_start_mints_a_fresh_id_after_an_abandoned_release(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #322 review finding 1: an abandoned release frees the claim but
+    """An abandoned release frees the claim but
     never touches the worktree; the next `start` resumes that same worktree
     yet still mints a brand-new id, never reusing a terminal one a
     deterministic `start-314` id would have left behind."""
@@ -2488,7 +2488,7 @@ def test_start_mints_a_fresh_id_after_an_abandoned_release(
 def test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #322 review finding 1: a `--merged` release removes #72's own
+    """A `--merged` release removes #72's own
     worktree and branch entirely; once the item reopens, `start` builds a
     fresh worktree and mints a brand-new id rather than failing before CAS
     on a terminal id a deterministic `start-72` would have left behind."""
@@ -2580,7 +2580,7 @@ def test_start_refuses_a_closed_or_missing_item(
 def test_start_refuses_a_malformed_body_before_no_scope(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #310 finding 43, mirrored for `start` (issue #406): a target
+    """A target
     whose `aco` block is malformed refuses by naming that defect --
     the same block-defect reader `claim` shares -- before `start`'s own
     claim delegation ever gets to name the less specific "item names no
@@ -2642,13 +2642,13 @@ def _state_ref_item_body(
 def _real_state_ref_start_scenario(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, canonical_remote: str = "origin"
 ) -> tuple[Path, Path, protocol.ObjectId]:
-    """A real bare-remote-backed, `storage = "state-ref"` repository (issue
-    #322 review finding 2) with item #314 open, untitled scope, ready for
+    """A real bare-remote-backed, `storage = "state-ref"` repository
+    with item #314 open, untitled scope, ready for
     `start` -- the state-ref counterpart of `_start_scenario`, real
     `refs/aco/state` and all (`_use_real_store`), since `_FakeStore` cannot
     see which directory a read ran against. A `canonical_remote` other than
     `origin` keeps an `origin` beside it on the same bare remote that never
-    recorded its `HEAD` (issue #490)."""
+    recorded its `HEAD`."""
     repo, remote, seeded = _real_state_ref_repository(
         monkeypatch,
         tmp_path,
@@ -2714,13 +2714,12 @@ def test_state_ref_reads_answer_from_a_subdirectory_as_from_the_checkout_root(
     command: list[str],
     checkouts_agree: bool,
 ) -> None:
-    """Issue #460: a read run from `src/` of a checkout, or of a linked
+    """A read run from `src/` of a checkout, or of a linked
     worktree, answers exactly as from that checkout's root -- git lists and
     archives a tree object relative to its own working directory, so the
     state tree must be read from the checkout root, never the process cwd.
     The main checkout and a linked worktree answer alike, except `next`,
-    which advises `start` from the one and `claim` from the other
-    (issue #562)."""
+    which advises `start` from the one and `claim` from the other."""
     repo, _remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     linked = tmp_path / "linked"
     real_git(repo, "worktree", "add", "-q", "-b", "lane", str(linked))
@@ -2869,14 +2868,14 @@ def test_board_lends_no_closed_item_size_to_an_unreadable_trailer_item(
 def test_start_under_state_ref_claims_the_worktree_it_builds(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #322 review finding 2, end to end under `storage = "state-ref"`
+    """End to end under `storage = "state-ref"`
     with a real bare remote and a real `refs/aco/state`: the claim `start`
     prints is the one the worktree it built reads back. That the claim's
     checks read the item as it stands after the fetch, never the snapshot
     `start`'s first read took, is
     `test_start_under_state_ref_checks_the_item_as_it_stands_after_the_fetch`.
     The claim is written from the built worktree, so its lineage stamp names
-    the claim's own commit (issue #479, CAS-09)."""
+    the claim's own commit (CAS-09)."""
     repo, _remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     item_id = items.format_item_id(314)
 
@@ -2975,7 +2974,7 @@ def test_status_and_brief_show_the_trunks_lane_shared_files_or_its_defect(
     defect: str | None,
     path_answer: str,
 ) -> None:
-    """Spec: STAT-19, STAT-20, STAT-21, STAT-22, STAT-23. Issue #586 lines 1-3 on a real
+    """Spec: STAT-19, STAT-20, STAT-21, STAT-22, STAT-23. On a real
     state-ref board: `status`, `status
     --json`, `brief` and `brief --json` name the trunk's lane-shared entries,
     an entry naming no tracked file marked so; `status --path` names a
@@ -3219,7 +3218,7 @@ def test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resu
     reported: str,
     worktree_stood: bool,
 ) -> None:
-    """Issue #479 (head ruling, START-25), issues #494, #498: once the
+    """START-25: once the
     claim's push was sent and the store cannot tell whether it was written
     -- its lineage stamp, the search for a push whose answer was lost, a
     push that timed out before or after it landed -- the worktree and branch
@@ -3343,7 +3342,7 @@ def test_start_removes_only_its_own_build_when_the_store_refuses_its_sent_push_f
     refusal: str,
     worktree_stood: bool,
 ) -> None:
-    """Issue #498 (START-18, CAS-57): the claim's push was sent and
+    """START-18, CAS-57: the claim's push was sent and
     rejected, and the store's re-read found nothing of it written -- a rival
     claim landed first, or the store rejected every retry -- so the refusal
     is certain: the worktree and branch `start` built go, one it found
@@ -3477,12 +3476,12 @@ def test_a_claim_whose_item_closes_after_its_checks_refuses_and_writes_nothing(
     close_at: Callable[[pytest.MonkeyPatch, Callable[[], object]], None],
     build_line: str | None,
 ) -> None:
-    """Issue #496 proof 2: the item is closed after the claim's checks judged
+    """The item is closed after the claim's checks judged
     it open; the claim's write finds the item's blob no longer the one
     checked and refuses with CAS-20's sentence -- no live claim ever stands
     on the closed item (CLM-31, START-27). The refusal is certain, so
     `start` removes its build whether or not the claim's push was sent
-    (START-18, issue #498); `claim` builds nothing."""
+    (START-18); `claim` builds nothing."""
     repo, bare_remote, open_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     argv = arrange(monkeypatch, repo, tmp_path)
     closed_oids: list[protocol.ObjectId] = []
@@ -3516,7 +3515,7 @@ def test_a_claim_whose_item_closes_after_its_checks_refuses_and_writes_nothing(
 def test_a_github_claim_lands_though_a_stale_ledger_item_changes_under_its_rejected_push(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #496 proof 3 (CAS-60): under `github` the forge holds the item's
+    """CAS-60: under `github` the forge holds the item's
     state, so an `items/` entry the ledger still carries pins nothing -- its
     close rejects the claim's first push and the retry lands the claim."""
     _use_real_store(monkeypatch)
@@ -3545,14 +3544,14 @@ def test_a_github_claim_lands_though_a_stale_ledger_item_changes_under_its_rejec
 def test_start_observes_the_state_ref_afresh_and_its_default_branch_after_the_fetch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, canonical_remote: str
 ) -> None:
-    """Issue #479 (CAS-55): the claim's checks observe the state ref again
+    """CAS-55: the claim's checks observe the state ref again
     once the trunk fetch is done, while the canonical remote the run
     already read stays held -- one read of it per directory `start` works
     in. The default branch the built worktree is judged against is read
     after that fetch, never one held from before it, since a fetch may
-    record or move the `HEAD` it names (issue #484 ruling). Both are the
+    record or move the `HEAD` it names. Both are the
     canonical remote's: a `hub` starts from its own recorded `HEAD` beside
-    an `origin` that never recorded one (issue #490)."""
+    an `origin` that never recorded one."""
     toplevel, _remote, _seeded_oid = _real_state_ref_start_scenario(
         monkeypatch, tmp_path, canonical_remote=canonical_remote
     )
@@ -3593,8 +3592,7 @@ def test_start_observes_the_state_ref_afresh_and_its_default_branch_after_the_fe
 def test_start_under_state_ref_checks_the_item_as_it_stands_after_the_fetch(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #322 review finding 2 (the fix's own gate), moved before the
-    build by issue #479: item #314 gains a `scope` after `start`'s
+    """Item #314 gains a `scope` after `start`'s
     item-existence read but while it fetches the trunk, exactly the window a
     caller-checkout-cached forge cannot see. The claim's checks read a fresh
     forge once the fetch is done and refuse the now-mismatched `--scope`; a
@@ -3970,7 +3968,7 @@ def test_claim_refuses_when_the_higher_priority_item_needs_refining(
 
 def test_claim_parser_description_names_what_refuses_first() -> None:
     """`claim --help` must not send an agent to the README for what refuses
-    first in practice (issue #201): the parser's own description, pinned at
+    first in practice: the parser's own description, pinned at
     the layer that produces it, names an isolated worktree on a non-main
     branch, a clean tree before the first edit, and --scope paths being
     repository-relative."""
@@ -3988,8 +3986,8 @@ def test_claim_parser_description_names_what_refuses_first() -> None:
 
 
 def test_help_lists_commands_in_their_stable_registration_order() -> None:
-    """`aco --help`'s command order is part of the CLI's own contract (issue
-    #372 R3): `cli._COMMANDS` keeps every command in its original position,
+    """`aco --help`'s command order is part of the CLI's own contract:
+    `cli._COMMANDS` keeps every command in its original position,
     including the forge-free and local commands."""
     parser = issue_claim._parser()
     subparsers_action = next(
@@ -4032,7 +4030,7 @@ def _all_parser_help_texts(parser: argparse.ArgumentParser) -> tuple[str, ...]:
 
 
 def test_no_registered_parser_reads_an_abbreviated_option() -> None:
-    """OUT-09 (issue #502): the root and every subcommand level refuse an
+    """OUT-09: the root and every subcommand level refuse an
     abbreviated long option, so a command registered later cannot forget it
     and a prefix never comes to stand for a destructive flag."""
     readers = [each.prog for each in _every_parser(issue_claim._parser()) if each.allow_abbrev]
@@ -4041,12 +4039,12 @@ def test_no_registered_parser_reads_an_abbreviated_option() -> None:
 
 
 def test_readme_and_help_texts_carry_no_stale_state_ref_read_only_sentence() -> None:
-    """Issue #292 proof 5: state-ref's write commands (`cut`/`rule`/`ask`/
-    `item new`/`item edit`/`item close`, issues #283/#285/#287/#289/#291)
+    """State-ref's write commands (`cut`/`rule`/`ask`/
+    `item new`/`item edit`/`item close`)
     are real; no README line and no `--help` text still calls the storage
     read-only, or names `item new`/`item edit`/`item close` as "not yet"
     built or "slice 4" future work. `state-ref`'s own still-true residual --
-    a merged release's landing verification (#230 slice 6) -- keeps its own
+    a merged release's landing verification -- keeps its own
     "not yet" sentence; this proof is about the write path itself, not that
     named residual."""
     readme = (Path(__file__).parent.parent / "README.md").read_text(encoding="utf-8")
@@ -4114,9 +4112,9 @@ def test_help_text_names_the_refusal_or_source_it_documents(
 ) -> None:
     """`claim --help` and `rescope --help` each name, in prose, the refusal
     or derivation source their own behaviour documents -- the out-of-order
-    and wide-scope refusals, and (issue #337 proof 4, REVISE finding 2)
+    and wide-scope refusals, and
     where an omitted `--scope` comes from; `next --help` names the label
-    that holds an item for the operator and how to set it (issue #562)."""
+    that holds an item for the operator and how to set it."""
     with pytest.raises(SystemExit) as exited:
         issue_claim.main([command, "--help"])
 
@@ -4531,8 +4529,7 @@ def test_claim_names_an_incomplete_body_even_when_the_item_is_also_blocked(
 ) -> None:
     """`item.actionable_reason` names only the first applicable reason
     (frozen, claimed, blocked, then incomplete) -- that must not mask the
-    incomplete-body refusal when another reason also applies (#112 finding
-    2, delta review)."""
+    incomplete-body refusal when another reason also applies."""
     blocker = board_issue(50, "Blocker", complete_contract("Ship it."))
     dependent = board_issue(
         51, "Dependent", complete_contract("", now="Work.", done_when=""), blocked_by_count=1
@@ -4573,14 +4570,14 @@ CUT_CONTAINER = 79
 
 def _cuttable_row_toml(title: str) -> str:
     """A complete block with one `[[slice]]` row, `index = 1`, carrying the
-    `done_when` `cut` needs (issue #606) -- the container block every
+    `done_when` `cut` needs -- the container block every
     one-row cut scenario starts from."""
     return f'{MINIMAL_BLOCK_TOML}[[slice]]\nindex = 1\ntitle = "{title}"\ndone_when = "D"\n'
 
 
 def _cuttable_slice_entries(*titles: str) -> list[dict[str, object]]:
     """`slice_entries(*titles)`, each row carrying the `done_when` `cut`
-    needs (issue #606)."""
+    needs."""
     return [{**entry, "done_when": "D"} for entry in slice_entries(*titles)]
 
 
@@ -4640,12 +4637,12 @@ def test_cut_never_adopts_an_orphan_that_is_not_this_containers_recovery_shape(
     orphan: Issue,
     idea_label: str | None,
 ) -> None:
-    """A title match alone is too weak to adopt an orphan (#260): a
+    """A title match alone is too weak to adopt an orphan: a
     human-filed issue, an idea, the container's own issue, or another
     container's own failed-cut orphan can all share the row's exact title
     without being this container's recovery shape, so `cut` creates a fresh
     child instead of silently re-parenting any of them -- once the caller
-    has said the look-alike is no twin (issue #444)."""
+    has said the look-alike is no twin."""
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(_one_slice_container(),))
     _write_block_pin(tmp_path)
     if idea_label is not None:
@@ -4692,9 +4689,9 @@ def _client_with_item(
 def test_cli_claim_reports_invalid_usage_when_repo_is_given_under_state_ref(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """A wide `--scope` with no `--whole` reads the item's own body for one
-    (issue #399), resolving the forge before `cmd_claim.run`'s own typed-
-    refusal handlers ever see it (issue #406): under `storage = state-ref`,
+    """A wide `--scope` with no `--whole` reads the item's own body for one,
+    resolving the forge before `cmd_claim.run`'s own typed-
+    refusal handlers ever see it: under `storage = state-ref`,
     `--repo` is the wrong flag for this run, reported as `invalid_usage`
     rather than the generic `unavailable` bucket -- the same distinction
     `ask`/`rule`/`brief` already draw."""
@@ -4747,7 +4744,7 @@ def test_next_prints_a_cut_command_bash_runs_as_printed_and_cut_accepts(
     tmp_path: Path,
     slice_title: str,
 ) -> None:
-    """Issues #510 line 1 and #604 line 4: the `cut` line `next` prints runs
+    """The `cut` line `next` prints runs
     unchanged in a real shell and names no title, so `cut` gives the child
     the row's own title whatever it holds -- a leading `-` included."""
     toml_text = (
@@ -4770,11 +4767,11 @@ def test_next_prints_a_cut_command_bash_runs_as_printed_and_cut_accepts(
 def test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """#177: a block container whose own `next` line still names work in
+    """A block container whose own `next` line still names work in
     its own words, while its first uncut `[[slice]]` entry carries a
     different title, must still print a `cut` command that `cut` itself
     accepts and that links exactly that entry. Without `--row`, `cut` links
-    the first uncut entry and takes that entry's own title (#604), so the
+    the first uncut entry and takes that entry's own title, so the
     printed command names the container alone -- no title, so the `next`
     line's prose can never reach the child -- while the action line above
     it keeps naming the container's own words. `next
@@ -4782,7 +4779,7 @@ def test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line(
     step, `cut_title` is the title `cut` accepts -- a JSON consumer must
     build `--title` from `cut_title`, never `slice` (the README used to say
     otherwise). The child each cut writes carries `cut`'s own fixed `next`
-    (CUT-25, issue #606), never the container's `next` line."""
+    (CUT-25), never the container's `next` line."""
     toml_text = (
         f'version = 1\nnow = "N"\nnext = "{_DIFFERING_NEXT_LINE}"\ndone_when = "D"\n'
         '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "D"\n'
@@ -5093,7 +5090,7 @@ def test_board_reads_priority_configuration_from_the_checkout_root(
 def test_next_names_a_cuttable_container_slice(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Exact `cut_slice #N: …` text, per #112's own body example."""
+    """Exact `cut_slice #N: …` text."""
     container = Issue(
         180,
         "Epic",
@@ -5118,17 +5115,17 @@ def test_next_names_a_cuttable_container_slice(
 
 
 # A `Next` line whose own prose never matches any slice-table row title used
-# below -- the shape #177 fixes: a container whose Next line and first uncut
+# below -- a container whose Next line and first uncut
 # row disagree.
 _DIFFERING_NEXT_LINE = "Weitere Aufgabe."
 
 
 @dataclass(frozen=True)
 class _CutRoundTripCase:
-    """One #151 round-trip scenario for a container whose block still
+    """One round-trip scenario for a container whose block still
     carries an undispatched `[[slice]]` row: the `cut` command `next` prints
-    for `container_number` must be one `cut` itself accepts. Since issue
-    #208, that row is the only thing that makes `next` print a `cut`
+    for `container_number` must be one `cut` itself accepts.
+    That row is the only thing that makes `next` print a `cut`
     command at all -- a container with no uncut row is never one of these
     cases, whatever its `Next` line says (see
     `test_next_names_a_container_with_no_slice_row_by_its_own_next_line` for
@@ -5160,18 +5157,18 @@ def _uncut_row_case(
 
 
 _CUT_ROUND_TRIP_CASES = (
-    # next=no, uncut=yes -- an uncut row on its own already qualifies (#151).
+    # next=no, uncut=yes -- an uncut row on its own already qualifies.
     _uncut_row_case("uncut_row_only", 184, "", "Scheibe E"),
-    # next=yes, uncut=yes, and they disagree -- #177 itself: seven live
+    # next=yes, uncut=yes, and they disagree -- seven live
     # atelier-2 containers where `next` printed the `Next` line's prose and
     # `cut` refused it, because the row it actually links carries a
     # different title.
     _uncut_row_case("next_and_differing_uncut_row", 186, _DIFFERING_NEXT_LINE, "Scheibe F"),
     # The remaining combinations -- no uncut row, whether or not the `Next`
     # line still names work -- close the container instead of cutting a
-    # slice (issue #208: an empty slice table, with or without a `slice` key
-    # at all, is the typed statement that there is nothing here to cut, and
-    # #122 is what happened when a fallback ignored it), so they have no
+    # slice (an empty slice table, with or without a `slice` key
+    # at all, is the typed statement that there is nothing here to cut),
+    # so they have no
     # `cut` command to round-trip; `test_next_names_a_closeable_container`
     # and `test_next_names_a_container_with_no_slice_row_by_its_own_next_line`
     # prove those instead.
@@ -5185,7 +5182,7 @@ def test_next_prints_a_cut_command_that_cut_accepts(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """#151's own invariant, completed by #177: whatever `cut` command
+    """Whatever `cut` command
     `next` prints for a childless container is one `cut` itself accepts."""
     container = Issue(
         case.container_number,
@@ -5224,10 +5221,10 @@ def test_next_prints_a_cut_command_that_cut_accepts(
 def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """#177 (independent counter-check, 06.09.2026): `next` only ever proves
+    """`next` only ever proves
     the round-trip invariant for the single top-ranked container a board
-    carries -- exactly how this repository's own #122 sat with a disagreeing
-    `Next` line and first uncut row unnoticed, since only one container's
+    carries,
+    since only one container's
     printed command is ever checked per poll. This walks every container a
     real, multi-container board carries, deriving each one's own printed
     `cut` command through the public `workboard.next_action` path -- each container
@@ -5353,7 +5350,7 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
     slice_titles: tuple[str, ...],
     repair: str,
 ) -> None:
-    """Issue #503, the #299 shape: a container that is itself a child, its
+    """A container that is itself a child, its
     own children closed and an uncut `[[slice]]` row left. `cut` refuses it
     whatever its parent's type, state, or repository, so `next` never prints
     that `cut` -- it names the container's repair under `SKIPPED` instead,
@@ -5420,13 +5417,12 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
     top_level_scope: tuple[str, ...] | None,
     expected_claim: str,
 ) -> None:
-    """Issue #510 line 3: a nested container's one row carrying a scope gets
+    """A nested container's one row carrying a scope gets
     a claim on exactly those paths -- or, when the container names its own
     top-level `scope`, the bare claim that derives it (NEXT-03) -- and once
     retyped `next`'s own `Run:` line names that same claim, which runs
     unchanged in a real shell, and the parallel tail reads the paths that
-    claim occupies instead of collapsing to unknown (NEXT-16; #310 finding
-    168)."""
+    claim occupies instead of collapsing to unknown (NEXT-16)."""
     row_scope = ("docs/nested.md", "src/it's here.py")
     row = [{"index": 1, "title": "Scheibe Z", "scope": list(row_scope)}]
     nested_contract = (
@@ -5564,7 +5560,7 @@ def test_next_advises_a_pull_that_runs_as_printed_where_it_stands(
     expected_run: str,
     expected_branch: str,
 ) -> None:
-    """Issues #562 line 1 and #566 lines 1-2: from the default branch's
+    """From the default branch's
     checkout, where `claim` refuses, `next` advises `start` with the slug
     `start` derives from the title, else the item id's own; from a linked
     lane worktree it advises `claim`. A scope the width gate calls wide --
@@ -5648,7 +5644,7 @@ def test_state_ref_next_prints_cuts_bash_runs_as_printed_and_cut_accepts(
     tmp_path: Path,
     advice_marker: str,
 ) -> None:
-    """Issues #513 lines 1 and 4, #604 line 4: under a state-ref board a slice
+    """Under a state-ref board a slice
     title starting with `-` still reaches the child whole, and a second
     cuttable container behind the first action is named under `SKIPPED` with
     its own `cut`, never `container; claim a child` -- each command running
@@ -5703,7 +5699,7 @@ def test_state_ref_next_names_a_slice_row_line_with_a_control_character_instead_
     field: str,
     text: str,
 ) -> None:
-    """Issues #513 line 2, #517 line 3, #532 line 2 and #606 line 3: a first
+    """A first
     uncut row whose title or `done_when`, stored before `item edit` refused
     it, holds a line break or another control character would split the
     printed `cut` over two lines, hand it to the terminal raw, or be refused
@@ -5728,7 +5724,7 @@ def test_state_ref_next_names_a_slice_row_line_with_a_control_character_instead_
 
 
 def _raw_terminal_controls(text: str) -> set[str]:
-    """Every character of issues #538 and #540's ruled display-control set in
+    """Every character of the ruled display-control set in
     printed `text`, apart from the newlines that end its own lines: C0 but
     TAB, DEL, C1, U+2028/2029, the bidi controls, the Arabic letter mark,
     the zero-width characters, the word joiner and the tag characters, by
@@ -5843,7 +5839,7 @@ def test_state_ref_next_text_hands_the_terminal_no_raw_control_character(
     item_bodies: Callable[[], dict[int, str]],
     escaped_line: str,
 ) -> None:
-    """Issue #532 lines 1 and 2: whatever `next` prints -- a work item, a
+    """Whatever `next` prints -- a work item, a
     `cut_slice` or `check_container` action, a `SKIPPED` reason -- carries
     no control character a terminal would act on, each shown as its escape,
     and a slice title in `SKIPPED` prose sits inside a quote its own `"`
@@ -5862,7 +5858,7 @@ def test_state_ref_next_text_hands_the_terminal_no_raw_control_character(
 def test_state_ref_next_json_shares_the_quoted_skipped_prose(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Issue #532 line 3 (head ruling of 27.09.2026): the `SKIPPED` reason is
+    """The `SKIPPED` reason is
     prose text and `--json` share, so its quoted slice title carries `"` and
     `\\` escaped."""
     issue_claim.main(["next", "--json"])
@@ -5920,7 +5916,7 @@ def test_state_ref_next_shows_foreign_title_and_next_line_as_its_format_carries_
     read_title_and_next: Callable[[str], tuple[str, str]],
     shown: tuple[str, str],
 ) -> None:
-    """Issues #532 lines 1 and 3, #538 line 2, #540 line 2: text shows each
+    """Text shows each
     control character, U+2028, RLO, LRI, ZWSP, U+061C, U+2060 and a tag
     character as its printable escape, TAB, NBSP and the Umlaut as they are;
     `--json` leaves escaping to JSON, so a reader gets both back exactly as
@@ -6021,7 +6017,7 @@ def test_one_line_printers_show_foreign_text_as_next_escapes_it(
 ) -> None:
     """Spec: RUL-02, RUL-11 -- text controls and folded summaries.
 
-    Issue #540 lines 1 and 2: `release`'s `next:` line, the `rulings`
+    `release`'s `next:` line, the `rulings`
     text, `claim`'s out-of-order warning and the board configuration's
     unknown-key refusal show RLO, U+061C, U+2060 and a tag character as
     their printable escapes, while TAB and the Umlaut stay as they are;
@@ -6136,12 +6132,12 @@ def test_body_and_brief_config_printers_show_foreign_text_as_next_escapes_it(
     arrange: Callable[[pytest.MonkeyPatch, Path], list[str]],
     shown_as: str,
 ) -> None:
-    """Issue #544 lines 1-3: `brief` and `item show` print a stored body
+    """`brief` and `item show` print a stored body
     with ESC, RLO and U+2060 as their printable escapes while its line
     feeds, TAB and Umlauts stay; the brief configuration's unknown-key
     refusals and `brief --step`'s rules and checks escape the line feed
     too, as every one-line printer does (BRIEF-23, ITEM-56, BRIEF-24;
-    issue #548 line 1, BRIEF-25)."""
+    BRIEF-25)."""
     block = "Hallo\\x1b[2J Welt\tÜber\\u202eRLO\n\\u2060WJ Größe"
     line = "Hallo\\x1b[2J Welt\tÜber\\u202eRLO\\n\\u2060WJ Größe"
     arguments = arrange(monkeypatch, tmp_path)
@@ -6178,7 +6174,7 @@ def test_brief_config_unknown_key_json_refusal_carries_the_escaped_key(
     arrange: Callable[[pytest.MonkeyPatch, Path], list[str]],
     refusal_after_path: str,
 ) -> None:
-    """Issue #544 line 3: under `--json` the brief configuration's
+    """Under `--json` the brief configuration's
     unknown-key refusal is the `unavailable` envelope, its message and
     stderr naming the key as `next` escapes it (BRIEF-24, BRIEF-17)."""
     arguments = arrange(monkeypatch, tmp_path)
@@ -6210,7 +6206,7 @@ def test_foreign_text_printers_json_keep_the_foreign_lines_as_stored(
     arrange: Callable[[pytest.MonkeyPatch, Path], list[str]],
     key: str,
 ) -> None:
-    """Issue #544 line 2, issue #548 line 1: `--json` leaves a body's, a
+    """`--json` leaves a body's, a
     rule's and a check's escaping to JSON, so a reader gets the foreign
     lines back exactly as stored (BRIEF-23, ITEM-56, BRIEF-25): in the
     body, or as one whole `rules`/`checks` entry."""
@@ -6224,7 +6220,7 @@ def test_foreign_text_printers_json_keep_the_foreign_lines_as_stored(
 def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #513 line 3: a nested container's repair names a claim that the
+    """A nested container's repair names a claim that the
     ordering rule would refuse while a higher-ranked item is free, so it
     carries `--out-of-order <reason>`; filled in, the retype and the claim
     both run unchanged in a real shell and succeed."""
@@ -6273,7 +6269,7 @@ def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item
 def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_does_not_warn(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #553 lines 1-3: the record's `needs-operator` label keeps the
+    """The record's `needs-operator` label keeps the
     top-ranked item out of `next`'s pull and `claim`'s precedence check;
     `next` names it on its own line, and the pullable item claims as
     printed, without `--out-of-order`."""
@@ -6312,7 +6308,7 @@ def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_doe
 def test_state_ref_next_json_names_items_by_the_ids_its_text_prints(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #513 line 5: under a state-ref board every item `next --json`
+    """Under a state-ref board every item `next --json`
     names -- the action, a `parallel` candidate, a `scope_unknown` one, a
     `close` one, a `skipped` one -- is the `aco-xxxxxx` id the text prints,
     never the integer behind it."""
@@ -6441,12 +6437,12 @@ def test_next_json_names_a_closeable_container(
 def test_next_names_a_container_with_no_slice_row_by_its_own_next_line(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #208, reproduced live at #122: an empty slice table is the
+    """An empty slice table is the
     typed statement that there is nothing here to cut, even though the
     container's own `Next` line still names real work. `next` must not
     fabricate `cut --title "<the whole Next paragraph>"` from that prose,
-    nor list it under `close:` while that sentence names work (issue #503,
-    the #418 shape after a slice landed): it names the container for a
+    nor list it under `close:` while that sentence names work:
+    it names the container for a
     `done_when` check and its own sentence, and no command."""
     container = Issue(
         187,
@@ -6474,7 +6470,7 @@ def test_next_names_a_container_with_no_slice_row_by_its_own_next_line(
 def test_next_json_names_a_container_with_no_slice_row_by_its_own_next_line(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """The JSON form of the same #208/#503 case: `reason` is
+    """The JSON form of the same case: `reason` is
     `check_container`, never `close_container` while the `Next` line names
     work; `next_step` carries that sentence, `close` stays empty, and no
     `command` or `cut_title` is invented from it."""
@@ -6508,7 +6504,7 @@ def test_next_json_names_a_container_with_no_slice_row_by_its_own_next_line(
 def test_next_caps_the_parallel_text_list_at_three_and_counts_the_rest(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """issue #348, Beweis 1 (text cap): five mutually disjoint candidates --
+    """Text cap: five mutually disjoint candidates --
     the text form names only the first three, in board order, plus a
     trailing count; `--json` still carries every one with its full scope."""
     alpha = board_issue(60, "Alpha", complete_contract("Ship Alpha.", scope=["alpha/a.py"]))
@@ -6542,7 +6538,7 @@ def test_next_caps_the_parallel_text_list_at_three_and_counts_the_rest(
 def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """issue #348, Beweis 2: a cut proposal's own uncut-row scope is what
+    """A cut proposal's own uncut-row scope is what
     `workboard.parallel_set` occupies and checks disjointness against -- exactly like
     a work item's top-level scope, never a second rule. `#82`'s row repeats
     `#80`'s own path and is dropped silently, the same way an overlapping
@@ -6646,12 +6642,12 @@ def test_next_lists_a_labelled_idea_with_a_merged_pull_request_only_under_ideas(
 def test_next_close_names_every_zero_cost_action_regardless_of_rank(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """issue #348, Beweis 3 (#310 finding 29): a closable container ranked
+    """A closable container ranked
     well below the board's top row, and a landed-but-open recovery item,
     both still appear under `close:` -- unconditionally, never gated by
     which row `next` happens to recommend -- and, named there, never again
-    under `SKIPPED` (issue #510 line 2), nor under `waiting on operator:`
-    when the landed item still carries `needs-operator` (issue #562 line 2)."""
+    under `SKIPPED`, nor under `waiting on operator:`
+    when the landed item still carries `needs-operator`."""
     top_ranked = board_issue(
         70,
         "Top ranked work",
@@ -6713,7 +6709,7 @@ _RECOVERY_SHARED_SCOPE = "b"
 def test_next_parallel_set_never_lets_a_recovery_item_occupy_or_candidate(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """issue #348 review (G1): a landed-but-open item is `workboard.zero_cost_closes`'
+    """A landed-but-open item is `workboard.zero_cost_closes`'
     own domain, never `workboard.parallel_set`'s. `landed_but_open` (#71) and
     `free_item` (#72) name the same scope, and board order visits #71
     first -- pre-fix, the walk occupied that scope for #71 and silently
@@ -6864,7 +6860,7 @@ def test_board_shows_freed_from_a_sole_closed_local_dependency_and_claim_reaches
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """A complete block item whose sole dependency is closed passes body
-    checks and reaches claim mutation (#150 §6/§10): FREED on the projection,
+    checks and reaches claim mutation: FREED on the projection,
     and `claim` (without `--out-of-order`) actually posts a claim comment
     through the fake, not just a non-blocked projection."""
     closed_dependency = (
@@ -6945,7 +6941,7 @@ def test_blocked_check_reports_a_foreign_dependency_and_the_out_of_order_warning
 
 
 def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> None:
-    """Issue #300 (Codex Terra review): a same-repository blocker prints
+    """A same-repository blocker prints
     `workboard.item_label`'s own `aco-...` id under `storage = STATE_REF`, the
     same as everywhere else that pin already changes narrative output --
     never the bare `#n` GitHub uses."""
@@ -7259,8 +7255,8 @@ def test_status_scope_index_never_rescans_scope_pairs(
 def _write_state_ref_pin(toplevel: Path) -> None:
     """`.aco/board.toml` pinned to `storage = "state-ref"` in
     `toplevel`: the isolated toplevel `_isolate_git_toplevel` (conftest.py)
-    already redirects this process's `rev-parse --show-toplevel` to (issue
-    #248), or a repository `redirect_toplevel` points it at."""
+    already redirects this process's `rev-parse --show-toplevel` to,
+    or a repository `redirect_toplevel` points it at."""
     write_repository_config(toplevel, 'storage = "state-ref"\n')
 
 
@@ -7268,7 +7264,7 @@ def test_lazy_forge_builds_a_state_ref_board_under_the_state_ref_pin(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The `session.RunContext`'s forge chooses its adapter by the repository's own `storage`
-    pin (issue #248), never by the canonical remote's host: a state-ref
+    pin, never by the canonical remote's host: a state-ref
     pin must never build a `github.GitHubForge`, even when nothing else
     about the checkout looks unusual."""
     _write_state_ref_pin(tmp_path)
@@ -7287,7 +7283,7 @@ def test_repo_is_refused_under_the_state_ref_pin(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """`--repo` names a GitHub target; under `storage = "state-ref"` there
-    is no host-based target to override (issue #248), refused before this
+    is no host-based target to override, refused before this
     ever resolves a repository identity or touches the state ref."""
     _write_state_ref_pin(tmp_path)
 
@@ -7309,7 +7305,7 @@ def test_cli_board_family_reports_invalid_usage_when_repo_is_given_under_state_r
     """Spec: BOARD-42, PIN-04, RUL-09, E-RUL-06 -- state-ref refuses --repo.
 
     PIN-04, cited by BOARD-01/02 (`specs/board.spec.md`) and reused by
-    `rulings`/`next` (issue #412): all three resolve the same `RunContext.forge`
+    `rulings`/`next`: all three resolve the same `RunContext.forge`
     `board` does, so `--repo` under `storage = state-ref` reports the same
     `invalid_usage` `ask`/`rule`/`brief` already do, never their broad
     `unavailable` catch-all."""
@@ -7333,8 +7329,8 @@ def test_cli_board_family_reports_unavailable_for_a_forge_adapter_failure(
 ) -> None:
     """Spec: RUL-09, BOARD-02 -- adapter failure reports unavailable.
 
-    The same generic catch-all `ask`/`rule`/`brief` already fall to
-    (issue #412): a forge adapter construction failure that is not
+    The same generic catch-all `ask`/`rule`/`brief` already fall to:
+    a forge adapter construction failure that is not
     `session.RepoMeaninglessUnderStateRefError` reports `unavailable`, never
     `invalid_usage`, for `board`, `rulings`, and `next` alike."""
     monkeypatch.setattr(
@@ -7354,7 +7350,7 @@ def test_cli_board_family_reports_unavailable_for_a_forge_adapter_failure(
 class _RefusingItemWriter:
     """`state_board.ItemWriter` for a landing test: `release --merged
     <sha>` under `storage = "state-ref"` folds its item write into one
-    atomic `protocol.LandingIntent` (issue #359) and never calls
+    atomic `protocol.LandingIntent` and never calls
     `state_board.StateRefBoard`'s own injected writer at all -- a call reaching this is
     the test's own defect, not behaviour under test."""
 
@@ -7414,7 +7410,7 @@ _UNRELATED_LANDING_ITEM_ID = "aco-000014"
 
 
 def _landing_repository(tmp_path: Path) -> Path:
-    """A real `origin`-backed repository (issue #359) whose `main` carries,
+    """A real `origin`-backed repository whose `main` carries,
     in first-parent order: a merge commit trailer-naming item `aco-00000a`
     (#10), a squash commit whose trailer repeats `Work-Item:` for #11 and
     #12, and a commit landed through a real `git rebase` naming #13 --
@@ -7467,7 +7463,7 @@ def _landing_scenario(
     unrelated_blocked_by: tuple[str, ...] = (),
     foreign_entry: str | None = None,
 ) -> tuple[Path, state_board.StateRefBoard]:
-    """The shared fixture every atomic-landing test builds on (issue #359):
+    """The shared fixture every atomic-landing test builds on:
     `storage = "state-ref"`, a real trunk history (`_landing_repository`),
     a fake `state_board.StateRefBoard` over the three items it lands, a live claim on
     each, and a matching fake store whose `ClaimState.items` agrees with
@@ -7475,8 +7471,8 @@ def _landing_scenario(
     path) and `prepare_landing`/`mark_landed` (`state_board.py`'s) are
     exercised together, exactly as a real run composes them.
     `unrelated_blocked_by`, when given, seeds one further unclaimed item
-    carrying exactly those stored blockers (issue #546); `foreign_entry`,
-    one further `items/` entry whose file name names no item (issue #565)."""
+    carrying exactly those stored blockers; `foreign_entry`,
+    one further `items/` entry whose file name names no item."""
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo = _landing_repository(tmp_path)
     _write_state_ref_pin(repo)
@@ -7536,7 +7532,7 @@ def test_release_merged_closes_and_releases_atomically_under_the_state_ref_pin(
     landing_ref: str,
     use_sha: bool,
 ) -> None:
-    """Issue #359, LAND-47/LAND-52 (Beweis 1): a merge, squash, or rebase
+    """LAND-47/LAND-52: a merge, squash, or rebase
     landing carrying `Work-Item:`/`aco-xxxxxx` in the trunk closes its item
     and releases its claim in one commit, one CAS, whether `--merged` names
     the exact sha or is given bare (the newest trunk commit naming this
@@ -7585,7 +7581,7 @@ def test_release_merged_under_state_ref_hints_a_runnable_board_read_beside_an_un
     refusal: str,
     as_json: bool,
 ) -> None:
-    """Issue #546 (LAND-65, PIN-17, PIN-34): an unrelated item whose stored
+    """LAND-65, PIN-17, PIN-34: an unrelated item whose stored
     blockers the board read refuses -- one `items/` lacks, or one named
     twice -- leaves the committed landing standing and prints one neutral
     hint naming no forge, whose advice bash runs as printed and which reads
@@ -7611,7 +7607,7 @@ def test_release_merged_under_state_ref_hints_a_runnable_board_read_beside_an_un
 def test_release_merged_refuses_beside_an_items_entry_that_names_no_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """PIN-13, PIN-36 (issue #565): `release --merged` refuses by the
+    """PIN-13, PIN-36: `release --merged` refuses by the
     foreign entry's name before it closes the item or releases its claim."""
     _repo, client = _landing_scenario(monkeypatch, tmp_path, foreign_entry="NOTANID")
 
@@ -7629,7 +7625,7 @@ def test_release_merged_refuses_beside_an_items_entry_that_names_no_item(
 def test_release_merged_refuses_a_trunk_item_the_state_ref_has_no_entry_for(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Issue #359/CI: the squash commit's trailer names both `#11` and
+    """The squash commit's trailer names both `#11` and
     `#12` (LAND-02), but `_landing_scenario` seeds the state ref with only
     `#11`'s own item -- `release --merged` for `#12` refuses by name,
     before any claim or write, rather than crashing on a decode miss."""
@@ -7659,7 +7655,7 @@ def test_release_merged_refuses_a_landing_it_cannot_verify_under_the_state_ref_p
     landing_ref: str,
     reason: str,
 ) -> None:
-    """Issue #359, LAND-52 (Beweis 2): a commit with no trailer, one naming
+    """LAND-52: a commit with no trailer, one naming
     a different item, or one outside the first-parent trunk all refuse by
     name, close nothing, and leave the claim live."""
     repo, client = _landing_scenario(monkeypatch, tmp_path)
@@ -7676,7 +7672,7 @@ def test_release_merged_refuses_a_landing_it_cannot_verify_under_the_state_ref_p
     assert protocol.claim_key(protocol.IssueIdentity(10), "") in remaining
 
 
-# --- Real `file://` state-ref proofs (issue #359 R3) ------------------------
+# --- Real `file://` state-ref proofs ------------------------
 #
 # Every test above this point patches `store.fetch_state`/`commit_transition`
 # with `_FakeStore` (`_landing_scenario`): it proves this module's own CLI
@@ -7822,7 +7818,7 @@ def test_a_failed_trunk_read_refuses_with_gits_text_instead_of_guessing(
     command: list[str],
     failing_read: list[str],
 ) -> None:
-    """The caller matrix of issue #244 against real trunk history: git
+    """The caller matrix against real trunk history: git
     failing to read `<remote>/HEAD` is never a remote that recorded none, nor
     a failing commit read a checkout with no commit, so no command falls
     back to `<remote>/main`, judges against it, or prints `cannot resolve
@@ -7899,7 +7895,7 @@ def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """Issue #359 R3: a real `file://` proof of Beweis 1 -- one landing is
+    """A real `file://` proof of Beweis 1 -- one landing is
     exactly one new commit on `refs/aco/state` whose tree closes the item
     and drops the claim -- and of the replay case `_FakeStore` cannot see: a
     second `release` naming the released claim refuses it as gone (REL-09),
@@ -7943,7 +7939,7 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
     tmp_path: Path,
     as_json: bool,
 ) -> None:
-    """Issue #605 lines 1 and 3 under `storage = "state-ref"`: a release
+    """Under `storage = "state-ref"`: a release
     whose lane worktree lives elsewhere names the line that repeats its
     cleanup there; run as printed once the claim is gone, it verifies the
     trunk commit, closes nothing, moves `refs/aco/state` not at all, and
@@ -8069,7 +8065,7 @@ def test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_
     tmp_path: Path,
     reclaim_on: str | None,
 ) -> None:
-    """Issue #611 lines 1 to 3: a lane lands on its branch, its claim is
+    """A lane lands on its branch, its claim is
     abandoned, the item stays open and may be claimed again; the old
     landing's rerun then refuses that newer claim by name -- on another
     branch (REL-48), or on the landed branch from a trunk that already holds
@@ -8141,7 +8137,7 @@ def test_release_merged_rerun_under_state_ref_refuses_a_newer_claim_before_judgi
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """Issue #611: the claim decision comes before the close write is
+    """The claim decision comes before the close write is
     prepared, so a rerun of a landing whose item is already closed still
     names the newer claim on another branch (REL-48) rather than the closed
     item, and moves `refs/aco/state` not at all."""
@@ -8168,7 +8164,7 @@ def test_release_merged_rerun_under_state_ref_refuses_a_newer_claim_before_judgi
 def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #359 R3: an unrelated writer lands on `refs/aco/state` between
+    """An unrelated writer lands on `refs/aco/state` between
     this transition's own fetch and its first push attempt -- the real,
     non-fast-forward rejection `commit_transition`'s retry loop exists for.
     The retry refetches, reapplies on top of the racer's own commit, and
@@ -8230,7 +8226,7 @@ def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
 def test_item_close_refuses_a_claim_that_lands_between_its_first_attempt_and_the_retry(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #459 proof 1: a claim lands on the item after the close read an
+    """A claim lands on the item after the close read an
     unclaimed state and before its first push, so that push is rejected; the
     retry re-applies the close to the fresh state, meets the live claim, and
     refuses with PIN-26's sentence -- the item stays open, the claim stays."""
@@ -8287,7 +8283,7 @@ def _claim_pinned_to_item(issue: int, open_oid: protocol.ObjectId) -> protocol.C
 def test_a_pinned_claim_refuses_once_its_item_closes_between_its_rejection_and_retry(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #496 proof 1: a close lands after the claim's checks read the
+    """A close lands after the claim's checks read the
     item open and before its first push, so that push is rejected; the retry
     applies the claim to the fresh state, finds the item's blob no longer
     the pinned one, and refuses with CAS-20's sentence -- the item stays
@@ -8333,7 +8329,7 @@ def test_a_pinned_claim_refuses_once_its_item_closes_between_its_rejection_and_r
 def test_a_pinned_claim_on_an_unchanged_open_item_lands_past_an_unrelated_racer(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #496 proof 1: a racer that leaves the item's blob untouched
+    """A racer that leaves the item's blob untouched
     rejects the claim's first push as before, and the retry lands the claim
     with its pin intact."""
     worktree, bare_remote = _reset_repository(monkeypatch, tmp_path)
@@ -8358,7 +8354,7 @@ def test_a_pinned_claim_on_an_unchanged_open_item_lands_past_an_unrelated_racer(
 def test_landing_intent_refuses_a_stale_item_oid_without_writing_anything(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #359 R3: a `protocol.LandingIntent` built from a stale `item_expected`
+    """A `protocol.LandingIntent` built from a stale `item_expected`
     (someone else edited the item after this caller's own read) refuses by
     name, the same CAS discipline `protocol.ItemWriteIntent` already proves, and
     writes nothing -- the claim stays live and the item stays open on the
@@ -8404,7 +8400,7 @@ def test_release_merged_under_the_state_ref_pin_requires_an_issue(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """Issue #359: an issue-less lane has no state-ref item to close, so
+    """An issue-less lane has no state-ref item to close, so
     `--merged` under `storage = "state-ref"` refuses it by name rather than
     resolving a trunk walk that could never apply."""
     _write_state_ref_pin(tmp_path)
@@ -8434,7 +8430,7 @@ def test_cli_rescope_from_the_primary_checkout_points_back_at_the_claims_worktre
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The reported bug (#211): a held claim's worktree already exists, so
+    """A held claim's worktree already exists, so
     running `rescope` from the primary checkout on `main` must not send an
     agent to build a second one. No branch is known from `main`, so the
     refusal names none."""
@@ -8488,7 +8484,7 @@ def test_cli_claim_from_the_primary_checkout_still_names_the_create_recipe(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """`claim`'s refusal is unchanged by #211 -- pinned here through the real
+    """`claim`'s refusal is pinned here through the real
     command, alongside `rescope`'s corrected sentence above, since a fresh
     claim genuinely has no worktree yet to return to."""
     client = FakeForge()
@@ -8603,7 +8599,7 @@ def _parse_claim_command(*flags: str):
         ((), git_checkout(branch="main"), "isolated non-main worktree branch"),
         # `master` is not this repository's default branch (`git_checkout`'s
         # `origin/HEAD` resolves to `main`), so it binds like any other
-        # non-default branch (issue #238) -- the fallback-denied case for an
+        # non-default branch -- the fallback-denied case for an
         # unresolvable `origin/HEAD` is pinned separately, in
         # test_claim_default_branch_fallback_denies_only_main_and_master.
         ((), git_checkout(branch="master"), None),
@@ -8675,7 +8671,7 @@ def test_selected_store_claim_refuses_a_lane_identity_without_a_branch() -> None
 
 
 def test_claim_scope_is_optional_at_the_argparse_layer_for_issue_mode() -> None:
-    """Issue #337: `required=True` is gone from `--scope` -- issue mode
+    """`required=True` is gone from `--scope` -- issue mode
     derives it from the item body when omitted, so argparse itself must
     accept the omission; `cmd_claim.run`'s own runtime checks (lane mode still
     requiring it, issue mode refusing a body with no scope) are proven
@@ -8700,7 +8696,7 @@ def test_cli_claim_role_argparse_default_unchanged_and_release_omits_role() -> N
 
 
 def test_release_merged_bare_flag_parses_as_the_empty_sentinel() -> None:
-    """`release --merged` with no value (issue #359): the state-ref "pick
+    """`release --merged` with no value: the state-ref "pick
     the newest trunk landing" form -- distinct from omitting `--merged`
     altogether, which `--abandoned`'s own required-group partner still
     catches."""
