@@ -69,7 +69,7 @@ def stub_one_git_call(
     """Force exactly one `checkout._git_run` argv -- in `directory` only,
     when given -- to a chosen failure exit,
     every other call reaching the real launcher -- shared by
-    checkout and CLI test families (issue #322): a git-level failure
+    checkout and CLI test families: a git-level failure
     (an unreachable remote, a colliding worktree path, an unmerged branch
     `git branch -d` itself refuses, ...) is cheaper to force this way than
     to reproduce with real git state.
@@ -157,7 +157,7 @@ RECORDED_ORIGIN_HEAD_READ = recorded_head_read("origin")
 def trunk_git_calls(monkeypatch: pytest.MonkeyPatch, remote: str) -> list[tuple[str, Path]]:
     """Every `fetch <remote>` and every read of `<remote>`'s recorded `HEAD`
     the one git launcher runs from here on, in order, each keyed by the
-    directory git ran in (issue #488): a count at the launcher sees every
+    directory git ran in: a count at the launcher sees every
     trunk reader, whichever function asked."""
     watched = {("fetch", remote): "fetch", recorded_head_read(remote): "recorded head"}
     calls: list[tuple[str, Path]] = []
@@ -179,7 +179,7 @@ def landed_from_another_clone(tmp_path: Path, *git_step: str) -> str:
     """The tip a second clone of `tmp_path`'s bare `remote.git`
     (`real_repository_with_bare_remote`) pushes to its `main` after running
     `git_step` -- a commit or a merge -- so a checkout that has not fetched
-    since stands behind the remote (issue #488)."""
+    since stands behind the remote."""
     other = tmp_path / "other"
     real_git(tmp_path, "clone", "-q", str(tmp_path / "remote.git"), str(other))
     real_git(other, "config", "user.name", "Other")
@@ -217,7 +217,7 @@ def _repository_selecting_git_variables() -> frozenset[str]:
 
 def sealed_git_environment() -> dict[str, str]:
     """The inherited environment without any route or seed the operator
-    configured (#530, #534): no proxy, no operator repository, git
+    configured: no proxy, no operator repository, git
     configuration or template, and an ssh that reads no config file, so a
     remote a test names is the remote git dials and a repository it
     initializes carries no operator hook or URL rewrite."""
@@ -282,7 +282,7 @@ def real_repository_with_bare_remote(
     real bare `remote_name` remote pointing at a sibling bare repository --
     the one raw-git skeleton every trunk-history or trailer-classification
     fixture in this suite builds its own commits onto (`test_checkout.py`'s
-    and `test_cli.py`'s own real-repository proofs, issue #359 CI), instead
+    and `test_cli.py`'s own real-repository proofs), instead
     of each hand-rolling the same `init`/`config`/`remote add` sequence."""
     remote = init_bare_repository(tmp_path / "remote.git")
     repo = tmp_path / "repo"
@@ -417,7 +417,7 @@ def worktree(tmp_path: Path) -> Path:
 def push_repository_trunk(repo: Path, remote_name: str) -> None:
     """`repo`'s current `main` pushed to `remote_name`, with `<remote_name>/HEAD`
     resolved -- the trailing half of the skeleton every trunk-history
-    fixture repeats once its own commits are built (issue #359 CI)."""
+    fixture repeats once its own commits are built."""
     real_git(repo, "push", "-q", remote_name, "main")
     real_git(repo, "remote", "set-head", remote_name, "main")
 
@@ -506,8 +506,8 @@ def move_trunk(clone: Path, remote: Path, *, main_state: MainBranchState) -> Non
 
 def dangle_recorded_head(repo: Path, remote_name: str) -> None:
     """`<remote_name>/HEAD` left naming `master` once the remote renamed
-    that branch `main` and `<remote_name>/master` is gone from `repo`
-    (issue #490): the recorded `HEAD` dangles, while `<remote_name>/main`
+    that branch `main` and `<remote_name>/master` is gone from `repo`:
+    the recorded `HEAD` dangles, while `<remote_name>/main`
     stands at `repo`'s `main`."""
     real_git(repo, "push", "-q", remote_name, "main", "main:master")
     real_git(repo, "remote", "set-head", remote_name, "master")
@@ -515,8 +515,8 @@ def dangle_recorded_head(repo: Path, remote_name: str) -> None:
 
 
 def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every store-command test reads a tracked `board.toml` by default
-    (issue #315), whichever of `test_cli.py`'s faked worktree or
+    """Every store-command test reads a tracked `board.toml` by default,
+    whichever of `test_cli.py`'s faked worktree or
     `test_store.py`'s real scratch checkout it runs against -- neither actually `git add`s the
     file, so a real `git ls-files` check would otherwise always read "not
     tracked" here. The untracked/ignored refusal is its own axis, proven by
@@ -528,7 +528,7 @@ def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
     test module") so every test file states in its own body that it reads a
     tracked board.toml by default. Only that index question is stubbed:
     whether a revision's tree holds a file (the trunk's committed
-    `lane_shared`, issue #575) stays with the real helper, so a test's faked
+    `lane_shared`) stays with the real helper, so a test's faked
     `ls-tree` answer or its real repository decides it."""
 
     def tracked_in_the_index(
@@ -544,7 +544,7 @@ def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
 def stub_every_remote_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     """An in-memory store's checkout configures whichever canonical remote
     its board names, the way its faked URL stands for that remote. A test
-    proving a remote with no URL configured (issues #508, #516) restores
+    proving a remote with no URL configured restores
     `checkout.unconfigured_remote_refusal`, so real git answers it."""
     monkeypatch.setattr(checkout, "unconfigured_remote_refusal", lambda _remote, **_kwargs: None)
 
@@ -565,7 +565,7 @@ def git_checkout(
         ("branch", "--show-current"): branch,
         ("rev-parse", "--git-dir"): git_directory,
         ("rev-parse", "--git-common-dir"): common_directory,
-        # `resolve_path_checkout`'s one combined call (issue #314): the same
+        # `resolve_path_checkout`'s one combined call: the same
         # three facts above, in the order it requests them via
         # `-C`/`--path-format=absolute`, so `rescope`'s path-based checkout
         # resolution reads the identical fixture the separate keys above
@@ -635,9 +635,9 @@ def hub_canonical_worktree_file(
     """A file in a linked worktree on `branch` of a repository with the
     remotes `origin` and `hub` whose tracked `board.toml` makes `canonical`
     canonical, with `origin/HEAD` naming `main` and `<canonical>/HEAD`
-    naming `canonical_head` -- or never recorded (issue #490). A recorded
+    naming `canonical_head` -- or never recorded. A recorded
     `HEAD` of a canonical remote the repository never configured is one a
-    removed remote left behind (issue #492)."""
+    removed remote left behind."""
     main = tmp_path / "repo"
     main.mkdir()
     real_git(main, "init", "-q", "-b", "main")
@@ -791,9 +791,9 @@ CountedReads = tuple[dict[Path | None, int], dict[Path | None, int], dict[Path, 
 @dataclass
 class ContextReads:
     """Every toplevel and board-configuration read one command made, keyed
-    by the directory it was read from (issue #457), and every observation of
+    by the directory it was read from, and every observation of
     `refs/aco/state`, a transition's own included, keyed by the worktree it
-    was fetched into (issues #477, #494)."""
+    was fetched into."""
 
     toplevels: Counter[Path | None] = field(default_factory=Counter)
     configs: Counter[Path | None] = field(default_factory=Counter)
@@ -814,7 +814,7 @@ def count_context_reads(monkeypatch: pytest.MonkeyPatch) -> ContextReads:
     """Counts every `rev-parse` that asks `--show-toplevel` -- alone, or
     combined with other queries as `resolve_path_checkout` asks it -- the
     `board.toml` tracked check, and every `store.fetch_state`, a
-    transition's own included (issue #494), through whatever git and store
+    transition's own included, through whatever git and store
     fakes the test already installed, so it is called after the arrangement
     and before the command."""
     reads = ContextReads()
@@ -848,13 +848,13 @@ def count_context_reads(monkeypatch: pytest.MonkeyPatch) -> ContextReads:
 
 def fresh_observation(worktree: Path, remote: Path | str) -> store.Observation:
     """`worktree`'s own fresh read of the state ref over `remote`, the
-    observation a command hands its transition (issue #494)."""
+    observation a command hands its transition."""
     return store.Observation(
         worktree, str(remote), store.fetch_state(worktree=worktree, remote=str(remote))
     )
 
 
-# Captured at import, before `_stub_trunk` replaces them (issue #488).
+# Captured at import, before `_stub_trunk` replaces them.
 LIVE_TRUNK_REF_AFTER = checkout.trunk_ref_after
 LIVE_FETCH_REMOTE = checkout.fetch_remote
 
@@ -863,12 +863,12 @@ ITEM_NEW_BODY = complete_contract("Ship it.")
 
 def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
     """Point `RunContext.toplevel` (`rev-parse --show-toplevel`) at a real
-    repository this test built itself (issue #322), taking precedence over
+    repository this test built itself, taking precedence over
     `conftest.py`'s autouse `_isolate_git_toplevel` fake -- every other real
     git call `start`'s own worktree creation runs still reaches real git,
     unlike a fully faked `checkout.git_output`, and the trunk is resolved
     and fetched for real there, undoing `test_cli.py`'s autouse
-    `_stub_trunk` (issue #488)."""
+    `_stub_trunk`."""
     real_git_output = checkout.git_output
 
     def fake(arguments: list[str], *, directory: Path | None = None, **options: bool) -> str:
@@ -885,8 +885,8 @@ def arguments_bash_hands_aco(advice: str, tmp_path: Path) -> tuple[int, list[str
     """Bash's exit code and the argv it hands `aco` when the printed
     `advice` command runs verbatim in a throwaway git repository, `aco`
     standing in as a recorder of its own arguments -- so the caller runs
-    exactly those arguments through the real entry point (issue #510). A
-    scenario may run several pieces of advice in turn (issue #513)."""
+    exactly those arguments through the real entry point. A
+    scenario may run several pieces of advice in turn."""
     shim_directory = tmp_path / "shell-bin"
     shim_directory.mkdir(exist_ok=True)
     recorder = shim_directory / "aco"

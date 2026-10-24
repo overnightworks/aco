@@ -603,7 +603,7 @@ REFUSED_AFTER_BOTH_FETCHES = (
     ("configured_refspec", "arrange", "kind", "status", "watched_refs", "new_local_refs"),
     [
         # The claim write's own fetch honours a state-ref mapping onto a local
-        # branch even for an adoption; that residual is #47's (store push).
+        # branch even for an adoption; that residual belongs to the store push.
         pytest.param(BRANCHES_TO_A_MIRROR, *ADOPTED_OUTCOME, id="adopted-branches-to-a-mirror"),
         pytest.param(EVERYTHING_TO_ITSELF, *ADOPTED_OUTCOME, id="adopted-everything-to-itself"),
         pytest.param(
@@ -1438,7 +1438,7 @@ def test_adopt_stops_with_the_status_of_the_claim_check_phase_and_builds_nothing
 def test_adopts_rerun_after_a_re_push_and_a_rewritten_body_restores_the_line_under_the_same_claim(
     world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: ADOPT-34, ADOPT-26, ADOPT-31 (#47 line 6) -- the bot's force-push and body
+    """Spec: ADOPT-34, ADOPT-26, ADOPT-31 -- the bot's force-push and body
     rewrite end no claim: the holder's rerun writes the lost line again, builds nothing."""
     first_head = world.head
     adopt(capsys).expect_success()
@@ -1525,7 +1525,7 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
     worktree_outcome: str,
     merged: bool,
 ) -> None:
-    """Spec: ADOPT-34, LANDCMD-31, LANDCMD-12, LANDCMD-13, REL-57, REL-29 (#47 lines 1, 6) --
+    """Spec: ADOPT-34, LANDCMD-31, LANDCMD-12, LANDCMD-13, REL-57, REL-29 --
     `aco land --head` lands an adopted lane like any lane, but only at the head it is told to
     review; the trailer is the adopted line, the worktree goes only at the merged head."""
     world.forge.merge_remote = world.remote
@@ -1575,7 +1575,7 @@ def _abandon_the_adoption(capsys: pytest.CaptureFixture[str]) -> CliRun:
 def test_abandoning_an_adopted_lane_frees_the_claim_and_keeps_the_pair_and_the_line(
     world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: ADOPT-35, REL-33, REL-57 (#47 line 10) -- giving the lane up frees the claim and
+    """Spec: ADOPT-35, REL-33, REL-57 -- giving the lane up frees the claim and
     touches neither worktree, branch nor the line, and reads nothing from the forge."""
     adopt(capsys).expect_success()
     claim = _adopted_claim(world)
@@ -1637,7 +1637,7 @@ def test_an_abandoned_adoption_is_refused_by_land_and_by_adopt(
     attempt: Callable[[AdoptionWorld, pytest.CaptureFixture[str]], CliRun],
     refusal: str,
 ) -> None:
-    """Spec: ADOPT-35, LAND-16, ADOPT-05 (#47 line 10) -- after the lane is given up, the line
+    """Spec: ADOPT-35, LAND-16, ADOPT-05 -- after the lane is given up, the line
     that stayed in the body keeps `aco land` and a second `aco adopt` from acting on it."""
     adopt(capsys).expect_success()
     _abandon_the_adoption(capsys).expect_success()

@@ -282,7 +282,7 @@ def test_github_adapter_fails_loud_when_a_board_pull_request_is_not_an_object() 
 
 
 def test_github_adapter_retypes_an_issue_by_its_type_name() -> None:
-    """Issue #503: `set_item_kind` PATCHes the organization's type by name,
+    """`set_item_kind` PATCHes the organization's type by name,
     the field `create_issue` writes, and reads the type GitHub kept back."""
     observed: list[tuple[list[str], bytes | None]] = []
 
@@ -321,7 +321,7 @@ def test_github_adapter_fails_loud_when_github_drops_the_new_type() -> None:
 
 
 def test_github_adapter_creates_a_child_and_links_it_as_a_sub_issue() -> None:
-    """Composed from `create_issue` and `link_child` (#260): the create POST,
+    """Composed from `create_issue` and `link_child`: the create POST,
     the id read `link_child` needs for an issue it did not just create
     itself, and the sub-issue POST."""
     observed: list[tuple[list[str], bytes | None]] = []
@@ -371,7 +371,7 @@ def test_github_adapter_fails_loud_on_a_malformed_created_child(payload: str) ->
 
 def test_github_adapter_names_the_created_child_when_the_relation_post_fails() -> None:
     """The issue exists once `create_child`'s first write returns; a second
-    write failing after that must name the surviving child (#112 finding 3),
+    write failing after that must name the surviving child,
     never just surface the raw relation-POST error."""
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
@@ -392,8 +392,8 @@ def test_github_adapter_names_the_created_child_when_the_relation_post_fails() -
 def test_github_adapter_creates_an_issue_without_linking_it_as_a_child(
     returned_type_name: str,
 ) -> None:
-    """`create_issue` is `item new`'s own write without `--parent` (#444) and
-    `create_child`'s first write (#260): one POST carrying the issue type by
+    """`create_issue` is `item new`'s own write without `--parent` and
+    `create_child`'s first write: one POST carrying the issue type by
     name, no sub-issue relation. The returned type is read as the board
     reads it, so an org's own casing of the name still counts as set."""
     observed: list[tuple[list[str], bytes | None]] = []
@@ -428,8 +428,8 @@ def test_github_adapter_creates_an_issue_without_linking_it_as_a_child(
 def test_github_adapter_names_the_created_issue_github_left_without_its_type(
     created: dict[str, object],
 ) -> None:
-    """GitHub's REST create drops `type` silently without push access
-    (#444): the issue exists anyway, so the refusal names it and the type
+    """GitHub's REST create drops `type` silently without push access:
+    the issue exists anyway, so the refusal names it and the type
     still to set, never a plain success -- nor a generic malformed-response
     error once the response has named the created issue."""
     payload = json.dumps(created)
@@ -456,7 +456,7 @@ def closed_issue_row(
 
 
 def test_github_adapter_lists_only_issues_closed_since_the_cutoff() -> None:
-    """The twin search's closed half (#444): GitHub's `since` filters by the
+    """The twin search's closed half: GitHub's `since` filters by the
     last update, so an issue closed before the cutoff but touched after it
     is dropped here, and a pull request never counts as an issue."""
     observed: list[list[str]] = []
@@ -511,7 +511,7 @@ def test_github_adapter_fails_loud_on_a_malformed_closed_issue(row: object) -> N
 
 
 def test_github_adapter_links_an_existing_child_by_reading_its_internal_id() -> None:
-    """`link_child` records an already-existing issue as a sub-issue (#260) --
+    """`link_child` records an already-existing issue as a sub-issue --
     the write a repeat `cut` uses to adopt an orphan `create_child` left
     behind. GitHub's sub-issue POST wants the child's internal id, not its
     issue number, so this reads it first."""
@@ -578,8 +578,7 @@ _LANDING_COMMENTS_READ = [
 
 
 def test_github_adapter_closes_a_landed_item_with_a_comment_first() -> None:
-    """Issue #359 Card 1/CI, extended by issue #397: `close_landed_item`
-    reads its own past comments first (a repeat-safety check that finds
+    """`close_landed_item` reads its own past comments first (a repeat-safety check that finds
     none here), then posts the comment, then closes -- exactly the order
     its own docstring promises."""
     observed: list[tuple[list[str], bytes | None]] = []
@@ -606,7 +605,7 @@ def test_github_adapter_closes_a_landed_item_with_a_comment_first() -> None:
 
 
 def test_github_adapter_closing_a_landed_item_never_reaches_close_when_the_comment_fails() -> None:
-    """The comment lands first (issue #359 Card 1): a transient failure
+    """The comment lands first: a transient failure
     there must never reach the close call, leaving the issue open with no
     record of why it is about to close -- worse than leaving it open with
     the comment already explaining the pending landing."""
@@ -630,7 +629,7 @@ def test_github_adapter_closing_a_landed_item_never_reaches_close_when_the_comme
 
 
 def test_github_adapter_closing_a_landed_item_skips_a_repeated_comment() -> None:
-    """Issue #397: a rerun that finds its own `landed by PR #<n>` comment
+    """A rerun that finds its own `landed by PR #<n>` comment
     already posted -- the comment landed but a prior run crashed before the
     close -- skips straight to the close instead of posting it twice."""
     calls: list[list[str]] = []
@@ -651,7 +650,7 @@ def test_github_adapter_closing_a_landed_item_skips_a_repeated_comment() -> None
 
 
 def test_github_adapter_finds_a_landing_comment_past_the_first_page() -> None:
-    """Issue #397: a plain `gh api` request serves only its own `per_page`
+    """A plain `gh api` request serves only its own `per_page`
     (100 here) without `--paginate`. With 150 unrelated comments ahead of
     this run's own landing comment -- posted by a run whose close then
     failed -- a rerun must still find it via `--paginate` and skip straight
@@ -757,7 +756,7 @@ def _readiness_client(
 
 
 def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_checks() -> None:
-    """Issue #405: `landing_readiness` reads the pull request itself (open
+    """`landing_readiness` reads the pull request itself (open
     state, head sha, mergeable state), the check-runs endpoint against that
     same head sha, and the combined commit status -- never `gh pr checks`,
     which reads the pull request's current head rather than the one this
@@ -798,7 +797,7 @@ def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_ch
 def test_github_adapter_reads_a_check_run_reported_only_on_a_later_page(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Issue #405 review finding: a check run GitHub reports only on page
+    """A check run GitHub reports only on page
     two of `check-runs` still counts toward readiness -- a merge must not
     become possible just because a run sorted past the first page."""
     monkeypatch.setattr(github, "ISSUES_PER_PAGE", 1)
@@ -819,7 +818,7 @@ def test_github_adapter_reads_a_check_run_reported_only_on_a_later_page(
 
 
 def test_github_adapter_reads_a_pending_status_context() -> None:
-    """Issue #405 review finding: an external status context (SonarCloud,
+    """An external status context (SonarCloud,
     say) still `pending` reads as a not-yet-completed check, exactly as a
     check run with no conclusion does."""
     client, _calls = _readiness_client(
@@ -836,7 +835,7 @@ def test_github_adapter_reads_a_pending_status_context() -> None:
 
 
 def test_github_adapter_reads_a_failing_status_context() -> None:
-    """Issue #405 review finding: an external status context that failed
+    """An external status context that failed
     reads as a completed, non-successful check, so `aco land`'s preflight
     refuses on it exactly as it would a failed check run."""
     client, _calls = _readiness_client(
@@ -855,7 +854,7 @@ def test_github_adapter_reads_a_failing_status_context() -> None:
 def test_github_adapter_reads_a_pending_combined_status_aggregate_with_an_empty_names_page() -> (
     None
 ):
-    """Issue #405 review/gate finding: the combined-status endpoint's own
+    """The combined-status endpoint's own
     aggregate `state` decides the verdict, never a per-context
     reconstruction of it -- a `pending` aggregate with `total_count > 0`
     still blocks even when its own `statuses` page comes back empty (a
@@ -885,9 +884,9 @@ def test_github_adapter_reads_a_pending_combined_status_aggregate_with_an_empty_
 
 @pytest.mark.parametrize("aggregate", ["failure", "error"])
 def test_github_adapter_reads_a_blocking_combined_status_aggregate(aggregate: str) -> None:
-    """Issue #405 review/gate finding and round-4 finding 2: a `failure` or `error`
-    aggregate from the combined-status endpoint blocks, named from whatever context its
-    own paginated `statuses` does carry and read verbatim as the check's conclusion."""
+    """A `failure` or `error` aggregate from the combined-status endpoint blocks,
+    named from whatever context its own paginated `statuses` does carry and
+    read verbatim as the check's conclusion."""
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = arguments[1]
@@ -910,7 +909,7 @@ def test_github_adapter_reads_a_blocking_combined_status_aggregate(aggregate: st
 
 
 def test_github_adapter_reads_a_successful_combined_status_aggregate_as_a_named_check() -> None:
-    """Issue #405 round-4 finding 2: a `success` aggregate with statuses
+    """A `success` aggregate with statuses
     present is itself a named, successful check -- a pull request whose
     only CI is a combined status (no check runs at all) must still expose
     it, or `aco land`'s preflight misreads a green pull request as exposing
@@ -926,7 +925,7 @@ def test_github_adapter_reads_a_successful_combined_status_aggregate_as_a_named_
 
 
 def test_github_adapter_landing_rejects_a_malformed_status_summary_shape() -> None:
-    """Issue #405 CI coverage follow-up: the combined-status summary read is
+    """The combined-status summary read is
     exactly one JSON value; more than one -- `gh`'s own paginated-array
     shape, say -- is a malformed summary, not a valid aggregate verdict."""
     two_values = json.dumps({"state": "success", "total": 0}) + json.dumps(
@@ -953,7 +952,7 @@ def test_github_adapter_landing_rejects_a_malformed_status_summary_shape() -> No
 
 
 def test_github_adapter_landing_rejects_a_malformed_status_summary_fields() -> None:
-    """Issue #405 CI coverage follow-up: a combined-status summary whose own
+    """A combined-status summary whose own
     `state`/`total` fields fail their own shape check -- a negative `total`,
     here -- refuses as malformed, the field-level defect beside
     `test_github_adapter_landing_rejects_a_malformed_status_summary_shape`'s
@@ -979,7 +978,7 @@ def test_github_adapter_landing_rejects_a_malformed_status_summary_fields() -> N
 
 
 def test_github_adapter_landing_rejects_a_malformed_status_name() -> None:
-    """Issue #405 CI coverage follow-up: a combined-status names page entry
+    """A combined-status names page entry
     with no usable `name` field refuses loud, never silently dropped from
     the refusal sentence it would otherwise name."""
 
@@ -1003,7 +1002,7 @@ def test_github_adapter_landing_rejects_a_malformed_status_name() -> None:
 
 
 def test_github_adapter_accepts_a_mergeable_state_it_has_never_seen_before() -> None:
-    """Issue #405: `mergeable_state` is GitHub's own open vocabulary --
+    """`mergeable_state` is GitHub's own open vocabulary --
     read verbatim, never a closed set this adapter could refuse a genuine,
     simply-not-yet-enumerated answer against."""
 
@@ -1042,10 +1041,10 @@ def test_github_adapter_fails_loud_on_an_empty_mergeable_state() -> None:
 def test_github_adapter_merges_a_pull_request_with_a_pinned_sha(
     method: workboard.MergeMethod,
 ) -> None:
-    """Issue #405: `merge_landing` merges through `gh api --method PUT
+    """`merge_landing` merges through `gh api --method PUT
     pulls/<n>/merge`, never `gh pr merge`, which re-reads the pull
-    request's own current head instead of the sha this call pins; issue
-    #578: with the method `land` chose, a merge commit or a squash."""
+    request's own current head instead of the sha this call pins; the
+    method `land` chose, a merge commit or a squash, is sent along."""
     observed: list[tuple[list[str], bytes | None]] = []
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
@@ -1106,7 +1105,7 @@ def test_github_adapter_merges_a_pull_request_with_a_pinned_sha(
 def test_github_adapter_reads_the_repositorys_allowed_merge_methods(
     settings: dict[str, object], allowed: frozenset[workboard.MergeMethod] | None
 ) -> None:
-    """Issue #578: `allowed_merge_methods` reads the repository's own
+    """`allowed_merge_methods` reads the repository's own
     `allow_merge_commit`/`allow_squash_merge`/`allow_rebase_merge`, and
     `None` where GitHub withholds them from a token without push rights."""
     observed: list[list[str]] = []
@@ -1196,7 +1195,7 @@ _MALFORMED_RULE = "malformed branch merge rule"
 def test_github_adapter_fails_loud_on_malformed_merge_answers(
     read: Callable[[GitHubForge], object], answer: str, refusal: str
 ) -> None:
-    """Issues #578 and #615: a merge-settings or branch-rule answer this
+    """A merge-settings or branch-rule answer this
     adapter cannot read as merge methods fails loud rather than guessing."""
     client = GitHubForge(
         github.repository_id(REPOSITORY), run=lambda arguments, input_data=None: answer
@@ -1219,7 +1218,7 @@ def _branch_rules_refused_with(message: str, status: int = 403) -> GitHubForge:
 
 
 def test_github_adapter_reads_no_merge_rules_on_a_plan_without_rulesets() -> None:
-    """Issue #615 line 5: a private repository on a plan without rulesets
+    """A private repository on a plan without rulesets
     answers the branch-rules read with GitHub's own upgrade 403, which means
     no rule narrows the settings."""
     client = _branch_rules_refused_with(_RULESETS_UPGRADE_MESSAGE)
@@ -1237,7 +1236,7 @@ def test_github_adapter_reads_no_merge_rules_on_a_plan_without_rulesets() -> Non
 def test_github_adapter_fails_loud_on_any_other_branch_rules_refusal(
     message: str, status: int
 ) -> None:
-    """Issue #615 line 5: every other refusal of the branch-rules read fails
+    """Every other refusal of the branch-rules read fails
     loud rather than reading as no rules -- the upgrade phrase too, unless
     GitHub answered it with a 403."""
     client = _branch_rules_refused_with(message, status)
@@ -1279,7 +1278,7 @@ def test_github_adapter_fails_loud_on_any_other_branch_rules_refusal(
 def test_github_adapter_reads_the_default_branchs_merge_rules(
     answer: str, rules: tuple[frozenset[workboard.MergeMethod], ...]
 ) -> None:
-    """Issue #615 lines 4, 6 and 7: `branch_merge_rules` reads every rule on
+    """`branch_merge_rules` reads every rule on
     the branch through the branch-rules endpoint, one method set per
     `pull_request` rule carrying a method list and per
     `required_linear_history` rule, and an empty tuple where no rule
@@ -1314,10 +1313,10 @@ def test_github_adapter_reads_the_default_branchs_merge_rules(
 def test_github_adapter_tells_a_moved_head_from_a_refused_merge(
     status: int, refusal: type[forge.ForgeError]
 ) -> None:
-    """Issue #405: a 409 from the merge endpoint means the pull request's
+    """A 409 from the merge endpoint means the pull request's
     head moved since `landing_readiness` read it -- `ForgeMergeConflictError`,
     whose recovery is a re-run. GitHub's REST reference reads a 405 as "merge
-    cannot be performed" (issue #603) -- `ForgeMergeRefusedError`, carrying the
+    cannot be performed" -- `ForgeMergeRefusedError`, carrying the
     forge's own message, since no re-run repairs it."""
     message = f"gh: merge not possible (HTTP {status})"
     client = GitHubForge(
@@ -1347,7 +1346,7 @@ def _file_contents_client(answer: str | forge.ForgeError) -> GitHubForge:
 
 
 def test_github_adapter_reads_a_file_at_a_commit_from_its_base64_contents() -> None:
-    """Issue #505 proof 5: the contents API answers one base64 object --
+    """The contents API answers one base64 object --
     line-wrapped the way GitHub sends it -- and the adapter hands back the
     file's own text."""
     calls: list[list[str]] = []
@@ -1423,8 +1422,8 @@ def test_github_adapter_deletes_a_merged_branch() -> None:
     ],
 )
 def test_github_adapter_deleting_an_already_absent_branch_is_idempotent(decoded: str) -> None:
-    """Spec: LANDCMD-16. Issue #405 review finding 5: `gh api`'s real error text puts the
-    message before the code (`gh: Reference does not exist (HTTP 422)`);
+    """Spec: LANDCMD-16. `gh api`'s real error text puts the message before the
+    code (`gh: Reference does not exist (HTTP 422)`);
     the reversed order is covered alongside it so neither order regresses."""
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
@@ -1436,7 +1435,7 @@ def test_github_adapter_deleting_an_already_absent_branch_is_idempotent(decoded:
 
 
 def test_github_adapter_delete_branch_reraises_an_unrelated_422() -> None:
-    """Issue #405 review finding: only GitHub's own "reference does not
+    """Only GitHub's own "reference does not
     exist" 422 is idempotent absence; any other 422 -- a protected branch
     refusing the delete, say -- is a real failure `delete_branch` must
     still surface, not silently treat as already gone."""
@@ -1693,7 +1692,7 @@ def test_github_adapter_item_reference_fails_loud_on_a_malformed_response(
 def test_github_adapter_item_references_reads_every_number_from_one_batch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Issue #440: an open issue, a merged pull request (`state: MERGED`
+    """An open issue, a merged pull request (`state: MERGED`
     reads as closed, matching `item_reference`'s own REST-issues-endpoint
     normalization), and a number GitHub resolves to neither -- one `gh api
     graphql` round trip for all three, never one per number.
@@ -1701,9 +1700,9 @@ def test_github_adapter_item_references_reads_every_number_from_one_batch(
     A number resolving to neither an issue nor a pull request makes real
     `gh api graphql` exit nonzero even though its `data` already answers
     `null` for that alias: a NOT_FOUND entry in the response's own `errors`,
-    not a clean `"n2": None` result `gh` never actually produces (issue #440
-    review) -- so the fake `run` raises the way `gh` does instead of
-    returning a response shape real `gh` never returns.
+    not a clean `"n2": None` result `gh` never actually produces -- so the
+    fake `run` raises the way `gh` does instead of returning a response shape
+    real `gh` never returns.
     """
     observed: list[list[str]] = []
 
@@ -1768,7 +1767,7 @@ def test_github_adapter_item_references_of_nothing_costs_no_round_trip() -> None
 def test_github_adapter_item_references_splits_into_blocks_of_the_batch_size(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Issue #440: a closed-item history larger than one GraphQL block still
+    """A closed-item history larger than one GraphQL block still
     resolves every number, fetched over more than one round trip rather than
     one query that keeps growing forever."""
     numbers = tuple(range(1, github.GRAPHQL_ITEM_REFERENCE_BATCH_SIZE + 11))
@@ -1932,7 +1931,7 @@ def test_github_adapter_item_references_fails_loud_on_a_malformed_response(
 def test_github_adapter_item_references_reraises_an_unrecovered_graphql_error(
     message: str, match: str
 ) -> None:
-    """Issue #440 review: `_not_found_batch_nodes` only recovers a batch
+    """`_not_found_batch_nodes` only recovers a batch
     whose response parses as the shape a not-found alias actually produces,
     every error on it is `NOT_FOUND` on one of this call's own aliases, and
     `data.repository` already holds every alias asked for. Anything else --
@@ -2077,7 +2076,7 @@ def test_bounded_command_sets_github_quiet_environment() -> None:
 
 @pytest.fixture
 def non_github_remote_url() -> str:
-    """A remote URL `discover_repository` reads first (issue #245) and finds
+    """A remote URL `discover_repository` reads first and finds
     no repository in, so it falls through to asking `gh` -- every test using
     this in place of a matching GitHub remote is exercising that fallback,
     never the cheap local-URL read."""
@@ -2111,7 +2110,7 @@ def test_repository_resolution_uses_github_quiet_environment(
 def test_repository_resolution_asks_gh_about_the_named_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, non_github_remote_url: str
 ) -> None:
-    """Issue #472: the `gh repo view` fallback resolves the checkout the
+    """The `gh repo view` fallback resolves the checkout the
     caller named, never whatever this process's own cwd happens to be."""
     asked_in: list[Path | None] = []
 
@@ -2305,7 +2304,7 @@ def test_repository_resolution_refuses_when_no_remote_matches(
 def test_repository_resolves_from_a_standard_github_remote_without_asking_gh(
     monkeypatch: pytest.MonkeyPatch, remote: str
 ) -> None:
-    """The git remote is `discover_repository`'s first read (issue #245): a
+    """The git remote is `discover_repository`'s first read: a
     remote that already names a GitHub repository resolves from it alone,
     with `gh` never invoked at all."""
 

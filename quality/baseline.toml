@@ -30,24 +30,24 @@
 "src/aco/protocol.py" = 1881
 "src/aco/state_board.py" = 957
 "src/aco/store.py" = 2104
-"src/aco/workboard.py" = 3160
-"tests/aco_board/test_aco_board_api.py" = 1060
+"src/aco/workboard.py" = 3148
+"tests/aco_board/test_aco_board_api.py" = 1059
 "tests/cli_fixtures.py" = 969
-"tests/github_fixtures.py" = 839
+"tests/github_fixtures.py" = 838
 "tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4443
-"tests/test_checkout.py" = 2085
+"tests/test_checkout.py" = 2082
 "tests/test_cli.py" = 17792
 "tests/test_cut.py" = 1124
-"tests/test_github.py" = 3250
+"tests/test_github.py" = 3249
 "tests/test_land_after_merge_rerun.py" = 884
 "tests/test_land_preflight_claim.py" = 858
 "tests/test_protocol.py" = 802
 "tests/test_release_cleanup.py" = 807
-"tests/test_rescope_checkout.py" = 1088
+"tests/test_rescope_checkout.py" = 1087
 "tests/test_reset.py" = 954
 "tests/test_state_board.py" = 6113
-"tests/test_store.py" = 5526
+"tests/test_store.py" = 5511
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 111
@@ -95,7 +95,7 @@
 "test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change" = 61
 
 [function_lines."tests/test_checkout.py"]
-"_trunk_history_repository" = 63
+"_trunk_history_repository" = 62
 
 [function_lines."tests/test_cli.py"]
 "_board_fixture_environment" = 122
