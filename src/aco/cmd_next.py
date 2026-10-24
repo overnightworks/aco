@@ -41,15 +41,14 @@ def _next_action_command(
 
     A `workboard.WorkItemAction` is `claim` where `next` runs in a checkout `claim`
     accepts (`site.claims_in_place`), else `start` with the slug `start` itself
-    derives from the title (issue #562), so the advice runs as printed from
+    derives from the title, so the advice runs as printed from
     the default branch's checkout too. Either drops `--scope` entirely for
-    an item carrying its own top-level `scope` (issue #348, #337's own
-    derivation); an item whose one `[[slice]]` row names paths claims
+    an item carrying its own top-level `scope`; an item whose one `[[slice]]` row names paths claims
     exactly those; only an item naming neither still prints the
     placeholder, alongside `_SCOPE_UNKNOWN_NOTE`. A scope the width gate
     calls wide in this checkout, with no `whole` in the body, adds
-    `--whole <reason>` (issue #566). All render through `workboard.advice_command`, so the line
-    runs as printed (issue #510).
+    `--whole <reason>`. All render through `workboard.advice_command`, so the line
+    runs as printed.
     """
     if isinstance(action, workboard.CutSliceAction):
         return workboard.cut_command(action.container.number, storage)
@@ -63,7 +62,7 @@ def _next_action_command(
 
 def _advised_slug(number: int, title: str, storage: body.Storage) -> str:
     """The slug `start` derives from `title`, else, for a title with no
-    usable slug (issue #566), the one item `number`'s own id yields -- a
+    usable slug, the one item `number`'s own id yields -- a
     value `start --slug` accepts, so the advice runs as printed."""
     try:
         return checkout.slug_from_title(title)
@@ -75,7 +74,7 @@ def _advised_slug(number: int, title: str, storage: body.Storage) -> str:
 class _PullSite:
     """What the checkout `next` runs in says about pulling its action:
     whether `claim` accepts it in place, and whether the width gate calls
-    the action's scope wide there (issue #566)."""
+    the action's scope wide there."""
 
     claims_in_place: bool
     scope_is_wide: bool
@@ -103,8 +102,8 @@ def _claims_in_place(context: session.RunContext) -> bool:
 
 
 class _NextReason(StrEnum):
-    """`aco next`'s own `--json` `reason` vocabulary (issue #412,
-    `specs/next.spec.md`): the action type -- `work_item`, `cut_slice`,
+    """`aco next`'s own `--json` `reason` vocabulary
+    (`specs/next.spec.md`): the action type -- `work_item`, `cut_slice`,
     `check_container`, `close_container` -- names a success (`ok: true`) exactly as it did
     when carried under the dropped `"action"` key; `nothing_actionable`
     is the one `ok: false` outcome that exits `3` in text (NEXT-01) and
@@ -172,11 +171,11 @@ def _next_action_payload(
     }
 
 
-# The three sentences issue #348 adds to `next`'s own text form, each named
+# The three sentences `next`'s own text form adds, each named
 # once so text and JSON (`_parallel_json`) never restate them (Sonar S1192).
 _SCOPE_UNKNOWN_NOTE = "scope unknown"
 _PARALLEL_UNKNOWN_LINE = "parallel: unknown (first action names no scope)"
-# "Text zeigt höchstens drei Kandidaten plus 'and N more'" (issue #348 Form):
+# "Text zeigt höchstens drei Kandidaten plus 'and N more'":
 # a stable display cap, not something an operator tunes.
 _PARALLEL_TEXT_LIMIT = 3
 
@@ -239,12 +238,12 @@ def _parallel_json(parallel: workboard.ParallelSet, storage: body.Storage) -> di
 class _NextReport:
     """Everything `_next`/`_next_json` print for one `next` run, bundled so
     each printer takes one argument instead of PLR0913's five-scalar
-    ceiling (issue #348): the board's own first action (`None` when nothing
+    ceiling: the board's own first action (`None` when nothing
     qualifies), the unworkable rows `SKIPPED` names, the landed-but-open
     `RECOVERY` rows, the parallel-capacity projection, the zero-cost
-    `close:` list, the items waiting on the operator (issue #553), the items
+    `close:` list, the items waiting on the operator, the items
     labelled as ideas, and whether `claim` accepts this checkout, which picks
-    `claim` or `start` as the advice (issue #562)."""
+    `claim` or `start` as the advice."""
 
     action: workboard.NextAction | None
     skipped: tuple[workboard.BoardItem, ...]
@@ -327,7 +326,7 @@ def _next_action_lines(
 def _next(next_report: _NextReport, storage: body.Storage) -> None:
     """A landed-but-open item is named before anything new is pulled; the
     parallel set and the zero-cost `close:` list are named right after the
-    first action, unconditionally (issue #348) -- regardless of that
+    first action, unconditionally -- regardless of that
     action's own rank, so a closable container or a recovery item never goes
     unmentioned merely because something else pulled ahead of it."""
     lines: list[str] = []

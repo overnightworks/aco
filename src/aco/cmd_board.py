@@ -10,8 +10,8 @@ from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
 class _BoardReason(StrEnum):
-    """`aco board`'s own `--json` `reason` vocabulary (issue #412,
-    `specs/board.spec.md`): `projected` the only success. `invalid_usage`
+    """`aco board`'s own `--json` `reason` vocabulary
+    (`specs/board.spec.md`): `projected` the only success. `invalid_usage`
     covers a bare `aco board` naming no `--json` (BOARD-44) and `--repo`
     under `storage = state-ref` (PIN-04); every other refusal -- an
     unsupported forge host (BOARD-02), a state-ref checkout with no
@@ -24,8 +24,8 @@ class _BoardReason(StrEnum):
 
 
 class _BoardNoModeUsageError(protocol.ClaimError):
-    """No `--json` given (BOARD-44): the retired text table (issue #420,
-    #390 Befund 13) leaves `board` with no default mode of its own any
+    """No `--json` given (BOARD-44): the retired text table
+    leaves `board` with no default mode of its own any
     more, so a bare `aco board` must name `--json` instead of guessing."""
 
 
