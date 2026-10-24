@@ -1,8 +1,0 @@
-claim_id = "44397ec40b2c487c8f2697ec1276d251"
-agent = "Codex 01a16e6e-894a-7692-929e-d605748ac260"
-role = "builder"
-base = "b51087c06b15e6166ae8ea02c1c92fd0c93da7cb"
-branch = "codex/issue-351-root-layout-owner"
-scope = [".aco/brief.toml", ".github/workflows/ci.yml", "scripts/check_root_layout.py", "tests/test_root_layout.py"]
-opened_commit = "813f8dfdd428d498b07bb5d1d06a2a8f73276fdd"
-whole_reason = "Prüfer, Test und beide Aufrufer müssen zusammen entfallen, damit keine Referenz auf das gelöschte Skript bleibt."
