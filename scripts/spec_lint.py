@@ -47,18 +47,10 @@ Checks (one finding per hit, each named ``file:line``):
   fenced block (the block itself may be preceded by prose, as several examples do; the scan
   reads every line up to that fence, not a fixed lookahead).
 
-Exemptions
-----------
-``scripts/spec_lint_exemptions.txt``, next to this script, is the one ledger of accepted
-findings: one ``file:line:rule — reason`` line, written by hand only when a finding is
-deliberately accepted. Empty when there is nothing to exempt -- the calibration pass leaves
-none needed today. A line missing its `` — reason`` tail cannot be parsed into a key at all,
-so it surfaces as its own ``malformed_exemption`` finding and always fails ``--ci``.
-
 Usage:
     uv run scripts/spec_lint.py             # human-readable report
     uv run scripts/spec_lint.py --json      # machine-readable
-    uv run scripts/spec_lint.py --ci        # exit non-zero on an unexempted finding
+    uv run scripts/spec_lint.py --ci        # exit non-zero on any finding
 """
 
 from __future__ import annotations
@@ -73,7 +65,6 @@ from enum import Enum
 from pathlib import Path
 
 SPEC_DIR = Path("specs")
-EXEMPTIONS_FILE = Path(__file__).resolve().parent / "spec_lint_exemptions.txt"
 MAX_CRITERION_LENGTH = 200
 
 # A criterion is always one physical line in aco's house format: no continuation-line
@@ -138,7 +129,6 @@ class Rule(Enum):
     MISSING_SECTION = "missing_section"
     IMPLEMENTATION_NAME = "implementation_name"
     MISSING_SETUP = "missing_setup"
-    MALFORMED_EXEMPTION = "malformed_exemption"
 
 
 @dataclass(frozen=True)
@@ -151,10 +141,6 @@ class Finding:
     @property
     def location(self) -> str:
         return f"{self.file}:{self.line}"
-
-    @property
-    def exemption_key(self) -> str:
-        return f"{self.file}:{self.line}:{self.rule.value}"
 
 
 @dataclass(frozen=True)
@@ -489,46 +475,6 @@ def analyze(spec_files: list[SpecFile]) -> list[Finding]:
     return findings
 
 
-def load_exemptions(path: Path = EXEMPTIONS_FILE) -> tuple[dict[str, str], list[Finding]]:
-    """``({"file:line:rule": reason}, malformed-line findings)`` from *path* (one line per
-    exemption, ``key — reason``). A line missing the ` — reason`` tail cannot be parsed into a
-    key at all, so it is reported as its own ``malformed_exemption`` finding instead of being
-    silently dropped or silently accepted -- there is no ledger for the ledger, so it always
-    fails ``--ci``."""
-    if not path.exists():
-        return {}, []
-    exemptions: dict[str, str] = {}
-    malformed: list[Finding] = []
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        key, separator, reason = stripped.partition(" — ")
-        if not separator or not reason.strip():
-            malformed.append(
-                Finding(
-                    Rule.MALFORMED_EXEMPTION,
-                    path.name,
-                    lineno,
-                    f"{stripped!r} has no ` — <reason>` after its key",
-                )
-            )
-            continue
-        exemptions[key.strip()] = reason.strip()
-    return exemptions, malformed
-
-
-def unexempted(findings: list[Finding], exemptions: dict[str, str]) -> list[Finding]:
-    # A malformed_exemption finding is never exempt: exempting a ledger line requires trusting
-    # the ledger, and a malformed line is exactly the ledger failing that trust -- there is no
-    # ledger for the ledger.
-    return [
-        f
-        for f in findings
-        if f.rule is Rule.MALFORMED_EXEMPTION or f.exemption_key not in exemptions
-    ]
-
-
 def _print_report(findings: list[Finding]) -> None:
     if not findings:
         print("spec_lint: no findings")
@@ -545,7 +491,7 @@ def _print_report(findings: list[Finding]) -> None:
             print(f"  {finding.location}: {finding.detail}")
 
 
-def _to_json(findings: list[Finding], failing: list[Finding]) -> dict[str, object]:
+def _to_json(findings: list[Finding]) -> dict[str, object]:
     return {
         "findings": [
             {
@@ -556,31 +502,27 @@ def _to_json(findings: list[Finding], failing: list[Finding]) -> dict[str, objec
             }
             for f in findings
         ],
-        "failing": [f.exemption_key for f in failing],
     }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Mechanical style lint for specs/*.spec.md")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
-    parser.add_argument("--ci", action="store_true", help="exit non-zero on an unexempted finding")
+    parser.add_argument("--ci", action="store_true", help="exit non-zero on any finding")
     args = parser.parse_args(argv)
 
-    exemptions, malformed_exemptions = load_exemptions(EXEMPTIONS_FILE)
-    all_findings = analyze(load_spec_dir(SPEC_DIR)) + malformed_exemptions
-    findings = sorted(all_findings, key=_finding_sort_key)
-    failing = unexempted(findings, exemptions)
+    findings = analyze(load_spec_dir(SPEC_DIR))
 
     if args.json:
-        print(json.dumps(_to_json(findings, failing), indent=2, sort_keys=True))
+        print(json.dumps(_to_json(findings), indent=2, sort_keys=True))
     else:
         _print_report(findings)
-        if failing:
-            print(f"\nFAIL: {len(failing)} unexempted finding(s)", file=sys.stderr)
+        if findings:
+            print(f"\nFAIL: {len(findings)} finding(s)", file=sys.stderr)
 
     if not args.ci:
         return 0
-    return 1 if failing else 0
+    return 1 if findings else 0
 
 
 if __name__ == "__main__":

@@ -11,12 +11,10 @@ already be clean under this gate.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
-import spec_lint
 from spec_lint import analyze, load_spec_dir, load_spec_file
 
 _REPOSITORY_SPEC_DIR = Path(__file__).parent.parent / "specs"
@@ -234,49 +232,6 @@ def test_see_reference_shorthand_is_resolved(
     assert all(f.line == CRITERION_LINE for f in findings)
     for expected_detail in expected_details:
         assert any(expected_detail in f.detail for f in findings)
-
-
-def test_well_formed_exemption_line_parses(tmp_path: Path) -> None:
-    ledger = tmp_path / "exemptions.txt"
-    ledger.write_text("sample.spec.md:1:criterion_length — accepted for now\n", encoding="utf-8")
-
-    exemptions, malformed = spec_lint.load_exemptions(ledger)
-
-    assert exemptions == {"sample.spec.md:1:criterion_length": "accepted for now"}
-    assert malformed == []
-
-
-def test_exemption_line_without_a_reason_is_malformed(tmp_path: Path) -> None:
-    ledger = tmp_path / "exemptions.txt"
-    ledger.write_text("sample.spec.md:1:criterion_length\n", encoding="utf-8")
-
-    exemptions, malformed = spec_lint.load_exemptions(ledger)
-
-    assert exemptions == {}
-    assert [(f.rule.value, f.line) for f in malformed] == [("malformed_exemption", 1)]
-
-
-def test_malformed_exemption_line_cannot_exempt_itself(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """A ledger line naming a malformed_exemption finding as accepted must not suppress that
-    finding: trusting the exemption requires trusting the ledger, which a malformed line is
-    exactly failing to do (regression for issue #385 review round 2)."""
-    spec_dir = tmp_path / "specs"
-    spec_dir.mkdir()
-    (spec_dir / "sample.spec.md").write_text(GREEN_SPEC, encoding="utf-8")
-    ledger = tmp_path / "exemptions.txt"
-    ledger.write_text(
-        "exemptions.txt:2:malformed_exemption — suppress it\nmalformed\n", encoding="utf-8"
-    )
-    monkeypatch.setattr(spec_lint, "SPEC_DIR", spec_dir)
-    monkeypatch.setattr(spec_lint, "EXEMPTIONS_FILE", ledger)
-
-    exit_code = spec_lint.main(["--ci", "--json"])
-    report = json.loads(capsys.readouterr().out)
-
-    assert exit_code == 1
-    assert report["failing"] == ["exemptions.txt:2:malformed_exemption"]
 
 
 def test_repository_specs_are_clean_under_the_gate() -> None:
