@@ -1,5 +1,5 @@
 [gate]
-mandatory_jobs = ["check (3.11)", "check (3.12)", "check (3.13)", "Package smoke (wheel, sdist, tool install without Node)", "Frontend (svelte-check, lint, knip, vitest, assets fresh)", "E2E (Playwright, desktop)"]
+mandatory_jobs = ["check (3.11)", "check (3.12)", "check (3.13)", "check (3.14)", "Package smoke (wheel, sdist, tool install without Node)", "Frontend (svelte-check, lint, knip, vitest, assets fresh)", "E2E (Playwright, desktop)"]
 legacy = "fail"
 
 [[gate.loosened]]
