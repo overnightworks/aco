@@ -57,7 +57,7 @@ from aco import github, process, protocol, store
 _UNRESOLVABLE_OBJECT_ID = protocol.ObjectId("0" * 40)
 _PLACEHOLDER_TIP = protocol.ObjectId("1" * 40)
 # `schema.toml`'s content one version below `SUPPORTED_STATE_SCHEMA_VERSION`
-# (2, issue #248's `items/` directory): unsupported for the same reason
+# (2, which added the `items/` directory): unsupported for the same reason
 # version 3 is, and reused verbatim wherever a test needs any syntactically
 # valid `schema.toml` body that is not the currently supported one.
 _SCHEMA_TOML_VERSION_ONE = b"version = 1\n"
@@ -75,8 +75,8 @@ def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every store-command test reads a tracked `board.toml` by default
-    (issue #315): the `bootstrap` proofs below drive a real `worktree` that
+    """Every store-command test reads a tracked `board.toml` by default:
+    the `bootstrap` proofs below drive a real `worktree` that
     never `git add`s `board.CONFIG_PATH` -- it has no reason to carry
     one, since `board.load_config` already defaults `canonical_remote` to
     `"origin"`, the remote these tests add -- so a real `git ls-files` check
@@ -92,7 +92,7 @@ def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
     `_run_git` (`process.run_captured`) and `_run_git_with_input`
     (`process.run_bounded_captured`) -- the proof that a transition's or a read's
     git-invocation count is independent of how many claims the state tree
-    holds (issue #241).
+    holds.
     """
     counts: Counter[str] = Counter()
 
@@ -158,7 +158,7 @@ def _push_custom_tree(
 
 def _push_message_only_commit(remote: Path, worktree: Path, *, parent: str, message: str) -> str:
     """Push one commit reusing `parent`'s own tree verbatim, differing only
-    in its message -- test scaffolding for issue #357 R1's hand-written
+    in its message -- test scaffolding for a hand-written
     malformed history: a claim-shaped commit `store`'s own writer never
     produces, whose trailer `claim_lifecycle`'s reader must skip and count
     rather than crash on."""
@@ -205,7 +205,7 @@ class _AcceptThenRaiseTransport:
 
 class _AlwaysRejectingTransport:
     """A `PushTransport` that never lands a push -- exhausts the retry loop
-    without the ref ever moving (issue #237 finding 22's stuck-lock case)."""
+    without the ref ever moving."""
 
     def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
         raise protocol.PushRejectedError("simulated permanent rejection")
@@ -229,9 +229,7 @@ class _RejectsFirstPushesTransport:
 class _AlwaysRacingTransport:
     """A `PushTransport` where a concurrent writer always lands first: each
     call pushes one real, distinct commit onto the ref before raising, so
-    every retry attempt observes it having genuinely moved (issue #237
-    finding 22's race case, as opposed to `_AlwaysRejectingTransport`'s
-    stuck ref)."""
+    every retry attempt observes it having genuinely moved."""
 
     def __init__(self) -> None:
         self._real = store.GitPushTransport()
@@ -253,9 +251,8 @@ class _AlwaysRacingTransport:
 class _MovesOnceThenSticksTransport:
     """A `PushTransport` where a concurrent writer's commit lands first on
     exactly the first attempt, then the ref sits fixed while every further
-    push is rejected -- issue #237 finding 22's mixed case, neither
-    `_AlwaysRacingTransport`'s pure race nor `_AlwaysRejectingTransport`'s
-    pure stuck ref."""
+    push is rejected -- the mixed case, neither `_AlwaysRacingTransport`'s
+    pure race nor `_AlwaysRejectingTransport`'s pure stuck ref."""
 
     def __init__(self) -> None:
         self._real = store.GitPushTransport()
@@ -367,9 +364,9 @@ def test_fetch_state_anchors_the_tip_without_creating_the_shared_state_ref(
 ) -> None:
     """`fetch_state` never creates `STATE_REF` itself in the local, shared
     ref namespace -- it fetches straight into its own per-worktree anchor
-    instead (`_fetch_into_anchor`, issue #237 finding 25), git's own
+    instead (`_fetch_into_anchor`), git's own
     per-worktree namespace, never the one `STATE_REF` reserves. It leaves
-    `FETCH_HEAD` alone too (issue #426 gate finding): the anchor is the one
+    `FETCH_HEAD` alone too: the anchor is the one
     name it reads back, so writing the shared file every `git fetch` in this
     worktree overwrites would be a side effect on a name concurrent
     processes here rely on."""
@@ -393,8 +390,7 @@ def test_fetch_state_anchors_the_tip_without_creating_the_shared_state_ref(
 def test_peek_state_reads_the_current_tip_without_touching_the_anchor_or_lineage_stamp(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """`store.peek_state` (issue #405 review/gate finding, `land`'s
-    read-only preflight): the tip comes from `_ls_remote_state`'s own
+    """`store.peek_state`: the tip comes from `_ls_remote_state`'s own
     answer and reads whatever tip is on the remote right now -- even one
     another writer landed after this worktree's own last observation --
     without ever anchoring it or stamping its own lineage, unlike
@@ -421,7 +417,7 @@ def test_peek_state_reads_the_current_tip_without_touching_the_anchor_or_lineage
 def test_peek_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     bare_remote: Path, worktree: Path, tmp_path: Path
 ) -> None:
-    """Issue #310 finding 48, reproduced: `peek_state` used to read the
+    """`peek_state` used to read the
     fetched tip from `FETCH_HEAD`, the one file any `git fetch` in this
     worktree overwrites regardless of what it fetches -- exactly what a
     fixer agent's own concurrent `git fetch origin <branch>` did to `aco
@@ -474,7 +470,7 @@ def test_peek_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
 def test_peek_state_for_reset_reports_an_unreadable_schema_by_tip_and_version(
     bare_remote: Path, worktree: Path, files: dict[str, bytes], version: int
 ) -> None:
-    """Issue #341: `reset` must still export and lease-delete a ledger whose
+    """`reset` must still export and lease-delete a ledger whose
     schema this client does not speak, so the read yields its oid and
     version instead of refusing -- even when that schema's layout carries a
     top-level entry this client does not know."""
@@ -533,8 +529,7 @@ def test_fetch_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     `_FETCH_ANCHOR_REF` by name (`_fetch_into_anchor`), never from the shared
     `FETCH_HEAD` file the foreign fetch also overwrites, so this passes today;
     it fails against the previous `FETCH_HEAD`-reading implementation, which
-    shared this exact race with `peek_state`'s old one (issue #310 finding
-    48).
+    shared this exact race with `peek_state`'s old one.
     """
     created = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     reader = tmp_path / "reader"
@@ -623,8 +618,8 @@ def test_fetch_state_rejects_a_malformed_or_unsupported_tree(
 def test_fetch_state_rejects_schema_version_one_without_stamping_its_lineage(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """`version = 1` predates `SUPPORTED_STATE_SCHEMA_VERSION = 2` (issue
-    #248's `items/` directory): it is exactly as unsupported as the version-3
+    """`version = 1` predates `SUPPORTED_STATE_SCHEMA_VERSION = 2` (which added the
+    `items/` directory): it is exactly as unsupported as the version-3
     case above, and `_parse_state_tree` must raise before `fetch_state` ever
     reaches `_write_lineage_stamp`, so a first, unsupported observation never
     poisons the lineage check a later, supported fetch relies on.
@@ -702,7 +697,7 @@ def _entry_object(worktree: Path, mode: str) -> str:
             id="resources",
         ),
         # A name git would quote (non-ASCII) used to vanish from every read
-        # instead of refusing (issue #558).
+        # instead of refusing.
         pytest.param(
             store.CLAIMS_DIRECTORY, "ä", "is not a claim file", "100644", id="claims-quoted"
         ),
@@ -784,7 +779,7 @@ def test_fetch_state_refuses_an_entry_whose_name_its_directory_does_not_accept(
 def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the_ref(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """A claim file written before issue #331 sorted every scope at
+    """A claim file written before every scope was sorted at
     creation can still carry its paths in typed order on the real ref:
     `parse_claim_toml` must project it through `protocol.valid_scope` on
     read (REVISE finding 1) rather than expose the stored order verbatim.
@@ -860,9 +855,8 @@ def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the
 def test_fetch_state_rejects_a_stored_scope_entry_valid_scope_refuses(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """The other half of `_claim_toml_scope`'s canonicalization (issue #331
-    REVISE finding 1): a stored scope only reads as a legacy record when
-    `valid_scope` itself would still accept it, just unsorted -- content
+    """The other half of `_claim_toml_scope`'s canonicalization: a stored scope only reads as a
+    legacy record when `valid_scope` itself would still accept it, just unsorted -- content
     it would refuse from a fresh request (here an absolute path) fails
     loud on read too, named by the claim key, never silently passed
     through."""
@@ -897,7 +891,7 @@ def test_fetch_state_rejects_a_stored_scope_entry_valid_scope_refuses(
 def test_fetch_state_never_archives_items_content(
     bare_remote: Path, worktree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`items/` (issue #248) is a recognized top-level entry, but
+    """`items/` is a recognized top-level entry, but
     `_parse_state_tree`'s own archive excludes it by naming exactly the
     paths it wants (never a bare `git archive <tree>`): reading claim state
     never pays to fetch item content."""
@@ -997,7 +991,7 @@ def non_file_items_store(
 def test_read_item_files_refuses_an_entry_that_is_no_file(
     worktree: Path, non_file_items_store: tuple[protocol.ObjectId, str]
 ) -> None:
-    """CAS-32 (issue #565): a directory, a symlink, or a submodule under
+    """CAS-32: a directory, a symlink, or a submodule under
     `items/` refuses by name, never left out of the read without a word."""
     tip, refusal = non_file_items_store
 
@@ -1010,7 +1004,7 @@ def test_read_item_files_refuses_an_entry_that_is_no_file(
 def test_fetch_state_refuses_an_items_entry_that_is_no_file(
     bare_remote: Path, worktree: Path, non_file_items_store: tuple[protocol.ObjectId, str]
 ) -> None:
-    """`ClaimState.items` (issue #279) enforces the same CAS-32 shape
+    """`ClaimState.items` enforces the same CAS-32 shape
     `read_item_files` does, through the state-parsing side."""
     refusal = non_file_items_store[1]
     remote = str(bare_remote)
@@ -1022,7 +1016,7 @@ def test_fetch_state_refuses_an_items_entry_that_is_no_file(
 
 
 def test_read_state_archive_short_circuits_on_an_empty_paths_list(worktree: Path) -> None:
-    """An empty `paths` sequence means "nothing to fetch" (issue #248): `git
+    """An empty `paths` sequence means "nothing to fetch": `git
     archive -- ` with zero path arguments would otherwise archive the whole
     tree, silently defeating the exclusion `_parse_state_tree` relies on."""
     schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
@@ -1047,7 +1041,7 @@ def test_lineage_error_when_the_ref_is_rewritten_without_this_worktrees_stamp_as
 def test_lineage_check_fails_loud_when_merge_base_cannot_be_read_at_all(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #390 finding 10/CAS-48: `merge-base --is-ancestor`'s exit `1` is
+    """CAS-48: `merge-base --is-ancestor`'s exit `1` is
     the one documented "not an ancestor" outcome (proven above); every other
     nonzero exit -- here, an unresolvable stamped commit -- is a git
     failure, not a lineage fact, and must refuse CAS-48's exact sentence,
@@ -1134,7 +1128,7 @@ def test_a_state_fetch_ignores_the_remotes_configured_fetch_refspecs(
 def test_a_state_fetch_starts_no_git_maintenance_on_the_shared_object_store(
     bare_remote: Path, worktree: Path, tmp_path: Path, state_fetch: Callable[..., object]
 ) -> None:
-    """Issue #22: a fetch-started repack of the object store linked
+    """A fetch-started repack of the object store linked
     worktrees share can remove an `objects/xx` directory under another
     agent's concurrent `hash-object -w`. The reader is forced to run
     loose-objects maintenance in the foreground on every auto run, so a
@@ -1295,7 +1289,7 @@ def test_bootstrap_refuses_as_an_uncertain_write_once_a_sent_push_cannot_be_judg
 def test_push_retry_exhausts_and_names_a_stuck_lock_when_the_ref_never_moves(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #237 finding 22: rejection without advancement names a stuck lock.
+    """Rejection without advancement names a stuck lock.
 
     Exhaustion must never say "moved N times": that would blame a race
     that never happened.
@@ -1552,7 +1546,7 @@ def test_fetch_into_anchor_never_quotes_a_stray_stdout_line(
 ) -> None:
     """A failed `git fetch` never writes its result to stdout, so a stray
     line there on a stderr-empty failure must not be mistaken for the
-    failure detail (issue #372 R1): `_fetch_into_anchor` reads
+    failure detail: `_fetch_into_anchor` reads
     `process.git_failure_detail_from_stderr`, not `git_failure_detail`."""
 
     def fake_run_captured(*_args: object, **_kwargs: object) -> process.CapturedResult:
@@ -1621,7 +1615,7 @@ def test_cli_bootstrap_creates_the_empty_state_ref_without_a_ledger(
     bare_remote: Path,
     worktree: Path,
 ) -> None:
-    """Without `--ledger`, bootstrap only creates `refs/aco/state` (issue #176)."""
+    """Without `--ledger`, bootstrap only creates `refs/aco/state`."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     monkeypatch.setattr(
@@ -1670,7 +1664,7 @@ def test_cli_bootstrap_with_a_path_for_repo_writes_no_state_ref(
     bare_remote: Path,
     worktree: Path,
 ) -> None:
-    """Issue #465 proof 2: a path handed to `--repo` refuses instead of
+    """A path handed to `--repo` refuses instead of
     bootstrapping the checkout's own `origin` in its place."""
     real_git(worktree, "remote", "add", "origin", str(bare_remote))
     monkeypatch.chdir(worktree)
@@ -1724,9 +1718,8 @@ def test_parse_state_tree_fails_loud_when_a_blob_is_missing_from_the_object_data
     # loose object, simulating a corrupted or incomplete local store. A real
     # remote would re-supply the object on the next `fetch`, so this drives
     # `_parse_state_tree` directly against a commit this worktree never
-    # pushed or fetched. `git archive` -- the bulk-read boundary (issue
-    # #241) -- is what notices, not `ls-tree`, which happily lists a
-    # dangling entry.
+    # pushed or fetched. `git archive` -- the bulk-read boundary -- is what
+    # notices, not `ls-tree`, which happily lists a dangling entry.
     blob_oid = blob(worktree, _SCHEMA_TOML_VERSION_ONE)
     tree = raw_tree(worktree, [("100644", "blob", blob_oid, "schema.toml")])
     commit = real_git(worktree, "commit-tree", tree, "-m", "test fixture").stdout.strip()
@@ -1788,8 +1781,8 @@ def _fake_run_captured_failing_candidate_log(
 ) -> Callable[[list[str]], process.CapturedResult]:
     """Every real git subprocess runs except the per-candidate `git log -1`
     inside `_find_operation_id`'s search -- distinguished from that
-    function's own outer `git log --format=%H` listing (issue #390 finding
-    9a) by the `-1` argument the inner read alone carries."""
+    function's own outer `git log --format=%H` listing by the `-1` argument the inner read
+    alone carries."""
 
     def fake(arguments: list[str]) -> process.CapturedResult:
         if "log" in arguments and "-1" in arguments:
@@ -1804,7 +1797,7 @@ def _fake_run_captured_failing_candidate_log(
 def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #390 finding 9a, CAS-47: after a lost response, a transition's
+    """CAS-47: after a lost response, a transition's
     retry searches new history for its own `operation_id` before assuming
     nothing landed. Reading a broken per-candidate read as "not found" would
     let the retry build and push a second transition on top of the one that
@@ -1889,7 +1882,7 @@ def _raw_commit_message(remote: Path, commit: str) -> str:
 def test_commit_transition_writes_the_exact_trailer_block_for_a_claim_and_a_landing(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #390 finding 4: `_transition_message`'s trailer block is the
+    """`_transition_message`'s trailer block is the
     one machine-readable shape `claim_lifecycle` and `_find_operation_id`
     read back key by key, in order -- pin every `key: value` line of a
     claim transition's and a landing transition's own commit, read back
@@ -1967,7 +1960,7 @@ def test_claim_ages_reads_the_committer_date_of_each_claim_from_one_log_walk(
 def test_claim_ages_survives_a_gc_prune_of_the_just_fetched_history(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #237 finding 25, reproduced: an unanchored fetch lands the
+    """An unanchored fetch lands the
     fetched commits only in `FETCH_HEAD`, which is not a ref and roots
     nothing once the fetch subprocess exits -- a `git gc --prune=now` run
     against this same checkout right after `fetch_state` returns collected
@@ -2067,7 +2060,7 @@ def test_claim_ages_fails_loud_on_a_malformed_date(
         store.claim_ages(worktree=worktree, tip=state.tip, claims=(claim,))
 
 
-# --- `claim_lifecycle` (issue #357) -----------------------------------------
+# --- `claim_lifecycle` -----------------------------------------
 
 
 def _rescope_intent(claim_id: str, operation_id: str) -> protocol.RescopeIntent:
@@ -2093,8 +2086,8 @@ def _release_intent(claim_id: str, operation_id: str) -> protocol.ReleaseIntent:
 def test_claim_lifecycle_reads_intervals_from_real_ref_history(
     bare_remote: Path, worktree: Path, git_call_spy: Counter[str]
 ) -> None:
-    """Three claims land, rescope, and release; a fourth stays open (issue
-    #357, proof 1): `claim_lifecycle` reads every one from `refs/aco/state`'s
+    """Three claims land, rescope, and release; a fourth stays open:
+    `claim_lifecycle` reads every one from `refs/aco/state`'s
     own first-parent history in one `git log` walk, with no item content and
     no trunk-landing knowledge of its own -- `size` stays `None`, the
     caller's own join (`board.py`) fills it."""
@@ -2155,7 +2148,7 @@ def test_claim_lifecycle_reads_intervals_from_real_ref_history(
 
 
 def test_claim_lifecycle_excludes_history_before_a_reset(bare_remote: Path, worktree: Path) -> None:
-    """A reset (issue #298) deletes `STATE_REF` and rebuilds it from an empty
+    """A reset deletes `STATE_REF` and rebuilds it from an empty
     tree with no parent commit -- simulated here through the store's own
     reset primitives (a raw ref delete, `clear_lineage_stamps`, a fresh
     `bootstrap`) rather than the full CLI `reset` command, since this test's
@@ -2193,7 +2186,7 @@ def test_claim_lifecycle_skips_and_counts_a_malformed_claim_shaped_commit(
     """A commit whose `intent:` trailer names `claim` but carries no
     `item:`/`claim_id:` line -- older history predating this trailer, or a
     foreign commit merely shaped like one -- is skipped and counted rather
-    than crashing the whole walk (issue #357 R1)."""
+    than crashing the whole walk."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     _committed_claim(bare_remote, worktree, issue=1)
     mid_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
@@ -2226,7 +2219,7 @@ def test_claim_lifecycle_counts_a_release_with_no_matching_claim_as_unparsed(
     """A well-formed release/rescope trailer naming a `claim_id` this walk
     never saw claimed -- history torn at a boundary this first-parent walk
     cannot see past -- is skipped and counted, never raised: one broken
-    record must not abort the whole board (issue #357 R2)."""
+    record must not abort the whole board."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
     assert state.tip is not None
@@ -2251,7 +2244,7 @@ def test_claim_lifecycle_counts_a_second_claim_of_the_same_id_as_unparsed(
     opened -- history `protocol.apply`'s own `consumed_ids` never lets a
     live writer produce, since a claim id is never claimed twice -- used to
     silently overwrite the accumulator and duplicate the same id into
-    `events` (issue #357 gate B2). It must instead count as `unparsed` and
+    `events`. It must instead count as `unparsed` and
     leave the first claim's own event untouched: one event for `c1`, still
     naming item 1, still open."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
@@ -2284,7 +2277,7 @@ def test_claim_lifecycle_counts_a_second_release_of_the_same_claim_as_unparsed(
     """A second `release` commit for a `claim_id` this walk already closed --
     `protocol.apply`'s `consumed_ids` never lets a live writer release a
     claim twice -- used to silently overwrite `released_at` with the second
-    commit's own committer date (issue #357 gate B2). It must instead count
+    commit's own committer date. It must instead count
     as `unparsed` and leave the first release's own timestamp untouched."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     _committed_claim(bare_remote, worktree, issue=1)
@@ -2323,9 +2316,8 @@ def test_claim_lifecycle_counts_a_rescope_after_release_as_unparsed(
     """A `rescope` naming a `claim_id` this walk already released -- `rescope`
     requires a live claim (`protocol.apply`; `specs/rescope.spec.md`), so a
     live writer can never produce one after that claim's own release -- used
-    to silently increment `rescoped` on the already-closed accumulator
-    (issue #357 gate B3). It must instead count as `unparsed` and leave the
-    event's own `rescopes` count untouched."""
+    to silently increment `rescoped` on the already-closed accumulator. It must instead count as
+    `unparsed` and leave the event's own `rescopes` count untouched."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     _committed_claim(bare_remote, worktree, issue=1)
     release_state = store.commit_transition(
@@ -2356,7 +2348,7 @@ def test_claim_lifecycle_counts_a_rescope_after_release_as_unparsed(
 
 _LIFECYCLE_CLAIM_BODY = "claim issue 1\n\nintent: claim\nclaim_id: c1\nitem: 1\n"
 
-# Issue #357: `claim_lifecycle` reads only `git log`; every case fixes that one stream.
+# `claim_lifecycle` reads only `git log`; every case fixes that one stream.
 _BROKEN_LIFECYCLE_LOGS = {
     "the-log-read-fails": (1, b"", "cannot read the commit history"),
     # A `-z` stream whose field count is not a multiple of three plus one trailing empty
@@ -2488,7 +2480,7 @@ def test_commit_transition_rescope_and_release_round_trip(
 def test_commit_transition_preserves_items_across_claim_rescope_and_release(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """`items/` (issue #248) is board data that claim, rescope, and release
+    """`items/` is board data that claim, rescope, and release
     intents reuse unchanged -- only `ItemWriteIntent` rewrites it.
     `_write_incremental_state_tree` must carry its oid forward unchanged on
     every claim, rescope, and release -- not silently rebuild the top-level
@@ -2550,7 +2542,7 @@ def test_commit_transition_preserves_items_across_claim_rescope_and_release(
     assert_items_unchanged()
 
 
-# --- foreign items/ entries (issue #558) --------------------------------------
+# --- foreign items/ entries --------------------------------------
 
 
 @pytest.fixture
@@ -2636,7 +2628,7 @@ def test_commit_transition_carries_every_items_entry_it_does_not_write_byte_for_
 ) -> None:
     """CAS-61: a claim, its release, and a write to another item leave every
     other `items/` entry -- name, mode, blob -- exactly as it was, and keep
-    `items/` even when only foreign entries hold it (issue #558)."""
+    `items/` even when only foreign entries hold it."""
     _push_items_store(bare_remote, worktree, foreign_item_entries + item_entries)
     before = _listing_outside_the_claim_ledger(bare_remote)
     item_write = _hashed_item_intent(
@@ -2657,7 +2649,7 @@ def test_commit_transition_carries_every_items_entry_it_does_not_write_byte_for_
 def test_a_claim_and_its_release_keep_every_entry_they_do_not_write_by_mode(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """CAS-61 across the whole tree (issue #565): an executable `schema.toml`
+    """CAS-61 across the whole tree: an executable `schema.toml`
     and `ids/` entry stay executable, same blob, through a claim and its
     release."""
     schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
@@ -2682,7 +2674,7 @@ def test_a_claim_and_its_release_keep_every_entry_they_do_not_write_by_mode(
 def test_an_item_write_keeps_the_empty_ledger_directories_it_does_not_write(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """CAS-61 across the whole tree (issue #565): an empty `claims/`,
+    """CAS-61 across the whole tree: an empty `claims/`,
     `ids/`, and `resources/` stay through a write to one item."""
     schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
     empty_tree = raw_tree(worktree, [])
@@ -2875,7 +2867,7 @@ def test_an_exclusive_claim_is_stored_byte_identical_to_an_ordinary_lane_claim(
 def test_commit_transition_a_different_key_loser_that_exhausts_retries_names_a_stuck_lock(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #237 finding 22: the ref never actually moves under
+    """The ref never actually moves under
     `_AlwaysRejectingTransport`, so exhaustion names a stuck lock, never
     "held by X" (there is no other real claim here to be held by) and never
     a race (it never moved)."""
@@ -2960,7 +2952,7 @@ def _spec_texts() -> list[str]:
 def test_no_src_message_or_spec_advises_a_hand_run_ref_delete_overwrite_or_force_push(
     user_facing_texts: Callable[[], list[str]],
 ) -> None:
-    """Issues #579/#582: a hand-run ref deletion, overwrite or force-push
+    """A hand-run ref deletion, overwrite or force-push
     wipes every claim and state-ref item; a stuck ref is `aco reset`'s job,
     which exports first by default. The corpus must hold the retry-budget
     refusal that sends a stuck agent to `aco reset`, so a collector that
@@ -3031,7 +3023,7 @@ def test_the_deletion_advice_guard_lets_the_bundle_restore_fetch_through() -> No
 def test_commit_transition_a_different_key_loser_that_exhausts_retries_names_a_race(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #237 finding 22's other half: a concurrent writer's commit
+    """A concurrent writer's commit
     genuinely lands first every attempt, so exhaustion names the race, not
     the stuck-lock repair sentence."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
@@ -3054,7 +3046,7 @@ def test_commit_transition_a_different_key_loser_that_exhausts_retries_names_a_r
 def test_commit_transition_exhaustion_names_the_true_mix_when_the_ref_moves_once_then_sticks(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """Issue #237 finding 22's mixed case for `commit_transition`: a
+    """The mixed case for `commit_transition`: a
     concurrent writer's commit lands first on exactly the first attempt,
     then the ref sits fixed while the remaining 31 pushes are all rejected
     -- the true count is one move, not "moved 32 times"."""
@@ -3107,7 +3099,7 @@ def test_commit_transition_reads_the_ref_afresh_once_after_a_rejected_push(
     arrange: Callable[..., store.PushTransport | None],
     expected_claims: set[str],
 ) -> None:
-    """Issue #494 proof 2 (CAS-13, CAS-14): a push rejected against the
+    """CAS-13, CAS-14: a push rejected against the
     observation it was handed reads the ref afresh exactly once -- one
     `ls-remote`, one `fetch` -- then re-applies onto what it read, or, when
     its answer was lost after the remote took it, finds its own
@@ -3209,7 +3201,7 @@ def test_commit_transition_says_whether_a_failed_write_may_have_landed(
     arrange: Callable[..., store.PushTransport | None],
     raised_kind: type[protocol.ClaimError],
 ) -> None:
-    """Issues #479, #494, #498 (CAS-56, CAS-57): a write that fails after
+    """CAS-56, CAS-57: a write that fails after
     its push was sent says by type whether it may have landed. One whose
     outcome the store cannot tell -- no answer, an answer and the re-read
     after it lost, a landed push whose bookkeeping failed -- is an
@@ -3331,7 +3323,7 @@ def test_commit_transition_ten_thread_contention_lands_every_distinct_key(
     assert errors == []
     state = store.fetch_state(worktree=main_repo, remote=str(bare_remote))
     assert set(state.claims) == {f"issue-{issue}" for issue in issue_numbers}
-    # Ten writers land in one linear chain (issue #241, "proven sound -- do
+    # Ten writers land in one linear chain ("proven sound -- do
     # not break"): the bootstrap commit plus ten claim commits, never a
     # merge -- every losing racer's retry re-reads its own fresh
     # `observed.tip` and rebuilds against it rather than merging histories.
@@ -3352,7 +3344,7 @@ def test_commit_transition_ten_thread_contention_lands_every_distinct_key(
 
 
 # --- Item write transitions: `ItemWriteIntent`'s oid CAS through the real --
-# --- git transport (issue #279) ---------------------------------------------
+# --- git transport ---------------------------------------------
 
 
 def _hashed_item_intent(
@@ -3366,7 +3358,7 @@ def _hashed_item_intent(
     """An `ItemWriteIntent` whose `new_oid` is a real blob hashed once, up
     front -- the same shape a production caller must use: `commit_transition`
     never hashes content itself, so every retry attempt re-applies the exact
-    same `new_oid` (issue #279's "hashed once before the retry loop")."""
+    same `new_oid`."""
     return protocol.ItemWriteIntent(
         item_id=item_id,
         expected=expected,
@@ -3380,8 +3372,8 @@ def test_commit_transition_item_create_adds_a_file_and_preserves_the_claim_ledge
 ) -> None:
     """A create lands `items/<id>.md` while `claims/`, `ids/`, and
     `resources/` stay byte-identical -- the same subtree-reuse seam
-    `_write_incremental_state_tree` already gives claim/rescope/release
-    (issue #241), now proven from the item-write side."""
+    `_write_incremental_state_tree` already gives claim/rescope/release,
+    now proven from the item-write side."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
@@ -3463,11 +3455,9 @@ def test_commit_transition_item_edit_refuses_a_stale_expected_oid_without_clobbe
 def test_commit_transition_two_writers_different_item_ids_both_land(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """Same shape as the two-racer claim test on different keys (issue
-    #176): two item creates on distinct ids both land, because every
-    attempt patches its own tip's `items/` children with only the ids it
-    writes, never a copy of the parent tree's `items/` oid (issues #279,
-    #558)."""
+    """Same shape as the two-racer claim test on different keys: two item creates on distinct ids
+    both land, because every attempt patches its own tip's `items/` children with only the ids it
+    writes, never a copy of the parent tree's `items/` oid."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
@@ -3527,7 +3517,7 @@ def _linked_worktrees(main_repo: Path, tmp_path: Path, names: tuple[str, ...]) -
 def test_commit_transition_two_threads_creating_different_item_ids_both_land(
     tmp_path: Path, bare_remote: Path
 ) -> None:
-    """Issue #279 Gate F2: the same two-racer shape as the ten-thread claim
+    """The same two-racer shape as the ten-thread claim
     contention test above, now proven for item writes -- two real threads, a
     barrier, no sleeps. Distinct ids never contend, so both creates land
     (the sequential version of this claim is
@@ -3576,7 +3566,7 @@ def test_commit_transition_two_threads_creating_different_item_ids_both_land(
 def test_commit_transition_two_threads_racing_the_same_item_id_lands_exactly_one(
     tmp_path: Path, bare_remote: Path
 ) -> None:
-    """Issue #279 Gate F2: two real threads race `ItemWriteIntent`'s
+    """Two real threads race `ItemWriteIntent`'s
     create-only CAS (`expected=None`) against the identical id -- exactly one
     lands, and the loser refuses by the same 'already exists' sentence
     `test_commit_transition_item_create_refuses_a_duplicate_id` proves
@@ -3626,7 +3616,7 @@ def test_commit_transition_two_threads_racing_the_same_item_id_lands_exactly_one
 
 
 # --- Incremental write/bulk read: git-invocation count is independent of ---
-# --- how many claims the state tree holds (issue #241) ---------------------
+# --- how many claims the state tree holds ---------------------
 
 
 def _seeded_claims_state(count: int, *, opened_commit: protocol.ObjectId) -> protocol.ClaimState:
@@ -3661,7 +3651,7 @@ def _push_seeded_state(bare_remote: Path, worktree: Path, count: int) -> protoco
     real TOML codec, once -- never `count` round trips through
     `commit_transition`, and never `store`'s own incremental writer, which
     has nothing yet to diff against on a tree's first write; `bootstrap`
-    itself only ever writes `schema.toml` alone (issue #241)."""
+    itself only ever writes `schema.toml` alone."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     parent = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
     assert parent is not None
@@ -3711,7 +3701,7 @@ def test_fetch_state_git_call_count_is_independent_of_claim_count(
     claim_count: int,
 ) -> None:
     """One `ls-tree` and one `archive` read every claim regardless of how
-    many there are (issue #241, audit findings 20-21) -- replacing what used
+    many there are -- replacing what used
     to be one `ls-tree` and one `cat-file -p` per claim.
     """
     _push_seeded_state(bare_remote, worktree, claim_count)
@@ -3735,7 +3725,7 @@ def test_fetch_state_git_call_count_is_independent_of_claim_count(
 def test_fetch_state_populates_items_from_the_one_existing_ls_tree_call(
     bare_remote: Path, worktree: Path, tmp_path: Path, git_call_spy: Counter[str]
 ) -> None:
-    """`ClaimState.items` (issue #279) comes free from the same recursive
+    """`ClaimState.items` comes free from the same recursive
     `ls-tree` `_parse_state_tree` already pays for its structure -- no
     second `ls-tree` and no `archive` call for `items/`'s own oids."""
     schema_blob = blob(worktree, protocol.serialize_empty_schema_toml().encode())
@@ -3776,8 +3766,8 @@ def test_status_git_call_count_is_independent_of_claim_count(
 ) -> None:
     """`status`'s two store reads -- `fetch_state` then `claim_ages` -- make a
     fixed number of git calls regardless of how many live claims the state
-    tree holds (issue #242): one `ls-tree`/`archive` pair for the claims
-    (issue #241) plus one batched `log` walk for their ages, never one
+    tree holds: one `ls-tree`/`archive` pair for the claims
+    plus one batched `log` walk for their ages, never one
     `merge-base`+`log` per claim.
     """
     _push_seeded_state(bare_remote, worktree, claim_count)
@@ -3846,12 +3836,12 @@ def test_commit_transition_git_call_count_is_independent_of_claim_count(
     expected_mktree: int,
 ) -> None:
     """A transition's git-invocation count is fixed by which subtrees the
-    intent touches, never by how many claims the tree already holds (issue
-    #241): the write seam's own `ls-tree` (inside the retry loop, against
-    that attempt's `observed.tip`) plus `hash-object` only for entries that
+    intent touches, never by how many claims the tree already holds: the write seam's own `ls-tree`
+    (inside the retry loop, against that attempt's `observed.tip`) plus
+    `hash-object` only for entries that
     actually changed, `mktree` only for subtrees that actually changed plus
     the top, and one `commit-tree`. Uncontended, it reads the ref no time of
-    its own: it applies to the observation it is handed (issue #494).
+    its own: it applies to the observation it is handed.
     """
     _push_seeded_state(bare_remote, worktree, claim_count)
     observed = fresh_observation(worktree, bare_remote)
@@ -3874,8 +3864,8 @@ def test_commit_transition_git_call_count_is_independent_of_claim_count(
 def test_commit_transition_reuses_an_unchanged_claims_blob_byte_for_byte(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """An entry a transition does not touch keeps its exact bytes and oid
-    (issue #241): today's normalisation-on-every-write would still produce
+    """An entry a transition does not touch keeps its exact bytes and oid:
+    today's normalisation-on-every-write would still produce
     the same bytes for an unchanged record (the codec is deterministic), so
     this pins the oid, the sharper claim reuse actually makes.
     """
@@ -3904,7 +3894,7 @@ def test_commit_transition_reuses_a_whole_unchanged_subtree_by_its_own_oid(
     bare_remote: Path, worktree: Path
 ) -> None:
     """A subtree no member of which changed is reused by its own oid --
-    never rebuilt with `mktree` (issue #241): claiming issue 2 without a
+    never rebuilt with `mktree`: claiming issue 2 without a
     resource leaves `resources/`, populated by issue 1's claim, byte for
     byte the same tree object.
     """
@@ -3934,7 +3924,7 @@ def test_parse_state_tree_fails_loud_on_malformed_archive_framing(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
     """`git archive`'s exit status cannot signal a framing problem in bytes
-    it already returned successfully (issue #241) -- `tarfile` owns that
+    it already returned successfully -- `tarfile` owns that
     failure, which a real git repository cannot itself produce, so this
     fabricates one at the `process` chokepoint.
     """
@@ -3959,7 +3949,7 @@ def test_parse_state_tree_fails_loud_on_malformed_archive_framing(
 
 # --- `apply`, the claim-key codec, and the claim/resource TOML codecs ------
 #
-# Pure logic (issue #176, slice C2): no git subprocess needed, so these
+# Pure logic: no git subprocess needed, so these
 # exercise `protocol.apply` and its codecs directly rather than through a
 # bare repository -- the thin git-transport integration layer above stays
 # reserved for what actually needs a real repository.
@@ -4316,7 +4306,7 @@ def test_apply_resource_value_must_be_a_positive_integer() -> None:
         protocol.apply(STATE_WITH_TIP, intent)
 
 
-# --- `ItemWriteIntent`'s oid CAS (issue #279) -------------------------------
+# --- `ItemWriteIntent`'s oid CAS -------------------------------
 
 _ITEM_OID = protocol.ObjectId("d" * 40)
 
@@ -4481,7 +4471,7 @@ def test_claim_key_issue_and_lane_prefixes_never_collide() -> None:
         pytest.param("issue-" + "7" * 5000, "malformed issue number", id="issue-past-int-limit"),
         pytest.param("lane-%2", "malformed percent-escape", id="lane-incomplete-escape"),
         pytest.param("lane-%zz", "malformed percent-escape", id="lane-invalid-escape"),
-        # Issue #237 finding 23: `_percent_encode_branch` never emits a
+        # `_percent_encode_branch` never emits a
         # literal byte outside `_LANE_KEY_UNRESERVED` -- these two hand-
         # corrupted blobs carry one anyway, a shape `claim_key` itself would
         # never produce, so `parse_claim_key` must refuse them rather than
@@ -4720,7 +4710,7 @@ def test_commit_transition_refuses_a_missing_state_ref(worktree: Path, tmp_path:
         store.commit_transition(observed=observed, subject=subject, intent=intent)
 
 
-# `reset` (issue #298): `export_state_bundle`, `delete_state_ref`, and
+# `reset`: `export_state_bundle`, `delete_state_ref`, and
 # `clear_lineage_stamps`, plus the two small reads (`list_worktrees`,
 # `local_state_ref_exists`) `cli.py`'s reset command plans and reports from.
 
@@ -4729,8 +4719,7 @@ def test_local_state_ref_exists_for_reset_fails_loud_on_a_git_failure_other_than
     monkeypatch: pytest.MonkeyPatch, worktree: Path
 ) -> None:
     """`git show-ref --verify --quiet`'s own documented "no such ref"
-    outcome is exit 1 with empty output (issue #298, 19.09.2026 gate
-    finding 4) -- any other nonzero exit, a corrupt ref or a repository
+    outcome is exit 1 with empty output -- any other nonzero exit, a corrupt ref or a repository
     failure, must fail loud rather than be read as the ref's absence."""
     real_run_captured = process.run_captured
 
@@ -4755,7 +4744,7 @@ def test_export_state_bundle_writes_a_verifiable_bundle_and_never_touches_the_sh
     bare_remote: Path, worktree: Path, tmp_path: Path, shared_state_ref_before_export: str
 ) -> None:
     """Bundles the private `EXPORT_BUNDLE_REF`, never the shared
-    `STATE_REF` (issue #298, 19.09.2026 REVISE findings 1+2). The previous
+    `STATE_REF`. The previous
     implementation pointed `STATE_REF` at `tip` to give the bundle a name --
     `refs/aco/state` is visible from every linked worktree of a repository,
     so a concurrent reset elsewhere could repoint or delete it between that
@@ -4866,7 +4855,7 @@ def _break_export_via_a_cross_device_link_failure(
     """`os.link`'s no-clobber semantics (`FileExistsError`) are not its only
     failure mode: publishing across a filesystem boundary raises
     `OSError(errno.EXDEV, ...)` instead, a path CI's 100 % line-coverage
-    gate found unexercised (issue #298, the fifth 19.09.2026 gate REVISE).
+    gate found unexercised.
     Patched at `store.os.link`, the module boundary `_write_and_publish_bundle`
     calls through, rather than reimplementing a real cross-device mount."""
     tip = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
@@ -4962,8 +4951,7 @@ def _fail_temporary_unlink(
 
 
 class _RefDeletionFailure(Enum):
-    """The three independent ways `_delete_export_ref`'s guard (issue #298,
-    the third and fourth 19.09.2026 gate REVISEs) must survive an injected
+    """The three independent ways `_delete_export_ref`'s guard must survive an injected
     `update-ref -d EXPORT_BUNDLE_REF` failure: a nonzero exit matching a
     real `git update-ref` refusal, a raised `OSError` matching an
     invocation that never reached git at all, and a nonzero exit whose
@@ -5223,8 +5211,7 @@ def test_export_state_bundle_names_every_uncleaned_leftover_and_preserves_the_or
 ) -> None:
     """The two cleanup steps `_clear_export_artifacts` runs -- clearing
     `EXPORT_BUNDLE_REF` and removing the temporary file -- are independent
-    of each other and of whatever exception type each raises (issue #298,
-    the second and third 19.09.2026 gate REVISEs): whichever one fails,
+    of each other and of whatever exception type each raises: whichever one fails,
     the other is still attempted, the raised error names every artifact
     that is actually left behind together with its own failure, and it is
     chained to the write/publish failure that preceded it when there was
@@ -5346,8 +5333,7 @@ def _fake_failed_remote_delete(
     monkeypatch: pytest.MonkeyPatch, *, also_break_ls_remote: bool = False
 ) -> None:
     """A `--force-with-lease` push that always reports failure, standing in
-    for a lost response after the remote actually applied it (issue #298,
-    19.09.2026 gate finding 5) -- every real git subprocess still runs
+    for a lost response after the remote actually applied it -- every real git subprocess still runs
     except `push`, and, when `also_break_ls_remote` is set, the repair's own
     re-probe too, reproducing an unreachable remote."""
     real_run_captured = process.run_captured
@@ -5389,8 +5375,7 @@ def test_delete_state_ref_repair_never_recommends_a_manual_lease(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path, *, remote_moved: bool
 ) -> None:
     """A re-probed tip that differs from the lease means the remote moved
-    since this reset last observed it (issue #298, 19.09.2026 REVISE
-    finding 3): the replacement tip was never checked against a live claim
+    since this reset last observed it: the replacement tip was never checked against a live claim
     nor exported, so the only repair the message may name is re-running
     `aco reset --confirm` -- which repeats both checks -- never a manual
     `--force-with-lease` command against a tip neither check has seen. The
