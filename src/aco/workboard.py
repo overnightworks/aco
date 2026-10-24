@@ -113,9 +113,9 @@ TOUCHES_WITHOUT_CLOSING_LINE_PATTERN = re.compile(
     r"(?im)^(?:Refs?|References?|Part of|Teil von)\b[:\s].*$"
 )
 CLAIM_OLD_AFTER = timedelta(hours=1)
-# The three slice-title forms seen in atelier-2: a parenthetical
-# after the real title (`(#<n> Scheibe <k>)`, `(#<n> slice <k>)`) or a leading
-# German phrase (`Scheibe <k> von #<n>`).
+# The three slice-title forms: a parenthetical
+# after the real title (`(#962 Scheibe 4)`, `(#962 slice 4)`) or a leading
+# German phrase (`Scheibe 4 von #962`).
 _SLICE_TITLE_PARENTHETICAL_PATTERN = re.compile(
     rf"\(#(?P<parent>{ISSUE_NUMBER})[ \t]+(?:Scheibe|slice)[ \t]+(?P<slice>{ISSUE_NUMBER})\)",
     re.IGNORECASE | re.ASCII,
@@ -1188,7 +1188,7 @@ def declared_work_items(pull_requests: tuple[PullRequest, ...], repository: str)
 def slice_title_match(title: str) -> tuple[int, int] | None:
     """`(slice number, parent issue)` when `title` looks like a dispatched slice.
 
-    Matches the three forms `(#<n> Scheibe <k>)`, `(#<n> slice
+    Matches the three forms: `(#<n> Scheibe <k>)`, `(#<n> slice
     <k>)`, and `Scheibe <k> von #<n>`. A title carrying none of them returns
     None — the heuristic simply has nothing to check.
     """
