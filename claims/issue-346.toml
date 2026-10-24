@@ -1,8 +1,0 @@
-claim_id = "6eef88b2dc40487bb6e6633685d95b96"
-agent = "claude"
-role = "builder"
-base = "beeba89da0561bfae54b3e02ed92dfac563a6ef2"
-branch = "claude/issue-346-quality-060"
-scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", "frontend/package.json", "frontend/pnpm-lock.yaml", "quality/baseline.toml", "quality/config.toml"]
-opened_commit = "922964898d3224e46a676c821a75be0ec67cb720"
-whole_reason = "Pin, Baseline und der abgelöste Audit-Schritt hängen am selben quality-Stand; ein npm-Fund wird im selben PR behoben."
