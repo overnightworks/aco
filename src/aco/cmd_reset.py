@@ -253,8 +253,8 @@ def _reset_observation(
     `store.peek_state_for_reset` instead of `RunContext.observation`'s ordinary
     `store.fetch_state`, so a broken lineage -- exactly what `reset` exists to
     recover from -- never blocks it, and so a dry run, a live-claim
-    refusal, or a failed export writes no per-worktree stamp or anchor
-    (finding 2). A canonical remote with no URL refuses before that read."""
+    refusal, or a failed export writes no per-worktree stamp or anchor.
+    A canonical remote with no URL refuses before that read."""
     canonical_remote = context.configured_canonical_remote
     worktree = context.toplevel
     state = store.peek_state_for_reset(worktree=worktree, remote=canonical_remote)

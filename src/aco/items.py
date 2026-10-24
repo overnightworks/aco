@@ -110,7 +110,7 @@ def format_item_id(number: int) -> str:
 
 def is_item_number(number: int) -> bool:
     """Whether `number` lies in the id space: `format_item_id` renders it as
-    an id `ITEM_ID_PATTERN` accepts back. A `16777216` in free
+    an id `ITEM_ID_PATTERN` accepts back. A `#16777216` in free
     text names no item, since six hex digits end at 16777215."""
     return ITEM_ID_PATTERN.fullmatch(format_item_id(number)) is not None
 
