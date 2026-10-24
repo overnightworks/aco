@@ -14,7 +14,7 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from board_fixtures import REPOSITORY
@@ -2386,20 +2386,10 @@ def test_bounded_command_wraps_stdin_write_errors(
 def launched_children(monkeypatch: pytest.MonkeyPatch) -> list[subprocess.Popen[Any]]:
     """Every child `subprocess.Popen` starts, so a test can observe its cleanup."""
     children: list[subprocess.Popen[Any]] = []
-    original_popen = subprocess.Popen
+    original_popen = cast(Callable[..., subprocess.Popen[Any]], subprocess.Popen)
 
-    def start(
-        command: list[str],
-        *,
-        stdin: int | None = None,
-        stdout: int | None = None,
-        stderr: int | None = None,
-        env: dict[str, str] | None = None,
-        cwd: Path | None = None,
-    ) -> subprocess.Popen[bytes]:
-        children.append(
-            original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env, cwd=cwd)
-        )
+    def start(command: list[str], **options: object) -> subprocess.Popen[Any]:
+        children.append(original_popen(command, **options))
         return children[-1]
 
     monkeypatch.setattr(subprocess, "Popen", start)

@@ -24,7 +24,7 @@
 "scripts/test_inventory.py" = 933
 "src/aco/body.py" = 1669
 "src/aco/checkout.py" = 2041
-"src/aco/cli.py" = 970
+"src/aco/cli.py" = 888
 "src/aco/cmd_claim.py" = 1137
 "src/aco/cmd_release.py" = 925
 "src/aco/github.py" = 1765

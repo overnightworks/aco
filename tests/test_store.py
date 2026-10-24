@@ -1332,9 +1332,7 @@ class _PushProcessProbe:
         self._controlling = True
         real_popen = cast(Callable[..., subprocess.Popen[Any]], subprocess.Popen)
 
-        def popen(
-            command: list[str], *args: object, **options: object
-        ) -> subprocess.Popen[Any] | UnstoppableProcess:
+        def popen(command: list[str], *args: object, **options: object) -> object:
             if "push" not in command:
                 return real_popen(command, *args, **options)
             self.started += 1
@@ -1359,21 +1357,12 @@ class _PushProcessProbe:
         self._replacement_command = command
 
     def expires_the_push_at_once(self) -> None:
-        run_without_limit = process.run_bounded_captured
+        unlimited = cast(Callable[..., process.CapturedResult], process.run_bounded_captured)
 
-        def bounded(
-            command: list[str],
-            *,
-            input_data: bytes | None = None,
-            env: dict[str, str] | None = None,
-            timeout: float = process.DEFAULT_TIMEOUT_SECONDS,
-        ) -> process.CapturedResult:
-            return run_without_limit(
-                command,
-                input_data=input_data,
-                env=env,
-                timeout=0 if "push" in command else timeout,
-            )
+        def bounded(command: list[str], **options: object) -> process.CapturedResult:
+            if "push" in command:
+                options["timeout"] = 0
+            return unlimited(command, **options)
 
         self._monkeypatch.setattr(process, "run_bounded_captured", bounded)
 

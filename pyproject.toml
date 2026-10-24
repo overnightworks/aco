@@ -81,6 +81,7 @@ layers = [
     "items",
     "body",
     "metrics",
+    "usage",
     "protocol | process | board",
 ]
 # `metrics` moved below `body` (issue #419): it has no `aco`
