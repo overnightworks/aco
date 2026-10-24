@@ -32,7 +32,7 @@ def _touch_line(
 ) -> str:
     """One overlapping claim, named with the paths where its scope meets
     `own_scope` -- the fact a claimant needs to know they hold both scopes
-    at once, not only the other item's name (issue #206)."""
+    at once, not only the other item's name."""
     paths = protocol.named_with_overflow_count(protocol.scope_overlap_paths(own_scope, claim.scope))
     return f"{workboard.claim_subject(claim, storage)} on {paths}"
 
@@ -96,10 +96,10 @@ class ClaimArguments:
 
 def _resolved_claim_branch(arguments: ClaimArguments, *, directory: Path | None = None) -> str:
     """`claim`'s own branch: `--branch` when given, else `directory`'s
-    checked-out branch, read via `-C` when given (issue #322: `start`'s own
+    checked-out branch, read via `-C` when given (`start`'s own
     resolved worktree, never a process-wide `os.chdir`) or the calling
     process's own cwd otherwise -- the one resolution `_request` and
-    `run` (issue #337, which needs it before `_request` builds a full
+    `run` (which needs it before `_request` builds a full
     request) both bind to, so it stays a single owner rather than two copies
     of the same git call and validation."""
     branch = (
@@ -118,8 +118,7 @@ def _request(
 ) -> protocol.ClaimRequest:
     """`claim_request`, checked against the checkout it is made in:
     `claim` stands in the worktree it claims, judged against the canonical
-    remote's recorded default branch `default_branch` answers (issue
-    #490)."""
+    remote's recorded default branch `default_branch` answers."""
     request = claim_request(ClaimArguments.from_parsed(arguments), directory=directory)
     checkout.validate_checkout(request, default_branch=default_branch, directory=directory)
     return request
@@ -129,12 +128,12 @@ def claim_request(
     arguments: ClaimArguments, *, directory: Path | None = None, adopted: bool = False
 ) -> protocol.ClaimRequest:
     """The `protocol.ClaimRequest` `claim` submits, `arguments.scope` bound as-is
-    when given. Omitted -- issue mode only (issue #337); lane mode still
+    when given. Omitted -- issue mode only; lane mode still
     refuses it, `checked_claim`'s own first check -- it binds the empty
     tuple instead of raising: `checked_claim` replaces it with the item's
     own body scope, or a live claim's stored scope on replay, before this
     request's scope ever reaches a wide-scope check or a write. With
-    `--base` and `--branch` given it reads no checkout at all (issue #479:
+    `--base` and `--branch` given it reads no checkout at all (
     `start` checks its claim before the worktree exists). `adopted` claims a
     pull request's own head branch, whatever its prefix, as an issue-less
     lane (`aco adopt`); `aco claim` never passes it."""
@@ -184,7 +183,7 @@ class ScopeVersioning:
 
 
 class ClaimReason(StrEnum):
-    """`aco claim`'s own `--json` `reason` vocabulary (issue #406,
+    """`aco claim`'s own `--json` `reason` vocabulary (
     `specs/claim.spec.md`): `claimed` the only success. `precondition_failed`
     covers the shared `checks` array `refuse_claim` reports (out-of-order,
     blocked, container, closed/missing, body-incomplete, missing-parent --
@@ -232,7 +231,7 @@ def _claim_json(
 
 @dataclass(frozen=True)
 class _SliceCheck:
-    """One slice-rule finding — the `check` table `#79` rules.
+    """One slice-rule finding in the `check` table.
 
     `slice`/`issue` carry whichever numbers the message names, so a `--json`
     caller can act on the finding without re-parsing `text`; either is
@@ -338,7 +337,7 @@ def _parent_checks(
 
 
 def _malformed_checks(item: workboard.BoardItem) -> tuple[_SliceCheck, ...] | None:
-    """The one refusal a malformed block body gets (#150) -- every other
+    """The one refusal a malformed block body gets -- every other
     body-contract check (blocker state, completeness) never runs, since
     neither the parsed projections nor the blocker set can be trusted once
     the body itself failed to read."""
@@ -440,9 +439,9 @@ def _claim_intent_from_request(
     request: protocol.ClaimRequest, operation_id: str, item_pin: protocol.ItemPin | None
 ) -> protocol.ClaimIntent:
     """`_request`'s validated `protocol.ClaimRequest`, converted to the store's own
-    intent (issue #176, §1: `protocol.ClaimRequest` stays the CLI-facing input,
+    intent (`protocol.ClaimRequest` stays the CLI-facing input,
     `protocol.ClaimIntent` is what `protocol.apply` actually consumes), pinned to `item_pin`
-    when the claim's checks judged a state-ref item open (issue #496)."""
+    when the claim's checks judged a state-ref item open."""
     resource_name = None
     resource_value = None
     if request.resource is not None:
@@ -469,7 +468,7 @@ def _claimed_item_pin(
     identity: protocol.ClaimIdentity, observed: protocol.ClaimState, storage: body.Storage
 ) -> protocol.ItemPin | None:
     """The state-ref item a claim's checks judged open, pinned to its blob in
-    `observed`, the observation those checks read (issue #496). `None` for a
+    `observed`, the observation those checks read. `None` for a
     lane, and under `github`, whose forge holds the item's state while the
     ledger holds no fact of it; `None` too for an item `observed` lacks,
     which the checks already refuse as missing."""
@@ -519,17 +518,17 @@ _CLAIM_SCOPE_MISMATCH = "claim scope differs from the item's scope; correct the 
 class _ClaimTargetInvalidError(protocol.ClaimError):
     """The item a claim's scope is being *derived* from is unusable --
     missing, or a pull request -- discovered while reading its body, before
-    any slice-rule check ever runs (issue #406). Named so `--json` can
+    any slice-rule check ever runs. Named so `--json` can
     choose `target_invalid` over the broad `unavailable` every other claim
     refusal falls to."""
 
 
 class _ClaimBodyInvalidError(protocol.ClaimError):
     """The item a claim's scope is being *derived* from has a body that
-    cannot supply or confirm one -- a malformed `aco` block (issue
-    #310 finding 43: named *before* "item names no scope", reusing the same
+    cannot supply or confirm one -- a malformed `aco` block (
+    named *before* "item names no scope", reusing the same
     block-defect reader `check -` uses), no `scope` field at all, or
-    one differing from an explicit `--scope` (issue #406). Named so
+    one differing from an explicit `--scope`. Named so
     `--json` can choose `body_invalid`. Also covers CLM-37: a malformed
     body on the whole fallback for an explicit or replayed wide scope."""
 
@@ -540,15 +539,15 @@ def _item_target_body(
     number: int,
     storage: body.Storage,
 ) -> str:
-    """The item's own body for `_item_scope`/`_item_whole` (issue #337):
+    """The item's own body for `_item_scope`/`_item_whole`:
     from `open_by_number` -- the open-board listing `claim` needs anyway
     for its slice-rule checks -- when the target is open, so a derived
     scope costs no separate body read; a closed, missing, or pull-request
     target never appears there, and falls back to the one single-item
-    lookup `_issue_reference_state` uses for the same reason (issue #245).
+    lookup `_issue_reference_state` uses for the same reason.
     `board_read.item_body_or_refuse`'s own `protocol.ClaimUnavailableError` -- missing or a
     pull request, CLM-24's own two conditions -- becomes
-    `_ClaimTargetInvalidError` by name (issue #406); a forge outage or
+    `_ClaimTargetInvalidError` by name; a forge outage or
     malformed response (`forge.ForgeError`, raised by `client.item_reference`
     itself) is a different failure and passes through unwrapped to
     `run`'s `unavailable` catch-all (CLM-27)."""
@@ -666,7 +665,7 @@ def _reject_scope_mismatch(
     storage: body.Storage,
 ) -> None:
     """Refuses an explicit `--scope` whose canonical set differs from the
-    target item's own body scope (issue #337) -- reusing the open board
+    target item's own body scope -- reusing the open board
     `run` fetches once, whether for a derived scope or for its
     slice-rule checks, so this costs no second forge read. A target item
     outside the fetched open list, or one with no `scope` field of its own,
@@ -690,18 +689,18 @@ def scope_versioning(
     whole_from_body: Callable[[], str | None] | None = None,
     revision: str | None = None,
 ) -> tuple[ScopeVersioning, str | None]:
-    """`claim`'s local, forge-free scope checks (issue #207's comma guard,
+    """`claim`'s local, forge-free scope checks (the comma guard,
     the wide-scope width gate) against the real checkout, run once the
     requested scope is final -- whether it came from `--scope` or was
     derived from the item's own body. Read from `context`'s directory via
-    `-C` when it names one (issue #322: `start`'s own resolved worktree,
+    `-C` when it names one (`start`'s own resolved worktree,
     never a process-wide `os.chdir`) or the calling process's own cwd
     otherwise. The second element is the effective `whole_reason` the width
-    gate actually admitted the scope with (issue #399): `whole_reason`
+    gate actually admitted the scope with: `whole_reason`
     itself, or `whole_from_body()`'s own result when the gate tripped and
     needed it -- the caller's own claim persists this, not the raw
     `whole_reason` it passed in. Given `revision`, the scope is measured
-    against that commit's tree instead of the checkout (issue #479:
+    against that commit's tree instead of the checkout (
     `start`'s fetched trunk, before any worktree of it exists)."""
     versioned = checkout.versioned_paths(directory=context.directory, revision=revision)
     policy.reject_ungrounded_comma_scope(scope, versioned, flag="--scope")
@@ -727,7 +726,7 @@ def scope_versioning(
 class _ClaimTargetContext:
     """The board-environment scalars `_claim_target_checks` needs beyond
     the claim request itself, bundled once instead of PLR0913's
-    five-scalar ceiling (issue #337): `storage` and `worktree` `run`
+    five-scalar ceiling: `storage` and `worktree` `run`
     already resolved before this point, and `open_by_number` -- the open
     board, when deriving the scope already fetched it, `None` otherwise --
     so a fresh issue claim that did not derive its scope still fetches the
@@ -749,10 +748,10 @@ def _claim_target_checks(
     check against. A replayed claim (`_matching_store_claim`) skips the
     forge and the checks entirely, since an interrupted retry was already
     accepted once. A fresh issue claim reuses `target.open_by_number` when
-    deriving the scope already fetched it (issue #337), so this never
+    deriving the scope already fetched it, so this never
     re-fetches the open board a second time, then runs the mismatch and
     slice-rule gates against it. `context.forge` -- built and
-    Erwartung-6-checked on this first call (issue #245) -- runs only on
+    Erwartung-6-checked on this first call -- runs only on
     this fresh-claim path, never for a lane claim or a replay."""
     if not isinstance(requested.identity, protocol.IssueIdentity):
         return (), None, None
@@ -792,7 +791,7 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
 def refuse_claim_error(
     error: protocol.ClaimError, context: session.RunContext, *, as_json: bool
 ) -> int:
-    """`claim`'s own `--json` refusals (issue #406, `ClaimReason`):
+    """`claim`'s own `--json` refusals (`ClaimReason`):
     `claim_write`'s typed exceptions choose `target_invalid`/
     `body_invalid`/`claim_conflict`; `session.RepoMeaninglessUnderStateRefError`
     chooses `invalid_usage`; every other `protocol.ClaimError` -- a checkout
@@ -825,15 +824,15 @@ def claim_write(
     parsed: argparse.Namespace, context: session.RunContext, *, worktree: Path | None = None
 ) -> int:
     """`claim` made in the session's own checkout, or in `worktree` when
-    given (`start` claiming in a lane worktree that already stands, issue
-    #479): then the request is read and checked in `worktree` and the scope
+    given (`start` claiming in a lane worktree that already stands):
+    then the request is read and checked in `worktree` and the scope
     measured against its HEAD, while the claim's checks read the session's
     own board configuration -- the main checkout's."""
 
     def default_branch() -> str | None:
         # A remote this checkout does not configure records no default
         # branch, so the `main`/`master` guess would judge the checkout
-        # against a trunk nobody named (issue #512): name the remote first.
+        # against a trunk nobody named: name the remote first.
         context.refuse_unconfigured_canonical_remote()
         return context.recorded_default_branch
 
@@ -856,7 +855,7 @@ def claim_write(
 @dataclass(frozen=True)
 class _ClaimPlan:
     """What `claim`'s check phase accepted, and everything its commit phase
-    writes and reports (issue #479): `start` runs the two phases around the
+    writes and reports: `start` runs the two phases around the
     worktree it builds, so a refusal comes before the build."""
 
     requested: protocol.ClaimRequest
@@ -879,7 +878,7 @@ def checked_claim(
     """`claim`'s check phase: every refusal a claim meets before its one
     ledger write -- the scope's shape and width, the store, the target's
     slice rules, and the ledger's own conflict, `protocol.apply` run on the
-    observed state (issue #479). Refusing slice rules come back in the plan
+    observed state. Refusing slice rules come back in the plan
     for the caller to report in its own shape; every other refusal raises.
     `revision` names the commit the scope is measured against when the
     session's own checkout is not the one claimed in (`start`'s fetched
@@ -894,7 +893,7 @@ def checked_claim(
         # existed, so a comma or width refusal never touches the store or
         # resolves the repository toplevel -- unless the scope is actually
         # wide and names no `--whole` of its own, in which case the width
-        # gate's own lazy fallback (issue #399) resolves the toplevel itself
+        # gate's own lazy fallback resolves the toplevel itself
         # to read the item's body, never this branch.
         versioning, effective_whole = scope_versioning(
             requested.scope,
@@ -911,7 +910,7 @@ def checked_claim(
         # `--scope` was omitted in issue mode: the item's own scope has to
         # come from the store, and usually the forge, before it can even be
         # shape-checked -- both observed exactly once, here, so an omitted-
-        # scope claim never fetches either a second time (issue #337).
+        # scope claim never fetches either a second time.
         observed = context.observation
         protocol.require_state_ref(observed)
         storage = context.config.storage
@@ -1038,7 +1037,7 @@ def print_lane_worktree(target: LaneWorktree) -> None:
 
 def _remove_refused_worktree(target: LaneWorktree, *, command: str) -> None:
     """Undo a build whose claim was refused after the check
-    phase passed (issue #479), saying so: a refusal must leave no worktree
+    phase passed, saying so: a refusal must leave no worktree
     or branch behind. When git will not remove the worktree, that is said
     too, beside the refusal rather than in its place."""
     try:

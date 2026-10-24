@@ -33,7 +33,7 @@ MAX_RECENT_MERGED_PULL_REQUESTS = 1000
 PARALLEL_FETCH_CONCURRENCY = 20
 # GraphQL aliases every number into one query field, so a block this size
 # stays one round trip; GitHub's own guidance keeps a query's alias count in
-# the 50-100 range rather than one huge query per repository (issue #440).
+# the 50-100 range rather than one huge query per repository.
 GRAPHQL_ITEM_REFERENCE_BATCH_SIZE = 100
 # `Repository.issueOrPullRequest`'s own `state` enum spans both `Issue`
 # (`OPEN`/`CLOSED`) and `PullRequest` (`OPEN`/`CLOSED`/`MERGED`); `forge.
@@ -42,7 +42,7 @@ GRAPHQL_ITEM_REFERENCE_BATCH_SIZE = 100
 # merged pull request reads exactly like a closed one here too. GraphQL's own
 # schema has `MERGED` solely on `PullRequestState`, so an `Issue` node
 # claiming it is impossible on the wire and a malformed response, never a
-# state to normalize (issue #440 review).
+# state to normalize.
 _GRAPHQL_ITEM_STATES_BY_TYPENAME: dict[str, dict[str, forge.ItemState]] = {
     "Issue": {"OPEN": forge.ItemState.OPEN, "CLOSED": forge.ItemState.CLOSED},
     "PullRequest": {
@@ -90,8 +90,8 @@ MALFORMED_BRANCH_RULES = "GitHub returned a malformed branch merge rule"
 MALFORMED_CLOSED_ISSUE = "GitHub returned a malformed closed issue"
 # The combined-status endpoint's own aggregate `state` can be `pending`,
 # `failure`, or `error` with a `statuses` page that, this instant, names no
-# context at all -- a status posted after this read, say (issue #405
-# review/gate finding). A refusal still needs one name to print, so an
+# context at all -- a status posted after this read, say.
+# A refusal still needs one name to print, so an
 # unnamed non-passing verdict prints this stand-in rather than reading as
 # "no checks" and passing silently.
 EXTERNAL_STATUS_FALLBACK_NAME = "external status checks"
@@ -102,8 +102,8 @@ _HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
 # `merge_landing`'s own two refusal signals, neither a 4xx
 # `_nonzero_exit_failure` above already classifies. GitHub's REST reference
 # for the merge endpoint: 409 "if sha was provided and pull request head did
-# not match" (issue #405), 405 "if merge cannot be performed" -- a rule, a
-# required review, an unmergeable state, which no re-run repairs (issue #603).
+# not match", 405 "if merge cannot be performed" -- a rule, a
+# required review, an unmergeable state, which no re-run repairs.
 _MERGE_HEAD_MOVED_STATUS = "HTTP 409"
 _MERGE_REFUSED_STATUS = "HTTP 405"
 # GitHub's own 403 message where the repository's plan offers no rulesets (a
@@ -113,8 +113,8 @@ _RULESETS_UNAVAILABLE_STATUS = "HTTP 403"
 
 
 def _branch_already_absent(error_text: str) -> bool:
-    """`delete_branch`'s own idempotent-absence signal (issue #405 review
-    finding; S8786): `gh api`'s own error text puts the message before the
+    """`delete_branch`'s own idempotent-absence signal (S8786):
+    `gh api`'s own error text puts the message before the
     code -- "Reference does not exist (HTTP 422)" -- so this checks both
     substrings independent of order, rather than the two-lookahead regex
     that made an order-agnostic match super-linear to backtrack; any other
@@ -130,7 +130,7 @@ GITHUB_REMOTE_PATTERN = re.compile(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git
 
 
 def pull_request_number(value: str) -> int:
-    """`--merged`'s value under `storage = "github"` (issue #359): a bare
+    """`--merged`'s value under `storage = "github"`: a bare
     decimal pull request number -- the sha grammar and the empty "newest
     trunk landing" sentinel both belong to `storage = "state-ref"` alone,
     since GitHub has no trunk walk to read either from."""
@@ -144,7 +144,7 @@ def pull_request_number(value: str) -> int:
 
 def landing_comment(pull_request: int) -> str:
     """The one comment body `close_landed_item` posts naming the pull
-    request that landed an item (issue #359 Card 1) -- named once so a
+    request that landed an item -- named once so a
     test can assert the exact text without a second copy of it."""
     return f"landed by PR #{pull_request}"
 
@@ -157,7 +157,7 @@ def command_environment() -> dict[str, str]:
 
 # GitHub reserves these as repository names; as a path segment they name the
 # current or parent directory, so a run would silently fall back to the
-# checkout it stands in (issue #465).
+# checkout it stands in.
 RESERVED_REPOSITORY_NAMES = frozenset({".", ".."})
 
 
@@ -176,13 +176,13 @@ def repository_id(text: str) -> forge.RepositoryId:
 def discover_repository(*, remote_url: str, directory: Path | None = None) -> forge.RepositoryId:
     """Resolve the repository `--repo` did not name.
 
-    Reads the canonical remote's URL first (issue #245, #310 finding 138):
+    Reads the canonical remote's URL first:
     almost every checkout's remote already names its GitHub repository, and
     that read is a local `git config` lookup, not a network round trip --
     so `gh repo view` (a real `gh` API call, `GH_TIMEOUT_SECONDS` long) only
     runs as a fallback, when the remote's own URL names no repository at
     all. That fallback asks about the checkout at `directory`, not this
-    process's own cwd (issue #472).
+    process's own cwd.
     """
     match = GITHUB_REMOTE_PATTERN.search(remote_url)
     if match is not None:
@@ -240,7 +240,7 @@ _ITEM_REFERENCE_FIELDS = (
 
 def _item_reference_query(numbers: Sequence[int]) -> str:
     """One GraphQL query reading every one of `numbers` through its own
-    alias (issue #440): `issueOrPullRequest` -- unlike the narrower `issue`
+    alias: `issueOrPullRequest` -- unlike the narrower `issue`
     field -- answers for a pull request number too, matching `item_reference`'s
     own REST read of a single number. GraphQL's own schema answers `null` in
     `data` for a number that exists in neither space, but `gh api graphql`
@@ -287,8 +287,8 @@ def _parsed_item_reference_node(node: object) -> forge.ItemReference:
 
 
 def _aliased_node(nodes: Mapping[str, object], index: int) -> object:
-    """One alias's own raw node out of a batch's `nodes` mapping (issue #440
-    review): an omitted key is a malformed response -- GitHub always answers
+    """One alias's own raw node out of a batch's `nodes` mapping:
+    an omitted key is a malformed response -- GitHub always answers
     every alias a query names, `null` included for one it cannot resolve --
     never silently read the same as that explicit `null` (`_parsed_item_
     reference_node`'s own `MISSING` case)."""
@@ -311,7 +311,7 @@ def _item_references_from_nodes(
     }
 
 
-# A NOT_FOUND error's own `path` (issue #440 review): `["repository", "nN"]`,
+# A NOT_FOUND error's own `path`: `["repository", "nN"]`,
 # the field GraphQL walked to reach the alias it could not resolve.
 _ITEM_REFERENCE_ERROR_PATH_LENGTH = 2
 
@@ -334,7 +334,7 @@ def _is_recovered_not_found_error(
 
 
 def _not_found_batch_nodes(message: str, numbers: Sequence[int]) -> Mapping[str, object] | None:
-    """`_item_reference_block`'s own recovery (issue #440 review): `gh api
+    """`_item_reference_block`'s own recovery: `gh api
     graphql` exits nonzero whenever any alias in `_item_reference_query`
     resolved to neither an issue nor a pull request, even though GraphQL's
     own response already answers `null` for it in `data` rather than ending
@@ -512,8 +512,8 @@ class GitHubForge:
         )
 
     def _run(self, arguments: list[str], *, input_data: bytes | None = None) -> str:
-        """The one chokepoint every board or claim read/write funnels through
-        (issue #168): every one of this class's operations calls `self._run`,
+        """The one chokepoint every board or claim read/write funnels through:
+        every one of this class's operations calls `self._run`,
         never `self._gh` or an injected `run` directly, so `requests` counts
         every round trip exactly once regardless of which operation asked for
         it. Locked because `board` fans reads out across worker threads
@@ -574,12 +574,12 @@ class GitHubForge:
         )
 
     def _item_reference_block(self, numbers: tuple[int, ...]) -> dict[int, forge.ItemReference]:
-        """One `numbers`-sized GraphQL round trip (issue #440): `item_
+        """One `numbers`-sized GraphQL round trip: `item_
         references`' own block, never called with more than `GRAPHQL_ITEM_
         REFERENCE_BATCH_SIZE` numbers. A number that resolves to neither an
         issue nor a pull request makes `gh` exit nonzero even though GraphQL
         itself already answered the rest -- `_not_found_batch_nodes` reads
-        that failure back as the partial success it is (issue #440 review)
+        that failure back as the partial success it is
         rather than this call failing the whole block loud."""
         try:
             raw = self._run(
@@ -608,7 +608,7 @@ class GitHubForge:
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
         """Every one of `numbers`, batched into GraphQL blocks of
-        `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE` (issue #440): the 32-call, fully
+        `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE`: the 32-call, fully
         serial `gh api .../issues/N` walk `board_read._closed_item_sizes` used to pay
         (12.8 of an 18s board build) collapses to one round trip for any
         repository whose closed-item history still fits one block, and stays
@@ -946,8 +946,8 @@ class GitHubForge:
         return self._json_lines(raw, "check run")
 
     def _check_runs(self, sha: str) -> tuple[forge.CheckRun, ...]:
-        """Every check run against `sha`, not merely its first page (issue
-        #405 review finding): GitHub's own `check-runs` listing paginates
+        """Every check run against `sha`, not merely its first page:
+        GitHub's own `check-runs` listing paginates
         like every other collection this adapter reads, so a run reported
         only on a later page must count toward readiness exactly as one on
         the first page does."""
@@ -957,8 +957,8 @@ class GitHubForge:
         return tuple(self._check_run(value) for value in values)
 
     def _combined_status_summary(self, sha: str) -> tuple[str, int]:
-        """`sha`'s combined-status verdict and true total (issue #405
-        review/gate finding): GitHub computes `state` -- `success`,
+        """`sha`'s combined-status verdict and true total:
+        GitHub computes `state` -- `success`,
         `pending`, `failure`, or `error` -- as the aggregate over every
         status context on `sha`, and `total_count` as their true count,
         both independent of pagination; one cheap call answers both,
@@ -1005,8 +1005,8 @@ class GitHubForge:
         return self._json_lines(raw, "commit status")
 
     def _combined_status_names(self, sha: str) -> tuple[str, ...]:
-        """Every combined-status context's own name, paginated (issue #405
-        gate finding, round-4 finding 2): named to report each context as a
+        """Every combined-status context's own name, paginated:
+        named to report each context as a
         successful check once `_combined_status_summary` reads `success`, or
         to fill in a refusal sentence once it reads anything else -- only
         `total_count` zero (no statuses at all) never pays for this
@@ -1023,8 +1023,8 @@ class GitHubForge:
         return tuple(names)
 
     def _combined_status_checks(self, sha: str) -> tuple[forge.CheckRun, ...]:
-        """`sha`'s combined commit status, read as one verdict (issue #405
-        review/gate finding, round-4 finding 2): the external checks
+        """`sha`'s combined commit status, read as one verdict:
+        the external checks
         GitHub's own check-runs listing never carries -- a SonarCloud
         quality gate, say -- posted through the separate legacy status API.
         The endpoint's own aggregate `state` decides pending/failure/
@@ -1046,7 +1046,7 @@ class GitHubForge:
 
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
         """Whether pull request `number` is safe to merge with its own
-        pinned head sha (`aco land`'s preflight, issue #405): read from the
+        pinned head sha (`aco land`'s preflight): read from the
         pull request itself (open state, head sha, mergeable state), every
         page of the check-runs endpoint, and the combined commit status
         (external contexts such as SonarCloud) against that same head sha --
@@ -1079,7 +1079,7 @@ class GitHubForge:
         return forge.LandingReadiness(number, state == "open", head_sha, mergeable_state, checks)
 
     def allowed_merge_methods(self) -> frozenset[workboard.MergeMethod] | None:
-        """Which merge methods this repository allows (issue #578), from its
+        """Which merge methods this repository allows, from its
         own `allow_merge_commit`/`allow_squash_merge`/`allow_rebase_merge`
         settings, or `None` where GitHub withholds them -- it reports them
         only to a token that may push."""
@@ -1102,7 +1102,7 @@ class GitHubForge:
         return frozenset(method for method, allowed in settings.items() if allowed)
 
     def branch_merge_rules(self, branch: str) -> tuple[frozenset[workboard.MergeMethod], ...]:
-        """The merge methods each rule on `branch` allows (issue #615), one
+        """The merge methods each rule on `branch` allows, one
         set per rule, read through the branch-rules endpoint that resolves
         every ruleset applying to it: GitHub refuses a method any one rule
         excludes, even where the repository settings allow it. A
@@ -1163,8 +1163,8 @@ class GitHubForge:
         title: str,
         body: str,
     ) -> str:
-        """Merge pull request `number` with `method`, pinned to `head_sha`
-        (issues #405, #578): never `gh pr merge`, which re-reads the pull
+        """Merge pull request `number` with `method`, pinned to `head_sha`:
+        never `gh pr merge`, which re-reads the pull
         request's current head itself rather than merging the exact commit
         `landing_readiness` already proved green. `title` and `body` are the
         landed commit's own message either way. A 409 means the pull request's
@@ -1212,7 +1212,7 @@ class GitHubForge:
 
     def file_at_commit(self, path: Path, sha: str) -> str | None:
         """The text of `path` (repository-relative) at commit `sha`, or
-        `None` when that commit carries no such file (issue #505): `aco
+        `None` when that commit carries no such file: `aco
         land` reads a pull request head's board configuration here, through
         the contents API, never through this run's one fetch of the
         canonical remote. A 404 is that answer, not a failure; anything but
@@ -1244,13 +1244,12 @@ class GitHubForge:
 
     def delete_branch(self, branch: str) -> None:
         """Delete `branch` from this repository once its pull request has
-        merged (`aco land`, issue #405): idempotent -- GitHub answering that
+        merged (`aco land`): idempotent -- GitHub answering that
         the ref already does not exist (branch protection auto-deleted it,
         or a previous `land` run already deleted it before a later step
         failed) is success, not a failure to surface. Any other 422 -- a
         protected branch refusing the delete, say -- is this adapter's
-        normal error family, not an absence to swallow (issue #405 review
-        finding)."""
+        normal error family, not an absence to swallow."""
         try:
             self._run(
                 ["api", "--method", "DELETE", f"repos/{self.repository}/git/refs/heads/{branch}"]
@@ -1581,7 +1580,7 @@ class GitHubForge:
 
     def create_issue(self, *, title: str, body: str, kind: ItemKind) -> int:
         """Create a fresh issue of `kind`, linked to no parent -- `item new`'s
-        own write without `--parent` (issue #444), and `create_child`'s first
+        own write without `--parent`, and `create_child`'s first
         write. GitHub's REST issue create takes the organization's issue type
         by its name (`ITEM_KIND_TYPE_NAMES`), so no type id is ever looked up.
 
@@ -1631,7 +1630,7 @@ class GitHubForge:
     def link_child(self, parent: int, child: int) -> None:
         """Record already-existing issue `child` as `parent`'s sub-issue --
         the write a repeat `cut` uses to adopt an orphan a failed
-        `create_child` left behind (#260), instead of creating a second
+        `create_child` left behind, instead of creating a second
         issue. GitHub's sub-issue POST wants `child`'s internal id, not its
         issue number, so this reads it first.
         """
@@ -1651,7 +1650,7 @@ class GitHubForge:
     def create_child(self, *, parent: int, title: str, body: str, kind: ItemKind) -> int:
         """Create a fresh issue of `kind` and record it as `parent`'s sub-issue.
 
-        Composed from `create_issue` and `link_child` (#260): not atomic,
+        Composed from `create_issue` and `link_child`: not atomic,
         since GitHub has no transaction across the two writes. A failure in
         the relation POST raises `forge.ForgePartialChildCreationError`
         naming the child that already exists; safe to retry the same `cut`,
@@ -1712,7 +1711,7 @@ class GitHubForge:
 
     def _has_landing_comment(self, number: int, comment: str) -> bool:
         """Whether `number` already carries `close_landed_item`'s own
-        deterministic comment (issue #397): a repeat run after a comment
+        deterministic comment: a repeat run after a comment
         that landed but a close that did not (a crash or a transient
         failure between the two `_run` calls below) must read this before
         posting the same comment a second time."""
@@ -1733,7 +1732,7 @@ class GitHubForge:
         return False
 
     def close_landed_item(self, number: int, *, pull_request: int) -> None:
-        """Closes `number` itself instead of refusing (issue #359 Card 1):
+        """Closes `number` itself instead of refusing:
         `release --merged <pr>` used to require the item already closed on
         the forge; now it closes a still-open one here -- not part of the
         generic `ForgeWriter` port, since `storage = "state-ref"` closes its
@@ -1742,7 +1741,7 @@ class GitHubForge:
         write at all. The comment lands first: a transient failure between
         the two calls then leaves an open issue explaining the pull request
         that is about to close it, never a closed issue with no record of
-        why -- and repeat-safe (issue #397): a rerun that finds its own
+        why -- and repeat-safe: a rerun that finds its own
         comment already posted skips straight to the close, never doubling
         it.
         """
