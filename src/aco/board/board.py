@@ -36,7 +36,7 @@ def wire_fingerprint(repo: str, line: ExpectationLine) -> str:
     `Boards.decide`'s own repo-binding check share this one function, so a
     card's content being identical in two configured repos never lets its
     fingerprint satisfy the other repo's check, even with the two labels
-    swapped (issue #637)."""
+    swapped."""
     bound = json.dumps([repo, line.fingerprint], ensure_ascii=False)
     return hashlib.sha256(bound.encode("utf-8", "surrogatepass")).hexdigest()
 
@@ -84,7 +84,7 @@ class Board:
         built from an earlier read, and an open line whose shown fields changed
         since must not be ruled blind. It compares `wire_fingerprint(repo, ...)`,
         not the line's own bare fingerprint, so the same content read under
-        another repo's label never passes here either (issue #637). A line
+        another repo's label never passes here either. A line
         that is no longer open skips the comparison on purpose: whether it is
         already ruled, out of range, or its item unknown is the source's own
         refusal, which `rule` reports.
@@ -146,7 +146,7 @@ class Boards:
         `fingerprint` is `wire_fingerprint`'s value for the card as shown,
         bound to `repo`: `Board.decide_one` checks it against the same
         binding during its own fresh read, so an identical line read under
-        another configured repo's label never satisfies it (issue #637).
+        another configured repo's label never satisfies it.
         """
         if not self._take_turn():
             return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)

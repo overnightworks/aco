@@ -1,4 +1,4 @@
-"""The operator's decision board (issue #617).
+"""The operator's decision board.
 
 `aco serve` shows this repository's open expectation lines as cards and
 writes the operator's choice back as a ruling. It talks to aco only through

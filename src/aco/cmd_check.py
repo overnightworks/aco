@@ -43,7 +43,7 @@ class _CheckKind(StrEnum):
     dispatch request actually distinguishes: GitHub gives issues and pull
     requests a single number space, so a number that is not there was never
     proven to be either. A trunk commit is the fourth: named by its `sha`,
-    read from local history instead of that number space (issue #435).
+    read from local history instead of that number space.
     """
 
     PULL_REQUEST = "pull_request"
@@ -56,8 +56,7 @@ class _CheckKind(StrEnum):
 class _NumberSubject:
     """One run's subject in the forge's number space, printed under
     `number`. Its `kind` cannot be `TRUNK_COMMIT`: the key travels with the
-    value that determines it, so no answer can name a sha under `number`
-    (issue #435)."""
+    value that determines it, so no answer can name a sha under `number`."""
 
     kind: Literal[_CheckKind.PULL_REQUEST, _CheckKind.ISSUE, _CheckKind.MISSING]
     number: int
@@ -70,7 +69,7 @@ class _NumberSubject:
 class _TrunkSubject:
     """One run's subject in local trunk history, printed under `sha`. It
     carries no `kind` field, because a commit is never anything but
-    `TRUNK_COMMIT` (issue #435)."""
+    `TRUNK_COMMIT`."""
 
     sha: str
 
@@ -82,8 +81,8 @@ _CheckSubject = _NumberSubject | _TrunkSubject
 
 
 class _CheckReason(StrEnum):
-    """`aco check`'s own `--json` `reason` vocabulary (`specs/check.spec.md`,
-    issue #404): `valid` the only exit `0`; `blocked` the only exit `3`
+    """`aco check`'s own `--json` `reason` vocabulary (`specs/check.spec.md`):
+    `valid` the only exit `0`; `blocked` the only exit `3`
     (a valid, complete issue with an open dependency); every other member
     exits `2`. `valid`/`malformed`/`incomplete` mirror
     `body.BodyShapeVerdict`'s own three values -- the body-shape decision
@@ -110,7 +109,7 @@ class _CheckOutcome:
     was asked about, printing itself under its own key; `message` mirrors
     the line's own finding without its `ISSUE #<n> `/`REFUSED: #<n> `/
     `REFUSED: <sha> ` prefix; `blocked_by` is only ever set together with
-    `_CheckReason.BLOCKED` (issue #404)."""
+    `_CheckReason.BLOCKED`."""
 
     subject: _CheckSubject
     line: str
@@ -263,8 +262,8 @@ def _check_piped_body(parsed: argparse.Namespace, context: RunContext) -> int:
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """One number or trunk commit, one dispatch request into one of four
     answers: a pull request to classify, an issue whose body contract to
-    read, a trunk commit to classify from its own trailer block (issue
-    #359, LAND-48), or a number that is in neither number space. Only the
+    read, a trunk commit to classify from its own trailer block
+    (LAND-48), or a number that is in neither number space. Only the
     pull-request side needs the live claims, so the issue side never
     fetches the state ref. `-` is a fifth: a body piped on stdin, judged
     without any read of the forge."""
@@ -311,8 +310,8 @@ def _trunk_classification_text(
     classification: workboard.TrunkClassification, storage: body.Storage
 ) -> str:
     """`classification`'s own display line, the trunk-trailer counterpart of
-    `workboard.WorkItemClassification`/`workboard.NoItemClassification`'s `__str__` (issue
-    #359): a trunk `Work-Item:` trailer names bare, repository-local
+    `workboard.WorkItemClassification`/`workboard.NoItemClassification`'s `__str__`: a trunk
+    `Work-Item:` trailer names bare, repository-local
     numbers (`workboard.TrunkWorkItemClassification.numbers`), never a qualified
     `workboard.IssueReference` -- a commit's own trailer is always local -- so this
     lives here rather than reusing either PR-body type's `__str__`."""
@@ -335,7 +334,7 @@ _STATE_REF_TRAILER_PAST_THE_ID_SPACE = (
 def _trailer_number_past_the_id_space(
     classification: workboard.TrunkClassification, storage: body.Storage
 ) -> int | None:
-    """LAND-68 (issue #467, #469 review): under `storage = "state-ref"` a
+    """LAND-68: under `storage = "state-ref"` a
     trailer number past `aco-ffffff` names no item, and its label would be
     an id `workboard.parse_item_reference` refuses back -- the first such
     number, or `None` when every number names an item."""
@@ -350,7 +349,7 @@ def _trailer_number_past_the_id_space(
 def _trunk_commit_outcome(
     sha: str, landing: checkout.TrunkLanding | None, storage: body.Storage
 ) -> _CheckOutcome:
-    """`sha`'s own answer (issue #359, LAND-48): the same three answers
+    """`sha`'s own answer (LAND-48): the same three answers
     `check <pr>` reads from a pull request body's classification
     (LAND-04/LAND-06), read instead from the trailer block of `landing`, the
     walked first-parent trunk's own entry for `sha` -- `None` when that walk
@@ -386,7 +385,7 @@ def _trunk_commit_outcome(
 
 def _check_trunk_commit(parsed: argparse.Namespace, context: RunContext) -> int:
     """`check <sha>`: the trunk form of the one check, reporting through the
-    same envelope and the same exit codes the number forms use (issue #435).
+    same envelope and the same exit codes the number forms use.
     Its walk is the one `release --merged <sha>` verifies against under
     `storage = "state-ref"` (LAND-47/LAND-52), reused rather than re-derived
     here. Needs no forge at all: a trunk commit's trailer is local history."""

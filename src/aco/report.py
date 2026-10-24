@@ -29,7 +29,7 @@ def read_piped_body() -> str:
 
 
 def emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:
-    """The one `--json` envelope owner (issue #396, `specs/output.spec.md`):
+    """The one `--json` envelope owner (`specs/output.spec.md`):
     `ok` and `reason` always print first, in that order -- `reason` a
     stable enum token, never an `error` object -- then the payload in the
     order given, with an optional `message` (free prose) moved last so a
@@ -55,7 +55,7 @@ def bounded_refusal(sentence: str) -> str:
     """`sentence` as one bounded refusal line: a pull request's own text
     (a check name, a head's board configuration key) may carry a newline or
     a terminal escape, so it is shown as `next` shows foreign text (`\\n`,
-    `\\x1b`) before the length cap applies (issues #505, #538)."""
+    `\\x1b`) before the length cap applies."""
     return _cut_to(protocol.terminal_text(sentence), _REFUSAL_SENTENCE_LENGTH_LIMIT)
 
 
@@ -77,8 +77,8 @@ def _cut_to(printable: str, limit: int) -> str:
 def refuse(
     reason: StrEnum, error: protocol.ClaimError | str, *, as_json: bool, **payload: object
 ) -> int:
-    """One shared refusal report for every `--json` command (issue #396) and
-    for `main`'s own pre-start checks (issue #425): `ERROR: <sentence>`
+    """One shared refusal report for every `--json` command and
+    for `main`'s own pre-start checks: `ERROR: <sentence>`
     on stderr through `render_error`, then
     -- only under `--json` -- the envelope naming this call's own reason
     instead of the dropped `error` key. Exit `2`, the one exit every refusal

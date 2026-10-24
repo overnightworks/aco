@@ -12,14 +12,14 @@ from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
 class TargetUnavailableError(protocol.ClaimError):
-    """`require_writable_target`'s own "forge cannot write" refusal (issue
-    #396) -- a distinct type from `InvalidTargetError` so `ask`/`rule` can
+    """`require_writable_target`'s own "forge cannot write" refusal -- a distinct type from
+    `InvalidTargetError` so `ask`/`rule` can
     each choose their own `unavailable` without parsing prose."""
 
 
 class InvalidTargetError(protocol.ClaimError):
-    """`require_writable_target`'s own "no such writable item" refusal
-    (issue #396) -- missing, a pull request, or a malformed body -- so
+    """`require_writable_target`'s own "no such writable item" refusal -- missing, a pull request,
+    or a malformed body -- so
     `ask`/`rule` can each choose their own `invalid_item` without parsing
     prose."""
 
@@ -30,7 +30,7 @@ def require_writable_target(
     """`ask` and `rule`'s shared target gate (RULE-06..08, cited verbatim by
     `specs/ask.spec.md`): the forge must accept a body write, the item must
     exist and not be a pull request, and its body must parse -- in that
-    order, unchanged from before issue #396 factored it out of both
+    order, unchanged from before it was factored out of both
     commands. Returns the live body and the board configuration `ask`/
     `rule` still need for their own write."""
     try:
@@ -55,8 +55,8 @@ def _rule_remaining_open(new_body: str, *, storage: body.Storage) -> int:
 
 
 class _RuleReason(StrEnum):
-    """`aco rule`'s own `--json` `reason` vocabulary (`specs/rule.spec.md`,
-    issue #396): `ruled` the only success."""
+    """`aco rule`'s own `--json` `reason` vocabulary (`specs/rule.spec.md`):
+    `ruled` the only success."""
 
     RULED = "ruled"
     ALREADY_RULED = "already_ruled"
@@ -96,7 +96,7 @@ def _emit_rule_result(
 def _rule_item(
     context: RunContext, number: int, line: int, ruling: str, note: str | None
 ) -> tuple[body.ExpectationLine, int]:
-    """`run`'s own write (issue #280): returns the newly ruled line and
+    """`run`'s own write: returns the newly ruled line and
     how many the item still has open; raises `protocol.ClaimError` by name
     for every refusal (already ruled, out of range, a bad outcome, a
     malformed or missing item), which `run` turns into its own
@@ -120,7 +120,7 @@ _RuleItemError = (
 
 def _rule_item_reason(error: _RuleItemError) -> _RuleReason:
     """`run`'s own mapping from `_rule_item`'s four refusals to their
-    `--json` `reason` (issue #396): a bad target names `unavailable`
+    `--json` `reason`: a bad target names `unavailable`
     (forge cannot write) or `invalid_item` (missing item, pull request);
     a bad line names `already_ruled` or `line_out_of_range`."""
     if isinstance(error, TargetUnavailableError):
@@ -145,8 +145,8 @@ def _rule_expectation_line(parsed: argparse.Namespace, context: RunContext) -> i
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`rule`'s own `--json` refusals (issue #396), for the whole command and
-    not only its first steps (issue #432): the body write inside the shared
+    """`rule`'s own `--json` refusals, for the whole command and
+    not only its first steps: the body write inside the shared
     ruling path can fail like any other forge call, and a failure there names
     this command's own `unavailable` rather than escaping the envelope."""
     as_json = parsed.json

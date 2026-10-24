@@ -45,13 +45,13 @@ def reject_wide_scope(
     directories: tuple[str, ...],
     whole_from_body: Callable[[], str | None] | None = None,
 ) -> tuple[int, int, float, str | None]:
-    """`scope`'s own width gate (issue #326), `whole_reason`'s own text
-    admitting a wide one exactly as before -- plus, for `claim`/`start`
-    (issue #399), the effective reason actually used: `whole_reason` itself
+    """`scope`'s own width gate, `whole_reason`'s own text
+    admitting a wide one exactly as before -- plus, for `claim`/`start`, the effective reason
+    actually used: `whole_reason` itself
     when given, else `whole_from_body()`, read only once the gate actually
     trips and the caller named none, so a narrow scope or an explicit
     `--whole` never costs the body read `whole_from_body` performs.
-    `rescope` judges an issue claim by the same rule (issue #554), from the
+    `rescope` judges an issue claim by the same rule, from the
     body it already read; a lane claim names no item, passes no
     `whole_from_body`, and keeps the plain refusal. `directories` are
     the scope entries that name a directory in the tree `versioned` lists
@@ -75,7 +75,7 @@ def wide_scope_trip(
 ) -> protocol.WideScopeTrip | None:
     """`scope`'s width judged against the tree `versioned` lists, whose
     entries naming a directory are `directories` -- the one measure the
-    width gate refuses by and `next`'s advice anticipates (issue #566)."""
+    width gate refuses by and `next`'s advice anticipates."""
     covered_file_count, versioned_file_count, _share = _scope_cost(versioned, scope)
     return protocol.wide_scope_trip(
         scope,
@@ -90,7 +90,7 @@ def reject_ungrounded_comma_scope(
 ) -> None:
     """Refuse a scope entry that contains a comma and matches no versioned
     file -- the shape `{flag} a.py,b.py` takes when passed as one flag from
-    habit instead of one path per flag (issue #207). Stored verbatim, that
+    habit instead of one path per flag. Stored verbatim, that
     single entry names a path nothing tracks, so the claim protects nothing:
     the lane's real files stay uncovered and no overlap check can ever fire
     for them.
@@ -103,7 +103,7 @@ def reject_ungrounded_comma_scope(
     leave open (dropping an already-claimed ungrounded value), or never fire
     at all (a not-yet-dropped value the claim lacks is refused first).
 
-    Splitting on the comma would be the old, wrong fix (issue #201): it made
+    Splitting on the comma would be the old, wrong fix: it made
     a real comma-bearing filename unrepresentable. So a real comma-bearing
     path that names a versioned file, or a directory holding one, still
     passes here -- `paths_under_scope` matches either. So does a comma-free
@@ -264,7 +264,7 @@ class _ParentRequirement:
 
 def _parent_body_finding(reference: workboard.IssueReference, parsed: body.ParsedBody) -> str:
     """Why a malformed parent body refuses the last-child rule before its
-    `Next` line is ever consulted (#150)."""
+    `Next` line is ever consulted."""
     defect = parsed.contract.defects[0]
     return f"has parent {reference} with a {body.body_defect_text(defect)}"
 
@@ -293,7 +293,7 @@ def _parent_requirement(
     item: workboard.IssueReference,
 ) -> _ParentRequirement | workboard.ClassificationDefect | None:
     """The parent's demand, read from GitHub's sub-issue relation and its
-    body under the repository's own pin (#150).
+    body under the repository's own pin.
 
     Closing a parent's last open child completes the parent only when the
     parent holds no uncut `[[slice]]` row and its own `Next` line names no
@@ -433,13 +433,12 @@ def _target_branch_defect(
 def structural_classification(
     context: LandingCheckContext, detail: forge.Landing
 ) -> workboard.Classification | workboard.ClassificationDefect:
-    """The classification `check <pr>` and `land` both start from (issue
-    #405): whether this pull request's own shape -- its source repository,
+    """The classification `check <pr>` and `land` both start from: whether this pull request's own
+    shape -- its source repository,
     its `Work-Item:`/`No-Item:` line, its target branch -- names one item at
     all. Never touches a claim, a parent, or a closing reference: `land`'s
     own preflight checks the named item's live open state between this and
-    `classification_defect` (LANDCMD-08 before claim validation, issue #405
-    review/gate finding)."""
+    `classification_defect` (LANDCMD-08 before claim validation)."""
     cross_repository = cross_repository_defect(context.repository, detail)
     if cross_repository is not None:
         return cross_repository
@@ -460,8 +459,8 @@ def classification_defect(
     *,
     expected_head: str,
 ) -> workboard.ClassificationDefect | None:
-    """Whether `classification`'s own claim, parent, and closing rules hold
-    (issue #405): the second half of `cmd_check._checked_classification`, split out so
+    """Whether `classification`'s own claim, parent, and closing rules hold: the second half of
+    `cmd_check._checked_classification`, split out so
     a caller needing a live-store read only for this half (`land`'s own
     preflight, which fetches store state no earlier than this) never pays
     for one just to read the pull request's own shape."""
