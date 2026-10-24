@@ -1,4 +1,4 @@
-"""Pure codec for one state-ref item file's `[record]` table (issue #248).
+"""Pure codec for one state-ref item file's `[record]` table.
 
 An item file (`items/<id>.md` in the tree of `refs/aco/state`) is a
 work-item body in the same `aco`-block grammar `body.py` already
@@ -35,7 +35,7 @@ from .protocol import (
     item_id_of_filename,
 )
 
-# Refuse rather than silently widen (issue #283, ruling 16.09.2026): an id
+# Refuse rather than silently widen (ruling 16.09.2026): an id
 # never grows a seventh hex character just because the id space (16.7
 # million values per repository) is filling up. Three tries against real
 # randomness is already astronomically unlikely to collide even once; a
@@ -48,7 +48,7 @@ _OptionalStr: TypeAlias = str | None
 
 
 class RecordState(StrEnum):
-    """An item's own `[record].state` (issue #248): `body.py`'s schema
+    """An item's own `[record].state`: `body.py`'s schema
     already restricts the raw value to these two; this is the typed read of
     it, distinct from `workboard.BlockerState`/`workboard.ChildState`, which name a
     *relation's target* state, not an item's own."""
@@ -61,8 +61,8 @@ class RecordState(StrEnum):
 class ItemRecord:
     """One state-ref item's `[record]` table, decoded and typed.
 
-    `number` is read from the item's file name, never a block key (issue
-    #248): the id's hex suffix read as an integer -- deterministic,
+    `number` is read from the item's file name, never a block key: the id's hex suffix read as an
+    integer -- deterministic,
     reversible, and never a counter -- so this record fits
     `workboard.Issue.number` and every other port type keyed by `int` without
     widening them. The id itself has exactly one owner, the file name
@@ -99,26 +99,26 @@ def item_number(item_id: str) -> int:
 
 
 def format_item_id(number: int) -> str:
-    """`number`, encoded the way `item_number` decodes it back (issue
-    #285): the one display id `aco item show`'s header prints under every
+    """`number`, encoded the way `item_number` decodes it back: the one display id `aco item show`'s
+    header prints under every
     storage pin, `github` included -- so an id this tool prints is always a
     valid reference back into `workboard.parse_item_reference`, regardless of
-    which forge actually owns the number (decision D4, #230 cut 16.09.2026:
+    which forge actually owns the number (decision D4, 16.09.2026:
     an id is identity, not just display)."""
     return f"aco-{number:06x}"
 
 
 def is_item_number(number: int) -> bool:
     """Whether `number` lies in the id space: `format_item_id` renders it as
-    an id `ITEM_ID_PATTERN` accepts back (issue #467). A `#16777216` in free
+    an id `ITEM_ID_PATTERN` accepts back. A `#16777216` in free
     text names no item, since six hex digits end at 16777215."""
     return ITEM_ID_PATTERN.fullmatch(format_item_id(number)) is not None
 
 
 def item_id_from_filename(filename: str) -> str:
     """The item id `filename` names, or a loud refusal: every file directly
-    under `items/` must be `aco-<six hex>.md`, never anything else (issue
-    #248, ruling "a broken tree is corrupt state"). Which name is an item
+    under `items/` must be `aco-<six hex>.md`, never anything else (ruling
+    "a broken tree is corrupt state"). Which name is an item
     is `protocol.item_id_of_filename`'s to answer; this is the refusal a
     whole-board read raises beside a foreign entry (PIN-13)."""
     item_id = item_id_of_filename(filename)
@@ -128,7 +128,7 @@ def item_id_from_filename(filename: str) -> str:
 
 
 def parse_origin(value: str) -> str:
-    """`--origin`'s argparse `type=` (issue #316): `value` unchanged when it
+    """`--origin`'s argparse `type=`: `value` unchanged when it
     matches `ORIGIN_PATTERN`, a loud refusal before any write otherwise --
     the same `protocol.ClaimError` `workboard.parse_item_reference` already
     raises from an argparse `type=`, so `main`'s existing `parse_args` guard
@@ -167,7 +167,7 @@ def _random_hex_suffix() -> str:
 def mint_item_id(
     existing: Iterable[str], *, random_hex: Callable[[], str] = _random_hex_suffix
 ) -> str:
-    """A fresh, unpredictable item id (issue #283): `aco-` plus six
+    """A fresh, unpredictable item id: `aco-` plus six
     lowercase hex characters from `random_hex` (`secrets.token_hex` by
     default) -- never a counter, never reused. Refuses by name after
     `_MAX_MINT_ATTEMPTS` collisions against `existing`'s ids rather than
