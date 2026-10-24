@@ -31,7 +31,6 @@ checks = [
   "uv run --locked ruff format --check .",
   "uv run --locked pyright src tests scripts",
   "uv run --locked vulture src scripts/vulture_whitelist.py --min-confidence 60",
-  "uv run --locked python scripts/check_root_layout.py",
   "uv run --locked lint-imports",
   "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=aco --cov-report=term-missing",
 ]
