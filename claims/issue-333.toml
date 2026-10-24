@@ -3,6 +3,6 @@ agent = "claude"
 role = "builder"
 base = "ccf519eece16cf9c8e13b548a1f7b377942e2d70"
 branch = "claude/issue-333-ann401"
-scope = ["pyproject.toml", "quality/baseline.toml", "src/aco/cli.py", "tests/process_fixtures.py", "tests/test_bootstrap.py", "tests/test_github.py", "tests/test_store.py"]
+scope = ["pyproject.toml", "quality/baseline.toml", "src/aco/cli.py", "src/aco/usage.py", "tests/process_fixtures.py", "tests/test_bootstrap.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_store.py"]
 opened_commit = "2c1f42397b3dfa06e4a7ae7befda4bcf3a05933e"
 whole_reason = "Eine Ruff-Regel und ihre 17 Treffer: die Regel ohne die Treffer wäre rot, die Treffer ohne die Regel wären nicht bewacht."
