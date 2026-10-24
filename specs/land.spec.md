@@ -71,6 +71,7 @@ order `merge`, `squash`, `rebase`.
 | a step after the merge fails | LANDCMD-15, LANDCMD-16 |
 | this repository's own pull request | LANDCMD-17 |
 | a pull request already merged (rerun) | LANDCMD-18 |
+| the head branch is no safe name, or a merged pull request comes from another repository | LANDCMD-50, LANDCMD-51, LANDCMD-52, LANDCMD-53 |
 | a rerun whose release already succeeded | LANDCMD-38 |
 
 ## Preflight, read-only, in order
@@ -80,6 +81,10 @@ claim check needs is `store.peek_state` (CAS-49), never `fetch_state` --
 this worktree's own fetch anchor and lineage stamp stay untouched by a
 preflight, refused or not, exactly as `reset`'s own read does.
 
+- [ ] [LANDCMD-50] On a first run and a rerun alike, a head branch that is no safe branch name refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2` (E-LANDCMD-50).
+- [ ] [LANDCMD-51] A merged pull request proposing a branch of another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, nothing written.
+- [ ] [LANDCMD-52] The head-branch check (LANDCMD-50) and the cross-repository check LANDCMD-51 refuse right after the first read, before LANDCMD-02; LANDCMD-50 shows `<branch>` escaped, cut to 200 characters.
+- [ ] [LANDCMD-53] LANDCMD-51 comes before LANDCMD-11 and after LANDCMD-50; a first run meets the same sentence at LANDCMD-07 (LAND-12).
 - [ ] [LANDCMD-33] A `--head` that is not 7 to 40 hex digits refuses `--head must be 7 to 40 hex digits`, exit `2`, at the argument parse: before any read, PIN-32, or LANDCMD-01, on a rerun too (E-LANDCMD-33).
 - [ ] [LANDCMD-44] An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
 - [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
@@ -133,7 +138,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-21] The fast-forward fetches the canonical remote `<remote>` once per run and moves `<branch>` to `<remote>/<branch>`; the delegated release walks that same ref.
 - [ ] [LANDCMD-16] Deleting the merged branch is idempotent: a forge already reporting it absent is success, not a refusal.
 - [ ] [LANDCMD-17] In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing further.
-- [ ] [LANDCMD-18] A rerun skips every preflight check but LANDCMD-11, LANDCMD-19, LANDCMD-25, and LANDCMD-33, verifies the trailer as `release --merged` does (LAND-62, LAND-64), and resumes -- never a second merge.
+- [ ] [LANDCMD-18] A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25 and 33, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
 - [ ] [LANDCMD-38] A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-17 line follows (see E-LANDCMD-18a).
 
 Accepted residual: a squash-landed local branch behind or ahead of the pull request's recorded
@@ -146,7 +151,7 @@ the default branch` on every rerun; it is removed by hand.
 - `aco land` never runs `release`'s own close, store transition, `freed`/`next` report, or worktree cleanup a second time; it delegates to the one existing `release --merged` path (`specs/release.spec.md`).
 - A step after the merge never re-merges: recovery always resumes from the pull request's own already-merged state, read fresh on every rerun.
 - Once merged, the delegated release never reads the pull request's own mutable body for routing: a fixer editing it away afterward changes nothing this pull request already landed (LAND-64).
-- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43, LANDCMD-46) refuses.
+- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-50..53, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43, LANDCMD-46) refuses.
 - `aco land` never takes its storage, canonical remote, forge, or claim store from a head's `<path>`: this checkout's own tracked copy governs, and the head's copy is only checked (LANDCMD-22..24).
 
 ## Examples
@@ -362,6 +367,18 @@ exit 2
 ```
 
 `aco land` read nothing again on its own and wrote nothing; the same refusal names `the pull request` for the first read and `its merge rules` for the allowed-method reads.
+
+### E-LANDCMD-50 — a merged pull request from a fork refuses before anything is deleted
+
+Setup: bare-remote, fake `gh`, pull request `#57` already merged, its head `release/1.x` of the repository `stranger/fork`
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 proposes a branch of stranger/fork; cross-repository pull requests are not classified
+exit 2
+```
+
+No branch of this repository is deleted, the checkout stays where it was and no claim is released. An unsafe head name such as `main#x` refuses `pull request #57 head branch 'main#x' is no safe branch name` the same way, on a first run too.
 
 ### E-LANDCMD-14 — the pull request changed since preflight refuses the merge
 
