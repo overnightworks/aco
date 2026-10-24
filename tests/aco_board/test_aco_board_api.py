@@ -1,8 +1,8 @@
 """The board's JSON API served in-process against a fake `aco` on PATH.
 
 Each test drives the real server, wire form, and `aco` adapter; only the
-`aco` executable is a fake whose state and call log the test reads (issue
-#631, specs/serve.spec.md).
+`aco` executable is a fake whose state and call log the test reads
+(specs/serve.spec.md).
 """
 
 from __future__ import annotations
@@ -942,8 +942,7 @@ def test_a_decision_only_writes_the_repo_its_fingerprint_was_read_from(
 ) -> None:
     """ABRD-16/21: a card decided against its own repo writes there; posted
     against another configured repo instead -- even one holding an identical
-    line -- it is refused like a changed line, no write in either repo
-    (issue #637)."""
+    line -- it is refused like a changed line, no write in either repo."""
     repository_a, repository_b = two_repositories
     identical_card = row(42, "Share page", line(1, "Guests?"))
     repository_a.set_rulings(identical_card)

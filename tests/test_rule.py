@@ -424,7 +424,7 @@ class TestGithubRule:
         initial: str,
         expected: dict[str, str],
     ) -> None:
-        """Spec: Never 3 — preserve bytes outside the block; stronger entry claim belongs to #17."""
+        """Spec: Never 3 — preserve bytes outside the block; the stronger entry claim is open."""
         freeze_cli_now(monkeypatch)
         reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)
         client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
