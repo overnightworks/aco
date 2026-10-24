@@ -1,8 +1,0 @@
-claim_id = "0f5b79cdd69a43fcb37a95b043e3df1f"
-agent = "claude"
-role = "builder"
-base = "ccf519eece16cf9c8e13b548a1f7b377942e2d70"
-branch = "claude/issue-334-gates-out"
-scope = [".aco/board.toml", ".aco/brief.toml", ".github/workflows/ci.yml", "quality/baseline.toml", "quality/config.toml", "scripts/spec_lint.py", "scripts/spec_lint_exemptions.txt", "scripts/test_budget.py", "scripts/test_budget_ratchet.txt", "scripts/test_inventory.py", "scripts/test_inventory_dropped.txt", "specs/storage-pin.spec.md", "src/aco/workboard.py", "tests/test_spec_lint.py", "tests/test_test_budget.py", "tests/test_test_inventory.py"]
-opened_commit = "a6af18607224dabf2ad8b1066bb61eed3a85c89f"
-whole_reason = "Ein CI-Job, seine Skripte, Ledger, Tests, Pflicht-Eintrag und Baseline-Einträge gehen zusammen; der Notmerge soll nur einmal nötig sein."
