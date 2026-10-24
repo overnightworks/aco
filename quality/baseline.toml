@@ -21,13 +21,13 @@
 "check_status.check" = 19
 
 [file_lines]
-"src/aco/body.py" = 1669
+"src/aco/body.py" = 1668
 "src/aco/checkout.py" = 2033
 "src/aco/cli.py" = 887
 "src/aco/cmd_claim.py" = 1137
 "src/aco/cmd_release.py" = 925
-"src/aco/github.py" = 1765
-"src/aco/protocol.py" = 1881
+"src/aco/github.py" = 1764
+"src/aco/protocol.py" = 1879
 "src/aco/state_board.py" = 957
 "src/aco/store.py" = 2104
 "src/aco/workboard.py" = 3148

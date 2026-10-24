@@ -1,4 +1,4 @@
-"""The body-block codec (issue #419, audit #365 finding 3): parses, validates,
+"""The body-block codec: parses, validates,
 renders, and names defects for one work-item body's typed `aco`
 fenced block -- the `[[expectation]]`/`[[slice]]` arrays, `scope`/`size`/
 `whole`, and the state-ref-only `[record]` table. `workboard.py` imports this
@@ -42,7 +42,7 @@ FENCE_CLOSING_PATTERN = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})[ \t]*$")
 CONTAINER_SKELETON_PROSE = "Blocked by: nichts"
 
 # The one fenced-block info string a repository pinned to `body_contract =
-# "block"` (issue #150) reads as its typed work-item body -- any other
+# "block"` reads as its typed work-item body -- any other
 # fence's info string is ordinary documentation.
 BLOCK_FENCE_INFO = "aco"
 BLOCK_TOP_LEVEL_KEYS = frozenset(
@@ -59,7 +59,7 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
         "slice",
     }
 )
-# A work item's own size class (issue #357), read straight from
+# A work item's own size class, read straight from
 # `metrics.Size` -- the one owner of the three letters and their order --
 # rather than a second enum here. A top-level block key, not a `[record]`
 # one: `[record]` is a `Storage.STATE_REF`-only table (BODY-15), while an
@@ -69,13 +69,13 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
 SIZE_VALUES = frozenset(size.value for size in metrics.Size)
 BLOCK_VERSION = 1
 BLOCK_EXPECTATION_DEFAULTS = frozenset({"yes", "no", "later"})
-# A ruling transcribes the operator's word (#240): "later" is a legitimate
+# A ruling transcribes the operator's word: "later" is a legitimate
 # final answer -- an explicit, dated decision to defer -- not only a
 # proposer's guessed default, so it rules exactly like "yes"/"no" (`rule
 # --later` writes `ruling = "later"` the same way `--yes`/`--no` do).
 BLOCK_EXPECTATION_RULINGS = frozenset({"yes", "no", "later"})
 # The three optional card fields a proposer (`aco ask`) may attach to an
-# `[[expectation]]` entry (issue #295): the operator-language question and
+# `[[expectation]]` entry: the operator-language question and
 # example a card shows in place of `text`, and an inline-SVG picture. Absent
 # entirely, a card falls back to `text` unchanged.
 EXPECTATION_QUESTION_MAXIMUM_CHARACTERS = 160
@@ -84,7 +84,7 @@ EXPECTATION_PICTURE_MAXIMUM_BYTES = 8 * 1024
 
 class Storage(StrEnum):
     """Where a repository's board and item data live (`.aco/board.toml`
-    `storage`, issue #248): `GITHUB` reads issues, `STATE_REF` reads
+    `storage`): `GITHUB` reads issues, `STATE_REF` reads
     `items/<id>.md` files in the tree of `refs/aco/state`. The pin decides
     which adapter `RunContext.repository_id` resolves for; it never guesses from
     the remote's own host."""
@@ -93,7 +93,7 @@ class Storage(StrEnum):
     STATE_REF = "state-ref"
 
 
-# A state-ref item file's own `[record]` table (issue #248): the identity
+# A state-ref item file's own `[record]` table: the identity
 # and relations a GitHub issue would otherwise carry through its native
 # type, sub-issue, and blocked-by relations. Legal only under
 # `storage = "state-ref"` -- `_block_schema_defects` refuses it by name as
@@ -116,16 +116,16 @@ RECORD_KEYS = frozenset(
     }
 )
 
-# The one origin grammar (issue #316, parent #230): a forge name or
+# The one origin grammar: a forge name or
 # host/owner/repo path -- one or more letter/digit/hyphen segments joined by
 # `.` or `/` -- then `#` and the number that forge itself uses for the
-# issue. Case-insensitive on the host/owner/repo part (issue #316 delta): a
+# issue. Case-insensitive on the host/owner/repo part: a
 # hand-written v2 ref may carry the forge's own capitalization, e.g.
 # `github.com/OvernightWorks/x#1`. `items.parse_origin`'s argparse `type=`
 # and the persisted `[record].origin` field (`_record_relation_defects`
 # below) both validate against this one pattern, so a stored malformed
 # origin is exactly as rejected as a malformed `--origin` flag. This is
-# also the one owner `aco pull <forge>#<n>` (#230 slice 5) will later split
+# also the one owner `aco pull <forge>#<n>` will later split
 # `record.origin` back out through. Owned here, not in `items.py`, so this
 # module's own `_record_relation_defects` never has to import a higher
 # layer for one shared pattern (`items` may import `body`, never the
@@ -142,7 +142,7 @@ ORIGIN_GRAMMAR_HINT = "forge#n or host/owner/repo#n, e.g. gitlab#42"
 
 class ItemKind(StrEnum):
     """An item's kind, read from the forge's native issue type -- the one
-    owner for "is this a container" (decision record 0001 ruling D3, #112)."""
+    owner for "is this a container" (decision record 0001 ruling D3)."""
 
     TASK = "task"
     BUG = "bug"
@@ -155,9 +155,9 @@ class SliceRow:
     """One `[[slice]]` entry of a body's `aco` block: a slice its
     container still has to dispatch. `index` is exactly what `cut --row N`
     names it by, `title` exactly what `cut --title` must match. `scope`
-    (issue #331) is the row's own optional `scope = [...]`, validated and
+    is the row's own optional `scope = [...]`, validated and
     canonicalized like the block's top-level field; `None` when the row
-    names no paths of its own. `done_when` (issue #606) is the row's own
+    names no paths of its own. `done_when` is the row's own
     one-line done-when, the child's `done_when` once `cut` creates it;
     `None` when the row carries none."""
 
@@ -174,7 +174,7 @@ class ContractDefect:
 
 
 def body_defect_text(defect: ContractDefect) -> str:
-    """The one rendering of a malformed body defect (issue #176 H3).
+    """The one rendering of a malformed body defect.
 
     `cut` and the board/claim checks share this; a second renderer is a
     defect. `check` in slice F reuses it. It escapes each display control
@@ -239,7 +239,7 @@ class BodyReadState(StrEnum):
 
     `MALFORMED` covers both a block whose schema was refused and a body
     with no recognized `aco` block at all -- the latter carries the
-    one defect `no aco block` (issue #273: there is no third state
+    one defect `no aco block` (there is no third state
     for a body written before the block existed).
     """
 
@@ -258,7 +258,7 @@ class ParsedBody:
     expectation_progress: ExpectationProgress
     ruling_date: date | None
     frozen_trigger: str | None
-    # The block's own top-level `scope = [...]` (issue #331), exactly the
+    # The block's own top-level `scope = [...]`, exactly the
     # canonical (sorted, deduplicated) tuple `protocol.valid_scope` returns
     # -- the same function a live claim's own scope passes through, so the
     # two stay comparable regardless of typed order. `None` when the block
@@ -268,16 +268,16 @@ class ParsedBody:
     scope: tuple[str, ...] | None
     slices: tuple[SliceRow, ...]
     read_state: BodyReadState
-    # The block's own top-level `size` (issue #357), or `None` for a body
+    # The block's own top-level `size`, or `None` for a body
     # that names no size at all -- absent means "no estimate", never a
     # default class a reader would have to guess.
     size: metrics.Size | None = None
-    # The block's own top-level `whole` reason (issue #399), or `None` when
+    # The block's own top-level `whole` reason, or `None` when
     # the item names none -- `claim`/`start`'s own fallback for `--whole`
     # when the call itself names none, read here rather than re-parsed at
     # each call site.
     whole: str | None = None
-    # The validated `[record]` table (issue #248), or `None` for every body
+    # The validated `[record]` table, or `None` for every body
     # parsed under `Storage.GITHUB` and every state-ref body without one --
     # `items.py` is the one reader that ever looks at this field.
     record: Mapping[str, object] | None = None
@@ -316,8 +316,8 @@ def names_parent(raw: str, label: str) -> bool:
 
 
 def _fence_matches(body: str) -> list[tuple[int, int | None, str]]:
-    """Every fence in `body` whose info string is exactly `aco`
-    (issue #150 §4): `(opening line index, closing line index or None when
+    """Every fence in `body` whose info string is exactly `aco`:
+    `(opening line index, closing line index or None when
     unclosed, interior text)`. Walks `body.splitlines(keepends=True)` --
     stripping only each line's own ending before matching the CommonMark
     fence patterns, so CRLF is recognized and every other byte, including
@@ -416,7 +416,7 @@ SCOPE_MUST_NAME_A_PATH = "must name at least one path"
 def _scope_value_defect(field_name: str, value: object) -> ContractDefect | None:
     """One `scope` field's own refusal -- the block's top-level `scope`
     (`field_name="scope"`) or one `[[slice]]` row's own
-    (`field_name="slice[N].scope"`) -- issue #331. Called only once the
+    (`field_name="slice[N].scope"`). Called only once the
     caller already knows the key is present; a present value must be a
     non-empty list, refused with this module's own sentence, and every
     entry must pass `protocol.valid_scope` -- the one path grammar `claim`
@@ -473,8 +473,8 @@ def _canonical_scope(value: object) -> tuple[str, ...]:
     """`value`'s validated scope entries, in `protocol.valid_scope`'s own
     canonical (sorted, deduplicated) order -- the one scope normaliser a
     live claim's own scope is built through too, so a body's projected
-    `scope` and a claim's recorded `scope` stay comparable as tuples
-    (issue #331). Callable only once a schema check (`_block_scope_defects`,
+    `scope` and a claim's recorded `scope` stay comparable as tuples.
+    Callable only once a schema check (`_block_scope_defects`,
     `_block_slice_entry_defects`) has already proven `value` valid."""
     return protocol.valid_scope(value)
 
@@ -488,8 +488,8 @@ def _record_timestamp_defect(value: object, key_name: str) -> ContractDefect | N
 
 
 def is_valid_title(title: object) -> TypeGuard[str]:
-    """An item title's one rule, `record.title`'s and `--title`'s alike
-    (issue #447): a string holding more than whitespace."""
+    """An item title's one rule, `record.title`'s and `--title`'s alike:
+    a string holding more than whitespace."""
     return isinstance(title, str) and bool(title.strip())
 
 
@@ -551,7 +551,7 @@ def _record_relation_defects(value: dict[str, object]) -> list[ContractDefect]:
 
 
 def _block_record_defects(data: dict[str, object]) -> list[ContractDefect]:
-    """`[record]` (issue #248), valid only when this parse is storage-gated
+    """`[record]`, valid only when this parse is storage-gated
     to allow it at all (`_block_schema_defects`'s caller): the identity and
     relations a GitHub issue would otherwise carry natively. `items.py`
     trusts every field's shape once this returns no defect -- it never
@@ -620,15 +620,15 @@ _EXPECTATION_PICTURE_EVENT_HANDLER_ATTRIBUTE = re.compile(r"[\s/]on[a-z]+\s*=", 
 # before the attribute) is still caught; the final alternative's class adds
 # `\s` so a greedy `\s*` that backtracks into the gap between `=` and a
 # quoted value (`href = "#x"`) cannot land on that whitespace and misread it
-# as an unquoted external value -- both #300 residuals of #234's own rule.
+# as an unquoted external value.
 _EXPECTATION_PICTURE_EXTERNAL_HREF = re.compile(
     r'(?:^|[\s:/])href\s*=\s*(?:"(?!#)|\'(?!#)|(?![\s"\'#]))', re.IGNORECASE
 )
-# SMIL can retarget `href` without ever writing `href=` itself (issue #300,
-# residual of #234): `<animate attributeName="href" to="http://…">` swaps
+# SMIL can retarget `href` without ever writing `href=` itself:
+# `<animate attributeName="href" to="http://…">` swaps
 # the target after the document loads, and `xlink:href` is the same escape
 # under its namespaced spelling. Refused only when both attributes sit on the
-# same element (Codex Terra review of #300): scanning each `<...>` tag on its
+# same element: scanning each `<...>` tag on its
 # own keeps an unrelated `attributeName`/`to` pair on a different element from
 # falsely refusing the picture. Both attributes accept SMIL's own quoting
 # forms -- double-quoted, single-quoted, or bare -- mirroring
@@ -639,8 +639,8 @@ _EXPECTATION_PICTURE_SMIL_HREF_ATTRIBUTE = re.compile(
 )
 # `values` lists a `;`-separated sequence of keyframes (SMIL's own syntax),
 # so a rule that only reads the first character after `=` misses a later
-# external segment such as `values="#a;http://evil.example"` (issue #300
-# residual, Codex delta). The regex only captures the raw attribute value in
+# external segment such as `values="#a;http://evil.example"`.
+# The regex only captures the raw attribute value in
 # each of SMIL's own quoting forms; `_expectation_picture_smil_external_target`
 # below splits it on `;` and refuses if any trimmed segment does not start
 # with `#`, so `to`/`from` (which never carry a `;`) are covered by the same
@@ -653,8 +653,8 @@ _EXPECTATION_PICTURE_SVG_ELEMENT = re.compile(r"<[^<>]+>")
 
 def _expectation_picture_smil_external_target(element: str) -> bool:
     """Whether `element` sets SMIL `to`, `from`, or `values` to any
-    `;`-separated segment that does not start with `#` (issue #300
-    residual): `values` can list several keyframes, so every segment is
+    `;`-separated segment that does not start with `#`:
+    `values` can list several keyframes, so every segment is
     checked, not only the value's first character."""
     for match in _EXPECTATION_PICTURE_SMIL_TARGET_ATTRIBUTE.finditer(element):
         raw = next(group for group in match.groups() if group is not None)
@@ -667,7 +667,7 @@ def _expectation_picture_smil_external_href(value: str) -> bool:
     """Whether any single SVG element in `value` both retargets `href` (or
     `xlink:href`) via SMIL's `attributeName` and points it outside the
     document -- scanning element-by-element instead of across the whole
-    document (issue #300, Codex Terra review)."""
+    document."""
     return any(
         _EXPECTATION_PICTURE_SMIL_HREF_ATTRIBUTE.search(element)
         and _expectation_picture_smil_external_target(element)
@@ -707,7 +707,7 @@ def _expectation_picture_content_refusals(value: str) -> tuple[tuple[bool, str],
 
 def _expectation_picture_defect(value: object) -> str | None:
     """The refusal sentence for an invalid `[[expectation]]` picture, or
-    `None` for a valid one (issue #295): an inline SVG, rooted at `<svg`, at
+    `None` for a valid one: an inline SVG, rooted at `<svg`, at
     most `EXPECTATION_PICTURE_MAXIMUM_BYTES`, and free of every refusal
     `_expectation_picture_content_refusals` names. The one owner the body
     parser's defects and `append_expectation`'s pre-write refusal both
@@ -724,7 +724,7 @@ def _expectation_picture_defect(value: object) -> str | None:
     return None
 
 
-# The three optional `[[expectation]]` card fields (issue #295), each with
+# The three optional `[[expectation]]` card fields, each with
 # its own refusal-sentence check -- shared, in this fixed order, by the body
 # parser's defects (`_block_expectation_optional_field_defects`) and by
 # `append_expectation`'s pre-write validation, so the rule is owned once.
@@ -810,8 +810,8 @@ def _block_slice_entry_defects(
     return defects
 
 
-# A `[[slice]]` row's two one-line text fields (BODY-47, BODY-63; issue
-# #606): `title` is required, `done_when` optional -- absent, `cut` leaves
+# A `[[slice]]` row's two one-line text fields (BODY-47, BODY-63):
+# `title` is required, `done_when` optional -- absent, `cut` leaves
 # the child's `done_when` empty.
 SLICE_LINE_KEYS = ("title", "done_when")
 
@@ -949,7 +949,7 @@ def slice_row(entry: Mapping[str, object]) -> SliceRow:
 def _block_slices(data: dict[str, object]) -> tuple[SliceRow, ...]:
     """Every still-undispatched `[[slice]]` entry: `cut` removes an entry
     from the block at the moment it links a child to it, so whatever is left
-    here is exactly what is still uncut. Each row's own `scope` (issue #331)
+    here is exactly what is still uncut. Each row's own `scope`
     is canonicalized the same way the block's top-level one is."""
     return tuple(
         slice_row(entry)
@@ -990,14 +990,14 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
 
 
 def parse_body(body: str, *, storage: Storage = Storage.GITHUB) -> ParsedBody:
-    """The one read of a work-item body (issue #150, narrowed to one grammar
-    by #204): the typed `aco` block. Every consumer reads the
+    """The one read of a work-item body:
+    the typed `aco` block. Every consumer reads the
     returned `ParsedBody` instead of re-parsing the raw body. Human prose
     around the block is never parsed -- another repository may own its own
     section headings in the same body.
 
-    `storage` gates the one storage-specific extension, `[record]` (issue
-    #248): legal, and validated, only under `Storage.STATE_REF`; an unknown
+    `storage` gates the one storage-specific extension, `[record]`:
+    legal, and validated, only under `Storage.STATE_REF`; an unknown
     top-level key under `Storage.GITHUB`, the default every existing caller
     keeps reading with.
     """
@@ -1046,14 +1046,14 @@ def _block_data(body: str) -> dict[str, object] | ParsedBody:
 class UnreadParent(Enum):
     """The parent of an item whose `[record]`, or its `parent`, does not
     read: it may name any item, so no container can rule it out as its
-    child (issue #536, ITEM-54)."""
+    child (ITEM-54)."""
 
     UNREAD = "unread"
 
 
 def readable_record_title(body: str) -> str | None:
     """`body`'s `[record]` title when it alone still reads -- even when
-    another field leaves the block malformed (issue #447), so `item new`'s
+    another field leaves the block malformed, so `item new`'s
     twin search still compares a malformed state-ref item's title; `None`
     when no valid title can be read at all."""
     record = _readable_record(body)
@@ -1063,10 +1063,10 @@ def readable_record_title(body: str) -> str | None:
 
 def readable_record_parent(body: str) -> str | UnreadParent | None:
     """`body`'s `[record]` parent when it alone still reads -- even when
-    another field leaves the block malformed (issue #517), so a container
+    another field leaves the block malformed, so a container
     still counts a malformed state-ref child as its own; `None` when the
     record reads without a parent, a top-level item; `UnreadParent.UNREAD`
-    when the record or its parent does not read (issue #536)."""
+    when the record or its parent does not read."""
     record = _readable_record(body)
     if record is None:
         return UnreadParent.UNREAD
@@ -1086,8 +1086,8 @@ def _readable_record(body: str) -> Mapping[str, object] | None:
 class LocatedBlock:
     """A valid `aco` block's decoded TOML, plus the byte-exact span
     of its interior -- between the fence lines, which stay byte-identical --
-    and the newline convention new interior lines are rendered with (#150
-    §4/§7). Callable only on a body `parse_body` already read as `VALID`;
+    and the newline convention new interior lines are rendered with.
+    Callable only on a body `parse_body` already read as `VALID`;
     `cut` refuses a malformed target before ever calling this."""
 
     data: dict[str, object]
@@ -1140,8 +1140,8 @@ _JsonObject = dict[str, object]
 # `cast` names a real type instead of repeating the string.
 _JsonRows = list[_JsonObject]
 
-# `protocol.toml_string` is this repository's one TOML basic-string writer
-# (issue #378): it lives below this module in the Layers contract, so it is
+# `protocol.toml_string` is this repository's one TOML basic-string writer:
+# it lives below this module in the Layers contract, so it is
 # imported rather than kept as a second escape table here, and so is its
 # multi-line twin `protocol.toml_multiline_string`.
 
@@ -1161,8 +1161,8 @@ def _render_frozen_until(data: Mapping[str, object]) -> list[str]:
 def _render_scope_array(values: object) -> str:
     """`values`'s scope entries as a canonical TOML array: the one rendering
     `_render_scope` (top-level) and `_render_slices` (per row) both call,
-    routed through `protocol.valid_scope` -- the one scope canonicalizer
-    (issue #331 REVISE finding 2), rather than a second sort/dedupe owner
+    routed through `protocol.valid_scope` -- the one scope canonicalizer,
+    rather than a second sort/dedupe owner
     here. Callable only once a schema check has already proven `values`
     valid, so this never itself refuses a duplicate."""
     entries = protocol.valid_scope(values)
@@ -1211,7 +1211,7 @@ def _render_expectations(data: Mapping[str, object]) -> list[str]:
 def _render_empty_slice_table(data: Mapping[str, object]) -> list[str]:
     """`slice = []` (BODY-49), the typed "nothing left to cut", among the
     top-level keys: written after any `[[expectation]]` table, TOML would
-    bind it to that table as `expectation[N].slice` (#310 finding 350)."""
+    bind it to that table as `expectation[N].slice`."""
     if data.get("slice") == []:
         return ["", "slice = []"]
     return []
@@ -1241,7 +1241,7 @@ def _render_record_array(values: object) -> str:
 
 
 def _render_record(data: Mapping[str, object]) -> list[str]:
-    """`[record]` (issue #248), rendered only when `data` carries one --
+    """`[record]`, rendered only when `data` carries one --
     every GitHub-stored block never does. Optional fields (`kind`, `parent`,
     `origin`, `closed_at`) are omitted entirely rather than written `= ""`,
     matching how `parse_body`/`_block_record_defects` read their absence as
@@ -1271,7 +1271,7 @@ def _render_record(data: Mapping[str, object]) -> list[str]:
 
 
 def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
-    """The canonical `aco` block interior for `data` (#150 §4):
+    """The canonical `aco` block interior for `data`:
     schema key order, TOML-safe strings, unquoted dates, ending in
     `newline` so a following fence line starts clean. Production caller:
     block-mode `cut`; there is no standalone validator."""
@@ -1303,7 +1303,7 @@ def replace_block(body: str, located: LocatedBlock, data: Mapping[str, object]) 
 
 def carries_block(body: str) -> bool:
     """Whether `body` opens any `aco` fence at all, closed or not --
-    a body without one is prose a fresh block goes below (issue #555)."""
+    a body without one is prose a fresh block goes below."""
     return bool(_fence_matches(body))
 
 
@@ -1317,7 +1317,7 @@ _SKELETON_PROJECTION: Mapping[str, object] = {
 
 def prose_above_fresh_block(prose: str, fields: Mapping[str, object]) -> str:
     """`prose`, kept byte for byte, above a fresh `aco` block holding
-    `fields` (issues #555, #567), every projection key `fields` leaves out
+    `fields`, every projection key `fields` leaves out
     written empty; the bare block when `prose` is empty. The block follows
     one blank line below the prose, in the prose's own line ending."""
     newline = _first_line_ending(prose)
@@ -1356,7 +1356,7 @@ def _block_field_text(key: str, value: object) -> str:
 
 def block_field_conflicts(body: str, fields: Mapping[str, object]) -> tuple[str, ...]:
     """One sentence per field of `fields` that `body`'s schema-valid block
-    already holds with another value (issue #555), naming both values: a
+    already holds with another value, naming both values: a
     flag never silently overrides, nor yields to, a piped block."""
     data = locate_block(body).data
     conflicts: list[str] = []
@@ -1380,7 +1380,6 @@ class ExpectationLine:
     `default`. `default` is the line's own default (`str | None`, `None`
     once ruled) -- `aco rulings --json`'s own line payload reads it from
     here rather than re-parsing the block. `question`/`example`/`picture`
-    (issue #295)
     are the card's optional operator-language heading, illustration
     sentence, and inline SVG -- `None` when `aco ask` was not given them,
     in which case a card falls back to `text`."""
@@ -1404,7 +1403,7 @@ def expectation_lines(
     accepts. Empty for a body with no block, no expectations, or one
     `parse_body` reads as MALFORMED -- a malformed body's lines are not
     addressable until it is fixed by hand. `storage` is forwarded to
-    `parse_body` unchanged (issue #248)."""
+    `parse_body` unchanged."""
     if parse_body(body, storage=storage).read_state is not BodyReadState.VALID:
         return ()
     entries = _block_expectation_dicts(locate_block(body).data)
@@ -1426,7 +1425,7 @@ def expectation_lines(
 def expectation_line_state(line: ExpectationLine) -> str:
     """`open`, or `ruled <ruling> <ruled_on>` -- the one state text
     `rulings`' human form prints; `--json` carries `ruling`/`ruled_on`
-    directly and does not call this (issue #379)."""
+    directly and does not call this."""
     if line.ruling is None:
         return "open"
     ruled_on = cast(date, line.ruled_on)
@@ -1442,13 +1441,13 @@ def expectation_line_summary(line: ExpectationLine) -> str:
 
 
 class ExpectationAlreadyRuledError(protocol.ClaimError):
-    """`rule_expectation`'s own already-ruled refusal (issue #396) -- a
+    """`rule_expectation`'s own already-ruled refusal -- a
     distinct type from `ExpectationOutOfRangeError` so a `--json`-emitting
     caller can choose `already_ruled` without parsing the refusal prose."""
 
 
 class ExpectationOutOfRangeError(protocol.ClaimError):
-    """`rule_expectation`'s own out-of-range `--line` refusal (issue #396)."""
+    """`rule_expectation`'s own out-of-range `--line` refusal."""
 
 
 def rule_expectation(
@@ -1457,7 +1456,7 @@ def rule_expectation(
     """`body` with its `index`-th (1-based, block order) `[[expectation]]`
     entry moved from proposed to ruled: `default` falls, `ruling` and
     `ruled_on` take its place. Byte-preserving outside that one entry
-    (`locate_block` -> `replace_block`, #150 §4/§7 --
+    (`locate_block` -> `replace_block` --
     the same pair `cut` writes through). `note`, when given, is appended to
     the line's own text as ` Anmerkung: <note>`: the schema has no dedicated
     note field, and the ruled line's own text is the one place a
@@ -1492,7 +1491,7 @@ def rule_expectation(
 @dataclass(frozen=True)
 class ExpectationCardFields:
     """The three optional `[[expectation]]` card fields `aco ask` may
-    attach (issue #295), grouped so a caller passes one value instead of
+    attach, grouped so a caller passes one value instead of
     three positional strings that must stay paired: `question` and
     `example`, one operator-language sentence each, and `picture`, an
     inline SVG. Each defaults to absent, matching a line with none of
@@ -1504,14 +1503,14 @@ class ExpectationCardFields:
 
 
 class ExpectationTextError(protocol.ClaimError):
-    """`append_expectation`'s own blank-`text` refusal (issue #396) -- a
+    """`append_expectation`'s own blank-`text` refusal -- a
     distinct type from `ExpectationFieldError` so a `--json`-emitting caller
     can choose `invalid_expectation` without parsing the refusal prose."""
 
 
 class ExpectationFieldError(protocol.ClaimError):
     """`append_expectation`'s own optional-card-field refusal -- `question`,
-    `example`, or `picture` failing its own content rule (issue #396) --
+    `example`, or `picture` failing its own content rule --
     carrying the failing `field` by name so a `--json`-emitting caller can
     choose `invalid_expectation` (`question`, `example`) or `invalid_picture`
     (`picture`) without parsing the refusal prose."""
@@ -1526,7 +1525,7 @@ def append_expectation(
 ) -> str:
     """`body` with one fresh proposed `[[expectation]]` entry appended:
     `text` verbatim, `default` as given, plus whichever of `card`'s
-    optional fields (issue #295) `aco ask` was given -- each validated by
+    optional fields `aco ask` was given -- each validated by
     the same check `_block_expectation_optional_field_defects` reads a
     stored body with, so a value this refuses can never be written.
     Byte-preserving outside the appended entry, the same write path as
@@ -1558,18 +1557,18 @@ def missing_or_empty_sections(contract: Contract) -> tuple[str, ...]:
     """Every projection key a body-incomplete refusal names: an absent key
     and a fresh skeleton's empty string both count, even though both stay
     legitimate CONTRACT-column *presence* (`_contract_summary` is
-    `None`-only for that column, matching #150 §5's rule that a block
+    `None`-only for that column, matching the rule that a block
     skeleton still shows `Now, Next, Done when`)."""
     return tuple(name for name, value in contract_fields(contract) if not value)
 
 
 def _slice_line_defects(slices: tuple[SliceRow, ...]) -> tuple[ContractDefect, ...]:
     """The rule wherever a body's shape is judged -- `check -`,
-    `check`, `item new`/`item edit` (issue #517 line 2): a slice title is
+    `check`, `item new`/`item edit`: a slice title is
     one line, since `next` prints it inside a runnable `cut`, so every
-    `protocol.is_display_control` character is a defect (issue #538); a
+    `protocol.is_display_control` character is a defect; a
     row's `done_when` keeps the same rule, since `cut` copies it into the
-    child's one-line `done_when` (issue #606). `board` and `next` keep
+    child's one-line `done_when`. `board` and `next` keep
     reading a body stored before this rule, and `next` names such a row
     instead of printing its `cut` (`unprintable_slice_line_key`)."""
     return tuple(
@@ -1584,7 +1583,7 @@ def unprintable_slice_line_key(row: SliceRow) -> str | None:
     """The first of `row`'s one-line fields that breaks BODY-66, or `None`:
     `next` withholds the row's `cut` on it (NEXT-32), since a title would
     split the printed command and a `done_when` makes that `cut` refuse
-    (CUT-39; issue #606 line 3)."""
+    (CUT-39)."""
     return next(
         (key for key, text in _slice_lines(row) if _display_control_in(text) is not None),
         None,
@@ -1613,8 +1612,8 @@ def _slice_line_defect(
 
 
 def slice_done_when_defect(located: LocatedBlock, row: SliceRow) -> str | None:
-    """BODY-66 for the one row of `located` that `cut` selects (issue #606
-    line 3), in the sentence `check -` prints for it: `cut` copies only
+    """BODY-66 for the one row of `located` that `cut` selects,
+    in the sentence `check -` prints for it: `cut` copies only
     that row's `done_when` into a child, so no other row's line can refuse
     the cut."""
     position = _block_slices(located.data).index(row)
@@ -1623,8 +1622,8 @@ def slice_done_when_defect(located: LocatedBlock, row: SliceRow) -> str | None:
 
 
 class BodyShapeVerdict(StrEnum):
-    """Whether a body's own shape is one a builder can start from (issue
-    #404): the third state beyond `BodyReadState.VALID`/`MALFORMED` -- a
+    """Whether a body's own shape is one a builder can start from:
+    the third state beyond `BodyReadState.VALID`/`MALFORMED` -- a
     schema-valid block that still leaves a required section unfilled.
     `check <item>` and `check -` both need to tell `malformed` from
     `incomplete` apart for their own `--json` `reason`, never by sniffing a
@@ -1637,7 +1636,7 @@ class BodyShapeVerdict(StrEnum):
 
 @dataclass(frozen=True)
 class BodyShapeCheck:
-    """One body's own shape verdict and defect sentences (issue #404): the
+    """One body's own shape verdict and defect sentences: the
     single read `check <item>` and `check -` both share, so neither
     writes a second rendering of `body_defect_text`'s or the incomplete
     sentence's own text."""
@@ -1651,7 +1650,7 @@ def body_shape_check(body: str, *, storage: Storage = Storage.GITHUB) -> BodySha
     anything -- malformed (one sentence per schema defect) or incomplete
     (one joined sentence) -- paired with the verdict a caller's `--json`
     `reason` reads. `storage` gates the one storage-specific extension,
-    `[record]` (issue #248)."""
+    `[record]`."""
     parsed = parse_body(body, storage=storage)
     malformed = (
         parsed.contract.defects
