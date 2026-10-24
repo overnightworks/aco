@@ -23,7 +23,7 @@ from . import (
 )
 from .session import RunContext
 
-# `item new`'s own projection flags (issue #555), keyed by the block key
+# `item new`'s own projection flags, keyed by the block key
 # each one writes.
 ITEM_NEW_PROJECTION_FLAGS = (
     ("now", "the block's now: where the item stands"),
@@ -35,8 +35,8 @@ ITEM_NEW_PROJECTION_FLAGS = (
 def _body_shape_defects(
     raw_body: str, *, storage: body.Storage = body.Storage.GITHUB
 ) -> tuple[str, ...]:
-    """`item edit`'s own accessor (issue #287) onto `body.body_shape_check`
-    (issue #404): only the defect sentences, never the verdict `check
+    """`item edit`'s own accessor onto `body.body_shape_check`:
+    only the defect sentences, never the verdict `check
     <item>` and `check -` read for their own `--json` `reason`."""
     return body.body_shape_check(raw_body, storage=storage).defects
 
@@ -52,8 +52,8 @@ def _stdin_file_mode() -> int | None:
 
 
 def _stdin_carries_a_body() -> bool:
-    """Whether stdin carries a body a command reads (head ruling of
-    01.10.2026 on issue #555): a redirected file (`< body.md`) or a pipe
+    """Whether stdin carries a body a command reads:
+    a redirected file (`< body.md`) or a pipe
     (`printf ... |`). A socket -- what Claude Code's Bash tool hands a
     command -- a terminal, `/dev/null` or a closed stdin carry none, so the
     command never waits on an idle harness stdin."""
@@ -63,7 +63,7 @@ def _stdin_carries_a_body() -> bool:
 
 def _refuse_a_body_on_stdin(command: str) -> None:
     """Refuses, before any write, a body `command` would otherwise drop
-    unread (issue #567): it reads no stdin, so a file or pipe there carrying
+    unread: it reads no stdin, so a file or pipe there carrying
     one (`_stdin_carries_a_body`) is a mistake the person must see."""
     if _stdin_carries_a_body():
         raise protocol.ClaimUnavailableError(f"{command} reads no stdin; drop the redirect")
@@ -83,15 +83,15 @@ _ITEM_NEW_ORIGIN_ON_GITHUB_REFUSAL = '--origin needs storage = "state-ref"'
 
 class _ItemReason(StrEnum):
     """`aco item`'s own `--json` `reason` vocabulary, shared across its four
-    subcommands (issue #425, `specs/item.spec.md`): `created`/`edited`/
+    subcommands (`specs/item.spec.md`): `created`/`edited`/
     `closed`/`shown` name each subcommand's own success; `unchanged`, an
     `item edit --size/--whole/--kind` whose value is already set, which
-    writes nothing (issue #572). `body_invalid`
+    writes nothing. `body_invalid`
     covers only `item new`'s and `item edit`'s own piped-body shape check
     (`_body_shape_defects`, the same check `check -` runs), carrying
-    `defects` the same way (`cmd_check._CheckReason`, issue #404); `partial_write`
+    `defects` the same way (`cmd_check._CheckReason`); `partial_write`
     only a GitHub issue `item new` created but could not type or record under
-    its `--parent` (issue #444), `cut`'s own shape. Every other refusal -- a
+    its `--parent`, `cut`'s own shape. Every other refusal -- a
     `storage = "github"` command, a missing item or parent, a possible twin,
     a pull request target, a forge write capability, or a live claim still
     on the item -- is `precondition_failed`, this command family's single
@@ -114,12 +114,12 @@ def _refuse_item_body_invalid(defects: tuple[str, ...], *, as_json: bool) -> int
 
 
 def _cmd_item_new(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item new` (issues #285, #316, #444): one fresh item under
+    """`aco item new`: one fresh item under
     either storage pin, each through its own adapter's write
     (`_item_new_on_github`, `_item_new_on_state_ref`), both behind the same
     twin search `cut` runs (`cmd_cut.refuse_possible_twin`). Every refusal but a
     malformed piped body or a partial GitHub write reports through the
-    shared envelope as `precondition_failed` (issue #425)."""
+    shared envelope as `precondition_failed`."""
     as_json = parsed.json
     try:
         if context.config.storage is body.Storage.GITHUB:
@@ -162,7 +162,7 @@ def _item_new_block_fields(parsed: argparse.Namespace) -> dict[str, object]:
 
 
 def _item_new_body(parsed: argparse.Namespace, storage: body.Storage) -> str:
-    """The body `item new` stores under either storage (issue #555): the
+    """The body `item new` stores under either storage: the
     piped one, its block given each flag it lacks and refused when a flag
     contradicts it; or, piped without a block, the prose above a block the
     flags build -- a container's own skeleton prose when nothing was piped."""
@@ -183,7 +183,7 @@ def _item_new_body(parsed: argparse.Namespace, storage: body.Storage) -> str:
 
 
 def _item_new_on_github(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`item new` under `storage = "github"` (issue #444): the body it
+    """`item new` under `storage = "github"`: the body it
     stores (`_item_new_body`) passes the same shape check `aco check <n>`
     applies before
     anything else is read or written, so an invalid body creates nothing;
@@ -247,7 +247,7 @@ def _retype_task_parent(
     client: forge.ForgeWriter, parent: workboard.Issue | None, storage: body.Storage
 ) -> None:
     """Retype an open Task `--parent` to Container before it gets its first
-    child (issue #503), under either storage, and say so on stderr, leaving
+    child, under either storage, and say so on stderr, leaving
     stdout and `--json` the created item's alone; any other parent keeps
     its kind."""
     if parent is None or parent.kind is not body.ItemKind.TASK:
@@ -258,7 +258,7 @@ def _retype_task_parent(
 
 
 def _item_new_on_state_ref(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`item new` under `storage = "state-ref"` (issues #285, #316): the one
+    """`item new` under `storage = "state-ref"`: the one
     write path for a fresh state-ref item -- `StateRefBoard.compose_item`
     then `create_item`, the same CAS write `cut`'s own `create_child`
     performs, generalized to an optional parent and origin -- so this
@@ -272,7 +272,7 @@ def _item_new_on_state_ref(parsed: argparse.Namespace, context: RunContext) -> i
     `create_item` is not part of the generic `ForgeWriter` port every other
     write command narrows to. The body is `_item_new_body`'s, the piped one
     stored as under github; one left incomplete is still written, each
-    missing section named on stderr (issue #555)."""
+    missing section named on stderr."""
     client = _state_ref_board(context)
     parent = parsed.parent
     storage = context.config.storage
@@ -312,8 +312,7 @@ _ITEM_EDIT_GITHUB_REFUSAL = "forge issues are edited on the forge; aco never gov
 
 
 def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM` (issue #287; `--size`, issue #357; `--whole`,
-    issue #399; `--kind`, issue #503): with `--size`, `--whole`, or `--kind`,
+    """`aco item edit ITEM`: with `--size`, `--whole`, or `--kind`,
     a narrow write of only that one field (`_cmd_item_edit_size`/
     `_cmd_item_edit_whole`/`_cmd_item_edit_kind`, both storages); with none,
     the state-ref item's own body, replaced from
@@ -322,7 +321,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
     `_body_shape_defects`). The CAS `expected` oid is this process's own
     already-read snapshot (`StateRefBoard.update_item_body`'s
     `current.oid`, set once at `session._state_ref_forge` construction): a second
-    process writing from that same snapshot refuses with issue #279's own
+    process writing from that same snapshot refuses with a stale-write
     sentence, never merged, never silently overwritten. `parent`, `state`,
     `origin`, `created_at`, and `closed_at` stay this item's own stored
     values regardless of what the piped body's `[record]` names for them --
@@ -337,7 +336,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
     governed by aco. Narrows the context's forge to the state-ref board,
     as `item new`'s state-ref path does. A malformed piped body reports through
     the shared envelope as `body_invalid`, with `check -`'s own
-    `defects`; every other refusal is `precondition_failed` (issue #425)."""
+    `defects`; every other refusal is `precondition_failed`."""
     if parsed.size is not None:
         return _cmd_item_edit_size(parsed, context)
     if parsed.whole is not None:
@@ -369,7 +368,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
 
 def _read_item_edit_body(number: int) -> str:
     """`item edit`'s new body, read only when stdin carries one
-    (`_stdin_carries_a_body`, issue #572): an idle socket, a terminal,
+    (`_stdin_carries_a_body`): an idle socket, a terminal,
     `/dev/null` or a closed stdin refuses at once, naming the redirect,
     rather than hanging on a read or replacing the body with nothing."""
     if not _stdin_carries_a_body():
@@ -384,14 +383,14 @@ _ITEM_EDIT_SIZE_COMMAND = "item edit --size"
 
 
 def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM --size S|M|L` (issue #357): the one item-size
+    """`aco item edit ITEM --size S|M|L`: the one item-size
     write, over the generic `ForgeWriter.update_item_body` both `github`
     and `state-ref` already implement -- unlike the whole-body `item edit`
     above, this works under `storage = "github"` too, since it patches only
     the block's own top-level `size` key (never `[record]`, a
     `state-ref`-only table BODY-15 refuses under `github`) and leaves every
     other byte untouched. Every refusal reports through the shared envelope
-    as `precondition_failed` (issue #425)."""
+    as `precondition_failed`."""
     as_json = parsed.json
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_SIZE_COMMAND)
@@ -421,8 +420,8 @@ def _write_block_data(
     new_data: dict[str, object],
 ) -> _ItemReason:
     """Writes `new_data` as item `number`'s block, every other byte
-    untouched, or nothing at all when the block already carries it (issue
-    #572), so a repeated narrow edit leaves no empty write behind."""
+    untouched, or nothing at all when the block already carries it,
+    so a repeated narrow edit leaves no empty write behind."""
     if new_data == located.data:
         return _ItemReason.UNCHANGED
     client.update_item_body(number, body.replace_block(current_body, located, new_data))
@@ -447,12 +446,12 @@ _ITEM_EDIT_WHOLE_COMMAND = "item edit --whole"
 
 
 def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM --whole REASON` (issue #399): the one item-whole
+    """`aco item edit ITEM --whole REASON`: the one item-whole
     write, mirroring `_cmd_item_edit_size` over the same generic
     `ForgeWriter.update_item_body` -- works under `storage = "github"` too,
     since it patches only the block's own top-level `whole` key and leaves
     every other byte untouched. Every refusal reports through the shared
-    envelope as `precondition_failed` (issue #425)."""
+    envelope as `precondition_failed`."""
     as_json = parsed.json
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_WHOLE_COMMAND)
@@ -490,7 +489,7 @@ _ITEM_EDIT_KIND_COMMAND = "item edit --kind"
 
 
 def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM --kind task|container` (issue #503): the one
+    """`aco item edit ITEM --kind task|container`: the one
     retype a person runs, over the `ForgeWriter.set_item_kind` both storages
     implement -- the repair `next` names for a nested container with one
     uncut row. Reads no stdin, and refuses a body piped or redirected there
@@ -505,8 +504,8 @@ def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
         storage = context.config.storage
         number = parsed.item
         kind = body.ItemKind(parsed.kind)
-        # Under state-ref the retype reads its item alone (ITEM-37/38, issue
-        # #536); the forge answers only through its open-issue list.
+        # Under state-ref the retype reads its item alone (ITEM-37/38);
+        # the forge answers only through its open-issue list.
         if isinstance(client, state_board.StateRefBoard):
             target = client.open_issue(number)
         else:
@@ -517,9 +516,9 @@ def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
         label = workboard.item_label(number, storage)
         if target is None:
             raise protocol.ClaimUnavailableError(f"{label} is not an open item")
-        # The retype decides with the item and its children alone (issue
-        # #536), and holds the store it read through its write, so a child
-        # written since refuses it rather than being guessed past (#447).
+        # The retype decides with the item and its children alone,
+        # and holds the store it read through its write, so a child
+        # written since refuses it rather than being guessed past.
         if isinstance(client, state_board.StateRefBoard):
             _refuse_an_unreadable_relative(client, number, with_parent=False)
             client.hold_items()
@@ -559,16 +558,16 @@ _ITEM_CLOSE_GITHUB_REFUSAL = "the forge closes its issues; aco never governs the
 
 
 def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item close ITEM` (issue #289): the state-ref item's own record,
+    """`aco item close ITEM`: the state-ref item's own record,
     closed -- `state` to `CLOSED`, `closed_at`/`updated_at` to now, the item
     file and every other byte untouched (`StateRefBoard.close_item`'s one
-    CAS write over this process's own already-read oid, extending #287's
+    CAS write over this process's own already-read oid, extending the
     record-owner rule by one field rather than composing a record here).
     Refuses under `storage = "github"` by name -- the forge closes its own
     issues, aco never governs them -- and, once the state ref is readable,
     refuses a live claim on the item before every item-state refusal
     (missing, malformed, already closed), then again on every write
-    attempt, retries included (`protocol.ItemCloseIntent`, issue #459), so
+    attempt, retries included (`protocol.ItemCloseIntent`), so
     a concurrent claim cannot slip past the first check.
     Existence is checked through the ordinary
     `item_reference` read before `close_item` is ever called, so an unknown
@@ -579,13 +578,13 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
     unreadable parent or child, or a parent `items/` lacks, refuses before
     the write (`_refuse_an_unreadable_relative`); any other malformed item only goes
     unfreed, and one failing the `freed:` read after the write turns that line
-    into a hint (issue #541). Prints one line, `CLOSED aco-xxxxxx` (`--json`:
+    into a hint. Prints one line, `CLOSED aco-xxxxxx` (`--json`:
     `{"item", "number", "closed_at", "parent_closable"}`), then `release
     --merged`'s own `freed:` line -- open items whose only open local
-    blocker was this one (`workboard.freed_item_numbers`, issue #256; nothing new) --
+    blocker was this one (`workboard.freed_item_numbers`) --
     and, when this close was its parent's last open child, `release
-    --merged`'s own parent hint (issue #348). Every refusal reports through
-    the shared envelope as `precondition_failed` (issue #425)."""
+    --merged`'s own parent hint. Every refusal reports through
+    the shared envelope as `precondition_failed`."""
     as_json = parsed.json
     try:
         if context.config.storage is not body.Storage.STATE_REF:
@@ -620,8 +619,8 @@ def _refuse_an_unreadable_relative(
 ) -> None:
     """Refuses by the lowest id while one of `number`'s children -- the same
     children the board counts, an unreadable item that may be one included
-    (issue #550, ITEM-54) -- or, `with_parent`, its parent does not read
-    (issue #536, ITEM-53): a single-item write decides with those alone, so
+    (ITEM-54) -- or, `with_parent`, its parent does not read
+    (ITEM-53): a single-item write decides with those alone, so
     each is read through the one narrow `item_references` read, and an
     unrelated malformed item never blocks the write. `parent_number` refuses
     a parent `items/` lacks (PIN-16) here too, before the write rather than
@@ -637,7 +636,7 @@ def _closable_parent_of_a_closed_item(
     client: state_board.StateRefBoard, closed_item: int
 ) -> int | None:
     """`board_read.parent_closable_number`'s parent hint, withheld while the parent's
-    own `item close` would refuse by an unreadable relative (issue #536,
+    own `item close` would refuse by an unreadable relative (
     ITEM-54): the hint recommends that close, so it asks the very check
     that close runs rather than contradicting it."""
     closable = board_read.parent_closable_number(client, closed_item, body.Storage.STATE_REF)
@@ -651,7 +650,7 @@ def _closable_parent_of_a_closed_item(
 
 
 def _item_close_freed(client: forge.ForgeReader, number: int) -> tuple[int, ...]:
-    """Every open item `number`'s own close just freed -- issue #256's own
+    """Every open item `number`'s own close just freed -- the existing
     derivation, reused rather than reinvented, the same base-issues-plus-
     dependency-fetch wave `cmd_release._release_landing` runs for a merged release, read
     fresh off `client`'s own already-closed view so `number` itself never
@@ -667,10 +666,10 @@ def _item_close_freed(client: forge.ForgeReader, number: int) -> tuple[int, ...]
 
 @dataclass(frozen=True)
 class _ItemCloseResult:
-    """Everything `_print_item_close_result` needs for one `item close`
-    (issue #348), bundled so the printer itself takes one argument instead
+    """Everything `_print_item_close_result` needs for one `item close`,
+    bundled so the printer itself takes one argument instead
     of PLR0913's five-scalar ceiling. `freed` is the freed numbers, or
-    the hint that replaced them when that read refused (issue #541)."""
+    the hint that replaced them when that read refused."""
 
     item_id: str
     number: int
@@ -717,7 +716,7 @@ def _item_header(number: int, reference: forge.ItemReference, parent: int | None
     """`item show`'s one header line: id, number, state, parent, and origin
     -- the same shape regardless of which forge answered the reads, since an
     id (`items.format_item_id`) is a pure encoding of `number`, never a
-    per-adapter fact. `reference.origin` (issue #316) stays `None` for a
+    per-adapter fact. `reference.origin` stays `None` for a
     GitHub-stored item, so this prints `origin none` there exactly like an
     unset parent prints `parent none`."""
     return (
@@ -728,15 +727,14 @@ def _item_header(number: int, reference: forge.ItemReference, parent: int | None
 
 
 def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item show` (issue #285): the stored body behind one header
-    line, its display controls escaped in text (issue #544), byte-exact
+    """`aco item show`: the stored body behind one header
+    line, its display controls escaped in text, byte-exact
     under `--json` -- read through the ordinary forge port, so it works
     identically under `storage = "github"` (the forge's own issue body) and
     `storage = "state-ref"` (the item file's own body); closing an item
     never deletes it, so a closed item is shown exactly like an open one.
     A missing id -- or a forge that fails either read this header needs --
-    reports through the shared envelope as `precondition_failed` (issue
-    #425)."""
+    reports through the shared envelope as `precondition_failed`."""
     as_json = parsed.json
     try:
         client = context.forge
@@ -769,7 +767,7 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
 
 
 # `item new --parent` also takes a Task: an item becomes a container exactly
-# when it gets its first child, so that write retypes it (issue #503).
+# when it gets its first child, so that write retypes it.
 _ITEM_PARENT_KINDS = frozenset({body.ItemKind.CONTAINER, body.ItemKind.TASK})
 
 
