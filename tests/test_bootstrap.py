@@ -5,7 +5,6 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 import pytest
 from cli_fixtures import (
@@ -153,8 +152,15 @@ def test_bootstrap_whose_creation_push_is_rejected_by_a_rival_leaves_the_rivals_
 def _lose_the_response_of_the_first_push(monkeypatch: pytest.MonkeyPatch) -> None:
     real_push = store.GitPushTransport.push
 
-    def push_landing_then_failing(transport: store.GitPushTransport, **push: Any) -> None:
-        real_push(transport, **push)
+    def push_landing_then_failing(
+        transport: store.GitPushTransport,
+        *,
+        worktree: Path,
+        remote: str,
+        ref: str,
+        new_oid: protocol.ObjectId,
+    ) -> None:
+        real_push(transport, worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
         raise protocol.PushRejectedError("simulated lost response")
 
     monkeypatch.setattr(store.GitPushTransport, "push", push_landing_then_failing)
@@ -164,9 +170,16 @@ def _reject_the_first_push(monkeypatch: pytest.MonkeyPatch) -> None:
     real_push = store.GitPushTransport.push
     rejections: list[None] = []
 
-    def push_rejected_once(transport: store.GitPushTransport, **push: Any) -> None:
+    def push_rejected_once(
+        transport: store.GitPushTransport,
+        *,
+        worktree: Path,
+        remote: str,
+        ref: str,
+        new_oid: protocol.ObjectId,
+    ) -> None:
         if rejections:
-            real_push(transport, **push)
+            real_push(transport, worktree=worktree, remote=remote, ref=ref, new_oid=new_oid)
             return
         rejections.append(None)
         raise protocol.PushRejectedError("simulated rejection")

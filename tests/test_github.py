@@ -2388,8 +2388,18 @@ def launched_children(monkeypatch: pytest.MonkeyPatch) -> list[subprocess.Popen[
     children: list[subprocess.Popen[Any]] = []
     original_popen = subprocess.Popen
 
-    def start(command: list[str], **keywords: Any) -> subprocess.Popen[bytes]:
-        children.append(original_popen(command, **keywords))
+    def start(
+        command: list[str],
+        *,
+        stdin: int | None = None,
+        stdout: int | None = None,
+        stderr: int | None = None,
+        env: dict[str, str] | None = None,
+        cwd: Path | None = None,
+    ) -> subprocess.Popen[bytes]:
+        children.append(
+            original_popen(command, stdin=stdin, stdout=stdout, stderr=stderr, env=env, cwd=cwd)
+        )
         return children[-1]
 
     monkeypatch.setattr(subprocess, "Popen", start)

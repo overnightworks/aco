@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import NoReturn, TypedDict, TypeVar, Unpack, cast, overload
 
 from . import (
     __version__,
@@ -659,6 +659,25 @@ class _UsageError(protocol.ClaimError):
         self.parser = parser
 
 
+_Namespace = TypeVar("_Namespace")
+
+
+class _ArgumentOptions(TypedDict, total=False):
+    """The `add_argument` options `aco` parsers declare, as typeshed types them."""
+
+    action: str | type[argparse.Action]
+    nargs: int | str | None
+    const: object
+    default: object
+    type: Callable[[str], object] | argparse.FileType | str
+    choices: Iterable[object] | None
+    required: bool
+    help: str | None
+    metavar: str | tuple[str, ...] | None
+    dest: str | None
+    version: str
+
+
 class _UsageErrorParser(argparse.ArgumentParser):
     """Every `aco` parser and subparser -- argparse hands this class down to
     each subparser it builds. Its own refusal path prints usage and exits
@@ -676,24 +695,40 @@ class _UsageErrorParser(argparse.ArgumentParser):
     it was handed and the arguments declared on it, and `subcommands` names
     the parsers one level down."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *, prog: str | None = None, description: str | None = None) -> None:
         self.declared_actions: list[argparse.Action] = []
         self.received_tokens: tuple[str, ...] | None = None
         self.subcommands: _Subcommands | None = None
-        super().__init__(*args, allow_abbrev=False, **kwargs)
+        super().__init__(prog=prog, description=description, allow_abbrev=False)
 
-    def add_argument(self, *args: Any, **kwargs: Any) -> argparse.Action:
-        action = super().add_argument(*args, **kwargs)
+    def add_argument(
+        self, *name_or_flags: str, **options: Unpack[_ArgumentOptions]
+    ) -> argparse.Action:
+        action = super().add_argument(*name_or_flags, **options)
         self.declared_actions.append(action)
         return action
 
+    @overload
     def parse_known_args(
-        self, args: Iterable[str] | None = None, *rest: Any, **keywords: Any
-    ) -> tuple[Any, list[str]]:
+        self, args: Iterable[str] | None = None, namespace: None = None
+    ) -> tuple[argparse.Namespace, list[str]]: ...
+
+    @overload
+    def parse_known_args(
+        self, args: Iterable[str] | None, namespace: _Namespace
+    ) -> tuple[_Namespace, list[str]]: ...
+
+    @overload
+    def parse_known_args(self, *, namespace: _Namespace) -> tuple[_Namespace, list[str]]: ...
+
+    def parse_known_args(
+        self, args: Iterable[str] | None = None, namespace: _Namespace | None = None
+    ) -> tuple[_Namespace | argparse.Namespace, list[str]]:
         if self.subcommands:
             self.subcommands.forget_received_tokens()
         self.received_tokens = tuple(sys.argv[1:] if args is None else args)
-        return super().parse_known_args(self.received_tokens, *rest, **keywords)
+        parsed = super().parse_known_args(self.received_tokens, namespace)
+        return cast("tuple[_Namespace | argparse.Namespace, list[str]]", parsed)
 
     def error(self, message: str) -> NoReturn:
         raise _UsageError(self, message)
@@ -707,8 +742,10 @@ class _Subcommands:
     def __init__(self, parent: _UsageErrorParser, dest: str) -> None:
         self._action = parent.add_subparsers(dest=dest, required=True)
 
-    def add_parser(self, name: str, **kwargs: Any) -> _UsageErrorParser:
-        return self._action.add_parser(name, **kwargs)
+    def add_parser(
+        self, name: str, *, help: str, description: str | None = None
+    ) -> _UsageErrorParser:
+        return self._action.add_parser(name, help=help, description=description)
 
     def chosen(self) -> tuple[_UsageErrorParser, tuple[str, ...]] | None:
         return next(
