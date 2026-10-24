@@ -35,7 +35,7 @@
 "tests/cli_fixtures.py" = 969
 "tests/github_fixtures.py" = 839
 "tests/test_adopt.py" = 1650
-"tests/test_board.py" = 4444
+"tests/test_board.py" = 4443
 "tests/test_checkout.py" = 2085
 "tests/test_cli.py" = 17792
 "tests/test_cut.py" = 1124
@@ -46,7 +46,7 @@
 "tests/test_release_cleanup.py" = 807
 "tests/test_rescope_checkout.py" = 1088
 "tests/test_reset.py" = 954
-"tests/test_state_board.py" = 6118
+"tests/test_state_board.py" = 6114
 "tests/test_store.py" = 5526
 
 [function_lines."src/aco/board_read.py"]
@@ -149,7 +149,7 @@
 "TestCliStateRefForge.test_item_close_refuses_a_live_claim_then_succeeds_after_release_abandoned" = 60
 "TestCliStateRefForge.test_item_new_with_origin_writes_the_record_and_a_fresh_show_prints_it" = 65
 "TestCliStateRefForge.test_next_status_and_rulings_print_state_ref_ids_where_github_prints_hash_n" = 61
-"TestCliStateRefForge.test_readme_week_without_a_forge_runs_end_to_end_against_a_fresh_bare_remote" = 157
+"TestCliStateRefForge.test_readme_week_without_a_forge_runs_end_to_end_against_a_fresh_bare_remote" = 156
 "TestCliStateRefForge.test_whole_state_ref_paths_preserve_state" = 111
 
 [function_lines."tests/test_status.py"]
