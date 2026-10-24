@@ -3,7 +3,7 @@ branch validation, claim conflict/overlap, and the wide-scope trip rule.
 Tests that drive these through `issue_claim.main([...])` stay in
 `tests/test_cli.py` as CLI-wiring behavior; `protocol.apply` and its TOML
 codecs are `tests/test_store.py`'s own (the store's pure counterpart) --
-except `LandingIntent` (issue #359), whose one job is exactly the atomic
+except `LandingIntent`, whose one job is exactly the atomic
 close-and-release this module owns describing, so its own `apply` proof
 lives here instead."""
 
@@ -70,8 +70,8 @@ def test_outbound_text_refuses_a_non_string_field() -> None:
     ["Codex\nSol", "Codex\x1fSol", " ", "x" * 129],
 )
 def test_outbound_text_rejects_controlled_or_overlong_fields(invalid: str) -> None:
-    """`outbound_text` is the one owner of this validation since issue #176
-    moved it out of the deleted ledger comment writers (`claim_comment` /
+    """`outbound_text` is the one owner of this validation since it moved out of the deleted
+    ledger comment writers (`claim_comment` /
     `release_comment` / `supersede_comment`) and onto every real call site
     that builds an intent: `cmd_claim._request`'s agent/role, and `release`'s
     abandoned reason."""
@@ -138,7 +138,7 @@ def test_claim_scope_must_be_canonical_repository_relative_paths(scope: object, 
 
 
 def test_claim_scope_keeps_a_path_with_a_printable_space() -> None:
-    """Issue #538 line 3 (head ruling of 28.09.2026): NBSP is text, not a
+    """Head ruling of 28.09.2026: NBSP is text, not a
     display control, so a scope path carrying it stays a valid entry."""
     path = "docs/a\N{NO-BREAK SPACE}b.md"
 
@@ -149,7 +149,7 @@ def test_claim_scope_is_recorded_and_serialized_in_canonical_order() -> None:
     """`valid_scope` is the one place a claim's scope order is decided --
     `cmd_claim._request` calls it at creation, `combined_scope` calls it again at
     rescope -- so a claim recorded from paths given in caller order still
-    lands in `claims/<key>.toml` sorted (issue #331 R1): the body-scope
+    lands in `claims/<key>.toml` sorted: the body-scope
     projection `workboard._canonical_scope` reuses this exact function, never a
     second sort, so a body's own `scope` and a live claim's `scope` stay
     comparable as tuples no matter which order either was typed in."""
@@ -170,7 +170,7 @@ def test_claim_scope_is_recorded_and_serialized_in_canonical_order() -> None:
 def test_serialize_claim_toml_escapes_control_characters_the_reader_accepts_back(
     control_character: str,
 ) -> None:
-    """`toml_string` (issues #378, #517) escapes every control character
+    """`toml_string` escapes every control character
     TOML's basic-string grammar forbids literal, not only backslash, quote,
     tab and newline: a claim field carrying U+0000-U+001F or U+007F still
     round-trips through `tomllib.loads` (the reader `claims/<key>.toml` is
@@ -307,7 +307,7 @@ def test_wide_scope_trip_names_the_condition_in_the_rule_s_priority_order() -> N
     )
 
 
-# --- `LandingIntent`: the atomic close-and-release (issue #359) ------------
+# --- `LandingIntent`: the atomic close-and-release ------------
 
 _LANDING_ITEM_ID = "aco-000001"
 _LANDING_ITEM_OID = protocol.ObjectId("d" * 40)
@@ -350,7 +350,7 @@ def _claimed_state_with_item() -> protocol.ClaimState:
 
 
 def test_apply_landing_intent_closes_the_item_and_releases_the_claim_in_one_transition() -> None:
-    """Issue #359: one `apply` call both moves the item's blob oid and
+    """One `apply` call both moves the item's blob oid and
     removes the claim -- the atomicity a landing needs (never one without
     the other) is exactly this being a single `ClaimState` transition, not
     two intents applied in sequence."""
@@ -403,8 +403,8 @@ def test_apply_landing_intent_allows_a_coordinator_override() -> None:
 def test_apply_landing_intent_refuses(
     build_intent: Callable[[], protocol.LandingIntent], match: str
 ) -> None:
-    """Every way a landing refuses before it ever touches `refs/aco/state`
-    (issue #359): a claim id that names no live claim, a non-claimant with
+    """Every way a landing refuses before it ever touches `refs/aco/state`:
+    a claim id that names no live claim, a non-claimant with
     no coordinator override, an override without the coordinator role --
     all three `ReleaseIntent`'s own sentences, proven exactly in
     `test_store.py` (`test_apply_release_intent_refuses_releasing_a_claim_that_does_not_exist`,
@@ -437,11 +437,11 @@ def test_apply_landing_intent_refuses_against_a_missing_state_ref() -> None:
         protocol.apply(protocol.EMPTY_STATE, intent)
 
 
-# --- `ItemCloseIntent`: a close refused while its item is claimed (#459) ---
+# --- `ItemCloseIntent`: a close refused while its item is claimed ---
 
 
 def test_apply_item_close_intent_refuses_while_the_item_is_claimed() -> None:
-    """Issue #459: the live-claim check is part of the transition itself, so
+    """The live-claim check is part of the transition itself, so
     every attempt `store.commit_transition` applies it to re-checks it; the
     unclaimed close is `item close`'s own CLI proofs (PIN-25, ITEM-16)."""
     claimed = _claimed_state_with_item()
@@ -470,7 +470,7 @@ def test_apply_item_close_intent_refuses_while_the_item_is_claimed() -> None:
 def test_apply_claim_intent_replaying_its_own_claim_refuses_once_its_pinned_item_changed(
     items_after_the_claim: dict[str, protocol.ObjectId],
 ) -> None:
-    """Issue #496 / CAS-59: the item pin is checked on every attempt, the
+    """CAS-59: the item pin is checked on every attempt, the
     retry of a claim whose own earlier push already landed included -- its
     consumed claim id does not let it past an item written since."""
     pinned = replace(claim_intent(), item_pin=protocol.ItemPin(_LANDING_ITEM_ID, _LANDING_ITEM_OID))
@@ -529,12 +529,12 @@ def test_a_claim_conflict_names_its_item_in_the_state_ref_form_the_cli_asks_for(
     forge_sentence: str,
     named_sentence: str,
 ) -> None:
-    """Issue #471: a claim-ledger refusal's own text names an item `#<n>`,
+    """A claim-ledger refusal's own text names an item `#<n>`,
     and `named` with the renderer the CLI hands it under `storage =
     "state-ref"` names it `aco-xxxxxx`; a lane names no item, so both read
-    alike. A resource conflict (CLAIM-42, #476 review finding 3) names its
+    alike. A resource conflict (CLAIM-42) names its
     holder's item the same way, and a stored holder past `aco-ffffff` keeps
-    `#<n>` (PIN-30's second exception, #476 review finding 2) rather than an
+    `#<n>` (PIN-30's second exception) rather than an
     `aco-1000000` no command takes back. The CLI offers no explicit resource
     value, so CLAIM-42 is driven at the store's own transition."""
     claimed = protocol.apply(STATE_WITH_TIP, held)

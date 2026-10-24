@@ -315,7 +315,7 @@ class TestLandAfterMerge:
         self, keep_world: KeepWorld, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: REL-26.
-        Land's Never 2 delegates cleanup; #17 owns the missing explicit land sentence.
+        Land's Never 2 delegates cleanup; the explicit land sentence is still missing.
         """
         landing = keep_world.landing
         case = keep_world.case

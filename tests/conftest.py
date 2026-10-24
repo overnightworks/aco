@@ -69,7 +69,7 @@ def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
 @pytest.fixture
 def isolated_global_git_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     """Real git reads an empty global configuration, never the operator's
-    own (#310 finding 184): an operator's `remote.hub.url` or
+    own: an operator's `remote.hub.url` or
     `[remote "hub"]` line would otherwise answer whether a test's checkout
     configures its canonical remote. A test that needs a global line
     writes it into the returned file."""

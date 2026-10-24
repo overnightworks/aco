@@ -1,7 +1,7 @@
 """Behavior of `aco.process`: the bounded subprocess boundary
 (`run_bounded`) and the one git
 launcher (`run_git`/`git_command`/`git_failure_detail`/
-`git_failure_detail_from_stderr`, issue #372) `checkout` and `store` each call
+`git_failure_detail_from_stderr`) `checkout` and `store` each call
 rather than re-typing. The GitHub adapter's own thin
 wrapper over that boundary (`github._bounded_command`) is covered in
 `tests/test_github.py`; `checkout`'s and `store`'s own `ClaimError`
@@ -59,8 +59,7 @@ def test_git_failure_detail_from_stderr_never_reads_stdout(
 ) -> None:
     """Unlike `git_failure_detail`, a command whose stdout carries nothing a
     failure message should ever quote (`fetch`, `update-ref`, ...) must fall
-    back straight to `UNKNOWN_GIT_FAILURE` rather than a stray stdout line
-    (issue #372 R1)."""
+    back straight to `UNKNOWN_GIT_FAILURE` rather than a stray stdout line."""
     result = process.CapturedResult(exit_status=1, stdout=stdout, stderr=stderr)
 
     assert process.git_failure_detail_from_stderr(result) == expected

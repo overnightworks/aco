@@ -164,7 +164,7 @@ def _two_directories_named_the_same(tmp_path: Path) -> list[str]:
 
 def _a_symlink_resolving_to_a_configured_directory(tmp_path: Path) -> list[str]:
     """A second `--repo` spelling that resolves to the same directory as the
-    first (issue #637 follow-up): `ABRD-19`'s own-directory check must read
+    first: `ABRD-19`'s own-directory check must read
     the resolved path, not the string a symlink was given as."""
     real = _repository(tmp_path / "shared", row(1, "A", line(1, "A?")))
     alias = tmp_path / "alias"

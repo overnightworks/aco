@@ -22,7 +22,7 @@ from aco.body import (
 )
 from aco.protocol import ClaimRequest
 
-# Issue #538: display controls a slice title refuses beside the Cc set --
+# Display controls a slice title refuses beside the Cc set --
 # the bidi override and isolate and the zero-width space -- with the code
 # point BODY-63 names.
 BIDI_AND_ZERO_WIDTH_CONTROLS = (
@@ -153,7 +153,7 @@ def standing_active_claim(
     resource: protocol.ResourceHold | None = None,
     whole_reason: str | None = None,
 ) -> protocol.ActiveClaim:
-    """Build one store-truth `ActiveClaim` directly (issue #176): the store
+    """Build one store-truth `ActiveClaim` directly: the store
     fake's counterpart to `request()`'s ledger-comment `ClaimRequest` --
     every `status` test that needs a live claim on a faked
     `store.fetch_state` builds it from here instead of round-tripping
@@ -237,7 +237,7 @@ def block_body(
 ) -> str:
     """A body carrying one recognized block fence around `toml_text`, with
     `before` above it and `after` below its closing line -- ordinary prose
-    on both sides by default (issue #150 §4)."""
+    on both sides by default."""
     return f"{before}{fence}{BLOCK_FENCE_INFO}\n{toml_text}\n{fence}\n{after}"
 
 
@@ -312,7 +312,7 @@ def proposed_expectation(
     picture: str | None = None,
 ) -> dict[str, object]:
     """A proposed `[[expectation]]` entry, plus whichever of the optional
-    card fields (issue #295) the scenario needs -- omitted entirely when
+    card fields the scenario needs -- omitted entirely when
     left `None`, matching a line `aco ask` was never given one for."""
     entry: dict[str, object] = {"text": text, "default": default}
     entry.update(

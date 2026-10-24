@@ -42,7 +42,7 @@ def _item_body(record: Mapping[str, object]) -> str:
     """One item file's full text: prose, then the same `aco` fence
     `board.py` reads elsewhere, its interior rendered by `render_block` --
     never hand-serialized, so a test fixture and the real writer can never
-    drift apart (issue #248)."""
+    drift apart."""
     data = {"version": 1, "now": "N", "next": "X", "done_when": "D", "record": dict(record)}
     return block_body(render_block(data).removesuffix("\n"), before="Item body.\n\n", after="")
 
@@ -366,7 +366,7 @@ class TestRecordTable:
 
 
 class TestParseOrigin:
-    """The one origin grammar (issue #316), tested once against
+    """The one origin grammar, tested once against
     `parse_origin` -- the same `ORIGIN_PATTERN` `board._record_relation_defects`
     validates a persisted `record.origin` against, so this class is that
     grammar's one test."""

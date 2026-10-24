@@ -37,7 +37,7 @@ def _completed_lane(item: str, size: Size, hours: float) -> LaneEvent:
     return _lane(item, BASE, BASE + timedelta(hours=hours), size=size)
 
 
-# Three S-lanes and two M-lanes (issue #299 proof 1), shared by the
+# Three S-lanes and two M-lanes, shared by the
 # size-class and estimate proofs so both read the same measured world.
 _THREE_S_TWO_M_LANES = [
     _completed_lane("s1", Size.SMALL, 1.0),
