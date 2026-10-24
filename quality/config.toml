@@ -7,3 +7,11 @@ what = 'mandatory job "Test-efficiency gates (test-budget, similar-methods, test
 item = "#334"
 date = 2026-10-24
 reason = "the operator ruled the unused efficiency gates and the spec-lint exemption ledger out; spec-lint stays a pytest test in the check job"
+
+[[root.allow]]
+entry = "frontend/"
+reason = "the web client, built apart from the Python package"
+
+[[root.allow]]
+entry = "specs/"
+reason = "the command specs that own each command's behaviour and printed literals"
