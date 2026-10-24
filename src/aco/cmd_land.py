@@ -347,7 +347,9 @@ def _land_merge_method(
     the forge allows one, and a squash where it allows a squash but no merge
     commit -- never a rebase, so a forge allowing no method at all, or only a
     rebase to an unpinned land, refuses."""
-    allowed = _forge_allowed_merge_methods(client, number, branch)
+    allowed = _land_read(
+        number, "its merge rules", lambda: _forge_allowed_merge_methods(client, number, branch)
+    )
     if pinned is not None and allowed:
         if pinned not in allowed:
             allowed_list = ", ".join(
@@ -420,6 +422,32 @@ def _land_merge(
 
 
 _LandStepResult = TypeVar("_LandStepResult")
+
+
+_LAND_READ_FAILURE_ERRORS = frozenset(
+    {forge.ForgeError, forge.ForgeTransientError, forge.ForgeMalformedResponseError}
+)
+_LAND_READ_FAILURE_REFUSAL = (
+    "pull request #{number} was not merged: reading {what} failed ({foreign}); "
+    "re-run aco land {number}"
+)
+
+
+def _land_read(number: int, what: str, read: Callable[[], _LandStepResult]) -> _LandStepResult:
+    """A read `aco land` runs before its merge: a forge failure
+    of exactly the unclassified, transient or malformed kind refuses naming
+    what was read and that nothing was merged, so a re-run helps. Any other
+    forge error keeps its own text. The read is never repeated here."""
+    try:
+        return read()
+    except forge.ForgeError as error:
+        if type(error) not in _LAND_READ_FAILURE_ERRORS:
+            raise
+        raise protocol.ClaimUnavailableError(
+            report.refusal_around_foreign_text(
+                _LAND_READ_FAILURE_REFUSAL, str(error), number=number, what=what
+            )
+        ) from error
 
 
 def _land_step(
@@ -530,6 +558,17 @@ def _land_is_own_repository(toplevel: Path) -> bool:
     return isinstance(project, dict) and project.get("name") == _LAND_SELF_PACKAGE_NAME
 
 
+def _land_peek_claims(context: RunContext) -> protocol.ClaimState:
+    # `store.peek_state`, never `RunContext.observation`'s
+    # `fetch_state` (issue #405 review/gate finding): a pull
+    # request this preflight goes on to refuse must anchor no ref
+    # and stamp no lineage -- the same read-only requirement
+    # `cmd_reset._reset_observation` already carries for `reset`.
+    observed = store.peek_state(worktree=context.toplevel, remote=context.canonical_remote)
+    protocol.require_state_ref(observed)
+    return observed
+
+
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`aco land <pr>` (issue #405): preflight every ruled precondition
     read-only, merge with a pinned head sha and a commit message this tool
@@ -553,7 +592,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     client = cast(github.GitHubForge, context.forge)
     number = parsed.pull_request
     repository = client.repository.path
-    detail = client.landing(number)
+    detail = _land_read(number, "the pull request", lambda: client.landing(number))
     classification: workboard.Classification | None
     if detail.merged:
         assert detail.merge_commit is not None  # `merged` is true; github.py guarantees this.
@@ -564,20 +603,13 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         # own trailer instead (issue #405 point 4).
         classification = None
     else:
-
-        def claims_provider() -> protocol.ClaimState:
-            # `store.peek_state`, never `RunContext.observation`'s
-            # `fetch_state` (issue #405 review/gate finding): a pull
-            # request this preflight goes on to refuse must anchor no ref
-            # and stamp no lineage -- the same read-only requirement
-            # `cmd_reset._reset_observation` already carries for `reset`.
-            observed = store.peek_state(worktree=context.toplevel, remote=context.canonical_remote)
-            protocol.require_state_ref(observed)
-            return observed
-
         check_context = policy.LandingCheckContext(context, repository, config.storage)
-        detail, classification, readiness = _land_preflight(
-            client, claims_provider, check_context, number, parsed
+        detail, classification, readiness = _land_read(
+            number,
+            "its landing preconditions",
+            lambda: _land_preflight(
+                client, lambda: _land_peek_claims(context), check_context, number, parsed
+            ),
         )
         checkout.refuse_unlandable_checkout(context.default_branch, directory=toplevel)
         method = _land_merge_method(config.merge_method, client, number, context.default_branch)

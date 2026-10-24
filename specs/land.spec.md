@@ -51,6 +51,7 @@ order `merge`, `squash`, `rebase`.
 | the default branch adopts the quality gate and the completed checks hold no `quality / verdict` | LANDCMD-43 |
 | not mergeable | LANDCMD-03 |
 | `mergeable_state` is `unknown` | LANDCMD-45 |
+| a GitHub read before the merge fails | LANDCMD-46, LANDCMD-47, LANDCMD-48 |
 | no CI checks at all | LANDCMD-04 |
 | a check still running | LANDCMD-05 |
 | a check finished without success | LANDCMD-06 |
@@ -89,6 +90,9 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-43] If `<branch>` holds `quality/config.toml`, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
+- [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n>`, exit `2`.
+- [ ] [LANDCMD-47] `<what>` is `the pull request`, `its landing preconditions` or `its merge rules`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
+- [ ] [LANDCMD-48] `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable `quality/config.toml` takes LANDCMD-46).
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
 - [ ] [LANDCMD-06] A pull request whose checks all completed, at least one without success, refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
@@ -141,7 +145,7 @@ the default branch` on every rerun; it is removed by hand.
 - `aco land` never runs `release`'s own close, store transition, `freed`/`next` report, or worktree cleanup a second time; it delegates to the one existing `release --merged` path (`specs/release.spec.md`).
 - A step after the merge never re-merges: recovery always resumes from the pull request's own already-merged state, read fresh on every rerun.
 - Once merged, the delegated release never reads the pull request's own mutable body for routing: a fixer editing it away afterward changes nothing this pull request already landed (LAND-64).
-- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43) refuses.
+- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43, LANDCMD-46) refuses.
 - `aco land` never takes its storage, canonical remote, forge, or claim store from a head's `<path>`: this checkout's own tracked copy governs, and the head's copy is only checked (LANDCMD-22..24).
 
 ## Examples
@@ -208,7 +212,7 @@ $ aco land 57
 exit 2
 ```
 
-The adoption read of LANDCMD-43 is one contents read of `quality/config.toml` on `<branch>`, the default branch -- never the pull request head, so a head that deletes the file is still refused and the pull request that adds it is not. Only HTTP 200 (adopted) and 404 (not adopted) decide; any other answer refuses with the forge's error and never counts as not adopted. A check still running defers the refusal, the read runs only after LANDCMD-02 (a not-open pull request never reads it), and a rerun after the merge (LANDCMD-18) never reads it. The refusal stays within the 200-character bound like every other.
+The adoption read of LANDCMD-43 is one contents read of `quality/config.toml` on `<branch>`, the default branch -- never the pull request head, so a head that deletes the file is still refused and the pull request that adds it is not. Only HTTP 200 (adopted) and 404 (not adopted) decide; any other answer refuses as LANDCMD-46 (reading `its landing preconditions` failed) and never counts as not adopted. A check still running defers the refusal, the read runs only after LANDCMD-02 (a not-open pull request never reads it), and a rerun after the merge (LANDCMD-18) never reads it. The refusal stays within the 200-character bound like every other.
 
 ### E-LANDCMD-05 — a pull request with a check still running refuses
 
@@ -345,6 +349,18 @@ exit 2
 ```
 
 The command re-read the readiness 10 times, 3 seconds apart, before it refused; had the third read answered `clean`, it would have gone on after about 6 seconds, and a `dirty` answer refuses at once (LANDCMD-03).
+
+### E-LANDCMD-46 — a read that fails before the merge says nothing was merged and a re-run helps
+
+Setup: bare-remote, fake `gh`, pull request `#57` open, the fake `gh` answering the readiness read with the error `unexpected end of JSON input`
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 was not merged: reading its landing preconditions failed (unexpected end of JSON input); re-run aco land 57
+exit 2
+```
+
+`aco land` read nothing again on its own and wrote nothing; the same refusal names `the pull request` for the first read and `its merge rules` for the allowed-method reads.
 
 ### E-LANDCMD-14 — the pull request changed since preflight refuses the merge
 

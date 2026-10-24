@@ -454,7 +454,8 @@ class TestLandQualityGate:
             pytest.param(
                 LandingCase(
                     landing_readiness(),
-                    "GitHub returned HTTP 500",
+                    "pull request #12 was not merged: reading its landing preconditions failed "
+                    "(GitHub returned HTTP 500); re-run aco land 12",
                     quality_config_error=forge.ForgeError("GitHub returned HTTP 500"),
                     quality_reads=("main",),
                 ),
@@ -464,7 +465,7 @@ class TestLandQualityGate:
         indirect=True,
     )
     def test_refusal(self, world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-02, LANDCMD-43 -- exact refusal and no writes."""
+        """Spec: LANDCMD-02, LANDCMD-43, LANDCMD-46 -- exact refusal and no writes."""
         capsys.readouterr()
         observed, expected = refusal_observations(
             world,
