@@ -1,7 +1,6 @@
-"""`StateRefBoard` behaviour: the state-ref adapter, reads and writes alike
-(issues #248, #283).
+"""`StateRefBoard` behaviour: the state-ref adapter, reads and writes alike.
 
-The three-item scenario below is built the way #241's archive reader
+The three-item scenario below is built the way the archive reader
 actually walks a real state tree -- `store`'s own git plumbing
 (`hash-object`/`mktree`/`commit-tree`/`push`), never a hand-serialized item
 body -- so this module's central claim (the adapter reads what is really
@@ -186,7 +185,7 @@ def _record(
     return record
 
 
-# The one logical scenario every test below reads (issue #248's proof): a
+# The one logical scenario every test below reads: a
 # container with two children, one of the children blocked by its sibling,
 # and the other carrying an open expectation line. Built once as plain
 # Python values, then rendered two ways -- a GitHub-style body (no record)
@@ -284,7 +283,7 @@ def _container_body_with_slices(
 ) -> str:
     """`CONTAINER_ID`'s own body, its `[[slice]]` table set to `slice_rows`,
     its stored `blocked_by` to `blocked_by` and its `parent` to `parent` --
-    the one shape issue #291's `cut` proofs need and the flat
+    the one shape the `cut` proofs need and the flat
     `_CONTAINER_PROJECTION`/`_record` pair above cannot express (neither
     carries a `slice` array)."""
     data = {
@@ -314,7 +313,7 @@ def _item_files_with_one_scoped_slice(
     index: int, title: str, scope: tuple[str, ...] | None
 ) -> dict[str, bytes]:
     """`_item_files_with_container_slices`'s own one-row shape, that row's
-    own `scope` set to `scope` (issue #337) -- `None` names a row with no
+    own `scope` set to `scope` -- `None` names a row with no
     scope of its own, matching how `_render_scope` omits the key entirely
     rather than writing an empty one."""
     entry: dict[str, object] = {"index": index, "title": title, "done_when": "D"}
@@ -327,7 +326,7 @@ def _item_files_with_container_block(fields: Mapping[str, object]) -> dict[str, 
     """`_item_files`'s own scenario, `CONTAINER_ID`'s block carrying
     `fields` beside its projection and `[record]` -- a container shape the
     other builders cannot express, such as a row without `done_when` or an
-    `[[expectation]]` beside the slice table (issue #606)."""
+    `[[expectation]]` beside the slice table."""
     data = {
         **_CONTAINER_PROJECTION.block_data(),
         **fields,
@@ -366,7 +365,7 @@ def _item_files_with_a_malformed_item(
     content: bytes, item_id: str = MALFORMED_ID
 ) -> dict[str, bytes]:
     """`_item_files()` plus `item_id`'s own file planted by hand with
-    `content` -- the store issue #447's reproduction left behind."""
+    `content` -- the store a blank-title `item new` left behind."""
     return {**_item_files(), f"{item_id}.md": content}
 
 
@@ -378,7 +377,7 @@ def _task_item(parent: str | None, title: str = "Slice A") -> bytes:
 
 
 def _blank_title_item(parent: str | None = None) -> bytes:
-    """The item `item new --title ""` wrote before issue #447: a complete
+    """The item `item new --title ""` wrote before blank titles were refused: a complete
     `[record]` whose only defect is its empty title, under `parent`."""
     return _task_item(parent, title="")
 
@@ -455,8 +454,8 @@ def _container_alone() -> dict[str, bytes]:
 def _unplaced_malformed_child_cases() -> list[object]:
     """`item close` and `item edit --kind task` of `CONTAINER_ID`, which has
     no readable child, beside an item whose record, or its parent, does not
-    read: its parent is unknown, so it may be the container's open child (issue
-    #536, ITEM-48, ITEM-54), and each refuses by that item's repair."""
+    read: its parent is unknown, so it may be the container's open child
+    (ITEM-48, ITEM-54), and each refuses by that item's repair."""
     unreadable_contents = {
         "no-block": (b"no block at all\n", _malformed_block("aco: no aco block")),
         "broken-toml": (
@@ -490,7 +489,7 @@ def _unplaced_malformed_child_cases() -> list[object]:
     ]
 
 
-# A second open expectation line beside `EXPECTATION_TEXT` (issue #283): one
+# A second open expectation line beside `EXPECTATION_TEXT`: one
 # CLI-level `aco rule` proof needs a line still open after the ruled one, so
 # `aco rulings` still has something to print for this item -- a fully-ruled
 # item drops out of `rulings` entirely (it only lists open lines), which
@@ -513,8 +512,8 @@ def _rulable_item_files() -> dict[str, bytes]:
     return {f"{RULABLE_ID}.md": body.encode()}
 
 
-# A flat two-item scenario for `aco item edit`'s own `blocked_by` proof
-# (issue #287, proof 3): neither item is a container's own child, so `aco
+# A flat two-item scenario for `aco item edit`'s own `blocked_by` proof:
+# neither item is a container's own child, so `aco
 # next`'s pick between them turns on `blocked_by` alone, never on a
 # container's own cut/close recommendation.
 EDIT_TARGET_ID = "aco-00000a"
@@ -561,8 +560,8 @@ def _edit_target_item_files() -> dict[str, bytes]:
     }
 
 
-# A flat two-item scenario for `aco item close`'s own freed-item proof
-# (issue #289, proofs 1-2): `TARGET` starts blocked by `BLOCKER` alone and
+# A flat two-item scenario for `aco item close`'s own freed-item proof:
+# `TARGET` starts blocked by `BLOCKER` alone and
 # neither is a container's own child, so closing `BLOCKER` frees `TARGET`
 # through `blocked_by` alone, never a container's own cut/close
 # recommendation.
@@ -588,8 +587,8 @@ def _close_scenario_item_files() -> dict[str, bytes]:
     }
 
 
-# A container-and-only-child scenario for `aco item close`'s own parent hint
-# (issue #348, Beweis 4): the parent's block carries no `[[slice]]` row, so
+# A container-and-only-child scenario for `aco item close`'s own parent hint:
+# the parent's block carries no `[[slice]]` row, so
 # closing its only child leaves it freshly closable -- `item close`'s own
 # version of `release --merged`'s parent hint.
 CLOSE_PARENT_ID = "aco-00000e"
@@ -624,7 +623,7 @@ def _decoded_record(body: str, item_id: str) -> items.ItemRecord:
 
 
 def _push_item_tree(remote: Path, worktree_path: Path, item_files: dict[str, bytes]) -> str:
-    """Push a state tree carrying `schema.toml` and `items/` (issue #248),
+    """Push a state tree carrying `schema.toml` and `items/`,
     built through the exact plumbing `store.py` itself uses -- one blob per
     file, one `items/` subtree, one top-level tree, one commit -- never a
     hand-crafted archive or a bypass of `store.read_item_files`'s own read
@@ -684,7 +683,7 @@ class _UnusedItemWriter:
 def _fake_oid(seed: str) -> protocol.ObjectId:
     """A well-formed 40-character git object id, deterministic in `seed` --
     stands in for a real blob oid in the ad hoc scenarios below that never
-    push their bytes through real git (issue #283): only its shape, never
+    push their bytes through real git: only its shape, never
     its actual content-addressing, matters to a test that never writes."""
     return protocol.ObjectId(hashlib.sha1(seed.encode()).hexdigest())
 
@@ -704,7 +703,7 @@ def _state_ref_board(
     """A `StateRefBoard` over `item_files` alone, its oids fabricated
     (`_fake_oid`) and its writer refusing any write by default -- the one
     constructor call every read-only scenario in this module shares, so a
-    constructor signature change (issue #283: `item_oids`, `writer`) has one
+    constructor signature change has one
     call site to update, not the dozen ad hoc scenarios below."""
     return StateRefBoard(
         repository=REPOSITORY,
@@ -824,7 +823,7 @@ _MALFORMED_CONTENTS = (
 
 
 class TestMalformedItem:
-    """Issues #447 and #517: one malformed item file refuses its own read,
+    """One malformed item file refuses its own read,
     never a read of another item, and the open board lists it by its
     defect."""
 
@@ -852,7 +851,7 @@ class TestMalformedItem:
     def test_the_open_board_lists_it_unreadable_beside_every_other_item(
         self, content: bytes, problem: str
     ) -> None:
-        """Issue #517 line 4: a malformed item's state is unknown, so the
+        """A malformed item's state is unknown, so the
         open board lists it with its defect instead of refusing the store."""
         del problem
         adapter = _state_ref_board(_item_files_with_a_malformed_item(content))
@@ -865,7 +864,7 @@ class TestMalformedItem:
         ]
 
     def test_its_container_counts_it_as_an_open_child(self) -> None:
-        """Issue #517: a container whose only child is unreadable, that
+        """A container whose only child is unreadable, that
         child's `[record].parent` still reading, never reads as childless,
         so no close or cut verdict guesses past it."""
         unreadable_child = _state_ref_body(
@@ -925,7 +924,7 @@ class TestMalformedItem:
     def test_a_repair_whose_record_does_not_resolve_refuses_before_any_write(
         self, record: dict[str, object], refusal: str
     ) -> None:
-        """Issue #447: a repair writes its `[record]` whole, so a relation
+        """A repair writes its `[record]` whole, so a relation
         that would leave the item unreadable, or a close that skips `item
         close`'s claim guard, refuses; `_UnusedItemWriter` fails any write."""
         adapter = _state_ref_board(_item_files_with_a_malformed_item(_blank_title_item()))
@@ -938,7 +937,7 @@ class TestMalformedItem:
         assert str(refused.value) == refusal
 
     def test_an_edit_adding_a_malformed_blocker_refuses_naming_its_repair(self) -> None:
-        """Issue #450, ITEM-44: a blocker naming a malformed item refuses its
+        """A blocker naming a malformed item refuses its
         repair before any write; `_UnusedItemWriter` fails any write."""
         adapter = _state_ref_board(_item_files_with_a_malformed_item(_blank_title_item()))
         edit = _state_ref_body(
@@ -952,7 +951,7 @@ class TestMalformedItem:
         assert str(refused.value) == _malformed_item_refusal(_malformed_block(BLANK_TITLE_DEFECT))
 
     def test_a_malformed_item_whose_title_still_reads_stays_a_twin_candidate(self) -> None:
-        """Issue #447: an item malformed only by another field keeps its
+        """An item malformed only by another field keeps its
         title in `item new`'s twin search, so no exact duplicate of it can
         be created unnamed."""
         content = _state_ref_body(
@@ -985,7 +984,7 @@ class TestMalformedItem:
     def test_a_whole_store_read_refuses_beside_an_entry_that_names_no_item(
         self, whole_store_read: Callable[[StateRefBoard], object]
     ) -> None:
-        """PIN-13 (issue #565): the read names the lowest such entry; the
+        """PIN-13: the read names the lowest such entry; the
         store still builds, since a write to one item goes past it."""
         adapter = _state_ref_board({**_item_files(), "zz-later": b"z", "NOTANID": b"anything"})
 
@@ -1138,7 +1137,7 @@ class TestStateRefBoardMethods:
     def test_list_recently_closed_issues_keeps_only_items_closed_at_or_after_the_cutoff(
         self,
     ) -> None:
-        """Issue #444's twin search: an item closed before `since` is past the
+        """An item closed before `since` is past the
         window and never listed; one closed exactly at it is."""
         closed_in_window = _record(
             title="In window", state="closed", kind="task", closed_at="2026-09-01T00:00:00Z"
@@ -1249,7 +1248,7 @@ class TestStateRefBoardAgainstARealStateTree:
 
 OBSERVED_AT = datetime(2026, 9, 16, tzinfo=UTC)
 
-# A live claim on Slice A (issue #248, Grok final gate blocking 2): opened at
+# A live claim on Slice A: opened at
 # `OBSERVED_AT` itself, so its rendered age stays fixed across both adapters'
 # runs below rather than drifting with wall-clock time.
 LIVE_CLAIM = protocol.ActiveClaim(
@@ -1281,7 +1280,7 @@ def _projected(
     the one assembly both parametrized cases below share, mirroring what
     `board_read.build_board` does at the CLI layer without that layer's filesystem and
     network concerns. `open_pull_requests_supported` comes from
-    `client.capability` (issue #248), the same read `board_read.build_board` makes,
+    `client.capability`, the same read `board_read.build_board` makes,
     never from the storage pin `config.storage` also carries."""
     issues = client.list_open_board_issues()
     children = {
@@ -1323,7 +1322,7 @@ _EXPECTED_BOARD = _projected(_github_fake(), storage=Storage.GITHUB)
 EXPECTED_BOARD_PAYLOAD = board_payload(_EXPECTED_BOARD)
 EXPECTED_NEXT_ACTION = workboard.next_action(_EXPECTED_BOARD)
 EXPECTED_RULINGS_LINES = _rulings_lines(_github_fake(), _EXPECTED_BOARD, storage=Storage.GITHUB)
-# `rulings`' own header line names the item under the pin (issue #292):
+# `rulings`' own header line names the item under the pin:
 # `aco-xxxxxx` under state-ref, `#n` unchanged under github -- the same
 # shared scenario re-rendered under each storage, so the only sanctioned
 # difference is that one id-shaped prefix, never a second hand-built
@@ -1333,14 +1332,13 @@ EXPECTED_RULINGS_LINES_BY_STORAGE = {
     Storage.STATE_REF: _rulings_lines(_github_fake(), _EXPECTED_BOARD, storage=Storage.STATE_REF),
 }
 # `state-ref` projects the identical scenario, never `_EXPECTED_BOARD` itself
-# `replace`d: `item.actionable_reason` (issue #300 residual 2) is now baked
+# `replace`d: `item.actionable_reason` is now baked
 # in at build time from `config.storage`, exactly like every other field a
 # real `state-ref` pin changes, so reusing the `Storage.GITHUB`-built board
 # for a different storage's own payload would silently keep its stale `#n`
 # blocker text. A fresh `_projected` call under `Storage.STATE_REF` bakes
 # that text correctly; the two payloads otherwise agree apart from the
-# id-shaped pins, since this scenario carries no merged pull request at all
-# (issue #371 retired the one line that used to differ).
+# id-shaped pins, since this scenario carries no merged pull request at all.
 EXPECTED_STATE_REF_BOARD_PAYLOAD = board_payload(
     _projected(_github_fake(), storage=Storage.STATE_REF)
 )
@@ -1388,7 +1386,7 @@ class TestStateRefInFlightWithoutPullRequests:
 
 
 class TestTwoAdapterParity:
-    """One scenario, driven through both adapters (issue #248's proof): the
+    """One scenario, driven through both adapters: the
     GitHub fake's own `board`/`next`/`rulings` rows, computed once above as
     the expected value, and each adapter's own rows, computed here -- a
     genuine defect in either adapter shows up as a mismatch against that
@@ -1437,7 +1435,7 @@ class TestTwoAdapterParity:
         storage: Storage,
     ) -> None:
         """`LIVE_CLAIM` on Slice A reaches `Stage.IN_FLIGHT` on both
-        adapters (issue #248, Grok final gate blocking 2) -- GitHub from
+        adapters -- GitHub from
         `LIVE_CLAIM_OPEN_PULL_REQUEST`'s matching branch, `state-ref` from
         the claim alone, since it cannot list pull requests at all. Two
         different signals, the identical projected payload: the state-ref
@@ -1456,7 +1454,7 @@ class TestTwoAdapterParity:
 
 
 class TestStateRefBoardWrites:
-    """`StateRefBoard`'s three mutating operations (issue #283), driven
+    """`StateRefBoard`'s three mutating operations, driven
     directly against a real bare remote through the production
     `session._StoreItemWriter` -- the same git plumbing `session._state_ref_forge`
     wires in production, never a fake CAS."""
@@ -1543,7 +1541,7 @@ class TestStateRefBoardWrites:
     def test_a_write_holding_a_well_formed_store_refuses_once_another_item_went_bad(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        """CAS-51 (issue #447): after `hold_items`, this instance's
+        """CAS-51: after `hold_items`, this instance's
         writes land only onto the store it checked -- its own write still
         lands, but an item another writer turned malformed since refuses
         the next one before anything is written."""
@@ -1642,7 +1640,7 @@ class TestStateRefBoardWrites:
         expected_labels: tuple[str, ...],
         expected_blocked_by: tuple[str, ...],
     ) -> None:
-        """Issue #287's owner split for `update_item_body`'s own record
+        """The owner split for `update_item_body`'s own record
         merge: `title`, `labels`, `blocked_by` come from a delivered
         `[record]` table when the key is present -- a hostile `state` or
         `parent` in that same table never takes, an omitted key (or no
@@ -1684,7 +1682,7 @@ class TestStateRefBoardWrites:
     def test_update_item_body_keeps_a_stored_unknown_blocker_beside_a_new_one(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        """Issue #450, ITEM-44: only a blocker the write adds is judged, so
+        """Only a blocker the write adds is judged, so
         a stored blocker naming no item survives an edit that adds a
         resolving one -- the edit is never refused for what it carried."""
         stored_unknown = "aco-ffffff"
@@ -1710,7 +1708,7 @@ class TestStateRefBoardWrites:
     ) -> None:
         """Proof 3: two writers both read the item at the same oid; the
         first write lands, the second -- still holding that now-stale oid --
-        refuses with #279's own sentence, and the remote keeps the first
+        refuses with the stale-oid sentence, and the remote keeps the first
         writer's content."""
         _push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
@@ -1734,7 +1732,7 @@ class TestStateRefBoardWrites:
     def test_a_write_whose_body_the_read_would_refuse_names_its_defect_and_writes_nothing(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        """ITEM-52 (issue #517): the adapter itself checks every body it
+        """ITEM-52: the adapter itself checks every body it
         stores with the read's own rule -- `ask`, `rule` and `cut` compose
         theirs past any piped-body pre-check -- so a body whose block the
         read would set aside refuses by its first defect and the remote
@@ -1761,7 +1759,7 @@ class TestStateRefBoardWrites:
     def test_close_item_sets_state_and_closed_at_keeps_the_rest_and_refuses_a_second_close(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        """Issue #289: `close_item` moves `state` to `CLOSED` and sets
+        """`close_item` moves `state` to `CLOSED` and sets
         `closed_at`/`updated_at` to the timestamp it returns, every other
         record field and the body untouched; a second `close_item` on the
         same already-closed instance refuses by name, naming the date,
@@ -1809,7 +1807,7 @@ class TestStateRefBoardWrites:
         """Proof 4/6: `create_child` mints an `aco-` id, records `parent`,
         and the new child shows up under the container's `list_children` --
         both on this same instance and on a freshly re-fetched one. A
-        follow-up `link_child` call is the no-op #283 rules it as."""
+        follow-up `link_child` call is the no-op it is ruled to be."""
         _push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         adapter = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
@@ -1835,7 +1833,7 @@ class TestStateRefBoardWrites:
 
 
 class TestStateRefBoardAtomicLanding:
-    """`prepare_landing`/`mark_landed` (issue #359): the staged half of
+    """`prepare_landing`/`mark_landed`: the staged half of
     `close_item`'s own composition, reused by `release --merged <sha>`'s
     atomic `protocol.LandingIntent` instead of `close_item`'s own immediate
     write -- proven directly against the fake-oid fixture (`state_ref_board`),
@@ -1900,7 +1898,7 @@ def _stub_claim_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _first_ruling_date(capsys: pytest.CaptureFixture[str]) -> str:
-    """`rulings --json`'s first listed line's own `ruled_on` (issue #412's
+    """`rulings --json`'s first listed line's own `ruled_on` (the
     envelope: the array now sits under the `rulings` key), read back so a
     README-sequence assertion never has to guess the wall clock."""
     payload = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())
@@ -1923,7 +1921,7 @@ def _path_without_gh(tmp_path: Path) -> str:
     """A `PATH` carrying a real `git` and `bash` and nothing else -- proof
     that a run never shells out to `gh` under `storage = state-ref` rather
     than an assertion resting on a fake that could never have called it
-    anyway; `bash` runs printed advice as printed (issue #546)."""
+    anyway; `bash` runs printed advice as printed."""
     bin_directory = tmp_path / "bin"
     bin_directory.mkdir()
     for tool in ("git", "bash"):
@@ -2009,7 +2007,7 @@ def _childless_container(slice_titles: tuple[str, ...] = ()) -> dict[str, bytes]
 
 
 class TestCliStateRefForge:
-    """`session._state_ref_forge` (issue #248, Sonnet review blocking 4) driven
+    """`session._state_ref_forge` driven
     through the real CLI entry point against a real bare `file://` remote
     and a real checkout -- never through a fake or a monkeypatch of the
     function itself, unlike every other CLI test, which stands in a stub for
@@ -2021,7 +2019,7 @@ class TestCliStateRefForge:
     ) -> None:
         """Writes the state-ref pin naming `canonical_remote` into
         `worktree`, makes it this run's checkout root and cwd, and stubs
-        `path_is_tracked` to report the pin tracked (#315): its `board.toml`
+        `path_is_tracked` to report the pin tracked: its `board.toml`
         is never actually `git add`ed, so a real `git ls-files` check would
         otherwise never see it."""
         write_repository_config(
@@ -2042,7 +2040,7 @@ class TestCliStateRefForge:
         """A real checkout pinned to `storage = "state-ref"`, `origin`
         pointed at `bare_remote` with `item_files` already seeded and
         `origin/HEAD` set, and `PATH` carrying no `gh` -- the one setup
-        every write proof below shares (issue #283)."""
+        every write proof below shares."""
         remote_url = f"file://{bare_remote}"
         _push_item_tree(bare_remote, worktree, item_files)
         real_git(worktree, "remote", "add", "origin", remote_url)
@@ -2340,7 +2338,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #283 proof 1: `aco rule` under `storage = state-ref` writes
+        """`aco rule` under `storage = state-ref` writes
         straight into `items/<id>.md` through `session._StoreItemWriter` -- no
         `gh`, no forge -- and a second `aco rulings` invocation (its own
         fresh fetch, standing in for a second process) reads the line back
@@ -2375,12 +2373,12 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #292 proofs 1-2: `next`'s own pick, its `Run:` command
-        (issue #300 residual 3), `rulings`' row header, and `status`'s
+        """`next`'s own pick, its `Run:` command,
+        `rulings`' row header, and `status`'s
         claimed-issue line print `aco-xxxxxx` under `storage = "state-ref"`
         -- the same id `workboard.parse_item_reference` already accepts right
         back -- never `#n`. `board --json`'s own payload carries the same
-        id-shaped pin too (issue #300 residual 2):
+        id-shaped pin too:
         `EXPECTED_STATE_REF_BOARD_PAYLOAD` above proves it against
         this module's own shared scenario, so this test does not repeat that
         proof against a second one."""
@@ -2437,7 +2435,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #283 proof 2: `aco ask --text ...` under `storage =
+        """`aco ask --text ...` under `storage =
         state-ref` appends the proposed line straight into `items/<id>.md`
         through `session._StoreItemWriter` -- no `gh`, no forge -- and a second `aco
         rulings` invocation (its own fresh fetch, standing in for a second
@@ -2480,7 +2478,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #295 against issue #283's own write path: `aco ask --text
+        """`aco ask --text
         ... --question ... --example ... --picture FILE.svg` under `storage
         = state-ref` lands all three optional card fields in the same
         `items/<id>.md` write -- a combination `--picture` alone was never
@@ -2534,7 +2532,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #283 proof 5: `aco claim` against a state-ref item runs its
+        """`aco claim` against a state-ref item runs its
         slice rules from `StateRefBoard`'s own reads alone, and `aco check`
         reads the same item back -- neither ever resolves `gh`. The
         checkout's own cleanliness precondition (`validate_checkout`) is
@@ -2577,15 +2575,15 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #283 proof 6: `aco cut` on a state-ref container runs
+        """`aco cut` on a state-ref container runs
         through to a freshly minted child -- `create_child`'s single CAS
         write -- with no `KeyError` from a missing `LINK_CHILD` capability
         and no refusal; this container's own `[record]` carries no `slice`
         rows, so it creates an untied child exactly like GitHub does for the
         same shape (see `tests/test_cut.py::test_cut_creates_the_child_and_removes_its_row`
         with case `untied-without-a-slice-key`).
-        The byte-exact `[[slice]]` row removal itself is issue #291's own
-        proof, below."""
+        The byte-exact `[[slice]]` row removal itself is proved
+        below."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
         status = issue_claim.main(["cut", str(CONTAINER_NUMBER), "--title", "Slice C"])
@@ -2617,7 +2615,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #291 proof 1: `aco cut` on a state-ref container with a
+        """`aco cut` on a state-ref container with a
         `[[slice]]` table creates the child under `record.parent` and
         removes the cut row from the container's own body byte-exact --
         every byte outside the removed `[[slice]]` entry, `now`/`next`/
@@ -2686,7 +2684,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #291 proof 2 (selection): `--row 2` cuts the container's
+        """`--row 2` cuts the container's
         second `[[slice]]` entry, leaving the first untouched -- the same
         `[[slice]]` table `aco board` already renders, no second parser."""
         item_files = _item_files_with_container_slices(((1, "Slice C"), (2, "Slice D")))
@@ -2723,7 +2721,7 @@ class TestCliStateRefForge:
         worktree: Path,
         stored_blockers: tuple[str, ...],
     ) -> None:
-        """Issue #450: ITEM-43/44 never re-judge a stored list delivered
+        """ITEM-43/44 never re-judge a stored list delivered
         unchanged, so a container already carrying a self, unknown or
         repeated blocker still has its cut row removed -- never CUT-18's
         partial write that a re-run could not finish."""
@@ -2796,8 +2794,7 @@ class TestCliStateRefForge:
         row: list[str],
         refusal: str,
     ) -> None:
-        """Issue #291 proof 2 (refusal), issue #467 and issue #606 line 3:
-        `--row 9` naming no entry, a container that is itself a child, or a
+        """`--row 9` naming no entry, a container that is itself a child, or a
         row whose `done_when` holds a display control (BODY-66, CUT-05)
         refuses by the item id -- the same by-name refusals GitHub's own
         cut tests prove -- and nothing reaches the remote. A readable
@@ -2831,7 +2828,7 @@ class TestCliStateRefForge:
         row_done_when: dict[str, str],
         child_done_when: str,
     ) -> None:
-        """CUT-25 and BODY-67 under state-ref (issue #606; #310 finding 350):
+        """CUT-25 and BODY-67 under state-ref:
         the fresh child's block names the container it was cut from, carries
         the fixed `next`, and takes the row's own `done_when`, empty when the
         row carries none -- never a refusal; the container whose last row was
@@ -2872,7 +2869,7 @@ class TestCliStateRefForge:
         self, slice_rows: tuple[tuple[int, str], ...]
     ) -> tuple[str, dict[str, bytes]]:
         """`CONTAINER_ID` carrying `slice_rows`, itself a child of an open
-        outer container -- the #299 shape -- and that outer container's id."""
+        outer container and that outer container's id."""
         outer_id = "aco-0000aa"
         return outer_id, {
             f"{outer_id}.md": _state_ref_body(
@@ -2889,7 +2886,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #503: a nested container's several uncut rows need moving to
+        """A nested container's several uncut rows need moving to
         its parent, named by item id, and `cut` keeps its refusal."""
         outer_id, item_files = self._nested_container_files(((1, "Slice Y"), (2, "Slice Z")))
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
@@ -2916,7 +2913,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #503 head ruling (#506 end-to-end finding): `next`'s repair
+        """`next`'s repair
         for a nested container's one uncut row is a command aco runs under
         state-ref too -- `item edit --kind task` (ITEM-47) -- and following
         it to the end claims the item on that row's scope."""
@@ -3034,7 +3031,7 @@ class TestCliStateRefForge:
         expected_child_scope: tuple[str, ...] | None,
         expected_err: str | None,
     ) -> None:
-        """Issue #337 proof 2: `cut --scope` fills a linked row's own scope
+        """`cut --scope` fills a linked row's own scope
         only when the row carries none -- a row that already names one
         refuses by name instead, since the row is the one place to change
         it -- and with no linked row at all, `--scope` becomes the fresh
@@ -3067,7 +3064,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #494 proof 3: `cut`'s two writes -- the child, then the row
+        """`cut`'s two writes -- the child, then the row
         removal -- read the state ref once between them: the second applies
         to the state the first returned, so its push is never rejected into
         a fresh read, and both land."""
@@ -3095,13 +3092,13 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #291 proof 3: a state-ref `cut` can never leave an orphan
+        """A state-ref `cut` can never leave an orphan
         the way GitHub's two-write `create_child` can (`link_child` is a
-        no-op, #283) -- but the row-removal write that follows it is a
+        no-op) -- but the row-removal write that follows it is a
         second, separate CAS write, and that one can still lose a race. This
         drives the real race directly: a competing write lands on the
         container between `create_child`'s own commit and the row-removal
-        commit, so the row removal refuses with issue #279's own CAS
+        commit, so the row removal refuses with the stale-oid CAS
         sentence (via `forge.ForgePartialChildCreationError`) while the
         child stays created and already carries `record.parent`. An
         identical re-run finds that child through `list_children` (typed
@@ -3206,9 +3203,9 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #291 proof 4: `aco item new --parent` writes `record.parent`
+        """`aco item new --parent` writes `record.parent`
         straight into the fresh child's `[record]` table and no `Parent:`
-        prose line at all (issue #285) -- unlike `cmd_cut._cut_child_body`'s own
+        prose line at all -- unlike `cmd_cut._cut_child_body`'s own
         skeleton. `cut`'s adoption key is `record.parent` alone
         (`list_children`, never `body.names_parent`'s prose-line
         match), so it still adopts this child instead of minting a second
@@ -3254,15 +3251,15 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #291 proof 5: GitHub's own equivalent
+        """GitHub's own equivalent
         (`tests/test_cut.py::test_cut_requires_a_valid_block_for_the_row_it_cuts`
         with case `no-aco-block`) hits
         `workboard.located_block_or_refuse`'s refusal only because a fetched GitHub
         issue can carry any body at all. A state-ref item cannot: every
         item's `[record]` table is validated once, at read time, by
-        `StateRefBoard`'s own decode (issue #283) -- so a container without
+        `StateRefBoard`'s own decode -- so a container without
         a working `[[slice]]` table (no aco block to hold one) is
-        refused by the defect that decode names it by (issues #447, #517),
+        refused by the defect that decode names it by,
         rather than a second, cut-specific sentence, and `next` names that
         same defect instead of recommending `cut` on such a container.
         Nothing reaches the remote."""
@@ -3308,7 +3305,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #304: the trunk-derived landed set applies under
+        """The trunk-derived landed set applies under
         `storage = state-ref` exactly as under GitHub --
         `checkout.trunk_landings` reads the real `main` history independent
         of which forge names the item, so a trailer-carrying commit lands a
@@ -3337,7 +3334,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #371, Beweis 1: two trailer-carrying trunk commits each land
+        """Two trailer-carrying trunk commits each land
         their own item under `storage = state-ref` -- `board --json`'s
         `landings` array reads `checkout.trunk_landings` directly, one row
         per item with its own sha and no `pull_request`, independent of any
@@ -3380,7 +3377,7 @@ class TestCliStateRefForge:
         worktree: Path,
         canonical_remote: str,
     ) -> None:
-        """PIN-05 (issue #490): no `git remote set-head` ever ran here, so
+        """PIN-05: no `git remote set-head` ever ran here, so
         the canonical remote's `HEAD` stays unresolved -- the refusal
         `session._state_ref_forge` owns names that remote, worded exactly as the run
         tells the operator to fix it."""
@@ -3407,7 +3404,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #285 proof 1: `aco item new --title X` writes a fresh task
+        """`aco item new --title X` writes a fresh task
         skeleton plus `[record]` straight into `items/<id>.md` and prints
         exactly the minted id; a second `aco board` invocation (its own
         fresh fetch, standing in for a second process) shows the new item
@@ -3438,7 +3435,7 @@ class TestCliStateRefForge:
     @pytest.mark.parametrize(
         ("flags", "key", "expected"),
         [
-            # Issue #337: canonicalized (sorted, deduplicated) by the same `protocol.valid_scope`
+            # Canonicalized (sorted, deduplicated) by the same `protocol.valid_scope`
             # a live claim's own scope passes through -- never a second grammar.
             pytest.param(
                 ["--scope", "src/b.py", "--scope", "src/a.py"],
@@ -3446,7 +3443,7 @@ class TestCliStateRefForge:
                 ["src/a.py", "src/b.py"],
                 id="scope",
             ),
-            # Issue #357: a plain block field, never nested under `[record]` (a `state-ref`-only
+            # A plain block field, never nested under `[record]` (a `state-ref`-only
             # table BODY-15 refuses under `github`), so the same write reaches a github item too.
             pytest.param(["--size", "M"], "size", "M", id="size"),
             pytest.param(
@@ -3561,7 +3558,7 @@ class TestCliStateRefForge:
         prefix: str,
         block: dict[str, object],
     ) -> None:
-        """Issue #555 lines 1-3: under state-ref, `item new` stores the
+        """Under state-ref, `item new` stores the
         piped body as github does -- prose above a block its flags build,
         or a piped block the flags agree with -- never dropping it; every
         section left empty is named on stderr, one line each. Stdin carries
@@ -3591,7 +3588,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #555 line 1: a flag naming another value than the piped
+        """A flag naming another value than the piped
         block refuses, naming both, and writes nothing."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         command = ["item", "new", "--title", "Ship the importer", "--now", "Elsewhere."]
@@ -3637,7 +3634,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #285 proof 2 (kind): `--kind container` writes the
+        """`--kind container` writes the
         container skeleton (a `Blocked by:` line ahead of the block) and
         `kind = "container"` in the record."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -3667,7 +3664,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #285 proof 2 (parent): `--parent aco-…` sets `record.parent`,
+        """`--parent aco-…` sets `record.parent`,
         and a fresh `aco board --json` shows the new child under the
         container."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -3750,10 +3747,9 @@ class TestCliStateRefForge:
         expected_err_substring: str,
         patch_minting_collision: bool,
     ) -> None:
-        """Issue #285 proof 3 / issue #316 proof 2 / issue #337 proof 1:
-        `item new` refuses -- on an injected minting collision against every
+        """`item new` refuses -- on an injected minting collision against every
         already-known id after three attempts, on an `--origin` that does
-        not match `FORGE#N` or a blank `--title` (issue #447; both refused
+        not match `FORGE#N` or a blank `--title` (both refused
         before `argparse` even reaches `item new`'s own body), or on a
         `--scope` value `protocol.valid_scope` refuses -- with a diagnostic
         naming the cause, and nothing reaches the remote."""
@@ -3778,7 +3774,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #316 proof 1/2: `--origin gitlab#42` writes `record.origin`
+        """`--origin gitlab#42` writes `record.origin`
         straight into `items/<id>.md` over a real `file://` remote through
         `main`, and a fresh `item show` (its own fetch, standing in for a
         second process) prints it in the header; `claim` then runs on that
@@ -3844,7 +3840,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #285 proof 4: the header names id, number, state, and
+        """The header names id, number, state, and
         parent; a closed item is shown exactly like an open one (closing
         never deletes it); the body is printed byte-exact."""
         closed_id = "aco-000005"
@@ -3923,10 +3919,10 @@ class TestCliStateRefForge:
         planted: str,
         neighbours: dict[str, bytes],
     ) -> None:
-        """Issue #447 proof 1: an item `item new --title ""` once wrote,
+        """An item `item new --title ""` once wrote,
         planted by hand beside `neighbours`, no longer stops `item new` or
         `item show` of any other item -- its own child included, whose
-        header needs only the parent's id -- nor, issue #536 (ITEM-53,
+        header needs only the parent's id -- nor (ITEM-53,
         ITEM-54, PIN-29), `item close` of an item it is neither, nor the
         parent or a child of, nor `item edit --kind` of any item it is not a
         child of: its readable record names no parent, so no Container
@@ -4008,14 +4004,14 @@ class TestCliStateRefForge:
         item_files: dict[str, bytes],
         refusal: str,
     ) -> None:
-        """Issue #447 proof 1: every command that must read exactly the
+        """Every command that must read exactly the
         malformed item, or close or retype an item that is its parent or
-        child (issue #536), refuses by its id, naming `item edit` with a
+        child, refuses by its id, naming `item edit` with a
         valid `[record]` as the repair, and nothing reaches the remote.
-        Issue #536 (ITEM-53, PIN-16): `item close` of an item whose `parent`
+        ITEM-53, PIN-16: `item close` of an item whose `parent`
         no `items/` entry carries refuses PIN-16's sentence before the close
         writes, so the item stays open rather than closing and then refusing.
-        Issue #565 (PIN-13, PIN-36): an entry whose file name is no item
+        PIN-13, PIN-36: an entry whose file name is no item
         refuses every read of the whole store and every write that decides
         over it -- a minted id, a fresh claim -- `--not-a-twin` included."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
@@ -4091,7 +4087,7 @@ class TestCliStateRefForge:
         piped_body: str | None,
         printed: str,
     ) -> None:
-        """Issue #565 line 1 (PIN-35, CAS-61, E-PIN-39): beside a non-id
+        """PIN-35, CAS-61, E-PIN-39: beside a non-id
         name and a bare id without `.md`, a write to one healthy item --
         `item close`, `item edit`, `rule`, `ask` -- lands, and both entries
         keep their name, mode, and blob."""
@@ -4138,7 +4134,7 @@ class TestCliStateRefForge:
         arguments: list[str],
         printed: str,
     ) -> None:
-        """Issue #565 line 1 (PIN-35): beside a non-id name and a bare id
+        """PIN-35: beside a non-id name and a bare id
         without `.md`, a read of one healthy item -- `item show`, `brief`,
         `check` -- prints it, and the store stays exactly as it was."""
         foreign = {"NOTANID": b"anything", "aco-000001": b"a bare id\n"}
@@ -4175,7 +4171,7 @@ class TestCliStateRefForge:
         item_id: str,
         refusal: str,
     ) -> None:
-        """Issue #565 (PIN-35, PIN-36): `start` reads its one item past an
+        """PIN-35, PIN-36: `start` reads its one item past an
         entry whose name is no item -- a missing item still refuses as
         missing -- and only its fresh claim refuses with PIN-13's sentence,
         before any worktree is built or the store moves."""
@@ -4203,7 +4199,7 @@ class TestCliStateRefForge:
         content: bytes,
         problem: str,
     ) -> None:
-        """Issue #517 line 4: `Slice A` turned unreadable -- `Slice B` is
+        """`Slice A` turned unreadable -- `Slice B` is
         blocked by it and a childless container with an uncut row is nested
         under it -- yet `board`, `next` and `rulings` still read, `board`
         and `next` naming it by its defect (BOARD-54), `item show` still
@@ -4304,7 +4300,7 @@ class TestCliStateRefForge:
         unplaced_content: bytes,
         problem: str,
     ) -> None:
-        """Issue #550 line 2 (ITEM-54): the container's one readable child is
+        """ITEM-54: the container's one readable child is
         closed, and an item whose record, or its parent, does not read may be
         its open child, so `board --json` counts it open, `next` never offers the close
         `item close` refuses, and names that item as what holds it."""
@@ -4350,7 +4346,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #447: the repair the refusal names -- `item edit` with a
+        """The repair the refusal names -- `item edit` with a
         body whose block carries a complete `[record]` -- makes the item
         readable again for a fresh process."""
         item_files = _item_files_with_a_malformed_item(_blank_title_item())
@@ -4388,7 +4384,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #285 proof 5: `claim`, `rule`, and `check` all run straight
+        """`claim`, `rule`, and `check` all run straight
         through to the same state-ref item when given the `aco-xxxxxx`
         reference form, not only the bare number `#n`/`n` every other test
         in this class already exercises."""
@@ -4464,7 +4460,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #287 proof 1: `aco item edit` replaces a state-ref item's
+        """`aco item edit` replaces a state-ref item's
         body from stdin, byte-exact outside `[record]`, and a fresh `aco
         item show` (its own fetch, standing in for a second process) reads
         it back; `updated_at` moves to today, `created_at`/`parent`/`state`
@@ -4509,7 +4505,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issues #357, #399: only the block's own top-level field changes, no stdin read, every
+        """Only the block's own top-level field changes, no stdin read, every
         other byte (including `[record]`) untouched -- unlike the whole-body `item edit`."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         shown = issue_claim.main(["item", "show", str(CHILD_A_NUMBER), "--json"])
@@ -4566,7 +4562,7 @@ class TestCliStateRefForge:
         err: str,
         stored_kind: str,
     ) -> None:
-        """Issue #503 head ruling (ITEM-47/ITEM-48): `item edit --kind`
+        """ITEM-47/ITEM-48: `item edit --kind`
         moves only `record.kind` (and `updated_at`) between task and
         container, reading no stdin; a container with an open child keeps
         its kind and nothing is written."""
@@ -4614,7 +4610,7 @@ class TestCliStateRefForge:
         err: str,
         parent_kind: str,
     ) -> None:
-        """Issue #503 head ruling (ITEM-45 under state-ref, the #484 shape):
+        """ITEM-45 under state-ref:
         an item becomes a container with its first child, so `--parent` on
         an open Task retypes it and says so on stderr; stdout stays the
         created id. A closed parent keeps its kind."""
@@ -4700,7 +4696,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #287 proof 2: a piped `[record]` naming a foreign `parent`,
+        """A piped `[record]` naming a foreign `parent`,
         `state = "closed"`, and a different `created_at` is silently
         overwritten by this item's own stored values; the piped `title`,
         `labels`, and `blocked_by` are taken as given."""
@@ -4746,7 +4742,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #287 proof 3: `blocked_by` set through `aco item edit`
+        """`blocked_by` set through `aco item edit`
         makes `aco next` skip the item as blocked; removing it again
         through a second `item edit` frees it."""
         self._live_state_ref_checkout(
@@ -4762,8 +4758,8 @@ class TestCliStateRefForge:
         assert issue_claim.main(["next"]) == 0
         blocked_out = capsys.readouterr().out
         # The item's own prefix and the blocker it names inside the reason
-        # both print the state-ref id (issue #292, #300 residual 2:
-        # `open_blocker_label` now takes `storage`) -- never `#n`.
+        # both print the state-ref id:
+        # `open_blocker_label` takes `storage`, never `#n`.
         assert f"{EDIT_TARGET_ID}: blocked by {EDIT_BLOCKER_ID}" in blocked_out
         assert f"#{EDIT_BLOCKER_NUMBER}" not in blocked_out
 
@@ -4843,7 +4839,7 @@ class TestCliStateRefForge:
         piped_body: str,
         refusal: str,
     ) -> None:
-        """Issues #450 proof 1 and #517 lines 1-2: a piped `blocked_by`
+        """A piped `blocked_by`
         naming no item, the edited item itself, or one item twice, a slice
         title holding a line break or control character, or any body whose
         stored bytes the read would set aside refuses before any write, so
@@ -4891,7 +4887,7 @@ class TestCliStateRefForge:
         piped_body: str,
         shown_title: str,
     ) -> None:
-        """Issue #517 lines 1-2: TAB is the one control character a slice
+        """TAB is the one control character a slice
         title keeps, and a record title may hold any control character,
         which the writer escapes; the edit lands and `item show` reads it
         back."""
@@ -4912,11 +4908,11 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #287 proof 4: two worktrees read the same item oid -- the
+        """Two worktrees read the same item oid -- the
         first `aco item edit` (this CLI's own write) lands, and a second
         writer still holding that now-stale oid (`_fetch_state_ref_board`'s
-        own read, the same technique issue #283's own CAS test uses to
-        stand in for an independent process) refuses with issue #279's own
+        own read, the same technique the write path's own CAS test uses to
+        stand in for an independent process) refuses with the stale-oid
         sentence; the remote keeps the first writer's body."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         second = _fetch_state_ref_board(
@@ -4950,7 +4946,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #287 proof 5: a piped body with no recognized `aco`
+        """A piped body with no recognized `aco`
         block refuses with `check -`'s own sentence, before any write
         -- the remote's tip stays exactly what it was."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -4984,7 +4980,7 @@ class TestCliStateRefForge:
         stdin_source: Callable[[Path], AbstractContextManager[TextIO | None]],
         edits: bool,
     ) -> None:
-        """Issue #572 line 1 (ITEM-63): `item edit ITEM` reads its new body from a
+        """ITEM-63: `item edit ITEM` reads its new body from a
         redirected file or a pipe as before; the socket an agent harness
         hands over, a terminal, `/dev/null` or a closed stdin carries none,
         so the edit refuses at once naming the redirect and writes nothing
@@ -5026,7 +5022,7 @@ class TestCliStateRefForge:
         value: str,
         field: str,
     ) -> None:
-        """Issue #572 line 3 (ITEM-64): the first `item edit --size/--whole/
+        """ITEM-64: the first `item edit --size/--whole/
         --kind` sets the value; the same edit again reports `UNCHANGED` and
         leaves the state ref's tip where the first one put it."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -5053,7 +5049,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #444: the twin search reads state-ref items too -- an item
+        """The twin search reads state-ref items too -- an item
         closed a moment ago still twins a fresh `item new` of its title,
         leaving the remote's tip untouched; `--not-a-twin` creates anyway."""
         self._live_state_ref_checkout(
@@ -5081,7 +5077,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #289 proofs 1-2: `aco item close` sets `state = "closed"`
+        """`aco item close` sets `state = "closed"`
         and `closed_at` (today) in the record, the item file stays and a
         fresh `item show` (its own fetch) reads it back closed; the closed
         item leaves `board` and `next`, and `TARGET`, the item it alone
@@ -5145,7 +5141,7 @@ class TestCliStateRefForge:
         refusal: str,
         as_json: bool,
     ) -> None:
-        """Issues #541, #546 (ITEM-55, PIN-17, PIN-34): an unrelated item whose
+        """ITEM-55, PIN-17, PIN-34: an unrelated item whose
         stored blockers the board read refuses -- one `items/` lacks, or one
         named twice -- fails only `freed:`'s read after the close is written,
         so the close still reports success and the state ref holds it; the
@@ -5195,7 +5191,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #348, Beweis 4: closing a container's only open child
+        """Closing a container's only open child
         prints the same parent hint `release --merged` prints, naming the
         container `item close`'s own way (`freed:`'s own id form)."""
         self._live_state_ref_checkout(
@@ -5219,7 +5215,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #214: an uncut `[[slice]]` row is work left in the parent,
+        """An uncut `[[slice]]` row is work left in the parent,
         even with `Next` naming none -- closing its last child names no
         parent as closable."""
         parent_with_uncut_row = _state_ref_body(
@@ -5248,7 +5244,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #348 review (G2): a parent already closed by some other
+        """A parent already closed by some other
         landing before this close even runs is never named freshly
         closable -- a childless, uncut container that is not open must not
         surface the hint, since a second close would only refuse. The
@@ -5305,12 +5301,12 @@ class TestCliStateRefForge:
         neighbours: dict[str, bytes],
         parent_closable: int | None,
     ) -> None:
-        """Issue #348, Beweis 4 (JSON): `parent_closable` carries the same
-        number the text form's parent hint names. Issue #536 (ITEM-54):
+        """`parent_closable` carries the same
+        number the text form's parent hint names. ITEM-54:
         beside an item whose record does not read, that item counts as the
         parent's child, so the parent's own close would refuse by it and
         the hint names no parent rather than recommending that close.
-        Issue #536 (ITEM-53, PIN-16): the same holds while the parent's own
+        ITEM-53, PIN-16: the same holds while the parent's own
         parent does not read."""
         item_files = {**_close_parent_scenario_item_files(), **neighbours}
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
@@ -5329,7 +5325,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #289 proof 3: a second `item close` on an already-closed
+        """A second `item close` on an already-closed
         item refuses, naming the date it closed on, without writing --
         the remote's item oid stays exactly what the first close left."""
         self._live_state_ref_checkout(
@@ -5358,7 +5354,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """PIN-26 outranks an already-closed item (#459 review finding 2): a
+        """PIN-26 outranks an already-closed item: a
         closed item a live claim still sits on (CLAIM-52's recovery state)
         refuses with PIN-26's live-claim sentence, not the closed date."""
         self._live_state_ref_checkout(
@@ -5395,7 +5391,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #289 proof 4: an item with a live claim refuses `close` --
+        """An item with a live claim refuses `close` --
         release the claim first -- a closed item with a live claim still on
         it would be the `RECOVERY` anomaly the board already guards
         against. `release --abandoned` frees it, and `close` then
@@ -5456,11 +5452,11 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #289 proof 5: two worktrees read the same item oid -- the
+        """Two worktrees read the same item oid -- the
         first `aco item close` (this CLI's own write) lands, and a second
         writer still holding that now-stale oid (`_fetch_state_ref_board`'s
-        own read, the same technique issue #283's own CAS test uses to
-        stand in for an independent process) refuses with issue #279's own
+        own read, the same technique the write path's own CAS test uses to
+        stand in for an independent process) refuses with the stale-oid
         sentence; the remote keeps the first close's record."""
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, _close_scenario_item_files()
@@ -5490,7 +5486,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """PIN-28 (issue #467): the missing id is named as given, and a
+        """PIN-28: the missing id is named as given, and a
         forge-less remote's repository slot is that remote's own path."""
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, _close_scenario_item_files()
@@ -5583,13 +5579,13 @@ class TestCliStateRefForge:
         arguments: list[str],
         expected: str,
     ) -> None:
-        """Issue #467 proof 1: under `storage = state-ref` a command names a
+        """Under `storage = state-ref` a command names a
         fresh (still incomplete) item, or the seeded actionable `CHILD_A`,
         as `aco-xxxxxx` -- the form it takes back -- never as `#<n>` or a
         quoted string of the id's own decimal value. The fresh item's title
         is slice-shaped, naming `CONTAINER` as its parent without recording
         it, so `claim` also warns about that parent by its id. A number past
-        `aco-ffffff` refuses by PIN-31 before any lookup (#469 review), and
+        `aco-ffffff` refuses by PIN-31 before any lookup, and
         no output ever prints an id wider than six hex digits."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         _stub_claim_checkout(monkeypatch)
@@ -5614,7 +5610,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """CLM-28, issue #467 (#469 review finding 3): a title's `#16777216` names no
+        """CLM-28: a title's `#16777216` names no
         state-ref item -- six hex digits end at 16777215 -- so `claim` has no
         parent to warn about and never prints an id it cannot take back."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -5636,7 +5632,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #467 (#469 review finding 4): the cost line a fresh claim
+        """The cost line a fresh claim
         prints names the standing claim it overlaps by the id the next
         command takes back, never `issue #<n>`."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -5683,7 +5679,7 @@ class TestCliStateRefForge:
         arguments: list[str],
         refusal: str,
     ) -> None:
-        """Issue #471 proof 1: with `CHILD_A` claimed, a second claim on it,
+        """With `CHILD_A` claimed, a second claim on it,
         closing it, and releasing the unclaimed `CHILD_B` refuse naming the
         item by the id the next command takes back, never `#<n>`. The github
         half keeps `#<n>` through the same entry:
@@ -5709,7 +5705,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #467 (#469 review finding 6): `RESCOPED` names the claim's
+        """`RESCOPED` names the claim's
         item by its id, never `issue #<n>`. The rescope checkout is the
         claim's own linked worktree, which this single-checkout fixture
         stands in for."""
@@ -5752,7 +5748,7 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """Issue #292 proof 4: the README's "A week without a forge" runs
+        """The README's "A week without a forge" runs
         end to end, one `aco` invocation per README sentence, against a
         fresh bare `file://` remote carrying no items yet -- bootstrap, cut
         the epic and its first child, the daily claim/release/close loop,
@@ -5836,8 +5832,7 @@ class TestCliStateRefForge:
             ],
             capsys,
         ).expect_success()
-        # `claim`'s own success line now prints the state-ref id too
-        # (issue #300 residual 1: `workboard.claim_subject` takes `config.storage`).
+        # `claim`'s own success line now prints the state-ref id too.
         assert claim_out.splitlines()[0] == f"CLAIMED issue {child_id}: state-ref-claim"
 
         assert f"CLAIMED issue {child_id}" in run_cli(["status", child_id], capsys).expect_success()
@@ -5860,8 +5855,8 @@ class TestCliStateRefForge:
             ],
             capsys,
         ).expect_success()
-        # `release`'s own `RELEASED ...` line prints the state-ref id too
-        # (issue #300 residual 1); an abandoned release prints neither
+        # `release`'s own `RELEASED ...` line prints the state-ref id too;
+        # an abandoned release prints neither
         # `freed:` nor `next:`.
         assert release_out.strip() == f"RELEASED issue {child_id}: state-ref-claim"
 
@@ -5873,7 +5868,7 @@ class TestCliStateRefForge:
         close_out = run_cli(["item", "close", child_id], capsys).expect_success()
         # `child_id` was `container_id`'s only child, but the container's own
         # `Next` line still names work, so the parent hint
-        # `release --merged` shares never offers to close it (issue #503).
+        # `release --merged` shares never offers to close it.
         assert close_out.splitlines() == [f"CLOSED {child_id}", "freed: none"]
 
         asked_text = "Does the runbook still hold without a forge?"
@@ -5885,7 +5880,7 @@ class TestCliStateRefForge:
 
         # `container_id`'s only expectation line is now ruled, so `rulings`
         # lists the item fully ruled rather than printing the empty
-        # sentence (issue #379). Read `ruled_on` back from the CLI's own
+        # sentence. Read `ruled_on` back from the CLI's own
         # `--json` line rather than the wall clock, so the assertion cannot
         # flake across a UTC midnight between the `rule` call above and here.
         assert run_cli(["rulings"], capsys).expect_success().strip() == (
