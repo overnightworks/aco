@@ -22,7 +22,7 @@
 
 [file_lines]
 "src/aco/body.py" = 1669
-"src/aco/checkout.py" = 2041
+"src/aco/checkout.py" = 2033
 "src/aco/cli.py" = 887
 "src/aco/cmd_claim.py" = 1137
 "src/aco/cmd_release.py" = 925
