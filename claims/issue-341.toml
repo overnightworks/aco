@@ -1,8 +1,0 @@
-claim_id = "b2224cd1de8048a3a0453149d2024850"
-agent = "claude"
-role = "builder"
-base = "af4c9efb9ec920278af1cb71c2b94c19d709343f"
-branch = "claude/issue-341-refs-s1"
-scope = ["quality/baseline.toml", "src/aco/board/__init__.py", "src/aco/board/board.py", "src/aco/cli.py", "src/aco/cmd_ask.py", "src/aco/cmd_board.py", "src/aco/cmd_bootstrap.py", "src/aco/cmd_brief.py", "src/aco/cmd_check.py", "src/aco/cmd_next.py", "src/aco/cmd_rescope.py", "src/aco/cmd_reset.py", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/cmd_start.py", "src/aco/cmd_status.py", "src/aco/items.py", "src/aco/policy.py", "src/aco/process.py", "src/aco/report.py"]
-opened_commit = "6bb25bdcd500a83bb58051a069440fdde84f103f"
-whole_reason = "Die 19 Module tragen dieselbe mechanische, AST-gleiche Kommentarbereinigung; ein feinerer Schnitt vervielfacht nur Claims, Reviews und Baseline-Läufe."
