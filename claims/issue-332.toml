@@ -1,0 +1,8 @@
+claim_id = "f99043c4672447eca28b9d8ff512eb85"
+agent = "claude"
+role = "builder"
+base = "ccf519eece16cf9c8e13b548a1f7b377942e2d70"
+branch = "claude/issue-332-land-head-safety"
+scope = ["quality/baseline.toml", "specs/land.spec.md", "src/aco/cmd_adopt.py", "src/aco/cmd_land.py", "src/aco/policy.py", "tests/test_land_head_safety.py"]
+opened_commit = "4dcf4ca972357b03a17cb66c1634aa116a0d0e74"
+whole_reason = "Ein geteilter Ablehnungssatz, seine zwei Aufrufer, die Spec und ein neues Testmodul hängen zusammen."
