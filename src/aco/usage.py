@@ -60,11 +60,16 @@ class UsageErrorParser(argparse.ArgumentParser):
     it was handed and the arguments declared on it, and `subcommands` names
     the parsers one level down."""
 
-    def __init__(self, *, prog: str | None = None, description: str | None = None) -> None:
+    def __init__(
+        self, *, prog: str | None = None, description: str | None = None, color: bool = True
+    ) -> None:
         self.declared_actions: list[argparse.Action] = []
         self.received_tokens: tuple[str, ...] | None = None
         self.subcommands: Subcommands | None = None
         super().__init__(prog=prog, description=description, allow_abbrev=False)
+        # Python 3.14 hands every subparser `color=` and its formatter reads
+        # this attribute; earlier versions never read it.
+        self.color = color
 
     def add_argument(
         self, *name_or_flags: str, **options: Unpack[_ArgumentOptions]
