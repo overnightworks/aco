@@ -3,8 +3,8 @@
 `aco rule ITEM --line N (--yes|--no|--later) [--note TEXT]`: moves one
 proposed `[[expectation]]` line to ruled, transcribing the operator's own
 word (`aco ask` proposes; this command decides). This CLI invocation is the
-one write path for a ruling (issue #644 retired `board --serve`'s own
-in-process `POST /rule` form; `aco serve`'s decision board shells out to
+one write path for a ruling (`board --serve`'s own
+in-process `POST /rule` form is retired; `aco serve`'s decision board shells out to
 this exact command instead, `specs/serve.spec.md` ABRD-01). This
 file owns the ruling's own refusals -- an already-ruled
 line, an out-of-range one -- the `RULED` line, its own `reason` vocabulary,

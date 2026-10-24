@@ -1,11 +1,11 @@
 # Item: new, show, edit, close
 
 `aco item new`/`show`/`edit`/`close`: the one straight-to-`refs/aco/state`
-item lifecycle (issues #285, #287, #289, #316, #337, #357), plus `item new`
-under `storage = "github"`, which opens the GitHub issue itself (issue #444).
+item lifecycle, plus `item new`
+under `storage = "github"`, which opens the GitHub issue itself.
 This file owns each command's own flags (`--title`, `--kind`, `--parent`,
 `--origin`, `--scope`, `--size`, `--whole`, `--now`, `--next`, `--done-when`,
-`--not-a-twin`), the body `item new` builds from them (issue #555), its printed and
+`--not-a-twin`), the body `item new` builds from them, its printed and
 `--json` shapes, and `item edit`'s record-merge rule; `specs/cut.spec.md`
 owns the twin search `item new` shares with `cut` (CUT-29..CUT-31). `specs/body-block.spec.md` also owns the stored
 `size` field's own schema (BODY-57..BODY-59), cited by ITEM-20 rather than
@@ -90,7 +90,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
   ```
 - [ ] [ITEM-23] `--whole REASON` writes the item's own top-level `whole` (BODY-60..BODY-62), the same bound `claim`'s own `--whole` enforces; `claim`/`start` read it back when their own call names none (CLM-21).
 
-## The body `item new` stores (issue #555)
+## The body `item new` stores
 
 - [ ] [ITEM-58] Either storage keeps prose piped without a block byte for byte, CRLF and trailing blanks too, above a block the flags build in its line ending; a key no flag names stays `""` (see E-ITEM-16).
 - [ ] [ITEM-59] A piped body keeps its prose and fence lines byte for byte; a flag naming another value refuses `--<flag> <value> contradicts the piped block's <key> = <value>`, exit `2` (see E-ITEM-16).
@@ -98,7 +98,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-61] Under `storage = "state-ref"`, each section the stored body leaves empty prints `<item-id> misses <Section>; aco item edit <item-id> fills it` on stderr, one line each (see E-ITEM-01).
 - [ ] [ITEM-62] A piped block is stored verbatim when the flags add nothing to it under `storage = "github"`, otherwise in its canonical rendering, a comment typed inside it not kept.
 
-## `item new` under `storage = "github"` (issue #444)
+## `item new` under `storage = "github"`
 
 - [ ] [ITEM-26] Under `storage = "github"`, `aco item new --title T < BODY` opens one GitHub issue titled `T` whose body is the piped one, its block built or completed from the flags (ITEM-58, ITEM-59).
 - [ ] [ITEM-27] The body to store passes `aco check <n>`'s own body check first; a failing body refuses exactly like ITEM-25, and nothing is created (see E-ITEM-08).
@@ -130,7 +130,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-12] `aco item edit ITEM < BODY` takes `title`, `labels`, `blocked_by` from a delivered `[record]` when the piped body carries one valid (see E-ITEM-03).
 - [ ] [ITEM-57] A delivered `[record]` whose `labels` add or drop `needs-operator` marks the item waiting on the operator or frees it (`specs/next.spec.md` NEXT-39).
 - [ ] [ITEM-13] `item edit`'s every other field — `parent`, `state`, `origin`, `kind`, `created_at`, `closed_at` — stays stored, except a malformed item (ITEM-39) or `--kind` (ITEM-47); `updated_at` moves to now.
-- [ ] [ITEM-14] A delivered body carrying no `[record]` table at all leaves `title`, `labels`, `blocked_by` unchanged too, exactly `item edit`'s own pre-#287 behaviour, except a malformed item (ITEM-39).
+- [ ] [ITEM-14] A delivered body carrying no `[record]` table at all leaves `title`, `labels`, `blocked_by` unchanged too, exactly `item edit`'s own behaviour, except a malformed item (ITEM-39).
 - [ ] [ITEM-43] A delivered `blocked_by` refuses before any write when it names one blocker twice, `item <item-id> lists blocker <blocker-id> more than once`, or a new one naming no item, PIN-17's (see E-ITEM-11).
 - [ ] [ITEM-44] So does a new blocker naming a malformed item, PIN-14/PIN-15's then ITEM-38's, or the item itself, `item <item-id> is listed as its own blocker`; a stored list delivered unchanged is never re-judged.
 - [ ] [ITEM-52] A state-ref write whose stored body PIN-14/PIN-15 would refuse prints `<defect>; stored, that body would not read back, so nothing was written`, exit `2`, before any write (see E-ITEM-14).
@@ -173,10 +173,10 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 
 ## `item close`
 
-- [ ] [ITEM-16] `aco item close ITEM --json` prints `reason: "closed"`, then `item`, `number`, `closed_at`, `parent_closable` (issue #348's parent hint); overlaps ITEM-09's `item`/`number` (see E-ITEM-04).
+- [ ] [ITEM-16] `aco item close ITEM --json` prints `reason: "closed"`, then `item`, `number`, `closed_at`, `parent_closable` (the parent hint); overlaps ITEM-09's `item`/`number` (see E-ITEM-04).
 - [ ] [ITEM-55] After the write, only hints: a `freed:` read another item refuses (PIN-16/17/34) prints LAND-38's or LAND-65's `hint:` line instead (`--json`: on stderr), exit `0` (see E-ITEM-15).
 
-## One malformed item (issue #447)
+## One malformed item
 
 - [ ] [ITEM-37] Under `storage = "state-ref"`, an item whose file PIN-14/PIN-15 refuse never stops `item new`, nor `item show` of any other item.
 - [ ] [ITEM-42] That item's `record.title`, while it still reads as a non-empty string, joins ITEM-33's twin search as an open item's title.

@@ -2,8 +2,8 @@
 
 `aco next` names the one action the board recommends pulling right now,
 plus a fixed tail of three further lines every run prints regardless of
-which action it recommends: `parallel:`, `scope unknown:`, and `close:`
-(issue #348). This file owns every one of those lines' own shape, the
+which action it recommends: `parallel:`, `scope unknown:`, and `close:`.
+This file owns every one of those lines' own shape, the
 three `NextAction` variants' own text and `--json`, the `RECOVERY`
 preamble and `SKIPPED` tail, and exit `0`/`3`. It cites rather than
 restates: the forge-resolution precondition (`specs/board.spec.md`,
@@ -114,7 +114,7 @@ other printable space are text.
 ## `close:`
 
 - [ ] [NEXT-18] `close:` unions closable containers (kind, no open child, no uncut `[[slice]]` row, no `Next` work) then recovery items, in board order, first-seen, whatever the first action (E-NEXT-06).
-- [ ] [NEXT-19] `close:` never names a container the forge reports no recognized `kind` for (BOARD-08's own exclusion, #309): such an item is read as ordinary, not as one with nothing left to do.
+- [ ] [NEXT-19] `close:` never names a container the forge reports no recognized `kind` for (BOARD-08's own exclusion): such an item is read as ordinary, not as one with nothing left to do.
 - [ ] [NEXT-20] `close:` prints `none` when neither a closable container nor a recovery item exists.
 
 ## `--json`
@@ -214,7 +214,7 @@ close: #182
 exit 0
 ```
 
-The same container after a slice landed, its `Next` line still naming the next slice (issue #503):
+The same container after a slice landed, its `Next` line still naming the next slice:
 
 ```console
 $ aco next

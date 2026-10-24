@@ -1,21 +1,19 @@
 # The `--json` envelope
 
 Every migrated command's `--json` object is built and printed through one
-shared, nameless envelope (issue #396). This file owns the envelope's own
+shared, nameless envelope. This file owns the envelope's own
 shape -- key order, when `ok` is `true`, and what `reason` and `message`
 may and may not carry -- and applies to every command whose own spec cites
 `OUT-nn`; `ask`, `rule`, and `brief` were its first three
 (`specs/ask.spec.md`, `specs/rule.spec.md`, `specs/brief.spec.md`), and
-`release`, `cut`, and `item` are its last (issue #425,
-`specs/release.spec.md`, `specs/cut.spec.md`, `specs/item.spec.md`), each
+`release`, `cut`, and `item` are its last
+(`specs/release.spec.md`, `specs/cut.spec.md`, `specs/item.spec.md`), each
 naming its own `reason` vocabulary with examples. Every `--json` command's
-own spec now cites this file (issue #425 finished the migration ask/rule/
-brief started; issue #435 brought `check <sha>`, the last printer that
-still built an object of its own, in), including the refusals that fire
+own spec now cites this file (`check <sha>` was the last printer that
+still built an object of its own), including the refusals that fire
 before the
 named command starts (OUT-05) and the ones the argument parser itself
-raises on the way into a command that declares `--json` (OUT-06,
-issue #432).
+raises on the way into a command that declares `--json` (OUT-06).
 
 ## Behavior table
 
@@ -38,7 +36,7 @@ issue #432).
 - [ ] [OUT-07] The exit code answers before the object does: a refusal is never exit `0`, so a caller reads the code, then `ok` and `reason`, then the payload keys.
 - [ ] [OUT-08] On every command, `--repo` not shaped OWNER/REPO refuses `repository must be OWNER/REPO, not '<value>'`, exit `2`, before any git or forge call; with `--json` as OUT-06 (see E-OUT-05).
 - [ ] [OUT-09] On every command, a long option spelled short of its full name is never read as that option: it is a parser refusal, exit `2`, with `--json` as OUT-06 (see E-OUT-06).
-- OUT-04 (retired 20.09.2026, issue #425): the `{"ok": false, "error": "<sentence>"}` fallback it kept for a command whose own spec cited no `OUT-nn` no longer exists; every `--json` command cites this file now.
+- OUT-04 (retired 20.09.2026): the `{"ok": false, "error": "<sentence>"}` fallback it kept for a command whose own spec cited no `OUT-nn` no longer exists; every `--json` command cites this file now.
 
 ## Never
 
@@ -46,10 +44,10 @@ issue #432).
 - `ok`/`reason` never reorder around a command's payload: `reason` is always the second key, never last, never interleaved with structured detail keys.
 - `message` never carries structured data: every structured detail (`item`, `index`, `claim`, `checks`, and the like) is its own sibling key, never packed into the prose.
 - `message` never promises a stderr line beside the object: `ask`'s refusal prints `ERROR: <sentence>` there (E-OUT-02), `check <sha> --json` prints the object alone (`specs/check.spec.md`).
-- A parser refusal without `--json` never changes shape (issue #432): stdout stays empty and stderr carries argparse's own usage block and sentence, exactly as it did before the envelope reached this refusal at all.
-- A command that declares no `--json` never answers in this envelope (issue #432): `aco bootstrap --json` stays argparse's own text, and so does `aco release 42 --merged --jso`, an abbreviation OUT-09 refuses.
-- An abbreviation never stands for a destructive flag (issue #502): `aco reset --conf --f` refuses before any read, never acting as `--confirm --force-unreadable`.
-- A `--repo` path, bare owner, third segment, or `.`/`..` name is never dropped for the checkout's own remote: it refuses by name (OUT-08, issue #465).
+- A parser refusal without `--json` never changes shape: stdout stays empty and stderr carries argparse's own usage block and sentence, exactly as it did before the envelope reached this refusal at all.
+- A command that declares no `--json` never answers in this envelope: `aco bootstrap --json` stays argparse's own text, and so does `aco release 42 --merged --jso`, an abbreviation OUT-09 refuses.
+- An abbreviation never stands for a destructive flag: `aco reset --conf --f` refuses before any read, never acting as `--confirm --force-unreadable`.
+- A `--repo` path, bare owner, third segment, or `.`/`..` name is never dropped for the checkout's own remote: it refuses by name (OUT-08).
 - A non-zero exit never means a refusal on its own: a command may name a further code for an answer it did give, and its own spec owns that code.
 - `bootstrap`, `reset`, `start`, and `adopt` never gain a `--json` mode of their own (each command's own product decision, not a pending migration): each names it in its own `## Never` (`specs/bootstrap.spec.md`, `specs/reset.spec.md`, `specs/start.spec.md`, `specs/adopt.spec.md`).
 

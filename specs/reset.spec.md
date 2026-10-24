@@ -1,6 +1,6 @@
 # `aco reset`
 
-`aco reset` (issue #298, operator-ruled 15.09.2026/16.09.2026) is the one
+`aco reset` (operator-ruled 15.09.2026/16.09.2026) is the one
 recovery path over a broken or rewritten `refs/aco/state`, its own five-step
 shape owned start to finish by `specs/ref-store-cas.spec.md` (CAS-39..46)
 along with the mandatory export and its bundle naming, the live-claim
@@ -8,7 +8,7 @@ refusal, `--no-export`, and the bundle's own restore proof; this file owns
 the command's own argument shape, forge-freedom, and the exact per-step line
 for every state CAS-39..46 do not already spell out: an absent ref, a
 failed export, every shape a rejected remote delete can take, and a state
-whose schema this aco cannot read (issue #341). A refusal
+whose schema this aco cannot read. A refusal
 reaching this command's own sink prints `ERROR: <sentence>` on stderr, exit
 `2`, the shared sink `specs/ref-store-cas.spec.md`'s own preamble already
 documents. `<repo>`/`<sha>`/`<tip>`/`<remote>` are the runner's own values;

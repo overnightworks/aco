@@ -2,7 +2,7 @@
 
 `aco ask ITEM --text TEXT`: appends one fresh proposed `[[expectation]]`
 line to an item's `aco` block; `--question`/`--example`/`--picture
-FILE.svg` (issue #295) attach the card fields a picture-owner's mockup
+FILE.svg` attach the card fields a picture-owner's mockup
 shows instead of the bare `text`. This file owns the command's own argument
 shape, its `ASKED` line, its own `reason` vocabulary, and the two refusals
 unique to appending a card (an unreadable or refused `--picture` file),
