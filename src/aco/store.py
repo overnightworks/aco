@@ -15,8 +15,8 @@ through plumbing (`ls-remote`, a `fetch` anchored straight into its own
 per-worktree ref, one recursive `ls-tree` and one `archive`, never a
 `cat-file` per entry), and every write
 builds a tree with `hash-object`/`mktree` -- reusing whatever a
-transition's already-committed parent tree still carries unchanged (issue
-#241) -- and a commit with `commit-tree`.
+transition's already-committed parent tree still carries unchanged
+-- and a commit with `commit-tree`.
 """
 
 from __future__ import annotations
@@ -81,22 +81,22 @@ STATE_REF = "refs/aco/state"
 CLAIMS_DIRECTORY = "claims"
 IDS_DIRECTORY = "ids"
 RESOURCES_DIRECTORY = "resources"
-# Item files (issue #248): board/item data, never claim-ledger data, so it
+# Item files: board/item data, never claim-ledger data, so it
 # is a recognized top-level entry but deliberately excluded from
 # `_parse_state_tree`'s own archive read (`read_item_files` below) -- a
 # command that never touches items pays nothing to fetch them. Its id -> oid
 # structure is folded into `ClaimState.items` for free from the same
-# recursive `ls-tree` (issue #279); only the byte content stays excluded.
+# recursive `ls-tree`; only the byte content stays excluded.
 ITEMS_DIRECTORY = "items"
 SCHEMA_TOML_FILENAME = "schema.toml"
 TOML_SUFFIX = ".toml"
-# Tree entry names travel as git's raw bytes (`-z`, issue #558);
+# Tree entry names travel as git's raw bytes (`-z`);
 # `surrogateescape` lets a name that is not UTF-8 survive the round trip
 # from `_list_tree` back into `_mktree` byte for byte.
 _TREE_NAME_ENCODING = "utf-8"
 _TREE_NAME_ERRORS = "surrogateescape"
 # git's two file modes: a symlink (120000) also lists as a blob, yet
-# `git archive` yields no file for it, so the mode decides (issue #565).
+# `git archive` yields no file for it, so the mode decides.
 _FILE_MODES = frozenset({"100644", "100755"})
 _STATE_TOP_LEVEL_NAMES = frozenset(
     {SCHEMA_TOML_FILENAME, CLAIMS_DIRECTORY, IDS_DIRECTORY, RESOURCES_DIRECTORY, ITEMS_DIRECTORY}
@@ -105,7 +105,7 @@ _STATE_TOP_LEVEL_NAMES = frozenset(
 
 class TransitionIntent(StrEnum):
     """The commit message's own `intent:` trailer label (§1 "Commit
-    message"; issue #357 R2), the house `StrEnum` protocol-token type used
+    message"), the house `StrEnum` protocol-token type used
     everywhere else in the package -- a loose string here would let a typo
     in one of the two writers (`_transition_message`) or readers
     (`_parsed_transition`) drift from the other unnoticed."""
@@ -119,14 +119,14 @@ class TransitionIntent(StrEnum):
 
 @dataclass(frozen=True)
 class _TransitionKind:
-    """One transition intent type's own registration (issue #357 R2): the
+    """One transition intent type's own registration: the
     commit message's `intent:` trailer label `_transition_message` writes
     and `claim_lifecycle`'s reader reads back, paired with whether this
     intent is claim-shaped -- carries `claim_id:` and a mandatory `item:`
     trailer on write, and is walked into a claim's own lifecycle on read
     exactly like a release. One table, not a label registered here and its
-    own shape remembered a second time in the reader -- `LandingIntent`
-    (issue #359), the one intent that is both claim- and item-write-shaped,
+    own shape remembered a second time in the reader -- `LandingIntent`,
+    the one intent that is both claim- and item-write-shaped,
     is one more row here, never a second place to update."""
 
     label: TransitionIntent
@@ -134,14 +134,14 @@ class _TransitionKind:
 
 
 # §1 "Commit message": `intent: claim` / `rescope` / `release` / `item_write`
-# / `landing` (issue #359, `LandingIntent`'s atomic close-and-release).
+# / `landing` (`LandingIntent`'s atomic close-and-release).
 _TRANSITION_KINDS: dict[type[ClaimTransitionIntent], _TransitionKind] = {
     ClaimIntent: _TransitionKind(label=TransitionIntent.CLAIM, claim_shaped=True),
     RescopeIntent: _TransitionKind(label=TransitionIntent.RESCOPE, claim_shaped=True),
     ReleaseIntent: _TransitionKind(label=TransitionIntent.RELEASE, claim_shaped=True),
     ItemWriteIntent: _TransitionKind(label=TransitionIntent.ITEM_WRITE, claim_shaped=False),
     # A close commits as the item write it is; its live-claim check is a
-    # precondition of `apply`, not a trailer of its own (issue #459).
+    # precondition of `apply`, not a trailer of its own.
     ItemCloseIntent: _TransitionKind(label=TransitionIntent.ITEM_WRITE, claim_shaped=False),
     LandingIntent: _TransitionKind(label=TransitionIntent.LANDING, claim_shaped=True),
 }
@@ -165,7 +165,7 @@ _LS_REMOTE_EXIT_NO_MATCH = 2
 # an ancestor" outcome `_check_lineage` reads as a rewritten ref. Any other
 # nonzero exit -- 128 when `previous` or `tip` cannot be read, a pruned
 # object among them -- is a git failure, not a lineage fact, and must fail
-# loud with its own detail instead (issue #390 finding 10).
+# loud with its own detail instead.
 _MERGE_BASE_EXIT_NOT_ANCESTOR = 1
 
 # Bound on `bootstrap`'s creation pushes (CAS-68). Distinct from
@@ -183,12 +183,12 @@ _LINEAGE_STAMP_FILENAME = "last-oid"
 
 # The options every state-store fetch carries, so a fetch writes only objects
 # and the ref its own refspec names. `--no-tags` and `--no-write-fetch-head`
-# keep it out of the shared `refs/tags/*` and `FETCH_HEAD` (issue #298 finding
-# 2; `_fetch_into_anchor` and `_fetch_ref_objects` say why per caller).
+# keep it out of the shared `refs/tags/*` and `FETCH_HEAD` (`_fetch_into_anchor` and
+# `_fetch_ref_objects` say why per caller).
 # `--no-auto-maintenance` keeps it from starting a repack of the object store
 # every linked worktree shares: since git 2.54 that repack can `rmdir` an
-# empty `objects/xx` under another agent's concurrent `hash-object -w`
-# (issue #22). `--refmap=` sets aside the remote's configured fetch refspecs,
+# empty `objects/xx` under another agent's concurrent `hash-object -w`.
+# `--refmap=` sets aside the remote's configured fetch refspecs,
 # which could otherwise write a local branch or the shared `STATE_REF`.
 _STATE_FETCH_OPTIONS = (
     "--no-tags",
@@ -201,21 +201,19 @@ _STATE_FETCH_OPTIONS = (
 # fetch's own destination refspec, instead of reading the tip back from
 # `FETCH_HEAD`. One mechanism now settles two separate problems:
 # - it roots the fetched commits so they survive a `git gc --prune=now` run
-#   against this checkout right after the fetch (issue #237 finding 25,
-#   reproduced in the audit, and again by
+#   against this checkout right after the fetch (reproduced in the audit, and again by
 #   `test_claim_ages_survives_a_gc_prune_of_the_just_fetched_history`);
 # - it decouples the read from `FETCH_HEAD`, so a concurrent `git fetch`
 #   anywhere else in this same worktree -- which overwrites the one shared
 #   `FETCH_HEAD` file regardless of what it fetches -- can never be read as
 #   this fetch's own result, and `--no-write-fetch-head` keeps aco's own
-#   fetch out of that shared file in turn (issue #310 finding 48: `aco
+#   fetch out of that shared file in turn (`aco
 #   rescope` once read a fixer agent's own concurrent `git fetch origin`
 #   as the state tip because both shared this worktree's `FETCH_HEAD`).
 #   The fetch itself lands the anchor in one atomic git ref update, but
 #   the read-back that follows, the lineage check against this worktree's
 #   stamp, and the stamp write are three separate steps: two concurrent
-#   `aco` processes in this same worktree are not serialised across them
-#   (owner: issue #418).
+#   `aco` processes in this same worktree are not serialised across them.
 # `refs/worktree/*` is git's own per-worktree ref namespace (never shared
 # across linked worktrees), the same worktree-private guarantee
 # `_lineage_stamp_path` already relies on, so anchoring here never touches
@@ -223,13 +221,13 @@ _STATE_FETCH_OPTIONS = (
 # anchoring is the sole production writer and reader of this name --
 # `export_state_bundle` below has its own, separate ref in the same private
 # namespace (`EXPORT_BUNDLE_REF`), never this one, and `peek_state` never
-# writes here at all (issue #298 finding 2): its read comes from
+# writes here at all: its read comes from
 # `_ls_remote_state`'s own answer, since a dry run, a live-claim refusal, or
 # a failed export must change nothing durable.
 _FETCH_ANCHOR_REF = "refs/worktree/aco/state"
 
-# `export_state_bundle` points this at the leased tip and bundles it
-# (issue #298, 19.09.2026 REVISE findings 1+2): the previous implementation
+# `export_state_bundle` points this at the leased tip and bundles it:
+# the previous implementation
 # pointed the *shared* `STATE_REF` at `tip` to give the bundle a name, but
 # that ref is shared across every linked worktree of this repository --
 # a concurrent reset elsewhere could repoint or delete it between this
@@ -389,7 +387,7 @@ _LOG_FORMAT = "%H%x09%cI"
 
 def _commit_history_read_failure(tip: ObjectId, result: process.CapturedResult) -> ClaimError:
     """The one sentence both first-parent history walks below raise on a
-    failing `git log` (issue #390 finding 7): `_first_parent_commit_dates`
+    failing `git log`: `_first_parent_commit_dates`
     and `_claim_lifecycle_transitions` used to spell this identically by
     hand, dropping git's own stderr each time -- one owner, carrying the
     detail forward instead."""
@@ -404,7 +402,7 @@ def _first_parent_commit_dates(worktree: Path, tip: ObjectId) -> dict[ObjectId, 
 
     `refs/aco/state`'s own history is always linear by construction --
     `commit_transition` never writes a merge, every retry parents its new
-    commit onto a freshly observed tip (issue #241, "never a merge") -- so a
+    commit onto a freshly observed tip ("never a merge") -- so a
     first-parent walk from `tip` reaches every commit the ref has ever held.
     """
     result = _run_git(worktree, ["log", "--first-parent", f"--format={_LOG_FORMAT}", str(tip)])
@@ -425,8 +423,8 @@ def claim_ages(
     *, worktree: Path, tip: ObjectId, claims: Iterable[ActiveClaim]
 ) -> dict[str, datetime]:
     """Each `claim`'s age -- its `opened_commit`'s committer date -- from one
-    walk of `tip`'s history (issue #242, replacing a `merge-base` plus `log`
-    pair per claim).
+    walk of `tip`'s history, replacing a `merge-base` plus `log`
+    pair per claim.
 
     Refuses with `StateLineageError` for a claim whose `opened_commit` the
     walk never reaches (§1 "Status age..."): a claim's age display reads
@@ -457,7 +455,7 @@ def claim_ages(
 _CLAIM_LIFECYCLE_LOG_FORMAT = "%H%x00%cI%x00%B"
 _CLAIM_LIFECYCLE_FIELD_COUNT = 3
 
-# The commit message's own terminal trailer block (issue #357 R2): the last
+# The commit message's own terminal trailer block: the last
 # blank-line-separated paragraph of `_transition_message`'s output, every
 # line of it one `key: value` pair -- this module's own stricter grammar, not
 # what `git interpret-trailers` accepts -- read here as such pairs rather
@@ -498,7 +496,7 @@ class _RawTransition:
 
 @dataclass(frozen=True)
 class _TransitionOutcome:
-    """One commit's own read (issue #357 R2): a claim-shaped transition this
+    """One commit's own read: a claim-shaped transition this
     reader could fully parse (`transition`), or `unparsed=True` for a
     claim-shaped commit whose terminal trailer block is missing
     `claim_id`/`item` or carries an unparsable committer date -- older
@@ -513,7 +511,7 @@ class _TransitionOutcome:
 
 def _parsed_transition(raw_date: str, raw_body: str) -> _TransitionOutcome:
     """One commit's `_TransitionOutcome`, read from its own terminal
-    trailer block alone (issue #357 R2) -- never a crash: a malformed or
+    trailer block alone -- never a crash: a malformed or
     foreign commit in `refs/aco/state`'s history must never take down the
     whole walk, so a claim-shaped `intent:` whose block lacks
     `claim_id`/`item` or carries an unparsable committer date is
@@ -544,9 +542,8 @@ def _claim_lifecycle_transitions(
     worktree: Path, tip: ObjectId
 ) -> tuple[tuple[_RawTransition, ...], int]:
     """Every fully parsed claim-shaped transition on `tip`'s first-parent
-    history, plus how many claim-shaped commits this walk could not parse
-    (issue #357 R2) -- the raw counterpart `claim_lifecycle` turns into a
-    `ClaimLifecycle`."""
+    history, plus how many claim-shaped commits this walk could not parse -- the raw counterpart
+    `claim_lifecycle` turns into a `ClaimLifecycle`."""
     result = _run_git(
         worktree,
         [
@@ -593,7 +590,7 @@ class _LifecycleAccumulator:
 
 @dataclass(frozen=True)
 class ClaimLifecycle:
-    """`claim_lifecycle`'s own result (issue #357 R2): every claim this walk
+    """`claim_lifecycle`'s own result: every claim this walk
     could read, plus how many claim-shaped transition commits it could
     not -- a commit whose `intent:` trailer names `claim`/`rescope`/`release`
     but whose terminal trailer block is missing `claim_id`/`item`, carries an
@@ -614,8 +611,7 @@ def _record_claim_transition(
 ) -> bool:
     """Opens `transition`'s `claim_id` as a new accumulator; returns whether
     it parsed. A second `claim` for a `claim_id` this walk already opened
-    (issue #357 gate B2) is unparsed instead, its first accumulator left
-    untouched."""
+    is unparsed instead, its first accumulator left untouched."""
     if transition.claim_id in accumulators:
         return False
     accumulators[transition.claim_id] = _LifecycleAccumulator(
@@ -630,8 +626,8 @@ def _record_release_or_rescope_transition(
     """Applies a rescope, release, or landing `transition` to its own
     already-open `accumulator`; returns whether it parsed. A transition
     naming a `claim_id` this walk never saw claimed, a rescope naming an
-    already-released `claim_id` (issue #357 gate B3), or a second
-    release/landing for one already closed (issue #357 gate B2), is
+    already-released `claim_id`, or a second
+    release/landing for one already closed, is
     unparsed instead, the accumulator left untouched."""
     if accumulator is None:
         return False
@@ -648,13 +644,13 @@ def _record_release_or_rescope_transition(
 
 def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
     """Every claim's own lifecycle on `refs/aco/state`'s first-parent
-    history up to `tip` (issue #357), read in one `git log` walk: a claim's
+    history up to `tip`, read in one `git log` walk: a claim's
     `claimed_at`/`released_at` are its own claim/release commit's committer
     date, `rescopes` counts its rescope commits between them. `tip` is the
     caller's own already-fetched observation (the same seam `claim_ages`
     uses), never a fresh fetch this function performs itself.
 
-    A `reset` (issue #298) deletes and rebuilds `STATE_REF` from an empty
+    A `reset` deletes and rebuilds `STATE_REF` from an empty
     tree, so its bootstrap commit has no parent at all -- history "before
     the last reset" is excluded for free by this first-parent walk, never a
     date compared against here.
@@ -670,7 +666,7 @@ def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
 
     A rescope or release naming a `claim_id` this walk never saw claimed --
     history torn at a boundary this first-parent walk cannot see past -- is
-    counted into `unparsed` rather than raised (issue #357 R2): the same
+    counted into `unparsed` rather than raised: the same
     "never crash the whole board over one broken record" contract
     `_parsed_transition` already keeps for a single malformed commit. A
     second `claim` for a `claim_id` this walk already opened, or a second
@@ -679,12 +675,12 @@ def claim_lifecycle(*, worktree: Path, tip: ObjectId) -> ClaimLifecycle:
     live `claim_id` be claimed twice or released twice, so a commit shaped
     that way cannot be a second genuine transition -- and is counted into
     `unparsed` the same way, its first (and only trustworthy) event left
-    untouched rather than overwritten or duplicated (issue #357 gate B2). A
+    untouched rather than overwritten or duplicated. A
     `rescope` naming an already-released `claim_id` is the same kind of
     impossible history: `rescope` requires a live claim (`protocol.apply`,
     `specs/rescope.spec.md`), so a rescope commit after that claim's own
     release commit is counted into `unparsed` too, its `rescoped` count left
-    untouched (issue #357 gate B3).
+    untouched.
     """
     transitions, unparsed = _claim_lifecycle_transitions(worktree, tip)
     accumulators: dict[str, _LifecycleAccumulator] = {}
@@ -768,7 +764,7 @@ def _fetch_ref_objects(worktree: Path, remote: str) -> None:
     write nothing at all, not merely nothing this worktree reads back);
     `--no-tags` keeps a reachable tag on `STATE_REF`'s own history from
     auto-following into the shared local `refs/tags/*` namespace -- the
-    write-nothing contract issue #298 finding 2 requires of it.
+    write-nothing contract it must keep.
     """
     result = _run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, STATE_REF])
     if result.exit_status != 0:
@@ -787,8 +783,8 @@ def _tree_oid(worktree: Path, tip: ObjectId) -> ObjectId:
 @dataclass(frozen=True)
 class _ListedEntry:
     """One tree entry as `git ls-tree` lists it: its mode, kind, and oid --
-    the mode kept so a writer can carry an entry over byte for byte (issue
-    #558), an executable or symlink blob included."""
+    the mode kept so a writer can carry an entry over byte for byte,
+    an executable or symlink blob included."""
 
     mode: str
     kind: str
@@ -812,11 +808,11 @@ def _list_tree(
     its tree); `-t` keeps intermediate tree entries in the recursive listing
     git would otherwise omit, so a caller can validate `claims`/`ids`/
     `resources` themselves as well as their direct children from this one
-    call (issue #241) -- the read side's bulk-listing counterpart to
+    call -- the read side's bulk-listing counterpart to
     `_read_state_archive`, and the write side's own lookup of what it may
     reuse unchanged.
 
-    `-z` lists every path as its raw bytes (issue #558): without it git
+    `-z` lists every path as its raw bytes: without it git
     quotes a non-ASCII or tab-bearing name, and the quoted path matched no
     directory prefix, so such an entry vanished from every read and write.
     """
@@ -859,13 +855,13 @@ def _read_state_archive(
     worktree: Path, tree_oid: ObjectId, *, tip: ObjectId, paths: Iterable[str] | None = None
 ) -> dict[str, bytes]:
     """Every blob's raw bytes under `tree_oid`, read via one `git archive`
-    instead of one `cat-file -p` per file (issue #241, audit findings 20-21):
+    instead of one `cat-file -p` per file:
     a state tree with hundreds of claims used to cost one process per file
     to read; this costs one regardless of how many. `tarfile` owns the
     framing, never a hand-rolled parse of git's batch output.
 
     `paths`, when given, restricts the archive to exactly those top-level
-    entries (issue #248): `_parse_state_tree` uses this to exclude
+    entries: `_parse_state_tree` uses this to exclude
     `items/`, so a store command that never reads items never pays to
     fetch their content. `git archive` errors on a pathspec that matches
     nothing, so an empty `paths` short-circuits to an empty read rather
@@ -975,7 +971,7 @@ def _require_file_entry(
 ) -> None:
     """CAS-29, CAS-31, CAS-32, CAS-74: an entry the read opens is a file --
     never a directory, a submodule, or a symlink, which the archive would
-    otherwise leave out without a word (issue #565) -- and ends in `suffix`."""
+    otherwise leave out without a word -- and ends in `suffix`."""
     if entry.mode not in _FILE_MODES or not path.endswith(suffix):
         raise MalformedStateTreeError(f"{path} at {tip} {sentence}")
 
@@ -987,10 +983,10 @@ def _require_item_file(name: str, entry: _ListedEntry, *, tip: ObjectId) -> None
 def _parse_items_subtree(
     entries: dict[str, _ListedEntry], *, present: bool, tip: ObjectId
 ) -> Mapping[str, ObjectId]:
-    """`items/`'s id -> blob oid mapping (issue #279): every entry must be a
+    """`items/`'s id -> blob oid mapping: every entry must be a
     file (`_require_item_file`).
-    Only an entry `protocol.item_id_of_filename` names an item is keyed
-    (issue #558); a foreign entry stays in the tree, carried over by every
+    Only an entry `protocol.item_id_of_filename` names an item is keyed;
+    a foreign entry stays in the tree, carried over by every
     write (`_patch_items_subtree`), and is the whole-board read's to refuse.
     The `[record]` content grammar stays `items.py`'s.
     """
@@ -1007,14 +1003,13 @@ def _parse_items_subtree(
 
 def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
     """Parse the full state tree at `tip`: `schema.toml` plus whichever of
-    `claims/`, `ids/`, `resources/`, `items/` are present (issue #176, slice
-    C2; item oids, issue #279).
+    `claims/`, `ids/`, `resources/`, `items/` are present.
 
     One recursive `ls-tree` for structure and one `git archive` for every
-    blob's bytes (issue #241) replace what used to be one `ls-tree` and one
+    blob's bytes replace what used to be one `ls-tree` and one
     `cat-file -p` per entry -- the process count this function pays is fixed
     regardless of how many claims, ids, or resources the tree holds. `items/`
-    (issue #248) is recognized here and its id -> blob oid structure is
+    is recognized here and its id -> blob oid structure is
     folded into `ClaimState.items` for free from this same `ls-tree`; its
     *content* stays excluded from that one archive read -- board data, read
     lazily and separately by `read_item_files`, never folded into
@@ -1063,7 +1058,7 @@ def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
 
 def read_item_files(worktree: Path, tip: ObjectId) -> Mapping[str, bytes]:
     """Every `items/<id>.md` blob's raw bytes at `tip`, fetched only when a
-    caller actually asks for it (issue #248): one `ls-tree` plus one `git
+    caller actually asks for it: one `ls-tree` plus one `git
     archive` scoped to the `items/` subtree alone, decoupled from
     `ClaimState.items`' oid-only mapping and from every other store read
     (`_parse_state_tree`'s own archive explicitly excludes this directory).
@@ -1115,13 +1110,12 @@ def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
 
 
 def peek_state(*, worktree: Path, remote: str) -> ClaimState:
-    """Read `STATE_REF` on `remote` for a caller that must not write (issue
-    #298, 19.09.2026 gate finding 1; issue #405 review/gate finding, `land`'s
+    """Read `STATE_REF` on `remote` for a caller that must not write (`land`'s
     read-only preflight): one of the two peeks in this module, with
     `peek_state_for_reset`, that read through `_peek_tip` and so skip
     `fetch_state`'s own lineage guard, anchor, and stamp.
 
-    The tip is `_ls_remote_state`'s own answer (issue #310 finding 48): the
+    The tip is `_ls_remote_state`'s own answer: the
     fetch that follows (`_fetch_ref_objects`) only brings the objects into
     this worktree's local store so `_parse_state_tree` can read them -- it
     writes no destination ref, and `--no-write-fetch-head` keeps it from
@@ -1154,7 +1148,7 @@ def peek_state(*, worktree: Path, remote: str) -> ClaimState:
 
 
 def peek_state_for_reset(*, worktree: Path, remote: str) -> ClaimState | UnreadableState:
-    """`peek_state` for `reset` alone (issue #341): a tip whose schema this
+    """`peek_state` for `reset` alone: a tip whose schema this
     client does not speak comes back as its oid and version -- all the
     export and the lease need -- instead of failing the one command built
     to replace exactly such a ledger. The schema is judged before the
@@ -1220,7 +1214,7 @@ def _find_operation_id(
     `fetch_state` just parsed), so a failing walk is a broken invariant, not
     an absent id: reading it as "not found" would let a lost response whose
     commit already landed be pushed a second time. The per-candidate read
-    below holds that same contract (issue #390 finding 9a): a nonzero exit
+    below holds that same contract: a nonzero exit
     reading one candidate's own message fails loud with git's detail, never
     silently treated as "this commit does not carry the id" -- that reading
     is reserved for a candidate whose message was actually read.
@@ -1272,8 +1266,7 @@ def _advance_tip_retry(
 def _retry_exhaustion_error(
     *, remote: str, attempts: int, moves: int, stationary_since_last_move: int
 ) -> ClaimUnavailableError:
-    """The real cause behind exhausting every retry attempt (issue #237
-    finding 22, corrected for the mixed case): each rejected attempt either
+    """The real cause behind exhausting every retry attempt: each rejected attempt either
     observed the ref land on a genuinely new tip (a concurrent writer landing
     first) or found it exactly where the previous attempt left it (the push
     itself never landed) -- a real run can do some of each, so `moves`
@@ -1308,7 +1301,7 @@ def _retry_exhaustion_error(
 
 
 def hash_blob(worktree: Path, content: bytes) -> ObjectId:
-    """One blob's oid, hashed and written to the object store (issue #283):
+    """One blob's oid, hashed and written to the object store:
     the public seam `session._StoreItemWriter` uses to compute
     `ItemWriteIntent.new_oid` once, before `commit_transition`'s own retry
     loop -- an item write already carries finished bytes, unlike
@@ -1333,7 +1326,7 @@ _TreeEntry = tuple[str, str, ObjectId, str]
 
 def _mktree(worktree: Path, entries: list[_TreeEntry]) -> ObjectId:
     """`entries` as one tree object; `-z` takes every name as its raw bytes
-    (`_list_tree`'s counterpart, issue #558), and git orders the entries."""
+    (`_list_tree`'s counterpart), and git orders the entries."""
     mktree_input = b"".join(
         f"{mode} {kind} {oid}\t".encode() + _encode_tree_name(name) + b"\0"
         for mode, kind, oid, name in entries
@@ -1342,9 +1335,9 @@ def _mktree(worktree: Path, entries: list[_TreeEntry]) -> ObjectId:
 
 
 def _write_bootstrap_tree(worktree: Path) -> ObjectId:
-    """The one tree `bootstrap` ever writes: `schema.toml` alone (issue #176
-    slice C1). Every later transition's tree comes from
-    `_write_incremental_state_tree` instead (issue #241), which diffs
+    """The one tree `bootstrap` ever writes: `schema.toml` alone.
+    Every later transition's tree comes from
+    `_write_incremental_state_tree` instead, which diffs
     against an already-committed tree -- exactly what bootstrap's own first
     commit has none of yet.
     """
@@ -1357,8 +1350,8 @@ _SubtreeValueT = TypeVar("_SubtreeValueT")
 
 @dataclass(frozen=True)
 class _ExistingSubtree:
-    """One subtree's already-committed shape from `observed.tip` (issue
-    #241): its own oid (`None` when the directory did not exist yet) and its
+    """One subtree's already-committed shape from `observed.tip`:
+    its own oid (`None` when the directory did not exist yet) and its
     direct children's entries by bare name -- exactly what the incremental
     writer needs to decide what it may reuse, and no more, so the writers
     below stay at one `existing`-shaped parameter each.
@@ -1378,7 +1371,7 @@ def _existing_subtree(existing: dict[str, _ListedEntry], directory: str) -> _Exi
 
 def _carried_entry(entries: Mapping[str, _ListedEntry], name: str) -> _TreeEntry:
     """`name`'s entry exactly as the observed tree holds it -- name, mode,
-    kind, blob -- for a write that does not change it (CAS-61, issue #565)."""
+    kind, blob -- for a write that does not change it (CAS-61)."""
     entry = entries[name]
     return (entry.mode, entry.kind, entry.oid, name)
 
@@ -1392,13 +1385,13 @@ def _reuse_or_write_mapping_subtree(
     serialize: Callable[[_SubtreeValueT], str],
 ) -> ObjectId | None:
     """A `claims/`- or `resources/`-shaped subtree's new oid, reusing every
-    member unchanged since `old_members` (issue #241): frozen-dataclass
+    member unchanged since `old_members`: frozen-dataclass
     equality on the parsed record is exactly serialization equality --
     `serialize` is a pure function of the record's fields -- so an identical
     record needs neither a new blob nor a new tree; only `mktree` for a
     directory that actually changed, never once per unchanged entry.
     An unchanged directory, an empty one included, is carried as it stands
-    (CAS-61, issue #565); `None` while it is absent or this write empties it.
+    (CAS-61); `None` while it is absent or this write empties it.
     """
     if old_members == new_members:
         return existing.oid
@@ -1421,10 +1414,10 @@ def _reuse_or_write_ids_subtree(
     old_ids: frozenset[ClaimId],
     new_ids: frozenset[ClaimId],
 ) -> ObjectId | None:
-    """`ids/`'s new subtree oid (issue #241): every id's blob is the same
+    """`ids/`'s new subtree oid: every id's blob is the same
     empty content, so reuse is membership-only -- the empty blob is written
     at most once per call, never once per newly consumed id. An unchanged
-    `ids/` is carried as it stands (CAS-61, issue #565), `None` while it is
+    `ids/` is carried as it stands (CAS-61), `None` while it is
     absent; `protocol.apply` only ever adds ids, so a write never empties it.
     """
     if old_ids == new_ids:
@@ -1447,7 +1440,7 @@ def _patch_items_subtree(
     new_items: Mapping[str, ObjectId],
 ) -> ObjectId | None:
     """`items/`'s new subtree oid, or `None` while there is no `items/` at
-    all (issue #558): this attempt's own `items/` children carried over byte
+    all: this attempt's own `items/` children carried over byte
     for byte -- name, mode, blob -- with only the ids whose oid changed
     placed on top. A foreign entry (`protocol.item_id_of_filename` names no
     item) is never renamed, merged, or dropped, and keeps `items/` alive on
@@ -1472,7 +1465,7 @@ def _write_incremental_state_tree(
     worktree: Path, *, observed: ClaimState, new_state: ClaimState
 ) -> ObjectId:
     """`new_state`'s tree, reusing every blob and subtree oid `observed.tip`'s
-    already-committed tree still carries unchanged (issue #241): the write
+    already-committed tree still carries unchanged: the write
     seam inside `commit_transition`'s retry loop, read fresh every attempt
     against that attempt's own `observed.tip` -- never lifted above the
     loop, never cached on `ClaimState` itself, which stays free of this
@@ -1527,7 +1520,7 @@ def _write_incremental_state_tree(
 
 @dataclass(frozen=True)
 class TransitionSubject:
-    """An item write's own commit-message identity (issue #279): `text` is
+    """An item write's own commit-message identity: `text` is
     the human-facing subject line (`"write item aco-xxxxxx"`). An item
     write carries no `item:` trailer at all -- `item_id` on the intent
     itself already names the file -- so this subject carries no `item`
@@ -1540,8 +1533,8 @@ class TransitionSubject:
 
 @dataclass(frozen=True)
 class ClaimTransitionSubject:
-    """One claim-shaped transition's own commit-message identity (issue
-    #357 R2): `text` is the human-facing subject line
+    """One claim-shaped transition's own commit-message identity:
+    `text` is the human-facing subject line
     (`transition_subject`'s own `"claim issue 42"` prose) and `item`
     -- `protocol.transition_item_identifier`'s own bare identifier -- is
     mandatory: every claim/rescope/release produces a machine-readable
@@ -1557,7 +1550,7 @@ class ClaimTransitionSubject:
 
 def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> ClaimTransitionSubject:
     """One claim-shaped transition's own `ClaimTransitionSubject` (§1
-    "Commit message"; issue #357 R2): `text` is `claim issue 42`, `rescope
+    "Commit message"): `text` is `claim issue 42`, `rescope
     lane docs/lane-cleanup`, and so on -- `action` plus `issue`/`lane` plus
     `transition_item_identifier`'s own bare identifier; `item` is
     that same identifier again, carried separately into the commit's own
@@ -1572,8 +1565,7 @@ def _transition_message(
     subject: TransitionSubject | ClaimTransitionSubject, intent: ClaimTransitionIntent
 ) -> str:
     """The commit message trailer for one transition (§1 "Commit message";
-    widened for item writes, issue #279; widened again for atomic landings,
-    issue #359; `item:`, issue #357 R2): every intent carries
+    widened for item writes, atomic landings and `item:`): every intent carries
     `operation_id`, the one field `_find_operation_id`'s replay search
     reads back; a claim-shaped intent also names its `claim_id` and its own
     `item` (`subject.item`, the one owned grammar `claim_lifecycle`'s
@@ -1609,7 +1601,7 @@ def _transition_message(
 @dataclass(frozen=True)
 class Observation:
     """One checkout's read of `STATE_REF` over its canonical remote, the
-    state a transition applies its intent to first (issue #494). It stays
+    state a transition applies its intent to first. It stays
     bound to the worktree and remote it was read in: that worktree's fetch
     anchor and lineage stamp stand on it, and the write goes to that
     remote."""
@@ -1624,7 +1616,7 @@ def _uncertain_once_sent() -> Iterator[None]:
     """Once a push is sent, only the remote knows whether it landed: a
     failure before the store has either re-read the ref after a rejection or
     finished its own bookkeeping after a landing leaves the write's outcome
-    unknown (issue #494), in the failure's own words -- a git refusal and
+    unknown, in the failure's own words -- a git refusal and
     the lineage stamp's own filesystem failure alike."""
     try:
         yield
@@ -1674,17 +1666,16 @@ def commit_transition(
     transport: PushTransport | None = None,
 ) -> ClaimState:
     """Apply and push one claim/rescope/release/item-write/landing
-    transition (issue #176, slice C2; item writes, issue #279; atomic
-    landings, issue #359): the production caller of `protocol.apply`. A
+    transition: the production caller of `protocol.apply`. A
     claim-shaped `subject`'s own `item` --
     `protocol.transition_item_identifier(identity, branch)` -- becomes the
-    commit's own `item:` trailer (issue #357 R2), the one machine-readable
+    commit's own `item:` trailer, the one machine-readable
     field `claim_lifecycle` reads back rather than reconstructing an item
     from the human-facing `subject.text` line -- a landing included; an
     item write's plain `TransitionSubject` carries no such field at all.
 
     The first attempt applies `intent` to the command's own `observed`
-    state and reads nothing itself (issue #494). Unlike `bootstrap`'s fixed
+    state and reads nothing itself. Unlike `bootstrap`'s fixed
     tree, a transition's result depends on the state it is applied to, so a
     rejected push re-fetches, looks for its own `operation_id`, and
     re-applies `intent` to the fresh state instead of reusing a stale tree
@@ -1787,8 +1778,8 @@ _WORKTREE_LIST_PATH_PREFIX = "worktree "
 
 
 def list_worktrees(worktree: Path) -> tuple[Path, ...]:
-    """Every worktree `git worktree list` reports for this repository (issue
-    #298): `reset`'s own plan and `clear_lineage_stamps` below both need the
+    """Every worktree `git worktree list` reports for this repository:
+    `reset`'s own plan and `clear_lineage_stamps` below both need the
     full set -- a lineage stamp or fetch anchor left behind in even one
     linked worktree survives the reset and trips the next `fetch_state` it
     runs there."""
@@ -1809,8 +1800,8 @@ _SHOW_REF_EXIT_MISSING = 1
 
 
 def local_state_ref_exists(worktree: Path) -> bool:
-    """Whether *this* worktree happens to hold a local `STATE_REF` (issue
-    #298): production never creates one on an ordinary read (`fetch_state`
+    """Whether *this* worktree happens to hold a local `STATE_REF`:
+    production never creates one on an ordinary read (`fetch_state`
     lands fetched objects in its own per-worktree anchor, `peek_state` in
     this worktree's object store alone), nor does `export_state_bundle` below,
     which bundles its own private
@@ -1868,8 +1859,8 @@ def _write_and_publish_bundle(
     *, worktree: Path, tip: ObjectId, destination: Path, descriptor: int, temporary: Path
 ) -> None:
     """Write `tip`'s bundle into the already-claimed temporary file, then
-    publish it into `destination` (issue #298 reset, the write half of
-    `export_state_bundle`'s step 1 of 5).
+    publish it into `destination`, the write half of
+    `export_state_bundle`'s step 1 of 5.
 
     Publishes atomically: the bundle is written in full to `temporary` first
     (`tempfile.mkstemp`, the same idiom `_write_lineage_stamp` uses), then
@@ -1901,7 +1892,7 @@ def _delete_export_ref(worktree: Path) -> str | None:
     reached `update-ref` in the first place costs nothing here.
 
     Catches `(ClaimError, OSError, ValueError)` rather than only
-    `ClaimError` (issue #298, the third and sixth 19.09.2026 gate REVISEs):
+    `ClaimError`:
     `_run_git` only wraps `ExecutableMissingError`/`ProcessTimedOutError`
     into `ClaimError`, so a raw `OSError` from `process.run_git`'s own
     `subprocess.run` (a descriptor exhausted) would otherwise escape before
@@ -1924,8 +1915,7 @@ def _delete_export_ref(worktree: Path) -> str | None:
 
 def _clear_export_artifacts(*, worktree: Path, temporary: Path) -> tuple[str, ...]:
     """Remove the temporary export ref and the temporary file, each
-    attempted independently of whether the other fails (issue #298, the
-    second, third and sixth 19.09.2026 gate REVISEs): a broken `git`
+    attempted independently of whether the other fails: a broken `git`
     invocation while clearing `EXPORT_BUNDLE_REF` -- the
     `(ClaimError, OSError, ValueError)` family `_delete_export_ref`
     documents -- must never skip the temporary file's removal, and an
@@ -1961,7 +1951,7 @@ def _export_cleanup_failure(
 
 
 def export_state_bundle(*, worktree: Path, tip: ObjectId, destination: Path) -> Path:
-    """Bundle `tip` into `destination` (issue #298 reset, step 1 of 5): the
+    """Bundle `tip` into `destination` (reset, step 1 of 5): the
     sole mandatory-unless-`--no-export` write a reset performs before
     anything is deleted.
 
@@ -1976,8 +1966,7 @@ def export_state_bundle(*, worktree: Path, tip: ObjectId, destination: Path) -> 
     `cmd_reset._reset_restore_command` builds the command).
 
     Cleanup of the temporary export ref and the temporary file is
-    unconditional and the two are independent of each other (issue #298,
-    the second 19.09.2026 gate REVISE): whatever happened while writing or
+    unconditional and the two are independent of each other: whatever happened while writing or
     publishing the bundle -- success, or a failure raised at any point --
     both cleanups are always attempted, via `_clear_export_artifacts`, and a
     failure in one never skips the other. The previous version ran the ref
@@ -2025,7 +2014,7 @@ def _repair_after_failed_remote_delete(
     assuming the worst.
 
     Never recommends a manual `--force-with-lease` repair, in either
-    outcome (issue #298, 19.09.2026 REVISE finding 3): a re-probed tip that
+    outcome: a re-probed tip that
     differs from `expected_remote_tip` means the remote moved since this
     reset last observed it, and that replacement tip has been through
     neither of this reset's own safeguards -- it was never checked against
@@ -2058,8 +2047,8 @@ def _repair_after_failed_remote_delete(
 
 
 def delete_state_ref(*, worktree: Path, remote: str, expected_remote_tip: ObjectId | None) -> bool:
-    """Delete `STATE_REF` on `remote`, then locally if present (issue #298
-    reset, steps 2-3 of 5): never `--force` -- a matching
+    """Delete `STATE_REF` on `remote`, then locally if present (reset,
+    steps 2-3 of 5): never `--force` -- a matching
     `--force-with-lease` refuses the moment `expected_remote_tip` is stale,
     which is the whole point of reading it before deleting rather than
     trusting whatever is there when the push actually runs.
@@ -2094,8 +2083,8 @@ def delete_state_ref(*, worktree: Path, remote: str, expected_remote_tip: Object
 
 def clear_lineage_stamps(*, worktree: Path) -> tuple[Path, ...]:
     """Delete the lineage stamp and the per-worktree fetch anchor
-    (`_FETCH_ANCHOR_REF`) in every worktree of this repository (issue #298
-    reset, step 4 of 5), before `bootstrap` re-creates `STATE_REF` from
+    (`_FETCH_ANCHOR_REF`) in every worktree of this repository (reset,
+    step 4 of 5), before `bootstrap` re-creates `STATE_REF` from
     nothing.
 
     Both must go in every worktree, not just this one: `fetch_state`'s own

@@ -38,10 +38,10 @@ IDENTITY_ENVIRONMENT_ORDER = (
 # One owner for every git-subprocess failure sentence: `_git_run` launches
 # every `git` subprocess this module runs and translates the same three
 # launch-failure shapes -- a missing executable, a timeout, and any other
-# OS-level launch failure -- to the same `ClaimError` text (issue #315 Sonar
-# S1192; issue #314 gate G's follow-up folds `versioned_paths` and
-# `path_is_tracked` into this one owner too, F1). `process.run_git` and
-# `process.git_failure_detail` (issue #372) own the argv shape and the
+# OS-level launch failure -- to the same `ClaimError` text (Sonar
+# S1192). `versioned_paths` and `path_is_tracked` fold into this one owner too.
+# `process.run_git` and
+# `process.git_failure_detail` own the argv shape and the
 # fallback reading `store.py` needs too; the `ClaimError` translation stays
 # here since `checkout`/`store` share one import-linter layer. `git_output`,
 # `versioned_paths`, and `path_is_tracked` each interpret a successful
@@ -50,7 +50,7 @@ _GIT_MISSING_EXECUTABLE_ERROR = "git is required for issue claims"
 
 
 class GitTimedOutError(ClaimError):
-    """A git step that ran past its timeout (issue #603), named by its own
+    """A git step that ran past its timeout, named by its own
     subcommand, never by a purpose it may not serve. Typed apart from every
     other launch failure, since a write git may already have committed
     before it was stopped, where one that never started has not."""
@@ -72,8 +72,8 @@ class GitExitError(ClaimError):
 def _git_run(
     arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
 ) -> process.CapturedResult:
-    """Launch `git arguments`, in `directory` when given via `-C` (issue
-    #314) -- every caller that must judge a specific checkout rather than
+    """Launch `git arguments`, in `directory` when given via `-C` -- every caller that must judge a
+    specific checkout rather than
     the calling process's own cwd names `directory` explicitly, so the
     checkout a security decision reads is never an accident of where the
     process happens to run.
@@ -100,8 +100,8 @@ def _git_run(
 def git_output(
     arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
 ) -> str:
-    """`git arguments`'s stdout, in `directory` when given via `-C` (issue
-    #314) or the calling process's own cwd otherwise; a nonzero exit fails
+    """`git arguments`'s stdout, in `directory` when given via `-C` or the calling process's own
+    cwd otherwise; a nonzero exit fails
     closed as a `GitExitError`. `literal_pathspecs` reads every path
     argument literally (see `process.run_git`)."""
     if literal_pathspecs:
@@ -136,7 +136,7 @@ def is_detached_head(checked_out: str) -> bool:
 def attached_branch(checked_out: str) -> str:
     """`checked_out`, a checkout's `current_branch`, as the lane branch a
     claim is made on; a detached HEAD, which has none, refuses by name
-    before any claim field is built from it (issue #526)."""
+    before any claim field is built from it."""
     if is_detached_head(checked_out):
         raise ClaimError(DETACHED_HEAD_REFUSAL)
     return checked_out
@@ -177,8 +177,8 @@ def resolved_commit(ref: str, *, directory: Path | None = None) -> str | None:
 
 
 def lane_changed_paths(tip: str, *, trunk: str, directory: Path) -> tuple[str, ...]:
-    """The paths `tip` changes since its merge base with `trunk` (issue
-    #468), read in `directory`: the lane's own change only. A diff from the
+    """The paths `tip` changes since its merge base with `trunk`, read in `directory`: the lane's
+    own change only. A diff from the
     claim's base would also list every path a trunk pull brought in from
     other lanes."""
     diff = git_output(["diff", "--name-only", f"{trunk}...{tip}"], directory=directory)
@@ -187,7 +187,7 @@ def lane_changed_paths(tip: str, *, trunk: str, directory: Path) -> tuple[str, .
 
 def remote_url(remote: str, *, directory: Path | None = None) -> str:
     """One named remote's URL, read from `directory` via `-C` when given
-    (issue #457: a `RunContext` for another checkout) or the calling
+    (a `RunContext` for another checkout) or the calling
     process's own cwd otherwise."""
     return git_output(["config", "--get", f"remote.{remote}.url"], directory=directory)
 
@@ -195,10 +195,10 @@ def remote_url(remote: str, *, directory: Path | None = None) -> str:
 @dataclass(frozen=True)
 class RemoteLocation:
     """A git remote URL's host and repository path, independent of any forge
-    adapter's own URL syntax (issue #245).
+    adapter's own URL syntax.
 
     The one owner comparing a forge target against the checkout's canonical
-    remote (Erwartung 6, issue #176 §2): a GitHub adapter target and a
+    remote (Erwartung 6): a GitHub adapter target and a
     `RemoteLocation` agree exactly when their `host` and `path` do, whether
     the canonical remote is GitHub, another forge host entirely, or a local
     `file://` path.
@@ -226,7 +226,7 @@ def _without_git_suffix(path: str) -> str:
 
 
 def parse_remote_location(url: str) -> RemoteLocation:
-    """`url`'s host and repository path (issue #245): every remote shape
+    """`url`'s host and repository path: every remote shape
     `aco` accepts -- SSH scp-like (`git@host:o/r.git`), SSH URL
     (`ssh://git@host/o/r`), HTTPS (`https://host/o/r(.git)`), and
     `file:///...` (host `"file"`, its filesystem path) -- normalizes to one
@@ -251,10 +251,10 @@ def versioned_paths(
     *, directory: Path | None = None, revision: str | None = None
 ) -> tuple[str, ...]:
     """Every versioned path git tracks, from `directory` via `-C` when given
-    (issue #314: `rescope`'s own resolved checkout, never the calling
+    (`rescope`'s own resolved checkout, never the calling
     process's cwd) or the process's own checkout otherwise (`claim`'s own
-    precondition, unaffected by #314) -- or, given `revision`, every path
-    that commit's tree holds (issue #479: `start` measures a scope against
+    precondition) -- or, given `revision`, every path
+    that commit's tree holds (`start` measures a scope against
     the trunk it has not checked out yet)."""
     listing = (
         ["ls-files", "-z", "--full-name"]
@@ -271,12 +271,12 @@ def path_is_tracked(
     path: str, *, directory: Path | None = None, revision: str | None = None
 ) -> bool:
     """Whether `path` (repo-relative, forward slashes) is tracked in git's
-    index right now -- or, given `revision`, in that commit's tree (issue
-    #520: whether the trunk already holds a pin this checkout lacks), where
+    index right now -- or, given `revision`, in that commit's tree (whether
+    the trunk already holds a pin this checkout lacks), where
     an unresolvable `revision` is a git failure, never a plain "no" --
-    read from `directory` via `-C` when given (issue #314:
-    `session.board_config`'s own resolved checkout, never the calling process's
-    cwd) or the process's own checkout otherwise (issue #315) -- absent,
+    read from `directory` via `-C` when given (`session.board_config`'s own resolved checkout,
+    never the calling process's
+    cwd) or the process's own checkout otherwise -- absent,
     untracked, and ignored all read as `False`, since
     `git ls-files --error-unmatch` exits 1, and only 1, for a path it does
     not track. A dedicated call, not `path in versioned_paths()`: that
@@ -293,7 +293,7 @@ def path_is_tracked(
 def file_at_revision(path: str, *, revision: str, directory: Path) -> str | None:
     """The text of `path` (repo-relative, forward slashes) in `revision`'s
     tree, read from `directory` via `-C` -- `None` only when that tree holds
-    no such file (issue #575: the trunk's committed board configuration,
+    no such file (the trunk's committed board configuration,
     which no lane can change from its own worktree). A `revision` that does
     not resolve, or a file git cannot show, is a git failure, never an
     absent file."""
@@ -337,13 +337,13 @@ def scope_directories(
     revision: str | None = None,
 ) -> tuple[str, ...]:
     """Return the scope entries that name a git tree or on-disk directory,
-    read from `directory` via `-C` when given (issue #314 gate B4:
-    `rescope`'s own resolved checkout, never the calling process's cwd) or
-    the process's own checkout otherwise (`claim`'s own precondition,
-    unaffected by #314). `toplevel` is the caller's own held toplevel
-    (issue #472: its run context's, never a second git read), asked once
+    read from `directory` via `-C` when given (`rescope`'s own resolved checkout, never the calling
+    process's cwd) or
+    the process's own checkout otherwise (`claim`'s own precondition).
+    `toplevel` is the caller's own held toplevel
+    (its run context's, never a second git read), asked once
     and only for an entry that is no git tree. Given `revision`, only that
-    commit's own trees count (issue #479): it has no checkout on disk yet.
+    commit's own trees count: it has no checkout on disk yet.
     A path `<rev>` does not know falls through to the checkout like any
     entry that is no tree; a git failure reading it, or the toplevel, raises
     `ClaimError` with git's own detail, never dropping the entry."""
@@ -398,8 +398,8 @@ ISOLATED_WORKTREE_RECIPE = (
     "git worktree add ../<repo>-worktrees/issue-<n>-<slug> -b <agent>/issue-<n>-<slug>"
 )
 
-# One owner for both worktree-isolation refusal sentences (issue #314 gate
-# B6, Sonar S1192): `claim`'s own cwd-based precondition
+# One owner for both worktree-isolation refusal sentences (Sonar
+# S1192): `claim`'s own cwd-based precondition
 # (`_validate_worktree_branch`) and `rescope`'s path-resolved one
 # (`refuse_shared_checkout`) raise the identical two sentences, so each is
 # spelled once here instead of twice across the two functions.
@@ -449,12 +449,12 @@ def _validate_worktree_branch(
     directory: Path | None = None,
 ) -> None:
     """Require an isolated non-main worktree checked out on `branch`, read
-    from `directory` via `-C` when given (issue #322: `start`'s own resolved
+    from `directory` via `-C` when given (`start`'s own resolved
     worktree, never a process-wide `os.chdir`) or the calling process's own
     cwd otherwise -- `claim`'s own precondition, since a fresh claim is
     created by literally standing in the worktree it claims. `default_branch`
     is the canonical remote's recorded default branch, or `None` when none
-    is recorded (issue #490). `rescope` no longer shares this (issue #314):
+    is recorded. `rescope` no longer shares this:
     it judges an already-resolved `PathCheckout` instead, via
     `refuse_shared_checkout` below, so a rescope invoked from a foreign cwd
     is not silently judged by the wrong checkout.
@@ -479,7 +479,7 @@ def _validate_worktree_branch(
 
 class CheckoutKind(StrEnum):
     """Whether a resolved checkout is the shared main checkout or a linked,
-    isolated worktree (issue #314) -- the one structural fact `rescope`
+    isolated worktree -- the one structural fact `rescope`
     judges a rescope by, read from the checkout itself rather than from a
     branch name."""
 
@@ -490,18 +490,18 @@ class CheckoutKind(StrEnum):
 @dataclass(frozen=True)
 class PathCheckout:
     """The git checkout that owns a directory, resolved directly from that
-    directory (issue #314) -- never from the calling process's own cwd, so
+    directory -- never from the calling process's own cwd, so
     the same directory yields the same checkout regardless of where the
     process runs. `rescope` resolves it from the first absolute path it
     is given, falling back to its own process cwd when none is (its one
     other legitimate location signal). `common_directory` is the one fact
     shared by every worktree of the same repository -- the key a caller
     fetching store state once per repository, not once per worktree, caches
-    on (issue #314 gate G5). `has_commit` is `False` for an unborn branch
+    on. `has_commit` is `False` for an unborn branch
     (a symbolic `HEAD` naming a branch with no commit yet, git's exit 1; any
     other git failure raises instead): a resolved
-    checkout with no commit must never itself authorize a rescope (issue
-    #314 gate G3), since its branch name can coincidentally match a
+    checkout with no commit must never itself authorize a rescope, since its branch name can
+    coincidentally match a
     still-live claim's."""
 
     toplevel: Path
@@ -543,8 +543,7 @@ def relative_scope_entry(absolute_path: str, *, toplevel: Path) -> str | None:
     """`absolute_path` (already an absolute filesystem path -- a
     `rescope --add`/`--drop` entry given that way) as a canonical,
     repository-relative scope entry under `toplevel`, or `None` when it
-    resolves outside `toplevel` or is otherwise not a valid scope entry
-    (issue #314 delta, finding R1)."""
+    resolves outside `toplevel` or is otherwise not a valid scope entry."""
     try:
         relative = checkout_relative(Path(absolute_path), toplevel=toplevel)
         if relative is None:
@@ -556,7 +555,7 @@ def relative_scope_entry(absolute_path: str, *, toplevel: Path) -> str | None:
 
 def resolve_path_checkout(directory: Path) -> PathCheckout | None:
     """The checkout owning `directory`, or `None` when `directory` sits
-    outside every git repository ("not in a repository", issue #314).
+    outside every git repository ("not in a repository").
 
     Every git read runs `git -C directory`, so the result is the same
     regardless of the calling process's own cwd -- unlike the ad hoc,
@@ -569,12 +568,12 @@ def resolve_path_checkout(directory: Path) -> PathCheckout | None:
 
     A git failure on an existing `directory` is "outside every repository"
     only when no repository marker sits in it or any of its ancestors
-    either; below one, the failure is raised instead (issue #448 review
-    finding: a missing git must never read as "no repository here"). Inside
+    either; below one, the failure is raised instead (a missing git must never read as "no
+    repository here"). Inside
     a git directory itself -- a checkout's `.git/` or a bare repository --
     the failure is raised as
     `inside_git_directory_reason`'s sentence rather than git's own
-    localized text (issue #483). A `directory` that does not exist yet is
+    localized text. A `directory` that does not exist yet is
     never inside a repository -- `git -C` cannot even enter it -- so it
     stays `None` whatever sits above it, even an outer checkout's `.git`.
     Only that first discovery may read as "outside", and never while the
@@ -629,7 +628,7 @@ def inside_git_directory_reason(git_directory: Path) -> str:
 
 def resolve_named_path_checkout(path: Path) -> PathCheckout | None:
     """The checkout an absolute path a caller names belongs to -- the
-    resolver `rescope` uses for an `--add`/`--drop` entry (issue #483). A
+    resolver `rescope` uses for an `--add`/`--drop` entry. A
     directory that is itself a checkout root resolves as that checkout
     (RESC-30): a nested checkout's own root, whose parent sits inside an
     outer repository, must not have the outer checkout answer for it, and a
@@ -652,7 +651,7 @@ def resolve_named_path_checkout(path: Path) -> PathCheckout | None:
 def unscopable_path_reason(absolute_path: str, *, toplevel: Path) -> str | None:
     """Why `absolute_path`, inside the checkout at `toplevel`, can never be a
     scope entry, or `None` when it can -- the sentence `rescope` refuses
-    with (issue #483). Below a file or a
+    with. Below a file or a
     dangling symlink the path can never exist; the checkout root itself is
     the whole checkout, not a path in it."""
     path = Path(os.path.normpath(absolute_path))
@@ -671,11 +670,11 @@ def resolve_nearest_existing_checkout(directory: Path) -> PathCheckout | None:
     """The checkout owning `directory`, judged from its nearest existing
     ancestor when it does not exist yet (RESC-18): a file about to be
     written may sit in directories not created yet either, and resolving a
-    missing directory would read as "outside every repository" (issue #474:
-    `rescope --add` of a file in a new directory refused `not in a
+    missing directory would read as "outside every repository" (`rescope --add` of a file in a new
+    directory refused `not in a
     repository`). `directory` is normalized lexically first: a `..` through
     a directory not created yet must not walk up to an ancestor the
-    normalized path has already left (issue #474 drive finding)."""
+    normalized path has already left."""
     return resolve_path_checkout(_nearest_existing_directory(Path(os.path.normpath(directory))))
 
 
@@ -814,7 +813,7 @@ def _validate_headref(head: Path) -> bool:
 
 def _resolve_checkout(directory: Path) -> PathCheckout:
     """`resolve_path_checkout`'s own git reads, without swallowing a failure
-    into `None` (issue #322 review/gate finding: `worktree_on_branch` below
+    into `None` (`worktree_on_branch` below
     resolves paths git's own worktree registry already vouches for as
     worktrees of this repository, so any failure resolving one of them is
     real -- a moved or deleted worktree directory, most often -- never a
@@ -872,11 +871,11 @@ def refuse_shared_checkout(
     canonical_remote: str,
     repair: WorktreeRepair,
 ) -> None:
-    """`rescope`'s own worktree-isolation refusal (issue #314): the same
+    """`rescope`'s own worktree-isolation refusal: the same
     invariant `_validate_worktree_branch` enforces for `claim`, judged from
     an already path-resolved checkout and `default_branch`, the recorded
-    default branch of that checkout's `canonical_remote` (issue #490),
-    instead of a fresh git read in the calling process's own cwd (gate G4).
+    default branch of that checkout's `canonical_remote`,
+    instead of a fresh git read in the calling process's own cwd.
 
     Unlike `claim`'s own `is_default_branch`, which falls back to guessing
     `{main, master}` when no default branch is recorded, this denies
@@ -922,11 +921,11 @@ def validate_checkout(
     directory: Path | None = None,
 ) -> None:
     """`claim`'s own preconditions against `directory` via `-C` when given
-    (issue #322: `start`'s own resolved worktree, never a process-wide
+    (`start`'s own resolved worktree, never a process-wide
     `os.chdir`) or the calling process's own cwd otherwise, judging the
     recorded default branch `default_branch` answers as
     `_validate_worktree_branch` does -- asked only once the base matches,
-    so a refusal before it reads no configuration (issue #490)."""
+    so a refusal before it reads no configuration."""
     head = git_output(["rev-parse", "HEAD"], directory=directory)
     if head != request.base:
         raise CheckoutBaseMismatchError(
@@ -943,15 +942,15 @@ def validate_checkout(
 DEFAULT_BRANCH_FALLBACK = frozenset({"main", "master"})
 
 # `rescope`'s own denial when a resolved checkout's default branch cannot be
-# determined at all (issue #314 gate G4): unlike `claim`'s
+# determined at all: unlike `claim`'s
 # `is_default_branch` fallback below, it never guesses -- see
 # `refuse_shared_checkout`'s own docstring for why the callers of the same
 # `recorded_default_branch` reader accept different risk here. It names the one git command that
-# records the canonical remote's `HEAD` (issue #603), since a bare "unknown"
+# records the canonical remote's `HEAD`, since a bare "unknown"
 # left an agent no repair to run.
 _DEFAULT_BRANCH_UNKNOWN_REASON = "default branch unknown; run git remote set-head {remote} --auto"
 
-# Every trunk reader's refusal prefix (issues #492, #508), one spelling
+# Every trunk reader's refusal prefix, one spelling
 # for each reason it names after it.
 TRUNK_UNKNOWN_REASON = "cannot determine the trunk"
 
@@ -959,13 +958,13 @@ TRUNK_UNKNOWN_REASON = "cannot determine the trunk"
 class TrunkUnknownError(ClaimError):
     """`trunk_ref_after`'s refusal when no candidate trunk ref resolves,
     typed so a caller for which an unresolvable trunk tracks nothing -- an
-    absent board configuration's repair (issue #520) -- tells it apart from
+    absent board configuration's repair -- tells it apart from
     every other git failure."""
 
 
 def unconfigured_remote_refusal(remote: str, *, directory: Path | None) -> str | None:
     """The one answer to whether the checkout at `directory` configures the
-    canonical `remote` with a URL (issues #492, #508, #512, #516): `None`
+    canonical `remote` with a URL: `None`
     when it does, otherwise the one sentence every command refuses with. A
     board configuration may name a canonical remote this clone never added,
     and a `remote.<name>` line without a URL -- a global `prune`, a local
@@ -984,8 +983,8 @@ def default_branch_unknown_reason(
     """`rescope`'s denial when the checkout at `directory`
     has no default branch of its canonical `remote` to judge by, or `None`
     once `default_branch`, `remote`'s recorded one, stands. A remote with no
-    URL configured is named first, in every command's own sentence (issues
-    #492, #516): its remote-tracking refs, a recorded `HEAD` among them, can
+    URL configured is named first, in every command's own sentence: its remote-tracking refs, a
+    recorded `HEAD` among them, can
     outlive the remote itself, so no such record answers for a remote that
     is not there."""
     unconfigured = unconfigured_remote_refusal(remote, directory=directory)
@@ -999,12 +998,12 @@ def default_branch_unknown_reason(
 def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | None:
     """`remote`'s recorded `HEAD` symbolic ref (e.g.
     `refs/remotes/origin/trunk`), read from `directory` via `-C` when given
-    (issue #314: a resolved checkout's own lookup, never the calling
+    (a resolved checkout's own lookup, never the calling
     process's cwd) or the process's own checkout otherwise -- `None` when a
     clone, a fetch, or `git remote set-head` never recorded one, or when
-    the branch it names no longer resolves (issue #490: the remote renamed
+    the branch it names no longer resolves (the remote renamed
     it and `fetch --prune` removed the old one). The one reader of a
-    remote's `HEAD`; each caller decides its own fallback (issue #238),
+    remote's `HEAD`; each caller decides its own fallback,
     since `claim`, `rescope`, and the trunk word or guess differently.
 
     One git read resolves the symbolic ref and proves its target exists; a
@@ -1021,7 +1020,7 @@ def recorded_head_ref(remote: str, *, directory: Path | None = None) -> str | No
 
 def recorded_default_branch(remote: str, *, directory: Path | None = None) -> str | None:
     """The default branch name `remote`'s recorded `HEAD` names in
-    `directory` (issue #490), or `None` when `recorded_head_ref` finds none
+    `directory`, or `None` when `recorded_head_ref` finds none
     -- the offline checks' default branch, asked of the canonical remote."""
     recorded_head = recorded_head_ref(remote, directory=directory)
     if recorded_head is None:
@@ -1030,16 +1029,15 @@ def recorded_default_branch(remote: str, *, directory: Path | None = None) -> st
 
 
 def is_default_branch(branch: str, default_branch: str | None) -> bool:
-    """Whether `branch` is the repository's default branch (issue #238):
+    """Whether `branch` is the repository's default branch:
     `default_branch` -- `recorded_default_branch`'s answer -- or the
     historical `{"main", "master"}` guess when none is recorded.
 
     `claim`'s own worktree precondition (`_validate_worktree_branch`) alone,
     since a fresh claim is created by literally standing in the worktree it
     claims -- there is no attacker-reachable payload location to spoof
-    here, so the historical guess stays an accepted risk (issue #238).
-    `rescope` denies outright when no default branch is recorded (issue
-    #314 gate G4), rather than share this guess.
+    here, so the historical guess stays an accepted risk.
+    `rescope` denies outright when no default branch is recorded, rather than share this guess.
     """
     if default_branch is not None:
         return branch == default_branch
@@ -1053,13 +1051,13 @@ LAND_MISSING_GIT_IDENTITY_REFUSAL = (
 
 
 def refuse_unlandable_checkout(default_branch: str, *, directory: Path) -> None:
-    """`land`'s own checkout precondition (issue #405): the checkout at
+    """`land`'s own checkout precondition: the checkout at
     `directory` must already sit on `default_branch` -- the run's own
-    answer, never read here (issue #492) -- with nothing uncommitted, since
+    answer, never read here -- with nothing uncommitted, since
     `land` fast-forwards that exact branch in place once its merge
     succeeds, and it must carry a git identity, since its delegated release
     commits to the claim state from here: a separate landing clone without
-    one merged and only then failed its release (issue #578). Raises the
+    one merged and only then failed its release. Raises the
     ruled refusal otherwise."""
     current = current_branch(directory=directory)
     dirty = git_output(["status", "--porcelain"], directory=directory)
@@ -1077,7 +1075,7 @@ def trunk_ref(remote: str, *, directory: Path) -> str:
     without fetching: its recorded `HEAD` read now, resolved by
     `trunk_ref_after` -- a `RunContext`'s trunk, and the trunk an absent
     board configuration is judged against before any configuration names
-    the canonical remote (issue #520)."""
+    the canonical remote."""
     return trunk_ref_after(
         remote, recorded_head_ref(remote, directory=directory), directory=directory
     )
@@ -1087,17 +1085,17 @@ def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) 
     """`remote`'s trunk ref in `directory`: `recorded_head` -- `remote`'s
     recorded `HEAD` as `recorded_head_ref` read it -- or, when `remote`
     never recorded one or it dangles, the historical `{main, master}` guess,
-    `remote`'s own before the local branch (issues #238, #304). A `RunContext` asks
-    this once per directory, and again only after its run's fetch (issue
-    #488), so a trunk is never resolved from a `HEAD` read before it.
+    `remote`'s own before the local branch. A `RunContext` asks
+    this once per directory, and again only after its run's fetch, so a trunk is never resolved
+    from a `HEAD` read before it.
 
     The local guess applies only while `remote` has no remote-tracking
-    branch at all -- a fresh or offline repository (issue #492 ruling): a
+    branch at all -- a fresh or offline repository: a
     remote that renamed its trunk to anything else refuses with the repair
     instead, since a local branch standing in for it would report an
     unpushed local commit as landed. It trusts `remote` to be configured:
     its `RunContext` refuses one this checkout never configured before it
-    reads `recorded_head` or asks this at all (issue #508), so neither a
+    reads `recorded_head` or asks this at all, so neither a
     ref such a remote left behind nor a local branch answers for it. A
     `recorded_head` of `None` is a remote that recorded none: a failed read
     never reaches here, `recorded_head_ref` having raised it."""
@@ -1162,7 +1160,7 @@ def _git_hex_placeholder(character: str) -> str:
 # (`trunk_landings`, below) reads every record's four fields *and* the
 # boundary between records through the one byte git forbids inside a commit
 # message -- unlike the historical `\x1f` separator this replaces, which git
-# never escapes inside a trailer *value* (issue #304 review, finding B1: a
+# never escapes inside a trailer *value* (a
 # probed value `#12\x1f#13` survived verbatim and silently split into two
 # fabricated work items).
 #
@@ -1187,15 +1185,14 @@ _TRUNK_LANDING_LOG_FORMAT = (
 
 @dataclass(frozen=True)
 class TrunkLanding:
-    """One first-parent commit on the trunk (issue #304): its identity, when
+    """One first-parent commit on the trunk: its identity, when
     it landed, and -- when its own trailer block names one -- what it
     landed. `classification` is read solely from the trailer block git's own
     parsing recognizes; a `Work-Item:`/`No-Item:` line anywhere else in the
     body is prose, not evidence, so most trunk commits (not every landing is
     a dispatched slice's own merge or squash) carry `None`.
     `work_item_values` keeps the trailer's own `Work-Item:` values verbatim,
-    so a refusal can quote what landed even when the grammar rejects it
-    (issue #427)."""
+    so a refusal can quote what landed even when the grammar rejects it."""
 
     sha: str
     committed_at: datetime
@@ -1225,7 +1222,7 @@ def _parsed_trunk_landing(fields: tuple[str, str, str, str]) -> TrunkLanding:
 def trunk_landings(trunk: str, depth: int, *, directory: Path) -> tuple[TrunkLanding, ...]:
     """The most recent `depth` first-parent landings on `trunk`, read in
     `directory`, oldest first, each classified from its own trailer block
-    alone (issue #304).
+    alone.
 
     A merge counts once. Reading the trunk — never the work branch — is the
     contract: a ruling ages with trunk, not with local commits, and `trunk`
@@ -1233,7 +1230,7 @@ def trunk_landings(trunk: str, depth: int, *, directory: Path) -> tuple[TrunkLan
     hardcoded `origin`'s, so a repository configured with a different
     canonical remote ages rulings against the trunk it actually lands on.
     A caller that must see a commit the forge just reported merged passes
-    the trunk its context fetched first (issue #397).
+    the trunk its context fetched first.
     """
     raw = git_output(
         [
@@ -1270,7 +1267,7 @@ def message_trailers(message: str) -> tuple[str, ...]:
     """The trailers git's own parsing reads in commit message `message`,
     one `Token: value` line each -- the same block `trunk_landings` reads
     through `%(trailers)`, so `--no-divider` keeps a Markdown `---` rule
-    prose (issue #594). Only git's stdout is the answer: a warning or trace
+    prose. Only git's stdout is the answer: a warning or trace
     git writes to stderr while exiting 0 is never a trailer."""
     with tempfile.TemporaryDirectory(prefix="aco-trailers-") as scratch:
         message_path = Path(scratch) / "message"
@@ -1280,10 +1277,10 @@ def message_trailers(message: str) -> tuple[str, ...]:
 
 
 def fast_forward_default_branch(trunk: str, *, directory: Path) -> None:
-    """`land`'s own step once its merge succeeds (issue #405): fast-forward
+    """`land`'s own step once its merge succeeds: fast-forward
     the checkout's local default branch to `trunk`, that branch's tracking
-    ref once its run fetched (`RunContext.fetched_default_branch_ref`,
-    issue #492). `--ff-only` refuses loud
+    ref once its run fetched (`RunContext.fetched_default_branch_ref`).
+    `--ff-only` refuses loud
     rather than rewriting history if the local branch somehow diverged --
     never true in the ordinary case, since
     `refuse_unlandable_checkout` already proved this exact
@@ -1295,7 +1292,7 @@ def fast_forward_default_branch(trunk: str, *, directory: Path) -> None:
 
 def merge_base(first: str, second: str, *, directory: Path) -> str | None:
     """The best common ancestor commit of `first` and `second` in
-    `directory` (issue #524: the trunk commit a branch last merged or was
+    `directory` (the trunk commit a branch last merged or was
     cut from), or `None` for unrelated histories, which `git merge-base`
     alone answers with exit 1."""
     result = _git_run(["merge-base", first, second], directory=directory)
@@ -1333,7 +1330,7 @@ def session_agent() -> str | None:
     return None
 
 
-# One owner for `start`'s own path/branch naming scheme (issue #322): the
+# One owner for `start`'s own path/branch naming scheme: the
 # same `<repo>-worktrees/issue-<n>-<slug>` / `<prefix>/issue-<n>-<slug>`
 # shape `ISOLATED_WORKTREE_RECIPE` already spells out by hand, so a lane
 # directory `start` creates looks exactly like one a person typed.
@@ -1343,7 +1340,7 @@ _SLUG_COLLAPSE_PATTERN = re.compile(r"[^a-z0-9]+")
 
 def slug_from_title(title: str) -> str:
     """`start`'s own worktree/branch slug, derived from an item's title when
-    `--slug` is not given (issue #322): lowercased, every run of characters
+    `--slug` is not given: lowercased, every run of characters
     outside `[a-z0-9]` collapsed to one hyphen, at most 40 characters, with
     no leading or trailing hyphen. Refuses when nothing usable survives (a
     title that is empty or pure punctuation), rather than emitting a
@@ -1355,7 +1352,7 @@ def slug_from_title(title: str) -> str:
     return slug
 
 
-# The shape `slug_from_title` always produces (issue #322 review finding 3):
+# The shape `slug_from_title` always produces:
 # an explicit `--slug` value is held to the identical rule rather than used
 # verbatim, since it lands unescaped in a worktree path and a branch name.
 _SLUG_SHAPE_RULE = (
@@ -1367,7 +1364,7 @@ _SLUG_SHAPE_PATTERN = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 
 def validate_slug(slug: str) -> str:
     """`slug`, refused by name when it does not match the shape
-    `slug_from_title` itself always produces (issue #322 review finding 3):
+    `slug_from_title` itself always produces:
     `--slug` is never sanitized the way a derived slug is, so a value with
     uppercase letters, punctuation, or a leading/trailing/doubled `-` is
     refused outright rather than silently accepted into a worktree path and
@@ -1378,7 +1375,7 @@ def validate_slug(slug: str) -> str:
 
 
 def branch_prefix_for_identity() -> str:
-    """`start`'s own branch prefix (issue #322): `session_agent`'s own
+    """`start`'s own branch prefix: `session_agent`'s own
     identity rendered as a short git-branch-safe token -- its first word,
     lowercased (`"Claude head (coordinator)"` -> `"claude"`, `"Grok <id>"`
     -> `"grok"`); refused when none resolves, since a worktree/branch
@@ -1390,8 +1387,8 @@ def branch_prefix_for_identity() -> str:
 
 
 def refuse_unsafe_start_branch(branch: str, *, prefix: str) -> None:
-    """Refuse `start`'s own built branch name before any git write (issue
-    #322 review/gate: an unsafe `ACO_AGENT` first word used to reach `git
+    """Refuse `start`'s own built branch name before any git write (an unsafe `ACO_AGENT` first
+    word used to reach `git
     worktree add` before the claim machinery ever validated the resulting
     branch, so an invalid name could leave an orphan worktree and branch
     behind). `slug_from_title`/`validate_slug` already bind the slug's own
@@ -1408,10 +1405,10 @@ def refuse_unsafe_start_branch(branch: str, *, prefix: str) -> None:
 
 def branch_exists(branch: str) -> bool:
     """Whether the calling process's own checkout already has a local
-    branch named `branch` (issue #322) -- for `start`'s naming-collision
+    branch named `branch` -- for `start`'s naming-collision
     guard, its detached-HEAD repair advice (`_attach_command`), and the
-    squashed lane cleanup's section gate (`_remove_deleted_branch_section`,
-    issue #578) -- read the same `-C`-free
+    squashed lane cleanup's section gate (`_remove_deleted_branch_section`)
+    -- read the same `-C`-free
     way `_validate_worktree_branch` reads the checkout's own current branch,
     since both always run from the repository whose sibling worktree they
     create or remove, never from an arbitrary resolved directory."""
@@ -1458,7 +1455,7 @@ def fetch_remote_branches(remote: str, branches: tuple[str, ...], *, directory: 
 
 
 def commit_at(ref: str, *, directory: Path) -> str:
-    """The commit `ref` names now in `directory` (issue #479): `start`
+    """The commit `ref` names now in `directory`: `start`
     checks its claim against this one commit -- the claim's base and the
     tree its scope is measured against -- before it builds."""
     return git_output(["rev-parse", "--verify", f"{ref}^{{commit}}"], directory=directory)
@@ -1470,8 +1467,8 @@ def create_linked_worktree(
     """Create a linked worktree at `path` on a fresh `branch` from `start_point`,
     a ref or commit selected by the caller. Git's own `branch.autoSetupMerge`
     determines whether the new branch tracks that start point.
-    Reads and writes `directory`'s own checkout via `-C` when given (issue
-    #394: a test builds a worktree fixture from an explicit repository
+    Reads and writes `directory`'s own checkout via `-C` when given (a test builds a worktree
+    fixture from an explicit repository
     path, never the test process's cwd) or the calling process's own
     checkout otherwise."""
     result = _git_run(
@@ -1501,7 +1498,7 @@ def sibling_worktree_path(main_checkout: Path, name: str) -> Path:
 
 def main_checkout_root(*, toplevel: Path, command: str) -> Path:
     """The repository's main checkout, whichever of its worktrees the
-    caller stands in (issue #479): `start` places a lane's worktree beside
+    caller stands in: `start` places a lane's worktree beside
     it, so a call from inside a linked worktree never nests the new one
     under that worktree. `toplevel` is the caller's own, held by its run
     context. A main checkout is its own answer, whatever layout its git
@@ -1540,8 +1537,8 @@ def _configured_worktree(*, directory: Path) -> str | None:
 
 def _refuse_foreign_worktree(path: Path, existing: PathCheckout) -> None:
     """Refuse to resume `existing` -- already resolved at `path` -- unless
-    it is a linked worktree of this same repository (issue #322 review
-    finding 2): the caller's own common git directory, read from its own
+    it is a linked worktree of this same repository: the caller's own common git directory, read
+    from its own
     cwd since `existing_start_worktree` always runs from the repository
     it is building a sibling worktree for, must equal `existing`'s; a clean
     linked worktree from a different repository that merely happens to sit
@@ -1569,16 +1566,15 @@ NOT_A_WORKTREE_REFUSAL = "path exists and is not a worktree of this repository"
 
 def existing_start_worktree(path: Path, branch: str) -> bool:
     """Whether a prior `start`'s own worktree already stands at `path`,
-    validated for resume (issue #322), or nothing does and `start` may
-    build there (issue #479: it checks its claim first, so this only
+    validated for resume, or nothing does and `start` may
+    build there (it checks its claim first, so this only
     reads). Refuses by name when `branch` is already taken by something
     that is not this worktree, when `path` resolves to a checkout this
     repository does not own (`_refuse_foreign_worktree`), when a worktree
     already at `path` has a detached HEAD (naming the git command that
     attaches it to `branch`), when a worktree already at `path` is dirty,
     or when something -- empty or not -- already sits at `path` without
-    being a worktree of this repository at all (issue #322 review/gate
-    finding: `git worktree add` must never be left to adopt, and
+    being a worktree of this repository at all (`git worktree add` must never be left to adopt, and
     potentially remove, an existing directory nobody offered up for
     this)."""
     if not path.exists():
@@ -1619,13 +1615,13 @@ def _attach_command(path: Path, branch: str) -> str:
 
 def worktree_on_branch(paths: tuple[Path, ...], branch: str) -> Path | None:
     """The one path among `paths` (`store.list_worktrees`'s own listing)
-    whose own checked-out branch is `branch`, or `None` when none matches
-    (issue #322) -- `release --merged`'s own cleanup finds the lane's
+    whose own checked-out branch is `branch`, or `None` when none matches -- `release --merged`'s
+    own cleanup finds the lane's
     linked worktree by the branch its claim already names, not by `start`'s
     naming scheme, since a claim's worktree may predate `start` or have
     been resumed under a different `--slug`. `paths` are entries git's own
     worktree registry already vouches for, so a failure resolving one of
-    them (issue #322 review/gate finding: a moved or deleted worktree
+    them (a moved or deleted worktree
     directory, most often) is a real refusal, via `_resolve_checkout`,
     never a silently skipped "not on this branch"."""
     for candidate in paths:
@@ -1638,8 +1634,7 @@ def worktree_on_branch(paths: tuple[Path, ...], branch: str) -> Path | None:
 @dataclass(frozen=True)
 class WorktreeRemoval:
     """Whether `release --merged`'s own cleanup removed the lane's linked
-    worktree, and why not when it did not (issue #322 review/gate finding
-    4)."""
+    worktree, and why not when it did not."""
 
     removed: bool
     reason: str | None
@@ -1648,7 +1643,7 @@ class WorktreeRemoval:
 @dataclass(frozen=True)
 class SectionKept:
     """A deleted squashed branch's own `branch.<name>` section whose removal
-    git refused or never completed (issue #578): the one cleanup step that can fail once the
+    git refused or never completed: the one cleanup step that can fail once the
     branch itself is gone, so it is reported on its own and never as a
     kept branch."""
 
@@ -1658,8 +1653,7 @@ class SectionKept:
 
 class BranchFate(StrEnum):
     """What the branch deletion left: gone, still there, or -- after a
-    delete git that timed out and so may already have committed (issue
-    #603) -- not known without looking."""
+    delete git that timed out and so may already have committed -- not known without looking."""
 
     REMOVED = "removed"
     KEPT = "kept"
@@ -1669,10 +1663,10 @@ class BranchFate(StrEnum):
 @dataclass(frozen=True)
 class BranchRemoval:
     """Whether the same cleanup also removed the lane's own local branch,
-    tracked apart from `WorktreeRemoval` (issue #322 review/gate finding 4):
+    tracked apart from `WorktreeRemoval`:
     `git worktree remove` and the branch deletion -- `git branch -d`, or for
     a squashed lane `git update-ref -d` plus the `branch.<name>` section
-    removal (issue #578) -- are separate git writes, so the first can
+    removal -- are separate git writes, so the first can
     succeed while a later one fails, and that must never read as a bare
     `kept` that hides the worktree's own removal. `section_kept` names a
     deleted squashed branch's section whose removal git refused or never
@@ -1685,8 +1679,8 @@ class BranchRemoval:
 
 @dataclass(frozen=True)
 class WorktreeCleanupOutcome:
-    """`release --merged`'s own worktree/branch cleanup result, in two parts
-    (issue #322 review/gate finding 4): this module owns the policy that
+    """`release --merged`'s own worktree/branch cleanup result, in two parts: this module owns the
+    policy that
     decides it, `cmd_release` only renders it."""
 
     worktree: WorktreeRemoval
@@ -1718,14 +1712,14 @@ def cleanup_landed_worktree(
     matching: Path, branch: str, *, trunk: str, landed_head: str | None, directory: Path
 ) -> WorktreeCleanupOutcome:
     """`release --merged`'s own cleanup policy once a lane's linked worktree
-    is already found (issue #322 review/gate finding 4): merged check, then
+    is already found: merged check, then
     checked-out-elsewhere check, then a dirty check, then the worktree
     removal itself, then the branch deletion -- in that order, since
     removing a dirty or still-needed worktree is unsafe and the two git
     writes below it are each worth reporting apart. A branch counts as
     landed when the trunk contains its tip, or when its tip is
-    `landed_head`, the merged pull request's recorded head (issues #578,
-    #590): a squash commit is no descendant of that tip, so ancestry alone would keep
+    `landed_head`, the merged pull request's recorded head: a squash commit is no descendant of
+    that tip, so ancestry alone would keep
     every squashed lane. `release`'s own cwd-equality guard and its "no
     worktree matches this branch" decision run before this and stay the
     caller's own job (they need the process's own cwd and worktree listing,
@@ -1752,9 +1746,8 @@ def cleanup_landed_worktree(
 def remove_linked_worktree(
     path: Path, *, branch: str, landed_head: str | None = None
 ) -> WorktreeCleanupOutcome:
-    """Remove a landed lane's linked worktree and its own local branch
-    (issue #322), or the pair a refused `start` had just created (issue
-    #479): `git worktree remove` first -- git refuses to delete a
+    """Remove a landed lane's linked worktree and its own local branch, or the pair a refused
+    `start` had just created: `git worktree remove` first -- git refuses to delete a
     branch still checked out anywhere -- then the branch deletion
     (`_delete_branch`), both through this module's own `_git_run`
     chokepoint. Never called on the calling
@@ -1763,7 +1756,7 @@ def remove_linked_worktree(
     worktree it created, never the one it runs in. A worktree-removal failure
     still raises loud (nothing on disk has changed yet); a branch-deletion
     failure once the worktree is already gone returns a typed outcome
-    instead (issue #322 review/gate finding 4), so that success is never
+    instead, so that success is never
     lost behind a bare `kept`."""
     result = _git_run(["worktree", "remove", str(path)])
     if result.exit_status != 0:
@@ -1776,7 +1769,7 @@ def remove_linked_worktree(
 def _delete_branch(branch: str, landed_head: str | None) -> BranchRemoval:
     """Delete local `branch` and report what git did: with `git branch -d`,
     whose own merged check guards a merged lane, or -- for a squash git's
-    merged check cannot see (issue #578) -- with `_delete_squashed_branch`."""
+    merged check cannot see -- with `_delete_squashed_branch`."""
     if landed_head is None:
         return _run_branch_deletion(branch, ["branch", "-d", branch])
     return _delete_squashed_branch(branch, landed_head)
@@ -1784,7 +1777,7 @@ def _delete_branch(branch: str, landed_head: str | None) -> BranchRemoval:
 
 def _run_branch_deletion(branch: str, arguments: list[str]) -> BranchRemoval:
     """Run the one git that deletes `branch` and read what it left. No
-    failure escapes, since the worktree is already gone (issue #603): a git
+    failure escapes, since the worktree is already gone: a git
     that exits nonzero or never launches kept the branch, and one that timed
     out may already have deleted it, so that branch reads unknown, naming
     the check that tells."""
@@ -1807,7 +1800,7 @@ def _branch_kept(failure: str) -> BranchRemoval:
 
 def _delete_squashed_branch(branch: str, landed_head: str) -> BranchRemoval:
     """Delete a squashed lane's `branch` with one compare-and-delete against
-    `landed_head` (issue #578 line 4), so a branch that moved on is refused
+    `landed_head`, so a branch that moved on is refused
     by git and kept and no commit is ever lost, then drop its own
     `branch.<name>` section once that delete removed the branch; a section
     step git refuses or never completes is named on its own."""
@@ -1838,7 +1831,7 @@ def _remove_deleted_branch_section(branch: str) -> None:
     branch -u` restores it."""
     if branch_exists(branch):
         return
-    # Key names only (issue #590): a value under `branch.*` -- a
+    # Key names only: a value under `branch.*` -- a
     # description, say -- may hold bytes that are no UTF-8, and the
     # cleanup runs after the worktree and branch are already gone.
     listed = _git_run(["config", "--local", "--null", "--name-only", "--get-regexp", r"^branch\."])
@@ -1862,7 +1855,7 @@ def _has_own_branch_section(keys: list[str], branch: str) -> bool:
 
 def branch_merged_into_default(branch: str, *, trunk: str, directory: Path) -> bool:
     """Whether `branch`'s tip is already an ancestor of `trunk` in
-    `directory` (issue #322): `release --merged`'s own cleanup
+    `directory`: `release --merged`'s own cleanup
     precondition, against the trunk its context fetched so a landing this
     same process just verified through the forge is visible locally even
     when nothing else in this checkout has fetched since. A squash or rebase
@@ -1882,11 +1875,10 @@ def _trunk_no_item_landing_defect(
     landings: tuple[TrunkLanding, ...], sha: str, pull_request: int
 ) -> str | None:
     """Why `sha` does not authorize an issue-less lane's own `--merged`
-    release (issue #405, #397 gate follow-up): mirrors `_trunk_landing_defect`'s
+    release: mirrors `_trunk_landing_defect`'s
     own walk of the first-parent trunk, for the one classification shape
     that names no work item at all -- read from the merge commit's own
-    trailer block, never the pull request's mutable `body` (issue #397,
-    Befund 41)."""
+    trailer block, never the pull request's mutable `body`."""
     landing = next((entry for entry in landings if entry.sha == sha), None)
     if landing is None:
         return SHA_NOT_ON_TRUNK_DEFECT
@@ -1901,8 +1893,8 @@ def _trunk_no_item_landing_defect(
 
 
 def _lane_work_item_trailer_defect(work_item_values: tuple[str, ...], pull_request: int) -> str:
-    """The lane rule a `Work-Item:` trailer breaks, valid or malformed alike
-    (issue #427), ending in the only way out: a landed trailer can no longer
+    """The lane rule a `Work-Item:` trailer breaks, valid or malformed alike, ending in the only
+    way out: a landed trailer can no longer
     change, so the lane is released as abandoned with the landing named."""
     values = ", ".join(work_item_values)
     return (
@@ -1944,7 +1936,7 @@ def _newest_landed_commit(
     landings: tuple[TrunkLanding, ...], item: int, storage: body.Storage
 ) -> str:
     """The most recent first-parent trunk commit whose own trailer names
-    `item` (issue #359, LAND-47): the empty-value form of `release
+    `item` (LAND-47): the empty-value form of `release
     --merged`'s own sha argument under `storage = "state-ref"`."""
     for landing in reversed(landings):
         classification = landing.classification
@@ -1966,12 +1958,12 @@ def _trunk_landing_defect(
     landings: tuple[TrunkLanding, ...], number: int, sha: str, storage: body.Storage
 ) -> str | None:
     """Why `sha` does not authorize closing work item `number` from the
-    walked first-parent trunk (issue #359 LAND-52), or `None` when it does:
+    walked first-parent trunk (LAND-52), or `None` when it does:
     `sha` must sit on that trunk and carry a `Work-Item:` trailer naming
     exactly `number`. One reader (`trunk_landings`) and one grammar
     (`workboard.trunk_commit_classification`) for both `release --merged
-    <sha|empty>` under `storage = state-ref` and, since issue #397 (Befund
-    41), `release --merged <pr>` under `storage = github`'s own merge-commit
+    <sha|empty>` under `storage = state-ref` and
+    `release --merged <pr>` under `storage = github`'s own merge-commit
     verification -- neither trusts a different notion of "landed"."""
     landing = next((entry for entry in landings if entry.sha == sha), None)
     if landing is None:
@@ -1992,8 +1984,8 @@ def _trunk_landing_defect(
 def _landed_commit_by_sha(
     landings: tuple[TrunkLanding, ...], number: int, sha: str, storage: body.Storage
 ) -> str:
-    """`sha`, verified as `number`'s own landing commit (issue #359,
-    LAND-52): refused by name before anything is written otherwise."""
+    """`sha`, verified as `number`'s own landing commit (LAND-52): refused by name before anything
+    is written otherwise."""
     defect = _trunk_landing_defect(landings, number, sha, storage)
     if defect is not None:
         raise protocol.ClaimUnavailableError(f"{sha} {defect}")
@@ -2008,7 +2000,7 @@ def _verify_merge_commit_authority(
     storage: body.Storage,
 ) -> None:
     """Refuse a github `release --merged <pr>` whose merge commit does not
-    authorize closing `number` (issue #397, Befund 41): `number` is the
+    authorize closing `number`: `number` is the
     claim's own issue, resolved before `cmd_release._verify_merged_release` ever calls
     this -- never the pull request's own mutable body -- and this merge
     commit trailer is the actual authority, the same `_trunk_landing_defect`
@@ -2032,7 +2024,7 @@ def landed_commit(
     storage: body.Storage,
 ) -> str:
     """The trunk-landing commit `release --merged <sha|empty>` closes
-    `number` from, under `storage = "state-ref"` (issue #359, LAND-47/
+    `number` from, under `storage = "state-ref"` (LAND-47/
     LAND-52): `requested` empty picks the newest such commit
     (`_newest_landed_commit`); a given sha is verified instead
     (`_landed_commit_by_sha`)."""
