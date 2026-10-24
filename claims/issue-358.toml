@@ -1,8 +1,0 @@
-claim_id = "ae7310cd746a4b42815b34d2000c45b9"
-agent = "Codex 01a16e6e-894a-7692-929e-d605748ac260"
-role = "builder"
-base = "f54f4e19426896b0838cd6eaff60891e5fdb7406"
-branch = "codex/issue-358-refs-s5"
-scope = ["quality/baseline.toml", "src/aco/body.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/protocol.py"]
-opened_commit = "ee8c2c6b25c3d6202a1b3b9a338b31c62adce4be"
-whole_reason = "Die vier zusammengehörigen Vertragsdateien werden im selben verhaltensneutralen Kommentardurchgang geprüft; kleinere Scheiben vervielfachen nur Claim-, Review- und Baseline-Läufe."
