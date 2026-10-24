@@ -1,5 +1,5 @@
 """Direct `checkout.py` behavior: remote/worktree/branch validation, the
-`git_output` boundary and its `directory` (issue #314), `resolve_path_checkout`
+`git_output` boundary and its `directory`, `resolve_path_checkout`
 (the path-based checkout resolver `rescope` uses), dirty-path
 reading, `versioned_paths`, trunk landings, and remote-location parsing.
 `validate_checkout` -- the precondition every `claim` call site in `cli.py`
@@ -65,7 +65,7 @@ def test_remote_url_reads_the_git_config_of_the_given_directory(
     remote: str,
     from_repository_cwd: bool,
 ) -> None:
-    """Issue #457 proof 7 at the checkout boundary: a remote's URL comes
+    """A remote's URL comes
     from the git configuration of the directory it is asked for, or of the
     calling process's cwd when none is given."""
     repo, origin = real_repository_with_bare_remote(tmp_path)
@@ -82,7 +82,7 @@ def test_remote_url_reads_the_git_config_of_the_given_directory(
 def test_scope_directories_finds_git_trees_and_untracked_directories_under_the_held_toplevel(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #472: an entry that is no git tree is looked up under the
+    """An entry that is no git tree is looked up under the
     caller's own held toplevel, never a second `rev-parse`."""
     (tmp_path / "scratch").mkdir()
     (tmp_path / "file.py").write_text("x\n")
@@ -444,10 +444,9 @@ def test_checkout_validation_names_the_isolated_worktree_recipe_for_the_default_
     default_branch: str | None,
 ) -> None:
     """Claiming from a checkout of the repository's default branch names the
-    exact `git worktree add` recipe (#52), not just the rule it violates --
-    whether that default is the guessed `main` or a recorded one (issue
-    #238: a repository whose default is `trunk` refuses a claim from
-    `trunk` the same way)."""
+    exact `git worktree add` recipe, not just the rule it violates --
+    whether that default is the guessed `main` or a recorded one: a repository
+    whose default is `trunk` refuses a claim from `trunk` the same way."""
     values = {("rev-parse", "HEAD"): BASE, ("branch", "--show-current"): branch}
     monkeypatch.setattr(
         checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
@@ -504,7 +503,7 @@ def test_claim_judges_the_canonical_remotes_recorded_default_branch(
     canonical_head: str | None,
     branch: str,
 ) -> None:
-    """Spec: CLM-29. Issue #490 proof 1: with `hub` canonical and `origin/HEAD`
+    """Spec: CLM-29. With `hub` canonical and `origin/HEAD`
     naming `main`, a worktree on `hub`'s default branch is refused; without a
     recorded `hub/HEAD`, `claim` guesses `main`/`master` -- `origin/HEAD`
     never answers for `hub`. `claim` stands in the worktree: its toplevel
@@ -540,7 +539,7 @@ def test_checkout_validation_names_the_first_three_dirty_paths_and_the_rest_as_a
 ) -> None:
     """The dirty-tree refusal used to discard `git status --porcelain`'s
     list entirely; it now names the first three changed paths and how many
-    more there are (#52)."""
+    more there are."""
     porcelain = "\n".join(
         [" M src/a.py", " M src/b.py", "?? src/c.py", " M src/d.py", " M src/e.py"]
     )
@@ -607,7 +606,7 @@ def _scratch_git_repository(tmp_path: Path, *init_options: str) -> Path:
 def test_dirty_paths_reads_a_modified_tracked_file_from_real_git_status(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Regression for the truncated-name bug (#52 follow-up): `git_output`
+    """Regression for the truncated-name bug: `git_output`
     used to `.strip()` its whole decoded output, which ate the leading space
     of a modified file's ` M path` porcelain line before `_dirty_paths`
     sliced off the fixed three-character status prefix -- `README.md` came
@@ -649,7 +648,7 @@ def test_dirty_paths_reads_a_rename_from_real_git_status(
 
 
 def test_git_output_directory_runs_git_dash_c_in_that_directory(tmp_path: Path) -> None:
-    """`directory` (issue #314) must reach the real `git` process as `-C`,
+    """`directory` must reach the real `git` process as `-C`,
     not merely be accepted and ignored -- the one fact every path-based
     resolution downstream of `git_output` depends on."""
     repository = _scratch_git_repository(tmp_path)
@@ -665,7 +664,7 @@ def test_git_output_denies_loud_on_a_non_standard_os_error_launching_git(
     """`run_captured` translates a missing executable and a timeout to their
     own typed errors, but leaves every other OS-level launch failure --
     permission denied, out of file descriptors, `-C` naming a non-directory
-    -- as a raw `OSError` (issue #314 gate G's follow-up). Every
+    -- as a raw `OSError`. Every
     `git_output` caller judges a checkout for a security decision, so this
     must fail closed with `ClaimError` too, never an uncaught traceback out
     of the command."""
@@ -681,7 +680,7 @@ def test_git_output_denies_loud_on_a_non_standard_os_error_launching_git(
 
 def _repo_with_linked_worktree(tmp_path: Path) -> tuple[Path, Path]:
     """A real repository with a linked, isolated worktree on a feature
-    branch (issue #314) -- `main` is the shared checkout, `worktree` is what
+    branch -- `main` is the shared checkout, `worktree` is what
     a claim actually builds in, via the same `git worktree add` recipe
     `checkout.ISOLATED_WORKTREE_RECIPE` documents."""
     main = _scratch_git_repository(tmp_path)
@@ -727,7 +726,7 @@ def test_resolve_path_checkout_reads_the_main_checkout_owning_a_directory(
 def test_resolve_path_checkout_is_independent_of_the_calling_process_cwd(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The whole point of issue #314: resolving from `directory` rather than
+    """The whole point: resolving from `directory` rather than
     an implicit process cwd means the same directory resolves the same way
     regardless of where the test process itself is standing."""
     _main, worktree = _repo_with_linked_worktree(tmp_path)
@@ -808,10 +807,10 @@ def test_refuse_shared_checkout_matrix(
     default_branch: str | None,
     expected: str,
 ) -> None:
-    """`rescope`'s own worktree-isolation refusal (issue #314 repeat gate,
-    finding 3) judges the repository's recorded default branch -- not just
-    the hardcoded `main`/`master` fallback, but any a real clone can record
-    (`master`, `trunk`) -- and never falls back to that guess when none is
+    """`rescope`'s own worktree-isolation refusal judges the repository's
+    recorded default branch -- not just the hardcoded `main`/`master`
+    fallback, but any a real clone can record (`master`, `trunk`) -- and never
+    falls back to that guess when none is
     recorded at all, not even for `main`.
 
     `RETURN_TO_CLAIM` is used throughout: `rescope` acts on a claim whose
@@ -850,10 +849,10 @@ def test_claim_default_branch_fallback_denies_only_main_and_master(
     branch: str,
     denied: bool,
 ) -> None:
-    """When no default branch is recorded, `claim`'s fallback (issue #238,
-    Grok review) still denies exactly the historical `{"main", "master"}`
-    guess and nothing else -- `trunk` is not treated as default without a
-    recorded one, so deleting `DEFAULT_BRANCH_FALLBACK` would fail this
+    """When no default branch is recorded, `claim`'s fallback still denies
+    exactly the historical `{"main", "master"}` guess and nothing else --
+    `trunk` is not treated as default without a recorded one, so deleting
+    `DEFAULT_BRANCH_FALLBACK` would fail this
     test by letting `main`/`master` through instead."""
     values = git_checkout(branch=branch)
     monkeypatch.setattr(
@@ -921,7 +920,7 @@ def test_checkout_git_calls_fail_loud_when_git_is_missing_or_times_out(
     """`versioned_paths`, `remote_url`, and `path_is_tracked` -- all
     direct `subprocess.run` callers (`git_output` backs `remote_url`)
     -- must translate a missing executable or a timeout to a `ClaimError`;
-    a timeout names the git step that ran, never a purpose (issue #603)."""
+    a timeout names the git step that ran, never a purpose."""
     expected = refusal.format(subcommand=subcommand)
 
     def fails(*_arguments, **_kwargs):
@@ -946,7 +945,7 @@ def test_checkout_git_calls_fail_loud_on_a_nonzero_git_exit(
 ) -> None:
     """`versioned_paths` and `path_is_tracked` both translate a real git
     failure exit -- 128 here, outside a git repository -- to the same
-    `ClaimError` detail (issue #315 review): `path_is_tracked`'s own exit-1
+    `ClaimError` detail: `path_is_tracked`'s own exit-1
     "not tracked" reading is proven separately by
     `test_path_is_tracked_reads_the_git_ls_files_exit_status`."""
 
@@ -971,8 +970,8 @@ def test_path_is_tracked_reads_the_git_ls_files_exit_status(
     monkeypatch: pytest.MonkeyPatch, exit_status: int, expected: bool
 ) -> None:
     """`git ls-files --error-unmatch` exits 0 for a path git tracks and 1
-    for any path it does not -- absent, merely untracked, and ignored alike
-    (issue #315): the caller never has to tell those apart."""
+    for any path it does not -- absent, merely untracked, and ignored alike:
+    the caller never has to tell those apart."""
     board_config_path = workboard.CONFIG_PATH.as_posix()
     observed: list[list[str]] = []
 
@@ -1031,7 +1030,7 @@ def test_path_is_tracked_reads_real_git_index_and_ignore_state(
     expected: bool,
 ) -> None:
     """`path_is_tracked` against real git filesystem/index state, not a
-    hand-typed exit code (issue #315 review): absent, merely untracked, and
+    hand-typed exit code: absent, merely untracked, and
     `.gitignore`-ignored (`.*/`, the pattern that hid `.aco/` in the
     field checkout the issue reports) all read `False`; a tracked file reads
     `True` even when a later `.gitignore` pattern would also match it, since
@@ -1055,7 +1054,7 @@ def test_path_is_tracked_reads_real_git_index_and_ignore_state(
 def test_file_at_revision_reads_the_committed_text_not_the_worktree_copy(
     tmp_path: Path, path: str, revision: str, expected: str | None
 ) -> None:
-    """Issue #575: a file's text as `revision`'s tree holds it, whatever the
+    """A file's text as `revision`'s tree holds it, whatever the
     worktree's copy now says; a tree without the file has no text to show."""
     repository = _scratch_git_repository(tmp_path)
     (repository / "README.md").write_text("edited in the worktree\n")
@@ -1078,7 +1077,7 @@ def _lose_the_committed_readme_blob(repository: Path) -> None:
 def test_file_at_revision_refuses_a_file_git_cannot_read(
     tmp_path: Path, revision: str, break_repository: Callable[[Path], None]
 ) -> None:
-    """Issue #575: an unresolvable revision, or a file its tree lists but git
+    """An unresolvable revision, or a file its tree lists but git
     cannot show, is a git failure, never a file the revision lacks -- the
     trunk's lane-shared list must not silently empty on a broken repository."""
     repository = _scratch_git_repository(tmp_path)
@@ -1134,7 +1133,7 @@ def test_trunk_ref_after_fails_loud_when_no_candidate_branch_resolves(
     """Neither a recorded `HEAD` nor any of the default-branch-name
     candidates resolving must fail loud rather than silently ruling every
     candidate's age as unknown (BRIEF-20); a git failure other than a
-    missing ref is git's own, never read as one (issue #492)."""
+    missing ref is git's own, never read as one."""
     if is_repository:
         real_git(tmp_path, "init", "-q", "-b", "trunk")
 
@@ -1146,9 +1145,8 @@ def test_trunk_ref_after_falls_back_to_the_local_branch_name_when_remote_head_wa
     tmp_path: Path,
 ) -> None:
     """A clone that never recorded its remote's `HEAD` still resolves
-    through the historical `{main, master}` guess (issue #238), generalized
-    to the caller's own remote name rather than `origin` alone (issue
-    #304)."""
+    through the historical `{main, master}` guess, generalized
+    to the caller's own remote name rather than `origin` alone."""
     repository = _scratch_git_repository(tmp_path)
     recorded_head = checkout.recorded_head_ref("hub", directory=repository)
 
@@ -1188,7 +1186,7 @@ def _dangle_origin_head_after_a_rename(repo: Path, _remote: Path) -> None:
 def test_a_dangling_or_plain_recorded_head_counts_as_unrecorded_and_the_trunk_guesses_on(
     tmp_path: Path, record: Callable[[Path, Path], None], expected_default_branch: str | None
 ) -> None:
-    """Issue #490: a remote `HEAD` that names no resolvable branch counts
+    """A remote `HEAD` that names no resolvable branch counts
     as never recorded -- no default branch, and the trunk guesses on with
     `origin/main` instead of handing git a ref it cannot resolve."""
     repo, remote = real_repository_with_bare_remote(tmp_path)
@@ -1318,7 +1316,7 @@ def _push_to_hub(repo: Path) -> None:
 def test_trunk_landings_classifies_a_control_byte_inside_a_trailer_value_as_one_literal_defect(
     tmp_path: Path, byte: str
 ) -> None:
-    """Issue #304 review, finding B1: git never escapes `\\x1f`, `\\x1e`, or
+    """Git never escapes `\\x1f`, `\\x1e`, or
     `\\x01` inside a trailer value -- exactly the bytes the historical
     `\\x1f`-separated framing used to split repeated trailer values -- so a
     value that happens to contain one of them must read back as the one
@@ -1326,7 +1324,7 @@ def test_trunk_landings_classifies_a_control_byte_inside_a_trailer_value_as_one_
     The NUL/newline framing reads it as data: `trunk_commit_classification`
     then reports that single literal value as a `ClassificationDefect`
     (LAND-03) rather than raising and aborting the whole read -- the commit
-    lands neither #12 nor #13."""
+    lands neither of the two items the bytes would have split it into."""
     repo = _minimal_pushed_repository(tmp_path)
     (repo / "f.txt").write_text("content\n")
     real_git(repo, "add", "f.txt")
@@ -1342,9 +1340,9 @@ def test_trunk_landings_classifies_a_control_byte_inside_a_trailer_value_as_one_
 
 
 def _trunk_history_repository(tmp_path: Path) -> Path:
-    """A worktree pushed to a `hub` remote (never `origin`, issue #304
-    proof 4) whose `main` carries, in first-parent order: a plain initial
-    commit, a merge commit trailer-classified `Work-Item: #10`, a squash
+    """A worktree pushed to a `hub` remote (never `origin`)
+    whose `main` carries, in first-parent order: a plain initial
+    commit, a merge commit trailer-classified by a `Work-Item:` trailer, a squash
     commit whose trailer block repeats `Work-Item:` twice, a commit landed
     through a real `git rebase` and trailer-classified `No-Item: docs`, and
     a commit whose `Work-Item:` line sits in prose, never its own trailer
@@ -1367,7 +1365,7 @@ def _trunk_history_repository(tmp_path: Path) -> Path:
     )
 
     # A squash commit whose trailer block repeats `Work-Item:` -- every
-    # named item lands (issue #304).
+    # named item lands.
     real_git(repo, "checkout", "-q", "-b", "squashed")
     (repo / "squash.txt").write_text("one\n")
     real_git(repo, "add", "squash.txt")
@@ -1389,13 +1387,12 @@ def _trunk_history_repository(tmp_path: Path) -> Path:
     real_git(repo, "merge", "-q", "--ff-only", "docslane")
 
     # A `Work-Item:` line in prose, never its own trailer block -- not a
-    # landing (issue #304 proof 2).
+    # landing.
     (repo / "prose.txt").write_text("prose\n")
     real_git(repo, "add", "prose.txt")
     real_git(repo, "commit", "-q", "-m", "Prose change", "-m", "Explanation prose.\nWork-Item: #7")
 
-    # A side branch that never joins the trunk's first-parent line
-    # (issue #304 proof 3).
+    # A side branch that never joins the trunk's first-parent line.
     real_git(repo, "checkout", "-q", "-b", "sidebranch")
     (repo / "side.txt").write_text("side\n")
     real_git(repo, "add", "side.txt")
@@ -1409,7 +1406,7 @@ def _trunk_history_repository(tmp_path: Path) -> Path:
 def test_trunk_landings_classify_merge_squash_and_rebase_commits_from_their_trailer_block_alone(
     tmp_path: Path,
 ) -> None:
-    """Issue #304 proofs 1-3, against a real `file://`-reachable remote with
+    """Against a real `file://`-reachable remote with
     real merge, squash, and rebase history."""
     repo = _trunk_history_repository(tmp_path)
     trunk = "refs/remotes/hub/main"
@@ -1485,7 +1482,7 @@ def test_parse_remote_location_refuses_an_unrecognized_shape() -> None:
         checkout.parse_remote_location("not-a-remote-url")
 
 
-# `start`'s own worktree/branch naming and git plumbing (issue #322): a
+# `start`'s own worktree/branch naming and git plumbing: a
 # slug/prefix pure-function pair, plus the create/resume/remove/ancestry
 # helpers `cmd_start.run`/`release --merged`'s own cleanup share, each proven
 # directly against real git rather than through the full CLI (that wiring
@@ -1591,7 +1588,7 @@ def test_refuse_unsafe_start_branch_accepts_a_safe_branch() -> None:
 
 
 def test_refuse_unsafe_start_branch_refuses_an_overlong_identity_prefix() -> None:
-    """Issue #322 review/gate finding 1: a syntactically safe but overlong
+    """A syntactically safe but overlong
     `ACO_AGENT` first word must still be refused before any git write,
     exactly as the claim machinery's own `BRANCH_NAME_MAX_LENGTH` bound on a
     stored claim marker refuses it -- one predicate, not a shape check that
@@ -1650,7 +1647,7 @@ def test_existing_start_worktree_is_absent_before_the_build_and_standing_after(
 def test_create_linked_worktree_builds_a_repository_nested_in_an_outer_working_tree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #448 review finding (START-01): an outer checkout's `.git` above
+    """START-01: an outer checkout's `.git` above
     the not-yet-created worktree path -- a home directory that is itself a
     git repository -- never turns git's "cannot change to" into a refusal."""
     real_git(tmp_path, "init", "-q")
@@ -1695,7 +1692,7 @@ def test_existing_start_worktree_refuses_a_branch_taken_by_no_worktree_of_this_i
 def test_existing_start_worktree_refuses_an_existing_non_worktree_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #322 review/gate finding: an ordinary directory already sitting
+    """An ordinary directory already sitting
     at the target path -- empty or not -- is refused outright rather than
     left for `git worktree add` to adopt."""
     repo = bare_remote_repository_with_one_commit(tmp_path)
@@ -1724,7 +1721,7 @@ def test_existing_start_worktree_refuses_a_worktree_on_a_different_branch(
 def test_existing_start_worktree_refuses_a_worktree_from_a_different_repository(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #322 review finding 2: a clean linked worktree on the exact
+    """A clean linked worktree on the exact
     same branch name, but belonging to an entirely different repository,
     must never be adopted as this item's own -- only its own repository's
     common git directory earns reuse."""
@@ -1741,7 +1738,7 @@ def test_existing_start_worktree_refuses_a_worktree_from_a_different_repository(
 def test_existing_start_worktree_refuses_a_path_that_is_not_a_checkout_root_itself(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #322 review finding 2: a path resolving into the middle of some
+    """A path resolving into the middle of some
     repository's own working tree -- rather than a checkout root by itself --
     must never be adopted as `start`'s own worktree, even when a branch of
     the same name happens to exist elsewhere in that repository."""
@@ -1757,7 +1754,7 @@ def test_existing_start_worktree_refuses_a_path_that_is_not_a_checkout_root_itse
 def test_existing_start_worktree_refuses_the_repositorys_own_main_checkout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #322 review finding 2: `path` resolving to this repository's own
+    """`path` resolving to this repository's own
     main checkout, not a linked worktree, must never be adopted -- only a
     linked worktree is ever safe to treat as one of `start`'s own lanes."""
     caller = _scratch_git_repository(tmp_path)
@@ -1812,7 +1809,7 @@ def test_main_checkout_root_is_the_main_checkout_from_any_of_its_worktrees(
     build_checkout: Callable[[Path], Path],
     runs_in_linked_lane: bool,
 ) -> None:
-    """Issue #479 (START-19): `start` builds beside the main checkout, never
+    """START-19: `start` builds beside the main checkout, never
     nested under a linked caller's, whatever layout its git directory has."""
     main = build_checkout(tmp_path)
     caller = _linked_lane_of(main, tmp_path) if runs_in_linked_lane else main
@@ -1856,7 +1853,7 @@ def test_main_checkout_root_refuses_a_linked_worktree_it_cannot_trace_back(
     build_checkout: Callable[[Path, pytest.MonkeyPatch], Path],
     refusal: str,
 ) -> None:
-    """Issue #479 (START-19, START-24): from a linked worktree whose git
+    """START-19, START-24: from a linked worktree whose git
     directory records no checkout, or whose `core.worktree` git cannot read,
     `start` refuses rather than build beside, or read the board
     configuration of, the linked worktree itself."""
@@ -1877,7 +1874,7 @@ def test_worktree_on_branch_finds_the_one_matching_path(tmp_path: Path) -> None:
 def test_worktree_on_branch_surfaces_a_git_failure_resolving_a_registered_worktree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #322 review/gate finding: `paths` names worktrees git's own
+    """`paths` names worktrees git's own
     registry already vouches for, so a failure resolving one of them (a
     moved or deleted directory, most often) must surface as a refusal --
     never a silently skipped "not on this branch"."""
@@ -1903,7 +1900,7 @@ def test_worktree_on_branch_surfaces_a_git_failure_resolving_a_registered_worktr
 def test_resolve_path_checkout_fails_loud_on_a_malformed_rev_parse_reply(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #322 review/gate finding: a successful `git rev-parse` exit
+    """A successful `git rev-parse` exit
     whose combined toplevel/git-dir/git-common-dir reply does not split into
     exactly three lines is a real git misbehavior -- `worktree_on_branch`'s
     own callers must see it as a refusal, never as a silently swallowed
@@ -2011,7 +2008,7 @@ def test_remove_linked_worktree_fails_loud_when_worktree_remove_itself_fails(
 def test_remove_linked_worktree_reports_the_worktree_removed_and_the_branch_kept(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #322 review/gate finding 4: a branch-deletion failure after the
+    """A branch-deletion failure after the
     worktree is already gone must never read as a bare `kept` -- the typed
     outcome names both halves apart."""
     main, worktree = _repo_with_linked_worktree(tmp_path)

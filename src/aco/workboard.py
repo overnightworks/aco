@@ -15,10 +15,10 @@ from typing import NoReturn, TypeGuard, TypeVar, cast
 
 from . import items, metrics, protocol
 
-# The body-block codec (issue #419, audit #365 finding 3): parsed, validated,
+# The body-block codec: parsed, validated,
 # and rendered in `body.py`, one layer below this module. Every reader
 # imports the names it needs from `body` directly (operator ruling
-# 16.09.2026, audit #370 finding 10); `workboard.py` itself imports only what
+# 16.09.2026); `workboard.py` itself imports only what
 # its own board-builder code below actually calls.
 from .body import (
     BLOCK_FENCE_INFO,
@@ -49,8 +49,8 @@ DEFAULT_IDEA_LABEL = "idea"
 # An item carrying the idea label is never proposed: it is pulled into work
 # only after the operator takes the label off, so `next` lists it apart.
 IDEA_REASON = "idea"
-# The one typed marker that an item waits on the operator's ruling (issue
-# #553): no agent can pull it, so `next` names it apart and `claim`'s
+# The one typed marker that an item waits on the operator's ruling:
+# no agent can pull it, so `next` names it apart and `claim`'s
 # precedence check never stops on it. A label, so both storages carry it.
 NEEDS_OPERATOR_LABEL = "needs-operator"
 WAITING_ON_OPERATOR = "waiting on operator"
@@ -113,7 +113,7 @@ TOUCHES_WITHOUT_CLOSING_LINE_PATTERN = re.compile(
     r"(?im)^(?:Refs?|References?|Part of|Teil von)\b[:\s].*$"
 )
 CLAIM_OLD_AFTER = timedelta(hours=1)
-# The three slice-title forms seen in atelier-2 (`#79`): a parenthetical
+# The three slice-title forms: a parenthetical
 # after the real title (`(#962 Scheibe 4)`, `(#962 slice 4)`) or a leading
 # German phrase (`Scheibe 4 von #962`).
 _SLICE_TITLE_PARENTHETICAL_PATTERN = re.compile(
@@ -138,7 +138,7 @@ class Issue:
     children_closed: int | None = None
     children_total: int | None = None
     blocked_by_count: int = 0
-    # Why the store could not read this item at all (issue #517): the board
+    # Why the store could not read this item at all: the board
     # names it with this defect instead of parsing `body`, and the item's
     # other fields are only what could still be read.
     unreadable: ContractDefect | None = None
@@ -213,7 +213,7 @@ class IssueReference:
 
 @dataclass(frozen=True)
 class IssueDependency:
-    """One `blocked_by` relation GitHub itself records for an issue (#150) --
+    """One `blocked_by` relation GitHub itself records for an issue --
     same- or foreign-repository, open or closed, issue or pull request. The
     board reads these instead of a `Blocked by:` body section once a
     repository is pinned to `body_contract = "block"`."""
@@ -229,8 +229,7 @@ def open_blocker_label(
 ) -> str:
     """How one entry of `BoardItem.open_blockers` (or `ChildItem.blocked_by`)
     is named against the board's own `repository`: a same-repository
-    blocker prints `item_label`'s own id under `storage` (issue #292,
-    Grok-Delta review of #300) -- unchanged `#n` under the default
+    blocker prints `item_label`'s own id under `storage` -- unchanged `#n` under the default
     `Storage.GITHUB`; a foreign one is always the qualified `owner/repo#n`
     (`IssueReference.__str__`), since a foreign reference is never local to
     this repository's own storage pin."""
@@ -241,7 +240,7 @@ def open_blocker_label(
 
 def _blocker_sort_key(reference: IssueReference, repository: str) -> tuple[int, str, int]:
     """Local references first, ascending by number; foreign references
-    after them, ascending by `(repository, number)` (#150 §6) -- read
+    after them, ascending by `(repository, number)` -- read
     directly off the typed reference, never re-parsed from a label."""
     return (0 if reference.repository == repository else 1, reference.repository, reference.number)
 
@@ -268,11 +267,11 @@ NO_ITEM_KINDS_TRAILER = "|".join(NoItemKind)
 def parse_item_reference(value: str) -> int:
     """One item reference -- `aco-xxxxxx` (`items.item_number`'s own hex
     decode), `#n`, or the bare integer `n` -- parsed to the number every
-    forge port keys by (issue #285, decision D4: an id is identity, not just
+    forge port keys by (an id is identity, not just
     display, so a fresh id `item new` prints is something every other
     command can claim right back). The one owner for both every argparse
     slot that means an item (`cli`'s `type=`) and a trunk commit's
-    `Work-Item:` trailer value (issue #304, `trunk_commit_classification`) --
+    `Work-Item:` trailer value (`trunk_commit_classification`) --
     a git trailer never carries the `OWNER/REPO#n` form `WORK_ITEM_VALUE_PATTERN`
     accepts for a pull request body, since a commit is always local to the
     repository whose history it lands on."""
@@ -307,8 +306,8 @@ Classification = WorkItemClassification | NoItemClassification
 
 @dataclass(frozen=True)
 class TrunkWorkItemClassification:
-    """The work items one trunk commit's trailer block names as landed
-    (issue #304). A trailer block may repeat `Work-Item:`; every named item
+    """The work items one trunk commit's trailer block names as landed.
+    A trailer block may repeat `Work-Item:`; every named item
     is landed by that commit -- unlike a pull request body, which
     `parse_pull_request_classification` refuses past a single `Work-Item:`
     line, a commit's trailer block is already-landed history, not a
@@ -325,7 +324,7 @@ def land_trunk_trailer(classification: Classification) -> str:
     (`trunk_commit_classification`'s counterpart), never the pull
     request body's qualified `owner/repo#n` form `WorkItemClassification.__str__`
     prints: a git trailer is always local to the repository whose history
-    it lands on (issue #405; see `parse_item_reference`'s own
+    it lands on (see `parse_item_reference`'s own
     docstring)."""
     if isinstance(classification, WorkItemClassification):
         return f"Work-Item: #{classification.item.number}"
@@ -354,8 +353,7 @@ def _narrower_separator(dropped: str | None, following: str) -> str:
 def body_without_classification(body: str) -> str:
     """`body` with its classification line removed; a paragraph the removal
     leaves blank goes, and its neighbours keep the narrower of the two
-    separators around it, so no blank-line run stays where it stood
-    (issue #594 line 5)."""
+    separators around it, so no blank-line run stays where it stood."""
     pieces = _BLANK_LINE_RUN.split(body.replace("\r\n", "\n"))
     composed = ""
     dropped_separator: str | None = None
@@ -374,8 +372,8 @@ def body_without_classification(body: str) -> str:
 def trunk_commit_classification(
     work_item_values: tuple[str, ...], no_item_values: tuple[str, ...]
 ) -> TrunkClassification | ClassificationDefect | None:
-    """A trunk commit's classification from its own trailer block alone
-    (issue #304): `work_item_values`/`no_item_values` are read through git's
+    """A trunk commit's classification from its own trailer block alone:
+    `work_item_values`/`no_item_values` are read through git's
     own trailer parsing (`%(trailers:key=...,valueonly)`), so a `Work-Item:`
     or `No-Item:` line elsewhere in the body -- prose, not a trailer --
     never reaches here. `None` means the commit's trailer block named
@@ -387,8 +385,8 @@ def trunk_commit_classification(
     `No-Item:`, is contradictory rather than merely absent -- `check <pr>`
     already refuses the equivalent shape in a pull request body
     (`_single_classification_match`) -- so it refuses with a typed
-    `ClassificationDefect` instead of letting `Work-Item:` win by ordering
-    (issue #304 review, finding B2). A malformed `Work-Item:` value also
+    `ClassificationDefect` instead of letting `Work-Item:` win by ordering.
+    A malformed `Work-Item:` value also
     returns a defect: that commit lands no items, while the rest of the
     trunk history remains readable."""
     if work_item_values and no_item_values:
@@ -424,7 +422,7 @@ class ClassificationDefect:
 
 @dataclass(frozen=True)
 class TrunkLandingItem:
-    """One item a trunk commit's own trailer names as landed (issue #371):
+    """One item a trunk commit's own trailer names as landed:
     `sha`/`committed_at` identify that commit. Read once by the caller from
     `checkout.trunk_landings` (a layer this module may never import) and
     handed in as plain data -- one entry per named item, since a trailer
@@ -439,7 +437,7 @@ class TrunkLandingItem:
 
 @dataclass(frozen=True)
 class TrunkLandingEvidence:
-    """A `LandingRow`'s primary evidence (issue #371): the trailer-carrying
+    """A `LandingRow`'s primary evidence: the trailer-carrying
     trunk commit that named its item landed, read straight from local git
     history under both storages."""
 
@@ -448,7 +446,7 @@ class TrunkLandingEvidence:
 
 @dataclass(frozen=True)
 class PullRequestLandingEvidence:
-    """A `LandingRow`'s `github`-only supplementary evidence (issue #371):
+    """A `LandingRow`'s `github`-only supplementary evidence:
     the merged pull request that plainly closed, declared, or landed its
     item (LAND-41's closing/landing keywords; never a bare `Refs`/`Part of`
     touch, LAND-45), used only when no trunk commit's own trailer names
@@ -463,7 +461,7 @@ LandingEvidence = TrunkLandingEvidence | PullRequestLandingEvidence
 
 @dataclass(frozen=True)
 class LandingRow:
-    """One row of the board's Landungen view (issue #371): `item` landed at
+    """One row of the board's Landungen view: `item` landed at
     `committed_at`, evidenced by `evidence`. This is the one projection
     `board --json` reads, so no two readers ever disagree about what landed
     and when -- independent of whether `item` is still open, unlike
@@ -475,7 +473,7 @@ class LandingRow:
 
 
 class MergeMethod(StrEnum):
-    """How GitHub merges a pull request (issue #578), in its own
+    """How GitHub merges a pull request, in its own
     `merge_method` vocabulary."""
 
     MERGE = "merge"
@@ -493,22 +491,22 @@ LANDING_MERGE_METHODS = frozenset({MergeMethod.MERGE, MergeMethod.SQUASH})
 class BoardConfig:
     priority_labels: tuple[str, ...] = DEFAULT_PRIORITY_LABELS
     idea_label: str = DEFAULT_IDEA_LABEL
-    # The remote `refs/aco/state` lives on (issue #176, §1); every store and
+    # The remote `refs/aco/state` lives on; every store and
     # import refusal is phrased in its terms. The store takes it from every
-    # caller, so this default is its one owner (issue #522).
+    # caller, so this default is its one owner.
     canonical_remote: str = DEFAULT_CANONICAL_REMOTE
-    # Which adapter owns this repository's board and item data (issue #248):
+    # Which adapter owns this repository's board and item data:
     # `RunContext.repository_id` resolves the one the pin names, never
     # guessed from the remote's own host. `github` is the default -- every
     # repository pinned today lives there.
     storage: Storage = Storage.GITHUB
-    # Repository files a lane may change beyond its scope (issue #575):
+    # Repository files a lane may change beyond its scope:
     # registries that follow every code change mechanically -- a dead-code
     # whitelist -- so no lane can know in advance whether it will need
     # one. Only the trunk's committed copy is read
     # (`session.trunk_lane_shared_reading`).
     lane_shared: tuple[str, ...] = ()
-    # The repository's own history convention for `aco land` (issue #578):
+    # The repository's own history convention for `aco land`:
     # a forge may allow several methods while the repository keeps one, so
     # a pin here beats the forge's allowed methods; `None` asks the forge.
     merge_method: MergeMethod | None = None
@@ -525,10 +523,10 @@ class BoardConfig:
         )
 
 
-# The body pin (issue #150) is still a key this file defines, but no longer
+# The body pin is still a key this file defines, but no longer
 # a setting: the typed `aco` block is the one grammar, so `"block"`
 # is its only legal value and there is nothing left for `BoardConfig` to
-# carry (issue #204). It must stay *known* all the same -- five repositories
+# carry. It must stay *known* all the same -- five repositories
 # pin it, and `_refuse_unknown_config_keys` lies on the path of every store
 # command, so forgetting it here would refuse `claim` and `release` there.
 BODY_CONTRACT_KEY = "body_contract"
@@ -556,12 +554,12 @@ class BoardItem:
     priority_order: int
     container: ContainerProgress | None
     container_parent: int | None
-    # The block's own top-level `scope = [...]` (issue #348), exactly
+    # The block's own top-level `scope = [...]`, exactly
     # `ParsedBody.scope`'s canonical tuple -- `None` when the item names no
     # scope of its own, the case `next`'s `Run:` line and `parallel_set`'s
     # disjointness walk both have to name rather than guess through.
     scope: tuple[str, ...] | None
-    # The block's own top-level `whole` reason (issue #566), exactly
+    # The block's own top-level `whole` reason, exactly
     # `ParsedBody.whole`: the reason `claim`/`start` read for a wide scope,
     # so `next`'s `Run:` line asks for `--whole` only where the body has none.
     whole: str | None
@@ -587,31 +585,31 @@ class BoardItem:
     score: int
     actionable: bool
     actionable_reason: str | None
-    # Whether the operator's ruling, not an agent, frees this item (issues
-    # #553, #604), decided once by `_waits_on_operator`: `next` names it under
+    # Whether the operator's ruling, not an agent, frees this item,
+    # decided once by `_waits_on_operator`: `next` names it under
     # `waiting on operator:` and never cuts or checks such a container.
     waits_on_operator: bool
-    # `actionable_reason` as `next`'s text prints it under `SKIPPED` (issue
-    # #532): through `protocol.terminal_text`. The prose itself, a cut slice's title
-    # quoted by `_quoted_prose` included (#310 finding 190), is one reason
+    # `actionable_reason` as `next`'s text prints it under `SKIPPED`:
+    # through `protocol.terminal_text`. The prose itself, a cut slice's title
+    # quoted by `_quoted_prose` included, is one reason
     # text and `--json` share; JSON and the HTML board escape on their own.
     terminal_actionable_reason: str | None
     read_state: BodyReadState
-    # What this container is up for once it holds no open child (issue #503),
+    # What this container is up for once it holds no open child,
     # decided once here by `_childless_container_verdict` so `next`'s action
     # and its `SKIPPED` reason read one answer; `None` for every other item.
     childless_verdict: ChildlessContainerVerdict | None
-    # This item's own top-level `size` (issue #357), exactly `ParsedBody.size`
+    # This item's own top-level `size`, exactly `ParsedBody.size`
     # -- carried here too so a renderer can tell "no size at all" apart from
     # "sized, but its class has no measured lane yet", which `estimate`
     # alone (`None` in both cases) cannot.
     size: metrics.Size | None
-    # Whether the body still carries any `[[slice]]` row (issue #399):
+    # Whether the body still carries any `[[slice]]` row:
     # `scope is None` alone cannot tell a truly unscoped item apart from one
     # that names no top-level scope yet but still cuts one from a row, so
     # `_buildable` reads both rather than `scope` alone.
     has_slices: bool
-    # This item's own size class's measured estimate (issue #357), or
+    # This item's own size class's measured estimate, or
     # `None` when the item names no size, or names one no measured lane has
     # reached yet -- an unmeasured class is exactly as unestimated as an
     # unsized item, never a guessed number.
@@ -620,8 +618,8 @@ class BoardItem:
 
 @dataclass(frozen=True)
 class SizeClassMeasurement:
-    """One size class's own row in the board's measurements section (issue
-    #357): `metrics.SizeClassStats`' median/p80/n/weak, plus the first and
+    """One size class's own row in the board's measurements section:
+    `metrics.SizeClassStats`' median/p80/n/weak, plus the first and
     last measured lane's own timestamp -- dates `metrics.py` never computes
     (it holds no clock), so `workboard.py` joins them from the same lane events
     `metrics.measure` read to build `stats`."""
@@ -633,12 +631,12 @@ class SizeClassMeasurement:
 
 @dataclass(frozen=True)
 class Measurements:
-    """The board's own measured-lane section (issue #357): `classes` is
+    """The board's own measured-lane section: `classes` is
     `metrics.MetricsReport.classes` plus each class's own date range,
     `unfinished` is `metrics.MetricsReport.incomplete` (a still-open claim,
     counted but never measured), `unparsed` is
     `BoardBuildInputs.unparsed_lifecycle_commits` (a claim-shaped commit
-    `store.claim_lifecycle` could not read at all, issue #357 R1), and
+    `store.claim_lifecycle` could not read at all), and
     `since` is the earliest lane event this build read at all -- `None`
     only when there is none, the one case the board's own "keine Messungen
     seit <Datum>" sentence reads a render-time date instead."""
@@ -665,7 +663,7 @@ class Board:
     item while they stayed open: the landing happened, the bookkeeping did
     not. An idea is never one: the label alone decides its list.
 
-    `landings` is the Landungen view (issue #371): `landing_rows`' own
+    `landings` is the Landungen view: `landing_rows`' own
     projection over the trunk walk (plus, under `github`, its
     pull-request supplement), independent of `items`/`recovery` -- a row
     stands whether or not its item is still open.
@@ -706,7 +704,7 @@ def _validated_idea_label(raw: dict[str, object]) -> str:
 
 
 def _refuse_unpinned_body_contract(raw: dict[str, object], path: Path) -> None:
-    """Refuse any body pin but the one grammar this tool reads (issue #204).
+    """Refuse any body pin but the one grammar this tool reads.
 
     An absent key means the block, so an unpinned repository needs no edit.
     `"prose"` is refused by name rather than as an unknown value: a
@@ -806,7 +804,7 @@ def _refuse_unknown_config_keys(raw: dict[str, object], path: Path) -> None:
     Silence here is expensive: `priorty_labels = [...]` would leave the
     board ordered by the defaults, with nothing in any output saying the
     repository's own ladder was never read. A key is foreign text, so it is
-    named as `protocol.terminal_text` shows it (issue #540).
+    named as `protocol.terminal_text` shows it.
     """
     unknown = sorted(set(raw) - CONFIG_KEYS)
     if unknown:
@@ -831,7 +829,7 @@ def load_config(path: Path = CONFIG_PATH) -> BoardConfig:
 def parse_config(text: str, path: Path) -> BoardConfig:
     """`text` validated as the board configuration at `path` -- the one
     validator both this checkout's own file (`load_config`) and a pull
-    request head's copy of it (`aco land`'s LANDCMD-24, issue #505) pass
+    request head's copy of it (`aco land`'s LANDCMD-24) pass
     through, so the two can never disagree about what a valid pin is."""
     try:
         raw = tomllib.loads(text)
@@ -852,17 +850,16 @@ def parse_config(text: str, path: Path) -> BoardConfig:
     )
 
 
-# The repository-owned rules a lane step's dispatch brief prints (issue
-# #324): a repository used to carry these ~25 lines by hand in every
+# The repository-owned rules a lane step's dispatch brief prints:
+# a repository used to carry these ~25 lines by hand in every
 # dispatch, pasted fresh each time. `.aco/brief.toml` gives it one
 # tracked owner instead, read only when `aco brief --step` asks for it.
 BRIEF_CONFIG_PATH = Path(".aco/brief.toml")
 
 
 class BriefStep(StrEnum):
-    """The four lane steps a dispatch brief can print rules and checks for
-    (issue #324) -- `aco brief --step`'s own choices, and `.aco/
-    brief.toml`'s four section names."""
+    """The four lane steps a dispatch brief can print rules and checks for --
+    `aco brief --step`'s own choices, and `.aco/brief.toml`'s four section names."""
 
     BUILD = "build"
     REVIEW = "review"
@@ -952,7 +949,7 @@ def _refuse_unknown_brief_config_keys(raw: dict[str, object], path: Path) -> Non
 
 
 def load_brief_config(path: Path = BRIEF_CONFIG_PATH) -> BriefConfig | None:
-    """The repository's own `.aco/brief.toml` (issue #324), or `None`
+    """The repository's own `.aco/brief.toml`, or `None`
     when it does not exist at `path` at all. Unlike `load_config`, absence
     is not a default to fall back on: `aco brief --step` refuses on it, so
     an agent asking for rules that were never written learns that instead
@@ -988,7 +985,7 @@ def _live_text(body: str) -> str:
     the end of the document, exactly as GitHub renders it — so an operator
     who left a fence unclosed, or wrote an info string on what they meant as
     a close, sees the same code block the tool does; there is no invisible
-    divergence. `#72`'s own body fences its example this way, and it must
+    divergence. An item body fences its example this way, and it must
     never itself read as live.
 
     Not modeled: a 4-space-indented code block (CommonMark's other fencing
@@ -1191,7 +1188,7 @@ def declared_work_items(pull_requests: tuple[PullRequest, ...], repository: str)
 def slice_title_match(title: str) -> tuple[int, int] | None:
     """`(slice number, parent issue)` when `title` looks like a dispatched slice.
 
-    Matches the three forms `#79` names: `(#<n> Scheibe <k>)`, `(#<n> slice
+    Matches the three forms: `(#<n> Scheibe <k>)`, `(#<n> slice
     <k>)`, and `Scheibe <k> von #<n>`. A title carrying none of them returns
     None — the heuristic simply has nothing to check.
     """
@@ -1213,7 +1210,7 @@ def _ruling_freshness_from(
 ) -> tuple[int | None, bool | None]:
     """`ruling_landings`/`ruling_old` from an already-resolved ruling date --
     the one place `_board_item` reads freshness, for either mode, since
-    `ParsedBody.ruling_date` is already `None` except when `RULED` (#150)."""
+    `ParsedBody.ruling_date` is already `None` except when `RULED`."""
     if ruling_date is None:
         return None, None
     count = landings_since(trunk_landings, ruling_date)
@@ -1227,7 +1224,7 @@ def _references(text: str) -> frozenset[int]:
 def open_dependency_blockers(
     dependencies: tuple[IssueDependency, ...], repository: str
 ) -> tuple[IssueReference, ...]:
-    """An item's `open_blockers` (#150 §6): every open `blocked_by`
+    """An item's `open_blockers`: every open `blocked_by`
     dependency GitHub records for it, same- or foreign-repository, issue or
     pull request alike."""
     references = (
@@ -1239,7 +1236,7 @@ def open_dependency_blockers(
 def dependency_freed_on(
     dependencies: tuple[IssueDependency, ...], repository: str
 ) -> datetime | None:
-    """An item's `freed_on` (#150 §6): only same-repository dependencies
+    """An item's `freed_on`: only same-repository dependencies
     can free an item -- a foreign dependency, open or closed, is dropped
     here and never blocks freedom on its own repository being unreachable."""
     local = tuple(
@@ -1292,7 +1289,7 @@ def _single_concrete_next(value: str | None) -> bool:
 # `next`'s cut_slice/check_container/close_container split both read a
 # `Next` line the same way. `""` belongs to it because a fresh skeleton writes `next = ""` and
 # that value stays the empty string (never mapped to `None`, so CONTRACT
-# still shows the key, #150 §5).
+# still shows the key).
 _NO_FURTHER_WORK_VALUES = frozenset({"keiner", "keine", "nichts", "none", "-", ""})
 
 
@@ -1407,7 +1404,7 @@ def _touched_without_closing(pull_requests: tuple[PullRequest, ...]) -> frozense
     foreign pull request that writes a dedicated, single "Refs #N" line for
     an unrelated reason still confers a stage; that risk is real and is not
     eliminated below, only narrowed. The one real narrowing available:
-    every observed genuine slice-to-epic reference (#848, #960, #965) names
+    every observed genuine slice-to-epic reference names
     its epic a second time elsewhere in the same pull request, in
     substantive prose — never only in the trailer line — so a marker with no
     corroborating mention elsewhere in the text is dropped. Fenced code
@@ -1431,7 +1428,7 @@ def _touched_without_closing(pull_requests: tuple[PullRequest, ...]) -> frozense
 
 def _merged_at(pull_request: PullRequest) -> datetime:
     """`pull_request`'s own merge date, parsed the way every other board
-    timestamp is (issue #371): `recent_merged_pull_requests` names only
+    timestamp is: `recent_merged_pull_requests` names only
     already-merged pull requests, so a `None` here is the forge answering a
     listing it does not honor, not a shape this function ever papers over."""
     if pull_request.merged_at is None:
@@ -1444,7 +1441,7 @@ def _pull_request_landing_rows(
     already_landed: frozenset[int],
     repository: str,
 ) -> tuple[LandingRow, ...]:
-    """`github`'s own supplement to the trunk walk (issue #371): one
+    """`github`'s own supplement to the trunk walk: one
     `LandingRow` per item a merged pull request plainly closes, declares, or
     lands -- LAND-41's own closing/landing keywords, never a `Refs`/`Part of`
     touch (LAND-45; a touch confers only the board's in-flight/landed
@@ -1480,15 +1477,14 @@ def _pull_request_landing_rows(
 
 def _landing_row_tie_break_key(row: LandingRow) -> tuple[int, int, int]:
     """The stable, ascending order two rows sharing `committed_at` fall back
-    to (issue #371): item number first, then evidence kind (a trunk
+    to: item number first, then evidence kind (a trunk
     trailer's row before a pull request's -- the trailer path always wins
     the same item, so this is unreachable today but keeps the key total
     rather than coincidentally sufficient), then pull request number.
     `landing_rows` negates every component below so its one
     `sorted(..., reverse=True)` pass resolves `committed_at` genuinely
     descending while this tie-break still comes out ascending -- avoiding
-    a second, sorted-fed-into-sorted pass (Sonar python:S7508, issue
-    #371)."""
+    a second, sorted-fed-into-sorted pass (Sonar python:S7508)."""
     if isinstance(row.evidence, TrunkLandingEvidence):
         return (row.item, 0, 0)
     return (row.item, 1, row.evidence.number)
@@ -1500,7 +1496,7 @@ def landing_rows(
     repository: str,
     storage: Storage,
 ) -> tuple[LandingRow, ...]:
-    """The board's Landungen view (issue #371): one row per item a trunk
+    """The board's Landungen view: one row per item a trunk
     commit's own trailer names as landed, across the trunk walk's own depth
     -- the one source under both storages, independent of whether that item
     is still open. `github` alone adds one more row per item a merged pull
@@ -1584,8 +1580,8 @@ class _BoardBuildContext:
 def _board_stage(
     issue: Issue, claim: protocol.ScopedClaim | None, context: _BoardBuildContext
 ) -> Stage:
-    # A board source that cannot list open pull requests at all (issue #248,
-    # `state-ref`) never populates `open_branches`, so a live claim can never
+    # A board source that cannot list open pull requests at all (`state-ref`)
+    # never populates `open_branches`, so a live claim can never
     # match it; its own honest in-flight signal is a live claim with a
     # branch, not a PR head this source structurally cannot see.
     in_flight = issue.number in context.in_flight_references or (
@@ -1606,8 +1602,8 @@ def _claim_projection(
     observed_at: datetime,
 ) -> tuple[str | None, str | None, bool]:
     """The (active_claim, claim_age, claim_old) trio a `BoardItem` shows for
-    `claim`. `opened_at` is the caller's own git-history read (issue #176,
-    §1) -- never derived here, so this stays a pure function of its inputs.
+    `claim`. `opened_at` is the caller's own git-history read --
+    never derived here, so this stays a pure function of its inputs.
     """
     if claim is None:
         return None, None, False
@@ -1786,39 +1782,39 @@ class BoardBuildInputs:
     repository: str
     now: datetime
     trunk_landings: tuple[datetime, ...] = ()
-    # Every item a trunk commit's own trailer names as landed, `sha` and all
-    # (issue #371) -- the one source of both `landing_rows` (the board's
+    # Every item a trunk commit's own trailer names as landed, `sha` and all --
+    # the one source of both `landing_rows` (the board's
     # Landungen view, under both storages) and the set of items trunk already
     # lands. `trunk_landings` above carries only each commit's timestamp, for
     # ruling-freshness, never its classification.
     trunk_landing_items: tuple[TrunkLandingItem, ...] = ()
     children: Mapping[int, tuple[ChildItem, ...]] = field(default_factory=dict)
     # The forge parent of each `childless_containers_with_uncut_rows`
-    # container that has one (issue #503), read by the caller through the
+    # container that has one, read by the caller through the
     # same `parent_issue` relation `cut` refuses a nested container on
     # (CUT-03) -- whatever that parent's type, state, or repository, which
     # the board's own open-container view cannot see.
     nesting_parents: Mapping[int, IssueReference] = field(default_factory=dict)
     dependencies: Mapping[int, tuple[IssueDependency, ...]] = field(default_factory=dict)
     requests: int = 0
-    # Each live claim's age (issue #176, §1): a committer date the caller
+    # Each live claim's age: a committer date the caller
     # already read from the store's git history, since workboard.py's own build
     # stays pure and never reaches for git itself. Keyed by claim_id.
     claim_ages: Mapping[str, datetime] = field(default_factory=dict)
-    # The board source's own capability (issue #248), never the storage
+    # The board source's own capability, never the storage
     # pin: a source that cannot list pull requests at all -- `state-ref`
     # today, honestly, not by name -- still has an in-flight signal (a live
     # claim with a branch) but no landed one, so the two stay independent
     # booleans instead of one storage-shaped flag.
     open_pull_requests_supported: bool = True
-    # Every claim's own ref-history lifecycle (issue #357,
-    # `store.claim_lifecycle`): `size` still `None` exactly as that reader
+    # Every claim's own ref-history lifecycle
+    # (`store.claim_lifecycle`): `size` still `None` exactly as that reader
     # leaves it -- `build_board` is the one place it is already known (an
     # item's own current size), so it joins it before ever calling
     # `metrics.measure`.
     lane_events: tuple[metrics.LaneEvent, ...] = ()
     # Every completed lane's own item's *current* size, for an item that is
-    # no longer among `issues` at all (issue #357 R2) -- closed, or vanished
+    # no longer among `issues` at all -- closed, or vanished
     # -- read once by the caller through the forge/state for exactly the
     # numbers `lane_events` names outside `issues`, since a closed item's
     # own current size is still readable there even though `build_board`
@@ -1827,7 +1823,7 @@ class BoardBuildInputs:
     # only for a number that map does not carry.
     closed_item_sizes: Mapping[int, metrics.Size | None] = field(default_factory=dict)
     # Claim-shaped `refs/aco/state` commits `store.claim_lifecycle` could
-    # not parse (issue #357 R1): older history predating its `item:`
+    # not parse: older history predating its `item:`
     # trailer, or a foreign commit merely shaped like one -- counted here
     # rather than silently dropped, and shown beside `Measurements.unfinished`
     # in the board's own Messungen section.
@@ -1839,7 +1835,7 @@ def _joined_lane_event(
     size_by_number: Mapping[int, metrics.Size | None],
 ) -> metrics.LaneEvent:
     """`event`, its `size` filled in from this build's own already-fetched
-    data (issue #357, closed items R2): a historical claim's size is read
+    data: a historical claim's size is read
     from its item's *current* size, open or closed -- `size_by_number` is
     `build_board`'s own union of every open item's parsed size and
     `inputs.closed_item_sizes` (read once through the forge/state for exactly
@@ -1884,8 +1880,8 @@ def _measurements(
 
 
 def _summed_lane_event(claims: Sequence[metrics.LaneEvent]) -> metrics.LaneEvent:
-    """One item's own completed claims, summed into a single measured lane
-    (issue #357 R2): their wall-clock durations added, never spanned or
+    """One item's own completed claims, summed into a single measured lane:
+    their wall-clock durations added, never spanned or
     averaged, so an item worked across several claims -- a builder, then a
     fixer, each its own claim -- contributes exactly one sample to its size
     class rather than `len(claims)` independent ones that would inflate `n`
@@ -1907,7 +1903,7 @@ def _summed_lane_event(claims: Sequence[metrics.LaneEvent]) -> metrics.LaneEvent
 
 
 def _measurement_feed(events: tuple[metrics.LaneEvent, ...]) -> tuple[metrics.LaneEvent, ...]:
-    """`events`, prepared for `metrics.measure` (issue #357 R2): every
+    """`events`, prepared for `metrics.measure`: every
     item's own completed claims summed into one lane by `_summed_lane_event`
     -- still-open claims (`released_at is None`) pass through unchanged,
     since each is already its own still-running lane and
@@ -2048,7 +2044,7 @@ def build_board(inputs: BoardBuildInputs) -> Board:
 
 def _buildable(item: BoardItem) -> bool:
     """Whether `item` names a path `claim`/`start` could actually claim right
-    now (issue #399): actionable, and naming either a top-level `scope` or at
+    now: actionable, and naming either a top-level `scope` or at
     least one `[[slice]]` row to cut one from. `next`'s own top action still
     picks a scopeless, sliceless item -- printed `scope unknown` rather than
     refused (NEXT-03) -- so this predicate is asked only by the claim/start
@@ -2063,7 +2059,7 @@ def highest_scored_actionable(board: Board) -> BoardItem | None:
     *buildable* row, not necessarily `next`'s own top action: an actionable
     item naming neither `scope` nor a slice row is one `next` still
     recommends (`scope unknown`), but never one this walk stops on, since
-    claiming past it costs no `--out-of-order` (issue #399).
+    claiming past it costs no `--out-of-order`.
 
     `ready_now` is a filtered view of `items`, which `build_board` orders by
     `board_rank`; filtering preserves that order, so the first buildable
@@ -2079,8 +2075,7 @@ def highest_scored_actionable(board: Board) -> BoardItem | None:
 class WorkItemAction:
     """Claim `item` -- today's `next` target. `scope` is the paths that
     claim occupies: the item's own top-level `scope`, else its one
-    `[[slice]]` row's -- the row a retyped nested container keeps (issue
-    #510) -- else `None`, unknown."""
+    `[[slice]]` row's -- the row a retyped nested container keeps -- else `None`, unknown."""
 
     item: BoardItem
     scope: tuple[str, ...] | None
@@ -2090,15 +2085,15 @@ class WorkItemAction:
 class CutSliceAction:
     """`container` has no open child and a still-undispatched `[[slice]]`
     row: that row is the typed statement that there is something to cut, and
-    is the only thing this action ever fires on (issue #208). `next_step` is
+    is the only thing this action ever fires on. `next_step` is
     the container's own words (its `Next` line when it still names work,
     else the row's own title) for the human-readable action line;
     `cut_title` is the title the printed `cut` gives the child -- always the
     first uncut row's title, the entry `cut` without `--row` links and names
-    the child after (issue #604). The two agree only when the `Next` line
+    the child after. The two agree only when the `Next` line
     names no work of its own. A container with no uncut row is never a
     `CutSliceAction`, however much prose its `Next` line still carries: that
-    prose is not a slice title (#208)."""
+    prose is not a slice title."""
 
     container: BoardItem
     container_progress: ContainerProgress
@@ -2110,7 +2105,7 @@ class CutSliceAction:
 class CloseContainerAction:
     """`container` has no open child, no uncut slice row, and a `Next` line
     naming no further work: nothing speaks against closing it, and no
-    command is ever proposed for it (issue #208)."""
+    command is ever proposed for it."""
 
     container: BoardItem
     container_progress: ContainerProgress
@@ -2120,8 +2115,8 @@ class CloseContainerAction:
 class CheckContainerAction:
     """`container` has no open child and no uncut slice row, but its own
     `Next` line (`next_step`) still names work: closing it could close open
-    work (issue #503), and that sentence is not a slice title to cut either
-    (#208), so `next` names it for a `done_when` check and nothing more."""
+    work, and that sentence is not a slice title to cut either, so `next` names it for a
+    `done_when` check and nothing more."""
 
     container: BoardItem
     container_progress: ContainerProgress
@@ -2138,7 +2133,7 @@ def _uncut_by_container(board: Board) -> dict[int, UncutSlices]:
 def _work_item_scope(
     own_scope: tuple[str, ...] | None, rows: tuple[SliceRow, ...]
 ) -> tuple[str, ...] | None:
-    """The paths a claim on a work item occupies (issue #510): its own
+    """The paths a claim on a work item occupies: its own
     top-level `scope`, else its one `[[slice]]` row's -- the row a retyped
     nested container keeps -- else `None`, unknown."""
     if own_scope is not None:
@@ -2148,7 +2143,7 @@ def _work_item_scope(
 
 @dataclass(frozen=True)
 class PullScope:
-    """What pulling a work item claims (issues #510, #566): its own
+    """What pulling a work item claims: its own
     top-level `scope`, which `claim` and `start` derive themselves; the
     `occupied` paths `_work_item_scope` names; its own `whole` reason,
     which both read from the body when the scope is wide; and whether the
@@ -2166,12 +2161,12 @@ class PullScope:
 
     def placeholders(self) -> tuple[str, ...]:
         """`WHOLE_PLACEHOLDER` when the width gate would refuse the occupied
-        paths for want of a reason (issue #566), else none."""
+        paths for want of a reason, else none."""
         return (WHOLE_PLACEHOLDER,) if self.wide and self.whole is None else ()
 
 
 def work_item_claim_command(number: int, storage: Storage, pull: PullScope) -> str:
-    """The one `claim` advice for work item `number` (NEXT-03, issue #510),
+    """The one `claim` advice for work item `number` (NEXT-03),
     scoped by `pull` -- so a nested container's pre-retype advice and
     `next`'s `Run:` line after the retype name the same claim."""
     arguments = ("claim", item_argument(number, storage))
@@ -2179,7 +2174,7 @@ def work_item_claim_command(number: int, storage: Storage, pull: PullScope) -> s
 
 
 def work_item_start_command(number: int, storage: Storage, slug: str, pull: PullScope) -> str:
-    """The `start` advice for work item `number` (issue #562), scoped as its
+    """The `start` advice for work item `number`, scoped as its
     `work_item_claim_command` is, for a caller standing where `claim`
     refuses, naming `slug` so the worktree and branch it builds are the
     ones the advice shows."""
@@ -2189,7 +2184,7 @@ def work_item_start_command(number: int, storage: Storage, slug: str, pull: Pull
 
 def _qualifying_actions(board: Board) -> Iterator[NextAction]:
     """Every row `next`'s family of readers can ever act on, in `board_rank`
-    order (issue #348) -- not only the first: `next_action`, `parallel_set`,
+    order -- not only the first: `next_action`, `parallel_set`,
     and `zero_cost_closes` all walk this one sequence instead of each
     re-deriving it, so the three stay in agreement by construction.
 
@@ -2199,21 +2194,20 @@ def _qualifying_actions(board: Board) -> Iterator[NextAction]:
     its block still carries an undispatched `[[slice]]` row, else
     `CheckContainerAction` when its own `Next` line still names work and
     `CloseContainerAction` when it names none; an empty slice table is the
-    typed statement that there is nothing to cut, and #208 is what happened
-    when a fallback ignored it).
+    typed statement that there is nothing to cut).
     `_container_progress` already fails loud on a container whose summary
     disagrees with its open-children list, so "no open child" here reliably
     means every created child has closed. Every other row -- blocked,
     claimed, incomplete, or a container still holding an open child -- is
     skipped, never blocking a later qualifying row.
 
-    Whichever branch carries a command, it never carries `--row` (#151):
+    Whichever branch carries a command, it never carries `--row`:
     `cut` without `--row` accepts every container a `CutSliceAction` names
     here, linking its first undispatched slice. `CloseContainerAction` and
     `CheckContainerAction` never carry a command at all -- inventing one from
-    prose that is not a slice title is #208.
+    prose that is not a slice title would be a guess.
 
-    A `MALFORMED` container (#150) is skipped here exactly like one still
+    A `MALFORMED` container is skipped here exactly like one still
     holding an open child: its own finding already surfaces through
     `actionable_reason`/`SKIPPED`, and proposing to cut or close a body
     that could not be read would act on a guess this module never makes.
@@ -2248,7 +2242,7 @@ def _action_scope(
     action: NextAction, uncut_by_container: Mapping[int, UncutSlices]
 ) -> tuple[str, ...] | None:
     """The scope one `NextAction` occupies for `parallel_set`'s disjointness
-    accounting (issue #348): a work item's own top-level `scope`, or a cut
+    accounting: a work item's own top-level `scope`, or a cut
     proposal's row scope -- the same first uncut row `uncut_by_container`
     already named its `cut_title` from. `CloseContainerAction` and
     `CheckContainerAction` always return `()`: closing or checking a
@@ -2265,7 +2259,7 @@ def _action_scope(
 @dataclass(frozen=True)
 class ParallelCandidate:
     """One free item `parallel_set` placed into the maximal disjoint set
-    alongside the first action (issue #348): its own number, and the exact
+    alongside the first action: its own number, and the exact
     scope that earned it a place -- a work item's own top-level scope, or a
     cut proposal's row scope."""
 
@@ -2275,7 +2269,7 @@ class ParallelCandidate:
 
 @dataclass(frozen=True)
 class ParallelSet:
-    """`next`'s own parallel-capacity projection (issue #348, Operator
+    """`next`'s own parallel-capacity projection (Operator
     19.09.2026: "ist das die maximale Auslastung?"): a priority-preserving
     greedy walk of `_qualifying_actions`, occupying live claims' scopes and
     the first action's own scope before it starts, then placing each further
@@ -2298,7 +2292,7 @@ def parallel_set(
     board: Board, live_claims: tuple[protocol.ScopedClaim, ...], action: NextAction | None
 ) -> ParallelSet:
     """The maximal set of further free items `next`'s first `action` can run
-    alongside right now (issue #348) -- see `ParallelSet` for the packing
+    alongside right now -- see `ParallelSet` for the packing
     rule. `CloseContainerAction` and `CheckContainerAction` never compete
     for scope at all and are skipped outright, whether one is `action`
     itself (occupying nothing) or a later candidate. A
@@ -2336,9 +2330,8 @@ def parallel_set(
 
 
 def waiting_on_operator(board: Board) -> tuple[int, ...]:
-    """The numbers of every item that waits on the operator (issues #553,
-    #604), in board order, less those `zero_cost_closes` already names (issue
-    #562): `next` names these apart from `SKIPPED`, since the operator's
+    """The numbers of every item that waits on the operator, in board order, less those
+    `zero_cost_closes` already names: `next` names these apart from `SKIPPED`, since the operator's
     ruling, not an agent's repair, is what frees them, while a landed item
     only waits to be closed."""
     closable = set(zero_cost_closes(board))
@@ -2357,11 +2350,10 @@ def ideas(board: Board) -> tuple[int, ...]:
 
 def zero_cost_closes(board: Board) -> tuple[int, ...]:
     """Every item `next` can close for free right now, regardless of which
-    row ranks first (issue #348; #310 finding 29: "warum wurde #122 nicht
-    geclosed? sollte aco das nicht feststellen?"): every childless container
+    row ranks first: every childless container
     with no undispatched `[[slice]]` row and no further `Next` work --
     `_qualifying_actions`'s own `CloseContainerAction` rows, never a
-    `CheckContainerAction` (issue #503), not only the board's top-ranked one --
+    `CheckContainerAction`, not only the board's top-ranked one --
     union every landed-but-open item (`board.recovery`), in first-seen
     order. Neither needs a claim first."""
     closable_containers = (
@@ -2383,12 +2375,12 @@ def closable_container_number(
     parent: ParentIssue, children: tuple[ChildItem, ...], storage: Storage
 ) -> int | None:
     """The container `release --merged`/`item close` should name as freshly
-    closable once one of its children just landed (issue #348): `parent`'s
+    closable once one of its children just landed: `parent`'s
     own kind, `children`'s open count, its own undispatched `[[slice]]`
     rows, and its own `Next` line decide it exactly like
     `_qualifying_actions`'s own `CloseContainerAction` branch -- a
     non-container parent, one still holding another open child, one with an
-    uncut row, or one whose `Next` line still names work (issue #503, a
+    uncut row, or one whose `Next` line still names work (a
     container between two slices) is never named.
     Whether a parent relation exists at all is the caller's own read
     (`ParentIssue | None`, forge-specific); this function only ever decides
@@ -2413,8 +2405,8 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
     `childless_verdict`, or `None` to skip it: a non-`VALID` body names its
     own finding elsewhere and is never guessed through, a
     `NestedRepairVerdict` names its repair under `SKIPPED` instead of a `cut`
-    that `cut` refuses (issue #503), and a container waiting on the operator
-    is only ever closed, never cut or checked (issue #604). A container
+    that `cut` refuses, and a container waiting on the operator
+    is only ever closed, never cut or checked. A container
     labelled as an idea is none of the three."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
@@ -2449,7 +2441,7 @@ _JsonRows = list[_JsonObject]
 
 def _project_blocker_references(entry: dict[str, object], key: str, repository: str) -> None:
     """Rewrite `entry[key]` (a list of `asdict`'d `IssueReference`s) into the
-    pre-#150 local-int list plus a sibling `foreign_blockers` key (A2) -- the
+    earlier local-int list plus a sibling `foreign_blockers` key (A2) -- the
     one projector `board_payload` uses for both `BoardItem.open_blockers`
     and each open child's `ChildItem.blocked_by`, never a mixed `int | str`
     list and never re-parsed from a label."""
@@ -2466,11 +2458,11 @@ def _project_blocker_references(entry: dict[str, object], key: str, repository: 
 
 def _project_uncut_row_scope(finding: dict[str, object]) -> None:
     """Drop a `None` `scope` from one uncut row's JSON dict rather than
-    printing it (issue #331): the public shape before this lane was
+    printing it: the public shape before this lane was
     `{"index", "title"}` with no third key, and `board --json` still owes
     that to a row that names no scope of its own -- only a row that
     actually carries one gains the extra `"scope"` key, canonical and
-    non-empty. A row's `done_when` (issue #606) is `cut`'s to read, never
+    non-empty. A row's `done_when` is `cut`'s to read, never
     part of `board --json`'s row shape (BOARD-14)."""
     for row in cast(_JsonRows, finding["rows"]):
         del row["done_when"]
@@ -2479,7 +2471,7 @@ def _project_uncut_row_scope(finding: dict[str, object]) -> None:
 
 
 def _project_landing_row(row: dict[str, object]) -> None:
-    """One `LandingRow`'s JSON shape (issue #371): `committed_at` turned to
+    """One `LandingRow`'s JSON shape: `committed_at` turned to
     ISO text like every other board timestamp, and `evidence` -- a nested
     `TrunkLandingEvidence`/`PullRequestLandingEvidence` dict after `asdict`
     -- flattened into `sha`/`pull_request`, exactly one of which is ever
@@ -2506,7 +2498,7 @@ def _tuples_to_lists(value: object) -> object:
 
 
 def board_payload(board: Board) -> dict[str, object]:
-    """`board`'s own `--json`/envelope payload (issue #412): every value
+    """`board`'s own `--json`/envelope payload: every value
     already JSON-primitive -- dates and datetimes turned to ISO text,
     blocker references split and re-keyed, every tuple turned into a list
     -- so `report.emit_json` can serialize it with a plain `json.dumps`,
@@ -2523,10 +2515,10 @@ def board_payload(board: Board) -> dict[str, object]:
             item.pop("terminal_actionable_reason")
             item.pop("read_state")
             item.pop("childless_verdict")
-            # `whole` feeds `next`'s advice only (issue #566); board.spec
+            # `whole` feeds `next`'s advice only; board.spec
             # names no such `--json` key.
             item.pop("whole")
-            # `waiting_on_operator` is `next`'s own projection (issue #604);
+            # `waiting_on_operator` is `next`'s own projection;
             # board.spec names no such per-item `--json` key.
             item.pop("waits_on_operator")
             _project_blocker_references(item, "open_blockers", repository)
@@ -2543,8 +2535,8 @@ def board_payload(board: Board) -> dict[str, object]:
 
 
 def _project_measurements(measurements: dict[str, object]) -> None:
-    """`Measurements`' own `datetime`/`date` fields, turned into ISO text
-    (issue #357) -- everything else in `payload["measurements"]` (`n`,
+    """`Measurements`' own `datetime`/`date` fields, turned into ISO text --
+    everything else in `payload["measurements"]` (`n`,
     `median_hours`, `p80_hours`, `weak`, the `Size` string) is already
     JSON-ready, since `metrics.py` carries no clock of its own."""
     measurements["as_of"] = cast(date, measurements["as_of"]).isoformat()
@@ -2556,12 +2548,12 @@ def _project_measurements(measurements: dict[str, object]) -> None:
 
 
 # The forge form an item takes under `GITHUB`: text for a label or a
-# command argument, a bare number for a `--json` field (issue #513).
+# command argument, a bare number for a `--json` field.
 _ForgeName = TypeVar("_ForgeName", int, str)
 
 
 def _storage_item_name(number: int, storage: Storage, forge_name: _ForgeName) -> str | _ForgeName:
-    """The one storage switch every item name below asks (issue #471): under
+    """The one storage switch every item name below asks: under
     `storage = STATE_REF` `items.format_item_id`'s `aco-xxxxxx` -- an id
     `parse_item_reference` accepts right back, so what a command prints is
     what the next command takes -- and under `GITHUB` the caller's own
@@ -2578,13 +2570,13 @@ def _storage_item_name(number: int, storage: Storage, forge_name: _ForgeName) ->
 
 def item_label(number: int, storage: Storage) -> str:
     """The display form of `number` any narrative output prints under
-    `storage` (issue #292): `#n` under `GITHUB`."""
+    `storage`: `#n` under `GITHUB`."""
     return _storage_item_name(number, storage, protocol.forge_item_label(number))
 
 
 def item_labeller(storage: Storage) -> protocol.ItemLabel:
     """`item_label` under `storage` -- the form a claim-ledger refusal from
-    `protocol` is named in (`protocol.ClaimError.named`, issue #471)."""
+    `protocol` is named in (`protocol.ClaimError.named`)."""
     return partial(item_label, storage=storage)
 
 
@@ -2595,7 +2587,7 @@ def located_block_or_refuse(
     any write: `cut`, `rescope`, `rule`, `ask`, and `item edit --size` /
     `--whole` need a body `parse_body` reads as VALID before they rewrite
     its block, and share this one gate so their refusal has one shape.
-    `storage` is forwarded to `parse_body` unchanged (issue #283): a state-ref item's own `[record]`
+    `storage` is forwarded to `parse_body` unchanged: a state-ref item's own `[record]`
     table must read as a known key, not a malformed one."""
     parsed = parse_body(raw_body, storage=storage)
     if parsed.read_state is BodyReadState.MALFORMED:
@@ -2618,7 +2610,7 @@ NAMES_NO_ITEM = "names no state-ref item; an item id ends at aco-ffffff"
 
 
 def names_no_item(number: int, storage: Storage) -> bool:
-    """Whether `number` names no item under `storage` (issue #467): under
+    """Whether `number` names no item under `storage`: under
     `storage = STATE_REF` a number past `aco-ffffff`, whose `item_label`
     would be an id `parse_item_reference` refuses back; under `GITHUB` every
     number stays a forge number. `NAMES_NO_ITEM` is the refusal's tail."""
@@ -2629,21 +2621,21 @@ def relation_label(reference: IssueReference, storage: Storage) -> str:
     """How a forge relation's other end (a parent, say) is named: always
     the qualified `owner/repo#n` under `storage = GITHUB`, where such a
     relation may cross repositories, and `item_label`'s own id under
-    `STATE_REF`, whose relations never leave the one store (issue #467)."""
+    `STATE_REF`, whose relations never leave the one store."""
     return _storage_item_name(reference.number, storage, str(reference))
 
 
 def item_argument(number: int, storage: Storage) -> str:
     """`number` as a bare item reference -- a printed command's positional
-    argument or a string-typed `--json` field (issue #467): the bare number
+    argument or a string-typed `--json` field: the bare number
     under `storage = GITHUB`, byte-identical to every such value before the
     state-ref pin existed, and `item_label`'s own id under `STATE_REF`, so
-    a person or agent can paste it back in (issue #292, residual of #300)."""
+    a person or agent can paste it back in."""
     return _storage_item_name(number, storage, str(number))
 
 
 def item_json_reference(number: int, storage: Storage) -> int | str:
-    """`number` as a `--json` item field (issue #513): `item_label`'s own id
+    """`number` as a `--json` item field: `item_label`'s own id
     under `storage = STATE_REF`, the form the text beside it prints rather
     than the internal integer behind it, and the bare number under
     `GITHUB`, unchanged."""
@@ -2662,7 +2654,7 @@ OUT_OF_ORDER_PLACEHOLDER = "--out-of-order <reason>"
 @dataclass(frozen=True)
 class AdviceOption:
     """One option and its value in an advice command, printed attached as
-    `--name=<quoted value>` (issue #513): argparse then takes the value
+    `--name=<quoted value>`: argparse then takes the value
     whatever it starts with, where a scope path written apart from its
     option, `--scope -notes.md`, refuses with `expected one argument`."""
 
@@ -2674,7 +2666,7 @@ class AdviceOption:
 
 
 def shell_command(program: str, *arguments: str | AdviceOption) -> str:
-    """The one rendering of a command a piece of advice names (issue #510):
+    """The one rendering of a command a piece of advice names:
     every argument quoted for a POSIX shell, so the line runs unchanged in
     the agent's real shell -- a scope path such as `docs/my $HOME notes.md`
     reaches the command as written, never split or expanded."""
@@ -2694,16 +2686,16 @@ _DISPLAY_NAME_LENGTH_LIMIT = 40
 
 
 def truncated_display_name(name: str) -> str:
-    """Cap names at 40 characters so three fit the 200-character budget (issue #405)."""
+    """Cap names at 40 characters so three fit the 200-character budget."""
     if len(name) <= _DISPLAY_NAME_LENGTH_LIMIT:
         return name
     return name[: _DISPLAY_NAME_LENGTH_LIMIT - 1] + "…"
 
 
 def _quoted_prose(text: str) -> str:
-    """`text` inside prose as one double-quoted span (issue #532, #310
-    finding 190): its own `\\` and `"` are escaped first, so a title such
-    as `x"; run aco claim 9` cannot close the quote and fake a command."""
+    """`text` inside prose as one double-quoted span:
+    its own `\\` and `"` are escaped first, so a
+    title such as `x"; run aco claim 9` cannot close the quote and fake a command."""
     escaped = text.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
@@ -2713,7 +2705,7 @@ def _pull_command(
     scope: tuple[str, ...] | None,
     placeholders: tuple[str, ...],
 ) -> str:
-    """A `claim` or `start` advice (issues #510, #562): one `--scope` per
+    """A `claim` or `start` advice: one `--scope` per
     path of `scope`, none at all for `()` -- the item's own body scope,
     which both derive themselves -- and `SCOPE_PLACEHOLDER` when no paths
     are known (`None`), ahead of every further `placeholders`."""
@@ -2723,9 +2715,8 @@ def _pull_command(
 
 
 def cut_command(number: int, storage: Storage) -> str:
-    """The `cut` advice for container `number`'s first uncut row (issues
-    #510, #604): `next`'s own action line and a `SKIPPED` container's reason
-    (issue #513) print this one command, which takes that row's own title."""
+    """The `cut` advice for container `number`'s first uncut row: `next`'s own action line and a
+    `SKIPPED` container's reason print this one command, which takes that row's own title."""
     return advice_command("cut", item_argument(number, storage))
 
 
@@ -2752,7 +2743,7 @@ class _ActionabilityFacts:
 
 
 # `next`'s own words for a childless container whose `Next` line still names
-# work (issue #503): its `check_container` line and its `SKIPPED` reason,
+# work: its `check_container` line and its `SKIPPED` reason,
 # never a close.
 CHECK_DONE_WHEN = "no open children; check done_when"
 
@@ -2776,10 +2767,9 @@ class NestedRepairVerdict:
 @dataclass(frozen=True)
 class UnprintableRowVerdict:
     """The first uncut row, the one `cut` links, has a one-line field, `key`,
-    holding a line break (issue #513) or another control character (issue
-    #532): a `cut` command naming its title would spread over two printed
-    lines or reach the terminal raw, and `cut` refuses its `done_when`
-    (issue #606 line 3), so only making that field one printable line helps.
+    holding a line break or another control character: a `cut` command naming its title would spread
+    over two printed lines or reach the terminal raw, and `cut` refuses its
+    `done_when`, so only making that field one printable line helps.
     `row` is the index `cut --row` names that row by."""
 
     row: int
@@ -2800,7 +2790,7 @@ class CloseVerdict:
     closing the container."""
 
 
-# What a container with no open child is up for (issue #503), each verdict
+# What a container with no open child is up for, each verdict
 # carrying the data its own answer needs.
 ChildlessContainerVerdict = (
     CutVerdict | NestedRepairVerdict | UnprintableRowVerdict | CheckVerdict | CloseVerdict
@@ -2810,14 +2800,13 @@ ChildlessContainerVerdict = (
 def _childless_container_verdict(
     slices: tuple[SliceRow, ...], next_line: str | None, nesting_parent: IssueReference | None
 ) -> ChildlessContainerVerdict:
-    """The one decider for a container with no open child (issue #503):
+    """The one decider for a container with no open child:
     `next`'s action, its `SKIPPED` reason, and `release --merged`'s
     closable parent all read this answer rather than re-deriving it. An
-    uncut `[[slice]]` row is the only thing to cut (#208) -- unless the
+    uncut `[[slice]]` row is the only thing to cut -- unless the
     container is itself a child, which `cut` refuses (CUT-03), so only a
     repair helps, or the row's title or `done_when` holds a line break or
-    control character no printed one-line advice or `cut` can carry
-    (issues #513, #532, #606);
+    control character no printed one-line advice or `cut` can carry;
     with no row left, a `Next` line still naming work asks for a
     `done_when` check, and only one naming none is closable."""
     if nesting_parent is not None and slices:
@@ -2858,8 +2847,8 @@ def parent_completion(parsed: ParsedBody) -> ParentCompletion:
 def childless_containers_with_uncut_rows(
     issues: Iterable[Issue], storage: Storage
 ) -> tuple[int, ...]:
-    """The containers whose forge parent can change their verdict (issue
-    #503): no open child and an uncut `[[slice]]` row, the only shape
+    """The containers whose forge parent can change their verdict:
+    no open child and an uncut `[[slice]]` row, the only shape
     `_childless_container_verdict` reads `nesting_parent` for. The caller
     reads just these parents and hands them back as
     `BoardBuildInputs.nesting_parents`."""
@@ -2880,8 +2869,8 @@ def _childless_container_reason(
     storage: Storage,
 ) -> str | None:
     """What container `number`, with no open child, is up for when `SKIPPED`
-    names it (issue #503) -- for a cuttable one not `next`'s first action,
-    its `cut` (issue #513) -- or `None` for a closable one, which `close:`
+    names it -- for a cuttable one not `next`'s first action,
+    its `cut` -- or `None` for a closable one, which `close:`
     names."""
     match verdict:
         case CutVerdict(title=title):
@@ -2901,7 +2890,7 @@ def _childless_container_reason(
 
 def _cut_slice_reason(number: int, storage: Storage, title: str) -> str:
     """The `SKIPPED` reason of a cuttable container `number` that is not
-    `next`'s first action (issue #513): its first uncut row `title`, quoted
+    `next`'s first action: its first uncut row `title`, quoted
     by `_quoted_prose`, and the `cut` that row takes."""
     return f"cut slice {_quoted_prose(title)}; run {cut_command(number, storage)}"
 
@@ -2913,12 +2902,11 @@ def _nested_container_repair(
     storage: Storage,
 ) -> str:
     """The repair container `number` needs when it is itself a child of
-    `nesting_parent` and still carries uncut `[[slice]]` rows (issue #503):
+    `nesting_parent` and still carries uncut `[[slice]]` rows:
     `cut` refuses it, so `next` never proposes one and names this instead --
     for its one row, the `item edit --kind task` both storages run (ITEM-47)
-    and the claim `work_item_claim_command` names for the task it becomes
-    (issue #510), out of order since a `SKIPPED` item is never `next`'s first
-    action (issue #513); for more rows, their move up to that
+    and the claim `work_item_claim_command` names for the task it becomes, out of order since a
+    `SKIPPED` item is never `next`'s first action; for more rows, their move up to that
     parent, named the way `cut`'s own refusal names it."""
     if len(parsed.slices) == 1:
         retype = advice_command("item", "edit", item_argument(number, storage), "--kind", "task")
@@ -2947,7 +2935,7 @@ def _nested_container_repair(
 def _read_state_actionable_reason(facts: _ActionabilityFacts) -> str | None:
     """The one refusal a malformed body gets, ahead of every other reason --
     including the container rule, so a container whose body itself cannot
-    be read is never offered as "claim a child" (#150 §5)."""
+    be read is never offered as "claim a child"."""
     if facts.read_state is BodyReadState.MALFORMED and facts.malformed_defect is not None:
         return body_defect_text(facts.malformed_defect)
     return None
@@ -2970,8 +2958,8 @@ def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
 
 
 def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
-    """Whether only the operator's ruling frees this item (issues #553,
-    #604): a readable container labelled `NEEDS_OPERATOR_LABEL` or frozen,
+    """Whether only the operator's ruling frees this item: a readable container
+    labelled `NEEDS_OPERATOR_LABEL` or frozen,
     which `next` then never cuts or checks, or any other readable item so
     labelled while unfrozen and unclaimed -- a frozen or claimed one names
     that reason instead. An idea waits on no ruling: `next` lists it apart."""
@@ -3007,7 +2995,7 @@ def _unreadable_children_reason(
     progress: ContainerProgress | None, unreadable_numbers: frozenset[int], storage: Storage
 ) -> str | None:
     """What holds a container whose every open child is an item that does
-    not read (issue #550, ITEM-54): no child is there to claim, and its
+    not read (ITEM-54): no child is there to claim, and its
     close refuses by them, so `next` names them instead."""
     if progress is None or not progress.open_children:
         return None
@@ -3028,7 +3016,7 @@ def claim_subject(claim: protocol.ScopedClaim, storage: Storage) -> str:
 
 def claim_age_fields(opened_at: datetime, now: datetime) -> tuple[str, bool]:
     """The rendered age and old-ness of a claim opened at `opened_at` (a
-    commit's committer date -- issue #176, §1 -- not a ledger comment
+    commit's committer date -- not a ledger comment
     timestamp)."""
     age = now.astimezone(UTC) - opened_at.astimezone(UTC)
     return format_claim_age(age), claim_is_old(age)
@@ -3042,7 +3030,7 @@ def claim_age_suffix(opened_at: datetime, now: datetime) -> str:
 def next_action_item(action: NextAction) -> BoardItem:
     """The `BoardItem` `action` targets, whichever action kind it is -- a
     plain claim target for `WorkItemAction`, the container itself for
-    `CutSliceAction`/`CheckContainerAction`/`CloseContainerAction` (issue #256)."""
+    `CutSliceAction`/`CheckContainerAction`/`CloseContainerAction`."""
     return action.item if isinstance(action, WorkItemAction) else action.container
 
 
@@ -3050,7 +3038,7 @@ def freed_item_numbers(
     dependencies: Mapping[int, tuple[IssueDependency, ...]],
     landed: IssueReference,
 ) -> tuple[int, ...]:
-    """Open items whose last open blocker was `landed` (issue #256): every
+    """Open items whose last open blocker was `landed`: every
     local `blocked_by` dependency of the item is now closed, `landed` was
     one of them, and nothing else -- local or foreign -- still blocks it.
     Reuses `open_dependency_blockers`/`dependency_freed_on`,
@@ -3059,8 +3047,8 @@ def freed_item_numbers(
     those only ever describe the *currently* open issues, so a landed
     item's own `blocked_by` reference disappears from them the moment it
     closes -- exactly the fact this needs to name who it freed. `dependencies`
-    is `cmd_release._release_landing`'s one fetch, shared with `board_read.build_board` (issue #256
-    review), rather than a second `list_board_dependencies` round trip over
+    is `cmd_release._release_landing`'s one fetch, shared with `board_read.build_board`,
+    rather than a second `list_board_dependencies` round trip over
     the same candidates.
     """
     repository = landed.repository
@@ -3108,7 +3096,7 @@ def closed_item_numbers(
     lane_events: tuple[metrics.LaneEvent, ...], open_numbers: frozenset[int]
 ) -> frozenset[int]:
     """Every numbered item `lane_events` names that is not among this board
-    build's own open issues (issue #357 R2) -- a completed lane whose item
+    build's own open issues -- a completed lane whose item
     has since closed, or one this walk can no longer resolve to a live
     issue at all. A `docs/`/`fix/` lane claim's own `item`, like any other
     trailer that is no `protocol.decimal_number_or_none` number, is silently
@@ -3133,7 +3121,7 @@ def selected_store_claim(
     direct key lookup, never the ledger's filter-then-disambiguate walk.
     `claim_id`, when given, is a safety check against that one claim, not a
     selector among several -- there are never several. A refusal names the
-    item in `storage`'s form (issue #471).
+    item in `storage`'s form.
     """
     if isinstance(identity, protocol.LaneIdentity) and not branch:
         raise protocol.ClaimUnavailableError(
@@ -3149,12 +3137,12 @@ def selected_store_claim(
 def no_active_build_claim(
     identity: protocol.ClaimIdentity, branch: str, storage: Storage
 ) -> protocol.ClaimUnavailableError:
-    """REL-09's refusal, naming the item in `storage`'s form (issue #471)."""
+    """REL-09's refusal, naming the item in `storage`'s form."""
     subject = protocol.identity_summary(identity, branch, item_labeller(storage))
     return protocol.ClaimUnavailableError(f"{subject} has no active build claim")
 
 
 def named_refusal(error: protocol.ClaimError, storage: Storage) -> protocol.ClaimError:
     """`error` as a report prints it: naming its item the way `storage`'s
-    board does (issue #471)."""
+    board does."""
     return protocol.ClaimError(error.named(item_labeller(storage)))
