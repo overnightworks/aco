@@ -49,7 +49,6 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "PL", "FURB", "N", "SLF001", "ANN401"]
-external = ["V107"]  # vulture's unused-attribute marker, used in usage.py
 
 [tool.ruff.lint.per-file-ignores]
 # Test literals are scenario data, not domain magic numbers; a pytest test

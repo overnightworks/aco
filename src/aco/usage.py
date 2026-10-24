@@ -31,14 +31,14 @@ class _ArgumentOptions(TypedDict, total=False):
     """The `add_argument` options `aco` parsers declare, as typeshed types them."""
 
     action: str | type[argparse.Action]
-    nargs: int | str | None  # noqa: V107
-    const: object  # noqa: V107
+    nargs: int | str | None
+    const: object
     default: object
     type: Callable[[str], object] | argparse.FileType | str
     choices: Iterable[object] | None
     required: bool
     help: str | None
-    metavar: str | tuple[str, ...] | None  # noqa: V107
+    metavar: str | tuple[str, ...] | None
     dest: str | None
     version: str
 
