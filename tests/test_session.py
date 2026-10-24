@@ -1,4 +1,4 @@
-"""Behaviour of `aco.session.RunContext` (issue #457): one
+"""Behaviour of `aco.session.RunContext`: one
 command run's static repository facts, read lazily, held once read, and
 answered per directory."""
 
@@ -77,8 +77,8 @@ def test_refuse_unsupported_forge_host_allows_github() -> None:
 
 
 def test_refuse_unsupported_forge_host_refuses_another_host() -> None:
-    """No forge adapter but GitHub's exists yet (#230 slice 2) -- a forge
-    command against any other host refuses by its own name (issue #245),
+    """No forge adapter but GitHub's exists yet -- a forge
+    command against any other host refuses by its own name,
     never with GitHub's "does not name a GitHub repository" text."""
     location = checkout.RemoteLocation("gitlab.com", "o/r")
 
@@ -108,7 +108,7 @@ def test_repository_id_refuses_before_asking_gh_on_a_non_github_host(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The GitHub repository gates on the canonical remote's own host
-    before it ever calls `discover_repository` (issue #245): a `gh` call
+    before it ever calls `discover_repository`: a `gh` call
     here would fail the test outright."""
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/repo.git"
@@ -144,7 +144,7 @@ def test_repository_id_checks_erwartung_6_against_a_github_remote(
 def test_repository_id_discovers_the_repository_of_the_context_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #472: a context for another directory asks about that
+    """A context for another directory asks about that
     directory's repository, never the calling process's own cwd."""
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: "git@github.com:owner/repo.git"
@@ -167,10 +167,9 @@ def test_repository_id_discovers_the_repository_of_the_context_directory(
 def test_default_branch_under_state_ref_reads_the_canonical_remotes_head_in_the_context_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, canonical_remote: str
 ) -> None:
-    """Issue #322 review finding 1, now the context's own fact (issue #457):
-    a context for `start`'s created worktree reads the recorded `HEAD`
+    """A context for `start`'s created worktree reads the recorded `HEAD`
     there, never from the calling process's own cwd -- the canonical
-    remote's, whichever it is (issue #490)."""
+    remote's, whichever it is."""
     worktree = _checkout_configuring(
         tmp_path,
         canonical_remote,
@@ -208,7 +207,7 @@ def _hub_canonical_repository(tmp_path: Path, *, origin_url: str | None) -> Path
 def test_repository_id_is_discovered_from_the_canonical_remotes_url(
     tmp_path: Path, origin_url: str | None
 ) -> None:
-    """#310 finding 138: with `hub` canonical, the repository is discovered
+    """With `hub` canonical, the repository is discovered
     from `hub`'s URL, with or without an `origin` -- a fork's `origin` is
     never read."""
     repository = _hub_canonical_repository(tmp_path, origin_url=origin_url)
@@ -221,7 +220,7 @@ def test_repository_id_is_discovered_from_the_canonical_remotes_url(
 def test_repository_id_refuses_a_repo_naming_the_fork_beside_the_canonical_remote(
     tmp_path: Path,
 ) -> None:
-    """#310 finding 138: `--repo` naming the fork an `origin` points at,
+    """`--repo` naming the fork an `origin` points at,
     while `hub` is canonical, refuses loudly rather than reading the fork."""
     repository = _hub_canonical_repository(tmp_path, origin_url="git@github.com:fork/repo.git")
     fork = forge.RepositoryId(github.GITHUB_HOST, ("fork",), "repo")
@@ -234,11 +233,11 @@ def test_repository_id_refuses_a_repo_naming_the_fork_beside_the_canonical_remot
 def test_a_context_for_another_directory_reads_its_remotes_there(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #457 proof 7: `for_directory` answers the canonical remote and
+    """`for_directory` answers the canonical remote and
     the repository it names from its own checkout, never from the calling
     process's cwd, so a child context never pairs its own configuration
     with another checkout's remote -- one read of the canonical remote's
-    URL answers both (#310 finding 138)."""
+    URL answers both."""
     worktree = _checkout_configuring(tmp_path, "origin", "")
     read_from: list[tuple[str, Path | None]] = []
 
@@ -259,7 +258,7 @@ def test_a_context_for_another_directory_reads_its_remotes_there(
 def test_a_failed_observation_is_fetched_again_and_a_successful_one_is_held(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #477 (CAS-53): a fetch of `refs/aco/state` that fails is never held --
+    """CAS-53: a fetch of `refs/aco/state` that fails is never held --
     the context's next ask fetches again, from its toplevel over its
     canonical remote -- while one that succeeds answers every later ask."""
     worktree = _checkout_configuring(tmp_path, "origin", "")
@@ -305,7 +304,7 @@ def _git_version() -> tuple[int, ...]:
 def test_a_fetched_trunk_is_resolved_after_the_fetch_never_from_a_trunk_held_before_it(
     tmp_path: Path,
 ) -> None:
-    """Issue #488: with no recorded `HEAD` and no remote-tracking trunk yet,
+    """With no recorded `HEAD` and no remote-tracking trunk yet,
     the held trunk is the stale local `main`; once the context fetches, it
     resolves the trunk again and names the remote's tip, never the ref it
     held before the fetch."""
@@ -326,7 +325,7 @@ def test_a_fetched_trunk_is_resolved_after_the_fetch_never_from_a_trunk_held_bef
 def test_a_default_branch_held_before_the_fetch_never_names_the_fetched_ref(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #492: under `state-ref` the default branch held before the
+    """Under `state-ref` the default branch held before the
     fetch is `main`; once the recorded `HEAD` names `trunk`, the fetched
     default-branch ref and every later ask name `trunk`, and the trunk asked
     after it shares that one fetch."""
@@ -354,7 +353,7 @@ def test_a_default_branch_held_before_the_fetch_never_names_the_fetched_ref(
     _git_version() < (2, 48), reason="git records a fetched remote's HEAD from 2.48 on"
 )
 def test_a_fetch_records_the_remote_head_the_trunk_then_names(tmp_path: Path) -> None:
-    """Issue #488 proof 4: a checkout that never recorded its remote's
+    """A checkout that never recorded its remote's
     `HEAD` has it recorded by the context's own fetch, and the trunk is read
     from it."""
     repository = _pushed_repository(tmp_path)
@@ -372,7 +371,7 @@ def test_a_fetch_records_the_remote_head_the_trunk_then_names(tmp_path: Path) ->
 def test_every_trunk_read_names_the_canonical_remote_never_a_diverging_origin(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #488 proof 2: `hub` is canonical beside an `origin` one commit
+    """`hub` is canonical beside an `origin` one commit
     behind it; the held trunk, the fetched trunk, and the landings walked
     from it are all `hub`'s, and git never fetches or reads `origin`'s
     `HEAD` for them."""
@@ -399,7 +398,7 @@ def test_every_trunk_read_names_the_canonical_remote_never_a_diverging_origin(
 def test_a_fresh_context_whose_configuration_names_another_remote_fetches_that_remote(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #488 with #457 proof 6: the run fetched `origin`, then the
+    """The run fetched `origin`, then the
     landed configuration names `hub`, whose tracking ref stands one commit
     behind it; the fresh context rereads that configuration and fetches
     `hub` before answering, never taking `origin`'s fetch for `hub`'s."""
@@ -429,7 +428,7 @@ def test_a_fresh_context_whose_configuration_names_another_remote_fetches_that_r
 def test_a_failed_trunk_fetch_fails_loud_and_is_fetched_again_on_the_next_ask(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Issue #488: a fetch that fails is never held as done -- the next ask
+    """A fetch that fails is never held as done -- the next ask
     fetches again -- while one that succeeds answers every later ask."""
     repository = _pushed_repository(tmp_path)
     launch = checkout._git_run
@@ -457,7 +456,7 @@ def test_a_failed_trunk_fetch_fails_loud_and_is_fetched_again_on_the_next_ask(
 def test_a_trunk_the_fetch_pruned_fails_loud_on_every_ask_never_answered_by_the_held_ref(
     tmp_path: Path,
 ) -> None:
-    """Issue #488: the trunk held before the fetch names `origin/main`; the
+    """The trunk held before the fetch names `origin/main`; the
     fetch prunes it and nothing else resolves -- no recorded `HEAD`, no
     local `main` or `master` -- so every later ask fails loud instead of
     answering with the ref held from before the fetch."""
@@ -491,7 +490,7 @@ def _hub_removed_leaving_its_refs(repository: Path) -> None:
 
 def _hub_left_a_fetch_line_without_a_url(repository: Path) -> None:
     """A local `remote.hub.fetch` with no `remote.hub.url` makes git list
-    `hub` beside the refs it left behind (issue #512)."""
+    `hub` beside the refs it left behind."""
     _hub_removed_leaving_its_refs(repository)
     real_git(repository, "config", "remote.hub.fetch", "+refs/heads/*:refs/remotes/hub/*")
 
@@ -520,7 +519,7 @@ def test_every_read_of_a_canonical_remote_the_checkout_does_not_configure_refuse
     unconfigure_hub: Callable[[Path], None],
     read: Callable[[RunContext], object],
 ) -> None:
-    """Issue #508 proof 1, against real git: the board names `hub`, which
+    """Against real git: the board names `hub`, which
     this checkout does not configure, so its trunk, its fetch, its state
     ref, its default branch and the repository it names all refuse by
     naming it -- never answered by the local `main` or by the refs a
@@ -542,7 +541,7 @@ def test_every_read_of_a_canonical_remote_the_checkout_does_not_configure_refuse
 def test_a_canonical_remote_the_checkout_does_not_configure_records_no_default_branch(
     tmp_path: Path, unconfigure_hub: Callable[[Path], None]
 ) -> None:
-    """Issue #508: the offline checks' recorded default branch asks the
+    """The offline checks' recorded default branch asks the
     same owner, so the `HEAD` a removed `hub` left behind records nothing
     -- each check then keeps its own rule for no default branch."""
     repository = _pushed_repository(tmp_path, 'storage = "state-ref"\ncanonical_remote = "hub"\n')
@@ -555,7 +554,7 @@ def test_a_canonical_remote_the_checkout_does_not_configure_records_no_default_b
 def test_a_canonical_remote_found_unconfigured_stays_refused_for_the_whole_context(
     tmp_path: Path,
 ) -> None:
-    """Issue #508: whether the checkout configures its canonical remote is
+    """Whether the checkout configures its canonical remote is
     answered once per context, a refusal as much as a success -- adding
     `hub` after the first ask changes nothing for that context."""
     repository = _pushed_repository(tmp_path, 'storage = "state-ref"\ncanonical_remote = "hub"\n')
@@ -572,9 +571,9 @@ def test_a_canonical_remote_found_unconfigured_stays_refused_for_the_whole_conte
 def test_a_configured_canonical_remote_without_branches_still_guesses_the_local_trunk(
     tmp_path: Path,
 ) -> None:
-    """Issue #508 proof 2: `hub` is configured but carries no branch yet --
+    """`hub` is configured but carries no branch yet --
     a fresh or offline repository -- so the trunk is still the local
-    `main` (issue #492 ruling)."""
+    `main`."""
     repository = _pushed_repository(tmp_path, 'canonical_remote = "hub"\n')
     real_git(repository, "remote", "add", "hub", str(tmp_path / "hub.git"))
 
@@ -604,7 +603,7 @@ def test_a_command_that_needs_no_repository_reads_no_context(
     stdin: str,
     exit_code: int,
 ) -> None:
-    """Issue #457 proof 2: the run's context is built lazily, so a parse
+    """The run's context is built lazily, so a parse
     refusal never reads the repository a context would answer for."""
     _forbid_context_reads(monkeypatch)
     monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
@@ -637,7 +636,7 @@ def test_a_repo_that_is_not_owner_slash_repo_refuses_before_any_git_or_gh_call(
     command: list[str],
     envelope: str,
 ) -> None:
-    """Issue #465 proof 1: `--repo` names a GitHub repository or nothing --
+    """`--repo` names a GitHub repository or nothing --
     a path is never silently dropped for the checkout's own remote."""
     _forbid_context_reads(monkeypatch)
 

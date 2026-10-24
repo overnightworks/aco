@@ -97,7 +97,7 @@ OTHER_REPOSITORY = "other/agent-coordination"
 
 @dataclass(frozen=True)
 class PreflightRow:
-    """One pull request #45 as `adoption_preflight` meets it, with the claims
+    """One pull request as `adoption_preflight` meets it, with the claims
     the store holds and the refusal or plan it must reach."""
 
     refusal: str = ""

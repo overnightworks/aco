@@ -1,5 +1,5 @@
 """Keeps every test run off non-local git remotes and off the operator's
-GitHub login (issues #530 and #534).
+GitHub login.
 
 A test that escapes its store fakes once pushed a claim into the live claim
 store on origin. Git refuses any transport outside `GIT_ALLOW_PROTOCOL`, so

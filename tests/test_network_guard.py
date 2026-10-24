@@ -1,4 +1,4 @@
-"""Behavioral tests for `tests/network_guard.py` (issues #530 and #534).
+"""Behavioral tests for `tests/network_guard.py`.
 
 Git and gh are the boundaries the guard constrains, so each proof runs the
 real binary under `tmp_path`. The refused remotes point at a closed
@@ -148,7 +148,7 @@ def test_the_shared_helper_pushes_to_a_local_remote_despite_a_hostile_template(
 ) -> None:
     """The guard lets local remotes through, and the shared real-git helper
     seeds nothing from the operator's template, whose rewrite would send the
-    `file://` push to a refused https port (#534 line 2)."""
+    `file://` push to a refused https port."""
     push = _push_a_commit(tmp_path, remote_url)
 
     assert push.returncode == 0, push.stderr
@@ -195,8 +195,8 @@ def test_a_module_outside_tests_is_guarded_by_the_project_plugin_alone(
 ) -> None:
     """A scratch directory whose initial conftest, module import and test
     each ask git for an https remote passes only when the plugin the project
-    configuration loads guards before the initial conftests (#530 lines 1
-    and 2). The operator's git configuration refuses https here too: at
+    configuration loads guards before the initial conftests. The operator's git
+    configuration refuses https here too: at
     runtime, in the repository `GIT_DIR` selects, and in that same
     repository enclosing the scratch directory under a path git cannot name
     as a discovery ceiling; the blocked run proves the scratch pytest never
@@ -262,7 +262,7 @@ def test_a_run_started_with_a_hostile_gh_setup_finds_no_login(
 ) -> None:
     """A pytest run started with the hostile gh setup asks gh for a login
     from its module and finds none only while the plugin displaces the
-    setup before the run begins (#534 line 1); the blocked run proves the
+    setup before the run begins; the blocked run proves the
     seeded login is one gh would use."""
     run = _run_scratch_pytest(
         tmp_path, _SCRATCH_GH_LOGIN_MODULE, plugin_arguments, hostile_gh_environment
@@ -284,8 +284,8 @@ def test_a_run_started_with_a_hostile_gh_setup_keeps_its_gh_requests_on_the_mach
     """A pytest run started with the hostile gh setup sends a request for a
     repository on the default host and a request for a host it names only to
     the closed loopback port, and only while the plugin displaces the
-    setup's proxy, exemption and repository before the run begins (#534
-    line 1); the blocked run reports that its module sees
+    setup's proxy, exemption and repository before the run begins; the blocked
+    run reports that its module sees
     the seeded routing, and never sends the request, because the module
     checks the routing first."""
     run = _run_scratch_pytest(
@@ -352,7 +352,7 @@ def test_gh_under_the_plugin_has_no_login_and_stays_on_the_machine(
 ) -> None:
     """The real gh binary finds no login for its default host nor, in the
     operator's keyring, for github.com, and a request for its default host
-    ends at the closed loopback port (#534 line 1)."""
+    ends at the closed loopback port."""
     # Its stdout is never captured, so a token gh does find cannot reach a failure report.
     gh = subprocess.run(
         ["gh", *gh_arguments],

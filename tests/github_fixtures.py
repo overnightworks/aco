@@ -36,7 +36,7 @@ from aco.workboard import IssueDependency, MergeMethod
 
 WORK_ITEM_ISSUE = 72
 LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"
-# A well-formed 40-hex sha (issue #397): the merge commit a merged `Landing`
+# A well-formed 40-hex sha: the merge commit a merged `Landing`
 # carries, matching `protocol.COMMIT_PATTERN` -- its own digits never mean
 # anything beyond "a plausible sha", so every scenario that just needs one
 # shares this instead of inventing a fresh, equally arbitrary string.
@@ -58,7 +58,7 @@ def landing_pull_request(
     """`merge_commit` defaults to a shared, well-formed sha once `merged` is
     true (a real merged pull request always carries one) and to `None`
     otherwise; a test proving the merge commit's own authority
-    (issue #397) passes its own sha instead."""
+    passes its own sha instead."""
     return forge.Landing(
         number,
         author,
@@ -190,7 +190,7 @@ class FakeForge:
     )
 
     def _run(self) -> None:
-        """This fake's mirror of `GitHubForge._run` (issue #168): every board
+        """This fake's mirror of `GitHubForge._run`: every board
         read that would cost a real round trip calls this once, so a test can
         assert `requests` against a hand-counted expectation the same way it
         would against the real adapter. Locked for the same reason: `board`
@@ -205,10 +205,10 @@ class FakeForge:
         """This fake's mirror of `GitHubForge.create_issue`: a fresh issue
         with no recorded parent, immediately visible to
         `list_open_board_issues` -- the orphan shape a failed `link_child`
-        leaves behind (#260). Carries `kind` (#260 Sonnet finding), since a
+        leaves behind. Carries `kind`, since a
         repeat `cut`'s orphan scan refuses to adopt anything but a `TASK`.
         `drop_created_issue_type` simulates GitHub silently dropping that
-        type (#444): the issue exists untyped and the create raises."""
+        type: the issue exists untyped and the create raises."""
         number = self.next_created_child_number
         self.next_created_child_number += 1
         self.created_issues.append((title, body, kind))
@@ -228,7 +228,7 @@ class FakeForge:
         `parent`'s open sub-issue, so a later `list_children`/`parent_issue`
         call sees it exactly as real GitHub would after the sub-issue POST
         succeeds. `fail_create_child_relation` simulates that POST itself
-        failing, leaving `child` the orphan a repeat `cut` must adopt (#260).
+        failing, leaving `child` the orphan a repeat `cut` must adopt.
         """
         self.linked_children.append((parent, child))
         if self.fail_create_child_relation:
@@ -243,9 +243,8 @@ class FakeForge:
 
     def create_child(self, *, parent: int, title: str, body: str, kind: body.ItemKind) -> int:
         """This fake's mirror of `GitHubForge.create_child`: composed from
-        `create_issue` and `link_child` exactly as the real adapter is
-        (#260), so a relation failure leaves the same real orphan behind
-        for a repeat `cut` to find."""
+        `create_issue` and `link_child` exactly as the real adapter is, so a relation failure
+        leaves the same real orphan behind for a repeat `cut` to find."""
         self.created_children.append((parent, title, body, kind))
         number = self.create_issue(title=title, body=body, kind=kind)
         try:
@@ -281,8 +280,8 @@ class FakeForge:
         self.retyped_items.append((number, kind))
 
     def close_landed_item(self, number: int, *, pull_request: int) -> None:
-        """This fake's mirror of `GitHubForge.close_landed_item` (issue
-        #359 Card 1): records the comment and the close as state, the same
+        """This fake's mirror of `GitHubForge.close_landed_item`: records the
+        comment and the close as state, the same
         two facts a test asserts against the real adapter's own two `_run`
         calls."""
         if self.close_error is not None:
@@ -291,8 +290,8 @@ class FakeForge:
         self.closed_issues.add(number)
 
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
-        """This fake's mirror of `GitHubForge.landing_readiness` (issue
-        #405): a test seeds `readiness_by_number` directly, one
+        """This fake's mirror of `GitHubForge.landing_readiness`: a test seeds
+        `readiness_by_number` directly, one
         `forge.LandingReadiness` per scenario, rather than reconstructing it
         from other fields."""
         self._run()
@@ -307,14 +306,14 @@ class FakeForge:
         return readiness
 
     def allowed_merge_methods(self) -> frozenset[MergeMethod] | None:
-        """This fake's mirror of `GitHubForge.allowed_merge_methods` (issue
-        #578): `allowed_methods`, `None` -- settings withheld -- by default."""
+        """This fake's mirror of `GitHubForge.allowed_merge_methods`:
+        `allowed_methods`, `None` -- settings withheld -- by default."""
         self._run()
         return self.allowed_methods
 
     def branch_merge_rules(self, branch: str) -> tuple[frozenset[MergeMethod], ...]:
-        """This fake's mirror of `GitHubForge.branch_merge_rules` (issue
-        #615): `branch_rules` for `branch`, no rule by default."""
+        """This fake's mirror of `GitHubForge.branch_merge_rules`:
+        `branch_rules` for `branch`, no rule by default."""
         self._run()
         return self.branch_rules.get(branch, ())
 
@@ -327,16 +326,16 @@ class FakeForge:
         title: str,
         body: str,
     ) -> str:
-        """This fake's mirror of `GitHubForge.merge_landing` (issue #405):
+        """This fake's mirror of `GitHubForge.merge_landing`:
         records every call for an adapter-shaped assertion, and, when
         `merge_remote` names a real bare repository (`land`'s own end-to-end
         tests), merges there into its default branch with `method`, as the
         forge does on its own side, so the landing checkout stands behind
         until its own real fast-forward. `closes_on_merge` closes every issue
         the pull request body names with `Closes #<n>`, as GitHub itself does
-        on the merge, before the release ever reads it (issue #578). The
+        on the merge, before the release ever reads it. The
         merged pull request keeps `head_sha` as its recorded head, as
-        GitHub does (issue #590)."""
+        GitHub does."""
         self._run()
         self.merge_requests.append((head_sha, method))
         if self.merge_error is not None:
@@ -366,7 +365,7 @@ class FakeForge:
         self.deleted_branches.append(branch)
 
     def file_at_commit(self, path: Path, sha: str) -> str | None:
-        """This fake's mirror of `GitHubForge.file_at_commit` (issue #505):
+        """This fake's mirror of `GitHubForge.file_at_commit`:
         every pull request head carries `head_board_config` as its board
         configuration -- by default an empty one, which pins exactly what an
         unconfigured checkout does -- and `None` removes it. Each read's
@@ -426,7 +425,7 @@ class FakeForge:
         return served if scripted is None else replace(served, body=scripted)
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        """This fake's mirror of `GitHubForge.item_references` (issue #440):
+        """This fake's mirror of `GitHubForge.item_references`:
         one `_run()` for the whole batch -- never one per number -- so a
         test can assert `requests` against the same one-round-trip count the
         real adapter now pays for any closed-item history that fits one

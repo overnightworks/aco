@@ -870,7 +870,7 @@ class TestLandAfterMergeRerun:
         self, world: RerunWorld, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: LANDCMD-18, LAND-62, LAND-64.
-        Issue #17 owns the gap between land's current error and release's trailer contract.
+        The gap between land's current error and release's trailer contract is open.
         """
         case = world.case
         capsys.readouterr()

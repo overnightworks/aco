@@ -46,8 +46,8 @@ def _real_repository_with_worktree(
     isolated worktree on a feature branch -- the same `git worktree add`
     recipe `checkout.ISOLATED_WORKTREE_RECIPE` documents. `main` carries a
     real, tracked (`git add -f`) `.aco/board.toml` holding
-    `board_config`, empty by default, beside the `trunk_files` it tracks
-    (issue #314 gate B3): every worktree shares `main`'s history, so
+    `board_config`, empty by default, beside the `trunk_files` it tracks: every worktree shares
+    `main`'s history, so
     `path_is_tracked` reads a real "tracked" answer for it from any of them.
     `main` also carries a real, resolvable `origin/HEAD` (gate G4): every
     worktree's own feature branch reads a real default-branch name through
@@ -466,8 +466,8 @@ _GIT_DIRECTORY_RECOGNITION_ROWS = [
 
 
 def _serve_item_72_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
-    """Issue #72's own body, with the `aco` block a rescope keeps in
-    step with its claim (issue #554), on a GitHub fake the checkout's
+    """An item body, with the `aco` block a rescope keeps in
+    step with its claim, on a GitHub fake the checkout's
     canonical remote names -- so no rescope here ever reaches a real forge."""
     client = FakeForge()
     client.issue_references[72] = forge.ItemReference(
@@ -481,7 +481,7 @@ def _serve_item_72_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
 
 
 def _serve_the_claim_on_the_widget_branch(monkeypatch: pytest.MonkeyPatch) -> protocol.ActiveClaim:
-    """A live builder claim of `Codex Sol` on issue #72 scoping `src/widget.py`,
+    """A live builder claim of `Codex Sol` scoping `src/widget.py`,
     served as the store's state; a commit applies its transition in memory."""
     claimed = standing_active_claim(
         "Codex Sol", scope=("src/widget.py",), branch="codex/issue-72-widget"
@@ -532,13 +532,13 @@ def test_rescope_succeeds_from_every_cwd_when_the_add_path_is_absolute(
     capsys: pytest.CaptureFixture[str],
     cwd_kind: str,
 ) -> None:
-    """Spec: RESC-12, RESC-22. Issue #314's own fourth proof: the same
+    """Spec: RESC-12, RESC-22. The same
     absolute `--add` path locates the claimed worktree's own checkout from
     the worktree itself, an unrelated tmp directory outside every
     repository, and the shared main checkout alike -- the one location
     signal a dispatcher in the head's own shared environment (editing a
     linked worktree through a subagent) can give without knowing its cwd.
-    The item body's scope moves with the claim (issue #554)."""
+    The item body's scope moves with the claim."""
     _isolate_home(monkeypatch, tmp_path)
     main, worktree = _real_repository_with_worktree(tmp_path)
     add = str(worktree / "docs" / "widget.md")
@@ -565,7 +565,7 @@ def test_rescope_admits_a_file_in_a_directory_not_created_yet(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: RESC-18. Issue #474: `rescope --add` of a file whose directories
+    """Spec: RESC-18. `rescope --add` of a file whose directories
     do not exist yet resolves the worktree from their nearest existing
     ancestor, so the claim can grow before the file is written."""
     _isolate_home(monkeypatch, tmp_path)
@@ -586,7 +586,7 @@ def test_rescope_rejects_a_wide_scope_from_a_foreign_cwd_via_the_resolved_checko
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: RESC-10. Issue #314 repeat gate B4: the width guard's own
+    """Spec: RESC-10. The width guard's own
     directory classifier (`checkout.scope_directories`) must read the
     resolved checkout's own directory, never the calling process's cwd. From
     a foreign cwd -- which has no `docs` directory at all, and is not even a
@@ -702,7 +702,7 @@ def test_rescope_denies_before_touching_the_store(
     expected_error_fragment: str,
 ) -> None:
     """Spec: RESC-01, RESC-05, RESC-26, RESC-28. `rescope`'s own
-    checkout-resolution paths (issue #314 delta and repeat gate, finding R1):
+    checkout-resolution paths:
     a second `--add`/`--drop` path outside the first path's own checkout
     (`cmd_rescope._rescope_scope_entries`) refuses rather than silently
     mis-scoping; a location outside every repository, and gate G3's no-commit
@@ -768,8 +768,7 @@ def test_rescope_refuses_a_path_no_claim_can_cover_with_one_sentence_and_its_jso
     dangling symlink, the checkout root itself, and a path no scope entry can
     spell (a newline in its name) are refused as a malformed `--add`; a path
     inside a git directory as an unresolved checkout -- each with one
-    sentence before the store is read, in text and under `--json` (issue
-    #483, #310 findings 110, 111, 112, 115)."""
+    sentence before the store is read, in text and under `--json`."""
     _isolate_home(monkeypatch, tmp_path)
     main, worktree = _real_repository_with_worktree(tmp_path)
     path, sentence = build_case(main, worktree)
@@ -838,7 +837,7 @@ def test_rescope_judges_the_canonical_remotes_recorded_default_branch(
     branch: str,
     sentence: str,
 ) -> None:
-    """Spec: RESC-20, RESC-29. Issue #490 proof 1: with `hub` canonical and
+    """Spec: RESC-20, RESC-29. With `hub` canonical and
     `origin/HEAD` naming `main`, a worktree on `hub`'s default branch is
     refused; without a recorded `hub/HEAD`, `rescope` refuses `default branch
     unknown` -- `origin/HEAD` never answers for `hub`."""
@@ -870,7 +869,7 @@ def test_rescope_names_a_canonical_remote_the_clone_never_configured(
 ) -> None:
     """Spec: RESC-21. A canonical remote the clone never added is named in
     every command's own sentence, even where a `HEAD` it left behind still
-    resolves (issues #492, #516)."""
+    resolves."""
     _isolate_home(monkeypatch, tmp_path)
     path = hub_canonical_worktree_file(
         tmp_path,
@@ -889,7 +888,7 @@ def test_rescope_names_a_canonical_remote_that_has_config_lines_but_no_url(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: RESC-21. Issues #512 line 1 and #516 line 2: a
+    """Spec: RESC-21. A
     `remote.upstream.fetch` line without a URL, beside a `HEAD` the remote
     left behind, is still no configured canonical remote -- `rescope` names
     it rather than judging its branch."""

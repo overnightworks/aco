@@ -597,7 +597,7 @@ class TestLandMessage:
         indirect=True,
     )
     def test_refusal(self, world: MessageWorld, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: keine (Lücke, #17). Git read failures refuse before merging."""
+        """Spec: keine (Lücke). Git read failures refuse before merging."""
         assert isinstance(world.case.outcome, str)
         capsys.readouterr()
         result = run_cli(["land", "12"], capsys)
