@@ -20,14 +20,13 @@
 		(question?.querySelector<HTMLElement>('.stage') ?? question)?.focus({ preventScroll: true });
 	}
 
-	async function resetQuestion() {
+	async function resetQuestion(explicitSelection = false) {
 		await tick();
 		if (question && question.getClientRects().length > 0) {
 			question.scrollTop = 0;
-			focusQuestion();
-		} else {
-			keepFocusVisible();
 		}
+		if (explicitSelection) focusQuestion();
+		else keepFocusVisible();
 	}
 
 	async function showList() {
@@ -44,7 +43,7 @@
 			active === document.body ||
 			(active instanceof HTMLElement && active.getClientRects().length === 0)
 		) {
-			if (showQuestion) focusQuestion();
+			if (question && question.getClientRects().length > 0) focusQuestion();
 			else tracks?.focus({ preventScroll: true });
 		}
 	}
@@ -101,7 +100,7 @@
 					onSelect={(key) => {
 						selectedKey = key;
 						showQuestion = true;
-						void resetQuestion();
+						void resetQuestion(true);
 					}}
 				/>
 			</div>

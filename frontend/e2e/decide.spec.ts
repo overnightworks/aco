@@ -140,6 +140,52 @@ test('advancing after phone list return and desktop resize focuses the next ques
 	await page.screenshot({ path: testInfo.outputPath('resized-advance.png') });
 });
 
+test('desktop completion preserves deliberately focused other list row', async ({
+	page
+}, testInfo) => {
+	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	await page.setViewportSize({ width: 1280, height: 900 });
+	writeRulings(repoDirectory, [
+		row(
+			954,
+			'Desktop completion',
+			line(1, 'First sentence', {
+				question: 'First?',
+				example: 'Long example. '.repeat(500),
+				default: 'yes'
+			}),
+			line(2, 'Second sentence', {
+				question: 'Second?',
+				example: 'Long example. '.repeat(500)
+			}),
+			line(3, 'Third sentence', { question: 'Third?' })
+		)
+	]);
+	await page.clock.install();
+	await page.goto(`${appUrl}#t=${token}`);
+	await page.getByRole('button', { name: /First sentence/ }).click();
+	await choices(page).getByRole('button', { name: /Ja/ }).click();
+	await expect
+		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
+		.toBeGreaterThan(0);
+	const third = page.getByRole('button', { name: /Third sentence/ });
+	await third.focus();
+	await expect(third).toBeFocused();
+	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+	await expect(page.getByRole('button', { name: /Second sentence/ })).toHaveAttribute(
+		'aria-current',
+		'true'
+	);
+	await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
+	await expect(third).toBeFocused();
+	await expect(third).toBeInViewport();
+	await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeInViewport();
+	await expect
+		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
+		.toBe(0);
+	await page.screenshot({ path: testInfo.outputPath('desktop-other-focus.png') });
+});
+
 for (const scenario of ['next question', 'exhausted list', 'focus elsewhere']) {
 	test(`phone list completion keeps visible focus: ${scenario}`, async ({ page }, testInfo) => {
 		const { appUrl, token, repoDirectory } = readBoardRuntime();
