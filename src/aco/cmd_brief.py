@@ -60,8 +60,8 @@ def _brief_live_claim(worktree: Path, state: protocol.ClaimState, item: int) -> 
 def _lane_tip(branch: str) -> str | None:
     """`branch`'s current commit -- local first, then `origin/` -- or `None`
     when neither ref resolves (a deleted or not-yet-pushed lane branch). A
-    git failure that keeps either read from answering (issue #390 finding
-    9b) raises instead of being read the same way as an absent ref."""
+    git failure that keeps either read from answering
+    raises instead of being read the same way as an absent ref."""
     for ref in (branch, f"origin/{branch}"):
         commit = checkout.resolved_commit(ref)
         if commit is not None:
@@ -89,11 +89,11 @@ def _print_brief_claim(
 
 
 def _print_brief_step_rules(step_rules: workboard.BriefStepRules) -> None:
-    """`RULES` and `CHECKS` (issue #324): two more sections after the four
+    """`RULES` and `CHECKS`: two more sections after the four
     `_print_brief` always prints, only under `--step` -- the repository's own
     `.aco/brief.toml` entries for that lane step, one per line,
     each as `protocol.terminal_text` shows it so no entry can break into a forged
-    line or section (issue #548)."""
+    line or section."""
     print()
     print("RULES")
     for rule in step_rules.rules:
@@ -106,7 +106,7 @@ def _print_brief_step_rules(step_rules: workboard.BriefStepRules) -> None:
 
 @dataclass(frozen=True)
 class _BriefComposition:
-    """One `aco brief`'s full composed reads (issue #324): the four sections
+    """One `aco brief`'s full composed reads: the four sections
     `_print_brief` always prints, plus, only under `--step`, the repository's
     own rules and checks -- gathered once so the text and `--json` renderers
     print the same reads with no chance to drift apart."""
@@ -146,8 +146,8 @@ def _print_brief(composition: _BriefComposition) -> None:
 
 
 class _BriefReason(StrEnum):
-    """`aco brief`'s own `--json` `reason` vocabulary (`specs/brief.spec.md`,
-    issue #396): `composed` the only success. `invalid_item` names no
+    """`aco brief`'s own `--json` `reason` vocabulary (`specs/brief.spec.md`):
+    `composed` the only success. `invalid_item` names no
     reachable refusal today -- brief never refuses for an item nothing
     carries (BRIEF-08's own Never clause) -- so it stays out until a future
     slice gives it a caller."""
@@ -200,7 +200,7 @@ def _brief_json(composition: _BriefComposition) -> int:
 
 def _brief_config(toplevel: Path) -> workboard.BriefConfig | None:
     """`.aco/brief.toml`'s own content, read only when the file is
-    actually tracked by git (issue #324) -- the same tracked-file
+    actually tracked by git -- the same tracked-file
     requirement `session.board_config` enforces for `board.toml`'s storage pin, so
     an ignored or not-yet-added file never quietly answers for the
     repository. `None` either when it is untracked or when `workboard.load_brief_config`
@@ -233,7 +233,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     Never a new data source, and never a write. Every refusal on this path --
     BRIEF-07, BRIEF-09's PIN-04/PIN-05, BRIEF-15, BRIEF-18's lane-tip read and
     trunk diff, BRIEF-20's trunk read, and the item read itself, which is a
-    forge call like any other (issue #432) -- reports through `report.refuse` under
+    forge call like any other -- reports through `report.refuse` under
     this command's own vocabulary."""
     as_json = parsed.json
     try:

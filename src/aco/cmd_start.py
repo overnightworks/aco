@@ -19,7 +19,7 @@ def _start_worktree_path(main_checkout: Path, *, number: int, slug: str) -> Path
 
 def _runs_in_lane_worktree(context: RunContext, lane_branch: str) -> bool:
     """Whether `start` runs inside a linked worktree checked out on
-    `lane_branch` -- the live claim's own lane (issue #479), whatever slug
+    `lane_branch` -- the live claim's own lane, whatever slug
     its path carries."""
     caller = checkout.resolve_path_checkout(context.toplevel)
     return (
@@ -67,7 +67,7 @@ def _checked_start_resume(
     revision: str | None = None,
 ) -> cmd_claim.ScopeVersioning:
     """Every refusal `start`'s resume of `live` can meet, run before anything
-    is printed or built (issue #479): an explicit `--scope` that disagrees
+    is printed or built: an explicit `--scope` that disagrees
     with the live claim's own stored scope (review/gate finding: resume must
     not silently ignore it), then the stored scope's own shape and width
     against `context`'s checkout -- or `revision`, the fetched trunk a gone
@@ -93,7 +93,7 @@ def _print_start_resume(
     storage: body.Storage,
     versioning: cmd_claim.ScopeVersioning,
 ) -> None:
-    """`start`'s own resume path (issue #322 review finding 1): prints the
+    """`start`'s own resume path: prints the
     same `CLAIMED ...`/cost-line grammar a fresh claim prints, for the live
     claim `run` already found in the store -- the same
     `observed.claims` lookup `status`/`release` use -- rather than minting a
@@ -134,7 +134,7 @@ def _start_branch_and_slug(parsed: argparse.Namespace, context: RunContext) -> t
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """Checks, then builds (issue #479): a worktree already standing -- the
+    """Checks, then builds: a worktree already standing -- the
     caller's own lane, or a prior `start`'s at the computed path -- is
     claimed in place; otherwise the claim is checked against the freshly
     fetched trunk before the worktree is built, so a refusal leaves
@@ -176,7 +176,7 @@ def _start_claim_arguments(
 ) -> cmd_claim.ClaimArguments:
     """The `aco claim` arguments `start` claims with: this session's own
     agent as the builder, and a fresh id, exactly as a bare `aco claim`
-    mints one (issue #322 review finding 1) -- `start` resumes a live claim
+    mints one -- `start` resumes a live claim
     by name before it ever claims, so CLAIM-15's own replay-by-claim-id
     logic never needs to recognize a `start`-minted id as special. A
     resume passes its live claim's own `claim_id`, so it never computes a
@@ -260,13 +260,13 @@ def _check_build_and_claim(
     parsed: argparse.Namespace, context: RunContext, target: cmd_claim.LaneWorktree
 ) -> int:
     """Fetch the trunk, run `claim`'s check phase against that one commit,
-    then build the worktree from the trunk and run the commit phase (issue
-    #479). A refusal after the build removes it again (START-18): the trunk
+    then build the worktree from the trunk and run the commit phase. A refusal after the build
+    removes it again (START-18): the trunk
     moved under another fetch meanwhile, the new worktree failing `claim`'s
     own checkout preconditions, or the ledger refusing the write -- a claim
     or close that landed after the checks, a store it cannot reach -- also
     once a sent push was rejected and the store re-read nothing of it
-    written (issue #498). Only a sent write whose outcome the store cannot
+    written. Only a sent write whose outcome the store cannot
     tell keeps the worktree and says so (START-25). An interrupt or an
     unexpected error is no refusal."""
     trunk_ref = context.fetched_trunk_ref()
@@ -274,7 +274,7 @@ def _check_build_and_claim(
     # The main checkout observed afresh, never the observation the
     # item-existence read already holds: the fetch above may take a while,
     # and the claim must read the item as it stands once the fetch is done,
-    # not the snapshot that read took (issue #322 review finding 2, CAS-55).
+    # not the snapshot that read took (CAS-55).
     check_context = context.observed_afresh()
     requested = cmd_claim.claim_request(
         _start_claim_arguments(parsed, base=trunk, branch=target.branch)
