@@ -101,9 +101,9 @@ RECOVERY_STEP = "close or re-project"
 # A slice's pull request must never close its still-open epic — that would
 # retire the epic before its remaining slices exist. This repository's
 # established substitute is a whole line opening with one of these markers
-# (observed verbatim in atelier-2 PRs: "Part of #<n>.", "Refs #<n>
-# and #<m>"). Anchoring to the start of the line
-# is what keeps a casual mid-paragraph mention — "as noted in #<n>'s plan" —
+# (observed verbatim in atelier-2 PRs #848 "Part of #79.", #960 "Refs #956
+# and #80", #965/#967 "Refs #<n> ..."). Anchoring to the start of the line
+# is what keeps a casual mid-paragraph mention — "as noted in #79's plan" —
 # from ever counting; only a dedicated reference line does. This is still a
 # syntactic marker, not a validated relation: GitHub has no structured field
 # for a non-closing PR-to-issue link, and this repository's own children use
@@ -1031,8 +1031,8 @@ def _references_matching(
 ) -> frozenset[IssueReference]:
     """Routed through `_live_text` for the same reason every other marker in
     this module is: a fenced example of the closing-keyword convention
-    ("Fixes #<n>" inside a code block, say) must document the syntax without
-    silently closing #<n>.
+    ("Fixes #64" inside a code block, say) must document the syntax without
+    silently closing #64.
     """
     return frozenset(
         _issue_reference(match, repository) for match in pattern.finditer(_live_text(text))
