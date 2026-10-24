@@ -6,4 +6,4 @@ legacy = "fail"
 what = 'mandatory job "Test-efficiency gates (test-budget, similar-methods, test-inventory, spec-lint)" removed'
 item = "#334"
 date = 2026-10-24
-reason = "the operator ruled the test-budget and test-inventory gates and the spec-lint exemption ledger out; spec-lint stays a pytest test in the check job"
+reason = "the operator ruled the unused efficiency gates and the spec-lint exemption ledger out; spec-lint stays a pytest test in the check job"
