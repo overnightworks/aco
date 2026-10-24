@@ -1,7 +1,0 @@
-claim_id = "6f20318af3b64b33b6d5ec1cbb3fd87c"
-agent = "Codex 01a16e6e-894a-7692-929e-d605748ac260"
-role = "builder"
-base = "e90ff567311ba9c1f31ae6f39547e11adedc05ce"
-branch = "codex/issue-362-refs-t10"
-scope = ["quality/baseline.toml", "tests/test_cli.py"]
-opened_commit = "5e3728fa6d215587fdbfc74a08b7e9d7d47c8440"
