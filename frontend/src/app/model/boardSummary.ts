@@ -88,9 +88,8 @@ export function openRepos(repos: RepoReading[]): RepoReading[] {
 export function firstOpenKey(repos: RepoReading[]): string | null {
 	for (const repo of openRepos(repos)) {
 		if (repo.error === null) {
-			for (const item of repo.items) {
-				for (const line of item.lines) return lineKey(repo.name, item.number, line);
-			}
+			const item = repo.items[0];
+			if (item) return lineKey(repo.name, item.number, item.lines[0] as ExpectationLine);
 		}
 	}
 	return null;

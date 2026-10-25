@@ -28,6 +28,7 @@ test('first selection follows configured order, skipping failed repos and ruled-
 	];
 	expect(firstOpenKey(repos)).toBe('first:2:3');
 	expect(firstOpenKey([])).toBeNull();
+	expect(firstOpenKey([repo({ items: [item({ lines: [line({ ruling: 'yes' })] })] })])).toBeNull();
 });
 
 test.each(['first', 'last'] as const)(
