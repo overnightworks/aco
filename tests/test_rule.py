@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import cast
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
 from cli_fixtures import (
     FROZEN_CLI_NOW,
     freeze_cli_now,
@@ -40,6 +41,63 @@ def github_world(github_clone: Path, bare_remote: Path) -> None:
 
 @pytest.mark.usefixtures(github_world.__name__)
 class TestGithubRule:
+    @pytest.mark.parametrize("ruling", ["yes", "no", "later"])
+    @pytest.mark.parametrize("note", [None, "Ja, mit Rückweg."])
+    @pytest.mark.parametrize("with_card", [True, False], ids=["card", "no-card"])
+    def test_rule_preserves_card_and_other_body_values(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        ruling: str,
+        note: str | None,
+        with_card: bool,
+    ) -> None:
+        """Spec: RULE-12, RULE-03 — retain card data through write and fresh rulings read."""
+        freeze_cli_now(monkeypatch)
+        card = (
+            'question = "Änderung behalten?"\nexample = "Ein Skript bleibt nutzbar."\n'
+            "picture = '<svg xmlns=\"http://www.w3.org/2000/svg\"><text>ä</text></svg>'\n"
+            if with_card
+            else ""
+        )
+        untouched = '[[expectation]]\ntext = "Andere Zeile"\ndefault = "no"\n' + card
+        block_text = (
+            MINIMAL_BLOCK_TOML
+            + 'scope = ["src/aco/body.py"]\n'
+            + untouched
+            + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
+            + card
+            + untouched
+        )
+        initial = block_body(block_text, before="Vorspann\n\n", after="\nNachspann\n")
+        reference = forge.ItemReference(forge.ItemState.OPEN, "Entscheidung", initial)
+        client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
+        arguments = ["rule", "90", "--line", "2", f"--{ruling}"]
+        result = run_cli(arguments + ([] if note is None else ["--note", note]), capsys)
+        assert result.status == 0, result.stderr
+        written = client.item_bodies[90]
+        expected = tomllib.loads(block_text)
+        target = expected["expectation"][1]
+        del target["default"]
+        target.update(ruling=ruling, ruled_on=FROZEN_CLI_NOW.date())
+        target["text"] = "Ship it?" if note is None else f"Ship it? Anmerkung: {note}"
+        located = body.locate_block(written)
+        assert located.data == expected
+        assert written[: located.content_start] == "Vorspann\n\n```aco\n"
+        assert written[located.content_end :] == "```\n\nNachspann\n"
+        client.board_issues = (board_issue(90, "Entscheidung", written),)
+        reread = run_cli(["rulings", "--json"], capsys)
+        assert reread.status == 0, reread.stderr
+        line = json.loads(reread.stdout)["rulings"][0]["lines"][1]
+        assert line == {
+            "index": 2,
+            "text": target["text"],
+            "ruling": ruling,
+            "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
+            "default": None,
+            **{key: target[key] for key in ("question", "example", "picture") if key in target},
+        }
+
     @pytest.mark.parametrize(
         "scenario,observe,expected",
         [
@@ -252,6 +310,8 @@ class TestGithubRule:
                 block_body(
                     MINIMAL_BLOCK_TOML
                     + '[[expectation]]\ntext = "Ship it?"\nruling = "yes"\nruled_on = 2026-08-01\n'
+                    'question = "Behalten?"\nexample = "Es bleibt so."\n'
+                    "picture = '<svg xmlns=\"http://www.w3.org/2000/svg\"/>'\n"
                 ),
                 forge.ItemState.OPEN,
                 False,

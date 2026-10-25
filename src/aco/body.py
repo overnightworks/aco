@@ -1453,18 +1453,10 @@ class ExpectationOutOfRangeError(protocol.ClaimError):
 def rule_expectation(
     body: str, index: int, ruling: str, ruled_on: date, *, note: str | None = None
 ) -> str:
-    """`body` with its `index`-th (1-based, block order) `[[expectation]]`
-    entry moved from proposed to ruled: `default` falls, `ruling` and
-    `ruled_on` take its place. Byte-preserving outside that one entry
-    (`locate_block` -> `replace_block` --
-    the same pair `cut` writes through). `note`, when given, is appended to
-    the line's own text as ` Anmerkung: <note>`: the schema has no dedicated
-    note field, and the ruled line's own text is the one place a
-    transcribed remark belongs.
+    """Rule one proposed line, preserving card fields and bytes outside the block.
 
-    Refuses an already-ruled entry by name -- a changed ruling is a new
-    line, never an overwrite -- and an out-of-range index. It validates
-    `ruling` itself rather than trust only its CLI caller.
+    Replace the default with outcome/date; append any note to its text.
+    Refuse invalid outcomes, out-of-range indices and already-ruled lines.
     """
     if ruling not in BLOCK_EXPECTATION_RULINGS:
         raise protocol.ClaimError(
@@ -1482,7 +1474,9 @@ def rule_expectation(
             f"line {index} is already ruled; a changed ruling is a new line"
         )
     text = cast(str, entry["text"]) if note is None else f"{entry['text']} Anmerkung: {note}"
-    ruled_entry: dict[str, object] = {"text": text, "ruling": ruling, "ruled_on": ruled_on}
+    ruled_entry = dict(entry)
+    ruled_entry.pop("default", None)
+    ruled_entry.update(text=text, ruling=ruling, ruled_on=ruled_on)
     new_entries = [*entries[: index - 1], ruled_entry, *entries[index:]]
     new_data = {**located.data, "expectation": new_entries}
     return replace_block(body, located, new_data)

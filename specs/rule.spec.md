@@ -26,6 +26,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 | state \ trigger | `aco rule ITEM --line N OUTCOME` | `--json` | `--note TEXT` |
 |---|---|---|---|
 | a still-open line | RULE-01 | RULE-02 | RULE-03 |
+| a still-open line with optional card fields | RULE-12 | RULE-12 | RULE-12 |
 | that line already ruled | RULE-04 | RULE-09 | — |
 | `N` out of range | RULE-05 | RULE-09 | — |
 | this forge cannot write the body | RULE-06 | RULE-09 | — |
@@ -40,6 +41,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 - [ ] [RULE-01] A still-open line makes `aco rule ITEM --line N` with `--yes`/`--no`/`--later` print `RULED #<n> line <k> <ruling>; <m> line(s) still open` on stdout, exit `0` (see E-RULE-01).
 - [ ] [RULE-02] `--json` on the same call prints `specs/output.spec.md`'s envelope with `reason: "ruled"`, then `"item": <n>, "index": <k>, "ruling": "<ruling>", "ruled_on": "<date>", "open": <m>`.
 - [ ] [RULE-03] `--note TEXT` appends ` Anmerkung: TEXT` to the ruled line's own `text`, never a separate field (see E-RULE-02).
+- [ ] [RULE-12] Every outcome, with or without a note, retains present `question`, `example`, `picture` unchanged, invents none, and removes `default` for `ruling` and today's UTC `ruled_on` (E-RULE-08).
 
 ## Refusals this command owns
 
@@ -159,3 +161,17 @@ $ aco rule <item-id> --line 1 --yes --json
 {"ok": false, "reason": "unavailable", "message": "<detail>"}
 exit 2
 ```
+
+### E-RULE-08 — card fields survive a ruling
+
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with one proposed line containing `text`, `default`, `question`, `example`, and `picture`.
+
+```console
+$ aco rule <item-id> --line 1 --yes
+RULED <item-id> line 1 yes; 0 line(s) still open
+exit 0
+```
+
+The stored line retains `text`, `question`, `example`, and `picture` exactly;
+`default` is absent, `ruling` is `yes`, and `ruled_on` is today's UTC date.
+With `--note`, only `text` gains the RULE-03 suffix. Absent card fields stay absent.
