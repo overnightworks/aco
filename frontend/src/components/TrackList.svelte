@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { lineStatusText } from '../app/model/boardSummary';
+	import { cardHeading, lineStatusText, openRepos } from '../app/model/boardSummary';
 	import { lineKey } from '../app/model/decision';
 	import type { RepoReading } from '../types';
 
@@ -12,29 +12,24 @@
 </script>
 
 <section aria-label="Zeilen je Item">
-	{#each repos as repo (repo.name)}
+	{#each openRepos(repos) as repo (repo.name)}
 		{#if repo.error !== null}
 			<p role="alert">{repo.name}: {repo.error}</p>
 		{:else}
 			{#each repo.items as item (item.number)}
-				<h2>#{item.number} {item.title}</h2>
+				<h2>{item.title} <small>{repo.name} · #{item.number}</small></h2>
 				<ul>
 					{#each item.lines as line (line.index)}
 						{@const key = lineKey(repo.name, item.number, line)}
 						<li>
-							{#if line.ruling === null}
-								<button
-									type="button"
-									aria-current={key === selectedKey}
-									onclick={() => onSelect(key)}
-								>
-									<span>{line.text}</span>
-									<span>{lineStatusText(line)}</span>
-								</button>
-							{:else}
-								<span>{line.text}</span>
+							<button
+								type="button"
+								aria-current={key === selectedKey}
+								onclick={() => onSelect(key)}
+							>
+								<span>{cardHeading(line)}</span>
 								<span>{lineStatusText(line)}</span>
-							{/if}
+							</button>
 						</li>
 					{/each}
 				</ul>

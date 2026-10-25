@@ -87,7 +87,7 @@ test('reactivating the selected desktop row restores the question heading and fo
 		)
 	]);
 	await page.goto(`${appUrl}#t=${token}`);
-	const selected = page.getByRole('button', { name: /First sentence/ });
+	const selected = page.getByRole('button', { name: /First\?/ });
 	await selected.click();
 	await expect(page.locator('.stage')).toBeFocused();
 	await page.keyboard.press('Tab');
@@ -129,7 +129,7 @@ test('advancing after phone list return and desktop resize focuses the next ques
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: /First sentence/ }).click();
+	await page.getByRole('button', { name: /First\?/ }).click();
 	await page.getByRole('button', { name: '← Liste' }).click();
 	await page.screenshot({ path: testInfo.outputPath('phone-return.png') });
 	await page.setViewportSize({ width: 1280, height: 900 });
@@ -163,20 +163,20 @@ test('desktop completion preserves deliberately focused other list row', async (
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: /First sentence/ }).click();
+	await page.getByRole('button', { name: /First\?/ }).click();
 	await choices(page).getByRole('button', { name: /Ja/ }).click();
 	await expect
 		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
 		.toBeGreaterThan(0);
-	const third = page.getByRole('button', { name: /Third sentence/ });
+	const third = page.getByRole('button', { name: /Third\?/ });
 	await third.focus();
 	await expect(third).toBeFocused();
 	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-	await expect(page.getByRole('button', { name: /Second sentence/ })).toHaveAttribute(
+	await expect(page.getByRole('button', { name: /Second\?/ })).toHaveAttribute(
 		'aria-current',
 		'true'
 	);
-	await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
+	await expect(page.locator('.tracks').getByRole('button', { name: /First\?/ })).toHaveCount(0);
 	await expect(third).toBeFocused();
 	await expect(third).toBeInViewport();
 	await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeInViewport();
@@ -197,18 +197,17 @@ for (const scenario of ['next question', 'exhausted list', 'focus elsewhere']) {
 		writeRulings(repoDirectory, [row(952, 'List completion', ...lines)]);
 		await page.clock.install();
 		await page.goto(`${appUrl}#t=${token}`);
-		const first = page.getByRole('button', { name: /First sentence/ });
+		const first = page.getByRole('button', { name: /First\?/ });
 		await first.click();
 		await choices(page).getByRole('button', { name: /Ja/ }).click();
 		await page.getByRole('button', { name: '← Liste' }).click();
 		await expect(first).toBeFocused();
 		const target =
 			scenario === 'focus elsewhere'
-				? page.getByRole('button', { name: /Second sentence/ })
+				? page.getByRole('button', { name: /Second\?/ })
 				: page.locator('.tracks');
 		if (scenario === 'focus elsewhere') await target.focus();
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-		await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
 		await expect(first).toHaveCount(0);
 		await expect(page.locator('.question-pane')).not.toBeVisible();
 		await expect(target).toBeFocused();
@@ -238,7 +237,7 @@ for (const viewport of [
 			]);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /First sentence/ }).click();
+			await page.getByRole('button', { name: /First\?/ }).click();
 			let release: (() => void) | undefined;
 			const held = new Promise<void>((resolve) => {
 				release = resolve;
@@ -250,7 +249,7 @@ for (const viewport of [
 			try {
 				await choices(page).getByRole('button', { name: /Ja/ }).click();
 				if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
-				const second = page.getByRole('button', { name: /Second sentence/ });
+				const second = page.getByRole('button', { name: /Second\?/ });
 				await second.focus();
 				const reload = page.waitForRequest('**/api/board');
 				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
@@ -320,7 +319,7 @@ for (const viewport of [
 
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Guests may join the call\./ }).click();
+			await page.getByRole('button', { name: /Guests allowed\?/ }).click();
 			await choices(page).getByRole('button', { name: /Ja/ }).click();
 			await page.getByRole('button', { name: 'Rückgängig' }).click();
 
@@ -350,7 +349,7 @@ for (const viewport of [
 
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Hosts may close the room\./ }).click();
+			await page.getByRole('button', { name: /Hosts allowed\?/ }).click();
 			await choices(page).getByRole('button', { name: /Nein/ }).click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
@@ -358,6 +357,7 @@ for (const viewport of [
 			await expect(page.locator('.stage')).toBeFocused();
 			await page.screenshot({ path: testInfo.outputPath('unselected.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
+			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
 			await expect(page.getByText('Nein · 2026-10-03')).toBeVisible();
 			expect(ruleRequests).toBe(1);
 		});
@@ -380,7 +380,7 @@ for (const viewport of [
 			]);
 
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Guests may join the call\./ }).click();
+			await page.getByRole('button', { name: /Guests allowed\?/ }).click();
 			await choices(page).getByRole('button', { name: /Ja/ }).click();
 
 			await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeVisible({
@@ -390,11 +390,11 @@ for (const viewport of [
 			await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeInViewport();
 			await expect(page.locator('.stage')).toBeFocused();
 
-			// The just-ruled line stays visible in the list, but as read-only text.
+			// The completed question is available only in the read-only history.
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
-			await expect(
-				page.getByRole('button', { name: /Guests may join the call\./ })
-			).not.toBeVisible();
+			await expect(page.getByRole('button', { name: /Guests allowed\?/ })).not.toBeVisible();
+			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			await page.locator('summary').filter({ hasText: 'Guests allowed?' }).click();
 			await expect(page.getByText('Guests may join the call.')).toBeVisible();
 			await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
 		});
@@ -410,7 +410,7 @@ for (const viewport of [
 			]);
 
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Original sentence\./ }).click();
+			await page.getByRole('button', { name: /Original question\?/ }).click();
 			await choices(page).getByRole('button', { name: /Ja/ }).click();
 
 			// An agent reformulates the line while the operator's undo window is
@@ -441,13 +441,14 @@ for (const viewport of [
 			]);
 
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /This can wait a cycle\./ }).click();
+			await page.getByRole('button', { name: /Deferred question\?/ }).click();
 			const recommended = choices(page).getByRole('button', { name: /Später/ });
 			await expect(recommended).toContainText('Empfohlen');
 			await recommended.click();
 
 			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible({ timeout: 10_000 });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
+			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
 			await expect(page.getByText('Später · 2026-10-03')).toBeVisible();
 		});
 
@@ -463,8 +464,8 @@ for (const viewport of [
 			});
 			await page.goto(`${appUrl}#t=${token}`);
 			if (viewport.width > 760) {
-				await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible();
-				await page.screenshot({ path: testInfo.outputPath('unselected.png') });
+				await expect(page.getByRole('heading', { name: 'Frage 0?', exact: true })).toBeVisible();
+				await page.screenshot({ path: testInfo.outputPath('initial-long.png') });
 			}
 			const tracks = page.locator('.tracks');
 			const selected = tracks.getByRole('button').last();
