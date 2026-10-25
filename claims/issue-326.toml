@@ -1,0 +1,8 @@
+claim_id = "31f878300dd94eb1a761e2883a25ac06"
+agent = "Codex 01a16e6e-894a-7692-929e-d605748ac260"
+role = "builder"
+base = "279b291e5bce106916e15974c93d8bce13546dfe"
+branch = "codex/issue-326-kurze-fragen-verlauf"
+scope = ["docs/board/README.md", "frontend/e2e/decide.spec.ts", "frontend/e2e/history.spec.ts", "frontend/src/App.svelte", "frontend/src/App.test.ts", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/components/HistoryView.svelte", "frontend/src/components/TrackList.svelte", "frontend/src/components/TrackList.test.ts", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "b8427231927113b21b89d82413ff7804bb040b7d"
+whole_reason = "Erstwahl, kurze Fragenliste und getrennter lesender Verlauf bilden einen einzigen freigegebenen Entscheidungsflow, dessen Sichtbarkeit, Fokus und Übergang nach einem Ruling gemeinsam bewiesen werden."
