@@ -7,8 +7,11 @@ variant. It is a static page with sample data; it talks to no aco and stores
 nothing, and loads only web fonts from the network.
 
 The shipped 3a selection flow follows this picture's list-and-question layout:
-desktop keeps both panes visible, while phones open the question and return to
-the preserved selection with “Liste”. The question, example, picture, note,
+desktop shows the first open question immediately, while phones start with
+the short question list and open the selected question on tap. “Liste” returns
+to the preserved selection. “Verlauf” separately shows decided lines from
+open board items as read-only details; it is not an archive of closed issues.
+The question, example, picture, note,
 answers and undo are available; the mockup's richer filters and comparison
 views are not part of this flow.
 

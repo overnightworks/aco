@@ -1,11 +1,20 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { isBoardEmpty, LIST_LABEL, nextOpenAfter } from './app/model/boardSummary';
+	import {
+		isBoardEmpty,
+		LIST_LABEL,
+		nextOpenAfter,
+		firstOpenKey,
+		DECIDE_LABEL,
+		HISTORY_LABEL,
+		EMPTY_OPEN_MESSAGE
+	} from './app/model/boardSummary';
 	import { BoardStore } from './app/state/board.svelte';
 	import { DecisionStore } from './app/state/decision.svelte';
 	import Stage from './components/Stage.svelte';
 	import TrackList from './components/TrackList.svelte';
 	import UndoToast from './components/UndoToast.svelte';
+	import HistoryView from './components/HistoryView.svelte';
 
 	let { token }: { token: string | null } = $props();
 
@@ -13,6 +22,8 @@
 	let decisions: DecisionStore | null = $state(null);
 	let selectedKey: string | null = $state(null);
 	let showQuestion = $state(false);
+	let view: 'decide' | 'history' = $state('decide');
+	let initialized = $state(false);
 	let tracks: HTMLDivElement | undefined = $state();
 	let question: HTMLDivElement | undefined = $state();
 
@@ -38,6 +49,7 @@
 	}
 
 	function keepFocusVisible() {
+		if (view === 'history') return;
 		const active = document.activeElement;
 		if (
 			active === document.body ||
@@ -50,6 +62,10 @@
 
 	$effect(() => {
 		if (board.status === 'ready') {
+			if (!initialized) {
+				selectedKey = firstOpenKey(board.repos);
+				initialized = true;
+			}
 			void tick().then(() => {
 				if (document.activeElement === question) focusQuestion();
 				else keepFocusVisible();
@@ -89,11 +105,19 @@
 		<p role="status">Lädt…</p>
 	{:else if board.status === 'unavailable'}
 		<p role="alert">aco antwortet nicht. {board.error}</p>
-	{:else if isBoardEmpty(board.repos)}
-		<p>Nichts offen. Neue Fragen erscheinen hier nach Neuladen, sobald ein Agent eine stellt.</p>
 	{:else if decisions !== null}
-		<div class="decide" class:show-question={showQuestion}>
+		<nav aria-label="Board">
+			<button type="button" aria-current={view === 'decide'} onclick={() => (view = 'decide')}
+				>{DECIDE_LABEL}</button
+			>
+			<button type="button" aria-current={view === 'history'} onclick={() => (view = 'history')}
+				>{HISTORY_LABEL}</button
+			>
+		</nav>
+		<div class="history" hidden={view !== 'history'}><HistoryView repos={board.repos} /></div>
+		<div class="decide" hidden={view !== 'decide'} class:show-question={showQuestion}>
 			<div class="tracks" bind:this={tracks} tabindex="-1">
+				{#if firstOpenKey(board.repos) === null}<p>{EMPTY_OPEN_MESSAGE}</p>{/if}
 				<TrackList
 					repos={board.repos}
 					{selectedKey}
@@ -113,7 +137,7 @@
 				{/if}
 			</div>
 		</div>
-		<div class="toasts" aria-live="polite">
+		<div class="toasts" hidden={view !== 'decide'} aria-live="polite">
 			{#each decisions.pendingEntries as entry (entry.key)}
 				<UndoToast message={entry.message} onUndo={() => decisions?.undo(entry.key)} />
 			{/each}
@@ -164,6 +188,41 @@
 	main > p {
 		padding: 20px;
 	}
+	[hidden] {
+		display: none !important;
+	}
+	nav {
+		display: flex;
+		gap: 8px;
+		padding: 10px 20px;
+		background: white;
+		border-bottom: 1px solid #e1dee8;
+	}
+	nav button {
+		padding: 8px 18px;
+		border: 1px solid #c9c4d4;
+		border-radius: 8px;
+		background: white;
+	}
+	nav button[aria-current='true'] {
+		border-bottom: 3px solid #8a2a63;
+		background: #f6e8f0;
+		font-weight: 600;
+	}
+	.history {
+		flex: 1;
+		overflow: auto;
+		min-height: 0;
+	}
+	.tracks > p {
+		padding: 20px;
+	}
+	.tracks :global(h2 small) {
+		display: block;
+		font-size: 11px;
+		font-weight: 400;
+		color: #4d4759;
+	}
 	.decide {
 		display: grid;
 		grid-template-columns: 320px minmax(0, 1fr);
@@ -190,10 +249,8 @@
 		margin: 0;
 		padding: 0;
 	}
-	.tracks :global(li > span) {
-		display: block;
-		padding: 4px 20px;
-		color: #4d4759;
+	.tracks :global(li) {
+		margin: 6px 12px;
 	}
 	.tracks :global(button) {
 		display: flex;
@@ -202,9 +259,10 @@
 		width: 100%;
 		text-align: left;
 		padding: 11px 20px;
-		border: 0;
-		border-left: 3px solid transparent;
-		background: transparent;
+		border: 1px solid #c9c4d4;
+		border-left: 4px solid #c9c4d4;
+		border-radius: 8px;
+		background: white;
 		overflow-wrap: anywhere;
 	}
 	.tracks :global(button:hover) {
@@ -212,6 +270,7 @@
 	}
 	.tracks :global(button[aria-current='true']) {
 		border-left-color: #8a2a63;
+		border-left-width: 7px;
 		background: #f6e8f0;
 	}
 	.tracks :global(button span:last-child) {

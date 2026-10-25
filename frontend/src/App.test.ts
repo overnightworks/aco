@@ -67,7 +67,7 @@ test('a board with lines shows the track list', async () => {
 
 	render(App, { token: 'a-token' });
 
-	expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('#42 Share page');
+	expect(await screen.findByRole('heading', { name: /Share page repo/ })).toBeInTheDocument();
 });
 
 test('selecting an open line opens it in the stage', async () => {
@@ -76,7 +76,18 @@ test('selecting an open line opens it in the stage', async () => {
 	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
 
 	render(App, { token: 'a-token' });
-	(await screen.findByRole('button', { name: /Guests\?/ })).click();
+	(await screen.findByRole('button', { name: /Guests allowed\?/ })).click();
 
 	expect(await screen.findByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
+});
+
+test('an empty successful repository does not hide another repository error', async () => {
+	vi.stubGlobal(
+		'fetch',
+		fakeFetch(200, {
+			repos: [repo({ items: [] }), repo({ name: 'broken', error: 'Read failed', items: [] })]
+		})
+	);
+	render(App, { token: 'a-token' });
+	expect(await screen.findByRole('alert')).toHaveTextContent('broken: Read failed');
 });

@@ -23,7 +23,7 @@ test('an item title stands once as a group header, its lines below it', () => {
 		})
 	]);
 
-	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('#42 Share page');
+	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Share page repo · #42');
 	expect(screen.getByText('Guests?')).toBeInTheDocument();
 });
 
@@ -33,14 +33,27 @@ test('a newly open line shows its recommendation under its item', () => {
 	expect(screen.getByText('Empfohlen: Ja')).toBeInTheDocument();
 });
 
-test('a ruled line shows its outcome and date instead of a recommendation', () => {
+test('a short question labels the control instead of repeating its full sentence', () => {
+	renderList([
+		repo({
+			items: [
+				item({ lines: [line({ question: 'Guests allowed?', text: 'Guests may join the call.' })] })
+			]
+		})
+	]);
+	expect(screen.getByRole('button', { name: /Guests allowed/ })).toBeInTheDocument();
+	expect(screen.queryByText('Guests may join the call.')).not.toBeInTheDocument();
+});
+
+test('ruled lines and their otherwise empty groups leave the decision list', () => {
 	renderList([
 		repo({
 			items: [item({ lines: [line({ ruling: 'no', ruled_on: '2026-10-01', default: null })] })]
 		})
 	]);
 
-	expect(screen.getByText('Nein · 2026-10-01')).toBeInTheDocument();
+	expect(screen.queryByText('Nein · 2026-10-01')).not.toBeInTheDocument();
+	expect(screen.queryByRole('heading')).not.toBeInTheDocument();
 });
 
 test('hostile item title, line text, repo label and error text is shown as text, never as markup', () => {
@@ -57,7 +70,7 @@ test('hostile item title, line text, repo label and error text is shown as text,
 	]);
 
 	expect(screen.getByRole('alert')).toHaveTextContent(`${hostileName}: ${hostileError}`);
-	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(`#42 ${hostileTitle}`);
+	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(hostileTitle);
 	expect(screen.getByText(hostileText)).toBeInTheDocument();
 	expect(container.querySelectorAll('script, img, svg')).toHaveLength(0);
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
@@ -79,7 +92,7 @@ test('each repo keeps its own items grouped separately, even with matching item 
 	]);
 
 	const headings = screen.getAllByRole('heading', { level: 2 });
-	expect(headings.map((heading) => heading.textContent)).toEqual(['#42 In a', '#42 In b']);
+	expect(headings.map((heading) => heading.textContent)).toEqual(['In a a · #42', 'In b b · #42']);
 });
 
 test('an open line is a button that selects it by its repo-bound key', () => {

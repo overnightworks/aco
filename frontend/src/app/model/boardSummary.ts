@@ -10,6 +10,12 @@ import { lineKey } from './decision';
 
 export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
 export const LIST_LABEL = 'Liste';
+export const DECIDE_LABEL = 'Entscheiden';
+export const HISTORY_LABEL = 'Verlauf';
+export const EMPTY_OPEN_MESSAGE =
+	'Nichts offen. Neue Fragen erscheinen hier nach Neuladen, sobald ein Agent eine stellt.';
+export const EMPTY_HISTORY_MESSAGE = 'Noch keine Entscheidungen in den offenen Board-Items.';
+export const UNKNOWN_DATE_LABEL = 'Datum fehlt';
 export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
 
 const OUTCOME_LABEL: Record<Outcome, string> = {
@@ -65,6 +71,47 @@ export interface SelectedLine {
 	repo: string;
 	item: BoardItem;
 	line: ExpectationLine;
+}
+
+export function openRepos(repos: RepoReading[]): RepoReading[] {
+	return repos.map((repo) => ({
+		...repo,
+		items: repo.items
+			.map((item) => ({
+				...item,
+				lines: item.lines.filter((line) => line.ruling === null)
+			}))
+			.filter((item) => item.lines.length > 0)
+	}));
+}
+
+export function firstOpenKey(repos: RepoReading[]): string | null {
+	for (const repo of openRepos(repos)) {
+		if (repo.error === null) {
+			for (const item of repo.items) {
+				for (const line of item.lines) return lineKey(repo.name, item.number, line);
+			}
+		}
+	}
+	return null;
+}
+
+export function historyLines(repos: RepoReading[]): SelectedLine[] {
+	return repos
+		.filter((repo) => repo.error === null)
+		.flatMap((repo) =>
+			repo.items.flatMap((item) =>
+				item.lines
+					.filter((line) => line.ruling !== null)
+					.map((line) => ({ repo: repo.name, item, line }))
+			)
+		)
+		.sort(
+			(left, right) =>
+				(right.line.ruled_on ?? '').localeCompare(left.line.ruled_on ?? '') ||
+				right.item.number - left.item.number ||
+				right.line.index - left.line.index
+		);
 }
 
 /** The one line `key` (`decision.ts`'s own) names, matched regardless of its

@@ -48,6 +48,19 @@ resolved directory's name.
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
 - [ ] [ABRD-07] A line whose `default` or `ruling` is neither `null` nor `yes`/`no`/`later`, or whose `ruled_on` is neither `null` nor an ISO date, shows `aco rulings --json is unreadable: <detail>` instead of cards.
 
+## Browser decision flow
+
+- [ ] [ABRD-28] The decision list contains only open lines, headed by their short question or full sentence as fallback; an item title appears once above its open lines.
+- [ ] [ABRD-29] First load selects the first open line in repository/item/line order. Desktop shows its question; phones show the selected list row until tapped.
+- [ ] [ABRD-30] “Verlauf” shows ruled lines of open board items as read-only details: question, outcome, date and repository/item; opening reveals the full sentence. It is no archive of closed issues.
+- [ ] [ABRD-31] Browser history sorts date, item number, then line index descending; missing dates last. Complete ties keep repository order. CLI order is unchanged.
+- [ ] [ABRD-32] Returning from history preserves selection, list position and phone view. A completed background decision displaces neither another selected question nor history.
+- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to history. A stored “Später” stays there and is not automatically presented again.
+
+The browser proofs are `frontend/e2e/decide.spec.ts` and
+`frontend/e2e/history.spec.ts`; ordering is additionally proven by
+`frontend/src/app/model/boardSummary.test.ts`.
+
 ## Multiple repositories
 
 - [ ] [ABRD-14] `aco serve --repo PATH` (repeatable) configures the repos served, labelled `<repo>` by each resolved directory's name; without `--repo`, the current directory is the one repository.
