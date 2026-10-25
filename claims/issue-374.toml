@@ -1,0 +1,8 @@
+claim_id = "6aed26c03bcc4bf0ad1e347f7c6537d1"
+agent = "Codex 01a16e6e-894a-7692-929e-d605748ac260"
+role = "builder"
+base = "279b291e5bce106916e15974c93d8bce13546dfe"
+branch = "codex/issue-374-rule-kartenfelder-erhalten"
+scope = ["quality/baseline.toml", "specs/rule.spec.md", "src/aco/body.py", "tests/test_rule.py"]
+opened_commit = "aca2a21ad60704b2ac320cc23efaeec1f7816f76"
+whole_reason = "Writer, direkter CLI-Regressionsbeweis, Befehlsvertrag und generierte Größenbaseline bilden die unteilbare Reparatur des belegten Datenverlusts."
