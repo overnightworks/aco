@@ -30,27 +30,31 @@ test('first selection follows configured order, skipping failed repos and ruled-
 	expect(firstOpenKey([])).toBeNull();
 });
 
-test('history orders dates, items and lines descending, missing dates last, preserving repo ties and input', () => {
-	const entries = [
-		['a', 9, 1, null],
-		['b', 2, 1, '2026-10-02'],
-		['c', 3, 1, '2026-10-02'],
-		['d', 3, 2, '2026-10-02'],
-		['e', 3, 2, '2026-10-02'],
-		['f', 99, 9, '2026-10-01']
-	] as const;
-	const repos = entries.map(([name, number, index, ruled_on]) =>
-		repo({
-			name,
-			items: [
-				item({ number, lines: [line({ index, ruling: 'later', ruled_on }), line({ index: 10 })] })
-			]
-		})
-	);
-	const before = structuredClone(repos);
-	expect(historyLines(repos).map((entry) => entry.repo)).toEqual(['d', 'e', 'c', 'b', 'f', 'a']);
-	expect(repos).toEqual(before);
-});
+test.each(['first', 'last'] as const)(
+	'history keeps missing dates last from %s input with descending dates/items/lines and stable repo ties',
+	(position) => {
+		const entries = [
+			['a', 9, 1, null],
+			['b', 2, 1, '2026-10-02'],
+			['c', 3, 1, '2026-10-02'],
+			['d', 3, 2, '2026-10-02'],
+			['e', 3, 2, '2026-10-02'],
+			['f', 99, 9, '2026-10-01']
+		] as const;
+		const ordered = position === 'first' ? entries : [...entries.slice(1), entries[0]];
+		const repos = ordered.map(([name, number, index, ruled_on]) =>
+			repo({
+				name,
+				items: [
+					item({ number, lines: [line({ index, ruling: 'later', ruled_on }), line({ index: 10 })] })
+				]
+			})
+		);
+		const before = structuredClone(repos);
+		expect(historyLines(repos).map((entry) => entry.repo)).toEqual(['d', 'e', 'c', 'b', 'f', 'a']);
+		expect(repos).toEqual(before);
+	}
+);
 
 describe('totalLineCount / isBoardEmpty', () => {
 	test('counts every line across every item and repo', () => {

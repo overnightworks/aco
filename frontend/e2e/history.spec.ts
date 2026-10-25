@@ -137,6 +137,61 @@ for (const viewport of [
 			expect(writes).toBe(0);
 		});
 
+		test('history reveals additional sentences and keeps sentence fallbacks free of empty disclosures', async ({
+			page
+		}, testInfo) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			writeRulings(repoDirectory, [
+				row(
+					42,
+					'Gastzugang',
+					line(1, 'Gäste dürfen teilnehmen.', {
+						question: 'Gäste zulassen?',
+						ruling: 'yes',
+						ruled_on: '2026-10-03'
+					}),
+					line(2, 'Die Aufzeichnung bleibt ausgeschaltet.', {
+						ruling: 'no',
+						ruled_on: '2026-10-02'
+					}),
+					line(3, 'Die nächste Runde bleibt unverändert.', {
+						question: 'Runde ändern?',
+						ruling: 'later',
+						ruled_on: '2026-10-01'
+					})
+				)
+			]);
+			let writes = 0;
+			await page.route('**/api/rule', (route) => {
+				writes += 1;
+				return route.abort();
+			});
+			await page.goto(`${appUrl}#t=${token}`);
+			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			const history = page.getByRole('region', { name: 'Verlauf' });
+			await expect(history.locator('summary')).toHaveCount(2);
+			const fallback = history.getByRole('article');
+			await expect(fallback).toContainText('Die Aufzeichnung bleibt ausgeschaltet.');
+			await expect(fallback.locator('summary, button, details')).toHaveCount(0);
+			await expect(
+				history.getByText('Die Aufzeichnung bleibt ausgeschaltet.', { exact: true })
+			).toHaveCount(1);
+			await expect(history.getByText('Gäste dürfen teilnehmen.', { exact: true })).toBeHidden();
+			await history.locator('summary').first().press('Enter');
+			await expect(history.getByText('Gäste dürfen teilnehmen.', { exact: true })).toBeVisible();
+			await expect(history.getByRole('button')).toHaveCount(0);
+			await page.screenshot({ path: testInfo.outputPath('history-outcomes.png') });
+			await page.evaluate(() => {
+				document.body.style.filter = 'grayscale(1)';
+			});
+			await page.screenshot({ path: testInfo.outputPath('history-outcomes-grayscale.png') });
+			await page.evaluate(() => {
+				document.body.style.filter = 'blur(4px) grayscale(1)';
+			});
+			await page.screenshot({ path: testInfo.outputPath('history-outcomes-shapes.png') });
+			expect(writes).toBe(0);
+		});
+
 		test('a pending ruling does not displace history and appears only after successful reload', async ({
 			page
 		}) => {
