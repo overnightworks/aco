@@ -140,8 +140,12 @@
 		background: var(--oc-surface);
 		font-weight: 700;
 	}
-	.decide-row button.pick:not(.recommended):hover:enabled {
+	.decide-row button.pick:not(.recommended):hover:enabled:not([aria-disabled='true']) {
 		border-color: var(--oc-fg-2);
+	}
+	.decide-row button.pick[aria-disabled='true'] {
+		opacity: 0.55;
+		cursor: default;
 	}
 	.decide-row button.pick.recommended {
 		border-color: var(--oc-accent);
