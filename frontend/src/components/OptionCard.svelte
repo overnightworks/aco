@@ -4,12 +4,18 @@
 		cardMeta,
 		chosenOption,
 		decidedText,
+		nextOpenOption,
+		type OpenOption,
 		ROW_LABEL,
 		UNDO_LABEL
 	} from '../app/model/optionCard';
 	import type { OptionLine } from '../types';
+	import OptionDetails from './OptionDetails.svelte';
+	import WarnMark from './WarnMark.svelte';
 
-	let { repo, line }: { repo: string; line: OptionLine } = $props();
+	let { repo, item, line }: { repo: string; item: number; line: OptionLine } = $props();
+
+	let openOption: OpenOption = $state(null);
 
 	const meta = $derived(cardMeta(repo, line));
 	const chosen = $derived(chosenOption(line));
@@ -23,22 +29,7 @@
 		<span class="sep" aria-hidden="true">·</span>
 		{#if meta.undo === 'final'}
 			<span class="final">
-				<svg aria-hidden="true" viewBox="0 0 14 14" width="12" height="12">
-					<path
-						d="M7 1.6 13 12.4H1z"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.6"
-						stroke-linejoin="round"
-					/>
-					<path
-						d="M7 5.6v3.2M7 10.4v.1"
-						stroke="currentColor"
-						stroke-width="1.6"
-						stroke-linecap="round"
-					/>
-				</svg>
-				{UNDO_LABEL[meta.undo]}
+				<WarnMark />{UNDO_LABEL[meta.undo]}
 			</span>
 		{:else}
 			<span>{UNDO_LABEL[meta.undo]}</span>
@@ -82,14 +73,41 @@
 				<dd>
 					<ol aria-label={ROW_LABEL.options}>
 						{#each line.options as option (option.letter)}
+							{@const isOpen = openOption === option.letter}
 							<li aria-current={option.letter === line.ruling ? 'true' : undefined}>
-								<span class="letter" class:chosen={option.letter === line.ruling}
-									>{option.letter}</span
+								<button
+									type="button"
+									class="disclosure"
+									aria-expanded={isOpen}
+									onclick={() => (openOption = nextOpenOption(openOption, option.letter))}
 								>
-								<span>
-									<strong>{option.name}</strong>
-									<span class="effect">{option.effect}</span>
-								</span>
+									<span class="letter" class:chosen={option.letter === line.ruling}
+										>{option.letter}</span
+									>
+									<span>
+										<strong>{option.name}</strong>
+										<span class="effect">{option.effect}</span>
+									</span>
+									<svg
+										class="chevron"
+										aria-hidden="true"
+										viewBox="0 0 16 16"
+										width="16"
+										height="16"
+									>
+										<path
+											d="m4 6 4 4 4-4"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.7"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
+									</svg>
+								</button>
+								{#if isOpen}
+									<OptionDetails {repo} {item} {line} {option} />
+								{/if}
 							</li>
 						{/each}
 					</ol>
@@ -117,6 +135,8 @@
 		--oc-accent-fg: #ffffff;
 		--oc-good: #1c7350;
 		--oc-warn: #99570c;
+		--oc-label-width: 136px;
+		--oc-column-gap: 24px;
 		max-width: 880px;
 		margin-inline: auto;
 	}
@@ -136,10 +156,6 @@
 	.final {
 		color: var(--oc-warn);
 		font-weight: 600;
-	}
-	.final svg {
-		vertical-align: -1px;
-		margin-right: 4px;
 	}
 	article {
 		background: var(--oc-surface);
@@ -161,8 +177,8 @@
 	}
 	.row {
 		display: grid;
-		grid-template-columns: 136px minmax(0, 1fr);
-		column-gap: 24px;
+		grid-template-columns: var(--oc-label-width) minmax(0, 1fr);
+		column-gap: var(--oc-column-gap);
 		align-items: start;
 	}
 	dt {
@@ -196,17 +212,47 @@
 		margin: 0;
 		padding: 0;
 	}
-	li {
-		display: grid;
-		grid-template-columns: 24px minmax(0, 1fr);
-		column-gap: 12px;
-		align-items: start;
-		padding: 4px 0;
-	}
 	li + li {
 		border-top: 1px solid var(--oc-line);
 		margin-top: 8px;
+	}
+	.option-card button.disclosure {
+		display: grid;
+		grid-template-columns: 24px minmax(0, 1fr) 16px;
+		column-gap: 12px;
+		align-items: start;
+		width: 100%;
+		padding: 4px 0;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.option-card li + li > button.disclosure {
 		padding-top: 12px;
+	}
+	button:hover strong {
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+	.chevron {
+		margin-top: 3px;
+		color: var(--oc-fg-3);
+		transition: transform 0.15s;
+	}
+	button[aria-expanded='true'] .chevron {
+		transform: rotate(180deg);
+	}
+	li + li > button .chevron {
+		margin-top: 11px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.chevron {
+			transition: none;
+		}
 	}
 	strong {
 		display: block;

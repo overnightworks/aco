@@ -4,11 +4,21 @@ import type { CardOption, DecisionKind } from '../../types';
 import {
 	cardMeta,
 	chosenOption,
+	CONTRACT_SUMMARY,
+	contractTexts,
 	decidedText,
 	isOptionLine,
 	KIND_LABEL,
+	nextOpenOption,
+	type OpenOption,
 	optionStatusText,
+	resultAltText,
+	ROW_LABEL,
+	SAME_AS_TODAY_MARK,
+	sourceLine,
 	UNDO_LABEL,
+	UNDO_SEPARATOR,
+	undoTail,
 	verdictLabel
 } from './optionCard';
 
@@ -83,4 +93,64 @@ describe('optionStatusText', () => {
 test('only a line carrying form options is an option line', () => {
 	expect(isOptionLine(optionLine())).toBe(true);
 	expect(isOptionLine(line())).toBe(false);
+});
+
+describe('the detail rows of an option', () => {
+	test('are labelled with the ruled words of the decision card', () => {
+		expect([
+			ROW_LABEL.result,
+			ROW_LABEL.notice,
+			ROW_LABEL.cost,
+			ROW_LABEL.undo,
+			ROW_LABEL.contract
+		]).toEqual(['Result', 'You notice', 'Cost', 'Undo', 'Contract']);
+		expect([SAME_AS_TODAY_MARK, CONTRACT_SUMMARY, UNDO_SEPARATOR]).toEqual([
+			'= TODAY',
+			'Show',
+			' — '
+		]);
+	});
+
+	test('give the picture the caption as alt text, or letter, name and effect without one', () => {
+		const captioned = cardOption({ caption: 'The song stays.' }) as CardOption;
+
+		expect(resultAltText(captioned)).toBe('The song stays.');
+		expect(resultAltText(cardOption())).toBe('A · Keep the song open: The app jumps itself.');
+	});
+
+	test('read the undo word, the separator and how to undo', () => {
+		const option = cardOption({ undo: 'final', undo_how: 'nie' });
+
+		expect(undoTail(option)).toBe(' — nie');
+	});
+
+	test('name the source as repository, item and line', () => {
+		expect(sourceLine('songmaker', 1843, optionLine({ index: 1 }))).toBe(
+			'songmaker · Item 1843 · Line 1'
+		);
+	});
+
+	test.each([
+		[
+			'the line text differs from the contract',
+			'The song stays.',
+			'Rule 10.',
+			['The song stays.', 'Rule 10.']
+		],
+		['the line text equals the contract', 'Rule 10.', 'Rule 10.', ['Rule 10.']]
+	])('bind both sentences when %s', (_name, contract, text, expected) => {
+		const texts = contractTexts(optionLine({ text }), cardOption({ contract }));
+
+		expect(texts).toEqual(expected);
+	});
+});
+
+describe('nextOpenOption', () => {
+	test.each<[string, OpenOption, CardOption['letter'], OpenOption]>([
+		['opens a closed option', null, 'A', 'A'],
+		['switches from one option to another', 'A', 'B', 'B'],
+		['closes the open option', 'B', 'B', null]
+	])('%s', (_name, open, letter, expected) => {
+		expect(nextOpenOption(open, letter)).toBe(expected);
+	});
 });

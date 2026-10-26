@@ -23,6 +23,14 @@ export function cardOption(overrides: Partial<CardOption> = {}): CardOption {
 	} as CardOption;
 }
 
+/** An option that leaves the TODAY picture as it is: it carries no
+ * `picture` (`cardOption()` always does). */
+export function sameAsTodayOption(overrides: Partial<CardOption> = {}): CardOption {
+	const fields: Record<string, unknown> = { ...cardOption(), same_as_today: true, ...overrides };
+	delete fields.picture;
+	return fields as unknown as CardOption;
+}
+
 export function optionLine(overrides: Partial<OptionLine> = {}): OptionLine {
 	return {
 		index: 1,

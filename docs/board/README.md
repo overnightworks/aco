@@ -8,9 +8,10 @@ stores nothing.
 
 The shipped board shows an option line as the picture's read-only card: meta
 line, question, PROBLEM, TODAY, OPTIONS A to D with name and effect, and
-RECOMMENDATION, and a ruled one with its chosen letter. It still lacks the
-per-option disclosure, picture enlargement, DECIDE with "Other / Unclear"
-instead of "Später", Mitsprache, the agent list and group decisions. A yes/no
+RECOMMENDATION, and a ruled one with its chosen letter. Each option opens its
+RESULT, YOU NOTICE, COST, UNDO and CONTRACT. The card still lacks picture
+enlargement, DECIDE with "Other / Unclear" instead of "Später", Mitsprache,
+the agent list and group decisions. A yes/no
 line keeps its card. What the board does today is in the "Browser decision flow"
 of [`specs/serve.spec.md`](../../specs/serve.spec.md).
 

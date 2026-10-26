@@ -85,6 +85,7 @@ const FOUR_OPTIONS: RulingOption[] = ['A', 'B', 'C', 'D'].map((letter, position)
 	name: `Weg ${letter}`,
 	effect: `Wirkung von Weg ${letter}.`,
 	picture: resultPicture(`Weg ${letter}`),
+	...(letter === 'A' ? { caption: 'So sieht Weg A aus.' } : {}),
 	notice: 'Du merkst es.',
 	cost: 'Aufwand.',
 	undo: position === 3 ? 'final' : 'reversible',
@@ -133,7 +134,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px option card`, () => {
 		test.use({ viewport });
 
-		test('an open option line shows the whole card and offers no outcome', async ({
+		test('an open option line shows the whole card, every option closed, and offers no outcome', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
@@ -180,7 +181,10 @@ for (const viewport of [
 			await expect(page.getByRole('button', { name: 'Nein', exact: true })).toHaveCount(0);
 			await expect(page.getByRole('button', { name: 'Später', exact: true })).toHaveCount(0);
 			await expect(page.getByText('Notiz', { exact: true })).toHaveCount(0);
-			await expect(card.getByRole('button')).toHaveCount(0);
+			const disclosures = card.getByRole('button');
+			await expect(disclosures).toHaveCount(2);
+			await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'false');
+			await expect(disclosures.nth(1)).toHaveAttribute('aria-expanded', 'false');
 
 			await page.screenshot({ path: testInfo.outputPath('song-card.png') });
 			await page.evaluate(() => {
@@ -208,6 +212,171 @@ for (const viewport of [
 			await expect(card.getByRole('listitem')).toHaveCount(4);
 			await expect(card.getByRole('listitem').nth(3)).toContainText('Weg D');
 			await page.screenshot({ path: testInfo.outputPath('final-card.png') });
+		});
+
+		test('each option opens its rows, one at a time, and folds the contract behind Show', async ({
+			page
+		}, testInfo) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.goto(`${appUrl}#t=${token}`);
+			await openFromList(page, SONG_QUESTION, phone);
+
+			const card = page.locator('.option-card');
+			const first = card.getByRole('button', { name: /Song bleibt offen/ });
+			const second = card.getByRole('button', { name: /Browser-Sprung bleibt/ });
+			await first.click();
+			await expect(first).toHaveAttribute('aria-expanded', 'true');
+			await expect(first).toHaveCSS('border-top-width', '0px');
+			await expect(first).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+			await expect(card.locator('summary')).toHaveCSS('padding-top', '0px');
+			await expect(card.getByRole('term')).toHaveText([
+				'Problem',
+				'Today',
+				'Options',
+				'Result',
+				'You notice',
+				'Cost',
+				'Undo',
+				'Contract',
+				'Recommendation'
+			]);
+			const result = card.getByRole('img', {
+				name: 'A · Song bleibt offen: Die App springt selbst: v5 klappt auf, Take 7 ist markiert.'
+			});
+			await expect(result).toHaveAttribute('src', /^data:image\/svg\+xml;base64,/);
+			await expect(card.getByText(SONG_OPTIONS[0]?.notice ?? '')).toBeVisible();
+			await expect(card.getByText(SONG_OPTIONS[0]?.cost ?? '')).toBeVisible();
+			await expect(card.locator('.details dd').nth(3)).toHaveText(
+				'reversible — eine neue Entscheidung kann es wieder ändern.'
+			);
+
+			const source = card.getByText(`${REPOSITORY} · Item 1843 · Line 1`);
+			await expect(card.getByText(SONG_CONTRACT)).toBeHidden();
+			await expect(source).toBeHidden();
+			await card.getByText('Show', { exact: true }).click();
+			await expect(card.getByText(SONG_CONTRACT)).toBeVisible();
+			await expect(
+				card.getByText('Der Song bleibt beim Sprung zum Ursprungs-Take offen.', { exact: true })
+			).toBeVisible();
+			await expect(source).toBeVisible();
+			await page.screenshot({ path: testInfo.outputPath('song-card-open.png') });
+			await page.evaluate(() => {
+				document.body.style.filter = 'blur(4px) grayscale(1)';
+			});
+			await page.screenshot({ path: testInfo.outputPath('song-card-open-shapes.png') });
+			await page.evaluate(() => {
+				document.body.style.filter = '';
+			});
+
+			await second.click();
+			await expect(first).toHaveAttribute('aria-expanded', 'false');
+			await expect(second).toHaveAttribute('aria-expanded', 'true');
+			await expect(card.locator('.details dd').first()).toHaveText('= TODAY');
+			await expect(card.getByRole('img')).toHaveCount(1);
+			await second.click();
+			await expect(second).toHaveAttribute('aria-expanded', 'false');
+			await expect(card.locator('.details')).toHaveCount(0);
+			await expect(card.getByRole('img')).toHaveCount(1);
+		});
+
+		test('the disclosures work from the keyboard', async ({ page }) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.goto(`${appUrl}#t=${token}`);
+			await openFromList(page, SONG_QUESTION, phone);
+
+			const card = page.locator('.option-card');
+			const first = card.getByRole('button', { name: /Song bleibt offen/ });
+			const second = card.getByRole('button', { name: /Browser-Sprung bleibt/ });
+			await first.focus();
+			await page.keyboard.press('Enter');
+			await expect(first).toHaveAttribute('aria-expanded', 'true');
+			await page.keyboard.press('Tab');
+			await expect(card.locator('summary')).toBeFocused();
+			await page.keyboard.press('Enter');
+			await expect(card.getByText(SONG_CONTRACT)).toBeVisible();
+			await page.keyboard.press('Tab');
+			await expect(second).toBeFocused();
+			await page.keyboard.press('Space');
+			await expect(second).toHaveAttribute('aria-expanded', 'true');
+			await expect(first).toHaveAttribute('aria-expanded', 'false');
+		});
+
+		test('a final option shows its warn mark beside the word, and a caption sits below its picture', async ({
+			page
+		}, testInfo) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.goto(`${appUrl}#t=${token}`);
+			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
+
+			const card = page.locator('.option-card');
+			await card.getByRole('button', { name: /Weg D/ }).click();
+			const undo = card.locator('.details dd').nth(3);
+			await expect(undo).toHaveText('final — nie');
+			await expect(undo.locator('b')).toHaveCSS('color', 'rgb(153, 87, 12)');
+			await expect(undo.locator('b svg[aria-hidden="true"]')).toBeVisible();
+			await page.screenshot({ path: testInfo.outputPath('final-open.png') });
+
+			await card.getByRole('button', { name: /Weg A/ }).click();
+			const picture = card.locator('.details').getByRole('img');
+			const caption = card.getByText('So sieht Weg A aus.', { exact: true });
+			await expect(caption).toBeVisible();
+			const pictureBox = await picture.boundingBox();
+			const captionBox = await caption.boundingBox();
+			expect(pictureBox?.y ?? 0).toBeLessThan(captionBox?.y ?? 0);
+		});
+
+		test('selecting another card shows it with every option closed', async ({ page }) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.goto(`${appUrl}#t=${token}`);
+			await openFromList(page, SONG_QUESTION, phone);
+			await page
+				.locator('.option-card')
+				.getByRole('button', { name: /Song bleibt offen/ })
+				.click();
+			await expect(page.locator('.option-card .details')).toHaveCount(1);
+
+			if (phone) await page.getByRole('button', { name: '← Liste' }).click();
+			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
+
+			const disclosures = page.locator('.option-card').getByRole('button');
+			await expect(disclosures).toHaveCount(4);
+			for (let position = 0; position < 4; position += 1) {
+				await expect(disclosures.nth(position)).toHaveAttribute('aria-expanded', 'false');
+			}
+			await expect(page.locator('.option-card .details')).toHaveCount(0);
+		});
+
+		test('the detail labels stand in the label column, or above their values on a phone', async ({
+			page
+		}) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.goto(`${appUrl}#t=${token}`);
+			await openFromList(page, SONG_QUESTION, phone);
+
+			const card = page.locator('.option-card');
+			const first = card.getByRole('button', { name: /Song bleibt offen/ });
+			await first.click();
+			const labels = card.locator('.details dt');
+			await expect(labels).toHaveCount(5);
+			if (phone) {
+				for (let position = 0; position < 5; position += 1) {
+					const label = await labels.nth(position).boundingBox();
+					const value = await card.locator('.details dd').nth(position).boundingBox();
+					expect((label?.y ?? 0) + (label?.height ?? 0)).toBeLessThanOrEqual(value?.y ?? 0);
+				}
+			} else {
+				const label = await labels.first().boundingBox();
+				const head = await first.boundingBox();
+				expect((label?.x ?? 0) + (label?.width ?? 0)).toBeLessThanOrEqual(head?.x ?? 0);
+			}
+			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+				viewport.width
+			);
 		});
 
 		test('a yes/no line keeps Ja, Nein, Später and its note beside option cards', async ({

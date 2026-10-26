@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { expect, test } from 'vitest';
 import { cardOption, optionLine, PICTURE } from '../test-support/board';
 import OptionCard from './OptionCard.svelte';
@@ -18,7 +18,7 @@ function openCard() {
 }
 
 test('an open card shows the meta line, question and rows in the order of the picture', () => {
-	render(OptionCard, { repo: 'songmaker', line: openCard() });
+	render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard() });
 
 	expect(screen.getByText('songmaker › Song page')).toBeInTheDocument();
 	expect(screen.getByText('Product')).toBeInTheDocument();
@@ -30,7 +30,7 @@ test('an open card shows the meta line, question and rows in the order of the pi
 });
 
 test('Today is an image with a data URI source, its caption as alt text and below it', () => {
-	render(OptionCard, { repo: 'songmaker', line: openCard() });
+	render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard() });
 
 	const picture = screen.getByRole('img', { name: 'Today the song is lost.' });
 	expect(picture.tagName).toBe('IMG');
@@ -43,7 +43,7 @@ test('Today is an image with a data URI source, its caption as alt text and belo
 });
 
 test('options appear in letter order with name and effect, the recommendation beside its reason', () => {
-	render(OptionCard, { repo: 'songmaker', line: openCard() });
+	render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard() });
 
 	const options = within(screen.getByRole('list', { name: 'Options' })).getAllByRole('listitem');
 	expect(options.map((option) => option.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
@@ -54,12 +54,41 @@ test('options appear in letter order with name and effect, the recommendation be
 	expect(recommendation).toHaveTextContent('A Ends the loss.');
 });
 
-test('an open card offers no outcome', () => {
-	const { container } = render(OptionCard, { repo: 'songmaker', line: openCard() });
+test('a closed card offers only one collapsed disclosure per option and no outcome', () => {
+	const { container } = render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard() });
 
-	expect(screen.queryAllByRole('button')).toHaveLength(0);
+	const buttons = screen.getAllByRole('button');
+	expect(buttons.map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
+	expect(buttons[0]).toHaveTextContent('A Song stays open The app jumps itself.');
 	expect(container.querySelectorAll('textarea, input, summary, a')).toHaveLength(0);
 	expect(screen.queryByText('Decided')).not.toBeInTheDocument();
+});
+
+test('opening an option shows its rows, opening another closes the first, opening it again closes all', async () => {
+	render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard() });
+	const first = screen.getByRole('button', { name: /Song stays open/ });
+	const second = screen.getByRole('button', { name: /As today/ });
+	const expanded = () => [first, second].map((button) => button.getAttribute('aria-expanded'));
+
+	await fireEvent.click(first);
+	expect(expanded()).toEqual(['true', 'false']);
+	expect(screen.getAllByText('Result', { selector: 'dt' })).toHaveLength(1);
+
+	await fireEvent.click(second);
+	expect(expanded()).toEqual(['false', 'true']);
+	expect(screen.getAllByText('Result', { selector: 'dt' })).toHaveLength(1);
+
+	await fireEvent.click(second);
+	expect(expanded()).toEqual(['false', 'false']);
+	expect(screen.queryByText('Result', { selector: 'dt' })).not.toBeInTheDocument();
+});
+
+test('an open option shows its contract with the item number of the card', async () => {
+	render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard() });
+
+	await fireEvent.click(screen.getByRole('button', { name: /Song stays open/ }));
+
+	expect(screen.getByText('songmaker · Item 1843 · Line 1')).toBeInTheDocument();
 });
 
 test('a final option marks the meta line final', () => {
@@ -67,7 +96,7 @@ test('a final option marks the meta line final', () => {
 		options: [cardOption(), cardOption({ letter: 'B', name: 'Delete it', undo: 'final' })]
 	});
 
-	render(OptionCard, { repo: 'songmaker', line });
+	render(OptionCard, { repo: 'songmaker', item: 1843, line });
 
 	expect(screen.getByText('final')).toBeInTheDocument();
 	expect(screen.queryByText('reversible')).not.toBeInTheDocument();
@@ -76,14 +105,14 @@ test('a final option marks the meta line final', () => {
 test('a ruled card fills the chosen letter and adds the Decided row with name and date', () => {
 	const line = { ...openCard(), ruling: 'B' as const, ruled_on: '2026-10-26' };
 
-	render(OptionCard, { repo: 'songmaker', line });
+	render(OptionCard, { repo: 'songmaker', item: 1843, line });
 
 	const options = within(screen.getByRole('list', { name: 'Options' })).getAllByRole('listitem');
 	expect(options.map((option) => option.getAttribute('aria-current'))).toEqual([null, 'true']);
 	const decided = screen.getByText('Decided').closest('div') as HTMLElement;
 	expect(decided).toHaveTextContent('B — As today');
 	expect(decided).toHaveTextContent('2026-10-26');
-	expect(screen.queryAllByRole('button')).toHaveLength(0);
+	expect(screen.getAllByRole('button')).toHaveLength(2);
 });
 
 test('hostile texts render as text and the picture stays out of the DOM tree', () => {
@@ -95,9 +124,9 @@ test('hostile texts render as text and the picture stays out of the DOM tree', (
 		picture: '<svg onload="alert(1)"><script>alert(2)</script></svg>'
 	});
 
-	const { container } = render(OptionCard, { repo: 'songmaker', line });
+	const { container } = render(OptionCard, { repo: 'songmaker', item: 1843, line });
 
-	expect(container.querySelectorAll('script, svg')).toHaveLength(0);
+	expect(container.querySelectorAll('script, svg:not([aria-hidden="true"])')).toHaveLength(0);
 	expect(container.querySelectorAll('img')).toHaveLength(1);
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
