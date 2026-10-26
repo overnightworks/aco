@@ -1,8 +1,0 @@
-claim_id = "69a270d2c2694a5db62485f76cdb80db"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "102c3ef3ba74b80c55144ecedb2be9c8d0d80d5e"
-branch = "claude/issue-378-give-the-expectation-domain-its-own-modu"
-scope = ["pyproject.toml", "quality/baseline.toml", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/ports.py", "src/aco/body.py", "src/aco/cli.py", "src/aco/cmd_ask.py", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/aco_board/test_aco_board_api.py", "tests/aco_board/test_aco_board_core.py", "tests/aco_board/test_aco_board_server.py", "tests/test_ask.py", "tests/test_board.py", "tests/test_rule.py", "tests/test_state_board.py"]
-opened_commit = "fb2acb2a5cb50ccef8b3aaf9bcdbf6599c28e430"
-whole_reason = "One owner move: the expectation domain leaves body.py and cli.py; every importer changes its import line only."
