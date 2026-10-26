@@ -19,7 +19,7 @@ export interface YesNoLine {
 	fingerprint: string;
 }
 
-export type OptionLetter = 'A' | 'B' | 'C' | 'D';
+type OptionLetter = 'A' | 'B' | 'C' | 'D';
 
 export type DecisionKind =
 	'product' | 'technical' | 'data_risk' | 'money' | 'access' | 'wording' | 'release';

@@ -26,6 +26,12 @@ export interface DecisionBanner {
 	message: string;
 }
 
+/** A changed or already-ruled card is decided only after `Neu laden`; any
+ * other refusal leaves the choices usable for a retry. */
+export function locksCard(banner: DecisionBanner | null): boolean {
+	return banner !== null && banner.kind !== 'failed';
+}
+
 export interface PendingDecision {
 	key: string;
 	message: string;

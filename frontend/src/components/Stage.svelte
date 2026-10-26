@@ -9,10 +9,12 @@
 	} from '../app/model/boardSummary';
 	import { NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
 	import { isOptionLine } from '../app/model/optionCard';
-	import type { DecisionStore } from '../app/state/decision.svelte';
+	import { locksCard, type DecisionStore } from '../app/state/decision.svelte';
 	import type { Outcome, RepoReading } from '../types';
 	import ChoiceButtons from './ChoiceButtons.svelte';
+	import DecideRow from './DecideRow.svelte';
 	import OptionCard from './OptionCard.svelte';
+	import RefusalBanner from './RefusalBanner.svelte';
 
 	let {
 		repos,
@@ -34,15 +36,29 @@
 	{#if selected === null}
 		<p>{NO_SELECTION_MESSAGE}</p>
 	{:else if isOptionLine(selected.line)}
-		{#key lineKey(selected.repo, selected.item.number, selected.line)}
-			<OptionCard repo={selected.repo} item={selected.item.number} line={selected.line} />
+		{@const optionLine = selected.line}
+		{@const repoName = selected.repo}
+		{@const itemNumber = selected.item.number}
+		{@const optionKey = lineKey(repoName, itemNumber, optionLine)}
+		{#key optionKey}
+			<OptionCard repo={repoName} item={itemNumber} line={optionLine}>
+				{#if optionLine.ruling === null}
+					<DecideRow
+						line={optionLine}
+						pending={decisions.isPending(optionKey)}
+						banner={decisions.banner(optionKey)}
+						onDecide={(option) => decisions.decideOption(repoName, itemNumber, optionLine, option)}
+						onReload={() => decisions.reloadAfterBanner(optionKey)}
+					/>
+				{/if}
+			</OptionCard>
 		{/key}
 	{:else}
 		{@const yesNoLine = selected.line}
 		{@const activeKey = lineKey(selected.repo, selected.item.number, selected.line)}
 		{@const ruled = selected.line.ruling !== null}
 		{@const banner = decisions.banner(activeKey)}
-		{@const locked = banner !== null && banner.kind !== 'failed'}
+		{@const locked = locksCard(banner)}
 		<article class="card">
 			<p class="item">
 				#{selected.item.number} · {selected.item.title} · Zeile {selected.line.index}
@@ -64,12 +80,7 @@
 				</div>
 			{:else}
 				{#if banner !== null}
-					<p role="alert" class="banner">{banner.message}</p>
-					{#if locked}
-						<button type="button" onclick={() => decisions.reloadAfterBanner(activeKey)}>
-							Neu laden
-						</button>
-					{/if}
+					<RefusalBanner {banner} onReload={() => decisions.reloadAfterBanner(activeKey)} />
 				{/if}
 				{#if !locked}
 					<details class="note">

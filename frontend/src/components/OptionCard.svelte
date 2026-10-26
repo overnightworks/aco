@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import {
 		cardMeta,
 		chosenOption,
@@ -13,7 +14,12 @@
 	import OptionDetails from './OptionDetails.svelte';
 	import WarnMark from './WarnMark.svelte';
 
-	let { repo, item, line }: { repo: string; item: number; line: OptionLine } = $props();
+	let {
+		repo,
+		item,
+		line,
+		children
+	}: { repo: string; item: number; line: OptionLine; children?: Snippet } = $props();
 
 	let openOption: OpenOption = $state(null);
 
@@ -124,6 +130,7 @@
 					<p>{line.reason}</p>
 				</dd>
 			</div>
+			{@render children?.()}
 		</dl>
 	</article>
 </div>
