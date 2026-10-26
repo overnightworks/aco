@@ -1,8 +1,0 @@
-claim_id = "52b21a4644bd44dfbed3533f2170e2ac"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "f83e32d3cc675368b12486af2902f809daff8132"
-branch = "claude/issue-376-freeze-the-blessed-v4-decision-card-pict"
-scope = ["README.md", "docs/board/README.md", "docs/board/mockup.html", "frontend/src/app/model/boardSummary.ts", "src/aco/board/static"]
-opened_commit = "ca1239a35f770434531770fafb66c178da58eab7"
-whole_reason = "One picture freeze: the picture, its README, the root README's pointer, one stale comment and the generated assets CI demands fresh."
