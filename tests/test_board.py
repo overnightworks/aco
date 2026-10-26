@@ -61,7 +61,7 @@ from aco.body import (
 )
 from aco.expectations import (
     ExpectationCardFields,
-    ExpectationLine,
+    YesNoLine,
     append_expectation,
     expectation_line_state,
     expectation_line_summary,
@@ -119,9 +119,7 @@ def test_rule_expectation_rules_a_proposed_line(ruling: str) -> None:
 
     new_body = rule_expectation(body, 1, ruling, date(2026, 9, 15))
 
-    assert expectation_lines(new_body) == (
-        ExpectationLine(1, "Ship it?", ruling, date(2026, 9, 15)),
-    )
+    assert expectation_lines(new_body) == (YesNoLine(1, "Ship it?", ruling, date(2026, 9, 15)),)
     assert parse_body(new_body).expectation_state is ExpectationState.RULED
 
 
@@ -136,7 +134,7 @@ def test_rule_expectation_preserves_every_byte_outside_the_ruled_line(newline: s
     assert new_body.startswith(prefix)
     assert new_body.endswith(suffix)
     assert expectation_lines(new_body) == (
-        ExpectationLine(1, ISSUE_230_EXPECTATION_TEXT, "yes", date(2026, 9, 15)),
+        YesNoLine(1, ISSUE_230_EXPECTATION_TEXT, "yes", date(2026, 9, 15)),
     )
 
 
@@ -195,7 +193,7 @@ def test_append_expectation_adds_a_proposed_line(default: str) -> None:
     new_body = append_expectation(body, "New question?", default)
 
     assert expectation_lines(new_body) == (
-        ExpectationLine(1, "New question?", None, None, default=default),
+        YesNoLine(1, "New question?", None, None, default=default),
     )
     entries = locate_block(new_body).data["expectation"]
     assert entries == [{"text": "New question?", "default": default}]
@@ -208,8 +206,8 @@ def test_append_expectation_appends_after_existing_lines() -> None:
     new_body = append_expectation(body, "Second", "no")
 
     assert expectation_lines(new_body) == (
-        ExpectationLine(1, "First", None, None, default="yes"),
-        ExpectationLine(2, "Second", None, None, default="no"),
+        YesNoLine(1, "First", None, None, default="yes"),
+        YesNoLine(2, "Second", None, None, default="no"),
     )
 
 
@@ -223,7 +221,7 @@ def test_append_expectation_preserves_every_byte_outside_the_appended_line(newli
 
     assert new_body.startswith(prefix)
     assert new_body.endswith(suffix)
-    assert expectation_lines(new_body)[-1] == ExpectationLine(
+    assert expectation_lines(new_body)[-1] == YesNoLine(
         2, "New question?", None, None, default="yes"
     )
 
@@ -258,7 +256,7 @@ def test_append_expectation_writes_the_card_fields() -> None:
     new_body = append_expectation(body, "New question?", "yes", card=card)
 
     assert expectation_lines(new_body) == (
-        ExpectationLine(
+        YesNoLine(
             1,
             "New question?",
             None,
@@ -592,8 +590,8 @@ def test_expectation_lines_reports_index_text_ruling_and_ruled_on() -> None:
     )
 
     assert expectation_lines(body) == (
-        ExpectationLine(1, "Open one", None, None, default="later"),
-        ExpectationLine(2, "Settled one", "no", date(2026, 9, 1)),
+        YesNoLine(1, "Open one", None, None, default="later"),
+        YesNoLine(2, "Settled one", "no", date(2026, 9, 1)),
     )
 
 
@@ -618,7 +616,7 @@ def test_expectation_lines_reads_question_example_and_picture() -> None:
     )
 
     assert expectation_lines(body) == (
-        ExpectationLine(
+        YesNoLine(
             1,
             "Ship it?",
             None,
@@ -644,15 +642,15 @@ def test_expectation_lines_is_empty_for_an_unaddressable_body(body: str) -> None
 
 
 def test_expectation_line_state_names_open_or_the_ruling_and_date() -> None:
-    open_line = ExpectationLine(1, "Open one", None, None)
-    ruled_line = ExpectationLine(2, "Settled one", "no", date(2026, 9, 1))
+    open_line = YesNoLine(1, "Open one", None, None)
+    ruled_line = YesNoLine(2, "Settled one", "no", date(2026, 9, 1))
 
     assert expectation_line_state(open_line) == "open"
     assert expectation_line_state(ruled_line) == "ruled no 2026-09-01"
 
 
 def test_expectation_line_summary_truncates_long_text() -> None:
-    line = ExpectationLine(1, "x" * 150, None, None)
+    line = YesNoLine(1, "x" * 150, None, None)
 
     summary = expectation_line_summary(line)
 
@@ -661,7 +659,7 @@ def test_expectation_line_summary_truncates_long_text() -> None:
 
 
 def test_expectation_line_summary_keeps_short_text_unchanged() -> None:
-    line = ExpectationLine(1, "Short.", None, None)
+    line = YesNoLine(1, "Short.", None, None)
 
     assert expectation_line_summary(line) == "Short."
 

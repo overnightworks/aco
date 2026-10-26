@@ -164,17 +164,23 @@ def test_rulings_lists_items_and_lines(
                         "lines": [
                             {
                                 "index": 1,
+                                "form": "yes_no",
                                 "text": "Open decision 0.",
                                 "ruling": None,
                                 "ruled_on": None,
                                 "default": "later",
+                                "card_hash": "sha256:92fad404e67af67d8cc0e7fa9cfbafc3c1347bff3946"
+                                "4f1340be3337a4e773f5",
                             },
                             {
                                 "index": 2,
+                                "form": "yes_no",
                                 "text": "Settled decision 0.",
                                 "ruling": "yes",
                                 "ruled_on": RULED_ON.isoformat(),
                                 "default": None,
+                                "card_hash": "sha256:17457e4511187ef44f7105e4882ad61dc585ff023fa4"
+                                "6624d7b5b94de1c05266",
                             },
                         ],
                     }
@@ -209,17 +215,23 @@ def test_rulings_lists_items_and_lines(
                         "lines": [
                             {
                                 "index": 1,
+                                "form": "yes_no",
                                 "text": "Settled decision 0.",
                                 "ruling": "yes",
                                 "ruled_on": RULED_ON.isoformat(),
                                 "default": None,
+                                "card_hash": "sha256:17457e4511187ef44f7105e4882ad61dc585ff023fa4"
+                                "6624d7b5b94de1c05266",
                             },
                             {
                                 "index": 2,
+                                "form": "yes_no",
                                 "text": "Settled decision 1.",
                                 "ruling": "yes",
                                 "ruled_on": RULED_ON.isoformat(),
                                 "default": None,
+                                "card_hash": "sha256:b426f8de344e80247e131c697860556229f4b8828a03"
+                                "81d7696a807a46ad5fca",
                             },
                         ],
                     }
@@ -273,10 +285,13 @@ def test_rulings_lists_items_and_lines(
                         "lines": [
                             {
                                 "index": 1,
+                                "form": "yes_no",
                                 "text": "Open decision.",
                                 "ruling": None,
                                 "ruled_on": None,
                                 "default": "later",
+                                "card_hash": "sha256:c95e9ce16738e47faf5d6924c958e670f8005587e8ca"
+                                "5a126a520627adf2a9e4",
                                 "question": "Ship it?",
                                 "example": "Release on Friday.",
                                 "picture": (

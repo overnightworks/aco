@@ -82,7 +82,7 @@ from aco.body import (
     parse_body,
     render_block,
 )
-from aco.expectations import ExpectationLine, expectation_lines
+from aco.expectations import YesNoLine, expectation_lines
 from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
 from aco.session import RunContext
 from aco.state_board import ItemWriter, StateRefBoard
@@ -2512,7 +2512,7 @@ class TestCliStateRefForge:
         assert state.tip is not None
         stored = store.read_item_files(worktree, state.tip)[f"{CHILD_A_ID}.md"].decode()
         lines = expectation_lines(stored, storage=Storage.STATE_REF)
-        assert lines[1] == ExpectationLine(
+        assert lines[1] == YesNoLine(
             2,
             asked_text,
             None,

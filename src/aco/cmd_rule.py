@@ -136,20 +136,24 @@ _RuleItemError = (
     | InvalidTargetError
     | expectations.ExpectationAlreadyRuledError
     | expectations.ExpectationOutOfRangeError
+    | expectations.ExpectationOptionLineError
 )
 
 
 def _rule_item_reason(error: _RuleItemError) -> _RuleReason:
-    """`run`'s own mapping from `_rule_item`'s four refusals to their
+    """`run`'s own mapping from `_rule_item`'s five refusals to their
     `--json` `reason`: a bad target names `unavailable`
     (forge cannot write) or `invalid_item` (missing item, pull request);
-    a bad line names `already_ruled` or `line_out_of_range`."""
+    a bad line names `already_ruled` or `line_out_of_range`, and an
+    option line `invalid_usage`."""
     if isinstance(error, TargetUnavailableError):
         return _RuleReason.UNAVAILABLE
     if isinstance(error, InvalidTargetError):
         return _RuleReason.INVALID_ITEM
     if isinstance(error, expectations.ExpectationAlreadyRuledError):
         return _RuleReason.ALREADY_RULED
+    if isinstance(error, expectations.ExpectationOptionLineError):
+        return _RuleReason.INVALID_USAGE
     return _RuleReason.LINE_OUT_OF_RANGE
 
 
@@ -178,6 +182,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         InvalidTargetError,
         expectations.ExpectationAlreadyRuledError,
         expectations.ExpectationOutOfRangeError,
+        expectations.ExpectationOptionLineError,
     ) as error:
         return report.refuse(_rule_item_reason(error), error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:

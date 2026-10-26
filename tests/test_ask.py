@@ -73,7 +73,7 @@ class TestGithubAsk:
                 TextResult(
                     "ASKED #90 line 1: New question?\n",
                     (
-                        expectations.ExpectationLine(
+                        expectations.YesNoLine(
                             1,
                             "New question?",
                             None,

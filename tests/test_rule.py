@@ -89,8 +89,10 @@ class TestGithubRule:
         reread = run_cli(["rulings", "--json"], capsys)
         assert reread.status == 0, reread.stderr
         line = json.loads(reread.stdout)["rulings"][0]["lines"][1]
+        assert line.pop("card_hash").startswith("sha256:")
         assert line == {
             "index": 2,
+            "form": "yes_no",
             "text": target["text"],
             "ruling": ruling,
             "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
@@ -127,10 +129,10 @@ class TestGithubRule:
                         f"e{index + 1}.{key}": value
                         for index, entry in enumerate(
                             (
-                                expectations.ExpectationLine(
+                                expectations.YesNoLine(
                                     1, "Ship it?", ruling, FROZEN_CLI_NOW.date()
                                 ),
-                                expectations.ExpectationLine(
+                                expectations.YesNoLine(
                                     2, "Ship it too?", None, None, default="later"
                                 ),
                             )

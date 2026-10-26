@@ -56,24 +56,68 @@ def _rulings_rows(
     )
 
 
-def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "index": line.index,
-        "text": line.text,
-        "ruling": line.ruling,
-        "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
-        "default": line.default,
+def _rulings_option_json(option: expectations.CardOption) -> dict[str, object]:
+    result: dict[str, object] = {"same_as_today": True}
+    if option.result is not None:
+        result = {"picture": option.result.picture}
+        if option.result.caption is not None:
+            result["caption"] = option.result.caption
+    return {
+        "letter": option.letter,
+        "name": option.name,
+        "effect": option.effect,
+        **result,
+        "notice": option.notice,
+        "cost": option.cost,
+        "undo": option.undo.value,
+        "undo_how": option.undo_how,
+        "contract": option.contract,
     }
-    payload.update(
-        (key, value)
+
+
+def _rulings_option_line_card_json(line: expectations.OptionLine) -> dict[str, object]:
+    return {
+        "question": line.question,
+        "problem": line.problem,
+        "picture": line.picture,
+        "caption": line.caption,
+        "decision_kind": line.decision_kind.value,
+        "area": line.area,
+        "topic": line.topic,
+        "recommended": line.recommended,
+        "reason": line.reason,
+        "options": [_rulings_option_json(option) for option in line.options],
+    }
+
+
+def _rulings_yes_no_card_json(line: expectations.YesNoLine) -> dict[str, object]:
+    return {
+        key: value
         for key, value in (
             ("question", line.question),
             ("example", line.example),
             ("picture", line.picture),
         )
         if value is not None
-    )
-    return payload
+    }
+
+
+def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
+    """RUL-10, RUL-12..RUL-14: the shared keys of either form, then its card."""
+    if isinstance(line, expectations.OptionLine):
+        default, card = None, _rulings_option_line_card_json(line)
+    else:
+        default, card = line.default, _rulings_yes_no_card_json(line)
+    return {
+        "index": line.index,
+        "form": line.form.value,
+        "text": line.text,
+        "ruling": line.ruling,
+        "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
+        "default": default,
+        "card_hash": line.card_hash,
+        **card,
+    }
 
 
 def _rulings_line_text(line: expectations.ExpectationLine) -> str:

@@ -683,14 +683,14 @@ def block_expectation_dicts(data: dict[str, object]) -> list[dict[str, object]]:
 def _block_expectation_state(expectations: list[dict[str, object]]) -> ExpectationState:
     if not expectations:
         return ExpectationState.NONE
-    if any("default" in entry for entry in expectations):
+    if any("ruling" not in entry for entry in expectations):
         return ExpectationState.PROPOSED
     return ExpectationState.RULED
 
 
 def _block_expectation_progress(expectations: list[dict[str, object]]) -> ExpectationProgress:
     return ExpectationProgress(
-        open=sum(1 for entry in expectations if "default" in entry), total=len(expectations)
+        open=sum(1 for entry in expectations if "ruling" not in entry), total=len(expectations)
     )
 
 

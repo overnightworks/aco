@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date
-from typing import cast
+from enum import StrEnum
+from typing import ClassVar, TypeAlias, cast
 
 from . import protocol
 from .body import (
@@ -23,13 +24,25 @@ from .expectation_grammar import (
     BLOCK_EXPECTATION_DEFAULTS,
     BLOCK_EXPECTATION_RULINGS,
     EXPECTATION_OPTIONAL_FIELDS,
+    OPTION_LETTERS,
+    DecisionKind,
+    Undo,
+    card_hash,
+    is_option_line,
 )
 
 EXPECTATION_LINE_TEXT_MAXIMUM = 100
 
 
+class LineForm(StrEnum):
+    """Which of the two line forms an `[[expectation]]` entry takes."""
+
+    YES_NO = "yes_no"
+    OPTIONS = "options"
+
+
 @dataclass(frozen=True)
-class ExpectationLine:
+class YesNoLine:
     """One `[[expectation]]` entry as `rule --line`, `ask`, and `rulings`
     see it: `index` is its 1-based position in block order -- what `rule
     --line` accepts and what `rulings` prints -- `text` its full prose, and
@@ -41,6 +54,7 @@ class ExpectationLine:
     sentence, and inline SVG -- `None` when `aco ask` was not given them,
     in which case a card falls back to `text`."""
 
+    form: ClassVar[LineForm] = LineForm.YES_NO
     index: int
     text: str
     ruling: str | None
@@ -49,6 +63,137 @@ class ExpectationLine:
     question: str | None = None
     example: str | None = None
     picture: str | None = None
+
+    @property
+    def card_hash(self) -> str:
+        """The hash of the card this line shows (BODY-89)."""
+        return card_hash(asdict(self))
+
+
+@dataclass(frozen=True)
+class ResultPicture:
+    """An option's RESULT drawn as its own picture, with an optional caption."""
+
+    picture: str
+    caption: str | None
+
+
+@dataclass(frozen=True)
+class CardOption:
+    """One option of an option line; `letter` is derived from its position,
+    and `result` is `None` when the result is the same as today."""
+
+    letter: str
+    name: str
+    effect: str
+    result: ResultPicture | None
+    notice: str
+    cost: str
+    undo: Undo
+    undo_how: str
+    contract: str
+
+
+@dataclass(frozen=True)
+class OptionRuling:
+    """The decided state of a ruled option line: the chosen letter and its date."""
+
+    letter: str
+    ruled_on: date
+
+
+@dataclass(frozen=True)
+class OptionLine:
+    """One `[[expectation]]` entry that offers lettered options, as `rulings`
+    sees it: the card's own fields, its options in order, `decision`
+    `None` while the line is open, and `card_hash` the hash of the card it
+    shows -- for a ruled line equal to the stored one, or the body would be
+    malformed (BODY-87)."""
+
+    form: ClassVar[LineForm] = LineForm.OPTIONS
+    index: int
+    text: str
+    question: str
+    problem: str
+    picture: str
+    caption: str
+    decision_kind: DecisionKind
+    area: str
+    topic: str
+    recommended: str
+    reason: str
+    options: tuple[CardOption, ...]
+    decision: OptionRuling | None
+    card_hash: str
+
+    @property
+    def ruling(self) -> str | None:
+        return None if self.decision is None else self.decision.letter
+
+    @property
+    def ruled_on(self) -> date | None:
+        return None if self.decision is None else self.decision.ruled_on
+
+
+ExpectationLine: TypeAlias = YesNoLine | OptionLine
+
+
+def _card_option(position: int, option: dict[str, object]) -> CardOption:
+    picture = option.get("picture")
+    result = (
+        None
+        if picture is None
+        else ResultPicture(cast(str, picture), cast(str | None, option.get("caption")))
+    )
+    return CardOption(
+        letter=OPTION_LETTERS[position],
+        name=cast(str, option["name"]),
+        effect=cast(str, option["effect"]),
+        result=result,
+        notice=cast(str, option["notice"]),
+        cost=cast(str, option["cost"]),
+        undo=Undo(cast(str, option["undo"])),
+        undo_how=cast(str, option["undo_how"]),
+        contract=cast(str, option["contract"]),
+    )
+
+
+def _option_line(index: int, entry: dict[str, object]) -> OptionLine:
+    options = cast(list[dict[str, object]], entry["option"])
+    decision = (
+        OptionRuling(cast(str, entry["ruling"]), cast(date, entry["ruled_on"]))
+        if "ruling" in entry
+        else None
+    )
+    return OptionLine(
+        index=index,
+        text=cast(str, entry["text"]),
+        question=cast(str, entry["question"]),
+        problem=cast(str, entry["problem"]),
+        picture=cast(str, entry["picture"]),
+        caption=cast(str, entry["caption"]),
+        decision_kind=DecisionKind(cast(str, entry["decision_kind"])),
+        area=cast(str, entry["area"]),
+        topic=cast(str, entry["topic"]),
+        recommended=cast(str, entry["recommended"]),
+        reason=cast(str, entry["reason"]),
+        options=tuple(_card_option(position, option) for position, option in enumerate(options)),
+        decision=decision,
+        card_hash=card_hash(entry),
+    )
+
+
+def _yes_no_line(index: int, entry: dict[str, object]) -> YesNoLine:
+    return YesNoLine(
+        index=index,
+        text=cast(str, entry["text"]),
+        ruling=cast(str | None, entry.get("ruling")),
+        ruled_on=cast("date | None", entry.get("ruled_on")),
+        default=cast(str | None, entry.get("default")),
+        question=cast(str | None, entry.get("question")),
+        example=cast(str | None, entry.get("example")),
+        picture=cast(str | None, entry.get("picture")),
+    )
 
 
 def expectation_lines(
@@ -65,16 +210,7 @@ def expectation_lines(
         return ()
     entries = block_expectation_dicts(locate_block(body).data)
     return tuple(
-        ExpectationLine(
-            index=position,
-            text=cast(str, entry["text"]),
-            ruling=cast(str | None, entry.get("ruling")),
-            ruled_on=cast("date | None", entry.get("ruled_on")),
-            default=cast(str | None, entry.get("default")),
-            question=cast(str | None, entry.get("question")),
-            example=cast(str | None, entry.get("example")),
-            picture=cast(str | None, entry.get("picture")),
-        )
+        _option_line(position, entry) if is_option_line(entry) else _yes_no_line(position, entry)
         for position, entry in enumerate(entries, start=1)
     )
 
@@ -107,13 +243,19 @@ class ExpectationOutOfRangeError(protocol.ClaimError):
     """`rule_expectation`'s own out-of-range `--line` refusal."""
 
 
+class ExpectationOptionLineError(protocol.ClaimError):
+    """`rule_expectation`'s own refusal to rule an option line with a
+    yes/no outcome, which would store a value the grammar refuses."""
+
+
 def rule_expectation(
     body: str, index: int, ruling: str, ruled_on: date, *, note: str | None = None
 ) -> str:
     """Rule one proposed line, preserving card fields and bytes outside the block.
 
     Replace the default with outcome/date; append any note to its text.
-    Refuse invalid outcomes, out-of-range indices and already-ruled lines.
+    Refuse invalid outcomes, out-of-range indices, option lines and
+    already-ruled lines, in that order.
     """
     if ruling not in BLOCK_EXPECTATION_RULINGS:
         raise protocol.ClaimError(
@@ -126,6 +268,10 @@ def rule_expectation(
             f"line {index} out of range: this item has {len(entries)} expectation line(s)"
         )
     entry = entries[index - 1]
+    if is_option_line(entry):
+        raise ExpectationOptionLineError(
+            f"line {index} is an option line; --yes, --no and --later rule only a yes/no line"
+        )
     if "ruling" in entry:
         raise ExpectationAlreadyRuledError(
             f"line {index} is already ruled; a changed ruling is a new line"

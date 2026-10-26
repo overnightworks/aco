@@ -46,12 +46,17 @@ request it cannot parse, its `handle` loop reads `self.close_connection` to
 end the connection, and `send_response` reads `self.request_version` to
 decide whether to write headers -- none through a call or read this package
 writes.
+
+The `DecisionKind` members are reached only by construction from a stored
+value (`DecisionKind(value)`) and by iteration when the grammar lists the
+accepted kinds; no code names one of them.
 """
 
 import argparse
 from datetime import UTC, date, datetime
 
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
+from aco.expectation_grammar import DecisionKind
 from aco.metrics import Size, SizeClassStats
 from aco.workboard import (
     Board,
@@ -135,6 +140,12 @@ _referenced_only_for_vulture = (
     NoItemKind.DOCS,
     NoItemKind.FIX,
     MergeMethod.REBASE,
+    DecisionKind.PRODUCT,
+    DecisionKind.TECHNICAL,
+    DecisionKind.DATA_RISK,
+    DecisionKind.MONEY,
+    DecisionKind.ACCESS,
+    DecisionKind.WORDING,
     _BoardApiRequestHandler.do_GET,
     _BoardApiRequestHandler.do_POST,
     _BoardApiRequestHandler.log_message,
