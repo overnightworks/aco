@@ -17,8 +17,8 @@ export const LIST_REGION_LABEL = 'Decisions';
 export const QUIET_PREFIX = 'Nothing open: ';
 export const EMPTY_LIST_TITLE = 'All decided';
 export const EMPTY_LIST_TEXT = 'No project is waiting for you.';
-export const EMPTY_HISTORY_MESSAGE = 'Noch keine Entscheidungen in den offenen Board-Items.';
-export const UNKNOWN_DATE_LABEL = 'Datum fehlt';
+export const EMPTY_DECIDED_TITLE = 'Nothing decided yet';
+export const EMPTY_DECIDED_TEXT = 'Your decisions show here with their answer and date.';
 export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
 
 const OUTCOME_LABEL: Record<Outcome, string> = {
@@ -63,63 +63,96 @@ export interface SelectedLine {
 }
 
 /** How a row reads at a glance: an option line is `open`; a yes/no line is
- * `todo` because its head still has to rewrite it as an option card. */
-export type RowState = 'open' | 'todo';
+ * `todo` because its head still has to rewrite it as an option card; a ruled
+ * line is `done`. */
+export type RowState = OpenRowState | 'done';
+type OpenRowState = 'open' | 'todo';
+
+/** The two tabs that list rows. */
+export type ListView = 'open' | 'decided';
 
 export const STATE_LABEL: Record<RowState, string> = {
 	open: 'Open',
-	todo: 'Not ready · head to fill'
+	todo: 'Not ready · head to fill',
+	done: 'Decided'
 };
 
-/** Lower comes first; `nextOpenAfter` and the list both order by it. */
-const ROW_RANK: Record<RowState, number> = { open: 0, todo: 1 };
+/** Lower comes first; `nextOpenAfter` and the open list both order by it. */
+const ROW_RANK: Record<OpenRowState, number> = { open: 0, todo: 1 };
 
-interface ListRow {
+interface ListRow<State extends RowState = RowState> {
 	key: string;
-	state: RowState;
+	state: State;
 	label: string;
 	/** The full question, for the row's tooltip. */
 	title: string;
 }
 
-type ListGroup = { repo: string; error: string } | { repo: string; rows: ListRow[] };
+type ListGroup<Row extends ListRow> =
+	{ repo: string; error: string } | { repo: string; rows: Row[] };
 
-export interface OpenList {
-	groups: ListGroup[];
-	/** Readable repositories with no open line. */
+export interface RowList<Row extends ListRow = ListRow> {
+	groups: ListGroup<Row>[];
+	/** Readable repositories with no row; only the open list names them. */
 	quiet: string[];
 }
 
-function listRow(repo: string, itemNumber: number, line: ExpectationLine): ListRow {
+function listRow<State extends RowState>(
+	repo: string,
+	itemNumber: number,
+	line: ExpectationLine,
+	state: State
+): ListRow<State> {
 	return {
 		key: lineKey(repo, itemNumber, line),
-		state: isOptionLine(line) ? 'open' : 'todo',
+		state,
 		label: isOptionLine(line) ? line.topic : cardHeading(line),
 		title: cardHeading(line)
 	};
 }
 
-function openRows(reading: RepoReading): ListRow[] {
+function openRows(reading: RepoReading): ListRow<OpenRowState>[] {
 	return reading.items
 		.flatMap((item) =>
 			item.lines
 				.filter((line) => line.ruling === null)
-				.map((line) => listRow(reading.name, item.number, line))
+				.map((line) =>
+					listRow(reading.name, item.number, line, isOptionLine(line) ? 'open' : 'todo')
+				)
 		)
 		.sort((left, right) => ROW_RANK[left.state] - ROW_RANK[right.state]);
 }
 
-/** The open list: one group per repository that failed or has an open line,
- * its option rows before its yes/no rows, each in aco's order. */
-export function openList(repos: RepoReading[]): OpenList {
-	const groups: ListGroup[] = [];
+/** Newest date first, then item number and line index descending; a missing
+ * date last. */
+function decidedRows(reading: RepoReading): ListRow<'done'>[] {
+	return reading.items
+		.flatMap((item) =>
+			item.lines.filter((line) => line.ruling !== null).map((line) => ({ item, line }))
+		)
+		.sort(
+			(left, right) =>
+				(right.line.ruled_on ?? '').localeCompare(left.line.ruled_on ?? '') ||
+				right.item.number - left.item.number ||
+				right.line.index - left.line.index
+		)
+		.map(({ item, line }) => listRow(reading.name, item.number, line, 'done'));
+}
+
+/** One group per repository that failed or has a row, in configured order; a
+ * readable repository without one is quiet. */
+function groupedRows<Row extends ListRow>(
+	repos: RepoReading[],
+	rowsFor: (reading: RepoReading) => Row[]
+): RowList<Row> {
+	const groups: ListGroup<Row>[] = [];
 	const quiet: string[] = [];
 	for (const reading of repos) {
 		if (reading.error !== null) {
 			groups.push({ repo: reading.name, error: reading.error });
 			continue;
 		}
-		const rows = openRows(reading);
+		const rows = rowsFor(reading);
 		if (rows.length === 0) {
 			quiet.push(reading.name);
 		} else {
@@ -129,30 +162,33 @@ export function openList(repos: RepoReading[]): OpenList {
 	return { groups, quiet };
 }
 
-function listedRows(repos: RepoReading[]): ListRow[] {
-	return openList(repos).groups.flatMap((group) => ('rows' in group ? group.rows : []));
+/** The open list: one group per repository that failed or has an open line,
+ * its option rows before its yes/no rows, each in aco's order. */
+export function openList(repos: RepoReading[]): RowList<ListRow<OpenRowState>> {
+	return groupedRows(repos, openRows);
+}
+
+/** The Decided list: one group per repository that failed or has a ruled
+ * line. The picture names quiet projects only on Open, so `quiet` stays
+ * empty. */
+export function decidedList(repos: RepoReading[]): RowList<ListRow<'done'>> {
+	return { groups: groupedRows(repos, decidedRows).groups, quiet: [] };
+}
+
+function rowsOf<Row extends ListRow>(list: RowList<Row>): Row[] {
+	return list.groups.flatMap((group) => ('rows' in group ? group.rows : []));
+}
+
+function listedRows(repos: RepoReading[]): ListRow<OpenRowState>[] {
+	return rowsOf(openList(repos));
 }
 
 export function firstOpenKey(repos: RepoReading[]): string | null {
 	return listedRows(repos)[0]?.key ?? null;
 }
 
-export function historyLines(repos: RepoReading[]): SelectedLine[] {
-	return repos
-		.filter((repo) => repo.error === null)
-		.flatMap((repo) =>
-			repo.items.flatMap((item) =>
-				item.lines
-					.filter((line) => line.ruling !== null)
-					.map((line) => ({ repo: repo.name, item, line }))
-			)
-		)
-		.sort(
-			(left, right) =>
-				(right.line.ruled_on ?? '').localeCompare(left.line.ruled_on ?? '') ||
-				right.item.number - left.item.number ||
-				right.line.index - left.line.index
-		);
+export function firstDecidedKey(repos: RepoReading[]): string | null {
+	return rowsOf(decidedList(repos))[0]?.key ?? null;
 }
 
 /** The one line `key` (`decision.ts`'s own) names, matched regardless of its
@@ -192,5 +228,5 @@ export function nextOpenAfter(repos: RepoReading[], key: string): string | null 
 /** What the header's two tabs count: the rows the open list shows and the
  * ruled lines the Decided view lists. */
 export function tabCounts(repos: RepoReading[]): { open: number; decided: number } {
-	return { open: listedRows(repos).length, decided: historyLines(repos).length };
+	return { open: listedRows(repos).length, decided: rowsOf(decidedList(repos)).length };
 }

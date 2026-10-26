@@ -3,9 +3,10 @@ import { item, line, optionLine, repo } from '../../test-support/board';
 import {
 	cardHeading,
 	cardSentence,
+	decidedList,
 	findSelectedLine,
+	firstDecidedKey,
 	firstOpenKey,
-	historyLines,
 	nextOpenAfter,
 	openList,
 	outcomeLabel,
@@ -126,33 +127,144 @@ describe('openList', () => {
 	});
 });
 
-test.each(['first', 'last'] as const)(
-	'history keeps missing dates last from %s input with descending dates/items/lines and stable repo ties',
-	(position) => {
-		const entries = [
-			['a', 9, 1, null],
-			['b', 2, 1, '2026-10-02'],
-			['c', 3, 1, '2026-10-02'],
-			['d', 3, 2, '2026-10-02'],
-			['e', 3, 2, '2026-10-02'],
-			['f', 99, 9, '2026-10-01']
-		] as const;
-		const ordered = position === 'first' ? entries : [...entries.slice(1), entries[0]];
-		const repos = ordered.map(([name, number, index, ruled_on]) =>
+describe('decidedList', () => {
+	function rowKeys(group: ReturnType<typeof decidedList>['groups'][number] | undefined): string[] {
+		return group && 'rows' in group ? group.rows.map((row) => row.key) : [];
+	}
+
+	test('[ABRD-30] groups ruled lines per repository in configured order, a failed one as its error group and a repository with nothing ruled absent', () => {
+		const { groups, quiet } = decidedList([
 			repo({
-				name,
+				name: 'first',
 				items: [
-					item({ number, lines: [line({ index, ruling: 'later', ruled_on }), line({ index: 10 })] })
+					item({ lines: [line({ ruling: 'yes', ruled_on: '2026-10-01' }), line({ index: 2 })] })
+				]
+			}),
+			repo({ name: 'broken', error: 'down' }),
+			repo({ name: 'untouched', items: [item({ lines: [line()] })] }),
+			repo({
+				name: 'last',
+				items: [item({ lines: [optionLine({ ruling: 'A', ruled_on: '2026-10-02' })] })]
+			})
+		]);
+
+		expect(groups.map((group) => group.repo)).toEqual(['first', 'broken', 'last']);
+		expect(groups[1]).toEqual({ repo: 'broken', error: 'down' });
+		expect(quiet).toEqual([]);
+	});
+
+	test('[ABRD-30] a row is done, keyed by its line, labelled with the option topic or the yes/no question, and titled with the question', () => {
+		const { groups } = decidedList([
+			repo({
+				items: [
+					item({
+						number: 4,
+						lines: [
+							optionLine({
+								index: 1,
+								ruling: 'B',
+								ruled_on: '2026-10-02',
+								topic: 'Sprung',
+								question: 'Keep the song open?'
+							}),
+							line({
+								index: 2,
+								ruling: 'no',
+								ruled_on: '2026-10-01',
+								question: 'Guests allowed?',
+								text: 'Guests may join.'
+							}),
+							line({ index: 3, ruling: 'later', ruled_on: '2026-09-30', text: 'Dark mode?' })
+						]
+					})
 				]
 			})
-		);
-		const before = structuredClone(repos);
-		expect(historyLines(repos).map((entry) => entry.repo)).toEqual(['d', 'e', 'c', 'b', 'f', 'a']);
-		expect(repos).toEqual(before);
-	}
-);
+		]);
 
-describe('[ABRD-30] ruledOutcomeText', () => {
+		const [group] = groups;
+		expect(group && 'rows' in group ? group.rows : []).toEqual([
+			{ key: 'repo:4:1', state: 'done', label: 'Sprung', title: 'Keep the song open?' },
+			{ key: 'repo:4:2', state: 'done', label: 'Guests allowed?', title: 'Guests allowed?' },
+			{ key: 'repo:4:3', state: 'done', label: 'Dark mode?', title: 'Dark mode?' }
+		]);
+	});
+
+	test('[ABRD-30] open lines are never listed', () => {
+		const { groups } = decidedList([
+			repo({
+				items: [item({ lines: [line({ index: 1 }), optionLine({ index: 2 })] })]
+			})
+		]);
+
+		expect(groups).toEqual([]);
+	});
+
+	test.each(['first', 'last'] as const)(
+		'[ABRD-31] a repository lists the newest date first, then item number and line index descending, missing dates last, from %s input',
+		(position) => {
+			const entries = [
+				[9, 1, null],
+				[2, 1, '2026-10-02'],
+				[3, 1, '2026-10-02'],
+				[3, 2, '2026-10-02'],
+				[99, 9, '2026-10-01']
+			] as const;
+			const ordered = position === 'first' ? entries : [...entries.slice(1), entries[0]];
+			const repos = [
+				repo({
+					name: 'a',
+					items: ordered.map(([number, index, ruled_on]) =>
+						item({
+							number,
+							lines: [line({ index, ruling: 'later', ruled_on }), line({ index: 10 })]
+						})
+					)
+				})
+			];
+			const before = structuredClone(repos);
+
+			expect(rowKeys(decidedList(repos).groups[0])).toEqual([
+				'a:3:2',
+				'a:3:1',
+				'a:2:1',
+				'a:99:9',
+				'a:9:1'
+			]);
+			expect(repos).toEqual(before);
+		}
+	);
+});
+
+describe('firstDecidedKey', () => {
+	test('[ABRD-32] is the first row of the decided list', () => {
+		const repos = [
+			repo({ name: 'broken', error: 'down' }),
+			repo({ name: 'open', items: [item({ lines: [line()] })] }),
+			repo({
+				name: 'ruled',
+				items: [
+					item({
+						number: 3,
+						lines: [
+							line({ index: 1, ruling: 'yes', ruled_on: '2026-10-01' }),
+							line({ index: 2, ruling: 'no', ruled_on: '2026-10-02' })
+						]
+					})
+				]
+			})
+		];
+
+		expect(firstDecidedKey(repos)).toBe('ruled:3:2');
+	});
+
+	test('[ABRD-32] is null with nothing ruled or only failed repositories', () => {
+		expect(firstDecidedKey([])).toBeNull();
+		expect(firstDecidedKey([repo({ error: 'down' })])).toBeNull();
+		expect(firstDecidedKey([repo({ items: [item({ lines: [line()] })] })])).toBeNull();
+	});
+});
+
+describe('ruledOutcomeText', () => {
 	test.each([
 		['yes', '2026-10-01', 'Ja · 2026-10-01'],
 		['no', '2026-10-02', 'Nein · 2026-10-02'],

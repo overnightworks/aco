@@ -1,15 +1,17 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 import { item, line, optionLine, repo } from '../test-support/board';
+import type { ListView } from '../app/model/boardSummary';
 import TrackList from './TrackList.svelte';
 
 function renderList(
 	repos: ReturnType<typeof repo>[],
-	overrides: { selectedKey?: string | null } = {}
+	overrides: { selectedKey?: string | null; view?: ListView } = {}
 ) {
 	const onSelect = vi.fn();
 	const rendered = render(TrackList, {
 		repos,
+		view: overrides.view ?? 'open',
 		selectedKey: overrides.selectedKey ?? null,
 		onSelect
 	});
@@ -162,4 +164,51 @@ test('[ABRD-28] the selected row is marked current among several open ones', () 
 	const [first, second] = screen.getAllByRole('button');
 	expect(first).toHaveAttribute('aria-current', 'false');
 	expect(second).toHaveAttribute('aria-current', 'true');
+});
+
+test('[ABRD-30] a decided row is named Decided with its label, carries the Decided shape and is not muted', () => {
+	renderList(
+		[
+			repo({
+				items: [
+					item({
+						lines: [
+							optionLine({ index: 1, topic: 'Sprung', ruling: 'A', ruled_on: '2026-10-02' }),
+							line({ index: 2, text: 'Guests?', ruling: 'later', ruled_on: '2026-10-01' }),
+							line({ index: 3, text: 'Still open?' })
+						]
+					})
+				]
+			})
+		],
+		{ view: 'decided' }
+	);
+
+	const row = screen.getByRole('button', { name: 'Decided Sprung' });
+	expect(within(row).getByRole('img', { name: 'Decided' })).toBeInTheDocument();
+	expect(within(row).getByText('Sprung')).not.toHaveClass('muted');
+	expect(screen.getByRole('button', { name: 'Decided Guests?' })).toBeInTheDocument();
+	expect(screen.getAllByRole('button')).toHaveLength(2);
+	expect(screen.getByRole('region', { name: 'Decided' })).toBeInTheDocument();
+	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('repo 2');
+});
+
+test('[ABRD-31] with nothing ruled the decided list reads Nothing decided yet and says what shows here', () => {
+	renderList([repo({ items: [item({ lines: [line()] })] })], { view: 'decided' });
+
+	expect(screen.getByText('Nothing decided yet')).toBeInTheDocument();
+	expect(
+		screen.getByText('Your decisions show here with their answer and date.')
+	).toBeInTheDocument();
+	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
+});
+
+test('[ABRD-31] a failed repository shows its alert in the decided list and no Nothing decided yet', () => {
+	renderList([repo({ name: 'broken', error: 'down', items: [] }), repo({ name: 'idle' })], {
+		view: 'decided'
+	});
+
+	expect(screen.getByRole('alert')).toHaveTextContent('broken: down');
+	expect(screen.queryByText('Nothing decided yet')).not.toBeInTheDocument();
+	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
 });

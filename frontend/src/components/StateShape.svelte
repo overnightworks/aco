@@ -8,15 +8,27 @@
 
 <span class="shape {state}" role="img" aria-label={label} title={label}>
 	<svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
-		<circle
-			cx="7"
-			cy="7"
-			r="5.6"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.6"
-			stroke-dasharray={state === 'todo' ? '2.4 2.2' : undefined}
-		/>
+		{#if state === 'done'}
+			<circle cx="7" cy="7" r="6.2" fill="currentColor" />
+			<path
+				d="m4.3 7.2 1.9 1.9 3.5-3.9"
+				fill="none"
+				stroke="var(--surface)"
+				stroke-width="1.7"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			/>
+		{:else}
+			<circle
+				cx="7"
+				cy="7"
+				r="5.6"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.6"
+				stroke-dasharray={state === 'todo' ? '2.4 2.2' : undefined}
+			/>
+		{/if}
 	</svg>
 </span>
 
@@ -28,6 +40,9 @@
 	}
 	.todo {
 		color: var(--fg-3);
+	}
+	.done {
+		color: var(--good);
 	}
 	svg {
 		display: block;

@@ -3,7 +3,9 @@
 	import {
 		LIST_LABEL,
 		nextOpenAfter,
+		firstDecidedKey,
 		firstOpenKey,
+		type ListView,
 		OPEN_TAB_LABEL,
 		DECIDED_TAB_LABEL,
 		tabCounts
@@ -13,7 +15,6 @@
 	import Stage from './components/Stage.svelte';
 	import TrackList from './components/TrackList.svelte';
 	import UndoToast from './components/UndoToast.svelte';
-	import HistoryView from './components/HistoryView.svelte';
 
 	let { token }: { token: string | null } = $props();
 
@@ -21,31 +22,40 @@
 	let decisions: DecisionStore | null = $state(null);
 	let selectedKey: string | null = $state(null);
 	let showQuestion = $state(false);
-	let view: 'open' | 'decided' = $state('open');
+	let decidedKey: string | null = $state(null);
+	let showDecidedCard = $state(false);
+	let view: ListView = $state('open');
 	const counts = $derived(tabCounts(board.repos));
 	let initialized = $state(false);
 	let tracks: HTMLDivElement | undefined = $state();
 	let question: HTMLDivElement | undefined = $state();
+	let decidedTracks: HTMLDivElement | undefined = $state();
+	let decidedQuestion: HTMLDivElement | undefined = $state();
 
-	function focusQuestion() {
-		(question?.querySelector<HTMLElement>('.stage') ?? question)?.focus({ preventScroll: true });
+	function focusQuestion(pane: HTMLDivElement | undefined) {
+		(pane?.querySelector<HTMLElement>('.stage') ?? pane)?.focus({ preventScroll: true });
 	}
 
-	async function resetQuestion(explicitSelection = false) {
+	async function resetQuestion(pane: HTMLDivElement | undefined, explicitSelection = false) {
 		await tick();
-		if (question && question.getClientRects().length > 0) {
-			question.scrollTop = 0;
+		if (pane && pane.getClientRects().length > 0) {
+			pane.scrollTop = 0;
 		}
-		if (explicitSelection) focusQuestion();
+		if (explicitSelection) focusQuestion(pane);
 		else keepFocusVisible();
 	}
 
-	async function showList() {
-		showQuestion = false;
+	async function showList(list: HTMLDivElement | undefined) {
 		await tick();
-		(tracks?.querySelector<HTMLElement>('[aria-current="true"]') ?? tracks)?.focus({
+		(list?.querySelector<HTMLElement>('[aria-current="true"]') ?? list)?.focus({
 			preventScroll: true
 		});
+	}
+
+	function openDecided() {
+		decidedKey = firstDecidedKey(board.repos);
+		showDecidedCard = false;
+		view = 'decided';
 	}
 
 	function keepFocusVisible() {
@@ -55,7 +65,7 @@
 			active === document.body ||
 			(active instanceof HTMLElement && active.getClientRects().length === 0)
 		) {
-			if (question && question.getClientRects().length > 0) focusQuestion();
+			if (question && question.getClientRects().length > 0) focusQuestion(question);
 			else tracks?.focus({ preventScroll: true });
 		}
 	}
@@ -67,7 +77,7 @@
 				initialized = true;
 			}
 			void tick().then(() => {
-				if (document.activeElement === question) focusQuestion();
+				if (document.activeElement === question) focusQuestion(question);
 				else keepFocusVisible();
 			});
 		}
@@ -90,7 +100,7 @@
 	$effect(() => {
 		if (decisions !== null && decisions.justRuled !== null && decisions.justRuled === selectedKey) {
 			selectedKey = nextOpenAfter(board.repos, decisions.justRuled);
-			void resetQuestion();
+			void resetQuestion(question);
 		}
 	});
 </script>
@@ -111,8 +121,7 @@
 				<button
 					type="button"
 					aria-current={view === 'decided' ? 'page' : undefined}
-					onclick={() => (view = 'decided')}
-					>{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span></button
+					onclick={openDecided}>{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span></button
 				>
 			</nav>
 		{/if}
@@ -124,26 +133,67 @@
 	{:else if board.status === 'unavailable'}
 		<p role="alert">aco antwortet nicht. {board.error}</p>
 	{:else if decisions !== null}
-		<div class="history" hidden={view !== 'decided'}><HistoryView repos={board.repos} /></div>
-		<div class="decide" hidden={view !== 'open'} class:show-question={showQuestion}>
+		<div class="split" hidden={view !== 'open'} class:show-question={showQuestion}>
 			<div class="tracks" bind:this={tracks} tabindex="-1">
 				<TrackList
 					repos={board.repos}
+					view="open"
 					{selectedKey}
 					onSelect={(key) => {
 						selectedKey = key;
 						showQuestion = true;
-						void resetQuestion(true);
+						void resetQuestion(question, true);
 					}}
 				/>
 			</div>
 			<div class="question-pane" bind:this={question} tabindex="-1">
 				<div class="inner">
-					<button class="back" type="button" onclick={showList}>← {LIST_LABEL}</button>
+					<button
+						class="back"
+						type="button"
+						onclick={() => {
+							showQuestion = false;
+							void showList(tracks);
+						}}>← {LIST_LABEL}</button
+					>
 					<Stage repos={board.repos} {selectedKey} {decisions} refreshing={board.refreshing} />
 				</div>
 			</div>
 		</div>
+		{#if view === 'decided'}
+			<div class="split" class:show-question={showDecidedCard}>
+				<div class="tracks" bind:this={decidedTracks} tabindex="-1">
+					<TrackList
+						repos={board.repos}
+						view="decided"
+						selectedKey={decidedKey}
+						onSelect={(key) => {
+							decidedKey = key;
+							showDecidedCard = true;
+							void resetQuestion(decidedQuestion, true);
+						}}
+					/>
+				</div>
+				<div class="question-pane" bind:this={decidedQuestion} tabindex="-1">
+					<div class="inner">
+						<button
+							class="back"
+							type="button"
+							onclick={() => {
+								showDecidedCard = false;
+								void showList(decidedTracks);
+							}}>← {LIST_LABEL}</button
+						>
+						<Stage
+							repos={board.repos}
+							selectedKey={decidedKey}
+							{decisions}
+							refreshing={board.refreshing}
+						/>
+					</div>
+				</div>
+			</div>
+		{/if}
 		<div class="toasts" hidden={view !== 'open'} aria-live="polite">
 			{#each decisions.pendingEntries as entry (entry.key)}
 				<UndoToast message={entry.message} onUndo={() => decisions?.undo(entry.key)} />
@@ -254,12 +304,7 @@
 		color: inherit;
 		opacity: 0.75;
 	}
-	.history {
-		flex: 1;
-		overflow: auto;
-		min-height: 0;
-	}
-	.decide {
+	.split {
 		display: grid;
 		grid-template-columns: 320px minmax(0, 1fr);
 		flex: 1;
@@ -410,7 +455,7 @@
 		nav button {
 			padding: 6px 8px;
 		}
-		.decide {
+		.split {
 			grid-template-columns: minmax(0, 1fr);
 		}
 		.question-pane {
