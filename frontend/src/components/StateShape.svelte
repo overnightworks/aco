@@ -24,10 +24,10 @@
 	.shape {
 		display: inline-flex;
 		flex: none;
-		color: #4d4758;
+		color: var(--fg-2);
 	}
 	.todo {
-		color: #6e6779;
+		color: var(--fg-3);
 	}
 	svg {
 		display: block;
