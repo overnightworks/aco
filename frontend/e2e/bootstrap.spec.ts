@@ -3,8 +3,7 @@ import path from 'node:path';
 import { expect, test } from './consoleGuard';
 import { readBoardRuntime } from './runtime';
 
-const EMPTY_BOARD_MESSAGE =
-	'Nichts offen. Neue Fragen erscheinen hier nach Neuladen, sobald ein Agent eine stellt.';
+const EMPTY_BOARD_MESSAGE = 'All decided';
 
 // One shared board server backs every test in this file (see
 // global-setup.ts); a run toggling its fake `aco` must not race another.
