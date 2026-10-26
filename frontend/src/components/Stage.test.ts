@@ -1,9 +1,9 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { DecisionStore } from '../app/state/decision.svelte';
 import { UNDO_SECONDS, lineKey } from '../app/model/decision';
-import { item, line, repo } from '../test-support/board';
+import { item, line, optionLine, repo } from '../test-support/board';
 import type { DecisionResult } from '../types';
 import Stage from './Stage.svelte';
 
@@ -55,6 +55,42 @@ test('a selected line shows only its own question, example, sentence and recomme
 	expect(screen.getByRole('button', { name: /Empfohlen/ })).toHaveTextContent('Ja');
 	// The note stays collapsed: its textarea is present but not shown open.
 	expect(screen.getByText('Notiz').closest('details')).not.toHaveAttribute('open');
+});
+
+test('a selected option line shows its card and offers no outcome', () => {
+	const card = optionLine({ index: 2, question: 'Keep the song open?' });
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+
+	render(Stage, {
+		repos,
+		selectedKey: lineKey('repo', 42, card),
+		decisions: storeAnswering({ status: 'ruled', message: null })
+	});
+
+	expect(screen.getByRole('heading', { name: 'Keep the song open?' })).toBeInTheDocument();
+	expect(screen.getByText('Problem')).toBeInTheDocument();
+	expect(screen.queryByRole('group', { name: 'Entscheidung' })).not.toBeInTheDocument();
+	expect(screen.queryByText('Notiz')).not.toBeInTheDocument();
+	expect(screen.queryAllByRole('button')).toHaveLength(0);
+});
+
+test('a selected yes/no line still offers Ja, Nein and Später', () => {
+	const card = line({ index: 2, question: 'Guests allowed?' });
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+
+	render(Stage, {
+		repos,
+		selectedKey: lineKey('repo', 42, card),
+		decisions: storeAnswering({ status: 'ruled', message: null })
+	});
+
+	const choices = screen.getByRole('group', { name: 'Entscheidung' });
+	expect(
+		within(choices)
+			.getAllByRole('button')
+			.map((button) => button.textContent?.trim())
+	).toEqual(['Ja', 'Nein', 'Später']);
+	expect(screen.queryByText('Problem')).not.toBeInTheDocument();
 });
 
 test('an already-ruled selected line shows a read-only box, never live choice buttons', () => {

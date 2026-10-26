@@ -77,13 +77,7 @@ export class DecisionStore {
 	}
 
 	/** Starts the undo window for one card as shown; never sends before it elapses. */
-	decide(
-		repo: string,
-		item: number,
-		line: YesNoLine,
-		outcome: Outcome,
-		note: string | null
-	): void {
+	decide(repo: string, item: number, line: YesNoLine, outcome: Outcome, note: string | null): void {
 		const key = lineKey(repo, item, line);
 		this.#banners = withoutKey(this.#banners, key);
 		const request = decisionRequest(repo, item, line, outcome, note);

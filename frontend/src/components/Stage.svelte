@@ -8,9 +8,11 @@
 		pictureDataUri
 	} from '../app/model/boardSummary';
 	import { NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
+	import { isOptionLine } from '../app/model/optionCard';
 	import type { DecisionStore } from '../app/state/decision.svelte';
 	import type { Outcome, RepoReading } from '../types';
 	import ChoiceButtons from './ChoiceButtons.svelte';
+	import OptionCard from './OptionCard.svelte';
 
 	let {
 		repos,
@@ -31,7 +33,10 @@
 >
 	{#if selected === null}
 		<p>{NO_SELECTION_MESSAGE}</p>
+	{:else if isOptionLine(selected.line)}
+		<OptionCard repo={selected.repo} line={selected.line} />
 	{:else}
+		{@const yesNoLine = selected.line}
 		{@const activeKey = lineKey(selected.repo, selected.item.number, selected.line)}
 		{@const ruled = selected.line.ruling !== null}
 		{@const banner = decisions.banner(activeKey)}
@@ -82,7 +87,7 @@
 							decisions.decide(
 								selected.repo,
 								selected.item.number,
-								selected.line,
+								yesNoLine,
 								outcome,
 								noteOrNull(noteText)
 							);
