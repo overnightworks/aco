@@ -23,7 +23,10 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-36, ABRD-37, ABRD-38 | RULE-13 |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-36, ABRD-37, ABRD-38 | RULE-13 (outcome), ABRD-39 (option) |
+| an `option` posted for a line that is no option line | — | ABRD-40 |
+| its card changed between the board's read and aco's write | — | ABRD-41 |
+| a post naming both or neither of `outcome` and `option`, another letter, or an `option` with a note | — | ABRD-42 |
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note on the decision | — | ABRD-05 |
@@ -38,11 +41,15 @@ resolved directory's name.
 
 ## Writing a decision
 
-- [ ] [ABRD-01] Deciding a shown open card with outcome `yes`, `no`, or `later` runs `aco rule <n> --line <k>` with `--yes`, `--no`, or `--later` and `--json` (see E-ABRD-01).
+- [ ] [ABRD-01] Deciding a shown open yes/no card with outcome `yes`, `no`, or `later` runs `aco rule <n> --line <k>` with `--yes`, `--no`, or `--later` and `--json` (see E-ABRD-01).
 - [ ] [ABRD-02] A card whose shown fields changed since it was shown -- an option line's `card_hash` (ABRD-35) -- is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run (see E-ABRD-02).
 - [ ] [ABRD-03] The board runs one `aco rule` at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
 - [ ] [ABRD-04] Stopping the board waits for an `aco rule` already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, no `aco rule` run.
 - [ ] [ABRD-05] A note is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other note refuses the decision before any `aco` call; a blank note is no note.
+- [ ] [ABRD-39] An `option` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --option <X> --via board --card-hash=<H> --json`, `<H>` that line's `card_hash` just read (E-ABRD-12).
+- [ ] [ABRD-40] An `option` posted for a line that is no option line, or for no line at all, is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run: the board has no card hash to name.
+- [ ] [ABRD-41] An `aco rule` refusal `card_changed` (RULE-17) answers `failed` with `Diese Zeile hat sich geändert, bitte neu laden`; every other answer keeps its mapping, `already_ruled` (RULE-04) included.
+- [ ] [ABRD-42] A post naming both or neither of `outcome` and `option`, an `option` other than `A`, `B`, `C`, `D`, or an `option` with a non-blank `note` answers 400 `bad request: decision` before any `aco` call.
 
 ## Reading the lines
 
@@ -80,7 +87,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## The JSON API
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's failure sentence, `items: []` (E-ABRD-06).
-- [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint`, `outcome`, `note`; answers 200 `{"status", "message"}`, else 400 `{"error": "bad request: decision"}` (E-ABRD-04, E-ABRD-07).
+- [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint`, `outcome` (with `note`) or `option`; answers 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the start token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
@@ -106,6 +113,8 @@ and no `card_hash`; pictures are SVG text as stored.
 ## Never
 
 - The board never writes a decision for a line it did not just read as open with the same shown fields: ABRD-02 compares before every write.
+- An option's `--card-hash` is the hash the board just read from the line whose fingerprint was posted, and aco compares it again at its write (RULE-17).
+- The board never sends `--via chat` or `--via default`. Its `--via board` is the cooperative record of `specs/rule.spec.md`'s Never, not proof that a person clicked.
 - The board never runs two `aco rule` commands at once across any configured repo, and never starts one after stopping began (ABRD-03, ABRD-04, ABRD-17, ABRD-18).
 - No answer carries an `Access-Control-*` header, so a page from another origin can neither read an answer nor send the token header (ABRD-10).
 - The board never resolves a repo label from a request into a path: a label is only ever a lookup key among the repos `--repo` configured at start (ABRD-16).
@@ -278,3 +287,16 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
 ```
 
 Posting `yes` for `#12` line `1` with the listed fingerprint answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is an option line; --yes, --no and --later rule only a yes/no line"}` (RULE-13).
+
+### E-ABRD-12 -- deciding an option line
+
+Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts option `A` for that card
+
+```text
+request: POST /api/rule, header X-Board-Token: <start token>
+body: {"repo": "<repo>", "item": 12, "line": 1, "fingerprint": "<as listed>", "option": "A"}
+aco calls: aco rulings --json, then aco rule 12 --line 1 --option A --via board --card-hash=<card_hash of that line> --json
+answer 200: {"status": "ruled", "message": null}
+```
+
+Posting the same body after aco answers `card_changed` (RULE-17) because the card changed between the board's read and aco's write answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`; the stored line is unchanged.
