@@ -8,7 +8,7 @@
  */
 
 import { postDecision } from '../../client';
-import type { DecisionRequest, ExpectationLine, Outcome } from '../../types';
+import type { DecisionRequest, Outcome, YesNoLine } from '../../types';
 import { cardHeading, outcomeLabel } from '../model/boardSummary';
 import {
 	BOARD_UNREACHABLE_MESSAGE,
@@ -80,7 +80,7 @@ export class DecisionStore {
 	decide(
 		repo: string,
 		item: number,
-		line: ExpectationLine,
+		line: YesNoLine,
 		outcome: Outcome,
 		note: string | null
 	): void {

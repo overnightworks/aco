@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { item, line, repo } from '../../test-support/board';
+import { item, line, optionLine, repo } from '../../test-support/board';
 import {
 	cardHeading,
 	cardSentence,
@@ -87,7 +87,9 @@ describe('lineStatusText', () => {
 		[line({ ruling: 'later', ruled_on: '2026-10-03' }), 'Später · 2026-10-03'],
 		[line({ ruling: 'yes', ruled_on: null }), 'Ja · '],
 		[line({ ruling: null, default: 'yes' }), 'Empfohlen: Ja'],
-		[line({ ruling: null, default: null }), 'Offen']
+		[line({ ruling: null, default: null }), 'Offen'],
+		[optionLine({ recommended: 'B' }), 'Empfohlen: B'],
+		[optionLine({ ruling: 'A', ruled_on: '2026-10-04' }), 'A · Keep the song open · 2026-10-04']
 	])('%o -> %s', (candidate, expected) => {
 		expect(lineStatusText(candidate)).toBe(expected);
 	});
@@ -109,6 +111,12 @@ describe('cardHeading / cardSentence', () => {
 
 		expect(cardHeading(card)).toBe('Guests allowed?');
 		expect(cardSentence(card)).toBe('Guests may join the call.');
+	});
+
+	test('an option line is headed by its question', () => {
+		const card = optionLine({ question: 'Keep the song open?' });
+
+		expect(cardHeading(card)).toBe('Keep the song open?');
 	});
 
 	test('with no distinct question, the sentence itself is the heading, shown once', () => {
