@@ -1,7 +1,9 @@
 """`DecisionPort` over the installed `aco` command line.
 
 Reads with `aco rulings --json` (specs/rulings.spec.md) and writes with
-`aco rule ITEM --line N --yes|--no|--later [--note TEXT] --json` (specs/rule.spec.md).
+`aco rule ITEM --line N --yes|--no|--later [--note TEXT] --json` or
+`aco rule ITEM --line N --option X --via board --card-hash=HASH --json`
+(specs/rule.spec.md).
 Every call runs in the directory the board was started in, so the board only
 ever sees that repository, and passes its arguments as a list, never through
 a shell.
@@ -19,12 +21,14 @@ from typing import TypeVar
 from .ports import (
     OPTION_LETTERS,
     OPTIONS_FORM,
+    CardChanged,
     CardOption,
     Decision,
     DecisionResult,
     DecisionSourceUnavailableError,
     DecisionStatus,
     ExpectationLine,
+    OptionDecision,
     OptionLetter,
     OptionLine,
     Outcome,
@@ -36,6 +40,10 @@ DEFAULT_TIMEOUT_SECONDS = 120.0
 """`aco rulings` builds the whole board projection, which can take tens of
 seconds against a forge; a call still running after this is treated as hung."""
 _ALREADY_RULED_REASON = "already_ruled"
+_CARD_CHANGED_REASON = "card_changed"
+_VIA_BOARD = "board"
+"""The only `--via` the board writes: it records the cooperative path, never
+`chat` or `default`, which belong to the operator's other writers."""
 
 _Field = TypeVar("_Field")
 
@@ -45,6 +53,12 @@ class _Completed:
     exit_code: int
     stdout: str
     stderr: str
+
+
+@dataclass(frozen=True)
+class _RuleAnswer:
+    result: DecisionResult
+    card_changed: bool
 
 
 @dataclass(frozen=True)
@@ -72,18 +86,42 @@ class AcoCli:
         if decision.note is not None:
             # One argument: a note starting with "-" would otherwise read as an option.
             arguments.append(f"--note={decision.note}")
+        return self._write(arguments).result
+
+    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
+        answer = self._write(
+            [
+                "rule",
+                str(decision.item),
+                "--line",
+                str(decision.index),
+                "--option",
+                decision.letter,
+                "--via",
+                _VIA_BOARD,
+                # One argument: a hash from aco's output can never read as an option.
+                f"--card-hash={card_hash}",
+            ]
+        )
+        return CardChanged() if answer.card_changed else answer.result
+
+    def _write(self, arguments: list[str]) -> _RuleAnswer:
         try:
             completed = self._run([*arguments, "--json"])
         except DecisionSourceUnavailableError as error:
-            return DecisionResult(DecisionStatus.FAILED, str(error))
+            return _RuleAnswer(DecisionResult(DecisionStatus.FAILED, str(error)), False)
         envelope = _envelope(completed)
         if completed.exit_code == 0 and envelope.get("ok") is True:
-            return DecisionResult(DecisionStatus.RULED)
-        if envelope.get("reason") == _ALREADY_RULED_REASON:
-            return DecisionResult(DecisionStatus.ALREADY_RULED, _message(envelope))
-        return DecisionResult(
+            return _RuleAnswer(DecisionResult(DecisionStatus.RULED), False)
+        reason = envelope.get("reason")
+        if reason == _ALREADY_RULED_REASON:
+            return _RuleAnswer(
+                DecisionResult(DecisionStatus.ALREADY_RULED, _message(envelope)), False
+            )
+        failed = DecisionResult(
             DecisionStatus.FAILED, _failure_sentence("aco rule", completed, envelope)
         )
+        return _RuleAnswer(failed, reason == _CARD_CHANGED_REASON)
 
     def _run(self, arguments: list[str]) -> _Completed:
         try:
