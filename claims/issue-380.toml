@@ -1,8 +1,0 @@
-claim_id = "27e03b6bf3944813bd149769f3e0e60a"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "a0affbcfacded8b814f63fdccc0521e40d1e433d"
-branch = "claude/issue-380-persist-render-and-read-the-v4-option-ca"
-scope = ["quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/body-block.spec.md", "specs/rule.spec.md", "specs/rulings.spec.md", "src/aco/__init__.py", "src/aco/body.py", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/test_ask.py", "tests/test_board.py", "tests/test_option_line_rewrites.py", "tests/test_option_lines.py", "tests/test_rule.py", "tests/test_rulings.py", "tests/test_state_board.py"]
-opened_commit = "c4898a515bbb18de664cee581606639a2b36975a"
-whole_reason = "The option-line shape, its canonical rendering and its one reader land together so no body can hold a line that a rewrite drops, a writer corrupts or the JSON cannot show."
