@@ -498,10 +498,15 @@ class TestOptionLineRulings:
         result = run_cli(["rulings", "--json"], capsys)
         assert result.status == 0, result.stderr
         lines = json.loads(result.stdout)["rulings"][0]["lines"]
-        assert [line["form"] for line in lines] == ["yes_no", "options"]
-        assert [line["default"] for line in lines] == ["no", None]
-        assert lines[0]["card_hash"].startswith("sha256:")
-        assert len(lines[0]["card_hash"]) == len(GOLDEN_CARD_HASH)
+        assert lines[0] == {
+            "index": 1,
+            "text": "Alt",
+            "ruling": None,
+            "ruled_on": None,
+            "default": "no",
+        }
+        assert lines[1]["form"] == "options"
+        assert lines[1]["default"] is None
         assert lines[1] == {
             "index": 2,
             "form": "options",
@@ -511,6 +516,7 @@ class TestOptionLineRulings:
             "ruled_on": None,
             "default": None,
             "card_hash": GOLDEN_CARD_HASH,
+            "stored_card_hash": None,
             "question": "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?",
             "problem": "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg.",
             "picture": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'
@@ -550,12 +556,13 @@ class TestOptionLineRulings:
             "in der App: die Version klappt auf, der Take ist markiert,…\n"
         )
         line = json.loads(run_cli(["rulings", "--json"], capsys).stdout)["rulings"][0]["lines"][0]
-        assert (line["ruling"], line["ruled_on"], line["default"], line["card_hash"]) == (
-            "A",
-            "2026-10-28",
-            None,
-            GOLDEN_CARD_HASH,
-        )
+        assert (
+            line["ruling"],
+            line["ruled_on"],
+            line["default"],
+            line["card_hash"],
+            line["stored_card_hash"],
+        ) == ("A", "2026-10-28", None, GOLDEN_CARD_HASH, GOLDEN_CARD_HASH)
 
     def test_a_caption_less_option_hashes_without_the_caption(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

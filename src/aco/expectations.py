@@ -64,11 +64,6 @@ class YesNoLine:
     example: str | None = None
     picture: str | None = None
 
-    @property
-    def card_hash(self) -> str:
-        """The hash of the card this line shows (BODY-89)."""
-        return card_hash(asdict(self))
-
 
 @dataclass(frozen=True)
 class ResultPicture:
@@ -96,10 +91,12 @@ class CardOption:
 
 @dataclass(frozen=True)
 class OptionRuling:
-    """The decided state of a ruled option line: the chosen letter and its date."""
+    """The decided state of a ruled option line: the chosen letter, its date
+    and the card hash stored with the ruling."""
 
     letter: str
     ruled_on: date
+    card_hash: str
 
 
 @dataclass(frozen=True)
@@ -161,7 +158,11 @@ def _card_option(position: int, option: dict[str, object]) -> CardOption:
 def _option_line(index: int, entry: dict[str, object]) -> OptionLine:
     options = cast(list[dict[str, object]], entry["option"])
     decision = (
-        OptionRuling(cast(str, entry["ruling"]), cast(date, entry["ruled_on"]))
+        OptionRuling(
+            cast(str, entry["ruling"]),
+            cast(date, entry["ruled_on"]),
+            cast(str, entry["card_hash"]),
+        )
         if "ruling" in entry
         else None
     )

@@ -103,20 +103,25 @@ def _rulings_yes_no_card_json(line: expectations.YesNoLine) -> dict[str, object]
 
 
 def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
-    """RUL-10, RUL-12..RUL-14: the shared keys of either form, then its card."""
-    if isinstance(line, expectations.OptionLine):
-        default, card = None, _rulings_option_line_card_json(line)
-    else:
-        default, card = line.default, _rulings_yes_no_card_json(line)
-    return {
+    """RUL-10, RUL-12..RUL-15: a yes/no line keeps its original keys; an option line
+    adds `form`, the current and the stored card hash, then its card."""
+    shared = {
         "index": line.index,
-        "form": line.form.value,
         "text": line.text,
         "ruling": line.ruling,
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
-        "default": default,
+    }
+    if isinstance(line, expectations.YesNoLine):
+        return {**shared, "default": line.default, **_rulings_yes_no_card_json(line)}
+    stored = None if line.decision is None else line.decision.card_hash
+    return {
+        "index": line.index,
+        "form": line.form.value,
+        **{key: shared[key] for key in ("text", "ruling", "ruled_on")},
+        "default": None,
         "card_hash": line.card_hash,
-        **card,
+        "stored_card_hash": stored,
+        **_rulings_option_line_card_json(line),
     }
 
 
