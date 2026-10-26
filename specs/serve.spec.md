@@ -23,7 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34 | RULE-13 |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-36, ABRD-37 | RULE-13 |
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note on the decision | — | ABRD-05 |
@@ -59,9 +59,11 @@ An option line is malformed when its `ruling` or `recommended` is no letter of i
 - [ ] [ABRD-31] Browser history sorts date, item number, then line index descending; missing dates last. Complete ties keep repository order. CLI order is unchanged.
 - [ ] [ABRD-32] Returning from history preserves selection, list position and phone view. A completed background decision displaces neither another selected question nor history.
 - [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to history. A stored “Später” stays there and is not automatically presented again.
+- [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation; no outcome button.
+- [ ] [ABRD-37] A ruled option line marks its chosen letter on its card; Verlauf shows letter, option name and date, and opening it reveals the chosen option's contract and the line's sentence.
 
-The browser proofs are `frontend/e2e/decide.spec.ts` and
-`frontend/e2e/history.spec.ts`; ordering is additionally proven by
+The browser proofs are `frontend/e2e/decide.spec.ts`,
+`frontend/e2e/history.spec.ts` and `frontend/e2e/optionCard.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories
