@@ -20,7 +20,7 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
-from aco import board_read, body, cli, forge, github, session, store
+from aco import board_read, body, cli, expectations, forge, github, session, store
 
 
 @dataclass(frozen=True)
@@ -114,7 +114,9 @@ class TestGithubRule:
                     **{
                         f"e{index + 1}.{key}": value
                         for index in (0, 1)
-                        for key, value in asdict(body.expectation_lines(written[90])[index]).items()
+                        for key, value in asdict(
+                            expectations.expectation_lines(written[90])[index]
+                        ).items()
                     },
                 },
                 {
@@ -125,8 +127,10 @@ class TestGithubRule:
                         f"e{index + 1}.{key}": value
                         for index, entry in enumerate(
                             (
-                                body.ExpectationLine(1, "Ship it?", ruling, FROZEN_CLI_NOW.date()),
-                                body.ExpectationLine(
+                                expectations.ExpectationLine(
+                                    1, "Ship it?", ruling, FROZEN_CLI_NOW.date()
+                                ),
+                                expectations.ExpectationLine(
                                     2, "Ship it too?", None, None, default="later"
                                 ),
                             )

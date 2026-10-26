@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import re
 import tomllib
-from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import date
 from enum import Enum, StrEnum
 from typing import TypeGuard, cast
 
 from . import metrics, protocol
+from .expectation_grammar import block_expectation_defects, render_expectations
 
 # CommonMark fence delimiters: at most 3 leading spaces, then a run of 3+
 # backticks or 3+ tildes. An OPENING delimiter may carry an info string after
@@ -68,18 +69,6 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
 # item a second write path.
 SIZE_VALUES = frozenset(size.value for size in metrics.Size)
 BLOCK_VERSION = 1
-BLOCK_EXPECTATION_DEFAULTS = frozenset({"yes", "no", "later"})
-# A ruling transcribes the operator's word: "later" is a legitimate
-# final answer -- an explicit, dated decision to defer -- not only a
-# proposer's guessed default, so it rules exactly like "yes"/"no" (`rule
-# --later` writes `ruling = "later"` the same way `--yes`/`--no` do).
-BLOCK_EXPECTATION_RULINGS = frozenset({"yes", "no", "later"})
-# The three optional card fields a proposer (`aco ask`) may attach to an
-# `[[expectation]]` entry: the operator-language question and
-# example a card shows in place of `text`, and an inline-SVG picture. Absent
-# entirely, a card falls back to `text` unchanged.
-EXPECTATION_QUESTION_MAXIMUM_CHARACTERS = 160
-EXPECTATION_PICTURE_MAXIMUM_BYTES = 8 * 1024
 
 
 class Storage(StrEnum):
@@ -564,220 +553,6 @@ def _block_record_defects(data: dict[str, object]) -> list[ContractDefect]:
     return _record_identity_defects(value) + _record_relation_defects(value)
 
 
-def _block_expectation_variant_defects(
-    prefix: str, entry: dict[str, object]
-) -> list[ContractDefect]:
-    has_default, has_ruling, has_ruled_on = (
-        "default" in entry,
-        "ruling" in entry,
-        "ruled_on" in entry,
-    )
-    if has_default and (has_ruling or has_ruled_on):
-        return [
-            ContractDefect(
-                f"{prefix}.default",
-                f"{prefix} must be proposed (default) or ruled (ruling, ruled_on), not both",
-            )
-        ]
-    if has_default:
-        if entry["default"] not in BLOCK_EXPECTATION_DEFAULTS:
-            return [
-                ContractDefect(f"{prefix}.default", f"{prefix}.default must be yes, no, or later")
-            ]
-        return []
-    if has_ruling or has_ruled_on:
-        defects = []
-        if entry.get("ruling") not in BLOCK_EXPECTATION_RULINGS:
-            defects.append(
-                ContractDefect(f"{prefix}.ruling", f"{prefix}.ruling must be yes, no, or later")
-            )
-        if type(entry.get("ruled_on")) is not date:
-            defects.append(
-                ContractDefect(f"{prefix}.ruled_on", f"{prefix}.ruled_on must be a TOML local date")
-            )
-        return defects
-    return [
-        ContractDefect(
-            f"{prefix}.default", f"{prefix} must carry default, or both ruling and ruled_on"
-        )
-    ]
-
-
-def _expectation_question_defect(value: object) -> str | None:
-    if not isinstance(value, str) or not value.strip():
-        return "must be a non-empty string"
-    if len(value) > EXPECTATION_QUESTION_MAXIMUM_CHARACTERS:
-        return f"must be at most {EXPECTATION_QUESTION_MAXIMUM_CHARACTERS} characters"
-    return None
-
-
-def _expectation_example_defect(value: object) -> str | None:
-    return None if isinstance(value, str) and value.strip() else "must be a non-empty string"
-
-
-_EXPECTATION_PICTURE_EVENT_HANDLER_ATTRIBUTE = re.compile(r"[\s/]on[a-z]+\s*=", re.IGNORECASE)
-# `/` joins `[\s:]` as a separator so `<a/href=…>` (slash instead of a space
-# before the attribute) is still caught; the final alternative's class adds
-# `\s` so a greedy `\s*` that backtracks into the gap between `=` and a
-# quoted value (`href = "#x"`) cannot land on that whitespace and misread it
-# as an unquoted external value.
-_EXPECTATION_PICTURE_EXTERNAL_HREF = re.compile(
-    r'(?:^|[\s:/])href\s*=\s*(?:"(?!#)|\'(?!#)|(?![\s"\'#]))', re.IGNORECASE
-)
-# SMIL can retarget `href` without ever writing `href=` itself:
-# `<animate attributeName="href" to="http://…">` swaps
-# the target after the document loads, and `xlink:href` is the same escape
-# under its namespaced spelling. Refused only when both attributes sit on the
-# same element: scanning each `<...>` tag on its
-# own keeps an unrelated `attributeName`/`to` pair on a different element from
-# falsely refusing the picture. Both attributes accept SMIL's own quoting
-# forms -- double-quoted, single-quoted, or bare -- mirroring
-# `_EXPECTATION_PICTURE_EXTERNAL_HREF`'s own unquoted-value check above.
-_EXPECTATION_PICTURE_SMIL_HREF_ATTRIBUTE = re.compile(
-    r"attributename\s*=\s*(?:\"(?:xlink:)?href\"|'(?:xlink:)?href'|(?:xlink:)?href(?=[\s/>]))",
-    re.IGNORECASE,
-)
-# `values` lists a `;`-separated sequence of keyframes (SMIL's own syntax),
-# so a rule that only reads the first character after `=` misses a later
-# external segment such as `values="#a;http://evil.example"`.
-# The regex only captures the raw attribute value in
-# each of SMIL's own quoting forms; `_expectation_picture_smil_external_target`
-# below splits it on `;` and refuses if any trimmed segment does not start
-# with `#`, so `to`/`from` (which never carry a `;`) are covered by the same
-# one-segment case.
-_EXPECTATION_PICTURE_SMIL_TARGET_ATTRIBUTE = re.compile(
-    r"""\b(?:to|from|values)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]*))""", re.IGNORECASE
-)
-_EXPECTATION_PICTURE_SVG_ELEMENT = re.compile(r"<[^<>]+>")
-
-
-def _expectation_picture_smil_external_target(element: str) -> bool:
-    """Whether `element` sets SMIL `to`, `from`, or `values` to any
-    `;`-separated segment that does not start with `#`:
-    `values` can list several keyframes, so every segment is
-    checked, not only the value's first character."""
-    for match in _EXPECTATION_PICTURE_SMIL_TARGET_ATTRIBUTE.finditer(element):
-        raw = next(group for group in match.groups() if group is not None)
-        if any(not segment.strip().startswith("#") for segment in raw.split(";")):
-            return True
-    return False
-
-
-def _expectation_picture_smil_external_href(value: str) -> bool:
-    """Whether any single SVG element in `value` both retargets `href` (or
-    `xlink:href`) via SMIL's `attributeName` and points it outside the
-    document -- scanning element-by-element instead of across the whole
-    document."""
-    return any(
-        _EXPECTATION_PICTURE_SMIL_HREF_ATTRIBUTE.search(element)
-        and _expectation_picture_smil_external_target(element)
-        for element in _EXPECTATION_PICTURE_SVG_ELEMENT.findall(value)
-    )
-
-
-def _expectation_picture_content_refusals(value: str) -> tuple[tuple[bool, str], ...]:
-    """Every path an inline SVG can run script or reach outside the
-    document, checked case-insensitively: `refused` paired with the
-    sentence for the first one `value` matches, in this fixed order."""
-    lowered = value.lower()
-    return (
-        ("<script" in lowered, "must not contain <script>"),
-        ("<foreignobject" in lowered, "must not contain <foreignObject>"),
-        (
-            bool(_EXPECTATION_PICTURE_EVENT_HANDLER_ATTRIBUTE.search(value)),
-            "must not contain an event-handler attribute",
-        ),
-        ("javascript:" in lowered, "must not contain a javascript: reference"),
-        ("data:" in lowered, "must not contain a data: reference"),
-        (
-            bool(_EXPECTATION_PICTURE_EXTERNAL_HREF.search(value)),
-            "must not reference an href outside the document",
-        ),
-        (
-            _expectation_picture_smil_external_href(value),
-            "must not animate href to an external target",
-        ),
-        ("url(" in lowered, "must not contain a url() reference"),
-        ("<iframe" in lowered, "must not contain <iframe>"),
-        ("<embed" in lowered, "must not contain <embed>"),
-        ("<object" in lowered, "must not contain <object>"),
-        ("srcdoc" in lowered, "must not contain srcdoc"),
-    )
-
-
-def _expectation_picture_defect(value: object) -> str | None:
-    """The refusal sentence for an invalid `[[expectation]]` picture, or
-    `None` for a valid one: an inline SVG, rooted at `<svg`, at
-    most `EXPECTATION_PICTURE_MAXIMUM_BYTES`, and free of every refusal
-    `_expectation_picture_content_refusals` names. The one owner the body
-    parser's defects and `append_expectation`'s pre-write refusal both
-    call."""
-    if not isinstance(value, str):
-        return "must be a string"
-    if len(value.encode("utf-8")) > EXPECTATION_PICTURE_MAXIMUM_BYTES:
-        return f"must be at most {EXPECTATION_PICTURE_MAXIMUM_BYTES} bytes"
-    if not value.strip().startswith("<svg"):
-        return "must be inline SVG rooted at <svg>"
-    for refused, reason in _expectation_picture_content_refusals(value):
-        if refused:
-            return reason
-    return None
-
-
-# The three optional `[[expectation]]` card fields, each with
-# its own refusal-sentence check -- shared, in this fixed order, by the body
-# parser's defects (`_block_expectation_optional_field_defects`) and by
-# `append_expectation`'s pre-write validation, so the rule is owned once.
-_EXPECTATION_OPTIONAL_FIELDS: tuple[tuple[str, Callable[[object], str | None]], ...] = (
-    ("question", _expectation_question_defect),
-    ("example", _expectation_example_defect),
-    ("picture", _expectation_picture_defect),
-)
-_EXPECTATION_KNOWN_KEYS = frozenset(
-    {"text", "default", "ruling", "ruled_on", *(key for key, _ in _EXPECTATION_OPTIONAL_FIELDS)}
-)
-
-
-def _block_expectation_optional_field_defects(
-    prefix: str, entry: dict[str, object]
-) -> list[ContractDefect]:
-    defects: list[ContractDefect] = []
-    for key, check in _EXPECTATION_OPTIONAL_FIELDS:
-        if key not in entry:
-            continue
-        reason = check(entry[key])
-        if reason is not None:
-            defects.append(ContractDefect(f"{prefix}.{key}", f"{prefix}.{key} {reason}"))
-    return defects
-
-
-def _block_expectation_entry_defects(index: int, entry: object) -> list[ContractDefect]:
-    prefix = f"expectation[{index}]"
-    if not isinstance(entry, dict):
-        return [ContractDefect(prefix, f"{prefix} must be a table")]
-    defects: list[ContractDefect] = []
-    text = entry.get("text")
-    if not isinstance(text, str) or not text.strip():
-        defects.append(
-            ContractDefect(f"{prefix}.text", f"{prefix}.text must be a non-empty string")
-        )
-    defects.extend(_block_expectation_variant_defects(prefix, entry))
-    defects.extend(_block_expectation_optional_field_defects(prefix, entry))
-    unknown = sorted(set(entry) - _EXPECTATION_KNOWN_KEYS)
-    defects.extend(
-        ContractDefect(f"{prefix}.{key}", f"unknown key {prefix}.{key}") for key in unknown
-    )
-    return defects
-
-
-def _block_expectation_defects(entries: list[object]) -> list[ContractDefect]:
-    return [
-        defect
-        for index, entry in enumerate(entries)
-        for defect in _block_expectation_entry_defects(index, entry)
-    ]
-
-
 def _block_slice_entry_defects(
     index: int, entry: object, seen_indices: dict[int, int]
 ) -> list[ContractDefect]:
@@ -858,7 +633,7 @@ def _block_schema_defects(data: dict[str, object], storage: Storage) -> tuple[Co
         defects.append(whole_defect)
     expectations, expectation_defect = _block_array_or_defect(data, "expectation")
     defects.append(expectation_defect) if expectation_defect else defects.extend(
-        _block_expectation_defects(expectations)
+        ContractDefect(*defect) for defect in block_expectation_defects(expectations)
     )
     slices, slice_defect = _block_array_or_defect(data, "slice")
     defects.append(slice_defect) if slice_defect else defects.extend(_block_slice_defects(slices))
@@ -901,7 +676,7 @@ def _block_array(data: dict[str, object], key: str) -> list[object]:
     return value if isinstance(value, list) else []
 
 
-def _block_expectation_dicts(data: dict[str, object]) -> list[dict[str, object]]:
+def block_expectation_dicts(data: dict[str, object]) -> list[dict[str, object]]:
     return [entry for entry in _block_array(data, "expectation") if isinstance(entry, dict)]
 
 
@@ -966,7 +741,7 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
         cast(str, data["next"]).strip(),
         cast(str, data["done_when"]).strip(),
     )
-    expectations = _block_expectation_dicts(data)
+    expectations = block_expectation_dicts(data)
     expectation_state = _block_expectation_state(expectations)
     record = data.get(RECORD_KEY) if storage is Storage.STATE_REF else None
     return ParsedBody(
@@ -1187,27 +962,6 @@ def _render_whole(data: Mapping[str, object]) -> list[str]:
     return ["", f"whole = {protocol.toml_string(data['whole'])}"]
 
 
-def _render_expectations(data: Mapping[str, object]) -> list[str]:
-    lines: list[str] = []
-    for expectation in cast(_JsonRows, data.get("expectation", [])):
-        lines.extend(("", "[[expectation]]", f"text = {protocol.toml_string(expectation['text'])}"))
-        if "default" in expectation:
-            lines.append(f"default = {protocol.toml_string(expectation['default'])}")
-        else:
-            ruled_on = cast(date, expectation["ruled_on"])
-            lines.append(f"ruling = {protocol.toml_string(expectation['ruling'])}")
-            lines.append(f"ruled_on = {ruled_on.isoformat()}")
-        if "question" in expectation:
-            lines.append(f"question = {protocol.toml_string(expectation['question'])}")
-        if "example" in expectation:
-            lines.append(f"example = {protocol.toml_string(expectation['example'])}")
-        if "picture" in expectation:
-            lines.append(
-                f"picture = {protocol.toml_multiline_string(cast(str, expectation['picture']))}"
-            )
-    return lines
-
-
 def _render_empty_slice_table(data: Mapping[str, object]) -> list[str]:
     """`slice = []` (BODY-49), the typed "nothing left to cut", among the
     top-level keys: written after any `[[expectation]]` table, TOML would
@@ -1284,7 +1038,7 @@ def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     lines.extend(_render_size(data))
     lines.extend(_render_whole(data))
     lines.extend(_render_empty_slice_table(data))
-    lines.extend(_render_expectations(data))
+    lines.extend(render_expectations(data))
     lines.extend(_render_slices(data))
     lines.extend(_render_record(data))
     return newline.join((*lines, ""))
@@ -1366,185 +1120,6 @@ def block_field_conflicts(body: str, fields: Mapping[str, object]) -> tuple[str,
             flag = f"--{key.replace('_', '-')}"
             conflicts.append(f"{flag} {flagged} contradicts the piped block's {key} = {piped}")
     return tuple(conflicts)
-
-
-EXPECTATION_LINE_TEXT_MAXIMUM = 100
-
-
-@dataclass(frozen=True)
-class ExpectationLine:
-    """One `[[expectation]]` entry as `rule --line`, `ask`, and `rulings`
-    see it: `index` is its 1-based position in block order -- what `rule
-    --line` accepts and what `rulings` prints -- `text` its full prose, and
-    `ruling`/`ruled_on` present only once a `rule` call has replaced its
-    `default`. `default` is the line's own default (`str | None`, `None`
-    once ruled) -- `aco rulings --json`'s own line payload reads it from
-    here rather than re-parsing the block. `question`/`example`/`picture`
-    are the card's optional operator-language heading, illustration
-    sentence, and inline SVG -- `None` when `aco ask` was not given them,
-    in which case a card falls back to `text`."""
-
-    index: int
-    text: str
-    ruling: str | None
-    ruled_on: date | None
-    default: str | None = None
-    question: str | None = None
-    example: str | None = None
-    picture: str | None = None
-
-
-def expectation_lines(
-    body: str, *, storage: Storage = Storage.GITHUB
-) -> tuple[ExpectationLine, ...]:
-    """Every `[[expectation]]` entry of `body`'s `aco` block, in
-    block order -- the one projection `rulings`, `rule --line`, and `ask`'s
-    fresh index all share, so a printed index always matches what `rule`
-    accepts. Empty for a body with no block, no expectations, or one
-    `parse_body` reads as MALFORMED -- a malformed body's lines are not
-    addressable until it is fixed by hand. `storage` is forwarded to
-    `parse_body` unchanged."""
-    if parse_body(body, storage=storage).read_state is not BodyReadState.VALID:
-        return ()
-    entries = _block_expectation_dicts(locate_block(body).data)
-    return tuple(
-        ExpectationLine(
-            index=position,
-            text=cast(str, entry["text"]),
-            ruling=cast(str | None, entry.get("ruling")),
-            ruled_on=cast("date | None", entry.get("ruled_on")),
-            default=cast(str | None, entry.get("default")),
-            question=cast(str | None, entry.get("question")),
-            example=cast(str | None, entry.get("example")),
-            picture=cast(str | None, entry.get("picture")),
-        )
-        for position, entry in enumerate(entries, start=1)
-    )
-
-
-def expectation_line_state(line: ExpectationLine) -> str:
-    """`open`, or `ruled <ruling> <ruled_on>` -- the one state text
-    `rulings`' human form prints; `--json` carries `ruling`/`ruled_on`
-    directly and does not call this."""
-    if line.ruling is None:
-        return "open"
-    ruled_on = cast(date, line.ruled_on)
-    return f"ruled {line.ruling} {ruled_on.isoformat()}"
-
-
-def expectation_line_summary(line: ExpectationLine) -> str:
-    """`line.text` on one line, truncated to `EXPECTATION_LINE_TEXT_MAXIMUM`
-    characters -- `rulings`' human form; `--json` carries the full text."""
-    one_line = " ".join(line.text.split())
-    maximum = EXPECTATION_LINE_TEXT_MAXIMUM
-    return one_line if len(one_line) <= maximum else one_line[: maximum - 1] + "…"
-
-
-class ExpectationAlreadyRuledError(protocol.ClaimError):
-    """`rule_expectation`'s own already-ruled refusal -- a
-    distinct type from `ExpectationOutOfRangeError` so a `--json`-emitting
-    caller can choose `already_ruled` without parsing the refusal prose."""
-
-
-class ExpectationOutOfRangeError(protocol.ClaimError):
-    """`rule_expectation`'s own out-of-range `--line` refusal."""
-
-
-def rule_expectation(
-    body: str, index: int, ruling: str, ruled_on: date, *, note: str | None = None
-) -> str:
-    """Rule one proposed line, preserving card fields and bytes outside the block.
-
-    Replace the default with outcome/date; append any note to its text.
-    Refuse invalid outcomes, out-of-range indices and already-ruled lines.
-    """
-    if ruling not in BLOCK_EXPECTATION_RULINGS:
-        raise protocol.ClaimError(
-            f"ruling must be one of {', '.join(sorted(BLOCK_EXPECTATION_RULINGS))}"
-        )
-    located = locate_block(body)
-    entries = _block_expectation_dicts(located.data)
-    if not 1 <= index <= len(entries):
-        raise ExpectationOutOfRangeError(
-            f"line {index} out of range: this item has {len(entries)} expectation line(s)"
-        )
-    entry = entries[index - 1]
-    if "ruling" in entry:
-        raise ExpectationAlreadyRuledError(
-            f"line {index} is already ruled; a changed ruling is a new line"
-        )
-    text = cast(str, entry["text"]) if note is None else f"{entry['text']} Anmerkung: {note}"
-    ruled_entry = dict(entry)
-    ruled_entry.pop("default", None)
-    ruled_entry.update(text=text, ruling=ruling, ruled_on=ruled_on)
-    new_entries = [*entries[: index - 1], ruled_entry, *entries[index:]]
-    new_data = {**located.data, "expectation": new_entries}
-    return replace_block(body, located, new_data)
-
-
-@dataclass(frozen=True)
-class ExpectationCardFields:
-    """The three optional `[[expectation]]` card fields `aco ask` may
-    attach, grouped so a caller passes one value instead of
-    three positional strings that must stay paired: `question` and
-    `example`, one operator-language sentence each, and `picture`, an
-    inline SVG. Each defaults to absent, matching a line with none of
-    them -- the card then falls back to `text`."""
-
-    question: str | None = None
-    example: str | None = None
-    picture: str | None = None
-
-
-class ExpectationTextError(protocol.ClaimError):
-    """`append_expectation`'s own blank-`text` refusal -- a
-    distinct type from `ExpectationFieldError` so a `--json`-emitting caller
-    can choose `invalid_expectation` without parsing the refusal prose."""
-
-
-class ExpectationFieldError(protocol.ClaimError):
-    """`append_expectation`'s own optional-card-field refusal -- `question`,
-    `example`, or `picture` failing its own content rule --
-    carrying the failing `field` by name so a `--json`-emitting caller can
-    choose `invalid_expectation` (`question`, `example`) or `invalid_picture`
-    (`picture`) without parsing the refusal prose."""
-
-    def __init__(self, field: str, message: str) -> None:
-        super().__init__(message)
-        self.field = field
-
-
-def append_expectation(
-    body: str, text: str, default: str, *, card: ExpectationCardFields | None = None
-) -> str:
-    """`body` with one fresh proposed `[[expectation]]` entry appended:
-    `text` verbatim, `default` as given, plus whichever of `card`'s
-    optional fields `aco ask` was given -- each validated by
-    the same check `_block_expectation_optional_field_defects` reads a
-    stored body with, so a value this refuses can never be written.
-    Byte-preserving outside the appended entry, the same write path as
-    `rule_expectation`."""
-    if not text.strip():
-        raise ExpectationTextError("expectation text must be a non-empty string")
-    if default not in BLOCK_EXPECTATION_DEFAULTS:
-        raise protocol.ClaimError(
-            f"default must be one of {', '.join(sorted(BLOCK_EXPECTATION_DEFAULTS))}"
-        )
-    provided = asdict(card if card is not None else ExpectationCardFields())
-    entry: dict[str, object] = {"text": text, "default": default}
-    for key, check in _EXPECTATION_OPTIONAL_FIELDS:
-        value = provided[key]
-        if value is None:
-            continue
-        reason = check(value)
-        if reason is not None:
-            raise ExpectationFieldError(key, f"{key} {reason}")
-        entry[key] = value
-    located = locate_block(body)
-    entries = _block_expectation_dicts(located.data)
-    new_entries = [*entries, entry]
-    new_data = {**located.data, "expectation": new_entries}
-    return replace_block(body, located, new_data)
 
 
 def missing_or_empty_sections(contract: Contract) -> tuple[str, ...]:

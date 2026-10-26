@@ -76,14 +76,13 @@ from aco import cli as issue_claim
 from aco.body import (
     BLOCK_FENCE_INFO,
     CONTAINER_SKELETON_PROSE,
-    ExpectationLine,
     ItemKind,
     Storage,
-    expectation_lines,
     locate_block,
     parse_body,
     render_block,
 )
+from aco.expectations import ExpectationLine, expectation_lines
 from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
 from aco.session import RunContext
 from aco.state_board import ItemWriter, StateRefBoard

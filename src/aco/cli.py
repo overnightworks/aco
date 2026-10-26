@@ -452,31 +452,7 @@ def _add_cut_parser(commands: usage.Subcommands, name: str) -> None:
 
 def _add_ask_parser(commands: usage.Subcommands, name: str) -> None:
     ask = commands.add_parser(name, help="append one proposed expectation line to an item's block")
-    item_help = "the item to append the expectation line to"
-    ask.add_argument("item", type=workboard.parse_item_reference, help=item_help)
-    ask.add_argument("--text", required=True, help="the expectation line's prose")
-    ask.add_argument(
-        "--default",
-        choices=sorted(body.BLOCK_EXPECTATION_DEFAULTS),
-        default="yes",
-        help="the proposer's suggested outcome; default yes",
-    )
-    ask.add_argument(
-        "--question",
-        help=(
-            "one operator-language sentence the card shows as its heading "
-            f"instead of --text; at most {body.EXPECTATION_QUESTION_MAXIMUM_CHARACTERS} characters"
-        ),
-    )
-    ask.add_argument("--example", help="one operator-language sentence illustrating the question")
-    ask.add_argument(
-        "--picture",
-        metavar="FILE.svg",
-        help=(
-            "a path to an inline-SVG file (root <svg>, no <script>, no external "
-            f"href, at most {body.EXPECTATION_PICTURE_MAXIMUM_BYTES} bytes) the card shows"
-        ),
-    )
+    cmd_ask.add_arguments(ask)
     _add_json_flag(ask)
 
 
@@ -484,21 +460,7 @@ def _add_rule_parser(commands: usage.Subcommands, name: str) -> None:
     rule = commands.add_parser(
         name, help="rule one proposed expectation line, transcribing the operator's word"
     )
-    rule.add_argument(
-        "item", type=workboard.parse_item_reference, help="the item whose expectation line is ruled"
-    )
-    rule.add_argument(
-        "--line",
-        type=int,
-        required=True,
-        metavar="N",
-        help="the 1-based expectation line index, as rulings prints it",
-    )
-    outcome = rule.add_mutually_exclusive_group(required=True)
-    outcome.add_argument("--yes", action="store_const", dest="ruling", const="yes")
-    outcome.add_argument("--no", action="store_const", dest="ruling", const="no")
-    outcome.add_argument("--later", action="store_const", dest="ruling", const="later")
-    rule.add_argument("--note", help="appended to the line's own text as ' Anmerkung: TEXT'")
+    cmd_rule.add_arguments(rule)
     _add_json_flag(rule)
 
 

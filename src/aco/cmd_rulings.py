@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-from . import board_read, body, protocol, report, workboard
+from . import board_read, body, expectations, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -19,7 +19,7 @@ class _RulingsRow:
 
     item: workboard.BoardItem
     progress: body.ExpectationProgress
-    lines: tuple[body.ExpectationLine, ...]
+    lines: tuple[expectations.ExpectationLine, ...]
 
 
 def _rulings_rows(
@@ -31,7 +31,7 @@ def _rulings_rows(
     then the fully ruled items in that same
     order. Each row is paired with its lines read fresh from `bodies` --
     `projected.items` itself carries only the open/total counters. `storage`
-    is forwarded to `body.expectation_lines` unchanged: a state-ref
+    is forwarded to `expectations.expectation_lines` unchanged: a state-ref
     body's `[record]` table must read as a known key, not a malformed one."""
     ranked = sorted(
         (
@@ -48,13 +48,15 @@ def _rulings_rows(
     )
     return tuple(
         _RulingsRow(
-            item, progress, body.expectation_lines(bodies.get(item.number, ""), storage=storage)
+            item,
+            progress,
+            expectations.expectation_lines(bodies.get(item.number, ""), storage=storage),
         )
         for item, progress in ranked
     )
 
 
-def _rulings_line_json(line: body.ExpectationLine) -> dict[str, object]:
+def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
     payload: dict[str, object] = {
         "index": line.index,
         "text": line.text,
@@ -74,9 +76,9 @@ def _rulings_line_json(line: body.ExpectationLine) -> dict[str, object]:
     return payload
 
 
-def _rulings_line_text(line: body.ExpectationLine) -> str:
-    state = body.expectation_line_state(line)
-    summary = protocol.terminal_text(body.expectation_line_summary(line))
+def _rulings_line_text(line: expectations.ExpectationLine) -> str:
+    state = expectations.expectation_line_state(line)
+    summary = protocol.terminal_text(expectations.expectation_line_summary(line))
     return f"  {line.index} {state}: {summary}"
 
 
