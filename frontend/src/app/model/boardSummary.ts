@@ -10,7 +10,6 @@ import { lineKey } from './decision';
 import { isOptionLine } from './optionCard';
 
 export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
-export const LIST_LABEL = 'Liste';
 export const OPEN_TAB_LABEL = 'Open';
 export const DECIDED_TAB_LABEL = 'Decided';
 export const LIST_REGION_LABEL = 'Decisions';

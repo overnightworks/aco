@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import {
-		LIST_LABEL,
 		nextOpenAfter,
 		firstDecidedKey,
 		firstOpenKey,
@@ -26,6 +25,7 @@
 	let showDecidedCard = $state(false);
 	let view: ListView = $state('open');
 	const counts = $derived(tabCounts(board.repos));
+	const cardView = $derived(view === 'open' ? showQuestion : showDecidedCard);
 	let initialized = $state(false);
 	let tracks: HTMLDivElement | undefined = $state();
 	let question: HTMLDivElement | undefined = $state();
@@ -50,6 +50,16 @@
 		(list?.querySelector<HTMLElement>('[aria-current="true"]') ?? list)?.focus({
 			preventScroll: true
 		});
+	}
+
+	function leaveCard() {
+		if (view === 'open') {
+			showQuestion = false;
+			void showList(tracks);
+		} else {
+			showDecidedCard = false;
+			void showList(decidedTracks);
+		}
 	}
 
 	function openDecided() {
@@ -108,9 +118,14 @@
 <svelte:window onresize={keepFocusVisible} />
 
 <main>
-	<header class="top">
+	<header class="top" class:card-view={cardView}>
 		<h1 class="brand">Entscheidungs-Board</h1>
 		{#if board.status === 'ready' && decisions !== null}
+			{#if cardView}
+				<button type="button" class="back" onclick={leaveCard}
+					>‹ {view === 'open' ? OPEN_TAB_LABEL : DECIDED_TAB_LABEL}</button
+				>
+			{/if}
 			<nav aria-label="Views">
 				<button
 					type="button"
@@ -148,14 +163,6 @@
 			</div>
 			<div class="question-pane" bind:this={question} tabindex="-1">
 				<div class="inner">
-					<button
-						class="back"
-						type="button"
-						onclick={() => {
-							showQuestion = false;
-							void showList(tracks);
-						}}>← {LIST_LABEL}</button
-					>
 					<Stage repos={board.repos} {selectedKey} {decisions} refreshing={board.refreshing} />
 				</div>
 			</div>
@@ -176,14 +183,6 @@
 				</div>
 				<div class="question-pane" bind:this={decidedQuestion} tabindex="-1">
 					<div class="inner">
-						<button
-							class="back"
-							type="button"
-							onclick={() => {
-								showDecidedCard = false;
-								void showList(decidedTracks);
-							}}>← {LIST_LABEL}</button
-						>
 						<Stage
 							repos={board.repos}
 							selectedKey={decidedKey}
@@ -444,12 +443,32 @@
 		}
 		.brand {
 			position: absolute;
-			width: 0;
-			height: 0;
+			width: 1px;
+			height: 1px;
+			margin: -1px;
+			padding: 0;
+			border: 0;
 			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+		.card-view .back {
+			display: inline-flex;
+			padding: 6px 8px 6px 0;
+			border: 0;
+			background: none;
+			color: var(--fg);
+			font-weight: 600;
+			white-space: nowrap;
+		}
+		.card-view nav {
+			display: none;
 		}
 		nav {
 			gap: 2px;
+		}
+		.tracks {
+			border-right: 0;
 		}
 		nav button {
 			padding: 6px 8px;
@@ -459,7 +478,8 @@
 		}
 		.question-pane {
 			display: none;
-			padding: 16px 16px 0;
+			padding: 12px 16px 0;
+			background: var(--surface);
 		}
 		.inner {
 			padding-bottom: 16px;
@@ -469,10 +489,6 @@
 		}
 		.show-question .question-pane {
 			display: block;
-		}
-		.back {
-			display: inline-block;
-			margin-bottom: 20px;
 		}
 	}
 </style>

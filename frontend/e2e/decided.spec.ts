@@ -195,7 +195,7 @@ for (const viewport of [
 			await expectDecidedAnswer(page, 'Nein', 'not recorded · 03.10.2026');
 			await page.screenshot({ path: testInfo.outputPath('decided-card.png') });
 			if (phone) {
-				await page.getByRole('button', { name: '← Liste' }).click();
+				await page.getByRole('button', { name: '‹ Decided' }).click();
 				await expect(firstCard).toBeHidden();
 				await expect(rows.first()).toHaveAttribute('aria-current', 'true');
 			}
@@ -233,7 +233,7 @@ for (const viewport of [
 				await page.screenshot({
 					path: testInfo.outputPath(`decided-way-${position + 1}.png`)
 				});
-				if (phone) await page.getByRole('button', { name: '← Liste' }).click();
+				if (phone) await page.getByRole('button', { name: '‹ Decided' }).click();
 			}
 		});
 
@@ -345,6 +345,7 @@ for (const viewport of [
 				page.getByRole('heading', { name: 'Gespräch beenden?', exact: true })
 			).toBeVisible();
 
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await decidedTab(page).click();
 			const rows = decidedList(page).getByRole('button');
 			await expect(rows).toHaveCount(16);
@@ -354,13 +355,14 @@ for (const viewport of [
 			);
 			await rows.last().click();
 			await expect(page.getByRole('heading', { name: 'Aufzeichnen?', exact: true })).toBeVisible();
-			if (phone) await page.getByRole('button', { name: '← Liste' }).click();
+			if (phone) await page.getByRole('button', { name: '‹ Decided' }).click();
 			await expect(rows.last()).toHaveAttribute('aria-current', 'true');
 			await openTab(page).click();
-			await expect(
-				page.getByRole('heading', { name: 'Gespräch beenden?', exact: true })
-			).toBeVisible();
-			if (phone) await page.getByRole('button', { name: '← Liste' }).click();
+			if (!phone) {
+				await expect(
+					page.getByRole('heading', { name: 'Gespräch beenden?', exact: true })
+				).toBeVisible();
+			}
 			await expect(last).toHaveAttribute('aria-current', 'true');
 			await expect.poll(() => tracks.evaluate((element) => element.scrollTop)).toBe(position);
 
@@ -369,7 +371,7 @@ for (const viewport of [
 			await expect(rows.last()).toHaveAttribute('aria-current', 'false');
 			await expect(page.getByText('Keine Frage ausgewählt.')).toBeHidden();
 			if (phone) {
-				await expect(page.getByRole('button', { name: '← Liste' })).toBeHidden();
+				await expect(page.getByRole('button', { name: '‹ Decided' })).toBeHidden();
 			}
 			expect(writes).toBe(0);
 		});
@@ -389,6 +391,7 @@ for (const viewport of [
 			await page.goto(`${appUrl}#t=${token}`);
 			await page.getByRole('button', { name: /Gäste zulassen/ }).click();
 			await page.getByRole('button', { name: 'Ja', exact: true }).click();
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await decidedTab(page).click();
 			await expect(page.getByText('Nothing decided yet')).toBeVisible();
 			await page.clock.runFor(UNDO_SECONDS * 1000 + 500);
@@ -396,7 +399,6 @@ for (const viewport of [
 			await expect(decidedList(page).getByTitle('Gäste zulassen?', { exact: true })).toBeVisible();
 			await expect(decidedTab(page)).toBeFocused();
 			await openTab(page).click();
-			if (phone) await page.getByRole('button', { name: '← Liste' }).click();
 			await expect(page.getByText('All decided')).toBeVisible();
 		});
 	});

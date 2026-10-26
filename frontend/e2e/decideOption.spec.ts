@@ -177,6 +177,7 @@ for (const viewport of [
 				await expect(page.getByRole('heading', { name: OTHER_QUESTION })).toBeVisible();
 			}
 			await expect(page.locator('.tracks').getByTitle(SONG_QUESTION)).toHaveCount(0);
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			const rows = decidedList(page).getByRole('button');
 			await expect(rows).toHaveCount(1);
@@ -212,6 +213,7 @@ for (const viewport of [
 			).toBeVisible();
 			await expect(picks(page).getByRole('button')).toHaveText(['A', 'B']);
 			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeEnabled();
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await expect(page.getByText('Nothing decided yet')).toBeVisible();
 			await expect(decidedList(page).getByRole('button')).toHaveCount(0);
@@ -341,6 +343,7 @@ for (const viewport of [
 			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeDisabled();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await expect(decidedList(page).getByRole('button')).toHaveCount(1);
 			await decidedList(page).getByTitle(SONG_QUESTION, { exact: true }).click();

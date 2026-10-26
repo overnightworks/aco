@@ -18,7 +18,7 @@ Mitsprache, the agent list and group decisions. An open yes/no line keeps its ca
 The list groups open and decided lines per project with the picture's Open,
 Not-ready and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its
-colour tokens; it still lacks the phone header.
+colour tokens. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
 What the board does today is in the "Browser decision flow" of
 [`specs/serve.spec.md`](../../specs/serve.spec.md).
 

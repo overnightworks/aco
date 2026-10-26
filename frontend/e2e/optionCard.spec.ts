@@ -358,7 +358,7 @@ for (const viewport of [
 				.click();
 			await expect(page.locator('.option-card .details')).toHaveCount(1);
 
-			if (phone) await page.getByRole('button', { name: '← Liste' }).click();
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
 
 			const disclosures = page.locator('.option-card button[aria-expanded]');

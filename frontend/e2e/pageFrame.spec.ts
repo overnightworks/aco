@@ -70,6 +70,10 @@ async function height(locator: Locator) {
 	return (await locator.boundingBox())?.height;
 }
 
+async function top(locator: Locator) {
+	return (await locator.boundingBox())?.y ?? 0;
+}
+
 async function bottom(locator: Locator) {
 	const box = await locator.boundingBox();
 	return (box?.y ?? 0) + (box?.height ?? 0);
@@ -95,8 +99,11 @@ for (const viewport of [
 			expect(await height(page.locator('header'))).toBe(isPhone ? 52 : 56);
 			await expect(brand).toHaveCount(1);
 			await expect(brand).toHaveText('Entscheidungs-Board');
-			if (isPhone) await expect(brand).not.toBeVisible();
-			else await expect(brand).toBeVisible();
+			if (isPhone) {
+				const box = await brand.boundingBox();
+				expect(box?.width).toBeLessThanOrEqual(1);
+				expect(box?.height).toBeLessThanOrEqual(1);
+			} else await expect(brand).toBeVisible();
 			await expect(views.getByRole('button')).toHaveCount(2);
 			await expect(open).toHaveAttribute('aria-current', 'page');
 			await expect(open).toHaveCSS('background-color', 'rgb(24, 21, 31)');
@@ -136,6 +143,72 @@ for (const viewport of [
 			await expect(decideRow).toHaveCSS('box-shadow', 'none');
 			expect((await bottom(pane)) - (await bottom(decideRow))).toBeGreaterThanOrEqual(16);
 			await screenshots(page, testInfo.outputPath.bind(testInfo), 'decide-row-at-rest');
+		});
+
+		test('[ABRD-55] on phones an opened card stands edge to edge under ‹ Open or ‹ Decided, which returns to its list', async ({
+			page
+		}, testInfo) => {
+			await openBoard(page);
+			const views = page.getByRole('navigation', { name: 'Views' });
+			const back = page.getByRole('button', { name: /^‹ (Open|Decided)$/ });
+			const card = page.locator('.option-card article');
+			const where = page.locator('.option-card .meta .where');
+			const props = page.locator('.option-card .meta .props');
+
+			if (!isPhone) {
+				await openTheCard(page, false);
+				await expect(back).toBeHidden();
+				await expect(views).toBeVisible();
+				await expect(card).toHaveCSS('border-top-width', '1px');
+				expect(await top(props)).toBeLessThan(await bottom(where));
+				return;
+			}
+
+			await expect(back).toHaveCount(0);
+			await expect(views.getByRole('button')).toHaveCount(2);
+			const row = page.locator('.tracks').getByRole('button').first();
+			await row.click();
+			await expect(page.getByRole('button', { name: '‹ Open', exact: true })).toBeVisible();
+			await expect(views).toBeHidden();
+			expect(await height(page.locator('header'))).toBe(52);
+			await expect(card).toHaveCSS('border-top-width', '0px');
+			await expect(card).toHaveCSS('padding-left', '0px');
+			expect((await card.boundingBox())?.x).toBe(16);
+			await expect(page.locator('.question-pane')).toHaveCSS(
+				'background-color',
+				'rgb(255, 255, 255)'
+			);
+			expect(await top(props)).toBeGreaterThanOrEqual(await bottom(where));
+			expect(
+				await page.evaluate(
+					() => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+				)
+			).toBe(true);
+			await page.screenshot({ path: testInfo.outputPath('phone-card-open.png') });
+
+			await page.getByRole('button', { name: '‹ Open', exact: true }).click();
+
+			await expect(row).toBeFocused();
+			await expect(row).toHaveAttribute('aria-current', 'true');
+			await expect(views).toBeVisible();
+			await expect(back).toHaveCount(0);
+
+			await views.getByRole('button', { name: 'Decided 1' }).click();
+			const decidedRow = page
+				.getByRole('region', { name: 'Decided', exact: true })
+				.getByRole('button')
+				.first();
+			await decidedRow.click();
+
+			await expect(page.getByRole('button', { name: '‹ Decided', exact: true })).toBeVisible();
+			await expect(views).toBeHidden();
+			await expect(page.locator('.decided-card article')).toHaveCSS('border-top-width', '0px');
+			await page.screenshot({ path: testInfo.outputPath('phone-card-decided.png') });
+
+			await page.getByRole('button', { name: '‹ Decided', exact: true }).click();
+
+			await expect(decidedRow).toBeFocused();
+			await expect(views).toBeVisible();
 		});
 
 		if (!isPhone) {
