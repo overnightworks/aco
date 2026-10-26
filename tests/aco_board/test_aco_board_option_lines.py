@@ -1,5 +1,5 @@
 """The decision board reads option lines beside yes/no lines and decides them
-(specs/serve.spec.md: ABRD-07, ABRD-34, ABRD-35, ABRD-39..42, E-ABRD-11,
+(specs/serve.spec.md: ABRD-07, ABRD-34, ABRD-35, ABRD-39..42, ABRD-53, E-ABRD-11,
 E-ABRD-12), driven through the real server, wire form and `aco` adapter
 against a fake `aco` on PATH."""
 
@@ -35,6 +35,7 @@ _OPTION_LINE_KEYS = [
     "options",
     "ruling",
     "ruled_on",
+    "via",
     "fingerprint",
 ]
 _RULE_13_SENTENCE = "line 1 is an option line; --yes, --no and --later rule only a yes/no line"
@@ -85,6 +86,7 @@ def option_line(*, ruling: object = None, **changes: object) -> dict[str, object
         "text": "The song stays open on the jump.",
         "ruling": ruling,
         "ruled_on": "2026-10-28" if ruling is not None else None,
+        "via": "board" if ruling is not None else None,
         "default": None,
         "card_hash": card_hash,
         "stored_card_hash": card_hash if ruling is not None else None,
@@ -100,6 +102,10 @@ def option_line(*, ruling: object = None, **changes: object) -> dict[str, object
         "options": [_picture_option(), _same_as_today_option()],
         **changes,
     }
+
+
+def _without_key(stored: dict[str, object], key: str) -> dict[str, object]:
+    return {name: value for name, value in stored.items() if name != key}
 
 
 def _listed_lines(board: BoardClient) -> list[dict[str, Any]]:
@@ -154,6 +160,18 @@ def test_an_option_line_is_listed_with_its_card_in_the_wire_order(
     ]
 
 
+@pytest.mark.parametrize("via", ["board", "chat", "default"])
+def test_an_option_line_lists_via_as_acos_rulings_names_it(
+    repository: FakeAcoRepository, board: BoardClient, via: str
+) -> None:
+    """ABRD-53, line 18: `default` stays distinguishable from `board` and `chat`."""
+    repository.set_rulings(row(12, "Song jump", option_line(ruling="A", via=via)))
+
+    [listed] = _listed_lines(board)
+
+    assert listed["via"] == via
+
+
 def test_an_option_line_stands_beside_a_yes_no_line_in_acos_order(
     repository: FakeAcoRepository, board: BoardClient
 ) -> None:
@@ -196,6 +214,7 @@ def _fingerprint_of(
         ({"index": 2}, 12, True),
         ({"stored_card_hash": "sha256:other"}, 12, False),
         ({"default": "yes"}, 12, False),
+        ({"via": "chat"}, 12, False),
         ({"provenance": "x"}, 12, False),
         ({"text": "Another wording."}, 12, False),
     ],
@@ -205,6 +224,7 @@ def _fingerprint_of(
         "index",
         "stored-card-hash",
         "default",
+        "via",
         "unknown-key",
         "text-not-in-the-hash",
     ],
@@ -216,6 +236,7 @@ def test_an_option_lines_fingerprint_follows_item_index_and_card_hash_only(
     number: int,
     changes_fingerprint: bool,
 ) -> None:
+    """ABRD-35: `via` is no part of the fingerprint."""
     before = _fingerprint_of(repository, board, option_line())
 
     after = _fingerprint_of(repository, board, option_line(**changes), number)
@@ -285,6 +306,10 @@ def test_a_yes_no_decision_on_an_option_line_writes_nothing_and_says_why(
         option_line(ruling="A", ruled_on="tomorrow"),
         option_line(form="cards"),
         option_line(form=None),
+        _without_key(option_line(), "via"),
+        option_line(ruling="A", via="phone"),
+        option_line(ruling="A", via="Board"),
+        option_line(ruling="A", via=5),
     ],
     ids=[
         "ruling-not-a-letter-of-the-options",
@@ -307,11 +332,16 @@ def test_a_yes_no_decision_on_an_option_line_writes_nothing_and_says_why(
         "ruled-on-not-a-date",
         "unknown-form",
         "form-null",
+        "via-missing",
+        "via-unknown-value",
+        "via-wrong-case",
+        "via-not-text",
     ],
 )
 def test_a_malformed_option_line_makes_only_its_repository_unreadable(
     two_repositories: tuple[FakeAcoRepository, FakeAcoRepository], malformed: dict[str, object]
 ) -> None:
+    """ABRD-07, ABRD-53."""
     repository_a, repository_b = two_repositories
     repository_a.set_rulings(row(12, "Song jump", malformed))
     repository_b.set_rulings(row(42, "Share page", line(1, "Guests?", default="yes")))
@@ -334,7 +364,7 @@ def _card_hash_of(stored: dict[str, object]) -> str:
 def test_an_option_on_an_open_option_line_is_ruled_through_acos_option_write(
     repository: FakeAcoRepository, board: BoardClient
 ) -> None:
-    """ABRD-39, E-ABRD-12."""
+    """ABRD-39, E-ABRD-12, ABRD-53: the board's own decision lists `via` as `board`."""
     stored = option_line()
     repository.set_rulings(row(12, "Song jump", stored))
     [listed] = _listed_lines(board)
@@ -361,6 +391,7 @@ def test_an_option_on_an_open_option_line_is_ruled_through_acos_option_write(
     ]
     [ruled] = _listed_lines(board)
     assert ruled["ruling"] == "A"
+    assert ruled["via"] == "board"
 
 
 @pytest.mark.parametrize("note", [None, "  "], ids=["null-note", "blank-note"])
