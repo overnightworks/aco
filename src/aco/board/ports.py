@@ -21,6 +21,16 @@ class Outcome(StrEnum):
     LATER = "later"
 
 
+class RulingVia(StrEnum):
+    """`aco rulings --json` names an option line's `via` (RUL-15); the board
+    keeps its own copy of the vocabulary and reads aco only through its command
+    line."""
+
+    BOARD = "board"
+    CHAT = "chat"
+    DEFAULT = "default"
+
+
 OptionLetter = Literal["A", "B", "C", "D"]
 """The letters of an option line's options, by position."""
 
@@ -103,6 +113,7 @@ class OptionLine:
     options: tuple[CardOption, ...]
     ruling: OptionLetter | None
     ruled_on: date | None
+    via: RulingVia | None
     card_hash: str
 
     @property

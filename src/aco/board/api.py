@@ -161,6 +161,7 @@ def _option_line_json(line: OptionLine, repo: str) -> dict[str, object]:
         "options": [_card_option_json(option) for option in line.options],
         "ruling": line.ruling,
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
+        "via": line.via,
         "fingerprint": wire_fingerprint(repo, line),
     }
 

@@ -23,7 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
 | a post naming both or neither of `outcome` and `option`, another letter, or an `option` with a note | — | ABRD-42 |
@@ -56,7 +56,7 @@ resolved directory's name.
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
 - [ ] [ABRD-07] A yes/no line with a `default` or `ruling` that is no outcome, a malformed option line (below), another `form`, or a `ruled_on` that is no ISO date shows `aco rulings --json is unreadable: <detail>`.
 
-An option line is malformed when its `ruling` or `recommended` is no letter of its options, an option's `letter` is not A, B, C, D by position, or a card field has the wrong type.
+An option line is malformed when its `ruling` or `recommended` is no letter of its options, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
 ## Browser decision flow
 
@@ -105,11 +105,12 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line (RULE-13).
-- [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default` and unknown keys leave it unchanged.
+- [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via` and unknown keys leave it unchanged.
+- [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
 
 An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,
-`ruled_on`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
+`ruled_on`, `via`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
 and no `card_hash`; pictures are SVG text as stored.
 
 ## The SPA shell
@@ -291,7 +292,7 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
     {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true,
      "notice": "You pick the song again.", "cost": "None.", "undo": "final",
      "undo_how": "Nothing is built.", "contract": "The link stays a link."}],
-   "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]},
+   "ruling": null, "ruled_on": null, "via": null, "fingerprint": "<hex>"}]},
   {"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
    "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}
