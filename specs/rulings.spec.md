@@ -37,11 +37,11 @@ it, `<k>` an expectation line's 1-based index.
 ## `--json`
 
 - [ ] [RUL-05] `rulings --json` wraps OUT-nn (`reason: "listed"`) around a `rulings` array (see E-RUL-03, E-RUL-05).
-- [ ] [RUL-10] A row is `{"number", "title", "open", "total", "lines"}`; a yes/no line is `{"index", "text", "ruling", "ruled_on", "default"}`, an option line starts `{"index", "form", "text", "ruling", "ruled_on", "default", "card_hash", "stored_card_hash"}` with `form` `"options"` (see E-RUL-03, E-RUL-07).
+- [ ] [RUL-10] A row is `{"number", "title", "open", "total", "lines"}`; a yes/no line is `{"index", "text", "ruling", "ruled_on", "default"}` (see E-RUL-03).
 - [ ] [RUL-12] An open line has `ruling`/`ruled_on` `null`; a yes/no line's `default` is its proposed outcome (ASK-02) until ruled, an option line's always `null` (see E-RUL-03, E-RUL-05, E-RUL-07).
 - [ ] [RUL-06] A yes/no line's `question`/`example`/`picture` (`aco ask`, ASK-03) each add their own key, present only when that field was given.
 - [ ] [RUL-13] An option line adds `question` to `reason` and `options`, each option keyed as listed below, its `letter` derived from its position (see E-RUL-07).
-- [ ] [RUL-14] An option line's `card_hash` is the hash of the card it shows now (BODY-89) and `stored_card_hash` the hash stored with its ruling, `null` while open; a ruled line's two are equal, or its body is malformed (BODY-87). A yes/no line carries neither.
+- [ ] [RUL-14] An option line also starts with `"form": "options"`, `"card_hash"` (the card now, BODY-89) and `"stored_card_hash"` (its ruling's, `null` while open); a ruled line's two are equal (BODY-87).
 
 An option line's keys after `stored_card_hash` are `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`,
