@@ -78,9 +78,9 @@ layers = [
     "github | state_board",
     "forge",
     "workboard",
-    "items",
+    "items | expectations",
     "body",
-    "metrics",
+    "metrics | expectation_grammar",
     "usage",
     "protocol | process | board",
 ]

@@ -7,8 +7,27 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import cast
 
-from . import board_read, body, forge, protocol, report, workboard
+from . import board_read, body, expectations, forge, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
+
+
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """`rule`'s own flags; the `--json` flag stays `cli`'s one declaration."""
+    parser.add_argument(
+        "item", type=workboard.parse_item_reference, help="the item whose expectation line is ruled"
+    )
+    parser.add_argument(
+        "--line",
+        type=int,
+        required=True,
+        metavar="N",
+        help="the 1-based expectation line index, as rulings prints it",
+    )
+    outcome = parser.add_mutually_exclusive_group(required=True)
+    outcome.add_argument("--yes", action="store_const", dest="ruling", const="yes")
+    outcome.add_argument("--no", action="store_const", dest="ruling", const="no")
+    outcome.add_argument("--later", action="store_const", dest="ruling", const="later")
+    parser.add_argument("--note", help="appended to the line's own text as ' Anmerkung: TEXT'")
 
 
 class TargetUnavailableError(protocol.ClaimError):
@@ -50,7 +69,9 @@ def require_writable_target(
 
 def _rule_remaining_open(new_body: str, *, storage: body.Storage) -> int:
     return sum(
-        1 for line in body.expectation_lines(new_body, storage=storage) if line.ruling is None
+        1
+        for line in expectations.expectation_lines(new_body, storage=storage)
+        if line.ruling is None
     )
 
 
@@ -68,7 +89,7 @@ class _RuleReason(StrEnum):
 
 def _emit_rule_result(
     number: int,
-    line: body.ExpectationLine,
+    line: expectations.ExpectationLine,
     open_remaining: int,
     storage: body.Storage,
     *,
@@ -95,7 +116,7 @@ def _emit_rule_result(
 
 def _rule_item(
     context: RunContext, number: int, line: int, ruling: str, note: str | None
-) -> tuple[body.ExpectationLine, int]:
+) -> tuple[expectations.ExpectationLine, int]:
     """`run`'s own write: returns the newly ruled line and
     how many the item still has open; raises `protocol.ClaimError` by name
     for every refusal (already ruled, out of range, a bad outcome, a
@@ -104,17 +125,17 @@ def _rule_item(
     client = context.forge_writer
     current_body, config = require_writable_target(client, context, number, command="rule")
     ruled_on = datetime.now(UTC).date()
-    new_body = body.rule_expectation(current_body, line, ruling, ruled_on, note=note)
+    new_body = expectations.rule_expectation(current_body, line, ruling, ruled_on, note=note)
     client.update_item_body(number, new_body)
-    ruled_line = body.expectation_lines(new_body, storage=config.storage)[line - 1]
+    ruled_line = expectations.expectation_lines(new_body, storage=config.storage)[line - 1]
     return ruled_line, _rule_remaining_open(new_body, storage=config.storage)
 
 
 _RuleItemError = (
     TargetUnavailableError
     | InvalidTargetError
-    | body.ExpectationAlreadyRuledError
-    | body.ExpectationOutOfRangeError
+    | expectations.ExpectationAlreadyRuledError
+    | expectations.ExpectationOutOfRangeError
 )
 
 
@@ -127,7 +148,7 @@ def _rule_item_reason(error: _RuleItemError) -> _RuleReason:
         return _RuleReason.UNAVAILABLE
     if isinstance(error, InvalidTargetError):
         return _RuleReason.INVALID_ITEM
-    if isinstance(error, body.ExpectationAlreadyRuledError):
+    if isinstance(error, expectations.ExpectationAlreadyRuledError):
         return _RuleReason.ALREADY_RULED
     return _RuleReason.LINE_OUT_OF_RANGE
 
@@ -155,8 +176,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     except (
         TargetUnavailableError,
         InvalidTargetError,
-        body.ExpectationAlreadyRuledError,
-        body.ExpectationOutOfRangeError,
+        expectations.ExpectationAlreadyRuledError,
+        expectations.ExpectationOutOfRangeError,
     ) as error:
         return report.refuse(_rule_item_reason(error), error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:

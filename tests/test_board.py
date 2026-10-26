@@ -36,29 +36,19 @@ from board_fixtures import (
     unfilled_block_body,
 )
 
-from aco import body, checkout, metrics, protocol, workboard
+from aco import body, checkout, expectation_grammar, expectations, metrics, protocol, workboard
 from aco.body import (
     BLOCK_FENCE_INFO,
-    EXPECTATION_LINE_TEXT_MAXIMUM,
-    EXPECTATION_PICTURE_MAXIMUM_BYTES,
-    EXPECTATION_QUESTION_MAXIMUM_CHARACTERS,
     BodyReadState,
     Contract,
     ContractDefect,
-    ExpectationCardFields,
-    ExpectationLine,
     ExpectationProgress,
     ExpectationState,
     ItemKind,
     SliceRow,
     Storage,
-    _expectation_picture_defect,
-    append_expectation,
     body_defect_text,
     cuttable_rows,
-    expectation_line_state,
-    expectation_line_summary,
-    expectation_lines,
     has_slice_table,
     locate_block,
     missing_or_empty_sections,
@@ -68,6 +58,14 @@ from aco.body import (
     remove_slice_row,
     render_block,
     replace_block,
+)
+from aco.expectations import (
+    ExpectationCardFields,
+    ExpectationLine,
+    append_expectation,
+    expectation_line_state,
+    expectation_line_summary,
+    expectation_lines,
     rule_expectation,
 )
 from aco.protocol import ClaimError, ClaimRequest
@@ -392,8 +390,8 @@ def test_append_expectation_writes_the_card_fields() -> None:
             id="srcdoc",
         ),
         pytest.param(
-            f"<svg>{'x' * EXPECTATION_PICTURE_MAXIMUM_BYTES}</svg>",
-            f"must be at most {EXPECTATION_PICTURE_MAXIMUM_BYTES} bytes",
+            f"<svg>{'x' * expectation_grammar.EXPECTATION_PICTURE_MAXIMUM_BYTES}</svg>",
+            f"must be at most {expectation_grammar.EXPECTATION_PICTURE_MAXIMUM_BYTES} bytes",
             id="oversized",
         ),
     ],
@@ -404,7 +402,7 @@ def test_expectation_picture_is_refused_by_both_the_parser_and_the_writer(
     """One rule, two callers: a body already carrying the bad
     picture reads MALFORMED at `expectation[0].picture`, and
     `append_expectation` refuses the same picture before any write --
-    `_expectation_picture_defect` is the one owner both share."""
+    `expectation_grammar._expectation_picture_defect` is the one owner both share."""
     malformed_body = block_body(
         render_block(
             {
@@ -434,7 +432,7 @@ def test_expectation_picture_allows_an_internal_anchor_href_with_surrounding_spa
     lookahead, so a greedy `\\s*` must not be free to backtrack onto that
     whitespace and misread it as an external value's first character."""
     picture = '<svg><a href = "#x"><circle cx="5" cy="5" r="4"/></a></svg>'
-    assert _expectation_picture_defect(picture) is None
+    assert expectation_grammar._expectation_picture_defect(picture) is None
 
     body = block_body(MINIMAL_BLOCK_TOML)
     updated = append_expectation(
@@ -453,7 +451,7 @@ def test_expectation_picture_allows_an_unrelated_animation_to_an_external_url() 
         '<svg><animate attributeName="href" to="#ok"/>'
         '<animate attributeName="x" to="http://evil.example"/></svg>'
     )
-    assert _expectation_picture_defect(picture) is None
+    assert expectation_grammar._expectation_picture_defect(picture) is None
 
 
 def test_expectation_picture_allows_an_animated_href_with_every_values_segment_internal() -> None:
@@ -461,12 +459,14 @@ def test_expectation_picture_allows_an_animated_href_with_every_values_segment_i
     two internal anchors are as harmless as one, so a picture must not be
     refused just because `values` contains a semicolon."""
     picture = '<svg><animate attributeName="href" values="#a;#b"/></svg>'
-    assert _expectation_picture_defect(picture) is None
+    assert expectation_grammar._expectation_picture_defect(picture) is None
 
 
 def test_append_expectation_refuses_an_overlong_question() -> None:
     body = block_body(MINIMAL_BLOCK_TOML)
-    card = ExpectationCardFields(question="Q" * (EXPECTATION_QUESTION_MAXIMUM_CHARACTERS + 1))
+    card = ExpectationCardFields(
+        question="Q" * (expectation_grammar.EXPECTATION_QUESTION_MAXIMUM_CHARACTERS + 1)
+    )
 
     with pytest.raises(protocol.ClaimError, match="question must be at most"):
         append_expectation(body, "New question?", "yes", card=card)
@@ -656,7 +656,7 @@ def test_expectation_line_summary_truncates_long_text() -> None:
 
     summary = expectation_line_summary(line)
 
-    assert len(summary) == EXPECTATION_LINE_TEXT_MAXIMUM
+    assert len(summary) == expectations.EXPECTATION_LINE_TEXT_MAXIMUM
     assert summary.endswith("…")
 
 

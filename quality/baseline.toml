@@ -21,9 +21,9 @@
 "check_status.check" = 19
 
 [file_lines]
-"src/aco/body.py" = 1662
+"src/aco/body.py" = 1237
 "src/aco/checkout.py" = 2033
-"src/aco/cli.py" = 887
+"src/aco/cli.py" = 849
 "src/aco/cmd_claim.py" = 1136
 "src/aco/cmd_release.py" = 924
 "src/aco/github.py" = 1764
@@ -46,7 +46,7 @@
 "tests/test_release_cleanup.py" = 807
 "tests/test_rescope_checkout.py" = 1087
 "tests/test_reset.py" = 954
-"tests/test_state_board.py" = 6113
+"tests/test_state_board.py" = 6112
 "tests/test_store.py" = 5508
 
 [function_lines."src/aco/board_read.py"]

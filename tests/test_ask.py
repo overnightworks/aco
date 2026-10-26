@@ -19,7 +19,7 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
-from aco import body, cli, forge, github, session
+from aco import body, cli, expectations, forge, github, session
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class AskInput:
 @dataclass(frozen=True)
 class TextResult:
     stdout: str
-    entries: tuple[body.ExpectationLine, ...] | None = None
+    entries: tuple[expectations.ExpectationLine, ...] | None = None
     stderr: str | None = None
     written_keys: tuple[int, ...] | None = None
 
@@ -73,7 +73,7 @@ class TestGithubAsk:
                 TextResult(
                     "ASKED #90 line 1: New question?\n",
                     (
-                        body.ExpectationLine(
+                        expectations.ExpectationLine(
                             1,
                             "New question?",
                             None,
@@ -125,7 +125,7 @@ class TestGithubAsk:
         result = run_cli(["ask", "90", "--text", "New question?", *scenario.arguments], capsys)
         actual = TextResult(
             result.stdout,
-            body.expectation_lines(client.item_bodies[90])
+            expectations.expectation_lines(client.item_bodies[90])
             if expected.entries is not None
             else None,
             result.stderr if expected.stderr is not None else None,
@@ -496,7 +496,7 @@ class TestGithubAsk:
                 False,
                 lambda result, written: (
                     result.stdout,
-                    tuple(entry.text for entry in body.expectation_lines(written)),
+                    tuple(entry.text for entry in expectations.expectation_lines(written)),
                 ),
                 ("ASKED #90 line 2: New question?\n", ("New question?", "New question?")),
                 id="duplicate",
