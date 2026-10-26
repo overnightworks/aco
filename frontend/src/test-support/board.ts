@@ -4,9 +4,56 @@
  * `vite.config.ts`.
  */
 
-import type { BoardItem, ExpectationLine, RepoReading } from '../types';
+import type { BoardItem, CardOption, OptionLine, RepoReading, YesNoLine } from '../types';
 
-export function line(overrides: Partial<ExpectationLine> = {}): ExpectationLine {
+export const PICTURE = '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>';
+
+export function cardOption(overrides: Partial<CardOption> = {}): CardOption {
+	return {
+		letter: 'A',
+		name: 'Keep the song open',
+		effect: 'The app jumps itself.',
+		picture: PICTURE,
+		notice: 'You stay in your song.',
+		cost: 'More code.',
+		undo: 'reversible',
+		undo_how: 'Any time.',
+		contract: 'The song stays open.',
+		...overrides
+	} as CardOption;
+}
+
+export function optionLine(overrides: Partial<OptionLine> = {}): OptionLine {
+	return {
+		index: 1,
+		form: 'options',
+		text: 'The song stays open on the jump.',
+		question: 'Keep the song open?',
+		problem: 'The jump closes your song.',
+		picture: PICTURE,
+		caption: 'Today the song is lost.',
+		decision_kind: 'product',
+		area: 'Song page',
+		topic: 'Jump',
+		recommended: 'A',
+		reason: 'Ends the loss.',
+		options: [
+			cardOption(),
+			cardOption({
+				letter: 'B',
+				name: 'As today',
+				effect: 'The browser jumps.',
+				contract: 'The browser keeps jumping.'
+			})
+		],
+		ruling: null,
+		ruled_on: null,
+		fingerprint: 'fingerprint-option',
+		...overrides
+	};
+}
+
+export function line(overrides: Partial<YesNoLine> = {}): YesNoLine {
 	return {
 		index: 1,
 		text: 'Guests?',

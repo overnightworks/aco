@@ -8,7 +8,7 @@
  */
 
 import { postDecision } from '../../client';
-import type { DecisionRequest, ExpectationLine, Outcome } from '../../types';
+import type { DecisionRequest, Outcome, YesNoLine } from '../../types';
 import { cardHeading, outcomeLabel } from '../model/boardSummary';
 import {
 	BOARD_UNREACHABLE_MESSAGE,
@@ -77,13 +77,7 @@ export class DecisionStore {
 	}
 
 	/** Starts the undo window for one card as shown; never sends before it elapses. */
-	decide(
-		repo: string,
-		item: number,
-		line: ExpectationLine,
-		outcome: Outcome,
-		note: string | null
-	): void {
+	decide(repo: string, item: number, line: YesNoLine, outcome: Outcome, note: string | null): void {
 		const key = lineKey(repo, item, line);
 		this.#banners = withoutKey(this.#banners, key);
 		const request = decisionRequest(repo, item, line, outcome, note);

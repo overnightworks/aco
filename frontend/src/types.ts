@@ -6,7 +6,7 @@
 
 export type Outcome = 'yes' | 'no' | 'later';
 
-export interface ExpectationLine {
+export interface YesNoLine {
 	index: number;
 	text: string;
 	question: string | null;
@@ -18,6 +18,53 @@ export interface ExpectationLine {
 	/** Bound to the repo it was read under (ABRD-21); opaque to this client. */
 	fingerprint: string;
 }
+
+type OptionLetter = 'A' | 'B' | 'C' | 'D';
+
+export type DecisionKind =
+	'product' | 'technical' | 'data_risk' | 'money' | 'access' | 'wording' | 'release';
+
+export type Undo = 'reversible' | 'final';
+
+interface CardOptionFields {
+	letter: OptionLetter;
+	name: string;
+	effect: string;
+	notice: string;
+	cost: string;
+	undo: Undo;
+	undo_how: string;
+	contract: string;
+}
+
+/** An option's RESULT picture, or the statement that it leaves the TODAY
+ * picture as it is -- never both (`specs/serve.spec.md` ABRD-34). */
+export type CardOption = CardOptionFields &
+	({ picture: string; caption?: string } | { same_as_today: true });
+
+/** An option line (`specs/serve.spec.md` ABRD-34): the one form `form`
+ * names; a yes/no line carries no `form` at all. */
+export interface OptionLine {
+	index: number;
+	form: 'options';
+	text: string;
+	question: string;
+	problem: string;
+	picture: string;
+	caption: string;
+	decision_kind: DecisionKind;
+	area: string;
+	topic: string;
+	recommended: OptionLetter;
+	reason: string;
+	options: CardOption[];
+	ruling: OptionLetter | null;
+	ruled_on: string | null;
+	/** Bound to the repo it was read under (ABRD-21); opaque to this client. */
+	fingerprint: string;
+}
+
+export type ExpectationLine = YesNoLine | OptionLine;
 
 export interface BoardItem {
 	number: number;

@@ -7,6 +7,7 @@
 
 import type { BoardItem, ExpectationLine, Outcome, RepoReading } from '../../types';
 import { lineKey } from './decision';
+import { isOptionLine, optionStatusText } from './optionCard';
 
 export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
 export const LIST_LABEL = 'Liste';
@@ -40,6 +41,9 @@ export function isBoardEmpty(repos: RepoReading[]): boolean {
 }
 
 export function lineStatusText(line: ExpectationLine): string {
+	if (isOptionLine(line)) {
+		return optionStatusText(line);
+	}
 	if (line.ruling !== null) {
 		return `${outcomeLabel(line.ruling)} · ${line.ruled_on ?? ''}`;
 	}

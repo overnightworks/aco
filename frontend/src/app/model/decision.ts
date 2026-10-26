@@ -6,7 +6,13 @@
  * only source for "what just happened".
  */
 
-import type { DecisionRequest, DecisionResult, ExpectationLine, Outcome } from '../../types';
+import type {
+	DecisionRequest,
+	DecisionResult,
+	ExpectationLine,
+	Outcome,
+	YesNoLine
+} from '../../types';
 
 export const UNDO_SECONDS = 8;
 /** The operator's window to change their mind before a decision writes; the
@@ -37,7 +43,7 @@ export function lineKey(repo: string, item: number, line: ExpectationLine): stri
 export function decisionRequest(
 	repo: string,
 	item: number,
-	line: ExpectationLine,
+	line: YesNoLine,
 	outcome: Outcome,
 	note: string | null
 ): DecisionRequest {
