@@ -19,7 +19,7 @@
 	} = $props();
 </script>
 
-<div class="decide">
+<div class="decide-row">
 	<dt>{ROW_LABEL.decide}</dt>
 	<dd>
 		{#if banner !== null}
@@ -45,7 +45,7 @@
 </div>
 
 <style>
-	.decide {
+	.decide-row {
 		display: grid;
 		grid-template-columns: var(--oc-label-width) minmax(0, 1fr);
 		column-gap: var(--oc-column-gap);
@@ -75,7 +75,7 @@
 		flex-wrap: wrap;
 		gap: 8px;
 	}
-	.decide button.pick {
+	.decide-row button.pick {
 		min-width: 48px;
 		height: 40px;
 		padding: 0 12px;
@@ -84,15 +84,15 @@
 		background: var(--oc-surface);
 		font-weight: 700;
 	}
-	.decide button.pick:hover:enabled {
+	.decide-row button.pick:not(.recommended):hover:enabled {
 		border-color: var(--oc-fg-2);
 	}
-	.decide button.pick.recommended {
+	.decide-row button.pick.recommended {
 		border-color: var(--oc-accent);
 		color: var(--oc-accent);
 	}
 	@media (max-width: 760px) {
-		.decide {
+		.decide-row {
 			grid-template-columns: minmax(0, 1fr);
 			padding-top: 12px;
 		}

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import {
 	line,
@@ -121,6 +121,11 @@ function arrange(directory: string): void {
 	]);
 }
 
+/** An option's disclosure; the Decide pick of the same option carries the name too. */
+function disclosureOf(card: Locator, name: RegExp): Locator {
+	return card.locator('button[aria-expanded]').filter({ hasText: name });
+}
+
 async function openFromList(page: Page, question: string, phone: boolean): Promise<void> {
 	await page.getByRole('button', { name: new RegExp(question.replace('?', '\\?')) }).click();
 	if (phone) await expect(page.locator('.question-pane')).toBeVisible();
@@ -134,7 +139,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px option card`, () => {
 		test.use({ viewport });
 
-		test('an open option line shows the whole card, every option closed, and offers no outcome', async ({
+		test('an open option line shows the whole card, every option closed, and offers the Decide picks', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
@@ -151,7 +156,8 @@ for (const viewport of [
 				'Problem',
 				'Today',
 				'Options',
-				'Recommendation'
+				'Recommendation',
+				'Decide'
 			]);
 			await expect(
 				card.getByText('Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg.')
@@ -181,7 +187,7 @@ for (const viewport of [
 			await expect(page.getByRole('button', { name: 'Nein', exact: true })).toHaveCount(0);
 			await expect(page.getByRole('button', { name: 'Später', exact: true })).toHaveCount(0);
 			await expect(page.getByText('Notiz', { exact: true })).toHaveCount(0);
-			await expect(card.getByRole('button')).toHaveCount(3);
+			await expect(card.getByRole('group', { name: 'Decide' }).getByRole('button')).toHaveCount(2);
 			await expect(card.getByRole('button', { name: 'Enlarge picture' })).toHaveCount(1);
 			const disclosures = card.locator('button[aria-expanded]');
 			await expect(disclosures).toHaveCount(2);
@@ -225,8 +231,8 @@ for (const viewport of [
 			await openFromList(page, SONG_QUESTION, phone);
 
 			const card = page.locator('.option-card');
-			const first = card.getByRole('button', { name: /Song bleibt offen/ });
-			const second = card.getByRole('button', { name: /Browser-Sprung bleibt/ });
+			const first = disclosureOf(card, /Song bleibt offen/);
+			const second = disclosureOf(card, /Browser-Sprung bleibt/);
 			await first.click();
 			await expect(first).toHaveAttribute('aria-expanded', 'true');
 			await expect(first).toHaveCSS('border-top-width', '0px');
@@ -241,7 +247,8 @@ for (const viewport of [
 				'Cost',
 				'Undo',
 				'Contract',
-				'Recommendation'
+				'Recommendation',
+				'Decide'
 			]);
 			const result = card.getByRole('img', {
 				name: 'A · Song bleibt offen: Die App springt selbst: v5 klappt auf, Take 7 ist markiert.'
@@ -289,8 +296,8 @@ for (const viewport of [
 			await openFromList(page, SONG_QUESTION, phone);
 
 			const card = page.locator('.option-card');
-			const first = card.getByRole('button', { name: /Song bleibt offen/ });
-			const second = card.getByRole('button', { name: /Browser-Sprung bleibt/ });
+			const first = disclosureOf(card, /Song bleibt offen/);
+			const second = disclosureOf(card, /Browser-Sprung bleibt/);
 			await first.focus();
 			await page.keyboard.press('Enter');
 			await expect(first).toHaveAttribute('aria-expanded', 'true');
@@ -318,14 +325,14 @@ for (const viewport of [
 			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
 
 			const card = page.locator('.option-card');
-			await card.getByRole('button', { name: /Weg D/ }).click();
+			await disclosureOf(card, /Weg D/).click();
 			const undo = card.locator('.details dd').nth(3);
 			await expect(undo).toHaveText('final — nie');
 			await expect(undo.locator('b')).toHaveCSS('color', 'rgb(153, 87, 12)');
 			await expect(undo.locator('b svg[aria-hidden="true"]')).toBeVisible();
 			await page.screenshot({ path: testInfo.outputPath('final-open.png') });
 
-			await card.getByRole('button', { name: /Weg A/ }).click();
+			await disclosureOf(card, /Weg A/).click();
 			const picture = card.locator('.details').getByRole('img');
 			const caption = card.getByText('So sieht Weg A aus.', { exact: true });
 			await expect(caption).toBeVisible();
@@ -340,8 +347,8 @@ for (const viewport of [
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
 			await page
-				.locator('.option-card')
-				.getByRole('button', { name: /Song bleibt offen/ })
+				.locator('.option-card button[aria-expanded]')
+				.filter({ hasText: /Song bleibt offen/ })
 				.click();
 			await expect(page.locator('.option-card .details')).toHaveCount(1);
 
@@ -365,7 +372,7 @@ for (const viewport of [
 			await openFromList(page, SONG_QUESTION, phone);
 
 			const card = page.locator('.option-card');
-			const first = card.getByRole('button', { name: /Song bleibt offen/ });
+			const first = disclosureOf(card, /Song bleibt offen/);
 			await first.click();
 			const labels = card.locator('.details dt');
 			await expect(labels).toHaveCount(5);
