@@ -23,6 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06 | RULE-04 |
+| an option line, open or ruled | ABRD-07, ABRD-34 | RULE-13 |
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note on the decision | — | ABRD-05 |
@@ -38,7 +39,7 @@ resolved directory's name.
 ## Writing a decision
 
 - [ ] [ABRD-01] Deciding a shown open card with outcome `yes`, `no`, or `later` runs `aco rule <n> --line <k>` with `--yes`, `--no`, or `--later` and `--json` (see E-ABRD-01).
-- [ ] [ABRD-02] A card whose title, text, question, example, picture, or recommended outcome changed since it was shown is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run (see E-ABRD-02).
+- [ ] [ABRD-02] A card whose shown fields changed since it was shown -- an option line's `card_hash` (ABRD-35) -- is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run (see E-ABRD-02).
 - [ ] [ABRD-03] The board runs one `aco rule` at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
 - [ ] [ABRD-04] Stopping the board waits for an `aco rule` already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, no `aco rule` run.
 - [ ] [ABRD-05] A note is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other note refuses the decision before any `aco` call; a blank note is no note.
@@ -46,7 +47,9 @@ resolved directory's name.
 ## Reading the lines
 
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
-- [ ] [ABRD-07] A line whose `default` or `ruling` is neither `null` nor `yes`/`no`/`later`, or whose `ruled_on` is neither `null` nor an ISO date, shows `aco rulings --json is unreadable: <detail>` instead of cards.
+- [ ] [ABRD-07] A yes/no line with a `default` or `ruling` that is no outcome, a malformed option line (below), another `form`, or a `ruled_on` that is no ISO date shows `aco rulings --json is unreadable: <detail>`.
+
+An option line is malformed when its `ruling` or `recommended` is no letter of its options, an option's `letter` is not A, B, C, D by position, or a card field has the wrong type.
 
 ## Browser decision flow
 
@@ -80,6 +83,13 @@ The browser proofs are `frontend/e2e/decide.spec.ts` and
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
+- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line (RULE-13).
+- [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default` and unknown keys leave it unchanged.
+
+An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
+`caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,
+`ruled_on`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
+and no `card_hash`; pictures are SVG text as stored.
 
 ## The SPA shell
 
@@ -237,3 +247,31 @@ $ aco --repo overnightworks/aco serve
 2> ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH
 exit 2
 ```
+
+### E-ABRD-11 -- listing an option line beside a yes/no line
+
+Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line, and item `#42` titled `Share page` with open line `Guests?` recommending `yes`
+
+```text
+request: GET /api/board, header X-Board-Token: <start token>
+aco calls: aco rulings --json
+answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12, "title": "Song jump", "lines": [
+  {"index": 1, "form": "options", "text": "The song stays open on the jump.",
+   "question": "Keep the song open?", "problem": "The jump closes your song.",
+   "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Today",
+   "decision_kind": "product", "area": "Song page", "topic": "Jump", "recommended": "A",
+   "reason": "Ends the loss.", "options": [
+    {"letter": "A", "name": "Song stays open", "effect": "The app jumps itself.",
+     "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Still open",
+     "notice": "You stay in your song.", "cost": "More code.", "undo": "reversible",
+     "undo_how": "Any time.", "contract": "The song stays open."},
+    {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true,
+     "notice": "You pick the song again.", "cost": "None.", "undo": "final",
+     "undo_how": "Nothing is built.", "contract": "The link stays a link."}],
+   "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]},
+  {"number": 42, "title": "Share page", "lines": [
+  {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
+   "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}
+```
+
+Posting `yes` for `#12` line `1` with the listed fingerprint answers 200 `{"status": "failed", "message": "line 1 is an option line; --yes, --no and --later rule only a yes/no line"}` (RULE-13).
