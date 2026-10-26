@@ -20,10 +20,12 @@ from aco_board_fixtures import FakeAcoRepository, line, row
 from aco.board.aco_cli import AcoCli
 from aco.board.board import SHUTTING_DOWN, Board, Boards
 from aco.board.ports import (
+    CardChanged,
     Decision,
     DecisionResult,
     DecisionStatus,
     ExpectationLine,
+    OptionDecision,
     Outcome,
     YesNoLine,
 )
@@ -85,6 +87,9 @@ class _HeldDecisions:
         assert self.may_finish.wait(_WAIT_SECONDS)
         self.ruled.append(decision)
         return DecisionResult(DecisionStatus.RULED, "ruled")
+
+    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
+        raise AssertionError("an option is never ruled here")
 
 
 def _signal_when_a_decision_waits_for_its_turn(

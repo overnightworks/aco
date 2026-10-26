@@ -55,6 +55,9 @@ rule.add_argument("--line", type=int, required=True)
 outcomes = rule.add_mutually_exclusive_group(required=True)
 for outcome in ("yes", "no", "later"):
     outcomes.add_argument("--" + outcome, dest="ruling", action="store_const", const=outcome)
+outcomes.add_argument("--option", dest="ruling")
+rule.add_argument("--via")
+rule.add_argument("--card-hash")
 rule.add_argument("--note")
 rule.add_argument("--json", action="store_true")
 arguments = parser.parse_args()
@@ -103,6 +106,8 @@ if line["ruling"] is not None:
     refuse("already_ruled",
            "line %d is already ruled; a changed ruling is a new line" % arguments.line)
 line["ruling"], line["ruled_on"] = arguments.ruling, "2026-10-03"
+if arguments.via is not None:
+    line["via"] = arguments.via
 if arguments.note is not None:
     line["text"] += " Anmerkung: " + arguments.note
 rulings.write_text(json.dumps(rows), encoding="utf-8")
@@ -414,6 +419,29 @@ class BoardClient:
             "outcome": outcome,
             "note": note,
         }
+        return self.post_rule(payload)
+
+    def decide_option_through_api(
+        self,
+        line: Mapping[str, object],
+        item: int,
+        option: str,
+        *,
+        repo: str | None = None,
+    ) -> Response:
+        """Post `option` for a line exactly as `GET /api/board` listed it."""
+        return self.post_rule(
+            {
+                "repo": self.repo if repo is None else repo,
+                "item": item,
+                "line": line["index"],
+                "fingerprint": line["fingerprint"],
+                "option": option,
+            }
+        )
+
+    def post_rule(self, payload: Mapping[str, object]) -> Response:
+        """Post `payload` to `/api/rule` with the start token, as given."""
         return self.call_api("POST", "/api/rule", json.dumps(payload), presented=self.token)
 
     def _request(

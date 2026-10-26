@@ -22,7 +22,14 @@ import pytest
 from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, row, serving
 
 from aco.board.aco_cli import AcoCli
-from aco.board.ports import Decision, DecisionResult, ExpectationLine, YesNoLine
+from aco.board.ports import (
+    CardChanged,
+    Decision,
+    DecisionResult,
+    ExpectationLine,
+    OptionDecision,
+    YesNoLine,
+)
 from aco.board.server import LOOPBACK_HOST, read_before_deadline
 
 
@@ -224,6 +231,9 @@ class _HugeLineSource:
     def rule(self, decision: Decision) -> DecisionResult:
         raise AssertionError("listing the board must not write")
 
+    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
+        raise AssertionError("listing the board must not write")
+
 
 def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
     capsys: pytest.CaptureFixture[str],
@@ -249,6 +259,9 @@ class _BrokenPipeSource:
         raise BrokenPipeError("aco's pipe broke")
 
     def rule(self, decision: Decision) -> DecisionResult:
+        raise AssertionError("the board must not write after a failed read")
+
+    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
         raise AssertionError("the board must not write after a failed read")
 
 

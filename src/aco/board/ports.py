@@ -134,6 +134,15 @@ class Decision:
     note: str | None
 
 
+@dataclass(frozen=True)
+class OptionDecision:
+    """An option line's chosen letter; an option carries no note."""
+
+    item: int
+    index: int
+    letter: OptionLetter
+
+
 class DecisionStatus(StrEnum):
     RULED = "ruled"
     ALREADY_RULED = "already_ruled"
@@ -144,6 +153,11 @@ class DecisionStatus(StrEnum):
 class DecisionResult:
     status: DecisionStatus
     message: str | None = None
+
+
+@dataclass(frozen=True)
+class CardChanged:
+    """The source refused an option because its card changed since the hash was read."""
 
 
 class DecisionSourceUnavailableError(Exception):
@@ -161,4 +175,9 @@ class DecisionPort(Protocol):
     def rule(self, decision: Decision) -> DecisionResult:
         """Write one decision; the source itself refuses an already-ruled line,
         an unknown item, or a line the item does not have."""
+        ...
+
+    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
+        """Write one option decision for the card `card_hash` names; the source
+        compares that hash again at its write and refuses a changed card."""
         ...
