@@ -46,7 +46,7 @@
 	<dt>{ROW_LABEL.contract}</dt>
 	<dd>
 		<details>
-			<summary>{CONTRACT_SUMMARY}</summary>
+			<summary class="fold">{CONTRACT_SUMMARY}</summary>
 			<div class="binding">
 				{#each contractTexts(line, option) as sentence (sentence)}
 					<p>{sentence}</p>
@@ -110,7 +110,7 @@
 	b.final {
 		color: var(--oc-warn);
 	}
-	summary {
+	.details summary.fold {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;

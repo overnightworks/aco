@@ -77,6 +77,7 @@
 							<li aria-current={option.letter === line.ruling ? 'true' : undefined}>
 								<button
 									type="button"
+									class="disclosure"
 									aria-expanded={isOpen}
 									onclick={() => (openOption = nextOpenOption(openOption, option.letter))}
 								>
@@ -215,7 +216,7 @@
 		border-top: 1px solid var(--oc-line);
 		margin-top: 8px;
 	}
-	button {
+	.option-card button.disclosure {
 		display: grid;
 		grid-template-columns: 24px minmax(0, 1fr) 16px;
 		column-gap: 12px;
@@ -230,7 +231,7 @@
 		text-align: left;
 		cursor: pointer;
 	}
-	li + li > button {
+	.option-card li + li > button.disclosure {
 		padding-top: 12px;
 	}
 	button:hover strong {
