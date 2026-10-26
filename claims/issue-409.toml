@@ -1,0 +1,8 @@
+claim_id = "cab9e586803343c3a34d4c306ba6b707"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "f91e2349705cdbfa1975598803148ce1babeccfb"
+branch = "claude/issue-409-via-on-the-wire"
+scope = ["frontend/e2e/rulingsFixture.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "scripts/vulture_whitelist.py", "specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/ports.py", "tests/aco_board/test_aco_board_option_lines.py"]
+opened_commit = "c8006bb266d071c80c339e506665bb94248830c5"
+whole_reason = "The wire key is one path from aco rulings --json to the SPA's type: the reader, the port type, the JSON, the type file, the two fixtures that must carry the now-required key, the serve spec and the API test change together."
