@@ -22,13 +22,14 @@ it, `<k>` an expectation line's 1-based index.
 | an item whose every line is already ruled | RUL-01, RUL-04 | RUL-05, RUL-10 |
 | a ruled line | RUL-02 | RUL-05, RUL-10, RUL-12 |
 | a line's `question`/`example`/`picture` | — | RUL-06 |
+| an option line, open or ruled | RUL-02 | RUL-10, RUL-12, RUL-13, RUL-14 |
 | no item on the whole board carries an expectation line | RUL-07 | RUL-08 |
 | a title or line holds a display control | RUL-11 | RUL-10, RUL-11 |
 
 ## Rows and lines
 
 - [ ] [RUL-01] Each listed item prints one header, `<label> <open>/<total>: <title>`, then one line per expectation entry -- ruled ones too -- in block order (see E-RUL-01, E-RUL-05).
-- [ ] [RUL-02] A still-open line prints `  <k> open: <summary>`; a ruled one prints `  <k> ruled <outcome> <date>: <summary>`, `<summary>` capped at 100 characters total, its last char `…` when cut (see E-RUL-01).
+- [ ] [RUL-02] An open line prints `  <k> open: <summary>`, a ruled one `  <k> ruled <outcome> <date>: <summary>`, `<outcome>` an option line's letter; `<summary>` caps at 100 chars, last `…` if cut (see E-RUL-01).
 - [ ] [RUL-11] Text shows `<title>` and `<summary>` with each display control escaped (NEXT-37), `<summary>` after its cap; `--json` carries both as stored.
 - [ ] [RUL-03] Rows rank by priority category, score, fewer open lines, ascending `<n>` (never `board --json`'s raw order); open-line items precede fully ruled ones, each group in that order (see E-RUL-02).
 - [ ] [RUL-04] An item whose every expectation line is already ruled is listed, in both text and `--json`, in the fully-ruled group RUL-03 orders last (see E-RUL-02, E-RUL-05).
@@ -36,9 +37,17 @@ it, `<k>` an expectation line's 1-based index.
 ## `--json`
 
 - [ ] [RUL-05] `rulings --json` wraps OUT-nn (`reason: "listed"`) around a `rulings` array (see E-RUL-03, E-RUL-05).
-- [ ] [RUL-10] Each `rulings` row is `{"number", "title", "open", "total", "lines"}`; each line `{"index", "text", "ruling", "ruled_on", "default"}`, untruncated text (see E-RUL-03, E-RUL-05).
-- [ ] [RUL-12] An open line has `ruling`/`ruled_on` `null` and `default` its proposed outcome, `"yes"`, `"no"`, or `"later"` (ASK-02); a ruled line has `default` `null` (see E-RUL-03, E-RUL-05).
-- [ ] [RUL-06] A line's `question`/`example`/`picture` (`aco ask`, ASK-03) each add their own key, present only when that field was given.
+- [ ] [RUL-10] A row is `{"number", "title", "open", "total", "lines"}`; a line starts `{"index", "form", "text", "ruling", "ruled_on", "default", "card_hash"}`, `form` `"yes_no"` or `"options"` (see E-RUL-03).
+- [ ] [RUL-12] An open line has `ruling`/`ruled_on` `null`; a yes/no line's `default` is its proposed outcome (ASK-02) until ruled, an option line's always `null` (see E-RUL-03, E-RUL-05, E-RUL-07).
+- [ ] [RUL-06] A yes/no line's `question`/`example`/`picture` (`aco ask`, ASK-03) each add their own key, present only when that field was given.
+- [ ] [RUL-13] An option line adds `question` to `reason` and `options`, each option keyed as listed below, its `letter` derived from its position (see E-RUL-07).
+- [ ] [RUL-14] Each line's `card_hash` is the hash of the card it shows now (BODY-89); a ruled option line's stored hash equals it, or its body is malformed (BODY-87).
+
+An option line's keys after `card_hash` are `question`, `problem`, `picture`,
+`caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`,
+`options`; each option is `{"letter", "name", "effect", "picture"` or
+`"same_as_today": true`, `"caption"` when stored, `"notice", "cost", "undo",
+"undo_how", "contract"}`.
 - [ ] [RUL-09] `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-RUL-06).
 
 `reason`, by which refusal fired:
@@ -102,7 +111,7 @@ Setup: bare-remote, fake `gh`, issue `#10` as in E-RUL-01
 
 ```console
 $ aco rulings --json
-{"ok": true, "reason": "listed", "rulings": [{"number": 10, "title": "Open expectation", "open": 1, "total": 2, "lines": [{"index": 1, "text": "Open decision 0.", "ruling": null, "ruled_on": null, "default": "later"}, {"index": 2, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null}]}]}
+{"ok": true, "reason": "listed", "rulings": [{"number": 10, "title": "Open expectation", "open": 1, "total": 2, "lines": [{"index": 1, "form": "yes_no", "text": "Open decision 0.", "ruling": null, "ruled_on": null, "default": "later", "card_hash": "sha256:92fad404e67af67d8cc0e7fa9cfbafc3c1347bff39464f1340be3337a4e773f5"}, {"index": 2, "form": "yes_no", "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null, "card_hash": "sha256:17457e4511187ef44f7105e4882ad61dc585ff023fa46624d7b5b94de1c05266"}]}]}
 exit 0
 ```
 
@@ -130,7 +139,7 @@ $ aco rulings
   2 ruled yes 2026-09-19: Settled decision 1.
 exit 0
 $ aco rulings --json
-{"ok": true, "reason": "listed", "rulings": [{"number": 11, "title": "Fully ruled", "open": 0, "total": 2, "lines": [{"index": 1, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null}, {"index": 2, "text": "Settled decision 1.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null}]}]}
+{"ok": true, "reason": "listed", "rulings": [{"number": 11, "title": "Fully ruled", "open": 0, "total": 2, "lines": [{"index": 1, "form": "yes_no", "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null, "card_hash": "sha256:17457e4511187ef44f7105e4882ad61dc585ff023fa46624d7b5b94de1c05266"}, {"index": 2, "form": "yes_no", "text": "Settled decision 1.", "ruling": "yes", "ruled_on": "2026-09-19", "default": null, "card_hash": "sha256:b426f8de344e80247e131c697860556229f4b8828a0381d7696a807a46ad5fca"}]}]}
 exit 0
 ```
 
@@ -144,3 +153,56 @@ $ aco --repo acme/items rulings --json
 {"ok": false, "reason": "invalid_usage", "message": "--repo is meaningless under storage = state-ref"}
 exit 2
 ```
+
+### E-RUL-07 — an open option line
+
+Setup: bare-remote, fake `gh`, issue `#12` "Song jump" open, its one
+`[[expectation]]` line the option line below
+
+```toml
+[[expectation]]
+text = "The song stays open on the jump."
+question = "Keep the song open?"
+problem = "The jump closes your song."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+caption = "Today"
+decision_kind = "product"
+area = "Song page"
+topic = "Jump"
+recommended = "A"
+reason = "Ends the loss."
+
+[[expectation.option]]
+name = "Song stays open"
+effect = "The app jumps itself."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+caption = "Still open"
+notice = "You stay in your song."
+cost = "More code."
+undo = "reversible"
+undo_how = "Any time."
+contract = "The song stays open."
+
+[[expectation.option]]
+name = "As today"
+effect = "The browser jumps."
+same_as_today = true
+notice = "You pick the song again."
+cost = "None."
+undo = "final"
+undo_how = "Nothing is built."
+contract = "The link stays a link."
+```
+
+```console
+$ aco rulings
+#12 1/1: Song jump
+  1 open: The song stays open on the jump.
+exit 0
+$ aco rulings --json
+{"ok": true, "reason": "listed", "rulings": [{"number": 12, "title": "Song jump", "open": 1, "total": 1, "lines": [{"index": 1, "form": "options", "text": "The song stays open on the jump.", "ruling": null, "ruled_on": null, "default": null, "card_hash": "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a", "question": "Keep the song open?", "problem": "The jump closes your song.", "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Today", "decision_kind": "product", "area": "Song page", "topic": "Jump", "recommended": "A", "reason": "Ends the loss.", "options": [{"letter": "A", "name": "Song stays open", "effect": "The app jumps itself.", "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Still open", "notice": "You stay in your song.", "cost": "More code.", "undo": "reversible", "undo_how": "Any time.", "contract": "The song stays open."}, {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true, "notice": "You pick the song again.", "cost": "None.", "undo": "final", "undo_how": "Nothing is built.", "contract": "The link stays a link."}]}]}]}
+exit 0
+```
+
+Ruled `A` on 2026-10-28, the same line prints `  1 ruled A 2026-10-28: The song stays open on the jump.`
+and carries `"ruling": "A", "ruled_on": "2026-10-28"` with the same `card_hash`.

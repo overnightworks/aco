@@ -33,6 +33,9 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
+| option line defective | BODY-69..BODY-84, BODY-86, BODY-87 | BODY-50 | BODY-52 |
+| complete option line, open or ruled | BODY-85, BODY-89 | — | — |
+| a rewrite of a block carrying expectation lines | BODY-88 | — | — |
 | `[[slice]]` defective | BODY-43..BODY-48, BODY-65 | BODY-50 | BODY-52 |
 | a `[[slice]]` title holding a display control (`specs/next.spec.md`) | BODY-63 | BODY-64 | BODY-64 |
 | a `[[slice]]` `done_when` holding a display control | BODY-66 | BODY-64 | BODY-64 |
@@ -84,12 +87,12 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-25] An `expectation` key that is not an array of tables prints `body malformed: expectation: expectation must be an array of tables` on stderr, exit `2`.
 - [ ] [BODY-26] An `[[expectation]]` entry that is not a table prints `body malformed: expectation[0]: expectation[0] must be a table` on stderr, exit `2`.
 - [ ] [BODY-27] An entry whose `text` is missing, blank or not a string prints `body malformed: expectation[0].text: expectation[0].text must be a non-empty string`, exit `2`.
-- [ ] [BODY-28] An entry carrying both `default` and a ruling prints `body malformed: expectation[0].default: expectation[0] must be proposed (default) or ruled (ruling, ruled_on), not both` on stderr, exit `2`.
-- [ ] [BODY-29] An entry carrying neither prints `body malformed: expectation[0].default: expectation[0] must carry default, or both ruling and ruled_on`, exit `2`.
-- [ ] [BODY-30] An entry whose `default` is not `yes`, `no` or `later` prints `body malformed: expectation[0].default: expectation[0].default must be yes, no, or later`, exit `2`.
-- [ ] [BODY-31] An entry whose `ruling` is not `yes`, `no` or `later` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be yes, no, or later`, exit `2`.
+- [ ] [BODY-28] A yes/no entry carrying both `default` and a ruling prints `body malformed: expectation[0].default: expectation[0] must be proposed (default) or ruled (ruling, ruled_on), not both`, exit `2`.
+- [ ] [BODY-29] A yes/no entry carrying neither prints `body malformed: expectation[0].default: expectation[0] must carry default, or both ruling and ruled_on`, exit `2`.
+- [ ] [BODY-30] A yes/no entry whose `default` is not `yes`, `no` or `later` prints `body malformed: expectation[0].default: expectation[0].default must be yes, no, or later`, exit `2`.
+- [ ] [BODY-31] A yes/no entry whose `ruling` is not `yes`, `no` or `later` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be yes, no, or later`, exit `2`.
 - [ ] [BODY-32] A ruled entry whose `ruled_on` is not a TOML local date prints `body malformed: expectation[0].ruled_on: expectation[0].ruled_on must be a TOML local date`, exit `2`.
-- [ ] [BODY-33] An entry key outside `text`, `default`, `ruling`, `ruled_on`, `question`, `example`, `picture` prints `body malformed: expectation[0].<key>: unknown key expectation[0].<key>` on stderr, exit `2`.
+- [ ] [BODY-33] An entry key its form does not know (a yes/no line: the seven keys above) prints `body malformed: expectation[0].<key>: unknown key expectation[0].<key>`, exit `2`; BODY-79/83/84 come first.
 
 ## The card fields `question`, `example`, `picture`
 
@@ -102,6 +105,58 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-40] A `picture` carrying an event-handler attribute prints `body malformed: expectation[0].picture: expectation[0].picture must not contain an event-handler attribute`, exit `2`.
 - [ ] [BODY-41] A `picture` whose `href` or `xlink:href` does not start with `#` prints `body malformed: expectation[0].picture: expectation[0].picture must not reference an href outside the document`, exit `2`.
 - [ ] [BODY-42] A `picture` matching two refused contents names the earlier one in the order `<script>, <foreignObject>, on…=, javascript:, data:, href, animated href, url(), <iframe>, <embed>, <object>, srcdoc`.
+
+## Option lines
+
+An entry carrying `option` is an option line; any other is a yes/no line,
+judged by BODY-26..BODY-42 exactly as before. Its keys, in the order a rewrite
+writes them:
+
+- `text`, then the decided state `ruling`, `ruled_on`, `card_hash` (all three, or none while open);
+- `question`, `problem`, `picture` (TODAY), `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required;
+- 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then either `picture` with an optional `caption` or `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
+
+The options' letters are `A`..`D` by position and never stored; `<L>` below
+is the present letters, for example `A, B`. Inside one entry the refusals print
+in this order: `text`, decided state, line keys, options, pictures, picture
+budget, unknown keys, and last BODY-87, only when no other refusal fired.
+
+- [ ] [BODY-69] An `option` that is not an array of tables prints `body malformed: expectation[0].option: expectation[0].option must be an array of tables`, exit `2` (see E-BODY-11).
+- [ ] [BODY-70] Fewer than 2 or more than 4 options print `body malformed: expectation[0].option: expectation[0] must carry 2 to 4 options`, exit `2` (see E-BODY-11).
+- [ ] [BODY-71] An option that is not a table prints `body malformed: expectation[0].option[1]: expectation[0].option[1] must be a table`, exit `2` (see E-BODY-11).
+- [ ] [BODY-72] A missing line key, `picture` included, prints `body malformed: expectation[0].<key>: expectation[0].<key> is required`, exit `2` (see E-BODY-11).
+- [ ] [BODY-73] An option missing a key prints `body malformed: expectation[0].option[1].<key>: expectation[0].option[1].<key> is required`, exit `2` (see E-BODY-11).
+- [ ] [BODY-74] A blank or non-string text key of the line or an option prints `body malformed: <field>: <field> must be a non-empty string`, exit `2`; a long `question` stays BODY-34 (see E-BODY-11).
+- [ ] [BODY-75] Another `decision_kind` prints `body malformed: expectation[0].decision_kind: expectation[0].decision_kind must be product, technical, data_risk, money, access, wording, or release` (see E-BODY-11).
+- [ ] [BODY-76] An `undo` other than `reversible` or `final` prints `body malformed: expectation[0].option[0].undo: expectation[0].option[0].undo must be reversible or final` (see E-BODY-11).
+- [ ] [BODY-77] A `recommended` that is not a present letter prints `body malformed: expectation[0].recommended: expectation[0].recommended must be one of <L>`, exit `2` (see E-BODY-11).
+- [ ] [BODY-78] A `ruling` that is not a present letter prints `body malformed: expectation[0].ruling: expectation[0].ruling must be one of <L>`, exit `2`; a bad `ruled_on` keeps BODY-32 (see E-BODY-12).
+- [ ] [BODY-79] A `default` or `example` on an option line prints `body malformed: expectation[0].<key>: expectation[0].<key> does not belong on an option line`, exit `2` (see E-BODY-11).
+- [ ] [BODY-80] An option's result breaking one rule prints that rule's sentence below, exit `2` (see E-BODY-11):
+  - neither `picture` nor `same_as_today`: `body malformed: expectation[0].option[1].picture: expectation[0].option[1] must carry exactly one of picture and same_as_today = true`
+  - both: the same sentence under `expectation[0].option[1].same_as_today`
+  - `same_as_today` not `true`: `body malformed: expectation[0].option[1].same_as_today: expectation[0].option[1].same_as_today must be true`
+  - a `caption` without a picture: `body malformed: expectation[0].option[1].caption: expectation[0].option[1].caption needs a picture beside it`
+- [ ] [BODY-81] Every picture, TODAY's and each option's, keeps BODY-37..BODY-42 under its own path, as `expectation[0].option[0].picture must not contain <script>` (see E-BODY-11).
+- [ ] [BODY-82] All of a line's pictures over 16384 UTF-8 bytes together print `body malformed: expectation[0]: expectation[0] pictures must total at most 16384 bytes`, exit `2` (see E-BODY-11).
+- [ ] [BODY-83] An option-line key (`problem` to `reason`) on a yes/no line prints `body malformed: expectation[0].<key>: expectation[0].<key> belongs to an option line; this line has none` (see E-BODY-11).
+- [ ] [BODY-84] An option key it does not know, `letter` included, prints `body malformed: expectation[0].option[0].<key>: unknown key expectation[0].option[0].<key>`, exit `2` (see E-BODY-11).
+- [ ] [BODY-85] A complete option line, open or ruled with its card's hash, prints `body ok` on stdout, exit `0` (see E-BODY-10).
+- [ ] [BODY-86] A partial decided state prints exactly one sentence, by which keys it carries, exit `2`; a ruled line's `card_hash` must be `sha256:` and 64 lowercase hex digits (see E-BODY-12):
+  - `ruling` without `ruled_on`: `body malformed: expectation[0].ruled_on: expectation[0] carries ruling without ruled_on`
+  - `ruling` and `ruled_on`: `body malformed: expectation[0].card_hash: expectation[0] is ruled without card_hash`
+  - `ruled_on`, no `ruling`: `body malformed: expectation[0].ruling: expectation[0] carries ruled_on without ruling`
+  - `card_hash` alone: `body malformed: expectation[0].ruling: expectation[0] carries card_hash without ruling`
+  - another `card_hash`: `body malformed: expectation[0].card_hash: expectation[0].card_hash must be sha256: followed by 64 lowercase hex digits`
+- [ ] [BODY-87] A ruled card edited later prints `body malformed: expectation[0].card_hash: expectation[0] was edited after its ruling; a changed ruling is a new line` until reverted (see E-BODY-13).
+- [ ] [BODY-88] A rewrite writes each present key in the order above, line keys before option tables; it re-reads to the same values, and a second rewrite changes no byte, LF or CRLF.
+- [ ] [BODY-89] `card_hash` is `sha256:` and the SHA-256 hex of the shown card's present keys as compact, key-sorted UTF-8 JSON, the option tables under `options` (see E-BODY-10).
+
+The card hash covers `text`, `default`, `question`, `example`, `picture` on a
+yes/no line, and every key listed above except the decided state on an option
+line. It never covers the item title, the index, `ruling`, `ruled_on` or
+`card_hash`, and it reads parsed values, so TOML quoting, key order and line
+endings cannot change it.
 
 ## `[[slice]]`
 
@@ -166,6 +221,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - No reader ever derives a blocker or a parent from the body: `Blocked by:` prose beside the block is documentation, and the `Parent: #<n>` line is read back by `aco cut`'s own orphan adoption alone.
 - A rewrite of one block field never changes a byte outside the fence, but it does re-render the whole block interior canonically: schema key order, TOML-safe quoting, the fence's own newline convention.
 - No reader guesses through a defect: a malformed body is refused by name, never treated as an empty or partial block.
+- No reader maps one line form onto the other: a yes/no line and an option line are each read at their own index, and `yes` never reads as `A`.
 
 ## Examples
 
@@ -385,5 +441,284 @@ done_when = "Every slice is cut."
 ```
 BODY
 2> body malformed: k\x1b]0;x\x07: unknown top-level key k\x1b]0;x\x07
+exit 2
+````
+
+### E-BODY-10 — a complete open option line
+
+Setup: bare-remote, `storage = "github"`; its `card_hash` once ruled is `sha256:f7f1db4c507733e34c58d64de61fd482ad3d308db7ce3bf14bc503179c26519d`
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Ein Klick auf den Ursprungs-Link springt in der App: die Version klappt auf, der Take ist markiert, der Song bleibt offen."
+question = "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?"
+problem = "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg."
+picture = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80"><style>.b{fill:#fff;stroke:#555}</style><rect class="b" x="1" y="1" width="198" height="78" rx="8"/></svg>"""
+caption = "Der Browser springt selbst, dabei geht der Song verloren."
+decision_kind = "product"
+area = "Song-Seite"
+topic = "Sprung zum Ursprungs-Take"
+recommended = "A"
+reason = "Behebt den Verlust; Strg- und Mittelklick bleiben normale Links."
+
+[[expectation.option]]
+name = "Song bleibt offen"
+effect = "Die App springt selbst: v5 klappt auf, Take 7 ist markiert."
+picture = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80"><style>.b{fill:#fff;stroke:#2a7}</style><rect class="b" x="1" y="1" width="198" height="78" rx="8"/></svg>"""
+caption = "Der Song bleibt offen."
+notice = "Du bleibst in deinem Song; Zurück führt zur Ansicht davor."
+cost = "Mehr Navigationscode, abgesichert durch Browserfälle."
+undo = "reversible"
+undo_how = "jederzeit änderbar."
+contract = "Ein normaler Klick oder Enter auf den Ursprungs-Link öffnet die Version in der App; der Song bleibt geöffnet."
+
+[[expectation.option]]
+name = "Bleibt wie heute"
+effect = "Der Browser springt; der Song schließt sich."
+same_as_today = true
+notice = "Nach dem Klick wählst du den Song neu."
+cost = "Keine."
+undo = "reversible"
+undo_how = "es wird nichts gebaut."
+contract = "Der Ursprungs-Link bleibt ein normaler Browser-Sprung."
+```
+BODY
+body ok
+exit 0
+````
+
+### E-BODY-11 — option-line shape defects
+
+Setup: bare-remote, `storage = "github"`. `<card>` stands for the projection
+keys and line keys of E-BODY-12's card without its `ruling`, which with
+E-BODY-12's two options prints `body ok`.
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Der Song bleibt beim Sprung offen."
+default = "yes"
+question = "Song offen lassen?"
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+caption = "Heute"
+decision_kind = "kind"
+area = "Song-Seite"
+topic = "Sprung"
+recommended = "C"
+reason = "Behebt den Verlust."
+
+[[expectation.option]]
+letter = "A"
+name = "Song bleibt offen"
+effect = "Die App springt selbst."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>'
+notice = "Du bleibst im Song."
+cost = ""
+undo = "maybe"
+undo_how = "jederzeit."
+contract = "Der Song bleibt offen."
+
+[[expectation.option]]
+name = "Wie heute"
+effect = "Der Browser springt."
+same_as_today = true
+caption = "Wie heute"
+notice = "Du wählst neu."
+cost = "Keine."
+undo = "final"
+undo_how = "nichts gebaut."
+```
+BODY
+2> body malformed: expectation[0].problem: expectation[0].problem is required
+2> body malformed: expectation[0].decision_kind: expectation[0].decision_kind must be product, technical, data_risk, money, access, wording, or release
+2> body malformed: expectation[0].recommended: expectation[0].recommended must be one of A, B
+2> body malformed: expectation[0].default: expectation[0].default does not belong on an option line
+2> body malformed: expectation[0].option[0].cost: expectation[0].option[0].cost must be a non-empty string
+2> body malformed: expectation[0].option[0].undo: expectation[0].option[0].undo must be reversible or final
+2> body malformed: expectation[0].option[1].contract: expectation[0].option[1].contract is required
+2> body malformed: expectation[0].option[1].caption: expectation[0].option[1].caption needs a picture beside it
+2> body malformed: expectation[0].option[0].picture: expectation[0].option[0].picture must not contain <script>
+2> body malformed: expectation[0].option[0].letter: unknown key expectation[0].option[0].letter
+exit 2
+$ aco check - <<'BODY'
+```aco
+<card>
+option = "A"
+```
+BODY
+2> body malformed: expectation[0].option: expectation[0].option must be an array of tables
+exit 2
+$ aco check - <<'BODY'
+```aco
+<card>
+option = [1, 2]
+```
+BODY
+2> body malformed: expectation[0].option[0]: expectation[0].option[0] must be a table
+2> body malformed: expectation[0].option[1]: expectation[0].option[1] must be a table
+exit 2
+$ aco check - <<'BODY'
+```aco
+<card>
+
+[[expectation.option]]
+name = "Song bleibt offen"
+effect = "Die App springt selbst."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+notice = "Du bleibst im Song."
+cost = "Mehr Code."
+undo = "reversible"
+undo_how = "jederzeit."
+contract = "Der Song bleibt offen."
+```
+BODY
+2> body malformed: expectation[0].option: expectation[0] must carry 2 to 4 options
+exit 2
+$ aco check - <<'BODY'
+```aco
+<card>
+# its two options, today's and option A's picture each about 6000 bytes,
+# option B's `same_as_today = true` replaced by a third such picture
+```
+BODY
+2> body malformed: expectation[0]: expectation[0] pictures must total at most 16384 bytes
+exit 2
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Ship it?"
+default = "yes"
+problem = "It waits."
+```
+BODY
+2> body malformed: expectation[0].problem: expectation[0].problem belongs to an option line; this line has none
+exit 2
+````
+
+### E-BODY-12 — the decided state of an option line
+
+Setup: bare-remote, `storage = "github"`. The card, ruled `A` on 2026-10-28,
+carries `card_hash = "sha256:6308916341e71850961411f654688124981f4854f6380da12f456a216ac97908"`.
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Der Song bleibt beim Sprung offen."
+ruling = "A"
+question = "Song offen lassen?"
+problem = "Der Song schließt sich."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+caption = "Heute"
+decision_kind = "product"
+area = "Song-Seite"
+topic = "Sprung"
+recommended = "A"
+reason = "Behebt den Verlust."
+
+[[expectation.option]]
+name = "Song bleibt offen"
+effect = "Die App springt selbst."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+notice = "Du bleibst im Song."
+cost = "Mehr Code."
+undo = "reversible"
+undo_how = "jederzeit."
+contract = "Der Song bleibt offen."
+
+[[expectation.option]]
+name = "Wie heute"
+effect = "Der Browser springt."
+same_as_today = true
+notice = "Du wählst neu."
+cost = "Keine."
+undo = "final"
+undo_how = "nichts gebaut."
+contract = "Der Link bleibt."
+```
+BODY
+2> body malformed: expectation[0].ruled_on: expectation[0] carries ruling without ruled_on
+exit 2
+````
+
+The same card with `ruling = "C"`, `ruled_on = 2026-10-28` and the hash
+above prints `2> body malformed: expectation[0].ruling: expectation[0].ruling must be one of A, B`, exit `2`.
+
+### E-BODY-13 — a ruled card edited later
+
+Setup: bare-remote, `storage = "github"`; E-BODY-12's card ruled `A` with
+`ruled_on = 2026-10-28` and its hash prints `body ok`, exit `0`. Then its
+`area` is edited:
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Der Song bleibt beim Sprung offen."
+ruling = "A"
+ruled_on = 2026-10-28
+card_hash = "sha256:6308916341e71850961411f654688124981f4854f6380da12f456a216ac97908"
+question = "Song offen lassen?"
+problem = "Der Song schließt sich."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+caption = "Heute"
+decision_kind = "product"
+area = "Song-Liste"
+topic = "Sprung"
+recommended = "A"
+reason = "Behebt den Verlust."
+
+[[expectation.option]]
+name = "Song bleibt offen"
+effect = "Die App springt selbst."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+notice = "Du bleibst im Song."
+cost = "Mehr Code."
+undo = "reversible"
+undo_how = "jederzeit."
+contract = "Der Song bleibt offen."
+
+[[expectation.option]]
+name = "Wie heute"
+effect = "Der Browser springt."
+same_as_today = true
+notice = "Du wählst neu."
+cost = "Keine."
+undo = "final"
+undo_how = "nichts gebaut."
+contract = "Der Link bleibt."
+```
+BODY
+2> body malformed: expectation[0].card_hash: expectation[0] was edited after its ruling; a changed ruling is a new line
 exit 2
 ````
