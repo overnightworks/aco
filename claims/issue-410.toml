@@ -1,0 +1,8 @@
+claim_id = "06818caaab5f494c941775046212748b"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "f91e2349705cdbfa1975598803148ce1babeccfb"
+branch = "claude/issue-410-shared-card-frame"
+scope = ["frontend/src/components/CardFrame.svelte", "frontend/src/components/CardRow.svelte", "frontend/src/components/ContractFold.svelte", "frontend/src/components/OptionCard.svelte", "frontend/src/components/OptionDetails.svelte", "src/aco/board/static"]
+opened_commit = "108de66d54d249cc914b2f8287e3386ce2dda94d"
+whole_reason = "The card frame and contract fold move as one: the three new components, the two components they come out of, and the rebuilt static assets, proven by the unchanged tests and identical screenshots."
