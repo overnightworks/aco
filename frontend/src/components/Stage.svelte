@@ -47,7 +47,8 @@
 						line={optionLine}
 						pending={decisions.isPending(optionKey)}
 						banner={decisions.banner(optionKey)}
-						onDecide={(option) => decisions.decideOption(repoName, itemNumber, optionLine, option)}
+						onDecide={(shownLine, option) =>
+							decisions.decideOption(repoName, itemNumber, shownLine, option)}
 						onReload={() => decisions.reloadAfterBanner(optionKey)}
 					/>
 				{/if}
