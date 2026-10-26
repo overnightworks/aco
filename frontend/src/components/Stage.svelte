@@ -19,8 +19,14 @@
 	let {
 		repos,
 		selectedKey,
-		decisions
-	}: { repos: RepoReading[]; selectedKey: string | null; decisions: DecisionStore } = $props();
+		decisions,
+		refreshing
+	}: {
+		repos: RepoReading[];
+		selectedKey: string | null;
+		decisions: DecisionStore;
+		refreshing: boolean;
+	} = $props();
 
 	let noteText = $state('');
 
@@ -46,6 +52,7 @@
 					<DecideRow
 						line={optionLine}
 						pending={decisions.isPending(optionKey)}
+						{refreshing}
 						banner={decisions.banner(optionKey)}
 						onDecide={(shownLine, option) =>
 							decisions.decideOption(repoName, itemNumber, shownLine, option)}
@@ -93,7 +100,7 @@
 					</details>
 					<ChoiceButtons
 						default={selected.line.default}
-						disabled={decisions.isPending(activeKey)}
+						disabled={decisions.isPending(activeKey) || refreshing}
 						onChoose={(outcome: Outcome) => {
 							if (selected === null) {
 								return;

@@ -232,6 +232,7 @@ for (const viewport of [
 			await page.getByRole('button', { name: 'Neu laden' }).click();
 			await expect(page.getByRole('alert')).toHaveCount(0);
 			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeEnabled();
+			await expect(page.locator('.stage')).toBeFocused();
 		});
 
 		test('[ABRD-45] a card ruled elsewhere answers already ruled instead of a second write', async ({

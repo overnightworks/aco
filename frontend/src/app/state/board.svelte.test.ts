@@ -49,7 +49,7 @@ test('setNoAccess resets a previously loaded board', async () => {
 	expect(store.error).toBeNull();
 });
 
-test('a ready board stays ready and readable while it is re-read', async () => {
+test('[ABRD-47] a ready board stays ready and readable while it is re-read', async () => {
 	const store = new BoardStore();
 	const first = [repo()];
 	await store.load('secret', fakeFetch(200, { repos: first }));
@@ -65,8 +65,10 @@ test('a ready board stays ready and readable while it is re-read', async () => {
 	const reloading = store.load('secret', slowFetch);
 
 	expect(store.status).toBe('ready');
+	expect(store.refreshing).toBe(true);
 	expect(store.repos).toEqual(first);
 	release();
 	await reloading;
+	expect(store.refreshing).toBe(false);
 	expect(store.repos).toEqual([]);
 });

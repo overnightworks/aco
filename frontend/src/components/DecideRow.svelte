@@ -17,12 +17,14 @@
 	let {
 		line,
 		pending,
+		refreshing,
 		banner,
 		onDecide,
 		onReload
 	}: {
 		line: OptionLine;
 		pending: boolean;
+		refreshing: boolean;
 		banner: DecisionBanner | null;
 		onDecide: (line: OptionLine, option: CardOption) => void;
 		onReload: () => void;
@@ -35,6 +37,7 @@
 	let confirming: { line: OptionLine; option: CardOption } | null = $state(null);
 
 	async function pick(option: CardOption) {
+		if (refreshing) return;
 		if (!asksToConfirm(option)) {
 			onDecide(line, option);
 			return;
@@ -64,6 +67,7 @@
 						class="pick"
 						class:recommended={option.letter === line.recommended}
 						disabled={pending}
+						aria-disabled={refreshing}
 						aria-label={pickLabel(option)}
 						onclick={() => pick(option)}
 					>

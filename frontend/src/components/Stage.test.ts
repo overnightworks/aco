@@ -25,6 +25,7 @@ function storeAnswering(result: DecisionResult, reload: () => Promise<void> = as
 
 test('with nothing selected, the stage says no question is selected', () => {
 	render(Stage, {
+		refreshing: false,
 		repos: [],
 		selectedKey: null,
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -44,6 +45,7 @@ test('a selected line shows only its own question, example, sentence and recomme
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	render(Stage, {
+		refreshing: false,
 		repos,
 		selectedKey: lineKey('repo', 42, card),
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -57,11 +59,27 @@ test('a selected line shows only its own question, example, sentence and recomme
 	expect(screen.getByText('Notiz').closest('details')).not.toHaveAttribute('open');
 });
 
+test('defect:#398 a card shown during a board re-read offers no usable answer', () => {
+	const card = line({ index: 1, text: 'Guests may join.', question: 'Guests allowed?' });
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+
+	render(Stage, {
+		refreshing: true,
+		repos,
+		selectedKey: lineKey('repo', 42, card),
+		decisions: storeAnswering({ status: 'ruled', message: null })
+	});
+
+	expect(screen.getByRole('button', { name: /Ja/ })).toBeDisabled();
+	expect(screen.getByRole('button', { name: /Nein/ })).toBeDisabled();
+});
+
 test('[ABRD-44] a selected option line shows its card and offers the Decide picks, no outcome', () => {
 	const card = optionLine({ index: 2, question: 'Keep the song open?' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	render(Stage, {
+		refreshing: false,
 		repos,
 		selectedKey: lineKey('repo', 42, card),
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -88,6 +106,7 @@ test('[ABRD-44] a ruled option line offers no Decide group', () => {
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	render(Stage, {
+		refreshing: false,
 		repos,
 		selectedKey: lineKey('repo', 42, card),
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -102,7 +121,7 @@ test('[ABRD-44] picking an option disables the picks, then posts exactly that le
 	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
 	const decisions = new DecisionStore('token', async () => {}, send as never);
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { refreshing: false, repos, selectedKey: lineKey('repo', 42, card), decisions });
 	screen.getByRole('button', { name: /^Decide B:/ }).click();
 	await tick();
 
@@ -126,7 +145,7 @@ test('[ABRD-45] a changed option card hides the picks until Neu laden reloads it
 	const reload = vi.fn(async () => {});
 	const decisions = storeAnswering({ status: 'failed', message: LINE_CHANGED_MESSAGE }, reload);
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { refreshing: false, repos, selectedKey: lineKey('repo', 42, card), decisions });
 	screen.getByRole('button', { name: /^Decide A:/ }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
@@ -141,6 +160,7 @@ test('a selected yes/no line still offers Ja, Nein and Später', () => {
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	render(Stage, {
+		refreshing: false,
 		repos,
 		selectedKey: lineKey('repo', 42, card),
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -165,6 +185,7 @@ test('an already-ruled selected line shows a read-only box, never live choice bu
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	render(Stage, {
+		refreshing: false,
 		repos,
 		selectedKey: lineKey('repo', 42, card),
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -181,7 +202,7 @@ test('choosing an outcome starts the undo window and disables the buttons', asyn
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const decisions = storeAnswering({ status: 'ruled', message: null });
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { refreshing: false, repos, selectedKey: lineKey('repo', 42, card), decisions });
 	screen.getByRole('button', { name: 'Ja' }).click();
 	await tick();
 
@@ -195,7 +216,7 @@ test('an already-ruled refusal hides the choices and offers a reload', async () 
 	const reload = vi.fn(async () => {});
 	const decisions = storeAnswering({ status: 'already_ruled', message: null }, reload);
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { refreshing: false, repos, selectedKey: lineKey('repo', 42, card), decisions });
 	screen.getByRole('button', { name: 'Ja' }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
@@ -214,6 +235,7 @@ test('a hostile picture is embedded only as an image, never as markup', () => {
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	const { container } = render(Stage, {
+		refreshing: false,
 		repos,
 		selectedKey: lineKey('repo', 42, card),
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -242,6 +264,7 @@ test('hostile question, sentence, example and item title render as text, never a
 	const repos = [repo({ items: [item({ number: 42, title: hostileTitle, lines: [card] })] })];
 
 	const { container } = render(Stage, {
+		refreshing: false,
 		repos,
 		selectedKey: lineKey('repo', 42, card),
 		decisions: storeAnswering({ status: 'ruled', message: null })
@@ -260,7 +283,7 @@ test('a plain failure keeps the choices usable for a retry', async () => {
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const decisions = storeAnswering({ status: 'failed', message: 'aco rule failed: boom' });
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { refreshing: false, repos, selectedKey: lineKey('repo', 42, card), decisions });
 	screen.getByRole('button', { name: 'Ja' }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
