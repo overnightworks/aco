@@ -1,0 +1,8 @@
+claim_id = "ca2cafcca26c404fad8ff64d7bf7f0a7"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "d2f02d2ac210b18333fa41dbbd3995b1591bbd66"
+branch = "claude/issue-413-decided-card"
+scope = ["docs/board/README.md", "frontend/e2e/decide.spec.ts", "frontend/e2e/decideOption.spec.ts", "frontend/e2e/decided.spec.ts", "frontend/e2e/optionCard.spec.ts", "frontend/src/App.svelte", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/decidedCard.test.ts", "frontend/src/app/model/decidedCard.ts", "frontend/src/app/model/optionCard.test.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/components/CardFrame.svelte", "frontend/src/components/DecidedCard.svelte", "frontend/src/components/DecidedCard.test.ts", "frontend/src/components/OptionCard.svelte", "frontend/src/components/OptionCard.test.ts", "frontend/src/components/Stage.svelte", "frontend/src/components/Stage.test.ts", "frontend/src/types.ts", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "ae7dc79eaf2cfb4c79c069eee0134f397fa22f43"
+whole_reason = "One rendering of a ruled line: the decided card, its model and the frame's optional meta tokens come in, the stage routes every ruled line to it, and the two older renderings go in the same change, together with the tests and e2e pins that read them, the serve criteria, the board README and the rebuilt static assets."
