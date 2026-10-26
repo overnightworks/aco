@@ -154,7 +154,7 @@ for (const viewport of [
 			const card = await openCard(page, phone);
 			const dialog = page.getByRole('dialog', { name: 'Picture at full width' });
 
-			await card.getByRole('button', { name: /Weg A/ }).click();
+			await card.locator('button[aria-expanded]').filter({ hasText: /Weg A/ }).click();
 			const resultButton = card
 				.locator('.details')
 				.getByRole('button', { name: 'Enlarge picture' });
@@ -171,7 +171,7 @@ for (const viewport of [
 			await expect(dialog).toBeHidden();
 			await expect(resultButton).toBeFocused();
 
-			await card.getByRole('button', { name: /Weg B/ }).click();
+			await card.locator('button[aria-expanded]').filter({ hasText: /Weg B/ }).click();
 			await card.locator('.details').getByRole('button', { name: 'Enlarge picture' }).click();
 			await expect(dialog.getByText(`B · ${B_NAME}: ${B_EFFECT}`, { exact: true })).toBeVisible();
 			await page.keyboard.press('Escape');

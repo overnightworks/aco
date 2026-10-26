@@ -152,7 +152,7 @@ test('pendingEntries names what is waiting, for the toast to show', () => {
 
 	store.decide('repo', 42, card, 'no', null);
 
-	expect(store.pendingEntries).toEqual([{ key, outcome: 'no', message: 'Nein: Guests allowed?' }]);
+	expect(store.pendingEntries).toEqual([{ key, message: 'Nein: Guests allowed?' }]);
 });
 
 test('justRuled names the key a successful write just resolved, for the stage to move on from', async () => {

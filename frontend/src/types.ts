@@ -86,7 +86,7 @@ export interface BoardResponse {
 /** `POST /api/rule`'s body (`specs/serve.spec.md` ABRD-09): `fingerprint`
  * is the card's own, bound to `repo` as read (ABRD-21) -- never the line's
  * bare fingerprint. */
-export interface DecisionRequest {
+export interface YesNoDecisionRequest {
 	repo: string;
 	item: number;
 	line: number;
@@ -94,6 +94,18 @@ export interface DecisionRequest {
 	outcome: Outcome;
 	note: string | null;
 }
+
+/** The same body for an option line: the picked letter instead of an outcome
+ * and a note (ABRD-39, ABRD-42). */
+export interface OptionDecisionRequest {
+	repo: string;
+	item: number;
+	line: number;
+	fingerprint: string;
+	option: OptionLetter;
+}
+
+export type DecisionRequest = YesNoDecisionRequest | OptionDecisionRequest;
 
 export interface DecisionResult {
 	/** `aco.board.ports.DecisionStatus`'s three values, the only ones `POST

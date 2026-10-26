@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { DecisionStore } from '../app/state/decision.svelte';
-import { UNDO_SECONDS, lineKey } from '../app/model/decision';
+import { LINE_CHANGED_MESSAGE, UNDO_SECONDS, lineKey } from '../app/model/decision';
 import { item, line, optionLine, repo } from '../test-support/board';
 import type { DecisionResult } from '../types';
 import Stage from './Stage.svelte';
@@ -57,7 +57,7 @@ test('a selected line shows only its own question, example, sentence and recomme
 	expect(screen.getByText('Notiz').closest('details')).not.toHaveAttribute('open');
 });
 
-test('a selected option line shows its card and offers no outcome', () => {
+test('[ABRD-44] a selected option line shows its card and offers the Decide picks, no outcome', () => {
 	const card = optionLine({ index: 2, question: 'Keep the song open?' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
@@ -71,15 +71,69 @@ test('a selected option line shows its card and offers no outcome', () => {
 	expect(screen.getByText('Problem')).toBeInTheDocument();
 	expect(screen.queryByRole('group', { name: 'Entscheidung' })).not.toBeInTheDocument();
 	expect(screen.queryByText('Notiz')).not.toBeInTheDocument();
+	const picks = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button');
+	expect(picks.map((pick) => pick.textContent?.trim())).toEqual(['A', 'B']);
 	const buttons = screen.getAllByRole('button');
-	expect(buttons.length).toBeGreaterThan(0);
 	const disclosures = buttons.filter((button) => button.hasAttribute('aria-expanded'));
 	expect(disclosures.length).toBeGreaterThan(0);
 	for (const button of disclosures) {
 		expect(button).toHaveAttribute('aria-expanded', 'false');
 	}
-	expect(buttons.length - disclosures.length).toBe(1);
+	expect(buttons.length - disclosures.length - picks.length).toBe(1);
 	expect(screen.getByRole('button', { name: 'Enlarge picture' })).toBeInTheDocument();
+});
+
+test('[ABRD-44] a ruled option line offers no Decide group', () => {
+	const card = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01' });
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+
+	render(Stage, {
+		repos,
+		selectedKey: lineKey('repo', 42, card),
+		decisions: storeAnswering({ status: 'ruled', message: null })
+	});
+
+	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
+});
+
+test('[ABRD-44] picking an option disables the picks, then posts exactly that letter', async () => {
+	const card = optionLine({ index: 2, fingerprint: 'fp-option' });
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
+	const decisions = new DecisionStore('token', async () => {}, send as never);
+
+	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	screen.getByRole('button', { name: /^Decide B:/ }).click();
+	await tick();
+
+	for (const pick of within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')) {
+		expect(pick).toBeDisabled();
+	}
+	expect(send).not.toHaveBeenCalled();
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(send).toHaveBeenCalledWith('token', {
+		repo: 'repo',
+		item: 42,
+		line: 2,
+		fingerprint: 'fp-option',
+		option: 'B'
+	});
+});
+
+test('[ABRD-45] a changed option card hides the picks until Neu laden reloads it', async () => {
+	const card = optionLine({ index: 2 });
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+	const reload = vi.fn(async () => {});
+	const decisions = storeAnswering({ status: 'failed', message: LINE_CHANGED_MESSAGE }, reload);
+
+	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	screen.getByRole('button', { name: /^Decide A:/ }).click();
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(screen.getByRole('alert')).toHaveTextContent(LINE_CHANGED_MESSAGE);
+	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
+	screen.getByRole('button', { name: 'Neu laden' }).click();
+	expect(reload).toHaveBeenCalledTimes(1);
 });
 
 test('a selected yes/no line still offers Ja, Nein and Später', () => {

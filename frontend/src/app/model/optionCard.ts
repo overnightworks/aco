@@ -13,6 +13,7 @@ export const ROW_LABEL = {
 	today: 'Today',
 	options: 'Options',
 	recommendation: 'Recommendation',
+	decide: 'Decide',
 	decided: 'Decided',
 	result: 'Result',
 	notice: 'You notice',
@@ -78,6 +79,16 @@ export function verdictLabel(option: CardOption): string {
 /** The ruled card's Decided row. */
 export function decidedText(option: CardOption): string {
 	return `${option.letter} — ${option.name}`;
+}
+
+/** A pick's accessible name; the pick itself shows only the letter. */
+export function pickLabel(option: CardOption): string {
+	return `${ROW_LABEL.decide} ${option.letter}: ${option.name}`;
+}
+
+/** The toast text of a pick waiting out the undo window. */
+export function pendingOptionText(line: OptionLine, option: CardOption): string {
+	return `${decidedText(option)} · ${line.topic}`;
 }
 
 /** The list's status text: the recommended letter while open, the verdict

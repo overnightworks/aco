@@ -7,10 +7,13 @@
  */
 
 import type {
-	DecisionRequest,
 	DecisionResult,
+	CardOption,
 	ExpectationLine,
+	OptionDecisionRequest,
+	OptionLine,
 	Outcome,
+	YesNoDecisionRequest,
 	YesNoLine
 } from '../../types';
 
@@ -34,6 +37,9 @@ export const LINE_CHANGED_MESSAGE = 'Diese Zeile hat sich geändert, bitte neu l
  * recognising it here to tell "changed" from any other failure is reading
  * the contract, not duplicating an implementation value. */
 
+export const RELOAD_LABEL = 'Neu laden';
+/** The one button that answers a refusal needing a fresh card. */
+
 export const BOARD_UNREACHABLE_MESSAGE = 'Das Board ist nicht erreichbar.';
 
 export function lineKey(repo: string, item: number, line: ExpectationLine): string {
@@ -46,8 +52,18 @@ export function decisionRequest(
 	line: YesNoLine,
 	outcome: Outcome,
 	note: string | null
-): DecisionRequest {
+): YesNoDecisionRequest {
 	return { repo, item, line: line.index, fingerprint: line.fingerprint, outcome, note };
+}
+
+/** Only an option line can be asked for a letter, and only one of its own. */
+export function optionDecisionRequest(
+	repo: string,
+	item: number,
+	line: OptionLine,
+	option: CardOption
+): OptionDecisionRequest {
+	return { repo, item, line: line.index, fingerprint: line.fingerprint, option: option.letter };
 }
 
 /** A blank note, trimmed, is no note (mirrors `aco.board.api._note`). */
