@@ -151,7 +151,7 @@ test.each(['first', 'last'] as const)(
 	}
 );
 
-describe('ruledOutcomeText', () => {
+describe('[ABRD-30] ruledOutcomeText', () => {
 	test.each([
 		['yes', '2026-10-01', 'Ja · 2026-10-01'],
 		['no', '2026-10-02', 'Nein · 2026-10-02'],

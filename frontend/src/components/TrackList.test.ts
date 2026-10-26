@@ -111,7 +111,7 @@ test('[ABRD-49] with no open line and no failure the list reads All decided', ()
 	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
 });
 
-test('hostile titles, topics, repository names and errors are shown as text, never as markup', () => {
+test('[ABRD-15] hostile titles, topics, repository names and errors are shown as text, never as markup', () => {
 	const hostileTopic = '<script>alert(1)</script>';
 	const hostileQuestion = '"><img src=x onerror=alert(2)>';
 	const hostileName = '<svg onload=alert(3)>';
@@ -139,7 +139,7 @@ test('hostile titles, topics, repository names and errors are shown as text, nev
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
-test('a row is a button that selects its line by the repository-bound key', () => {
+test('[ABRD-28] a row is a button that selects its line by the repository-bound key', () => {
 	const { onSelect } = renderList([
 		repo({ name: 'a', items: [item({ number: 42, lines: [line({ index: 3 })] })] })
 	]);
@@ -149,7 +149,7 @@ test('a row is a button that selects its line by the repository-bound key', () =
 	expect(onSelect).toHaveBeenCalledWith('a:42:3');
 });
 
-test('the selected row is marked current among several open ones', () => {
+test('[ABRD-28] the selected row is marked current among several open ones', () => {
 	renderList(
 		[
 			repo({
