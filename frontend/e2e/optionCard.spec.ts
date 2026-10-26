@@ -408,7 +408,7 @@ for (const viewport of [
 			await expect(page.locator('.option-card')).toHaveCount(0);
 		});
 
-		test('a ruled option line leaves the list and Verlauf shows its letter, name, date and contract', async ({
+		test('a ruled option line leaves the list and Decided shows its letter, name, date and contract', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
@@ -418,8 +418,8 @@ for (const viewport of [
 			await expect(page.locator('.tracks')).toContainText('Sprung zum Ursprungs-Take');
 			await expect(page.locator('.tracks')).toContainText('Thema');
 
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const history = page.getByRole('region', { name: 'Verlauf' });
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const history = page.getByRole('region', { name: 'Decided', exact: true });
 			const entry = history.locator('summary');
 			await expect(entry).toHaveCount(1);
 			await expect(entry).toContainText('Song offen lassen?');

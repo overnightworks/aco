@@ -10,7 +10,8 @@ import {
 	openList,
 	outcomeLabel,
 	pictureDataUri,
-	ruledOutcomeText
+	ruledOutcomeText,
+	tabCounts
 } from './boardSummary';
 
 test('first selection follows configured order, skipping failed repos and ruled-only groups', () => {
@@ -248,11 +249,11 @@ describe('nextOpenAfter', () => {
 	const third = line({ index: 3 });
 	const repos = [repo({ items: [item({ number: 42, lines: [first, second, third] })] })];
 
-	test('moves to the next open line in list order', () => {
+	test('[ABRD-50] among yes/no lines only, the first other open line comes next', () => {
 		expect(nextOpenAfter(repos, 'repo:42:1')).toBe('repo:42:2');
 	});
 
-	test('wraps to the first open line once the given key was the last in list order', () => {
+	test('[ABRD-50] the decided line is skipped, so from the last line the first one comes next', () => {
 		expect(nextOpenAfter(repos, 'repo:42:3')).toBe('repo:42:1');
 	});
 
@@ -320,5 +321,38 @@ describe('nextOpenAfter', () => {
 		];
 
 		expect(nextOpenAfter(withARuledMiddle, 'repo:42:1')).toBe('repo:42:3');
+	});
+});
+
+describe('tabCounts', () => {
+	test('[ABRD-51] counts the open list rows and the ruled lines', () => {
+		const repos = [
+			repo({
+				items: [
+					item({
+						number: 1,
+						lines: [
+							optionLine({ index: 1 }),
+							line({ index: 2 }),
+							line({ index: 3, ruling: 'yes', ruled_on: '2026-10-01' })
+						]
+					})
+				]
+			})
+		];
+
+		expect(tabCounts(repos)).toEqual({ open: 2, decided: 1 });
+	});
+
+	test('[ABRD-51] a failed repository adds to neither count', () => {
+		const repos = [
+			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [line()] })] })
+		];
+
+		expect(tabCounts(repos)).toEqual({ open: 0, decided: 0 });
+	});
+
+	test('[ABRD-51] an empty board counts nothing', () => {
+		expect(tabCounts([])).toEqual({ open: 0, decided: 0 });
 	});
 });

@@ -74,7 +74,7 @@
 		margin: 8px 0 0;
 		font-size: 13px;
 		line-height: 18px;
-		color: var(--oc-fg-2);
+		color: var(--fg-2);
 	}
 	.picture button.enlarge {
 		display: block;
@@ -92,9 +92,9 @@
 	dialog {
 		max-width: calc(100vw - 32px);
 		padding: 16px;
-		border: 1px solid var(--oc-line);
+		border: 1px solid var(--line);
 		border-radius: 12px;
-		background: var(--oc-surface);
+		background: var(--surface);
 		color: inherit;
 	}
 	dialog::backdrop {
@@ -114,7 +114,7 @@
 	.picture button.close {
 		height: 40px;
 		padding: 0 16px;
-		border: 1.5px solid var(--oc-line-strong);
+		border: 1.5px solid var(--line-strong);
 		border-radius: 8px;
 		background: none;
 		font-weight: 600;
@@ -126,7 +126,7 @@
 			position: relative;
 			zoom: 0.5;
 			padding: 6px;
-			border: 1px solid var(--oc-line);
+			border: 1px solid var(--line);
 			border-radius: 8px;
 		}
 		.thumbnail .mark {
@@ -134,7 +134,7 @@
 			position: absolute;
 			right: 4px;
 			bottom: 2px;
-			color: var(--oc-fg-3);
+			color: var(--fg-3);
 		}
 	}
 </style>

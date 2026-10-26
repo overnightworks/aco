@@ -137,16 +137,6 @@
 
 <style>
 	.option-card {
-		--oc-surface: #ffffff;
-		--oc-line: #e5e2ea;
-		--oc-line-strong: #cdc8d5;
-		--oc-fg: #18151f;
-		--oc-fg-2: #4d4758;
-		--oc-fg-3: #6e6779;
-		--oc-accent: #7d2459;
-		--oc-accent-fg: #ffffff;
-		--oc-good: #1c7350;
-		--oc-warn: #99570c;
 		--oc-label-width: 136px;
 		--oc-column-gap: 24px;
 		max-width: 880px;
@@ -160,18 +150,18 @@
 		margin: 0 0 8px 2px;
 		font-size: 13px;
 		line-height: 18px;
-		color: var(--oc-fg-3);
+		color: var(--fg-3);
 	}
 	.sep {
 		opacity: 0.6;
 	}
 	.final {
-		color: var(--oc-warn);
+		color: var(--warn);
 		font-weight: 600;
 	}
 	article {
-		background: var(--oc-surface);
-		border: 1px solid var(--oc-line);
+		background: var(--surface);
+		border: 1px solid var(--line);
 		border-radius: 12px;
 		padding: 24px 32px 32px;
 	}
@@ -199,7 +189,7 @@
 		font-weight: 650;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: var(--oc-fg-3);
+		color: var(--fg-3);
 	}
 	dd {
 		margin: 0;
@@ -214,7 +204,7 @@
 		padding: 0;
 	}
 	li + li {
-		border-top: 1px solid var(--oc-line);
+		border-top: 1px solid var(--line);
 		margin-top: 8px;
 	}
 	.option-card button.disclosure {
@@ -241,7 +231,7 @@
 	}
 	.chevron {
 		margin-top: 3px;
-		color: var(--oc-fg-3);
+		color: var(--fg-3);
 		transition: transform 0.15s;
 	}
 	button[aria-expanded='true'] .chevron {
@@ -261,7 +251,7 @@
 	}
 	.effect {
 		display: block;
-		color: var(--oc-fg-2);
+		color: var(--fg-2);
 	}
 	.letter {
 		display: grid;
@@ -269,21 +259,21 @@
 		width: 24px;
 		height: 24px;
 		margin-top: -1px;
-		border: 1.5px solid var(--oc-line-strong);
+		border: 1.5px solid var(--line-strong);
 		border-radius: 50%;
 		font-size: 13px;
 		font-weight: 700;
 		line-height: 1;
-		color: var(--oc-fg-2);
+		color: var(--fg-2);
 	}
 	.letter.recommended {
-		border-color: var(--oc-accent);
-		color: var(--oc-accent);
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 	.letter.chosen {
-		background: var(--oc-accent);
-		border-color: var(--oc-accent);
-		color: var(--oc-accent-fg);
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--accent-fg);
 	}
 	.recommendation {
 		display: flex;
@@ -299,13 +289,13 @@
 	.decided svg {
 		flex: none;
 		margin-top: 4px;
-		color: var(--oc-good);
+		color: var(--good);
 	}
 	.decided path {
-		stroke: var(--oc-surface);
+		stroke: var(--surface);
 	}
 	.date {
-		color: var(--oc-fg-2);
+		color: var(--fg-2);
 	}
 	@media (max-width: 760px) {
 		article {

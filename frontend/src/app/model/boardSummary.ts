@@ -11,8 +11,8 @@ import { isOptionLine } from './optionCard';
 
 export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
 export const LIST_LABEL = 'Liste';
-export const DECIDE_LABEL = 'Entscheiden';
-export const HISTORY_LABEL = 'Verlauf';
+export const OPEN_TAB_LABEL = 'Open';
+export const DECIDED_TAB_LABEL = 'Decided';
 export const LIST_REGION_LABEL = 'Decisions';
 export const QUIET_PREFIX = 'Nothing open: ';
 export const EMPTY_LIST_TITLE = 'All decided';
@@ -187,4 +187,10 @@ export function nextOpenAfter(repos: RepoReading[], key: string): string | null 
 	const others = listedRows(repos).filter((row) => row.key !== key);
 	const bestRank = Math.min(...others.map((row) => ROW_RANK[row.state]));
 	return others.find((row) => ROW_RANK[row.state] === bestRank)?.key ?? null;
+}
+
+/** What the header's two tabs count: the rows the open list shows and the
+ * ruled lines the Decided view lists. */
+export function tabCounts(repos: RepoReading[]): { open: number; decided: number } {
+	return { open: listedRows(repos).length, decided: historyLines(repos).length };
 }
