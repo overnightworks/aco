@@ -102,7 +102,6 @@ OPTION_KEYS = (
 _OPTION_REQUIRED_KEYS = tuple(
     key for key in OPTION_KEYS if key not in {_PICTURE, _SAME_AS_TODAY, _CAPTION}
 )
-_YES_NO_CARD_KEYS = ("text", "default", "question", "example", _PICTURE)
 
 
 def _one_of(values: tuple[str, ...]) -> str:
@@ -579,17 +578,14 @@ def _present_values(table: Mapping[str, object], keys: tuple[str, ...]) -> dict[
 
 
 def card_hash(entry: Mapping[str, object]) -> str:
-    """The hash of exactly the fields a card shows, over parsed values:
-    the present covered keys as compact, key-sorted JSON in UTF-8, hashed
-    with SHA-256 and written `sha256:<64 lowercase hex>` (BODY-89). A key
-    absent from `entry`, or `None`, is left out, so a covered key added
-    later leaves every hash of a line without it unchanged."""
-    if is_option_line(entry):
-        covered = _present_values(entry, ("text", *OPTION_LINE_KEYS))
-        options = cast(list[Mapping[str, object]], entry[_OPTION_TABLES])
-        covered["options"] = [_present_values(option, OPTION_KEYS) for option in options]
-    else:
-        covered = _present_values(entry, _YES_NO_CARD_KEYS)
+    """The hash of exactly the fields an option line's card shows, over
+    parsed values: the present covered keys as compact, key-sorted JSON in
+    UTF-8, hashed with SHA-256 and written `sha256:<64 lowercase hex>`
+    (BODY-89). A key absent from `entry`, or `None`, is left out, so a
+    covered key added later leaves every hash of a line without it unchanged."""
+    covered = _present_values(entry, ("text", *OPTION_LINE_KEYS))
+    options = cast(list[Mapping[str, object]], entry[_OPTION_TABLES])
+    covered["options"] = [_present_values(option, OPTION_KEYS) for option in options]
     canonical = json.dumps(covered, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
 

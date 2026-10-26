@@ -152,9 +152,8 @@ budget, unknown keys, and last BODY-87, only when no other refusal fired.
 - [ ] [BODY-88] A rewrite writes each present key in the order above, line keys before option tables; it re-reads to the same values, and a second rewrite changes no byte, LF or CRLF.
 - [ ] [BODY-89] `card_hash` is `sha256:` and the SHA-256 hex of the shown card's present keys as compact, key-sorted UTF-8 JSON, the option tables under `options` (see E-BODY-10).
 
-The card hash covers `text`, `default`, `question`, `example`, `picture` on a
-yes/no line, and every key listed above except the decided state on an option
-line. It never covers the item title, the index, `ruling`, `ruled_on` or
+The card hash belongs to option lines and covers every key listed above except
+the decided state. It never covers the item title, the index, `ruling`, `ruled_on` or
 `card_hash`, and it reads parsed values, so TOML quoting, key order and line
 endings cannot change it.
 
