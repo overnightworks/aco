@@ -86,6 +86,29 @@ export function pickLabel(option: CardOption): string {
 	return `${ROW_LABEL.decide} ${option.letter}: ${option.name}`;
 }
 
+/** The words of the confirm before a pick that cannot be taken back. */
+export const CONFIRM_LABEL = {
+	cancel: 'Cancel'
+} as const;
+
+/** Only a pick that cannot be taken back asks first (#13 line 12). */
+export function asksToConfirm(option: CardOption): boolean {
+	return option.undo === 'final';
+}
+
+export function confirmTitle(option: CardOption): string {
+	return `${confirmVerb(option)}?`;
+}
+
+export function confirmVerb(option: CardOption): string {
+	return `${ROW_LABEL.decide} ${option.letter}`;
+}
+
+/** The one consequence line: the Undo sentence, standing alone. */
+export function consequenceText(option: CardOption): string {
+	return option.undo_how.charAt(0).toUpperCase() + option.undo_how.slice(1);
+}
+
 /** The toast text of a pick waiting out the undo window. */
 export function pendingOptionText(line: OptionLine, option: CardOption): string {
 	return `${decidedText(option)} · ${line.topic}`;
