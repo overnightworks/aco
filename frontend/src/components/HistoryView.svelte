@@ -9,6 +9,7 @@
 		UNKNOWN_DATE_LABEL
 	} from '../app/model/boardSummary';
 	import { lineKey } from '../app/model/decision';
+	import { chosenOption, isOptionLine, verdictLabel } from '../app/model/optionCard';
 	import type { RepoReading } from '../types';
 	let { repos }: { repos: RepoReading[] } = $props();
 	const entries = $derived(historyLines(repos));
@@ -21,10 +22,26 @@
 	{#if entries.length === 0}<p>{EMPTY_HISTORY_MESSAGE}</p>{/if}
 	{#each entries as entry (lineKey(entry.repo, entry.item.number, entry.line))}
 		{@const sentence = cardSentence(entry.line)}
+		{@const chosen = isOptionLine(entry.line) ? chosenOption(entry.line) : undefined}
 		{#snippet heading()}
 			<strong>{cardHeading(entry.line)}</strong>
 			<span class="metadata">
-				{#if entry.line.ruling !== null}
+				{#if chosen !== undefined}
+					<span class="verdict chosen">
+						<svg
+							aria-hidden="true"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M5 12l5 5 9-10" />
+						</svg>
+						{verdictLabel(chosen)}
+					</span>
+				{:else if !isOptionLine(entry.line) && entry.line.ruling !== null}
 					<span class="verdict {entry.line.ruling}">
 						<svg
 							aria-hidden="true"
@@ -53,6 +70,7 @@
 		{#if sentence !== null}
 			<details>
 				<summary>{@render heading()}</summary>
+				{#if chosen !== undefined}<p>{chosen.contract}</p>{/if}
 				<p>{sentence}</p>
 			</details>
 		{:else}
@@ -111,6 +129,10 @@
 	.verdict.no {
 		background: #fbe7e7;
 		color: #c42f2f;
+	}
+	.verdict.chosen {
+		background: #f6e9f1;
+		color: #7d2459;
 	}
 	.verdict.later {
 		background: #f8eeda;
