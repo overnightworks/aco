@@ -6,6 +6,7 @@
 		confirmTitle,
 		confirmVerb,
 		consequenceText,
+		isStuck,
 		pickLabel,
 		ROW_LABEL
 	} from '../app/model/optionCard';
@@ -36,6 +37,44 @@
 	// dialog must not change what `Decide <X>` posts.
 	let confirming: { line: OptionLine; option: CardOption } | null = $state(null);
 
+	let row: HTMLDivElement | undefined = $state();
+	let stuck = $state(false);
+
+	function scrollingAncestor(element: HTMLElement): HTMLElement | null {
+		for (
+			let ancestor = element.parentElement;
+			ancestor !== null;
+			ancestor = ancestor.parentElement
+		) {
+			const { overflowY } = getComputedStyle(ancestor);
+			if (overflowY === 'auto' || overflowY === 'scroll') return ancestor;
+		}
+		return null;
+	}
+
+	// The row sticks to the foot of the pane that scrolls its card; the shadow
+	// shows while the card still runs on beneath it.
+	$effect(() => {
+		const container = row?.parentElement;
+		const scroller = row ? scrollingAncestor(row) : null;
+		if (!container || !scroller) return;
+		const measure = () => {
+			stuck = isStuck(
+				container.getBoundingClientRect().bottom,
+				scroller.getBoundingClientRect().bottom
+			);
+		};
+		measure();
+		scroller.addEventListener('scroll', measure, { passive: true });
+		const resizes = new ResizeObserver(measure);
+		resizes.observe(scroller);
+		resizes.observe(container);
+		return () => {
+			scroller.removeEventListener('scroll', measure);
+			resizes.disconnect();
+		};
+	});
+
 	async function pick(option: CardOption) {
 		if (refreshing) return;
 		if (!asksToConfirm(option)) {
@@ -53,7 +92,7 @@
 	}
 </script>
 
-<div class="decide-row">
+<div class="decide-row" class:stuck bind:this={row}>
 	<dt>{ROW_LABEL.decide}</dt>
 	<dd>
 		{#if banner !== null}
@@ -113,6 +152,9 @@
 		padding: 16px 0 8px;
 		border-top: 1px solid var(--line);
 		background: var(--surface);
+	}
+	.decide-row.stuck {
+		box-shadow: 0 -12px 14px -14px rgba(0, 0, 0, 0.28);
 	}
 	dt {
 		font-size: 11px;
