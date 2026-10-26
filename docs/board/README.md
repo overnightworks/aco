@@ -11,11 +11,11 @@ question, PROBLEM, TODAY, OPTIONS A to D with name and effect, RECOMMENDATION an
 DECIDE with one pick per option, and a ruled one with its chosen letter. Each
 option opens its RESULT, YOU NOTICE, COST, UNDO and CONTRACT. Every TODAY and
 RESULT picture opens enlarged in a dialog, and on a phone TODAY is a framed
-thumbnail with the enlarge mark. The card still lacks the confirm before a
-`final` option, "Other / Unclear" instead of "Später", Mitsprache, the agent
-list and group decisions. A yes/no
-line keeps its card. What the board does today is in the "Browser decision flow"
-of [`specs/serve.spec.md`](../../specs/serve.spec.md).
+thumbnail with the enlarge mark. A pick on a `final` option first asks in a
+confirm dialog. The card still lacks "Other / Unclear" instead of "Später",
+Mitsprache, the agent list and group decisions. A yes/no line keeps its card.
+What the board does today is in the "Browser decision flow" of
+[`specs/serve.spec.md`](../../specs/serve.spec.md).
 
 A change to the board's surface starts here: change the mockup first, get the
 operator's blessing, then build.
