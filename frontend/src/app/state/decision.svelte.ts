@@ -8,16 +8,18 @@
  */
 
 import { postDecision } from '../../client';
-import type { DecisionRequest, Outcome, YesNoLine } from '../../types';
+import type { CardOption, DecisionRequest, OptionLine, Outcome, YesNoLine } from '../../types';
 import { cardHeading, outcomeLabel } from '../model/boardSummary';
 import {
 	BOARD_UNREACHABLE_MESSAGE,
 	decisionRequest,
 	lineKey,
+	optionDecisionRequest,
 	readDecisionResult,
 	UNDO_SECONDS,
 	type DecisionOutcome
 } from '../model/decision';
+import { pendingOptionText } from '../model/optionCard';
 
 export interface DecisionBanner {
 	kind: 'already-ruled' | 'changed' | 'failed';
@@ -26,7 +28,6 @@ export interface DecisionBanner {
 
 export interface PendingDecision {
 	key: string;
-	outcome: Outcome;
 	message: string;
 }
 
@@ -59,7 +60,6 @@ export class DecisionStore {
 	get pendingEntries(): PendingDecision[] {
 		return Object.entries(this.#pending).map(([key, entry]) => ({
 			key,
-			outcome: entry.request.outcome,
 			message: entry.message
 		}));
 	}
@@ -78,10 +78,24 @@ export class DecisionStore {
 
 	/** Starts the undo window for one card as shown; never sends before it elapses. */
 	decide(repo: string, item: number, line: YesNoLine, outcome: Outcome, note: string | null): void {
-		const key = lineKey(repo, item, line);
+		this.#startUndoWindow(
+			lineKey(repo, item, line),
+			decisionRequest(repo, item, line, outcome, note),
+			`${outcomeLabel(outcome)}: ${cardHeading(line)}`
+		);
+	}
+
+	/** The same window for the letter picked on an option card. */
+	decideOption(repo: string, item: number, line: OptionLine, option: CardOption): void {
+		this.#startUndoWindow(
+			lineKey(repo, item, line),
+			optionDecisionRequest(repo, item, line, option),
+			pendingOptionText(line, option)
+		);
+	}
+
+	#startUndoWindow(key: string, request: DecisionRequest, message: string): void {
 		this.#banners = withoutKey(this.#banners, key);
-		const request = decisionRequest(repo, item, line, outcome, note);
-		const message = `${outcomeLabel(outcome)}: ${cardHeading(line)}`;
 		const timer = setTimeout(() => void this.#commit(key, request), this.undoSeconds * 1000);
 		this.#pending = { ...this.#pending, [key]: { request, message, timer } };
 	}
