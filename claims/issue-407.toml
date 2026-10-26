@@ -1,8 +1,0 @@
-claim_id = "e47cb72e77cb4ff7a6195ec9b4a0d190"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "bbac1b398fbde85844c6adc61d98fb9c723d95ee"
-branch = "claude/issue-407-decided-list-per-project"
-scope = ["docs/board/README.md", "frontend/e2e/decide.spec.ts", "frontend/e2e/decideOption.spec.ts", "frontend/e2e/decided.spec.ts", "frontend/e2e/decidedView.ts", "frontend/e2e/history.spec.ts", "frontend/e2e/optionCard.spec.ts", "frontend/src/App.svelte", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/components/HistoryView.svelte", "frontend/src/components/StateShape.svelte", "frontend/src/components/TrackList.svelte", "frontend/src/components/TrackList.test.ts", "specs/serve.spec.md", "src/aco/board/static"]
-opened_commit = "b2c587f1b128386a24e79426e617437895cf176f"
-whole_reason = "The Decided list is one path from data to page: the list projection and its done shape, the list component serving both tabs, App's Decided block and its selection, the predecessor HistoryView and its e2e module that exit, the e2e pins that read the old entries, the rewritten serve criteria and the rebuilt static assets change together."
