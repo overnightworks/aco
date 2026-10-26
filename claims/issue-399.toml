@@ -1,0 +1,8 @@
+claim_id = "dc2cb9d8dacf4ea2a0045b442f346bb3"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "9e66c9d0eaeab65aa52588b35b64e88fb9162e93"
+branch = "claude/issue-399-open-list-per-project"
+scope = ["docs/board/README.md", "frontend/e2e/bootstrap.spec.ts", "frontend/e2e/decide.spec.ts", "frontend/e2e/decideOption.spec.ts", "frontend/e2e/history.spec.ts", "frontend/e2e/openList.spec.ts", "frontend/e2e/optionCard.spec.ts", "frontend/e2e/pictureEnlargement.spec.ts", "frontend/src/App.svelte", "frontend/src/App.test.ts", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/optionCard.test.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/components/Stage.svelte", "frontend/src/components/StateShape.svelte", "frontend/src/components/TrackList.svelte", "frontend/src/components/TrackList.test.ts", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "19b4c5a354fadac68e5c50d579714859f375de0c"
+whole_reason = "The project-grouped list is one path from /api/board to a row: the list projection and its order, the state shape, the rewritten list, the deletions of what only the old list used, the tests and e2e pins that read the old list, the spec criteria and the rebuilt static assets change together."
