@@ -287,7 +287,7 @@ for (const viewport of [
 			await expect(page.getByRole('status')).toHaveText('Lädt…');
 			await page.screenshot({ path: testInfo.outputPath('loading.png') });
 			finishLoading?.();
-			await expect(page.getByText(/Nichts offen/)).toBeVisible();
+			await expect(page.getByText('All decided')).toBeVisible();
 			await page.screenshot({ path: testInfo.outputPath('empty.png') });
 			await page.unroute('**/api/board');
 			await page.route('**/api/board', (route) =>

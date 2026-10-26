@@ -114,16 +114,6 @@ export function pendingOptionText(line: OptionLine, option: CardOption): string 
 	return `${decidedText(option)} · ${line.topic}`;
 }
 
-/** The list's status text: the recommended letter while open, the verdict
- * and its date once ruled. */
-export function optionStatusText(line: OptionLine): string {
-	const chosen = chosenOption(line);
-	if (chosen === undefined) {
-		return `Empfohlen: ${line.recommended}`;
-	}
-	return `${verdictLabel(chosen)} · ${line.ruled_on ?? ''}`;
-}
-
 export const SAME_AS_TODAY_MARK = '= TODAY';
 export const CONTRACT_SUMMARY = 'Show';
 export const UNDO_SEPARATOR = ' — ';

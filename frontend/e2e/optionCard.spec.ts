@@ -127,7 +127,7 @@ function disclosureOf(card: Locator, name: RegExp): Locator {
 }
 
 async function openFromList(page: Page, question: string, phone: boolean): Promise<void> {
-	await page.getByRole('button', { name: new RegExp(question.replace('?', '\\?')) }).click();
+	await page.locator('.tracks').getByTitle(question).click();
 	if (phone) await expect(page.locator('.question-pane')).toBeVisible();
 }
 
@@ -414,9 +414,9 @@ for (const viewport of [
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			arrange(repoDirectory);
 			await page.goto(`${appUrl}#t=${token}`);
-			await expect(page.locator('.tracks').getByText('Song offen lassen?')).toHaveCount(0);
-			await expect(page.locator('.tracks')).toContainText('Empfohlen: A');
-			await expect(page.locator('.tracks')).toContainText('Empfohlen: B');
+			await expect(page.locator('.tracks').getByTitle('Song offen lassen?')).toHaveCount(0);
+			await expect(page.locator('.tracks')).toContainText('Sprung zum Ursprungs-Take');
+			await expect(page.locator('.tracks')).toContainText('Thema');
 
 			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
 			const history = page.getByRole('region', { name: 'Verlauf' });

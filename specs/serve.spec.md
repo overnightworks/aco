@@ -60,8 +60,8 @@ An option line is malformed when its `ruling` or `recommended` is no letter of i
 
 ## Browser decision flow
 
-- [ ] [ABRD-28] The decision list contains only open lines, headed by their short question or full sentence as fallback; an item title appears once above its open lines.
-- [ ] [ABRD-29] First load selects the first open line in repository/item/line order. Desktop shows its question; phones show the selected list row until tapped.
+- [ ] [ABRD-28] The decision list groups open lines by repository under its name and open count; a row shows its state shape and an option line's topic, or a yes/no line's short question or sentence.
+- [ ] [ABRD-29] Within a repository, open option lines come before yes/no lines, each in aco's order. First load selects the first row; desktop shows its card, phones the list until a row is tapped.
 - [ ] [ABRD-30] “Verlauf” shows ruled lines of open board items as read-only details: question, outcome, date and repository/item; opening reveals the full sentence. It is no archive of closed issues.
 - [ ] [ABRD-31] Browser history sorts date, item number, then line index descending; missing dates last. Complete ties keep repository order. CLI order is unchanged.
 - [ ] [ABRD-32] Returning from history preserves selection, list position and phone view. A completed background decision displaces neither another selected question nor history.
@@ -74,10 +74,13 @@ An option line is malformed when its `ruling` or `recommended` is no letter of i
 - [ ] [ABRD-45] A refused pick shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide the picks behind `Neu laden`, and any other failure keeps them.
 - [ ] [ABRD-46] A pick on a `final` option first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` starts the undo window (ABRD-44).
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` posts the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
+- [ ] [ABRD-48] An option line's row carries the Open shape; a yes/no line's row the dashed Not ready shape in muted text. Each shape names its state, and a row's title is its full question.
+- [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
+- [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option line, else to its first row; a card selected meanwhile stays (ABRD-32).
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/history.spec.ts`,
-`frontend/e2e/optionCard.spec.ts` and `frontend/e2e/pictureEnlargement.spec.ts`; ordering is additionally proven by
+`frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts` and `frontend/e2e/pictureEnlargement.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories

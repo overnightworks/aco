@@ -3,9 +3,9 @@
 		cardHeading,
 		cardSentence,
 		findSelectedLine,
-		lineStatusText,
 		NO_SELECTION_MESSAGE,
-		pictureDataUri
+		pictureDataUri,
+		ruledOutcomeText
 	} from '../app/model/boardSummary';
 	import { NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
 	import { isOptionLine } from '../app/model/optionCard';
@@ -64,7 +64,6 @@
 	{:else}
 		{@const yesNoLine = selected.line}
 		{@const activeKey = lineKey(selected.repo, selected.item.number, selected.line)}
-		{@const ruled = selected.line.ruling !== null}
 		{@const banner = decisions.banner(activeKey)}
 		{@const locked = locksCard(banner)}
 		<article class="card">
@@ -81,9 +80,9 @@
 			{#if selected.line.picture !== null}
 				<img alt="Bild zur Frage" src={pictureDataUri(selected.line.picture)} />
 			{/if}
-			{#if ruled}
+			{#if yesNoLine.ruling !== null}
 				<div class="ruledbox">
-					<p>{lineStatusText(selected.line)}</p>
+					<p>{ruledOutcomeText(yesNoLine.ruling, yesNoLine.ruled_on)}</p>
 					<p class="hint">Nur zum Lesen. Umentscheiden heißt: eine neue Zeile in aco.</p>
 				</div>
 			{:else}

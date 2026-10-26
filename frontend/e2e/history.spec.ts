@@ -25,7 +25,8 @@ for (const viewport of [
 			);
 			await page.goto(`${appUrl}#t=${token}`);
 			await expect(page.getByRole('alert')).toContainText('unavailable');
-			await expect(page.getByText(/Nichts offen/)).toBeVisible();
+			await expect(page.getByText('Nothing open: available')).toBeVisible();
+			await expect(page.getByText('All decided')).toHaveCount(0);
 			await page.screenshot({ path: testInfo.outputPath('empty-repo-error.png') });
 			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
 			await expect(page.getByRole('alert')).toContainText('unavailable');
@@ -91,7 +92,7 @@ for (const viewport of [
 			const tracks = page.locator('.tracks');
 			const first = tracks.getByRole('button').first();
 			await expect(first).toHaveAttribute('aria-current', 'true');
-			await expect(first).toHaveAccessibleName('Gäste einladen? Empfohlen: Ja');
+			await expect(first).toHaveAccessibleName('Not ready · head to fill Gäste einladen?');
 			await expect(first).toBeInViewport();
 			await expect(tracks.getByText('Gastzugänge ändern?')).toHaveCount(0);
 			await expect(page.locator('.question-pane')).toBeVisible({ visible: viewport.width > 760 });
@@ -219,7 +220,7 @@ for (const viewport of [
 			await expect(page.getByRole('group', { name: 'Entscheidung' })).toHaveCount(0);
 			await page.getByRole('button', { name: 'Entscheiden', exact: true }).click();
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
-			await expect(page.getByText(/Nichts offen/)).toBeVisible();
+			await expect(page.getByText('All decided')).toBeVisible();
 		});
 	});
 }

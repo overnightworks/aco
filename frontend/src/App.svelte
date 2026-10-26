@@ -5,8 +5,7 @@
 		nextOpenAfter,
 		firstOpenKey,
 		DECIDE_LABEL,
-		HISTORY_LABEL,
-		EMPTY_OPEN_MESSAGE
+		HISTORY_LABEL
 	} from './app/model/boardSummary';
 	import { BoardStore } from './app/state/board.svelte';
 	import { DecisionStore } from './app/state/decision.svelte';
@@ -116,7 +115,6 @@
 		<div class="history" hidden={view !== 'history'}><HistoryView repos={board.repos} /></div>
 		<div class="decide" hidden={view !== 'decide'} class:show-question={showQuestion}>
 			<div class="tracks" bind:this={tracks} tabindex="-1">
-				{#if firstOpenKey(board.repos) === null}<p>{EMPTY_OPEN_MESSAGE}</p>{/if}
 				<TrackList
 					repos={board.repos}
 					{selectedKey}
@@ -209,15 +207,6 @@
 		overflow: auto;
 		min-height: 0;
 	}
-	.tracks > p {
-		padding: 20px;
-	}
-	.tracks :global(h2 small) {
-		display: block;
-		font-size: 11px;
-		font-weight: 400;
-		color: #4d4759;
-	}
 	.decide {
 		display: grid;
 		grid-template-columns: 320px minmax(0, 1fr);
@@ -232,45 +221,7 @@
 	.tracks {
 		background: white;
 		border-right: 1px solid #e1dee8;
-		padding: 16px 0 32px;
-	}
-	.tracks :global(h2) {
-		margin: 0;
-		padding: 12px 20px 6px;
-		font-size: 13px;
-	}
-	.tracks :global(ul) {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-	.tracks :global(li) {
-		margin: 6px 12px;
-	}
-	.tracks :global(button) {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		width: 100%;
-		text-align: left;
-		padding: 11px 20px;
-		border: 1px solid #c9c4d4;
-		border-left: 4px solid #c9c4d4;
-		border-radius: 8px;
-		background: white;
-		overflow-wrap: anywhere;
-	}
-	.tracks :global(button:hover) {
-		background: #eceaf1;
-	}
-	.tracks :global(button[aria-current='true']) {
-		border-left-color: #8a2a63;
-		border-left-width: 7px;
-		background: #f6e8f0;
-	}
-	.tracks :global(button span:last-child) {
-		font-size: 12px;
-		color: #4d4759;
+		padding: 8px 0 24px;
 	}
 	.question-pane {
 		padding: 28px clamp(16px, 3vw, 44px) 56px;

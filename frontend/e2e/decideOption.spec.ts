@@ -118,7 +118,7 @@ async function open(page: Page, phone: boolean, question = SONG_QUESTION): Promi
 	const { appUrl, token } = readBoardRuntime();
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: new RegExp(question.replace('?', '\\?')) }).click();
+	await page.locator('.tracks').getByTitle(question).click();
 	if (phone) await expect(page.locator('.question-pane')).toBeVisible();
 }
 
@@ -170,11 +170,11 @@ for (const viewport of [
 
 			await expect(page.locator('.option-card').getByText(SONG_QUESTION)).toHaveCount(0);
 			if (phone) {
-				await expect(page.locator('.tracks')).toContainText(OTHER_QUESTION);
+				await expect(page.locator('.tracks').getByTitle(OTHER_QUESTION)).toHaveCount(1);
 			} else {
 				await expect(page.getByRole('heading', { name: OTHER_QUESTION })).toBeVisible();
 			}
-			await expect(page.locator('.tracks').getByText(SONG_QUESTION)).toHaveCount(0);
+			await expect(page.locator('.tracks').getByTitle(SONG_QUESTION)).toHaveCount(0);
 			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
 			const entry = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
 			await expect(entry).toHaveCount(1);
@@ -422,7 +422,7 @@ test.describe('1280px confirm over a changing board', () => {
 		await picks(page)
 			.getByRole('button', { name: /^Decide B:/ })
 			.click();
-		await page.getByRole('button', { name: new RegExp(SONG_QUESTION.replace('?', '\\?')) }).click();
+		await page.locator('.tracks').getByTitle(SONG_QUESTION).click();
 		await picks(page)
 			.getByRole('button', { name: /^Decide B:/ })
 			.click();
@@ -435,7 +435,7 @@ test.describe('1280px confirm over a changing board', () => {
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 		await reloaded;
 		// The modal makes the page inert, so the board is read by CSS, not by role.
-		await expect(page.locator('.tracks')).not.toContainText(OTHER_QUESTION);
+		await expect(page.locator('.tracks').getByTitle(OTHER_QUESTION)).toHaveCount(0);
 		await expect(confirm(page)).toBeVisible();
 		await confirm(page).getByRole('button', { name: 'Decide B' }).click();
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
@@ -457,7 +457,7 @@ test.describe('1280px confirm over a changing board', () => {
 		await picks(page)
 			.getByRole('button', { name: /^Decide B:/ })
 			.click();
-		await page.getByRole('button', { name: new RegExp(SONG_QUESTION.replace('?', '\\?')) }).click();
+		await page.locator('.tracks').getByTitle(SONG_QUESTION).click();
 		const pickB = picks(page).getByRole('button', { name: /^Decide B:/ });
 		await pickB.click();
 		await expect(confirm(page)).toBeVisible();

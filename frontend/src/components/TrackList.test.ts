@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
-import { item, line, repo } from '../test-support/board';
+import { item, line, optionLine, repo } from '../test-support/board';
 import TrackList from './TrackList.svelte';
 
 function renderList(
@@ -16,24 +16,37 @@ function renderList(
 	return { onSelect, container: rendered.container };
 }
 
-test('an item title stands once as a group header, its lines below it', () => {
+test('[ABRD-28] a repository is a heading with its name and open count', () => {
 	renderList([
 		repo({
-			items: [item({ number: 42, title: 'Share page', lines: [line({ text: 'Guests?' })] })]
+			items: [item({ lines: [line({ index: 1 }), line({ index: 2, text: 'Second?' })] })]
 		})
 	]);
 
-	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Share page repo · #42');
-	expect(screen.getByText('Guests?')).toBeInTheDocument();
+	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('repo 2');
 });
 
-test('a newly open line shows its recommendation under its item', () => {
-	renderList([repo({ items: [item({ lines: [line({ ruling: null, default: 'yes' })] })] })]);
+test('[ABRD-48] an option row shows its topic, the Open shape and its question as title', () => {
+	renderList([
+		repo({
+			items: [item({ lines: [optionLine({ topic: 'Sprung', question: 'Keep the song open?' })] })]
+		})
+	]);
 
-	expect(screen.getByText('Empfohlen: Ja')).toBeInTheDocument();
+	const row = screen.getByRole('button', { name: 'Open Sprung' });
+	expect(row).toHaveAttribute('title', 'Keep the song open?');
+	expect(within(row).getByRole('img', { name: 'Open' })).toBeInTheDocument();
 });
 
-test('a short question labels the control instead of repeating its full sentence', () => {
+test('[ABRD-48] a yes/no row shows its question, the Not ready shape and a muted label', () => {
+	renderList([repo({ items: [item({ lines: [line({ text: 'Guests?' })] })] })]);
+
+	const row = screen.getByRole('button', { name: 'Not ready · head to fill Guests?' });
+	expect(within(row).getByRole('img', { name: 'Not ready · head to fill' })).toBeInTheDocument();
+	expect(within(row).getByText('Guests?')).toHaveClass('muted');
+});
+
+test('[ABRD-28] a short question labels the row instead of the full sentence', () => {
 	renderList([
 		repo({
 			items: [
@@ -41,63 +54,94 @@ test('a short question labels the control instead of repeating its full sentence
 			]
 		})
 	]);
-	expect(screen.getByRole('button', { name: /Guests allowed/ })).toBeInTheDocument();
+
+	expect(screen.getByText('Guests allowed?')).toBeInTheDocument();
 	expect(screen.queryByText('Guests may join the call.')).not.toBeInTheDocument();
 });
 
-test('ruled lines and their otherwise empty groups leave the decision list', () => {
+test('[ABRD-29] the option row comes before the yes/no row of its repository', () => {
 	renderList([
 		repo({
-			items: [item({ lines: [line({ ruling: 'no', ruled_on: '2026-10-01', default: null })] })]
+			items: [
+				item({
+					lines: [line({ index: 1, text: 'Guests?' }), optionLine({ index: 2, topic: 'Sprung' })]
+				})
+			]
 		})
 	]);
 
-	expect(screen.queryByText('Nein · 2026-10-01')).not.toBeInTheDocument();
-	expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+	const [first, second] = screen.getAllByRole('button');
+	expect(first).toHaveAccessibleName('Open Sprung');
+	expect(second).toHaveAccessibleName('Not ready · head to fill Guests?');
 });
 
-test('hostile item title, line text, repo label and error text is shown as text, never as markup', () => {
-	const hostileTitle = '<script>alert(1)</script>';
-	const hostileText = '"><img src=x onerror=alert(2)>';
+test('[ABRD-49] ruled lines and ruled-only repositories leave the groups and stand in the quiet line', () => {
+	renderList([
+		repo({ name: 'busy', items: [item({ lines: [line()] })] }),
+		repo({
+			name: 'done',
+			items: [item({ lines: [line({ ruling: 'no', ruled_on: '2026-10-01' })] })]
+		}),
+		repo({ name: 'idle', items: [] })
+	]);
+
+	expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(1);
+	expect(screen.getByText('Nothing open: done · idle')).toBeInTheDocument();
+	expect(screen.queryByText('Nein · 2026-10-01')).not.toBeInTheDocument();
+});
+
+test('[ABRD-49] a failed repository shows its alert, and with no open line no All decided', () => {
+	renderList([
+		repo({ name: 'b', error: 'aco rulings failed: ERROR: no forge adapter', items: [] }),
+		repo({ name: 'idle', items: [] })
+	]);
+
+	expect(screen.getByRole('alert')).toHaveTextContent('b: aco rulings failed');
+	expect(screen.getByText('Nothing open: idle')).toBeInTheDocument();
+	expect(screen.queryByText('All decided')).not.toBeInTheDocument();
+});
+
+test('[ABRD-49] with no open line and no failure the list reads All decided', () => {
+	renderList([
+		repo({ items: [item({ lines: [line({ ruling: 'yes', ruled_on: '2026-10-01' })] })] })
+	]);
+
+	expect(screen.getByText('All decided')).toBeInTheDocument();
+	expect(screen.getByText('No project is waiting for you.')).toBeInTheDocument();
+	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
+});
+
+test('[ABRD-15] hostile titles, topics, repository names and errors are shown as text, never as markup', () => {
+	const hostileTopic = '<script>alert(1)</script>';
+	const hostileQuestion = '"><img src=x onerror=alert(2)>';
 	const hostileName = '<svg onload=alert(3)>';
 	const hostileError = '<img src=x onerror=alert(4)>';
 	const { container } = renderList([
 		repo({ name: hostileName, error: hostileError, items: [] }),
 		repo({
 			name: 'clean',
-			items: [item({ number: 42, title: hostileTitle, lines: [line({ text: hostileText })] })]
+			items: [
+				item({
+					lines: [
+						optionLine({ index: 1, topic: hostileTopic, question: hostileQuestion }),
+						line({ index: 2, text: hostileQuestion })
+					]
+				})
+			]
 		})
 	]);
 
 	expect(screen.getByRole('alert')).toHaveTextContent(`${hostileName}: ${hostileError}`);
-	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(hostileTitle);
-	expect(screen.getByText(hostileText)).toBeInTheDocument();
-	expect(container.querySelectorAll('script, img, svg')).toHaveLength(0);
+	expect(screen.getByText(hostileTopic)).toBeInTheDocument();
+	expect(screen.getAllByTitle(hostileQuestion)).toHaveLength(2);
+	expect(container.querySelectorAll('script, img')).toHaveLength(0);
+	expect(container.querySelectorAll('svg')).toHaveLength(2);
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
-test('a failed repo shows its error sentence instead of its items', () => {
-	renderList([
-		repo({ name: 'b', error: 'aco rulings failed: ERROR: no forge adapter', items: [] })
-	]);
-
-	expect(screen.getByRole('alert')).toHaveTextContent('b: aco rulings failed');
-	expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
-});
-
-test('each repo keeps its own items grouped separately, even with matching item numbers', () => {
-	renderList([
-		repo({ name: 'a', items: [item({ number: 42, title: 'In a' })] }),
-		repo({ name: 'b', items: [item({ number: 42, title: 'In b' })] })
-	]);
-
-	const headings = screen.getAllByRole('heading', { level: 2 });
-	expect(headings.map((heading) => heading.textContent)).toEqual(['In a a · #42', 'In b b · #42']);
-});
-
-test('an open line is a button that selects it by its repo-bound key', () => {
+test('[ABRD-28] a row is a button that selects its line by the repository-bound key', () => {
 	const { onSelect } = renderList([
-		repo({ name: 'a', items: [item({ number: 42, lines: [line({ index: 3, ruling: null })] })] })
+		repo({ name: 'a', items: [item({ number: 42, lines: [line({ index: 3 })] })] })
 	]);
 
 	screen.getByRole('button').click();
@@ -105,24 +149,11 @@ test('an open line is a button that selects it by its repo-bound key', () => {
 	expect(onSelect).toHaveBeenCalledWith('a:42:3');
 });
 
-test('a ruled line carries no button: its history is read-only', () => {
-	renderList([
-		repo({ items: [item({ lines: [line({ ruling: 'yes', ruled_on: '2026-10-01' })] })] })
-	]);
-
-	expect(screen.queryByRole('button')).not.toBeInTheDocument();
-});
-
-test('the selected line is marked current among several open ones', () => {
+test('[ABRD-28] the selected row is marked current among several open ones', () => {
 	renderList(
 		[
 			repo({
-				items: [
-					item({
-						number: 42,
-						lines: [line({ index: 1, ruling: null }), line({ index: 2, ruling: null })]
-					})
-				]
+				items: [item({ number: 42, lines: [line({ index: 1 }), line({ index: 2 })] })]
 			})
 		],
 		{ selectedKey: 'repo:42:2' }

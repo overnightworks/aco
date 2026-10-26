@@ -65,7 +65,7 @@ async function openCard(page: Page, phone: boolean): Promise<Locator> {
 	const { appUrl, token, repoDirectory } = readBoardRuntime();
 	arrange(repoDirectory);
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: new RegExp(QUESTION.replace('?', '\\?')) }).click();
+	await page.locator('.tracks').getByTitle(QUESTION).click();
 	if (phone) await expect(page.locator('.question-pane')).toBeVisible();
 	return page.locator('.option-card');
 }
