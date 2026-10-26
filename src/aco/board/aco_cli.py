@@ -17,12 +17,18 @@ from pathlib import Path
 from typing import TypeVar
 
 from .ports import (
+    OPTION_LETTERS,
+    OPTIONS_FORM,
+    CardOption,
     Decision,
     DecisionResult,
     DecisionSourceUnavailableError,
     DecisionStatus,
     ExpectationLine,
+    OptionLetter,
+    OptionLine,
     Outcome,
+    YesNoLine,
 )
 
 ACO_EXECUTABLE = "aco"
@@ -149,12 +155,24 @@ def _line(item: int, title: str, line: object) -> ExpectationLine:
     fields = _as_object(line)
     if fields is None:
         raise _unreadable(f"#{item} has a line that is not an object")
-    # RUL-10 always names a line's default, ruling and ruling date, null while
-    # absent; a missing key is a broken shape, never an open line.
-    for key in ("default", "ruling", "ruled_on"):
+    if "form" not in fields:
+        return _yes_no_line(item, title, fields)
+    if fields["form"] != OPTIONS_FORM:
+        raise _unreadable(f"#{item} line has an unknown form")
+    return _option_line(item, title, fields)
+
+
+def _require_keys(item: int, fields: dict[str, object], keys: tuple[str, ...]) -> None:
+    for key in keys:
         if key not in fields:
             raise _unreadable(f"#{item} line has no {key}")
-    return ExpectationLine(
+
+
+def _yes_no_line(item: int, title: str, fields: dict[str, object]) -> YesNoLine:
+    # RUL-10 always names a line's default, ruling and ruling date, null while
+    # absent; a missing key is a broken shape, never an open line.
+    _require_keys(item, fields, ("default", "ruling", "ruled_on"))
+    return YesNoLine(
         item=item,
         item_title=title,
         index=_required(fields, "index", int),
@@ -165,6 +183,75 @@ def _line(item: int, title: str, line: object) -> ExpectationLine:
         default=_optional_outcome(fields, "default"),
         ruling=_optional_outcome(fields, "ruling"),
         ruled_on=_optional_date(fields, "ruled_on"),
+    )
+
+
+def _option_line(item: int, title: str, fields: dict[str, object]) -> OptionLine:
+    """RUL-13 and RUL-14's card; the always-null `default` and `stored_card_hash`
+    are not read."""
+    _require_keys(item, fields, ("ruling", "ruled_on"))
+    options = _card_options(fields.get("options"))
+    letters: tuple[OptionLetter, ...] = tuple(option.letter for option in options)
+    recommended = _letter(fields, "recommended", letters)
+    return OptionLine(
+        item=item,
+        item_title=title,
+        index=_required(fields, "index", int),
+        text=_required(fields, "text", str),
+        question=_required(fields, "question", str),
+        problem=_required(fields, "problem", str),
+        picture=_required(fields, "picture", str),
+        caption=_required(fields, "caption", str),
+        decision_kind=_required(fields, "decision_kind", str),
+        area=_required(fields, "area", str),
+        topic=_required(fields, "topic", str),
+        recommended=recommended,
+        reason=_required(fields, "reason", str),
+        options=options,
+        ruling=None if fields["ruling"] is None else _letter(fields, "ruling", letters),
+        ruled_on=_optional_date(fields, "ruled_on"),
+        card_hash=_required(fields, "card_hash", str),
+    )
+
+
+def _letter(fields: dict[str, object], key: str, letters: tuple[OptionLetter, ...]) -> OptionLetter:
+    value = _required(fields, key, str)
+    for letter in letters:
+        if letter == value:
+            return letter
+    raise _unreadable(f"{key} is not a letter of its options")
+
+
+def _card_options(raw: object) -> tuple[CardOption, ...]:
+    if not isinstance(raw, list):
+        raise _unreadable("options is not a list")
+    if len(raw) > len(OPTION_LETTERS):
+        raise _unreadable("options hold more than the letters allow")
+    return tuple(
+        _card_option(letter, option) for letter, option in zip(OPTION_LETTERS, raw, strict=False)
+    )
+
+
+def _card_option(letter: OptionLetter, raw: object) -> CardOption:
+    fields = _as_object(raw)
+    if fields is None:
+        raise _unreadable("an option is not an object")
+    if fields.get("letter") != letter:
+        raise _unreadable(f"option {letter} is out of position")
+    picture = _optional_text(fields, "picture")
+    if picture is None and fields.get("same_as_today") is not True:
+        raise _unreadable(f"option {letter} has neither picture nor same_as_today")
+    return CardOption(
+        letter=letter,
+        name=_required(fields, "name", str),
+        effect=_required(fields, "effect", str),
+        picture=picture,
+        caption=_optional_text(fields, "caption"),
+        notice=_required(fields, "notice", str),
+        cost=_required(fields, "cost", str),
+        undo=_required(fields, "undo", str),
+        undo_how=_required(fields, "undo_how", str),
+        contract=_required(fields, "contract", str),
     )
 
 

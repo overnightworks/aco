@@ -274,4 +274,4 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
    "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}
 ```
 
-Posting `yes` for `#12` line `1` with the listed fingerprint answers 200 `{"status": "failed", "message": "line 1 is an option line; --yes, --no and --later rule only a yes/no line"}` (RULE-13).
+Posting `yes` for `#12` line `1` with the listed fingerprint answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is an option line; --yes, --no and --later rule only a yes/no line"}` (RULE-13).
