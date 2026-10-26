@@ -176,6 +176,7 @@ for (const viewport of [
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
 
+			await expect(decidedList(page).getByRole('button')).toHaveCount(3);
 			await expect
 				.poll(() =>
 					decidedList(page)

@@ -409,7 +409,7 @@ for (const viewport of [
 			await expect(page.locator('.option-card')).toHaveCount(0);
 		});
 
-		test('a ruled option line leaves the open list and Decided lists it under its project', async ({
+		test('[ABRD-37] a ruled option line leaves the open list and Decided lists it under its project', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
