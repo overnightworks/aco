@@ -45,9 +45,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         choices=[via.value for via in expectation_grammar.RulingVia],
         help=argparse.SUPPRESS,
     )
-    parser.add_argument(
-        "--card-hash", metavar="HASH", help=argparse.SUPPRESS
-    )
+    parser.add_argument("--card-hash", metavar="HASH", help=argparse.SUPPRESS)
 
 
 class TargetUnavailableError(protocol.ClaimError):

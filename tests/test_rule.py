@@ -664,7 +664,7 @@ def test_parser_refusal(
 
 
 def test_legacy_refusal_usage_names_no_option_flag(capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: Never 1 — the yes/no refusal's usage text stays byte-identical, naming no option flag."""
+    """Spec: Never 1 — the yes/no refusal usage stays byte-identical, naming no option flag."""
     with pytest.raises(SystemExit):
         cli.main(["rule", "90", "--line", "1"])
     usage_text = capsys.readouterr().err
