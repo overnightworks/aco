@@ -31,10 +31,6 @@ export function outcomeLabel(outcome: Outcome): string {
 	return OUTCOME_LABEL[outcome];
 }
 
-export function ruledOutcomeText(ruling: Outcome, ruledOn: string | null): string {
-	return `${outcomeLabel(ruling)} · ${ruledOn ?? ''}`;
-}
-
 /** The stage's heading: the tapped question, or the line's own sentence when
  * the source names no distinct question. */
 export function cardHeading(line: ExpectationLine): string {

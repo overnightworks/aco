@@ -11,7 +11,6 @@ import {
 	openList,
 	outcomeLabel,
 	pictureDataUri,
-	ruledOutcomeText,
 	tabCounts
 } from './boardSummary';
 
@@ -261,17 +260,6 @@ describe('firstDecidedKey', () => {
 		expect(firstDecidedKey([])).toBeNull();
 		expect(firstDecidedKey([repo({ error: 'down' })])).toBeNull();
 		expect(firstDecidedKey([repo({ items: [item({ lines: [line()] })] })])).toBeNull();
-	});
-});
-
-describe('ruledOutcomeText', () => {
-	test.each([
-		['yes', '2026-10-01', 'Ja · 2026-10-01'],
-		['no', '2026-10-02', 'Nein · 2026-10-02'],
-		['later', '2026-10-03', 'Später · 2026-10-03'],
-		['yes', null, 'Ja · ']
-	] as const)('%s on %s -> %s', (ruling, ruledOn, expected) => {
-		expect(ruledOutcomeText(ruling, ruledOn)).toBe(expected);
 	});
 });
 

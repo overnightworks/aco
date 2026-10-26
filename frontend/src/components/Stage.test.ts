@@ -160,26 +160,36 @@ test('a selected yes/no line still offers Ja, Nein and Später', () => {
 	expect(screen.queryByText('Problem')).not.toBeInTheDocument();
 });
 
-test('an already-ruled selected line shows a read-only box, never live choice buttons', () => {
-	const card = line({
+test('[ABRD-37] an already-ruled line of either form shows the decided card, never live choices', () => {
+	const yesNo = line({
 		index: 1,
 		question: 'Guests allowed?',
 		ruling: 'yes',
 		ruled_on: '2026-10-01'
 	});
-	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
+	const option = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01', via: 'chat' });
+	const repos = [repo({ items: [item({ number: 42, lines: [yesNo, option] })] })];
+	const decisions = storeAnswering({ status: 'ruled', message: null });
 
-	render(Stage, {
+	const view = render(Stage, {
 		repos,
-		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null }),
+		selectedKey: lineKey('repo', 42, yesNo),
+		decisions,
 		refreshing: false
 	});
 
 	expect(screen.getByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
-	expect(screen.getByText('Ja · 2026-10-01')).toBeInTheDocument();
+	expect(screen.getByText('Ja')).toBeInTheDocument();
+	expect(screen.getByText('not recorded · 01.10.2026')).toBeInTheDocument();
 	expect(screen.queryByRole('group', { name: 'Entscheidung' })).not.toBeInTheDocument();
 	expect(screen.queryByText('Notiz')).not.toBeInTheDocument();
+
+	view.rerender({ repos, selectedKey: lineKey('repo', 42, option), decisions, refreshing: false });
+
+	expect(screen.getByText('How', { selector: 'dt' })).toBeInTheDocument();
+	expect(screen.getByText('From chat · 01.10.2026')).toBeInTheDocument();
+	expect(screen.queryByText('Problem')).not.toBeInTheDocument();
+	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
 });
 
 test('choosing an outcome starts the undo window and disables the buttons', async () => {
