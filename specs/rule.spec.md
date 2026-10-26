@@ -29,6 +29,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 | a still-open line with optional card fields | RULE-12 | RULE-12 | RULE-12 |
 | that line already ruled | RULE-04 | RULE-09 | — |
 | `N` out of range | RULE-05 | RULE-09 | — |
+| line `N` is an option line, open or ruled | RULE-13 | RULE-09 | — |
 | this forge cannot write the body | RULE-06 | RULE-09 | — |
 | item does not exist | RULE-07 | RULE-09 | — |
 | item is a pull request | RULE-08 | RULE-09 | — |
@@ -53,7 +54,8 @@ the same sentence; RULE-07's sentence is identical for both commands.
 - [ ] [RULE-06] A forge whose `update_item_body` capability is not `READ_WRITE` refuses `this forge cannot update_item_body; rule by hand`, exit `2`, before any write.
 - [ ] [RULE-07] An item no reference resolves refuses `#<n> does not exist`, exit `2`, before any write.
 - [ ] [RULE-08] An item that is a pull request refuses `#<n> is a pull request, not an issue; rule needs an issue`, exit `2`, before any write.
-- [ ] [RULE-09] `--json` on a dispatched refusal (RULE-04..RULE-08, RULE-10, ASK-05) prints the envelope with `reason` from the table below and the sentence as `message`, exit `2` (see E-RULE-05).
+- [ ] [RULE-13] `--line N` naming an option line refuses `line <k> is an option line; --yes, --no and --later rule only a yes/no line`, exit `2`, before any write, after RULE-05, before RULE-04 (see E-RULE-09).
+- [ ] [RULE-09] `--json` on a dispatched refusal (RULE-04..RULE-08, RULE-10, RULE-13, ASK-05) prints the envelope with `reason` from the table below and the sentence as `message`, exit `2` (see E-RULE-05).
 - [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `aco ask`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 
@@ -64,7 +66,7 @@ the same sentence; RULE-07's sentence is identical for both commands.
 | RULE-04 (already ruled) | `already_ruled` |
 | RULE-05 (out of range) | `line_out_of_range` |
 | RULE-07 (missing item), RULE-08 (pull-request target), ASK-05 (malformed body, cited) | `invalid_item` |
-| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04) | `invalid_usage` |
+| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-13 (an option line) | `invalid_usage` |
 | RULE-06 (forge cannot write), RULE-11 (the write itself fails) | `unavailable` |
 
 ## Never
@@ -175,3 +177,22 @@ exit 0
 The stored line retains `text`, `question`, `example`, and `picture` exactly;
 `default` is absent, `ruling` is `yes`, and `ruled_on` is today's UTC date.
 With `--note`, only `text` gains the RULE-03 suffix. Absent card fields stay absent.
+
+### E-RULE-09 — an option line refuses a yes/no outcome before any write
+
+Setup: bare-remote, fake `gh`, issue `#7` open, its line 1 a yes/no line and its line 2 the option line of `specs/body-block.spec.md` E-BODY-10, open or ruled
+
+```console
+$ aco rule 7 --line 2 --yes
+2> ERROR: line 2 is an option line; --yes, --no and --later rule only a yes/no line
+exit 2
+$ aco rule 7 --line 2 --later --json
+2> ERROR: line 2 is an option line; --yes, --no and --later rule only a yes/no line
+{"ok": false, "reason": "invalid_usage", "message": "line 2 is an option line; --yes, --no and --later rule only a yes/no line"}
+exit 2
+$ aco rule 7 --line 3 --no
+2> ERROR: line 3 out of range: this item has 2 expectation line(s)
+exit 2
+```
+
+The body is unchanged after each call.

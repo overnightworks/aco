@@ -127,10 +127,10 @@ class TestGithubRule:
                         f"e{index + 1}.{key}": value
                         for index, entry in enumerate(
                             (
-                                expectations.ExpectationLine(
+                                expectations.YesNoLine(
                                     1, "Ship it?", ruling, FROZEN_CLI_NOW.date()
                                 ),
-                                expectations.ExpectationLine(
+                                expectations.YesNoLine(
                                     2, "Ship it too?", None, None, default="later"
                                 ),
                             )
