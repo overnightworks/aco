@@ -6,11 +6,13 @@ as #13 line 12). It is a static page with sample data from public repositories;
 it is self-contained: it loads nothing from the network, talks to no aco and
 stores nothing.
 
-The shipped board does not have the picture's decision card yet: a structured
-card with PROBLEM, TODAY, OPTIONS, RECOMMENDATION and DECIDE, the options A to D
-with "Other / Unclear" instead of "Später", Mitsprache, the agent list and group
-decisions. What the board does today is in the "Browser decision flow" of
-[`specs/serve.spec.md`](../../specs/serve.spec.md).
+The shipped board shows an option line as the picture's read-only card: meta
+line, question, PROBLEM, TODAY, OPTIONS A to D with name and effect, and
+RECOMMENDATION, and a ruled one with its chosen letter. It still lacks the
+per-option disclosure, picture enlargement, DECIDE with "Other / Unclear"
+instead of "Später", Mitsprache, the agent list and group decisions. A yes/no
+line keeps its card. What the board does today is in the "Browser decision flow"
+of [`specs/serve.spec.md`](../../specs/serve.spec.md).
 
 A change to the board's surface starts here: change the mockup first, get the
 operator's blessing, then build.
