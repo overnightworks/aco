@@ -1,23 +1,27 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { type CardMeta, UNDO_LABEL } from '../app/model/optionCard';
+	import { type FrameMeta, UNDO_LABEL } from '../app/model/optionCard';
 	import WarnMark from './WarnMark.svelte';
 
-	let { meta, title, children }: { meta: CardMeta; title: string; children: Snippet } = $props();
+	let { meta, title, children }: { meta: FrameMeta; title: string; children: Snippet } = $props();
 </script>
 
 <div class="frame">
 	<p class="meta">
 		<span>{meta.where}</span>
-		<span class="sep" aria-hidden="true">·</span>
-		<span>{meta.kind}</span>
-		<span class="sep" aria-hidden="true">·</span>
-		{#if meta.undo === 'final'}
-			<span class="final">
-				<WarnMark />{UNDO_LABEL[meta.undo]}
-			</span>
-		{:else}
-			<span>{UNDO_LABEL[meta.undo]}</span>
+		{#if meta.kind !== undefined}
+			<span class="sep" aria-hidden="true">·</span>
+			<span>{meta.kind}</span>
+		{/if}
+		{#if meta.undo !== undefined}
+			<span class="sep" aria-hidden="true">·</span>
+			{#if meta.undo === 'final'}
+				<span class="final">
+					<WarnMark />{UNDO_LABEL[meta.undo]}
+				</span>
+			{:else}
+				<span>{UNDO_LABEL[meta.undo]}</span>
+			{/if}
 		{/if}
 	</p>
 	<article>

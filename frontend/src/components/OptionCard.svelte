@@ -1,13 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import {
-		cardMeta,
-		chosenOption,
-		decidedText,
-		nextOpenOption,
-		type OpenOption,
-		ROW_LABEL
-	} from '../app/model/optionCard';
+	import { cardMeta, nextOpenOption, type OpenOption, ROW_LABEL } from '../app/model/optionCard';
 	import type { OptionLine } from '../types';
 	import CardFrame from './CardFrame.svelte';
 	import CardRow from './CardRow.svelte';
@@ -22,30 +15,10 @@
 	}: { repo: string; item: number; line: OptionLine; children?: Snippet } = $props();
 
 	let openOption: OpenOption = $state(null);
-
-	const chosen = $derived(chosenOption(line));
 </script>
 
 <div class="option-card">
 	<CardFrame meta={cardMeta(repo, line)} title={line.question}>
-		{#if chosen !== undefined}
-			<CardRow label={ROW_LABEL.decided}>
-				<div class="decided">
-					<svg aria-hidden="true" viewBox="0 0 14 14" width="14" height="14">
-						<circle cx="7" cy="7" r="6.2" fill="currentColor" />
-						<path
-							d="m4.3 7.2 1.9 1.9 3.5-3.9"
-							fill="none"
-							stroke-width="1.7"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						/>
-					</svg>
-					<p>{decidedText(chosen)}</p>
-					<p class="date">{line.ruled_on}</p>
-				</div>
-			</CardRow>
-		{/if}
 		<CardRow label={ROW_LABEL.problem}>
 			<p>{line.problem}</p>
 		</CardRow>
@@ -61,16 +34,14 @@
 			<ol aria-label={ROW_LABEL.options}>
 				{#each line.options as option (option.letter)}
 					{@const isOpen = openOption === option.letter}
-					<li aria-current={option.letter === line.ruling ? 'true' : undefined}>
+					<li>
 						<button
 							type="button"
 							class="disclosure"
 							aria-expanded={isOpen}
 							onclick={() => (openOption = nextOpenOption(openOption, option.letter))}
 						>
-							<span class="letter" class:chosen={option.letter === line.ruling}
-								>{option.letter}</span
-							>
+							<span class="letter">{option.letter}</span>
 							<span>
 								<strong>{option.name}</strong>
 								<span class="effect">{option.effect}</span>
@@ -179,31 +150,9 @@
 		border-color: var(--accent);
 		color: var(--accent);
 	}
-	.letter.chosen {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: var(--accent-fg);
-	}
 	.recommendation {
 		display: flex;
 		align-items: start;
 		gap: 12px;
-	}
-	.decided {
-		display: flex;
-		align-items: start;
-		flex-wrap: wrap;
-		gap: 4px 12px;
-	}
-	.decided svg {
-		flex: none;
-		margin-top: 4px;
-		color: var(--good);
-	}
-	.decided path {
-		stroke: var(--surface);
-	}
-	.date {
-		color: var(--fg-2);
 	}
 </style>

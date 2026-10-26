@@ -42,7 +42,7 @@ interface CardOptionFields {
 export type CardOption = CardOptionFields &
 	({ picture: string; caption?: string } | { same_as_today: true });
 
-type RulingVia = 'board' | 'chat' | 'default';
+export type RulingVia = 'board' | 'chat' | 'default';
 
 /** An option line (`specs/serve.spec.md` ABRD-34): the one form `form`
  * names; a yes/no line carries no `form` at all. */

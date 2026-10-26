@@ -1,6 +1,12 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { decidedList } from './decidedView';
+import {
+	decidedCard,
+	decidedList,
+	decidedRow,
+	expectDecidedAnswer,
+	openDecidedLine
+} from './decidedView';
 import {
 	line,
 	optionLine,
@@ -64,6 +70,41 @@ function arrangeMixed(repoDirectory: string): void {
 		)
 	]);
 }
+
+/** Item 50: option lines ruled the three ways, then one yes/no line. */
+function arrangeEveryWay(repoDirectory: string): void {
+	writeRulings(repoDirectory, [
+		row(
+			50,
+			'Gespräch',
+			ruledOption(1, { question: 'Per Board?', via: 'board', ruled_on: '2026-10-25' }),
+			ruledOption(2, { question: 'Per Chat?', ruling: 'B', via: 'chat', ruled_on: '2026-10-04' }),
+			ruledOption(3, { question: 'Ohne Antwort?', via: 'default', ruled_on: '2026-10-26' }),
+			line(4, 'Gäste dürfen über einen Link teilnehmen.', {
+				question: 'Gäste einladen?',
+				ruling: 'no',
+				ruled_on: '2026-10-03'
+			})
+		)
+	]);
+}
+
+const EVERY_WAY = [
+	{ title: 'Per Board?', answer: 'A — Offen', how: 'Board · 25.10.2026', area: 'Bereich' },
+	{ title: 'Per Chat?', answer: 'B — Wie heute', how: 'From chat · 04.10.2026', area: 'Bereich' },
+	{
+		title: 'Ohne Antwort?',
+		answer: 'A — Offen',
+		how: 'Recommendation kept – no answer · 26.10.2026',
+		area: 'Bereich'
+	},
+	{
+		title: 'Gäste einladen?',
+		answer: 'Nein',
+		how: 'not recorded · 03.10.2026',
+		area: 'Gespräch'
+	}
+];
 
 async function routeRepositories(
 	page: Page,
@@ -151,12 +192,48 @@ for (const viewport of [
 				await expect(rows.first()).toHaveAttribute('aria-current', 'true');
 			}
 			await expect(firstCard).toBeVisible();
-			await expect(page.getByText('Nein · 2026-10-03')).toBeVisible();
+			await expectDecidedAnswer(page, 'Nein', 'not recorded · 03.10.2026');
 			await page.screenshot({ path: testInfo.outputPath('decided-card.png') });
 			if (phone) {
 				await page.getByRole('button', { name: '← Liste' }).click();
 				await expect(firstCard).toBeHidden();
 				await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+			}
+		});
+
+		test('[ABRD-37] [ABRD-54] the decided card says what was decided, how and when', async ({
+			page
+		}, testInfo) => {
+			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			arrangeEveryWay(repoDirectory);
+			await page.goto(`${appUrl}#t=${token}`);
+
+			for (const [position, { title, answer, how, area }] of EVERY_WAY.entries()) {
+				await openDecidedLine(page, title);
+				const card = decidedCard(page);
+				await expect(card.locator('.meta')).toContainText(`repo › ${area}`);
+				await expect(card.getByRole('heading', { name: title, exact: true })).toBeVisible();
+				await expect(card.getByRole('term')).toHaveText(['Decided', 'How', 'Contract']);
+				await expect(
+					decidedRow(card, 'Decided').getByRole('img', { name: 'Decided' })
+				).toBeVisible();
+				await expectDecidedAnswer(page, answer, how);
+				const binding = card.locator('.binding');
+				await expect(binding).toBeHidden();
+				await card.getByText('Show', { exact: true }).click();
+				await expect(binding).toBeVisible();
+				await expect(binding).toContainText('repo · Item 50 · Line');
+				await expect(card.getByText('Problem', { exact: true })).toHaveCount(0);
+				await expect(card.getByText('Today', { exact: true })).toHaveCount(0);
+				await expect(card.getByText('Options', { exact: true })).toHaveCount(0);
+				await expect(card.getByText('Recommendation', { exact: true })).toHaveCount(0);
+				await expect
+					.poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+					.toBeLessThanOrEqual(viewport.width);
+				await page.screenshot({
+					path: testInfo.outputPath(`decided-way-${position + 1}.png`)
+				});
+				if (phone) await page.getByRole('button', { name: '← Liste' }).click();
 			}
 		});
 

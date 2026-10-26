@@ -107,19 +107,6 @@ test('a final option marks the meta line final', () => {
 	expect(screen.queryByText('reversible')).not.toBeInTheDocument();
 });
 
-test('a ruled card fills the chosen letter and adds the Decided row with name and date', () => {
-	const line = { ...openCard(), ruling: 'B' as const, ruled_on: '2026-10-26' };
-
-	render(OptionCard, { repo: 'songmaker', item: 1843, line });
-
-	const options = within(screen.getByRole('list', { name: 'Options' })).getAllByRole('listitem');
-	expect(options.map((option) => option.getAttribute('aria-current'))).toEqual([null, 'true']);
-	const decided = screen.getByText('Decided').closest('div') as HTMLElement;
-	expect(decided).toHaveTextContent('B — As today');
-	expect(decided).toHaveTextContent('2026-10-26');
-	expect(screen.getAllByRole('button')).toHaveLength(3);
-});
-
 test('hostile texts render as text and the picture stays out of the DOM tree', () => {
 	const hostile = '<img src=x onerror=alert(1)>';
 	const line = optionLine({

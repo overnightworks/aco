@@ -404,8 +404,7 @@
 		opacity: 0.55;
 		cursor: default;
 	}
-	.question-pane :global(.banner),
-	.question-pane :global(.ruledbox) {
+	.question-pane :global(.banner) {
 		padding: 16px;
 		border: 1px dashed #c9c4d4;
 		border-radius: 12px;
