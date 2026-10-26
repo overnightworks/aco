@@ -100,7 +100,10 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
 
 def _decision(item: int, line: int, fields: dict[str, object]) -> Decision | OptionDecision | None:
     """Exactly one of `outcome` (with an optional note) and `option` (with none);
-    an absent key and a `null` both name nothing."""
+    an absent key and a `null` both name nothing, but a post carrying both keys
+    is refused whatever their values."""
+    if "outcome" in fields and "option" in fields:
+        return None
     outcome, option, note = fields.get("outcome"), fields.get("option"), fields.get("note")
     if option is None:
         if (

@@ -334,6 +334,7 @@ def _card_hash_of(stored: dict[str, object]) -> str:
 def test_an_option_on_an_open_option_line_is_ruled_through_acos_option_write(
     repository: FakeAcoRepository, board: BoardClient
 ) -> None:
+    """ABRD-39, E-ABRD-12."""
     stored = option_line()
     repository.set_rulings(row(12, "Song jump", stored))
     [listed] = _listed_lines(board)
@@ -366,6 +367,7 @@ def test_an_option_on_an_open_option_line_is_ruled_through_acos_option_write(
 def test_an_option_post_without_a_real_note_is_accepted(
     repository: FakeAcoRepository, board: BoardClient, note: str | None
 ) -> None:
+    """ABRD-39, ABRD-42."""
     repository.set_rulings(row(12, "Song jump", option_line()))
     [listed] = _listed_lines(board)
 
@@ -386,6 +388,7 @@ def test_an_option_post_without_a_real_note_is_accepted(
 def test_an_option_post_after_the_card_changed_is_refused_without_a_write(
     repository: FakeAcoRepository, board: BoardClient
 ) -> None:
+    """ABRD-41."""
     repository.set_rulings(row(12, "Song jump", option_line()))
     [listed] = _listed_lines(board)
     repository.set_rulings(row(12, "Song jump", option_line(card_hash="sha256:other")))
@@ -399,6 +402,7 @@ def test_an_option_post_after_the_card_changed_is_refused_without_a_write(
 def test_an_option_post_acos_write_refuses_as_changed_is_refused_as_changed(
     repository: FakeAcoRepository, board: BoardClient
 ) -> None:
+    """ABRD-41."""
     repository.set_rulings(row(12, "Song jump", option_line()))
     repository.refuse_rule("card_changed", _RULE_17_SENTENCE)
     before = repository.rulings_state()
@@ -433,6 +437,7 @@ def test_an_option_post_for_a_line_that_is_no_option_line_is_refused_without_a_w
     item: int,
     index: int,
 ) -> None:
+    """ABRD-40."""
     repository.set_rulings(*rows)
     [listed] = _listed_lines(board)
 
@@ -453,6 +458,7 @@ def test_an_option_post_for_a_line_that_is_no_option_line_is_refused_without_a_w
 def test_an_option_post_on_a_ruled_option_line_answers_already_ruled_with_its_card_hash(
     repository: FakeAcoRepository, board: BoardClient
 ) -> None:
+    """ABRD-41."""
     stored = option_line(ruling="A")
     repository.set_rulings(row(12, "Song jump", stored))
     repository.refuse_rule("already_ruled", _RULE_04_SENTENCE)
@@ -468,6 +474,7 @@ def test_an_option_post_on_a_ruled_option_line_answers_already_ruled_with_its_ca
 def test_a_letter_not_on_the_card_answers_acos_refusal_as_a_failure(
     repository: FakeAcoRepository, board: BoardClient
 ) -> None:
+    """ABRD-41."""
     repository.set_rulings(row(12, "Song jump", option_line()))
     repository.refuse_rule("invalid_usage", _RULE_18_SENTENCE)
     before = repository.rulings_state()
@@ -482,6 +489,7 @@ def test_a_letter_not_on_the_card_answers_acos_refusal_as_a_failure(
 def test_an_option_lines_fingerprint_never_satisfies_another_repos_option_check(
     two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
 ) -> None:
+    """ABRD-39."""
     repository_a, repository_b = two_repositories
     for repository in two_repositories:
         repository.set_rulings(row(12, "Song jump", option_line()))
@@ -507,6 +515,8 @@ def test_an_option_lines_fingerprint_never_satisfies_another_repos_option_check(
         {"outcome": "yes", "option": "A"},
         {},
         {"outcome": None, "option": None},
+        {"outcome": None, "option": "A"},
+        {"outcome": "yes", "option": None},
         {"option": "a"},
         {"option": "E"},
         {"option": ""},
@@ -519,6 +529,8 @@ def test_an_option_lines_fingerprint_never_satisfies_another_repos_option_check(
         "both",
         "neither",
         "both-null",
+        "outcome-null-with-option",
+        "option-null-with-outcome",
         "lowercase-letter",
         "letter-past-the-options",
         "empty-letter",
@@ -531,6 +543,7 @@ def test_an_option_lines_fingerprint_never_satisfies_another_repos_option_check(
 def test_a_malformed_option_post_is_refused_before_any_aco_call(
     repository: FakeAcoRepository, board: BoardClient, decision: dict[str, object]
 ) -> None:
+    """ABRD-42."""
     repository.set_rulings(row(12, "Song jump", option_line()))
     [listed] = _listed_lines(board)
     calls_before = repository.calls()

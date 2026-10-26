@@ -85,7 +85,7 @@ class Board:
     ) -> DecisionResult:
         """Write `decision` unless the open line it names no longer reads as shown.
 
-        The fingerprint comparison is the board's only own check: the card was
+        The fingerprint comparison is the board's own stale check: the card was
         built from an earlier read, and an open line whose shown fields changed
         since must not be ruled blind. It compares `wire_fingerprint(repo, ...)`,
         not the line's own bare fingerprint, so the same content read under
