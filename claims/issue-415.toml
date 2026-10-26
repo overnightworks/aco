@@ -1,0 +1,8 @@
+claim_id = "517ee4814c0142c28d78801734d378d5"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "5c2754f03bac1c494906533f0fe14028e3989869"
+branch = "claude/issue-415-phone-shell"
+scope = ["docs/board/README.md", "frontend/e2e/decide.spec.ts", "frontend/e2e/decideOption.spec.ts", "frontend/e2e/decided.spec.ts", "frontend/e2e/optionCard.spec.ts", "frontend/e2e/pageFrame.spec.ts", "frontend/src/App.svelte", "frontend/src/app/model/boardSummary.ts", "frontend/src/components/CardFrame.svelte", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "b3f1eb2f672c073aa03c68b16d6e70d78d5197ef"
+whole_reason = "The phone shell: one header back button ‹ Open / ‹ Decided replaces the two in-pane ← Liste buttons and hides the tabs in card view, the brand is visually hidden, the pane and the shared card frame drop the inset frame and split the meta as the picture does, together with ABRD-55, the e2e test and re-pointed pins, the board README and the rebuilt static assets."
