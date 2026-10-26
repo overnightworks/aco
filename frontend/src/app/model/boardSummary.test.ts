@@ -304,7 +304,7 @@ describe('nextOpenAfter', () => {
 			repo({ name: 'b', items: [item({ number: 2, lines: [line({ index: 1 })] })] })
 		];
 
-		expect(nextOpenAfter(onlyYesNo, 'b:2:1')).toBe('a:1:1');
+		expect(nextOpenAfter(onlyYesNo, 'a:1:2')).toBe('a:1:1');
 	});
 
 	test('skips a line that was already ruled when picking the next one', () => {
