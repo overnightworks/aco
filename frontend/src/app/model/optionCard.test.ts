@@ -112,6 +112,10 @@ describe('the detail rows of an option', () => {
 		);
 	});
 
+	test('[ABRD-37] name the source of a yes/no line the same way', () => {
+		expect(sourceLine('songmaker', 42, line({ index: 3 }))).toBe('songmaker · Item 42 · Line 3');
+	});
+
 	test.each([
 		[
 			'the line text differs from the contract',

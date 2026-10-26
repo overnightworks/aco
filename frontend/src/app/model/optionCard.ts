@@ -15,6 +15,7 @@ export const ROW_LABEL = {
 	recommendation: 'Recommendation',
 	decide: 'Decide',
 	decided: 'Decided',
+	how: 'How',
 	result: 'Result',
 	notice: 'You notice',
 	cost: 'Cost',
@@ -49,8 +50,15 @@ export function isOptionLine(line: ExpectationLine): line is OptionLine {
 	return 'form' in line;
 }
 
-export interface CardMeta {
+/** What the frame's meta line shows; a card without a kind or an undo token
+ * leaves it out. */
+export interface FrameMeta {
 	where: string;
+	kind?: string;
+	undo?: Undo;
+}
+
+export interface CardMeta extends FrameMeta {
 	kind: string;
 	undo: Undo;
 }
@@ -76,7 +84,7 @@ export function verdictLabel(option: CardOption): string {
 	return `${option.letter} · ${option.name}`;
 }
 
-/** The ruled card's Decided row. */
+/** The Decided row of a ruled line. */
 export function decidedText(option: CardOption): string {
 	return `${option.letter} — ${option.name}`;
 }
@@ -140,7 +148,7 @@ export function undoTail(option: CardOption): string {
 }
 
 /** Where the binding sentences stand: repository, item and line. */
-export function sourceLine(repo: string, item: number, line: OptionLine): string {
+export function sourceLine(repo: string, item: number, line: ExpectationLine): string {
 	return `${repo} · Item ${item} · Line ${line.index}`;
 }
 
