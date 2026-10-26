@@ -139,8 +139,7 @@ export function findSelectedLine(repos: RepoReading[], key: string | null): Sele
 
 /** The next still-open line after `key`, in the same board order the list
  * shows, wrapping to the first open line when `key` was the last one, or
- * `null` once nothing is open any more (picture: `mockup.html`'s own
- * `nextOpenAfter`, which `Stage`'s auto-advance after a decision mirrors). */
+ * `null` once nothing is open any more. */
 export function nextOpenAfter(repos: RepoReading[], key: string): string | null {
 	const order: string[] = [];
 	const openKeys = new Set<string>();
