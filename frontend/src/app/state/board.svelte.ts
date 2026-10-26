@@ -3,6 +3,7 @@
  * four states (no access, loading, unavailable, ready) to show.
  */
 
+import { untrack } from 'svelte';
 import { BoardApiError, fetchBoard } from '../../client';
 import type { RepoReading } from '../../types';
 
@@ -20,7 +21,11 @@ export class BoardStore {
 	}
 
 	async load(token: string, fetchImpl: typeof fetch = fetch): Promise<void> {
-		this.status = 'loading';
+		// A ready board stays on screen while it is re-read: replacing it with a
+		// loading state would tear down what the person is working in, such as
+		// an open confirmation.
+		// Untracked: the caller's effect must not subscribe to the status it triggers.
+		if (untrack(() => this.status) !== 'ready') this.status = 'loading';
 		this.error = null;
 		try {
 			const board = await fetchBoard(token, fetchImpl);

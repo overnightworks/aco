@@ -28,8 +28,7 @@
 	let question: HTMLDivElement | undefined = $state();
 
 	function focusQuestion() {
-		const stage = question?.querySelector<HTMLElement>('.stage');
-		(stage && stage.getClientRects().length > 0 ? stage : question)?.focus({ preventScroll: true });
+		(question?.querySelector<HTMLElement>('.stage') ?? question)?.focus({ preventScroll: true });
 	}
 
 	async function resetQuestion(explicitSelection = false) {
@@ -133,11 +132,9 @@
 				<button class="back" type="button" onclick={showList}>← {LIST_LABEL}</button>
 				{#if board.status === 'loading'}
 					<p role="status">Lädt…</p>
-				{/if}
-				<!-- Hidden, not unmounted, while loading: an open confirmation keeps its card. -->
-				<div hidden={board.status === 'loading'}>
+				{:else}
 					<Stage repos={board.repos} {selectedKey} {decisions} />
-				</div>
+				{/if}
 			</div>
 		</div>
 		<div class="toasts" hidden={view !== 'decide'} aria-live="polite">

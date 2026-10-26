@@ -446,4 +446,44 @@ test.describe('1280px confirm over a changing board', () => {
 		await expect(entries).toHaveCount(1);
 		await expect(entries).not.toContainText(SONG_QUESTION);
 	});
+
+	test('[ABRD-47] a slow background reload leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
+		page
+	}) => {
+		const { repoDirectory } = readBoardRuntime();
+		arrangeFinal(repoDirectory);
+		await open(page, false, OTHER_QUESTION);
+		await picks(page)
+			.getByRole('button', { name: /^Decide B:/ })
+			.click();
+		await page.getByRole('button', { name: new RegExp(SONG_QUESTION.replace('?', '\\?')) }).click();
+		const pickB = picks(page).getByRole('button', { name: /^Decide B:/ });
+		await pickB.click();
+		await expect(confirm(page)).toBeVisible();
+
+		let release: (() => void) | undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await page.route('**/api/board', async (route) => {
+			if (route.request().method() !== 'GET') return route.continue();
+			await held;
+			return route.continue();
+		});
+		try {
+			const reload = page.waitForRequest(
+				(request) => request.url().endsWith('/api/board') && request.method() === 'GET'
+			);
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await reload;
+
+			await expect(confirm(page)).toBeVisible();
+			await expect(confirm(page).getByRole('button', { name: 'Cancel' })).toBeFocused();
+			await page.keyboard.press('Escape');
+			await expect(page.getByRole('dialog')).toHaveCount(0);
+			await expect(pickB).toBeFocused();
+		} finally {
+			release?.();
+		}
+	});
 });

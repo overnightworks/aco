@@ -256,8 +256,8 @@ for (const viewport of [
 				await reload;
 				await expect(second).toBeFocused();
 				await second.press('Enter');
-				await expect(page.getByRole('status')).toHaveText('Lädt…');
-				await expect(choices(page)).toHaveCount(0);
+				await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeVisible();
+				await expect(page.getByRole('status')).toHaveCount(0);
 				await page.screenshot({ path: testInfo.outputPath('background-loading.png') });
 			} finally {
 				release?.();
