@@ -616,13 +616,23 @@ def test_context_refusal(
     [
         pytest.param(
             ["rule", "90", "--line", "1"],
-            "aco rule: error: one of the arguments --yes --no --later is required",
+            "aco rule: error: one of the arguments --yes --no --later --option is required",
             id="no-outcome",
         ),
         pytest.param(
             ["rule", "90", "--line", "1", "--yes", "--no"],
             "aco rule: error: argument --no: not allowed with argument --yes",
             id="two-outcomes",
+        ),
+        pytest.param(
+            ["rule", "90", "--line", "1", "--yes", "--option", "A"],
+            "aco rule: error: argument --option: not allowed with argument --yes",
+            id="yes-and-option",
+        ),
+        pytest.param(
+            ["rule", "90", "--line", "1", "--option", "A", "--via", "phone"],
+            "aco rule: error: argument --via: invalid choice: 'phone'",
+            id="unknown-via",
         ),
     ],
 )
@@ -632,7 +642,8 @@ def test_parser_refusal(
     arguments: list[str],
     sentence: str,
 ) -> None:
-    """Spec: Never 1 — parser requires exactly one of --yes, --no, --later before command entry."""
+    """Spec: Never 1 — parser requires exactly one of --yes, --no, --later, --option and a known
+    --via before command entry."""
 
     def forbidden(*args, **kwargs):
         pytest.fail("invalid outcomes reached the rule command entry")

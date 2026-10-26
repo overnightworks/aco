@@ -6,6 +6,7 @@ is `expectation_grammar`'s; the block codec is `body`'s.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date
 from enum import StrEnum
@@ -26,6 +27,7 @@ from .expectation_grammar import (
     EXPECTATION_OPTIONAL_FIELDS,
     OPTION_LETTERS,
     DecisionKind,
+    RulingVia,
     Undo,
     card_hash,
     is_option_line,
@@ -91,12 +93,13 @@ class CardOption:
 
 @dataclass(frozen=True)
 class OptionRuling:
-    """The decided state of a ruled option line: the chosen letter, its date
-    and the card hash stored with the ruling."""
+    """The decided state of a ruled option line: the chosen letter, its date,
+    the card hash stored with the ruling and how the decision reached aco."""
 
     letter: str
     ruled_on: date
     card_hash: str
+    via: RulingVia
 
 
 @dataclass(frozen=True)
@@ -162,6 +165,7 @@ def _option_line(index: int, entry: dict[str, object]) -> OptionLine:
             cast(str, entry["ruling"]),
             cast(date, entry["ruled_on"]),
             cast(str, entry["card_hash"]),
+            RulingVia(cast(str, entry["via"])),
         )
         if "ruling" in entry
         else None
@@ -244,9 +248,57 @@ class ExpectationOutOfRangeError(protocol.ClaimError):
     """`rule_expectation`'s own out-of-range `--line` refusal."""
 
 
-class ExpectationOptionLineError(protocol.ClaimError):
-    """`rule_expectation`'s own refusal to rule an option line with a
-    yes/no outcome, which would store a value the grammar refuses."""
+class ExpectationLineFormError(protocol.ClaimError):
+    """A ruling whose outcome belongs to the other line form: a yes/no
+    outcome on an option line, or a letter on a yes/no line; either would
+    store a value the grammar refuses."""
+
+
+class ExpectationCardChangedError(protocol.ClaimError):
+    """`rule_option`'s refusal of a card that changed since it was shown."""
+
+
+class ExpectationOptionChoiceError(protocol.ClaimError):
+    """`rule_option`'s refusal of a letter the card does not offer, or of a
+    kept recommendation that names another letter."""
+
+
+_OTHER_FORM_SENTENCES = {
+    LineForm.YES_NO: "is an option line; --yes, --no and --later rule only a yes/no line",
+    LineForm.OPTIONS: "is a yes/no line; --option rules only an option line",
+}
+
+
+def _open_entry(entries: list[dict[str, object]], index: int, form: LineForm) -> dict[str, object]:
+    """Line `index` of `entries`, still open and of `form`; refuses an
+    out-of-range index, the other form and an already-ruled line, in that
+    order -- the checks both writes share."""
+    if not 1 <= index <= len(entries):
+        raise ExpectationOutOfRangeError(
+            f"line {index} out of range: this item has {len(entries)} expectation line(s)"
+        )
+    entry = entries[index - 1]
+    if (LineForm.OPTIONS if is_option_line(entry) else LineForm.YES_NO) is not form:
+        raise ExpectationLineFormError(f"line {index} {_OTHER_FORM_SENTENCES[form]}")
+    if "ruling" in entry:
+        raise ExpectationAlreadyRuledError(
+            f"line {index} is already ruled; a changed ruling is a new line"
+        )
+    return entry
+
+
+_Decide: TypeAlias = Callable[[dict[str, object]], dict[str, object]]
+
+
+def _rule_entry(body: str, index: int, form: LineForm, decide: _Decide) -> str:
+    """`body` with its open line `index` of `form` replaced by `decide`'s
+    ruled entry; bytes outside the block are preserved."""
+    located = locate_block(body)
+    entries = block_expectation_dicts(located.data)
+    ruled_entry = decide(_open_entry(entries, index, form))
+    new_entries = [*entries[: index - 1], ruled_entry, *entries[index:]]
+    new_data = {**located.data, "expectation": new_entries}
+    return replace_block(body, located, new_data)
 
 
 def rule_expectation(
@@ -262,28 +314,65 @@ def rule_expectation(
         raise protocol.ClaimError(
             f"ruling must be one of {', '.join(sorted(BLOCK_EXPECTATION_RULINGS))}"
         )
-    located = locate_block(body)
-    entries = block_expectation_dicts(located.data)
-    if not 1 <= index <= len(entries):
-        raise ExpectationOutOfRangeError(
-            f"line {index} out of range: this item has {len(entries)} expectation line(s)"
+
+    def decide(entry: dict[str, object]) -> dict[str, object]:
+        text = cast(str, entry["text"]) if note is None else f"{entry['text']} Anmerkung: {note}"
+        ruled_entry = dict(entry)
+        ruled_entry.pop("default", None)
+        ruled_entry.update(text=text, ruling=ruling, ruled_on=ruled_on)
+        return ruled_entry
+
+    return _rule_entry(body, index, LineForm.YES_NO, decide)
+
+
+@dataclass(frozen=True)
+class OptionChoice:
+    """What a decider picked on a shown option card: the `letter`, how the
+    decision reached aco, and the hash of the card that was shown."""
+
+    letter: str
+    via: RulingVia
+    shown_card_hash: str
+
+
+def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionChoice) -> None:
+    """The card checks after the line's own: the card shown is the card now,
+    the letter is on it, and a kept recommendation names the recommended
+    letter, in that order."""
+    if choice.shown_card_hash != card_hash(entry):
+        raise ExpectationCardChangedError(
+            f"line {index} changed since its card was shown; show it again and rule what it "
+            "shows now"
         )
-    entry = entries[index - 1]
-    if is_option_line(entry):
-        raise ExpectationOptionLineError(
-            f"line {index} is an option line; --yes, --no and --later rule only a yes/no line"
+    letters = OPTION_LETTERS[: len(cast(list[object], entry["option"]))]
+    if choice.letter not in letters:
+        raise ExpectationOptionChoiceError(
+            f"line {index} has no option {choice.letter}; its options are {', '.join(letters)}"
         )
-    if "ruling" in entry:
-        raise ExpectationAlreadyRuledError(
-            f"line {index} is already ruled; a changed ruling is a new line"
+    recommended = entry["recommended"]
+    if choice.via is RulingVia.DEFAULT and choice.letter != recommended:
+        raise ExpectationOptionChoiceError(
+            f"--via default keeps only the recommended option {recommended}, not {choice.letter}"
         )
-    text = cast(str, entry["text"]) if note is None else f"{entry['text']} Anmerkung: {note}"
-    ruled_entry = dict(entry)
-    ruled_entry.pop("default", None)
-    ruled_entry.update(text=text, ruling=ruling, ruled_on=ruled_on)
-    new_entries = [*entries[: index - 1], ruled_entry, *entries[index:]]
-    new_data = {**located.data, "expectation": new_entries}
-    return replace_block(body, located, new_data)
+
+
+def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> str:
+    """Decide one open option line: it gains `ruling`, `ruled_on`,
+    `card_hash` and `via` and keeps every other key, so its stored hash is
+    the hash of the card it shows. Refuses as `_open_entry` does, then as
+    `_refuse_a_wrong_choice` does, before any write."""
+
+    def decide(entry: dict[str, object]) -> dict[str, object]:
+        _refuse_a_wrong_choice(index, entry, choice)
+        return {
+            **entry,
+            "ruling": choice.letter,
+            "ruled_on": ruled_on,
+            "card_hash": choice.shown_card_hash,
+            "via": choice.via.value,
+        }
+
+    return _rule_entry(body, index, LineForm.OPTIONS, decide)
 
 
 @dataclass(frozen=True)
