@@ -3,7 +3,8 @@
 [`mockup.html`](mockup.html) is the frozen picture owner of the `aco serve`
 surface: the target picture of the decision board (v4, blessed 26.10.2026, ruled
 as #13 line 12). It is a static page with sample data from public repositories;
-it talks to no aco and stores nothing, and loads only web fonts from the network.
+it is self-contained: it loads nothing from the network, talks to no aco and
+stores nothing.
 
 The shipped board does not have the picture's decision card yet: a structured
 card with PROBLEM, TODAY, OPTIONS, RECOMMENDATION and DECIDE, the options A to D
