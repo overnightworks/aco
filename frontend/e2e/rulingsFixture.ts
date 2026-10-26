@@ -37,7 +37,7 @@ export interface RulingOption {
 }
 
 /** An option line as `aco rulings --json` writes it (`specs/rulings.spec.md`
- * RUL-13/14); `default` and `stored_card_hash` are always null here, which
+ * RUL-13/14, `via` RUL-15); `default` and `stored_card_hash` are always null here, which
  * the board's adapter never reads. */
 export interface OptionRulingLine {
 	index: number;
@@ -55,6 +55,7 @@ export interface OptionRulingLine {
 	options: RulingOption[];
 	ruling: string | null;
 	ruled_on: string | null;
+	via: 'board' | 'chat' | 'default' | null;
 	card_hash: string;
 	stored_card_hash: string | null;
 	default: null;
@@ -101,6 +102,7 @@ export function optionLine(
 		options: [],
 		ruling: null,
 		ruled_on: null,
+		via: null,
 		card_hash: `card-hash-${index}`,
 		stored_card_hash: null,
 		default: null,
