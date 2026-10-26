@@ -54,12 +54,17 @@ test('options appear in letter order with name and effect, the recommendation be
 	expect(recommendation).toHaveTextContent('A Ends the loss.');
 });
 
-test('a closed card offers only one collapsed disclosure per option and no outcome', () => {
+test('a closed card offers Today to enlarge and one collapsed disclosure per option, no outcome', () => {
 	const { container } = render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard() });
 
 	const buttons = screen.getAllByRole('button');
-	expect(buttons.map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
-	expect(buttons[0]).toHaveTextContent('A Song stays open The app jumps itself.');
+	expect(buttons.map((button) => button.getAttribute('aria-expanded'))).toEqual([
+		null,
+		'false',
+		'false'
+	]);
+	expect(buttons[0]).toHaveAccessibleName('Enlarge picture');
+	expect(buttons[1]).toHaveTextContent('A Song stays open The app jumps itself.');
 	expect(container.querySelectorAll('textarea, input, summary, a')).toHaveLength(0);
 	expect(screen.queryByText('Decided')).not.toBeInTheDocument();
 });
@@ -112,7 +117,7 @@ test('a ruled card fills the chosen letter and adds the Decided row with name an
 	const decided = screen.getByText('Decided').closest('div') as HTMLElement;
 	expect(decided).toHaveTextContent('B — As today');
 	expect(decided).toHaveTextContent('2026-10-26');
-	expect(screen.getAllByRole('button')).toHaveLength(2);
+	expect(screen.getAllByRole('button')).toHaveLength(3);
 });
 
 test('hostile texts render as text and the picture stays out of the DOM tree', () => {

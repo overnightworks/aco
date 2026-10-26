@@ -73,9 +73,13 @@ test('a selected option line shows its card and offers no outcome', () => {
 	expect(screen.queryByText('Notiz')).not.toBeInTheDocument();
 	const buttons = screen.getAllByRole('button');
 	expect(buttons.length).toBeGreaterThan(0);
-	for (const button of buttons) {
+	const disclosures = buttons.filter((button) => button.hasAttribute('aria-expanded'));
+	expect(disclosures.length).toBeGreaterThan(0);
+	for (const button of disclosures) {
 		expect(button).toHaveAttribute('aria-expanded', 'false');
 	}
+	expect(buttons.length - disclosures.length).toBe(1);
+	expect(screen.getByRole('button', { name: 'Enlarge picture' })).toBeInTheDocument();
 });
 
 test('a selected yes/no line still offers Ja, Nein and Später', () => {

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { pictureDataUri } from '../app/model/boardSummary';
 	import {
 		CONTRACT_SUMMARY,
 		contractTexts,
@@ -11,6 +10,7 @@
 		undoTail
 	} from '../app/model/optionCard';
 	import type { CardOption, OptionLine } from '../types';
+	import EnlargeablePicture from './EnlargeablePicture.svelte';
 	import WarnMark from './WarnMark.svelte';
 
 	let {
@@ -25,8 +25,11 @@
 	<dt>{ROW_LABEL.result}</dt>
 	<dd>
 		{#if 'picture' in option}
-			<img src={pictureDataUri(option.picture)} alt={resultAltText(option)} />
-			{#if option.caption !== undefined}<p class="caption">{option.caption}</p>{/if}
+			<EnlargeablePicture
+				picture={option.picture}
+				alt={resultAltText(option)}
+				caption={option.caption}
+			/>
 		{:else}
 			<span class="same">{SAME_AS_TODAY_MARK}</span>
 		{/if}
@@ -81,17 +84,6 @@
 	}
 	p {
 		margin: 0;
-	}
-	img {
-		display: block;
-		max-width: 100%;
-		height: auto;
-	}
-	.caption {
-		margin-top: 8px;
-		font-size: 13px;
-		line-height: 18px;
-		color: var(--oc-fg-2);
 	}
 	.same {
 		display: inline-flex;

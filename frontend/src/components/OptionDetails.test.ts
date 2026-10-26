@@ -41,8 +41,8 @@ test('a picture option shows an image from a data URI with the fallback alt and 
 test('a captioned option shows the caption below its picture', () => {
 	renderDetails(cardOption({ caption: 'The song stays open.' }));
 
-	const picture = within(value('Result')).getByRole('img', { name: 'The song stays open.' });
-	expect(picture.nextElementSibling).toHaveTextContent('The song stays open.');
+	const button = within(value('Result')).getByRole('button', { name: 'Enlarge picture' });
+	expect(button.nextElementSibling).toHaveTextContent('The song stays open.');
 });
 
 test('an option that is the same as today shows the mark and no image', () => {

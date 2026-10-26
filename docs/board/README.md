@@ -9,9 +9,10 @@ stores nothing.
 The shipped board shows an option line as the picture's read-only card: meta
 line, question, PROBLEM, TODAY, OPTIONS A to D with name and effect, and
 RECOMMENDATION, and a ruled one with its chosen letter. Each option opens its
-RESULT, YOU NOTICE, COST, UNDO and CONTRACT. The card still lacks picture
-enlargement, DECIDE with "Other / Unclear" instead of "Später", Mitsprache,
-the agent list and group decisions. A yes/no
+RESULT, YOU NOTICE, COST, UNDO and CONTRACT. Every TODAY and RESULT picture
+opens enlarged in a dialog, and on a phone TODAY is a framed thumbnail with the
+enlarge mark. The card still lacks DECIDE with "Other / Unclear" instead of
+"Später", Mitsprache, the agent list and group decisions. A yes/no
 line keeps its card. What the board does today is in the "Browser decision flow"
 of [`specs/serve.spec.md`](../../specs/serve.spec.md).
 

@@ -21,6 +21,13 @@ export const ROW_LABEL = {
 	contract: 'Contract'
 } as const;
 
+/** The words of a card picture and its enlargement dialog. */
+export const PICTURE_LABEL = {
+	enlarge: 'Enlarge picture',
+	dialog: 'Picture at full width',
+	close: 'Close'
+} as const;
+
 export const KIND_LABEL: Record<DecisionKind, string> = {
 	product: 'Product',
 	technical: 'Technical',
