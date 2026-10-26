@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		CONTRACT_SUMMARY,
 		contractTexts,
 		ROW_LABEL,
 		resultAltText,
@@ -10,6 +9,7 @@
 		undoTail
 	} from '../app/model/optionCard';
 	import type { CardOption, OptionLine } from '../types';
+	import ContractFold from './ContractFold.svelte';
 	import EnlargeablePicture from './EnlargeablePicture.svelte';
 	import WarnMark from './WarnMark.svelte';
 
@@ -48,15 +48,7 @@
 	</dd>
 	<dt>{ROW_LABEL.contract}</dt>
 	<dd>
-		<details>
-			<summary class="fold">{CONTRACT_SUMMARY}</summary>
-			<div class="binding">
-				{#each contractTexts(line, option) as sentence (sentence)}
-					<p>{sentence}</p>
-				{/each}
-				<span class="source">{sourceLine(repo, item, line)}</span>
-			</div>
-		</details>
+		<ContractFold sentences={contractTexts(line, option)} source={sourceLine(repo, item, line)} />
 	</dd>
 </dl>
 
@@ -101,44 +93,6 @@
 	}
 	b.final {
 		color: var(--warn);
-	}
-	.details summary.fold {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding-block: 0;
-		list-style: none;
-		cursor: pointer;
-		color: var(--fg-2);
-	}
-	summary::-webkit-details-marker {
-		display: none;
-	}
-	summary::before {
-		content: '';
-		width: 0;
-		height: 0;
-		border-left: 5px solid currentColor;
-		border-top: 4px solid transparent;
-		border-bottom: 4px solid transparent;
-	}
-	details[open] summary::before {
-		transform: rotate(90deg);
-	}
-	.binding {
-		display: grid;
-		gap: 8px;
-		margin-top: 8px;
-		padding-left: 12px;
-		border-left: 2px solid var(--line-strong);
-		font-size: 13px;
-		line-height: 18px;
-		color: var(--fg-2);
-	}
-	.source {
-		font-family: ui-monospace, 'DejaVu Sans Mono', Menlo, Consolas, monospace;
-		font-size: 12px;
-		color: var(--fg-3);
 	}
 	@media (max-width: 760px) {
 		.details {
