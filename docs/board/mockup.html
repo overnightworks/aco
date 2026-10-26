@@ -642,9 +642,7 @@ function decidedCard(x) {
     lab("Contract"), val(h("details", {class: "contract"}, h("summary", null, "Show"),
       h("div", {class: "bind"}, ...d.contracts.map(t => h("p", {class: "p"}, t)),
         h("span", {class: "src"}, c.points.length > 1 ? c.project + " · Item " + c.item : c.points[0].source),
-        h("span", {class: "src"}, "Card " + d.hash)))),
-    h("div", {class: "decide"}, lab("Decide"), val(h("div", {class: "dbar"},
-      h("button", {type: "button", class: "quiet", onclick: () => undoDecision(c.ref)}, "Undo")))));
+        h("span", {class: "src"}, "Card " + d.hash)))));
   return [meta(c, [c.kinds.join(" · ")]), h("article", {class: "card"}, h("h1", null, c.title), g)];
 }
 
