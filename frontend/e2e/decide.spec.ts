@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
+import { openDecidedLine } from './decidedView';
 import { line, row, writeRulings } from './rulingsFixture';
 import { readBoardRuntime } from './runtime';
 import { UNDO_SECONDS } from '../src/app/model/decision';
@@ -357,7 +358,7 @@ for (const viewport of [
 			await expect(page.locator('.stage')).toBeFocused();
 			await page.screenshot({ path: testInfo.outputPath('unselected.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
-			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			await openDecidedLine(page, 'Hosts allowed?');
 			await expect(page.getByText('Nein · 2026-10-03')).toBeVisible();
 			expect(ruleRequests).toBe(1);
 		});
@@ -390,11 +391,10 @@ for (const viewport of [
 			await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeInViewport();
 			await expect(page.locator('.stage')).toBeFocused();
 
-			// The completed question is available only in the read-only history.
+			// The completed question is available only in the read-only Decided card.
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
 			await expect(page.getByRole('button', { name: /Guests allowed\?/ })).not.toBeVisible();
-			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
-			await page.locator('summary').filter({ hasText: 'Guests allowed?' }).click();
+			await openDecidedLine(page, 'Guests allowed?');
 			await expect(page.getByText('Guests may join the call.')).toBeVisible();
 			await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
 		});
@@ -448,7 +448,7 @@ for (const viewport of [
 
 			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible({ timeout: 10_000 });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
-			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			await openDecidedLine(page, 'Deferred question?');
 			await expect(page.getByText('Später · 2026-10-03')).toBeVisible();
 		});
 

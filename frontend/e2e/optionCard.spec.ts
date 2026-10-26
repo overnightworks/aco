@@ -8,6 +8,7 @@ import {
 	type OptionRulingLine,
 	type RulingOption
 } from './rulingsFixture';
+import { decidedList } from './decidedView';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
@@ -408,7 +409,7 @@ for (const viewport of [
 			await expect(page.locator('.option-card')).toHaveCount(0);
 		});
 
-		test('a ruled option line leaves the list and Decided shows its letter, name, date and contract', async ({
+		test('a ruled option line leaves the open list and Decided lists it under its project', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
@@ -419,20 +420,20 @@ for (const viewport of [
 			await expect(page.locator('.tracks')).toContainText('Thema');
 
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
-			const history = page.getByRole('region', { name: 'Decided', exact: true });
-			const entry = history.locator('summary');
-			await expect(entry).toHaveCount(1);
-			await expect(entry).toContainText('Song offen lassen?');
-			await expect(entry).toContainText('A · Song bleibt offen');
-			await expect(entry).toContainText('2026-10-26');
-			await expect(history.getByText(SONG_CONTRACT)).toBeHidden();
-			await entry.press('Enter');
-			await expect(history.getByText(SONG_CONTRACT)).toBeVisible();
-			await expect(
-				history.getByText('Der Song bleibt beim Sprung zum Ursprungs-Take offen.')
-			).toBeVisible();
-			await expect(history.getByRole('button')).toHaveCount(0);
-			await page.screenshot({ path: testInfo.outputPath('history-option.png') });
+			const row = decidedList(page).getByRole('button');
+			await expect(decidedList(page).getByRole('heading', { level: 2 })).toHaveText(
+				new RegExp(`^${REPOSITORY}\\s+1$`)
+			);
+			await expect(row).toHaveCount(1);
+			await expect(row).toContainText('Sprung zum Ursprungs-Take');
+			if (phone) await row.click();
+			await expect(page.locator('.decided')).toContainText('A — Song bleibt offen');
+			await expect(page.locator('.decided')).toContainText('2026-10-26');
+			const chosen = page.locator('.option-card li[aria-current="true"]');
+			await chosen.locator('.disclosure').click();
+			await chosen.getByText('Show', { exact: true }).click();
+			await expect(chosen.getByText(SONG_CONTRACT)).toBeVisible();
+			await page.screenshot({ path: testInfo.outputPath('decided-option.png') });
 		});
 
 		if (phone) {
