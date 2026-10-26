@@ -13,7 +13,12 @@ export const ROW_LABEL = {
 	today: 'Today',
 	options: 'Options',
 	recommendation: 'Recommendation',
-	decided: 'Decided'
+	decided: 'Decided',
+	result: 'Result',
+	notice: 'You notice',
+	cost: 'Cost',
+	undo: 'Undo',
+	contract: 'Contract'
 } as const;
 
 export const KIND_LABEL: Record<DecisionKind, string> = {
@@ -76,4 +81,40 @@ export function optionStatusText(line: OptionLine): string {
 		return `Empfohlen: ${line.recommended}`;
 	}
 	return `${verdictLabel(chosen)} · ${line.ruled_on ?? ''}`;
+}
+
+export const SAME_AS_TODAY_MARK = '= TODAY';
+export const CONTRACT_SUMMARY = 'Show';
+export const UNDO_SEPARATOR = ' — ';
+
+/** The letter of the one option that is open on a card, or none. */
+export type OpenOption = CardOption['letter'] | null;
+
+/** Activating an option opens it and closes any other; activating the open
+ * one closes it. */
+export function nextOpenOption(open: OpenOption, letter: CardOption['letter']): OpenOption {
+	return open === letter ? null : letter;
+}
+
+/** An option's RESULT alt text: its caption, else the picture's own
+ * fallback `A · name: effect`. */
+export function resultAltText(option: CardOption): string {
+	const caption = 'caption' in option ? option.caption : undefined;
+	return caption ?? `${verdictLabel(option)}: ${option.effect}`;
+}
+
+/** The Undo row's tail after the bold word. */
+export function undoTail(option: CardOption): string {
+	return `${UNDO_SEPARATOR}${option.undo_how}`;
+}
+
+/** Where the binding sentences stand: repository, item and line. */
+export function sourceLine(repo: string, item: number, line: OptionLine): string {
+	return `${repo} · Item ${item} · Line ${line.index}`;
+}
+
+/** The sentences that bind an option: its contract, then the line's text
+ * unless it only repeats the contract. */
+export function contractTexts(line: OptionLine, option: CardOption): string[] {
+	return line.text === option.contract ? [option.contract] : [option.contract, line.text];
 }
