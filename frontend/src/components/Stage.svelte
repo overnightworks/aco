@@ -20,12 +20,12 @@
 		repos,
 		selectedKey,
 		decisions,
-		refreshing = false
+		refreshing
 	}: {
 		repos: RepoReading[];
 		selectedKey: string | null;
 		decisions: DecisionStore;
-		refreshing?: boolean;
+		refreshing: boolean;
 	} = $props();
 
 	let noteText = $state('');
