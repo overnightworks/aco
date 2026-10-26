@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { openDecidedLine } from './decidedView';
+import { decidedCard, expectDecidedAnswer, openDecidedLine } from './decidedView';
 import { line, row, writeRulings } from './rulingsFixture';
 import { readBoardRuntime } from './runtime';
 import { UNDO_SECONDS } from '../src/app/model/decision';
@@ -359,7 +359,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('unselected.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
 			await openDecidedLine(page, 'Hosts allowed?');
-			await expect(page.getByText('Nein · 2026-10-03')).toBeVisible();
+			await expectDecidedAnswer(page, 'Nein', 'not recorded · 03.10.2026');
 			expect(ruleRequests).toBe(1);
 		});
 
@@ -395,8 +395,9 @@ for (const viewport of [
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
 			await expect(page.getByRole('button', { name: /Guests allowed\?/ })).not.toBeVisible();
 			await openDecidedLine(page, 'Guests allowed?');
+			await expectDecidedAnswer(page, 'Ja', 'not recorded · 03.10.2026');
+			await decidedCard(page).getByText('Show', { exact: true }).click();
 			await expect(page.getByText('Guests may join the call.')).toBeVisible();
-			await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
 		});
 
 		test('a question changed mid-undo refuses to save and asks for a reload', async ({ page }) => {
@@ -449,7 +450,7 @@ for (const viewport of [
 			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible({ timeout: 10_000 });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
 			await openDecidedLine(page, 'Deferred question?');
-			await expect(page.getByText('Später · 2026-10-03')).toBeVisible();
+			await expectDecidedAnswer(page, 'Später', 'not recorded · 03.10.2026');
 		});
 
 		test('eight long repository lists keep selection, focus and all content inside the viewport', async ({

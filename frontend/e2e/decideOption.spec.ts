@@ -7,7 +7,7 @@ import {
 	type OptionRulingLine,
 	type RulingOption
 } from './rulingsFixture';
-import { decidedList } from './decidedView';
+import { decidedList, expectDecidedAnswer } from './decidedView';
 import { readBoardRuntime } from './runtime';
 import {
 	ALREADY_RULED_MESSAGE,
@@ -22,8 +22,9 @@ test.describe.configure({ mode: 'serial' });
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
-// The fake aco stamps every ruling with this date (`aco_board_fixtures`).
-const FAKE_RULING_DATE = '2026-10-03';
+// The fake aco stores every board pick as `--via board` on this date
+// (`aco_board_fixtures`); the decided card's How row reads it back.
+const BOARD_PICK_HOW = 'Board · 03.10.2026';
 
 const SONG_QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const OTHER_QUESTION = 'Welcher Weg für die Altdaten?';
@@ -182,8 +183,7 @@ for (const viewport of [
 			await expect(rows).toHaveAttribute('title', SONG_QUESTION);
 			await expect(rows).toContainText('Sprung');
 			await rows.click();
-			await expect(page.locator('.decided')).toContainText('B — Browser-Sprung bleibt');
-			await expect(page.locator('.decided')).toContainText(FAKE_RULING_DATE);
+			await expectDecidedAnswer(page, 'B — Browser-Sprung bleibt', BOARD_PICK_HOW);
 			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 				viewport.width
 			);
@@ -344,7 +344,7 @@ for (const viewport of [
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await expect(decidedList(page).getByRole('button')).toHaveCount(1);
 			await decidedList(page).getByTitle(SONG_QUESTION, { exact: true }).click();
-			await expect(page.locator('.decided')).toContainText('B — Browser-Sprung bleibt');
+			await expectDecidedAnswer(page, 'B — Browser-Sprung bleibt', BOARD_PICK_HOW);
 		});
 
 		for (const [key, close] of [

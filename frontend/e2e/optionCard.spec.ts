@@ -8,7 +8,7 @@ import {
 	type OptionRulingLine,
 	type RulingOption
 } from './rulingsFixture';
-import { decidedList } from './decidedView';
+import { decidedCard, decidedList, expectDecidedAnswer } from './decidedView';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
@@ -117,7 +117,12 @@ function arrange(directory: string): void {
 		row(
 			1850,
 			'Schon entschieden',
-			songCard(1, { ruling: 'A', ruled_on: '2026-10-26', question: 'Song offen lassen?' })
+			songCard(1, {
+				ruling: 'A',
+				ruled_on: '2026-10-26',
+				via: 'board',
+				question: 'Song offen lassen?'
+			})
 		)
 	]);
 }
@@ -427,12 +432,10 @@ for (const viewport of [
 			await expect(row).toHaveCount(1);
 			await expect(row).toContainText('Sprung zum Ursprungs-Take');
 			if (phone) await row.click();
-			await expect(page.locator('.decided')).toContainText('A — Song bleibt offen');
-			await expect(page.locator('.decided')).toContainText('2026-10-26');
-			const chosen = page.locator('.option-card li[aria-current="true"]');
-			await chosen.locator('.disclosure').click();
-			await chosen.getByText('Show', { exact: true }).click();
-			await expect(chosen.getByText(SONG_CONTRACT)).toBeVisible();
+			await expectDecidedAnswer(page, 'A — Song bleibt offen', 'Board · 26.10.2026');
+			const card = decidedCard(page);
+			await card.getByText('Show', { exact: true }).click();
+			await expect(card.getByText(SONG_CONTRACT)).toBeVisible();
 			await page.screenshot({ path: testInfo.outputPath('decided-option.png') });
 		});
 
