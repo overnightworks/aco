@@ -1,8 +1,0 @@
-claim_id = "1fe54d898d594d298f9a3e87f43b867e"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "249171783fdb980cda0d42c2264f65f4e9c657bb"
-branch = "claude/issue-385-decide-an-option-card"
-scope = ["scripts/vulture_whitelist.py", "specs/body-block.spec.md", "specs/rule.spec.md", "specs/rulings.spec.md", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/test_option_lines.py", "tests/test_rule.py", "tests/test_rule_option.py"]
-opened_commit = "bd9f3aa022cbbda3382339d9a7b9cc0dc0445985"
-whole_reason = "The via key, the grammar that reads it and the one write that stores it ship in one release, or a release would write a key its own reader refuses."
