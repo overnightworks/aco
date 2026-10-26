@@ -344,7 +344,7 @@ def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionC
             f"line {index} changed since its card was shown; show it again and rule what it "
             "shows now"
         )
-    letters = OPTION_LETTERS[: len(cast(list[object], entry["option"]))]
+    letters = tuple(OPTION_LETTERS[: len(cast(list[object], entry["option"]))])
     if choice.letter not in letters:
         raise ExpectationOptionChoiceError(
             f"line {index} has no option {choice.letter}; its options are {', '.join(letters)}"
