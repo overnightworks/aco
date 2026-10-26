@@ -1,6 +1,7 @@
-"""The decision board reads option lines beside yes/no lines (specs/serve.spec.md:
-ABRD-07, ABRD-34, ABRD-35, E-ABRD-11), driven through the real server, wire
-form and `aco` adapter against a fake `aco` on PATH."""
+"""The decision board reads option lines beside yes/no lines and decides them
+(specs/serve.spec.md: ABRD-07, ABRD-34, ABRD-35, ABRD-39..42, E-ABRD-11,
+E-ABRD-12), driven through the real server, wire form and `aco` adapter
+against a fake `aco` on PATH."""
 
 from __future__ import annotations
 
@@ -37,6 +38,11 @@ _OPTION_LINE_KEYS = [
     "fingerprint",
 ]
 _RULE_13_SENTENCE = "line 1 is an option line; --yes, --no and --later rule only a yes/no line"
+_RULE_17_SENTENCE = (
+    "line 1 changed since its card was shown; show it again and rule what it shows now"
+)
+_RULE_18_SENTENCE = "line 1 has no option C; its options are A, B"
+_RULE_04_SENTENCE = "line 1 is already ruled; a changed ruling is a new line"
 
 
 def _picture_option(letter: str = "A", **changes: object) -> dict[str, object]:
@@ -319,3 +325,226 @@ def test_a_malformed_option_line_makes_only_its_repository_unreadable(
     assert repos[0]["items"] == []
     assert repos[1]["error"] is None
     assert [item["number"] for item in repos[1]["items"]] == [42]
+
+
+def _card_hash_of(stored: dict[str, object]) -> str:
+    return cast(str, stored["card_hash"])
+
+
+def test_an_option_on_an_open_option_line_is_ruled_through_acos_option_write(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    stored = option_line()
+    repository.set_rulings(row(12, "Song jump", stored))
+    [listed] = _listed_lines(board)
+
+    answer = board.decide_option_through_api(listed, 12, "A")
+
+    assert answer.status == 200
+    assert answer.json() == {"status": "ruled", "message": None}
+    assert repository.calls() == [
+        ["rulings", "--json"],
+        ["rulings", "--json"],
+        [
+            "rule",
+            "12",
+            "--line",
+            "1",
+            "--option",
+            "A",
+            "--via",
+            "board",
+            f"--card-hash={_card_hash_of(stored)}",
+            "--json",
+        ],
+    ]
+    [ruled] = _listed_lines(board)
+    assert ruled["ruling"] == "A"
+
+
+@pytest.mark.parametrize("note", [None, "  "], ids=["null-note", "blank-note"])
+def test_an_option_post_without_a_real_note_is_accepted(
+    repository: FakeAcoRepository, board: BoardClient, note: str | None
+) -> None:
+    repository.set_rulings(row(12, "Song jump", option_line()))
+    [listed] = _listed_lines(board)
+
+    answer = board.post_rule(
+        {
+            "repo": board.repo,
+            "item": 12,
+            "line": 1,
+            "fingerprint": listed["fingerprint"],
+            "option": "B",
+            "note": note,
+        }
+    )
+
+    assert answer.json() == {"status": "ruled", "message": None}
+
+
+def test_an_option_post_after_the_card_changed_is_refused_without_a_write(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    repository.set_rulings(row(12, "Song jump", option_line()))
+    [listed] = _listed_lines(board)
+    repository.set_rulings(row(12, "Song jump", option_line(card_hash="sha256:other")))
+
+    answer = board.decide_option_through_api(listed, 12, "A")
+
+    assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
+    assert repository.rule_calls() == []
+
+
+def test_an_option_post_acos_write_refuses_as_changed_is_refused_as_changed(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    repository.set_rulings(row(12, "Song jump", option_line()))
+    repository.refuse_rule("card_changed", _RULE_17_SENTENCE)
+    before = repository.rulings_state()
+    [listed] = _listed_lines(board)
+
+    answer = board.decide_option_through_api(listed, 12, "A")
+
+    assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
+    assert repository.rulings_state() == before
+
+
+@pytest.mark.parametrize(
+    ("rows", "item", "index"),
+    [
+        (
+            [row(42, "Share page", line(1, "Guests?", default="yes"))],
+            42,
+            1,
+        ),
+        (
+            [row(12, "Song jump", option_line())],
+            12,
+            2,
+        ),
+    ],
+    ids=["yes-no-line", "no-such-line"],
+)
+def test_an_option_post_for_a_line_that_is_no_option_line_is_refused_without_a_write(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    rows: list[dict[str, object]],
+    item: int,
+    index: int,
+) -> None:
+    repository.set_rulings(*rows)
+    [listed] = _listed_lines(board)
+
+    answer = board.post_rule(
+        {
+            "repo": board.repo,
+            "item": item,
+            "line": index,
+            "fingerprint": listed["fingerprint"],
+            "option": "A",
+        }
+    )
+
+    assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
+    assert repository.rule_calls() == []
+
+
+def test_an_option_post_on_a_ruled_option_line_answers_already_ruled_with_its_card_hash(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    stored = option_line(ruling="A")
+    repository.set_rulings(row(12, "Song jump", stored))
+    repository.refuse_rule("already_ruled", _RULE_04_SENTENCE)
+    [listed] = _listed_lines(board)
+
+    answer = board.decide_option_through_api(listed, 12, "B")
+
+    assert answer.json() == {"status": "already_ruled", "message": _RULE_04_SENTENCE}
+    [rule_call] = repository.rule_calls()
+    assert f"--card-hash={_card_hash_of(stored)}" in rule_call
+
+
+def test_a_letter_not_on_the_card_answers_acos_refusal_as_a_failure(
+    repository: FakeAcoRepository, board: BoardClient
+) -> None:
+    repository.set_rulings(row(12, "Song jump", option_line()))
+    repository.refuse_rule("invalid_usage", _RULE_18_SENTENCE)
+    before = repository.rulings_state()
+    [listed] = _listed_lines(board)
+
+    answer = board.decide_option_through_api(listed, 12, "C")
+
+    assert answer.json() == {"status": "failed", "message": f"aco rule failed: {_RULE_18_SENTENCE}"}
+    assert repository.rulings_state() == before
+
+
+def test_an_option_lines_fingerprint_never_satisfies_another_repos_option_check(
+    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+) -> None:
+    repository_a, repository_b = two_repositories
+    for repository in two_repositories:
+        repository.set_rulings(row(12, "Song jump", option_line()))
+
+    with serving_two(two_repositories) as board:
+        [listed_in_a] = [
+            entry
+            for repo in cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+            if repo["name"] == "a"
+            for item in repo["items"]
+            for entry in item["lines"]
+        ]
+        answer = board.decide_option_through_api(listed_in_a, 12, "A", repo="b")
+
+    assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
+    assert repository_a.rule_calls() == []
+    assert repository_b.rule_calls() == []
+
+
+@pytest.mark.parametrize(
+    "decision",
+    [
+        {"outcome": "yes", "option": "A"},
+        {},
+        {"outcome": None, "option": None},
+        {"option": "a"},
+        {"option": "E"},
+        {"option": ""},
+        {"option": 1},
+        {"option": ["A"]},
+        {"option": "A", "note": "x"},
+        {"option": "A", "note": 5},
+    ],
+    ids=[
+        "both",
+        "neither",
+        "both-null",
+        "lowercase-letter",
+        "letter-past-the-options",
+        "empty-letter",
+        "number",
+        "list",
+        "note",
+        "note-not-text",
+    ],
+)
+def test_a_malformed_option_post_is_refused_before_any_aco_call(
+    repository: FakeAcoRepository, board: BoardClient, decision: dict[str, object]
+) -> None:
+    repository.set_rulings(row(12, "Song jump", option_line()))
+    [listed] = _listed_lines(board)
+    calls_before = repository.calls()
+
+    answer = board.post_rule(
+        {
+            "repo": board.repo,
+            "item": 12,
+            "line": 1,
+            "fingerprint": listed["fingerprint"],
+            **decision,
+        }
+    )
+
+    assert answer.status == 400
+    assert answer.json() == {"error": "bad request: decision"}
+    assert repository.calls() == calls_before

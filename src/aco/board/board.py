@@ -18,12 +18,15 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 
 from .ports import (
+    CardChanged,
     Decision,
     DecisionPort,
     DecisionResult,
     DecisionSourceUnavailableError,
     DecisionStatus,
     ExpectationLine,
+    OptionDecision,
+    OptionLine,
 )
 
 LINE_CHANGED = "Diese Zeile hat sich geändert, bitte neu laden"
@@ -77,7 +80,9 @@ class Board:
         """A fresh read of the source; raises `DecisionSourceUnavailableError`."""
         return BoardSnapshot(self._decisions.expectation_lines())
 
-    def decide_one(self, decision: Decision, repo: str, fingerprint: str) -> DecisionResult:
+    def decide_one(
+        self, decision: Decision | OptionDecision, repo: str, fingerprint: str
+    ) -> DecisionResult:
         """Write `decision` unless the open line it names no longer reads as shown.
 
         The fingerprint comparison is the board's only own check: the card was
@@ -89,6 +94,12 @@ class Board:
         already ruled, out of range, or its item unknown is the source's own
         refusal, which `rule` reports.
 
+        An option is written with the `card_hash` of the option line this same
+        read holds: the fingerprint comparison binds that hash to the card the
+        browser showed, and the source compares it once more at its write. A
+        line that is no option line leaves the board no hash to name, so it is
+        refused like a changed card.
+
         Callers serialize writes across every repo (`Boards`); this method
         itself holds no lock, so it must never run concurrently with another
         call on the same `Board`.
@@ -97,15 +108,20 @@ class Board:
             lines = self._decisions.expectation_lines()
         except DecisionSourceUnavailableError as error:
             return DecisionResult(DecisionStatus.FAILED, str(error))
-        named = (decision.item, decision.index)
-        if any(
-            (line.item, line.index) == named
-            and line.is_open
-            and wire_fingerprint(repo, line) != fingerprint
-            for line in lines
-        ):
+        named = next(
+            (line for line in lines if (line.item, line.index) == (decision.item, decision.index)),
+            None,
+        )
+        if named is not None and named.is_open and wire_fingerprint(repo, named) != fingerprint:
             return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-        return self._decisions.rule(decision)
+        if isinstance(decision, Decision):
+            return self._decisions.rule(decision)
+        if not isinstance(named, OptionLine):
+            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
+        written = self._decisions.rule_option(decision, named.card_hash)
+        if isinstance(written, CardChanged):
+            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
+        return written
 
 
 class Boards:
@@ -140,7 +156,9 @@ class Boards:
             }
             return tuple(_reading(label, futures[label]) for label in self._boards)
 
-    def decide(self, repo: str, decision: Decision, fingerprint: str) -> DecisionResult:
+    def decide(
+        self, repo: str, decision: Decision | OptionDecision, fingerprint: str
+    ) -> DecisionResult:
         """Write through `repo`'s board; `repo` must already be one of `labels`.
 
         `fingerprint` is `wire_fingerprint`'s value for the card as shown,

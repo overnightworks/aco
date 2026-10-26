@@ -16,11 +16,14 @@ from typing import TypeGuard, cast
 from .board import RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
+    OPTION_LETTERS,
     OPTIONS_FORM,
     CardOption,
     Decision,
     DecisionResult,
     ExpectationLine,
+    OptionDecision,
+    OptionLetter,
     OptionLine,
     Outcome,
 )
@@ -42,7 +45,7 @@ class DecisionRequest:
     """The label of the configured repo this decision belongs to."""
     fingerprint: str
     """The fingerprint of the card as it was shown when the operator chose."""
-    decision: Decision
+    decision: Decision | OptionDecision
 
 
 def board_json(readings: Sequence[RepoReading]) -> str:
@@ -82,19 +85,33 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
         return None
     repo = fields.get("repo")
     fingerprint, item, line = fields.get("fingerprint"), fields.get("item"), fields.get("line")
-    outcome, note = fields.get("outcome"), fields.get("note")
     if (
         isinstance(repo, str)
         and repo != ""
         and isinstance(fingerprint, str)
         and _is_position(item)
         and _is_position(line)
-        and isinstance(outcome, str)
-        and outcome in _VALID_OUTCOME_VALUES
-        and (note is None or _is_note_text(note))
     ):
-        decision = Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
-        return DecisionRequest(repo=repo, fingerprint=fingerprint, decision=decision)
+        decision = _decision(item, line, fields)
+        if decision is not None:
+            return DecisionRequest(repo=repo, fingerprint=fingerprint, decision=decision)
+    return None
+
+
+def _decision(item: int, line: int, fields: dict[str, object]) -> Decision | OptionDecision | None:
+    """Exactly one of `outcome` (with an optional note) and `option` (with none);
+    an absent key and a `null` both name nothing."""
+    outcome, option, note = fields.get("outcome"), fields.get("option"), fields.get("note")
+    if option is None:
+        if (
+            isinstance(outcome, str)
+            and outcome in _VALID_OUTCOME_VALUES
+            and (note is None or _is_note_text(note))
+        ):
+            return Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
+        return None
+    if outcome is None and _is_option_letter(option) and (note is None or _is_blank_text(note)):
+        return OptionDecision(item=item, index=line, letter=option)
     return None
 
 
@@ -185,6 +202,14 @@ def _is_note_text(note: object) -> TypeGuard[str]:
     except UnicodeEncodeError:
         return False
     return True
+
+
+def _is_option_letter(value: object) -> TypeGuard[OptionLetter]:
+    return isinstance(value, str) and value in OPTION_LETTERS
+
+
+def _is_blank_text(value: object) -> bool:
+    return isinstance(value, str) and not value.strip()
 
 
 def _note(raw: str | None) -> str | None:
