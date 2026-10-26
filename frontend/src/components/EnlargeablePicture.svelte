@@ -20,47 +20,49 @@
 	}
 </script>
 
-<button
-	type="button"
-	class="enlarge"
-	class:thumbnail
-	aria-label={PICTURE_LABEL.enlarge}
-	onclick={enlarge}
->
-	<img src={pictureDataUri(picture)} {alt} />
-	{#if thumbnail}
-		<svg class="mark" aria-hidden="true" viewBox="0 0 22 22" width="22" height="22">
-			<path
-				d="M13 4h5v5M9 18H4v-5M18 4l-6 6M4 18l6-6"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.6"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
-		</svg>
-	{/if}
-</button>
-{#if caption !== undefined}<p class="caption">{caption}</p>{/if}
-<dialog
-	bind:this={dialog}
-	aria-label={PICTURE_LABEL.dialog}
-	onclose={() => {
-		isOpen = false;
-	}}
->
-	{#if isOpen}
-		<div class="big">
-			<img src={pictureDataUri(picture)} {alt} />
-		</div>
-		<p class="caption">{alt}</p>
-		<div class="actions">
-			<button type="button" class="close" onclick={() => dialog?.close()}>
-				{PICTURE_LABEL.close}
-			</button>
-		</div>
-	{/if}
-</dialog>
+<div class="picture">
+	<button
+		type="button"
+		class="enlarge"
+		class:thumbnail
+		aria-label={PICTURE_LABEL.enlarge}
+		onclick={enlarge}
+	>
+		<img src={pictureDataUri(picture)} {alt} />
+		{#if thumbnail}
+			<svg class="mark" aria-hidden="true" viewBox="0 0 22 22" width="22" height="22">
+				<path
+					d="M13 4h5v5M9 18H4v-5M18 4l-6 6M4 18l6-6"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.6"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				/>
+			</svg>
+		{/if}
+	</button>
+	{#if caption !== undefined}<p class="caption">{caption}</p>{/if}
+	<dialog
+		bind:this={dialog}
+		aria-label={PICTURE_LABEL.dialog}
+		onclose={() => {
+			isOpen = false;
+		}}
+	>
+		{#if isOpen}
+			<div class="big">
+				<img src={pictureDataUri(picture)} {alt} />
+			</div>
+			<p class="caption">{alt}</p>
+			<div class="actions">
+				<button type="button" class="close" onclick={() => dialog?.close()}>
+					{PICTURE_LABEL.close}
+				</button>
+			</div>
+		{/if}
+	</dialog>
+</div>
 
 <style>
 	img {
@@ -74,7 +76,7 @@
 		line-height: 18px;
 		color: var(--oc-fg-2);
 	}
-	button.enlarge {
+	.picture button.enlarge {
 		display: block;
 		max-width: 100%;
 		padding: 0;
@@ -109,7 +111,7 @@
 		display: flex;
 		justify-content: flex-end;
 	}
-	button.close {
+	.picture button.close {
 		height: 40px;
 		padding: 0 16px;
 		border: 1.5px solid var(--oc-line-strong);
@@ -120,7 +122,7 @@
 		cursor: pointer;
 	}
 	@media (max-width: 760px) {
-		button.enlarge.thumbnail {
+		.picture button.enlarge.thumbnail {
 			position: relative;
 			zoom: 0.5;
 			padding: 6px;
