@@ -7,14 +7,16 @@
 
 import type { BoardItem, ExpectationLine, Outcome, RepoReading } from '../../types';
 import { lineKey } from './decision';
-import { isOptionLine, optionStatusText } from './optionCard';
+import { isOptionLine } from './optionCard';
 
 export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
 export const LIST_LABEL = 'Liste';
 export const DECIDE_LABEL = 'Entscheiden';
 export const HISTORY_LABEL = 'Verlauf';
-export const EMPTY_OPEN_MESSAGE =
-	'Nichts offen. Neue Fragen erscheinen hier nach Neuladen, sobald ein Agent eine stellt.';
+export const LIST_REGION_LABEL = 'Decisions';
+export const QUIET_PREFIX = 'Nothing open: ';
+export const EMPTY_LIST_TITLE = 'All decided';
+export const EMPTY_LIST_TEXT = 'No project is waiting for you.';
 export const EMPTY_HISTORY_MESSAGE = 'Noch keine Entscheidungen in den offenen Board-Items.';
 export const UNKNOWN_DATE_LABEL = 'Datum fehlt';
 export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
@@ -29,14 +31,8 @@ export function outcomeLabel(outcome: Outcome): string {
 	return OUTCOME_LABEL[outcome];
 }
 
-export function lineStatusText(line: ExpectationLine): string {
-	if (isOptionLine(line)) {
-		return optionStatusText(line);
-	}
-	if (line.ruling !== null) {
-		return `${outcomeLabel(line.ruling)} · ${line.ruled_on ?? ''}`;
-	}
-	return line.default !== null ? `Empfohlen: ${outcomeLabel(line.default)}` : 'Offen';
+export function ruledOutcomeText(ruling: Outcome, ruledOn: string | null): string {
+	return `${outcomeLabel(ruling)} · ${ruledOn ?? ''}`;
 }
 
 /** The stage's heading: the tapped question, or the line's own sentence when
@@ -66,26 +62,79 @@ export interface SelectedLine {
 	line: ExpectationLine;
 }
 
-export function openRepos(repos: RepoReading[]): RepoReading[] {
-	return repos.map((repo) => ({
-		...repo,
-		items: repo.items
-			.map((item) => ({
-				...item,
-				lines: item.lines.filter((line) => line.ruling === null)
-			}))
-			.filter((item) => item.lines.length > 0)
-	}));
+/** How a row reads at a glance: an option line is `open`; a yes/no line is
+ * `todo` because its head still has to rewrite it as an option card. */
+export type RowState = 'open' | 'todo';
+
+export const STATE_LABEL: Record<RowState, string> = {
+	open: 'Open',
+	todo: 'Not ready · head to fill'
+};
+
+/** Lower comes first; `nextOpenAfter` and the list both order by it. */
+const ROW_RANK: Record<RowState, number> = { open: 0, todo: 1 };
+
+interface ListRow {
+	key: string;
+	state: RowState;
+	label: string;
+	/** The full question, for the row's tooltip. */
+	title: string;
+}
+
+type ListGroup = { repo: string; error: string } | { repo: string; rows: ListRow[] };
+
+export interface OpenList {
+	groups: ListGroup[];
+	/** Readable repositories with no open line. */
+	quiet: string[];
+}
+
+function listRow(repo: string, itemNumber: number, line: ExpectationLine): ListRow {
+	return {
+		key: lineKey(repo, itemNumber, line),
+		state: isOptionLine(line) ? 'open' : 'todo',
+		label: isOptionLine(line) ? line.topic : cardHeading(line),
+		title: cardHeading(line)
+	};
+}
+
+function openRows(reading: RepoReading): ListRow[] {
+	return reading.items
+		.flatMap((item) =>
+			item.lines
+				.filter((line) => line.ruling === null)
+				.map((line) => listRow(reading.name, item.number, line))
+		)
+		.sort((left, right) => ROW_RANK[left.state] - ROW_RANK[right.state]);
+}
+
+/** The open list: one group per repository that failed or has an open line,
+ * its option rows before its yes/no rows, each in aco's order. */
+export function openList(repos: RepoReading[]): OpenList {
+	const groups: ListGroup[] = [];
+	const quiet: string[] = [];
+	for (const reading of repos) {
+		if (reading.error !== null) {
+			groups.push({ repo: reading.name, error: reading.error });
+			continue;
+		}
+		const rows = openRows(reading);
+		if (rows.length === 0) {
+			quiet.push(reading.name);
+		} else {
+			groups.push({ repo: reading.name, rows });
+		}
+	}
+	return { groups, quiet };
+}
+
+function listedRows(repos: RepoReading[]): ListRow[] {
+	return openList(repos).groups.flatMap((group) => ('rows' in group ? group.rows : []));
 }
 
 export function firstOpenKey(repos: RepoReading[]): string | null {
-	for (const repo of openRepos(repos)) {
-		if (repo.error === null) {
-			const item = repo.items[0];
-			if (item) return lineKey(repo.name, item.number, item.lines[0] as ExpectationLine);
-		}
-	}
-	return null;
+	return listedRows(repos)[0]?.key ?? null;
 }
 
 export function historyLines(repos: RepoReading[]): SelectedLine[] {
@@ -130,27 +179,12 @@ export function findSelectedLine(repos: RepoReading[], key: string | null): Sele
 	return null;
 }
 
-/** The next still-open line after `key`, in the same board order the list
- * shows, wrapping to the first open line when `key` was the last one, or
- * `null` once nothing is open any more. */
+/** The line the stage moves to once `key` is decided: of the other open
+ * rows, the first with the best rank in list order, so an option card comes
+ * before a yes/no line the head must still fill; `null` once nothing else is
+ * open. */
 export function nextOpenAfter(repos: RepoReading[], key: string): string | null {
-	const order: string[] = [];
-	const openKeys = new Set<string>();
-	for (const repoReading of repos) {
-		if (repoReading.error !== null) {
-			continue;
-		}
-		for (const item of repoReading.items) {
-			for (const line of item.lines) {
-				const candidateKey = lineKey(repoReading.name, item.number, line);
-				order.push(candidateKey);
-				if (line.ruling === null) {
-					openKeys.add(candidateKey);
-				}
-			}
-		}
-	}
-	const open = order.filter((candidateKey) => openKeys.has(candidateKey) && candidateKey !== key);
-	const position = order.indexOf(key);
-	return open.find((candidateKey) => order.indexOf(candidateKey) > position) ?? open[0] ?? null;
+	const others = listedRows(repos).filter((row) => row.key !== key);
+	const bestRank = Math.min(...others.map((row) => ROW_RANK[row.state]));
+	return others.find((row) => ROW_RANK[row.state] === bestRank)?.key ?? null;
 }

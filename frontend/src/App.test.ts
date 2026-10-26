@@ -3,9 +3,6 @@ import { afterEach, expect, test, vi } from 'vitest';
 import App from './App.svelte';
 import { item, line, repo } from './test-support/board';
 
-const EMPTY_BOARD_MESSAGE =
-	'Nichts offen. Neue Fragen erscheinen hier nach Neuladen, sobald ein Agent eine stellt.';
-
 function fakeFetch(status: number, body: unknown) {
 	return vi.fn(async () => ({
 		ok: status >= 200 && status < 300,
@@ -58,7 +55,7 @@ test('a board with no open or ruled lines shows the empty message', async () => 
 
 	render(App, { token: 'a-token' });
 
-	expect(await screen.findByText(EMPTY_BOARD_MESSAGE)).toBeInTheDocument();
+	expect(await screen.findByText('All decided')).toBeInTheDocument();
 });
 
 test('a board with lines shows the track list', async () => {
@@ -67,7 +64,7 @@ test('a board with lines shows the track list', async () => {
 
 	render(App, { token: 'a-token' });
 
-	expect(await screen.findByRole('heading', { name: /Share page repo/ })).toBeInTheDocument();
+	expect(await screen.findByRole('heading', { name: 'repo 1' })).toBeInTheDocument();
 });
 
 test('selecting an open line opens it in the stage', async () => {

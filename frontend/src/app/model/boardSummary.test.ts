@@ -6,10 +6,11 @@ import {
 	findSelectedLine,
 	firstOpenKey,
 	historyLines,
-	lineStatusText,
 	nextOpenAfter,
+	openList,
 	outcomeLabel,
-	pictureDataUri
+	pictureDataUri,
+	ruledOutcomeText
 } from './boardSummary';
 
 test('first selection follows configured order, skipping failed repos and ruled-only groups', () => {
@@ -27,6 +28,101 @@ test('first selection follows configured order, skipping failed repos and ruled-
 	expect(firstOpenKey(repos)).toBe('first:2:3');
 	expect(firstOpenKey([])).toBeNull();
 	expect(firstOpenKey([repo({ items: [item({ lines: [line({ ruling: 'yes' })] })] })])).toBeNull();
+});
+
+test('[ABRD-29] first selection is the option line that follows a yes/no line in the same repository', () => {
+	const repos = [
+		repo({
+			name: 'first',
+			items: [
+				item({ number: 2, lines: [line({ index: 1 })] }),
+				item({ number: 3, lines: [optionLine({ index: 1 })] })
+			]
+		})
+	];
+
+	expect(firstOpenKey(repos)).toBe('first:3:1');
+});
+
+describe('openList', () => {
+	test('[ABRD-28] groups follow configured order, a failed repository as its error group', () => {
+		const { groups } = openList([
+			repo({ name: 'zeta', items: [item({ number: 1, lines: [line({ index: 1 })] })] }),
+			repo({ name: 'broken', error: 'aco failed', items: [] }),
+			repo({ name: 'alpha', items: [item({ number: 2, lines: [line({ index: 1 })] })] })
+		]);
+
+		expect(groups.map((group) => group.repo)).toEqual(['zeta', 'broken', 'alpha']);
+		expect(groups[1]).toEqual({ repo: 'broken', error: 'aco failed' });
+	});
+
+	test('[ABRD-28] a row carries its key, state, label and the full question as its title', () => {
+		const { groups } = openList([
+			repo({
+				name: 'a',
+				items: [
+					item({
+						number: 7,
+						lines: [
+							optionLine({ index: 2, topic: 'Sprung', question: 'Keep the song open?' }),
+							line({ index: 3, question: 'Guests allowed?', text: 'Guests may join.' }),
+							line({ index: 4, question: null, text: 'Plain sentence.' })
+						]
+					})
+				]
+			})
+		]);
+
+		expect(groups).toEqual([
+			{
+				repo: 'a',
+				rows: [
+					{ key: 'a:7:2', state: 'open', label: 'Sprung', title: 'Keep the song open?' },
+					{ key: 'a:7:3', state: 'todo', label: 'Guests allowed?', title: 'Guests allowed?' },
+					{ key: 'a:7:4', state: 'todo', label: 'Plain sentence.', title: 'Plain sentence.' }
+				]
+			}
+		]);
+	});
+
+	test('[ABRD-29] option rows come before yes/no rows in one repository, each in aco order', () => {
+		const { groups } = openList([
+			repo({
+				name: 'a',
+				items: [
+					item({
+						number: 1,
+						lines: [line({ index: 1 }), optionLine({ index: 2 }), line({ index: 3 })]
+					}),
+					item({ number: 2, lines: [optionLine({ index: 1 }), line({ index: 2 })] })
+				]
+			})
+		]);
+
+		const [group] = groups;
+		expect(group && 'rows' in group ? group.rows.map((row) => row.key) : []).toEqual([
+			'a:1:2',
+			'a:2:1',
+			'a:1:1',
+			'a:1:3',
+			'a:2:2'
+		]);
+	});
+
+	test('[ABRD-49] readable repositories with no open line are quiet, a ruled-only one included', () => {
+		const { groups, quiet } = openList([
+			repo({ name: 'open', items: [item({ lines: [line()] })] }),
+			repo({ name: 'empty', items: [] }),
+			repo({ name: 'broken', error: 'down', items: [] }),
+			repo({
+				name: 'ruled',
+				items: [item({ lines: [line({ ruling: 'yes', ruled_on: '2026-10-01' })] })]
+			})
+		]);
+
+		expect(groups.map((group) => group.repo)).toEqual(['open', 'broken']);
+		expect(quiet).toEqual(['empty', 'ruled']);
+	});
 });
 
 test.each(['first', 'last'] as const)(
@@ -55,18 +151,14 @@ test.each(['first', 'last'] as const)(
 	}
 );
 
-describe('lineStatusText', () => {
+describe('ruledOutcomeText', () => {
 	test.each([
-		[line({ ruling: 'yes', ruled_on: '2026-10-01' }), 'Ja · 2026-10-01'],
-		[line({ ruling: 'no', ruled_on: '2026-10-02' }), 'Nein · 2026-10-02'],
-		[line({ ruling: 'later', ruled_on: '2026-10-03' }), 'Später · 2026-10-03'],
-		[line({ ruling: 'yes', ruled_on: null }), 'Ja · '],
-		[line({ ruling: null, default: 'yes' }), 'Empfohlen: Ja'],
-		[line({ ruling: null, default: null }), 'Offen'],
-		[optionLine({ recommended: 'B' }), 'Empfohlen: B'],
-		[optionLine({ ruling: 'A', ruled_on: '2026-10-04' }), 'A · Keep the song open · 2026-10-04']
-	])('%o -> %s', (candidate, expected) => {
-		expect(lineStatusText(candidate)).toBe(expected);
+		['yes', '2026-10-01', 'Ja · 2026-10-01'],
+		['no', '2026-10-02', 'Nein · 2026-10-02'],
+		['later', '2026-10-03', 'Später · 2026-10-03'],
+		['yes', null, 'Ja · ']
+	] as const)('%s on %s -> %s', (ruling, ruledOn, expected) => {
+		expect(ruledOutcomeText(ruling, ruledOn)).toBe(expected);
 	});
 });
 
@@ -156,11 +248,11 @@ describe('nextOpenAfter', () => {
 	const third = line({ index: 3 });
 	const repos = [repo({ items: [item({ number: 42, lines: [first, second, third] })] })];
 
-	test('moves to the next open line in board order', () => {
+	test('moves to the next open line in list order', () => {
 		expect(nextOpenAfter(repos, 'repo:42:1')).toBe('repo:42:2');
 	});
 
-	test('wraps to the first open line once the given key was the last in order', () => {
+	test('wraps to the first open line once the given key was the last in list order', () => {
 		expect(nextOpenAfter(repos, 'repo:42:3')).toBe('repo:42:1');
 	});
 
@@ -189,6 +281,30 @@ describe('nextOpenAfter', () => {
 		];
 
 		expect(nextOpenAfter(withAFailedRepo, 'repo:42:1')).toBe('repo:42:2');
+	});
+
+	test('[ABRD-50] an option line in a later repository wins over the next yes/no line', () => {
+		const mixed = [
+			repo({
+				name: 'a',
+				items: [item({ number: 1, lines: [line({ index: 1 }), line({ index: 2 })] })]
+			}),
+			repo({ name: 'b', items: [item({ number: 2, lines: [optionLine({ index: 1 })] })] })
+		];
+
+		expect(nextOpenAfter(mixed, 'a:1:1')).toBe('b:2:1');
+	});
+
+	test('[ABRD-50] with only yes/no lines left it returns the first of them', () => {
+		const onlyYesNo = [
+			repo({
+				name: 'a',
+				items: [item({ number: 1, lines: [line({ index: 1 }), line({ index: 2 })] })]
+			}),
+			repo({ name: 'b', items: [item({ number: 2, lines: [line({ index: 1 })] })] })
+		];
+
+		expect(nextOpenAfter(onlyYesNo, 'b:2:1')).toBe('a:1:1');
 	});
 
 	test('skips a line that was already ruled when picking the next one', () => {

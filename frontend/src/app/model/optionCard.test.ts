@@ -11,7 +11,6 @@ import {
 	KIND_LABEL,
 	nextOpenOption,
 	type OpenOption,
-	optionStatusText,
 	resultAltText,
 	ROW_LABEL,
 	SAME_AS_TODAY_MARK,
@@ -69,24 +68,6 @@ describe('the chosen option', () => {
 
 	test('does not exist while the line is open', () => {
 		expect(chosenOption(optionLine())).toBeUndefined();
-	});
-});
-
-describe('optionStatusText', () => {
-	test('recommends the letter on an open line', () => {
-		expect(optionStatusText(optionLine({ recommended: 'C' }))).toBe('Empfohlen: C');
-	});
-
-	test('gives letter, name and date on a ruled line', () => {
-		const ruled = optionLine({ ruling: 'A', ruled_on: '2026-10-26' });
-
-		expect(optionStatusText(ruled)).toBe('A · Keep the song open · 2026-10-26');
-	});
-
-	test('leaves the date empty when the ruling carries none', () => {
-		expect(optionStatusText(optionLine({ ruling: 'A', ruled_on: null }))).toBe(
-			'A · Keep the song open · '
-		);
 	});
 });
 
