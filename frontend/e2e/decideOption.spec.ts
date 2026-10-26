@@ -428,7 +428,14 @@ test.describe('1280px confirm over a changing board', () => {
 		await expect(confirm(page)).toBeVisible();
 
 		arrangeFinal(repoDirectory, { card_hash: 'card-hash-changed' });
+		const reloaded = page.waitForResponse(
+			(response) => response.url().endsWith('/api/board') && response.request().method() === 'GET'
+		);
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+		await reloaded;
+		// The modal makes the page inert, so the board is read by CSS, not by role.
+		await expect(page.locator('.tracks')).not.toContainText(OTHER_QUESTION);
+		await expect(confirm(page)).toBeVisible();
 		await confirm(page).getByRole('button', { name: 'Decide B' }).click();
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
