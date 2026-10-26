@@ -208,7 +208,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('failed-and-quiet.png') });
 		});
 
-		test('Tab moves from the first row to the second, Enter opens it and focuses the stage', async ({
+		test('[ABRD-28] Tab moves from the first row to the second, Enter opens it and focuses the stage', async ({
 			page
 		}) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
