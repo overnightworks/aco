@@ -37,15 +37,16 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     outcome.add_argument("--yes", action="store_const", dest="ruling", const="yes")
     outcome.add_argument("--no", action="store_const", dest="ruling", const="no")
     outcome.add_argument("--later", action="store_const", dest="ruling", const="later")
-    outcome.add_argument("--option", metavar="X", help="the letter chosen on an option line")
+    # The option flags stay out of --help and usage so the yes/no refusals stay byte-identical.
+    outcome.add_argument("--option", metavar="X", help=argparse.SUPPRESS)
     parser.add_argument("--note", help="appended to the line's own text as ' Anmerkung: TEXT'")
     parser.add_argument(
         "--via",
         choices=[via.value for via in expectation_grammar.RulingVia],
-        help="how the option was decided: board, chat or default (recommendation kept)",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "--card-hash", metavar="HASH", help="the card_hash of the option card that was shown"
+        "--card-hash", metavar="HASH", help=argparse.SUPPRESS
     )
 
 

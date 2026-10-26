@@ -616,7 +616,7 @@ def test_context_refusal(
     [
         pytest.param(
             ["rule", "90", "--line", "1"],
-            "aco rule: error: one of the arguments --yes --no --later --option is required",
+            "aco rule: error: one of the arguments --yes --no --later is required",
             id="no-outcome",
         ),
         pytest.param(
@@ -661,3 +661,11 @@ def test_parser_refusal(
         "stdout": captured.out,
     }
     assert observed == {"code": 2, "sentence": sentence, "usage": usage, "stdout": ""}
+
+
+def test_legacy_refusal_usage_names_no_option_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    """Spec: Never 1 — the yes/no refusal's usage text stays byte-identical, naming no option flag."""
+    with pytest.raises(SystemExit):
+        cli.main(["rule", "90", "--line", "1"])
+    usage_text = capsys.readouterr().err
+    assert [flag in usage_text for flag in ("--option", "--via", "--card-hash")] == [False] * 3
