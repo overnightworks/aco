@@ -9,7 +9,7 @@
 		UNKNOWN_DATE_LABEL
 	} from '../app/model/boardSummary';
 	import { lineKey } from '../app/model/decision';
-	import { chosenOption, isOptionLine, verdictLabel } from '../app/model/optionCard';
+	import { chosenOption, contractTexts, isOptionLine, verdictLabel } from '../app/model/optionCard';
 	import type { RepoReading } from '../types';
 	let { repos }: { repos: RepoReading[] } = $props();
 	const entries = $derived(historyLines(repos));
@@ -70,8 +70,13 @@
 		{#if sentence !== null}
 			<details>
 				<summary>{@render heading()}</summary>
-				{#if chosen !== undefined}<p>{chosen.contract}</p>{/if}
-				<p>{sentence}</p>
+				{#if chosen !== undefined && isOptionLine(entry.line)}
+					{#each contractTexts(entry.line, chosen) as bindingSentence (bindingSentence)}
+						<p>{bindingSentence}</p>
+					{/each}
+				{:else}
+					<p>{sentence}</p>
+				{/if}
 			</details>
 		{:else}
 			<article>{@render heading()}</article>

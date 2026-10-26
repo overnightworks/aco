@@ -34,7 +34,9 @@
 	{#if selected === null}
 		<p>{NO_SELECTION_MESSAGE}</p>
 	{:else if isOptionLine(selected.line)}
-		<OptionCard repo={selected.repo} line={selected.line} />
+		{#key lineKey(selected.repo, selected.item.number, selected.line)}
+			<OptionCard repo={selected.repo} item={selected.item.number} line={selected.line} />
+		{/key}
 	{:else}
 		{@const yesNoLine = selected.line}
 		{@const activeKey = lineKey(selected.repo, selected.item.number, selected.line)}
