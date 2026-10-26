@@ -57,7 +57,7 @@ test('a selected line shows only its own question, example, sentence and recomme
 	expect(screen.getByText('Notiz').closest('details')).not.toHaveAttribute('open');
 });
 
-test('a selected option line shows its card and offers the Decide picks, no outcome', () => {
+test('[ABRD-44] a selected option line shows its card and offers the Decide picks, no outcome', () => {
 	const card = optionLine({ index: 2, question: 'Keep the song open?' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
@@ -83,7 +83,7 @@ test('a selected option line shows its card and offers the Decide picks, no outc
 	expect(screen.getByRole('button', { name: 'Enlarge picture' })).toBeInTheDocument();
 });
 
-test('a ruled option line offers no Decide group', () => {
+test('[ABRD-44] a ruled option line offers no Decide group', () => {
 	const card = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
@@ -96,7 +96,7 @@ test('a ruled option line offers no Decide group', () => {
 	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
 });
 
-test('picking an option disables the picks, then posts exactly that letter', async () => {
+test('[ABRD-44] picking an option disables the picks, then posts exactly that letter', async () => {
 	const card = optionLine({ index: 2, fingerprint: 'fp-option' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
@@ -120,7 +120,7 @@ test('picking an option disables the picks, then posts exactly that letter', asy
 	});
 });
 
-test('a changed option card hides the picks until Neu laden reloads it', async () => {
+test('[ABRD-45] a changed option card hides the picks until Neu laden reloads it', async () => {
 	const card = optionLine({ index: 2 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const reload = vi.fn(async () => {});

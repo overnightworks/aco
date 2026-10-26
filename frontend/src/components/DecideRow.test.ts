@@ -28,7 +28,7 @@ function renderRow(overrides: { pending?: boolean; banner?: DecisionBanner | nul
 	return { container, onDecide, onReload };
 }
 
-test('the Decide group holds one pick per option in letter order, named by letter and option', () => {
+test('[ABRD-44] the Decide group holds one pick per option in letter order, named by letter and option', () => {
 	renderRow();
 
 	const picks = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button');
@@ -40,7 +40,7 @@ test('the Decide group holds one pick per option in letter order, named by lette
 	expect(picks.map((pick) => pick.textContent?.trim())).toEqual(['A', 'B', 'C']);
 });
 
-test('only the recommended pick carries the recommended look', () => {
+test('[ABRD-44] only the recommended pick carries the recommended look', () => {
 	renderRow();
 
 	const recommended = screen
@@ -49,7 +49,7 @@ test('only the recommended pick carries the recommended look', () => {
 	expect(recommended.map((pick) => pick.textContent?.trim())).toEqual(['B']);
 });
 
-test('clicking a pick decides exactly that option', async () => {
+test('[ABRD-44] clicking a pick decides exactly that option', async () => {
 	const { onDecide } = renderRow();
 
 	await fireEvent.click(screen.getByRole('button', { name: /^Decide B:/ }));
@@ -58,7 +58,7 @@ test('clicking a pick decides exactly that option', async () => {
 	expect(onDecide).toHaveBeenCalledWith(songCard.options[1]);
 });
 
-test('a pending decision disables every pick', () => {
+test('[ABRD-44] a pending decision disables every pick', () => {
 	renderRow({ pending: true });
 
 	for (const pick of screen.getAllByRole('button')) {
@@ -81,7 +81,7 @@ test.each([
 	}
 );
 
-test('any other failure shows its sentence and keeps the picks usable', () => {
+test('[ABRD-45] any other failure shows its sentence and keeps the picks usable', () => {
 	renderRow({ banner: { kind: 'failed', message: 'Das Board ist nicht erreichbar.' } });
 
 	expect(screen.getByRole('alert')).toHaveTextContent('Das Board ist nicht erreichbar.');
@@ -91,7 +91,7 @@ test('any other failure shows its sentence and keeps the picks usable', () => {
 	}
 });
 
-test('a hostile option name is text, never markup', () => {
+test('[ABRD-44] a hostile option name is text, never markup', () => {
 	const { container } = renderRow();
 
 	expect(container.querySelector('img')).toBeNull();

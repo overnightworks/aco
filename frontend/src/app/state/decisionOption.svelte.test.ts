@@ -33,7 +33,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-test('a pick sends nothing before the window ends, then exactly the picked letter', async () => {
+test('[ABRD-44] a pick sends nothing before the window ends, then exactly the picked letter', async () => {
 	const send = sender({ status: 'ruled', message: null });
 	const store = new DecisionStore(
 		'token',
@@ -50,7 +50,7 @@ test('a pick sends nothing before the window ends, then exactly the picked lette
 	expect(send).toHaveBeenCalledWith('token', optionDecisionRequest('repo', 42, card, optionB));
 });
 
-test('undoing a pick inside the window sends nothing, and the card is no longer pending', async () => {
+test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is no longer pending', async () => {
 	const send = sender({ status: 'ruled', message: null });
 	const reload = vi.fn(async () => {});
 	const store = new DecisionStore('token', reload, send);
@@ -65,7 +65,7 @@ test('undoing a pick inside the window sends nothing, and the card is no longer 
 	expect(reload).not.toHaveBeenCalled();
 });
 
-test('a stored pick reloads the board and names the card as just ruled', async () => {
+test('[ABRD-44] a stored pick reloads the board and names the card as just ruled', async () => {
 	const reload = vi.fn(async () => {});
 	const store = new DecisionStore('token', reload, sender({ status: 'ruled', message: null }));
 
@@ -98,7 +98,7 @@ test.each([
 	expect(store.justRuled).toBeNull();
 });
 
-test('a pending pick names its letter, option and topic for the toast', () => {
+test('[ABRD-44] a pending pick names its letter, option and topic for the toast', () => {
 	const store = new DecisionStore(
 		'token',
 		vi.fn(async () => {}),

@@ -112,7 +112,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px Decide row`, () => {
 		test.use({ viewport });
 
-		test('a pick waits out the undo window, then the card moves to Verlauf', async ({
+		test('[ABRD-44] a pick waits out the undo window, then the card moves to Verlauf', async ({
 			page
 		}, testInfo) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -153,7 +153,7 @@ for (const viewport of [
 			);
 		});
 
-		test('Rückgängig inside the window posts nothing and leaves the picks usable', async ({
+		test('[ABRD-33] Rückgängig inside the window posts nothing and leaves the picks usable', async ({
 			page
 		}) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -180,7 +180,7 @@ for (const viewport of [
 			await expect(page.getByRole('region', { name: 'Verlauf' }).locator('summary')).toHaveCount(0);
 		});
 
-		test('a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
+		test('[ABRD-45] a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
 			page
 		}, testInfo) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -201,7 +201,7 @@ for (const viewport of [
 			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeEnabled();
 		});
 
-		test('a card ruled elsewhere answers already ruled instead of a second write', async ({
+		test('[ABRD-45] a card ruled elsewhere answers already ruled instead of a second write', async ({
 			page
 		}) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -219,7 +219,9 @@ for (const viewport of [
 			await expect(page.getByRole('button', { name: 'Neu laden' })).toBeVisible();
 		});
 
-		test('the Decide row stays in view above a card taller than the pane', async ({ page }) => {
+		test('[ABRD-44] the Decide row stays in view above a card taller than the pane', async ({
+			page
+		}) => {
 			const { repoDirectory } = readBoardRuntime();
 			arrange(repoDirectory);
 			await open(page, phone);
@@ -234,7 +236,7 @@ for (const viewport of [
 			await expect(picks(page)).toBeInViewport({ ratio: 1 });
 		});
 
-		test('Tab reaches the picks in letter order after the options and Enter starts the window', async ({
+		test('[ABRD-44] Tab reaches the picks in letter order after the options and Enter starts the window', async ({
 			page
 		}) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -254,7 +256,7 @@ for (const viewport of [
 			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeDisabled();
 		});
 
-		test('a ruled card inside an open picture dialog leaves the stage focused', async ({
+		test('[ABRD-44] a ruled card inside an open picture dialog leaves the stage focused', async ({
 			page
 		}) => {
 			const { repoDirectory } = readBoardRuntime();
