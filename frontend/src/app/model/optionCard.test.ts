@@ -8,6 +8,7 @@ import {
 	contractTexts,
 	decidedText,
 	isOptionLine,
+	isStuck,
 	KIND_LABEL,
 	nextOpenOption,
 	type OpenOption,
@@ -133,5 +134,16 @@ describe('nextOpenOption', () => {
 		['closes the open option', 'B', 'B', null]
 	])('%s', (_name, open, letter, expected) => {
 		expect(nextOpenOption(open, letter)).toBe(expected);
+	});
+});
+
+describe('isStuck', () => {
+	test.each<[string, number, boolean]>([
+		['the card runs on 2 px below the view', 102, true],
+		['the card ends 1 px below the view', 101, false],
+		['the card ends level with the view', 100, false],
+		['the card ends above the view', 90, false]
+	])('[ABRD-52] %s', (_name, containerBottom, expected) => {
+		expect(isStuck(containerBottom, 100)).toBe(expected);
 	});
 });

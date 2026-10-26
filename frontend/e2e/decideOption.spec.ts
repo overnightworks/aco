@@ -145,7 +145,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px Decide row`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-44] a pick waits out the undo window, then the card moves to Verlauf', async ({
+		test('[ABRD-44] a pick waits out the undo window, then the card moves to Decided', async ({
 			page
 		}, testInfo) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -175,8 +175,8 @@ for (const viewport of [
 				await expect(page.getByRole('heading', { name: OTHER_QUESTION })).toBeVisible();
 			}
 			await expect(page.locator('.tracks').getByTitle(SONG_QUESTION)).toHaveCount(0);
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const entry = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const entry = page.getByRole('region', { name: 'Decided', exact: true }).locator('summary');
 			await expect(entry).toHaveCount(1);
 			await expect(entry).toContainText(SONG_QUESTION);
 			await expect(entry).toContainText('B · Browser-Sprung bleibt');
@@ -209,8 +209,10 @@ for (const viewport of [
 			).toBeVisible();
 			await expect(picks(page).getByRole('button')).toHaveText(['A', 'B']);
 			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeEnabled();
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			await expect(page.getByRole('region', { name: 'Verlauf' }).locator('summary')).toHaveCount(0);
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			await expect(
+				page.getByRole('region', { name: 'Decided', exact: true }).locator('summary')
+			).toHaveCount(0);
 		});
 
 		test('[ABRD-45] a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
@@ -337,8 +339,8 @@ for (const viewport of [
 			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeDisabled();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const entry = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const entry = page.getByRole('region', { name: 'Decided', exact: true }).locator('summary');
 			await expect(entry).toHaveCount(1);
 			await expect(entry).toContainText(SONG_QUESTION);
 			await expect(entry).toContainText('B · Browser-Sprung bleibt');
@@ -442,8 +444,8 @@ test.describe('1280px confirm over a changing board', () => {
 
 		await expect(page.getByRole('alert')).toContainText(LINE_CHANGED_MESSAGE);
 		await expect(page.getByRole('button', { name: 'Neu laden' })).toBeVisible();
-		await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-		const entries = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
+		await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+		const entries = page.getByRole('region', { name: 'Decided', exact: true }).locator('summary');
 		await expect(entries).toHaveCount(1);
 		await expect(entries).not.toContainText(SONG_QUESTION);
 	});

@@ -357,7 +357,7 @@ for (const viewport of [
 			await expect(page.locator('.stage')).toBeFocused();
 			await page.screenshot({ path: testInfo.outputPath('unselected.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await expect(page.getByText('Nein · 2026-10-03')).toBeVisible();
 			expect(ruleRequests).toBe(1);
 		});
@@ -393,7 +393,7 @@ for (const viewport of [
 			// The completed question is available only in the read-only history.
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
 			await expect(page.getByRole('button', { name: /Guests allowed\?/ })).not.toBeVisible();
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await page.locator('summary').filter({ hasText: 'Guests allowed?' }).click();
 			await expect(page.getByText('Guests may join the call.')).toBeVisible();
 			await expect(page.getByText('Ja · 2026-10-03')).toBeVisible();
@@ -448,7 +448,7 @@ for (const viewport of [
 
 			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible({ timeout: 10_000 });
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await expect(page.getByText('Später · 2026-10-03')).toBeVisible();
 		});
 

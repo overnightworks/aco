@@ -3,7 +3,7 @@
 		cardHeading,
 		cardSentence,
 		EMPTY_HISTORY_MESSAGE,
-		HISTORY_LABEL,
+		DECIDED_TAB_LABEL,
 		historyLines,
 		outcomeLabel,
 		UNKNOWN_DATE_LABEL
@@ -15,7 +15,7 @@
 	const entries = $derived(historyLines(repos));
 </script>
 
-<section aria-label={HISTORY_LABEL}>
+<section aria-label={DECIDED_TAB_LABEL}>
 	{#each repos.filter((repo) => repo.error !== null) as repo (repo.name)}
 		<p role="alert">{repo.name}: {repo.error}</p>
 	{/each}

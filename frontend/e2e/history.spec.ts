@@ -28,7 +28,7 @@ for (const viewport of [
 			await expect(page.getByText('Nothing open: available')).toBeVisible();
 			await expect(page.getByText('All decided')).toHaveCount(0);
 			await page.screenshot({ path: testInfo.outputPath('empty-repo-error.png') });
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await expect(page.getByRole('alert')).toContainText('unavailable');
 			await expect(
 				page.getByText('Noch keine Entscheidungen in den offenen Board-Items.')
@@ -114,8 +114,8 @@ for (const viewport of [
 			await last.scrollIntoViewIfNeeded();
 			const position = await tracks.evaluate((element) => element.scrollTop);
 			await last.click();
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const history = page.getByRole('region', { name: 'Verlauf' });
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const history = page.getByRole('region', { name: 'Decided', exact: true });
 			await expect(history.locator('summary')).toHaveCount(16);
 			await expect(history.locator('summary').first()).toContainText('Projekt 1 · #42');
 			await history.locator('summary').first().press('Enter');
@@ -128,7 +128,7 @@ for (const viewport of [
 			await expect
 				.poll(() => page.evaluate(() => document.documentElement.scrollWidth))
 				.toBeLessThanOrEqual(viewport.width);
-			await page.getByRole('button', { name: 'Entscheiden', exact: true }).click();
+			await page.getByRole('button', { name: /^Open \d+$/ }).click();
 			await expect(
 				page.getByRole('heading', { name: 'Gespräch beenden?', exact: true })
 			).toBeVisible();
@@ -168,8 +168,8 @@ for (const viewport of [
 				return route.abort();
 			});
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const history = page.getByRole('region', { name: 'Verlauf' });
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const history = page.getByRole('region', { name: 'Decided', exact: true });
 			await expect(history.locator('summary')).toHaveCount(2);
 			const fallback = history.getByRole('article');
 			await expect(fallback).toContainText('Die Aufzeichnung bleibt ausgeschaltet.');
@@ -208,17 +208,17 @@ for (const viewport of [
 			await page.goto(`${appUrl}#t=${token}`);
 			await page.getByRole('button', { name: /Gäste zulassen/ }).click();
 			await page.getByRole('button', { name: 'Ja', exact: true }).click();
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await expect(
 				page.getByText('Noch keine Entscheidungen in den offenen Board-Items.')
 			).toBeVisible();
 			await page.clock.runFor(UNDO_SECONDS * 1000 + 500);
-			await expect(page.getByRole('region', { name: 'Verlauf' }).locator('summary')).toContainText(
-				'Ja · 2026-10-03'
-			);
-			await expect(page.getByRole('button', { name: 'Verlauf', exact: true })).toBeFocused();
+			await expect(
+				page.getByRole('region', { name: 'Decided', exact: true }).locator('summary')
+			).toContainText('Ja · 2026-10-03');
+			await expect(page.getByRole('button', { name: /^Decided \d+$/ })).toBeFocused();
 			await expect(page.getByRole('group', { name: 'Entscheidung' })).toHaveCount(0);
-			await page.getByRole('button', { name: 'Entscheiden', exact: true }).click();
+			await page.getByRole('button', { name: /^Open \d+$/ }).click();
 			if (viewport.width === 390) await page.getByRole('button', { name: '← Liste' }).click();
 			await expect(page.getByText('All decided')).toBeVisible();
 		});
