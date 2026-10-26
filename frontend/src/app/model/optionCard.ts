@@ -70,8 +70,8 @@ export function chosenOption(line: OptionLine): CardOption | undefined {
 	return line.options.find((option) => option.letter === line.ruling);
 }
 
-/** `A · name` -- the verdict Decided and the list show instead of a yes/no
- * outcome. */
+/** `A · name` -- an option named by its letter, as the RESULT picture's
+ * fallback alt text reads it. */
 export function verdictLabel(option: CardOption): string {
 	return `${option.letter} · ${option.name}`;
 }

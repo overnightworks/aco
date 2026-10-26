@@ -62,12 +62,12 @@ An option line is malformed when its `ruling` or `recommended` is no letter of i
 
 - [ ] [ABRD-28] The decision list groups open lines by repository under its name and open count; a row shows its state shape and an option line's topic, or a yes/no line's short question or sentence.
 - [ ] [ABRD-29] Within a repository, open option lines come before yes/no lines, each in aco's order. First load selects the first row; desktop shows its card, phones the list until a row is tapped.
-- [ ] [ABRD-30] “Decided” shows ruled lines of open board items as read-only details: question, outcome, date and repository/item; opening reveals the full sentence. It is no archive of closed issues.
-- [ ] [ABRD-31] Browser history sorts date, item number, then line index descending; missing dates last. Complete ties keep repository order. CLI order is unchanged.
-- [ ] [ABRD-32] Returning from history preserves selection, list position and phone view. A completed background decision displaces neither another selected question nor history.
-- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to history. A stored “Später” stays there and is not automatically presented again.
+- [ ] [ABRD-30] Decided groups the ruled lines of open board items by repository under its name and count; a row shows the Decided shape and an option line's topic, or a yes/no line's short question or sentence.
+- [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending, missing dates last; with no ruled line and no failed repository it reads `Nothing decided yet`.
+- [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
+- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided. A stored “Später” stays there and is not automatically presented again.
 - [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation and Decide (ABRD-44).
-- [ ] [ABRD-37] A ruled option line marks its chosen letter on its card; Decided shows letter, option name and date, and opening it reveals the chosen option's contract and the line's sentence.
+- [ ] [ABRD-37] A ruled option line's card marks its chosen letter and adds a Decided row with `<letter> — <name>` and its date; Decided shows a ruled line's card once its row is selected.
 - [ ] [ABRD-38] Each option on an option card is a button that opens its Result (picture or `= TODAY`), You notice, Cost, Undo and Contract behind `Show`; opening one closes the other.
 - [ ] [ABRD-43] Each Today and Result picture on an option card is an `Enlarge picture` button opening it with its caption in a modal dialog; `Close` or `Esc` closes it and focus returns to the button.
 - [ ] [ABRD-44] An open option card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts `option` (ABRD-39); once stored, the card moves to Decided.
@@ -81,7 +81,7 @@ An option line is malformed when its `ruling` or `recommended` is no letter of i
 - [ ] [ABRD-52] An option card's Decide row sticks to the pane's foot while the card runs on beneath it and then casts a shadow over that content; at the card's end it rests in place without one.
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
-`frontend/e2e/decideOption.spec.ts`, `frontend/e2e/history.spec.ts`,
+`frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`,
 `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts` and `frontend/e2e/pictureEnlargement.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
