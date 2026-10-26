@@ -1,0 +1,8 @@
+claim_id = "c091cf66df4c4ee1b94a363546223ebc"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "249171783fdb980cda0d42c2264f65f4e9c657bb"
+branch = "claude/issue-384-option-card-read-only"
+scope = ["README.md", "docs/board/README.md", "frontend/e2e/optionCard.spec.ts", "frontend/e2e/rulingsFixture.ts", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/decision.ts", "frontend/src/app/model/optionCard.test.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/app/state/decision.svelte.ts", "frontend/src/components/HistoryView.svelte", "frontend/src/components/OptionCard.svelte", "frontend/src/components/OptionCard.test.ts", "frontend/src/components/Stage.svelte", "frontend/src/components/Stage.test.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "3dcb73b7bc096a309e5098602f6ab167ec7e644c"
+whole_reason = "The SPA's line type becomes a union, so every reader of a line handles both forms in one commit or svelte-check fails; the read-only card is the one consumer that proves it, and the rebuilt static assets must match."
