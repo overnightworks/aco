@@ -165,7 +165,7 @@ class TestRuleOption:
             pytest.param(
                 card(),
                 YES_NO_LINE,
-                decide('', "chat"),
+                decide("", "chat"),
                 "line 2 has no option ; its options are A, B",
                 "invalid_usage",
                 id="RULE-18-empty",
@@ -173,7 +173,7 @@ class TestRuleOption:
             pytest.param(
                 card(),
                 YES_NO_LINE,
-                decide('AB', "chat"),
+                decide("AB", "chat"),
                 "line 2 has no option AB; its options are A, B",
                 "invalid_usage",
                 id="RULE-18-longer-than-one-letter",
