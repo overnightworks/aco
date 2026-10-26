@@ -1,8 +1,0 @@
-claim_id = "b5085c5c59424f91b12426fa9502aa47"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "95e8682b99812f84c1d6c76486c9b97c0b811133"
-branch = "claude/issue-390-board-writes-option"
-scope = ["specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/ports.py", "tests/aco_board/aco_board_fixtures.py", "tests/aco_board/test_aco_board_core.py", "tests/aco_board/test_aco_board_option_lines.py", "tests/aco_board/test_aco_board_server.py"]
-opened_commit = "15bbcfd29f0638e51d37950d03be56b491e768cf"
-whole_reason = "The option decision is one type that crosses the wire parser, the board's card-hash binding, the port and the adapter, and the port's test doubles must follow its new method."
