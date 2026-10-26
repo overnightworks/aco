@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { pictureDataUri } from '../app/model/boardSummary';
 	import {
 		cardMeta,
 		chosenOption,
@@ -10,6 +9,7 @@
 		UNDO_LABEL
 	} from '../app/model/optionCard';
 	import type { OptionLine } from '../types';
+	import EnlargeablePicture from './EnlargeablePicture.svelte';
 	import OptionDetails from './OptionDetails.svelte';
 	import WarnMark from './WarnMark.svelte';
 
@@ -64,8 +64,12 @@
 			<div class="row">
 				<dt>{ROW_LABEL.today}</dt>
 				<dd>
-					<img src={pictureDataUri(line.picture)} alt={line.caption} />
-					<p class="caption">{line.caption}</p>
+					<EnlargeablePicture
+						picture={line.picture}
+						alt={line.caption}
+						caption={line.caption}
+						thumbnail
+					/>
 				</dd>
 			</div>
 			<div class="row">
@@ -195,17 +199,6 @@
 	}
 	p {
 		margin: 0;
-	}
-	img {
-		display: block;
-		max-width: 100%;
-		height: auto;
-	}
-	.caption {
-		margin-top: 8px;
-		font-size: 13px;
-		line-height: 18px;
-		color: var(--oc-fg-2);
 	}
 	ol {
 		list-style: none;
