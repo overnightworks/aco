@@ -8,20 +8,24 @@
 
 <div class="frame">
 	<p class="meta">
-		<span>{meta.where}</span>
-		{#if meta.kind !== undefined}
-			<span class="sep" aria-hidden="true">·</span>
-			<span>{meta.kind}</span>
-		{/if}
-		{#if meta.undo !== undefined}
-			<span class="sep" aria-hidden="true">·</span>
-			{#if meta.undo === 'final'}
-				<span class="final">
-					<WarnMark />{UNDO_LABEL[meta.undo]}
-				</span>
-			{:else}
-				<span>{UNDO_LABEL[meta.undo]}</span>
-			{/if}
+		<span class="where">{meta.where}</span>
+		{#if meta.kind !== undefined || meta.undo !== undefined}
+			<span class="sep lead" aria-hidden="true">·</span>
+			<span class="props">
+				{#if meta.kind !== undefined}
+					<span>{meta.kind}</span>
+				{/if}
+				{#if meta.kind !== undefined && meta.undo !== undefined}
+					<span class="sep" aria-hidden="true">·</span>
+				{/if}
+				{#if meta.undo === 'final'}
+					<span class="final">
+						<WarnMark />{UNDO_LABEL[meta.undo]}
+					</span>
+				{:else if meta.undo !== undefined}
+					<span>{UNDO_LABEL[meta.undo]}</span>
+				{/if}
+			</span>
 		{/if}
 	</p>
 	<article>
@@ -49,6 +53,11 @@
 		line-height: 18px;
 		color: var(--fg-3);
 	}
+	.props {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 0 8px;
+	}
 	.sep {
 		opacity: 0.6;
 	}
@@ -75,8 +84,22 @@
 		margin: 0;
 	}
 	@media (max-width: 760px) {
+		.meta {
+			display: block;
+			margin-bottom: 12px;
+		}
+		.where,
+		.props {
+			display: flex;
+		}
+		.lead {
+			display: none;
+		}
 		article {
-			padding: 16px;
+			padding: 0;
+			border: 0;
+			border-radius: 0;
+			background: none;
 		}
 		h2 {
 			font-size: 20px;
