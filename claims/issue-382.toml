@@ -1,0 +1,8 @@
+claim_id = "6e85c08067fc451987e7eb4fe27f488d"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "f4fc448ca73005dffb08e5f7cc1fa136efea059b"
+branch = "claude/issue-382-board-reads-option-cards"
+scope = ["specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/ports.py", "tests/aco_board/test_aco_board_option_lines.py", "tests/aco_board/test_aco_board_server.py"]
+opened_commit = "2dcc6bf28d69783841ab9a9466d9cf71487560df"
+whole_reason = "The wire shape, the reader and the fingerprint of an option line are one change that a consumer cannot take in halves."
