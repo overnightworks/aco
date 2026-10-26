@@ -22,7 +22,7 @@ import pytest
 from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, row, serving
 
 from aco.board.aco_cli import AcoCli
-from aco.board.ports import Decision, DecisionResult, ExpectationLine
+from aco.board.ports import Decision, DecisionResult, ExpectationLine, YesNoLine
 from aco.board.server import LOOPBACK_HOST, read_before_deadline
 
 
@@ -207,7 +207,7 @@ class _HugeLineSource:
 
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         huge_text = "x" * (32 * 1024 * 1024)
-        huge_line = ExpectationLine(
+        huge_line = YesNoLine(
             item=42,
             item_title="Share page",
             index=1,

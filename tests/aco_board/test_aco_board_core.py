@@ -19,7 +19,14 @@ from aco_board_fixtures import FakeAcoRepository, line, row
 
 from aco.board.aco_cli import AcoCli
 from aco.board.board import SHUTTING_DOWN, Board, Boards
-from aco.board.ports import Decision, DecisionResult, DecisionStatus, ExpectationLine, Outcome
+from aco.board.ports import (
+    Decision,
+    DecisionResult,
+    DecisionStatus,
+    ExpectationLine,
+    Outcome,
+    YesNoLine,
+)
 
 _WAIT_SECONDS = 5
 _LABEL = "repo"
@@ -43,6 +50,7 @@ def test_a_snapshot_reads_a_lines_recommendation_and_ruling(
 
     [read_line] = Board(AcoCli(directory=repository.directory)).snapshot().lines
 
+    assert isinstance(read_line, YesNoLine)
     assert read == (read_line.default, read_line.ruling, read_line.ruled_on, read_line.is_open)
 
 

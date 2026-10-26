@@ -14,7 +14,16 @@ from dataclasses import dataclass
 from typing import TypeGuard, cast
 
 from .board import RepoReading, RepoUnavailable, wire_fingerprint
-from .ports import NOTE_MAX_LENGTH, Decision, DecisionResult, ExpectationLine, Outcome
+from .ports import (
+    NOTE_MAX_LENGTH,
+    OPTIONS_FORM,
+    CardOption,
+    Decision,
+    DecisionResult,
+    ExpectationLine,
+    OptionLine,
+    Outcome,
+)
 
 JSON_CONTENT_TYPE = "application/json"
 
@@ -99,6 +108,8 @@ def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:
 
 
 def _line_json(line: ExpectationLine, repo: str) -> dict[str, object]:
+    if isinstance(line, OptionLine):
+        return _option_line_json(line, repo)
     return {
         "index": line.index,
         "text": line.text,
@@ -109,6 +120,47 @@ def _line_json(line: ExpectationLine, repo: str) -> dict[str, object]:
         "ruling": line.ruling,
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
         "fingerprint": wire_fingerprint(repo, line),
+    }
+
+
+def _option_line_json(line: OptionLine, repo: str) -> dict[str, object]:
+    """ABRD-34: pictures stay SVG text for the browser to turn into data URIs."""
+    return {
+        "index": line.index,
+        "form": OPTIONS_FORM,
+        "text": line.text,
+        "question": line.question,
+        "problem": line.problem,
+        "picture": line.picture,
+        "caption": line.caption,
+        "decision_kind": line.decision_kind,
+        "area": line.area,
+        "topic": line.topic,
+        "recommended": line.recommended,
+        "reason": line.reason,
+        "options": [_card_option_json(option) for option in line.options],
+        "ruling": line.ruling,
+        "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
+        "fingerprint": wire_fingerprint(repo, line),
+    }
+
+
+def _card_option_json(option: CardOption) -> dict[str, object]:
+    result: dict[str, object] = {"same_as_today": True}
+    if option.picture is not None:
+        result = {"picture": option.picture}
+    if option.caption is not None:
+        result["caption"] = option.caption
+    return {
+        "letter": option.letter,
+        "name": option.name,
+        "effect": option.effect,
+        **result,
+        "notice": option.notice,
+        "cost": option.cost,
+        "undo": option.undo,
+        "undo_how": option.undo_how,
+        "contract": option.contract,
     }
 
 

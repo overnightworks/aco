@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import Protocol
+from typing import Literal, Protocol, get_args
 
 
 class Outcome(StrEnum):
@@ -21,8 +21,18 @@ class Outcome(StrEnum):
     LATER = "later"
 
 
+OptionLetter = Literal["A", "B", "C", "D"]
+"""The letters of an option line's options, by position."""
+
+OPTION_LETTERS: tuple[OptionLetter, ...] = get_args(OptionLetter)
+
+
+OPTIONS_FORM = "options"
+"""The `form` that marks an option line in the source's own listing."""
+
+
 @dataclass(frozen=True)
-class ExpectationLine:
+class YesNoLine:
     item: int
     item_title: str
     index: int
@@ -58,6 +68,56 @@ class ExpectationLine:
             ensure_ascii=False,
         )
         return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+@dataclass(frozen=True)
+class CardOption:
+    letter: OptionLetter
+    name: str
+    effect: str
+    picture: str | None
+    """The option's RESULT picture as stored; None marks `same_as_today`."""
+    caption: str | None
+    notice: str
+    cost: str
+    undo: str
+    undo_how: str
+    contract: str
+
+
+@dataclass(frozen=True)
+class OptionLine:
+    item: int
+    item_title: str
+    index: int
+    text: str
+    question: str
+    problem: str
+    picture: str
+    caption: str
+    decision_kind: str
+    area: str
+    topic: str
+    recommended: OptionLetter
+    reason: str
+    options: tuple[CardOption, ...]
+    ruling: OptionLetter | None
+    ruled_on: date | None
+    card_hash: str
+
+    @property
+    def is_open(self) -> bool:
+        return self.ruling is None
+
+    @property
+    def fingerprint(self) -> str:
+        """The card hash already covers every field the card shows; the item
+        number and line index tell the card apart across items."""
+        shown = json.dumps([self.item, self.index, self.card_hash], ensure_ascii=False)
+        return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+ExpectationLine = YesNoLine | OptionLine
 
 
 NOTE_MAX_LENGTH = 280
