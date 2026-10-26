@@ -15,7 +15,9 @@ from github_fixtures import FakeForge, assert_github_world, serve_forge
 from aco import forge
 
 GOLDEN_CARD_HASH = "sha256:f7f1db4c507733e34c58d64de61fd482ad3d308db7ce3bf14bc503179c26519d"
-RULED_KEYS = f'ruling = "A"\nruled_on = 2026-10-28\ncard_hash = "{GOLDEN_CARD_HASH}"\n'
+RULED_KEYS = (
+    f'ruling = "A"\nruled_on = 2026-10-28\ncard_hash = "{GOLDEN_CARD_HASH}"\nvia = "board"\n'
+)
 
 
 def card_head(*edits: tuple[str, str]) -> str:
@@ -387,6 +389,26 @@ class TestOptionLineCheck:
                 id="BODY-86-card-hash-shape",
             ),
             pytest.param(
+                ruled_card(('via = "board"\n', "")),
+                [malformed(f"{E}.via", f"{E} is ruled without via")],
+                id="BODY-86-ruled-without-via",
+            ),
+            pytest.param(
+                card(card_head(("question = ", 'via = "chat"\nquestion = '))),
+                [malformed(f"{E}.ruling", f"{E} carries via without ruling")],
+                id="BODY-86-via",
+            ),
+            pytest.param(
+                ruled_card(('ruling = "A"\nruled_on = 2026-10-28\n', "")),
+                [malformed(f"{E}.ruling", f"{E} carries card_hash without ruling")],
+                id="BODY-86-card-hash-via",
+            ),
+            pytest.param(
+                ruled_card(('via = "board"', 'via = "phone"')),
+                [malformed(f"{E}.via", f"{E}.via must be board, chat, or default")],
+                id="BODY-90",
+            ),
+            pytest.param(
                 ruled_card(('area = "Song-Seite"', 'area = "Song-Liste"')),
                 [
                     malformed(
@@ -431,19 +453,22 @@ class TestOptionLineCheck:
     def test_a_defective_option_line_is_refused(
         self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
     ) -> None:
-        """Spec: BODY-69..BODY-84, BODY-86, BODY-87 -- one sentence per refusal, in entry order."""
+        """Spec: BODY-69..BODY-84, BODY-86, BODY-87, BODY-90 -- one sentence per refusal, in
+        entry order."""
         assert check_defects(capsys, card_body(line)) == (2, defects)
 
     @pytest.mark.parametrize(
         ("line", "defects"),
         [
             pytest.param(
-                '[[expectation]]\ntext = "T"\ndefault = "yes"\nproblem = "P"\ncard_hash = "H"\n',
+                '[[expectation]]\ntext = "T"\ndefault = "yes"\nproblem = "P"\ncard_hash = "H"\n'
+                'via = "chat"\n',
                 [
                     malformed(
                         f"{E}.problem", f"{E}.problem belongs to an option line; this line has none"
                     ),
                     malformed(f"{E}.card_hash", f"unknown key {E}.card_hash"),
+                    malformed(f"{E}.via", f"unknown key {E}.via"),
                 ],
                 id="BODY-83",
             ),
@@ -491,7 +516,7 @@ class TestOptionLineRulings:
     def test_rulings_json_carries_every_card_field_and_the_card_hash(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], newline: str
     ) -> None:
-        """Spec: RUL-10, RUL-12, RUL-13, RUL-14, BODY-89 -- a mixed item, the golden hash."""
+        """Spec: RUL-10, RUL-12..RUL-15, BODY-89 -- a mixed item, the golden hash."""
         yes_no = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
         raw_body = card_body(card(), before="\n" + yes_no, newline=newline)
         serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(7, "Karte", raw_body),)))
@@ -517,6 +542,7 @@ class TestOptionLineRulings:
             "default": None,
             "card_hash": GOLDEN_CARD_HASH,
             "stored_card_hash": None,
+            "via": None,
             "question": "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?",
             "problem": "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg.",
             "picture": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'
@@ -547,7 +573,8 @@ class TestOptionLineRulings:
     def test_a_ruled_option_line_lists_its_letter_and_date(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: RUL-02, RUL-12 -- text names the letter, `--json` the letter and stored hash."""
+        """Spec: RUL-02, RUL-12, RUL-15 -- text names the letter, `--json` the letter, stored
+        hash and via."""
         raw_body = card_body(ruled_card())
         serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(7, "Karte", raw_body),)))
         text = run_cli(["rulings"], capsys)
@@ -562,7 +589,8 @@ class TestOptionLineRulings:
             line["default"],
             line["card_hash"],
             line["stored_card_hash"],
-        ) == ("A", "2026-10-28", None, GOLDEN_CARD_HASH, GOLDEN_CARD_HASH)
+            line["via"],
+        ) == ("A", "2026-10-28", None, GOLDEN_CARD_HASH, GOLDEN_CARD_HASH, "board")
 
     def test_a_caption_less_option_hashes_without_the_caption(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -580,7 +608,8 @@ class TestOptionLineRulings:
         assert line["card_hash"] != GOLDEN_CARD_HASH
         ruled = without_caption.replace(
             "question = ",
-            f'ruling = "B"\nruled_on = 2026-10-28\ncard_hash = "{line["card_hash"]}"\nquestion = ',
+            f'ruling = "B"\nruled_on = 2026-10-28\ncard_hash = "{line["card_hash"]}"\n'
+            'via = "default"\nquestion = ',
             1,
         )
         result = run_cli(["check", "-"], capsys, stdin=card_body(ruled))

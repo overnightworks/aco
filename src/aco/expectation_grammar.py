@@ -68,6 +68,16 @@ class Undo(StrEnum):
     FINAL = "final"
 
 
+class RulingVia(StrEnum):
+    """Who decided an option line and how the decision reached aco: the
+    operator clicked on the board, a head transcribed his word from the
+    chat, or he left the card unanswered and its recommendation stands."""
+
+    BOARD = "board"
+    CHAT = "chat"
+    DEFAULT = "default"
+
+
 # The card keys of an option line, each required, in rendering order after
 # `text` and the decided state; `question` and `picture` are shared with the
 # yes/no line, the others belong to the option line alone.
@@ -156,9 +166,13 @@ def _non_empty_string_defect(value: object) -> str | None:
     return None if isinstance(value, str) and value.strip() else "must be a non-empty string"
 
 
-def _decision_kind_defect(value: object) -> str | None:
-    kinds = tuple(DecisionKind)
-    return None if value in kinds else f"must be {_one_of(kinds)}"
+def _member_defect(members: tuple[str, ...]) -> Callable[[object], str | None]:
+    """The check that a value is one of an enumeration's `members`."""
+
+    def defect(value: object) -> str | None:
+        return None if value in members else f"must be {_one_of(members)}"
+
+    return defect
 
 
 def _undo_defect(value: object) -> str | None:
@@ -300,7 +314,7 @@ _EXPECTATION_KNOWN_KEYS = frozenset(
     {"text", "default", "ruling", "ruled_on", *(key for key, _ in EXPECTATION_OPTIONAL_FIELDS)}
 )
 _OPTION_TABLES = "option"
-_OPTION_LINE_DECISION_KEYS = ("ruling", "ruled_on", "card_hash")
+_OPTION_LINE_DECISION_KEYS = ("ruling", "ruled_on", "card_hash", "via")
 _OPTION_LINE_KNOWN_KEYS = frozenset(
     {
         "text",
@@ -347,13 +361,17 @@ def _present_letters(options: object) -> tuple[str, ...]:
 
 def _partial_decision_defect(prefix: str, entry: dict[str, object]) -> FieldDefect:
     """The one refusal of a partial decided state: some but not all of
-    `ruling`, `ruled_on` and `card_hash`."""
-    if "ruling" in entry and "ruled_on" not in entry:
+    `ruling`, `ruled_on`, `card_hash` and `via`, named by the first key
+    missing after `ruling`, or by the first present one when `ruling` is
+    missing."""
+    after_ruling = _OPTION_LINE_DECISION_KEYS[1:]
+    if "ruling" not in entry:
+        beside = next(key for key in after_ruling if key in entry)
+        return FieldDefect(f"{prefix}.ruling", f"{prefix} carries {beside} without ruling")
+    missing = next(key for key in after_ruling if key not in entry)
+    if missing == "ruled_on":
         return FieldDefect(f"{prefix}.ruled_on", f"{prefix} carries ruling without ruled_on")
-    if "ruling" in entry:
-        return FieldDefect(f"{prefix}.card_hash", f"{prefix} is ruled without card_hash")
-    beside = "ruled_on" if "ruled_on" in entry else "card_hash"
-    return FieldDefect(f"{prefix}.ruling", f"{prefix} carries {beside} without ruling")
+    return FieldDefect(f"{prefix}.{missing}", f"{prefix} is ruled without {missing}")
 
 
 def _card_hash_defect(value: object) -> str | None:
@@ -375,6 +393,7 @@ def _option_line_decision_defects(
         *_field_defect(f"{prefix}.ruling", _letter_defect(letters)(entry["ruling"])),
         *_field_defect(f"{prefix}.ruled_on", ruled_on_reason),
         *_field_defect(f"{prefix}.card_hash", _card_hash_defect(entry["card_hash"])),
+        *_field_defect(f"{prefix}.via", _member_defect(tuple(RulingVia))(entry["via"])),
     ]
 
 
@@ -383,7 +402,7 @@ def _option_line_key_defects(
 ) -> list[FieldDefect]:
     checks: dict[str, Callable[[object], str | None]] = {
         "question": _expectation_question_defect,
-        "decision_kind": _decision_kind_defect,
+        "decision_kind": _member_defect(tuple(DecisionKind)),
         "recommended": _letter_defect(letters),
     }
     defects: list[FieldDefect] = []

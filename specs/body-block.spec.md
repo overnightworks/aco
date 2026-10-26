@@ -33,7 +33,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
-| option line defective | BODY-69..BODY-84, BODY-86, BODY-87 | BODY-50 | BODY-52 |
+| option line defective | BODY-69..BODY-84, BODY-86, BODY-87, BODY-90 | BODY-50 | BODY-52 |
 | complete option line, open or ruled | BODY-85, BODY-89 | — | — |
 | a rewrite of a block carrying expectation lines | BODY-88 | — | — |
 | `[[slice]]` defective | BODY-43..BODY-48, BODY-65 | BODY-50 | BODY-52 |
@@ -112,7 +112,7 @@ An entry carrying `option` is an option line; any other is a yes/no line,
 judged by BODY-26..BODY-42 exactly as before. Its keys, in the order a rewrite
 writes them:
 
-- `text`, then the decided state `ruling`, `ruled_on`, `card_hash` (all three, or none while open);
+- `text`, then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open);
 - `question`, `problem`, `picture` (TODAY), `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required;
 - 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then either `picture` with an optional `caption` or `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
 
@@ -148,13 +148,16 @@ budget, unknown keys, and last BODY-87, only when no other refusal fired.
   - `ruled_on`, no `ruling`: `body malformed: expectation[0].ruling: expectation[0] carries ruled_on without ruling`
   - `card_hash` alone: `body malformed: expectation[0].ruling: expectation[0] carries card_hash without ruling`
   - another `card_hash`: `body malformed: expectation[0].card_hash: expectation[0].card_hash must be sha256: followed by 64 lowercase hex digits`
+  - `ruling`, `ruled_on` and `card_hash`: `body malformed: expectation[0].via: expectation[0] is ruled without via`
+  - `via` alone: `body malformed: expectation[0].ruling: expectation[0] carries via without ruling`
 - [ ] [BODY-87] A ruled card edited later prints `body malformed: expectation[0].card_hash: expectation[0] was edited after its ruling; a changed ruling is a new line` until reverted (see E-BODY-13).
 - [ ] [BODY-88] A rewrite writes each present key in the order above, line keys before option tables; it re-reads to the same values, and a second rewrite changes no byte, LF or CRLF.
 - [ ] [BODY-89] `card_hash` is `sha256:` and the SHA-256 hex of the shown card's present keys as compact, key-sorted UTF-8 JSON, the option tables under `options` (see E-BODY-10).
+- [ ] [BODY-90] A `via` other than `board`, `chat` or `default` prints `body malformed: expectation[0].via: expectation[0].via must be board, chat, or default`, exit `2` (see E-BODY-12).
 
 The card hash belongs to option lines and covers every key listed above except
-the decided state. It never covers the item title, the index, `ruling`, `ruled_on` or
-`card_hash`, and it reads parsed values, so TOML quoting, key order and line
+the decided state. It never covers the item title, the index, `ruling`, `ruled_on`,
+`card_hash` or `via`, and it reads parsed values, so TOML quoting, key order and line
 endings cannot change it.
 
 ## `[[slice]]`
@@ -617,7 +620,8 @@ exit 2
 ### E-BODY-12 — the decided state of an option line
 
 Setup: bare-remote, `storage = "github"`. The card, ruled `A` on 2026-10-28,
-carries `card_hash = "sha256:6308916341e71850961411f654688124981f4854f6380da12f456a216ac97908"`.
+carries `card_hash = "sha256:6308916341e71850961411f654688124981f4854f6380da12f456a216ac97908"`
+and `via = "board"`.
 
 ````console
 $ aco check - <<'BODY'
@@ -665,13 +669,16 @@ BODY
 exit 2
 ````
 
-The same card with `ruling = "C"`, `ruled_on = 2026-10-28` and the hash
-above prints `2> body malformed: expectation[0].ruling: expectation[0].ruling must be one of A, B`, exit `2`.
+The same card with `ruling = "C"`, `ruled_on = 2026-10-28`, the hash
+above and `via = "board"` prints `2> body malformed: expectation[0].ruling: expectation[0].ruling must be one of A, B`, exit `2`.
+Ruled `A` with `via = "phone"` it prints
+`2> body malformed: expectation[0].via: expectation[0].via must be board, chat, or default`, exit `2`,
+and without `via` it prints `2> body malformed: expectation[0].via: expectation[0] is ruled without via`, exit `2`.
 
 ### E-BODY-13 — a ruled card edited later
 
 Setup: bare-remote, `storage = "github"`; E-BODY-12's card ruled `A` with
-`ruled_on = 2026-10-28` and its hash prints `body ok`, exit `0`. Then its
+`ruled_on = 2026-10-28`, its hash and `via = "board"` prints `body ok`, exit `0`. Then its
 `area` is edited:
 
 ````console
@@ -687,6 +694,7 @@ text = "Der Song bleibt beim Sprung offen."
 ruling = "A"
 ruled_on = 2026-10-28
 card_hash = "sha256:6308916341e71850961411f654688124981f4854f6380da12f456a216ac97908"
+via = "board"
 question = "Song offen lassen?"
 problem = "Der Song schließt sich."
 picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'

@@ -49,14 +49,16 @@ writes.
 
 The `DecisionKind` members are reached only by construction from a stored
 value (`DecisionKind(value)`) and by iteration when the grammar lists the
-accepted kinds; no code names one of them.
+accepted kinds; no code names one of them. `RulingVia.BOARD` and
+`RulingVia.CHAT` are reached the same way, from `--via` and from a stored
+`via`.
 """
 
 import argparse
 from datetime import UTC, date, datetime
 
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
-from aco.expectation_grammar import DecisionKind
+from aco.expectation_grammar import DecisionKind, RulingVia
 from aco.metrics import Size, SizeClassStats
 from aco.workboard import (
     Board,
@@ -146,6 +148,8 @@ _referenced_only_for_vulture = (
     DecisionKind.MONEY,
     DecisionKind.ACCESS,
     DecisionKind.WORDING,
+    RulingVia.BOARD,
+    RulingVia.CHAT,
     _BoardApiRequestHandler.do_GET,
     _BoardApiRequestHandler.do_POST,
     _BoardApiRequestHandler.log_message,

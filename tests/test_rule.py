@@ -624,6 +624,16 @@ def test_context_refusal(
             "aco rule: error: argument --no: not allowed with argument --yes",
             id="two-outcomes",
         ),
+        pytest.param(
+            ["rule", "90", "--line", "1", "--yes", "--option", "A"],
+            "aco rule: error: argument --option: not allowed with argument --yes",
+            id="yes-and-option",
+        ),
+        pytest.param(
+            ["rule", "90", "--line", "1", "--option", "A", "--via", "phone"],
+            "aco rule: error: argument --via: invalid choice: 'phone'",
+            id="unknown-via",
+        ),
     ],
 )
 def test_parser_refusal(
@@ -632,7 +642,8 @@ def test_parser_refusal(
     arguments: list[str],
     sentence: str,
 ) -> None:
-    """Spec: Never 1 — parser requires exactly one of --yes, --no, --later before command entry."""
+    """Spec: Never 1 — parser requires exactly one of --yes, --no, --later, --option and a known
+    --via before command entry."""
 
     def forbidden(*args, **kwargs):
         pytest.fail("invalid outcomes reached the rule command entry")
@@ -650,3 +661,11 @@ def test_parser_refusal(
         "stdout": captured.out,
     }
     assert observed == {"code": 2, "sentence": sentence, "usage": usage, "stdout": ""}
+
+
+def test_legacy_refusal_usage_names_no_option_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    """Spec: Never 1 — the yes/no refusal usage stays byte-identical, naming no option flag."""
+    with pytest.raises(SystemExit):
+        cli.main(["rule", "90", "--line", "1"])
+    usage_text = capsys.readouterr().err
+    assert [flag in usage_text for flag in ("--option", "--via", "--card-hash")] == [False] * 3
