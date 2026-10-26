@@ -81,6 +81,39 @@ function arrange(directory: string, song: Partial<OptionRulingLine> = {}): void 
 	]);
 }
 
+const FINAL_OPTIONS: RulingOption[] = [
+	SONG_OPTIONS[0],
+	{ ...SONG_OPTIONS[1], undo: 'final', undo_how: 'nicht rückholbar.' }
+];
+
+function arrangeFinal(directory: string, song: Partial<OptionRulingLine> = {}): void {
+	arrange(directory, { options: FINAL_OPTIONS, ...song });
+}
+
+function confirm(page: Page): Locator {
+	return page.getByRole('dialog', { name: 'Decide B?' });
+}
+
+function countPosts(page: Page): { count(): number } {
+	let posts = 0;
+	page.on('request', (request) => {
+		if (request.method() === 'POST') posts += 1;
+	});
+	return { count: () => posts };
+}
+
+async function dialogInsideViewport(page: Page, viewportWidth: number): Promise<void> {
+	expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+		viewportWidth
+	);
+	const box = await confirm(page).evaluate((dialog) => {
+		const { left, right } = dialog.getBoundingClientRect();
+		return { left, right };
+	});
+	expect(box.left).toBeGreaterThanOrEqual(0);
+	expect(box.right).toBeLessThanOrEqual(viewportWidth);
+}
+
 async function open(page: Page, phone: boolean, question = SONG_QUESTION): Promise<void> {
 	const { appUrl, token } = readBoardRuntime();
 	await page.clock.install();
@@ -199,6 +232,7 @@ for (const viewport of [
 			await page.getByRole('button', { name: 'Neu laden' }).click();
 			await expect(page.getByRole('alert')).toHaveCount(0);
 			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeEnabled();
+			await expect(page.locator('.stage')).toBeFocused();
 		});
 
 		test('[ABRD-45] a card ruled elsewhere answers already ruled instead of a second write', async ({
@@ -273,5 +307,184 @@ for (const viewport of [
 			await expect(page.getByRole('dialog')).toHaveCount(0);
 			if (!phone) await expect(page.locator('.stage')).toBeFocused();
 		});
+
+		test('[ABRD-46] a final pick asks first and Decide B starts the undo window', async ({
+			page
+		}, testInfo) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrangeFinal(repoDirectory);
+			const posts = countPosts(page);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.click();
+
+			await expect(confirm(page)).toBeVisible();
+			await expect(confirm(page).locator('.cline')).toHaveText('Nicht rückholbar.');
+			await expect(confirm(page).locator('.cline svg')).toBeVisible();
+			await expect(confirm(page).getByRole('button')).toHaveText(['Cancel', 'Decide B']);
+			await expect(confirm(page).getByRole('button', { name: 'Cancel' })).toBeFocused();
+			expect(posts.count()).toBe(0);
+			await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveCount(0);
+			await shoot(page, testInfo, 'confirm');
+			await dialogInsideViewport(page, viewport.width);
+
+			await confirm(page).getByRole('button', { name: 'Decide B' }).click();
+			await expect(confirm(page)).toHaveCount(0);
+			await expect(page.locator('.toasts')).toContainText('B — Browser-Sprung bleibt · Sprung');
+			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeDisabled();
+			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeDisabled();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+			const entry = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
+			await expect(entry).toHaveCount(1);
+			await expect(entry).toContainText(SONG_QUESTION);
+			await expect(entry).toContainText('B · Browser-Sprung bleibt');
+		});
+
+		for (const [key, close] of [
+			['Cancel', (page: Page) => confirm(page).getByRole('button', { name: 'Cancel' }).click()],
+			['Esc', (page: Page) => page.keyboard.press('Escape')]
+		] as const) {
+			test(`[ABRD-47] ${key} closes the confirm, posts nothing and returns focus to the pick`, async ({
+				page
+			}) => {
+				const { repoDirectory } = readBoardRuntime();
+				arrangeFinal(repoDirectory);
+				const posts = countPosts(page);
+				await open(page, phone);
+				const pickB = picks(page).getByRole('button', { name: /^Decide B:/ });
+
+				await pickB.click();
+				await expect(confirm(page)).toBeVisible();
+				await close(page);
+
+				await expect(confirm(page)).toHaveCount(0);
+				await expect(pickB).toBeFocused();
+				await expect(pickB).toBeEnabled();
+				await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeEnabled();
+				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+				expect(posts.count()).toBe(0);
+				await expect(
+					page.locator('.option-card').getByRole('heading', { name: SONG_QUESTION })
+				).toBeVisible();
+			});
+		}
+
+		test('[ABRD-46] Enter on the pick opens the confirm on Cancel and a second Enter cancels', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrangeFinal(repoDirectory);
+			const posts = countPosts(page);
+			await open(page, phone);
+			const pickB = picks(page).getByRole('button', { name: /^Decide B:/ });
+
+			await pickB.focus();
+			await page.keyboard.press('Enter');
+			await expect(confirm(page).getByRole('button', { name: 'Cancel' })).toBeFocused();
+			await page.keyboard.press('Enter');
+
+			await expect(confirm(page)).toHaveCount(0);
+			await expect(pickB).toBeFocused();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			expect(posts.count()).toBe(0);
+		});
+
+		test('[ABRD-44] a reversible pick on a card with a final option opens no confirm', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrangeFinal(repoDirectory);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide A:/ })
+				.click();
+
+			await expect(page.getByRole('dialog')).toHaveCount(0);
+			await expect(page.locator('.toasts')).toContainText('A — Song bleibt offen · Sprung');
+		});
 	});
 }
+
+test.describe('1280px confirm over a changing board', () => {
+	test.use({ viewport: { width: 1280, height: 900 } });
+
+	test('[ABRD-47] a card changed under the open confirm is refused as changed, not decided', async ({
+		page
+	}) => {
+		const { repoDirectory } = readBoardRuntime();
+		arrangeFinal(repoDirectory);
+		await open(page, false, OTHER_QUESTION);
+		await picks(page)
+			.getByRole('button', { name: /^Decide B:/ })
+			.click();
+		await page.getByRole('button', { name: new RegExp(SONG_QUESTION.replace('?', '\\?')) }).click();
+		await picks(page)
+			.getByRole('button', { name: /^Decide B:/ })
+			.click();
+		await expect(confirm(page)).toBeVisible();
+
+		arrangeFinal(repoDirectory, { card_hash: 'card-hash-changed' });
+		const reloaded = page.waitForResponse(
+			(response) => response.url().endsWith('/api/board') && response.request().method() === 'GET'
+		);
+		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+		await reloaded;
+		// The modal makes the page inert, so the board is read by CSS, not by role.
+		await expect(page.locator('.tracks')).not.toContainText(OTHER_QUESTION);
+		await expect(confirm(page)).toBeVisible();
+		await confirm(page).getByRole('button', { name: 'Decide B' }).click();
+		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+		await expect(page.getByRole('alert')).toContainText(LINE_CHANGED_MESSAGE);
+		await expect(page.getByRole('button', { name: 'Neu laden' })).toBeVisible();
+		await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
+		const entries = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
+		await expect(entries).toHaveCount(1);
+		await expect(entries).not.toContainText(SONG_QUESTION);
+	});
+
+	test('[ABRD-47] a slow background reload leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
+		page
+	}) => {
+		const { repoDirectory } = readBoardRuntime();
+		arrangeFinal(repoDirectory);
+		await open(page, false, OTHER_QUESTION);
+		await picks(page)
+			.getByRole('button', { name: /^Decide B:/ })
+			.click();
+		await page.getByRole('button', { name: new RegExp(SONG_QUESTION.replace('?', '\\?')) }).click();
+		const pickB = picks(page).getByRole('button', { name: /^Decide B:/ });
+		await pickB.click();
+		await expect(confirm(page)).toBeVisible();
+
+		let release: (() => void) | undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await page.route('**/api/board', async (route) => {
+			if (route.request().method() !== 'GET') return route.continue();
+			await held;
+			return route.continue();
+		});
+		try {
+			const reload = page.waitForRequest(
+				(request) => request.url().endsWith('/api/board') && request.method() === 'GET'
+			);
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await reload;
+
+			await expect(confirm(page)).toBeVisible();
+			await expect(confirm(page).getByRole('button', { name: 'Cancel' })).toBeFocused();
+			await page.keyboard.press('Escape');
+			await expect(page.getByRole('dialog')).toHaveCount(0);
+			await expect(pickB).toBeFocused();
+		} finally {
+			release?.();
+		}
+	});
+});

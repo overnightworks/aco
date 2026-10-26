@@ -48,3 +48,27 @@ test('setNoAccess resets a previously loaded board', async () => {
 	expect(store.repos).toEqual([]);
 	expect(store.error).toBeNull();
 });
+
+test('[ABRD-47] a ready board stays ready and readable while it is re-read', async () => {
+	const store = new BoardStore();
+	const first = [repo()];
+	await store.load('secret', fakeFetch(200, { repos: first }));
+	let release: () => void = () => {};
+	const held = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const slowFetch = (async () => {
+		await held;
+		return { ok: true, status: 200, json: async () => ({ repos: [] }) };
+	}) as unknown as typeof fetch;
+
+	const reloading = store.load('secret', slowFetch);
+
+	expect(store.status).toBe('ready');
+	expect(store.refreshing).toBe(true);
+	expect(store.repos).toEqual(first);
+	release();
+	await reloading;
+	expect(store.refreshing).toBe(false);
+	expect(store.repos).toEqual([]);
+});

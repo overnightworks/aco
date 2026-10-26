@@ -27,7 +27,8 @@ test('with nothing selected, the stage says no question is selected', () => {
 	render(Stage, {
 		repos: [],
 		selectedKey: null,
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	expect(screen.getByText('Keine Frage ausgewählt.')).toBeInTheDocument();
@@ -46,7 +47,8 @@ test('a selected line shows only its own question, example, sentence and recomme
 	render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	expect(screen.getByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
@@ -64,7 +66,8 @@ test('[ABRD-44] a selected option line shows its card and offers the Decide pick
 	render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	expect(screen.getByRole('heading', { name: 'Keep the song open?' })).toBeInTheDocument();
@@ -90,7 +93,8 @@ test('[ABRD-44] a ruled option line offers no Decide group', () => {
 	render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
@@ -102,7 +106,7 @@ test('[ABRD-44] picking an option disables the picks, then posts exactly that le
 	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
 	const decisions = new DecisionStore('token', async () => {}, send as never);
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
 	screen.getByRole('button', { name: /^Decide B:/ }).click();
 	await tick();
 
@@ -126,7 +130,7 @@ test('[ABRD-45] a changed option card hides the picks until Neu laden reloads it
 	const reload = vi.fn(async () => {});
 	const decisions = storeAnswering({ status: 'failed', message: LINE_CHANGED_MESSAGE }, reload);
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
 	screen.getByRole('button', { name: /^Decide A:/ }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
@@ -143,7 +147,8 @@ test('a selected yes/no line still offers Ja, Nein and Später', () => {
 	render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	const choices = screen.getByRole('group', { name: 'Entscheidung' });
@@ -167,7 +172,8 @@ test('an already-ruled selected line shows a read-only box, never live choice bu
 	render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	expect(screen.getByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
@@ -181,7 +187,7 @@ test('choosing an outcome starts the undo window and disables the buttons', asyn
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const decisions = storeAnswering({ status: 'ruled', message: null });
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
 	screen.getByRole('button', { name: 'Ja' }).click();
 	await tick();
 
@@ -195,7 +201,7 @@ test('an already-ruled refusal hides the choices and offers a reload', async () 
 	const reload = vi.fn(async () => {});
 	const decisions = storeAnswering({ status: 'already_ruled', message: null }, reload);
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
 	screen.getByRole('button', { name: 'Ja' }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
@@ -216,7 +222,8 @@ test('a hostile picture is embedded only as an image, never as markup', () => {
 	const { container } = render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	const image = screen.getByAltText('Bild zur Frage');
@@ -244,7 +251,8 @@ test('hostile question, sentence, example and item title render as text, never a
 	const { container } = render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null })
+		decisions: storeAnswering({ status: 'ruled', message: null }),
+		refreshing: false
 	});
 
 	expect(screen.getByRole('heading', { name: hostileQuestion })).toBeInTheDocument();
@@ -260,7 +268,7 @@ test('a plain failure keeps the choices usable for a retry', async () => {
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const decisions = storeAnswering({ status: 'failed', message: 'aco rule failed: boom' });
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions });
+	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
 	screen.getByRole('button', { name: 'Ja' }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 

@@ -29,17 +29,6 @@ export function outcomeLabel(outcome: Outcome): string {
 	return OUTCOME_LABEL[outcome];
 }
 
-export function totalLineCount(repos: RepoReading[]): number {
-	return repos.reduce(
-		(sum, repo) => sum + repo.items.reduce((itemSum, item) => itemSum + item.lines.length, 0),
-		0
-	);
-}
-
-export function isBoardEmpty(repos: RepoReading[]): boolean {
-	return totalLineCount(repos) === 0;
-}
-
 export function lineStatusText(line: ExpectationLine): string {
 	if (isOptionLine(line)) {
 		return optionStatusText(line);

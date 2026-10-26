@@ -23,7 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45 | RULE-13 (outcome), ABRD-39 (option) |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
 | a post naming both or neither of `outcome` and `option`, another letter, or an `option` with a note | — | ABRD-42 |
@@ -72,6 +72,8 @@ An option line is malformed when its `ruling` or `recommended` is no letter of i
 - [ ] [ABRD-43] Each Today and Result picture on an option card is an `Enlarge picture` button opening it with its caption in a modal dialog; `Close` or `Esc` closes it and focus returns to the button.
 - [ ] [ABRD-44] An open option card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts `option` (ABRD-39); once stored, the card moves to Verlauf.
 - [ ] [ABRD-45] A refused pick shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide the picks behind `Neu laden`, and any other failure keeps them.
+- [ ] [ABRD-46] A pick on a `final` option first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` starts the undo window (ABRD-44).
+- [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` posts the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/history.spec.ts`,

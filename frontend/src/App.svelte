@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import {
-		isBoardEmpty,
 		LIST_LABEL,
 		nextOpenAfter,
 		firstOpenKey,
@@ -61,7 +60,7 @@
 	}
 
 	$effect(() => {
-		if (board.status === 'ready') {
+		if (board.status === 'ready' && !board.refreshing) {
 			if (!initialized) {
 				selectedKey = firstOpenKey(board.repos);
 				initialized = true;
@@ -101,7 +100,7 @@
 	<h1>aco</h1>
 	{#if board.status === 'no-access'}
 		<p role="alert">Zugang fehlt. Starte das Board im Repo und öffne den Link, den es ausgibt.</p>
-	{:else if board.status === 'loading' && isBoardEmpty(board.repos)}
+	{:else if board.status === 'loading'}
 		<p role="status">Lädt…</p>
 	{:else if board.status === 'unavailable'}
 		<p role="alert">aco antwortet nicht. {board.error}</p>
@@ -130,11 +129,7 @@
 			</div>
 			<div class="question-pane" bind:this={question} tabindex="-1">
 				<button class="back" type="button" onclick={showList}>← {LIST_LABEL}</button>
-				{#if board.status === 'loading'}
-					<p role="status">Lädt…</p>
-				{:else}
-					<Stage repos={board.repos} {selectedKey} {decisions} />
-				{/if}
+				<Stage repos={board.repos} {selectedKey} {decisions} refreshing={board.refreshing} />
 			</div>
 		</div>
 		<div class="toasts" hidden={view !== 'decide'} aria-live="polite">

@@ -14,12 +14,15 @@ const songCard = optionLine({
 	]
 });
 
-function renderRow(overrides: { pending?: boolean; banner?: DecisionBanner | null } = {}) {
+function renderRow(
+	overrides: { pending?: boolean; refreshing?: boolean; banner?: DecisionBanner | null } = {}
+) {
 	const onDecide = vi.fn();
 	const onReload = vi.fn();
 	const { container } = render(DecideRow, {
 		line: songCard,
 		pending: false,
+		refreshing: false,
 		banner: null,
 		onDecide,
 		onReload,
@@ -55,7 +58,7 @@ test('[ABRD-44] clicking a pick decides exactly that option', async () => {
 	await fireEvent.click(screen.getByRole('button', { name: /^Decide B:/ }));
 
 	expect(onDecide).toHaveBeenCalledTimes(1);
-	expect(onDecide).toHaveBeenCalledWith(songCard.options[1]);
+	expect(onDecide).toHaveBeenCalledWith(songCard, songCard.options[1]);
 });
 
 test('[ABRD-44] a pending decision disables every pick', () => {
@@ -64,6 +67,17 @@ test('[ABRD-44] a pending decision disables every pick', () => {
 	for (const pick of screen.getAllByRole('button')) {
 		expect(pick).toBeDisabled();
 	}
+});
+
+test('defect:#398 picks shown during a board re-read answer nothing', async () => {
+	const { onDecide } = renderRow({ refreshing: true });
+
+	for (const pick of screen.getAllByRole('button')) {
+		expect(pick).toHaveAttribute('aria-disabled', 'true');
+	}
+	await fireEvent.click(screen.getByRole('button', { name: /^Decide B:/ }));
+
+	expect(onDecide).not.toHaveBeenCalled();
 });
 
 test.each([
@@ -95,4 +109,25 @@ test('[ABRD-44] a hostile option name is text, never markup', () => {
 	const { container } = renderRow();
 
 	expect(container.querySelector('img')).toBeNull();
+});
+
+test('[ABRD-46] a closed confirm adds no button and no visible dialog to a row with a final option', () => {
+	const finalCard = optionLine({
+		options: [
+			cardOption(),
+			cardOption({ letter: 'B', undo: 'final', undo_how: 'nicht rückholbar.' })
+		]
+	});
+	render(DecideRow, {
+		line: finalCard,
+		pending: false,
+		refreshing: false,
+		banner: null,
+		onDecide: vi.fn(),
+		onReload: vi.fn()
+	});
+
+	const picks = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button');
+	expect(screen.getAllByRole('button')).toHaveLength(picks.length);
+	expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });

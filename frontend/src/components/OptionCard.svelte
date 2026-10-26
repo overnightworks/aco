@@ -140,6 +140,7 @@
 		--oc-surface: #ffffff;
 		--oc-line: #e5e2ea;
 		--oc-line-strong: #cdc8d5;
+		--oc-fg: #18151f;
 		--oc-fg-2: #4d4758;
 		--oc-fg-3: #6e6779;
 		--oc-accent: #7d2459;
