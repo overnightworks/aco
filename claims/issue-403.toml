@@ -1,0 +1,8 @@
+claim_id = "27972bf3e7134ba1b3dfbf531cd13fc5"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "fd610d914ac709759455742f4106990ee2c0aa1e"
+branch = "claude/issue-403-page-header-and-frame"
+scope = ["docs/board/README.md", "frontend/e2e/decide.spec.ts", "frontend/e2e/decideOption.spec.ts", "frontend/e2e/history.spec.ts", "frontend/e2e/optionCard.spec.ts", "frontend/e2e/pageFrame.spec.ts", "frontend/src/App.svelte", "frontend/src/App.test.ts", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/optionCard.test.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/components/DecideRow.svelte", "frontend/src/components/EnlargeablePicture.svelte", "frontend/src/components/HistoryView.svelte", "frontend/src/components/OptionCard.svelte", "frontend/src/components/OptionDetails.svelte", "frontend/src/components/StateShape.svelte", "frontend/src/components/TrackList.svelte", "frontend/src/main.test.ts", "frontend/src/test-setup.ts", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "ffc94db08c4e0c9f0b35999d9cf793bdae054d49"
+whole_reason = "The page frame is one shell: the page token owner and the components that read it, the header with its tabs and counts, the pane padding and the Decide row's stuck shadow, the tests and e2e pins that read the old heading and tab names, the spec criteria and the rebuilt static assets change together."
