@@ -6,12 +6,10 @@ import {
 	findSelectedLine,
 	firstOpenKey,
 	historyLines,
-	isBoardEmpty,
 	lineStatusText,
 	nextOpenAfter,
 	outcomeLabel,
-	pictureDataUri,
-	totalLineCount
+	pictureDataUri
 } from './boardSummary';
 
 test('first selection follows configured order, skipping failed repos and ruled-only groups', () => {
@@ -56,29 +54,6 @@ test.each(['first', 'last'] as const)(
 		expect(repos).toEqual(before);
 	}
 );
-
-describe('totalLineCount / isBoardEmpty', () => {
-	test('counts every line across every item and repo', () => {
-		const repos = [
-			repo({ items: [item({ lines: [line(), line({ index: 2 })] })] }),
-			repo({ name: 'other', items: [item({ number: 7, lines: [line()] })] })
-		];
-
-		expect(totalLineCount(repos)).toBe(3);
-		expect(isBoardEmpty(repos)).toBe(false);
-	});
-
-	test('a repo with no items counts as empty', () => {
-		const repos = [repo({ items: [] })];
-
-		expect(totalLineCount(repos)).toBe(0);
-		expect(isBoardEmpty(repos)).toBe(true);
-	});
-
-	test('no repos at all counts as empty', () => {
-		expect(isBoardEmpty([])).toBe(true);
-	});
-});
 
 describe('lineStatusText', () => {
 	test.each([
