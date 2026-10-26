@@ -14,9 +14,10 @@ RESULT picture opens enlarged in a dialog, and on a phone TODAY is a framed
 thumbnail with the enlarge mark. A pick on a `final` option first asks in a
 confirm dialog. The card still lacks "Other / Unclear" instead of "Später",
 Mitsprache, the agent list and group decisions. A yes/no line keeps its card.
-The list groups open lines per project with the picture's Open and Not-ready
-shapes, and the page has the picture's header with Open and Decided and its
-colour tokens; it still lacks the Decided view with who and how, and the phone
+The list groups open and decided lines per project with the picture's Open,
+Not-ready and Decided shapes (Decided shows the selected line's card in the
+pane), and the page has the picture's header with Open and Decided and its
+colour tokens; it still lacks who and how on a decided card, and the phone
 header.
 What the board does today is in the "Browser decision flow" of
 [`specs/serve.spec.md`](../../specs/serve.spec.md).
