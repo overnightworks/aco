@@ -12,7 +12,7 @@ from typing import cast
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, container_issue
-from cli_fixtures import freeze_cli_now, real_git, run_cli, track_board_config
+from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 from test_option_lines import GOLDEN_CARD_HASH, card, ruled_card
 
@@ -139,7 +139,6 @@ class TestCommandRewrites:
         """Spec: BODY-88, CUT-11 -- removing a slice row re-renders the container's block."""
         track_board_config(github_world, 'body_contract = "block"\n')
         assert real_git(github_world, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
-        freeze_cli_now(monkeypatch)
         row = '\n[[slice]]\nindex = 1\ntitle = "Slice A"\ndone_when = "D"\n'
         raw = item_body(item, newline=newline, extra=row)
         container = dataclasses.replace(container_issue(79, ""), body=raw)
