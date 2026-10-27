@@ -741,7 +741,7 @@ function sendBack(c, note) {
   S.panel.delete(c.ref);
   S.back.set(c.ref, note);
   S.strip = {ref: c.ref, text: "With head: " + c.topic, kind: "back"};
-  S.sel = (ordered("open").find(r => stateOf(r) === "open") || c).ref;
+  S.sel = (ordered("open").find(r => RANK[stateOf(r)] <= RANK.open) || c).ref;
   render();
 }
 function undoDecision(key) {
