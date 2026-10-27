@@ -1,8 +1,0 @@
-claim_id = "d11ee0795eab403097d26f08db09a78a"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "03d69226e0f449411d8d158b71811bffc1e2b4ca"
-branch = "claude/issue-447-one-forge-fact"
-scope = ["docs/decisions/0001-claim-state-without-a-ledger-issue.md", "pyproject.toml", "quality/baseline.toml", "specs/ask.spec.md", "specs/cut.spec.md", "specs/rule.spec.md", "src/aco/board_read.py", "src/aco/cmd_ask.py", "src/aco/cmd_check.py", "src/aco/cmd_cut.py", "src/aco/cmd_item.py", "src/aco/cmd_rescope.py", "src/aco/cmd_rule.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/session.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests/github_fixtures.py", "tests/test_ask.py", "tests/test_cli.py", "tests/test_cut.py", "tests/test_github.py", "tests/test_rule.py", "tests/test_state_board.py"]
-opened_commit = "998ee8a2c4984ab5458cd190663ec2eeb073bdaa"
-whole_reason = "One table, one removal: the forge capability table and every refusal, spec ID, fake and comment that reads it go together, replaced by the single board-source fact the code branches on."
