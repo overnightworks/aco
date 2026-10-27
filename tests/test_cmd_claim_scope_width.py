@@ -12,17 +12,24 @@ from enum import Enum
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY, board_issue, complete_contract
-from claim_worktrees import LANE_BRANCH, StandIn, Standing, Standpoint, make_stand_in
+from board_fixtures import REPOSITORY, complete_contract
+from claim_worktrees import (
+    ISSUE,
+    LANE_BRANCH,
+    LANE_MODE_BRANCH,
+    StandIn,
+    Standing,
+    Standpoint,
+    make_stand_in,
+    serve_body,
+    standing_claims,
+)
 from cli_fixtures import stub_one_git_call
-from github_fixtures import FakeForge, serve_forge
 
-from aco import checkout, forge, policy, protocol, store
+from aco import checkout, policy
 from aco import cli as issue_claim
 from aco.protocol import ClaimError
 
-ISSUE = 72
-LANE_MODE_BRANCH = "docs/lane-cleanup"
 CUT_BODY = complete_contract("Claim #72.") + "\n\n## Schnitt\n\n**Scheibe 1: Title**\n"
 UNCUT_BODY = complete_contract("Claim #72.") + "\n\n## Schnitt\n\nNo slices yet.\n"
 
@@ -238,24 +245,6 @@ def stand_in(
     return make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ())
 
 
-def serve_item(monkeypatch: pytest.MonkeyPatch, body: str | None = None) -> None:
-    served_body = body or complete_contract("Claim #72.")
-    serve_forge(
-        monkeypatch,
-        FakeForge(
-            board_issues=(board_issue(ISSUE, "Work", served_body),),
-            issue_references={
-                ISSUE: forge.ItemReference(forge.ItemState.OPEN, "Work", served_body)
-            },
-        ),
-    )
-
-
-def held_claims(standpoint: Standpoint) -> list[protocol.ActiveClaim]:
-    state = store.fetch_state(worktree=standpoint.directory, remote="origin")
-    return list(state.claims.values())
-
-
 def arrange(stand_in: StandIn, monkeypatch: pytest.MonkeyPatch, case: WidthCase) -> Standpoint:
     standing = (
         (Standing(case.standing_scope, issue=ISSUE, branch=LANE_BRANCH),)
@@ -265,7 +254,7 @@ def arrange(stand_in: StandIn, monkeypatch: pytest.MonkeyPatch, case: WidthCase)
     standpoint = stand_in(branch=case.branch, standing=standing, more_trunk_files=case.trunk)
     for name in case.empty_directories:
         (standpoint.directory / name).mkdir()
-    serve_item(monkeypatch, case.body)
+    serve_body(monkeypatch, case.body or complete_contract("Claim #72."))
     return standpoint
 
 
@@ -293,7 +282,7 @@ def test_a_wide_scope_is_refused_without_whole_and_changes_no_claim(
     """Spec: CLAIM-25, CLAIM-26, CLM-18, RESC-10."""
 
     standpoint = arrange(stand_in, monkeypatch, refusal.case)
-    held_before = held_claims(standpoint)
+    held_before = standing_claims(standpoint)
 
     status = issue_claim.main(arguments(refusal.case, standpoint))
 
@@ -304,7 +293,7 @@ def test_a_wide_scope_is_refused_without_whole_and_changes_no_claim(
     else:
         assert "scope is wide" in captured.err
         assert "--whole" in captured.err
-    assert held_claims(standpoint) == held_before
+    assert standing_claims(standpoint) == held_before
 
 
 @pytest.mark.parametrize("acceptance", ACCEPTANCES)
@@ -322,7 +311,7 @@ def test_a_scope_within_the_width_limits_or_with_whole_is_claimed_with_its_reaso
     status = issue_claim.main(arguments(case, standpoint))
 
     out = capsys.readouterr().out
-    [held] = [claim for claim in held_claims(standpoint) if claim.branch == case.branch]
+    [held] = [claim for claim in standing_claims(standpoint) if claim.branch == case.branch]
     assert status == 0
     assert held.scope == tuple(sorted({*case.standing_scope, *case.scope}))
     assert held.whole_reason == case.whole
@@ -365,7 +354,7 @@ def test_claim_under_state_ref_storage_refuses_repo_as_invalid_usage_before_the_
         captured.out
         == json.dumps({"ok": False, "reason": "invalid_usage", "message": message}) + "\n"
     )
-    assert not held_claims(standpoint)
+    assert not standing_claims(standpoint)
 
 
 def fail_reading_tree_entry(monkeypatch: pytest.MonkeyPatch, path: str) -> None:
