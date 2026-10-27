@@ -25,6 +25,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from email.message import Message
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -520,6 +521,11 @@ def same_as_today_option(letter: str = "B", **changes: object) -> dict[str, obje
         "contract": "The link stays a link.",
         **changes,
     }
+
+
+def first_listed_line(board: BoardClient) -> dict[str, Any]:
+    [listed_repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+    return cast(dict[str, Any], listed_repo["items"][0]["lines"][0])
 
 
 def option_line(*, ruling: object = None, **changes: object) -> dict[str, object]:
