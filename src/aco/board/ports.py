@@ -127,6 +127,8 @@ class OptionLine:
     ruling: OptionLetter | OtherAnswer | None
     ruled_on: date | None
     via: RulingVia | None
+    returned_on: date | None
+    returned_note: str | None
     card_hash: str
 
     @property
