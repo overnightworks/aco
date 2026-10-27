@@ -1,8 +1,7 @@
 """Behavioral tests for the pure `aco` block write path `body.py`
-owns (moved from `board.py`): `rule_expectation`,
-`append_expectation`, and the `expectation_lines` projection `rule --line`,
-`ask`, and `rulings` all share. CLI wiring lives in `tests/test_ask.py` for `ask`,
-`tests/test_cmd_rule.py` for `rule`, and `tests/test_cmd_rulings.py` for `rulings`."""
+owns (moved from `board.py`): `rule_expectation` and the `expectation_lines`
+projection `rule --line` and `rulings` share. CLI wiring lives in
+`tests/test_cmd_rule.py` for `rule` and `tests/test_cmd_rulings.py` for `rulings`."""
 
 from __future__ import annotations
 
@@ -61,9 +60,7 @@ from aco.body import (
     replace_block,
 )
 from aco.expectations import (
-    ExpectationCardFields,
     YesNoLine,
-    append_expectation,
     expectation_line_state,
     expectation_line_summary,
     expectation_lines,
@@ -184,100 +181,7 @@ def test_rule_expectation_appends_a_note_to_the_ruled_line_text() -> None:
     assert expectation_lines(new_body)[0].text == "Ship it? Anmerkung: Ja, sofort."
 
 
-# --- append_expectation ---
-
-
-@pytest.mark.parametrize("default", ["yes", "no", "later"])
-def test_append_expectation_adds_a_proposed_line(default: str) -> None:
-    body = block_body(MINIMAL_BLOCK_TOML)
-
-    new_body = append_expectation(body, "New question?", default)
-
-    assert expectation_lines(new_body) == (
-        YesNoLine(1, "New question?", None, None, default=default),
-    )
-    entries = locate_block(new_body).data["expectation"]
-    assert entries == [{"text": "New question?", "default": default}]
-    assert parse_body(new_body).expectation_state is ExpectationState.PROPOSED
-
-
-def test_append_expectation_appends_after_existing_lines() -> None:
-    body = block_body(f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "First"\ndefault = "yes"\n')
-
-    new_body = append_expectation(body, "Second", "no")
-
-    assert expectation_lines(new_body) == (
-        YesNoLine(1, "First", None, None, default="yes"),
-        YesNoLine(2, "Second", None, None, default="no"),
-    )
-
-
-@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
-def test_append_expectation_preserves_every_byte_outside_the_appended_line(newline: str) -> None:
-    body = issue_230_body(default="yes").replace("\n", newline)
-    located = locate_block(body)
-    prefix, suffix = body[: located.content_start], body[located.content_end :]
-
-    new_body = append_expectation(body, "New question?", "yes")
-
-    assert new_body.startswith(prefix)
-    assert new_body.endswith(suffix)
-    assert expectation_lines(new_body)[-1] == YesNoLine(
-        2, "New question?", None, None, default="yes"
-    )
-
-
-def test_append_expectation_refuses_empty_text() -> None:
-    body = block_body(MINIMAL_BLOCK_TOML)
-
-    with pytest.raises(protocol.ClaimError, match="non-empty"):
-        append_expectation(body, "   ", "yes")
-
-
-def test_append_expectation_refuses_an_unknown_default() -> None:
-    body = block_body(MINIMAL_BLOCK_TOML)
-
-    with pytest.raises(protocol.ClaimError, match="default must be"):
-        append_expectation(body, "New question?", "maybe")
-
-
 VALID_SVG_PICTURE = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>'
-
-
-def test_append_expectation_writes_the_card_fields() -> None:
-    """`question`/`example`/`picture` land on the appended
-    line, `expectation_lines` surfaces all three, and a body with none of
-    them (every earlier `append_expectation` test) keeps reading `None` --
-    absent keys leave the line unchanged."""
-    body = block_body(MINIMAL_BLOCK_TOML)
-    card = ExpectationCardFields(
-        question="Ship it?", example="Release on Friday.", picture=VALID_SVG_PICTURE
-    )
-
-    new_body = append_expectation(body, "New question?", "yes", card=card)
-
-    assert expectation_lines(new_body) == (
-        YesNoLine(
-            1,
-            "New question?",
-            None,
-            None,
-            default="yes",
-            question="Ship it?",
-            example="Release on Friday.",
-            picture=VALID_SVG_PICTURE,
-        ),
-    )
-    entries = locate_block(new_body).data["expectation"]
-    assert entries == [
-        {
-            "text": "New question?",
-            "default": "yes",
-            "question": "Ship it?",
-            "example": "Release on Friday.",
-            "picture": VALID_SVG_PICTURE,
-        }
-    ]
 
 
 @pytest.mark.parametrize(
@@ -395,13 +299,10 @@ def test_append_expectation_writes_the_card_fields() -> None:
         ),
     ],
 )
-def test_expectation_picture_is_refused_by_both_the_parser_and_the_writer(
-    picture: str, match: str
-) -> None:
-    """One rule, two callers: a body already carrying the bad
-    picture reads MALFORMED at `expectation[0].picture`, and
-    `append_expectation` refuses the same picture before any write --
-    `expectation_grammar._expectation_picture_defect` is the one owner both share."""
+def test_expectation_picture_is_refused_by_the_parser(picture: str, match: str) -> None:
+    """A body carrying the bad picture reads MALFORMED at
+    `expectation[0].picture`; `expectation_grammar._expectation_picture_defect`
+    is the one owner of the rule."""
     malformed_body = block_body(
         render_block(
             {
@@ -419,11 +320,6 @@ def test_expectation_picture_is_refused_by_both_the_parser_and_the_writer(
         ContractDefect("expectation[0].picture", f"expectation[0].picture {match}"),
     )
 
-    valid_body = block_body(MINIMAL_BLOCK_TOML)
-    card = ExpectationCardFields(picture=picture)
-    with pytest.raises(protocol.ClaimError, match=re.escape(match)):
-        append_expectation(valid_body, "New question?", "yes", card=card)
-
 
 def test_expectation_picture_allows_an_internal_anchor_href_with_surrounding_spaces() -> None:
     """`href = "#x"` (space around `=`) targets the same document -- the
@@ -432,12 +328,6 @@ def test_expectation_picture_allows_an_internal_anchor_href_with_surrounding_spa
     whitespace and misread it as an external value's first character."""
     picture = '<svg><a href = "#x"><circle cx="5" cy="5" r="4"/></a></svg>'
     assert expectation_grammar._expectation_picture_defect(picture) is None
-
-    body = block_body(MINIMAL_BLOCK_TOML)
-    updated = append_expectation(
-        body, "New question?", "yes", card=ExpectationCardFields(picture=picture)
-    )
-    assert parse_body(updated).read_state is BodyReadState.VALID
 
 
 def test_expectation_picture_allows_an_unrelated_animation_to_an_external_url() -> None:
@@ -459,24 +349,6 @@ def test_expectation_picture_allows_an_animated_href_with_every_values_segment_i
     refused just because `values` contains a semicolon."""
     picture = '<svg><animate attributeName="href" values="#a;#b"/></svg>'
     assert expectation_grammar._expectation_picture_defect(picture) is None
-
-
-def test_append_expectation_refuses_an_overlong_question() -> None:
-    body = block_body(MINIMAL_BLOCK_TOML)
-    card = ExpectationCardFields(
-        question="Q" * (expectation_grammar.EXPECTATION_QUESTION_MAXIMUM_CHARACTERS + 1)
-    )
-
-    with pytest.raises(protocol.ClaimError, match="question must be at most"):
-        append_expectation(body, "New question?", "yes", card=card)
-
-
-def test_append_expectation_refuses_an_empty_example() -> None:
-    body = block_body(MINIMAL_BLOCK_TOML)
-    card = ExpectationCardFields(example="   ")
-
-    with pytest.raises(protocol.ClaimError, match="example must be a non-empty string"):
-        append_expectation(body, "New question?", "yes", card=card)
 
 
 def test_parse_body_still_refuses_an_unknown_expectation_key() -> None:
@@ -737,7 +609,7 @@ def test_render_block_refuses_a_duplicate_scope_entry() -> None:
     """`_render_scope_array` routes through `protocol.valid_scope`,
     the one scope canonicalizer, rather than
     silently deduplicating a second time: a duplicate it is ever handed --
-    never a real `cut`/`rule`/`ask` write, which all reuse an
+    never a real `cut`/`rule` write, which all reuse an
     already-validated body's own scope -- fails loud instead of vanishing."""
     data = {
         "version": 1,

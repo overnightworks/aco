@@ -30,6 +30,7 @@ from board_fixtures import (
     MINIMAL_BLOCK_TOML,
     block_body,
     projected_board,
+    proposed_expectation,
     unfilled_block_body,
     write_repository_config,
 )
@@ -81,9 +82,9 @@ from aco.body import (
     Storage,
     locate_block,
     parse_body,
+    prose_above_fresh_block,
     render_block,
 )
-from aco.expectations import YesNoLine, expectation_lines
 from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
 from aco.session import RunContext
 from aco.state_board import ItemWriter, StateRefBoard
@@ -2402,103 +2403,6 @@ class TestCliStateRefForge:
         assert f"CLAIMED issue {RULABLE_ID}" in status_out
         assert f"issue #{RULABLE_NUMBER}" not in status_out
 
-    def test_ask_appends_a_state_ref_item_and_a_fresh_process_reads_it_open(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        """`aco ask --text ...` under `storage =
-        state-ref` appends the proposed line straight into `items/<id>.md`
-        through `session._StoreItemWriter` -- no `gh`, no forge -- and a second `aco
-        rulings` invocation (its own fresh fetch, standing in for a second
-        process) reads the line back open, its `--json` carrying the asked
-        `--default` (RUL-12)."""
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        asked_text = "Does a second process see the appended line?"
-
-        asked = issue_claim.main(
-            ["ask", str(CHILD_A_NUMBER), "--text", asked_text, "--default", "no"]
-        )
-        assert asked == 0
-        capsys.readouterr()
-
-        remote_url = f"file://{bare_remote}"
-        state = store.fetch_state(worktree=worktree, remote=remote_url)
-        assert state.tip is not None
-        stored = store.read_item_files(worktree, state.tip)[f"{CHILD_A_ID}.md"].decode()
-        assert asked_text in stored
-
-        rulings_status = issue_claim.main(["rulings"])
-        assert rulings_status == 0
-        lines = capsys.readouterr().out.splitlines()
-        assert any(line.strip() == f"2 open: {asked_text}" for line in lines)
-
-        asked_line = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())["rulings"][
-            0
-        ]["lines"][1]
-        assert (asked_line["text"], asked_line["ruling"], asked_line["default"]) == (
-            asked_text,
-            None,
-            "no",
-        )
-
-    def test_ask_with_a_picture_writes_the_card_fields_into_the_state_ref_item(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        """`aco ask --text
-        ... --question ... --example ... --picture FILE.svg` under `storage
-        = state-ref` lands all three optional card fields in the same
-        `items/<id>.md` write -- a combination `--picture` alone was never
-        proved against, since every other `--picture` proof (`test_cli.py`)
-        drives the `FakeForge`, never the real `file://` remote this module
-        owns."""
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        picture_file = tmp_path / "sketch.svg"
-        picture_svg = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>'
-        picture_file.write_text(picture_svg, encoding="utf-8")
-        asked_text = "Brauchen wir Admin-Rechte?"
-
-        asked = issue_claim.main(
-            [
-                "ask",
-                str(CHILD_A_NUMBER),
-                "--text",
-                asked_text,
-                "--question",
-                "Admin-Rechte nötig?",
-                "--example",
-                "Wie beim letzten Import.",
-                "--picture",
-                str(picture_file),
-            ]
-        )
-        assert asked == 0
-        capsys.readouterr()
-
-        remote_url = f"file://{bare_remote}"
-        state = store.fetch_state(worktree=worktree, remote=remote_url)
-        assert state.tip is not None
-        stored = store.read_item_files(worktree, state.tip)[f"{CHILD_A_ID}.md"].decode()
-        lines = expectation_lines(stored, storage=Storage.STATE_REF)
-        assert lines[1] == YesNoLine(
-            2,
-            asked_text,
-            None,
-            None,
-            default="yes",
-            question="Admin-Rechte nötig?",
-            example="Wie beim letzten Import.",
-            picture=picture_svg,
-        )
-
     def test_claim_passes_slice_rules_against_a_state_ref_item_and_check_reads_it_back(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -4062,12 +3966,6 @@ class TestCliStateRefForge:
                 f"RULED {RULABLE_ID} line 1 yes; 1 line(s) still open\n",
                 id="rule",
             ),
-            pytest.param(
-                ["ask", CHILD_B_ID, "--text", "Does it go past?"],
-                None,
-                f"ASKED {CHILD_B_ID} line 1: Does it go past?\n",
-                id="ask",
-            ),
         ],
     )
     def test_a_write_to_one_item_goes_past_entries_that_name_no_item(
@@ -4083,7 +3981,7 @@ class TestCliStateRefForge:
     ) -> None:
         """PIN-35, CAS-61, E-PIN-39: beside a non-id
         name and a bare id without `.md`, a write to one healthy item --
-        `item close`, `item edit`, `rule`, `ask` -- lands, and both entries
+        `item close`, `item edit`, `rule` -- lands, and both entries
         keep their name, mode, and blob."""
         foreign = {"NOTANID": b"anything", "aco-000001": b"a bare id\n"}
         item_files = {**_item_files(), **_rulable_item_files(), **foreign}
@@ -5763,8 +5661,11 @@ class TestCliStateRefForge:
         )
         assert items.ITEM_ID_PATTERN.fullmatch(container_id)
 
+        asked_text = "Does the runbook still hold without a forge?"
         container_body = _filled_body(
-            unfilled_block_body(CONTAINER_SKELETON_PROSE),
+            prose_above_fresh_block(
+                CONTAINER_SKELETON_PROSE, {"expectation": [proposed_expectation(asked_text)]}
+            ),
             now="Land every slice.",
             next_step="Cut the first slice.",
             done_when="Both slices are closed.",
@@ -5862,10 +5763,6 @@ class TestCliStateRefForge:
         # `Next` line still names work, so the parent hint
         # `release --merged` shares never offers to close it.
         assert close_out.splitlines() == [f"CLOSED {child_id}", "freed: none"]
-
-        asked_text = "Does the runbook still hold without a forge?"
-        asked_out = run_cli(["ask", container_id, "--text", asked_text], capsys).expect_success()
-        assert asked_out.strip() == f"ASKED {container_id} line 1: {asked_text}"
 
         ruled_out = run_cli(["rule", container_id, "--line", "1", "--yes"], capsys).expect_success()
         assert ruled_out.strip() == f"RULED {container_id} line 1 yes; 0 line(s) still open"

@@ -1,13 +1,13 @@
-"""The expectation line model and its two writes: the `[[expectation]]` entries
-of a work-item body as `aco rulings`, `aco rule --line` and `aco ask` see
-them, and the byte-preserving edits that rule or append one. The entry grammar
+"""The expectation line model and its writes: the `[[expectation]]` entries
+of a work-item body as `aco rulings` and `aco rule --line` see
+them, and the byte-preserving edits that rule one. The entry grammar
 is `expectation_grammar`'s; the block codec is `body`'s.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 from typing import ClassVar, TypeAlias, cast
@@ -22,9 +22,7 @@ from .body import (
     replace_block,
 )
 from .expectation_grammar import (
-    BLOCK_EXPECTATION_DEFAULTS,
     BLOCK_EXPECTATION_RULINGS,
-    EXPECTATION_OPTIONAL_FIELDS,
     OPTION_LETTERS,
     OTHER,
     RETURNED_NOTE,
@@ -56,7 +54,7 @@ class YesNoLine:
     once ruled) -- `aco rulings --json`'s own line payload reads it from
     here rather than re-parsing the block. `question`/`example`/`picture`
     are the card's optional operator-language heading, illustration
-    sentence, and inline SVG -- `None` when `aco ask` was not given them,
+    sentence, and inline SVG -- `None` when the line carries none,
     in which case a card falls back to `text`."""
 
     form: ClassVar[LineForm] = LineForm.YES_NO
@@ -511,68 +509,3 @@ def return_to_head(body: str, index: int, request: HeadReturn, returned_on: date
         return {**entry, RETURNED_ON: returned_on, **note}
 
     return _rule_entry(body, index, LineForm.OPTIONS, decide, _UNCLEAR_FLAG)
-
-
-@dataclass(frozen=True)
-class ExpectationCardFields:
-    """The three optional `[[expectation]]` card fields `aco ask` may
-    attach, grouped so a caller passes one value instead of
-    three positional strings that must stay paired: `question` and
-    `example`, one operator-language sentence each, and `picture`, an
-    inline SVG. Each defaults to absent, matching a line with none of
-    them -- the card then falls back to `text`."""
-
-    question: str | None = None
-    example: str | None = None
-    picture: str | None = None
-
-
-class ExpectationTextError(protocol.ClaimError):
-    """`append_expectation`'s own blank-`text` refusal -- a
-    distinct type from `ExpectationFieldError` so a `--json`-emitting caller
-    can choose `invalid_expectation` without parsing the refusal prose."""
-
-
-class ExpectationFieldError(protocol.ClaimError):
-    """`append_expectation`'s own optional-card-field refusal -- `question`,
-    `example`, or `picture` failing its own content rule --
-    carrying the failing `field` by name so a `--json`-emitting caller can
-    choose `invalid_expectation` (`question`, `example`) or `invalid_picture`
-    (`picture`) without parsing the refusal prose."""
-
-    def __init__(self, field: str, message: str) -> None:
-        super().__init__(message)
-        self.field = field
-
-
-def append_expectation(
-    body: str, text: str, default: str, *, card: ExpectationCardFields | None = None
-) -> str:
-    """`body` with one fresh proposed `[[expectation]]` entry appended:
-    `text` verbatim, `default` as given, plus whichever of `card`'s
-    optional fields `aco ask` was given -- each validated by
-    the same check `_block_expectation_optional_field_defects` reads a
-    stored body with, so a value this refuses can never be written.
-    Byte-preserving outside the appended entry, the same write path as
-    `rule_expectation`."""
-    if not text.strip():
-        raise ExpectationTextError("expectation text must be a non-empty string")
-    if default not in BLOCK_EXPECTATION_DEFAULTS:
-        raise protocol.ClaimError(
-            f"default must be one of {', '.join(sorted(BLOCK_EXPECTATION_DEFAULTS))}"
-        )
-    provided = asdict(card if card is not None else ExpectationCardFields())
-    entry: dict[str, object] = {"text": text, "default": default}
-    for key, check in EXPECTATION_OPTIONAL_FIELDS:
-        value = provided[key]
-        if value is None:
-            continue
-        reason = check(value)
-        if reason is not None:
-            raise ExpectationFieldError(key, f"{key} {reason}")
-        entry[key] = value
-    located = locate_block(body)
-    entries = block_expectation_dicts(located.data)
-    new_entries = [*entries, entry]
-    new_data = {**located.data, "expectation": new_entries}
-    return replace_block(body, located, new_data)

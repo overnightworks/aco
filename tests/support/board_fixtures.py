@@ -345,7 +345,7 @@ def proposed_expectation(
 ) -> dict[str, object]:
     """A proposed `[[expectation]]` entry, plus whichever of the optional
     card fields the scenario needs -- omitted entirely when
-    left `None`, matching a line `aco ask` was never given one for."""
+    left `None`, matching a line proposed without one."""
     entry: dict[str, object] = {"text": text, "default": default}
     entry.update(
         (key, value)

@@ -33,10 +33,9 @@ BLOCK_EXPECTATION_DEFAULTS = frozenset({"yes", "no", "later"})
 # proposer's guessed default, so it rules exactly like "yes"/"no" (`rule
 # --later` writes `ruling = "later"` the same way `--yes`/`--no` do).
 BLOCK_EXPECTATION_RULINGS = frozenset({"yes", "no", "later"})
-# The three optional card fields a proposer (`aco ask`) may attach to an
-# `[[expectation]]` entry: the operator-language question and
-# example a card shows in place of `text`, and an inline-SVG picture. Absent
-# entirely, a card falls back to `text` unchanged.
+# The three optional card fields an `[[expectation]]` entry may carry, read by the body parser: the
+# operator-language question and example a card shows in place of `text`,
+# and an inline-SVG picture. Absent entirely, a card falls back to `text` unchanged.
 EXPECTATION_QUESTION_MAXIMUM_CHARACTERS = 160
 EXPECTATION_PICTURE_MAXIMUM_BYTES = 8 * 1024
 # A chosen figure, not a measured one: a line holds at most five pictures
@@ -294,8 +293,7 @@ def _expectation_picture_defect(value: object) -> str | None:
     `None` for a valid one: an inline SVG, rooted at `<svg`, at
     most `EXPECTATION_PICTURE_MAXIMUM_BYTES`, and free of every refusal
     `_expectation_picture_content_refusals` names. The one owner the body
-    parser's defects and `append_expectation`'s pre-write refusal both
-    call."""
+    parser's defects call."""
     if not isinstance(value, str):
         return "must be a string"
     if len(value.encode("utf-8")) > EXPECTATION_PICTURE_MAXIMUM_BYTES:
@@ -310,8 +308,8 @@ def _expectation_picture_defect(value: object) -> str | None:
 
 # The three optional `[[expectation]]` card fields, each with
 # its own refusal-sentence check -- shared, in this fixed order, by the body
-# parser's defects (`_block_expectation_optional_field_defects`) and by
-# `append_expectation`'s pre-write validation, so the rule is owned once.
+# parser's defects (`_block_expectation_optional_field_defects`), so the rule
+# is owned once.
 EXPECTATION_OPTIONAL_FIELDS: tuple[tuple[str, Callable[[object], str | None]], ...] = (
     ("question", _expectation_question_defect),
     ("example", _non_empty_string_defect),

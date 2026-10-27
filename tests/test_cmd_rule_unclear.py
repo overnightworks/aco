@@ -4,7 +4,6 @@ them (RULE-22..27) and `aco rulings` that reads them (RUL-17/18)."""
 
 from __future__ import annotations
 
-import dataclasses
 import json
 from pathlib import Path
 
@@ -213,22 +212,18 @@ class TestRuleUnclear:
 @pytest.mark.usefixtures(github_world.__name__)
 class TestReturnedLineRewrites:
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
-    def test_a_later_write_keeps_a_returned_line_byte_for_byte(
+    def test_ruling_another_line_keeps_a_returned_line_byte_for_byte(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
         newline: str,
     ) -> None:
-        """Spec: BODY-88 -- `rule` on another line, then `ask` appending one."""
+        """Spec: BODY-88 -- `rule` on another line keeps a returned line."""
         raw = item_body(returned_today(), newline=newline)
         reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", raw)
         client = serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
         ruled = run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
         assert ruled.status == 0, ruled.stderr
-        assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
-        client.issue_references[7] = dataclasses.replace(reference, body=client.item_bodies[7])
-        asked = run_cli(["ask", "7", "--text", "Neue Frage?"], capsys)
-        assert asked.status == 0, asked.stderr
         assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
         kept = line_two(client.item_bodies[7])
         assert (kept["returned_on"], kept["returned_note"]) == (FROZEN_CLI_NOW.date(), NOTE)
