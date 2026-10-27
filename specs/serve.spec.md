@@ -20,7 +20,7 @@ resolved directory's name.
 
 | state \ trigger | load the page | decide a shown card |
 |---|---|---|
-| an open line | ABRD-06 | ABRD-01 |
+| an open line | ABRD-06 | ABRD-01, ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
 | an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
@@ -76,6 +76,8 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-45] A refused pick shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide the picks behind `Neu laden`, and any other failure keeps them.
 - [ ] [ABRD-46] A pick on a `final` option first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` starts the undo window (ABRD-44).
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` posts the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
+- [ ] [ABRD-58] A pick shows a strip above the card until its 8 s undo window ends: the Decided shape, `Decided: <letter> — <name> · <topic>` and `Undo`, in view while the card scrolls and atop a phone's list.
+- [ ] [ABRD-59] A pick moves focus to its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. A window that ends removes its strip, and ABRD-50 applies.
 - [ ] [ABRD-48] An option line's row carries the Open shape; a yes/no line's row the dashed Not ready shape in muted text. Each shape names its state, and a row's title is its full question.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option line, else to its first row; a card selected meanwhile stays (ABRD-32).

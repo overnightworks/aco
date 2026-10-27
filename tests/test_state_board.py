@@ -2553,7 +2553,7 @@ class TestCliStateRefForge:
         """`aco cut` on a state-ref container runs through to a freshly minted child --
         `create_child`'s single CAS write -- with no refusal; this container's own `[record]`
         carries no `slice` rows, so it creates an untied child exactly like GitHub does for the
-        same shape (see `tests/test_cut.py::test_cut_creates_the_child_and_removes_its_row`
+        same shape (see `tests/test_cmd_cut.py::test_cut_creates_the_child_and_removes_its_row`
         with case `untied-without-a-slice-key`). The byte-exact `[[slice]]` row removal itself
         is proved below."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
@@ -3223,7 +3223,7 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         """GitHub's own equivalent
-        (`tests/test_cut.py::test_cut_requires_a_valid_block_for_the_row_it_cuts`
+        (`tests/test_cmd_cut.py::test_cut_requires_a_valid_block_for_the_row_it_cuts`
         with case `no-aco-block`) hits
         `workboard.located_block_or_refuse`'s refusal only because a fetched GitHub
         issue can carry any body at all. A state-ref item cannot: every

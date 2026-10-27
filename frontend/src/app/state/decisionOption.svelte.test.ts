@@ -98,7 +98,7 @@ test.each([
 	expect(store.justRuled).toBeNull();
 });
 
-test('[ABRD-44] a pending pick names its letter, option and topic for the toast', () => {
+test('[ABRD-44] a pending pick names its letter, option and topic for the strip', () => {
 	const store = new DecisionStore(
 		'token',
 		vi.fn(async () => {}),

@@ -40,7 +40,7 @@
 	.frame {
 		--oc-label-width: 136px;
 		--oc-column-gap: 24px;
-		max-width: 880px;
+		max-width: var(--frame-width);
 		margin-inline: auto;
 	}
 	.meta {

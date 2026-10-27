@@ -2,7 +2,7 @@
 owns (moved from `board.py`): `rule_expectation`,
 `append_expectation`, and the `expectation_lines` projection `rule --line`,
 `ask`, and `rulings` all share. CLI wiring lives in `tests/test_ask.py` for `ask`,
-`tests/test_rule.py` for `rule`, and `tests/test_rulings.py` for `rulings`."""
+`tests/test_cmd_rule.py` for `rule`, and `tests/test_cmd_rulings.py` for `rulings`."""
 
 from __future__ import annotations
 

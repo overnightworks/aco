@@ -116,6 +116,19 @@ async function dialogInsideViewport(page: Page, viewportWidth: number): Promise<
 	expect(box.right).toBeLessThanOrEqual(viewportWidth);
 }
 
+function expectNear(actual: number, wanted: number): void {
+	expect(Math.abs(actual - wanted)).toBeLessThanOrEqual(1);
+}
+
+async function edges(
+	locator: Locator
+): Promise<{ left: number; right: number; top: number; bottom: number }> {
+	return locator.evaluate((element) => {
+		const { left, right, top, bottom } = element.getBoundingClientRect();
+		return { left, right, top, bottom };
+	});
+}
+
 async function open(page: Page, phone: boolean, question = SONG_QUESTION): Promise<void> {
 	const { appUrl, token } = readBoardRuntime();
 	await page.clock.install();
@@ -164,7 +177,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'decide-row');
 
 			await second.click();
-			await expect(page.locator('.toasts')).toContainText('B — Browser-Sprung bleibt · Sprung');
+			await expect(page.locator('.strip')).toContainText('B — Browser-Sprung bleibt · Sprung');
 			await expect(first).toBeDisabled();
 			await expect(second).toBeDisabled();
 			await shoot(page, testInfo, 'pending');
@@ -190,7 +203,7 @@ for (const viewport of [
 			);
 		});
 
-		test('[ABRD-33] Rückgängig inside the window posts nothing and leaves the picks usable', async ({
+		test('[ABRD-33] Undo inside the window posts nothing and leaves the picks usable', async ({
 			page
 		}) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -204,7 +217,7 @@ for (const viewport of [
 			await picks(page)
 				.getByRole('button', { name: /^Decide A:/ })
 				.click();
-			await page.getByRole('button', { name: 'Rückgängig' }).click();
+			await page.getByRole('button', { name: 'Undo', exact: true }).click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			expect(writes).toBe(0);
@@ -218,6 +231,132 @@ for (const viewport of [
 			await expect(page.getByText('Nothing decided yet')).toBeVisible();
 			await expect(decidedList(page).getByRole('button')).toHaveCount(0);
 		});
+
+		test('[ABRD-58] a pick shows the strip with the Decided shape and Undo above the card, in view while the card scrolls and over a phone list', async ({
+			page
+		}, testInfo) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			const posts = countPosts(page);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.click();
+
+			const strip = page.locator('.strip');
+			await expect(strip).toHaveCount(1);
+			await expect(strip).toContainText('B — Browser-Sprung bleibt · Sprung');
+			await expect(strip.getByRole('img', { name: 'Decided' })).toBeVisible();
+			await expect(strip.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
+			await expect(strip).toHaveCSS('background-color', 'rgb(228, 242, 234)');
+			await page.locator('.question-pane').evaluate((pane) => {
+				pane.scrollTop = 0;
+			});
+			const stripEdges = await edges(strip);
+			const frameEdges = await edges(page.locator('.option-card .frame'));
+			const headerEdges = await edges(page.locator('.top'));
+			expectNear(stripEdges.left, frameEdges.left);
+			expectNear(frameEdges.top - stripEdges.bottom, 16);
+			expectNear(stripEdges.top - headerEdges.bottom, phone ? 12 : 24);
+			await shoot(page, testInfo, 'strip-card');
+
+			await page
+				.locator('.option-card button[aria-expanded]')
+				.filter({ hasText: /Song bleibt offen/ })
+				.click();
+			await page.locator('.question-pane').evaluate((pane) => {
+				pane.scrollTop = pane.scrollHeight;
+			});
+			await expect(strip).toBeInViewport({ ratio: 1 });
+
+			if (phone) {
+				await page.getByRole('button', { name: '‹ Open' }).click();
+				await expect(strip).toBeVisible();
+				const listEdges = await edges(page.locator('.tracks'));
+				expect((await edges(strip)).bottom).toBeLessThanOrEqual(listEdges.top + 1);
+				await shoot(page, testInfo, 'strip-list');
+				expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+					viewport.width
+				);
+				await strip.getByRole('button', { name: 'Undo', exact: true }).click();
+				await expect(strip).toHaveCount(0);
+				await expect(page.locator('.tracks')).toBeFocused();
+			} else {
+				await strip.getByRole('button', { name: 'Undo', exact: true }).click();
+				await expect(strip).toHaveCount(0);
+			}
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			expect(posts.count()).toBe(0);
+		});
+
+		test('[ABRD-58] two picks on two option cards show two strips in pick order and Undo on the first cancels only the first', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			const posted: string[] = [];
+			page.on('request', (request) => {
+				if (request.method() === 'POST') posted.push(request.postDataJSON().option);
+			});
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide A:/ })
+				.click();
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.locator('.tracks').getByTitle(OTHER_QUESTION).click();
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.click();
+
+			const strips = page.locator('.strip');
+			await expect(strips).toHaveCount(2);
+			await expect(strips.first()).toContainText('A — Song bleibt offen');
+			await expect(strips.last()).toContainText('B — Browser-Sprung bleibt');
+			const first = await edges(strips.first());
+			const second = await edges(strips.last());
+			expectNear(second.top - first.bottom, 8);
+			if (phone) {
+				await page.getByRole('button', { name: '‹ Open' }).click();
+				expect((await edges(strips.last())).bottom).toBeLessThanOrEqual(
+					(await edges(page.locator('.tracks'))).top + 1
+				);
+			}
+
+			await strips.first().getByRole('button', { name: 'Undo', exact: true }).click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			expect(posted).toEqual(['B']);
+		});
+
+		if (phone) {
+			for (const width of [390, 320]) {
+				test(`[ABRD-58] Undo keeps its full width beside a long topic at ${width}px`, async ({
+					page
+				}) => {
+					const { repoDirectory } = readBoardRuntime();
+					arrange(repoDirectory, { topic: 'Ein sehr langes Thema '.repeat(8) });
+					await page.setViewportSize({ width, height: 844 });
+					await open(page, phone);
+
+					await picks(page)
+						.getByRole('button', { name: /^Decide A:/ })
+						.click();
+
+					const undo = page.locator('.strip').getByRole('button', { name: 'Undo', exact: true });
+					const undoEdges = await edges(undo);
+					expect(undoEdges.right - undoEdges.left).toBeGreaterThanOrEqual(40);
+					expect(undoEdges.right).toBeLessThanOrEqual(width);
+					expect(
+						await page.locator('.strip .tx').evaluate((text) => text.scrollWidth > text.clientWidth)
+					).toBe(true);
+					expect(
+						await page.evaluate(() => document.documentElement.scrollWidth)
+					).toBeLessThanOrEqual(width);
+				});
+			}
+		}
 
 		test('[ABRD-45] a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
 			page
@@ -276,12 +415,14 @@ for (const viewport of [
 			await expect(picks(page)).toBeInViewport({ ratio: 1 });
 		});
 
-		test('[ABRD-44] Tab reaches the picks in letter order after the options and Enter starts the window', async ({
+		test('[ABRD-59] Tab reaches the picks in letter order, Enter on a pick focuses its Undo and Enter again undoes it', async ({
 			page
 		}) => {
 			const { repoDirectory } = readBoardRuntime();
 			arrange(repoDirectory);
+			const posts = countPosts(page);
 			await open(page, phone);
+			const undo = page.getByRole('button', { name: 'Undo', exact: true });
 
 			await page
 				.locator('.option-card button[aria-expanded]')
@@ -292,8 +433,90 @@ for (const viewport of [
 			await page.keyboard.press('Tab');
 			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeFocused();
 			await page.keyboard.press('Enter');
-			await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeVisible();
+			await expect(undo).toBeFocused();
 			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeDisabled();
+
+			await page.keyboard.press('Enter');
+			await expect(page.locator('.strip')).toHaveCount(0);
+			await expect(page.locator('.stage')).toBeFocused();
+			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeEnabled();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			expect(posts.count()).toBe(0);
+		});
+
+		test('[ABRD-59] a window that ends in a refused post leaves focus on the stage, not on the page', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.route('**/api/rule', (route) =>
+				route.fulfill({ status: 503, body: 'Unavailable' })
+			);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.focus();
+			await page.keyboard.press('Enter');
+			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			await expect(page.locator('.strip')).toHaveCount(0);
+			await expect(page.locator('.stage')).toBeFocused();
+		});
+
+		test('[ABRD-59] an older window that ends in a refused post, while a newer pick stays pending, leaves focus on the stage', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.route('**/api/rule', (route) =>
+				route.fulfill({ status: 503, body: 'Unavailable' })
+			);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide A:/ })
+				.click();
+			await page.clock.runFor(5000);
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.locator('.tracks').getByTitle(OTHER_QUESTION).click();
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.focus();
+			await page.keyboard.press('Enter');
+			const strips = page.locator('.strip');
+			await expect(strips).toHaveCount(2);
+			await expect(strips.last().getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			await page.keyboard.press('Shift+Tab');
+			await expect(strips.first().getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			await page.clock.runFor((UNDO_SECONDS - 5) * 1000 + 500);
+
+			await expect(strips).toHaveCount(1);
+			await expect(strips.first()).toContainText('B — Browser-Sprung bleibt');
+			// Short timeout: the newer window must still be open when focus is judged.
+			await expect(page.locator('.stage')).toBeFocused({ timeout: 1000 });
+		});
+
+		test('[ABRD-59] a window that ends with focus on Undo leaves focus on the stage, not on the page', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.focus();
+			await page.keyboard.press('Enter');
+			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			const ruled = page.waitForResponse('**/api/rule');
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			await expect(page.locator('.strip')).toHaveCount(0);
+			await expect(page.locator('.stage')).toBeFocused();
+			// The post outlives the strip; let it land before the next test rewrites the rulings.
+			await ruled;
 		});
 
 		test('[ABRD-44] a ruled card inside an open picture dialog leaves the stage focused', async ({
@@ -332,13 +555,14 @@ for (const viewport of [
 			await expect(confirm(page).getByRole('button')).toHaveText(['Cancel', 'Decide B']);
 			await expect(confirm(page).getByRole('button', { name: 'Cancel' })).toBeFocused();
 			expect(posts.count()).toBe(0);
-			await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveCount(0);
+			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
 			await shoot(page, testInfo, 'confirm');
 			await dialogInsideViewport(page, viewport.width);
 
 			await confirm(page).getByRole('button', { name: 'Decide B' }).click();
 			await expect(confirm(page)).toHaveCount(0);
-			await expect(page.locator('.toasts')).toContainText('B — Browser-Sprung bleibt · Sprung');
+			await expect(page.locator('.strip')).toContainText('B — Browser-Sprung bleibt · Sprung');
+			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
 			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeDisabled();
 			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeDisabled();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
@@ -411,7 +635,7 @@ for (const viewport of [
 				.click();
 
 			await expect(page.getByRole('dialog')).toHaveCount(0);
-			await expect(page.locator('.toasts')).toContainText('A — Song bleibt offen · Sprung');
+			await expect(page.locator('.strip')).toContainText('A — Song bleibt offen · Sprung');
 		});
 	});
 }

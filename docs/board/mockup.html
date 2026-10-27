@@ -15,7 +15,7 @@
   --fs-title:22px; --lh-title:28px; --fs-body:15px; --lh-body:22px;
   --fs-caption:13px; --lh-caption:18px; --fs-label:11px;
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
-  --labw:136px; --listw:320px; --radius:10px;
+  --labw:136px; --listw:320px; --radius:10px; --frame-width:880px;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
@@ -50,10 +50,13 @@ button{cursor:pointer}
 .nav .mit{margin-left:var(--s2);border:1px solid var(--line-strong)}
 
 /* ---------- two panes ---------- */
-.app{display:grid;grid-template-columns:var(--listw) minmax(0,1fr);height:calc(100vh - 56px)}
-.list{overflow:auto;background:var(--surface);border-right:1px solid var(--line);padding:var(--s2) 0 var(--s5)}
-.pane{overflow:auto;padding:var(--s5) var(--s6) 0}
-.inner{max-width:880px;margin:0 auto;padding-bottom:var(--s6)}
+.app{display:grid;grid-template-columns:var(--listw) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);height:calc(100vh - 56px)}
+.list{grid-column:1;grid-row:1 / span 2;overflow:auto;background:var(--surface);border-right:1px solid var(--line);padding:var(--s2) 0 var(--s5)}
+.strips{grid-column:2;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:var(--s2);max-height:35vh;overflow:auto}
+.strips:has(.strip){padding:var(--s5) var(--s6) var(--s4)}
+.pane{grid-column:2;grid-row:2;overflow:auto;padding:var(--s5) var(--s6) 0}
+.strips:has(.strip) + .pane{padding-top:0}
+.inner{max-width:var(--frame-width);margin:0 auto;padding-bottom:var(--s6)}
 
 /* ---------- list ---------- */
 .grp{display:flex;justify-content:space-between;align-items:baseline;padding:var(--s4) var(--s5) var(--s1)}
@@ -144,7 +147,7 @@ details.contract[open] summary::before{transform:rotate(90deg)}
 
 /* strip after deciding */
 .strip{display:flex;align-items:center;gap:var(--s3);background:var(--good-soft);color:var(--fg);border-radius:var(--radius);
-  padding:var(--s2) var(--s2) var(--s2) var(--s4);margin-bottom:var(--s4)}
+  padding:var(--s2) var(--s2) var(--s2) var(--s4);width:100%;max-width:var(--frame-width);margin-inline:auto}
 .strip .ic{color:var(--good)}
 .strip .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .strip.back{background:var(--surface-2)}
@@ -279,7 +282,10 @@ dialog.big{max-width:calc(100vw - 32px);padding:var(--s4)}
   .nav .mitl{display:none}
   .app{grid-template-columns:1fr;height:calc(100vh - 52px)}
   .app:not(.card-view) .pane,.app.card-view .list{display:none}
-  .list{border-right:0}
+  .list,.strips,.pane{grid-column:1}
+  .list{grid-row:2;border-right:0}
+  .strips{background:var(--surface)}
+  .strips:has(.strip){padding:var(--s3) var(--s4) var(--s4)}
   .grp,.row{padding-left:var(--s4);padding-right:var(--s4)}
   .pane{padding:var(--s3) var(--s4) 0;background:var(--surface)}
   .inner{padding-bottom:var(--s4)}
@@ -337,6 +343,7 @@ dialog .cline .warnmark{color:var(--warn);flex:none}
 </header>
 <div class="app" id="app">
   <aside class="list" id="list" aria-label="Decisions"></aside>
+  <div class="strips" id="strips"></div>
   <main class="pane" id="pane"><div class="inner" id="inner"></div></main>
 </div>
 <dialog id="confirm" aria-labelledby="confirm-title"></dialog>
@@ -803,7 +810,7 @@ function strip() {
 }
 
 function renderPane() {
-  const kids = [strip()];
+  const kids = [];
   if (S.view === "mit") kids.push(mitView());
   else if (!S.sel) kids.push(emptyState());
   else if (S.tab === "agent") {
@@ -835,7 +842,7 @@ function render() {
   $("app").classList.toggle("card-view", S.phoneCard);
   document.body.classList.toggle("card-view", S.phoneCard);
   $("hback").textContent = "‹ " + (S.view === "mit" ? "Back" : TAB_LABEL[S.tab]);
-  renderNav(); renderList(); renderPane(); markStuck();
+  renderNav(); renderList(); $("strips").replaceChildren(...[strip()].filter(Boolean)); renderPane(); markStuck();
 }
 $("pane").addEventListener("scroll", markStuck, {passive: true});
 $("hback").addEventListener("click", () => { S.view = "card"; toList(); });
