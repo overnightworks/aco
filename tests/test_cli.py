@@ -6945,8 +6945,7 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
 
 @dataclass
 class _MinimalBoardSource:
-    """The smallest real `forge.BoardSource` -- every read empty, the dependency
-    fetch injectable -- for tests that exercise `board_read.fetch_dependencies` in isolation."""
+    """The smallest real `forge.BoardSource`, every read empty, for `fetch_dependencies` tests."""
 
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
@@ -16675,7 +16674,6 @@ def test_item_edit_json_reports_the_item_and_the_field(
             f"#{RULE_ITEM} is a pull request, not an issue; {{command}} needs an issue",
         ),
     ],
-    ids=["missing-item", "pull-request-target"],
 )
 def test_item_edit_refuses_through_the_shared_precondition_failed_envelope(
     case: _ItemFieldEdit,
@@ -16687,8 +16685,7 @@ def test_item_edit_refuses_through_the_shared_precondition_failed_envelope(
 ) -> None:
     """A target `item edit --size`/`--whole` cannot write reports as `precondition_failed`.
 
-    Spec: ITEM-17
-    """
+    Spec: ITEM-17"""
     _configured_board_client(monkeypatch, tmp_path).issue_references[RULE_ITEM] = reference
 
     exit_code = _edit_item_field(case, "--json")

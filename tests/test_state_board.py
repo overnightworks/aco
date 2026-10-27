@@ -1257,9 +1257,9 @@ def _projected(
     """`projected_board` fed entirely from `client`'s own read methods --
     the one assembly both parametrized cases below share, mirroring what
     `board_read.build_board` does at the CLI layer without that layer's filesystem and
-    network concerns. `open_pull_requests_supported` comes from
-    `client.lists_pull_requests`, the same read `board_read.build_board` makes,
-    never from the storage pin `config.storage` also carries."""
+    network concerns. `open_pull_requests_supported` comes from `client.lists_pull_requests`,
+    the same read `board_read.build_board` makes, never from the storage pin `config.storage`
+    also carries."""
     issues = client.list_open_board_issues()
     children = {
         issue.number: client.list_children(issue.number)
@@ -2550,14 +2550,12 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """`aco cut` on a state-ref container runs
-        through to a freshly minted child -- `create_child`'s single CAS
-        write -- with no refusal; this container's own `[record]` carries no `slice`
-        rows, so it creates an untied child exactly like GitHub does for the
+        """`aco cut` on a state-ref container runs through to a freshly minted child --
+        `create_child`'s single CAS write -- with no refusal; this container's own `[record]`
+        carries no `slice` rows, so it creates an untied child exactly like GitHub does for the
         same shape (see `tests/test_cut.py::test_cut_creates_the_child_and_removes_its_row`
-        with case `untied-without-a-slice-key`).
-        The byte-exact `[[slice]]` row removal itself is proved
-        below."""
+        with case `untied-without-a-slice-key`). The byte-exact `[[slice]]` row removal itself
+        is proved below."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
         status = issue_claim.main(["cut", str(CONTAINER_NUMBER), "--title", "Slice C"])
@@ -3277,9 +3275,8 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """`board_read.build_board` reads the state-ref source's `lists_pull_requests`
-        (`False`): a live claim with a branch and no pull request is in flight, not
-        waiting for a landed signal the source cannot give.
+        """`board_read.build_board` reads `lists_pull_requests` (`False`): a live claim with
+        a branch and no pull request is in flight, not waiting for a landed signal.
 
         Spec: defect:#447
         """

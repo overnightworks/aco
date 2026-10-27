@@ -20,8 +20,8 @@ never imports `store` itself.
 no data for them; `create_issue` raises it because `compose_item` mints a state-ref
 item's id and records its parent and origin in one write. The two pull-request listings
 still return an empty tuple rather than raising: `board_read.build_board` calls them
-unconditionally for every board read, and "no pull requests exist here" is
-this adapter's honest answer, not a refusal; `lists_pull_requests` is `False`.
+unconditionally for every board read, and "no pull requests exist here" is this adapter's
+honest answer, not a refusal; `lists_pull_requests` is `False`.
 `Board.recovery` -- purely pull-request-body-declared -- stays empty from that same emptiness.
 `Stage.CODE_LANDED` and the board's own Landungen view do not: both read
 `checkout.trunk_landings`'s trailer block straight from local git history
@@ -736,8 +736,7 @@ class StateRefBoard:
         return write.item_id
 
     def create_issue(self, *, title: str, body: str, kind: ItemKind) -> int:
-        """Unsupported: `compose_item` mints a
-        state-ref item's id and records its parent and origin in one write."""
+        """Unsupported: `compose_item` mints the id and records parent and origin in one write."""
         raise forge.ForgeUnsupportedError(NO_BARE_ISSUE)
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:
