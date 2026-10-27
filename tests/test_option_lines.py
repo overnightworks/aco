@@ -8,133 +8,34 @@ import json
 from pathlib import Path
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
+from board_fixtures import board_issue
 from cli_fixtures import run_cli
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-
-from aco import forge
-
-GOLDEN_CARD_HASH = "sha256:f7f1db4c507733e34c58d64de61fd482ad3d308db7ce3bf14bc503179c26519d"
-RULED_KEYS = (
-    f'ruling = "A"\nruled_on = 2026-10-28\ncard_hash = "{GOLDEN_CARD_HASH}"\nvia = "board"\n'
+from option_cards import (
+    GOLDEN_CARD_HASH,
+    OTHER_ANSWER,
+    RETURNED_NOTE,
+    RETURNED_ON,
+    RULED_KEYS,
+    E,
+    card,
+    card_body,
+    card_head,
+    card_option_a,
+    card_option_b,
+    check_defects,
+    malformed,
+    other_card,
+    other_decision,
+    returned_card,
+    ruled_card,
 )
 
-
-def card_head(*edits: tuple[str, str]) -> str:
-    """The line keys of the open card the item body shows, `edits` applied."""
-    head = (
-        "[[expectation]]\n"
-        'text = "Ein Klick auf den Ursprungs-Link springt in der App: die Version klappt auf, '
-        'der Take ist markiert, der Song bleibt offen."\n'
-        'question = "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?"\n'
-        'problem = "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg."\n'
-        'picture = """\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'
-        '<style>.b{fill:#fff;stroke:#555}</style><rect class="b" x="1" y="1" width="198" '
-        'height="78" rx="8"/></svg>"""\n'
-        'caption = "Der Browser springt selbst, dabei geht der Song verloren."\n'
-        'decision_kind = "product"\n'
-        'area = "Song-Seite"\n'
-        'topic = "Sprung zum Ursprungs-Take"\n'
-        'recommended = "A"\n'
-        'reason = "Behebt den Verlust; Strg- und Mittelklick bleiben normale Links."\n'
-    )
-    return apply_edits(head, edits)
-
-
-def card_option_a(*edits: tuple[str, str]) -> str:
-    option = (
-        "\n[[expectation.option]]\n"
-        'name = "Song bleibt offen"\n'
-        'effect = "Die App springt selbst: v5 klappt auf, Take 7 ist markiert."\n'
-        'picture = """\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'
-        '<style>.b{fill:#fff;stroke:#2a7}</style><rect class="b" x="1" y="1" width="198" '
-        'height="78" rx="8"/></svg>"""\n'
-        'caption = "Der Song bleibt offen."\n'
-        'notice = "Du bleibst in deinem Song; Zurück führt zur Ansicht davor."\n'
-        'cost = "Mehr Navigationscode, abgesichert durch Browserfälle."\n'
-        'undo = "reversible"\n'
-        'undo_how = "jederzeit änderbar."\n'
-        'contract = "Ein normaler Klick oder Enter auf den Ursprungs-Link öffnet die Version '
-        'in der App; der Song bleibt geöffnet."\n'
-    )
-    return apply_edits(option, edits)
-
-
-def card_option_b(*edits: tuple[str, str]) -> str:
-    option = (
-        "\n[[expectation.option]]\n"
-        'name = "Bleibt wie heute"\n'
-        'effect = "Der Browser springt; der Song schließt sich."\n'
-        "same_as_today = true\n"
-        'notice = "Nach dem Klick wählst du den Song neu."\n'
-        'cost = "Keine."\n'
-        'undo = "reversible"\n'
-        'undo_how = "es wird nichts gebaut."\n'
-        'contract = "Der Ursprungs-Link bleibt ein normaler Browser-Sprung."\n'
-    )
-    return apply_edits(option, edits)
-
-
-def apply_edits(text: str, edits: tuple[tuple[str, str], ...]) -> str:
-    for old, new in edits:
-        assert old in text, old
-        text = text.replace(old, new, 1)
-    return text
-
-
-def card(head: str | None = None, *options: str) -> str:
-    """One option line: `head` and `options`, the open card by default."""
-    return (card_head() if head is None else head) + "".join(
-        options or (card_option_a(), card_option_b())
-    )
-
-
-def ruled_card(*edits: tuple[str, str]) -> str:
-    """The card ruled `A` with the hash of the card shown, `edits` applied to its head."""
-    return card(card_head(("question = ", RULED_KEYS + "question = "), *edits))
-
-
-def card_body(line: str, *, before: str = "", newline: str = "\n") -> str:
-    return block_body(MINIMAL_BLOCK_TOML + before + "\n" + line).replace("\n", newline)
-
-
-def check_defects(capsys: pytest.CaptureFixture[str], raw_body: str) -> tuple[object, list[str]]:
-    result = run_cli(["check", "-", "--json"], capsys, stdin=raw_body)
-    return result.status, json.loads(result.stdout)["defects"]
-
-
-def malformed(field: str, message: str) -> str:
-    return f"body malformed: {field}: {message}"
-
-
-E = "expectation[0]"
-OTHER_ANSWER = "Nur auf dem Desktop offen lassen; auf dem Handy wie heute."
-
-
-def other_decision(answer: str = OTHER_ANSWER) -> str:
-    """The decided state of a card ruled `other` with the hash of the card shown."""
-    return (
-        f'ruling = "other"\nruled_on = 2026-10-28\ncard_hash = "{GOLDEN_CARD_HASH}"\n'
-        f'via = "chat"\nother = "{answer}"\n'
-    )
+from aco import forge
 
 
 def open_card_with(decision: str) -> str:
     return card(card_head(("question = ", decision + "question = ")))
-
-
-def other_card(*edits: tuple[str, str]) -> str:
-    """The option line ruled `other`, `edits` applied to its head."""
-    return card(card_head(("question = ", other_decision() + "question = "), *edits))
-
-
-RETURNED_ON = "returned_on = 2026-10-28\n"
-RETURNED_NOTE = 'returned_note = "Was kostet B im Betrieb?"\n'
-
-
-def returned_card(keys: str = RETURNED_ON + RETURNED_NOTE) -> str:
-    """The open option line with `keys` between its text and its card keys."""
-    return card(card_head(("question = ", keys + "question = ")))
 
 
 def ruled_with(keys: str) -> str:
