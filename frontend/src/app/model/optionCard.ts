@@ -117,7 +117,7 @@ export function consequenceText(option: CardOption): string {
 	return option.undo_how.charAt(0).toUpperCase() + option.undo_how.slice(1);
 }
 
-/** The toast text of a pick waiting out the undo window. */
+/** The strip text of a pick waiting out the undo window. */
 export function pendingOptionText(line: OptionLine, option: CardOption): string {
 	return `${decidedText(option)} · ${line.topic}`;
 }

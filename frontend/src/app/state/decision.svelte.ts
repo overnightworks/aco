@@ -2,7 +2,7 @@
  * Owns the 8 s undo window and the one write it allows: a chosen outcome
  * waits here, cancellable, until `UNDO_SECONDS` elapse, then becomes exactly
  * one `POST /api/rule`. `Stage.svelte` reads whether a line is mid-undo or
- * refused; `App.svelte` renders one `UndoToast` per still-pending entry.
+ * refused; `App.svelte` renders one `UndoStrip` per still-pending entry.
  * `reload` is `BoardStore.load` (`board.svelte.ts`): the one source of
  * truth this re-reads from after a write, rather than mutating a copy.
  */
