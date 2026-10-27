@@ -1,0 +1,8 @@
+claim_id = "f4849f6aefe34411b9e6407f5023306c"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "9ecbddce13e82c7e113003957e9f79d7db11b434"
+branch = "claude/issue-462-claim-real-worktree"
+scope = ["quality/baseline.toml", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_cmd_claim_checkout.py"]
+opened_commit = "f8cdffc2ed9689596e0f3c2fb1639bfa18f6d31c"
+whole_reason = "One test move: the new real-worktree module, the deletions it replaces in test_cli.py, one docstring in test_checkout.py and the baseline change together."
