@@ -90,8 +90,8 @@ def _print_claim_status_lines(
 ) -> None:
     state = "CONFLICT" if claim.claim_id in context.index.conflict_ids else "CLAIMED"
     print(
-        f"{state} {workboard.claim_subject(claim, context.storage)}: {claim.agent} ({claim.role}) "
-        f"base={claim.base} branch={claim.branch} claim={claim.claim_id}"
+        f"{state} {workboard.claim_subject(claim, context.storage)}: {claim_holder(claim)} "
+        f"base={claim.base} branch={protocol.terminal_text(claim.branch)} claim={claim.claim_id}"
         f"{workboard.claim_age_suffix(opened_at, observed_at)}"
     )
     for path in claim.scope:
@@ -99,7 +99,7 @@ def _print_claim_status_lines(
     if claim.resource is not None:
         print(f"  resource {claim.resource.name}={claim.resource.value}")
     if claim.whole_reason is not None:
-        print(f"  whole: {claim.whole_reason}")
+        print(f"  whole: {protocol.terminal_text(claim.whole_reason)}")
     note = _overlap_note(
         claims_by_id, protocol.overlap_peer_ids(context.index, claim), context.storage
     )
@@ -226,17 +226,21 @@ def _status_path(
         print(_lane_shared_unavailable_line(lane_shared))
 
 
+def claim_holder(claim: protocol.ActiveClaim) -> str:
+    return f"{protocol.terminal_text(claim.agent)} ({protocol.terminal_text(claim.role)})"
+
+
 def _print_path_holders(
     holders: tuple[protocol.ActiveClaim, ...], path: str, storage: body.Storage
 ) -> None:
     for claim in holders:
         print(
             f"CLAIMED {path} {workboard.claim_subject(claim, storage)}: "
-            f"{claim.agent} ({claim.role}) "
+            f"{claim_holder(claim)} "
             f"claim={claim.claim_id}"
         )
         if claim.whole_reason is not None:
-            print(f"  whole: {claim.whole_reason}")
+            print(f"  whole: {protocol.terminal_text(claim.whole_reason)}")
     if len(holders) > 1:
         print(
             "overlap: "

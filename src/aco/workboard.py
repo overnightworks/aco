@@ -3008,7 +3008,7 @@ def _unreadable_children_reason(
 
 def claim_subject(claim: protocol.ScopedClaim, storage: Storage) -> str:
     return (
-        f"lane {claim.branch}"
+        f"lane {protocol.terminal_text(claim.branch)}"
         if isinstance(claim.identity, protocol.LaneIdentity)
         else f"issue {item_label(claim.identity.issue, storage)}"
     )

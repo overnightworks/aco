@@ -40,6 +40,7 @@ object. A refusal reaching the shared collection point prints
 | no live issue claim | BRIEF-03 | BRIEF-06, BRIEF-27 |
 | `<item>` names no item at all | BRIEF-08 | BRIEF-08 |
 | the body holds a display control | BRIEF-23 | BRIEF-06 |
+| the live claim's text holds a display control | BRIEF-28 | BRIEF-28 |
 | a non-GitHub canonical remote | BRIEF-07 | BRIEF-07 |
 | `storage = "state-ref"` | BRIEF-09 | BRIEF-09 |
 | the item read itself fails | BRIEF-19 | BRIEF-19 |
@@ -64,6 +65,7 @@ object. A refusal reaching the shared collection point prints
 
 - [ ] [BRIEF-06] `aco brief <item> --json` prints `specs/output.spec.md`'s envelope, `reason: "composed"`, `"body", "claim", "tip", "touched"` (as `TOUCHED`), `"claim"` `null` without a live claim (see E-BRIEF-14).
 - [ ] [BRIEF-27] `"outside_claim"`, after `"touched"`, lists, in `"touched"`'s order, each touched path the live claim's scope does not cover, `[]` when all are covered, `null` without a live claim (see E-BRIEF-04).
+- [ ] [BRIEF-28] Text `aco brief` shows each display control in the `CLAIM` line's agent, role, branch and in its `whole:` line as NEXT-37 does; `--json`'s `claim` carries them as stored.
 - [ ] [BRIEF-10] A non-`null` `"claim"` object is `{"agent", "role", "branch", "base", "scope", "whole", "age"}` then STAT-22's keys, `"whole"` `null` without one (see E-BRIEF-04).
 
 ## `--step`

@@ -32,6 +32,7 @@ shared sink `specs/ref-store-cas.spec.md`'s own preamble already documents.
 | an OWNER/REPO `--repo`, or a non-GitHub canonical remote | STAT-16 | STAT-16 | STAT-16 | STAT-16 |
 | `--repo` not shaped OWNER/REPO | OUT-08 | OUT-08 | OUT-08 | OUT-08 |
 | the fetched state ref itself is rewritten or malformed | STAT-18 | STAT-18 | STAT-18 | STAT-18 |
+| a claim's text holds a display control | STAT-32 | STAT-32 | STAT-32 | STAT-32 |
 
 ## The empty repository and an unclaimed issue
 
@@ -100,6 +101,7 @@ the peer and its claim id, never the meeting paths.
 - [ ] [STAT-29] Plain `aco status` over a claim whose `opened_commit` the fetched tip does not reach refuses with CLAIM-50's sentence; `--path` reads no claim age and never refuses so (see Never).
 - [ ] [STAT-30] A fetched `refs/aco/state` that does not descend from this worktree's last observation refuses with CAS-11's sentence, in every form, `--path` included.
 - [ ] [STAT-31] With no trunk resolving, `aco status` names no lane-shared files: no `lane-shared:` line; `--json` carries `"lane_shared": []`, `"lane_shared_unavailable": null`; claims and exit are unchanged.
+- [ ] [STAT-32] Text `aco status`, `--path` too, shows each display control in a claim's agent, role, branch and `whole:` reason as NEXT-37's escape; `--json` carries it as stored.
 
 ## Never
 

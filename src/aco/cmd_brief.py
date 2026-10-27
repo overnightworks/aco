@@ -76,13 +76,14 @@ def _print_brief_claim(
     lane_shared: LaneSharedReading,
 ) -> None:
     print(
-        f"{claim.agent} ({claim.role}) branch={claim.branch} base={claim.base}"
+        f"{cmd_status.claim_holder(claim)} branch={protocol.terminal_text(claim.branch)} "
+        f"base={claim.base}"
         f"{workboard.claim_age_suffix(opened_at, observed_at)}"
     )
     for path in claim.scope:
         print(f"  {path}")
     if claim.whole_reason is not None:
-        print(f"  whole: {claim.whole_reason}")
+        print(f"  whole: {protocol.terminal_text(claim.whole_reason)}")
     shared = cmd_status.lane_shared_line(lane_shared)
     if shared is not None:
         print(f"  {shared}")
