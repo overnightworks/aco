@@ -53,6 +53,8 @@ resolved directory's name.
 - [ ] [ABRD-41] An `aco rule` refusal `card_changed` (RULE-17) answers `failed` with `Diese Zeile hat sich geändert, bitte neu laden`; every other answer keeps its mapping, `already_ruled` (RULE-04) included.
 - [ ] [ABRD-42] A post not naming exactly one answer (the key rules below) answers 400 `bad request: decision`; an `option` not `A`-`D` is refused the same way.
 
+The key rules for ABRD-42: `outcome` (with an optional `note`), `option` (with no note or a blank one) and `other` (its text, with no non-null `outcome`, `option` or `note`) each name one answer. An absent key and a `null` value name nothing, so a valid `other` alongside `outcome: null` and `option: null` is accepted. A post carrying both `outcome` and `option` keys is refused whatever their values, unless its `other` is non-null, which then decides as above.
+
 ## Reading the lines
 
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
