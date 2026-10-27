@@ -7,6 +7,7 @@
  * truth this re-reads from after a write, rather than mutating a copy.
  */
 
+import { SvelteSet } from 'svelte/reactivity';
 import { postDecision } from '../../client';
 import type { CardOption, DecisionRequest, OptionLine, Outcome, YesNoLine } from '../../types';
 import { cardHeading, outcomeLabel, type StripState } from '../model/boardSummary';
@@ -236,7 +237,7 @@ export class DecisionStore {
 	}
 
 	#dropDrafts(key: string, kinds: EscapeKind[]): void {
-		const dropped = new Set(kinds.map((kind) => draftKey(key, kind)));
+		const dropped = new SvelteSet(kinds.map((kind) => draftKey(key, kind)));
 		this.#drafts = Object.fromEntries(
 			Object.entries(this.#drafts).filter(([draft]) => !dropped.has(draft))
 		);
