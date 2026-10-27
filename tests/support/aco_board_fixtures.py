@@ -114,6 +114,9 @@ line = next((line for line in row["lines"] if line["index"] == arguments.line), 
 if line is None:
     refuse("line_out_of_range", "line %d out of range: this item has %d expectation line(s)"
            % (arguments.line, len(row["lines"])))
+if line["ruling"] is not None:
+    refuse("already_ruled",
+           "line %d is already ruled; a changed ruling is a new line" % arguments.line)
 if getattr(arguments, "unclear", False):
     if line["returned_on"] is not None:
         refuse("with_head", "line %d is already with its head; it comes back once revised"
@@ -124,9 +127,6 @@ if getattr(arguments, "unclear", False):
                       "index": arguments.line, "returned_on": "2026-10-03",
                       "open": sum(1 for entry in row["lines"] if entry["ruling"] is None)}))
     sys.exit(0)
-if line["ruling"] is not None:
-    refuse("already_ruled",
-           "line %d is already ruled; a changed ruling is a new line" % arguments.line)
 line["ruling"], line["ruled_on"] = arguments.ruling, "2026-10-03"
 if arguments.via is not None:
     line["via"] = arguments.via
