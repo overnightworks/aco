@@ -725,17 +725,12 @@ def _refuse_unpinned_body_contract(raw: dict[str, object], path: Path) -> None:
 
 
 def _validated_canonical_remote(raw: dict[str, object], path: Path) -> str:
-    canonical_remote_raw = raw.get("canonical_remote")
-    if canonical_remote_raw is None:
-        return DEFAULT_CANONICAL_REMOTE
-    if (
-        isinstance(canonical_remote_raw, str)
-        and canonical_remote_raw.strip() == canonical_remote_raw
-        and canonical_remote_raw
-    ):
-        return canonical_remote_raw
+    remote = raw.get("canonical_remote", DEFAULT_CANONICAL_REMOTE)
+    if isinstance(remote, str) and remote.strip() == remote and remote and remote[0] != "-":
+        return remote
     raise protocol.ClaimError(
-        f"board configuration {path} canonical_remote must be a non-empty remote name"
+        f"board configuration {path} canonical_remote must be a non-empty remote name "
+        "not starting with '-'"
     )
 
 
