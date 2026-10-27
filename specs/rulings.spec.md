@@ -24,6 +24,7 @@ it, `<k>` an expectation line's 1-based index.
 | a line's `question`/`example`/`picture` | — | RUL-06 |
 | an option line, open or ruled | RUL-02 | RUL-10, RUL-12, RUL-13, RUL-14, RUL-15 |
 | an option line ruled `other` | RUL-02, RUL-16 | RUL-16 |
+| an option line with its head | RUL-18 | RUL-17 |
 | no item on the whole board carries an expectation line | RUL-07 | RUL-08 |
 | a title or line holds a display control | RUL-11 | RUL-10, RUL-11 |
 
@@ -45,8 +46,10 @@ it, `<k>` an expectation line's 1-based index.
 - [ ] [RUL-14] An option line also starts with `"form": "options"`, `"card_hash"` (the card now, BODY-89) and `"stored_card_hash"` (its ruling's, `null` while open); a ruled line's two are equal (BODY-87).
 - [ ] [RUL-15] An option line carries `"via"` (`board`, `chat` or `default`, BODY-90) right after `"stored_card_hash"`, `null` while open; a yes/no line never carries it (see E-RUL-07).
 - [ ] [RUL-16] An option line carries `"other"` after `"via"`: the answer verbatim once ruled `other`, else `null`; text prints `other` as `<outcome>` and the answer as `<summary>` (see E-RUL-07).
+- [ ] [RUL-17] An option line carries `"returned_on"` and `"returned_note"` after `"other"`: its date and note while with its head, else `null`; a yes/no line never carries them (see E-RUL-07).
+- [ ] [RUL-18] Text prints a line with its head `  <k> with head <date>: <summary>`, `<summary>` its note, else its text, capped and escaped as RUL-02 and RUL-11; it still counts as open (see E-RUL-07).
 
-An option line's keys after `other` are `question`, `problem`, `picture`,
+An option line's keys after `returned_note` are `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`,
 `options`; each option is `{"letter", "name", "effect", "picture"` or
 `"same_as_today": true`, `"caption"` when stored, `"notice", "cost", "undo",
@@ -203,7 +206,7 @@ $ aco rulings
   1 open: The song stays open on the jump.
 exit 0
 $ aco rulings --json
-{"ok": true, "reason": "listed", "rulings": [{"number": 12, "title": "Song jump", "open": 1, "total": 1, "lines": [{"index": 1, "form": "options", "text": "The song stays open on the jump.", "ruling": null, "ruled_on": null, "default": null, "card_hash": "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a", "stored_card_hash": null, "via": null, "other": null, "question": "Keep the song open?", "problem": "The jump closes your song.", "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Today", "decision_kind": "product", "area": "Song page", "topic": "Jump", "recommended": "A", "reason": "Ends the loss.", "options": [{"letter": "A", "name": "Song stays open", "effect": "The app jumps itself.", "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Still open", "notice": "You stay in your song.", "cost": "More code.", "undo": "reversible", "undo_how": "Any time.", "contract": "The song stays open."}, {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true, "notice": "You pick the song again.", "cost": "None.", "undo": "final", "undo_how": "Nothing is built.", "contract": "The link stays a link."}]}]}]}
+{"ok": true, "reason": "listed", "rulings": [{"number": 12, "title": "Song jump", "open": 1, "total": 1, "lines": [{"index": 1, "form": "options", "text": "The song stays open on the jump.", "ruling": null, "ruled_on": null, "default": null, "card_hash": "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a", "stored_card_hash": null, "via": null, "other": null, "returned_on": null, "returned_note": null, "question": "Keep the song open?", "problem": "The jump closes your song.", "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Today", "decision_kind": "product", "area": "Song page", "topic": "Jump", "recommended": "A", "reason": "Ends the loss.", "options": [{"letter": "A", "name": "Song stays open", "effect": "The app jumps itself.", "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Still open", "notice": "You stay in your song.", "cost": "More code.", "undo": "reversible", "undo_how": "Any time.", "contract": "The song stays open."}, {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true, "notice": "You pick the song again.", "cost": "None.", "undo": "final", "undo_how": "Nothing is built.", "contract": "The link stays a link."}]}]}]}
 exit 0
 ```
 
@@ -211,3 +214,5 @@ Ruled `A` on 2026-10-28 with `via = "board"`, the same line prints `  1 ruled A 
 and carries `"ruling": "A", "ruled_on": "2026-10-28"` and `"via": "board"` with `stored_card_hash` equal to `card_hash`.
 Ruled `other` on 2026-10-28 with `via = "chat"` and `other = "Only on desktop."`, it prints `  1 ruled other 2026-10-28: Only on desktop.`
 and carries `"ruling": "other"`, `"via": "chat"` and `"other": "Only on desktop."`.
+Sent back to its head on 2026-10-28 with the note `Was kostet B?`, it prints `  1 with head 2026-10-28: Was kostet B?`
+and carries `"ruling": null`, `"returned_on": "2026-10-28"` and `"returned_note": "Was kostet B?"`; the header still counts it open.
