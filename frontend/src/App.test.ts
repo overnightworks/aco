@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App.svelte';
-import { item, line, repo } from './test-support/board';
+import { item, line, optionLine, repo } from './test-support/board';
 
 function fakeFetch(status: number, body: unknown) {
 	return vi.fn(async () => ({
@@ -18,7 +18,39 @@ afterEach(() => {
 test('the shell names the board in its heading, whatever the state', () => {
 	render(App, { token: null });
 
-	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('aco');
+	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Entscheidungs-Board');
+});
+
+test('[ABRD-51] a ready board offers the Open and Decided tabs with their counts, the current one marked', async () => {
+	const repos = [
+		repo({
+			items: [
+				item({
+					number: 42,
+					lines: [
+						optionLine({ index: 1 }),
+						line({ index: 2 }),
+						line({ index: 3, ruling: 'yes', ruled_on: '2026-10-01' })
+					]
+				})
+			]
+		})
+	];
+	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
+
+	render(App, { token: 'a-token' });
+	const views = await screen.findByRole('navigation', { name: 'Views' });
+	const open = within(views).getByRole('button', { name: 'Open 2' });
+	const decided = within(views).getByRole('button', { name: 'Decided 1' });
+
+	expect(within(views).getAllByRole('button')).toHaveLength(2);
+	expect(open).toHaveAttribute('aria-current', 'page');
+	expect(decided).not.toHaveAttribute('aria-current');
+
+	await fireEvent.click(decided);
+
+	expect(decided).toHaveAttribute('aria-current', 'page');
+	expect(open).not.toHaveAttribute('aria-current');
 });
 
 test('without a token in this tab, the shell shows access is missing and makes no request', () => {

@@ -15,6 +15,7 @@ import json
 import subprocess
 from dataclasses import dataclass
 from datetime import date
+from enum import StrEnum
 from pathlib import Path
 from typing import TypeVar
 
@@ -32,6 +33,7 @@ from .ports import (
     OptionLetter,
     OptionLine,
     Outcome,
+    RulingVia,
     YesNoLine,
 )
 
@@ -41,11 +43,9 @@ DEFAULT_TIMEOUT_SECONDS = 120.0
 seconds against a forge; a call still running after this is treated as hung."""
 _ALREADY_RULED_REASON = "already_ruled"
 _CARD_CHANGED_REASON = "card_changed"
-_VIA_BOARD = "board"
-"""The only `--via` the board writes: it records the cooperative path, never
-`chat` or `default`, which belong to the operator's other writers."""
 
 _Field = TypeVar("_Field")
+_Member = TypeVar("_Member", bound=StrEnum)
 
 
 @dataclass(frozen=True)
@@ -98,7 +98,9 @@ class AcoCli:
                 "--option",
                 decision.letter,
                 "--via",
-                _VIA_BOARD,
+                # The only `--via` the board writes: the cooperative path, never
+                # `chat` or `default`, which belong to the operator's other writers.
+                RulingVia.BOARD,
                 # One argument: a hash from aco's output can never read as an option.
                 f"--card-hash={card_hash}",
             ]
@@ -218,16 +220,16 @@ def _yes_no_line(item: int, title: str, fields: dict[str, object]) -> YesNoLine:
         question=_optional_text(fields, "question"),
         example=_optional_text(fields, "example"),
         picture=_optional_text(fields, "picture"),
-        default=_optional_outcome(fields, "default"),
-        ruling=_optional_outcome(fields, "ruling"),
+        default=_optional_member(fields, "default", Outcome, "an outcome"),
+        ruling=_optional_member(fields, "ruling", Outcome, "an outcome"),
         ruled_on=_optional_date(fields, "ruled_on"),
     )
 
 
 def _option_line(item: int, title: str, fields: dict[str, object]) -> OptionLine:
-    """RUL-13 and RUL-14's card; the always-null `default` and `stored_card_hash`
-    are not read."""
-    _require_keys(item, fields, ("ruling", "ruled_on"))
+    """RUL-13 and RUL-14's card with RUL-15's `via`; the always-null `default`
+    and `stored_card_hash` are not read."""
+    _require_keys(item, fields, ("ruling", "ruled_on", "via"))
     options = _card_options(fields.get("options"))
     letters: tuple[OptionLetter, ...] = tuple(option.letter for option in options)
     recommended = _letter(fields, "recommended", letters)
@@ -248,6 +250,7 @@ def _option_line(item: int, title: str, fields: dict[str, object]) -> OptionLine
         options=options,
         ruling=None if fields["ruling"] is None else _letter(fields, "ruling", letters),
         ruled_on=_optional_date(fields, "ruled_on"),
+        via=_optional_member(fields, "via", RulingVia, "board, chat or default"),
         card_hash=_required(fields, "card_hash", str),
     )
 
@@ -316,14 +319,16 @@ def _optional_text(fields: dict[str, object], key: str) -> str | None:
     return value
 
 
-def _optional_outcome(fields: dict[str, object], key: str) -> Outcome | None:
+def _optional_member(
+    fields: dict[str, object], key: str, vocabulary: type[_Member], noun: str
+) -> _Member | None:
     value = _optional_text(fields, key)
     if value is None:
         return None
     try:
-        return Outcome(value)
+        return vocabulary(value)
     except ValueError as error:
-        raise _unreadable(f"{key} is not an outcome") from error
+        raise _unreadable(f"{key} is not {noun}") from error
 
 
 def _optional_date(fields: dict[str, object], key: str) -> date | None:

@@ -1,7 +1,7 @@
 /**
  * Pure projections over an option line (`specs/serve.spec.md` ABRD-36/37):
  * the one vocabulary owner for every string on the option card, so
- * `OptionCard.svelte` and the list and Verlauf views carry no wording of
+ * `OptionCard.svelte` and the list and Decided views carry no wording of
  * their own. The row labels are the ruled English words of the decision
  * card (#13 line 12); the rest of the page keeps its German.
  */
@@ -15,6 +15,7 @@ export const ROW_LABEL = {
 	recommendation: 'Recommendation',
 	decide: 'Decide',
 	decided: 'Decided',
+	how: 'How',
 	result: 'Result',
 	notice: 'You notice',
 	cost: 'Cost',
@@ -49,8 +50,15 @@ export function isOptionLine(line: ExpectationLine): line is OptionLine {
 	return 'form' in line;
 }
 
-export interface CardMeta {
+/** What the frame's meta line shows; a card without a kind or an undo token
+ * leaves it out. */
+export interface FrameMeta {
 	where: string;
+	kind?: string;
+	undo?: Undo;
+}
+
+export interface CardMeta extends FrameMeta {
 	kind: string;
 	undo: Undo;
 }
@@ -70,13 +78,13 @@ export function chosenOption(line: OptionLine): CardOption | undefined {
 	return line.options.find((option) => option.letter === line.ruling);
 }
 
-/** `A · name` -- the verdict Verlauf and the list show instead of a yes/no
- * outcome. */
+/** `A · name` -- an option named by its letter, as the RESULT picture's
+ * fallback alt text reads it. */
 export function verdictLabel(option: CardOption): string {
 	return `${option.letter} · ${option.name}`;
 }
 
-/** The ruled card's Decided row. */
+/** The Decided row of a ruled line. */
 export function decidedText(option: CardOption): string {
 	return `${option.letter} — ${option.name}`;
 }
@@ -140,7 +148,7 @@ export function undoTail(option: CardOption): string {
 }
 
 /** Where the binding sentences stand: repository, item and line. */
-export function sourceLine(repo: string, item: number, line: OptionLine): string {
+export function sourceLine(repo: string, item: number, line: ExpectationLine): string {
 	return `${repo} · Item ${item} · Line ${line.index}`;
 }
 
@@ -148,4 +156,10 @@ export function sourceLine(repo: string, item: number, line: OptionLine): string
  * unless it only repeats the contract. */
 export function contractTexts(line: OptionLine, option: CardOption): string[] {
 	return line.text === option.contract ? [option.contract] : [option.contract, line.text];
+}
+
+/** Whether the Decide row floats over content: its sticky container runs on
+ * more than a pixel beyond the bottom of the pane that scrolls it. */
+export function isStuck(containerBottom: number, viewBottom: number): boolean {
+	return containerBottom > viewBottom + 1;
 }

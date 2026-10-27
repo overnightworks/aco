@@ -6,6 +6,7 @@
 		confirmTitle,
 		confirmVerb,
 		consequenceText,
+		isStuck,
 		pickLabel,
 		ROW_LABEL
 	} from '../app/model/optionCard';
@@ -36,6 +37,44 @@
 	// dialog must not change what `Decide <X>` posts.
 	let confirming: { line: OptionLine; option: CardOption } | null = $state(null);
 
+	let row: HTMLDivElement | undefined = $state();
+	let stuck = $state(false);
+
+	function scrollingAncestor(element: HTMLElement): HTMLElement | null {
+		for (
+			let ancestor = element.parentElement;
+			ancestor !== null;
+			ancestor = ancestor.parentElement
+		) {
+			const { overflowY } = getComputedStyle(ancestor);
+			if (overflowY === 'auto' || overflowY === 'scroll') return ancestor;
+		}
+		return null;
+	}
+
+	// The row sticks to the foot of the pane that scrolls its card; the shadow
+	// shows while the card still runs on beneath it.
+	$effect(() => {
+		const container = row?.parentElement;
+		const scroller = row ? scrollingAncestor(row) : null;
+		if (!container || !scroller) return;
+		const measure = () => {
+			stuck = isStuck(
+				container.getBoundingClientRect().bottom,
+				scroller.getBoundingClientRect().bottom
+			);
+		};
+		measure();
+		scroller.addEventListener('scroll', measure, { passive: true });
+		const resizes = new ResizeObserver(measure);
+		resizes.observe(scroller);
+		resizes.observe(container);
+		return () => {
+			scroller.removeEventListener('scroll', measure);
+			resizes.disconnect();
+		};
+	});
+
 	async function pick(option: CardOption) {
 		if (refreshing) return;
 		if (!asksToConfirm(option)) {
@@ -53,7 +92,7 @@
 	}
 </script>
 
-<div class="decide-row">
+<div class="decide-row" class:stuck bind:this={row}>
 	<dt>{ROW_LABEL.decide}</dt>
 	<dd>
 		{#if banner !== null}
@@ -111,8 +150,11 @@
 		z-index: 2;
 		margin-top: 4px;
 		padding: 16px 0 8px;
-		border-top: 1px solid var(--oc-line);
-		background: var(--oc-surface);
+		border-top: 1px solid var(--line);
+		background: var(--surface);
+	}
+	.decide-row.stuck {
+		box-shadow: 0 -12px 14px -14px rgba(0, 0, 0, 0.28);
 	}
 	dt {
 		font-size: 11px;
@@ -120,7 +162,7 @@
 		font-weight: 650;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: var(--oc-fg-3);
+		color: var(--fg-3);
 	}
 	dd {
 		margin: 0;
@@ -135,29 +177,29 @@
 		min-width: 48px;
 		height: 40px;
 		padding: 0 12px;
-		border: 1.5px solid var(--oc-line-strong);
+		border: 1.5px solid var(--line-strong);
 		border-radius: 8px;
-		background: var(--oc-surface);
+		background: var(--surface);
 		font-weight: 700;
 	}
 	.decide-row button.pick:not(.recommended):hover:enabled:not([aria-disabled='true']) {
-		border-color: var(--oc-fg-2);
+		border-color: var(--fg-2);
 	}
 	.decide-row button.pick[aria-disabled='true'] {
 		opacity: 0.55;
 		cursor: default;
 	}
 	.decide-row button.pick.recommended {
-		border-color: var(--oc-accent);
-		color: var(--oc-accent);
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 	dialog {
 		max-width: min(420px, calc(100vw - 32px));
 		padding: 24px;
-		border: 1px solid var(--oc-line);
+		border: 1px solid var(--line);
 		border-radius: 12px;
-		background: var(--oc-surface);
-		color: var(--oc-fg);
+		background: var(--surface);
+		color: var(--fg);
 	}
 	dialog::backdrop {
 		background: rgba(10, 8, 14, 0.45);
@@ -172,11 +214,11 @@
 		gap: 8px;
 		align-items: baseline;
 		margin: 0 0 16px;
-		color: var(--oc-fg-2);
+		color: var(--fg-2);
 	}
 	.cline :global(svg) {
 		flex: none;
-		color: var(--oc-warn);
+		color: var(--warn);
 	}
 	.actions {
 		display: flex;
@@ -186,16 +228,16 @@
 	.decide-row button.confirm {
 		height: 40px;
 		padding: 0 16px;
-		border: 1.5px solid var(--oc-fg);
+		border: 1.5px solid var(--fg);
 		border-radius: 8px;
-		background: var(--oc-fg);
-		color: var(--oc-surface);
+		background: var(--fg);
+		color: var(--surface);
 		font-weight: 600;
 	}
 	.decide-row button.confirm.alt {
-		border-color: var(--oc-line-strong);
+		border-color: var(--line-strong);
 		background: none;
-		color: var(--oc-fg);
+		color: var(--fg);
 	}
 	@media (max-width: 760px) {
 		.decide-row {

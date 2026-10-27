@@ -8,15 +8,17 @@ stores nothing.
 
 The shipped board shows an option line as the picture's card: meta line,
 question, PROBLEM, TODAY, OPTIONS A to D with name and effect, RECOMMENDATION and
-DECIDE with one pick per option, and a ruled one with its chosen letter. Each
+DECIDE with one pick per option. Every ruled line shows the picture's decided card:
+Decided, How with the way and the date or `not recorded`, and Contract behind Show. Each
 option opens its RESULT, YOU NOTICE, COST, UNDO and CONTRACT. Every TODAY and
 RESULT picture opens enlarged in a dialog, and on a phone TODAY is a framed
 thumbnail with the enlarge mark. A pick on a `final` option first asks in a
 confirm dialog. The card still lacks "Other / Unclear" instead of "Später",
-Mitsprache, the agent list and group decisions. A yes/no line keeps its card.
-The list groups open lines per project with the picture's Open and Not-ready
-shapes; the page still lacks the picture's header, its Decided view with who and
-how, and its phone header.
+Mitsprache, the agent list and group decisions. An open yes/no line keeps its card.
+The list groups open and decided lines per project with the picture's Open,
+Not-ready and Decided shapes (Decided shows the selected line's card in the
+pane), and the page has the picture's header with Open and Decided and its
+colour tokens. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
 What the board does today is in the "Browser decision flow" of
 [`specs/serve.spec.md`](../../specs/serve.spec.md).
 

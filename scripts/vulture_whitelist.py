@@ -51,12 +51,14 @@ The `DecisionKind` members are reached only by construction from a stored
 value (`DecisionKind(value)`) and by iteration when the grammar lists the
 accepted kinds; no code names one of them. `RulingVia.BOARD` and
 `RulingVia.CHAT` are reached the same way, from `--via` and from a stored
-`via`.
+`via`; so are the board's own `RulingVia.CHAT` and `RulingVia.DEFAULT`,
+reached only by construction from the `via` aco stored.
 """
 
 import argparse
 from datetime import UTC, date, datetime
 
+from aco.board.ports import RulingVia as BoardRulingVia
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
 from aco.expectation_grammar import DecisionKind, RulingVia
 from aco.metrics import Size, SizeClassStats
@@ -150,6 +152,8 @@ _referenced_only_for_vulture = (
     DecisionKind.WORDING,
     RulingVia.BOARD,
     RulingVia.CHAT,
+    BoardRulingVia.CHAT,
+    BoardRulingVia.DEFAULT,
     _BoardApiRequestHandler.do_GET,
     _BoardApiRequestHandler.do_POST,
     _BoardApiRequestHandler.log_message,

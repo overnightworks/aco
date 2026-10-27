@@ -7,6 +7,7 @@ import {
 	type OptionRulingLine,
 	type RulingOption
 } from './rulingsFixture';
+import { decidedList, expectDecidedAnswer } from './decidedView';
 import { readBoardRuntime } from './runtime';
 import {
 	ALREADY_RULED_MESSAGE,
@@ -21,8 +22,9 @@ test.describe.configure({ mode: 'serial' });
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
-// The fake aco stamps every ruling with this date (`aco_board_fixtures`).
-const FAKE_RULING_DATE = '2026-10-03';
+// The fake aco stores every board pick as `--via board` on this date
+// (`aco_board_fixtures`); the decided card's How row reads it back.
+const BOARD_PICK_HOW = 'Board · 03.10.2026';
 
 const SONG_QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const OTHER_QUESTION = 'Welcher Weg für die Altdaten?';
@@ -145,7 +147,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px Decide row`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-44] a pick waits out the undo window, then the card moves to Verlauf', async ({
+		test('[ABRD-44] a pick waits out the undo window, then the card moves to Decided', async ({
 			page
 		}, testInfo) => {
 			const { repoDirectory } = readBoardRuntime();
@@ -175,12 +177,14 @@ for (const viewport of [
 				await expect(page.getByRole('heading', { name: OTHER_QUESTION })).toBeVisible();
 			}
 			await expect(page.locator('.tracks').getByTitle(SONG_QUESTION)).toHaveCount(0);
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const entry = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
-			await expect(entry).toHaveCount(1);
-			await expect(entry).toContainText(SONG_QUESTION);
-			await expect(entry).toContainText('B · Browser-Sprung bleibt');
-			await expect(entry).toContainText(FAKE_RULING_DATE);
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const rows = decidedList(page).getByRole('button');
+			await expect(rows).toHaveCount(1);
+			await expect(rows).toHaveAttribute('title', SONG_QUESTION);
+			await expect(rows).toContainText('Sprung');
+			await rows.click();
+			await expectDecidedAnswer(page, 'B — Browser-Sprung bleibt', BOARD_PICK_HOW);
 			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 				viewport.width
 			);
@@ -209,8 +213,10 @@ for (const viewport of [
 			).toBeVisible();
 			await expect(picks(page).getByRole('button')).toHaveText(['A', 'B']);
 			await expect(picks(page).getByRole('button', { name: /^Decide A:/ })).toBeEnabled();
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			await expect(page.getByRole('region', { name: 'Verlauf' }).locator('summary')).toHaveCount(0);
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			await expect(page.getByText('Nothing decided yet')).toBeVisible();
+			await expect(decidedList(page).getByRole('button')).toHaveCount(0);
 		});
 
 		test('[ABRD-45] a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
@@ -337,11 +343,11 @@ for (const viewport of [
 			await expect(picks(page).getByRole('button', { name: /^Decide B:/ })).toBeDisabled();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const entry = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
-			await expect(entry).toHaveCount(1);
-			await expect(entry).toContainText(SONG_QUESTION);
-			await expect(entry).toContainText('B · Browser-Sprung bleibt');
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			await expect(decidedList(page).getByRole('button')).toHaveCount(1);
+			await decidedList(page).getByTitle(SONG_QUESTION, { exact: true }).click();
+			await expectDecidedAnswer(page, 'B — Browser-Sprung bleibt', BOARD_PICK_HOW);
 		});
 
 		for (const [key, close] of [
@@ -442,10 +448,10 @@ test.describe('1280px confirm over a changing board', () => {
 
 		await expect(page.getByRole('alert')).toContainText(LINE_CHANGED_MESSAGE);
 		await expect(page.getByRole('button', { name: 'Neu laden' })).toBeVisible();
-		await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-		const entries = page.getByRole('region', { name: 'Verlauf' }).locator('summary');
-		await expect(entries).toHaveCount(1);
-		await expect(entries).not.toContainText(SONG_QUESTION);
+		await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+		const rows = decidedList(page).getByRole('button');
+		await expect(rows).toHaveCount(1);
+		await expect(decidedList(page).getByTitle(SONG_QUESTION, { exact: true })).toHaveCount(0);
 	});
 
 	test('[ABRD-47] a slow background reload leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
