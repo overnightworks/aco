@@ -3279,7 +3279,10 @@ class TestCliStateRefForge:
     ) -> None:
         """`board_read.build_board` reads the state-ref source's `lists_pull_requests`
         (`False`): a live claim with a branch and no pull request is in flight, not
-        waiting for a landed signal the source cannot give."""
+        waiting for a landed signal the source cannot give.
+
+        Spec: defect:#447
+        """
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
         built = board_read.build_board(

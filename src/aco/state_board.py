@@ -16,8 +16,9 @@ compare-and-swap write to `items/<id>.md`, implemented in `session._StoreItemWri
 `close_item` and an `ItemCloseIntent`) -- so this module still
 never imports `store` itself.
 
-`landing`, `pull_request_changes` and `create_issue` raise `ForgeUnsupportedError`:
-this adapter has no data for them. The two pull-request listings
+`landing` and `pull_request_changes` raise `ForgeUnsupportedError`: this adapter has
+no data for them; `create_issue` raises it because `compose_item` mints a state-ref
+item's id and records its parent and origin in one write. The two pull-request listings
 still return an empty tuple rather than raising: `board_read.build_board` calls them
 unconditionally for every board read, and "no pull requests exist here" is
 this adapter's honest answer, not a refusal; `lists_pull_requests` is `False`.

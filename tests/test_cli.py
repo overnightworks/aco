@@ -16685,7 +16685,10 @@ def test_item_edit_refuses_through_the_shared_precondition_failed_envelope(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """A target `item edit --size`/`--whole` cannot write reports as `precondition_failed`."""
+    """A target `item edit --size`/`--whole` cannot write reports as `precondition_failed`.
+
+    Spec: ITEM-17
+    """
     _configured_board_client(monkeypatch, tmp_path).issue_references[RULE_ITEM] = reference
 
     exit_code = _edit_item_field(case, "--json")
