@@ -3201,13 +3201,12 @@ def test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resu
     reported: str,
     worktree_stood: bool,
 ) -> None:
-    """START-25: once the
-    claim's push was sent and the store cannot tell whether it was written
-    -- its lineage stamp, the search for a push whose answer was lost, a
-    push that timed out before or after it landed -- the worktree and branch
-    stay, whether `start` built them or found them standing (START-11), the
-    outcome is said to be uncertain, and the next `start` resumes whichever
-    outcome it finds."""
+    """START-25: once the claim's push was sent and the store cannot tell
+    whether it was written -- its lineage stamp, the search for a push whose
+    answer was lost, a push that timed out before or after it landed -- the
+    worktree and branch stay, whether `start` built them or found them
+    standing (START-11), the outcome is said to be uncertain, and the next
+    `start` resumes whichever outcome it finds."""
     repo, _remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     if worktree_stood:
@@ -3232,15 +3231,14 @@ def test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resu
     with monkeypatch.context() as failing:
         failing.setattr(store.GitPushTransport, "push", push_and_note)
         if failing_seam is not None:
-            seam_owner, seam_name = failing_seam
-            real_seam = getattr(seam_owner, seam_name)
+            real_seam = getattr(*failing_seam)
 
             def seam_fails_once_landed(*arguments: object, **keywords: object) -> object:
                 if landed:
                     raise protocol.ClaimError(_SEAM_FAILURE)
                 return real_seam(*arguments, **keywords)
 
-            failing.setattr(seam_owner, seam_name, seam_fails_once_landed)
+            failing.setattr(*failing_seam, seam_fails_once_landed)
 
         status = issue_claim.main(["start", "314", "--scope", "src/x.py"])
 
