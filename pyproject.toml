@@ -81,6 +81,7 @@ layers = [
     "items | expectations",
     "body",
     "metrics | expectation_grammar",
+    "card_rules",
     "usage",
     "protocol | process | board",
 ]
