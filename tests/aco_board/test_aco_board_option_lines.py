@@ -87,7 +87,6 @@ def option_line(*, ruling: object = None, **changes: object) -> dict[str, object
         "ruling": ruling,
         "ruled_on": "2026-10-28" if ruling is not None else None,
         "via": "board" if ruling is not None else None,
-        "other": None,
         "default": None,
         "card_hash": card_hash,
         "stored_card_hash": card_hash if ruling is not None else None,
@@ -143,13 +142,11 @@ def test_a_yes_no_line_is_listed_in_the_bytes_it_always_was(
     )
 
 
-@pytest.mark.parametrize(
-    "ruling", [None, "A", "B", "other"], ids=["open", "ruled-A", "ruled-B", "ruled-other"]
-)
+@pytest.mark.parametrize("ruling", [None, "A", "B"], ids=["open", "ruled-A", "ruled-B"])
 def test_an_option_line_is_listed_with_its_card_in_the_wire_order(
     repository: FakeAcoRepository, board: BoardClient, ruling: str | None
 ) -> None:
-    stored = option_line(ruling=ruling, other="Anders." if ruling == "other" else None)
+    stored = option_line(ruling=ruling)
     repository.set_rulings(row(12, "Song jump", stored))
 
     [listed] = _listed_lines(board)

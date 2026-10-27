@@ -108,7 +108,6 @@ from store_fixtures import (
     raw_tree,
     unrelated_racer_commit,
 )
-from test_option_lines import card_body, other_card
 
 from aco import (
     __version__,
@@ -1320,11 +1319,6 @@ PULLED_WITH_REFINING_FIRST = (
 )
 
 
-def _other_ruled_option_line() -> tuple[dict[str, object], ...]:
-    block = body.locate_block(card_body(other_card())).data
-    return tuple(body.block_expectation_dicts(block))
-
-
 @pytest.mark.parametrize(
     ("expectations", "expected_state", "expected_output"),
     [
@@ -1347,13 +1341,6 @@ def _other_ruled_option_line() -> tuple[dict[str, object], ...]:
             "#10 score -10: Work\nNext: Claim #10.\n"
             "Run: aco claim 10 --scope <paths>\n" + _UNKNOWN_SCOPE_NEXT_TAIL,
             id="fully_ruled_expectations_remain_actionable",
-        ),
-        pytest.param(
-            (ruled_expectation("Name it."), *_other_ruled_option_line()),
-            body.ExpectationState.RULED,
-            "#10 score -10: Work\nNext: Claim #10.\n"
-            "Run: aco claim 10 --scope <paths>\n" + _UNKNOWN_SCOPE_NEXT_TAIL,
-            id="an_other_ruled_line_is_decided",
         ),
         pytest.param(
             (ruled_expectation("Name it.", ruling="no"), proposed_expectation("Remove it.")),

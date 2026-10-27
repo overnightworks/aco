@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import Final, Literal, Protocol, get_args
+from typing import Literal, Protocol, get_args
 
 
 class Outcome(StrEnum):
@@ -33,12 +33,6 @@ class RulingVia(StrEnum):
 
 OptionLetter = Literal["A", "B", "C", "D"]
 """The letters of an option line's options, by position."""
-
-OTHER_RULING: Final = "other"
-"""`aco rulings --json` names an option line ruled with the operator's own
-answer by this `ruling` value and carries the answer beside it."""
-
-OptionRuling = OptionLetter | Literal["other"]
 
 OPTION_LETTERS: tuple[OptionLetter, ...] = get_args(OptionLetter)
 
@@ -117,11 +111,10 @@ class OptionLine:
     recommended: OptionLetter
     reason: str
     options: tuple[CardOption, ...]
-    ruling: OptionRuling | None
+    ruling: OptionLetter | None
     ruled_on: date | None
     via: RulingVia | None
     card_hash: str
-    other: str | None = None
 
     @property
     def is_open(self) -> bool:
