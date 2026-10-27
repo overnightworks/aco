@@ -55,7 +55,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 - [ ] [RULE-01] A still-open option line makes `aco rule ITEM --line N` with `--option` or `--other` print `RULED #<n> line <k> <ruling>; <m> line(s) still open` on stdout, exit `0` (see E-RULE-01).
 - [ ] [RULE-02] `--json` on the same call prints `specs/output.spec.md`'s envelope with `reason: "ruled"`, then `"item": <n>, "index": <k>, "ruling": "<ruling>", "ruled_on": "<date>", "open": <m>`.
 - RULE-03 (retired 27.10.2026): the note on a yes/no ruling went with the yes/no outcome flags; `--note` now only goes with `--unclear` (RULE-23).
-- [ ] [RULE-12] A ruling of an option line retains the card's `question`, `problem`, `picture` and `caption` unchanged and invents none (E-RULE-08); it adds only `ruling`, today's UTC `ruled_on`, `card_hash`, `via`, and `other` for `--other` (RULE-14, RULE-20).
+- [ ] [RULE-12] A ruling retains the card's `question`, `problem`, `picture`, `caption` unchanged, invents none, and adds only RULE-14's keys, plus `other` for `--other` (E-RULE-08).
 - [ ] [RULE-14] `--option X` on an open option line prints RULE-01/RULE-02 with `X` as `<ruling>`; the line gains `ruling`, today's UTC `ruled_on`, `card_hash` and `via`, no other key changes (see E-RULE-10).
 - [ ] [RULE-22] `--unclear` on an open option line prints `RETURNED #<n> line <k> to its head; <m> line(s) still open`, exit `0`; `--json` is `reason: "returned"` with `"item"`, `"index"`, `"returned_on"`, `"open"`.
 - [ ] [RULE-23] `--unclear` adds today's UTC `returned_on` and, with `--note TEXT`, `returned_note` TEXT verbatim; no other key changes and the line stays open (see E-RULE-12).

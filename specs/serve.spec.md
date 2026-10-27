@@ -111,7 +111,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
-- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line; `aco rule` has no yes/no flags left to answer one (see `specs/rule.spec.md`).
+- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line.
 - [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via`, `returned_on`, `returned_note`, unknown keys leave it be.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
 - [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`. A bad date, blank note, note without date, or either when ruled is unreadable.
@@ -308,7 +308,7 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
    "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}
 ```
 
-Posting `yes` for `#12` line `1` with the listed fingerprint still forwards `--yes` to `aco rule` until the board's argv path is re-pointed (K2); aco refuses the flag as unrecognized arguments, exit `2`, and the board answers 200 `{"status": "failed"}` carrying aco's message, with no write.
+Posting `yes` for `#12` line `1` with the listed fingerprint still forwards `--yes` to `aco rule` until the board's argv path is re-pointed (K2); aco refuses the call as a usage error (one of the arguments `--option --other` is required), exit `2`, and the board answers 200 `{"status": "failed"}` carrying aco's message, with no write.
 
 ### E-ABRD-12 -- deciding an option line
 
