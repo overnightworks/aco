@@ -2861,8 +2861,7 @@ class TestCliStateRefForge:
             child_done_when,
         )
         container_body = files_after[f"{CONTAINER_ID}.md"].decode()
-        monkeypatch.setattr(sys, "stdin", io.StringIO(container_body))
-        assert run_cli(["check", "-"], capsys).expect_success() == "body ok\n"
+        assert run_cli(["check", "-"], capsys, stdin=container_body).expect_success() == "body ok\n"
 
     def _nested_container_files(
         self, slice_rows: tuple[tuple[int, str], ...]
@@ -5775,8 +5774,7 @@ class TestCliStateRefForge:
             done_when="Both slices are closed.",
         )
 
-        monkeypatch.setattr(sys, "stdin", io.StringIO(container_body))
-        assert run_cli(["check", "-"], capsys).expect_success() == "body ok\n"
+        assert run_cli(["check", "-"], capsys, stdin=container_body).expect_success() == "body ok\n"
 
         edit_container = ["item", "edit", container_id]
         edited_container = run_cli(edit_container, capsys, stdin=container_body)
@@ -5798,8 +5796,7 @@ class TestCliStateRefForge:
             done_when="Slice one is merged.",
         )
 
-        monkeypatch.setattr(sys, "stdin", io.StringIO(child_body))
-        assert run_cli(["check", "-"], capsys).expect_success() == "body ok\n"
+        assert run_cli(["check", "-"], capsys, stdin=child_body).expect_success() == "body ok\n"
 
         edited_child = run_cli(["item", "edit", child_id], capsys, stdin=child_body)
         assert edited_child.status == 0

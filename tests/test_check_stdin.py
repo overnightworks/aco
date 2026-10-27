@@ -3,12 +3,26 @@
 from __future__ import annotations
 
 import json
+import sys
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, TextIO
 
 import pytest
 from board_fixtures import BIDI_AND_ZERO_WIDTH_CONTROLS, MINIMAL_BLOCK_TOML, block_body
-from cli_fixtures import forbid_forge_resolution, real_git, run_cli, track_board_config
+from cli_fixtures import (
+    body_file_on_stdin,
+    closed_stdin,
+    devnull_on_stdin,
+    empty_harness_socket_on_stdin,
+    forbid_forge_resolution,
+    piped_body_on_stdin,
+    real_git,
+    run_cli,
+    terminal_on_stdin,
+    track_board_config,
+)
 
 from aco import body, process, report, store
 
@@ -364,6 +378,72 @@ class TestBodyCheck:
             assert getattr(result, storage_pin.stream) == storage_pin.output
         assert result.status == storage_pin.exit_code
 
+    @pytest.mark.parametrize(
+        "stdin_source",
+        [
+            pytest.param(empty_harness_socket_on_stdin, id="harness-socket"),
+            pytest.param(terminal_on_stdin, id="terminal"),
+            pytest.param(devnull_on_stdin, id="devnull"),
+            pytest.param(closed_stdin, id="closed"),
+        ],
+    )
+    def test_check_stdin_refuses_a_stdin_that_carries_no_body(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        as_json: bool,
+        stdin_source: Callable[[Path], AbstractContextManager[TextIO | None]],
+    ) -> None:
+        """Spec: CHECK-24; a socket, terminal, `/dev/null` or closed stdin
+        refuses at once and is never read (the socket is the hang)."""
+
+        def forbidden_read() -> str:
+            pytest.fail("check - must not read a stdin that carries no body")
+
+        monkeypatch.setattr(report, "read_piped_body", forbidden_read)
+        sentence = "check - needs the body on stdin: aco check - < body.md"
+        with stdin_source(tmp_path) as stdin:
+            monkeypatch.setattr(sys, "stdin", stdin)
+            result = run_cli(["check", "-", *(["--json"] if as_json else [])], capsys)
+        envelope = {"ok": False, "reason": "unavailable", "message": sentence}
+        assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
+        assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
+
+    @pytest.mark.usefixtures("untrusted_pin")
+    def test_check_stdin_refuses_the_pin_before_a_stdin_that_carries_no_body(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        untrusted_pin: str,
+    ) -> None:
+        """Spec: CHECK-24, CHECK-21; the pin refusal comes first."""
+        with empty_harness_socket_on_stdin(tmp_path) as stdin:
+            monkeypatch.setattr(sys, "stdin", stdin)
+            result = run_cli(["check", "-"], capsys)
+        assert (result.status, result.stderr) == (2, f"ERROR: {untrusted_pin}\n")
+
+    @pytest.mark.parametrize(
+        "stdin_source",
+        [
+            pytest.param(body_file_on_stdin, id="redirected-file"),
+            pytest.param(piped_body_on_stdin, id="pipe"),
+        ],
+    )
+    def test_check_stdin_judges_a_file_or_a_pipe_on_stdin(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+        stdin_source: Callable[[Path], AbstractContextManager[TextIO | None]],
+    ) -> None:
+        """Spec: CHECK-24; a redirected file or a pipe carries a body."""
+        with stdin_source(tmp_path) as stdin:
+            monkeypatch.setattr(sys, "stdin", stdin)
+            result = run_cli(["check", "-"], capsys)
+        assert (result.status, result.stdout, result.stderr) == (0, "body ok\n", "")
+
     @pytest.mark.parametrize("raw_body", [pytest.param(b"\xff", id="invalid-utf8")])
     def test_check_stdin_refuses_undecodable_input(
         self,
@@ -478,3 +558,31 @@ class TestBodyCheck:
         result = run_cli(["check", "-"], capsys, stdin=block_body(MINIMAL_BLOCK_TOML))
         assert result.stdout == "body ok\n"
         assert result.status == 0
+
+
+@pytest.mark.usefixtures("outside_a_checkout")
+def test_check_stdin_outside_a_checkout_refuses_before_reading_stdin(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    as_json: bool,
+) -> None:
+    """Spec: CHECK-25; the storage pin needs a checkout, so the refusal
+    is CHECK-10's sentence and the piped body stays unread."""
+
+    def forbidden_read() -> str:
+        pytest.fail("check - must find a checkout before reading stdin")
+
+    monkeypatch.setattr(report, "read_piped_body", forbidden_read)
+    result = run_cli(
+        ["check", "-", *(["--json"] if as_json else [])],
+        capsys,
+        stdin=block_body(MINIMAL_BLOCK_TOML),
+    )
+    prefix = (
+        "ERROR: this command reads the repository's body contract from .aco/board.toml "
+        "and needs a checkout (a shallow one is enough): "
+    )
+    assert (result.status, result.stderr.startswith(prefix)) == (2, True)
+    if as_json:
+        payload = json.loads(result.stdout)
+        assert (payload["ok"], payload["reason"]) == (False, "unavailable")
