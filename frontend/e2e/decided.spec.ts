@@ -71,7 +71,12 @@ function arrangeMixed(repoDirectory: string): void {
 	]);
 }
 
-/** Item 50: option lines ruled the three ways, then one yes/no line. */
+const SHORT_ANSWER = 'Nur am Desktop; auf dem Handy bleibt es wie heute.';
+const UNBROKEN_TOKEN = 'x'.repeat(120);
+const LONG_ANSWER = `Erst am Desktop,\n„dann“ am Handy: ${'Der Sprung bleibt offen, solange das Lied läuft. '.repeat(4)}${UNBROKEN_TOKEN} Ende.`;
+
+/** Item 50: option lines ruled the three ways, one yes/no line, then two
+ * lines answered in the operator's own words. */
 function arrangeEveryWay(repoDirectory: string): void {
 	writeRulings(repoDirectory, [
 		row(
@@ -84,25 +89,69 @@ function arrangeEveryWay(repoDirectory: string): void {
 				question: 'Gäste einladen?',
 				ruling: 'no',
 				ruled_on: '2026-10-03'
+			}),
+			ruledOption(5, {
+				question: 'Nur Desktop?',
+				ruling: 'other',
+				other: SHORT_ANSWER,
+				via: 'board',
+				ruled_on: '2026-10-27'
+			}),
+			ruledOption(6, {
+				question: 'Auch Handy?',
+				ruling: 'other',
+				other: LONG_ANSWER,
+				via: 'chat',
+				ruled_on: '2026-10-27'
 			})
 		)
 	]);
 }
 
+const OPTION_TEXT = 'Der Sprung bleibt offen.';
+
 const EVERY_WAY = [
-	{ title: 'Per Board?', answer: 'A — Offen', how: 'Board · 25.10.2026', area: 'Bereich' },
-	{ title: 'Per Chat?', answer: 'B — Wie heute', how: 'From chat · 04.10.2026', area: 'Bereich' },
+	{
+		title: 'Per Board?',
+		answer: 'A — Offen',
+		how: 'Board · 25.10.2026',
+		area: 'Bereich',
+		binding: ['Vertrag von Offen.', OPTION_TEXT]
+	},
+	{
+		title: 'Per Chat?',
+		answer: 'B — Wie heute',
+		how: 'From chat · 04.10.2026',
+		area: 'Bereich',
+		binding: ['Vertrag von Wie heute.', OPTION_TEXT]
+	},
 	{
 		title: 'Ohne Antwort?',
 		answer: 'A — Offen',
 		how: 'Recommendation kept – no answer · 26.10.2026',
-		area: 'Bereich'
+		area: 'Bereich',
+		binding: ['Vertrag von Offen.', OPTION_TEXT]
 	},
 	{
 		title: 'Gäste einladen?',
 		answer: 'Nein',
 		how: 'not recorded · 03.10.2026',
-		area: 'Gespräch'
+		area: 'Gespräch',
+		binding: ['Gäste dürfen über einen Link teilnehmen.']
+	},
+	{
+		title: 'Nur Desktop?',
+		answer: `Other: „${SHORT_ANSWER}“`,
+		how: 'Board · 27.10.2026',
+		area: 'Bereich',
+		binding: [SHORT_ANSWER]
+	},
+	{
+		title: 'Auch Handy?',
+		answer: `Other: „${LONG_ANSWER}“`,
+		how: 'From chat · 27.10.2026',
+		area: 'Bereich',
+		binding: [LONG_ANSWER]
 	}
 ];
 
@@ -201,14 +250,19 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-37] [ABRD-54] the decided card says what was decided, how and when', async ({
+		test('[ABRD-37] [ABRD-54] [ABRD-57] the decided card says what was decided, how and when', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			arrangeEveryWay(repoDirectory);
 			await page.goto(`${appUrl}#t=${token}`);
+			await expect(openTab(page)).toHaveText(/^Open 0$/);
+			await expect(decidedTab(page)).toHaveText(/^Decided 6$/);
 
-			for (const [position, { title, answer, how, area }] of EVERY_WAY.entries()) {
+			for (const [
+				position,
+				{ title, answer, how, area, binding: sentences }
+			] of EVERY_WAY.entries()) {
 				await openDecidedLine(page, title);
 				const card = decidedCard(page);
 				await expect(card.locator('.meta')).toContainText(`repo › ${area}`);
@@ -222,7 +276,10 @@ for (const viewport of [
 				await expect(binding).toBeHidden();
 				await card.getByText('Show', { exact: true }).click();
 				await expect(binding).toBeVisible();
-				await expect(binding).toContainText('repo · Item 50 · Line');
+				await expect(binding.locator('p')).toHaveText(sentences);
+				await expect(binding.locator('.source')).toHaveText(
+					`repo · Item 50 · Line ${position + 1}`
+				);
 				await expect(card.getByText('Problem', { exact: true })).toHaveCount(0);
 				await expect(card.getByText('Today', { exact: true })).toHaveCount(0);
 				await expect(card.getByText('Options', { exact: true })).toHaveCount(0);

@@ -22,8 +22,8 @@ resolved directory's name.
 |---|---|---|
 | an open line | ABRD-06 | ABRD-01 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
-| a ruled line | ABRD-06, ABRD-37, ABRD-54 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
+| a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
 | a post naming both or neither of `outcome` and `option`, another letter, or an `option` with a note | — | ABRD-42 |
@@ -56,7 +56,7 @@ resolved directory's name.
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
 - [ ] [ABRD-07] A yes/no line with a `default` or `ruling` that is no outcome, a malformed option line (below), another `form`, or a `ruled_on` that is no ISO date shows `aco rulings --json is unreadable: <detail>`.
 
-An option line is malformed when its `ruling` or `recommended` is no letter of its options, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
+An option line is malformed when its `recommended` is no letter of its options, its `ruling` is neither such a letter nor `other`, its `other` is not non-blank text on a line ruled `other` or is neither absent nor `null` on any other, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
 ## Browser decision flow
 
@@ -67,8 +67,9 @@ An option line is malformed when its `ruling` or `recommended` is no letter of i
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
 - [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided. A stored “Später” stays there and is not automatically presented again.
 - [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation and Decide (ABRD-44).
-- [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, or `Ja`, `Nein`, `Später`), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
+- [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), else `not recorded`; then ` · ` and the ruling date as `DD.MM.YYYY` when known.
+- [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
 - [ ] [ABRD-38] Each option on an option card is a button that opens its Result (picture or `= TODAY`), You notice, Cost, Undo and Contract behind `Show`; opening one closes the other.
 - [ ] [ABRD-43] Each Today and Result picture on an option card is an `Enlarge picture` button opening it with its caption in a modal dialog; `Close` or `Esc` closes it and focus returns to the button.
 - [ ] [ABRD-44] An open option card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts `option` (ABRD-39); once stored, the card moves to Decided.
@@ -109,10 +110,11 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line (RULE-13).
 - [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via` and unknown keys leave it unchanged.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
+- [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
 
 An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,
-`ruled_on`, `via`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
+`ruled_on`, `via`, `other`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
 and no `card_hash`; pictures are SVG text as stored.
 
 ## The SPA shell
@@ -294,7 +296,7 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
     {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true,
      "notice": "You pick the song again.", "cost": "None.", "undo": "final",
      "undo_how": "Nothing is built.", "contract": "The link stays a link."}],
-   "ruling": null, "ruled_on": null, "via": null, "fingerprint": "<hex>"}]},
+   "ruling": null, "ruled_on": null, "via": null, "other": null, "fingerprint": "<hex>"}]},
   {"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
    "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}
