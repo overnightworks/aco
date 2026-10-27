@@ -281,6 +281,8 @@ def test_a_wide_scope_is_refused_without_whole_and_changes_no_claim(
     capsys: pytest.CaptureFixture[str],
     refusal: Refusal,
 ) -> None:
+    """Spec: CLAIM-25, CLAIM-26, CLM-18, RESC-10."""
+
     standpoint = arrange(stand_in, monkeypatch, refusal.case)
     held_before = held_claims(standpoint)
 
@@ -303,6 +305,8 @@ def test_a_scope_within_the_width_limits_or_with_whole_is_claimed_with_its_reaso
     capsys: pytest.CaptureFixture[str],
     acceptance: Acceptance,
 ) -> None:
+    """Spec: CLAIM-29, CLM-18, RESC-10."""
+
     case = acceptance.case
     standpoint = arrange(stand_in, monkeypatch, case)
 
@@ -329,6 +333,8 @@ def test_claim_under_state_ref_storage_refuses_repo_as_invalid_usage_before_the_
     stand_in: StandIn,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Spec: CLM-18."""
+
     standpoint = stand_in(board_config='storage = "state-ref"\n', more_trunk_files=FOUR_NEW_FILES)
 
     status = issue_claim.main(
@@ -390,6 +396,8 @@ def test_a_git_failure_reading_a_scope_entry_is_unavailable_and_never_a_wide_sco
     case: WidthCase,
     path: str,
 ) -> None:
+    """Spec: CLAIM-26, RESC-17."""
+
     standpoint = arrange(stand_in, monkeypatch, case)
     fail_reading_tree_entry(monkeypatch, path)
 
@@ -406,6 +414,8 @@ def test_an_untracked_scope_entry_outside_a_working_tree_keeps_the_checkout_refu
     stand_in: StandIn,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Spec: RESC-17."""
+
     case = WidthCase(Command.CLAIM, ("scratch",))
     standpoint = arrange(stand_in, monkeypatch, case)
     read_git = checkout.git_output
@@ -430,7 +440,7 @@ def test_an_untracked_scope_entry_outside_a_working_tree_keeps_the_checkout_refu
 
 
 def test_a_share_above_a_quarter_of_the_versioned_files_is_refused_with_its_numbers() -> None:
-    """No real tree reaches this refusal: a share over a quarter of at least
+    """Spec: CLM-18. No real tree reaches this refusal: a share over a quarter of at least
     twelve files takes four covered files, which three named paths hold only
     through a directory, and a directory is refused first."""
     with pytest.raises(ClaimError) as refusal:
