@@ -17,7 +17,7 @@ from typing import Any, NamedTuple
 import pytest
 from spec_lint import analyze, load_spec_dir, load_spec_file
 
-_REPOSITORY_SPEC_DIR = Path(__file__).parent.parent / "specs"
+_REPOSITORY_SPEC_DIR = Path(__file__).parent.parent.parent / "specs"
 
 GREEN_SPEC = """# Sample
 
