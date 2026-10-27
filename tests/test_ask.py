@@ -225,14 +225,13 @@ class TestGithubAsk:
         )
 
     @pytest.mark.parametrize(
-        "arguments,initial,state,is_landing,capability,fails,picture,message,reason,wire,store",
+        "arguments,initial,state,is_landing,fails,picture,message,reason,wire,store",
         [
             pytest.param(
                 (),
                 "## Now\nOld prose.\n",
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 None,
                 "#90 body malformed: aco: no aco block; ask needs a valid aco block",
@@ -242,25 +241,10 @@ class TestGithubAsk:
                 id="blockless",
             ),
             pytest.param(
-                (),
-                block_body(MINIMAL_BLOCK_TOML),
-                forge.ItemState.OPEN,
-                False,
-                forge.Capability.READ_ONLY,
-                False,
-                None,
-                "this forge cannot update_item_body; ask by hand",
-                "unavailable",
-                True,
-                True,
-                id="read-only",
-            ),
-            pytest.param(
                 ("--text", "   "),
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 None,
                 "expectation text must be a non-empty string",
@@ -274,7 +258,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 "<div>not an svg</div>",
                 "picture must be inline SVG rooted at <svg>",
@@ -288,7 +271,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 None,
                 "question must be a non-empty string",
@@ -302,7 +284,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 None,
                 "example must be a non-empty string",
@@ -316,7 +297,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 None,
                 "question must be at most 160 characters",
@@ -330,7 +310,6 @@ class TestGithubAsk:
                 "",
                 forge.ItemState.MISSING,
                 False,
-                None,
                 False,
                 None,
                 "#90 does not exist",
@@ -344,7 +323,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 True,
-                None,
                 False,
                 None,
                 "#90 is a pull request, not an issue; ask needs an issue",
@@ -358,7 +336,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 True,
                 None,
                 "update item body failed (simulated)",
@@ -372,7 +349,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 None,
                 "--picture missing.svg could not be read: "
@@ -387,7 +363,6 @@ class TestGithubAsk:
                 block_body(MINIMAL_BLOCK_TOML),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 None,
                 "--picture missing.svg could not be read: "
@@ -407,7 +382,6 @@ class TestGithubAsk:
         initial: str,
         state: forge.ItemState,
         is_landing: bool,
-        capability: forge.Capability | None,
         fails: bool,
         picture: str | None,
         message: str,
@@ -416,7 +390,7 @@ class TestGithubAsk:
         store: bool,
     ) -> None:
         """Spec: ASK-05, ASK-06, ASK-07, ASK-08, ASK-09, ASK-10, ASK-12,
-        RULE-06, RULE-07, RULE-08 — invalid input and failed writes.
+        RULE-07, RULE-08 — invalid input and failed writes.
         """
         client = serve_forge(
             monkeypatch,
@@ -425,9 +399,6 @@ class TestGithubAsk:
                     90: forge.ItemReference(state, "Decide something", initial, is_landing)
                 },
                 fail_update_item_body=fails,
-                capability_overrides={}
-                if capability is None
-                else {forge.ForgeOperation.UPDATE_ITEM_BODY: capability},
             ),
         )
         if picture is not None:

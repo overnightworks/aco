@@ -15,8 +15,8 @@ this exact command instead, `specs/serve.spec.md` ABRD-01). This
 file owns the ruling's own refusals -- an already-ruled
 line, an out-of-range one -- the `RULED` line, its own `reason` vocabulary,
 and every refusal `aco ask` shares only by substituting `command` ("rule"
-where ask's own reads "ask"): a missing item, a pull-request target, a
-forge that cannot write the body. `specs/output.spec.md` owns the `--json`
+where ask's own reads "ask"): a missing item and a pull-request target.
+`specs/output.spec.md` owns the `--json`
 envelope itself (OUT-nn: key order, `ok`, `message`); this file names only
 `rule`'s own `reason` values. `specs/ask.spec.md` owns the
 malformed-body-target refusal the two commands share verbatim (ASK-05);
@@ -49,7 +49,6 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 | its card changed since it was shown | RULE-17 | RULE-09 | — |
 | `--option` names a letter not on the card | RULE-18 | RULE-09 | — |
 | `--via default` names another letter than the recommended one | RULE-19 | RULE-09 | — |
-| this forge cannot write the body | RULE-06 | RULE-09 | — |
 | item does not exist | RULE-07 | RULE-09 | — |
 | item is a pull request | RULE-08 | RULE-09 | — |
 | item body malformed | ASK-05 (cited) | RULE-09 | — |
@@ -70,12 +69,12 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 
 ## Refusals this command owns
 
-`aco ask`'s equivalent of RULE-06/RULE-08 substitutes `ask` for `rule` in
+`aco ask`'s equivalent of RULE-08 substitutes `ask` for `rule` in
 the same sentence; RULE-07's sentence is identical for both commands.
 
 - [ ] [RULE-04] `--line N` naming an already-ruled entry refuses `line <k> is already ruled; a changed ruling is a new line`, exit `2`, before any write (see E-RULE-03).
 - [ ] [RULE-05] `--line N` outside the item's own expectation lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write (see E-RULE-04).
-- [ ] [RULE-06] A forge whose `update_item_body` capability is not `READ_WRITE` refuses `this forge cannot update_item_body; rule by hand`, exit `2`, before any write.
+- RULE-06 (retired 27.10.2026): the refusal for a forge that cannot write the item body went with the forge capability table, which no adapter ever answered `UNSUPPORTED` for the body write (audit #331 finding 17).
 - [ ] [RULE-07] An item no reference resolves refuses `#<n> does not exist`, exit `2`, before any write.
 - [ ] [RULE-08] An item that is a pull request refuses `#<n> is a pull request, not an issue; rule needs an issue`, exit `2`, before any write.
 - [ ] [RULE-13] `--line N` naming an option line refuses `line <k> is an option line; --yes, --no and --later rule only a yes/no line`, exit `2`, before any write, after RULE-05, before RULE-04 (see E-RULE-09).
@@ -96,7 +95,7 @@ the same sentence; RULE-07's sentence is identical for both commands.
 - [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-26] A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
 - [ ] [RULE-27] `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.
-- [ ] [RULE-09] `--json` on a refusal (RULE-04..08, 10, 13, 15..19, 21, 24, 26, 27, ASK-05) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
+- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 13, 15..19, 21, 24, 26, 27, ASK-05) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
 - [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `aco ask`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 
@@ -110,7 +109,7 @@ the same sentence; RULE-07's sentence is identical for both commands.
 | RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-13 (an option line), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter) | `invalid_usage` |
 | RULE-17 (the card changed) | `card_changed` |
 | RULE-24 (already with its head), RULE-27 (`--via default` on such a line) | `with_head` |
-| RULE-06 (forge cannot write), RULE-11 (the write itself fails) | `unavailable` |
+| RULE-11 (the write itself fails) | `unavailable` |
 
 ## Never
 

@@ -71,7 +71,7 @@ class _ItemReason(StrEnum):
     only a GitHub issue `item new` created but could not type or record under
     its `--parent`, `cut`'s own shape. Every other refusal -- a
     `storage = "github"` command, a missing item or parent, a possible twin,
-    a pull request target, a forge write capability, or a live claim still
+    a pull request target, or a live claim still
     on the item -- is `precondition_failed`, this command family's single
     generic bucket."""
 
@@ -373,7 +373,6 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_SIZE_COMMAND)
         client = context.forge_writer
-        board_read.require_update_item_body(client, command=_ITEM_EDIT_SIZE_COMMAND)
         number = parsed.item
         storage = context.config.storage
         current_body = board_read.item_body_or_refuse(
@@ -434,7 +433,6 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_WHOLE_COMMAND)
         client = context.forge_writer
-        board_read.require_update_item_body(client, command=_ITEM_EDIT_WHOLE_COMMAND)
         number = parsed.item
         storage = context.config.storage
         current_body = board_read.item_body_or_refuse(

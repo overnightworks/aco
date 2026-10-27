@@ -11,8 +11,7 @@ plus the malformed-body refusal `aco rule` shares verbatim.
 order, `ok`, `message`); this file names only `ask`'s own `reason` values.
 `specs/rule.spec.md` owns every refusal the two commands share only by
 substituting `command` ("ask" where rule reads "rule"): a missing item, a
-pull-request target, a forge that cannot write the body
-(RULE-06..RULE-08); this file cites those IDs rather than restating them.
+pull-request target (RULE-07, RULE-08); this file cites those IDs rather than restating them.
 `specs/storage-pin.spec.md` owns the state-ref forge gate (PIN-04) `ask`
 shares with `rule` and `brief`; this file cites it rather than restating
 it. `specs/body-block.spec.md` owns the picture's own content grammar
@@ -35,7 +34,6 @@ line's 1-based index.
 | `--question`/`--example` content refused | ASK-10 | ASK-09 | — |
 | item is a pull request | RULE-08 (cited) | ASK-09 | — |
 | item does not exist | RULE-07 (cited) | ASK-09 | — |
-| this forge cannot write the body | RULE-06 (cited) | ASK-09 | — |
 | `--repo` given, `storage = "state-ref"` | ASK-11 | ASK-09 | — |
 | the body write itself fails | ASK-12 | ASK-12 | — |
 
@@ -55,7 +53,7 @@ text (BODY-01..BODY-50); a picture's own content rules are BODY-37..BODY-42.
 - [ ] [ASK-06] `--picture FILE.svg` naming an unreadable file refuses `--picture <path> could not be read: <error>`, exit `2`, before the forge or the item body are touched (see E-ASK-04).
 - [ ] [ASK-07] A `--picture` failing a BODY-37..42 rule refuses `picture <reason>` (no `expectation[0].` prefix), exit `2`, before any write; `<reason>` is the first-matching row below.
 - [ ] [ASK-08] `--text` that is blank or all whitespace refuses `expectation text must be a non-empty string`, exit `2`, before any write.
-- [ ] [ASK-09] `--json` on a dispatched refusal (ASK-05..ASK-08, ASK-10, ASK-11, RULE-06..RULE-08) prints the envelope with `reason` from the table below and the sentence as `message`, exit `2` (see E-ASK-05).
+- [ ] [ASK-09] `--json` on a dispatched refusal (ASK-05..ASK-08, ASK-10, ASK-11, RULE-07, RULE-08) prints the envelope with `reason` from the table below and the sentence as `message`, exit `2` (see E-ASK-05).
 - [ ] [ASK-10] A `--question`/`--example` failing BODY-34..36 refuses `<field> <reason>`, exit `2`, before any write; `<field>` is `question` or `example`, `<reason>` from the table below (see E-ASK-06).
 - [ ] [ASK-11] Under `storage = "state-ref"`, `aco ask` resolves the state-ref forge like `aco rule`; `--repo` there refuses the same as PIN-04 (see E-ASK-07).
 - [ ] [ASK-12] A forge failure appending the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-ASK-08).
@@ -69,7 +67,7 @@ text (BODY-01..BODY-50); a picture's own content rules are BODY-37..BODY-42.
 | ASK-06 (`--picture` unreadable), ASK-07 (`--picture` content refused) | `invalid_picture` |
 | ASK-08 (blank `--text`), ASK-10 (`--question`/`--example` content refused) | `invalid_expectation` |
 | ASK-11 (`--repo` under `storage = state-ref`, cites PIN-04) | `invalid_usage` |
-| RULE-06 (forge cannot write, cited), ASK-12 (the append itself fails) | `unavailable` |
+| ASK-12 (the append itself fails) | `unavailable` |
 
 `<reason>` for ASK-10, checked in this fixed order:
 

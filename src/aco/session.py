@@ -582,8 +582,7 @@ class RunContext:
         (its `ItemWriter` injected by `_state_ref_forge`), and every test
         fake standing in for either -- already implements the full
         `ForgeWriter` surface, an unsupported operation as a method raising
-        `forge.ForgeUnsupportedError`, checked at each call site by
-        `capability()`, never by `isinstance`."""
+        `forge.ForgeUnsupportedError`, never checked by `isinstance`."""
         return cast(forge.ForgeWriter, self.forge)
 
     @cached_property

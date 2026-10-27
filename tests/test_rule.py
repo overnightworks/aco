@@ -307,7 +307,7 @@ class TestGithubRule:
         "as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")]
     )
     @pytest.mark.parametrize(
-        "arguments,initial,state,is_landing,capability,fails,message,reason",
+        "arguments,initial,state,is_landing,fails,message,reason",
         [
             pytest.param(
                 ("--line", "1", "--no"),
@@ -319,7 +319,6 @@ class TestGithubRule:
                 ),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 "line 1 is already ruled; a changed ruling is a new line",
                 "already_ruled",
@@ -334,7 +333,6 @@ class TestGithubRule:
                     ),
                     forge.ItemState.OPEN,
                     False,
-                    None,
                     False,
                     message,
                     "line_out_of_range",
@@ -355,23 +353,9 @@ class TestGithubRule:
             ],
             pytest.param(
                 ("--line", "1", "--yes"),
-                block_body(
-                    MINIMAL_BLOCK_TOML + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                ),
-                forge.ItemState.OPEN,
-                False,
-                forge.Capability.READ_ONLY,
-                False,
-                "this forge cannot update_item_body; rule by hand",
-                "unavailable",
-                id="read-only",
-            ),
-            pytest.param(
-                ("--line", "1", "--yes"),
                 "",
                 forge.ItemState.MISSING,
                 False,
-                None,
                 False,
                 "#90 does not exist",
                 "invalid_item",
@@ -384,7 +368,6 @@ class TestGithubRule:
                 ),
                 forge.ItemState.OPEN,
                 True,
-                None,
                 False,
                 "#90 is a pull request, not an issue; rule needs an issue",
                 "invalid_item",
@@ -395,7 +378,6 @@ class TestGithubRule:
                 "## Now\nOld prose.\n",
                 forge.ItemState.OPEN,
                 False,
-                None,
                 False,
                 "#90 body malformed: aco: no aco block; rule needs a valid aco block",
                 "invalid_item",
@@ -408,7 +390,6 @@ class TestGithubRule:
                 ),
                 forge.ItemState.OPEN,
                 False,
-                None,
                 True,
                 "update item body failed (simulated)",
                 "unavailable",
@@ -424,29 +405,23 @@ class TestGithubRule:
         initial: str,
         state: forge.ItemState,
         is_landing: bool,
-        capability: forge.Capability | None,
         fails: bool,
         message: str,
         reason: str,
         as_json: bool,
     ) -> None:
-        """Spec: RULE-04, RULE-05, RULE-06, RULE-07, RULE-08, RULE-09, RULE-11,
+        """Spec: RULE-04, RULE-05, RULE-07, RULE-08, RULE-09, RULE-11,
         ASK-05, Never 2, OUT-01 — refuse invalid targets and failed writes with ERROR.
         """
         reference = forge.ItemReference(state, "Decide something", initial, is_landing)
-        capabilities = (
-            {} if capability is None else {forge.ForgeOperation.UPDATE_ITEM_BODY: capability}
-        )
         client = serve_forge(
             monkeypatch,
             FakeForge(
                 issue_references={90: reference},
-                capability_overrides=capabilities,
                 fail_update_item_body=fails,
             ),
         )
         assert client.issue_references == {90: reference}
-        assert client.capability_overrides == capabilities
         assert client.fail_update_item_body == fails
         assert client.item_bodies == {}
         capsys.readouterr()

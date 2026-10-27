@@ -50,12 +50,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--card-hash", metavar="HASH", help=argparse.SUPPRESS)
 
 
-class TargetUnavailableError(protocol.ClaimError):
-    """`require_writable_target`'s own "forge cannot write" refusal -- a distinct type from
-    `InvalidTargetError` so `ask`/`rule` can
-    each choose their own `unavailable` without parsing prose."""
-
-
 class InvalidTargetError(protocol.ClaimError):
     """`require_writable_target`'s own "no such writable item" refusal -- missing, a pull request,
     or a malformed body -- so
@@ -66,17 +60,11 @@ class InvalidTargetError(protocol.ClaimError):
 def require_writable_target(
     client: forge.ForgeWriter, context: RunContext, number: int, *, command: str
 ) -> tuple[str, workboard.BoardConfig]:
-    """`ask` and `rule`'s shared target gate (RULE-06..08, cited verbatim by
-    `specs/ask.spec.md`): the forge must accept a body write, the item must
-    exist and not be a pull request, and its body must parse -- in that
-    order, unchanged from before it was factored out of both
-    commands. Returns the live body and the board configuration `ask`/
+    """`ask` and `rule`'s shared target gate (RULE-07, RULE-08, cited verbatim by
+    `specs/ask.spec.md`): the item must exist and not be a pull request, and
+    its body must parse. Returns the live body and the board configuration `ask`/
     `rule` still need for their own write."""
-    try:
-        board_read.require_update_item_body(client, command=command)
-    except protocol.ClaimError as error:
-        raise TargetUnavailableError(str(error)) from error
-    config = board_read.load_board_config(client, context)
+    config = context.config
     try:
         body = board_read.item_body_or_refuse(
             client, number, command=command, storage=config.storage
@@ -261,7 +249,6 @@ def _rule_item(
 # Each refusal's `--json` `reason`, by its type; any other refusal is a
 # forge that failed, `unavailable`.
 _REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _RuleReason], ...] = (
-    (TargetUnavailableError, _RuleReason.UNAVAILABLE),
     (InvalidTargetError, _RuleReason.INVALID_ITEM),
     (expectations.ExpectationAlreadyRuledError, _RuleReason.ALREADY_RULED),
     (expectations.ExpectationOutOfRangeError, _RuleReason.LINE_OUT_OF_RANGE),

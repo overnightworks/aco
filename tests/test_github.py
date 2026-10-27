@@ -28,21 +28,6 @@ from aco.protocol import ClaimError
 GitHubForge = github.GitHubForge
 
 
-def test_forge_operation_exhaustiveness_matches_the_declared_reader_and_writer_methods() -> None:
-    """Every `ForgeOperation` member names a `ForgeReader`/`ForgeWriter` method and
-    nothing else; the count is pinned so a new operation cannot be added without
-    its enum member, its capability entry, and this count bump."""
-    declared_methods = {
-        name
-        for name in dir(forge.ForgeWriter)
-        if not name.startswith("_") and name not in {"repository", "capability", "requests"}
-    }
-    assert {operation.value for operation in forge.ForgeOperation} == declared_methods
-    assert len(forge.ForgeOperation) == 18
-    assert set(github.GITHUB_CAPABILITIES) == set(forge.ForgeOperation)
-    assert forge.Capability.UNSUPPORTED not in github.GITHUB_CAPABILITIES.values()
-
-
 def test_only_the_github_adapter_speaks_gh_argv() -> None:
     """Source check, not a runtime guarantee: import-linter's module contract
     cannot see an argv string, so "only the adapter speaks `gh`" is proven by
@@ -1549,13 +1534,6 @@ def test_github_adapter_runs_gh_when_no_fake_run_is_given(monkeypatch: pytest.Mo
     assert observed == [
         ["gh", "api", "repos/example/agent-coordination", "--jq", ".default_branch"]
     ]
-
-
-def test_github_adapter_capability_reads_the_declared_table() -> None:
-    client = GitHubForge(github.repository_id("example/agent-coordination"))
-
-    assert client.capability(forge.ForgeOperation.ITEM_REFERENCE) is forge.Capability.READ_ONLY
-    assert client.capability(forge.ForgeOperation.CREATE_CHILD) is forge.Capability.READ_WRITE
 
 
 def test_github_adapter_item_reference_reads_state_title_and_body() -> None:
