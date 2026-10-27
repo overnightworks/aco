@@ -1,0 +1,8 @@
+claim_id = "12c607990b0941788eb8a5b7009783ed"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "03d69226e0f449411d8d158b71811bffc1e2b4ca"
+branch = "claude/issue-452-shared-option-cards"
+scope = ["pyproject.toml", "quality/baseline.toml", "tests/support/option_cards.py", "tests/test_option_line_rewrites.py", "tests/test_option_lines.py", "tests/test_rule_option.py", "tests/test_rule_other.py", "tests/test_rule_unclear.py"]
+opened_commit = "2a6e68c02289382cf9eec31fb2ad0f61e51c7c50"
+whole_reason = "One mechanical move: the shared module, its five importers, the pythonpath entry it needs and the baseline that names their paths change together."
