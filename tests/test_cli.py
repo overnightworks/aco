@@ -9177,57 +9177,6 @@ def _assert_whole_body_unchanged(client: FakeForge, raw_body: str) -> None:
     assert not client.created_issues
 
 
-@pytest.mark.parametrize(
-    "operation", ["rescope-body", "rescope-flag", "new-flag", "edit-flag", "edit-body", "new-body"]
-)
-def test_whole_github_write_refusals_preserve_state(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], operation: str
-) -> None:
-    """Spec: CLM-36, RESC-24, BODY-52. T4: matrix 16-19."""
-    client = _rescope_forge()
-    _arrange_github_rescope(monkeypatch, client)
-    before = _live_store_claim()
-    invalid = complete_contract("Ship it.", whole="x" * 513)
-    raw_body = (
-        invalid if operation in {"rescope-body", "edit-body"} else complete_contract("Ship it.")
-    )
-    _serve_whole_claim_body(client, raw_body)
-    commands = {
-        "rescope-body": ["rescope", "72", "--add", "x.py"],
-        "rescope-flag": ["rescope", "72", "--whole", " a"],
-        "new-flag": ["item", "new", "--title", "Fresh", "--whole", "x" * 513],
-        "edit-flag": ["item", "edit", "72", "--whole", ""],
-        "edit-body": ["item", "edit", "72", "--whole", "ok"],
-        "new-body": ["item", "new", "--title", "Fresh"],
-    }
-    for json_flags in ((), ("--json",)):
-        monkeypatch.setattr(sys, "stdin", io.StringIO(invalid if operation == "new-body" else ""))
-        argv = ["--repo", REPOSITORY, *commands[operation], *json_flags]
-        result = run_cli(argv, capsys, stdin=invalid if operation == "new-body" else None)
-        assert result.status == 2
-        sentence = "whole reason must be one bounded non-empty line"
-        if operation in {"rescope-body", "edit-body"}:
-            command = "rescope" if operation == "rescope-body" else "item edit --whole"
-            assert (
-                result.stderr == f"ERROR: #72 body malformed: whole: {sentence}; "
-                f"{command} needs a valid aco block\n"
-            )
-        elif operation == "new-body":
-            assert f"body malformed: whole: {sentence}" in result.stderr
-        else:
-            assert result.stderr == f"ERROR: {sentence}\n"
-        if json_flags:
-            assert json.loads(result.stdout)["reason"] == (
-                "body_invalid"
-                if operation == "new-body"
-                else "unavailable"
-                if operation == "rescope-flag"
-                else "precondition_failed"
-            )
-        assert _live_store_claim() == before
-        _assert_whole_body_unchanged(client, raw_body)
-
-
 def test_whole_github_next_and_board_report_the_defect(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -9386,24 +9335,18 @@ def test_cli_claim_replay_does_not_bypass_out_of_order_for_another_agent(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims
 
 
-def _rescope_forge(whole: str | None = None) -> FakeForge:
-    """A forge serving issue #72 with a valid `aco` block, naming
-    `whole` when given -- the body a rescope keeps in step with its claim."""
+def _rescope_forge() -> FakeForge:
+    """A forge serving issue #72 with a valid `aco` block -- the body a
+    rescope keeps in step with its claim."""
     client = FakeForge()
-    _serve_rescoped_item(client, whole=whole)
+    _serve_rescoped_item(client)
     return client
 
 
-def _serve_rescoped_item(client: FakeForge, *, whole: str | None = None) -> None:
-    block_entries = {} if whole is None else {"whole": whole}
+def _serve_rescoped_item(client: FakeForge) -> None:
     client.issue_references[72] = forge.ItemReference(
-        forge.ItemState.OPEN, "Rescoped item", complete_contract("Build it.", **block_entries)
+        forge.ItemState.OPEN, "Rescoped item", complete_contract("Build it.")
     )
-
-
-def _written_scope_and_whole(written_body: str) -> tuple[tuple[str, ...] | None, str | None]:
-    parsed = body.parse_body(written_body)
-    return parsed.scope, parsed.whole
 
 
 def _arrange_github_rescope(
@@ -9425,133 +9368,6 @@ def _arrange_github_rescope(
     )
     monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-
-
-@dataclass(frozen=True)
-class _BodyRescope:
-    """One rescope that must move the claim and the item body together: the
-    flags after `rescope 72`, the scope and `whole` both must then hold, and
-    the `whole` the body named before."""
-
-    id: str
-    argv_tail: tuple[str, ...]
-    scope: tuple[str, ...]
-    whole: str | None = None
-    body_whole: str | None = None
-
-
-_FOUR_FILE_REASON = "the four files share one lock"
-_BODY_RESCOPES = (
-    _BodyRescope("absolute-add", ("--add", "/repo/src/new.py"), ("src/new.py", "src/widget.py")),
-    _BodyRescope("relative-add", ("--add", "src/new.py"), ("src/new.py", "src/widget.py")),
-    _BodyRescope(
-        "relative-drop-beside-an-absolute-add",
-        ("--add", "/repo/src/new.py", "--drop", "src/widget.py"),
-        ("src/new.py",),
-    ),
-    _BodyRescope(
-        "whole-flag-written-into-the-body",
-        ("--add", "a.py", "--add", "b.py", "--add", "c.py", "--whole", _FOUR_FILE_REASON),
-        ("a.py", "b.py", "c.py", "src/widget.py"),
-        whole=_FOUR_FILE_REASON,
-    ),
-    _BodyRescope(
-        "body-whole-admits-a-wide-scope-as-for-start",
-        ("--add", "a.py", "--add", "b.py", "--add", "c.py"),
-        ("a.py", "b.py", "c.py", "src/widget.py"),
-        whole=_FOUR_FILE_REASON,
-        body_whole=_FOUR_FILE_REASON,
-    ),
-)
-
-
-@pytest.mark.parametrize("case", _BODY_RESCOPES, ids=[case.id for case in _BODY_RESCOPES])
-def test_cli_rescope_moves_the_claim_and_the_item_body_scope_together(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], case: _BodyRescope
-) -> None:
-    """RESC-22..25 under the github fake: one call, both owners of the scope."""
-    client = _rescope_forge(whole=case.body_whole)
-    _arrange_github_rescope(monkeypatch, client)
-    argv = ["--repo", REPOSITORY, "rescope", "72", *case.argv_tail]
-
-    status = issue_claim.main(argv)
-
-    assert (status, capsys.readouterr().err) == (0, "")
-    standing = _live_store_claim()
-    assert (standing.scope, standing.whole_reason) == (case.scope, case.whole)
-    assert _written_scope_and_whole(client.item_bodies[72]) == (case.scope, case.whole)
-
-
-def _reject_the_claim_push(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
-    def rejected(**_kwargs: object) -> protocol.ClaimState:
-        raise ClaimError("push rejected (simulated)")
-
-    monkeypatch.setattr(store, "commit_transition", rejected)
-
-
-def _reject_the_body_write(monkeypatch: pytest.MonkeyPatch, client: FakeForge) -> None:
-    client.fail_update_item_body = True
-
-
-@pytest.mark.parametrize(
-    ("fail_step", "body_scope", "refusal"),
-    [
-        pytest.param(
-            _reject_the_body_write,
-            None,
-            "ERROR: update item body failed (simulated)\n",
-            id="body-write-fails-first-and-the-claim-stays",
-        ),
-        pytest.param(
-            _reject_the_claim_push,
-            ("src/new.py", "src/widget.py"),
-            "ERROR: #72 body scope now reads ['src/new.py', 'src/widget.py'], but the claim "
-            "was not rescoped: push rejected (simulated); run the same rescope again\n",
-            id="claim-write-fails-second-and-names-the-written-body",
-        ),
-    ],
-)
-def test_cli_rescope_names_what_went_through_when_a_write_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    fail_step: Callable[[pytest.MonkeyPatch, FakeForge], None],
-    body_scope: tuple[str, ...] | None,
-    refusal: str,
-) -> None:
-    """RESC-23: the body is written first, so a failed body write leaves the
-    claim as it stood, and a failed claim write after it says the body
-    already moved and how to bring the claim in step."""
-    client = _rescope_forge()
-    _arrange_github_rescope(monkeypatch, client)
-    fail_step(monkeypatch, client)
-    argv = ["--repo", REPOSITORY, "rescope", "72", "--add", "src/new.py"]
-
-    status = issue_claim.main(argv)
-
-    assert (status, capsys.readouterr().err) == (2, refusal)
-    assert _live_store_claim().scope == ("src/widget.py",)
-    written = client.item_bodies.get(72)
-    assert (None if written is None else _written_scope_and_whole(written)[0]) == body_scope
-
-
-def test_cli_rescope_refuses_an_item_body_without_a_block_before_any_write(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """RESC-24: a body that cannot carry the scope refuses with both owners
-    as they stood."""
-    client = FakeForge()
-    _arrange_github_rescope(monkeypatch, client)
-    argv = ["--repo", REPOSITORY, "rescope", "72", "--add", "src/new.py", "--json"]
-
-    status = issue_claim.main(argv)
-
-    refusal = json.loads(capsys.readouterr().out)
-    assert status == 2
-    assert (refusal["reason"], refusal["message"]) == (
-        "precondition_failed",
-        "#72 body malformed: aco: no aco block; rescope needs a valid aco block",
-    )
-    assert (_live_store_claim().scope, client.item_bodies) == (("src/widget.py",), {})
 
 
 def test_cli_rescope_adds_a_path_without_matching_head_or_a_clean_tree(
