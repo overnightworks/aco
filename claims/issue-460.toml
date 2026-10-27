@@ -1,8 +1,0 @@
-claim_id = "8dee8536197244518ee40610edc0e36d"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "b361cf88725cf62b593e4a53c59ff5a3342a23e6"
-branch = "claude/issue-460-support-files"
-scope = ["quality/baseline.toml", "tests/board_fixtures.py", "tests/cli_fixtures.py", "tests/github_fixtures.py", "tests/network_guard.py", "tests/process_fixtures.py", "tests/scripts", "tests/store_fixtures.py", "tests/support", "tests/test_spec_lint.py"]
-opened_commit = "97120ac430ba9bb23c1d6e395e1ca2a28bab7b80"
-whole_reason = "One mechanical move: the six support files, the spec-lint test and the baseline that names their paths change together."
