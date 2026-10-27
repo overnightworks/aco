@@ -8,14 +8,20 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY, board_issue, complete_contract
-from claim_worktrees import LANE_BRANCH, StandIn, Standing, Standpoint, make_stand_in
-from github_fixtures import FakeForge, serve_forge
+from claim_worktrees import (
+    ISSUE,
+    LANE_BRANCH,
+    StandIn,
+    Standing,
+    claim,
+    claimed_here,
+    make_stand_in,
+    serve_item,
+    standing_claims,
+)
 
-from aco import checkout, forge, protocol, store
-from aco import cli as issue_claim
+from aco import checkout
 
-ISSUE = 72
 TRUNK_FILES = (
     "src/widget.py",
     "src/a.py",
@@ -36,45 +42,6 @@ def stand_in(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, github_clone: Path, bare_remote: Path
 ) -> StandIn:
     return make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, TRUNK_FILES)
-
-
-def serve_item(monkeypatch: pytest.MonkeyPatch, scope: tuple[str, ...]) -> None:
-    body = complete_contract("Build it.", scope=list(scope), whole="The scenario claims it as one.")
-    served = FakeForge(
-        board_issues=(board_issue(ISSUE, "Claims", body),),
-        issue_references={ISSUE: forge.ItemReference(forge.ItemState.OPEN, "Claims", body)},
-    )
-    serve_forge(monkeypatch, served)
-
-
-def claim(*flags: str, scope: tuple[str, ...] = ("src",)) -> int:
-    scope_flags = [part for path in scope for part in ("--scope", path)]
-    return issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            str(ISSUE),
-            "--agent",
-            "Codex Sol",
-            *scope_flags,
-            *flags,
-        ]
-    )
-
-
-def standing_claims(standpoint: Standpoint) -> list[protocol.ActiveClaim]:
-    state = store.fetch_state(worktree=standpoint.directory, remote="origin")
-    return list(state.claims.values())
-
-
-def claimed_here(standpoint: Standpoint) -> protocol.ActiveClaim:
-    [claimed] = [
-        held
-        for held in standing_claims(standpoint)
-        if held.identity == protocol.IssueIdentity(ISSUE)
-    ]
-    return claimed
 
 
 @pytest.mark.parametrize(
