@@ -1624,13 +1624,9 @@ def _container_progress(
     absent (no `kind`, no counts) is treated as an ordinary item, never
     guessed at from a partial read.
 
-    The summary (`children_closed`/`children_total`) and the open-children
-    list come from two different reads (the issue page and `list_children`),
-    so they can disagree -- a stale summary, a paginated list that lost a
-    row. `closed == total` must mean no open child, and an open child must
-    mean `closed < total`; any other combination is a malformed board this
-    function never guesses through, since guessing would let `next` close a
-    container that still has work or `board` hide one that doesn't.
+    The counts and the open children come from the sub-issue list alone: the
+    issue's own summary can lag behind its children, so it only says whether
+    the container reports numbers at all.
     """
     if (
         issue.kind is not ItemKind.CONTAINER
@@ -1638,14 +1634,13 @@ def _container_progress(
         or issue.children_total is None
     ):
         return None
+    listed = children.get(issue.number, ())
     open_children = tuple(
         replace(child, blocked_by=blockers.get(child.number, ()))
-        for child in children.get(issue.number, ())
+        for child in listed
         if child.state is ChildState.OPEN
     )
-    if bool(open_children) != issue.has_open_child:
-        raise protocol.ClaimError(f"GitHub returned a malformed board container #{issue.number}")
-    return ContainerProgress(issue.children_closed, issue.children_total, open_children)
+    return ContainerProgress(len(listed) - len(open_children), len(listed), open_children)
 
 
 def _completes_container(
@@ -2190,9 +2185,8 @@ def _qualifying_actions(board: Board) -> Iterator[NextAction]:
     `CheckContainerAction` when its own `Next` line still names work and
     `CloseContainerAction` when it names none; an empty slice table is the
     typed statement that there is nothing to cut).
-    `_container_progress` already fails loud on a container whose summary
-    disagrees with its open-children list, so "no open child" here reliably
-    means every created child has closed. Every other row -- blocked,
+    "No open child" here is read from the sub-issue list, the one source of a
+    container's children, so it means every created child has closed. Every other row -- blocked,
     claimed, incomplete, or a container still holding an open child -- is
     skipped, never blocking a later qualifying row.
 
@@ -2840,7 +2834,9 @@ def parent_completion(parsed: ParsedBody) -> ParentCompletion:
 
 
 def childless_containers_with_uncut_rows(
-    issues: Iterable[Issue], storage: Storage
+    issues: Iterable[Issue],
+    children: Mapping[int, tuple[ChildItem, ...]],
+    storage: Storage,
 ) -> tuple[int, ...]:
     """The containers whose forge parent can change their verdict:
     no open child and an uncut `[[slice]]` row, the only shape
@@ -2852,7 +2848,7 @@ def childless_containers_with_uncut_rows(
         for issue in issues
         if issue.kind is ItemKind.CONTAINER
         and issue.children_total is not None
-        and not issue.has_open_child
+        and not any(child.state is ChildState.OPEN for child in children.get(issue.number, ()))
         and parse_body(issue.body, storage=storage).slices
     )
 
