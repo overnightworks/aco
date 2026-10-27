@@ -1,0 +1,8 @@
+claim_id = "2b862d5f51694c8d9e4dacb8cad51ec8"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "cbe3abdfa623e8e6c5de9c95259c27d84c61cbbe"
+branch = "claude/issue-494-claim-scope-whole-real-worktree"
+scope = ["quality/baseline.toml", "tests/support/claim_worktrees.py", "tests/test_cli.py", "tests/test_cmd_claim_replay.py", "tests/test_cmd_claim_scope_from_body.py", "tests/test_cmd_claim_scope_width.py", "tests/test_cmd_claim_whole.py"]
+opened_commit = "fa7e7ad6c91beb5b82848cb29620f8f9d3aa3f5d"
+whole_reason = "quality v0.7.0 forbids one test module importing another, so the helper changes in claim_worktrees.py, the two new modules, the replay and scope_width edits and the baseline land together."
