@@ -40,6 +40,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     # The option flags stay out of --help and usage so the yes/no refusals stay byte-identical.
     outcome.add_argument("--option", metavar="X", help=argparse.SUPPRESS)
     outcome.add_argument("--other", metavar="TEXT", help=argparse.SUPPRESS)
+    outcome.add_argument("--unclear", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--note", help="appended to the line's own text as ' Anmerkung: TEXT'")
     parser.add_argument(
         "--via",
@@ -105,12 +106,15 @@ class _RuleReason(StrEnum):
     INVALID_USAGE = "invalid_usage"
     UNAVAILABLE = "unavailable"
     CARD_CHANGED = "card_changed"
+    RETURNED = "returned"
+    WITH_HEAD = "with_head"
 
 
 class FlagCombinationError(protocol.ClaimError):
-    """RULE-15, RULE-21: `--option` or `--other` without `--via` and
+    """RULE-15, RULE-21, RULE-26: `--option` or `--other` without `--via` and
     `--card-hash`, either of them without one of the two, `--note` beside
-    either, `--via default` beside `--other`, or a blank `--other`."""
+    either, `--via default` beside `--other`, a blank `--other`, `--unclear`
+    without `--card-hash` or with `--via`, or a blank `--note` beside it."""
 
 
 @dataclass(frozen=True)
@@ -121,7 +125,7 @@ class YesNoOutcome:
     note: str | None
 
 
-Outcome: TypeAlias = YesNoOutcome | expectations.OptionChoice
+Outcome: TypeAlias = YesNoOutcome | expectations.OptionChoice | expectations.HeadReturn
 
 
 def _require_via_and_card_hash(parsed: argparse.Namespace, flag: str) -> None:
@@ -151,6 +155,16 @@ def _other_choice(parsed: argparse.Namespace) -> expectations.OptionChoice:
     return expectations.OptionChoice(expectations.OtherAnswer(parsed.other), via, parsed.card_hash)
 
 
+def _head_return(parsed: argparse.Namespace) -> expectations.HeadReturn:
+    if parsed.card_hash is None:
+        raise FlagCombinationError("--unclear needs --card-hash")
+    if parsed.via is not None:
+        raise FlagCombinationError("--via does not go with --unclear; nothing is decided")
+    if parsed.note is not None and not parsed.note.strip():
+        raise FlagCombinationError("a blank --note says nothing; leave it out")
+    return expectations.HeadReturn(parsed.note, parsed.card_hash)
+
+
 def _outcome(parsed: argparse.Namespace) -> Outcome:
     """The one outcome the flags name, or RULE-15's refusal of their
     combination -- before any forge call."""
@@ -158,8 +172,10 @@ def _outcome(parsed: argparse.Namespace) -> Outcome:
         return _letter_choice(parsed)
     if parsed.other is not None:
         return _other_choice(parsed)
+    if parsed.unclear:
+        return _head_return(parsed)
     if parsed.via is not None or parsed.card_hash is not None:
-        raise FlagCombinationError("--via and --card-hash go only with --option or --other")
+        raise FlagCombinationError("--via and --card-hash do not go with --yes, --no or --later")
     return YesNoOutcome(parsed.ruling, parsed.note)
 
 
@@ -190,13 +206,40 @@ def _emit_rule_result(
     )
 
 
-def _ruled_body(current_body: str, line: int, outcome: Outcome) -> str:
-    ruled_on = datetime.now(UTC).date()
+def _written_body(current_body: str, line: int, outcome: Outcome) -> str:
+    today = datetime.now(UTC).date()
     if isinstance(outcome, YesNoOutcome):
         return expectations.rule_expectation(
-            current_body, line, outcome.ruling, ruled_on, note=outcome.note
+            current_body, line, outcome.ruling, today, note=outcome.note
         )
-    return expectations.rule_option(current_body, line, outcome, ruled_on)
+    if isinstance(outcome, expectations.HeadReturn):
+        return expectations.return_to_head(current_body, line, outcome, today)
+    return expectations.rule_option(current_body, line, outcome, today)
+
+
+def _emit_returned_result(
+    number: int,
+    line: expectations.OptionLine,
+    open_remaining: int,
+    storage: body.Storage,
+    *,
+    as_json: bool,
+) -> None:
+    returned = cast(expectations.ReturnedToHead, line.returned)
+    if as_json:
+        report.emit_json(
+            True,
+            _RuleReason.RETURNED,
+            item=number,
+            index=line.index,
+            returned_on=returned.returned_on.isoformat(),
+            open=open_remaining,
+        )
+        return
+    print(
+        f"RETURNED {workboard.item_label(number, storage)} line {line.index} to its head; "
+        f"{open_remaining} line(s) still open"
+    )
 
 
 def _rule_item(
@@ -209,7 +252,7 @@ def _rule_item(
     by-name response."""
     client = context.forge_writer
     current_body, config = require_writable_target(client, context, number, command="rule")
-    new_body = _ruled_body(current_body, line, outcome)
+    new_body = _written_body(current_body, line, outcome)
     client.update_item_body(number, new_body)
     ruled_line = expectations.expectation_lines(new_body, storage=config.storage)[line - 1]
     return ruled_line, _rule_remaining_open(new_body, storage=config.storage)
@@ -224,6 +267,7 @@ _REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _RuleReason], ...] = (
     (expectations.ExpectationOutOfRangeError, _RuleReason.LINE_OUT_OF_RANGE),
     (expectations.ExpectationCardChangedError, _RuleReason.CARD_CHANGED),
     (expectations.ExpectationLineFormError, _RuleReason.INVALID_USAGE),
+    (expectations.ExpectationWithHeadError, _RuleReason.WITH_HEAD),
     (expectations.ExpectationOptionChoiceError, _RuleReason.INVALID_USAGE),
     (FlagCombinationError, _RuleReason.INVALID_USAGE),
     (RepoMeaninglessUnderStateRefError, _RuleReason.INVALID_USAGE),
@@ -244,7 +288,11 @@ def _rule_expectation_line(parsed: argparse.Namespace, context: RunContext) -> i
     number = int(parsed.item)
     ruled_line, open_remaining = _rule_item(context, number, parsed.line, outcome)
     storage = context.config.storage
-    _emit_rule_result(number, ruled_line, open_remaining, storage, as_json=parsed.json)
+    if isinstance(outcome, expectations.HeadReturn):
+        returned_line = cast(expectations.OptionLine, ruled_line)
+        _emit_returned_result(number, returned_line, open_remaining, storage, as_json=parsed.json)
+    else:
+        _emit_rule_result(number, ruled_line, open_remaining, storage, as_json=parsed.json)
     return 0
 
 

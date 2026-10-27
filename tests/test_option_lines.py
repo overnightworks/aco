@@ -588,6 +588,8 @@ class TestOptionLineRulings:
             "stored_card_hash": None,
             "via": None,
             "other": None,
+            "returned_on": None,
+            "returned_note": None,
             "question": "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?",
             "problem": "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg.",
             "picture": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'

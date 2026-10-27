@@ -27,6 +27,8 @@ from .expectation_grammar import (
     EXPECTATION_OPTIONAL_FIELDS,
     OPTION_LETTERS,
     OTHER,
+    RETURNED_NOTE,
+    RETURNED_ON,
     DecisionKind,
     RulingVia,
     Undo,
@@ -113,12 +115,21 @@ class OptionRuling:
 
 
 @dataclass(frozen=True)
+class ReturnedToHead:
+    """An open option line the operator sent back to its head: the day, and
+    the note he gave, if any, verbatim."""
+
+    returned_on: date
+    note: str | None
+
+
+@dataclass(frozen=True)
 class OptionLine:
     """One `[[expectation]]` entry that offers lettered options, as `rulings`
     sees it: the card's own fields, its options in order, `decision`
-    `None` while the line is open, and `card_hash` the hash of the card it
-    shows -- for a ruled line equal to the stored one, or the body would be
-    malformed (BODY-87)."""
+    `None` while the line is open, `returned` set while the open line is with
+    its head, and `card_hash` the hash of the card it shows -- for a ruled
+    line equal to the stored one, or the body would be malformed (BODY-87)."""
 
     form: ClassVar[LineForm] = LineForm.OPTIONS
     index: int
@@ -134,6 +145,7 @@ class OptionLine:
     reason: str
     options: tuple[CardOption, ...]
     decision: OptionRuling | None
+    returned: ReturnedToHead | None
     card_hash: str
 
     @property
@@ -152,6 +164,16 @@ class OptionLine:
     @property
     def ruled_on(self) -> date | None:
         return None if self.decision is None else self.decision.ruled_on
+
+    @property
+    def spoken_text(self) -> str:
+        """What the line says now: the operator's own answer, else the note it
+        went back with, else its text."""
+        returned_note = None if self.returned is None else self.returned.note
+        for words in (self.other_answer, returned_note):
+            if words is not None:
+                return words
+        return self.text
 
 
 ExpectationLine: TypeAlias = YesNoLine | OptionLine
@@ -187,6 +209,14 @@ def _option_ruling(entry: dict[str, object]) -> OptionRuling:
     )
 
 
+def _returned_to_head(entry: dict[str, object]) -> ReturnedToHead | None:
+    if RETURNED_ON not in entry:
+        return None
+    return ReturnedToHead(
+        cast(date, entry[RETURNED_ON]), cast(str | None, entry.get(RETURNED_NOTE))
+    )
+
+
 def _option_line(index: int, entry: dict[str, object]) -> OptionLine:
     options = cast(list[dict[str, object]], entry["option"])
     decision = _option_ruling(entry) if "ruling" in entry else None
@@ -204,6 +234,7 @@ def _option_line(index: int, entry: dict[str, object]) -> OptionLine:
         reason=cast(str, entry["reason"]),
         options=tuple(_card_option(position, option) for position, option in enumerate(options)),
         decision=decision,
+        returned=_returned_to_head(entry),
         card_hash=card_hash(entry),
     )
 
@@ -241,9 +272,11 @@ def expectation_lines(
 
 
 def expectation_line_state(line: ExpectationLine) -> str:
-    """`open`, or `ruled <ruling> <ruled_on>` -- the one state text
-    `rulings`' human form prints; `--json` carries `ruling`/`ruled_on`
-    directly and does not call this."""
+    """`open`, `with head <returned_on>` or `ruled <ruling> <ruled_on>` -- the
+    one state text `rulings`' human form prints; `--json` carries
+    `ruling`/`ruled_on`/`returned_on` directly and does not call this."""
+    if isinstance(line, OptionLine) and line.returned is not None:
+        return f"with head {line.returned.returned_on.isoformat()}"
     if line.ruling is None:
         return "open"
     ruled_on = cast(date, line.ruled_on)
@@ -252,10 +285,11 @@ def expectation_line_state(line: ExpectationLine) -> str:
 
 def expectation_line_summary(line: ExpectationLine) -> str:
     """`line.text` -- the operator's own answer for an option line ruled
-    `other` -- on one line, truncated to `EXPECTATION_LINE_TEXT_MAXIMUM`
-    characters -- `rulings`' human form; `--json` carries the full text."""
-    answer = line.other_answer if isinstance(line, OptionLine) else None
-    one_line = " ".join((line.text if answer is None else answer).split())
+    `other`, the note of one with its head -- on one line, truncated to
+    `EXPECTATION_LINE_TEXT_MAXIMUM` characters -- `rulings`' human form;
+    `--json` carries the full text."""
+    words = line.spoken_text if isinstance(line, OptionLine) else line.text
+    one_line = " ".join(words.split())
     maximum = EXPECTATION_LINE_TEXT_MAXIMUM
     return one_line if len(one_line) <= maximum else one_line[: maximum - 1] + "…"
 
@@ -280,6 +314,11 @@ class ExpectationCardChangedError(protocol.ClaimError):
     """`rule_option`'s refusal of a card that changed since it was shown."""
 
 
+class ExpectationWithHeadError(protocol.ClaimError):
+    """A send-back or a default ruling that a line already with its head
+    refuses."""
+
+
 class ExpectationOptionChoiceError(protocol.ClaimError):
     """`rule_option`'s refusal of a letter the card does not offer, or of a
     kept recommendation that names another letter."""
@@ -287,14 +326,17 @@ class ExpectationOptionChoiceError(protocol.ClaimError):
 
 _OPTION_FLAG = "--option"
 _OTHER_FLAG = "--other"
+_UNCLEAR_FLAG = "--unclear"
+_RETURNED_KEYS = (RETURNED_ON, RETURNED_NOTE)
 
 
 def _wrong_form_sentence(form: LineForm, option_flag: str) -> str:
-    """What a ruling of `form` says about a line of the other form; `option_flag`
-    is the flag an option ruling was given with."""
+    """What a write of `form` says about a line of the other form; `option_flag`
+    is the flag an option write was given with."""
     if form is LineForm.YES_NO:
         return "is an option line; --yes, --no and --later rule only a yes/no line"
-    return f"is a yes/no line; {option_flag} rules only an option line"
+    verb = "returns" if option_flag == _UNCLEAR_FLAG else "rules"
+    return f"is a yes/no line; {option_flag} {verb} only an option line"
 
 
 def _open_entry(
@@ -368,15 +410,29 @@ class OptionChoice:
     shown_card_hash: str
 
 
-def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionChoice) -> None:
-    """The card checks after the line's own: the card shown is the card now,
-    and a letter is on it and, kept as recommended, is the recommended one,
-    in that order. An own answer needs no letter."""
-    if choice.shown_card_hash != card_hash(entry):
+@dataclass(frozen=True)
+class HeadReturn:
+    """What the operator asked for on a shown option card he found unclear:
+    the note he gave, if any, and the hash of the card that was shown. Nothing
+    is decided, so it is never an `OptionChoice`."""
+
+    note: str | None
+    shown_card_hash: str
+
+
+def _refuse_a_changed_card(index: int, entry: dict[str, object], shown_card_hash: str) -> None:
+    """The card shown is the card now."""
+    if shown_card_hash != card_hash(entry):
         raise ExpectationCardChangedError(
             f"line {index} changed since its card was shown; show it again and rule what it "
             "shows now"
         )
+
+
+def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionChoice) -> None:
+    """The choice checks after the card's: a letter is on it and, kept as
+    recommended, is the recommended one, in that order. An own answer needs no
+    letter."""
     letter = choice.answer
     if isinstance(letter, OtherAnswer):
         return
@@ -396,8 +452,10 @@ def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> 
     """Decide one open option line: it gains `ruling`, `ruled_on`,
     `card_hash` and `via` -- and `other` when the answer is the operator's
     own -- and keeps every other key, so its stored hash is the hash of the
-    card it shows. Refuses as `_open_entry` does, then as
-    `_refuse_a_wrong_choice` does, before any write."""
+    card it shows -- and drops `returned_on` and `returned_note` of a line that
+    was with its head. Refuses as `_open_entry` does, then a default ruling of
+    a line with its head, a changed card, and as `_refuse_a_wrong_choice` does,
+    before any write."""
     answer = choice.answer
     if isinstance(answer, OtherAnswer):
         ruling, own_answer, flag = OTHER, {OTHER: answer.text}, _OTHER_FLAG
@@ -405,9 +463,14 @@ def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> 
         ruling, own_answer, flag = answer, {}, _OPTION_FLAG
 
     def decide(entry: dict[str, object]) -> dict[str, object]:
+        if RETURNED_ON in entry and choice.via is RulingVia.DEFAULT:
+            raise ExpectationWithHeadError(
+                f"line {index} was answered Unclear; --via default records no answer"
+            )
+        _refuse_a_changed_card(index, entry, choice.shown_card_hash)
         _refuse_a_wrong_choice(index, entry, choice)
         return {
-            **entry,
+            **{key: value for key, value in entry.items() if key not in _RETURNED_KEYS},
             "ruling": ruling,
             "ruled_on": ruled_on,
             "card_hash": choice.shown_card_hash,
@@ -416,6 +479,24 @@ def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> 
         }
 
     return _rule_entry(body, index, LineForm.OPTIONS, decide, flag)
+
+
+def return_to_head(body: str, index: int, request: HeadReturn, returned_on: date) -> str:
+    """Send one open option line back to its head: it gains `returned_on` and,
+    with a note, `returned_note`, and keeps every other key. Refuses as
+    `_open_entry` does, then a line already with its head, then a changed
+    card, before any write."""
+
+    def decide(entry: dict[str, object]) -> dict[str, object]:
+        if RETURNED_ON in entry:
+            raise ExpectationWithHeadError(
+                f"line {index} is already with its head; it comes back once revised"
+            )
+        _refuse_a_changed_card(index, entry, request.shown_card_hash)
+        note = {} if request.note is None else {RETURNED_NOTE: request.note}
+        return {**entry, RETURNED_ON: returned_on, **note}
+
+    return _rule_entry(body, index, LineForm.OPTIONS, decide, _UNCLEAR_FLAG)
 
 
 @dataclass(frozen=True)

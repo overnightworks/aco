@@ -124,6 +124,10 @@ def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
         "stored_card_hash": None if decision is None else decision.card_hash,
         "via": None if decision is None else decision.via.value,
         expectation_grammar.OTHER: line.other_answer,
+        expectation_grammar.RETURNED_ON: (
+            None if line.returned is None else line.returned.returned_on.isoformat()
+        ),
+        expectation_grammar.RETURNED_NOTE: None if line.returned is None else line.returned.note,
         **_rulings_option_line_card_json(line),
     }
 
