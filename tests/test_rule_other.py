@@ -66,6 +66,7 @@ class TestRuleOther:
             "via": via,
             "other": OTHER_ANSWER,
         }
+        assert f'via = "{via}"{newline}other = ' in written
         checked = run_cli(["check", "-"], capsys, stdin=written)
         assert (checked.status, checked.stdout) == (0, "body ok\n")
         serve_written(monkeypatch, written)
