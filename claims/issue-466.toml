@@ -1,0 +1,8 @@
+claim_id = "aa5cda433582478589eeda14cc9ee074"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "f95ff7beead677cc2be83d3881c840b87263d4e9"
+branch = "claude/issue-466-board-tests-folder"
+scope = [".github/workflows/ci.yml", "frontend/e2e/global-setup.ts", "frontend/e2e/rulingsFixture.ts", "quality/baseline.toml", "tests/aco_board", "tests/board", "tests/support/aco_board_fixtures.py", "tests/support/e2e_server.py"]
+opened_commit = "752a34b92772401c30ec90e2076a384e4a931b11"
+whole_reason = "One mechanical move of the board test folder with its two helpers, the launcher paths that name them and the baseline that keys them."
