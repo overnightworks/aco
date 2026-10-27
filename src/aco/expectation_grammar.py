@@ -28,10 +28,8 @@ class FieldDefect(NamedTuple):
 
 
 BLOCK_EXPECTATION_DEFAULTS = frozenset({"yes", "no", "later"})
-# A ruling transcribes the operator's word: "later" is a legitimate
-# final answer -- an explicit, dated decision to defer -- not only a
-# proposer's guessed default, so it rules exactly like "yes"/"no" (`rule
-# --later` writes `ruling = "later"` the same way `--yes`/`--no` do).
+# A ruled yes/no line stays readable: "later" is a legitimate final answer,
+# an explicit, dated decision to defer, like "yes" and "no".
 BLOCK_EXPECTATION_RULINGS = frozenset({"yes", "no", "later"})
 # The three optional card fields an `[[expectation]]` entry may carry, read by the body parser: the
 # operator-language question and example a card shows in place of `text`,

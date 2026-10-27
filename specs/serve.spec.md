@@ -8,7 +8,7 @@ served. This file owns the board's decision rules: which outcomes it writes,
 when it refuses a decision, how writes are ordered and stopped, and the note
 it may carry -- across every configured repository, since one write turn and
 one drain span all of them. It cites the read shape `specs/rulings.spec.md`
-owns (RUL-10) and the write `specs/rule.spec.md` owns (RULE-01, RULE-03)
+owns (RUL-10) and the write `specs/rule.spec.md` owns (RULE-01, RULE-14, RULE-20)
 rather than restating them. It also owns the JSON API under `/api/` -- its
 shapes, token, and headers -- and the shell's own delivery contract (who may
 fetch it, and how it is contained to its own files); the SPA's own behaviour
@@ -23,7 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01, ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | ABRD-39 (option) |
 | a withdrawn line | ABRD-60 | — |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
@@ -111,7 +111,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
-- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line (RULE-13).
+- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line.
 - [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via`, `returned_on`, `returned_note`, unknown keys leave it be.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
 - [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`. A bad date, blank note, note without date, or either when ruled is unreadable.
@@ -308,7 +308,7 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
    "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}
 ```
 
-Posting `yes` for `#12` line `1` with the listed fingerprint answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is an option line; --yes, --no and --later rule only a yes/no line"}` (RULE-13).
+Posting `yes` for `#12` line `1` with the listed fingerprint still forwards `--yes` to `aco rule` until the board's argv path is re-pointed (K2); aco refuses the call as a usage error (one of the arguments `--option --other` is required), exit `2`, and the board answers 200 `{"status": "failed"}` carrying aco's message, with no write.
 
 ### E-ABRD-12 -- deciding an option line
 

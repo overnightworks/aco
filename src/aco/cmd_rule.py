@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import TypeAlias, cast
@@ -34,14 +33,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         help="the 1-based expectation line index, as rulings prints it",
     )
     outcome = parser.add_mutually_exclusive_group(required=True)
-    outcome.add_argument("--yes", action="store_const", dest="ruling", const="yes")
-    outcome.add_argument("--no", action="store_const", dest="ruling", const="no")
-    outcome.add_argument("--later", action="store_const", dest="ruling", const="later")
     outcome.add_argument("--option", metavar="X", help="the letter of the option card's answer")
     outcome.add_argument("--other", metavar="TEXT", help="a free-text answer")
     # --unclear is not an answer a head types from a chat, so it stays out of --help and usage.
     outcome.add_argument("--unclear", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--note", help="appended to the line's own text as ' Anmerkung: TEXT'")
+    parser.add_argument("--note", help="the note sent back to the head, with --unclear")
     parser.add_argument(
         "--via",
         choices=[via.value for via in expectation_grammar.RulingVia],
@@ -103,15 +99,7 @@ class FlagCombinationError(protocol.ClaimError):
     without `--card-hash` or with `--via`, or a blank `--note` beside it."""
 
 
-@dataclass(frozen=True)
-class YesNoOutcome:
-    """`--yes`, `--no` or `--later`, with its optional note."""
-
-    ruling: str
-    note: str | None
-
-
-Outcome: TypeAlias = YesNoOutcome | expectations.OptionChoice | expectations.HeadReturn
+Outcome: TypeAlias = expectations.OptionChoice | expectations.HeadReturn
 
 
 def _require_via_and_card_hash(parsed: argparse.Namespace, flag: str) -> None:
@@ -158,11 +146,7 @@ def _outcome(parsed: argparse.Namespace) -> Outcome:
         return _letter_choice(parsed)
     if parsed.other is not None:
         return _other_choice(parsed)
-    if parsed.unclear:
-        return _head_return(parsed)
-    if parsed.via is not None or parsed.card_hash is not None:
-        raise FlagCombinationError("--via and --card-hash do not go with --yes, --no or --later")
-    return YesNoOutcome(parsed.ruling, parsed.note)
+    return _head_return(parsed)
 
 
 def _emit_rule_result(
@@ -194,10 +178,6 @@ def _emit_rule_result(
 
 def _written_body(current_body: str, line: int, outcome: Outcome) -> str:
     today = datetime.now(UTC).date()
-    if isinstance(outcome, YesNoOutcome):
-        return expectations.rule_expectation(
-            current_body, line, outcome.ruling, today, note=outcome.note
-        )
     if isinstance(outcome, expectations.HeadReturn):
         return expectations.return_to_head(current_body, line, outcome, today)
     return expectations.rule_option(current_body, line, outcome, today)

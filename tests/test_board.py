@@ -1,5 +1,5 @@
 """Behavioral tests for the pure `aco` block write path `body.py`
-owns (moved from `board.py`): `rule_expectation` and the `expectation_lines`
+owns (moved from `board.py`): the `expectation_lines`
 projection `rule --line` and `rulings` share. CLI wiring lives in
 `tests/test_cmd_rule.py` for `rule` and `tests/test_cmd_rulings.py` for `rulings`."""
 
@@ -64,7 +64,6 @@ from aco.expectations import (
     expectation_line_state,
     expectation_line_summary,
     expectation_lines,
-    rule_expectation,
 )
 from aco.protocol import ClaimError, ClaimRequest
 from aco.workboard import BoardConfig, ClassificationDefect, NoItemClassification, NoItemKind
@@ -104,81 +103,6 @@ def issue_230_body(*, default: str = "later") -> str:
         }
     ).rstrip("\n")
     return block_body(interior, before=ISSUE_230_PROSE)
-
-
-# --- rule_expectation ---
-
-
-@pytest.mark.parametrize("ruling", ["yes", "no", "later"])
-def test_rule_expectation_rules_a_proposed_line(ruling: str) -> None:
-    body = block_body(
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    )
-
-    new_body = rule_expectation(body, 1, ruling, date(2026, 9, 15))
-
-    assert expectation_lines(new_body) == (YesNoLine(1, "Ship it?", ruling, date(2026, 9, 15)),)
-    assert parse_body(new_body).expectation_state is ExpectationState.RULED
-
-
-@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
-def test_rule_expectation_preserves_every_byte_outside_the_ruled_line(newline: str) -> None:
-    body = issue_230_body().replace("\n", newline)
-    located = locate_block(body)
-    prefix, suffix = body[: located.content_start], body[located.content_end :]
-
-    new_body = rule_expectation(body, 1, "yes", date(2026, 9, 15))
-
-    assert new_body.startswith(prefix)
-    assert new_body.endswith(suffix)
-    assert expectation_lines(new_body) == (
-        YesNoLine(1, ISSUE_230_EXPECTATION_TEXT, "yes", date(2026, 9, 15)),
-    )
-
-
-def test_rule_expectation_refuses_an_already_ruled_line() -> None:
-    body = block_body(
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\n'
-        'ruling = "yes"\nruled_on = 2026-09-01\n'
-    )
-
-    ruled_at = date(2026, 9, 15)
-
-    with pytest.raises(protocol.ClaimError, match="line 1 is already ruled"):
-        rule_expectation(body, 1, "no", ruled_at)
-
-
-@pytest.mark.parametrize("index", [0, 2])
-def test_rule_expectation_refuses_an_out_of_range_line(index: int) -> None:
-    body = block_body(
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    )
-
-    ruled_at = date(2026, 9, 15)
-
-    with pytest.raises(protocol.ClaimError, match="out of range"):
-        rule_expectation(body, index, "yes", ruled_at)
-
-
-def test_rule_expectation_refuses_an_unknown_ruling_value() -> None:
-    body = block_body(
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    )
-
-    ruled_at = date(2026, 9, 15)
-
-    with pytest.raises(protocol.ClaimError, match="ruling must be"):
-        rule_expectation(body, 1, "maybe", ruled_at)
-
-
-def test_rule_expectation_appends_a_note_to_the_ruled_line_text() -> None:
-    body = block_body(
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    )
-
-    new_body = rule_expectation(body, 1, "yes", date(2026, 9, 15), note="Ja, sofort.")
-
-    assert expectation_lines(new_body)[0].text == "Ship it? Anmerkung: Ja, sofort."
 
 
 VALID_SVG_PICTURE = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>'

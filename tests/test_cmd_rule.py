@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import tomllib
-from collections.abc import Callable
-from dataclasses import asdict, dataclass, replace
+from dataclasses import replace
 from pathlib import Path
-from typing import cast
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
+from board_fixtures import MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import (
     FROZEN_CLI_NOW,
     freeze_cli_now,
@@ -19,14 +17,16 @@ from cli_fixtures import (
     track_board_config,
 )
 from github_fixtures import FakeForge, assert_github_world, serve_forge
+from option_cards import (
+    GOLDEN_CARD_HASH,
+    YES_NO_LINE,
+    card,
+    decide,
+    other_arguments,
+    ruled_card,
+)
 
 from aco import board_read, body, cli, expectations, forge, github, session, store
-
-
-@dataclass(frozen=True)
-class RuleInput:
-    arguments: tuple[str, ...]
-    initial_body: str
 
 
 def json_wire(stdout: str) -> dict[str, object]:
@@ -39,159 +39,55 @@ def github_world(github_clone: Path, bare_remote: Path) -> None:
     assert_github_world(github_clone, bare_remote)
 
 
+def option_item(*lines: str) -> str:
+    """An item body whose expectation lines are `lines`, in order."""
+    return block_body(MINIMAL_BLOCK_TOML + "\n".join(lines))
+
+
+def decision(letter: str = "A", *, line: int = 1) -> list[str]:
+    """`rule`'s arguments after the item for a chat decision of option `letter`."""
+    return decide(letter, "chat", line=line)
+
+
 @pytest.mark.usefixtures(github_world.__name__)
 class TestGithubRule:
-    @pytest.mark.parametrize("ruling", ["yes", "no", "later"])
-    @pytest.mark.parametrize("note", [None, "Ja, mit Rückweg."])
-    @pytest.mark.parametrize("with_card", [True, False], ids=["card", "no-card"])
     def test_rule_preserves_card_and_other_body_values(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
-        ruling: str,
-        note: str | None,
-        with_card: bool,
     ) -> None:
-        """Spec: RULE-12, RULE-03 — retain card data through write and fresh rulings read."""
+        """Spec: RULE-12, Never 3 — the card and every byte outside the block survive the write."""
         freeze_cli_now(monkeypatch)
-        card = (
-            'question = "Änderung behalten?"\nexample = "Ein Skript bleibt nutzbar."\n'
-            "picture = '<svg xmlns=\"http://www.w3.org/2000/svg\"><text>ä</text></svg>'\n"
-            if with_card
-            else ""
-        )
-        untouched = '[[expectation]]\ntext = "Andere Zeile"\ndefault = "no"\n' + card
-        block_text = (
-            MINIMAL_BLOCK_TOML
-            + 'scope = ["src/aco/body.py"]\n'
-            + untouched
-            + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-            + card
-            + untouched
-        )
+        block_text = MINIMAL_BLOCK_TOML + 'scope = ["src/aco/body.py"]\n' + YES_NO_LINE + card()
         initial = block_body(block_text, before="Vorspann\n\n", after="\nNachspann\n")
         reference = forge.ItemReference(forge.ItemState.OPEN, "Entscheidung", initial)
         client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
-        arguments = ["rule", "90", "--line", "2", f"--{ruling}"]
-        result = run_cli(arguments + ([] if note is None else ["--note", note]), capsys)
+        result = run_cli(["rule", "90", *decision(line=2)], capsys)
         assert result.status == 0, result.stderr
         written = client.item_bodies[90]
         expected = tomllib.loads(block_text)
-        target = expected["expectation"][1]
-        del target["default"]
-        target.update(ruling=ruling, ruled_on=FROZEN_CLI_NOW.date())
-        target["text"] = "Ship it?" if note is None else f"Ship it? Anmerkung: {note}"
+        expected["expectation"][1].update(
+            ruling="A", ruled_on=FROZEN_CLI_NOW.date(), card_hash=GOLDEN_CARD_HASH, via="chat"
+        )
         located = body.locate_block(written)
         assert located.data == expected
         assert written[: located.content_start] == "Vorspann\n\n```aco\n"
         assert written[located.content_end :] == "```\n\nNachspann\n"
-        client.board_issues = (board_issue(90, "Entscheidung", written),)
-        reread = run_cli(["rulings", "--json"], capsys)
-        assert reread.status == 0, reread.stderr
-        line = json.loads(reread.stdout)["rulings"][0]["lines"][1]
-        assert line == {
-            "index": 2,
-            "text": target["text"],
-            "ruling": ruling,
-            "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
-            "default": None,
-            **{key: target[key] for key in ("question", "example", "picture") if key in target},
-        }
 
     @pytest.mark.parametrize(
-        "scenario,observe,expected",
+        "arguments,sentence,ruling",
         [
             pytest.param(
-                RuleInput(
-                    (flag,),
-                    block_body(
-                        MINIMAL_BLOCK_TOML
-                        + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                        '[[expectation]]\ntext = "Ship it too?"\ndefault = "later"\n'
-                    ),
-                ),
-                lambda written: {
-                    **{
-                        f"e{index + 1}.{key}": value
-                        for index in (0, 1)
-                        for key, value in asdict(
-                            expectations.expectation_lines(written[90])[index]
-                        ).items()
-                    },
-                },
-                {
-                    "exit": 0,
-                    "stdout": sentence,
-                    "stderr": "",
-                    **{
-                        f"e{index + 1}.{key}": value
-                        for index, entry in enumerate(
-                            (
-                                expectations.YesNoLine(
-                                    1, "Ship it?", ruling, FROZEN_CLI_NOW.date()
-                                ),
-                                expectations.YesNoLine(
-                                    2, "Ship it too?", None, None, default="later"
-                                ),
-                            )
-                        )
-                        for key, value in asdict(entry).items()
-                    },
-                },
-                id=ruling,
-            )
-            for flag, ruling, sentence in (
-                ("--yes", "yes", "RULED #90 line 1 yes; 1 line(s) still open\n"),
-                ("--no", "no", "RULED #90 line 1 no; 1 line(s) still open\n"),
-                ("--later", "later", "RULED #90 line 1 later; 1 line(s) still open\n"),
-            )
-        ]
-        + [
-            pytest.param(
-                RuleInput(
-                    ("--yes", "--note", "Ja, sofort."),
-                    block_body(
-                        MINIMAL_BLOCK_TOML
-                        + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                    ),
-                ),
-                lambda written: {
-                    "text": cast(
-                        list[dict[str, object]], body.locate_block(written[90]).data["expectation"]
-                    )[0]["text"],
-                    "keys": set(
-                        cast(
-                            list[dict[str, object]],
-                            body.locate_block(written[90]).data["expectation"],
-                        )[0]
-                    ),
-                },
-                {
-                    "exit": 0,
-                    "stdout": "RULED #90 line 1 yes; 0 line(s) still open\n",
-                    "stderr": "",
-                    "text": "Ship it? Anmerkung: Ja, sofort.",
-                    "keys": {"text", "ruling", "ruled_on"},
-                },
-                id="note",
+                decision(),
+                "RULED #90 line 1 A; 1 line(s) still open\n",
+                "A",
+                id="option",
             ),
             pytest.param(
-                RuleInput(
-                    ("--yes",),
-                    block_body(
-                        MINIMAL_BLOCK_TOML
-                        + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                        '[[slice]]\nindex = 1\ntitle = "Bad\\u000Btitle"\n'
-                    ),
-                ),
-                lambda written: {"written keys": tuple(written)},
-                {
-                    "exit": 0,
-                    "stdout": "RULED #90 line 1 yes; 0 line(s) still open\n",
-                    "stderr": "",
-                    "written keys": (90,),
-                },
-                id="display-control",
+                other_arguments("Nur am Desktop.", line=1),
+                "RULED #90 line 1 other; 1 line(s) still open\n",
+                "other",
+                id="other",
             ),
         ],
     )
@@ -199,124 +95,70 @@ class TestGithubRule:
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
-        scenario: RuleInput,
-        observe: Callable[[dict[int, str]], dict[str, object]],
-        expected: dict[str, object],
+        arguments: list[str],
+        sentence: str,
+        ruling: str,
     ) -> None:
-        """Spec: RULE-01, RULE-03, BODY-63, BODY-66 — RULED, note in text, legacy body accepted."""
+        """Spec: RULE-01 — RULED line; the other line stays open."""
         freeze_cli_now(monkeypatch)
-        reference = forge.ItemReference(
-            forge.ItemState.OPEN, "Decide something", scenario.initial_body
-        )
+        initial = option_item(card(), YES_NO_LINE)
+        reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)
         client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
-        assert client.issue_references == {90: reference}
-        assert client.item_bodies == {}
-        capsys.readouterr()
-        result = run_cli(["rule", "90", "--line", "1", *scenario.arguments], capsys)
-        written_state = (
-            observe(client.item_bodies)
-            if 90 in client.item_bodies
-            else {"written": client.item_bodies}
-        )
+        result = run_cli(["rule", "90", *arguments], capsys)
+        written = expectations.expectation_lines(client.item_bodies[90])
         observed = {
             "exit": result.status,
             "stdout": result.stdout,
             "stderr": result.stderr,
-            **written_state,
+            "rulings": [line.ruling for line in written],
         }
-        assert observed == expected
+        assert observed == {"exit": 0, "stdout": sentence, "stderr": "", "rulings": [ruling, None]}
 
     @pytest.mark.parametrize(
-        "scenario,expected",
+        "lines,open_remaining",
         [
-            pytest.param(
-                RuleInput(
-                    ("--yes",),
-                    block_body(
-                        MINIMAL_BLOCK_TOML
-                        + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                    ),
-                ),
-                {
-                    "ok": True,
-                    "reason": "ruled",
-                    "item": 90,
-                    "index": 1,
-                    "ruling": "yes",
-                    "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
-                    "open": 0,
-                },
-                id="yes",
-            ),
-            pytest.param(
-                RuleInput(
-                    ("--later",),
-                    block_body(
-                        MINIMAL_BLOCK_TOML
-                        + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                        '[[expectation]]\ntext = "Ship it too?"\ndefault = "later"\n'
-                    ),
-                ),
-                {
-                    "ok": True,
-                    "reason": "ruled",
-                    "item": 90,
-                    "index": 1,
-                    "ruling": "later",
-                    "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
-                    "open": 1,
-                },
-                id="open-remaining",
-            ),
+            pytest.param((card(),), 0, id="none-open"),
+            pytest.param((card(), YES_NO_LINE), 1, id="open-remaining"),
         ],
     )
     def test_json(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
-        scenario: RuleInput,
-        expected: dict[str, object],
+        lines: tuple[str, ...],
+        open_remaining: int,
     ) -> None:
         """Spec: RULE-02, OUT-01 — ruled envelope, open zero or one, ordered JSON."""
         freeze_cli_now(monkeypatch)
         reference = forge.ItemReference(
-            forge.ItemState.OPEN, "Decide something", scenario.initial_body
+            forge.ItemState.OPEN, "Decide something", option_item(*lines)
         )
-        client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
-        assert client.issue_references == {90: reference}
-        assert client.item_bodies == {}
-        capsys.readouterr()
-        result = run_cli(["rule", "90", "--line", "1", *scenario.arguments, "--json"], capsys)
-        parsed = json_wire(result.stdout)
-        observed = {
-            "exit": result.status,
-            "wire": result.stdout,
-            "stderr": result.stderr,
-            "keys": set(parsed),
-            **parsed,
+        serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
+        result = run_cli(["rule", "90", *decision(), "--json"], capsys)
+        expected = {
+            "ok": True,
+            "reason": "ruled",
+            "item": 90,
+            "index": 1,
+            "ruling": "A",
+            "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
+            "open": open_remaining,
         }
-        assert observed == {
-            "exit": 0,
-            "wire": json.dumps(expected) + "\n",
-            "stderr": "",
-            "keys": set(expected),
-            **expected,
-        }
+        assert (result.status, result.stdout, result.stderr) == (
+            0,
+            json.dumps(expected) + "\n",
+            "",
+        )
 
     @pytest.mark.parametrize(
         "as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")]
     )
     @pytest.mark.parametrize(
-        "arguments,initial,state,is_landing,fails,message,reason",
+        "line,initial,state,is_landing,fails,message,reason",
         [
             pytest.param(
-                ("--line", "1", "--no"),
-                block_body(
-                    MINIMAL_BLOCK_TOML
-                    + '[[expectation]]\ntext = "Ship it?"\nruling = "yes"\nruled_on = 2026-08-01\n'
-                    'question = "Behalten?"\nexample = "Es bleibt so."\n'
-                    "picture = '<svg xmlns=\"http://www.w3.org/2000/svg\"/>'\n"
-                ),
+                1,
+                option_item(ruled_card()),
                 forge.ItemState.OPEN,
                 False,
                 False,
@@ -326,33 +168,19 @@ class TestGithubRule:
             ),
             *[
                 pytest.param(
-                    ("--line", line, "--yes"),
-                    block_body(
-                        MINIMAL_BLOCK_TOML
-                        + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                    ),
+                    line,
+                    option_item(card()),
                     forge.ItemState.OPEN,
                     False,
                     False,
-                    message,
+                    f"line {line} out of range: this item has 1 expectation line(s)",
                     "line_out_of_range",
                     id=case,
                 )
-                for line, message, case in (
-                    (
-                        "2",
-                        "line 2 out of range: this item has 1 expectation line(s)",
-                        "out-of-range",
-                    ),
-                    (
-                        "0",
-                        "line 0 out of range: this item has 1 expectation line(s)",
-                        "out-of-range-zero",
-                    ),
-                )
+                for line, case in ((2, "out-of-range"), (0, "out-of-range-zero"))
             ],
             pytest.param(
-                ("--line", "1", "--yes"),
+                1,
                 "",
                 forge.ItemState.MISSING,
                 False,
@@ -362,10 +190,8 @@ class TestGithubRule:
                 id="missing-item",
             ),
             pytest.param(
-                ("--line", "1", "--yes"),
-                block_body(
-                    MINIMAL_BLOCK_TOML + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                ),
+                1,
+                option_item(card()),
                 forge.ItemState.OPEN,
                 True,
                 False,
@@ -374,7 +200,7 @@ class TestGithubRule:
                 id="pull-request",
             ),
             pytest.param(
-                ("--line", "1", "--yes"),
+                1,
                 "## Now\nOld prose.\n",
                 forge.ItemState.OPEN,
                 False,
@@ -384,10 +210,8 @@ class TestGithubRule:
                 id="malformed-body",
             ),
             pytest.param(
-                ("--line", "1", "--yes"),
-                block_body(
-                    MINIMAL_BLOCK_TOML + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-                ),
+                1,
+                option_item(card()),
                 forge.ItemState.OPEN,
                 False,
                 True,
@@ -401,7 +225,7 @@ class TestGithubRule:
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
-        arguments: tuple[str, ...],
+        line: int,
         initial: str,
         state: forge.ItemState,
         is_landing: bool,
@@ -421,11 +245,9 @@ class TestGithubRule:
                 fail_update_item_body=fails,
             ),
         )
-        assert client.issue_references == {90: reference}
-        assert client.fail_update_item_body == fails
-        assert client.item_bodies == {}
-        capsys.readouterr()
-        result = run_cli(["rule", "90", *arguments, *(["--json"] if as_json else [])], capsys)
+        result = run_cli(
+            ["rule", "90", *decision(line=line), *(["--json"] if as_json else [])], capsys
+        )
         expected = {"ok": False, "reason": reason, "message": message}
         observed = {
             "exit": result.status,
@@ -442,43 +264,6 @@ class TestGithubRule:
             "writes": {} if not fails else None,
         }
 
-    @pytest.mark.parametrize(
-        "initial,expected",
-        [
-            pytest.param(
-                block_body(
-                    MINIMAL_BLOCK_TOML + '[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n',
-                    before="Preamble stays.\n\n",
-                    after="\nTail stays.\n",
-                ),
-                {"prefix": "Preamble stays.\n\n```aco\n", "suffix": "```\n\nTail stays.\n"},
-                id="surrounding-bytes",
-            )
-        ],
-    )
-    def test_persistence(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        initial: str,
-        expected: dict[str, str],
-    ) -> None:
-        """Spec: Never 3 — preserve bytes outside the block; the stronger entry claim is open."""
-        freeze_cli_now(monkeypatch)
-        reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)
-        client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
-        assert client.issue_references == {90: reference}
-        assert client.item_bodies == {}
-        capsys.readouterr()
-        run_cli(["rule", "90", "--line", "1", "--yes"], capsys)
-        written = client.item_bodies[90]
-        block = body.locate_block(written)
-        observed = {
-            "prefix": written[: block.content_start],
-            "suffix": written[block.content_end :],
-        }
-        assert observed == expected
-
 
 @pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
 @pytest.mark.parametrize(
@@ -488,7 +273,7 @@ class TestGithubRule:
             "clone",
             "file:///srv/git/agent-coordination.git",
             None,
-            ("rule", "90", "--line", "1", "--yes"),
+            ("rule", "90", *decision()),
             ((github, "discover_repository"),),
             "no forge adapter for host file",
             "unavailable",
@@ -499,7 +284,7 @@ class TestGithubRule:
             "clone",
             None,
             'storage = "state-ref"\n',
-            ("--repo", "acme/items", "rule", "258", "--line", "1", "--yes"),
+            ("--repo", "acme/items", "rule", "258", *decision()),
             ((github, "GitHubForge"), (store, "fetch_state")),
             "--repo is meaningless under storage = state-ref",
             "invalid_usage",
@@ -510,7 +295,7 @@ class TestGithubRule:
             "tmp_path",
             None,
             None,
-            ("rule", "90", "--line", "1", "--yes"),
+            ("rule", "90", *decision()),
             (
                 (github, "discover_repository"),
                 (github, "GitHubForge"),
@@ -591,18 +376,23 @@ def test_context_refusal(
     [
         pytest.param(
             ["rule", "90", "--line", "1"],
-            "aco rule: error: one of the arguments --yes --no --later --option --other is required",
+            "aco rule: error: one of the arguments --option --other is required",
             id="no-outcome",
         ),
         pytest.param(
-            ["rule", "90", "--line", "1", "--yes", "--no"],
-            "aco rule: error: argument --no: not allowed with argument --yes",
-            id="two-outcomes",
+            ["rule", "90", *decision(), "--yes"],
+            "aco: error: unrecognized arguments: --yes",
+            id="yes",
         ),
         pytest.param(
-            ["rule", "90", "--line", "1", "--yes", "--option", "A"],
-            "aco rule: error: argument --option: not allowed with argument --yes",
-            id="yes-and-option",
+            ["rule", "90", *decision(), "--no"],
+            "aco: error: unrecognized arguments: --no",
+            id="no",
+        ),
+        pytest.param(
+            ["rule", "90", *decision(), "--later"],
+            "aco: error: unrecognized arguments: --later",
+            id="later",
         ),
         pytest.param(
             ["rule", "90", "--line", "1", "--other", "Anders", "--option", "A"],
@@ -610,9 +400,9 @@ def test_context_refusal(
             id="other-and-option",
         ),
         pytest.param(
-            ["rule", "90", "--line", "1", "--yes", "--unclear"],
-            "aco rule: error: argument --unclear: not allowed with argument --yes",
-            id="yes-and-unclear",
+            ["rule", "90", "--line", "1", "--option", "A", "--unclear"],
+            "aco rule: error: argument --unclear: not allowed with argument --option",
+            id="option-and-unclear",
         ),
         pytest.param(
             ["rule", "90", "--line", "1", "--option", "A", "--via", "phone"],
@@ -627,8 +417,8 @@ def test_parser_refusal(
     arguments: list[str],
     sentence: str,
 ) -> None:
-    """Spec: Never 1 — parser requires exactly one of --yes, --no, --later, --option, --other,
-    --unclear and a known --via before command entry."""
+    """Spec: Never 1 — parser requires exactly one of --option, --other, --unclear, refuses
+    the retired yes/no flags and a known --via before command entry."""
 
     def forbidden(*args, **kwargs):
         pytest.fail("invalid outcomes reached the rule command entry")
@@ -638,7 +428,7 @@ def test_parser_refusal(
     with pytest.raises(SystemExit) as raised:
         cli.main(arguments)
     captured = capsys.readouterr()
-    usage = "usage: aco rule "
+    usage = "usage: aco "
     observed = {
         "code": raised.value.code,
         "sentence": "".join(captured.err.splitlines()[-1:])[: len(sentence)],
@@ -659,6 +449,11 @@ def test_usage_and_help_name_the_chat_transcription_flags_but_not_unclear(
         cli.main(["rule", "--help"])
     help_text = capsys.readouterr().out
     shown = ("--option", "--other", "--via", "--card-hash")
+    retired = ("--yes", "--no", "--later")
     assert [flag in usage_text for flag in ("--option", "--other")] == [True, True]
     assert [flag in help_text for flag in shown] == [True] * len(shown)
-    assert "--unclear" not in usage_text + help_text
+    note_help = "the note sent back to the head, with --unclear"
+    assert " ".join(help_text.split()).count(note_help) == 1
+    assert "--unclear" not in usage_text + " ".join(help_text.split()).replace(note_help, "")
+    words = (usage_text + help_text).replace("[", " ").replace("]", " ").split()
+    assert [flag in words for flag in retired] == [False] * len(retired)

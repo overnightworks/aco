@@ -60,11 +60,11 @@ itself minted, `<n>` that same item's own bare number.
 
 ### E-OUT-01 -- a success envelope, `ok`/`reason` first
 
-Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with one proposed line
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with one open option line, `<hash>` its `card_hash`
 
 ```console
-$ aco rule <item-id> --line 1 --yes --json
-{"ok": true, "reason": "ruled", "item": <n>, "index": 1, "ruling": "yes", "ruled_on": "<ruled-on>", "open": 0}
+$ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash> --json
+{"ok": true, "reason": "ruled", "item": <n>, "index": 1, "ruling": "A", "ruled_on": "<ruled-on>", "open": 0}
 exit 0
 ```
 
@@ -73,7 +73,7 @@ exit 0
 Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `items/aco-000001.md` hand-written with no `aco` block
 
 ```console
-$ aco rule aco-000001 --line 1 --yes --json
+$ aco rule aco-000001 --line 1 --option A --via chat --card-hash sha256:0 --json
 2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
 {"ok": false, "reason": "invalid_item", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]"}
 exit 2

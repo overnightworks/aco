@@ -30,7 +30,6 @@ from board_fixtures import (
     MINIMAL_BLOCK_TOML,
     block_body,
     projected_board,
-    proposed_expectation,
     unfilled_block_body,
     write_repository_config,
 )
@@ -54,6 +53,7 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge
+from option_cards import decide, open_option_entry
 from store_fixtures import (
     blob,
     push_raw_state_tree,
@@ -502,7 +502,7 @@ _RULABLE_PROJECTION = _Projection(
     "Land it.",
     "Done.",
     expectations=(
-        {"text": EXPECTATION_TEXT, "default": "yes"},
+        open_option_entry(),
         {"text": "A second, still-open question?", "default": "later"},
     ),
 )
@@ -2323,14 +2323,14 @@ class TestCliStateRefForge:
             monkeypatch, tmp_path, bare_remote, worktree, _rulable_item_files()
         )
 
-        ruled = issue_claim.main(["rule", str(RULABLE_NUMBER), "--line", "1", "--yes"])
+        ruled = issue_claim.main(["rule", str(RULABLE_NUMBER), *decide("A", "chat", line=1)])
         assert ruled == 0
         capsys.readouterr()
 
         rulings_status = issue_claim.main(["rulings"])
         assert rulings_status == 0
         lines = capsys.readouterr().out.splitlines()
-        assert any(line.strip().startswith("1 ruled yes") for line in lines)
+        assert any(line.strip().startswith("1 ruled A") for line in lines)
 
         remote_url = f"file://{bare_remote}"
         state = store.fetch_state(worktree=worktree, remote=remote_url)
@@ -3961,9 +3961,9 @@ class TestCliStateRefForge:
                 id="edit-body",
             ),
             pytest.param(
-                ["rule", RULABLE_ID, "--line", "1", "--yes"],
+                ["rule", RULABLE_ID, *decide("A", "chat", line=1)],
                 None,
-                f"RULED {RULABLE_ID} line 1 yes; 1 line(s) still open\n",
+                f"RULED {RULABLE_ID} line 1 A; 1 line(s) still open\n",
                 id="rule",
             ),
         ],
@@ -4309,7 +4309,7 @@ class TestCliStateRefForge:
         assert checked == 0
         assert "body ok" in capsys.readouterr().out
 
-        ruled = issue_claim.main(["rule", RULABLE_ID, "--line", "1", "--yes"])
+        ruled = issue_claim.main(["rule", RULABLE_ID, *decide("A", "chat", line=1)])
         assert ruled == 0
 
     def test_check_names_a_blocked_item_and_its_local_blocker_by_their_ids(
@@ -5661,10 +5661,10 @@ class TestCliStateRefForge:
         )
         assert items.ITEM_ID_PATTERN.fullmatch(container_id)
 
-        asked_text = "Does the runbook still hold without a forge?"
+        asked_text = str(open_option_entry()["text"])
         container_body = _filled_body(
             prose_above_fresh_block(
-                CONTAINER_SKELETON_PROSE, {"expectation": [proposed_expectation(asked_text)]}
+                CONTAINER_SKELETON_PROSE, {"expectation": [open_option_entry()]}
             ),
             now="Land every slice.",
             next_step="Cut the first slice.",
@@ -5764,18 +5764,18 @@ class TestCliStateRefForge:
         # `release --merged` shares never offers to close it.
         assert close_out.splitlines() == [f"CLOSED {child_id}", "freed: none"]
 
-        ruled_out = run_cli(["rule", container_id, "--line", "1", "--yes"], capsys).expect_success()
-        assert ruled_out.strip() == f"RULED {container_id} line 1 yes; 0 line(s) still open"
+        ruled_out = run_cli(["rule", container_id, *decide("A", "chat", line=1)], capsys)
+        ruled_sentence = f"RULED {container_id} line 1 A; 0 line(s) still open"
+        assert ruled_out.expect_success().strip() == ruled_sentence
 
         # `container_id`'s only expectation line is now ruled, so `rulings`
         # lists the item fully ruled rather than printing the empty
         # sentence. Read `ruled_on` back from the CLI's own
         # `--json` line rather than the wall clock, so the assertion cannot
         # flake across a UTC midnight between the `rule` call above and here.
-        assert run_cli(["rulings"], capsys).expect_success().strip() == (
-            f"{container_id} 0/1: A week without a forge\n  1 ruled yes "
-            f"{_first_ruling_date(capsys)}: {asked_text}"
-        )
+        listing = run_cli(["rulings"], capsys).expect_success()
+        assert listing.startswith(f"{container_id} 0/1: A week without a forge\n  1 ruled A ")
+        assert f" {_first_ruling_date(capsys)}: {asked_text[:60]}" in listing
 
         child_state = json.loads(
             run_cli(["item", "show", child_id, "--json"], capsys).expect_success()

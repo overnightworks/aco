@@ -4,6 +4,7 @@ modules: card bodies, rule arguments and the rewrite invariant."""
 from __future__ import annotations
 
 import json
+import tomllib
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
@@ -91,6 +92,11 @@ def card(head: str | None = None, *options: str) -> str:
 def ruled_card(*edits: tuple[str, str]) -> str:
     """The card ruled `A` with the hash of the card shown, `edits` applied to its head."""
     return card(card_head(("question = ", RULED_KEYS + "question = "), *edits))
+
+
+def open_option_entry() -> dict[str, object]:
+    """The open option card as the `[[expectation]]` entry a block projection carries."""
+    return tomllib.loads(card())["expectation"][0]
 
 
 def card_body(line: str, *, before: str = "", newline: str = "\n") -> str:
