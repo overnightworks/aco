@@ -1,8 +1,0 @@
-claim_id = "972dafbd752e4b979fe27db3943514a8"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "0e50c992f090bfce1d268752305d73aedb82d741"
-branch = "claude/issue-417-claim-display-controls"
-scope = ["quality/baseline.toml", "specs/body-block.spec.md", "specs/brief.spec.md", "specs/claim-record.spec.md", "specs/release.spec.md", "specs/status.spec.md", "src/aco/cmd_brief.py", "src/aco/cmd_status.py", "src/aco/protocol.py", "src/aco/workboard.py", "tests/test_claim_display_controls.py"]
-opened_commit = "1304e1d04f98b2e86839e35ff6c911b6462953ed"
-whole_reason = "One defect, one fix: the one display-control predicate for the claim-field validators plus the escaped print of stored claim fields in status, brief and the lane subject, with its specs, one new test module and the size baseline."
