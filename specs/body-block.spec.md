@@ -204,7 +204,7 @@ endings cannot change it.
 ## `whole`, the item's own wide-scope justification
 
 - [ ] [BODY-60] A block with no `whole` key is valid: absence means no stored reason, never a default one, and `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-61] `whole = "<reason>"` is valid when the reason is one non-empty line of at most 512 characters, no surrounding whitespace, no control character: `aco check -` prints `body ok`, exit `0`.
+- [ ] [BODY-61] `whole = "<reason>"` is valid for one non-empty line of at most 512 characters, unpadded, with no control character or display control (NEXT-37): `aco check -` prints `body ok`, exit `0`.
 - [ ] [BODY-62] A `whole` outside BODY-61, or not a string, prints `body malformed: whole: whole reason must be one bounded non-empty line`, exit `2`, the same sentence for every invalid shape.
 
   ```

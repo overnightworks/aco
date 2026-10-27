@@ -11,9 +11,6 @@
 "GitHubForge._board_issue" = 20
 "GitHubForge._landing" = 28
 
-[ccn."src/aco/protocol.py"]
-"valid_scope" = 17
-
 [ccn."src/aco/workboard.py"]
 "build_board" = 33
 
@@ -27,7 +24,7 @@
 "src/aco/cmd_claim.py" = 1136
 "src/aco/cmd_release.py" = 924
 "src/aco/github.py" = 1764
-"src/aco/protocol.py" = 1879
+"src/aco/protocol.py" = 1877
 "src/aco/state_board.py" = 957
 "src/aco/store.py" = 2102
 "src/aco/workboard.py" = 3148

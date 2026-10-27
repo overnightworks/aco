@@ -43,6 +43,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 | hand-corrupted claim key | CLAIM-09, CLAIM-56, CLAIM-64..CLAIM-66 | CLAIM-09, CLAIM-56, CLAIM-64..CLAIM-66 | — |
 | item naming its own scope | CLAIM-53, CLAIM-54, CLAIM-55, CLAIM-67, CLAIM-68, CLAIM-73 | — | — |
 | one claim's own `--json` view | CLAIM-69 | CLAIM-69 | CLAIM-69 |
+| stored claim text holding a display control | — | CLAIM-74 | CLAIM-74 |
 
 ## The record and its key
 
@@ -53,7 +54,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-05] A claim file carries `claim_id`, `agent`, `role`, `base`, `branch`, `scope`, `opened_commit`, and only then the optional `whole_reason`, `resource_name`, `resource_value`.
 - [ ] [CLAIM-10] A lane claim and an issue claim never conflict by identity, so a `docs/` lane claims cleanly beside a live issue claim and `aco status` lists both; only CLAIM-71 refuses that.
 - [ ] [CLAIM-57] A branch that is not a safe Git ref — a leading `-`, `..`, `//`, `@{`, a `.lock` suffix, a dot-segment — refuses `claim marker branch is not a safe Git ref: '<branch>'`, exit `2`.
-- [ ] [CLAIM-58] An agent or role that is blank, padded, carries a control character or exceeds its bound refuses `agent must be one bounded non-empty line`, exit `2`, before anything is written.
+- [ ] [CLAIM-58] An agent or role that is blank, padded, holds a control character or display control (NEXT-37) or exceeds its bound refuses `agent must be one bounded non-empty line`, exit `2`, before any write.
 
 ## A hand-corrupted claim file
 
@@ -148,6 +149,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-67] An explicit `--scope` matching the item's own `scope` as a set, reordered, still claims: CLAIM-54 refuses only a genuine mismatch, never a reordering.
 - [ ] [CLAIM-68] Deriving scope from a malformed `aco` block names that block's own defect (the family `aco check -` reports) before it ever refuses CLAIM-55's less specific "item names no scope".
 - [ ] [CLAIM-73] Under `storage = "state-ref"`, an issue claim, whatever its scope, on an item PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CLAIM-68's, before any write.
+- [ ] [CLAIM-74] A stored claim whose agent, role, branch or whole reason holds a display control (NEXT-37) reads and lists unchanged: no refusal, exit `0`; `--json` carries it as stored.
 
 ## One claim's own `--json` field order
 
