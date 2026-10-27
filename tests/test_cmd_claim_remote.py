@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from claim_worktrees import (
+    LANE_MODE_BRANCH,
     StandIn,
     assert_json_refusal_object,
     claim,
@@ -22,7 +23,6 @@ from store_fixtures import state_ref_tip
 from aco import cli as issue_claim
 from aco import protocol, store
 
-LANE_MODE_BRANCH = "docs/lane-cleanup"
 TRUNK_FILES = ("src/widget.py", "docs/guide.md", "README.md")
 
 
@@ -61,14 +61,18 @@ def test_claim_refuses_a_missing_state_ref_and_json_names_it_unavailable(
     assert state_ref_tip(bare_remote) is None
 
 
+@pytest.mark.parametrize(
+    "json_flag", [pytest.param(False, id="without-json"), pytest.param(True, id="with-json")]
+)
 def test_claim_refuses_a_forge_target_that_is_not_the_canonical_remote_and_writes_nothing(
     monkeypatch: pytest.MonkeyPatch,
     stand_in: StandIn,
     github_clone: Path,
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
+    json_flag: bool,
 ) -> None:
-    """Spec: CLM-27."""
+    """Spec: CLM-27, OUT-03."""
     standpoint = stand_in()
     serve_item(monkeypatch, ("src",))
     other = "git@github.com:other/repo.git"
@@ -76,13 +80,18 @@ def test_claim_refuses_a_forge_target_that_is_not_the_canonical_remote_and_write
     real_git(github_clone, "remote", "set-url", "origin", other)
     tip_before = state_ref_tip(bare_remote)
 
-    status = claim(agent="Ada")
+    status = claim(*(("--json",) if json_flag else ()), agent="Ada")
 
+    captured = capsys.readouterr()
     assert status == 2
-    assert capsys.readouterr().err == (
+    assert captured.err == (
         "ERROR: forge target example/agent-coordination does not match canonical remote "
         "other/repo; run aco from that repository's checkout\n"
     )
+    if json_flag:
+        assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    else:
+        assert captured.out == ""
     assert state_ref_tip(bare_remote) == tip_before
     assert not standing_claims(standpoint)
 

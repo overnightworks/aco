@@ -13,6 +13,7 @@ from board_fixtures import REPOSITORY
 from claim_worktrees import (
     ISSUE,
     LANE_BRANCH,
+    LANE_MODE_BRANCH,
     StandIn,
     Standing,
     assert_json_refusal_object,
@@ -26,7 +27,6 @@ from cli_fixtures import set_agent_identity_env
 from aco import cli as issue_claim
 from aco import protocol, store
 
-LANE_MODE_BRANCH = "docs/lane-cleanup"
 JSON_SCOPE = ("src/widget.py", "docs/guide.md")
 TRUNK_FILES = ("src/widget.py", "docs/guide.md", "tests/c.py", "scripts/d.py")
 
@@ -41,7 +41,7 @@ def stand_in(
 def test_a_lane_claim_and_its_release_never_name_an_issue_number(
     monkeypatch: pytest.MonkeyPatch, stand_in: StandIn
 ) -> None:
-    """Spec: CLAIM-03, CLM-06, REL-03."""
+    """Spec: CLM-06, REL-03."""
     standpoint = stand_in(branch=LANE_MODE_BRANCH)
     set_agent_identity_env(monkeypatch, {"ACO_AGENT": "Codex Sol"})
 
