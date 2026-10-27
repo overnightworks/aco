@@ -1,0 +1,8 @@
+claim_id = "a6ba059c50e24145a466dc0fb62bed5e"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "f204e0f9c16c76798f66df134a8deffec6e051ea"
+branch = "claude/issue-443-rule-unclear"
+scope = ["specs/body-block.spec.md", "specs/rule.spec.md", "specs/rulings.spec.md", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/test_option_lines.py", "tests/test_rule.py", "tests/test_rule_option.py", "tests/test_rule_unclear.py"]
+opened_commit = "36013a97bbcf2c5526293c625a18c089c83c8b10"
+whole_reason = "Unclear in aco is one contract across the body grammar, the rule writer and the rulings reader: the returned_on and returned_note keys with their refusals and render order, the hidden --unclear flag with its refusals and RETURNED output, the drop of both keys by a ruling, the two rulings --json keys and the with-head text, their three specs, one new test module and the re-pointed pins."
