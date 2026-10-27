@@ -311,16 +311,6 @@ class TestRuleOption:
                 id="option-without-via",
             ),
             pytest.param(
-                ["--line", "1", "--yes", "--via", "chat"],
-                "--via and --card-hash do not go with --yes, --no or --later",
-                id="via-without-option",
-            ),
-            pytest.param(
-                ["--line", "1", "--no", "--card-hash", GOLDEN_CARD_HASH],
-                "--via and --card-hash do not go with --yes, --no or --later",
-                id="card-hash-without-option",
-            ),
-            pytest.param(
                 [*decide("A", "chat"), "--note", "Ja."],
                 "--note does not go with --option; keep the operator's word in the item's journal",
                 id="note-with-option",
@@ -384,11 +374,6 @@ class TestRuleOption:
                 [*unclear(), "--note", ""],
                 "a blank --note says nothing; leave it out",
                 id="RULE-26-empty",
-            ),
-            pytest.param(
-                ["--line", "1", "--yes", "--card-hash", GOLDEN_CARD_HASH],
-                "--via and --card-hash do not go with --yes, --no or --later",
-                id="RULE-15-yes-no",
             ),
         ],
     )

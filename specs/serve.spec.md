@@ -23,7 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01, ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | ABRD-39 (option) |
 | a withdrawn line | ABRD-60 | — |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |

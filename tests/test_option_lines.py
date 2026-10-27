@@ -1,6 +1,6 @@
 """Option lines through the real CLI: `check -` judges them, `rulings` reads
-them, `rule --yes|--no|--later` refuses them, and the card hash pins the card
-the operator decided (BODY-69..89, RUL-02/10/12..14, RULE-13)."""
+them, and the card hash pins the card the operator decided
+(BODY-69..89, RUL-02/10/12..14)."""
 
 from __future__ import annotations
 
@@ -30,8 +30,6 @@ from option_cards import (
     returned_card,
     ruled_card,
 )
-
-from aco import forge
 
 
 def open_card_with(decision: str) -> str:
@@ -618,58 +616,3 @@ class TestOptionLineRulings:
         )
         result = run_cli(["check", "-"], capsys, stdin=card_body(ruled))
         assert (result.status, result.stdout) == (0, "body ok\n")
-
-
-@pytest.mark.usefixtures(github_world.__name__)
-class TestRuleRefusesAnOptionLine:
-    @pytest.mark.parametrize("outcome", ["--yes", "--no", "--later"])
-    @pytest.mark.parametrize(
-        ("line", "arguments", "message", "reason"),
-        [
-            pytest.param(
-                card(),
-                ("--line", "2"),
-                "line 2 is an option line; --yes, --no and --later rule only a yes/no line",
-                "invalid_usage",
-                id="open",
-            ),
-            pytest.param(
-                ruled_card(),
-                ("--line", "2"),
-                "line 2 is an option line; --yes, --no and --later rule only a yes/no line",
-                "invalid_usage",
-                id="ruled-RULE-13-before-RULE-04",
-            ),
-            pytest.param(
-                card(),
-                ("--line", "3"),
-                "line 3 out of range: this item has 2 expectation line(s)",
-                "line_out_of_range",
-                id="RULE-05-before-RULE-13",
-            ),
-        ],
-    )
-    def test_rule_refuses_before_any_write(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        outcome: str,
-        line: str,
-        arguments: tuple[str, ...],
-        message: str,
-        reason: str,
-    ) -> None:
-        """Spec: RULE-13, RULE-09 -- check order RULE-05, RULE-13, RULE-04."""
-        yes_no = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
-        raw_body = card_body(line, before="\n" + yes_no)
-        reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", raw_body)
-        client = serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
-        command = ["rule", "7", *arguments, outcome]
-        text = run_cli(command, capsys)
-        wire = run_cli([*command, "--json"], capsys)
-        assert (text.status, text.stderr) == (2, f"ERROR: {message}\n")
-        assert (wire.status, json.loads(wire.stdout)) == (
-            2,
-            {"ok": False, "reason": reason, "message": message},
-        )
-        assert client.body_writes == []

@@ -22,7 +22,6 @@ from .body import (
     replace_block,
 )
 from .expectation_grammar import (
-    BLOCK_EXPECTATION_RULINGS,
     OPTION_LETTERS,
     OTHER,
     RETURNED_NOTE,
@@ -307,19 +306,18 @@ def expectation_line_summary(line: ExpectationLine) -> str:
 
 
 class ExpectationAlreadyRuledError(protocol.ClaimError):
-    """`rule_expectation`'s own already-ruled refusal -- a
+    """The already-ruled refusal -- a
     distinct type from `ExpectationOutOfRangeError` so a `--json`-emitting
     caller can choose `already_ruled` without parsing the refusal prose."""
 
 
 class ExpectationOutOfRangeError(protocol.ClaimError):
-    """`rule_expectation`'s own out-of-range `--line` refusal."""
+    """The out-of-range `--line` refusal."""
 
 
 class ExpectationLineFormError(protocol.ClaimError):
-    """A ruling whose outcome belongs to the other line form: a yes/no
-    outcome on an option line, or a letter on a yes/no line; either would
-    store a value the grammar refuses."""
+    """A ruling aimed at a yes/no line: an option outcome on it would store
+    a value the grammar refuses."""
 
 
 class ExpectationCardChangedError(protocol.ClaimError):
@@ -342,28 +340,22 @@ _UNCLEAR_FLAG = "--unclear"
 _RETURNED_KEYS = (RETURNED_ON, RETURNED_NOTE)
 
 
-def _wrong_form_sentence(form: LineForm, option_flag: str) -> str:
-    """What a write of `form` says about a line of the other form; `option_flag`
-    is the flag an option write was given with."""
-    if form is LineForm.YES_NO:
-        return "is an option line; --yes, --no and --later rule only a yes/no line"
-    verb = "returns" if option_flag == _UNCLEAR_FLAG else "rules"
-    return f"is a yes/no line; {option_flag} {verb} only an option line"
-
-
 def _open_entry(
-    entries: list[dict[str, object]], index: int, form: LineForm, option_flag: str
+    entries: list[dict[str, object]], index: int, option_flag: str
 ) -> dict[str, object]:
-    """Line `index` of `entries`, still open and of `form`; refuses an
-    out-of-range index, the other form and an already-ruled line, in that
+    """Line `index` of `entries`, still open and an option line; refuses an
+    out-of-range index, a yes/no line and an already-ruled line, in that
     order -- the checks both writes share."""
     if not 1 <= index <= len(entries):
         raise ExpectationOutOfRangeError(
             f"line {index} out of range: this item has {len(entries)} expectation line(s)"
         )
     entry = entries[index - 1]
-    if (LineForm.OPTIONS if is_option_line(entry) else LineForm.YES_NO) is not form:
-        raise ExpectationLineFormError(f"line {index} {_wrong_form_sentence(form, option_flag)}")
+    if not is_option_line(entry):
+        verb = "returns" if option_flag == _UNCLEAR_FLAG else "rules"
+        raise ExpectationLineFormError(
+            f"line {index} is a yes/no line; {option_flag} {verb} only an option line"
+        )
     if "ruling" in entry:
         raise ExpectationAlreadyRuledError(
             f"line {index} is already ruled; a changed ruling is a new line"
@@ -374,41 +366,15 @@ def _open_entry(
 _Decide: TypeAlias = Callable[[dict[str, object]], dict[str, object]]
 
 
-def _rule_entry(
-    body: str, index: int, form: LineForm, decide: _Decide, option_flag: str = _OPTION_FLAG
-) -> str:
-    """`body` with its open line `index` of `form` replaced by `decide`'s
+def _rule_entry(body: str, index: int, decide: _Decide, option_flag: str = _OPTION_FLAG) -> str:
+    """`body` with its open option line `index` replaced by `decide`'s
     ruled entry; bytes outside the block are preserved."""
     located = locate_block(body)
     entries = block_expectation_dicts(located.data)
-    ruled_entry = decide(_open_entry(entries, index, form, option_flag))
+    ruled_entry = decide(_open_entry(entries, index, option_flag))
     new_entries = [*entries[: index - 1], ruled_entry, *entries[index:]]
     new_data = {**located.data, "expectation": new_entries}
     return replace_block(body, located, new_data)
-
-
-def rule_expectation(
-    body: str, index: int, ruling: str, ruled_on: date, *, note: str | None = None
-) -> str:
-    """Rule one proposed line, preserving card fields and bytes outside the block.
-
-    Replace the default with outcome/date; append any note to its text.
-    Refuse invalid outcomes, out-of-range indices, option lines and
-    already-ruled lines, in that order.
-    """
-    if ruling not in BLOCK_EXPECTATION_RULINGS:
-        raise protocol.ClaimError(
-            f"ruling must be one of {', '.join(sorted(BLOCK_EXPECTATION_RULINGS))}"
-        )
-
-    def decide(entry: dict[str, object]) -> dict[str, object]:
-        text = cast(str, entry["text"]) if note is None else f"{entry['text']} Anmerkung: {note}"
-        ruled_entry = dict(entry)
-        ruled_entry.pop("default", None)
-        ruled_entry.update(text=text, ruling=ruling, ruled_on=ruled_on)
-        return ruled_entry
-
-    return _rule_entry(body, index, LineForm.YES_NO, decide)
 
 
 @dataclass(frozen=True)
@@ -490,7 +456,7 @@ def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> 
             **own_answer,
         }
 
-    return _rule_entry(body, index, LineForm.OPTIONS, decide, flag)
+    return _rule_entry(body, index, decide, flag)
 
 
 def return_to_head(body: str, index: int, request: HeadReturn, returned_on: date) -> str:
@@ -508,4 +474,4 @@ def return_to_head(body: str, index: int, request: HeadReturn, returned_on: date
         note = {} if request.note is None else {RETURNED_NOTE: request.note}
         return {**entry, RETURNED_ON: returned_on, **note}
 
-    return _rule_entry(body, index, LineForm.OPTIONS, decide, _UNCLEAR_FLAG)
+    return _rule_entry(body, index, decide, _UNCLEAR_FLAG)

@@ -19,6 +19,7 @@ from option_cards import (
     card,
     card_body,
     check_defects,
+    decide,
     item_body,
     malformed,
     other_arguments,
@@ -139,11 +140,11 @@ class TestRuleOther:
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], newline: str
     ) -> None:
         """Spec: BODY-88 -- ruling another line leaves the Other line's bytes alone."""
-        client = serve_item(monkeypatch, item_body(card(), newline=newline))
+        client = serve_item(monkeypatch, item_body(card(), yes_no_line=card(), newline=newline))
         run_cli(["rule", "7", *other_arguments(OTHER_ANSWER)], capsys)
         first = client.item_bodies[7]
         later = serve_item(monkeypatch, first)
-        ruled = run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
+        ruled = run_cli(["rule", "7", *decide("A", "chat", line=1)], capsys)
         assert ruled.status == 0, ruled.stderr
         other_line = first.split(f"[[expectation]]{newline}")[2].split("```")[0]
         assert other_line in later.item_bodies[7]
@@ -175,7 +176,7 @@ class TestRuleOther:
     ) -> None:
         """Spec: NEXT-04 -- `ruling` present means decided: `board` counts the Other line
         ruled, and `next` asks for no refining once its remaining line is ruled."""
-        client = serve_item(monkeypatch, item_body(card()))
+        client = serve_item(monkeypatch, item_body(card(), yes_no_line=card()))
         run_cli(["rule", "7", *other_arguments(OTHER_ANSWER)], capsys)
         serve_written(monkeypatch, client.item_bodies[7])
         shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"][0]
@@ -185,7 +186,7 @@ class TestRuleOther:
         )
         assert "expectations unruled" in run_cli(["next"], capsys).expect_success()
         later = serve_item(monkeypatch, client.item_bodies[7])
-        run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
+        run_cli(["rule", "7", *decide("A", "chat", line=1)], capsys)
         serve_written(monkeypatch, later.item_bodies[7])
         shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"][0]
         assert (shown["expectation_state"], shown["expectation_progress"]) == (
