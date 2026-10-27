@@ -37,6 +37,8 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | complete option line, open or ruled | BODY-85, BODY-89 | — | — |
 | option line ruled `other` | BODY-92 | — | — |
 | an open option line with its head | BODY-94 | — | — |
+| an open or returned option line breaking line 14's card rules | BODY-95..BODY-99 | BODY-50 | BODY-52 |
+| an open or returned option line keeping them, a ruled line | BODY-100 | — | — |
 | a rewrite of a block carrying expectation lines | BODY-88 | — | — |
 | `[[slice]]` defective | BODY-43..BODY-48, BODY-65 | BODY-50 | BODY-52 |
 | a `[[slice]]` title holding a display control (`specs/next.spec.md`) | BODY-63 | BODY-64 | BODY-64 |
@@ -122,7 +124,8 @@ The options' letters are `A`..`D` by position and never stored; `<L>` below
 is the present letters, for example `A, B`. A line ruled `other` is bound by
 `other`, not by its `text` or options. Inside one entry the refusals print
 in this order: `text`, decided state, line keys, options, pictures, picture
-budget, unknown keys, and last BODY-87, only when no other refusal fired.
+budget, unknown keys, the card rules of BODY-95..BODY-99, and last BODY-87, only when no
+other refusal fired.
 
 - [ ] [BODY-69] An `option` that is not an array of tables prints `body malformed: expectation[0].option: expectation[0].option must be an array of tables`, exit `2` (see E-BODY-11).
 - [ ] [BODY-70] Fewer than 2 or more than 4 options print `body malformed: expectation[0].option: expectation[0] must carry 2 to 4 options`, exit `2` (see E-BODY-11).
@@ -172,6 +175,19 @@ budget, unknown keys, and last BODY-87, only when no other refusal fired.
 
   Each is prefixed `body malformed: expectation[0].<key>: `.
 - [ ] [BODY-94] An open option line with a `returned_on` date and an optional non-empty `returned_note` prints `body ok`, exit `0`; neither key enters `card_hash`, so editing the card stays legal (see E-BODY-15).
+- [ ] [BODY-95] An open or returned option line has these words judged: `question`, `problem`, `caption`, `area`, `topic`, `reason`, option `name`, `effect`, `caption`, `notice`, `cost`, `undo_how` (see E-BODY-16).
+- [ ] [BODY-96] A judged field holding one of the following prints `body malformed: <field>: <field> must not contain <what>`, exit `2` (see E-BODY-16):
+  - `an issue number`: `#` and digits, as in `#13`
+  - `a path`: a word starting `./`, `~/` or `/` and a letter, holding `://`, or with a `/` and a file name after it
+  - `a file name`: a word ending `.py`, `.ts`, `.svelte`, `.js`, `.md`, `.toml`, `.json`, `.yml`, `.yaml`, `.html`, `.css` or `.sh`
+  - `a backtick`
+  - `a snake case name`: lower letters, `_`, lower letters or digits, as in `card_hash`
+  - `a camel case name`: two or more lower letters, then an upper and a lower letter, as in `cardHash`
+  - `a flag`: `--` and a letter at the start or after a space
+- [ ] [BODY-97] A `problem` of more than 20 words, split at white space, prints `body malformed: <field>: <field> must be at most 20 words`, exit `2` (see E-BODY-16).
+- [ ] [BODY-98] An option `name` of fewer than 2 or more than 5 words prints `body malformed: <field>: <field> must be 2 to 5 words`, exit `2` (see E-BODY-16).
+- [ ] [BODY-99] An `area`, `topic` or option `name` holding a line break, or a space at either end, prints `body malformed: <field>: <field> must be one line without spaces around it`, exit `2` (see E-BODY-16).
+- [ ] [BODY-100] `Ja/Nein`, `A/B/C`, `E-Mail`, `iPhone`, `v5.2` and `C#` break no rule; a ruled line, `contract`, `text`, a picture, `other` and `returned_note` are not judged: `body ok`, exit `0` (see E-BODY-16).
 
 The card hash belongs to option lines and covers every key listed above except
 the decided state. It never covers the item title, the index, `ruling`, `ruled_on`,
@@ -863,3 +879,60 @@ With `area = "Song-Liste"` as well it still prints `body ok`, exit `0`: the card
 `returned_note` alone prints `2> body malformed: expectation[0].returned_note: expectation[0].returned_note needs returned_on beside it`, exit `2`.
 `returned_on = "2026-10-28"` prints `2> body malformed: expectation[0].returned_on: expectation[0].returned_on must be a TOML local date`, exit `2`.
 Either key on E-BODY-12's ruled card prints `2> body malformed: expectation[0].<key>: expectation[0].<key> belongs only to an open line`, exit `2`.
+
+### E-BODY-16 — the card rules of line 14
+
+Setup: bare-remote, `storage = "github"`; E-BODY-15's card, with and without its `returned_on`, where `topic`, option A's `cost` and `problem` are changed:
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Der Song bleibt beim Sprung offen."
+question = "Song offen lassen?"
+problem = "Der Song schließt sich beim Sprung zum Ursprungs-Take, weil der Browser die ganze Seite neu lädt und dabei alles vergisst, was du gerade geöffnet hattest."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+caption = "Heute"
+decision_kind = "product"
+area = "Song-Seite "
+topic = "Sprung wie in #13"
+recommended = "A"
+reason = "Behebt den Verlust."
+
+[[expectation.option]]
+name = "Offen"
+effect = "Die App springt selbst."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+notice = "Du bleibst im Song."
+cost = "Aufruf `aco rule` in cmd_rule.py"
+undo = "reversible"
+undo_how = "jederzeit."
+contract = "Der Song bleibt offen."
+
+[[expectation.option]]
+name = "Wie heute"
+effect = "Der Browser springt."
+same_as_today = true
+notice = "Du wählst neu."
+cost = "Keine."
+undo = "final"
+undo_how = "nichts gebaut."
+contract = "Der Link bleibt."
+```
+BODY
+2> body malformed: expectation[0].problem: expectation[0].problem must be at most 20 words
+2> body malformed: expectation[0].area: expectation[0].area must be one line without spaces around it
+2> body malformed: expectation[0].topic: expectation[0].topic must not contain an issue number
+2> body malformed: expectation[0].option[0].name: expectation[0].option[0].name must be 2 to 5 words
+2> body malformed: expectation[0].option[0].cost: expectation[0].option[0].cost must not contain a file name
+2> body malformed: expectation[0].option[0].cost: expectation[0].option[0].cost must not contain a backtick
+2> body malformed: expectation[0].option[0].cost: expectation[0].option[0].cost must not contain a snake case name
+exit 2
+````
+
+With the card's `ruling`, `ruled_on`, `card_hash` and `via` of E-BODY-12 it prints `body ok`, exit `0`: a ruled line is exempt.
