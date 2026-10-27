@@ -222,7 +222,6 @@ def _rescoped_item_body(
     storage = context.config.storage
     number = identity.issue
     try:
-        board_read.require_update_item_body(client, command=_RESCOPE_COMMAND)
         text = board_read.item_body_or_refuse(
             client, number, command=_RESCOPE_COMMAND, storage=storage
         )

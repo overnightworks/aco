@@ -32,7 +32,6 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | `--title` empty or whitespace only | CUT-33 | CUT-33 | CUT-33 | CUT-33 |
 | `<n>` open but not a container | CUT-02 | CUT-02 | CUT-02 | CUT-02 |
 | `<n>` itself has a parent | CUT-03 | CUT-03 | CUT-03 | CUT-03 |
-| a required forge write is unsupported | CUT-04 | CUT-04 | CUT-04 | CUT-04 |
 | `<n>`'s body is malformed | CUT-05, CUT-40 | CUT-05, CUT-40 | — | CUT-05, CUT-40 |
 | the linked row's `done_when` holds a display control | CUT-39 | CUT-39 | — | CUT-05 |
 | a slice table, no `--row` | CUT-06, CUT-11 | — | — | CUT-12 |
@@ -66,10 +65,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-02] The same against an open issue that is not a container refuses `#<n> is not a container`, exit `2`.
 - [ ] [CUT-03] The same against a container that is itself a child of another item refuses `#<n> is itself a child of <ref>; nested containers are not supported`, exit `2`.
 - [ ] [CUT-34] `aco next` never proposes a cut CUT-03 refuses: it names a nested container's repair under `SKIPPED` instead (`specs/next.spec.md` NEXT-25, E-NEXT-09).
-
-## The forge precondition
-
-- [ ] [CUT-04] `aco cut` refuses `this forge cannot <operation>; cut the slice by hand` for an unsupported `create_child`, `link_child`, or `update_item_body`, exit `2`.
+- CUT-04 (retired 27.10.2026): the refusal for a forge that cannot create, link or write a cut slice went with the forge capability table, which no adapter ever answered `UNSUPPORTED` for a cut write (audit #331 finding 17).
 
 ## The body precondition
 

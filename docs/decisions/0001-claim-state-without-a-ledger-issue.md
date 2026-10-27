@@ -79,6 +79,18 @@ the concept's `Support(read, write)` pair, which could represent the illegal
 capability. Forge failures are typed (`ForgeUnsupported`, `ForgePermissionDenied`,
 `ForgeNotFound`, `ForgeTransient`, `ForgeMalformedResponse`) instead of substring-matched.
 
+**Addendum (27.10.2026).** The capability enum, its per-adapter tables and the refusals derived
+from them were removed: no adapter ever answered `UNSUPPORTED` for an operation a caller guarded,
+so those refusals were reachable only through a test fake. The port now carries one fact,
+`BoardSource.lists_pull_requests`, because the state-ref board has no pull requests; exactly one
+caller, `board_read.build_board`, branches on it. An adapter that cannot perform an operation
+raises a typed forge error (`ForgeUnsupportedError` today), never a table entry. No capability
+validates the pin any more (the check was `load_board_config`'s gate, now deleted, and the
+paragraph on blockers and parentage above still says capabilities validate it, as history); the
+owner is still never chosen at run time, because no code selects storage from the forge.
+`specs/rule.spec.md` RULE-06 and `specs/cut.spec.md` CUT-04 are retired. Source: audit #331
+finding 17 and the operator ruling of 27.10.2026.
+
 **Configuration stays in `.agent-claim/board.toml`,** extended only with settings that have a
 caller today: the pinned body contract (`body_contract`) and `canonical_remote`
 (default `origin`) naming the remote `refs/aco/state` lives on — every store and

@@ -1795,7 +1795,7 @@ class BoardBuildInputs:
     # already read from the store's git history, since workboard.py's own build
     # stays pure and never reaches for git itself. Keyed by claim_id.
     claim_ages: Mapping[str, datetime] = field(default_factory=dict)
-    # The board source's own capability, never the storage
+    # The board source's own fact (`BoardSource.lists_pull_requests`), never the storage
     # pin: a source that cannot list pull requests at all -- `state-ref`
     # today, honestly, not by name -- still has an in-flight signal (a live
     # claim with a branch) but no landed one, so the two stay independent

@@ -92,7 +92,6 @@ class CutCase:
     children: Mapping[int, tuple[workboard.ChildItem, ...]] = field(default_factory=dict)
     references: Mapping[int, forge.ItemReference] = field(default_factory=dict)
     recently_closed: tuple[forge.ClosedIssue, ...] = ()
-    capabilities: Mapping[forge.ForgeOperation, forge.Capability] = field(default_factory=dict)
     events: tuple[ForgeEvent, ...] = ()
     rerun: CutCase | None = None
 
@@ -137,7 +136,6 @@ def cut_check(
                 children=dict(case.children),
                 issue_references=dict(case.references),
                 recently_closed_issues=case.recently_closed,
-                capability_overrides=dict(case.capabilities),
             ),
         )
         assert client.board_issues == case.issues
@@ -145,7 +143,6 @@ def cut_check(
         assert client.children == case.children
         assert client.issue_references == case.references
         assert client.recently_closed_issues == case.recently_closed
-        assert client.capability_overrides == case.capabilities
         stage: CutCase | None = case
         position = 0
         while stage is not None:
@@ -203,7 +200,6 @@ def refused(
     forge_read: bool = True,
     searched: bool = False,
     parents: dict[int, ParentIssue] | None = None,
-    capabilities: dict[forge.ForgeOperation, forge.Capability] | None = None,
 ) -> CutCase:
     return CutCase(
         issues=issues,
@@ -218,7 +214,6 @@ def refused(
         closed_issue_cutoffs=(TWIN_SEARCH_START,) if searched else (),
         envelope={"ok": False, "reason": reason, "message": message},
         parents=parents or {},
-        capabilities=capabilities or {},
     )
 
 
@@ -432,57 +427,10 @@ def no_twin(
                 },
             ),
         ),
-        *rendered(
-            "forge-cannot-create-child",
-            refused(
-                "this forge cannot create_child; cut the slice by hand",
-                "precondition_failed",
-                (
-                    container_issue(
-                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
-                    ),
-                ),
-                (),
-                forge_read=False,
-                capabilities={forge.ForgeOperation.CREATE_CHILD: forge.Capability.READ_ONLY},
-            ),
-        ),
-        *rendered(
-            "forge-cannot-link-child",
-            refused(
-                "this forge cannot link_child; cut the slice by hand",
-                "precondition_failed",
-                (
-                    container_issue(
-                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
-                    ),
-                ),
-                (),
-                forge_read=False,
-                capabilities={forge.ForgeOperation.LINK_CHILD: forge.Capability.READ_ONLY},
-            ),
-        ),
-        *rendered(
-            "forge-cannot-update-item-body",
-            refused(
-                "this forge cannot update_item_body; cut the slice by hand",
-                "precondition_failed",
-                (
-                    container_issue(
-                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
-                    ),
-                ),
-                (),
-                forge_read=False,
-                capabilities={forge.ForgeOperation.UPDATE_ITEM_BODY: forge.Capability.READ_ONLY},
-            ),
-        ),
     ],
 )
-def test_cut_requires_an_open_top_level_container_and_a_writable_forge(
-    case: CutCase, cut_check: CutCheck
-) -> None:
-    """Spec: CUT-01, CUT-02, CUT-03, CUT-04, CUT-33, OUT-05, OUT-06, E-CUT-01."""
+def test_cut_requires_an_open_top_level_container(case: CutCase, cut_check: CutCheck) -> None:
+    """Spec: CUT-01, CUT-02, CUT-03, CUT-33, OUT-05, OUT-06, E-CUT-01."""
     cut_check(case)
 
 
