@@ -29,8 +29,8 @@
 "tests/support/cli_fixtures.py" = 969
 "tests/support/github_fixtures.py" = 835
 "tests/test_board.py" = 4315
-"tests/test_checkout.py" = 2047
-"tests/test_cli.py" = 17656
+"tests/test_checkout.py" = 2046
+"tests/test_cli.py" = 17483
 "tests/test_cmd_adopt.py" = 1650
 "tests/test_cmd_cut.py" = 1072
 "tests/test_cmd_land_after_merge_rerun.py" = 880
