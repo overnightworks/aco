@@ -36,8 +36,9 @@ _EXTENSIONS = "|".join(FILE_EXTENSIONS)
 _ISSUE_NUMBER = re.compile(r"(?<!\w)#\d+")
 _PATH = re.compile(rf"^(?:\./|~/|/[A-Za-z])|://|/[^/]*\.(?:{_EXTENSIONS})$")
 _FILE_NAME = re.compile(rf"[^/]*\.(?:{_EXTENSIONS})")
-_SNAKE_CASE = re.compile(r"(?<!\w)[a-zäöüß]++(?:_[a-zäöüß0-9]++)++(?!\w)")
-_CAMEL_CASE = re.compile(r"(?<!\w)[a-zäöüß]{2,}+[A-ZÄÖÜ][a-zäöüß]")
+_WORD = re.compile(r"\w+")
+_SNAKE_CASE = re.compile(r"[a-zäöüß]++(?:_[a-zäöüß0-9]++)++")
+_CAMEL_CASE = re.compile(r"[a-zäöüß]{2,}+[A-ZÄÖÜ][a-zäöüß]")
 _FLAG = re.compile(r"(?<!\S)--[A-Za-z]")
 
 
@@ -52,6 +53,12 @@ def _has_token(pattern: re.Pattern[str]) -> Callable[[str], bool]:
     return lambda text: any(pattern.search(token) for token in _tokens(text))
 
 
+def _has_word(pattern: re.Pattern[str], *, whole: bool) -> Callable[[str], bool]:
+    """Whether a word of the text, from its first character on, matches `pattern`."""
+    match = pattern.fullmatch if whole else pattern.match
+    return lambda text: any(match(word) for word in _WORD.findall(text))
+
+
 def _has_file_name(text: str) -> bool:
     return any(_FILE_NAME.fullmatch(token) for token in _tokens(text))
 
@@ -62,8 +69,8 @@ _JARGON_RULES: tuple[tuple[str, Callable[[str], bool]], ...] = (
     ("a path", _has_token(_PATH)),
     ("a file name", _has_file_name),
     ("a backtick", lambda text: "`" in text),
-    ("a snake case name", lambda text: _SNAKE_CASE.search(text) is not None),
-    ("a camel case name", lambda text: _CAMEL_CASE.search(text) is not None),
+    ("a snake case name", _has_word(_SNAKE_CASE, whole=True)),
+    ("a camel case name", _has_word(_CAMEL_CASE, whole=False)),
     ("a flag", lambda text: _FLAG.search(text) is not None),
 )
 
