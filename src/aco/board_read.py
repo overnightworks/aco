@@ -257,12 +257,8 @@ def build_board(
     if issues is None:
         issues = client.list_open_board_issues()
     since = workboard.merged_pull_request_floor(issues, now)
-    # A container whose own summary already says 0 (or carries no summary at
-    # all, `children_total is None`) can never own an open child either way:
-    # `workboard._container_progress` returns no progress at all without both numbers,
-    # and returns an empty open-children list when they're both 0 -- exactly
-    # what an absent `children` entry already defaults to. Fetching its
-    # detail list would cost a request `board` never needed.
+    # The summary only hints whether a sub-issue list is worth fetching: one
+    # saying 0 (or absent, `children_total is None`) skips the request.
     container_numbers = tuple(
         issue.number
         for issue in issues
@@ -299,7 +295,9 @@ def build_board(
     # so `next` never proposes a `cut` that `cut` refuses.
     nesting_parents = {
         number: parent.reference
-        for number in workboard.childless_containers_with_uncut_rows(issues, config.storage)
+        for number in workboard.childless_containers_with_uncut_rows(
+            issues, children, config.storage
+        )
         if (parent := client.parent_issue(number)) is not None
     }
     if landing is None:

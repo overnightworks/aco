@@ -255,6 +255,38 @@ def container_issue(number: int, toml_text: str) -> workboard.Issue:
     )
 
 
+def container_with_children(
+    number: int,
+    *,
+    closed: int,
+    open_children: tuple[int, ...] = (),
+    title: str = "Container",
+    body: str = "",
+) -> tuple[workboard.Issue, tuple[workboard.ChildItem, ...]]:
+    """A container whose child-count summary matches its sub-issue list: the
+    `open_children` numbers listed open, then `closed` closed children
+    numbered from 1000."""
+    listed = (
+        *(workboard.ChildItem(child, workboard.ChildState.OPEN) for child in open_children),
+        *(
+            workboard.ChildItem(1000 + index, workboard.ChildState.CLOSED)
+            for index in range(closed)
+        ),
+    )
+    container = workboard.Issue(
+        number,
+        title,
+        (),
+        body,
+        "2026-08-20T00:00:00Z",
+        "2026-08-20T00:00:00Z",
+        kind=ItemKind.CONTAINER,
+        children_closed=closed,
+        children_total=len(listed),
+    )
+    return container, listed
+
+
 def write_repository_config(
     toplevel: Path, content: str = "", *, path: Path = workboard.CONFIG_PATH
 ) -> None:
