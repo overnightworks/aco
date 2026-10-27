@@ -8,6 +8,7 @@ import {
 	firstDecidedKey,
 	firstOpenKey,
 	nextOpenAfter,
+	stageAfterReturned,
 	openList,
 	outcomeLabel,
 	pictureDataUri,
@@ -502,5 +503,31 @@ describe('tabCounts', () => {
 
 	test('[ABRD-51] an empty board counts nothing', () => {
 		expect(tabCounts([])).toEqual({ open: 0, decided: 0 });
+	});
+});
+
+describe('stageAfterReturned', () => {
+	const cards = (...options: (ReturnType<typeof optionLine> | ReturnType<typeof line>)[]) => [
+		repo({ items: [item({ number: 1, lines: options })] })
+	];
+
+	test('[ABRD-76] the first other open card comes next, skipping cards with their head', () => {
+		const repos = cards(
+			optionLine({ index: 1, returned_on: '2026-10-27' }),
+			optionLine({ index: 2 }),
+			optionLine({ index: 3 })
+		);
+
+		expect(stageAfterReturned(repos, 'repo:1:3')).toBe('repo:1:2');
+	});
+
+	test('[ABRD-76] with no other open card the stage stays on the card itself', () => {
+		const repos = cards(
+			optionLine({ index: 1, returned_on: '2026-10-27' }),
+			optionLine({ index: 2, returned_on: '2026-10-27' }),
+			line({ index: 3 })
+		);
+
+		expect(stageAfterReturned(repos, 'repo:1:2')).toBe('repo:1:2');
 	});
 });

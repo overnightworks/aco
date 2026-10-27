@@ -51,6 +51,7 @@
 		{@const repoName = selected.repo}
 		{@const itemNumber = selected.item.number}
 		{@const optionKey = lineKey(repoName, itemNumber, optionLine)}
+		{@const openPanel = decisions.panel(optionKey)}
 		{#key optionKey}
 			<OptionCard repo={repoName} item={itemNumber} line={optionLine}>
 				<DecideRow
@@ -61,13 +62,18 @@
 					onDecide={(shownLine, option) =>
 						decisions.decideOption(repoName, itemNumber, shownLine, option)}
 					onReload={() => decisions.reloadAfterBanner(optionKey)}
-					other={{
-						panel: decisions.otherPanel(optionKey),
-						draft: decisions.draft(optionKey),
-						onOpen: (shown) => decisions.openOtherPanel(optionKey, shown),
-						onClose: () => decisions.closeOtherPanel(optionKey),
-						onDraft: (text) => decisions.setDraft(optionKey, text),
-						onSend: (shown, text) => decisions.decideOther(repoName, itemNumber, shown, text)
+					escapes={{
+						panel: openPanel,
+						draft: openPanel === null ? '' : decisions.draft(optionKey, openPanel.kind),
+						onOpen: (kind, shown) => decisions.openPanel(optionKey, { kind, shown }),
+						onClose: () => decisions.closePanel(optionKey),
+						onDraft: (text) => {
+							if (openPanel !== null) decisions.setDraft(optionKey, openPanel.kind, text);
+						},
+						onSend: ({ kind, shown }, text) =>
+							kind === 'other'
+								? decisions.decideOther(repoName, itemNumber, shown, text)
+								: decisions.decideUnclear(repoName, itemNumber, shown, text)
 					}}
 				/>
 			</OptionCard>

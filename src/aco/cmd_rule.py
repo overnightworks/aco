@@ -82,7 +82,7 @@ def _rule_remaining_open(new_body: str, *, storage: body.Storage) -> int:
 
 class _RuleReason(StrEnum):
     """`aco rule`'s own `--json` `reason` vocabulary (`specs/rule.spec.md`):
-    `ruled` the only success."""
+    `ruled` and `returned` are the successes."""
 
     RULED = "ruled"
     ALREADY_RULED = "already_ruled"

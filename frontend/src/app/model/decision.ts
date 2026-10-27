@@ -14,6 +14,7 @@ import type {
 	OptionLine,
 	OtherDecisionRequest,
 	Outcome,
+	UnclearDecisionRequest,
 	YesNoDecisionRequest,
 	YesNoLine
 } from '../../types';
@@ -77,6 +78,23 @@ export function otherDecisionRequest(
 	return { repo, item, line: line.index, fingerprint: line.fingerprint, other: answer.trim() };
 }
 
+/** The card as shown, sent back to its head; a blank note is no note. */
+export function unclearDecisionRequest(
+	repo: string,
+	item: number,
+	line: OptionLine,
+	note: string
+): UnclearDecisionRequest {
+	return {
+		repo,
+		item,
+		line: line.index,
+		fingerprint: line.fingerprint,
+		unclear: true,
+		note: noteOrNull(note)
+	};
+}
+
 /** A blank note, trimmed, is no note (mirrors `aco.board.api._note`). */
 export function noteOrNull(raw: string): string | null {
 	const trimmed = raw.trim();
@@ -85,6 +103,7 @@ export function noteOrNull(raw: string): string | null {
 
 export type DecisionOutcome =
 	| { kind: 'ruled' }
+	| { kind: 'returned' }
 	| { kind: 'already-ruled'; message: string }
 	| { kind: 'changed'; message: string }
 	| { kind: 'failed'; message: string };
@@ -93,6 +112,8 @@ export function readDecisionResult(result: DecisionResult): DecisionOutcome {
 	switch (result.status) {
 		case 'ruled':
 			return { kind: 'ruled' };
+		case 'returned':
+			return { kind: 'returned' };
 		case 'already_ruled':
 			return { kind: 'already-ruled', message: ALREADY_RULED_MESSAGE };
 		case 'failed':

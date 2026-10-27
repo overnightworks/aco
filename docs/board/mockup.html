@@ -531,8 +531,9 @@ function decideRow(c) {
 function escapes(c) {
   const panel = S.panel.get(c.ref);
   const toggle = k => () => { S.panel.set(c.ref, panel === k ? null : k); render(); const t = $("note"); if (t) t.focus(); };
-  return [h("button", {type: "button", class: "quiet", "aria-expanded": String(panel === "other"), onclick: toggle("other")}, "Other…"),
-    h("button", {type: "button", class: "quiet", "aria-expanded": String(panel === "unclear"), onclick: toggle("unclear")}, "Unclear")];
+  const other = h("button", {type: "button", class: "quiet", "aria-expanded": String(panel === "other"), onclick: toggle("other")}, "Other…");
+  if (S.back.has(c.ref)) return [other];
+  return [other, h("button", {type: "button", class: "quiet", "aria-expanded": String(panel === "unclear"), onclick: toggle("unclear")}, "Unclear")];
 }
 
 function notePanel(c) {
@@ -740,7 +741,7 @@ function sendBack(c, note) {
   S.panel.delete(c.ref);
   S.back.set(c.ref, note);
   S.strip = {ref: c.ref, text: "With head: " + c.topic, kind: "back"};
-  S.sel = nextOpen() || c.ref;
+  S.sel = (ordered("open").find(r => RANK[stateOf(r)] <= RANK.open) || c).ref;
   render();
 }
 function undoDecision(key) {
