@@ -1,7 +1,0 @@
-claim_id = "01c05057d24b4a878f02bdca73605fc4"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "1d4cdcc7162a8c3498aa04b07ba5cc75b7f0efad"
-branch = "claude/issue-448-trailer-git-version"
-scope = ["tests/test_land_merge_message.py"]
-opened_commit = "79e1b7041c874fc5f34d8a0caffa6c95639aed39"
