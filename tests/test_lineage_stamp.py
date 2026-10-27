@@ -1,4 +1,4 @@
-"""`lineage_stamp`: the stamp's verdicts and lock, with no git."""
+"""`lineage_stamp`: the stamp's verdicts and lock, with no git (CAS-09..12, CAS-75..77)."""
 
 from __future__ import annotations
 
@@ -60,6 +60,9 @@ def test_check_and_stamp_judges_a_fetched_tip_against_the_stamp(
     verdict: lineage_stamp.Verdict | lineage_stamp.Diverged,
     stamp_after: ObjectId,
 ) -> None:
+    """CAS-09, CAS-10, CAS-11, CAS-12: a first sight, an unchanged tip and a descendant are
+    accepted and stamped; an unrelated tip or a rollback to an ancestor is refused.
+    """
     if stamped is not None:
         lineage_stamp.write(tmp_path, stamped)
 
@@ -88,6 +91,9 @@ def test_advance_moves_a_writers_stamp_forward_and_never_back(
     verdict: lineage_stamp.Verdict | lineage_stamp.Diverged,
     stamp_after: ObjectId,
 ) -> None:
+    """CAS-76: a writer's stamp step stamps a missing stamp, advances a stamp it descends
+    from, and never moves a stamp already past or diverged from its commit.
+    """
     if stamped is not None:
         lineage_stamp.write(tmp_path, stamped)
 
@@ -98,6 +104,8 @@ def test_advance_moves_a_writers_stamp_forward_and_never_back(
 def test_write_cleans_up_its_temp_file_on_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """CAS-09: a failed stamp write leaves no temp file behind."""
+
     def fail_replace(*_args: object, **_kwargs: object) -> None:
         raise OSError("simulated replace failure")
 
@@ -112,6 +120,8 @@ def test_write_cleans_up_its_temp_file_on_failure(
 def test_the_lock_excludes_a_second_holder_until_it_is_released_and_stays_on_disk(
     tmp_path: Path,
 ) -> None:
+    """CAS-75: the stamp lock excludes a second holder until released and stays on disk."""
+
     def second_holder_blocked() -> bool:
         descriptor = os.open(lineage_stamp.lock_path(tmp_path), os.O_RDWR)
         try:
@@ -129,6 +139,7 @@ def test_the_lock_excludes_a_second_holder_until_it_is_released_and_stays_on_dis
 
 
 def test_remove_deletes_the_stamp_and_tolerates_none(tmp_path: Path) -> None:
+    """CAS-77: reset's removal deletes the stamp and tolerates none."""
     lineage_stamp.write(tmp_path, _NEW)
 
     lineage_stamp.remove(tmp_path)

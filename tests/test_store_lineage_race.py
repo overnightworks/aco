@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import fcntl
 import os
+import shutil
+import stat
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -89,6 +92,51 @@ def _unrelated_commit(worktree: Path, *, like: protocol.ObjectId) -> protocol.Ob
     )
 
 
+_LOCK_PROBING_GIT = """#!{python}
+import fcntl, os, sys
+arguments = sys.argv[1:]
+for subcommand in ("ls-remote", "merge-base"):
+    if subcommand in arguments:
+        descriptor = os.open(os.environ["LOCK_PROBE_LOCK"], os.O_RDWR | os.O_CREAT)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            held = False
+        except BlockingIOError:
+            held = True
+        finally:
+            os.close(descriptor)
+        with open(os.environ["LOCK_PROBE_LOG"], "a") as log:
+            log.write(f"{{subcommand}} {{held}}\\n")
+        break
+os.execv({git!r}, [{git!r}, *arguments])
+"""
+
+
+def _git_noting_the_stamp_lock(
+    monkeypatch: pytest.MonkeyPatch, scratch: Path, worktree: Path
+) -> Path:
+    """Put a `git` on PATH that records, per `ls-remote` and `merge-base`, whether the
+    stamp lock is held, then runs the real git. Returns the log file."""
+    real_git_path = shutil.which("git")
+    assert real_git_path is not None
+    wrapper_directory = scratch / "lock-probing-git"
+    wrapper_directory.mkdir()
+    wrapper = wrapper_directory / "git"
+    wrapper.write_text(_LOCK_PROBING_GIT.format(python=sys.executable, git=real_git_path))
+    wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
+    log = scratch / "lock-probe.log"
+    monkeypatch.setenv("LOCK_PROBE_LOG", str(log))
+    monkeypatch.setenv(
+        "LOCK_PROBE_LOCK", str(lineage_stamp.lock_path(store._stamp_directory(worktree)))
+    )
+    monkeypatch.setenv("PATH", f"{wrapper_directory}{os.pathsep}{os.environ['PATH']}")
+    return log
+
+
+def _lock_probes(log: Path) -> list[str]:
+    return log.read_text().splitlines() if log.exists() else []
+
+
 def test_a_reader_inside_a_writers_stamp_window_returns_state_and_the_stamp_ends_at_the_writer(
     bare_remote: Path, worktree: Path
 ) -> None:
@@ -159,61 +207,32 @@ def test_a_fetch_refuses_a_rollback_to_an_ancestor_of_its_stamp(
 
 
 def test_a_fetch_holds_the_stamp_lock_from_its_probe_through_its_ancestry_check(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, bare_remote: Path, worktree: Path
 ) -> None:
     """CAS-75: held at the `ls-remote` probe, before any tip is read, and at the check."""
     first = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     _write_item(worktree, bare_remote, "aco-000001")
     lineage_stamp.write(store._stamp_directory(worktree), first)  # the check must compare
-    held_at_probe: list[bool] = []
-    held_at_check: list[bool] = []
-    real_probe = store._ls_remote_state
-    real_is_ancestor = store._is_ancestor
-
-    def probe(checked_worktree: Path, remote: str) -> protocol.ObjectId | None:
-        held_at_probe.append(_lock_is_held(worktree))
-        return real_probe(checked_worktree, remote)
-
-    def is_ancestor_factory(checked_worktree: Path) -> lineage_stamp.IsAncestor:
-        real = real_is_ancestor(checked_worktree)
-
-        def is_ancestor(ancestor: protocol.ObjectId, descendant: protocol.ObjectId) -> bool:
-            held_at_check.append(_lock_is_held(worktree))
-            return real(ancestor, descendant)
-
-        return is_ancestor
-
-    monkeypatch.setattr(store, "_ls_remote_state", probe)
-    monkeypatch.setattr(store, "_is_ancestor", is_ancestor_factory)
+    log = _git_noting_the_stamp_lock(monkeypatch, tmp_path, worktree)
 
     store.fetch_state(worktree=worktree, remote=str(bare_remote))
 
-    assert (held_at_probe, held_at_check) == ([True], [True])
+    assert _lock_probes(log) == ["ls-remote True", "merge-base True"]
     assert _lock_is_held(worktree) is False
 
 
 def test_a_writers_stamp_step_holds_the_stamp_lock_while_it_judges_ancestry(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, bare_remote: Path, worktree: Path
 ) -> None:
     """CAS-76: the stamp (the old tip) differs from the landed commit, so ancestry is asked."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    held_at_check: list[bool] = []
-    real_is_ancestor = store._is_ancestor
-
-    def is_ancestor_factory(checked_worktree: Path) -> lineage_stamp.IsAncestor:
-        real = real_is_ancestor(checked_worktree)
-
-        def is_ancestor(ancestor: protocol.ObjectId, descendant: protocol.ObjectId) -> bool:
-            held_at_check.append(_lock_is_held(worktree))
-            return real(ancestor, descendant)
-
-        return is_ancestor
-
-    monkeypatch.setattr(store, "_is_ancestor", is_ancestor_factory)
+    log = _git_noting_the_stamp_lock(monkeypatch, tmp_path, worktree)
 
     _write_item(worktree, bare_remote, "aco-000001")
 
-    assert held_at_check == [True]
+    assert [probe for probe in _lock_probes(log) if probe.startswith("merge-base")] == [
+        "merge-base True"
+    ]
 
 
 def test_reset_clears_each_worktrees_stamp_under_its_lock_and_the_next_fetch_accepts_a_fresh_ref(

@@ -621,7 +621,7 @@ def test_fetch_state_rejects_schema_version_one_without_stamping_its_lineage(
     """`version = 1` predates `SUPPORTED_STATE_SCHEMA_VERSION = 2` (which added the
     `items/` directory): it is exactly as unsupported as the version-3
     case above, and `_parse_state_tree` must raise before `fetch_state` ever
-    reaches `_write_lineage_stamp`, so a first, unsupported observation never
+    reaches `lineage_stamp`, so a first, unsupported observation never
     poisons the lineage check a later, supported fetch relies on.
     """
     _push_custom_tree(
@@ -5430,8 +5430,8 @@ def test_clear_lineage_stamps_lets_a_bootstrap_after_a_ref_rewrite_succeed_in_ev
 ) -> None:
     """The one behaviour reset exists to unblock: without clearing every
     worktree's stamp and anchor first, `fetch_state`'s own lineage guard
-    refuses a `bootstrap` that recreates `STATE_REF` from nothing (`store.py`
-    `_check_lineage`), in every worktree that had ever observed the old ref."""
+    refuses a `bootstrap` that recreates `STATE_REF` from nothing (its lineage
+    check against `lineage_stamp`), in every worktree that had ever observed the old ref."""
     linked = _linked_worktrees(worktree, tmp_path, ("lane",))["lane"]
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     store.fetch_state(worktree=linked, remote=str(bare_remote))
