@@ -10,8 +10,7 @@ import pytest
 from board_fixtures import board_issue
 from cli_fixtures import freeze_cli_now, run_cli
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-from test_option_lines import RETURNED_ON, card_body
-from test_rule_option import item_body, returned_today
+from option_cards import RETURNED_ON, card_body, item_body, returned_today
 
 from aco import workboard
 
