@@ -26,8 +26,8 @@
 "src/aco/store.py" = 2102
 "src/aco/workboard.py" = 3138
 "tests/aco_board/test_aco_board_api.py" = 1059
-"tests/cli_fixtures.py" = 969
-"tests/github_fixtures.py" = 835
+"tests/support/cli_fixtures.py" = 969
+"tests/support/github_fixtures.py" = 835
 "tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4315
 "tests/test_checkout.py" = 2047
@@ -77,7 +77,7 @@
 "_board_item" = 103
 "build_board" = 112
 
-[function_lines."tests/github_fixtures.py"]
+[function_lines."tests/support/github_fixtures.py"]
 "landed_observations" = 61
 "lane_landing_world" = 71
 
