@@ -1,0 +1,7 @@
+claim_id = "5017e6787fd64ab89069b851d2fe3384"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "88b0c79e839a29cf2f1d5bebab2dcb6a16068435"
+branch = "claude/issue-502-rescope-claim-real-worktree"
+scope = ["quality/baseline.toml", "tests/test_cli.py", "tests/test_cmd_rescope_claim.py"]
+opened_commit = "efc2a84b350876e662ba72c45ef14f01aff870c2"
