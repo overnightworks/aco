@@ -444,6 +444,27 @@ for (const viewport of [
 			expect(posts.count()).toBe(0);
 		});
 
+		test('[ABRD-59] a window that ends in a refused post leaves focus on the stage, not on the page', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.route('**/api/rule', (route) =>
+				route.fulfill({ status: 503, body: 'Unavailable' })
+			);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.focus();
+			await page.keyboard.press('Enter');
+			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			await expect(page.locator('.strip')).toHaveCount(0);
+			await expect(page.locator('.stage')).toBeFocused();
+		});
+
 		test('[ABRD-59] a window that ends with focus on Undo leaves focus on the stage, not on the page', async ({
 			page
 		}) => {

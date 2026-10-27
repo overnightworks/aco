@@ -99,6 +99,12 @@
 		}
 	});
 
+	// A strip that leaves takes a focused Undo with it, whether its post ruled,
+	// was refused or failed; the board reload only covers the ruled case.
+	$effect(() => {
+		if ((decisions?.pendingEntries.length ?? 0) === 0) void tick().then(keepFocusVisible);
+	});
+
 	$effect(() => {
 		if (token === null) {
 			board.setNoAccess();
