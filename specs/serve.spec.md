@@ -114,7 +114,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line (RULE-13).
 - [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via`, `returned_on`, `returned_note`, unknown keys leave it be.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
-- [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`. A bad date, blank note, note without date, or either when ruled is unreadable (ABRD-07).
+- [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`. A bad date, blank note, note without date, or either when ruled is unreadable.
 - [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
 - [ ] [ABRD-60] A line with `"form": "withdrawn"` is skipped unparsed, whatever its keys: no list shows it, its repo stays readable, the item's other lines keep their `index`, an item of only such is not listed.
 
