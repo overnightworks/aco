@@ -1,6 +1,6 @@
 """`aco rule --other` through the real CLI: it decides an open option line with
 the operator's own answer, stores it verbatim, keeps a later write
-byte-identical and stands (RULE-20, RULE-04, BODY-92, BODY-87, RUL-16)."""
+byte-identical and stands (RULE-20, RULE-04, BODY-92, BODY-88, BODY-87, RUL-16)."""
 
 from __future__ import annotations
 
@@ -58,14 +58,13 @@ class TestRuleOther:
         assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 other; 1 line(s) still open\n")
         written = client.item_bodies[7]
         entry = body.block_expectation_dicts(body.locate_block(written).data)[1]
-        decided = {key: entry[key] for key in ("ruling", "ruled_on", "card_hash", "via", "other")}
-        assert decided == {
-            "ruling": "other",
-            "ruled_on": today,
-            "card_hash": GOLDEN_CARD_HASH,
-            "via": via,
-            "other": OTHER_ANSWER,
-        }
+        assert (
+            entry["ruling"],
+            entry["ruled_on"],
+            entry["card_hash"],
+            entry["via"],
+            entry["other"],
+        ) == ("other", today, GOLDEN_CARD_HASH, via, OTHER_ANSWER)
         assert f'via = "{via}"{newline}other = ' in written
         checked = run_cli(["check", "-"], capsys, stdin=written)
         assert (checked.status, checked.stdout) == (0, "body ok\n")
@@ -171,8 +170,8 @@ class TestRuleOther:
     def test_next_and_board_count_an_other_line_as_decided(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: BODY-92, RUL-16 -- `ruling` present means decided: `board` counts the Other
-        line ruled, and `next` asks for no refining once the item's other line is ruled."""
+        """Spec: NEXT-04 -- `ruling` present means decided: `board` counts the Other line
+        ruled, and `next` asks for no refining once its remaining line is ruled."""
         client = serve_item(monkeypatch, item_body(card()))
         run_cli(["rule", "7", *other_arguments(OTHER_ANSWER)], capsys)
         serve_written(monkeypatch, client.item_bodies[7])
