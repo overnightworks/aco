@@ -104,10 +104,7 @@ def _release_landing(
     release judged its landing on (LANDCMD-21)."""
     client = context.forge
     issues = client.list_open_board_issues()
-    candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
-    dependencies = board_read.validated_dependencies(
-        issues, board_read.fetch_dependencies(client, candidates)
-    )
+    dependencies = board_read.fetch_validated_dependencies(client, issues)
     freed = () if landed is None else workboard.freed_item_numbers(dependencies, landed)
     projected = board_read.build_board(
         context,

@@ -5,11 +5,13 @@ from __future__ import annotations
 import re
 import shlex
 import tomllib
+from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import partial
+from itertools import chain
 from pathlib import Path
 from typing import NoReturn, TypeGuard, TypeVar, cast
 
@@ -1614,6 +1616,10 @@ def _board_score(stage: Stage, unblocks_count: int, single_next: bool) -> int:
     return score
 
 
+def _open_children(children: Iterable[ChildItem]) -> tuple[ChildItem, ...]:
+    return tuple(child for child in children if child.state is ChildState.OPEN)
+
+
 def _container_progress(
     issue: Issue,
     children: Mapping[int, tuple[ChildItem, ...]],
@@ -1636,9 +1642,7 @@ def _container_progress(
         return None
     listed = children.get(issue.number, ())
     open_children = tuple(
-        replace(child, blocked_by=blockers.get(child.number, ()))
-        for child in listed
-        if child.state is ChildState.OPEN
+        replace(item, blocked_by=blockers.get(item.number, ())) for item in _open_children(listed)
     )
     return ContainerProgress(len(listed) - len(open_children), len(listed), open_children)
 
@@ -1935,13 +1939,8 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         )
         for issue in issues
     }
-    unblocks = {
-        issue.number: sum(
-            IssueReference(repository, issue.number) in other_blockers
-            for other_blockers in blockers.values()
-        )
-        for issue in issues
-    }
+    blocked = Counter(chain.from_iterable(blockers.values()))
+    unblocks = {issue.number: blocked[IssueReference(repository, issue.number)] for issue in issues}
     container_progress = {
         issue.number: progress
         for issue in issues
@@ -2378,7 +2377,7 @@ def closable_container_number(
     """
     if parent.kind is not ItemKind.CONTAINER:
         return None
-    if any(child.state is ChildState.OPEN for child in children):
+    if _open_children(children):
         return None
     parsed = parse_body(parent.body, storage=storage)
     if parsed.read_state is not BodyReadState.VALID:
@@ -2848,7 +2847,7 @@ def childless_containers_with_uncut_rows(
         for issue in issues
         if issue.kind is ItemKind.CONTAINER
         and issue.children_total is not None
-        and not any(child.state is ChildState.OPEN for child in children.get(issue.number, ()))
+        and not _open_children(children.get(issue.number, ()))
         and parse_body(issue.body, storage=storage).slices
     )
 
