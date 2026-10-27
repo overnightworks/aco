@@ -103,10 +103,12 @@ def test_an_unclear_post_breaking_the_shape_or_the_bound_is_refused_before_any_a
     fields: dict[str, object],
 ) -> None:
     """ABRD-05, ABRD-42."""
+    calls_before = repository.calls()
+
     answer = _post_unclear(board, listed, **fields)
 
     assert (answer.status, answer.json()) == (400, {"error": _BAD_REQUEST})
-    assert repository.rule_calls() == []
+    assert repository.calls() == calls_before
 
 
 def test_a_null_unclear_and_null_neighbours_name_nothing_so_the_option_decides(
