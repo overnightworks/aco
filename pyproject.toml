@@ -37,7 +37,7 @@ cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true } }]
 testpaths = ["tests"]
 # The network guard loads from this configuration, not from tests/conftest.py,
 # so a test module run from outside tests/ with this file is guarded too.
-pythonpath = ["tests", "scripts"]
+pythonpath = ["tests", "tests/support", "scripts"]
 addopts = ["-p", "network_guard"]
 
 [tool.coverage.run]
@@ -227,7 +227,7 @@ ignore_imports = [
 ]
 
 [tool.pyright]
-extraPaths = ["src", "scripts"]
+extraPaths = ["src", "scripts", "tests/support"]
 venvPath = "."
 venv = ".venv"
 

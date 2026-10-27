@@ -11,17 +11,20 @@ import pytest
 from board_fixtures import board_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-from test_option_lines import (
+from option_cards import (
+    ALREADY_RULED,
     GOLDEN_CARD_HASH,
     OTHER_ANSWER,
     E,
     card,
     card_body,
     check_defects,
+    item_body,
     malformed,
+    other_arguments,
     other_card,
+    serve_item,
 )
-from test_rule_option import ALREADY_RULED, item_body, other_arguments, serve_item
 
 from aco import body
 

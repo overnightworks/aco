@@ -12,23 +12,21 @@ import pytest
 from board_fixtures import board_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-from test_option_line_rewrites import assert_rewritten_alike
-from test_option_lines import (
+from option_cards import (
     GOLDEN_CARD_HASH,
+    NOTE,
     RETURNED_ON,
+    STALE_CARD_HASH,
+    TODAY,
     E,
+    assert_rewritten_alike,
     card,
     card_body,
     card_head,
     check_defects,
-    malformed,
-)
-from test_rule_option import (
-    NOTE,
-    STALE_CARD_HASH,
-    TODAY,
     decide,
     item_body,
+    malformed,
     other_arguments,
     returned_today,
     serve_item,

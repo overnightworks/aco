@@ -14,10 +14,9 @@ import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, container_issue
 from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-from test_option_lines import GOLDEN_CARD_HASH, card, ruled_card
+from option_cards import assert_rewritten_alike, card, ruled_card
 
 from aco import body, cmd_item, cmd_rescope, forge, items, session, state_board
-from aco.expectations import OptionLine, expectation_lines
 
 OPEN_YES_NO = (
     '[[expectation]]\ntext = "Alte Frage?"\ndefault = "later"\nquestion = "Alt?"\n'
@@ -39,26 +38,6 @@ def item_body(item: str, *, newline: str = "\n", extra: str = "", record: bool =
     lines = "\n".join(ITEMS[item])
     toml_text = MINIMAL_BLOCK_TOML + extra + "\n" + lines + ("\n" + RECORD if record else "")
     return block_body(toml_text.rstrip("\n")).replace("\n", newline)
-
-
-def option_entries(raw: str) -> list[dict[str, object]]:
-    entries = body.block_expectation_dicts(body.locate_block(raw).data)
-    return [entry for entry in entries if "option" in entry]
-
-
-def assert_rewritten_alike(before: str, after: str, storage: body.Storage) -> None:
-    """`after` is valid, keeps `before`'s option lines value for value and its
-    newline, and rendering it again changes no byte."""
-    located = body.locate_block(after)
-    assert body.parse_body(after, storage=storage).read_state is body.BodyReadState.VALID
-    assert option_entries(after) == option_entries(before)
-    assert ("\r\n" in after) is ("\r\n" in before)
-    assert body.replace_block(after, located, located.data) == after
-    assert {
-        line.card_hash
-        for line in expectation_lines(after, storage=storage)
-        if isinstance(line, OptionLine)
-    } <= {GOLDEN_CARD_HASH}
 
 
 STORAGES = [
