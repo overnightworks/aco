@@ -137,6 +137,11 @@ for (const viewport of [
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByRole('heading', { name: OTHER_QUESTION })).toBeVisible();
+			// Selecting the sent card again later leaves the stage alone.
+			if (phone) await page.getByRole('button', { name: /^‹/ }).click();
+			await page.locator('.tracks').getByTitle(QUESTION).click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await expect(page.getByRole('heading', { name: QUESTION })).toBeVisible();
 			// The phone shows the question alone once a card is open.
 			if (!phone) {
 				await expect(
