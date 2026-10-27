@@ -13,7 +13,7 @@
 	import { DecisionStore } from './app/state/decision.svelte';
 	import Stage from './components/Stage.svelte';
 	import TrackList from './components/TrackList.svelte';
-	import UndoToast from './components/UndoToast.svelte';
+	import UndoStrip from './components/UndoStrip.svelte';
 
 	let { token }: { token: string | null } = $props();
 
@@ -68,6 +68,12 @@
 		view = 'decided';
 	}
 
+	async function undo(key: string) {
+		decisions?.undo(key);
+		await tick();
+		keepFocusVisible();
+	}
+
 	function keepFocusVisible() {
 		if (view === 'decided') return;
 		const active = document.activeElement;
@@ -91,6 +97,13 @@
 				else keepFocusVisible();
 			});
 		}
+	});
+
+	// A strip that leaves takes a focused Undo with it, whether its post ruled,
+	// was refused or failed; the board reload only covers the ruled case.
+	$effect(() => {
+		void decisions?.pendingEntries;
+		void tick().then(keepFocusVisible);
 	});
 
 	$effect(() => {
@@ -161,6 +174,11 @@
 					}}
 				/>
 			</div>
+			<div class="strips" aria-live="polite">
+				{#each decisions.pendingEntries as entry (entry.key)}
+					<UndoStrip message={entry.message} onUndo={() => undo(entry.key)} />
+				{/each}
+			</div>
 			<div class="question-pane" bind:this={question} tabindex="-1">
 				<div class="inner">
 					<Stage repos={board.repos} {selectedKey} {decisions} refreshing={board.refreshing} />
@@ -193,11 +211,6 @@
 				</div>
 			</div>
 		{/if}
-		<div class="toasts" hidden={view !== 'open'} aria-live="polite">
-			{#each decisions.pendingEntries as entry (entry.key)}
-				<UndoToast message={entry.message} onUndo={() => decisions?.undo(entry.key)} />
-			{/each}
-		</div>
 	{/if}
 </main>
 
@@ -217,7 +230,9 @@
 		--accent: #7d2459;
 		--accent-fg: #ffffff;
 		--good: #1c7350;
+		--good-soft: #e4f2ea;
 		--warn: #99570c;
+		--frame-width: 880px;
 		color-scheme: light;
 	}
 	:global(body) {
@@ -306,6 +321,7 @@
 	.split {
 		display: grid;
 		grid-template-columns: 320px minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
 		flex: 1;
 		min-height: 0;
 	}
@@ -315,12 +331,32 @@
 		min-width: 0;
 	}
 	.tracks {
+		grid-column: 1;
+		grid-row: 1 / span 2;
 		background: var(--surface);
 		border-right: 1px solid var(--line);
 		padding: 8px 0 24px;
 	}
+	.strips {
+		grid-column: 2;
+		grid-row: 1;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 8px;
+		min-width: 0;
+		max-height: 35dvh;
+		overflow: auto;
+	}
+	.strips:has(:global(.strip)) {
+		padding: 24px 32px 16px;
+	}
 	.question-pane {
+		grid-column: 2;
+		grid-row: 2;
 		padding: 24px 32px 0;
+	}
+	.strips:has(:global(.strip)) + .question-pane {
+		padding-top: 0;
 	}
 	.inner {
 		padding-bottom: 32px;
@@ -376,8 +412,7 @@
 		gap: 12px;
 		margin-top: 24px;
 	}
-	.question-pane :global(button),
-	.toasts :global(button) {
+	.question-pane :global(button) {
 		padding: 10px 18px;
 		border: 1px solid #c9c4d4;
 		border-radius: 12px;
@@ -412,29 +447,6 @@
 	.back {
 		display: none;
 	}
-	.toasts {
-		flex-shrink: 0;
-		max-height: 35dvh;
-		overflow: auto;
-	}
-	.toasts :global(.toast) {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 12px;
-		padding: 12px 20px;
-		background: #17141f;
-		color: white;
-		border-top: 1px solid #4d4759;
-	}
-	.toasts :global(.msg) {
-		flex: 1;
-		min-width: 0;
-	}
-	.toasts :global(button) {
-		color: #17141f;
-		flex-shrink: 0;
-	}
 	@media (max-width: 760px) {
 		.top {
 			height: 52px;
@@ -468,6 +480,7 @@
 			gap: 2px;
 		}
 		.tracks {
+			grid-row: 2;
 			border-right: 0;
 		}
 		nav button {
@@ -475,6 +488,17 @@
 		}
 		.split {
 			grid-template-columns: minmax(0, 1fr);
+		}
+		.tracks,
+		.strips,
+		.question-pane {
+			grid-column: 1;
+		}
+		.strips {
+			background: var(--surface);
+		}
+		.strips:has(:global(.strip)) {
+			padding: 12px 16px 16px;
 		}
 		.question-pane {
 			display: none;

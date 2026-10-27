@@ -143,7 +143,7 @@ test('"Neu laden" after a refusal drops the banner and reloads', async () => {
 	expect(reload).toHaveBeenCalledTimes(1);
 });
 
-test('pendingEntries names what is waiting, for the toast to show', () => {
+test('pendingEntries names what is waiting, for the strip to show', () => {
 	const store = new DecisionStore(
 		'token',
 		vi.fn(async () => {}),

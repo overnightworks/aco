@@ -322,7 +322,7 @@ for (const viewport of [
 			await page.goto(`${appUrl}#t=${token}`);
 			await page.getByRole('button', { name: /Guests allowed\?/ }).click();
 			await choices(page).getByRole('button', { name: /Ja/ }).click();
-			await page.getByRole('button', { name: 'Rückgängig' }).click();
+			await page.getByRole('button', { name: 'Undo', exact: true }).click();
 
 			// The page clock runs past the window: the undo must have cancelled the
 			// write, not merely delayed it, and no real waiting is needed to prove it.
@@ -522,10 +522,10 @@ for (const viewport of [
 				await choices(page).getByRole('button', { name: 'Ja', exact: true }).click();
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			}
-			await expect(page.getByRole('button', { name: 'Rückgängig' })).toHaveCount(2);
+			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(2);
 			await page.screenshot({ path: testInfo.outputPath('undo.png') });
-			await page.getByRole('button', { name: 'Rückgängig' }).last().click();
-			await page.getByRole('button', { name: 'Rückgängig' }).click();
+			await page.getByRole('button', { name: 'Undo', exact: true }).last().click();
+			await page.getByRole('button', { name: 'Undo', exact: true }).click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			expect(writes).toBe(0);
 		});
