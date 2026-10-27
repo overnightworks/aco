@@ -66,6 +66,10 @@ export interface OptionLine {
 	via: RulingVia | null;
 	/** The operator's own answer, verbatim, exactly when `ruling` is `'other'` (ABRD-56). */
 	other: string | null;
+	/** The day the operator sent the open line back to its head (ABRD-62), else null. */
+	returned_on: string | null;
+	/** What the operator asked of the head; null when none or not returned. */
+	returned_note: string | null;
 	/** Bound to the repo it was read under (ABRD-21); opaque to this client. */
 	fingerprint: string;
 }

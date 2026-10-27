@@ -37,6 +37,8 @@ _OPTION_LINE_KEYS = [
     "ruled_on",
     "via",
     "other",
+    "returned_on",
+    "returned_note",
     "fingerprint",
 ]
 _RULE_13_SENTENCE = "line 1 is an option line; --yes, --no and --later rule only a yes/no line"
@@ -89,6 +91,8 @@ def option_line(*, ruling: object = None, **changes: object) -> dict[str, object
         "ruled_on": "2026-10-28" if ruling is not None else None,
         "via": "board" if ruling is not None else None,
         "other": None,
+        "returned_on": None,
+        "returned_note": None,
         "default": None,
         "card_hash": card_hash,
         "stored_card_hash": card_hash if ruling is not None else None,

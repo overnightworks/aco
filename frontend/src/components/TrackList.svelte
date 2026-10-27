@@ -50,7 +50,9 @@
 							onclick={() => onSelect(row.key)}
 						>
 							<StateShape state={row.state} />
-							<span class="label" class:muted={row.state === 'todo'}>{row.label}</span>
+							<span class="label" class:muted={row.state === 'todo' || row.state === 'back'}
+								>{row.label}</span
+							>
 						</button>
 					</li>
 				{/each}

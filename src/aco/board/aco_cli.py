@@ -237,9 +237,11 @@ def _yes_no_line(item: int, title: str, fields: dict[str, object]) -> YesNoLine:
 def _option_line(item: int, title: str, fields: dict[str, object]) -> OptionLine:
     """RUL-13 and RUL-14's card with RUL-15's `via`; the always-null `default`
     and `stored_card_hash` are not read."""
-    _require_keys(item, fields, ("ruling", "ruled_on", "via"))
+    _require_keys(item, fields, ("ruling", "ruled_on", "via", "returned_on", "returned_note"))
     options = _card_options(fields.get("options"))
     letters: tuple[OptionLetter, ...] = tuple(option.letter for option in options)
+    ruling = _option_ruling(fields, letters)
+    returned_on, returned_note = _returned_to_head(fields, is_open=ruling is None)
     recommended = _letter(fields, "recommended", letters)
     return OptionLine(
         item=item,
@@ -256,9 +258,11 @@ def _option_line(item: int, title: str, fields: dict[str, object]) -> OptionLine
         recommended=recommended,
         reason=_required(fields, "reason", str),
         options=options,
-        ruling=_option_ruling(fields, letters),
+        ruling=ruling,
         ruled_on=_optional_date(fields, "ruled_on"),
         via=_optional_member(fields, "via", RulingVia, "board, chat or default"),
+        returned_on=returned_on,
+        returned_note=returned_note,
         card_hash=_required(fields, "card_hash", str),
     )
 
@@ -274,6 +278,21 @@ def _option_ruling(
     if answer is not None:
         raise _unreadable("other belongs only to a line ruled other")
     return None if fields["ruling"] is None else _letter(fields, "ruling", letters)
+
+
+def _returned_to_head(
+    fields: dict[str, object], *, is_open: bool
+) -> tuple[date | None, str | None]:
+    """BODY-93's grammar: a note needs its date, and only an open line is returned."""
+    returned_on = _optional_date(fields, "returned_on")
+    returned_note = _optional_text(fields, "returned_note")
+    if returned_on is None and returned_note is not None:
+        raise _unreadable("returned_note needs returned_on beside it")
+    if returned_on is not None and not is_open:
+        raise _unreadable("returned_on belongs only to an open line")
+    if returned_note is not None and not returned_note.strip():
+        raise _unreadable("returned_note is blank")
+    return returned_on, returned_note
 
 
 def _letter(fields: dict[str, object], key: str, letters: tuple[OptionLetter, ...]) -> OptionLetter:
