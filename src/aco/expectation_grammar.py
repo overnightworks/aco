@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import NamedTuple, cast
 
 from . import protocol
+from .card_rules import card_rule_defects
 
 
 class FieldDefect(NamedTuple):
@@ -569,9 +570,19 @@ def _option_line_picture_defects(prefix: str, entry: dict[str, object]) -> list[
     return defects
 
 
+def _card_rule_field_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
+    """Line 14's rules for the words of an open or returned card; a ruled card is exempt."""
+    if "ruling" in entry:
+        return []
+    return [
+        FieldDefect(*defect)
+        for defect in card_rule_defects(prefix, entry, _option_tables(entry[_OPTION_TABLES]))
+    ]
+
+
 def _option_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
     """An option line's defects after `text`, in the fixed order: decided
-    state, line keys, options, pictures, picture budget, unknown keys."""
+    state, line keys, options, pictures, picture budget, unknown keys, card rules."""
     options = entry[_OPTION_TABLES]
     letters = _present_letters(options)
     return [
@@ -587,6 +598,7 @@ def _option_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDef
                 f"{prefix}.{suffix}", sorted(set(option) - set(OPTION_KEYS))
             )
         ),
+        *_card_rule_field_defects(prefix, entry),
     ]
 
 
