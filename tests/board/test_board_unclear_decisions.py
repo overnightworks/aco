@@ -12,9 +12,7 @@ from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
     line,
-    listed_option_line,
     option_line,
-    post_rule_for_listed,
     row,
 )
 from cli_fixtures import run_cli
@@ -29,15 +27,26 @@ _NOTE = "Please show the jump on mobile too."
 
 @pytest.fixture
 def listed(repository: FakeAcoRepository, board: BoardClient) -> dict[str, Any]:
+    """The post payload naming item 12's first listed line, without a decision."""
     repository.set_rulings(row(12, "Song jump", option_line()))
-    return listed_option_line(board)
+    shown = _first_listed_line(board)
+    return {
+        "repo": board.repo,
+        "item": 12,
+        "line": shown["index"],
+        "fingerprint": shown["fingerprint"],
+    }
+
+
+def _first_listed_line(board: BoardClient) -> dict[str, Any]:
+    return board.get_board_json().json()["repos"][0]["items"][0]["lines"][0]
 
 
 def test_an_unclear_post_leaves_the_line_open_with_its_head_and_the_trimmed_note(
     repository: FakeAcoRepository, board: BoardClient, listed: dict[str, Any]
 ) -> None:
     """ABRD-70."""
-    answer = post_rule_for_listed(board, listed, unclear=True, note=f"  {_NOTE}\n")
+    answer = board.post_rule({**listed, "unclear": True, "note": f"  {_NOTE}\n"})
 
     assert answer.json() == {"status": "ruled", "message": None}
     stored = repository.stored_line(12, 1)
@@ -54,7 +63,7 @@ def test_an_unclear_post_runs_aco_rule_with_the_note_as_one_argument_and_no_via(
 ) -> None:
     """ABRD-70."""
     fields: dict[str, object] = {} if note is None else {"note": note}
-    post_rule_for_listed(board, listed, unclear=True, **fields)
+    board.post_rule({**listed, "unclear": True, **fields})
 
     sent_note = [] if note is None or not note.strip() else [f"--note={note.strip()}"]
     assert repository.rule_calls() == [
@@ -75,7 +84,7 @@ def test_an_unclear_note_of_exactly_the_bound_after_trimming_is_accepted(
     repository: FakeAcoRepository, board: BoardClient, listed: dict[str, Any]
 ) -> None:
     """ABRD-05, ABRD-42."""
-    answer = post_rule_for_listed(board, listed, unclear=True, note=f" {'x' * 280} ")
+    answer = board.post_rule({**listed, "unclear": True, "note": f" {'x' * 280} "})
 
     assert answer.json() == {"status": "ruled", "message": None}
     assert repository.stored_line(12, 1)["returned_note"] == "x" * 280
@@ -106,7 +115,7 @@ def test_an_unclear_post_breaking_the_shape_or_the_bound_is_refused_before_any_a
     """ABRD-05, ABRD-42, ABRD-70."""
     calls_before = repository.calls()
 
-    answer = post_rule_for_listed(board, listed, **fields)
+    answer = board.post_rule({**listed, **fields})
 
     assert (answer.status, answer.json()) == (400, {"error": "bad request: decision"})
     assert repository.calls() == calls_before
@@ -124,7 +133,7 @@ def test_a_null_unclear_names_nothing_so_the_option_beside_it_decides(
     fields: dict[str, object],
 ) -> None:
     """ABRD-42."""
-    answer = post_rule_for_listed(board, listed, option="A", **fields)
+    answer = board.post_rule({**listed, "option": "A", **fields})
 
     assert answer.json() == {"status": "ruled", "message": None}
     assert repository.stored_line(12, 1)["ruling"] == "A"
@@ -136,7 +145,7 @@ def test_an_unclear_post_after_the_card_changed_is_refused_without_a_write(
     """ABRD-02, ABRD-70."""
     repository.set_rulings(row(12, "Song jump", option_line(card_hash="sha256:other")))
 
-    answer = post_rule_for_listed(board, listed, unclear=True)
+    answer = board.post_rule({**listed, "unclear": True})
 
     assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
     assert repository.rule_calls() == []
@@ -148,7 +157,7 @@ def test_an_unclear_post_for_no_option_line_is_refused_as_changed(
 ) -> None:
     """ABRD-40."""
     repository.set_rulings(row(12, "Song jump", line(1, "Guests?", default="yes")))
-    yes_no = listed_option_line(board)
+    yes_no = _first_listed_line(board)
 
     answer = board.post_rule(
         {
@@ -168,8 +177,8 @@ def test_a_second_unclear_is_answered_failed_with_the_sentence_aco_gave(
     board: BoardClient, listed: dict[str, Any]
 ) -> None:
     """ABRD-70, E-ABRD-14."""
-    post_rule_for_listed(board, listed, unclear=True)
-    again = post_rule_for_listed(board, listed, unclear=True)
+    board.post_rule({**listed, "unclear": True})
+    again = board.post_rule({**listed, "unclear": True})
 
     assert (again.json()["status"], str(again.json()["message"])) == (
         "failed",
@@ -195,7 +204,7 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
     repository.set_rulings(
         row(7, "Karte", option_line(index=2, card_hash=GOLDEN_CARD_HASH, topic="Sprung"))
     )
-    shown = listed_option_line(board)
+    shown = _first_listed_line(board)
     board.post_rule(
         {
             "repo": board.repo,

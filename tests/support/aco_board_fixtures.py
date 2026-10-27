@@ -25,7 +25,6 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from email.message import Message
 from pathlib import Path
-from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -551,21 +550,3 @@ def option_line(*, ruling: object = None, **changes: object) -> dict[str, object
         "options": [picture_option(), same_as_today_option()],
         **changes,
     }
-
-
-def listed_option_line(board: BoardClient) -> dict[str, Any]:
-    """The first line of the first item the board lists."""
-    [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
-    return repo["items"][0]["lines"][0]
-
-
-def post_rule_for_listed(board: BoardClient, listed: dict[str, Any], **fields: object) -> Response:
-    """Post item 12's listed line to the board with `fields` as the decision."""
-    payload = {
-        "repo": board.repo,
-        "item": 12,
-        "line": listed["index"],
-        "fingerprint": listed["fingerprint"],
-        **fields,
-    }
-    return board.post_rule(payload)
