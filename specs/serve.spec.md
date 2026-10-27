@@ -51,7 +51,7 @@ resolved directory's name.
 - [ ] [ABRD-39] An `option` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --option <X> --via board --card-hash=<H> --json`, `<H>` that line's `card_hash` just read (E-ABRD-12).
 - [ ] [ABRD-40] An `option` or `other` posted for a line that is no option line, or for no line at all, is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run: no card hash to name.
 - [ ] [ABRD-41] An `aco rule` refusal `card_changed` (RULE-17) answers `failed` with `Diese Zeile hat sich geändert, bitte neu laden`; every other answer keeps its mapping, `already_ruled` (RULE-04) included.
-- [ ] [ABRD-42] A post not naming exactly one of `outcome`, `option`, `other` (`null` names none), an `option` not `A`-`D`, or a note beside `other` or non-blank beside `option` answers 400 `bad request: decision`.
+- [ ] [ABRD-42] A post not naming exactly one of `outcome`, `option`, `other` (an absent key or a `null` `other` names none; carrying both `outcome` and `option` keys is refused whatever their values), an `option` not `A`-`D`, or a note beside `other` or non-blank beside `option` answers 400 `bad request: decision`.
 
 ## Reading the lines
 
