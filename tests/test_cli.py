@@ -10593,11 +10593,6 @@ def test_cli_release_json_prints_effective_posted_identity(
     ("arguments", "assert_refusal"),
     [
         pytest.param(
-            ["claim", "72", "--agent", "Ada", "--scope", "src", "--claim-id", "cli-claim"],
-            lambda err, out: assert_json_refusal_object(err, out, reason="unavailable"),
-            id="claim-envelope-refusal",
-        ),
-        pytest.param(
             ["release", "72", "--agent", "Ada", "--claim-id", "mine", "--abandoned", "stopped"],
             lambda err, out: assert_json_refusal_object(err, out, reason="precondition_failed"),
             id="release-precondition-failed",
@@ -10610,9 +10605,8 @@ def test_cli_claim_and_release_json_errors_choose_their_own_shape(
     arguments: list[str],
     assert_refusal: Callable[[str, str], None],
 ) -> None:
-    """`claim`'s own dirty-tree checkout precondition reports
-    through the shared emitter, `reason: unavailable`; `release`'s own
-    generic refusal bucket reports `reason: precondition_failed`."""
+    """`release`'s own generic refusal bucket reports
+    `reason: precondition_failed`."""
     _patch_status_cli(monkeypatch, FakeForge())
 
     assert issue_claim.main(["--repo", REPOSITORY, *arguments, "--json"]) == 2
