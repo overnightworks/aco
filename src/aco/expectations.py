@@ -209,8 +209,12 @@ def _option_ruling(entry: dict[str, object]) -> OptionRuling:
     )
 
 
+def _with_its_head(entry: dict[str, object]) -> bool:
+    return RETURNED_ON in entry
+
+
 def _returned_to_head(entry: dict[str, object]) -> ReturnedToHead | None:
-    if RETURNED_ON not in entry:
+    if not _with_its_head(entry):
         return None
     return ReturnedToHead(
         cast(date, entry[RETURNED_ON]), cast(str | None, entry.get(RETURNED_NOTE))
@@ -463,7 +467,7 @@ def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> 
         ruling, own_answer, flag = answer, {}, _OPTION_FLAG
 
     def decide(entry: dict[str, object]) -> dict[str, object]:
-        if RETURNED_ON in entry and choice.via is RulingVia.DEFAULT:
+        if _with_its_head(entry) and choice.via is RulingVia.DEFAULT:
             raise ExpectationWithHeadError(
                 f"line {index} was answered Unclear; --via default records no answer"
             )
@@ -488,7 +492,7 @@ def return_to_head(body: str, index: int, request: HeadReturn, returned_on: date
     card, before any write."""
 
     def decide(entry: dict[str, object]) -> dict[str, object]:
-        if RETURNED_ON in entry:
+        if _with_its_head(entry):
             raise ExpectationWithHeadError(
                 f"line {index} is already with its head; it comes back once revised"
             )

@@ -3,10 +3,9 @@
 `aco rule ITEM --line N (--yes|--no|--later) [--note TEXT]`, or for an option
 line `aco rule ITEM --line N --option X --via board|chat|default --card-hash HASH` or
 `aco rule ITEM --line N --other TEXT --via board|chat --card-hash HASH`, or
-`aco rule ITEM --line N --unclear [--note TEXT] --card-hash HASH`, which sends an
-open option line back to its head instead of ruling it:
-moves one proposed `[[expectation]]` line to ruled, transcribing the operator's own
-word (`aco ask` proposes; this command decides). `--via` says how the
+`aco rule ITEM --line N --unclear [--note TEXT] --card-hash HASH`, moves one
+proposed `[[expectation]]` line to ruled (or, with `--unclear`, sends an open
+option line back to its head), transcribing the operator's own word (`aco ask` proposes; this command decides). `--via` says how the
 decision reached aco: `board` the operator clicked, `chat` a head transcribes
 his word, `default` he left the card unanswered and its recommendation stands.
 `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This CLI invocation is the
@@ -45,7 +44,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 | a line with its head, `--via default` | RULE-27 | RULE-09 | — |
 | `--note` blank beside `--unclear` | RULE-26 | RULE-09 | — |
 | `--other` blank | RULE-21 | RULE-09 | — |
-| a flag combination of `--option`, `--other`, `--unclear`, `--yes`, `--no` or `--later` the table below refuses | RULE-15 | RULE-09 | — |
+| a flag combination of `--option`, `--other`, `--unclear`, `--yes`, `--no` or `--later` the list under RULE-15 refuses | RULE-15 | RULE-09 | — |
 | line `N` is a yes/no line, `--option`, `--other` or `--unclear` | RULE-16 | RULE-09 | — |
 | its card changed since it was shown | RULE-17 | RULE-09 | — |
 | `--option` names a letter not on the card | RULE-18 | RULE-09 | — |

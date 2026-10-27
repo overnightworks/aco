@@ -394,12 +394,19 @@ class TestRuleUnclear:
         checked = run_cli(["check", "-"], capsys, stdin=client.item_bodies[7])
         assert (checked.status, checked.stdout) == (0, "body ok\n")
 
+    @pytest.mark.parametrize(
+        "shown",
+        [
+            pytest.param(GOLDEN_CARD_HASH, id="RULE-27"),
+            pytest.param(STALE_CARD_HASH, id="RULE-27-before-RULE-17"),
+        ],
+    )
     def test_via_default_records_no_answer_on_a_line_with_its_head(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], shown: str
     ) -> None:
         """Spec: RULE-27, RULE-09 -- an answered card is not a card left unanswered."""
         client = serve_item(monkeypatch, item_body(returned_today()))
-        command = ["rule", "7", *decide("A", "default")]
+        command = ["rule", "7", *decide("A", "default", shown)]
         text = run_cli(command, capsys)
         wire = run_cli([*command, "--json"], capsys)
         assert (text.status, text.stderr) == (2, f"ERROR: {ANSWERED_UNCLEAR}\n")
