@@ -184,8 +184,10 @@ def test_a_writer_finding_a_diverged_stamp_refuses_as_uncertain_with_the_lineage
     def stamp_a_stranger() -> None:
         lineage_stamp.write(store._stamp_directory(worktree), stranger)
 
+    transport = _AfterPushTransport(stamp_a_stranger)
+
     with pytest.raises(protocol.UncertainWriteError) as refusal:
-        _write_item(worktree, bare_remote, "aco-000001", _AfterPushTransport(stamp_a_stranger))
+        _write_item(worktree, bare_remote, "aco-000001", transport)
 
     landed = state_ref_tip(bare_remote)
     assert str(refusal.value).startswith(f"{store.STATE_REF} moved from {stranger} to {landed}")
