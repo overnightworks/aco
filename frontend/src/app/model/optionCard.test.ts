@@ -11,6 +11,7 @@ import {
 	isStuck,
 	KIND_LABEL,
 	nextOpenOption,
+	pendingOtherText,
 	type OpenOption,
 	resultAltText,
 	ROW_LABEL,
@@ -76,6 +77,10 @@ describe('the chosen option', () => {
 	test('does not exist while the line is open', () => {
 		expect(chosenOption(optionLine())).toBeUndefined();
 	});
+});
+
+test('[ABRD-67] the strip text of an Other answer names Other and the topic', () => {
+	expect(pendingOtherText(optionLine({ topic: 'Jump' }))).toBe('Other · Jump');
 });
 
 test('only a line carrying form options is an option line', () => {

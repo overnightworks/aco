@@ -12,6 +12,7 @@ import type {
 	ExpectationLine,
 	OptionDecisionRequest,
 	OptionLine,
+	OtherDecisionRequest,
 	Outcome,
 	YesNoDecisionRequest,
 	YesNoLine
@@ -64,6 +65,16 @@ export function optionDecisionRequest(
 	option: CardOption
 ): OptionDecisionRequest {
 	return { repo, item, line: line.index, fingerprint: line.fingerprint, option: option.letter };
+}
+
+/** The operator's own answer to the option card as shown; `fingerprint` is the card's. */
+export function otherDecisionRequest(
+	repo: string,
+	item: number,
+	line: OptionLine,
+	answer: string
+): OtherDecisionRequest {
+	return { repo, item, line: line.index, fingerprint: line.fingerprint, other: answer.trim() };
 }
 
 /** A blank note, trimmed, is no note (mirrors `aco.board.api._note`). */

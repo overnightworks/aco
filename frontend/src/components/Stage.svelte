@@ -61,6 +61,14 @@
 					onDecide={(shownLine, option) =>
 						decisions.decideOption(repoName, itemNumber, shownLine, option)}
 					onReload={() => decisions.reloadAfterBanner(optionKey)}
+					other={{
+						panel: decisions.otherPanel(optionKey),
+						draft: decisions.draft(optionKey),
+						onOpen: (shown) => decisions.openOtherPanel(optionKey, shown),
+						onClose: () => decisions.closeOtherPanel(optionKey),
+						onDraft: (text) => decisions.setDraft(optionKey, text),
+						onSend: (shown, text) => decisions.decideOther(repoName, itemNumber, shown, text)
+					}}
 				/>
 			</OptionCard>
 		{/key}

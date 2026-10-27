@@ -115,7 +115,17 @@ export interface OptionDecisionRequest {
 	option: OptionLetter;
 }
 
-export type DecisionRequest = YesNoDecisionRequest | OptionDecisionRequest;
+/** The same body for the operator's own answer to an option card: the trimmed
+ * text instead of a letter (ABRD-64). */
+export interface OtherDecisionRequest {
+	repo: string;
+	item: number;
+	line: number;
+	fingerprint: string;
+	other: string;
+}
+
+export type DecisionRequest = YesNoDecisionRequest | OptionDecisionRequest | OtherDecisionRequest;
 
 export interface DecisionResult {
 	/** `aco.board.ports.DecisionStatus`'s three values, the only ones `POST
