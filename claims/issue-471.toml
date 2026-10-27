@@ -1,8 +1,0 @@
-claim_id = "056069195f9c4487aec2fa602ab49461"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "75310fe6f80d26afd0bb0e073e31c47f2e29e129"
-branch = "claude/issue-471-board-with-head"
-scope = ["docs/board/README.md", "frontend/e2e/rulingsFixture.ts", "frontend/e2e/withHead.spec.ts", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/optionCard.test.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/components/CardFrame.svelte", "frontend/src/components/StateShape.svelte", "frontend/src/components/TrackList.svelte", "frontend/src/components/TrackList.test.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/ports.py", "src/aco/board/static", "tests/board/test_board_option_lines.py", "tests/board/test_board_returned_lines.py"]
-opened_commit = "aafb001e09641d547111da63e2a497d25783d8c6"
-whole_reason = "One wire field pair and its one reader: the board's port, parser and API, the frontend state, shape, row and meta, their fixtures, spec, README and the rebuilt static change together, or the field has no caller."
