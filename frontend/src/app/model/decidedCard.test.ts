@@ -56,6 +56,12 @@ describe('decidedAnswer', () => {
 	])('[ABRD-37] a yes/no line ruled %s reads %s', (ruling, expected) => {
 		expect(decidedAnswer(line({ ruling }))).toBe(expected);
 	});
+
+	test('[ABRD-57] an option line ruled other reads Other and its answer in quotes', () => {
+		const ruled = optionLine({ ruling: 'other', other: 'Nur am Desktop.', via: 'chat' });
+
+		expect(decidedAnswer(ruled)).toBe('Other: „Nur am Desktop.“');
+	});
 });
 
 describe('bindingSentences', () => {
@@ -81,6 +87,12 @@ describe('bindingSentences', () => {
 		});
 
 		expect(bindingSentences(ruled)).toEqual(expected);
+	});
+
+	test('[ABRD-57] an option line ruled other binds its answer alone', () => {
+		const ruled = optionLine({ text: 'Rule 10.', ruling: 'other', other: 'Nur am Desktop.' });
+
+		expect(bindingSentences(ruled)).toEqual(['Nur am Desktop.']);
 	});
 
 	test('[ABRD-37] a yes/no line binds its own sentence', () => {

@@ -60,10 +60,12 @@ export interface OptionLine {
 	recommended: OptionLetter;
 	reason: string;
 	options: CardOption[];
-	ruling: OptionLetter | null;
+	ruling: OptionLetter | 'other' | null;
 	ruled_on: string | null;
 	/** Who decided and how (ABRD-53), as aco stored it; null while open. */
 	via: RulingVia | null;
+	/** The operator's own answer, verbatim, exactly when `ruling` is `'other'` (ABRD-56). */
+	other: string | null;
 	/** Bound to the repo it was read under (ABRD-21); opaque to this client. */
 	fingerprint: string;
 }
