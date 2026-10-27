@@ -195,7 +195,7 @@ for (const viewport of [
 			await expect(page.getByText('Notiz', { exact: true })).toHaveCount(0);
 			await expect(card.getByRole('group', { name: 'Decide' }).getByRole('button')).toHaveCount(2);
 			await expect(card.getByRole('button', { name: 'Enlarge picture' })).toHaveCount(1);
-			const disclosures = options.locator('button[aria-expanded]');
+			const disclosures = card.locator('button[aria-expanded]');
 			await expect(disclosures).toHaveCount(2);
 			await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'false');
 			await expect(disclosures.nth(1)).toHaveAttribute('aria-expanded', 'false');
