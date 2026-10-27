@@ -1,0 +1,8 @@
+claim_id = "5501b2435aeb490e8f0354208b3c75d1"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "3be1e40b8d87cd5c1ab6b0f0645d49025baf23e8"
+branch = "claude/issue-316-container-child-list"
+scope = ["quality/baseline.toml", "specs/board.spec.md", "specs/next.spec.md", "src/aco/board_read.py", "src/aco/workboard.py", "tests/board_fixtures.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_container_child_list.py"]
+opened_commit = "fc51b35ed7fa695b4a3d1f9b1b4bd82e59515a44"
+whole_reason = "One fact, one source: the board takes a container's child counts and open children from the sub-issue list and drops the counter refusal, with its two specs, one new test module, the counter-pinned fixtures it re-seeds and the size baseline."
