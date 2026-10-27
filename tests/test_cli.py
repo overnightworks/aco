@@ -990,6 +990,12 @@ _EMPTY_PARALLEL_JSON: dict[str, object] = {
     "candidates": [],
     "scope_unknown": [],
 }
+_NOTHING_NAMED_JSON: dict[str, object] = {
+    "close": [],
+    "waiting_on_operator": [],
+    "ideas": [],
+    "with_head": [],
+}
 
 # Five free items -- Beta and Gamma name the same
 # path (the "two overlapping each other" pair), Delta names no scope at
@@ -1063,9 +1069,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "ruling_landings": None,
                 "ruling_old": None,
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-                "close": [],
-                "waiting_on_operator": [],
-                "ideas": [],
+                **_NOTHING_NAMED_JSON,
             },
             id="emits_the_highest_scored_actionable_item_as_json",
         ),
@@ -1133,9 +1137,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "recovery": [],
                 "skipped": [],
                 "parallel": _EMPTY_PARALLEL_JSON,
-                "close": [],
-                "waiting_on_operator": [],
-                "ideas": [],
+                **_NOTHING_NAMED_JSON,
             },
             id="emits_nothing_actionable_on_a_fully_empty_board",
         ),
@@ -1175,9 +1177,7 @@ _PARALLEL_LIVE_CLAIMS = (
                     "candidates": [{"number": 51, "scope": ["src/shared.py"]}],
                     "scope_unknown": [53],
                 },
-                "close": [],
-                "waiting_on_operator": [],
-                "ideas": [],
+                **_NOTHING_NAMED_JSON,
             },
             id="parallel_set_json_carries_full_scopes_for_every_candidate",
         ),
@@ -1215,6 +1215,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "close": [],
                 "waiting_on_operator": [230],
                 "ideas": [],
+                "with_head": [],
             },
             id="json_lists_the_item_waiting_on_the_operator_apart_from_skipped",
         ),
@@ -1253,6 +1254,7 @@ _PARALLEL_LIVE_CLAIMS = (
                 "close": [443],
                 "waiting_on_operator": [441, 442],
                 "ideas": [],
+                "with_head": [],
             },
             id="json_lists_operator_held_containers_as_waiting_and_a_closable_one_under_close",
         ),
@@ -1302,7 +1304,8 @@ def test_next_json_pins_the_raw_envelope_text_for_a_work_item_success(
         '{"ok": true, "reason": "work_item", "recovery": [], '
         '"skipped": [{"number": 12, "reason": "blocked by #11"}], '
         '"parallel": {"first_scope_unknown": true, "candidates": [], "scope_unknown": []}, '
-        '"close": [], "waiting_on_operator": [], "ideas": [], "number": 11, "score": 10, '
+        '"close": [], "waiting_on_operator": [], "ideas": [], "with_head": [], '
+        '"number": 11, "score": 10, '
         '"title": "Top work", "next": "Claim #11.", '
         '"command": "aco claim 11 --scope <paths>", "ruling_landings": null, '
         '"ruling_old": null}\n'
@@ -1432,9 +1435,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
             {"number": 13, "reason": "claimed"},
         ],
         "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-        "close": [],
-        "waiting_on_operator": [],
-        "ideas": [],
+        **_NOTHING_NAMED_JSON,
     }
 
 
@@ -7120,9 +7121,7 @@ def test_next_keeps_an_unlabelled_projectionless_item_skipped_with_an_active_ide
         "recovery": [],
         "skipped": [{"number": 10, "reason": "body incomplete: Now, Next, Done when"}],
         "parallel": _EMPTY_PARALLEL_JSON,
-        "close": [],
-        "waiting_on_operator": [],
-        "ideas": [],
+        **_NOTHING_NAMED_JSON,
     }
 
 

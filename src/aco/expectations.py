@@ -275,6 +275,16 @@ def expectation_lines(
     )
 
 
+def returned_line_indexes(body: str, *, storage: Storage = Storage.GITHUB) -> tuple[int, ...]:
+    """The indexes of `body`'s option lines sent back to their head, in
+    block order -- empty for a body `expectation_lines` cannot read."""
+    return tuple(
+        line.index
+        for line in expectation_lines(body, storage=storage)
+        if isinstance(line, OptionLine) and line.returned is not None
+    )
+
+
 def expectation_line_state(line: ExpectationLine) -> str:
     """`open`, `with head <returned_on>` or `ruled <ruling> <ruled_on>` -- the
     one state text `rulings`' human form prints; `--json` carries
