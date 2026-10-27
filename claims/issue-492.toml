@@ -1,8 +1,0 @@
-claim_id = "9ac92e4e3aef438f9127018f432647c9"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "767aad708825515ab3c20b0835e7d90b63ed0d9e"
-branch = "claude/issue-492-board-answers-returned"
-scope = ["specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/ports.py", "tests/board/test_board_other_decisions.py", "tests/board/test_board_unclear_decisions.py"]
-opened_commit = "d5be0e4b9f6e12de2b2ede6a183745f17976ef57"
-whole_reason = "One answer word end to end: the status value, the adapter reading aco's reason, the spec criterion and example and the tests that pin the old word for Unclear change together, or the spec and the wire disagree."
