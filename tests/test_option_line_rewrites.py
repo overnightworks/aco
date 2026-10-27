@@ -14,7 +14,7 @@ import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, container_issue
 from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-from option_cards import assert_rewritten_alike, card, ruled_card
+from option_cards import assert_rewritten_alike, card, decide, ruled_card
 
 from aco import body, cmd_item, cmd_rescope, forge, items, session, state_board
 
@@ -90,13 +90,18 @@ def test_rule_keeps_option_lines(
     capsys: pytest.CaptureFixture[str],
     newline: str,
 ) -> None:
-    """Spec: BODY-88, RULE-12 -- `rule` on a yes/no line rewrites only that line."""
+    """Spec: BODY-88, RULE-12 -- `rule` on an option line rewrites only that line."""
     raw = item_body("mixed", newline=newline)
     reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", raw)
     client = serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
-    ruled = run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
+    ruled = run_cli(["rule", "7", *decide("A", "chat", line=2)], capsys)
     assert ruled.status == 0, ruled.stderr
-    assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
+    written = client.item_bodies[7]
+    expectations_before = body.block_expectation_dicts(body.locate_block(raw).data)
+    expectations_after = body.block_expectation_dicts(body.locate_block(written).data)
+    assert expectations_after[2:] == expectations_before[2:]
+    assert expectations_after[0] == expectations_before[0]
+    assert (expectations_after[1]["ruling"], ("\r\n" in written) is ("\r\n" in raw)) == ("A", True)
 
 
 @pytest.mark.usefixtures(github_world.__name__)

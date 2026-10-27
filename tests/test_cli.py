@@ -99,6 +99,7 @@ from github_fixtures import (
     landing_pull_request,
     landing_readiness,
 )
+from option_cards import card, decide
 from store_fixtures import (
     RaceOnceTransport,
     blob,
@@ -16352,9 +16353,8 @@ def _check_stdin_command(_monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _C
 
 
 def _rule_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "Ship it?"\ndefault = "later"\n'
-    _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(toml_text))
-    argv = ["--repo", REPOSITORY, "rule", str(RULE_ITEM), "--line", "1", "--yes"]
+    _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML + card()))
+    argv = ["--repo", REPOSITORY, "rule", str(RULE_ITEM), *decide("A", "chat", line=1)]
     return _read_once(argv, toplevel=tmp_path, observes=False)
 
 

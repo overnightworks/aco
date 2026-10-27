@@ -28,7 +28,7 @@
 "tests/board/test_board_api.py" = 1059
 "tests/support/cli_fixtures.py" = 944
 "tests/support/github_fixtures.py" = 835
-"tests/test_board.py" = 4187
+"tests/test_board.py" = 4111
 "tests/test_checkout.py" = 2046
 "tests/test_cli.py" = 16871
 "tests/test_cmd_adopt.py" = 1650

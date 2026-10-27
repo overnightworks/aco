@@ -18,7 +18,6 @@ from option_cards import (
     STALE_CARD_HASH,
     TODAY,
     E,
-    assert_rewritten_alike,
     card,
     card_body,
     card_head,
@@ -26,6 +25,7 @@ from option_cards import (
     decide,
     item_body,
     malformed,
+    option_entries,
     other_arguments,
     returned_today,
     serve_item,
@@ -219,11 +219,11 @@ class TestReturnedLineRewrites:
         newline: str,
     ) -> None:
         """Spec: BODY-88 -- `rule` on another line keeps a returned line."""
-        raw = item_body(returned_today(), newline=newline)
+        raw = item_body(returned_today(), yes_no_line=card(), newline=newline)
         reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", raw)
         client = serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
-        ruled = run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
+        ruled = run_cli(["rule", "7", *decide("A", "chat", line=1)], capsys)
         assert ruled.status == 0, ruled.stderr
-        assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
+        assert option_entries(client.item_bodies[7])[1:] == option_entries(raw)[1:]
         kept = line_two(client.item_bodies[7])
         assert (kept["returned_on"], kept["returned_note"]) == (FROZEN_CLI_NOW.date(), NOTE)
