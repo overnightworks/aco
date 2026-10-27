@@ -1,8 +1,0 @@
-claim_id = "2486fabaf0834ae39464fe59f100b4e8"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "2809fec89cef84793a6c90f3f4970a536ad8bf8b"
-branch = "claude/issue-425-canonical-remote-dash"
-scope = ["quality/baseline.toml", "specs/storage-pin.spec.md", "src/aco/workboard.py", "tests/test_board.py", "tests/test_board_config_canonical_remote.py"]
-opened_commit = "3de5ac49e7291cb6455c73040e2fed18fc2f4eb6"
-whole_reason = "One validation rule at its one owner, with its two spec criteria, the canonical_remote test moved out of the ratcheted tests/test_board.py into its own module, and the size baseline."
