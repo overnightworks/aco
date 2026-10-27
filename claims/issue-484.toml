@@ -1,0 +1,8 @@
+claim_id = "411fbe035e01467987630f5ae9fee85f"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "514220e2ad4f8c8ab2ae1fb9e68acae70b1844df"
+branch = "claude/issue-484-quality-v070-pin"
+scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", "frontend/src/app/model/decisionOptionRequest.test.ts", "frontend/src/app/model/optionDecision.test.ts", "quality/baseline.toml", "quality/config.toml", "tests/board/test_board_core.py", "tests/board/test_board_option_lines.py", "tests/board/test_board_returned_lines.py", "tests/board/test_board_server.py", "tests/support/aco_board_fixtures.py", "tests/test_body_option_line_rewrites.py", "tests/test_claim_display_controls.py", "tests/test_cmd_check_option_lines.py", "tests/test_network_guard.py", "tests/test_option_line_rewrites.py", "tests/test_option_lines.py", "tests/test_protocol_claim_display_controls.py"]
+opened_commit = "c8787e0b558a0c1625c8fd8481547bdb28925b54"
+whole_reason = "The pin turns every remaining finding red at once, so the moves, the one declaration and the pin land together or quality / verdict is red."
