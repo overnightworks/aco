@@ -851,16 +851,10 @@ def test_github_adapter_reads_a_failing_status_context() -> None:
     )
 
 
-def test_github_adapter_reads_a_pending_combined_status_aggregate_with_an_empty_names_page() -> (
-    None
-):
-    """The combined-status endpoint's own
-    aggregate `state` decides the verdict, never a per-context
-    reconstruction of it -- a `pending` aggregate with `total_count > 0`
-    still blocks even when its own `statuses` page comes back empty (a
-    context posted after this read, say), named under
-    `EXTERNAL_STATUS_FALLBACK_NAME` rather than read as "no checks" and
-    passed silently."""
+def _raw_status_client(*, summary: str, names_page: str) -> GitHubForge:
+    """A forge whose open pull request has no check runs and whose
+    combined-status endpoint answers the raw `summary` text, then the raw
+    `names_page` text for its paginated names read."""
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = arguments[1]
@@ -871,11 +865,24 @@ def test_github_adapter_reads_a_pending_combined_status_aggregate_with_an_empty_
         if path.startswith(_READINESS_CHECK_RUNS_PATH):
             return ""
         if path == _READINESS_STATUS_PATH:
-            return json.dumps({"state": "pending", "total": 1})
+            return summary
         assert path.startswith(_READINESS_STATUS_PATH)
-        return ""
+        return names_page
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    return GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+
+
+def test_github_adapter_reads_a_pending_combined_status_aggregate_with_an_empty_names_page() -> (
+    None
+):
+    """The combined-status endpoint's own
+    aggregate `state` decides the verdict, never a per-context
+    reconstruction of it -- a `pending` aggregate with `total_count > 0`
+    still blocks even when its own `statuses` page comes back empty (a
+    context posted after this read, say), named under
+    `EXTERNAL_STATUS_FALLBACK_NAME` rather than read as "no checks" and
+    passed silently."""
+    client = _raw_status_client(summary=json.dumps({"state": "pending", "total": 1}), names_page="")
 
     readiness = client.landing_readiness(57)
 
@@ -887,21 +894,10 @@ def test_github_adapter_reads_a_blocking_combined_status_aggregate(aggregate: st
     """A `failure` or `error` aggregate from the combined-status endpoint blocks,
     named from whatever context its own paginated `statuses` does carry and
     read verbatim as the check's conclusion."""
-
-    def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        path = arguments[1]
-        if path == _READINESS_PULL_REQUEST_PATH:
-            return json.dumps(
-                {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": "clean"}
-            )
-        if path.startswith(_READINESS_CHECK_RUNS_PATH):
-            return ""
-        if path == _READINESS_STATUS_PATH:
-            return json.dumps({"state": aggregate, "total": 1})
-        assert path.startswith(_READINESS_STATUS_PATH)
-        return json.dumps({"name": "sonarcloud"})
-
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    client = _raw_status_client(
+        summary=json.dumps({"state": aggregate, "total": 1}),
+        names_page=json.dumps({"name": "sonarcloud"}),
+    )
 
     readiness = client.landing_readiness(57)
 
@@ -924,80 +920,38 @@ def test_github_adapter_reads_a_successful_combined_status_aggregate_as_a_named_
     assert readiness.checks == (forge.CheckRun("sonarcloud", "success"),)
 
 
-def test_github_adapter_landing_rejects_a_malformed_status_summary_shape() -> None:
-    """The combined-status summary read is
-    exactly one JSON value; more than one -- `gh`'s own paginated-array
-    shape, say -- is a malformed summary, not a valid aggregate verdict."""
-    two_values = json.dumps({"state": "success", "total": 0}) + json.dumps(
-        {"state": "success", "total": 0}
-    )
+@pytest.mark.parametrize(
+    ("summary", "names_page", "message"),
+    [
+        pytest.param(
+            json.dumps({"state": "success", "total": 0}) * 2,
+            "",
+            "malformed commit status summary",
+            id="summary-read-is-exactly-one-json-value",
+        ),
+        pytest.param(
+            json.dumps({"state": "success", "total": -1}),
+            "",
+            "malformed commit status summary",
+            id="summary-fields-fail-their-shape-check",
+        ),
+        pytest.param(
+            json.dumps({"state": "failure", "total": 1}),
+            json.dumps({"name": ""}),
+            r"malformed commit status$",
+            id="names-page-entry-has-no-usable-name",
+        ),
+    ],
+)
+def test_github_adapter_landing_rejects_a_malformed_combined_status_read(
+    summary: str, names_page: str, message: str
+) -> None:
+    """A combined-status read that fails its shape check refuses loud, never
+    read as a valid aggregate verdict or silently dropped from the refusal
+    sentence it would otherwise name."""
+    client = _raw_status_client(summary=summary, names_page=names_page)
 
-    def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        path = arguments[1]
-        if path == _READINESS_PULL_REQUEST_PATH:
-            return json.dumps(
-                {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": "clean"}
-            )
-        if path.startswith(_READINESS_CHECK_RUNS_PATH):
-            return ""
-        if path == _READINESS_STATUS_PATH:
-            return two_values
-        assert path.startswith(_READINESS_STATUS_PATH)
-        return ""
-
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
-
-    with pytest.raises(ClaimError, match="malformed commit status summary"):
-        client.landing_readiness(57)
-
-
-def test_github_adapter_landing_rejects_a_malformed_status_summary_fields() -> None:
-    """A combined-status summary whose own
-    `state`/`total` fields fail their own shape check -- a negative `total`,
-    here -- refuses as malformed, the field-level defect beside
-    `test_github_adapter_landing_rejects_a_malformed_status_summary_shape`'s
-    "more than one value" defect."""
-
-    def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        path = arguments[1]
-        if path == _READINESS_PULL_REQUEST_PATH:
-            return json.dumps(
-                {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": "clean"}
-            )
-        if path.startswith(_READINESS_CHECK_RUNS_PATH):
-            return ""
-        if path == _READINESS_STATUS_PATH:
-            return json.dumps({"state": "success", "total": -1})
-        assert path.startswith(_READINESS_STATUS_PATH)
-        return ""
-
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
-
-    with pytest.raises(ClaimError, match="malformed commit status summary"):
-        client.landing_readiness(57)
-
-
-def test_github_adapter_landing_rejects_a_malformed_status_name() -> None:
-    """A combined-status names page entry
-    with no usable `name` field refuses loud, never silently dropped from
-    the refusal sentence it would otherwise name."""
-
-    def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        path = arguments[1]
-        if path == _READINESS_PULL_REQUEST_PATH:
-            return json.dumps(
-                {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": "clean"}
-            )
-        if path.startswith(_READINESS_CHECK_RUNS_PATH):
-            return ""
-        if path == _READINESS_STATUS_PATH:
-            return json.dumps({"state": "failure", "total": 1})
-        assert path.startswith(_READINESS_STATUS_PATH)
-        return json.dumps({"name": ""})
-
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
-
-    with pytest.raises(ClaimError, match=r"malformed commit status$"):
+    with pytest.raises(ClaimError, match=message):
         client.landing_readiness(57)
 
 

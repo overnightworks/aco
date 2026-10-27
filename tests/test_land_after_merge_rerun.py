@@ -267,6 +267,67 @@ def prepare_separate_rerun(
     return str(merge), release
 
 
+def assert_rerun_race_guard(
+    world: SeparateWorld, release: SeparateRelease, *, follow_up_checkout: Path
+) -> None:
+    observed_guard = {
+        "race.publications.after": release.publications,
+        "follow-up.cwd": Path.cwd(),
+        "follow-up.toplevel": Path(checkout.git_output(["rev-parse", "--show-toplevel"])),
+    }
+    expected_guard = {
+        "race.publications.after": world.case.publications,
+        "follow-up.cwd": follow_up_checkout,
+        "follow-up.toplevel": follow_up_checkout,
+    }
+    assert observed_guard == expected_guard
+
+
+def assert_separate_rerun_outcome(
+    world: SeparateWorld,
+    release: SeparateRelease,
+    *,
+    merge: str,
+    before_tip: str | None,
+    land_result: CliRun,
+    land_tip: str | None,
+    follow_up_checkout: Path,
+) -> None:
+    """Assert the race guard, then the land outcome of a rerun in a separate
+    checkout against the world's case."""
+    case = world.case
+    assert_rerun_race_guard(world, release, follow_up_checkout=follow_up_checkout)
+    observed = {
+        "land.exit": land_result.status,
+        "land.stdout": land_result.stdout,
+        "land.stderr": land_result.stderr,
+        "merge.calls": len(world.landing.forge.merge_calls),
+        "closed.items": frozenset(world.landing.forge.closed_issues),
+        "landing.comments": world.landing.forge.landing_comments,
+        "issue.reads": tuple(world.landing.forge.issue_reference_lookups),
+        "claims": separate_claims(world),
+        "state.tip": state_ref_tip(world.landing.remote),
+        "land.state.tip": land_tip,
+        "lane.exists": world.lane.exists(),
+        "lane.branch.exists": case.branch in local_branches(world.original),
+    }
+    expected = {
+        "land.exit": case.land_status,
+        "land.stdout": case.land_stdout,
+        "land.stderr": case.land_stderr.format(merge=merge),
+        "merge.calls": case.merge_calls,
+        "closed.items": case.closed_items,
+        "landing.comments": case.comments,
+        "issue.reads": case.issue_reads,
+        "claims": case.claims,
+        "state.tip": release.tip,
+        "land.state.tip": before_tip,
+        "lane.exists": case.lane_exists,
+        "lane.branch.exists": case.branch_exists,
+    }
+    assert observed == expected
+
+
 class RerunPreparation(Enum):
     FAILED_LAND = "failed-land"
     FORGE_MERGE = "forge-merge"
@@ -597,58 +658,25 @@ class TestLandAfterMergeRerun:
     ) -> None:
         """Spec: E-LANDCMD-18a, LANDCMD-38, REL-26, REL-47, REL-55, REL-59, E-REL-24."""
         world = separate_world
-        case = world.case
         merge, release = prepare_separate_rerun(world, capsys)
         before_tip = release.tip
         land_result = run_cli(["land", "12"], capsys)
         land_tip = state_ref_tip(world.landing.remote)
         release_result = release.run(monkeypatch, capsys)
-        observed_guard = {
-            "race.publications.after": release.publications,
-            "follow-up.cwd": Path.cwd(),
-            "follow-up.toplevel": Path(checkout.git_output(["rev-parse", "--show-toplevel"])),
-        }
-        expected_guard = {
-            "race.publications.after": case.publications,
-            "follow-up.cwd": world.original,
-            "follow-up.toplevel": world.original,
-        }
-        assert observed_guard == expected_guard
-        observed = {
-            "land.exit": land_result.status,
-            "land.stdout": land_result.stdout,
-            "land.stderr": land_result.stderr,
-            "release.exit": release_result.status,
-            "release.stdout": release_result.stdout,
-            "release.stderr": release_result.stderr,
-            "merge.calls": len(world.landing.forge.merge_calls),
-            "closed.items": frozenset(world.landing.forge.closed_issues),
-            "landing.comments": world.landing.forge.landing_comments,
-            "issue.reads": tuple(world.landing.forge.issue_reference_lookups),
-            "claims": separate_claims(world),
-            "state.tip": state_ref_tip(world.landing.remote),
-            "land.state.tip": land_tip,
-            "lane.exists": world.lane.exists(),
-            "lane.branch.exists": case.branch in local_branches(world.original),
-        }
-        expected = {
-            "land.exit": case.land_status,
-            "land.stdout": case.land_stdout,
-            "land.stderr": case.land_stderr.format(merge=merge),
-            "release.exit": case.release_status,
-            "release.stdout": case.release_stdout,
-            "release.stderr": case.release_stderr,
-            "merge.calls": case.merge_calls,
-            "closed.items": case.closed_items,
-            "landing.comments": case.comments,
-            "issue.reads": case.issue_reads,
-            "claims": case.claims,
-            "state.tip": release.tip,
-            "land.state.tip": before_tip,
-            "lane.exists": case.lane_exists,
-            "lane.branch.exists": case.branch_exists,
-        }
-        assert observed == expected
+        assert_separate_rerun_outcome(
+            world,
+            release,
+            merge=merge,
+            before_tip=before_tip,
+            land_result=land_result,
+            land_tip=land_tip,
+            follow_up_checkout=world.original,
+        )
+        assert (release_result.status, release_result.stdout, release_result.stderr) == (
+            world.case.release_status,
+            world.case.release_stdout,
+            world.case.release_stderr,
+        )
 
     @pytest.mark.parametrize(
         "separate_world",
@@ -677,50 +705,18 @@ class TestLandAfterMergeRerun:
     ) -> None:
         """Spec: REL-58. An issue claim prevents an issueless rerun from releasing the lane."""
         world = separate_world
-        case = world.case
         merge, release = prepare_separate_rerun(world, capsys)
         before_tip = release.tip
         result = run_cli(["land", "12"], capsys)
-        observed_guard = {
-            "race.publications.after": release.publications,
-            "follow-up.cwd": Path.cwd(),
-            "follow-up.toplevel": Path(checkout.git_output(["rev-parse", "--show-toplevel"])),
-        }
-        expected_guard = {
-            "race.publications.after": case.publications,
-            "follow-up.cwd": world.landing.clone,
-            "follow-up.toplevel": world.landing.clone,
-        }
-        assert observed_guard == expected_guard
-        observed = {
-            "land.exit": result.status,
-            "land.stdout": result.stdout,
-            "land.stderr": result.stderr,
-            "merge.calls": len(world.landing.forge.merge_calls),
-            "closed.items": frozenset(world.landing.forge.closed_issues),
-            "landing.comments": world.landing.forge.landing_comments,
-            "issue.reads": tuple(world.landing.forge.issue_reference_lookups),
-            "claims": separate_claims(world),
-            "state.tip": state_ref_tip(world.landing.remote),
-            "land.state.tip": state_ref_tip(world.landing.remote),
-            "lane.exists": world.lane.exists(),
-            "lane.branch.exists": case.branch in local_branches(world.original),
-        }
-        expected = {
-            "land.exit": case.land_status,
-            "land.stdout": case.land_stdout,
-            "land.stderr": case.land_stderr.format(merge=merge),
-            "merge.calls": case.merge_calls,
-            "closed.items": case.closed_items,
-            "landing.comments": case.comments,
-            "issue.reads": case.issue_reads,
-            "claims": case.claims,
-            "state.tip": release.tip,
-            "land.state.tip": before_tip,
-            "lane.exists": case.lane_exists,
-            "lane.branch.exists": case.branch_exists,
-        }
-        assert observed == expected
+        assert_separate_rerun_outcome(
+            world,
+            release,
+            merge=merge,
+            before_tip=before_tip,
+            land_result=result,
+            land_tip=state_ref_tip(world.landing.remote),
+            follow_up_checkout=world.landing.clone,
+        )
 
     @pytest.mark.parametrize(
         "world",
