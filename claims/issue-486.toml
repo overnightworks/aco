@@ -3,6 +3,6 @@ agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
 role = "builder"
 base = "fea0e4736fa95c6c82e0b94201d58a0a38599f22"
 branch = "claude/issue-486-board-writes-unclear"
-scope = ["specs/rule.spec.md", "specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/ports.py", "src/aco/cmd_rule.py", "tests/board/test_board_core.py", "tests/board/test_board_server.py", "tests/board/test_board_unclear_decisions.py", "tests/support/aco_board_fixtures.py", "tests/test_cmd_rule.py"]
+scope = ["specs/rule.spec.md", "specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/ports.py", "src/aco/cmd_rule.py", "tests/board/conftest.py", "tests/board/test_board_core.py", "tests/board/test_board_other_decisions.py", "tests/board/test_board_server.py", "tests/board/test_board_unclear_decisions.py", "tests/support/aco_board_fixtures.py", "tests/test_cmd_rule.py"]
 opened_commit = "0e214e7dda30259b59ec9bf558d88053507b03da"
 whole_reason = "One answer path end to end: the board's wire shape, port, argv and fake, its spec criteria and the CLI help that names the flag change together, or the shape has no adapter and the help names a flag the board cannot send."
