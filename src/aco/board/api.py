@@ -19,6 +19,7 @@ from .ports import (
     OPTION_LETTERS,
     OPTIONS_FORM,
     OTHER,
+    UNCLEAR,
     CardOption,
     Decision,
     DecisionResult,
@@ -26,9 +27,11 @@ from .ports import (
     OptionDecision,
     OptionLetter,
     OptionLine,
+    OptionLineDecision,
     OtherAnswer,
     OtherDecision,
     Outcome,
+    UnclearDecision,
 )
 
 JSON_CONTENT_TYPE = "application/json"
@@ -48,7 +51,7 @@ class DecisionRequest:
     """The label of the configured repo this decision belongs to."""
     fingerprint: str
     """The fingerprint of the card as it was shown when the operator chose."""
-    decision: Decision | OptionDecision | OtherDecision
+    decision: Decision | OptionLineDecision
 
 
 def board_json(readings: Sequence[RepoReading]) -> str:
@@ -103,13 +106,14 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
 
 def _decision(
     item: int, line: int, fields: dict[str, object]
-) -> Decision | OptionDecision | OtherDecision | None:
-    """Exactly one of `outcome` (with an optional note), `option` (with none)
-    and `other` (with neither); an absent key and a `null` both name nothing,
-    but a post carrying both `outcome` and `option` keys is refused whatever
-    their values."""
-    if fields.get(OTHER) is not None:
-        return _other_decision(item, line, fields)
+) -> Decision | OptionLineDecision | None:
+    """Exactly one of `outcome` (with an optional note), `option` (with none),
+    `other` (with neither) and `unclear` (with an optional note only); an absent
+    key and a `null` both name nothing, but a post carrying both `outcome` and
+    `option` keys is refused whatever their values."""
+    for key, decide_alone in _ALONE_DECISIONS:
+        if fields.get(key) is not None:
+            return decide_alone(item, line, fields)
     if "outcome" in fields and "option" in fields:
         return None
     outcome, option, note = fields.get("outcome"), fields.get("option"), fields.get("note")
@@ -126,6 +130,15 @@ def _decision(
     return None
 
 
+def _unclear_decision(item: int, line: int, fields: dict[str, object]) -> UnclearDecision | None:
+    """`unclear: true` alone, with at most a note within ABRD-05's bounds."""
+    note = fields.get("note")
+    named_elsewhere = any(fields.get(key) is not None for key in ("outcome", "option", OTHER))
+    if fields[UNCLEAR] is not True or named_elsewhere or not (note is None or _is_note_text(note)):
+        return None
+    return UnclearDecision(item=item, index=line, note=_note(note))
+
+
 def _other_decision(item: int, line: int, fields: dict[str, object]) -> OtherDecision | None:
     """The operator's own words alone: stripped, non-blank and within ABRD-05's bounds."""
     text = fields[OTHER]
@@ -133,6 +146,12 @@ def _other_decision(item: int, line: int, fields: dict[str, object]) -> OtherDec
     if named_elsewhere or not _is_note_text(text) or not text.strip():
         return None
     return OtherDecision(item=item, index=line, text=text.strip())
+
+
+_ALONE_DECISIONS = (
+    (UNCLEAR, _unclear_decision),
+    (OTHER, _other_decision),
+)
 
 
 def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:

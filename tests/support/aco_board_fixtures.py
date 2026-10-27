@@ -57,6 +57,7 @@ for outcome in ("yes", "no", "later"):
     outcomes.add_argument("--" + outcome, dest="ruling", action="store_const", const=outcome)
 outcomes.add_argument("--option", dest="ruling")
 outcomes.add_argument("--other")
+outcomes.add_argument("--unclear", action="store_true")
 rule.add_argument("--via")
 rule.add_argument("--card-hash")
 rule.add_argument("--note")
@@ -66,6 +67,12 @@ if getattr(arguments, "other", None) is not None:
     arguments.ruling = "other"
     if arguments.via != "board" or arguments.card_hash is None or arguments.note is not None:
         parser.error("--other needs --via board and --card-hash, and takes no --note")
+if getattr(arguments, "unclear", False) and (
+    arguments.via is not None
+    or arguments.card_hash is None
+    or (arguments.note is not None and not arguments.note.strip())
+):
+    parser.error("--unclear needs --card-hash and takes no --via and no blank --note")
 
 
 def refuse(reason, message):
@@ -107,6 +114,16 @@ line = next((line for line in row["lines"] if line["index"] == arguments.line), 
 if line is None:
     refuse("line_out_of_range", "line %d out of range: this item has %d expectation line(s)"
            % (arguments.line, len(row["lines"])))
+if getattr(arguments, "unclear", False):
+    if line["returned_on"] is not None:
+        refuse("with_head", "line %d is already with its head; it comes back once revised"
+               % arguments.line)
+    line["returned_on"], line["returned_note"] = "2026-10-03", arguments.note
+    rulings.write_text(json.dumps(rows), encoding="utf-8")
+    print(json.dumps({"ok": True, "reason": "returned", "item": row["number"],
+                      "index": arguments.line, "returned_on": "2026-10-03",
+                      "open": sum(1 for entry in row["lines"] if entry["ruling"] is None)}))
+    sys.exit(0)
 if line["ruling"] is not None:
     refuse("already_ruled",
            "line %d is already ruled; a changed ruling is a new line" % arguments.line)

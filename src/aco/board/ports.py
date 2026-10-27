@@ -32,6 +32,7 @@ class RulingVia(StrEnum):
 
 
 OTHER = "other"
+UNCLEAR = "unclear"
 """Both the `ruling` value and the key that carries the operator's own answer
 (RUL-16); the board keeps its own copy and reads aco only through its command
 line."""
@@ -181,6 +182,18 @@ class OtherDecision:
     text: str
 
 
+@dataclass(frozen=True)
+class UnclearDecision:
+    """An option line sent back to its head; nothing is decided."""
+
+    item: int
+    index: int
+    note: str | None
+
+
+OptionLineDecision = OptionDecision | OtherDecision | UnclearDecision
+
+
 class DecisionStatus(StrEnum):
     RULED = "ruled"
     ALREADY_RULED = "already_ruled"
@@ -216,8 +229,8 @@ class DecisionPort(Protocol):
         ...
 
     def rule_option(
-        self, decision: OptionDecision | OtherDecision, card_hash: str
+        self, decision: OptionLineDecision, card_hash: str
     ) -> DecisionResult | CardChanged:
-        """Write one option or Other decision for the card `card_hash` names; the source
-        compares that hash again at its write and refuses a changed card."""
+        """Write one option, Other or Unclear decision for the card `card_hash` names; the
+        source compares that hash again at its write and refuses a changed card."""
         ...

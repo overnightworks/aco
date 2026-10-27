@@ -31,13 +31,14 @@ from .ports import (
     DecisionSourceUnavailableError,
     DecisionStatus,
     ExpectationLine,
-    OptionDecision,
     OptionLetter,
     OptionLine,
+    OptionLineDecision,
     OtherAnswer,
     OtherDecision,
     Outcome,
     RulingVia,
+    UnclearDecision,
     YesNoLine,
 )
 
@@ -65,11 +66,19 @@ class _RuleAnswer:
     card_changed: bool
 
 
-def _answer_arguments(decision: OptionDecision | OtherDecision) -> list[str]:
+def _answer_arguments(decision: OptionLineDecision) -> list[str]:
+    """The answer flags; an answer also says `--via board`, an Unclear decides nothing."""
+    if isinstance(decision, UnclearDecision):
+        # One argument: a note starting with "-" would otherwise read as an option.
+        note = [] if decision.note is None else [f"--note={decision.note}"]
+        return ["--unclear", *note]
+    # The only `--via` the board writes: the cooperative path, never `chat` or
+    # `default`, which belong to the operator's other writers.
+    via = ["--via", RulingVia.BOARD]
     if isinstance(decision, OtherDecision):
         # One argument: an answer starting with "-" would otherwise read as an option.
-        return [f"--other={decision.text}"]
-    return ["--option", decision.letter]
+        return [f"--other={decision.text}", *via]
+    return ["--option", decision.letter, *via]
 
 
 @dataclass(frozen=True)
@@ -100,7 +109,7 @@ class AcoCli:
         return self._write(arguments).result
 
     def rule_option(
-        self, decision: OptionDecision | OtherDecision, card_hash: str
+        self, decision: OptionLineDecision, card_hash: str
     ) -> DecisionResult | CardChanged:
         answer = self._write(
             [
@@ -109,10 +118,6 @@ class AcoCli:
                 "--line",
                 str(decision.index),
                 *_answer_arguments(decision),
-                "--via",
-                # The only `--via` the board writes: the cooperative path, never
-                # `chat` or `default`, which belong to the operator's other writers.
-                RulingVia.BOARD,
                 # One argument: a hash from aco's output can never read as an option.
                 f"--card-hash={card_hash}",
             ]

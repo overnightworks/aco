@@ -376,7 +376,7 @@ def test_context_refusal(
     [
         pytest.param(
             ["rule", "90", "--line", "1"],
-            "aco rule: error: one of the arguments --option --other is required",
+            "aco rule: error: one of the arguments --option --other --unclear is required",
             id="no-outcome",
         ),
         pytest.param(
@@ -438,22 +438,20 @@ def test_parser_refusal(
     assert observed == {"code": 2, "sentence": sentence, "usage": usage, "stdout": ""}
 
 
-def test_usage_and_help_name_the_chat_transcription_flags_but_not_unclear(
+def test_usage_and_help_name_every_flag_with_a_help_line_unclear_included(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: Never 1 — usage and --help name the four chat flags and keep --unclear hidden."""
+    """Spec: Never 1 — usage and --help name the answer flags, --unclear among them."""
     with pytest.raises(SystemExit):
         cli.main(["rule", "90", "--line", "1"])
     usage_text = capsys.readouterr().err
     with pytest.raises(SystemExit):
         cli.main(["rule", "--help"])
     help_text = capsys.readouterr().out
-    shown = ("--option", "--other", "--via", "--card-hash")
+    shown = ("--option", "--other", "--unclear", "--via", "--card-hash")
     retired = ("--yes", "--no", "--later")
-    assert [flag in usage_text for flag in ("--option", "--other")] == [True, True]
+    assert [flag in usage_text for flag in ("--option", "--other", "--unclear")] == [True] * 3
     assert [flag in help_text for flag in shown] == [True] * len(shown)
-    note_help = "the note sent back to the head, with --unclear"
-    assert " ".join(help_text.split()).count(note_help) == 1
-    assert "--unclear" not in usage_text + " ".join(help_text.split()).replace(note_help, "")
+    assert " ".join(help_text.split()).count("send an open option line back to its head") == 1
     words = (usage_text + help_text).replace("[", " ").replace("]", " ").split()
     assert [flag in words for flag in retired] == [False] * len(retired)
