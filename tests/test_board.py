@@ -26,6 +26,7 @@ from board_fixtures import (
     blocked_issue,
     board_issue,
     complete_contract,
+    container_with_children,
     idea_body,
     projected_board,
     proposed_expectation,
@@ -1373,17 +1374,7 @@ def test_board_ranks_by_category_before_score_and_issue_number(case: _Ranking) -
 def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
     """The completion boost (category 2) never outranks a real blocker (1)."""
     now = datetime(2026, 8, 21, tzinfo=UTC)
-    container = workboard.Issue(
-        100,
-        "Container",
-        (),
-        "",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.CONTAINER,
-        children_closed=1,
-        children_total=2,
-    )
+    container, container_children = container_with_children(100, closed=1, open_children=(101,))
     last_child = workboard.Issue(
         101, "Last open child", (), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
     )
@@ -1408,7 +1399,7 @@ def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
         BoardConfig(),
         dependencies={103: (block_dependency(102),)},
         now=now,
-        children={100: (workboard.ChildItem(101, workboard.ChildState.OPEN),)},
+        children={100: container_children},
     )
     by_number = {item.number: item for item in projected.items}
 
@@ -1448,16 +1439,8 @@ def test_completion_boost_requires_at_least_one_closed_sibling() -> None:
 
 
 def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
-    container = workboard.Issue(
-        120,
-        "Container",
-        (),
-        complete_contract("Cut the next slice."),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.CONTAINER,
-        children_closed=1,
-        children_total=2,
+    container, container_children = container_with_children(
+        120, closed=1, open_children=(121,), body=complete_contract("Cut the next slice.")
     )
     open_child = board_issue(121, "Open child", complete_contract("Ship it."))
 
@@ -1468,7 +1451,7 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
         (),
         BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN),)},
+        children={120: container_children},
     )
 
     container_item = next(item for item in projected.items if item.number == 120)
@@ -1683,19 +1666,17 @@ def test_next_action_never_cuts_a_container_whose_slice_table_is_empty() -> None
 
 
 def test_next_action_closes_a_container_with_no_open_child_and_no_further_work() -> None:
-    container = workboard.Issue(
-        140,
-        "Container",
-        (),
-        complete_contract("keiner", done_when="All slices land."),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.CONTAINER,
-        children_closed=3,
-        children_total=3,
+    container, container_children = container_with_children(
+        140, closed=3, body=complete_contract("keiner", done_when="All slices land.")
     )
     projected = projected_board(
-        (container,), (), (), (), BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
+        (container,),
+        (),
+        (),
+        (),
+        BoardConfig(),
+        now=datetime(2026, 8, 21, tzinfo=UTC),
+        children={140: container_children},
     )
 
     action = workboard.next_action(projected)
@@ -1750,53 +1731,6 @@ def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work
     assert isinstance(action, workboard.CutSliceAction)
     assert action.container.number == 141
     assert action.next_step == "Scheibe C"
-
-
-def test_container_progress_raises_when_an_open_child_contradicts_a_closed_summary() -> None:
-    container = workboard.Issue(
-        190,
-        "Container",
-        (),
-        "",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.CONTAINER,
-        children_closed=2,
-        children_total=2,
-    )
-    raised_argument_1 = BoardConfig()
-    raised_argument_2 = datetime(2026, 8, 21, tzinfo=UTC)
-    raised_argument_3 = {190: (workboard.ChildItem(191, workboard.ChildState.OPEN),)}
-
-    with pytest.raises(protocol.ClaimError, match=r"malformed board container #190"):
-        projected_board(
-            (container,),
-            (),
-            (),
-            (),
-            raised_argument_1,
-            now=raised_argument_2,
-            children=raised_argument_3,
-        )
-
-
-def test_container_progress_raises_when_no_open_child_contradicts_an_unclosed_summary() -> None:
-    container = workboard.Issue(
-        191,
-        "Container",
-        (),
-        "",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.CONTAINER,
-        children_closed=1,
-        children_total=2,
-    )
-    raised_argument_1 = BoardConfig()
-    raised_argument_2 = datetime(2026, 8, 21, tzinfo=UTC)
-
-    with pytest.raises(protocol.ClaimError, match=r"malformed board container #191"):
-        projected_board((container,), (), (), (), raised_argument_1, now=raised_argument_2)
 
 
 def test_board_json_reports_an_uncut_slice_entry() -> None:

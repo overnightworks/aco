@@ -39,6 +39,7 @@ reason text.
 | an item with a `size`, measured or not | — | BOARD-26, BOARD-27, BOARD-31 |
 | a claim commit whose `item:` trailer is no ASCII number of at most 18 digits | — | BOARD-56 |
 | an item carries the idea label | — | BOARD-57 |
+| a container whose child-count summary disagrees with its sub-issue list | — | BOARD-58 |
 
 ## No `--json`
 
@@ -87,10 +88,10 @@ does, before either reads a single issue -- cited there, not restated.
 - [ ] [BOARD-31] Each `classes` entry carries `{"stats": {"size", "n", "median_hours", "p80_hours", "weak"}, "first_event_at", "last_event_at"}`; `since` is `null` only with no lane event read.
 - [ ] [BOARD-56] A claim commit on the state ref whose `item:` trailer is no ASCII number of at most 18 digits reads like a lane's: left out of the measurements, not counted in `unparsed`; `board` and `next` exit `0`.
 - [ ] [BOARD-57] An item labelled `idea_label` carries `"idea": true` in `--json`, `"actionable": false` and `"actionable_reason": "idea"`, whatever its body, `body malformed` included (NEXT-43).
+- [ ] [BOARD-58] A container whose summary counts a child takes its `container` closed and total counts and open children from its sub-issue list; a summary that disagrees refuses nothing, exit `0`.
 
 ## Never
 
-- A container whose own child-count summary disagrees with its open-children list (a stale summary, a lost paginated row) is never silently reconciled into its own `container`/`--json` field: the board build refuses by name instead of rendering a guess.
 - `board`'s `--json` never carries a `read_state` key on any item, and never a bare `null` in place of an absent `foreign_blockers`/`uncut` `scope` entry.
 - `aco board` never regains an `--html`/`--serve` output mode of its own: `aco serve` (`specs/serve.spec.md`) is the one decision board going forward.
 
