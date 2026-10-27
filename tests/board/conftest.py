@@ -5,17 +5,22 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
     empty_repository_with_fake_aco,
+    first_listed_line,
     install_fake_aco,
     named_repository,
+    option_line,
     path_with,
+    row,
     serving,
 )
+from github_fixtures import assert_github_world
 
 from aco.board.aco_cli import AcoCli
 
@@ -39,3 +44,21 @@ def two_repositories(
     install_fake_aco(tmp_path / "bin")
     monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
     return named_repository(tmp_path, "a"), named_repository(tmp_path, "b")
+
+
+@pytest.fixture
+def listed(repository: FakeAcoRepository, board: BoardClient) -> dict[str, Any]:
+    """The post payload naming item 12's first listed line, without a decision."""
+    repository.set_rulings(row(12, "Song jump", option_line()))
+    shown = first_listed_line(board)
+    return {
+        "repo": board.repo,
+        "item": 12,
+        "line": shown["index"],
+        "fingerprint": shown["fingerprint"],
+    }
+
+
+@pytest.fixture
+def github_world(github_clone: Path, bare_remote: Path) -> None:
+    assert_github_world(github_clone, bare_remote)

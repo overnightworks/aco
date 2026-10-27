@@ -27,8 +27,7 @@ from aco.board.ports import (
     Decision,
     DecisionResult,
     ExpectationLine,
-    OptionDecision,
-    OtherDecision,
+    OptionLineDecision,
     YesNoLine,
 )
 from aco.board.server import LOOPBACK_HOST, read_before_deadline
@@ -233,7 +232,7 @@ class _HugeLineSource:
         raise AssertionError("listing the board must not write")
 
     def rule_option(
-        self, decision: OptionDecision | OtherDecision, card_hash: str
+        self, decision: OptionLineDecision, card_hash: str
     ) -> DecisionResult | CardChanged:
         raise AssertionError("listing the board must not write")
 
@@ -265,7 +264,7 @@ class _BrokenPipeSource:
         raise AssertionError("the board must not write after a failed read")
 
     def rule_option(
-        self, decision: OptionDecision | OtherDecision, card_hash: str
+        self, decision: OptionLineDecision, card_hash: str
     ) -> DecisionResult | CardChanged:
         raise AssertionError("the board must not write after a failed read")
 

@@ -35,8 +35,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     outcome = parser.add_mutually_exclusive_group(required=True)
     outcome.add_argument("--option", metavar="X", help="the letter of the option card's answer")
     outcome.add_argument("--other", metavar="TEXT", help="a free-text answer")
-    # --unclear is not an answer a head types from a chat, so it stays out of --help and usage.
-    outcome.add_argument("--unclear", action="store_true", help=argparse.SUPPRESS)
+    outcome.add_argument(
+        "--unclear",
+        action="store_true",
+        help="send an open option line back to its head; --note says why",
+    )
     parser.add_argument("--note", help="the note sent back to the head, with --unclear")
     parser.add_argument(
         "--via",
