@@ -13,14 +13,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract
-from claim_worktrees import (
-    LANE_BRANCH,
-    LANE_MODE_BRANCH,
-    StandIn,
-    Standing,
-    Standpoint,
-    make_stand_in,
-)
+from claim_worktrees import LANE_BRANCH, StandIn, Standing, Standpoint, make_stand_in
 from cli_fixtures import stub_one_git_call
 from github_fixtures import FakeForge, serve_forge
 
@@ -29,6 +22,7 @@ from aco import cli as issue_claim
 from aco.protocol import ClaimError
 
 ISSUE = 72
+LANE_MODE_BRANCH = "docs/lane-cleanup"
 CUT_BODY = complete_contract("Claim #72.") + "\n\n## Schnitt\n\n**Scheibe 1: Title**\n"
 UNCUT_BODY = complete_contract("Claim #72.") + "\n\n## Schnitt\n\nNo slices yet.\n"
 
