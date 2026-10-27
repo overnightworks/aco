@@ -1,8 +1,0 @@
-claim_id = "cc8c89ad274648e7811a3baadc6e3add"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "1d4cdcc7162a8c3498aa04b07ba5cc75b7f0efad"
-branch = "claude/issue-427-decided-strip"
-scope = ["docs/board/README.md", "docs/board/mockup.html", "frontend/e2e/decide.spec.ts", "frontend/e2e/decideOption.spec.ts", "frontend/src/App.svelte", "frontend/src/app/model/optionCard.ts", "frontend/src/app/state/decision.svelte.test.ts", "frontend/src/app/state/decision.svelte.ts", "frontend/src/app/state/decisionOption.svelte.test.ts", "frontend/src/components/CardFrame.svelte", "frontend/src/components/UndoStrip.svelte", "frontend/src/components/UndoStrip.test.ts", "frontend/src/components/UndoToast.svelte", "frontend/src/components/UndoToast.test.ts", "specs/serve.spec.md", "src/aco/board/static"]
-opened_commit = "81cc03661a4587dedad43db45dcebea20126e4fe"
-whole_reason = "The decided strip: UndoToast becomes UndoStrip with the picture's strip, placed as a live row above the Open pane and over a phone's list, its Undo focused after a pick and focus returned to the card after Undo; the bottom toast and Rückgängig go; together with ABRD-58/59, the e2e tests and re-pointed pins, the aligned mockup placement, the board README and the rebuilt static assets."
