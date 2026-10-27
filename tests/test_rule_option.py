@@ -17,6 +17,7 @@ from test_option_lines import (
     card,
     card_body,
     other_card,
+    returned_card,
     ruled_card,
 )
 
@@ -26,6 +27,7 @@ STALE_CARD_HASH = "sha256:" + "0" * 64
 YES_NO_LINE = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
 RULED_YES_NO_LINE = '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2026-10-01\n'
 ALREADY_RULED = "line 2 is already ruled; a changed ruling is a new line"
+ALREADY_WITH_HEAD = "line 2 is already with its head; it comes back once revised"
 CARD_CHANGED = "line 2 changed since its card was shown; show it again and rule what it shows now"
 
 
@@ -54,6 +56,22 @@ def other_arguments(
 ) -> list[str]:
     """`rule`'s arguments after the item for one Other answer; `=` keeps a leading dash."""
     return ["--line", str(line), f"--other={answer}", "--via", via, "--card-hash", shown]
+
+
+TODAY = FROZEN_CLI_NOW.date().isoformat()
+NOTE = "Was kostet B im Betrieb?"
+
+
+def returned_today(note: str | None = NOTE) -> str:
+    """The open option line as `--unclear` writes it on the frozen day."""
+    note_key = "" if note is None else f"returned_note = {json.dumps(note, ensure_ascii=False)}\n"
+    return returned_card(f"returned_on = {TODAY}\n{note_key}")
+
+
+def unclear(note: str | None = None, shown: str = GOLDEN_CARD_HASH, *, line: int = 2) -> list[str]:
+    """`rule`'s arguments after the item for one send-back; `=` keeps a leading dash."""
+    note_flags = [] if note is None else [f"--note={note}"]
+    return ["--line", str(line), "--unclear", *note_flags, "--card-hash", shown]
 
 
 def decided_state(rulings_stdout: str) -> tuple[object, ...]:
@@ -241,6 +259,54 @@ class TestRuleOption:
                 "card_changed",
                 id="RULE-17-other",
             ),
+            pytest.param(
+                card(),
+                RULED_YES_NO_LINE,
+                unclear(line=1),
+                "line 1 is a yes/no line; --unclear returns only an option line",
+                "invalid_usage",
+                id="RULE-16-before-RULE-04",
+            ),
+            pytest.param(
+                card(),
+                YES_NO_LINE,
+                unclear(line=3),
+                "line 3 out of range: this item has 2 expectation line(s)",
+                "line_out_of_range",
+                id="RULE-05-before-RULE-16",
+            ),
+            pytest.param(
+                ruled_card(),
+                YES_NO_LINE,
+                unclear(shown=STALE_CARD_HASH),
+                ALREADY_RULED,
+                "already_ruled",
+                id="RULE-04-letter",
+            ),
+            pytest.param(
+                other_card(),
+                YES_NO_LINE,
+                unclear(),
+                ALREADY_RULED,
+                "already_ruled",
+                id="RULE-04-other",
+            ),
+            pytest.param(
+                returned_today(),
+                YES_NO_LINE,
+                unclear(shown=STALE_CARD_HASH),
+                ALREADY_WITH_HEAD,
+                "with_head",
+                id="RULE-24-before-RULE-17",
+            ),
+            pytest.param(
+                card(),
+                YES_NO_LINE,
+                unclear(shown=STALE_CARD_HASH),
+                CARD_CHANGED,
+                "card_changed",
+                id="RULE-17",
+            ),
         ],
     )
     def test_a_refused_ruling_leaves_the_body_unwritten(
@@ -253,7 +319,7 @@ class TestRuleOption:
         message: str,
         reason: str,
     ) -> None:
-        """Spec: RULE-04, RULE-05, RULE-09, RULE-16..RULE-19 -- in that check order."""
+        """Spec: RULE-04, RULE-05, RULE-09, RULE-16..RULE-19, RULE-24 -- in that check order."""
         client = serve_item(monkeypatch, item_body(option_line, yes_no_line=yes_no_line))
         command = ["rule", "7", *arguments]
         text = run_cli(command, capsys)
@@ -323,6 +389,41 @@ class TestRuleOption:
                 "--other needs a non-empty answer",
                 id="RULE-21-lone-newline",
             ),
+            pytest.param(
+                ["--line", "2", "--unclear"],
+                "--unclear needs --card-hash",
+                id="RULE-15-without-card-hash",
+            ),
+            pytest.param(
+                ["--line", "2", "--unclear", "--via", "chat"],
+                "--unclear needs --card-hash",
+                id="RULE-15-card-hash-before-via",
+            ),
+            pytest.param(
+                [*unclear(), "--via", "chat"],
+                "--via does not go with --unclear; nothing is decided",
+                id="RULE-15-via",
+            ),
+            pytest.param(
+                [*unclear(), "--via", "chat", "--note", "  "],
+                "--via does not go with --unclear; nothing is decided",
+                id="RULE-15-via-before-RULE-26",
+            ),
+            pytest.param(
+                [*unclear(), "--note", "  "],
+                "a blank --note says nothing; leave it out",
+                id="RULE-26-blank",
+            ),
+            pytest.param(
+                [*unclear(), "--note", ""],
+                "a blank --note says nothing; leave it out",
+                id="RULE-26-empty",
+            ),
+            pytest.param(
+                ["--line", "1", "--yes", "--card-hash", GOLDEN_CARD_HASH],
+                "--via and --card-hash do not go with --yes, --no or --later",
+                id="RULE-15-yes-no",
+            ),
         ],
     )
     def test_a_flag_combination_is_refused_before_any_forge_call(
@@ -332,7 +433,8 @@ class TestRuleOption:
         arguments: list[str],
         message: str,
     ) -> None:
-        """Spec: RULE-15, RULE-21, RULE-09 -- an item no forge knows refuses RULE-07 if reached."""
+        """Spec: RULE-15, RULE-21, RULE-26, RULE-09 -- an item no forge knows
+        refuses RULE-07 if reached."""
         client = serve_forge(monkeypatch, FakeForge())
         command = ["rule", "7", *arguments]
         text = run_cli(command, capsys)

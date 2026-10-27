@@ -128,6 +128,20 @@ def other_card(*edits: tuple[str, str]) -> str:
     return card(card_head(("question = ", other_decision() + "question = "), *edits))
 
 
+RETURNED_ON = "returned_on = 2026-10-28\n"
+RETURNED_NOTE = 'returned_note = "Was kostet B im Betrieb?"\n'
+
+
+def returned_card(keys: str = RETURNED_ON + RETURNED_NOTE) -> str:
+    """The open option line with `keys` between its text and its card keys."""
+    return card(card_head(("question = ", keys + "question = ")))
+
+
+def ruled_with(keys: str) -> str:
+    """The option line ruled `A`, `keys` placed where a returned line has them."""
+    return ruled_card(("question = ", keys + "question = "))
+
+
 PAD = "a" * 6000
 
 
@@ -152,13 +166,25 @@ class TestOptionLineCheck:
                 ),
                 id="ruled-reordered-keys",
             ),
+            pytest.param(returned_card(), id="date-and-note"),
+            pytest.param(returned_card(RETURNED_ON), id="date-alone"),
+            pytest.param(
+                card(
+                    card_head(
+                        ("question = ", RETURNED_ON + RETURNED_NOTE + "question = "),
+                        ('area = "Song-Seite"', 'area = "Anderer Bereich"'),
+                    )
+                ),
+                id="card-revised-beside-the-keys",
+            ),
         ],
     )
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
     def test_a_complete_option_line_is_ok(
         self, capsys: pytest.CaptureFixture[str], line: str, newline: str
     ) -> None:
-        """Spec: BODY-85, BODY-87, BODY-89 -- the stored hash survives key order and CRLF."""
+        """Spec: BODY-85, BODY-87, BODY-89, BODY-94 -- the stored hash survives key order and CRLF;
+        a line with its head keeps the card editable."""
         result = run_cli(["check", "-"], capsys, stdin=card_body(line, newline=newline))
         assert (result.status, result.stdout, result.stderr) == (0, "body ok\n", "")
 
@@ -492,12 +518,42 @@ class TestOptionLineCheck:
                 [malformed(f"{E}.other", f"{E}.other must be a non-empty string")],
                 id="BODY-91-non-empty",
             ),
+            pytest.param(
+                returned_card(RETURNED_NOTE),
+                [malformed(f"{E}.returned_note", f"{E}.returned_note needs returned_on beside it")],
+                id="note-without-date",
+            ),
+            pytest.param(
+                returned_card('returned_on = "2026-10-28"\n'),
+                [malformed(f"{E}.returned_on", f"{E}.returned_on must be a TOML local date")],
+                id="string-date",
+            ),
+            pytest.param(
+                returned_card(RETURNED_ON + 'returned_note = "  "\n'),
+                [malformed(f"{E}.returned_note", f"{E}.returned_note must be a non-empty string")],
+                id="blank-note",
+            ),
+            pytest.param(
+                ruled_with(RETURNED_ON + RETURNED_NOTE),
+                [
+                    malformed(f"{E}.returned_on", f"{E}.returned_on belongs only to an open line"),
+                    malformed(
+                        f"{E}.returned_note", f"{E}.returned_note belongs only to an open line"
+                    ),
+                ],
+                id="both-keys-on-a-line-ruled-a-letter",
+            ),
+            pytest.param(
+                other_card(("question = ", RETURNED_ON + "question = ")),
+                [malformed(f"{E}.returned_on", f"{E}.returned_on belongs only to an open line")],
+                id="date-on-a-line-ruled-other",
+            ),
         ],
     )
     def test_a_defective_option_line_is_refused(
         self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
     ) -> None:
-        """Spec: BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91 -- one sentence per
+        """Spec: BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91, BODY-93 -- one sentence per
         refusal, in entry order."""
         assert check_defects(capsys, card_body(line)) == (2, defects)
 

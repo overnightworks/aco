@@ -15,110 +15,31 @@ from github_fixtures import FakeForge, assert_github_world, serve_forge
 from test_option_line_rewrites import assert_rewritten_alike
 from test_option_lines import (
     GOLDEN_CARD_HASH,
+    RETURNED_ON,
     E,
     card,
     card_body,
     card_head,
     check_defects,
     malformed,
-    other_card,
-    ruled_card,
 )
 from test_rule_option import (
-    ALREADY_RULED,
-    CARD_CHANGED,
-    RULED_YES_NO_LINE,
+    NOTE,
     STALE_CARD_HASH,
-    YES_NO_LINE,
+    TODAY,
     decide,
     item_body,
     other_arguments,
+    returned_today,
     serve_item,
+    unclear,
 )
 
 from aco import body, forge
 
-RETURNED_ON = "returned_on = 2026-10-28\n"
-RETURNED_NOTE = 'returned_note = "Was kostet B im Betrieb?"\n'
-
-
-def returned_card(keys: str = RETURNED_ON + RETURNED_NOTE) -> str:
-    """The open option line with `keys` between its text and its card keys."""
-    return card(card_head(("question = ", keys + "question = ")))
-
-
-def ruled_with(keys: str) -> str:
-    """The option line ruled `A`, `keys` placed where a returned line has them."""
-    return ruled_card(("question = ", keys + "question = "))
-
 
 @pytest.mark.usefixtures("clone")
 class TestReturnedLineGrammar:
-    @pytest.mark.parametrize(
-        "line",
-        [
-            pytest.param(returned_card(), id="date-and-note"),
-            pytest.param(returned_card(RETURNED_ON), id="date-alone"),
-            pytest.param(
-                card(
-                    card_head(
-                        ("question = ", RETURNED_ON + RETURNED_NOTE + "question = "),
-                        ('area = "Song-Seite"', 'area = "Anderer Bereich"'),
-                    )
-                ),
-                id="card-revised-beside-the-keys",
-            ),
-        ],
-    )
-    @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
-    def test_an_open_option_line_with_its_head_is_ok(
-        self, capsys: pytest.CaptureFixture[str], line: str, newline: str
-    ) -> None:
-        """Spec: BODY-94 -- the date and an optional note; the card stays editable."""
-        result = run_cli(["check", "-"], capsys, stdin=card_body(line, newline=newline))
-        assert (result.status, result.stdout) == (0, "body ok\n")
-
-    @pytest.mark.parametrize(
-        ("line", "defects"),
-        [
-            pytest.param(
-                returned_card(RETURNED_NOTE),
-                [malformed(f"{E}.returned_note", f"{E}.returned_note needs returned_on beside it")],
-                id="note-without-date",
-            ),
-            pytest.param(
-                returned_card('returned_on = "2026-10-28"\n'),
-                [malformed(f"{E}.returned_on", f"{E}.returned_on must be a TOML local date")],
-                id="string-date",
-            ),
-            pytest.param(
-                returned_card(RETURNED_ON + 'returned_note = "  "\n'),
-                [malformed(f"{E}.returned_note", f"{E}.returned_note must be a non-empty string")],
-                id="blank-note",
-            ),
-            pytest.param(
-                ruled_with(RETURNED_ON + RETURNED_NOTE),
-                [
-                    malformed(f"{E}.returned_on", f"{E}.returned_on belongs only to an open line"),
-                    malformed(
-                        f"{E}.returned_note", f"{E}.returned_note belongs only to an open line"
-                    ),
-                ],
-                id="both-keys-on-a-line-ruled-a-letter",
-            ),
-            pytest.param(
-                other_card(("question = ", RETURNED_ON + "question = ")),
-                [malformed(f"{E}.returned_on", f"{E}.returned_on belongs only to an open line")],
-                id="date-on-a-line-ruled-other",
-            ),
-        ],
-    )
-    def test_a_defective_returned_key_is_refused(
-        self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
-    ) -> None:
-        """Spec: BODY-93 -- one sentence per refusal, right after `other`'s."""
-        assert check_defects(capsys, card_body(line)) == (2, defects)
-
     def test_a_yes_no_line_keeps_returned_on_an_unknown_key(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -130,27 +51,12 @@ class TestReturnedLineGrammar:
         )
 
 
-TODAY = FROZEN_CLI_NOW.date().isoformat()
-NOTE = "Was kostet B im Betrieb?"
 AWKWARD_NOTE = "Zeile 1\n„Zitat“ \\ \u202e Ende"
 LINE_TEXT_SUMMARY = (
     "Ein Klick auf den Ursprungs-Link springt in der App: die Version klappt auf, "
     "der Take ist markiert,…"
 )
-ALREADY_WITH_HEAD = "line 2 is already with its head; it comes back once revised"
 ANSWERED_UNCLEAR = "line 2 was answered Unclear; --via default records no answer"
-
-
-def returned_today(note: str | None = NOTE) -> str:
-    """The open option line as `--unclear` writes it on the frozen day."""
-    note_key = "" if note is None else f"returned_note = {json.dumps(note, ensure_ascii=False)}\n"
-    return returned_card(f"returned_on = {TODAY}\n{note_key}")
-
-
-def unclear(note: str | None = None, shown: str = GOLDEN_CARD_HASH, *, line: int = 2) -> list[str]:
-    """`rule`'s arguments after the item for one send-back; `=` keeps a leading dash."""
-    note_flags = [] if note is None else [f"--note={note}"]
-    return ["--line", str(line), "--unclear", *note_flags, "--card-hash", shown]
 
 
 def line_two(raw: str) -> dict[str, object]:
@@ -238,140 +144,6 @@ class TestRuleUnclear:
         assert json.loads(listed)["rulings"][0]["lines"][1]["returned_note"] == AWKWARD_NOTE
         text = rulings_of(monkeypatch, capsys, written)
         assert text.splitlines()[-1].endswith(": Zeile 1 „Zitat“ \\ \\u202e Ende")
-
-    @pytest.mark.parametrize(
-        ("arguments", "message"),
-        [
-            pytest.param(
-                ["--line", "2", "--unclear"],
-                "--unclear needs --card-hash",
-                id="RULE-15-without-card-hash",
-            ),
-            pytest.param(
-                ["--line", "2", "--unclear", "--via", "chat"],
-                "--unclear needs --card-hash",
-                id="RULE-15-card-hash-before-via",
-            ),
-            pytest.param(
-                [*unclear(), "--via", "chat"],
-                "--via does not go with --unclear; nothing is decided",
-                id="RULE-15-via",
-            ),
-            pytest.param(
-                [*unclear(), "--via", "chat", "--note", "  "],
-                "--via does not go with --unclear; nothing is decided",
-                id="RULE-15-via-before-RULE-26",
-            ),
-            pytest.param(
-                [*unclear(), "--note", "  "],
-                "a blank --note says nothing; leave it out",
-                id="RULE-26-blank",
-            ),
-            pytest.param(
-                [*unclear(), "--note", ""],
-                "a blank --note says nothing; leave it out",
-                id="RULE-26-empty",
-            ),
-            pytest.param(
-                ["--line", "1", "--yes", "--card-hash", GOLDEN_CARD_HASH],
-                "--via and --card-hash do not go with --yes, --no or --later",
-                id="RULE-15-yes-no",
-            ),
-        ],
-    )
-    def test_a_flag_combination_is_refused_before_any_forge_call(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        arguments: list[str],
-        message: str,
-    ) -> None:
-        """Spec: RULE-15, RULE-26, RULE-09 -- before the forge is asked, text and `--json`."""
-        client = serve_forge(monkeypatch, FakeForge())
-        command = ["rule", "7", *arguments]
-        text = run_cli(command, capsys)
-        wire = run_cli([*command, "--json"], capsys)
-        assert (text.status, text.stderr) == (2, f"ERROR: {message}\n")
-        assert (wire.status, json.loads(wire.stdout)) == (
-            2,
-            {"ok": False, "reason": "invalid_usage", "message": message},
-        )
-        assert client.body_writes == []
-
-    @pytest.mark.parametrize(
-        ("option_line", "yes_no_line", "arguments", "message", "reason"),
-        [
-            pytest.param(
-                card(),
-                RULED_YES_NO_LINE,
-                unclear(line=1),
-                "line 1 is a yes/no line; --unclear returns only an option line",
-                "invalid_usage",
-                id="RULE-16-before-RULE-04",
-            ),
-            pytest.param(
-                card(),
-                YES_NO_LINE,
-                unclear(line=3),
-                "line 3 out of range: this item has 2 expectation line(s)",
-                "line_out_of_range",
-                id="RULE-05-before-RULE-16",
-            ),
-            pytest.param(
-                ruled_card(),
-                YES_NO_LINE,
-                unclear(shown=STALE_CARD_HASH),
-                ALREADY_RULED,
-                "already_ruled",
-                id="RULE-04-letter",
-            ),
-            pytest.param(
-                other_card(),
-                YES_NO_LINE,
-                unclear(),
-                ALREADY_RULED,
-                "already_ruled",
-                id="RULE-04-other",
-            ),
-            pytest.param(
-                returned_today(),
-                YES_NO_LINE,
-                unclear(shown=STALE_CARD_HASH),
-                ALREADY_WITH_HEAD,
-                "with_head",
-                id="RULE-24-before-RULE-17",
-            ),
-            pytest.param(
-                card(),
-                YES_NO_LINE,
-                unclear(shown=STALE_CARD_HASH),
-                CARD_CHANGED,
-                "card_changed",
-                id="RULE-17",
-            ),
-        ],
-    )
-    def test_a_refused_send_back_leaves_the_body_unwritten(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        option_line: str,
-        yes_no_line: str,
-        arguments: list[str],
-        message: str,
-        reason: str,
-    ) -> None:
-        """Spec: RULE-05, RULE-16, RULE-04, RULE-24, RULE-17, RULE-09 -- in that check order."""
-        client = serve_item(monkeypatch, item_body(option_line, yes_no_line=yes_no_line))
-        command = ["rule", "7", *arguments]
-        text = run_cli(command, capsys)
-        wire = run_cli([*command, "--json"], capsys)
-        assert (text.status, text.stderr) == (2, f"ERROR: {message}\n")
-        assert (wire.status, json.loads(wire.stdout)) == (
-            2,
-            {"ok": False, "reason": reason, "message": message},
-        )
-        assert client.body_writes == []
 
     @pytest.mark.parametrize(
         "arguments",
