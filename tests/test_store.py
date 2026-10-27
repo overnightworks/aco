@@ -2179,170 +2179,110 @@ def test_claim_lifecycle_excludes_history_before_a_reset(bare_remote: Path, work
     assert lifecycle.unparsed == 0
 
 
-def test_claim_lifecycle_skips_and_counts_a_malformed_claim_shaped_commit(
-    bare_remote: Path, worktree: Path
-) -> None:
-    """A commit whose `intent:` trailer names `claim` but carries no
-    `item:`/`claim_id:` line -- older history predating this trailer, or a
-    foreign commit merely shaped like one -- is skipped and counted rather
-    than crashing the whole walk."""
+def _lifecycle_around_a_message_only_commit(
+    bare_remote: Path,
+    worktree: Path,
+    *,
+    message: str,
+    claimed: bool = True,
+    released_before: bool = False,
+    released_after: bool = False,
+) -> tuple[store.ClaimLifecycle, store.ClaimLifecycle]:
+    """Claim and release issue 1 as asked, push `message` as a commit that
+    carries no state, and return the lifecycle read at the end and the one
+    read just before that commit."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    mid_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert mid_state.tip is not None
-    _push_message_only_commit(
-        bare_remote,
-        worktree,
-        parent=str(mid_state.tip),
-        message="claim issue 999\n\noperation_id: op-999\nintent: claim\n",
-    )
+    if claimed:
+        _committed_claim(bare_remote, worktree, issue=1)
+    if released_before:
+        _release_claim_one(bare_remote, worktree)
+    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    assert state.tip is not None
+    before_commit = store.claim_lifecycle(worktree=worktree, tip=state.tip)
+    _push_message_only_commit(bare_remote, worktree, parent=str(state.tip), message=message)
+    if released_after:
+        _release_claim_one(bare_remote, worktree)
+    final_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    assert final_state.tip is not None
+    return store.claim_lifecycle(worktree=worktree, tip=final_state.tip), before_commit
+
+
+def _release_claim_one(bare_remote: Path, worktree: Path) -> None:
     store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
         subject=store.ClaimTransitionSubject("release issue 1", item="1"),
         intent=_release_intent("c1", "op-1-release"),
     )
-    final_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert final_state.tip is not None
-
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=final_state.tip)
-
-    assert lifecycle.unparsed == 1
-    by_item = {event.item: event for event in lifecycle.events}
-    assert set(by_item) == {"1"}
-    assert by_item["1"].released_at is not None
 
 
-def test_claim_lifecycle_counts_a_release_with_no_matching_claim_as_unparsed(
-    bare_remote: Path, worktree: Path
-) -> None:
-    """A well-formed release/rescope trailer naming a `claim_id` this walk
-    never saw claimed -- history torn at a boundary this first-parent walk
-    cannot see past -- is skipped and counted, never raised: one broken
-    record must not abort the whole board."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert state.tip is not None
-    _push_message_only_commit(
-        bare_remote,
-        worktree,
-        parent=str(state.tip),
-        message=("release issue 1\n\noperation_id: op-1\nclaim_id: c1\nitem: 1\nintent: release\n"),
-    )
-    final_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert final_state.tip is not None
-
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=final_state.tip)
-
-    assert lifecycle == store.ClaimLifecycle(events=(), unparsed=1)
-
-
-def test_claim_lifecycle_counts_a_second_claim_of_the_same_id_as_unparsed(
-    bare_remote: Path, worktree: Path
-) -> None:
-    """A second `claim` commit naming a `claim_id` this walk already
-    opened -- history `protocol.apply`'s own `consumed_ids` never lets a
-    live writer produce, since a claim id is never claimed twice -- used to
-    silently overwrite the accumulator and duplicate the same id into
-    `events`. It must instead count as `unparsed` and
-    leave the first claim's own event untouched: one event for `c1`, still
-    naming item 1, still open."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    first_claim = _committed_claim(bare_remote, worktree, issue=1)
-    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert state.tip is not None
-    _push_message_only_commit(
-        bare_remote,
-        worktree,
-        parent=str(state.tip),
-        message=(
-            f"claim issue 1 again\n\noperation_id: op-1-dup\n"
-            f"claim_id: {first_claim.claim_id}\nitem: 9\nintent: claim\n"
+@pytest.mark.parametrize(
+    ("message", "arrangement", "expected_events"),
+    [
+        pytest.param(
+            # Older history predating the trailer, or a foreign commit merely
+            # shaped like one: skipped and counted, never crashing the walk.
+            "claim issue 999\n\noperation_id: op-999\nintent: claim\n",
+            {"released_after": True},
+            (("1", True, 0),),
+            id="malformed-claim-shaped-commit-with-no-item-or-claim-id",
         ),
-    )
-    final_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert final_state.tip is not None
-
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=final_state.tip)
-
-    assert lifecycle.unparsed == 1
-    assert len(lifecycle.events) == 1
-    assert lifecycle.events[0].item == "1"
-    assert lifecycle.events[0].released_at is None
-
-
-def test_claim_lifecycle_counts_a_second_release_of_the_same_claim_as_unparsed(
-    bare_remote: Path, worktree: Path
-) -> None:
-    """A second `release` commit for a `claim_id` this walk already closed --
-    `protocol.apply`'s `consumed_ids` never lets a live writer release a
-    claim twice -- used to silently overwrite `released_at` with the second
-    commit's own committer date. It must instead count
-    as `unparsed` and leave the first release's own timestamp untouched."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    first_release_state = store.commit_transition(
-        observed=fresh_observation(worktree, bare_remote),
-        subject=store.ClaimTransitionSubject("release issue 1", item="1"),
-        intent=_release_intent("c1", "op-1-release"),
-    )
-    assert first_release_state.tip is not None
-    first_lifecycle = store.claim_lifecycle(worktree=worktree, tip=first_release_state.tip)
-    (first_event,) = first_lifecycle.events
-    assert first_event.released_at is not None
-    _push_message_only_commit(
-        bare_remote,
-        worktree,
-        parent=str(first_release_state.tip),
-        message=(
+        pytest.param(
+            # History torn at a boundary the first-parent walk cannot see
+            # past: one broken record must not abort the whole board.
+            "release issue 1\n\noperation_id: op-1\nclaim_id: c1\nitem: 1\nintent: release\n",
+            {"claimed": False},
+            (),
+            id="release-with-no-matching-claim",
+        ),
+        pytest.param(
+            # Left unchecked it overwrote the accumulator and duplicated the
+            # id into `events`; the first claim's event stays open.
+            "claim issue 1 again\n\noperation_id: op-1-dup\nclaim_id: c1\nitem: 9\nintent: claim\n",
+            {},
+            (("1", False, 0),),
+            id="second-claim-of-the-same-id",
+        ),
+        pytest.param(
+            # Left unchecked it overwrote `released_at` with its own committer
+            # date; the first release's timestamp stays.
             "release issue 1 again\n\noperation_id: op-1-release-dup\n"
-            "claim_id: c1\nitem: 1\nintent: release\n"
+            "claim_id: c1\nitem: 1\nintent: release\n",
+            {"released_before": True},
+            (("1", True, 0),),
+            id="second-release-of-the-same-claim",
         ),
-    )
-    final_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert final_state.tip is not None
-
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=final_state.tip)
-
-    assert lifecycle.unparsed == 1
-    (event,) = lifecycle.events
-    assert event.item == "1"
-    assert event.released_at == first_event.released_at
-
-
-def test_claim_lifecycle_counts_a_rescope_after_release_as_unparsed(
-    bare_remote: Path, worktree: Path
-) -> None:
-    """A `rescope` naming a `claim_id` this walk already released -- `rescope`
-    requires a live claim (`protocol.apply`; `specs/rescope.spec.md`), so a
-    live writer can never produce one after that claim's own release -- used
-    to silently increment `rescoped` on the already-closed accumulator. It must instead count as
-    `unparsed` and leave the event's own `rescopes` count untouched."""
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    _committed_claim(bare_remote, worktree, issue=1)
-    release_state = store.commit_transition(
-        observed=fresh_observation(worktree, bare_remote),
-        subject=store.ClaimTransitionSubject("release issue 1", item="1"),
-        intent=_release_intent("c1", "op-1-release"),
-    )
-    assert release_state.tip is not None
-    _push_message_only_commit(
-        bare_remote,
-        worktree,
-        parent=str(release_state.tip),
-        message=(
+        pytest.param(
+            # `rescope` requires a live claim, so a live writer never produces
+            # one after the release; it must leave `rescopes` untouched.
             "rescope issue 1 after release\n\noperation_id: op-1-rescope-late\n"
-            "claim_id: c1\nitem: 1\nintent: rescope\n"
+            "claim_id: c1\nitem: 1\nintent: rescope\n",
+            {"released_before": True},
+            (("1", True, 0),),
+            id="rescope-after-release",
         ),
+    ],
+)
+def test_claim_lifecycle_counts_an_inconsistent_claim_record_as_unparsed(
+    bare_remote: Path,
+    worktree: Path,
+    message: str,
+    arrangement: dict[str, bool],
+    expected_events: tuple[tuple[str, bool, int], ...],
+) -> None:
+    """A claim-lifecycle record that contradicts the walk so far is skipped and
+    counted as `unparsed`, never raised and never allowed to rewrite an event
+    the walk already built."""
+    lifecycle, before_commit = _lifecycle_around_a_message_only_commit(
+        bare_remote, worktree, message=message, **arrangement
     )
-    final_state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    assert final_state.tip is not None
-
-    lifecycle = store.claim_lifecycle(worktree=worktree, tip=final_state.tip)
 
     assert lifecycle.unparsed == 1
-    (event,) = lifecycle.events
-    assert event.item == "1"
-    assert event.rescopes == 0
+    observed_events = tuple(
+        (event.item, event.released_at is not None, event.rescopes) for event in lifecycle.events
+    )
+    assert observed_events == expected_events
+    if not arrangement.get("released_after"):
+        assert lifecycle.events == before_commit.events
 
 
 _LIFECYCLE_CLAIM_BODY = "claim issue 1\n\nintent: claim\nclaim_id: c1\nitem: 1\n"
@@ -4006,36 +3946,47 @@ def test_apply_claim_intent_replays_idempotently_for_a_lane_identity() -> None:
     assert replayed == once
 
 
-def test_apply_claim_intent_refuses_a_reused_claim_id_with_different_fields() -> None:
-    once = protocol.apply(STATE_WITH_TIP, claim_intent())
-    reused = claim_intent(scope=("README.md",))
+@pytest.mark.parametrize(
+    ("released_first", "refused_intent", "message"),
+    [
+        pytest.param(
+            False,
+            claim_intent(scope=("README.md",)),
+            "already on this ledger",
+            id="reused-claim-id-with-different-fields",
+        ),
+        pytest.param(
+            True,
+            claim_intent(operation_id="op-3"),
+            "already on this ledger",
+            id="reused-claim-id-after-release",
+        ),
+        pytest.param(
+            False,
+            claim_intent(agent="Grace", claim_id="a2", operation_id="op-2"),
+            "is claimed by Ada",
+            id="identity-conflict",
+        ),
+    ],
+)
+def test_apply_claim_intent_refuses_a_claim_the_ledger_cannot_take(
+    released_first: bool, refused_intent: protocol.ClaimIntent, message: str
+) -> None:
+    ledger = protocol.apply(STATE_WITH_TIP, claim_intent())
+    if released_first:
+        ledger = protocol.apply(
+            ledger,
+            protocol.ReleaseIntent(
+                claim_id=protocol.ClaimId("a1"),
+                agent="Ada",
+                role="builder",
+                outcome=protocol.AbandonedRelease("done"),
+                operation_id="op-2",
+            ),
+        )
 
-    with pytest.raises(protocol.ClaimUnavailableError, match="already on this ledger"):
-        protocol.apply(once, reused)
-
-
-def test_apply_claim_intent_refuses_a_reused_claim_id_after_release() -> None:
-    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
-    release = protocol.ReleaseIntent(
-        claim_id=protocol.ClaimId("a1"),
-        agent="Ada",
-        role="builder",
-        outcome=protocol.AbandonedRelease("done"),
-        operation_id="op-2",
-    )
-    released = protocol.apply(claimed, release)
-    reclaim = claim_intent(operation_id="op-3")
-
-    with pytest.raises(protocol.ClaimUnavailableError, match="already on this ledger"):
-        protocol.apply(released, reclaim)
-
-
-def test_apply_claim_intent_refuses_an_identity_conflict() -> None:
-    claimed = protocol.apply(STATE_WITH_TIP, claim_intent())
-    conflicting = claim_intent(agent="Grace", claim_id="a2", operation_id="op-2")
-
-    with pytest.raises(protocol.ClaimUnavailableError, match="is claimed by Ada"):
-        protocol.apply(claimed, conflicting)
+    with pytest.raises(protocol.ClaimUnavailableError, match=message):
+        protocol.apply(ledger, refused_intent)
 
 
 def test_apply_rescope_intent_replaces_scope_and_preserves_opened_commit() -> None:

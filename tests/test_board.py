@@ -1733,45 +1733,22 @@ def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work
     assert action.next_step == "Scheibe C"
 
 
-def test_board_json_reports_an_uncut_slice_entry() -> None:
-    container = workboard.Issue(
-        160,
-        "Container",
-        (),
-        complete_contract("Cut it.", slice=slice_entries("Undispatched slice")),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    projected = projected_board(
-        (container,), (), (), (), BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
-    )
-
-    assert projected.uncut == (workboard.UncutSlices(160, (SliceRow(1, "Undispatched slice"),)),)
-    payload = workboard.board_payload(projected)
-    assert payload["uncut"] == [
-        {"item": 160, "rows": [{"index": 1, "title": "Undispatched slice"}]}
-    ]
-
-
-def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
-    """The only prior `board --json` uncut-row
-    coverage passed `scope: null` throughout, so a `[[slice]]` row that
-    carries its own `scope = [...]` had never been driven through parse ->
-    board projection -> JSON. Here it survives as that row's canonical
-    (sorted, deduplicated) array; a row without one still omits the key
-    entirely -- the public shape before this lane, proven by the sibling
-    test above. The row's own `done_when` is `cut`'s to read
-    and never joins the JSON row."""
-    container = workboard.Issue(
-        160,
-        "Container",
-        (),
-        complete_contract(
-            "Cut it.",
-            slice=[
+@pytest.mark.parametrize(
+    ("item", "slice_rows", "expected_uncut", "expected_json_rows"),
+    [
+        pytest.param(
+            160,
+            slice_entries("Undispatched slice"),
+            (SliceRow(1, "Undispatched slice"),),
+            [{"index": 1, "title": "Undispatched slice"}],
+            id="one-uncut-slice-entry",
+        ),
+        pytest.param(
+            160,
+            # A row's own `scope` survives as its canonical (sorted,
+            # deduplicated) array; a row without one omits the key. Its
+            # `done_when` is `cut`'s to read and never joins the JSON row.
+            [
                 {
                     "index": 1,
                     "title": "Undispatched slice",
@@ -1779,20 +1756,6 @@ def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
                     "scope": ["src/widget.py", "docs/plan.md"],
                 }
             ],
-        ),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    projected = projected_board(
-        (container,), (), (), (), BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
-    )
-
-    assert projected.uncut == (
-        workboard.UncutSlices(
-            160,
             (
                 SliceRow(
                     1,
@@ -1801,34 +1764,45 @@ def test_board_json_carries_a_scoped_uncut_slice_row_canonically() -> None:
                     "The widget ships.",
                 ),
             ),
-        ),
-    )
-    payload = workboard.board_payload(projected)
-    assert payload["uncut"] == [
-        {
-            "item": 160,
-            "rows": [
+            [
                 {
                     "index": 1,
                     "title": "Undispatched slice",
                     "scope": ["docs/plan.md", "src/widget.py"],
                 }
             ],
-        }
-    ]
-
-
-def test_board_json_names_several_uncut_rows_by_index() -> None:
-    """The ruled shape (06.09.2026): several still-open rows are named
-    by index, not by re-deriving it from a name string."""
+            id="scoped-uncut-slice-row-canonically",
+        ),
+        pytest.param(
+            122,
+            # The ruled shape (06.09.2026): several still-open rows are named
+            # by index, not by re-deriving it from a name string.
+            slice_entries("Fifth slice", "Sixth slice", "Seventh slice", first_index=5),
+            (
+                SliceRow(5, "Fifth slice"),
+                SliceRow(6, "Sixth slice"),
+                SliceRow(7, "Seventh slice"),
+            ),
+            [
+                {"index": 5, "title": "Fifth slice"},
+                {"index": 6, "title": "Sixth slice"},
+                {"index": 7, "title": "Seventh slice"},
+            ],
+            id="several-uncut-rows-named-by-index",
+        ),
+    ],
+)
+def test_board_json_reports_uncut_slice_rows(
+    item: int,
+    slice_rows: list[dict[str, object]],
+    expected_uncut: tuple[SliceRow, ...],
+    expected_json_rows: list[dict[str, object]],
+) -> None:
     container = workboard.Issue(
-        122,
+        item,
         "Container",
         (),
-        complete_contract(
-            "Cut them.",
-            slice=slice_entries("Fifth slice", "Sixth slice", "Seventh slice", first_index=5),
-        ),
+        complete_contract("Cut it.", slice=slice_rows),
         "2026-08-20T00:00:00Z",
         "2026-08-20T00:00:00Z",
         kind=ItemKind.CONTAINER,
@@ -1839,27 +1813,9 @@ def test_board_json_names_several_uncut_rows_by_index() -> None:
         (container,), (), (), (), BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    assert projected.uncut == (
-        workboard.UncutSlices(
-            122,
-            (
-                SliceRow(5, "Fifth slice"),
-                SliceRow(6, "Sixth slice"),
-                SliceRow(7, "Seventh slice"),
-            ),
-        ),
-    )
+    assert projected.uncut == (workboard.UncutSlices(item, expected_uncut),)
     payload = workboard.board_payload(projected)
-    assert payload["uncut"] == [
-        {
-            "item": 122,
-            "rows": [
-                {"index": 5, "title": "Fifth slice"},
-                {"index": 6, "title": "Sixth slice"},
-                {"index": 7, "title": "Seventh slice"},
-            ],
-        }
-    ]
+    assert payload["uncut"] == [{"item": item, "rows": expected_json_rows}]
 
 
 def test_next_action_skips_a_container_that_still_holds_an_open_child() -> None:
