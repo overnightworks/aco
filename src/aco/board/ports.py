@@ -32,10 +32,12 @@ class RulingVia(StrEnum):
 
 
 OTHER = "other"
-UNCLEAR = "unclear"
 """Both the `ruling` value and the key that carries the operator's own answer
 (RUL-16); the board keeps its own copy and reads aco only through its command
 line."""
+
+UNCLEAR = "unclear"
+"""The key that sends an option line back to its head; never a `ruling` value."""
 
 OptionLetter = Literal["A", "B", "C", "D"]
 """The letters of an option line's options, by position."""
