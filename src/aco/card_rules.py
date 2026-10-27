@@ -36,8 +36,8 @@ _EXTENSIONS = "|".join(FILE_EXTENSIONS)
 _ISSUE_NUMBER = re.compile(r"(?<!\w)#\d+")
 _PATH = re.compile(rf"^(?:\./|~/|/[A-Za-z])|://|/[^/]*\.(?:{_EXTENSIONS})$")
 _FILE_NAME = re.compile(rf"[^/]*\.(?:{_EXTENSIONS})")
-_SNAKE_CASE = re.compile(r"(?<!\w)[a-zäöüß]+(?:_[a-zäöüß0-9]+)+(?!\w)")
-_CAMEL_CASE = re.compile(r"(?<!\w)[a-zäöüß]{2,}[A-ZÄÖÜ][a-zäöüß]")
+_SNAKE_CASE = re.compile(r"(?<!\w)[a-zäöüß]++(?:_[a-zäöüß0-9]++)++(?!\w)")
+_CAMEL_CASE = re.compile(r"(?<!\w)[a-zäöüß]{2,}+[A-ZÄÖÜ][a-zäöüß]")
 _FLAG = re.compile(r"(?<!\S)--[A-Za-z]")
 
 
