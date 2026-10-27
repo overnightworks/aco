@@ -7,9 +7,10 @@
  * truth this re-reads from after a write, rather than mutating a copy.
  */
 
+import { SvelteSet } from 'svelte/reactivity';
 import { postDecision } from '../../client';
 import type { CardOption, DecisionRequest, OptionLine, Outcome, YesNoLine } from '../../types';
-import { cardHeading, outcomeLabel } from '../model/boardSummary';
+import { cardHeading, outcomeLabel, type StripState } from '../model/boardSummary';
 import {
 	BOARD_UNREACHABLE_MESSAGE,
 	decisionRequest,
@@ -18,9 +19,15 @@ import {
 	otherDecisionRequest,
 	readDecisionResult,
 	UNDO_SECONDS,
+	unclearDecisionRequest,
 	type DecisionOutcome
 } from '../model/decision';
-import { pendingOptionText, pendingOtherText } from '../model/optionCard';
+import {
+	pendingOptionText,
+	pendingOtherText,
+	type EscapeKind,
+	type EscapePanel
+} from '../model/optionCard';
 
 export interface DecisionBanner {
 	kind: 'already-ruled' | 'changed' | 'failed';
@@ -36,14 +43,20 @@ export function locksCard(banner: DecisionBanner | null): boolean {
 export interface PendingDecision {
 	key: string;
 	message: string;
+	state: StripState;
 }
 
 interface PendingEntry {
 	request: DecisionRequest;
 	message: string;
+	state: StripState;
 	timer: ReturnType<typeof setTimeout>;
-	/** The card whose Other panel `Undo` reopens, for an Other answer only. */
-	reopens: OptionLine | null;
+	/** The panel `Undo` reopens, for an escape answer only. */
+	reopens: EscapePanel | null;
+}
+
+function draftKey(key: string, kind: EscapeKind): string {
+	return `${kind}:${key}`;
 }
 
 function withoutKey<Value>(record: Record<string, Value>, key: string): Record<string, Value> {
@@ -58,10 +71,13 @@ export class DecisionStore {
 	 * when it is still the one shown, never for a manual reload after a
 	 * refusal banner. */
 	#justRuled: string | null = $state(null);
-	/** The Other answer typed per card, kept until its decision is stored. */
+	/** The key this store itself just sent back to its head, reported once
+	 * (`acknowledgeReturned`) so selecting the card later never moves the stage. */
+	#justReturned: string | null = $state(null);
+	/** The text typed per card and escape kind, kept until its decision is stored. */
 	#drafts: Record<string, string> = $state({});
-	/** The card as shown when its Other panel opened -- the card `Send` posts. */
-	#otherPanels: Record<string, OptionLine> = $state({});
+	/** The one open escape panel per card, with the card as shown when it opened. */
+	#panels: Record<string, EscapePanel> = $state({});
 
 	constructor(
 		private readonly token: string,
@@ -73,7 +89,8 @@ export class DecisionStore {
 	get pendingEntries(): PendingDecision[] {
 		return Object.entries(this.#pending).map(([key, entry]) => ({
 			key,
-			message: entry.message
+			message: entry.message,
+			state: entry.state
 		}));
 	}
 
@@ -89,25 +106,34 @@ export class DecisionStore {
 		return this.#justRuled;
 	}
 
-	draft(key: string): string {
-		return this.#drafts[key] ?? '';
+	get justReturned(): string | null {
+		return this.#justReturned;
 	}
 
-	setDraft(key: string, text: string): void {
-		this.#drafts = { ...this.#drafts, [key]: text };
+	acknowledgeReturned(): void {
+		this.#justReturned = null;
 	}
 
-	/** The card an open Other panel snapshotted, or null while it is closed. */
-	otherPanel(key: string): OptionLine | null {
-		return this.#otherPanels[key] ?? null;
+	draft(key: string, kind: EscapeKind): string {
+		return this.#drafts[draftKey(key, kind)] ?? '';
 	}
 
-	openOtherPanel(key: string, shown: OptionLine): void {
-		this.#otherPanels = { ...this.#otherPanels, [key]: shown };
+	setDraft(key: string, kind: EscapeKind, text: string): void {
+		this.#drafts = { ...this.#drafts, [draftKey(key, kind)]: text };
 	}
 
-	closeOtherPanel(key: string): void {
-		this.#otherPanels = withoutKey(this.#otherPanels, key);
+	/** The open escape panel and the card it snapshotted, or null while closed. */
+	panel(key: string): EscapePanel | null {
+		return this.#panels[key] ?? null;
+	}
+
+	/** Opening one kind closes the other: a card has one panel at a time. */
+	openPanel(key: string, panel: EscapePanel): void {
+		this.#panels = { ...this.#panels, [key]: panel };
+	}
+
+	closePanel(key: string): void {
+		this.#panels = withoutKey(this.#panels, key);
 	}
 
 	/** Starts the undo window for one card as shown; never sends before it elapses. */
@@ -115,7 +141,8 @@ export class DecisionStore {
 		this.#startUndoWindow(
 			lineKey(repo, item, line),
 			decisionRequest(repo, item, line, outcome, note),
-			`${outcomeLabel(outcome)}: ${cardHeading(line)}`
+			`${outcomeLabel(outcome)}: ${cardHeading(line)}`,
+			'done'
 		);
 	}
 
@@ -124,19 +151,34 @@ export class DecisionStore {
 		this.#startUndoWindow(
 			lineKey(repo, item, line),
 			optionDecisionRequest(repo, item, line, option),
-			pendingOptionText(line, option)
+			pendingOptionText(line, option),
+			'done'
 		);
 	}
 
 	/** The same window for the operator's own answer; the panel closes and the draft stays. */
 	decideOther(repo: string, item: number, shown: OptionLine, answer: string): void {
 		const key = lineKey(repo, item, shown);
-		this.closeOtherPanel(key);
+		this.closePanel(key);
 		this.#startUndoWindow(
 			key,
 			otherDecisionRequest(repo, item, shown, answer),
 			pendingOtherText(shown),
-			shown
+			'done',
+			{ kind: 'other', shown }
+		);
+	}
+
+	/** The same window for sending the card back to its head; the note may be blank. */
+	decideUnclear(repo: string, item: number, shown: OptionLine, note: string): void {
+		const key = lineKey(repo, item, shown);
+		this.closePanel(key);
+		this.#startUndoWindow(
+			key,
+			unclearDecisionRequest(repo, item, shown, note),
+			shown.topic,
+			'back',
+			{ kind: 'unclear', shown }
 		);
 	}
 
@@ -144,11 +186,12 @@ export class DecisionStore {
 		key: string,
 		request: DecisionRequest,
 		message: string,
-		reopens: OptionLine | null = null
+		state: StripState,
+		reopens: EscapePanel | null = null
 	): void {
 		this.#banners = withoutKey(this.#banners, key);
 		const timer = setTimeout(() => void this.#commit(key, request), this.undoSeconds * 1000);
-		this.#pending = { ...this.#pending, [key]: { request, message, timer, reopens } };
+		this.#pending = { ...this.#pending, [key]: { request, message, state, timer, reopens } };
 	}
 
 	/** Cancels a still-pending decision; a no-op once it already wrote or was undone. */
@@ -160,7 +203,7 @@ export class DecisionStore {
 		clearTimeout(entry.timer);
 		this.#pending = withoutKey(this.#pending, key);
 		if (entry.reopens !== null) {
-			this.openOtherPanel(key, entry.reopens);
+			this.openPanel(key, entry.reopens);
 		}
 	}
 
@@ -179,11 +222,24 @@ export class DecisionStore {
 			outcome = { kind: 'failed', message: BOARD_UNREACHABLE_MESSAGE };
 		}
 		if (outcome.kind === 'ruled') {
-			this.#drafts = withoutKey(this.#drafts, key);
+			this.#dropDrafts(key, ['other', 'unclear']);
 			await this.reload();
 			this.#justRuled = key;
 			return;
 		}
+		if (outcome.kind === 'returned') {
+			this.#dropDrafts(key, ['unclear']);
+			await this.reload();
+			this.#justReturned = key;
+			return;
+		}
 		this.#banners = { ...this.#banners, [key]: outcome };
+	}
+
+	#dropDrafts(key: string, kinds: EscapeKind[]): void {
+		const dropped = new SvelteSet(kinds.map((kind) => draftKey(key, kind)));
+		this.#drafts = Object.fromEntries(
+			Object.entries(this.#drafts).filter(([draft]) => !dropped.has(draft))
+		);
 	}
 }

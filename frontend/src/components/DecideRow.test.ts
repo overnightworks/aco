@@ -29,7 +29,7 @@ function renderRow(
 		refreshing?: boolean;
 		banner?: DecisionBanner | null;
 		line?: typeof songCard;
-		other?: typeof escapes;
+		escapes?: typeof escapes;
 	} = {}
 ) {
 	const onDecide = vi.fn();
@@ -148,7 +148,7 @@ test('[ABRD-46] a closed confirm adds no button and no visible dialog to a row w
 });
 
 test('[ABRD-63] Other… sits beside the picks, outside the Decide group, so the pick count stays', () => {
-	renderRow({ other: escapes });
+	renderRow({ escapes });
 
 	const picks = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button');
 	expect(picks).toHaveLength(3);
@@ -165,23 +165,36 @@ test('[ABRD-63] a row given no escapes offers no Other…', () => {
 test.each([
 	['changed', { kind: 'changed', message: LINE_CHANGED_MESSAGE }],
 	['already ruled', { kind: 'already-ruled', message: 'Schon entschieden' }]
-] as const)('[ABRD-65] Other… hides with the picks once the card is %s', (_name, banner) => {
-	renderRow({ other: escapes, banner });
+] as const)(
+	'[ABRD-65] Other… and Unclear hide with the picks once the card is %s',
+	(_name, banner) => {
+		renderRow({ escapes, banner });
 
-	expect(screen.queryByRole('button', { name: 'Other…' })).toBeNull();
-});
+		expect(screen.queryByRole('button', { name: 'Other…' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
+	}
+);
 
-test('[ABRD-65] a failed post keeps Other… for a retry', () => {
-	renderRow({ other: escapes, banner: { kind: 'failed', message: 'aco unavailable' } });
+test('[ABRD-65] a failed post keeps Other… and Unclear for a retry', () => {
+	renderRow({ escapes, banner: { kind: 'failed', message: 'aco unavailable' } });
 
 	expect(screen.getByRole('button', { name: 'Other…' })).toBeTruthy();
+	expect(screen.getByRole('button', { name: 'Unclear' })).toBeTruthy();
 });
 
-test('[ABRD-69] a card with its head still offers Other…', () => {
+test('[ABRD-72] a card with its head keeps its picks and Other… but offers no Unclear', () => {
 	renderRow({
-		other: escapes,
-		line: optionLine({ returned_on: '2026-10-27', returned_note: 'Why?' })
+		escapes,
+		line: optionLine({
+			options: songCard.options,
+			returned_on: '2026-10-27',
+			returned_note: 'Why?'
+		})
 	});
 
 	expect(screen.getByRole('button', { name: 'Other…' })).toBeTruthy();
+	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
+	expect(within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')).toHaveLength(
+		3
+	);
 });

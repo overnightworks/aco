@@ -7,7 +7,8 @@ import {
 	lineKey,
 	noteOrNull,
 	otherDecisionRequest,
-	readDecisionResult
+	readDecisionResult,
+	unclearDecisionRequest
 } from './decision';
 
 describe('lineKey / decisionRequest', () => {
@@ -48,6 +49,29 @@ describe('otherDecisionRequest', () => {
 	});
 });
 
+describe('unclearDecisionRequest', () => {
+	test.each([
+		['  Why two options? \n', 'Why two options?'],
+		['   ', null]
+	])('[ABRD-75] the note %j goes as %j, with the card fingerprint and no letter', (raw, note) => {
+		const request = unclearDecisionRequest(
+			'repo',
+			42,
+			optionLine({ index: 4, fingerprint: 'fp-song' }),
+			raw
+		);
+
+		expect(request).toEqual({
+			repo: 'repo',
+			item: 42,
+			line: 4,
+			fingerprint: 'fp-song',
+			unclear: true,
+			note
+		});
+	});
+});
+
 describe('noteOrNull', () => {
 	test.each([
 		['', null],
@@ -61,6 +85,12 @@ describe('noteOrNull', () => {
 describe('readDecisionResult', () => {
 	test('a ruled result needs no message', () => {
 		expect(readDecisionResult({ status: 'ruled', message: null })).toEqual({ kind: 'ruled' });
+	});
+
+	test('[ABRD-76] a returned result is read as stored, not as a refusal', () => {
+		expect(readDecisionResult({ status: 'returned', message: null })).toEqual({
+			kind: 'returned'
+		});
 	});
 
 	test('an already-ruled result gets the board’s own operator-facing sentence', () => {

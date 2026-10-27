@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { STATE_LABEL, type StripState } from '../app/model/boardSummary';
 	import StateShape from './StateShape.svelte';
 
-	let { message, onUndo }: { message: string; onUndo: () => void } = $props();
+	let { message, kind, onUndo }: { message: string; kind: StripState; onUndo: () => void } =
+		$props();
 
 	let undo: HTMLButtonElement | undefined = $state();
 
@@ -12,9 +14,9 @@
 	});
 </script>
 
-<div class="strip">
-	<StateShape state="done" />
-	<span class="tx">Decided: {message}</span>
+<div class="strip" class:back={kind === 'back'}>
+	<StateShape state={kind} />
+	<span class="tx">{STATE_LABEL[kind]}: {message}</span>
 	<button type="button" class="undo" bind:this={undo} onclick={onUndo}>Undo</button>
 </div>
 
@@ -30,6 +32,9 @@
 		border-radius: 10px;
 		background: var(--good-soft);
 		color: var(--fg);
+	}
+	.strip.back {
+		background: var(--surface-2);
 	}
 	.tx {
 		flex: 1;

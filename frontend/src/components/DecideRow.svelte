@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, type ComponentProps } from 'svelte';
 	import {
 		asksToConfirm,
 		CONFIRM_LABEL,
@@ -23,7 +23,7 @@
 		banner,
 		onDecide,
 		onReload,
-		other
+		escapes
 	}: {
 		line: OptionLine;
 		pending: boolean;
@@ -31,15 +31,8 @@
 		banner: DecisionBanner | null;
 		onDecide: (line: OptionLine, option: CardOption) => void;
 		onReload: () => void;
-		/** The Other… escape and its panel; absent where the card offers none. */
-		other?: {
-			panel: OptionLine | null;
-			draft: string;
-			onOpen: (shown: OptionLine) => void;
-			onClose: () => void;
-			onDraft: (text: string) => void;
-			onSend: (shown: OptionLine, text: string) => void;
-		};
+		/** The escapes (Other…, Unclear) and their panel; absent where the card offers none. */
+		escapes?: Omit<ComponentProps<typeof EscapeRow>, 'line' | 'pending' | 'refreshing'>;
 	} = $props();
 
 	const titleId = $props.id();
@@ -126,8 +119,8 @@
 						</button>
 					{/each}
 				</div>
-				{#if other !== undefined}
-					<EscapeRow {line} {pending} {refreshing} {...other} />
+				{#if escapes !== undefined}
+					<EscapeRow {line} {pending} {refreshing} {...escapes} />
 				{/if}
 			</div>
 		{/if}

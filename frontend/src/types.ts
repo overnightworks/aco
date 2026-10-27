@@ -125,11 +125,23 @@ export interface OtherDecisionRequest {
 	other: string;
 }
 
-export type DecisionRequest = YesNoDecisionRequest | OptionDecisionRequest | OtherDecisionRequest;
+/** The same body for sending an option card back to its head with an optional
+ * note (ABRD-70). */
+export interface UnclearDecisionRequest {
+	repo: string;
+	item: number;
+	line: number;
+	fingerprint: string;
+	unclear: true;
+	note: string | null;
+}
+
+export type DecisionRequest =
+	YesNoDecisionRequest | OptionDecisionRequest | OtherDecisionRequest | UnclearDecisionRequest;
 
 export interface DecisionResult {
-	/** `aco.board.ports.DecisionStatus`'s three values, the only ones `POST
+	/** `aco.board.ports.DecisionStatus`'s four values, the only ones `POST
 	 * /api/rule` ever answers with a 200. */
-	status: 'ruled' | 'already_ruled' | 'failed';
+	status: 'ruled' | 'returned' | 'already_ruled' | 'failed';
 	message: string | null;
 }

@@ -23,7 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01, ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-66, ABRD-67, ABRD-68, ABRD-69 | ABRD-39 (option) |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-39 (option) |
 | a withdrawn line | ABRD-60 | — |
 | an `option`, `other` or `unclear` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
@@ -98,11 +98,17 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
 - [ ] [ABRD-70] An `unclear` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --unclear [--note=<T>] --card-hash=<H> --json`, no `--via`, `<T>` the trimmed note (E-ABRD-14).
 - [ ] [ABRD-71] An `unclear` aco stores answers 200 `{"status": "returned", "message": null}`: the line stays open, with its head; only a stored `option` or `other` answers `ruled`.
+- [ ] [ABRD-72] An open option card's Decide row ends with `Other…` and `Unclear`; a card with its head (ABRD-61) shows no `Unclear` and no Unclear panel, and keeps its picks and `Other…`.
+- [ ] [ABRD-73] `Unclear` opens the panel with one focused textarea (`What is unclear? (optional)`, at most 280 characters) and `Send`, enabled while blank; it closes `Other…`'s panel; each keeps its draft.
+- [ ] [ABRD-74] `Send` closes the panel and starts the undo window with a grey strip: the With head shape, `With head: <topic>` and `Undo` (ABRD-59); `Undo` posts nothing and reopens the panel with the note.
+- [ ] [ABRD-75] After the window it posts `unclear` with the trimmed note, none if blank (ABRD-70); `Unclear` locks, and the card is posted and refused as ABRD-65, ABRD-66 and ABRD-68 say for `Other…`.
+- [ ] [ABRD-76] Once the post answers `returned` (ABRD-71), the stage moves to the list's first Open row, else stays on the card, now with its head; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-52] An option card's Decide row sticks to the pane's foot while the card runs on beneath it and then casts a shadow over that content; at the card's end it rests in place without one.
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`,
-`frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts` and `frontend/e2e/pictureEnlargement.spec.ts`; ordering is additionally proven by
+`frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`,
+`frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories
