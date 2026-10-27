@@ -4,9 +4,9 @@
 `state_board.StateRefBoard` both implement; `ForgeOperation` names every
 operation on that contract and `Capability` answers, per operation and adapter,
 whether an adapter can perform it at all. The GitHub adapter never answers
-`UNSUPPORTED`. `cmd_land` and `cmd_release` depend on `GitHubForge` directly and
-`cmd_item` on `StateRefBoard`, so a further forge needs its own contract for
-them first.
+`UNSUPPORTED`. `cmd_land` depends on `GitHubForge` directly, `cmd_item` on
+`StateRefBoard`, and `cmd_release` on both, so a further forge needs its own
+contract for them first.
 """
 
 from __future__ import annotations
