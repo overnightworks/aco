@@ -114,7 +114,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via` and unknown keys leave it unchanged.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
 - [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
-- [ ] [ABRD-60] A line with `"form": "withdrawn"` is skipped unparsed, whatever its other keys: no list shows it, its repo stays readable, its item's other lines keep their `index`, an item of only such is not listed.
+- [ ] [ABRD-60] A line with `"form": "withdrawn"` is skipped unparsed, whatever its keys: no list shows it, its repo stays readable, the item's other lines keep their `index`, an item of only such is not listed.
 
 An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,
