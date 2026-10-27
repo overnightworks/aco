@@ -232,7 +232,7 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
         row(7, "Karte", option_line(index=2, card_hash=GOLDEN_CARD_HASH, topic="Sprung"))
     )
     shown = first_listed_line(board)
-    board.post_rule(
+    posted = board.post_rule(
         {
             "repo": board.repo,
             "item": 7,
@@ -248,6 +248,7 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
 
     assert ruled.status == 0
     assert json.loads(ruled.stdout)["reason"] == reason
+    assert posted.json()["status"] == reason
     entry = body.block_expectation_dicts(body.locate_block(forge.item_bodies[7]).data)[1]
     assert {key: entry.get(key) for key in stored(text)} == stored(text)
     assert stamped <= set(entry)
