@@ -37,17 +37,17 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     outcome.add_argument("--yes", action="store_const", dest="ruling", const="yes")
     outcome.add_argument("--no", action="store_const", dest="ruling", const="no")
     outcome.add_argument("--later", action="store_const", dest="ruling", const="later")
-    # The option flags stay out of --help and usage so the yes/no refusals stay byte-identical.
-    outcome.add_argument("--option", metavar="X", help=argparse.SUPPRESS)
-    outcome.add_argument("--other", metavar="TEXT", help=argparse.SUPPRESS)
+    outcome.add_argument("--option", metavar="X", help="the letter of the option card's answer")
+    outcome.add_argument("--other", metavar="TEXT", help="a free-text answer")
+    # --unclear is not an answer a head types from a chat, so it stays out of --help and usage.
     outcome.add_argument("--unclear", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--note", help="appended to the line's own text as ' Anmerkung: TEXT'")
     parser.add_argument(
         "--via",
         choices=[via.value for via in expectation_grammar.RulingVia],
-        help=argparse.SUPPRESS,
+        help="board, chat, or default when a presented card stayed unanswered",
     )
-    parser.add_argument("--card-hash", metavar="HASH", help=argparse.SUPPRESS)
+    parser.add_argument("--card-hash", metavar="HASH", help="the hash of the card the decider saw")
 
 
 class InvalidTargetError(protocol.ClaimError):
