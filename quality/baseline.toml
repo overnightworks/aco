@@ -31,7 +31,7 @@
 "tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4315
 "tests/test_checkout.py" = 2047
-"tests/test_cli.py" = 17662
+"tests/test_cli.py" = 17660
 "tests/test_cut.py" = 1124
 "tests/test_github.py" = 3203
 "tests/test_land_after_merge_rerun.py" = 880
@@ -103,7 +103,6 @@
 "test_next_parallel_set_uses_a_cut_proposals_own_row_scope" = 68
 "test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line" = 62
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
-"test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped" = 61
 "test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 71
 "test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 67
 "test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 61
