@@ -1,8 +1,0 @@
-claim_id = "a9aea77c8d394364be6cd2808acb099b"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "1ae7aafd4cf69ffc05b7e74e1891e6d788f516b8"
-branch = "claude/issue-490-claim-standing-replay-real-worktree"
-scope = ["quality/baseline.toml", "tests/support/claim_worktrees.py", "tests/test_cli.py", "tests/test_cmd_claim_checkout.py", "tests/test_cmd_claim_identity.py", "tests/test_cmd_claim_replay.py", "tests/test_cmd_claim_standing.py", "tests/test_state_board.py"]
-opened_commit = "1177104761cb48ea88114b14302011957a9370a5"
-whole_reason = "quality v0.7.0 forbids one test module importing another, so the helper changes in claim_worktrees.py, the two new modules, the three edited test files and the baseline land together."
