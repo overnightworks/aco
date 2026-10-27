@@ -56,11 +56,16 @@ outcomes = rule.add_mutually_exclusive_group(required=True)
 for outcome in ("yes", "no", "later"):
     outcomes.add_argument("--" + outcome, dest="ruling", action="store_const", const=outcome)
 outcomes.add_argument("--option", dest="ruling")
+outcomes.add_argument("--other")
 rule.add_argument("--via")
 rule.add_argument("--card-hash")
 rule.add_argument("--note")
 rule.add_argument("--json", action="store_true")
 arguments = parser.parse_args()
+if getattr(arguments, "other", None) is not None:
+    arguments.ruling = "other"
+    if arguments.via != "board" or arguments.card_hash is None or arguments.note is not None:
+        parser.error("--other needs --via board and --card-hash, and takes no --note")
 
 
 def refuse(reason, message):
@@ -108,6 +113,8 @@ if line["ruling"] is not None:
 line["ruling"], line["ruled_on"] = arguments.ruling, "2026-10-03"
 if arguments.via is not None:
     line["via"] = arguments.via
+if arguments.other is not None:
+    line["other"] = arguments.other
 if arguments.note is not None:
     line["text"] += " Anmerkung: " + arguments.note
 rulings.write_text(json.dumps(rows), encoding="utf-8")

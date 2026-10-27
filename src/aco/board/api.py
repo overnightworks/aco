@@ -27,6 +27,7 @@ from .ports import (
     OptionLetter,
     OptionLine,
     OtherAnswer,
+    OtherDecision,
     Outcome,
 )
 
@@ -47,7 +48,7 @@ class DecisionRequest:
     """The label of the configured repo this decision belongs to."""
     fingerprint: str
     """The fingerprint of the card as it was shown when the operator chose."""
-    decision: Decision | OptionDecision
+    decision: Decision | OptionDecision | OtherDecision
 
 
 def board_json(readings: Sequence[RepoReading]) -> str:
@@ -100,10 +101,15 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
     return None
 
 
-def _decision(item: int, line: int, fields: dict[str, object]) -> Decision | OptionDecision | None:
-    """Exactly one of `outcome` (with an optional note) and `option` (with none);
-    an absent key and a `null` both name nothing, but a post carrying both keys
-    is refused whatever their values."""
+def _decision(
+    item: int, line: int, fields: dict[str, object]
+) -> Decision | OptionDecision | OtherDecision | None:
+    """Exactly one of `outcome` (with an optional note), `option` (with none)
+    and `other` (with neither); an absent key and a `null` both name nothing,
+    but a post carrying both `outcome` and `option` keys is refused whatever
+    their values."""
+    if fields.get(OTHER) is not None:
+        return _other_decision(item, line, fields)
     if "outcome" in fields and "option" in fields:
         return None
     outcome, option, note = fields.get("outcome"), fields.get("option"), fields.get("note")
@@ -118,6 +124,15 @@ def _decision(item: int, line: int, fields: dict[str, object]) -> Decision | Opt
     if outcome is None and _is_option_letter(option) and (note is None or _is_blank_text(note)):
         return OptionDecision(item=item, index=line, letter=option)
     return None
+
+
+def _other_decision(item: int, line: int, fields: dict[str, object]) -> OtherDecision | None:
+    """The operator's own words alone: stripped, non-blank and within ABRD-05's bounds."""
+    text = fields[OTHER]
+    named_elsewhere = any(fields.get(key) is not None for key in ("outcome", "option", "note"))
+    if named_elsewhere or not _is_note_text(text) or not text.strip():
+        return None
+    return OtherDecision(item=item, index=line, text=text.strip())
 
 
 def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:

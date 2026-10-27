@@ -12,6 +12,7 @@
 	} from '../app/model/optionCard';
 	import { locksCard, type DecisionBanner } from '../app/state/decision.svelte';
 	import type { CardOption, OptionLine } from '../types';
+	import EscapeRow from './EscapeRow.svelte';
 	import RefusalBanner from './RefusalBanner.svelte';
 	import WarnMark from './WarnMark.svelte';
 
@@ -21,7 +22,8 @@
 		refreshing,
 		banner,
 		onDecide,
-		onReload
+		onReload,
+		other
 	}: {
 		line: OptionLine;
 		pending: boolean;
@@ -29,6 +31,15 @@
 		banner: DecisionBanner | null;
 		onDecide: (line: OptionLine, option: CardOption) => void;
 		onReload: () => void;
+		/** The Other… escape and its panel; absent where the card offers none. */
+		other?: {
+			panel: OptionLine | null;
+			draft: string;
+			onOpen: (shown: OptionLine) => void;
+			onClose: () => void;
+			onDraft: (text: string) => void;
+			onSend: (shown: OptionLine, text: string) => void;
+		};
 	} = $props();
 
 	const titleId = $props.id();
@@ -99,20 +110,25 @@
 			<RefusalBanner {banner} {onReload} />
 		{/if}
 		{#if !locksCard(banner)}
-			<div class="picks" role="group" aria-label={ROW_LABEL.decide}>
-				{#each line.options as option (option.letter)}
-					<button
-						type="button"
-						class="pick"
-						class:recommended={option.letter === line.recommended}
-						disabled={pending}
-						aria-disabled={refreshing}
-						aria-label={pickLabel(option)}
-						onclick={() => pick(option)}
-					>
-						{option.letter}
-					</button>
-				{/each}
+			<div class="bar">
+				<div class="picks" role="group" aria-label={ROW_LABEL.decide}>
+					{#each line.options as option (option.letter)}
+						<button
+							type="button"
+							class="pick"
+							class:recommended={option.letter === line.recommended}
+							disabled={pending}
+							aria-disabled={refreshing}
+							aria-label={pickLabel(option)}
+							onclick={() => pick(option)}
+						>
+							{option.letter}
+						</button>
+					{/each}
+				</div>
+				{#if other !== undefined}
+					<EscapeRow {line} {pending} {refreshing} {...other} />
+				{/if}
 			</div>
 		{/if}
 		<dialog
@@ -167,6 +183,12 @@
 	dd {
 		margin: 0;
 		min-width: 0;
+	}
+	.bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 8px;
 	}
 	.picks {
 		display: flex;

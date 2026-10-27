@@ -125,6 +125,18 @@ export function pendingOptionText(line: OptionLine, option: CardOption): string 
 	return `${decidedText(option)} · ${line.topic}`;
 }
 
+export const ESCAPE_LABEL = {
+	other: 'Other…',
+	send: 'Send',
+	answer: 'Your answer',
+	placeholder: 'What should apply instead?'
+} as const;
+
+/** The strip text of an Other answer waiting out the undo window. */
+export function pendingOtherText(line: OptionLine): string {
+	return `Other · ${line.topic}`;
+}
+
 export const SAME_AS_TODAY_MARK = '= TODAY';
 export const CONTRACT_SUMMARY = 'Show';
 export const UNDO_SEPARATOR = ' — ';

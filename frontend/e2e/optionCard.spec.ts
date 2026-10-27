@@ -195,7 +195,7 @@ for (const viewport of [
 			await expect(page.getByText('Notiz', { exact: true })).toHaveCount(0);
 			await expect(card.getByRole('group', { name: 'Decide' }).getByRole('button')).toHaveCount(2);
 			await expect(card.getByRole('button', { name: 'Enlarge picture' })).toHaveCount(1);
-			const disclosures = card.locator('button[aria-expanded]');
+			const disclosures = options.locator('button[aria-expanded]');
 			await expect(disclosures).toHaveCount(2);
 			await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'false');
 			await expect(disclosures.nth(1)).toHaveAttribute('aria-expanded', 'false');
@@ -361,7 +361,7 @@ for (const viewport of [
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
 
-			const disclosures = page.locator('.option-card button[aria-expanded]');
+			const disclosures = page.locator('.option-card li button[aria-expanded]');
 			await expect(disclosures).toHaveCount(4);
 			for (let position = 0; position < 4; position += 1) {
 				await expect(disclosures.nth(position)).toHaveAttribute('aria-expanded', 'false');

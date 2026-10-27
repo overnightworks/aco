@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { line } from '../../test-support/board';
+import { line, optionLine } from '../../test-support/board';
 import {
 	ALREADY_RULED_MESSAGE,
 	decisionRequest,
 	LINE_CHANGED_MESSAGE,
 	lineKey,
 	noteOrNull,
+	otherDecisionRequest,
 	readDecisionResult
 } from './decision';
 
@@ -24,6 +25,25 @@ describe('lineKey / decisionRequest', () => {
 			fingerprint: 'fp-abc',
 			outcome: 'later',
 			note: 'a note'
+		});
+	});
+});
+
+describe('otherDecisionRequest', () => {
+	test('[ABRD-64] an Other answer carries the trimmed text and the card fingerprint, no letter or note', () => {
+		const request = otherDecisionRequest(
+			'repo',
+			42,
+			optionLine({ index: 4, fingerprint: 'fp-song' }),
+			'  Only on desktop \n'
+		);
+
+		expect(request).toEqual({
+			repo: 'repo',
+			item: 42,
+			line: 4,
+			fingerprint: 'fp-song',
+			other: 'Only on desktop'
 		});
 	});
 });

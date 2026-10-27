@@ -27,6 +27,7 @@ from .ports import (
     ExpectationLine,
     OptionDecision,
     OptionLine,
+    OtherDecision,
 )
 
 LINE_CHANGED = "Diese Zeile hat sich geändert, bitte neu laden"
@@ -81,7 +82,7 @@ class Board:
         return BoardSnapshot(self._decisions.expectation_lines())
 
     def decide_one(
-        self, decision: Decision | OptionDecision, repo: str, fingerprint: str
+        self, decision: Decision | OptionDecision | OtherDecision, repo: str, fingerprint: str
     ) -> DecisionResult:
         """Write `decision` unless the open line it names no longer reads as shown.
 
@@ -157,7 +158,7 @@ class Boards:
             return tuple(_reading(label, futures[label]) for label in self._boards)
 
     def decide(
-        self, repo: str, decision: Decision | OptionDecision, fingerprint: str
+        self, repo: str, decision: Decision | OptionDecision | OtherDecision, fingerprint: str
     ) -> DecisionResult:
         """Write through `repo`'s board; `repo` must already be one of `labels`.
 

@@ -172,6 +172,15 @@ class OptionDecision:
     letter: OptionLetter
 
 
+@dataclass(frozen=True)
+class OtherDecision:
+    """An option line answered in the operator's own words, stripped."""
+
+    item: int
+    index: int
+    text: str
+
+
 class DecisionStatus(StrEnum):
     RULED = "ruled"
     ALREADY_RULED = "already_ruled"
@@ -206,7 +215,9 @@ class DecisionPort(Protocol):
         an unknown item, or a line the item does not have."""
         ...
 
-    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
-        """Write one option decision for the card `card_hash` names; the source
+    def rule_option(
+        self, decision: OptionDecision | OtherDecision, card_hash: str
+    ) -> DecisionResult | CardChanged:
+        """Write one option or Other decision for the card `card_hash` names; the source
         compares that hash again at its write and refuses a changed card."""
         ...
