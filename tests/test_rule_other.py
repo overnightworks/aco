@@ -168,6 +168,30 @@ class TestRuleOther:
         assert (result.status, result.stderr) == (2, f"ERROR: {ALREADY_RULED}\n")
         assert client.body_writes == []
 
+    def test_next_and_board_count_an_other_line_as_decided(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: BODY-92, RUL-16 -- `ruling` present means decided: `board` counts the Other
+        line ruled, and `next` asks for no refining once the item's other line is ruled."""
+        client = serve_item(monkeypatch, item_body(card()))
+        run_cli(["rule", "7", *other_arguments(OTHER_ANSWER)], capsys)
+        serve_written(monkeypatch, client.item_bodies[7])
+        shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"][0]
+        assert (shown["expectation_state"], shown["expectation_progress"]) == (
+            "proposed",
+            {"open": 1, "total": 2},
+        )
+        assert "expectations unruled" in run_cli(["next"], capsys).expect_success()
+        later = serve_item(monkeypatch, client.item_bodies[7])
+        run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
+        serve_written(monkeypatch, later.item_bodies[7])
+        shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"][0]
+        assert (shown["expectation_state"], shown["expectation_progress"]) == (
+            "ruled",
+            {"open": 0, "total": 2},
+        )
+        assert "expectations unruled" not in run_cli(["next"], capsys).expect_success()
+
 
 @pytest.mark.usefixtures("clone")
 class TestOtherLineGrammar:
