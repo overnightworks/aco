@@ -1,0 +1,8 @@
+claim_id = "b2cab91a6f0347ccbf4b366f6171681c"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "38e8f375d64d9ed58d2b300628913af58f3c0c86"
+branch = "claude/issue-474-scope-width-real-worktrees"
+scope = ["quality/baseline.toml", "tests/support/claim_worktrees.py", "tests/support/cli_fixtures.py", "tests/test_cli.py", "tests/test_cmd_claim_checkout.py", "tests/test_cmd_claim_scope_width.py"]
+opened_commit = "b6f1441a11d3d28bb6272e2cb2f1c2ca7d547320"
+whole_reason = "One test move: the width cases leave test_cli.py for one real-worktree module, the patch helper and the shared arrangement follow, and the baseline that keys them is rewritten together."
