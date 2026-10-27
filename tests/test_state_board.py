@@ -1864,13 +1864,32 @@ class TestStateRefBoardAtomicLanding:
         }
 
 
-def _stub_claim_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The checkout reads `claim` makes that no state-ref proof is about --
-    the worktree's own validation, scope directories, and versioned files
-    -- stubbed the one way every `claim` in `TestCliStateRefForge` needs."""
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: ("README",))
+def _commit_state_ref_pin(worktree: Path) -> None:
+    """The pin `_enter_pinned_checkout` wrote, committed: a lane made from
+    `worktree` carries it, and `claim` finds the tree clean."""
+    real_git(worktree, "add", ".aco/board.toml")
+    real_git(worktree, "commit", "-q", "-m", "pin state-ref storage")
+
+
+def _add_lane(monkeypatch: pytest.MonkeyPatch, worktree: Path, branch: str, *, name: str) -> Path:
+    """A linked worktree on the new `branch`, made this run's checkout root
+    and cwd."""
+    lane = worktree.parent / name
+    real_git(worktree, "worktree", "add", "-q", "-b", branch, str(lane))
+    redirect_toplevel(monkeypatch, lane)
+    monkeypatch.chdir(lane)
+    return lane
+
+
+def _enter_claim_lane(
+    monkeypatch: pytest.MonkeyPatch, worktree: Path, branch: str, *, name: str = "lane"
+) -> str:
+    """A real linked worktree on the new `branch`, made from `worktree`
+    after the pin is committed, as this run's checkout root and cwd -- the
+    lane `claim` is made from. Answers the head a claim there names as its
+    base."""
+    _commit_state_ref_pin(worktree)
+    return head_sha(_add_lane(monkeypatch, worktree, branch, name=name))
 
 
 def _first_ruling_date(capsys: pytest.CaptureFixture[str]) -> str:
@@ -2086,7 +2105,12 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, {f"{MALFORMED_ID}.md": valid}
         )
-        _stub_claim_checkout(monkeypatch)
+        if operation in {"derived", "narrow", "wide", "wide-flag", "claim-flag"} or (
+            operation.startswith("replay-")
+        ):
+            _enter_claim_lane(monkeypatch, worktree, "codex/whole")
+        else:
+            _commit_state_ref_pin(worktree)
         monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Codex Sol")
         remote = f"file://{bare_remote}"
         start = ["start", MALFORMED_ID, "--slug", "whole"]
@@ -2239,13 +2263,13 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, {f"{MALFORMED_ID}.md": content}
         )
-        _stub_claim_checkout(monkeypatch)
+        head = _enter_claim_lane(monkeypatch, worktree, "codex/b")
         monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Codex Sol")
         remote = f"file://{bare_remote}"
         arguments = [
             *command,
             *(
-                ["--agent", "Codex Sol", "--branch", "codex/b", "--base", head_sha(worktree)]
+                ["--agent", "Codex Sol", "--branch", "codex/b", "--base", head]
                 if command[0] == "claim"
                 else []
             ),
@@ -2375,7 +2399,8 @@ class TestCliStateRefForge:
         assert rulings_out.splitlines()[0].startswith(f"{RULABLE_ID} ")
         assert f"#{RULABLE_NUMBER}" not in rulings_out
 
-        _stub_claim_checkout(monkeypatch)
+        branch = f"codex/issue-{RULABLE_NUMBER}-rulable"
+        head = _enter_claim_lane(monkeypatch, worktree, branch)
         claimed = issue_claim.main(
             [
                 "claim",
@@ -2385,9 +2410,9 @@ class TestCliStateRefForge:
                 "--role",
                 "builder",
                 "--base",
-                "a" * 40,
+                head,
                 "--branch",
-                f"codex/issue-{RULABLE_NUMBER}-rulable",
+                branch,
                 "--scope",
                 "README",
                 "--claim-id",
@@ -2413,12 +2438,11 @@ class TestCliStateRefForge:
     ) -> None:
         """`aco claim` against a state-ref item runs its
         slice rules from `StateRefBoard`'s own reads alone, and `aco check`
-        reads the same item back -- neither ever resolves `gh`. The
-        checkout's own cleanliness precondition (`validate_checkout`) is
-        unrelated to this proof and stubbed the same way every other
-        `claim` test stubs it."""
+        reads the same item back -- neither ever resolves `gh`. The claim
+        is made from a real linked worktree on its branch."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        _stub_claim_checkout(monkeypatch)
+        branch = f"codex/issue-{CHILD_A_NUMBER}-slice-a"
+        head = _enter_claim_lane(monkeypatch, worktree, branch)
 
         claimed = issue_claim.main(
             [
@@ -2429,9 +2453,9 @@ class TestCliStateRefForge:
                 "--role",
                 "builder",
                 "--base",
-                "a" * 40,
+                head,
                 "--branch",
-                f"codex/issue-{CHILD_A_NUMBER}-slice-a",
+                branch,
                 "--scope",
                 "README",
                 "--claim-id",
@@ -2794,7 +2818,7 @@ class TestCliStateRefForge:
         it to the end claims the item on that row's scope."""
         _outer_id, item_files = self._nested_container_files(((1, "Slice Z"),))
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
-        _stub_claim_checkout(monkeypatch)
+        _enter_claim_lane(monkeypatch, worktree, "codex/nested-container")
 
         next_status = issue_claim.main(["next"])
         advice = next(
@@ -3707,7 +3731,8 @@ class TestCliStateRefForge:
         edited = run_cli(["item", "edit", printed], capsys, stdin=filled_body)
         assert edited.status == 0
 
-        _stub_claim_checkout(monkeypatch)
+        branch = f"codex/issue-{items.item_number(printed)}-bound-to-gitlab"
+        head = _enter_claim_lane(monkeypatch, worktree, branch)
         claimed = issue_claim.main(
             [
                 "claim",
@@ -3717,9 +3742,9 @@ class TestCliStateRefForge:
                 "--role",
                 "builder",
                 "--base",
-                "a" * 40,
+                head,
                 "--branch",
-                f"codex/issue-{items.item_number(printed)}-bound-to-gitlab",
+                branch,
                 "--scope",
                 "README",
                 "--claim-id",
@@ -3913,7 +3938,7 @@ class TestCliStateRefForge:
         refuses every read of the whole store and every write that decides
         over it -- a minted id, a fresh claim -- `--not-a-twin` included."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
-        _stub_claim_checkout(monkeypatch)
+        _enter_claim_lane(monkeypatch, worktree, "codex/unreadable")
         stdin_source = closed_stdin if piped_body is None else piping(piped_body)
         remote_url = f"file://{bare_remote}"
         before = store.fetch_state(worktree=worktree, remote=remote_url)
@@ -4070,7 +4095,7 @@ class TestCliStateRefForge:
         foreign = {"NOTANID": b"anything", "aco-000001": b"a bare id\n"}
         item_files = {**_item_files(), **foreign}
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
-        _stub_claim_checkout(monkeypatch)
+        _commit_state_ref_pin(worktree)
         monkeypatch.setenv(checkout.ACO_AGENT_ENV, "Codex Sol")
         before = state_ref_listing(bare_remote)
 
@@ -4282,7 +4307,8 @@ class TestCliStateRefForge:
         in this class already exercises."""
         item_files = {**_item_files(), **_rulable_item_files()}
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
-        _stub_claim_checkout(monkeypatch)
+        branch = f"codex/issue-{CHILD_A_NUMBER}-slice-a"
+        head = _enter_claim_lane(monkeypatch, worktree, branch)
 
         claimed = issue_claim.main(
             [
@@ -4293,9 +4319,9 @@ class TestCliStateRefForge:
                 "--role",
                 "builder",
                 "--base",
-                "a" * 40,
+                head,
                 "--branch",
-                f"codex/issue-{CHILD_A_NUMBER}-slice-a",
+                branch,
                 "--scope",
                 "README",
                 "--claim-id",
@@ -5291,7 +5317,8 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, _close_scenario_item_files()
         )
-        _stub_claim_checkout(monkeypatch)
+        branch = f"codex/issue-{CLOSE_BLOCKER_NUMBER}-close-target"
+        head = _enter_claim_lane(monkeypatch, worktree, branch)
         claimed = issue_claim.main(
             [
                 "claim",
@@ -5301,9 +5328,9 @@ class TestCliStateRefForge:
                 "--role",
                 "builder",
                 "--base",
-                "a" * 40,
+                head,
                 "--branch",
-                f"codex/issue-{CLOSE_BLOCKER_NUMBER}-close-target",
+                branch,
                 "--scope",
                 "README",
                 "--claim-id",
@@ -5402,7 +5429,7 @@ class TestCliStateRefForge:
                     "--agent",
                     "Codex Sol",
                     "--base",
-                    "a" * 40,
+                    "{head}",
                     "--branch",
                     "codex/issue-fresh",
                     "--scope",
@@ -5480,12 +5507,16 @@ class TestCliStateRefForge:
         `aco-ffffff` refuses by PIN-31 before any lookup, and
         no output ever prints an id wider than six hex digits."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        _stub_claim_checkout(monkeypatch)
+        head = (
+            _enter_claim_lane(monkeypatch, worktree, "codex/issue-fresh")
+            if arguments[0] == "claim"
+            else ""
+        )
         fresh_title = f"Fresh work (#{items.item_number(CONTAINER_ID)} slice 2)"
         item_id = run_cli(["item", "new", "--title", fresh_title], capsys).expect_success().strip()
         named = {"item": item_id, "seeded": CHILD_A_ID}
 
-        issue_claim.main([argument.format(**named) for argument in arguments])
+        issue_claim.main([argument.format(head=head, **named) for argument in arguments])
 
         captured = capsys.readouterr()
         output = captured.out + captured.err
@@ -5506,7 +5537,7 @@ class TestCliStateRefForge:
         state-ref item -- six hex digits end at 16777215 -- so `claim` has no
         parent to warn about and never prints an id it cannot take back."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        _stub_claim_checkout(monkeypatch)
+        _enter_claim_lane(monkeypatch, worktree, "codex/past-the-id-space")
         item_id = run_cli(
             ["item", "new", "--title", "Fresh work (#16777216 slice 2)"], capsys
         ).expect_success()
@@ -5528,17 +5559,22 @@ class TestCliStateRefForge:
         prints names the standing claim it overlaps by the id the next
         command takes back, never `issue #<n>`."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        self._claim_child_a(monkeypatch, capsys)
+        lane = self._claim_child_a(monkeypatch, worktree, capsys)
+        _add_lane(monkeypatch, worktree, "docs/overlap", name="overlap-lane")
 
         overlapping = run_cli(
-            ["claim", "--branch", "docs/overlap", *self._CLAIMANT], capsys
+            ["claim", "--branch", "docs/overlap", *self._claimant(head_sha(lane))], capsys
         ).expect_success()
 
         assert f"overlaps issue {CHILD_A_ID} on README" in overlapping
         assert f"#{CHILD_A_NUMBER}" not in overlapping
 
     _CHILD_A_BRANCH = "codex/issue-2-slice-a"
-    _CLAIMANT = ("--agent", "Codex Sol", "--base", "a" * 40, "--scope", "README")
+    _CLAIMANT = ("--agent", "Codex Sol", "--base", "{head}", "--scope", "README")
+
+    @classmethod
+    def _claimant(cls, head: str) -> list[str]:
+        return [argument.format(head=head) for argument in cls._CLAIMANT]
 
     @pytest.mark.parametrize(
         ("arguments", "refusal"),
@@ -5583,9 +5619,12 @@ class TestCliStateRefForge:
         at store level: CAS-52's
         `test_item_close_refuses_a_claim_that_lands_between_its_first_attempt_and_the_retry`."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        self._claim_child_a(monkeypatch, capsys)
+        lane = self._claim_child_a(monkeypatch, worktree, capsys)
+        _add_lane(monkeypatch, worktree, "codex/second", name="second-lane")
 
-        err = run_cli(arguments, capsys).expect_refusal()
+        err = run_cli(
+            [argument.format(head=head_sha(lane)) for argument in arguments], capsys
+        ).expect_refusal()
 
         assert err == f"ERROR: {refusal}\n"
 
@@ -5598,39 +5637,36 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         """`RESCOPED` names the claim's
-        item by its id, never `issue #<n>`. The rescope checkout is the
-        claim's own linked worktree, which this single-checkout fixture
-        stands in for."""
+        item by its id, never `issue #<n>`, from the claim's own linked
+        worktree."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        self._claim_child_a(monkeypatch, capsys)
-        monkeypatch.setattr(
-            checkout,
-            "resolve_path_checkout",
-            lambda _directory: checkout.PathCheckout(
-                toplevel=worktree,
-                branch=self._CHILD_A_BRANCH,
-                kind=checkout.CheckoutKind.LINKED_WORKTREE,
-                common_directory=worktree / ".git",
-                has_commit=True,
-            ),
-        )
+        lane = self._claim_child_a(monkeypatch, worktree, capsys)
 
         rescoped = run_cli(
-            ["rescope", CHILD_A_ID, "--agent", "Codex Sol", "--add", str(worktree / "NOTES")],
+            ["rescope", CHILD_A_ID, "--agent", "Codex Sol", "--add", str(lane / "NOTES")],
             capsys,
         ).expect_success()
 
         assert rescoped.startswith(f"RESCOPED issue {CHILD_A_ID}: ")
 
     def _claim_child_a(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+        self, monkeypatch: pytest.MonkeyPatch, worktree: Path, capsys: pytest.CaptureFixture[str]
+    ) -> Path:
         """A standing claim on the seeded actionable `CHILD_A`, scoped to
-        `README` -- the one claim the overlap and rescope proofs share."""
-        _stub_claim_checkout(monkeypatch)
+        `README`, made from its own linked worktree -- the one claim the
+        overlap, refusal and rescope proofs share. Answers that worktree."""
+        head = _enter_claim_lane(monkeypatch, worktree, self._CHILD_A_BRANCH)
         run_cli(
-            ["claim", CHILD_A_ID, "--branch", self._CHILD_A_BRANCH, *self._CLAIMANT], capsys
+            [
+                "claim",
+                CHILD_A_ID,
+                "--branch",
+                self._CHILD_A_BRANCH,
+                *self._claimant(head),
+            ],
+            capsys,
         ).expect_success()
+        return Path.cwd()
 
     def test_readme_week_without_a_forge_runs_end_to_end_against_a_fresh_bare_remote(
         self,
@@ -5647,7 +5683,6 @@ class TestCliStateRefForge:
         and an expectation ruled -- each step asserted by the exact
         sentence README says it prints."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, {})
-        _stub_claim_checkout(monkeypatch)
 
         bootstrap_out = run_cli(["bootstrap"], capsys).expect_success().strip()
         assert protocol.COMMIT_PATTERN.fullmatch(bootstrap_out)
@@ -5706,6 +5741,8 @@ class TestCliStateRefForge:
         assert child_id in next_out
         assert f"#{child_number}" not in next_out
 
+        branch = f"codex/issue-{child_number}-slice-one"
+        head = _enter_claim_lane(monkeypatch, worktree, branch)
         claim_out = run_cli(
             [
                 "claim",
@@ -5715,9 +5752,9 @@ class TestCliStateRefForge:
                 "--role",
                 "builder",
                 "--base",
-                "a" * 40,
+                head,
                 "--branch",
-                f"codex/issue-{child_number}-slice-one",
+                branch,
                 "--scope",
                 "README",
                 "--claim-id",
