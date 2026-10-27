@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from . import board_read, body, checkout, policy, protocol, report, session, workboard
+from . import board_read, body, checkout, expectations, policy, protocol, report, session, workboard
 
 
 def _checkout_scope_is_wide(scope: tuple[str, ...], context: session.RunContext) -> bool:
@@ -252,6 +252,7 @@ class _NextReport:
     close: tuple[int, ...]
     waiting: tuple[int, ...]
     ideas: tuple[int, ...]
+    with_head: tuple[tuple[int, tuple[int, ...]], ...]
     site: _PullSite
 
 
@@ -281,6 +282,13 @@ def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
         "close": _next_json_numbers(next_report.close, storage),
         "waiting_on_operator": _next_json_numbers(next_report.waiting, storage),
         "ideas": _next_json_numbers(next_report.ideas, storage),
+        "with_head": [
+            {
+                "number": workboard.item_json_reference(number, storage),
+                "lines": list(line_indexes),
+            }
+            for number, line_indexes in next_report.with_head
+        ],
     }
     if next_report.action is not None:
         payload.update(_next_action_payload(next_report.action, storage, site=next_report.site))
@@ -352,6 +360,13 @@ def _next(next_report: _NextReport, storage: body.Storage) -> None:
     if next_report.ideas:
         named = ", ".join(workboard.item_label(number, storage) for number in next_report.ideas)
         lines.append(f"ideas: {named}")
+    if next_report.with_head:
+        named = ", ".join(
+            f"{workboard.item_label(number, storage)} line {index}"
+            for number, line_indexes in next_report.with_head
+            for index in line_indexes
+        )
+        lines.append(f"with head: {named}")
     if next_report.skipped:
         skipped_lines = (
             f"{workboard.item_label(skipped_item.number, storage)}: "
@@ -374,10 +389,23 @@ def _next_action_container_number(action: workboard.NextAction | None) -> int | 
     return action.container.number
 
 
+def _with_head(
+    issues: Iterable[workboard.Issue], storage: body.Storage
+) -> tuple[tuple[int, tuple[int, ...]], ...]:
+    """Each open item with an option line sent back to its head, with that
+    line's indexes, in board order."""
+    named = (
+        (issue.number, expectations.returned_line_indexes(issue.body, storage=storage))
+        for issue in issues
+    )
+    return tuple((number, indexes) for number, indexes in named if indexes)
+
+
 def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
     as_json = parsed.json
     try:
-        observed = board_read.observed_board(context)
+        issues = context.forge.list_open_board_issues()
+        observed = board_read.observed_board(context, issues=issues)
         storage = context.config.storage
         projected = observed.board
         action = workboard.next_action(projected)
@@ -389,6 +417,7 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
     close = workboard.zero_cost_closes(projected)
     waiting = workboard.waiting_on_operator(projected)
     ideas = workboard.ideas(projected)
+    with_head = _with_head(issues, storage)
     already_named = {_next_action_container_number(action), *close, *waiting, *ideas}
     skipped = tuple(item for item in _unworkable(projected) if item.number not in already_named)
     next_report = _NextReport(
@@ -399,6 +428,7 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
         close=close,
         waiting=waiting,
         ideas=ideas,
+        with_head=with_head,
         site=site,
     )
     if as_json:

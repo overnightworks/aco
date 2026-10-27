@@ -101,6 +101,7 @@ other printable space are text.
 - [ ] [NEXT-39] An unclaimed, unfrozen item or any container labelled `needs-operator`, or a frozen container, is never pulled, cut or checked; `waiting on operator: <labels>` names it (E-NEXT-13, E-NEXT-15).
 - [ ] [NEXT-40] `aco next --help` names that label and how to set or remove it: `gh issue edit <n> --add-label/--remove-label`, or `aco item edit <item-id>` under `storage = "state-ref"`.
 - [ ] [NEXT-43] An item labelled `idea_label` (PIN-49) is never pulled, cut, checked or closed, whatever its body or merged pull request; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
+- [ ] [NEXT-45] `with head: <label> line <k>, …` follows `ideas:` and names each open item's option lines sent back by `rule --unclear` (RULE-22); absent when none; an unreadable body names none (E-NEXT-16).
 
 ## `parallel:`
 
@@ -125,6 +126,7 @@ other printable space are text.
 - [ ] [NEXT-14] The object always carries `recovery` (`{number, title, step}` each), `skipped` (`{number, reason}` each), `close` and `waiting_on_operator` (bare number arrays), independent of `reason`; see NEXT-44.
 - [ ] [NEXT-15] `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope}` each, uncapped), and `scope_unknown` (a bare number array).
 - [ ] [NEXT-44] The object always carries `ideas`, a bare number array after `waiting_on_operator`, `[]` when no item carries the idea label (NEXT-43).
+- [ ] [NEXT-46] The object always carries `with_head`, after `ideas`: `{number, lines}` per item named by NEXT-45, `lines` the bare line indexes, `[]` when no line is with its head.
 - [ ] [NEXT-35] Under `storage = "state-ref"` each item these fields name, `number` included, is the `aco-xxxxxx` id the text prints, a string in place of the bare number.
 - [ ] [NEXT-24] `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-NEXT-08).
 
@@ -417,3 +419,22 @@ exit 0
 ```
 
 `#441` gets no `cut` and `#442` no `check_container`, nor a `SKIPPED` line; `#443`, closable, stays under `close:` alone (NEXT-28).
+
+### E-NEXT-16 — a line sent back to its head
+
+Setup: bare-remote, fake `gh`, `#7` with an open yes/no line 1 and an option line 2 sent back with `aco rule 7 --line 2 --unclear`; `#11` a scopeless open item
+
+```console
+$ aco next
+#11 score -10: Top work
+Next: Claim #11.
+Run: aco claim 11 --scope <paths>
+scope unknown
+parallel: unknown (first action names no scope)
+close: none
+with head: #7 line 2
+exit 0
+$ aco next --json
+{"ok": true, ..., "ideas": [], "with_head": [{"number": 7, "lines": [2]}], ...}
+exit 0
+```

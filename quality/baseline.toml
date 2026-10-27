@@ -26,12 +26,12 @@
 "src/aco/store.py" = 2102
 "src/aco/workboard.py" = 3138
 "tests/aco_board/test_aco_board_api.py" = 1059
-"tests/cli_fixtures.py" = 969
-"tests/github_fixtures.py" = 835
+"tests/support/cli_fixtures.py" = 969
+"tests/support/github_fixtures.py" = 835
 "tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4315
 "tests/test_checkout.py" = 2047
-"tests/test_cli.py" = 17657
+"tests/test_cli.py" = 17656
 "tests/test_cut.py" = 1072
 "tests/test_github.py" = 3181
 "tests/test_land_after_merge_rerun.py" = 880
@@ -77,7 +77,7 @@
 "_board_item" = 103
 "build_board" = 112
 
-[function_lines."tests/github_fixtures.py"]
+[function_lines."tests/support/github_fixtures.py"]
 "landed_observations" = 61
 "lane_landing_world" = 71
 
@@ -100,7 +100,6 @@
 "test_next_parallel_set_uses_a_cut_proposals_own_row_scope" = 68
 "test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line" = 62
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
-"test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped" = 61
 "test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 71
 "test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 67
 "test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 61
