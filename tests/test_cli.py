@@ -9128,12 +9128,10 @@ def test_cli_claim_and_release_accept_json_while_parent_and_bootstrap_reject_it(
 
 
 def _arranged_claim_client(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
-    """The GitHub-storage `claim` arrangement every scope-derivation proof
-    below shares: a fake forge, a no-op checkout validator, a
+    """The GitHub-storage `claim` arrangement the comma, rescope, read-count
+    and `--whole` tests share: a fake forge, a no-op checkout validator, a
     fixed versioned-file listing via `git_checkout`, and a fresh in-memory
-    store -- the same six lines `test_cli_claim_without_json_prints_the_claimed_line`
-    repeats inline, factored so each derivation case states only what makes
-    it different."""
+    store, so each test states only what makes it different."""
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
     monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)

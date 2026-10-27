@@ -127,7 +127,7 @@ def test_a_body_with_a_defective_whole_or_size_refuses_by_its_first_defect_and_w
     field: str,
     as_json: bool,
 ) -> None:
-    """Spec: CLM-22, CLM-37, BODY-62. A fresh claim never writes the claim or
+    """Spec: CLM-22, CLM-37, BODY-52, BODY-62. A fresh claim never writes the claim or
     the item, whichever of the body's defects or the width gate it meets."""
     standpoint = stand_in()
     entries: dict[str, str] = {} if value is None else {"whole": value}
