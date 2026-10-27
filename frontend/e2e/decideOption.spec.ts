@@ -279,11 +279,13 @@ for (const viewport of [
 				expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 					viewport.width
 				);
-				await page.locator('.tracks').getByTitle(SONG_QUESTION).click();
+				await strip.getByRole('button', { name: 'Undo', exact: true }).click();
+				await expect(strip).toHaveCount(0);
+				await expect(page.locator('.tracks')).toBeFocused();
+			} else {
+				await strip.getByRole('button', { name: 'Undo', exact: true }).click();
+				await expect(strip).toHaveCount(0);
 			}
-
-			await strip.getByRole('button', { name: 'Undo', exact: true }).click();
-			await expect(strip).toHaveCount(0);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			expect(posts.count()).toBe(0);
 		});
