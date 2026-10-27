@@ -25,6 +25,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from email.message import Message
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -57,6 +58,7 @@ for outcome in ("yes", "no", "later"):
     outcomes.add_argument("--" + outcome, dest="ruling", action="store_const", const=outcome)
 outcomes.add_argument("--option", dest="ruling")
 outcomes.add_argument("--other")
+outcomes.add_argument("--unclear", action="store_true")
 rule.add_argument("--via")
 rule.add_argument("--card-hash")
 rule.add_argument("--note")
@@ -66,6 +68,12 @@ if getattr(arguments, "other", None) is not None:
     arguments.ruling = "other"
     if arguments.via != "board" or arguments.card_hash is None or arguments.note is not None:
         parser.error("--other needs --via board and --card-hash, and takes no --note")
+if getattr(arguments, "unclear", False) and (
+    arguments.via is not None
+    or arguments.card_hash is None
+    or (arguments.note is not None and not arguments.note.strip())
+):
+    parser.error("--unclear needs --card-hash and takes no --via and no blank --note")
 
 
 def refuse(reason, message):
@@ -110,6 +118,16 @@ if line is None:
 if line["ruling"] is not None:
     refuse("already_ruled",
            "line %d is already ruled; a changed ruling is a new line" % arguments.line)
+if getattr(arguments, "unclear", False):
+    if line["returned_on"] is not None:
+        refuse("with_head", "line %d is already with its head; it comes back once revised"
+               % arguments.line)
+    line["returned_on"], line["returned_note"] = "2026-10-03", arguments.note
+    rulings.write_text(json.dumps(rows), encoding="utf-8")
+    print(json.dumps({"ok": True, "reason": "returned", "item": row["number"],
+                      "index": arguments.line, "returned_on": "2026-10-03",
+                      "open": sum(1 for entry in row["lines"] if entry["ruling"] is None)}))
+    sys.exit(0)
 line["ruling"], line["ruled_on"] = arguments.ruling, "2026-10-03"
 if arguments.via is not None:
     line["via"] = arguments.via
@@ -503,6 +521,11 @@ def same_as_today_option(letter: str = "B", **changes: object) -> dict[str, obje
         "contract": "The link stays a link.",
         **changes,
     }
+
+
+def first_listed_line(board: BoardClient) -> dict[str, Any]:
+    [listed_repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+    return cast(dict[str, Any], listed_repo["items"][0]["lines"][0])
 
 
 def option_line(*, ruling: object = None, **changes: object) -> dict[str, object]:
