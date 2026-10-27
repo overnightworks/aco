@@ -1,7 +1,0 @@
-claim_id = "431a6be312ba4430aa7f7f1f716794d6"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "c777b31af6e4d1cad25c407a6cf18a3712fa7f1c"
-branch = "claude/issue-498-claim-scope-paths-real-worktree"
-scope = ["quality/baseline.toml", "tests/test_cli.py", "tests/test_cmd_claim_scope_paths.py"]
-opened_commit = "d262ac2cecbf60f49618f9e52e10f58adbf99bee"
