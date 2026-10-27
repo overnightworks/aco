@@ -28,6 +28,16 @@
 				stroke-width="1.6"
 				stroke-dasharray={state === 'todo' ? '2.4 2.2' : undefined}
 			/>
+			{#if state === 'back'}
+				<path
+					d="M8.6 4.6 6.2 7l2.4 2.4"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.6"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				/>
+			{/if}
 		{/if}
 	</svg>
 </span>
@@ -38,7 +48,8 @@
 		flex: none;
 		color: var(--fg-2);
 	}
-	.todo {
+	.todo,
+	.back {
 		color: var(--fg-3);
 	}
 	.done {

@@ -48,6 +48,18 @@ test('[ABRD-48] a yes/no row shows its question, the Not ready shape and a muted
 	expect(within(row).getByText('Guests?')).toHaveClass('muted');
 });
 
+test('[ABRD-65] a returned option row shows its topic, the With head shape and a muted label', () => {
+	renderList([
+		repo({
+			items: [item({ lines: [optionLine({ topic: 'Sprung', returned_on: '2026-10-27' })] })]
+		})
+	]);
+
+	const row = screen.getByRole('button', { name: 'With head Sprung' });
+	expect(within(row).getByRole('img', { name: 'With head' })).toBeInTheDocument();
+	expect(within(row).getByText('Sprung')).toHaveClass('muted');
+});
+
 test('[ABRD-28] a short question labels the row instead of the full sentence', () => {
 	renderList([
 		repo({

@@ -15,7 +15,13 @@
 				{#if meta.kind !== undefined}
 					<span>{meta.kind}</span>
 				{/if}
-				{#if meta.kind !== undefined && meta.undo !== undefined}
+				{#if meta.withHead}
+					{#if meta.kind !== undefined}
+						<span class="sep" aria-hidden="true">·</span>
+					{/if}
+					<span>with head</span>
+				{/if}
+				{#if (meta.kind !== undefined || meta.withHead) && meta.undo !== undefined}
 					<span class="sep" aria-hidden="true">·</span>
 				{/if}
 				{#if meta.undo === 'final'}

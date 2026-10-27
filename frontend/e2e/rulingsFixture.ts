@@ -57,6 +57,8 @@ export interface OptionRulingLine {
 	ruled_on: string | null;
 	via: 'board' | 'chat' | 'default' | null;
 	other: string | null;
+	returned_on: string | null;
+	returned_note: string | null;
 	card_hash: string;
 	stored_card_hash: string | null;
 	default: null;
@@ -105,6 +107,8 @@ export function optionLine(
 		ruled_on: null,
 		via: null,
 		other: null,
+		returned_on: null,
+		returned_note: null,
 		card_hash: `card-hash-${index}`,
 		stored_card_hash: null,
 		default: null,
