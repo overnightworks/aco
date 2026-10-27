@@ -1,8 +1,0 @@
-claim_id = "b7982b2444f741f89ce3cfc52a57f461"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "d6df3b719252467ad4df352683499f6428c877d2"
-branch = "claude/issue-478-state-lineage-race"
-scope = ["pyproject.toml", "quality/baseline.toml", "specs/ref-store-cas.spec.md", "src/aco/lineage_stamp.py", "src/aco/store.py", "tests/support/store_fixtures.py", "tests/test_cli.py", "tests/test_cmd_bootstrap.py", "tests/test_lineage_stamp.py", "tests/test_store.py", "tests/test_store_lineage_race.py"]
-opened_commit = "b25154cdb6cd974ab99f7d83bcd7979ba193fa94"
-whole_reason = "One guard changes owner and rule together: the stamp's read, check and advance under one lock, its spec criteria, its tests and the callers of its private helpers move as one, or the guard has two owners."
