@@ -26,6 +26,7 @@ from aco.board.ports import (
     DecisionStatus,
     ExpectationLine,
     OptionDecision,
+    OtherDecision,
     Outcome,
     YesNoLine,
 )
@@ -88,7 +89,9 @@ class _HeldDecisions:
         self.ruled.append(decision)
         return DecisionResult(DecisionStatus.RULED, "ruled")
 
-    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
+    def rule_option(
+        self, decision: OptionDecision | OtherDecision, card_hash: str
+    ) -> DecisionResult | CardChanged:
         raise AssertionError("an option is never ruled here")
 
 

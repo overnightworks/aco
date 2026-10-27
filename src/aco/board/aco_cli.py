@@ -35,6 +35,7 @@ from .ports import (
     OptionLetter,
     OptionLine,
     OtherAnswer,
+    OtherDecision,
     Outcome,
     RulingVia,
     YesNoLine,
@@ -64,6 +65,13 @@ class _RuleAnswer:
     card_changed: bool
 
 
+def _answer_arguments(decision: OptionDecision | OtherDecision) -> list[str]:
+    if isinstance(decision, OtherDecision):
+        # One argument: an answer starting with "-" would otherwise read as an option.
+        return [f"--other={decision.text}"]
+    return ["--option", decision.letter]
+
+
 @dataclass(frozen=True)
 class AcoCli:
     directory: Path
@@ -91,15 +99,16 @@ class AcoCli:
             arguments.append(f"--note={decision.note}")
         return self._write(arguments).result
 
-    def rule_option(self, decision: OptionDecision, card_hash: str) -> DecisionResult | CardChanged:
+    def rule_option(
+        self, decision: OptionDecision | OtherDecision, card_hash: str
+    ) -> DecisionResult | CardChanged:
         answer = self._write(
             [
                 "rule",
                 str(decision.item),
                 "--line",
                 str(decision.index),
-                "--option",
-                decision.letter,
+                *_answer_arguments(decision),
                 "--via",
                 # The only `--via` the board writes: the cooperative path, never
                 # `chat` or `default`, which belong to the operator's other writers.
