@@ -1,0 +1,8 @@
+claim_id = "7c20f0c86b6c4d1885c65600cb2ce14b"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "5630c2bd654e5af13b4897160e2d5e5349d142e7"
+branch = "claude/issue-505-read-counts-real-worktree"
+scope = ["quality/baseline.toml", "tests/support/claim_worktrees.py", "tests/test_cli.py", "tests/test_cmd_claim_reads.py", "tests/test_cmd_claim_scope_from_body.py", "tests/test_cmd_next_whole.py", "tests/test_cmd_rescope_claim.py", "tests/test_cmd_rescope_item_body.py"]
+opened_commit = "cdf6a4b54c7c77c9facb4edf31b219e3df9a7c28"
+whole_reason = "All edits are test-only moves and deletions around two shared owners (tests/test_cli.py and tests/support/claim_worktrees.py), so one lane makes them together."
