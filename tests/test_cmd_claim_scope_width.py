@@ -324,15 +324,15 @@ def test_a_scope_within_the_width_limits_or_with_whole_is_claimed_with_its_reaso
     out = capsys.readouterr().out
     [held] = [claim for claim in held_claims(standpoint) if claim.branch == case.branch]
     assert status == 0
-    assert (held.scope, held.whole_reason) == (
-        tuple(sorted({*case.standing_scope, *case.scope})),
-        case.whole,
-    )
+    assert held.scope == tuple(sorted({*case.standing_scope, *case.scope}))
+    assert held.whole_reason == case.whole
     if acceptance.printed_ends_with is not None:
         assert out.endswith(acceptance.printed_ends_with)
     if acceptance.share is not None:
         payload = json.loads(out)
-        assert (payload["versioned_files"], payload["versioned_files_total"]) == acceptance.share
+        versioned_files, versioned_files_total = acceptance.share
+        assert payload["versioned_files"] == versioned_files
+        assert payload["versioned_files_total"] == versioned_files_total
         assert payload["share"] == pytest.approx(1 / 3)
         assert payload["touches"] == []
 
