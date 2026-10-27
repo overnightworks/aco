@@ -97,7 +97,7 @@ COMMA_RESCOPES = {
         None,
         ("reports/a,b.md", "src/widget.py"),
     ),
-    # Splitting at the comma would drop `reports/a` and `b.md`, neither of which the claim holds.
+    # A split drops `reports/a`, which the claim keeps, and `b.md`, which it does not hold.
     "drop-matches-a-comma-path-as-one-whole-path": CommaRescope(
         ("reports/a", "reports/a,b.md"),
         ("reports/a", "reports/a,b.md"),
