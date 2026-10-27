@@ -5,10 +5,11 @@ reading, `versioned_paths`, trunk landings, and remote-location parsing.
 `validate_checkout` -- the precondition every `claim` call site in `cli.py`
 uses -- is exercised directly. Tests that drive these through
 `issue_claim.main([...])` stay in `tests/test_cli.py` as CLI-wiring behavior,
-except `claim`'s own proof of the default branch the checkout judges."""
+except `claim`'s and `rescope`'s own proofs of the checkout they judge."""
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 import subprocess
@@ -23,7 +24,6 @@ from cli_fixtures import (
     GIT_FAILURE_INJECTIONS,
     bare_remote_repository_with_one_commit,
     dangle_recorded_head,
-    git_checkout,
     hub_canonical_worktree_file,
     init_bare_repository,
     push_repository_trunk,
@@ -37,7 +37,7 @@ from cli_fixtures import (
 
 from aco import checkout, process, store, workboard
 from aco import cli as issue_claim
-from aco.protocol import ClaimError, ClaimRequest
+from aco.protocol import ClaimError
 
 _LIVE_VERSIONED_PATHS = checkout.versioned_paths
 _LIVE_TRUNK_LANDINGS = checkout.trunk_landings
@@ -327,159 +327,180 @@ def test_paths_under_scope_matches_prefix_or_exact_entry() -> None:
     assert checkout.paths_under_scope(paths, ("missing",)) == ()
 
 
-def test_checkout_validation_binds_clean_head_and_branch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    values = {
-        ("rev-parse", "HEAD"): BASE,
-        ("branch", "--show-current"): "codex/issue-71-claims",
-        ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-        ("rev-parse", "--git-common-dir"): "/repo/.git",
-        ("status", "--porcelain"): "",
-    }
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
-    )
+_CHECKOUT_FILES = ("file", "src/a.py", "src/b.py", "src/c.py", "src/d.py", "src/e.py")
 
-    checkout.validate_checkout(request(), default_branch=lambda: "main")
+
+def _real_checkout(
+    tmp_path: Path, *, linked: bool, branch: str, dirty: tuple[str, ...] = ()
+) -> tuple[Path, str]:
+    """A real repository with six committed files, and the checkout of it
+    `validate_checkout` judges: a linked worktree on `branch`, or the primary
+    checkout switched to it. Each `dirty` path is written in that checkout --
+    modified when committed, untracked otherwise. Returns the checkout and its
+    real head."""
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    real_git(repository, "init", "-q", "-b", "main")
+    real_git(repository, "config", "user.name", "Test")
+    real_git(repository, "config", "user.email", "test@example.com")
+    for name in _CHECKOUT_FILES:
+        (repository / name).parent.mkdir(exist_ok=True)
+        (repository / name).write_text("committed\n")
+    real_git(repository, "add", ".")
+    real_git(repository, "commit", "-q", "-m", "initial")
+    directory = repository
+    if linked:
+        directory = tmp_path / "lane"
+        real_git(repository, "worktree", "add", "-q", "-b", branch, str(directory))
+    elif branch != "main":
+        real_git(repository, "checkout", "-q", "-b", branch)
+    for name in dirty:
+        (directory / name).write_text("changed\n")
+    return directory, real_git(directory, "rev-parse", "HEAD").stdout.strip()
+
+
+_LANE_BRANCH = "codex/issue-71-claims"
+_CREATE_RECIPE_SENTENCE = (
+    "build claims require an isolated non-main worktree branch; "
+    f"run {checkout.ISOLATED_WORKTREE_RECIPE}"
+)
 
 
 @pytest.mark.parametrize(
-    ("candidate", "values", "message"),
+    ("branch", "default_branch"),
     [
-        (
-            request(),
-            {
-                ("rev-parse", "HEAD"): "b" * 40,
-                ("branch", "--show-current"): "codex/issue-71-claims",
-                ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-                ("rev-parse", "--git-common-dir"): "/repo/.git",
-                ("status", "--porcelain"): "",
-            },
-            "does not match checkout HEAD",
-        ),
-        (
-            request(),
-            {
-                ("rev-parse", "HEAD"): BASE,
-                ("branch", "--show-current"): "other",
-                ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-                ("rev-parse", "--git-common-dir"): "/repo/.git",
-                ("status", "--porcelain"): "",
-            },
-            "does not match checkout branch",
-        ),
-        (
-            request(),
-            {
-                ("rev-parse", "HEAD"): BASE,
-                ("branch", "--show-current"): "codex/issue-71-claims",
-                ("rev-parse", "--git-dir"): "/repo/.git",
-                ("rev-parse", "--git-common-dir"): "/repo/.git",
-                ("status", "--porcelain"): "",
-            },
-            "linked isolated worktree",
-        ),
-        (
-            request(),
-            {
-                ("rev-parse", "HEAD"): BASE,
-                ("branch", "--show-current"): "codex/issue-71-claims",
-                ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-                ("rev-parse", "--git-common-dir"): "/repo/.git",
-                ("status", "--porcelain"): " M file",
-            },
-            "before the first worktree edit",
-        ),
+        pytest.param(_LANE_BRANCH, "main", id="clean-linked-lane-branch"),
+        # Without a recorded default branch only `main` and `master` count as
+        # default, so `trunk` binds like any other lane branch.
+        pytest.param("trunk", None, id="unrecorded-default-allows-trunk"),
     ],
 )
-def test_checkout_validation_rejects_false_or_late_claims(
-    monkeypatch: pytest.MonkeyPatch,
-    candidate: ClaimRequest,
-    values: dict[tuple[str, ...], str],
-    message: str,
+def test_checkout_validation_accepts_a_clean_linked_worktree_on_the_claimed_branch(
+    tmp_path: Path, branch: str, default_branch: str | None
 ) -> None:
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
-    )
+    """Spec: CLM-01, CLM-02, CLM-03, CLM-04, CLM-05, CLM-29. A clean linked
+    worktree whose head and branch are the claim's binds without a refusal."""
+    directory, head = _real_checkout(tmp_path, linked=True, branch=branch)
+    candidate = dataclasses.replace(request(branch=branch), base=head)
 
-    with pytest.raises(ClaimError, match=message):
-        checkout.validate_checkout(candidate, default_branch=lambda: "main")
+    checkout.validate_checkout(
+        candidate, default_branch=lambda: default_branch, directory=directory
+    )
 
 
 @pytest.mark.parametrize(
-    ("values", "branch", "default_branch", "sentence"),
+    ("linked", "branch", "default_branch", "dirty", "stale_base", "sentence"),
     [
         pytest.param(
-            {
-                ("rev-parse", "HEAD"): "b" * 40,
-                ("branch", "--show-current"): "codex/issue-71-claims",
-                ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-                ("rev-parse", "--git-common-dir"): "/repo/.git",
-                ("status", "--porcelain"): "",
-            },
-            None,
+            True,
+            _LANE_BRANCH,
             "main",
-            # The base-mismatch refusal names both SHAs and the repair: omitting
-            # `--base` binds it to checkout HEAD.
-            f"claim base {BASE} does not match checkout HEAD {'b' * 40}; "
+            (),
+            True,
+            f"claim base {BASE} does not match checkout HEAD {{head}}; "
             "omit --base to use checkout HEAD",
             id="base-repair",
         ),
         pytest.param(
-            {("rev-parse", "HEAD"): BASE, ("branch", "--show-current"): "main"},
+            True,
+            "other",
             "main",
-            None,
-            # Claiming from the default branch names the `git worktree add` recipe.
-            "build claims require an isolated non-main worktree branch; "
-            f"run {checkout.ISOLATED_WORKTREE_RECIPE}",
-            id="default-branch-recipe-guessed-main",
+            (),
+            False,
+            f"claim branch '{_LANE_BRANCH}' does not match checkout branch 'other'",
+            id="branch-mismatch",
         ),
         pytest.param(
-            {("rev-parse", "HEAD"): BASE, ("branch", "--show-current"): "trunk"},
-            "trunk",
-            "trunk",
-            # A repository whose recorded default is `trunk` refuses `trunk` the same way.
-            "build claims require an isolated non-main worktree branch; "
-            f"run {checkout.ISOLATED_WORKTREE_RECIPE}",
-            id="default-branch-recipe-repository-default-trunk",
-        ),
-        pytest.param(
-            {
-                ("rev-parse", "HEAD"): BASE,
-                ("branch", "--show-current"): "codex/issue-71-claims",
-                ("rev-parse", "--git-dir"): "/repo/.git",
-                ("rev-parse", "--git-common-dir"): "/repo/.git",
-                ("status", "--porcelain"): "",
-            },
-            None,
+            False,
+            _LANE_BRANCH,
             "main",
-            # A git-dir that is the shared common dir (not a linked worktree)
-            # names the same recipe as the trunk-branch refusal.
+            (),
+            False,
             "build claims require a linked isolated worktree checkout; "
             f"run {checkout.ISOLATED_WORKTREE_RECIPE}",
             id="shared-checkout-recipe",
         ),
+        pytest.param(
+            False,
+            "main",
+            None,
+            (),
+            False,
+            _CREATE_RECIPE_SENTENCE,
+            id="primary-on-main-guessed-default",
+        ),
+        pytest.param(
+            True,
+            "master",
+            None,
+            (),
+            False,
+            _CREATE_RECIPE_SENTENCE,
+            id="master-denied-by-the-fallback",
+        ),
+        pytest.param(
+            True,
+            "trunk",
+            "trunk",
+            (),
+            False,
+            _CREATE_RECIPE_SENTENCE,
+            id="default-branch-recipe-repository-default-trunk",
+        ),
+        pytest.param(
+            True,
+            _LANE_BRANCH,
+            "main",
+            ("file",),
+            False,
+            "claim must be acquired before the first worktree edit: file",
+            id="one-dirty-path",
+        ),
+        pytest.param(
+            True,
+            _LANE_BRANCH,
+            "main",
+            ("src/a.py",),
+            False,
+            "claim must be acquired before the first worktree edit: src/a.py",
+            id="every-dirty-path-named-when-three-or-fewer",
+        ),
+        pytest.param(
+            True,
+            _LANE_BRANCH,
+            "main",
+            ("src/a.py", "src/b.py", "src/c.py", "src/d.py", "src/e.py"),
+            False,
+            "claim must be acquired before the first worktree edit: "
+            "src/a.py, src/b.py, src/c.py, and 2 more",
+            id="first-three-dirty-paths-and-the-rest-as-a-count",
+        ),
     ],
 )
-def test_checkout_validation_names_the_repair_it_refuses_with(
-    monkeypatch: pytest.MonkeyPatch,
-    values: dict[tuple[str, ...], str],
-    branch: str | None,
+def test_checkout_validation_refuses_with_the_sentence_that_names_the_repair(
+    tmp_path: Path,
+    linked: bool,
+    branch: str,
     default_branch: str | None,
+    dirty: tuple[str, ...],
+    stale_base: bool,
     sentence: str,
 ) -> None:
-    """Each refusal names the repair an agent reading it needs, not just the rule
-    it violates."""
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
-    )
-    candidate = request() if branch is None else request(branch=branch)
+    """Spec: CLM-01, CLM-02, CLM-03, CLM-04, CLM-05, CLM-29. Each refusal
+    names the repair an agent reading it needs, not just the rule it
+    violates, whichever checkout layout it stands in."""
+    directory, head = _real_checkout(tmp_path, linked=linked, branch=branch, dirty=dirty)
+    claimed_branch = _LANE_BRANCH if branch == "other" else branch
+    candidate = request(branch=claimed_branch)
+    if not stale_base:
+        candidate = dataclasses.replace(candidate, base=head)
 
     with pytest.raises(ClaimError) as error:
-        checkout.validate_checkout(candidate, default_branch=lambda: default_branch)
+        checkout.validate_checkout(
+            candidate, default_branch=lambda: default_branch, directory=directory
+        )
 
-    assert str(error.value) == sentence
+    assert str(error.value) == sentence.format(head=head)
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
@@ -528,57 +549,35 @@ def test_claim_judges_the_canonical_remotes_recorded_default_branch(
     assert capsys.readouterr().err == f"ERROR: {sentence}\n"
 
 
-def test_checkout_validation_names_the_first_three_dirty_paths_and_the_rest_as_a_count(
+@pytest.mark.usefixtures("isolated_global_git_config")
+def test_rescope_from_a_shared_checkout_names_the_known_branch(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The dirty-tree refusal used to discard `git status --porcelain`'s
-    list entirely; it now names the first three changed paths and how many
-    more there are."""
-    porcelain = "\n".join(
-        [" M src/a.py", " M src/b.py", "?? src/c.py", " M src/d.py", " M src/e.py"]
+    """Spec: RESC-03. Standing in the primary checkout on the claim's own
+    branch, without a linked worktree, `rescope` refuses and names that branch
+    instead of leaving the sentence blank."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    linked_file = hub_canonical_worktree_file(
+        tmp_path, canonical="origin", canonical_head="main", branch="codex/issue-73-other"
     )
-    values = {
-        ("rev-parse", "HEAD"): BASE,
-        ("branch", "--show-current"): "codex/issue-71-claims",
-        ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-        ("rev-parse", "--git-common-dir"): "/repo/.git",
-        ("status", "--porcelain"): porcelain,
-    }
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
+    primary = tmp_path / "repo"
+    real_git(primary, "checkout", "-q", "-b", "codex/issue-72")
+    monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
+    monkeypatch.chdir(linked_file.parent)
+
+    status = issue_claim.main(["rescope", "72", "--add", str(primary / "widget.py")])
+
+    assert status == 2
+    assert capsys.readouterr().err == (
+        "ERROR: build claims require a linked isolated worktree checkout; "
+        "run this command from this claim's own worktree on 'codex/issue-72', "
+        "not the primary checkout\n"
     )
-    candidate = request()
-
-    with pytest.raises(ClaimError) as error:
-        checkout.validate_checkout(candidate, default_branch=lambda: "main")
-
-    assert str(error.value) == (
-        "claim must be acquired before the first worktree edit: "
-        "src/a.py, src/b.py, src/c.py, and 2 more"
-    )
-
-
-def test_checkout_validation_names_every_dirty_path_when_three_or_fewer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """No trailing count when every changed path already fits in the first
-    three named."""
-    values = {
-        ("rev-parse", "HEAD"): BASE,
-        ("branch", "--show-current"): "codex/issue-71-claims",
-        ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-        ("rev-parse", "--git-common-dir"): "/repo/.git",
-        ("status", "--porcelain"): " M src/a.py",
-    }
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
-    )
-    candidate = request()
-
-    with pytest.raises(ClaimError) as error:
-        checkout.validate_checkout(candidate, default_branch=lambda: "main")
-
-    assert str(error.value) == "claim must be acquired before the first worktree edit: src/a.py"
 
 
 def _scratch_git_repository(tmp_path: Path, *init_options: str) -> Path:
@@ -832,34 +831,6 @@ def test_refuse_shared_checkout_matrix(
         )
 
     assert str(error.value) == expected
-
-
-@pytest.mark.parametrize(
-    ("branch", "denied"),
-    [("main", True), ("master", True), ("trunk", False)],
-)
-def test_claim_default_branch_fallback_denies_only_main_and_master(
-    monkeypatch: pytest.MonkeyPatch,
-    branch: str,
-    denied: bool,
-) -> None:
-    """When no default branch is recorded, `claim`'s fallback still denies
-    exactly the historical `{"main", "master"}` guess and nothing else --
-    `trunk` is not treated as default without a recorded one, so deleting
-    `DEFAULT_BRANCH_FALLBACK` would fail this
-    test by letting `main`/`master` through instead."""
-    values = git_checkout(branch=branch)
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
-    )
-    candidate = request(branch=branch)
-
-    if not denied:
-        checkout.validate_checkout(candidate, default_branch=lambda: None)
-        return
-
-    with pytest.raises(ClaimError, match="isolated non-main worktree branch"):
-        checkout.validate_checkout(candidate, default_branch=lambda: None)
 
 
 def test_versioned_paths_reads_nul_terminated_ls_files_without_stripping(
