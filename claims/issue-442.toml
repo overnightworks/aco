@@ -1,0 +1,7 @@
+claim_id = "9781132ea8a34ff7b4823cdc0791a380"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "f204e0f9c16c76798f66df134a8deffec6e051ea"
+branch = "claude/issue-442-validate-checkout-real-checkouts"
+scope = ["quality/baseline.toml", "tests/test_checkout.py", "tests/test_cli.py"]
+opened_commit = "b69167d96395c19280f5e87616af8df175f54dd0"
