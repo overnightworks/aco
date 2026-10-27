@@ -24,6 +24,7 @@ resolved directory's name.
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
 | an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-65, ABRD-66, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
+| a withdrawn line | ABRD-60 | — |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
 | a post naming both or neither of `outcome` and `option`, another letter, or an `option` with a note | — | ABRD-42 |
@@ -54,7 +55,7 @@ resolved directory's name.
 ## Reading the lines
 
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
-- [ ] [ABRD-07] A yes/no line with a `default` or `ruling` that is no outcome, a malformed option line (below, ABRD-66), another `form`, or a `ruled_on` that is no ISO date shows `aco rulings --json is unreadable: <detail>`.
+- [ ] [ABRD-07] A yes/no line with a non-outcome `default` or `ruling`, a malformed option line (below, ABRD-66), a `form` but ABRD-60's, or a non-ISO `ruled_on` shows `aco rulings --json is unreadable: <detail>`.
 
 An option line is malformed when its `recommended` is no letter of its options, its `ruling` is neither such a letter nor `other`, its `other` is not non-blank text on a line ruled `other` or is neither absent nor `null` on any other, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
@@ -115,6 +116,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
 - [ ] [ABRD-66] An option line lists `returned_on` and `returned_note` right after `other`: as `aco rulings --json` names them (RUL-17), the ISO date and the note when its head has it, else `null`. A missing key, a `returned_on` that is no ISO date, a `returned_note` that is blank or no text or has no `returned_on`, or either on a ruled line is unreadable (ABRD-07). They stay outside the fingerprint (ABRD-35). A yes/no line lists none.
 - [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
+- [ ] [ABRD-60] A line with `"form": "withdrawn"` is skipped unparsed, whatever its keys: no list shows it, its repo stays readable, the item's other lines keep their `index`, an item of only such is not listed.
 
 An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,

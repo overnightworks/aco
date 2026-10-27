@@ -53,6 +53,9 @@ class OtherAnswer:
 OPTIONS_FORM = "options"
 """The `form` that marks an option line in the source's own listing."""
 
+WITHDRAWN_FORM = "withdrawn"
+"""The `form` that marks a line its head withdrew; the board does not list it."""
+
 
 @dataclass(frozen=True)
 class YesNoLine:
