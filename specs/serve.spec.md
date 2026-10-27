@@ -66,7 +66,7 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending, missing dates last; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
 - [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided. A stored “Später” stays there and is not automatically presented again.
-- [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation and Decide (ABRD-44).
+- [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `with head` when it has `returned_on` (ABRD-65), `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), else `not recorded`; then ` · ` and the ruling date as `DD.MM.YYYY` when known.
 - [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
@@ -118,7 +118,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,
-`ruled_on`, `via`, `other`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
+`ruled_on`, `via`, `other`, `returned_on`, `returned_note`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
 and no `card_hash`; pictures are SVG text as stored.
 
 ## The SPA shell
