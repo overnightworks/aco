@@ -1,0 +1,8 @@
+claim_id = "29b64c014896488dab5f4a4be2b29881"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "37d4c484028a65dff62690a1771328b69617ff26"
+branch = "claude/issue-436-blocked-by-fetch-owner"
+scope = ["quality/baseline.toml", "src/aco/board_read.py", "src/aco/cmd_item.py", "src/aco/cmd_release.py", "src/aco/workboard.py"]
+opened_commit = "6e9c59a23f0ec5452cc05b7c18415e15eb22bacc"
+whole_reason = "Small-card bundle on the board read path: one owner for the blocked_by fetch decision across board_read, cmd_item and cmd_release, a one-pass unblocks count in workboard, and the size baseline."
