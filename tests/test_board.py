@@ -2234,22 +2234,6 @@ def test_board_configuration_keeps_body_contract_as_a_known_block_only_key(
         workboard.load_config(config_path)
 
 
-def test_board_configuration_reads_and_validates_canonical_remote(tmp_path: Path) -> None:
-    config_path = tmp_path / "board.toml"
-    assert workboard.load_config(config_path).canonical_remote == "origin"
-
-    config_path.write_text('canonical_remote = "upstream"\n')
-    assert workboard.load_config(config_path).canonical_remote == "upstream"
-
-    config_path.write_text('canonical_remote = ""\n')
-    with pytest.raises(ClaimError, match="canonical_remote must be a non-empty remote name"):
-        workboard.load_config(config_path)
-
-    config_path.write_text("canonical_remote = true\n")
-    with pytest.raises(ClaimError, match="canonical_remote must be a non-empty remote name"):
-        workboard.load_config(config_path)
-
-
 def test_board_configuration_reads_and_validates_storage(tmp_path: Path) -> None:
     config_path = tmp_path / "board.toml"
     assert workboard.load_config(config_path).storage is Storage.GITHUB

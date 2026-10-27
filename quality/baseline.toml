@@ -27,12 +27,12 @@
 "src/aco/protocol.py" = 1877
 "src/aco/state_board.py" = 957
 "src/aco/store.py" = 2102
-"src/aco/workboard.py" = 3148
+"src/aco/workboard.py" = 3143
 "tests/aco_board/test_aco_board_api.py" = 1059
 "tests/cli_fixtures.py" = 969
 "tests/github_fixtures.py" = 838
 "tests/test_adopt.py" = 1650
-"tests/test_board.py" = 4441
+"tests/test_board.py" = 4425
 "tests/test_checkout.py" = 2082
 "tests/test_cli.py" = 17774
 "tests/test_cut.py" = 1124
