@@ -29,7 +29,7 @@ resolved directory's name.
 | its card changed between the board's read and aco's write | — | ABRD-41 |
 | a post naming not exactly one of `outcome`, `option`, `other`, `unclear`, another letter, or a note beside an `option` or `other` | — | ABRD-42 |
 | an `other` posted with an open option line's fingerprint | — | ABRD-64 |
-| an `unclear` posted with an open option line's fingerprint | — | ABRD-70 |
+| an `unclear` posted with an open option line's fingerprint | — | ABRD-70, ABRD-71 |
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
@@ -97,6 +97,7 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-68] `Send` posts the card as shown when the panel opened, so a card changed since is refused (ABRD-02); the answer stays in the draft.
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
 - [ ] [ABRD-70] An `unclear` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --unclear [--note=<T>] --card-hash=<H> --json`, no `--via`, `<T>` the trimmed note (E-ABRD-14).
+- [ ] [ABRD-71] An `unclear` aco stores answers 200 `{"status": "returned", "message": null}`: the line stays open, with its head; only a stored `option` or `other` answers `ruled`.
 - [ ] [ABRD-52] An option card's Decide row sticks to the pane's foot while the card runs on beneath it and then casts a shadow over that content; at the card's end it rests in place without one.
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
@@ -356,7 +357,7 @@ Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line;
 request: POST /api/rule, header X-Board-Token: <start token>
 body: {"repo": "<repo>", "item": 12, "line": 1, "fingerprint": "<as listed>", "unclear": true, "note": "  Mobile fehlt.  "}
 aco calls: aco rulings --json, then aco rule 12 --line 1 --unclear --note=Mobile fehlt. --card-hash=<card_hash of that line> --json
-answer 200: {"status": "ruled", "message": null}
+answer 200: {"status": "returned", "message": null}
 ```
 
 The line stays open, now with its head. Posting Unclear again answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is already with its head; it comes back once revised"}`. An `unclear` that is not `true`, or one beside `outcome`, `option` or `other`, or a note past 280 characters after trimming, answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.

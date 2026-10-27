@@ -198,6 +198,7 @@ OptionLineDecision = OptionDecision | OtherDecision | UnclearDecision
 
 class DecisionStatus(StrEnum):
     RULED = "ruled"
+    RETURNED = "returned"
     ALREADY_RULED = "already_ruled"
     FAILED = "failed"
 
