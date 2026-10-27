@@ -23,6 +23,7 @@ from .ports import (
     OPTION_LETTERS,
     OPTIONS_FORM,
     OTHER,
+    WITHDRAWN_FORM,
     CardChanged,
     CardOption,
     Decision,
@@ -190,7 +191,12 @@ def _lines_from_row(row: object) -> tuple[ExpectationLine, ...]:
     lines = fields.get("lines")
     if not isinstance(lines, list):
         raise _unreadable(f"#{item} lines is not a list")
-    return tuple(_line(item, title, line) for line in lines)
+    return tuple(_line(item, title, line) for line in lines if not _is_withdrawn(line))
+
+
+def _is_withdrawn(line: object) -> bool:
+    fields = _as_object(line)
+    return fields is not None and fields.get("form") == WITHDRAWN_FORM
 
 
 def _line(item: int, title: str, line: object) -> ExpectationLine:
