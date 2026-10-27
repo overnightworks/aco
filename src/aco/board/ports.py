@@ -31,10 +31,23 @@ class RulingVia(StrEnum):
     DEFAULT = "default"
 
 
+OTHER = "other"
+"""Both the `ruling` value and the key that carries the operator's own answer
+(RUL-16); the board keeps its own copy and reads aco only through its command
+line."""
+
 OptionLetter = Literal["A", "B", "C", "D"]
 """The letters of an option line's options, by position."""
 
 OPTION_LETTERS: tuple[OptionLetter, ...] = get_args(OptionLetter)
+
+
+@dataclass(frozen=True)
+class OtherAnswer:
+    """An option line's ruling when the operator answered in his own words,
+    kept verbatim."""
+
+    text: str
 
 
 OPTIONS_FORM = "options"
@@ -111,7 +124,7 @@ class OptionLine:
     recommended: OptionLetter
     reason: str
     options: tuple[CardOption, ...]
-    ruling: OptionLetter | None
+    ruling: OptionLetter | OtherAnswer | None
     ruled_on: date | None
     via: RulingVia | None
     card_hash: str

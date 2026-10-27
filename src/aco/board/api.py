@@ -18,6 +18,7 @@ from .ports import (
     NOTE_MAX_LENGTH,
     OPTION_LETTERS,
     OPTIONS_FORM,
+    OTHER,
     CardOption,
     Decision,
     DecisionResult,
@@ -25,6 +26,7 @@ from .ports import (
     OptionDecision,
     OptionLetter,
     OptionLine,
+    OtherAnswer,
     Outcome,
 )
 
@@ -159,9 +161,10 @@ def _option_line_json(line: OptionLine, repo: str) -> dict[str, object]:
         "recommended": line.recommended,
         "reason": line.reason,
         "options": [_card_option_json(option) for option in line.options],
-        "ruling": line.ruling,
+        "ruling": OTHER if isinstance(line.ruling, OtherAnswer) else line.ruling,
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
         "via": line.via,
+        "other": line.ruling.text if isinstance(line.ruling, OtherAnswer) else None,
         "fingerprint": wire_fingerprint(repo, line),
     }
 

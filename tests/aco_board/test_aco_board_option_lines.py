@@ -1,5 +1,5 @@
 """The decision board reads option lines beside yes/no lines and decides them
-(specs/serve.spec.md: ABRD-07, ABRD-34, ABRD-35, ABRD-39..42, ABRD-53, E-ABRD-11,
+(specs/serve.spec.md: ABRD-07, ABRD-34, ABRD-35, ABRD-39..42, ABRD-53, ABRD-56, E-ABRD-11,
 E-ABRD-12), driven through the real server, wire form and `aco` adapter
 against a fake `aco` on PATH."""
 
@@ -36,6 +36,7 @@ _OPTION_LINE_KEYS = [
     "ruling",
     "ruled_on",
     "via",
+    "other",
     "fingerprint",
 ]
 _RULE_13_SENTENCE = "line 1 is an option line; --yes, --no and --later rule only a yes/no line"
@@ -78,7 +79,7 @@ def _same_as_today_option(letter: str = "B", **changes: object) -> dict[str, obj
 
 
 def option_line(*, ruling: object = None, **changes: object) -> dict[str, object]:
-    """RUL-13's option line, E-RUL-07's card, open unless `ruling` is a letter."""
+    """RUL-13's option line, E-RUL-07's card, open unless `ruling` is a letter or `other`."""
     card_hash = "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a"
     return {
         "index": 1,
@@ -87,6 +88,7 @@ def option_line(*, ruling: object = None, **changes: object) -> dict[str, object
         "ruling": ruling,
         "ruled_on": "2026-10-28" if ruling is not None else None,
         "via": "board" if ruling is not None else None,
+        "other": None,
         "default": None,
         "card_hash": card_hash,
         "stored_card_hash": card_hash if ruling is not None else None,
@@ -142,11 +144,20 @@ def test_a_yes_no_line_is_listed_in_the_bytes_it_always_was(
     )
 
 
-@pytest.mark.parametrize("ruling", [None, "A", "B"], ids=["open", "ruled-A", "ruled-B"])
+@pytest.mark.parametrize(
+    "stored",
+    [
+        option_line(),
+        option_line(ruling="A"),
+        option_line(ruling="B"),
+        option_line(ruling="other", via="chat", other="Nur am Desktop.\n„Zitat“ \\ Ende"),
+    ],
+    ids=["open", "ruled-A", "ruled-B", "ruled-other"],
+)
 def test_an_option_line_is_listed_with_its_card_in_the_wire_order(
-    repository: FakeAcoRepository, board: BoardClient, ruling: str | None
+    repository: FakeAcoRepository, board: BoardClient, stored: dict[str, object]
 ) -> None:
-    stored = option_line(ruling=ruling)
+    """ABRD-56: `other` follows `via`, verbatim."""
     repository.set_rulings(row(12, "Song jump", stored))
 
     [listed] = _listed_lines(board)
@@ -310,6 +321,11 @@ def test_a_yes_no_decision_on_an_option_line_writes_nothing_and_says_why(
         option_line(ruling="A", via="phone"),
         option_line(ruling="A", via="Board"),
         option_line(ruling="A", via=5),
+        option_line(ruling="other", via="chat"),
+        option_line(ruling="other", via="chat", other="  "),
+        option_line(ruling="other", via="chat", other=5),
+        option_line(ruling="A", other="x"),
+        option_line(other="x"),
     ],
     ids=[
         "ruling-not-a-letter-of-the-options",
@@ -336,6 +352,11 @@ def test_a_yes_no_decision_on_an_option_line_writes_nothing_and_says_why(
         "via-unknown-value",
         "via-wrong-case",
         "via-not-text",
+        "other-missing-on-a-line-ruled-other",
+        "other-blank",
+        "other-not-text",
+        "other-beside-a-letter",
+        "other-on-an-open-line",
     ],
 )
 def test_a_malformed_option_line_makes_only_its_repository_unreadable(
