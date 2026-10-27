@@ -11,13 +11,21 @@ import pytest
 from board_fixtures import board_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-from test_option_lines import GOLDEN_CARD_HASH, card, card_body, ruled_card
+from test_option_lines import (
+    GOLDEN_CARD_HASH,
+    OTHER_ANSWER,
+    card,
+    card_body,
+    other_card,
+    ruled_card,
+)
 
 from aco import body, forge
 
 STALE_CARD_HASH = "sha256:" + "0" * 64
 YES_NO_LINE = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
 RULED_YES_NO_LINE = '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2026-10-01\n'
+ALREADY_RULED = "line 2 is already ruled; a changed ruling is a new line"
 CARD_CHANGED = "line 2 changed since its card was shown; show it again and rule what it shows now"
 
 
@@ -39,6 +47,13 @@ def serve_item(monkeypatch: pytest.MonkeyPatch, raw_body: str) -> FakeForge:
 def decide(letter: str, via: str, shown: str = GOLDEN_CARD_HASH, *, line: int = 2) -> list[str]:
     """`rule`'s arguments after the item for one option choice."""
     return ["--line", str(line), "--option", letter, "--via", via, "--card-hash", shown]
+
+
+def other_arguments(
+    answer: str, via: str = "chat", shown: str = GOLDEN_CARD_HASH, *, line: int = 2
+) -> list[str]:
+    """`rule`'s arguments after the item for one Other answer; `=` keeps a leading dash."""
+    return ["--line", str(line), f"--other={answer}", "--via", via, "--card-hash", shown]
 
 
 def decided_state(rulings_stdout: str) -> tuple[object, ...]:
@@ -126,7 +141,7 @@ class TestRuleOption:
                 ruled_card(),
                 YES_NO_LINE,
                 decide("B", "chat", STALE_CARD_HASH),
-                "line 2 is already ruled; a changed ruling is a new line",
+                ALREADY_RULED,
                 "already_ruled",
                 id="RULE-04-before-RULE-17",
             ),
@@ -186,6 +201,46 @@ class TestRuleOption:
                 "invalid_usage",
                 id="RULE-19",
             ),
+            pytest.param(
+                card(),
+                RULED_YES_NO_LINE,
+                other_arguments(OTHER_ANSWER, line=1),
+                "line 1 is a yes/no line; --other rules only an option line",
+                "invalid_usage",
+                id="RULE-16-before-RULE-04-other",
+            ),
+            pytest.param(
+                card(),
+                YES_NO_LINE,
+                other_arguments(OTHER_ANSWER, line=3),
+                "line 3 out of range: this item has 2 expectation line(s)",
+                "line_out_of_range",
+                id="RULE-05-before-RULE-16-other",
+            ),
+            pytest.param(
+                other_card(),
+                YES_NO_LINE,
+                other_arguments(OTHER_ANSWER, shown=STALE_CARD_HASH),
+                ALREADY_RULED,
+                "already_ruled",
+                id="RULE-04-before-RULE-17-other-ruled",
+            ),
+            pytest.param(
+                ruled_card(),
+                YES_NO_LINE,
+                other_arguments(OTHER_ANSWER, shown=STALE_CARD_HASH),
+                ALREADY_RULED,
+                "already_ruled",
+                id="RULE-04-before-RULE-17-letter-ruled",
+            ),
+            pytest.param(
+                card(),
+                YES_NO_LINE,
+                other_arguments(OTHER_ANSWER, shown=STALE_CARD_HASH),
+                CARD_CHANGED,
+                "card_changed",
+                id="RULE-17-other",
+            ),
         ],
     )
     def test_a_refused_ruling_leaves_the_body_unwritten(
@@ -225,18 +280,48 @@ class TestRuleOption:
             ),
             pytest.param(
                 ["--line", "1", "--yes", "--via", "chat"],
-                "--via and --card-hash go only with --option",
+                "--via and --card-hash go only with --option or --other",
                 id="via-without-option",
             ),
             pytest.param(
                 ["--line", "1", "--no", "--card-hash", GOLDEN_CARD_HASH],
-                "--via and --card-hash go only with --option",
+                "--via and --card-hash go only with --option or --other",
                 id="card-hash-without-option",
             ),
             pytest.param(
                 [*decide("A", "chat"), "--note", "Ja."],
                 "--note does not go with --option; keep the operator's word in the item's journal",
                 id="note-with-option",
+            ),
+            pytest.param(
+                ["--line", "2", "--other", "A", "--via", "chat"],
+                "--other needs --via and --card-hash",
+                id="other-without-card-hash",
+            ),
+            pytest.param(
+                ["--line", "2", "--other", "A", "--card-hash", GOLDEN_CARD_HASH],
+                "--other needs --via and --card-hash",
+                id="other-without-via",
+            ),
+            pytest.param(
+                [*other_arguments("A"), "--note", "Ja."],
+                "--note does not go with --other; its text is the answer",
+                id="note-with-other",
+            ),
+            pytest.param(
+                other_arguments("A", "default"),
+                "--via default keeps only the recommended option, not --other",
+                id="other-via-default",
+            ),
+            pytest.param(
+                other_arguments("   "),
+                "--other needs a non-empty answer",
+                id="RULE-21-blank",
+            ),
+            pytest.param(
+                other_arguments("\n"),
+                "--other needs a non-empty answer",
+                id="RULE-21-lone-newline",
             ),
         ],
     )
@@ -247,7 +332,7 @@ class TestRuleOption:
         arguments: list[str],
         message: str,
     ) -> None:
-        """Spec: RULE-15, RULE-09 -- an item no forge knows would refuse RULE-07 if reached."""
+        """Spec: RULE-15, RULE-21, RULE-09 -- an item no forge knows refuses RULE-07 if reached."""
         client = serve_forge(monkeypatch, FakeForge())
         command = ["rule", "7", *arguments]
         text = run_cli(command, capsys)

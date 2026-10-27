@@ -108,6 +108,26 @@ def malformed(field: str, message: str) -> str:
 
 
 E = "expectation[0]"
+OTHER_ANSWER = "Nur auf dem Desktop offen lassen; auf dem Handy wie heute."
+
+
+def other_decision(answer: str = OTHER_ANSWER) -> str:
+    """The decided state of a card ruled `other` with the hash of the card shown."""
+    return (
+        f'ruling = "other"\nruled_on = 2026-10-28\ncard_hash = "{GOLDEN_CARD_HASH}"\n'
+        f'via = "chat"\nother = "{answer}"\n'
+    )
+
+
+def open_card_with(decision: str) -> str:
+    return card(card_head(("question = ", decision + "question = ")))
+
+
+def other_card(*edits: tuple[str, str]) -> str:
+    """The option line ruled `other`, `edits` applied to its head."""
+    return card(card_head(("question = ", other_decision() + "question = "), *edits))
+
+
 PAD = "a" * 6000
 
 
@@ -242,7 +262,7 @@ class TestOptionLineCheck:
             ),
             pytest.param(
                 ruled_card(('ruling = "A"', 'ruling = "C"')),
-                [malformed(f"{E}.ruling", f"{E}.ruling must be one of A, B")],
+                [malformed(f"{E}.ruling", f"{E}.ruling must be one of A, B, or other")],
                 id="BODY-78",
             ),
             pytest.param(
@@ -448,13 +468,37 @@ class TestOptionLineCheck:
                 ],
                 id="order-within-one-entry",
             ),
+            pytest.param(
+                open_card_with(other_decision().replace(f'other = "{OTHER_ANSWER}"\n', "")),
+                [malformed(f"{E}.other", f"{E}.other is required when ruling is other")],
+                id="BODY-91-required-for-other",
+            ),
+            pytest.param(
+                open_card_with(
+                    other_decision()
+                    .replace('ruling = "other"', 'ruling = "A"')
+                    .replace(OTHER_ANSWER, "x")
+                ),
+                [malformed(f"{E}.other", f"{E}.other belongs only to a line ruled other")],
+                id="BODY-91-refused-beside-a-letter",
+            ),
+            pytest.param(
+                open_card_with('other = "x"\n'),
+                [malformed(f"{E}.other", f"{E}.other belongs only to a line ruled other")],
+                id="BODY-91-refused-on-an-open-line",
+            ),
+            pytest.param(
+                open_card_with(other_decision().replace(OTHER_ANSWER, "  ")),
+                [malformed(f"{E}.other", f"{E}.other must be a non-empty string")],
+                id="BODY-91-non-empty",
+            ),
         ],
     )
     def test_a_defective_option_line_is_refused(
         self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
     ) -> None:
-        """Spec: BODY-69..BODY-84, BODY-86, BODY-87, BODY-90 -- one sentence per refusal, in
-        entry order."""
+        """Spec: BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91 -- one sentence per
+        refusal, in entry order."""
         assert check_defects(capsys, card_body(line)) == (2, defects)
 
     @pytest.mark.parametrize(
@@ -543,6 +587,7 @@ class TestOptionLineRulings:
             "card_hash": GOLDEN_CARD_HASH,
             "stored_card_hash": None,
             "via": None,
+            "other": None,
             "question": "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?",
             "problem": "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg.",
             "picture": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'
