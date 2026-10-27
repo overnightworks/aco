@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		CONTRACT_SUMMARY,
 		contractTexts,
 		ROW_LABEL,
 		resultAltText,
@@ -10,6 +9,7 @@
 		undoTail
 	} from '../app/model/optionCard';
 	import type { CardOption, OptionLine } from '../types';
+	import ContractFold from './ContractFold.svelte';
 	import EnlargeablePicture from './EnlargeablePicture.svelte';
 	import WarnMark from './WarnMark.svelte';
 
@@ -48,15 +48,7 @@
 	</dd>
 	<dt>{ROW_LABEL.contract}</dt>
 	<dd>
-		<details>
-			<summary class="fold">{CONTRACT_SUMMARY}</summary>
-			<div class="binding">
-				{#each contractTexts(line, option) as sentence (sentence)}
-					<p>{sentence}</p>
-				{/each}
-				<span class="source">{sourceLine(repo, item, line)}</span>
-			</div>
-		</details>
+		<ContractFold sentences={contractTexts(line, option)} source={sourceLine(repo, item, line)} />
 	</dd>
 </dl>
 
@@ -76,7 +68,7 @@
 		font-weight: 550;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: var(--oc-fg-3);
+		color: var(--fg-3);
 	}
 	dd {
 		margin: 0;
@@ -91,8 +83,8 @@
 		font-size: 13px;
 		font-weight: 650;
 		letter-spacing: 0.04em;
-		color: var(--oc-fg-2);
-		border: 1.5px dashed var(--oc-line-strong);
+		color: var(--fg-2);
+		border: 1.5px dashed var(--line-strong);
 		border-radius: 6px;
 		padding: 2px 10px;
 	}
@@ -100,45 +92,7 @@
 		font-weight: 600;
 	}
 	b.final {
-		color: var(--oc-warn);
-	}
-	.details summary.fold {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding-block: 0;
-		list-style: none;
-		cursor: pointer;
-		color: var(--oc-fg-2);
-	}
-	summary::-webkit-details-marker {
-		display: none;
-	}
-	summary::before {
-		content: '';
-		width: 0;
-		height: 0;
-		border-left: 5px solid currentColor;
-		border-top: 4px solid transparent;
-		border-bottom: 4px solid transparent;
-	}
-	details[open] summary::before {
-		transform: rotate(90deg);
-	}
-	.binding {
-		display: grid;
-		gap: 8px;
-		margin-top: 8px;
-		padding-left: 12px;
-		border-left: 2px solid var(--oc-line-strong);
-		font-size: 13px;
-		line-height: 18px;
-		color: var(--oc-fg-2);
-	}
-	.source {
-		font-family: ui-monospace, 'DejaVu Sans Mono', Menlo, Consolas, monospace;
-		font-size: 12px;
-		color: var(--oc-fg-3);
+		color: var(--warn);
 	}
 	@media (max-width: 760px) {
 		.details {

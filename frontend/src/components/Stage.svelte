@@ -4,8 +4,7 @@
 		cardSentence,
 		findSelectedLine,
 		NO_SELECTION_MESSAGE,
-		pictureDataUri,
-		ruledOutcomeText
+		pictureDataUri
 	} from '../app/model/boardSummary';
 	import { NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
 	import { isOptionLine } from '../app/model/optionCard';
@@ -13,6 +12,7 @@
 	import type { Outcome, RepoReading } from '../types';
 	import ChoiceButtons from './ChoiceButtons.svelte';
 	import DecideRow from './DecideRow.svelte';
+	import DecidedCard from './DecidedCard.svelte';
 	import OptionCard from './OptionCard.svelte';
 	import RefusalBanner from './RefusalBanner.svelte';
 
@@ -41,6 +41,11 @@
 >
 	{#if selected === null}
 		<p>{NO_SELECTION_MESSAGE}</p>
+	{:else if selected.line.ruling !== null}
+		{@const ruledLine = selected.line}
+		{#key lineKey(selected.repo, selected.item.number, ruledLine)}
+			<DecidedCard repo={selected.repo} item={selected.item} line={ruledLine} />
+		{/key}
 	{:else if isOptionLine(selected.line)}
 		{@const optionLine = selected.line}
 		{@const repoName = selected.repo}
@@ -48,17 +53,15 @@
 		{@const optionKey = lineKey(repoName, itemNumber, optionLine)}
 		{#key optionKey}
 			<OptionCard repo={repoName} item={itemNumber} line={optionLine}>
-				{#if optionLine.ruling === null}
-					<DecideRow
-						line={optionLine}
-						pending={decisions.isPending(optionKey)}
-						{refreshing}
-						banner={decisions.banner(optionKey)}
-						onDecide={(shownLine, option) =>
-							decisions.decideOption(repoName, itemNumber, shownLine, option)}
-						onReload={() => decisions.reloadAfterBanner(optionKey)}
-					/>
-				{/if}
+				<DecideRow
+					line={optionLine}
+					pending={decisions.isPending(optionKey)}
+					{refreshing}
+					banner={decisions.banner(optionKey)}
+					onDecide={(shownLine, option) =>
+						decisions.decideOption(repoName, itemNumber, shownLine, option)}
+					onReload={() => decisions.reloadAfterBanner(optionKey)}
+				/>
 			</OptionCard>
 		{/key}
 	{:else}
@@ -80,41 +83,34 @@
 			{#if selected.line.picture !== null}
 				<img alt="Bild zur Frage" src={pictureDataUri(selected.line.picture)} />
 			{/if}
-			{#if yesNoLine.ruling !== null}
-				<div class="ruledbox">
-					<p>{ruledOutcomeText(yesNoLine.ruling, yesNoLine.ruled_on)}</p>
-					<p class="hint">Nur zum Lesen. Umentscheiden heißt: eine neue Zeile in aco.</p>
-				</div>
-			{:else}
-				{#if banner !== null}
-					<RefusalBanner {banner} onReload={() => decisions.reloadAfterBanner(activeKey)} />
-				{/if}
-				{#if !locked}
-					<details class="note">
-						<summary>Notiz</summary>
-						<textarea
-							bind:value={noteText}
-							maxlength={NOTE_MAX_LENGTH}
-							placeholder="Optional – wird als „Anmerkung: …“ an den Satz gehängt"></textarea>
-					</details>
-					<ChoiceButtons
-						default={selected.line.default}
-						disabled={decisions.isPending(activeKey) || refreshing}
-						onChoose={(outcome: Outcome) => {
-							if (selected === null) {
-								return;
-							}
-							decisions.decide(
-								selected.repo,
-								selected.item.number,
-								yesNoLine,
-								outcome,
-								noteOrNull(noteText)
-							);
-							noteText = '';
-						}}
-					/>
-				{/if}
+			{#if banner !== null}
+				<RefusalBanner {banner} onReload={() => decisions.reloadAfterBanner(activeKey)} />
+			{/if}
+			{#if !locked}
+				<details class="note">
+					<summary>Notiz</summary>
+					<textarea
+						bind:value={noteText}
+						maxlength={NOTE_MAX_LENGTH}
+						placeholder="Optional – wird als „Anmerkung: …“ an den Satz gehängt"></textarea>
+				</details>
+				<ChoiceButtons
+					default={selected.line.default}
+					disabled={decisions.isPending(activeKey) || refreshing}
+					onChoose={(outcome: Outcome) => {
+						if (selected === null) {
+							return;
+						}
+						decisions.decide(
+							selected.repo,
+							selected.item.number,
+							yesNoLine,
+							outcome,
+							noteOrNull(noteText)
+						);
+						noteText = '';
+					}}
+				/>
 			{/if}
 		</article>
 	{/if}

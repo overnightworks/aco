@@ -1,25 +1,39 @@
 <script lang="ts">
 	import {
+		DECIDED_TAB_LABEL,
+		decidedList,
+		EMPTY_DECIDED_TEXT,
+		EMPTY_DECIDED_TITLE,
 		EMPTY_LIST_TEXT,
 		EMPTY_LIST_TITLE,
 		LIST_REGION_LABEL,
 		openList,
-		QUIET_PREFIX
+		QUIET_PREFIX,
+		type ListView,
+		type RowList
 	} from '../app/model/boardSummary';
 	import type { RepoReading } from '../types';
 	import StateShape from './StateShape.svelte';
 
 	let {
 		repos,
+		view,
 		selectedKey,
 		onSelect
-	}: { repos: RepoReading[]; selectedKey: string | null; onSelect: (key: string) => void } =
-		$props();
+	}: {
+		repos: RepoReading[];
+		view: ListView;
+		selectedKey: string | null;
+		onSelect: (key: string) => void;
+	} = $props();
 
-	const list = $derived(openList(repos));
+	const list: RowList = $derived(view === 'open' ? openList(repos) : decidedList(repos));
+	const regionLabel = $derived(view === 'open' ? LIST_REGION_LABEL : DECIDED_TAB_LABEL);
+	const emptyTitle = $derived(view === 'open' ? EMPTY_LIST_TITLE : EMPTY_DECIDED_TITLE);
+	const emptyText = $derived(view === 'open' ? EMPTY_LIST_TEXT : EMPTY_DECIDED_TEXT);
 </script>
 
-<section aria-label={LIST_REGION_LABEL}>
+<section aria-label={regionLabel}>
 	{#each list.groups as group (group.repo)}
 		{#if 'error' in group}
 			<p role="alert">{group.repo}: {group.error}</p>
@@ -44,7 +58,7 @@
 		{/if}
 	{/each}
 	{#if list.groups.length === 0}
-		<div class="empty"><b>{EMPTY_LIST_TITLE}</b>{EMPTY_LIST_TEXT}</div>
+		<div class="empty"><b>{emptyTitle}</b>{emptyText}</div>
 	{:else if list.quiet.length > 0}
 		<p class="quiet">{QUIET_PREFIX}{list.quiet.join(' · ')}</p>
 	{/if}
@@ -65,7 +79,7 @@
 		font-weight: 650;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: #6e6779;
+		color: var(--fg-3);
 	}
 	ul {
 		list-style: none;
@@ -85,7 +99,7 @@
 	}
 	.row:hover,
 	.row[aria-current='true'] {
-		background: #f1eff4;
+		background: var(--surface-2);
 	}
 	.row[aria-current='true'] {
 		font-weight: 600;
@@ -98,22 +112,22 @@
 		text-overflow: ellipsis;
 	}
 	.muted {
-		color: #6e6779;
+		color: var(--fg-3);
 	}
 	.quiet {
 		margin: 0;
 		padding: 16px 24px 0;
 		font-size: 13px;
-		color: #6e6779;
+		color: var(--fg-3);
 	}
 	.empty {
 		padding: 32px 24px;
-		color: #4d4758;
+		color: var(--fg-2);
 	}
 	.empty b {
 		display: block;
 		margin-bottom: 4px;
-		color: #18151f;
+		color: var(--fg);
 	}
 	@media (max-width: 760px) {
 		.group,

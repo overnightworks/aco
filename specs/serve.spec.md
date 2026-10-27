@@ -22,8 +22,8 @@ resolved directory's name.
 |---|---|---|
 | an open line | ABRD-06 | ABRD-01 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
-| a ruled line | ABRD-06 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
+| a ruled line | ABRD-06, ABRD-37, ABRD-54 | RULE-04 |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
 | a post naming both or neither of `outcome` and `option`, another letter, or an `option` with a note | — | ABRD-42 |
@@ -56,31 +56,35 @@ resolved directory's name.
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
 - [ ] [ABRD-07] A yes/no line with a `default` or `ruling` that is no outcome, a malformed option line (below), another `form`, or a `ruled_on` that is no ISO date shows `aco rulings --json is unreadable: <detail>`.
 
-An option line is malformed when its `ruling` or `recommended` is no letter of its options, an option's `letter` is not A, B, C, D by position, or a card field has the wrong type.
+An option line is malformed when its `ruling` or `recommended` is no letter of its options, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
 ## Browser decision flow
 
 - [ ] [ABRD-28] The decision list groups open lines by repository under its name and open count; a row shows its state shape and an option line's topic, or a yes/no line's short question or sentence.
 - [ ] [ABRD-29] Within a repository, open option lines come before yes/no lines, each in aco's order. First load selects the first row; desktop shows its card, phones the list until a row is tapped.
-- [ ] [ABRD-30] “Verlauf” shows ruled lines of open board items as read-only details: question, outcome, date and repository/item; opening reveals the full sentence. It is no archive of closed issues.
-- [ ] [ABRD-31] Browser history sorts date, item number, then line index descending; missing dates last. Complete ties keep repository order. CLI order is unchanged.
-- [ ] [ABRD-32] Returning from history preserves selection, list position and phone view. A completed background decision displaces neither another selected question nor history.
-- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to history. A stored “Später” stays there and is not automatically presented again.
+- [ ] [ABRD-30] Decided groups the ruled lines of open board items by repository under its name and count; a row shows the Decided shape and an option line's topic, or a yes/no line's short question or sentence.
+- [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending, missing dates last; with no ruled line and no failed repository it reads `Nothing decided yet`.
+- [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
+- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided. A stored “Später” stays there and is not automatically presented again.
 - [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation and Decide (ABRD-44).
-- [ ] [ABRD-37] A ruled option line marks its chosen letter on its card; Verlauf shows letter, option name and date, and opening it reveals the chosen option's contract and the line's sentence.
+- [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, or `Ja`, `Nein`, `Später`), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
+- [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), else `not recorded`; then ` · ` and the ruling date as `DD.MM.YYYY` when known.
 - [ ] [ABRD-38] Each option on an option card is a button that opens its Result (picture or `= TODAY`), You notice, Cost, Undo and Contract behind `Show`; opening one closes the other.
 - [ ] [ABRD-43] Each Today and Result picture on an option card is an `Enlarge picture` button opening it with its caption in a modal dialog; `Close` or `Esc` closes it and focus returns to the button.
-- [ ] [ABRD-44] An open option card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts `option` (ABRD-39); once stored, the card moves to Verlauf.
+- [ ] [ABRD-44] An open option card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts `option` (ABRD-39); once stored, the card moves to Decided.
 - [ ] [ABRD-45] A refused pick shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide the picks behind `Neu laden`, and any other failure keeps them.
 - [ ] [ABRD-46] A pick on a `final` option first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` starts the undo window (ABRD-44).
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` posts the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
 - [ ] [ABRD-48] An option line's row carries the Open shape; a yes/no line's row the dashed Not ready shape in muted text. Each shape names its state, and a row's title is its full question.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option line, else to its first row; a card selected meanwhile stays (ABRD-32).
+- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board` and the tabs `Open n` and `Decided n`: n counts the open list's rows and the ruled lines Decided lists.
+- [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
+- [ ] [ABRD-52] An option card's Decide row sticks to the pane's foot while the card runs on beneath it and then casts a shadow over that content; at the card's end it rests in place without one.
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
-`frontend/e2e/decideOption.spec.ts`, `frontend/e2e/history.spec.ts`,
-`frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts` and `frontend/e2e/pictureEnlargement.spec.ts`; ordering is additionally proven by
+`frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`,
+`frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts` and `frontend/e2e/pictureEnlargement.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories
@@ -103,11 +107,12 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line (RULE-13).
-- [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default` and unknown keys leave it unchanged.
+- [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via` and unknown keys leave it unchanged.
+- [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
 
 An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,
-`ruled_on`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
+`ruled_on`, `via`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
 and no `card_hash`; pictures are SVG text as stored.
 
 ## The SPA shell
@@ -289,7 +294,7 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
     {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true,
      "notice": "You pick the song again.", "cost": "None.", "undo": "final",
      "undo_how": "Nothing is built.", "contract": "The link stays a link."}],
-   "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]},
+   "ruling": null, "ruled_on": null, "via": null, "fingerprint": "<hex>"}]},
   {"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
    "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}

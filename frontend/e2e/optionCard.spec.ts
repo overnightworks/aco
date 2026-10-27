@@ -8,6 +8,7 @@ import {
 	type OptionRulingLine,
 	type RulingOption
 } from './rulingsFixture';
+import { decidedCard, decidedList, expectDecidedAnswer } from './decidedView';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
@@ -116,7 +117,12 @@ function arrange(directory: string): void {
 		row(
 			1850,
 			'Schon entschieden',
-			songCard(1, { ruling: 'A', ruled_on: '2026-10-26', question: 'Song offen lassen?' })
+			songCard(1, {
+				ruling: 'A',
+				ruled_on: '2026-10-26',
+				via: 'board',
+				question: 'Song offen lassen?'
+			})
 		)
 	]);
 }
@@ -352,7 +358,7 @@ for (const viewport of [
 				.click();
 			await expect(page.locator('.option-card .details')).toHaveCount(1);
 
-			if (phone) await page.getByRole('button', { name: '← Liste' }).click();
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
 
 			const disclosures = page.locator('.option-card button[aria-expanded]');
@@ -408,7 +414,7 @@ for (const viewport of [
 			await expect(page.locator('.option-card')).toHaveCount(0);
 		});
 
-		test('a ruled option line leaves the list and Verlauf shows its letter, name, date and contract', async ({
+		test('[ABRD-37] a ruled option line leaves the open list and Decided lists it under its project', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
@@ -418,21 +424,19 @@ for (const viewport of [
 			await expect(page.locator('.tracks')).toContainText('Sprung zum Ursprungs-Take');
 			await expect(page.locator('.tracks')).toContainText('Thema');
 
-			await page.getByRole('button', { name: 'Verlauf', exact: true }).click();
-			const history = page.getByRole('region', { name: 'Verlauf' });
-			const entry = history.locator('summary');
-			await expect(entry).toHaveCount(1);
-			await expect(entry).toContainText('Song offen lassen?');
-			await expect(entry).toContainText('A · Song bleibt offen');
-			await expect(entry).toContainText('2026-10-26');
-			await expect(history.getByText(SONG_CONTRACT)).toBeHidden();
-			await entry.press('Enter');
-			await expect(history.getByText(SONG_CONTRACT)).toBeVisible();
-			await expect(
-				history.getByText('Der Song bleibt beim Sprung zum Ursprungs-Take offen.')
-			).toBeVisible();
-			await expect(history.getByRole('button')).toHaveCount(0);
-			await page.screenshot({ path: testInfo.outputPath('history-option.png') });
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const row = decidedList(page).getByRole('button');
+			await expect(decidedList(page).getByRole('heading', { level: 2 })).toHaveText(
+				new RegExp(`^${REPOSITORY}\\s+1$`)
+			);
+			await expect(row).toHaveCount(1);
+			await expect(row).toContainText('Sprung zum Ursprungs-Take');
+			if (phone) await row.click();
+			await expectDecidedAnswer(page, 'A — Song bleibt offen', 'Board · 26.10.2026');
+			const card = decidedCard(page);
+			await card.getByText('Show', { exact: true }).click();
+			await expect(card.getByText(SONG_CONTRACT)).toBeVisible();
+			await page.screenshot({ path: testInfo.outputPath('decided-option.png') });
 		});
 
 		if (phone) {

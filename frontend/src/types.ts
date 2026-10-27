@@ -42,6 +42,8 @@ interface CardOptionFields {
 export type CardOption = CardOptionFields &
 	({ picture: string; caption?: string } | { same_as_today: true });
 
+export type RulingVia = 'board' | 'chat' | 'default';
+
 /** An option line (`specs/serve.spec.md` ABRD-34): the one form `form`
  * names; a yes/no line carries no `form` at all. */
 export interface OptionLine {
@@ -60,6 +62,8 @@ export interface OptionLine {
 	options: CardOption[];
 	ruling: OptionLetter | null;
 	ruled_on: string | null;
+	/** Who decided and how (ABRD-53), as aco stored it; null while open. */
+	via: RulingVia | null;
 	/** Bound to the repo it was read under (ABRD-21); opaque to this client. */
 	fingerprint: string;
 }
