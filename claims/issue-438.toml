@@ -1,8 +1,0 @@
-claim_id = "03f4c0821359474c913e7faa39aafb28"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "fb33cdbf5e1db744c25cfd30fc15e781eeb5cda7"
-branch = "claude/issue-438-board-reads-other"
-scope = ["docs/board/README.md", "frontend/e2e/decided.spec.ts", "frontend/e2e/rulingsFixture.ts", "frontend/src/app/model/decidedCard.test.ts", "frontend/src/app/model/decidedCard.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "specs/serve.spec.md", "src/aco/__init__.py", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/ports.py", "src/aco/board/static", "tests/aco_board/test_aco_board_option_lines.py"]
-opened_commit = "3120a89d76e58d3d959cd6f4da4553533e64a59e"
-whole_reason = "The board's read half of Other as one path: the port's typed OtherAnswer, the strict reader, ruling and other on /api/board, the decided card's Other answer and binding sentence, ABRD-56/57 with the amended ABRD-37 and malformed paragraph, the Python, Vitest and e2e cases, the board README, the 5.2.0 version line and the rebuilt static assets."
