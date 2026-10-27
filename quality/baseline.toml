@@ -1,8 +1,5 @@
 # Measured by `quality baseline write`. Entries only ever go down.
 
-[ccn."src/aco/board_read.py"]
-"build_board" = 16
-
 [ccn."src/aco/cmd_cut.py"]
 "_adopt_existing_child" = 19
 
@@ -12,7 +9,7 @@
 "GitHubForge._landing" = 28
 
 [ccn."src/aco/workboard.py"]
-"build_board" = 33
+"build_board" = 32
 
 [ccn."tests/test_status.py"]
 "check_status.check" = 19
@@ -22,12 +19,12 @@
 "src/aco/checkout.py" = 2025
 "src/aco/cli.py" = 849
 "src/aco/cmd_claim.py" = 1136
-"src/aco/cmd_release.py" = 924
+"src/aco/cmd_release.py" = 921
 "src/aco/github.py" = 1764
 "src/aco/protocol.py" = 1877
 "src/aco/state_board.py" = 957
 "src/aco/store.py" = 2102
-"src/aco/workboard.py" = 3139
+"src/aco/workboard.py" = 3138
 "tests/aco_board/test_aco_board_api.py" = 1059
 "tests/cli_fixtures.py" = 969
 "tests/github_fixtures.py" = 838
@@ -47,7 +44,7 @@
 "tests/test_store.py" = 5508
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 109
+"build_board" = 104
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 84
@@ -78,7 +75,7 @@
 
 [function_lines."src/aco/workboard.py"]
 "_board_item" = 103
-"build_board" = 117
+"build_board" = 112
 
 [function_lines."tests/github_fixtures.py"]
 "landed_observations" = 61

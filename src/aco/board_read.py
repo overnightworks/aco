@@ -186,6 +186,15 @@ def fetch_dependencies(
         return {number: future.result() for number, future in futures.items()}
 
 
+def fetch_validated_dependencies(
+    client: forge.BoardSource, issues: tuple[workboard.Issue, ...]
+) -> dict[int, tuple[workboard.IssueDependency, ...]]:
+    """The validated `blocked_by` dependencies of every issue that reports a
+    positive blocker count: the one place that picks the issues to fetch."""
+    candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
+    return validated_dependencies(issues, fetch_dependencies(client, candidates))
+
+
 @dataclass(frozen=True)
 class ClaimHistory:
     """The store's own git-history reads one board build needs:
@@ -301,12 +310,7 @@ def build_board(
         if (parent := client.parent_issue(number)) is not None
     }
     if landing is None:
-        dependencies = validated_dependencies(
-            issues,
-            fetch_dependencies(
-                client, tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
-            ),
-        )
+        dependencies = fetch_validated_dependencies(client, issues)
         trunk_ref = context.trunk_ref
     else:
         # A merged release already fetched and validated this exact
