@@ -1,0 +1,8 @@
+claim_id = "a0da7cf336d941e3b4968cc24707d419"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "75310fe6f80d26afd0bb0e073e31c47f2e29e129"
+branch = "claude/issue-469-board-skips-withdrawn"
+scope = ["specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/ports.py", "tests/board/test_board_withdrawn_lines.py"]
+opened_commit = "3866363f3991d3cd143db5ddd81d0bf8e36f2812"
+whole_reason = "One reader rule: the skip, its token owner, its spec criterion and its test change together."
