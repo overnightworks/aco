@@ -335,9 +335,8 @@ def _real_checkout(
 ) -> tuple[Path, str]:
     """A real repository with six committed files, and the checkout of it
     `validate_checkout` judges: a linked worktree on `branch`, or the primary
-    checkout switched to it. Each `dirty` path is written in that checkout --
-    modified when committed, untracked otherwise. Returns the checkout and its
-    real head."""
+    checkout switched to it. Each `dirty` path, one of the committed files, is
+    modified in that checkout. Returns the checkout and its real head."""
     repository = tmp_path / "repo"
     repository.mkdir()
     real_git(repository, "init", "-q", "-b", "main")
