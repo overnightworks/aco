@@ -48,6 +48,7 @@ DEFAULT_TIMEOUT_SECONDS = 120.0
 seconds against a forge; a call still running after this is treated as hung."""
 _ALREADY_RULED_REASON = "already_ruled"
 _CARD_CHANGED_REASON = "card_changed"
+_RETURNED_REASON = "returned"
 
 _Field = TypeVar("_Field")
 _Member = TypeVar("_Member", bound=StrEnum)
@@ -131,7 +132,12 @@ class AcoCli:
             return _RuleAnswer(DecisionResult(DecisionStatus.FAILED, str(error)), False)
         envelope = _envelope(completed)
         if completed.exit_code == 0 and envelope.get("ok") is True:
-            return _RuleAnswer(DecisionResult(DecisionStatus.RULED), False)
+            stored = (
+                DecisionStatus.RETURNED
+                if envelope.get("reason") == _RETURNED_REASON
+                else DecisionStatus.RULED
+            )
+            return _RuleAnswer(DecisionResult(stored), False)
         reason = envelope.get("reason")
         if reason == _ALREADY_RULED_REASON:
             return _RuleAnswer(

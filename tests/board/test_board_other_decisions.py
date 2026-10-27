@@ -5,6 +5,7 @@ stores that call."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -128,10 +129,10 @@ def test_a_null_other_or_unclear_names_nothing_so_the_option_beside_it_decides(
 
 
 @pytest.mark.parametrize(
-    ("answer", "stored_key"),
+    ("answer", "stored_key", "status"),
     [
-        ({"other": f" {'x' * 280} "}, "other"),
-        ({"unclear": True, "note": f" {'x' * 280} "}, "returned_note"),
+        ({"other": f" {'x' * 280} "}, "other", "ruled"),
+        ({"unclear": True, "note": f" {'x' * 280} "}, "returned_note", "returned"),
     ],
     ids=["other", "unclear"],
 )
@@ -141,11 +142,12 @@ def test_an_answer_of_exactly_the_bound_after_trimming_is_accepted(
     listed: dict[str, Any],
     answer: dict[str, object],
     stored_key: str,
+    status: str,
 ) -> None:
-    """ABRD-05, ABRD-42, ABRD-65."""
+    """ABRD-05, ABRD-42, ABRD-65, ABRD-71."""
     posted = board.post_rule({**listed, **answer})
 
-    assert posted.json() == {"status": "ruled", "message": None}
+    assert posted.json() == {"status": status, "message": None}
     assert repository.stored_line(12, 1)[stored_key] == "x" * 280
 
 
@@ -196,17 +198,19 @@ def test_a_post_for_no_option_line_is_refused_as_changed(
 @pytest.mark.usefixtures("github_world")
 @pytest.mark.parametrize("text", ["-n first", "a\nb", 'say "hi" ä'])
 @pytest.mark.parametrize(
-    ("answer", "stored", "stamped"),
+    ("answer", "stored", "stamped", "reason"),
     [
         (
             lambda text: {"other": f" {text} "},
             lambda text: {"ruling": "other", "other": text, "via": "board", "note": None},
             set(),
+            "ruled",
         ),
         (
             lambda text: {"unclear": True, "note": f" {text} "},
             lambda text: {"ruling": None, "via": None, "returned_note": text},
             {"returned_on"},
+            "returned",
         ),
     ],
     ids=["other", "unclear"],
@@ -220,8 +224,10 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
     answer: Callable[[str], dict[str, object]],
     stored: Callable[[str], dict[str, object]],
     stamped: set[str],
+    reason: str,
 ) -> None:
-    """ABRD-64, ABRD-70, RULE-15, RULE-21, RULE-22, RULE-23: the argv is lawful for aco."""
+    """ABRD-64, ABRD-70, ABRD-71, RULE-15, RULE-21, RULE-22, RULE-23: the argv is lawful for aco,
+    and aco's printed reason is the word the board relays."""
     repository.set_rulings(
         row(7, "Karte", option_line(index=2, card_hash=GOLDEN_CARD_HASH, topic="Sprung"))
     )
@@ -241,6 +247,7 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
     ruled = run_cli(sent, capsys)
 
     assert ruled.status == 0
+    assert json.loads(ruled.stdout)["reason"] == reason
     entry = body.block_expectation_dicts(body.locate_block(forge.item_bodies[7]).data)[1]
     assert {key: entry.get(key) for key in stored(text)} == stored(text)
     assert stamped <= set(entry)
