@@ -11,6 +11,7 @@ import {
 	openList,
 	outcomeLabel,
 	pictureDataUri,
+	STATE_LABEL,
 	tabCounts
 } from './boardSummary';
 
@@ -108,6 +109,33 @@ describe('openList', () => {
 			'a:1:3',
 			'a:2:2'
 		]);
+	});
+
+	test('[ABRD-61] a returned option line is a back row ranked after open and before todo', () => {
+		const { groups } = openList([
+			repo({
+				name: 'a',
+				items: [
+					item({
+						number: 1,
+						lines: [
+							line({ index: 1 }),
+							optionLine({ index: 2, topic: 'Sprung', returned_on: '2026-10-27' }),
+							optionLine({ index: 3 })
+						]
+					})
+				]
+			})
+		]);
+
+		const [group] = groups;
+		expect(group && 'rows' in group ? group.rows.map((row) => row.key) : []).toEqual([
+			'a:1:3',
+			'a:1:2',
+			'a:1:1'
+		]);
+		expect(group && 'rows' in group ? group.rows[1]?.state : null).toBe('back');
+		expect(STATE_LABEL.back).toBe('With head');
 	});
 
 	test('[ABRD-49] readable repositories with no open line are quiet, a ruled-only one included', () => {
@@ -355,6 +383,26 @@ describe('nextOpenAfter', () => {
 
 	test('[ABRD-50] the decided line is skipped, so from the last line the first one comes next', () => {
 		expect(nextOpenAfter(repos, 'repo:42:3')).toBe('repo:42:1');
+	});
+
+	test('[ABRD-61] a returned option line comes after an open one and before a yes/no line', () => {
+		const withHead = [
+			repo({
+				items: [
+					item({
+						number: 1,
+						lines: [
+							line({ index: 1 }),
+							optionLine({ index: 2, returned_on: '2026-10-27' }),
+							optionLine({ index: 3 })
+						]
+					})
+				]
+			})
+		];
+
+		expect(nextOpenAfter(withHead, 'repo:1:3')).toBe('repo:1:2');
+		expect(nextOpenAfter(withHead, 'repo:1:2')).toBe('repo:1:3');
 	});
 
 	test('returns null once no line is open any more', () => {
