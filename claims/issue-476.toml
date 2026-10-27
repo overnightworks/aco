@@ -1,8 +1,0 @@
-claim_id = "c9fc66f527d841ab96a69a59436aa2fb"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "0fadeee00b48cafddda52aa6ec53c42111515406"
-branch = "claude/issue-476-rule-only-option-lines"
-scope = ["quality/baseline.toml", "specs/output.spec.md", "specs/rule.spec.md", "specs/serve.spec.md", "src/aco/cmd_rule.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/support/option_cards.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_cmd_rule.py", "tests/test_cmd_rule_option.py", "tests/test_cmd_rule_other.py", "tests/test_cmd_rule_unclear.py", "tests/test_option_line_rewrites.py", "tests/test_option_lines.py", "tests/test_state_board.py"]
-opened_commit = "e82b9062f8fc3cca270dcef1e7388b807d209afa"
-whole_reason = "One public form leaves whole: the flags, their outcome type, their writer, the spec criteria and every test that rode on them change together, or the tree tests a command form that no longer parses."
