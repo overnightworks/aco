@@ -29,7 +29,7 @@ describe('cardMeta', () => {
 		expect(meta).toEqual({ where: 'songmaker › Song page', kind: 'Money', undo: 'reversible' });
 	});
 
-	test('[ABRD-65] marks a returned line as with head', () => {
+	test('[ABRD-61] marks a returned line as with head', () => {
 		const meta = cardMeta('songmaker', optionLine({ returned_on: '2026-10-27' }));
 
 		expect(meta.withHead).toBe(true);

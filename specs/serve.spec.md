@@ -23,7 +23,7 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01, ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-65, ABRD-66, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47 | RULE-13 (outcome), ABRD-39 (option) |
 | a withdrawn line | ABRD-60 | — |
 | an `option` posted for a line that is no option line | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
@@ -55,7 +55,7 @@ resolved directory's name.
 ## Reading the lines
 
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
-- [ ] [ABRD-07] A yes/no line with a non-outcome `default` or `ruling`, a malformed option line (below, ABRD-66), a `form` but ABRD-60's, or a non-ISO `ruled_on` shows `aco rulings --json is unreadable: <detail>`.
+- [ ] [ABRD-07] A yes/no line with a non-outcome `default` or `ruling`, a malformed option line (below, ABRD-62), a `form` but ABRD-60's, or a non-ISO `ruled_on` shows `aco rulings --json is unreadable: <detail>`.
 
 An option line is malformed when its `recommended` is no letter of its options, its `ruling` is neither such a letter nor `other`, its `other` is not non-blank text on a line ruled `other` or is neither absent nor `null` on any other, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
@@ -67,7 +67,7 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending, missing dates last; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
 - [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided. A stored “Später” stays there and is not automatically presented again.
-- [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `with head` when it has `returned_on` (ABRD-65), `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation and Decide (ABRD-44).
+- [ ] [ABRD-36] An open option line shows its card: repository and area, kind, `with head` when it has `returned_on` (ABRD-61), `reversible` or `final`, question, Problem, Today picture, options A-D with name and effect, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), else `not recorded`; then ` · ` and the ruling date as `DD.MM.YYYY` when known.
 - [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
@@ -79,8 +79,8 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` posts the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
 - [ ] [ABRD-58] A pick shows a strip above the card until its 8 s undo window ends: the Decided shape, `Decided: <letter> — <name> · <topic>` and `Undo`, in view while the card scrolls and atop a phone's list.
 - [ ] [ABRD-59] A pick moves focus to its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. A window that ends removes its strip, and ABRD-50 applies.
-- [ ] [ABRD-48] An option line's row carries the Open shape, or the With head shape of ABRD-65; a yes/no line's row the dashed Not ready shape in muted text. Each shape names its state, and a row's title is its full question.
-- [ ] [ABRD-65] An open option line with a `returned_on` date is with its head: Open lists it with the With head shape (a ring with a back chevron) in muted text, ranked after the other option lines and before the dashed Not ready ones, and its card shows `with head` in the meta line between its kind and `reversible` or `final`; Decide stays offered. A line without `returned_on` shows as before; the note is not shown.
+- [ ] [ABRD-48] An option line's row carries the Open shape, or the With head shape of ABRD-61; a yes/no line's row the dashed Not ready shape in muted text. Each shape names its state, and a row's title is its full question.
+- [ ] [ABRD-61] An open option line with a `returned_on` date is with its head: Open lists it with the With head shape (a ring with a back chevron) in muted text, ranked after the other option lines and before the dashed Not ready ones, and its card shows `with head` in the meta line between its kind and `reversible` or `final`; Decide stays offered. A line without `returned_on` shows as before; the note is not shown.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option line, else to its first row; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board` and the tabs `Open n` and `Decided n`: n counts the open list's rows and the ruled lines Decided lists.
@@ -114,7 +114,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line (RULE-13).
 - [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of the JSON array `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via`, `returned_on`, `returned_note` and unknown keys leave it unchanged.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
-- [ ] [ABRD-66] An option line lists `returned_on` and `returned_note` right after `other`: as `aco rulings --json` names them (RUL-17), the ISO date and the note when its head has it, else `null`. A missing key, a `returned_on` that is no ISO date, a `returned_note` that is blank or no text or has no `returned_on`, or either on a ruled line is unreadable (ABRD-07). They stay outside the fingerprint (ABRD-35). A yes/no line lists none.
+- [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` right after `other`: as `aco rulings --json` names them (RUL-17), the ISO date and the note when its head has it, else `null`. A missing key, a `returned_on` that is no ISO date, a `returned_note` that is blank or no text or has no `returned_on`, or either on a ruled line is unreadable (ABRD-07). They stay outside the fingerprint (ABRD-35). A yes/no line lists none.
 - [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
 - [ ] [ABRD-60] A line with `"form": "withdrawn"` is skipped unparsed, whatever its keys: no list shows it, its repo stays readable, the item's other lines keep their `index`, an item of only such is not listed.
 

@@ -55,7 +55,7 @@ export function isOptionLine(line: ExpectationLine): line is OptionLine {
 export interface FrameMeta {
 	where: string;
 	kind?: string;
-	/** The line was sent back to its head (ABRD-65). */
+	/** The line was sent back to its head (ABRD-61). */
 	withHead?: true;
 	undo?: Undo;
 }

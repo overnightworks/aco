@@ -38,7 +38,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px with head`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-65] a returned line lists muted with the With head shape after the open ones, and its card says with head and offers Decide', async ({
+		test('[ABRD-61] a returned line lists muted with the With head shape after the open ones, and its card says with head and offers Decide', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();

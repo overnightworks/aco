@@ -19,10 +19,10 @@ that stays in view while the card scrolls and, on a phone, above the list too.
 The Decide row still lacks "Other / Unclear" instead of "Später",
 Mitsprache, the agent list and group decisions. An open yes/no line keeps its card.
 The list groups open and decided lines per project with the picture's Open,
-With-head (a line the operator sent back; muted, listed after the open ones, its card says `with head`),
-Not-ready and Decided shapes (Decided shows the selected line's card in the
+With-head, Not-ready and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its
-colour tokens. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
+colour tokens. With-head is a line the operator sent back: muted, listed after
+the open ones, its card says `with head`. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
 What the board does today is in the "Browser decision flow" of
 [`specs/serve.spec.md`](../../specs/serve.spec.md).
 

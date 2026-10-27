@@ -1,5 +1,5 @@
 """The board lists an open option line its head has been sent back as returned
-(specs/serve.spec.md: ABRD-65, ABRD-66, ABRD-07), driven through the real server, wire form
+(specs/serve.spec.md: ABRD-61, ABRD-62, ABRD-07), driven through the real server, wire form
 and `aco` adapter against a fake `aco` on PATH."""
 
 from __future__ import annotations

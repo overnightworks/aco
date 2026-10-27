@@ -111,7 +111,7 @@ describe('openList', () => {
 		]);
 	});
 
-	test('[ABRD-65] a returned option line is a back row ranked after open and before todo', () => {
+	test('[ABRD-61] a returned option line is a back row ranked after open and before todo', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
@@ -385,7 +385,7 @@ describe('nextOpenAfter', () => {
 		expect(nextOpenAfter(repos, 'repo:42:3')).toBe('repo:42:1');
 	});
 
-	test('[ABRD-65] a returned option line comes after an open one and before a yes/no line', () => {
+	test('[ABRD-61] a returned option line comes after an open one and before a yes/no line', () => {
 		const withHead = [
 			repo({
 				items: [
