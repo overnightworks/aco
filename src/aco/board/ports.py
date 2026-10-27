@@ -53,6 +53,9 @@ class OtherAnswer:
 OPTIONS_FORM = "options"
 """The `form` that marks an option line in the source's own listing."""
 
+WITHDRAWN_FORM = "withdrawn"
+"""The `form` that marks a line its head withdrew; the board does not list it."""
+
 
 @dataclass(frozen=True)
 class YesNoLine:
@@ -127,6 +130,8 @@ class OptionLine:
     ruling: OptionLetter | OtherAnswer | None
     ruled_on: date | None
     via: RulingVia | None
+    returned_on: date | None
+    returned_note: str | None
     card_hash: str
 
     @property

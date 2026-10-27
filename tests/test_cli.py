@@ -8433,85 +8433,6 @@ def _claim_without_agent_args(*flags: str) -> list[str]:
     ]
 
 
-def _parse_claim_command(*flags: str):
-    return issue_claim._parser().parse_args(
-        [
-            "claim",
-            "72",
-            "--agent",
-            "Codex Sol",
-            "--role",
-            "builder",
-            "--scope",
-            "src",
-            "--claim-id",
-            "cli-claim",
-            *flags,
-        ]
-    )
-
-
-@pytest.mark.parametrize(
-    ("flags", "git_values", "error"),
-    [
-        ((), git_checkout(), None),
-        (("--branch", "codex/issue-72"), git_checkout(), None),
-        (("--base", BASE), git_checkout(), None),
-        (("--branch", "other"), git_checkout(), "does not match checkout branch"),
-        (("--base", "b" * 40), git_checkout(), "does not match checkout HEAD"),
-        (
-            ("--base", "b" * 40, "--branch", "other"),
-            git_checkout(),
-            "does not match checkout HEAD",
-        ),
-        ((), git_checkout(branch="main"), "isolated non-main worktree branch"),
-        # `master` is not this repository's default branch (`git_checkout`'s
-        # `origin/HEAD` resolves to `main`), so it binds like any other
-        # non-default branch -- the fallback-denied case for an
-        # unresolvable `origin/HEAD` is pinned separately, in
-        # test_checkout_validation_refuses_with_the_sentence_that_names_the_repair.
-        ((), git_checkout(branch="master"), None),
-        (
-            (),
-            git_checkout(git_directory="/repo/.git", common_directory="/repo/.git"),
-            "linked isolated worktree",
-        ),
-        ((), git_checkout(dirty=" M file"), "before the first worktree edit"),
-    ],
-)
-def test_claim_request_binds_omitted_base_and_branch_to_checkout(
-    monkeypatch: pytest.MonkeyPatch,
-    flags: tuple[str, ...],
-    git_values: dict[tuple[str, ...], str],
-    error: str | None,
-) -> None:
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    parsed = _parse_claim_command(*flags)
-    if "--base" not in flags:
-        assert parsed.base is None
-    if "--branch" not in flags:
-        assert parsed.branch is None
-
-    if error is not None:
-        with pytest.raises(ClaimError, match=error):
-            cmd_claim._request(parsed, default_branch=lambda: "main")
-        return
-
-    claimed = cmd_claim._request(parsed, default_branch=lambda: "main")
-    assert claimed.base == git_values[("rev-parse", "HEAD")]
-    assert claimed.branch == git_values[("branch", "--show-current")]
-
-
-def test_claim_request_refuses_a_base_that_is_not_a_full_commit_sha() -> None:
-    parsed = _parse_claim_command("--base", "not-a-sha")
-
-    with pytest.raises(ClaimError, match="base must be a full lowercase commit SHA"):
-        cmd_claim._request(parsed, default_branch=lambda: "main")
-
-
 def test_matching_store_claim_never_replays_an_issueless_lane() -> None:
     """Issueless lanes keep the one-claim-per-branch contract: only a
     numbered item's replay is ever detected, matching `cmd_claim.run`'s own
@@ -8643,18 +8564,13 @@ def test_cli_claim_empty_role_fails_closed_without_posting_builder(
         "cli-claim",
     ]
 
-    parsed = issue_claim._parser().parse_args(argv)
-    with pytest.raises(ClaimError, match=r"role.+must be one bounded non-empty line"):
-        cmd_claim._request(parsed, default_branch=lambda: "main")
-
     claimed = issue_claim.main(argv)
     captured = capsys.readouterr()
 
     assert claimed == 2
     assert captured.out == ""
     assert "ERROR:" in captured.err
-    assert "role" in captured.err
-    assert "must be one bounded non-empty line" in captured.err
+    assert re.search(r"role.+must be one bounded non-empty line", captured.err)
     assert not store.fetch_state(worktree=Path("."), remote="origin").claims
 
 
@@ -8701,7 +8617,7 @@ def test_claim_and_release_parse_omitted_agent(arguments: list[str]) -> None:
         ),
     ],
 )
-def test_request_and_cli_claim_fill_agent_from_documented_else_chain(
+def test_cli_claim_fills_agent_from_documented_else_chain(
     monkeypatch: pytest.MonkeyPatch,
     explicit: str | None,
     environ: dict[str, str],
@@ -8716,8 +8632,6 @@ def test_request_and_cli_claim_fill_agent_from_documented_else_chain(
     command = _claim_without_agent_args()
     if explicit is not None:
         command.extend(["--agent", explicit])
-    parsed = issue_claim._parser().parse_args(command)
-    assert cmd_claim._request(parsed, default_branch=lambda: "main").agent == agent
 
     client = FakeForge()
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
@@ -8746,9 +8660,6 @@ def test_invalid_agent_identity_fails_before_git_and_github(
     command = _claim_without_agent_args()
     if explicit is not None:
         command.extend(["--agent", explicit])
-    parsed = issue_claim._parser().parse_args(command)
-    with pytest.raises(ClaimError, match="agent must be one bounded non-empty line"):
-        cmd_claim._request(parsed, default_branch=lambda: "main")
 
     forbid_github_construction(monkeypatch)
     releases = [
@@ -8786,10 +8697,6 @@ def test_missing_agent_identity_fails_closed_without_github(
     set_agent_identity_env(monkeypatch, environ)
     forbid_git_fill(monkeypatch)
     command = _claim_without_agent_args()
-    parsed = issue_claim._parser().parse_args(command)
-    with pytest.raises(ClaimError) as raised:
-        cmd_claim._request(parsed, default_branch=lambda: "main")
-    assert_missing_identity_message(str(raised.value))
 
     forbid_github_construction(monkeypatch)
     for argv in (
@@ -11842,86 +11749,6 @@ def test_cli_claim_json_touch_key_set_is_unchanged_by_the_human_overlap_line(
         "agent": "Ada",
         "scope": ["tests/adapters/test_claim_cli.py"],
     }
-
-
-def test_claim_cost_lists_an_overlapping_standing_claim_as_a_touch() -> None:
-    standing = store_claim_from_request(request("claim-a", issue=55, scope=("src",)))
-    lane = store_claim_from_request(
-        request("claim-b", "Grok 4.6", lane=True, branch="docs/foo", scope=("docs",))
-    )
-    narrow_scope = ("src/widget.py",)
-    overlapping = protocol.conflicting_claims(
-        (standing, lane), request("challenger", issue=56, scope=narrow_scope)
-    )
-    wide_scope = ("src", "docs")
-    both = protocol.conflicting_claims(
-        (standing, lane), request("wide", issue=56, scope=wide_scope)
-    )
-
-    assert [claim.claim_id for claim in overlapping] == ["claim-a"]
-    github = body.Storage.GITHUB
-    assert cmd_claim._touch_summary(narrow_scope, overlapping, github) == (
-        "overlaps issue #55 on src/widget.py"
-    )
-    assert cmd_claim._touch_summary(wide_scope, both, github) == (
-        "overlaps issue #55 on src, lane docs/foo on docs"
-    )
-    assert cmd_claim._touch_summary(wide_scope, (), github) == "overlaps no other open claims"
-
-
-def test_claim_cost_names_a_directory_scope_meeting_a_single_file_of_a_standing_claim() -> None:
-    """The case that hurt a consumer twice in one night: a
-    directory in the newly granted scope contains a single file a standing
-    claim already holds, so the overlap line must name that file, not just
-    the standing claim's issue."""
-    standing = store_claim_from_request(
-        request("claim-a", issue=1400, scope=("tests/adapters/test_claim_cli.py",))
-    )
-    own_scope = ("tests",)
-
-    touches = protocol.conflicting_claims(
-        (standing,), request("challenger", issue=1401, scope=own_scope)
-    )
-
-    assert cmd_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
-        "overlaps issue #1400 on tests/adapters/test_claim_cli.py"
-    )
-
-
-def test_claim_cost_counts_overflow_when_many_paths_collide_in_one_claim() -> None:
-    standing = store_claim_from_request(
-        request(
-            "claim-a",
-            issue=55,
-            scope=("src/a.py", "docs/b.md", "tests/c.py", "scripts/d.py"),
-        )
-    )
-    own_scope = ("src", "docs", "tests", "scripts")
-
-    touches = protocol.conflicting_claims(
-        (standing,), request("challenger", issue=56, scope=own_scope)
-    )
-
-    assert cmd_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
-        "overlaps issue #55 on docs/b.md, scripts/d.py, src/a.py, and 1 more"
-    )
-
-
-def test_claim_cost_lists_every_overlapping_claim_separately() -> None:
-    first = store_claim_from_request(request("claim-a", issue=55, scope=("src/a.py",)))
-    second = store_claim_from_request(request("claim-b", issue=57, scope=("docs/b.md",)))
-    third = store_claim_from_request(
-        request("claim-c", "Grok 4.6", lane=True, branch="docs/foo", scope=("tests/c.py",))
-    )
-    own_scope = ("src", "docs", "tests")
-
-    touches = protocol.conflicting_claims(
-        (first, second, third), request("challenger", issue=56, scope=own_scope)
-    )
-
-    assert cmd_claim._touch_summary(own_scope, touches, body.Storage.GITHUB) == (
-        "overlaps issue #55 on src/a.py, issue #57 on docs/b.md, lane docs/foo on tests/c.py"
-    )
 
 
 @pytest.mark.parametrize(

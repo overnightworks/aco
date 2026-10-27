@@ -165,6 +165,8 @@ def _option_line_json(line: OptionLine, repo: str) -> dict[str, object]:
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
         "via": line.via,
         "other": line.ruling.text if isinstance(line.ruling, OtherAnswer) else None,
+        "returned_on": line.returned_on.isoformat() if line.returned_on is not None else None,
+        "returned_note": line.returned_note,
         "fingerprint": wire_fingerprint(repo, line),
     }
 

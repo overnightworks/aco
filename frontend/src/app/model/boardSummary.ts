@@ -57,23 +57,24 @@ export interface SelectedLine {
 	line: ExpectationLine;
 }
 
-/** How a row reads at a glance: an option line is `open`; a yes/no line is
- * `todo` because its head still has to rewrite it as an option card; a ruled
- * line is `done`. */
+/** How a row reads at a glance: an option line is `open`, or `back` once the
+ * operator sent it to its head; a yes/no line is `todo` because its head still
+ * has to rewrite it as an option card; a ruled line is `done`. */
 export type RowState = OpenRowState | 'done';
-type OpenRowState = 'open' | 'todo';
+type OpenRowState = 'open' | 'back' | 'todo';
 
 /** The two tabs that list rows. */
 export type ListView = 'open' | 'decided';
 
 export const STATE_LABEL: Record<RowState, string> = {
 	open: 'Open',
+	back: 'With head',
 	todo: 'Not ready · head to fill',
 	done: 'Decided'
 };
 
 /** Lower comes first; `nextOpenAfter` and the open list both order by it. */
-const ROW_RANK: Record<OpenRowState, number> = { open: 0, todo: 1 };
+const ROW_RANK: Record<OpenRowState, number> = { open: 0, back: 1, todo: 2 };
 
 interface ListRow<State extends RowState = RowState> {
 	key: string;
@@ -106,14 +107,19 @@ function listRow<State extends RowState>(
 	};
 }
 
+function openState(line: ExpectationLine): OpenRowState {
+	if (!isOptionLine(line)) {
+		return 'todo';
+	}
+	return line.returned_on === null ? 'open' : 'back';
+}
+
 function openRows(reading: RepoReading): ListRow<OpenRowState>[] {
 	return reading.items
 		.flatMap((item) =>
 			item.lines
 				.filter((line) => line.ruling === null)
-				.map((line) =>
-					listRow(reading.name, item.number, line, isOptionLine(line) ? 'open' : 'todo')
-				)
+				.map((line) => listRow(reading.name, item.number, line, openState(line)))
 		)
 		.sort((left, right) => ROW_RANK[left.state] - ROW_RANK[right.state]);
 }
@@ -212,7 +218,7 @@ export function findSelectedLine(repos: RepoReading[], key: string | null): Sele
 
 /** The line the stage moves to once `key` is decided: of the other open
  * rows, the first with the best rank in list order, so an option card comes
- * before a yes/no line the head must still fill; `null` once nothing else is
+ * before one with its head, and that before a yes/no line the head must still fill; `null` once nothing else is
  * open. */
 export function nextOpenAfter(repos: RepoReading[], key: string): string | null {
 	const others = listedRows(repos).filter((row) => row.key !== key);

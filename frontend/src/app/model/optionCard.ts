@@ -55,6 +55,8 @@ export function isOptionLine(line: ExpectationLine): line is OptionLine {
 export interface FrameMeta {
 	where: string;
 	kind?: string;
+	/** The line was sent back to its head (ABRD-61). */
+	withHead?: true;
 	undo?: Undo;
 }
 
@@ -69,6 +71,7 @@ export function cardMeta(repo: string, line: OptionLine): CardMeta {
 	return {
 		where: `${repo} › ${line.area}`,
 		kind: KIND_LABEL[line.decision_kind],
+		...(line.returned_on !== null && { withHead: true as const }),
 		undo: line.options.some((option) => option.undo === 'final') ? 'final' : 'reversible'
 	};
 }
