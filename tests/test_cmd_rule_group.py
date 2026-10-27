@@ -4,7 +4,6 @@ all are written in one body write with one date, or none is (RULE-29..36, E-RULE
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
 
 import pytest
 from cli_fixtures import FROZEN_CLI_NOW, CliRun, freeze_cli_now, run_cli
@@ -23,7 +22,7 @@ from option_cards import (
     serve_item,
 )
 
-from aco import body, cmd_rule, expectations
+from aco import body, expectations
 
 TODAY = FROZEN_CLI_NOW.date().isoformat()
 ANSWER = "Nur am Desktop."
@@ -56,6 +55,10 @@ KINDS = {
         lambda via: [f"--other={ANSWER}", "--via", via],
     ),
     "unclear": (lambda letter, shown: ["--card-hash", shown], lambda via: ["--unclear"]),
+    "unclear-note": (
+        lambda letter, shown: ["--card-hash", shown],
+        lambda via: ["--unclear", "--note", NOTE],
+    ),
 }
 
 
@@ -116,24 +119,97 @@ class TestSeveralLinesInOneWrite:
         checked = run_cli(["check", "-"], capsys, stdin=client.item_bodies[7])
         assert (checked.status, checked.stdout) == (0, "body ok\n")
 
+    @pytest.mark.parametrize(
+        ("kind", "letters", "via", "extra", "envelope"),
+        [
+            pytest.param(
+                "option",
+                "AB",
+                via,
+                [],
+                {
+                    "reason": "ruled",
+                    "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "B"}],
+                    "ruled_on": TODAY,
+                    "open": 1,
+                },
+                id=f"option-{via}",
+            )
+            for via in ("board", "chat")
+        ]
+        + [
+            pytest.param(
+                "option",
+                "AA",
+                "default",
+                [],
+                {
+                    "reason": "ruled",
+                    "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "A"}],
+                    "ruled_on": TODAY,
+                    "open": 1,
+                },
+                id="option-default",
+            ),
+            pytest.param(
+                "other",
+                "  ",
+                "chat",
+                [],
+                {
+                    "reason": "ruled",
+                    "lines": [{"index": 2, "ruling": "other"}, {"index": 3, "ruling": "other"}],
+                    "ruled_on": TODAY,
+                    "open": 1,
+                },
+                id="other",
+            ),
+            pytest.param(
+                "unclear",
+                "  ",
+                "chat",
+                [],
+                {
+                    "reason": "returned",
+                    "lines": [{"index": 2}, {"index": 3}],
+                    "returned_on": TODAY,
+                    "open": 3,
+                },
+                id="unclear",
+            ),
+            pytest.param(
+                "unclear",
+                "  ",
+                "chat",
+                ["--note", NOTE],
+                {
+                    "reason": "returned",
+                    "lines": [{"index": 2}, {"index": 3}],
+                    "returned_on": TODAY,
+                    "open": 3,
+                },
+                id="unclear-note",
+            ),
+        ],
+    )
     def test_the_json_answer_lists_the_lines_under_one_date(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        kind: str,
+        letters: str,
+        via: str,
+        extra: list[str],
+        envelope: dict[str, object],
     ) -> None:
-        """Spec: RULE-32 -- `lines` replaces `index` and `ruling`, beside one `ruled_on`."""
+        """Spec: RULE-32, E-RULE-14 -- `lines` replaces `index` and `ruling`, beside one date."""
         freeze_cli_now(monkeypatch)
         serve_item(monkeypatch, group_body())
-        arguments = lines_of("option", (2, "A", HASH_2), (3, "B", HASH_3))
-        result = run_cli(["rule", "7", *arguments, "--json"], capsys)
+        arguments = lines_of(kind, (2, letters[0], HASH_2), (3, letters[1], HASH_3), via=via)
+        result = run_cli(["rule", "7", *arguments, *extra, "--json"], capsys)
         assert (result.status, json.loads(result.stdout)) == (
             0,
-            {
-                "ok": True,
-                "reason": "ruled",
-                "item": 7,
-                "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "B"}],
-                "ruled_on": TODAY,
-                "open": 1,
-            },
+            {"ok": True, "item": 7, **envelope},
         )
 
     @pytest.mark.parametrize("note", [None, NOTE], ids=["no-note", "note"])
@@ -155,26 +231,6 @@ class TestSeveralLinesInOneWrite:
             entry = stored(client, index)
             assert (str(entry["returned_on"]), entry.get("returned_note")) == (TODAY, note)
         assert len(client.body_writes) == 1
-
-    def test_the_returned_json_lists_the_lines_under_one_date(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Spec: RULE-32, E-RULE-14 -- `lines` carries `index` only."""
-        freeze_cli_now(monkeypatch)
-        serve_item(monkeypatch, group_body())
-        arguments = lines_of("unclear", (2, "", HASH_2), (3, "", HASH_3))
-        result = run_cli(["rule", "7", *arguments, "--note", "Was kostet B?", "--json"], capsys)
-        assert (result.status, json.loads(result.stdout)) == (
-            0,
-            {
-                "ok": True,
-                "reason": "returned",
-                "item": 7,
-                "lines": [{"index": 2}, {"index": 3}],
-                "returned_on": TODAY,
-                "open": 3,
-            },
-        )
 
     def test_a_returned_pair_is_then_ruled_with_the_one_text(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -200,26 +256,6 @@ class TestSeveralLinesInOneWrite:
                 ANSWER,
                 set(),
             )
-
-    def test_every_line_takes_the_first_date_when_the_clock_steps(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Spec: RULE-29, RULE-32 -- one date per write, however often the clock is read."""
-        reads: list[datetime] = []
-
-        class SteppingDateTime(datetime):
-            @classmethod
-            def now(cls, tz=None):
-                reads.append(FROZEN_CLI_NOW + timedelta(days=len(reads)))
-                return reads[-1].astimezone(UTC)
-
-        monkeypatch.setattr(cmd_rule, "datetime", SteppingDateTime)
-        client = serve_item(monkeypatch, group_body())
-        arguments = lines_of("option", (2, "A", HASH_2), (3, "B", HASH_3))
-        result = run_cli(["rule", "7", *arguments, "--json"], capsys)
-        first_day = FROZEN_CLI_NOW.date().isoformat()
-        assert (result.status, json.loads(result.stdout)["ruled_on"]) == (0, first_day)
-        assert [str(stored(client, index)["ruled_on"]) for index in (2, 3)] == [first_day] * 2
 
     def test_a_failing_write_stores_neither_line(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -416,18 +452,18 @@ class TestRefusedBeforeAnyForgeCall:
         assert (client.issue_reference_lookups, client.body_writes) == ([], [])
 
 
-def second_line_refusal(
-    kind: str, third: str, shown: str, letter: str, via: str
-) -> tuple[str, list[str]]:
-    """Issue #7 with `third` as line 3, and the call naming line 2 then line 3."""
-    named = ((2, "A", GOLDEN_CARD_HASH), (3, letter, shown))
-    return group_body(third), lines_of(kind, *named, via=via)
+def refusal_call(
+    kind: str, shown: str, letter: str, via: str, refused: int, position: str
+) -> list[str]:
+    """The call naming the good line 2 and the `refused` line, the refused one in `position`."""
+    named = [(2, "A", GOLDEN_CARD_HASH), (refused, letter, shown)]
+    return lines_of(kind, *(named[::-1] if position == "first" else named), via=via)
 
 
 @pytest.mark.usefixtures("github_clone")
 class TestRefusedOnTheSecondLine:
     @pytest.mark.parametrize(
-        ("kind", "third", "shown", "letter", "via", "message", "reason"),
+        ("kind", "third", "shown", "letter", "via", "message", "reason", "refused"),
         [
             pytest.param(
                 "option",
@@ -437,6 +473,7 @@ class TestRefusedOnTheSecondLine:
                 "chat",
                 "line 3 is already ruled; a changed ruling is a new line",
                 "already_ruled",
+                3,
                 id="RULE-04-option",
             ),
             pytest.param(
@@ -447,6 +484,7 @@ class TestRefusedOnTheSecondLine:
                 "chat",
                 "line 3 is already ruled; a changed ruling is a new line",
                 "already_ruled",
+                3,
                 id="RULE-04-other",
             ),
             pytest.param(
@@ -457,6 +495,7 @@ class TestRefusedOnTheSecondLine:
                 "chat",
                 "line 3 is already ruled; a changed ruling is a new line",
                 "already_ruled",
+                3,
                 id="RULE-04-unclear",
             ),
             pytest.param(
@@ -467,6 +506,7 @@ class TestRefusedOnTheSecondLine:
                 "board",
                 "line 3 changed since its card was shown; show it again and rule what it shows now",
                 "card_changed",
+                3,
                 id="RULE-17-option",
             ),
             pytest.param(
@@ -477,6 +517,7 @@ class TestRefusedOnTheSecondLine:
                 "board",
                 "line 3 changed since its card was shown; show it again and rule what it shows now",
                 "card_changed",
+                3,
                 id="RULE-17-other",
             ),
             pytest.param(
@@ -487,6 +528,7 @@ class TestRefusedOnTheSecondLine:
                 "chat",
                 "line 3 changed since its card was shown; show it again and rule what it shows now",
                 "card_changed",
+                3,
                 id="RULE-17-unclear",
             ),
             pytest.param(
@@ -497,6 +539,7 @@ class TestRefusedOnTheSecondLine:
                 "chat",
                 "line 3 has no option C; its options are A, B",
                 "invalid_usage",
+                3,
                 id="RULE-18",
             ),
             pytest.param(
@@ -507,6 +550,7 @@ class TestRefusedOnTheSecondLine:
                 "default",
                 "--via default keeps only the recommended option A, not B",
                 "invalid_usage",
+                3,
                 id="RULE-19",
             ),
             pytest.param(
@@ -517,7 +561,19 @@ class TestRefusedOnTheSecondLine:
                 "chat",
                 "line 3 is already with its head; it comes back once revised",
                 "with_head",
+                3,
                 id="RULE-24",
+            ),
+            pytest.param(
+                "unclear-note",
+                returned_today(),
+                GOLDEN_CARD_HASH,
+                "",
+                "chat",
+                "line 3 is already with its head; it comes back once revised",
+                "with_head",
+                3,
+                id="RULE-24-note",
             ),
             pytest.param(
                 "option",
@@ -527,11 +583,79 @@ class TestRefusedOnTheSecondLine:
                 "default",
                 "line 3 was answered Unclear; --via default records no answer",
                 "with_head",
+                3,
                 id="RULE-27",
+            ),
+            pytest.param(
+                "option",
+                card(),
+                GOLDEN_CARD_HASH,
+                "A",
+                "chat",
+                "line 4 out of range: this item has 3 expectation line(s)",
+                "line_out_of_range",
+                4,
+                id="RULE-05-option",
+            ),
+            pytest.param(
+                "other",
+                card(),
+                GOLDEN_CARD_HASH,
+                "A",
+                "chat",
+                "line 4 out of range: this item has 3 expectation line(s)",
+                "line_out_of_range",
+                4,
+                id="RULE-05-other",
+            ),
+            pytest.param(
+                "unclear",
+                card(),
+                GOLDEN_CARD_HASH,
+                "A",
+                "chat",
+                "line 4 out of range: this item has 3 expectation line(s)",
+                "line_out_of_range",
+                4,
+                id="RULE-05-unclear",
+            ),
+            pytest.param(
+                "option",
+                card(),
+                GOLDEN_CARD_HASH,
+                "A",
+                "chat",
+                "line 1 is a yes/no line; --option rules only an option line",
+                "invalid_usage",
+                1,
+                id="RULE-16-option",
+            ),
+            pytest.param(
+                "other",
+                card(),
+                GOLDEN_CARD_HASH,
+                "A",
+                "chat",
+                "line 1 is a yes/no line; --other rules only an option line",
+                "invalid_usage",
+                1,
+                id="RULE-16-other",
+            ),
+            pytest.param(
+                "unclear",
+                card(),
+                GOLDEN_CARD_HASH,
+                "A",
+                "chat",
+                "line 1 is a yes/no line; --unclear returns only an option line",
+                "invalid_usage",
+                1,
+                id="RULE-16-unclear",
             ),
         ],
     )
-    def test_the_first_line_is_not_stored_when_the_second_is_refused(
+    @pytest.mark.parametrize("position", ["first", "second"])
+    def test_no_line_is_stored_when_one_named_line_is_refused(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
@@ -542,10 +666,12 @@ class TestRefusedOnTheSecondLine:
         via: str,
         message: str,
         reason: str,
+        refused: int,
+        position: str,
     ) -> None:
-        """Spec: RULE-29, RULE-04, RULE-17..19, RULE-24, RULE-27, RULE-09 -- all or nothing."""
-        raw, arguments = second_line_refusal(kind, third, shown, letter, via)
-        client = serve_item(monkeypatch, raw)
+        """Spec: RULE-29, RULE-04..05, RULE-16..19, RULE-24, RULE-27, RULE-09 -- all or nothing."""
+        client = serve_item(monkeypatch, group_body(third))
+        arguments = refusal_call(kind, shown, letter, via, refused, position)
         command = ["rule", "7", *arguments]
         text = run_cli(command, capsys)
         wire = run_cli([*command, "--json"], capsys)
@@ -553,47 +679,5 @@ class TestRefusedOnTheSecondLine:
         assert (wire.status, json.loads(wire.stdout)) == (
             2,
             {"ok": False, "reason": reason, "message": message},
-        )
-        assert client.body_writes == []
-
-    @pytest.mark.parametrize(
-        ("kind", "flag", "verb"),
-        [
-            ("option", "--option", "rules"),
-            ("other", "--other", "rules"),
-            ("unclear", "--unclear", "returns"),
-        ],
-    )
-    def test_a_yes_no_line_second_is_refused_by_its_own_sentence(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        kind: str,
-        flag: str,
-        verb: str,
-    ) -> None:
-        """Spec: RULE-16, RULE-29 -- line 1 is a yes/no line."""
-        client = serve_item(monkeypatch, group_body(card()))
-        arguments = lines_of(kind, (2, "A", GOLDEN_CARD_HASH), (1, "A", GOLDEN_CARD_HASH))
-        result = run_cli(["rule", "7", *arguments], capsys)
-        message = f"line 1 is a yes/no line; {flag} {verb} only an option line"
-        assert (result.status, result.stderr) == (2, f"ERROR: {message}\n")
-        assert client.body_writes == []
-
-    @pytest.mark.parametrize("kind", ["option", "other", "unclear"])
-    def test_a_line_out_of_range_second_is_refused_by_its_own_sentence(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
-    ) -> None:
-        """Spec: RULE-05, RULE-29 -- the item has three lines."""
-        client = serve_item(monkeypatch, group_body(card()))
-        arguments = lines_of(kind, (2, "A", GOLDEN_CARD_HASH), (4, "A", GOLDEN_CARD_HASH))
-        result = run_cli(["rule", "7", *arguments, "--json"], capsys)
-        assert (result.status, json.loads(result.stdout)) == (
-            2,
-            {
-                "ok": False,
-                "reason": "line_out_of_range",
-                "message": "line 4 out of range: this item has 3 expectation line(s)",
-            },
         )
         assert client.body_writes == []

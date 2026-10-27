@@ -371,17 +371,16 @@ def _emit_returned_result(
 
 
 def _rule_item(
-    context: RunContext, number: int, named: Sequence[_LineOutcome]
+    context: RunContext, number: int, named: Sequence[_LineOutcome], today: date
 ) -> tuple[tuple[expectations.ExpectationLine, ...], int]:
-    """`run`'s own write: folds every named line over the body read once, with one
-    date, and writes it once; returns the newly ruled lines and how many the
+    """`run`'s own write: folds every named line over the body read once, with the
+    one date `today`, and writes it once; returns the newly ruled lines and how many the
     item still has open. Raises `protocol.ClaimError` by name for every refusal
     (already ruled, out of range, a bad outcome, a malformed or missing item)
     before the write, so none of the lines is stored, which `run` turns into
     its own by-name response."""
     client = context.forge_writer
     current_body, config = require_writable_target(client, context, number, command="rule")
-    today = datetime.now(UTC).date()
     new_body = current_body
     for line in named:
         new_body = _written_body(new_body, line.index, line.outcome, today)
@@ -418,7 +417,7 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
     report."""
     named = _line_outcomes(parsed)
     number = int(parsed.item)
-    ruled, open_remaining = _rule_item(context, number, named)
+    ruled, open_remaining = _rule_item(context, number, named, datetime.now(UTC).date())
     storage = context.config.storage
     if isinstance(named[0].outcome, expectations.HeadReturn):
         returned = cast(tuple[expectations.OptionLine, ...], ruled)
