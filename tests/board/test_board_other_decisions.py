@@ -8,15 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import (
-    BoardClient,
-    FakeAcoRepository,
-    line,
-    listed_option_line,
-    option_line,
-    post_rule_for_listed,
-    row,
-)
+from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, option_line, row
 from cli_fixtures import run_cli
 from github_fixtures import assert_github_world
 from option_cards import GOLDEN_CARD_HASH, card, item_body, serve_item
@@ -28,17 +20,33 @@ _BAD_REQUEST = "bad request: decision"
 _ANSWER = "Nur auf dem Desktop offen lassen."
 
 
+def _listed_option_line(board: BoardClient) -> dict[str, Any]:
+    [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+    return repo["items"][0]["lines"][0]
+
+
+def _post_other(board: BoardClient, listed: dict[str, Any], **fields: object) -> Response:
+    payload = {
+        "repo": board.repo,
+        "item": 12,
+        "line": listed["index"],
+        "fingerprint": listed["fingerprint"],
+        **fields,
+    }
+    return board.post_rule(payload)
+
+
 @pytest.fixture
 def listed(repository: FakeAcoRepository, board: BoardClient) -> dict[str, Any]:
     repository.set_rulings(row(12, "Song jump", option_line()))
-    return listed_option_line(board)
+    return _listed_option_line(board)
 
 
 def test_an_other_post_rules_the_line_with_the_stripped_answer(
     repository: FakeAcoRepository, board: BoardClient, listed: dict[str, Any]
 ) -> None:
     """ABRD-63, ABRD-64."""
-    answer = post_rule_for_listed(board, listed, other=f"  {_ANSWER}\n")
+    answer = _post_other(board, listed, other=f"  {_ANSWER}\n")
 
     assert answer.json() == {"status": "ruled", "message": None}
     stored = repository.stored_line(12, 1)
@@ -53,7 +61,7 @@ def test_an_other_post_runs_aco_rule_with_the_answer_as_one_argument(
     repository: FakeAcoRepository, board: BoardClient, listed: dict[str, Any], text: str
 ) -> None:
     """ABRD-64."""
-    post_rule_for_listed(board, listed, other=text)
+    _post_other(board, listed, other=text)
 
     assert repository.rule_calls() == [
         [
@@ -88,57 +96,37 @@ def listed_card_hash() -> str:
         {"other": "x", "option": "A"},
         {"other": "x", "note": "n"},
         {"other": "x", "note": ""},
-        {"unclear": False},
-        {"unclear": "true"},
-        {"unclear": 1},
-        {"unclear": True, "outcome": "yes"},
-        {"unclear": True, "option": "A"},
-        {"unclear": True, "other": "x"},
-        {"unclear": True, "note": 5},
-        {"unclear": True, "note": "x" * 281},
-        {"unclear": True, "note": "a\0b"},
-        {"unclear": True, "note": "\ud800"},
     ],
     ids=lambda fields: ",".join(f"{key}={str(value)[:12]!r}" for key, value in fields.items()),
 )
-def test_a_post_breaking_the_shape_or_the_bound_is_refused_before_any_aco_write(
+def test_an_other_post_breaking_the_shape_or_the_bound_is_refused_before_any_aco_write(
     repository: FakeAcoRepository,
     board: BoardClient,
     listed: dict[str, Any],
     fields: dict[str, object],
 ) -> None:
     """ABRD-05, ABRD-42, ABRD-65."""
-    calls_before = repository.calls()
-
-    answer = post_rule_for_listed(board, listed, **fields)
+    answer = _post_other(board, listed, **fields)
 
     assert (answer.status, answer.json()) == (400, {"error": _BAD_REQUEST})
-    assert repository.calls() == calls_before
+    assert repository.rule_calls() == []
 
 
 def test_an_other_of_exactly_the_bound_after_trimming_is_accepted(
     repository: FakeAcoRepository, board: BoardClient, listed: dict[str, Any]
 ) -> None:
     """ABRD-05, ABRD-65."""
-    answer = post_rule_for_listed(board, listed, other=f" {'x' * 280} ")
+    answer = _post_other(board, listed, other=f" {'x' * 280} ")
 
     assert answer.json() == {"status": "ruled", "message": None}
     assert repository.stored_line(12, 1)["other"] == "x" * 280
 
 
-@pytest.mark.parametrize(
-    "fields",
-    [{"other": None}, {"unclear": None, "other": None}],
-    ids=["null-other", "null-unclear-and-other"],
-)
-def test_a_null_neighbour_names_nothing_so_the_option_beside_it_decides(
-    repository: FakeAcoRepository,
-    board: BoardClient,
-    listed: dict[str, Any],
-    fields: dict[str, object],
+def test_a_null_other_names_nothing_so_the_option_beside_it_decides(
+    repository: FakeAcoRepository, board: BoardClient, listed: dict[str, Any]
 ) -> None:
     """ABRD-42."""
-    answer = post_rule_for_listed(board, listed, option="A", **fields)
+    answer = _post_other(board, listed, other=None, option="A")
 
     assert answer.json() == {"status": "ruled", "message": None}
     assert repository.stored_line(12, 1)["ruling"] == "A"
@@ -150,7 +138,7 @@ def test_an_other_post_after_the_card_changed_is_refused_without_a_write(
     """ABRD-02, ABRD-64."""
     repository.set_rulings(row(12, "Song jump", option_line(card_hash="sha256:other")))
 
-    answer = post_rule_for_listed(board, listed, other=_ANSWER)
+    answer = _post_other(board, listed, other=_ANSWER)
 
     assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
     assert repository.rule_calls() == []

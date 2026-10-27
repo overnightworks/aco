@@ -81,6 +81,55 @@ def test_an_unclear_note_of_exactly_the_bound_after_trimming_is_accepted(
     assert repository.stored_line(12, 1)["returned_note"] == "x" * 280
 
 
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"unclear": False},
+        {"unclear": "true"},
+        {"unclear": 1},
+        {"unclear": True, "outcome": "yes"},
+        {"unclear": True, "option": "A"},
+        {"unclear": True, "other": "x"},
+        {"unclear": True, "note": 5},
+        {"unclear": True, "note": "x" * 281},
+        {"unclear": True, "note": "a\0b"},
+        {"unclear": True, "note": "\ud800"},
+    ],
+    ids=lambda fields: ",".join(f"{key}={str(value)[:12]!r}" for key, value in fields.items()),
+)
+def test_an_unclear_post_breaking_the_shape_or_the_bound_is_refused_before_any_aco_call(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    listed: dict[str, Any],
+    fields: dict[str, object],
+) -> None:
+    """ABRD-05, ABRD-42, ABRD-70."""
+    calls_before = repository.calls()
+
+    answer = post_rule_for_listed(board, listed, **fields)
+
+    assert (answer.status, answer.json()) == (400, {"error": "bad request: decision"})
+    assert repository.calls() == calls_before
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"unclear": None}, {"unclear": None, "other": None}],
+    ids=["null-unclear", "null-unclear-and-other"],
+)
+def test_a_null_unclear_names_nothing_so_the_option_beside_it_decides(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    listed: dict[str, Any],
+    fields: dict[str, object],
+) -> None:
+    """ABRD-42."""
+    answer = post_rule_for_listed(board, listed, option="A", **fields)
+
+    assert answer.json() == {"status": "ruled", "message": None}
+    assert repository.stored_line(12, 1)["ruling"] == "A"
+
+
 def test_an_unclear_post_after_the_card_changed_is_refused_without_a_write(
     repository: FakeAcoRepository, board: BoardClient, listed: dict[str, Any]
 ) -> None:
