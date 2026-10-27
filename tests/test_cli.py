@@ -8406,98 +8406,6 @@ def test_cli_version_exits_before_requiring_a_command(
     assert capsys.readouterr().out == f"aco {__version__}\n"
 
 
-def test_cli_rescope_from_the_primary_checkout_points_back_at_the_claims_worktree(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A held claim's worktree already exists, so
-    running `rescope` from the primary checkout on `main` must not send an
-    agent to build a second one. No branch is known from `main`, so the
-    refusal names none."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(branch="main")
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-
-    status = issue_claim.main(
-        ["--repo", REPOSITORY, "rescope", "72", "--agent", "Ada", "--add", "/repo/x.py"]
-    )
-
-    assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: build claims require an isolated non-main worktree branch; "
-        "run this command from this claim's own worktree, not the primary checkout\n"
-    )
-
-
-def test_cli_rescope_from_a_shared_checkout_names_the_known_branch(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Checked out directly on the claim's own branch inside the primary
-    checkout, without a linked worktree -- the branch is already known here,
-    so the refusal names it instead of leaving the sentence blank."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(
-        branch="codex/issue-72", git_directory="/repo/.git", common_directory="/repo/.git"
-    )
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-
-    status = issue_claim.main(
-        ["--repo", REPOSITORY, "rescope", "72", "--agent", "Ada", "--add", "/repo/x.py"]
-    )
-
-    assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: build claims require a linked isolated worktree checkout; "
-        "run this command from this claim's own worktree on 'codex/issue-72', "
-        "not the primary checkout\n"
-    )
-
-
-def test_cli_claim_from_the_primary_checkout_still_names_the_create_recipe(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """`claim`'s refusal is pinned here through the real
-    command, alongside `rescope`'s corrected sentence above, since a fresh
-    claim genuinely has no worktree yet to return to."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    git_values = git_checkout(branch="main")
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--branch",
-            "main",
-            "--scope",
-            "src",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-
-    assert status == 2
-    assert capsys.readouterr().err == (
-        "ERROR: build claims require an isolated non-main worktree branch; "
-        f"run {checkout.ISOLATED_WORKTREE_RECIPE}\n"
-    )
-
-
 def _patch_release_session(
     monkeypatch: pytest.MonkeyPatch,
     client: FakeForge,
@@ -8581,7 +8489,7 @@ def _parse_claim_command(*flags: str):
         # `origin/HEAD` resolves to `main`), so it binds like any other
         # non-default branch -- the fallback-denied case for an
         # unresolvable `origin/HEAD` is pinned separately, in
-        # test_claim_default_branch_fallback_denies_only_main_and_master.
+        # test_checkout_validation_refuses_with_the_sentence_that_names_the_repair.
         ((), git_checkout(branch="master"), None),
         (
             (),
