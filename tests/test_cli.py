@@ -35,6 +35,7 @@ from board_fixtures import (
     board_issue,
     complete_contract,
     container_issue,
+    container_with_children,
     idea_body,
     projected_board,
     proposed_expectation,
@@ -6384,18 +6385,11 @@ def test_next_json_names_a_cuttable_container_slice(
 def test_next_names_a_closeable_container(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = Issue(
-        182,
-        "Epic",
-        (),
-        complete_contract("keiner"),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=3,
-        children_total=3,
+    container, container_children = container_with_children(
+        182, closed=3, body=complete_contract("keiner")
     )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client.children[182] = container_children
 
     exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
 
@@ -6409,18 +6403,11 @@ def test_next_names_a_closeable_container(
 def test_next_json_names_a_closeable_container(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    container = Issue(
-        183,
-        "Epic",
-        (),
-        complete_contract("keiner"),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=4,
-        children_total=4,
+    container, container_children = container_with_children(
+        183, closed=4, body=complete_contract("keiner")
     )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client.children[183] = container_children
 
     exit_code = issue_claim.main(["--repo", REPOSITORY, "next", "--json"])
 
@@ -6474,18 +6461,11 @@ def test_next_json_names_a_container_with_no_slice_row_by_its_own_next_line(
     `check_container`, never `close_container` while the `Next` line names
     work; `next_step` carries that sentence, `close` stays empty, and no
     `command` or `cut_title` is invented from it."""
-    container = Issue(
-        188,
-        "Epic",
-        (),
-        complete_contract("Schließen, sobald die letzte Bedingung erfüllt ist."),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=2,
-        children_total=2,
+    container, container_children = container_with_children(
+        188, closed=2, body=complete_contract("Schließen, sobald die letzte Bedingung erfüllt ist.")
     )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client.children[188] = container_children
 
     exit_code = issue_claim.main(["--repo", REPOSITORY, "next", "--json"])
 

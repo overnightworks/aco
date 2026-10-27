@@ -87,7 +87,7 @@ other printable space are text.
 - [ ] [NEXT-36] An item PIN-14/PIN-15 refuses is named under `SKIPPED` as `<item-id>: body malformed: <field>: <message>`; every other item still reads, one it blocks stays blocked (see E-NEXT-11).
 - [ ] [NEXT-38] A container whose every open child, ITEM-54's included, is such an item reads `container; its open children do not read: <item-ids>` under `SKIPPED`, never `close:` (see E-NEXT-12).
 - [ ] [NEXT-06] A childless container with no slice row whose `Next` names work prints `check_container <label>: no open children; check done_when`, then `Next: <next>`; never close or cut (E-NEXT-04).
-- [ ] [NEXT-07] The same container with no further `Next` work prints `close_container <label>: <closed>/<total> children closed, no Next work` (see E-NEXT-04).
+- [ ] [NEXT-07] The same container with no further `Next` work prints `close_container <label>: <closed>/<total> children closed, no Next work`, counted per BOARD-58 (see E-NEXT-04).
 - [ ] [NEXT-25] A childless container with an uncut row that is a child of any item -- any type, open or closed, any repository -- never gets `cut_slice` (CUT-03); `SKIPPED` names its repair (E-NEXT-09).
 - [ ] [NEXT-29] That repair for one row claims as the retyped item's `Run:` will (NEXT-03): bare with a top-level `scope`, else `--scope=<path>` per row path, else `--scope <paths>` (E-NEXT-09).
 - [ ] [NEXT-33] Every claim a `SKIPPED` reason names ends `--out-of-order <reason>`, since a skipped item is never the first action; `<reason>`, like `<paths>`, is for the agent to fill in.
@@ -203,7 +203,7 @@ exit 0
 
 ### E-NEXT-04 — a closable container, with and without further `Next` work
 
-Setup: bare-remote, fake `gh`, container `#182`, no open child, no `[[slice]]` row, `Next` line `keiner`
+Setup: bare-remote, fake `gh`, container `#182` with three closed children and no open child, no `[[slice]]` row, `Next` line `keiner`
 
 ```console
 $ aco next
