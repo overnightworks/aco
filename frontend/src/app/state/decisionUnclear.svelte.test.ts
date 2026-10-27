@@ -56,7 +56,7 @@ test('[ABRD-74] undo posts nothing and reopens the Unclear panel with the note',
 	expect(store.draft(key, 'unclear')).toBe('Why two?');
 });
 
-test('[ABRD-75] one panel per card: opening Unclear closes Other, and each keeps its own draft', () => {
+test('[ABRD-73] one panel per card: opening Unclear closes Other, and each keeps its own draft', () => {
 	const { store } = unclearStore();
 	store.openPanel(key, { kind: 'other', shown: card });
 	store.setDraft(key, 'other', 'Only on desktop');
