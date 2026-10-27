@@ -1,0 +1,8 @@
+claim_id = "45e3925effa84d3e924fc0030f7688e2"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "5630c2bd654e5af13b4897160e2d5e5349d142e7"
+branch = "claude/issue-504-rule-several-lines-one-write"
+scope = ["specs/rule.spec.md", "src/aco/cmd_rule.py", "tests/test_cmd_rule_group.py"]
+opened_commit = "fc14e4ec100d1e8b3504ea3a8758fd193bdf181c"
+whole_reason = "One write path: the ordered flag record, its pairing and repeat refusals, the one-write fold with one date, the several-lines output and the spec criteria with their examples change together, or a card's answers can still be stored in part or paired wrong."
