@@ -634,10 +634,7 @@ def _item_close_freed(client: forge.ForgeReader, number: int) -> tuple[int, ...]
     fresh off `client`'s own already-closed view so `number` itself never
     appears among its own candidates."""
     issues = client.list_open_board_issues()
-    candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
-    dependencies = board_read.validated_dependencies(
-        issues, board_read.fetch_dependencies(client, candidates)
-    )
+    dependencies = board_read.fetch_validated_dependencies(client, issues)
     landed = workboard.IssueReference(client.repository.path, number)
     return workboard.freed_item_numbers(dependencies, landed)
 
