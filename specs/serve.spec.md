@@ -262,7 +262,7 @@ Setup: none
 ```console
 $ aco serve --json
 2> usage: aco [-h] [--version] [--repo REPO]
-2>            {bootstrap,reset,status,board,serve,rulings,next,start,claim,release,land,adopt,rescope,cut,ask,rule,check,body,brief,item}
+2>            {bootstrap,reset,status,board,serve,rulings,next,start,claim,release,land,adopt,rescope,cut,rule,check,body,brief,item}
 2>            ...
 2> aco: error: unrecognized arguments: --json
 exit 2

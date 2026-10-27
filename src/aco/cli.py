@@ -15,7 +15,6 @@ from . import (
     body,
     checkout,
     cmd_adopt,
-    cmd_ask,
     cmd_board,
     cmd_bootstrap,
     cmd_brief,
@@ -450,12 +449,6 @@ def _add_cut_parser(commands: usage.Subcommands, name: str) -> None:
     _add_json_flag(cut)
 
 
-def _add_ask_parser(commands: usage.Subcommands, name: str) -> None:
-    ask = commands.add_parser(name, help="append one proposed expectation line to an item's block")
-    cmd_ask.add_arguments(ask)
-    _add_json_flag(ask)
-
-
 def _add_rule_parser(commands: usage.Subcommands, name: str) -> None:
     rule = commands.add_parser(
         name, help="rule one proposed expectation line, transcribing the operator's word"
@@ -679,7 +672,6 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "adopt": _RepositoryCommand(_add_adopt_parser, cmd_adopt.run, resolves_agent=True),
     "rescope": _RepositoryCommand(_add_rescope_parser, cmd_rescope.run, resolves_agent=True),
     "cut": _RepositoryCommand(_add_cut_parser, cmd_cut.run),
-    "ask": _RepositoryCommand(_add_ask_parser, cmd_ask.run),
     "rule": _RepositoryCommand(_add_rule_parser, cmd_rule.run),
     "check": _RepositoryCommand(_add_check_parser, cmd_check.run),
     "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),

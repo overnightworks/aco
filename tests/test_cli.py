@@ -4009,7 +4009,6 @@ def test_help_lists_commands_in_their_stable_registration_order() -> None:
         "adopt",
         "rescope",
         "cut",
-        "ask",
         "rule",
         "check",
         "brief",
@@ -4039,7 +4038,7 @@ def test_no_registered_parser_reads_an_abbreviated_option() -> None:
 
 
 def test_readme_and_help_texts_carry_no_stale_state_ref_read_only_sentence() -> None:
-    """State-ref's write commands (`cut`/`rule`/`ask`/
+    """State-ref's write commands (`cut`/`rule`/
     `item new`/`item edit`/`item close`)
     are real; no README line and no `--help` text still calls the storage
     read-only, or names `item new`/`item edit`/`item close` as "not yet"

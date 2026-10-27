@@ -4,8 +4,8 @@ Every migrated command's `--json` object is built and printed through one
 shared, nameless envelope. This file owns the envelope's own
 shape -- key order, when `ok` is `true`, and what `reason` and `message`
 may and may not carry -- and applies to every command whose own spec cites
-`OUT-nn`; `ask`, `rule`, and `brief` were its first three
-(`specs/ask.spec.md`, `specs/rule.spec.md`, `specs/brief.spec.md`), and
+`OUT-nn`; `rule` and `brief` were its first two
+(`specs/rule.spec.md`, `specs/brief.spec.md`), and
 `release`, `cut`, and `item` are its last
 (`specs/release.spec.md`, `specs/cut.spec.md`, `specs/item.spec.md`), each
 naming its own `reason` vocabulary with examples. Every `--json` command's
@@ -40,10 +40,10 @@ raises on the way into a command that declares `--json` (OUT-06).
 
 ## Never
 
-- This file never lists a command's own vocabulary: `ask`, `rule`, and `brief` each document their own `reason` members, with examples, in their own spec.
+- This file never lists a command's own vocabulary: `rule` and `brief` each document their own `reason` members, with examples, in their own spec.
 - `ok`/`reason` never reorder around a command's payload: `reason` is always the second key, never last, never interleaved with structured detail keys.
 - `message` never carries structured data: every structured detail (`item`, `index`, `claim`, `checks`, and the like) is its own sibling key, never packed into the prose.
-- `message` never promises a stderr line beside the object: `ask`'s refusal prints `ERROR: <sentence>` there (E-OUT-02), `check <sha> --json` prints the object alone (`specs/check.spec.md`).
+- `message` never promises a stderr line beside the object: `rule`'s refusal prints `ERROR: <sentence>` there (E-OUT-02), `check <sha> --json` prints the object alone (`specs/check.spec.md`).
 - A parser refusal without `--json` never changes shape: stdout stays empty and stderr carries argparse's own usage block and sentence, exactly as it did before the envelope reached this refusal at all.
 - A command that declares no `--json` never answers in this envelope: `aco bootstrap --json` stays argparse's own text, and so does `aco release 42 --merged --jso`, an abbreviation OUT-09 refuses.
 - An abbreviation never stands for a destructive flag: `aco reset --conf --f` refuses before any read, never acting as `--confirm --force-unreadable`.
@@ -60,11 +60,11 @@ itself minted, `<n>` that same item's own bare number.
 
 ### E-OUT-01 -- a success envelope, `ok`/`reason` first
 
-Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open (`aco item new --title "Decide something"`)
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with one proposed line
 
 ```console
-$ aco ask <item-id> --text "New question?" --json
-{"ok": true, "reason": "asked", "item": <n>, "index": 1, "text": "New question?", "default": "yes"}
+$ aco rule <item-id> --line 1 --yes --json
+{"ok": true, "reason": "ruled", "item": <n>, "index": 1, "ruling": "yes", "ruled_on": "<ruled-on>", "open": 0}
 exit 0
 ```
 
@@ -73,7 +73,7 @@ exit 0
 Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `items/aco-000001.md` hand-written with no `aco` block
 
 ```console
-$ aco ask aco-000001 --text "New question?" --json
+$ aco rule aco-000001 --line 1 --yes --json
 2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
 {"ok": false, "reason": "invalid_item", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]"}
 exit 2
