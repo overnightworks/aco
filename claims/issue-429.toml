@@ -1,0 +1,8 @@
+claim_id = "54007f4894594960a503c7eba1ccf705"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "a8a6f52155851472e450c28499313d560efdd4d1"
+branch = "claude/issue-429-rule-other"
+scope = ["specs/body-block.spec.md", "specs/rule.spec.md", "specs/rulings.spec.md", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/test_option_lines.py", "tests/test_rule.py", "tests/test_rule_option.py", "tests/test_rule_other.py"]
+opened_commit = "bb9718e3a80a068f52dca98f76eea669bcd4313a"
+whole_reason = "Other in aco is one contract across the body grammar, the rule writer and the rulings reader: the stored ruling = other with its other key, the hidden --other flag and its refusals, the rulings --json other key, their three specs, one new test module and the re-pointed pins."
