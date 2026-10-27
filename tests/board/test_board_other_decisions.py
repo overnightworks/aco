@@ -196,15 +196,17 @@ def test_a_post_for_no_option_line_is_refused_as_changed(
 @pytest.mark.usefixtures("github_world")
 @pytest.mark.parametrize("text", ["-n first", "a\nb", 'say "hi" ä'])
 @pytest.mark.parametrize(
-    ("answer", "stored"),
+    ("answer", "stored", "stamped"),
     [
         (
             lambda text: {"other": f" {text} "},
-            lambda text: {"ruling": "other", "other": text, "via": "board"},
+            lambda text: {"ruling": "other", "other": text, "via": "board", "note": None},
+            set(),
         ),
         (
             lambda text: {"unclear": True, "note": f" {text} "},
             lambda text: {"ruling": None, "via": None, "returned_note": text},
+            {"returned_on"},
         ),
     ],
     ids=["other", "unclear"],
@@ -217,6 +219,7 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
     text: str,
     answer: Callable[[str], dict[str, object]],
     stored: Callable[[str], dict[str, object]],
+    stamped: set[str],
 ) -> None:
     """ABRD-64, ABRD-70, RULE-15, RULE-21, RULE-22, RULE-23: the argv is lawful for aco."""
     repository.set_rulings(
@@ -240,3 +243,4 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
     assert ruled.status == 0
     entry = body.block_expectation_dicts(body.locate_block(forge.item_bodies[7]).data)[1]
     assert {key: entry.get(key) for key in stored(text)} == stored(text)
+    assert stamped <= set(entry)
