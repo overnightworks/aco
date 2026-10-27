@@ -1,6 +1,6 @@
 /**
  * The E2E launcher: starts the real board server
- * (`tests/aco_board/e2e_server.py`, the real `aco.board.server` behind a
+ * (`tests/support/e2e_server.py`, the real `aco.board.server` behind a
  * fake `aco`) and points every spec straight at the port it prints -- it
  * serves the committed, built SPA itself, so no dev server and no proxy are
  * involved. Returning a teardown closure -- Playwright's own pattern --
@@ -27,7 +27,7 @@ function startBoardServer(): Promise<{
 	ready: BoardReady;
 }> {
 	return new Promise((resolve, reject) => {
-		const child = spawn('uv', ['run', 'python', 'tests/aco_board/e2e_server.py'], {
+		const child = spawn('uv', ['run', 'python', 'tests/support/e2e_server.py'], {
 			cwd: REPO_ROOT
 		});
 		let stderr = '';
@@ -37,7 +37,7 @@ function startBoardServer(): Promise<{
 		child.once('error', reject);
 		child.once('exit', (code) => {
 			if (code !== null && code !== 0) {
-				reject(new Error(`tests/aco_board/e2e_server.py exited ${code}: ${stderr}`));
+				reject(new Error(`tests/support/e2e_server.py exited ${code}: ${stderr}`));
 			}
 		});
 		const lines = readline.createInterface({ input: child.stdout });
