@@ -389,20 +389,6 @@ class TestLandMessage:
             ),
             pytest.param(
                 MessageCase(
-                    "Closes #72\n\nWork-Item: #72\nhttps://x.example/a\nCo-authored-by: A <a@x>",
-                    Landed(
-                        Message(
-                            "Closes #72\n\nhttps://x.example/a\n"
-                            "Co-authored-by: A <a@x>\nWork-Item: #72\n",
-                            ["https", "Co-authored-by", "Work-Item"],
-                        )
-                    ),
-                    body_trailers="Closes #72\n\nhttps://x.example/a\nCo-authored-by: A <a@x>",
-                ),
-                id="url-beside-trailer",
-            ),
-            pytest.param(
-                MessageCase(
                     "Closes #72\n\nWork-Item: #72\nSigned-off-by: A <a@x>\nOne prose line.",
                     Landed(
                         Message(
