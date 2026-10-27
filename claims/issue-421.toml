@@ -1,8 +1,0 @@
-claim_id = "6033dbd427794a9ba2fe53085470c40f"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "0e50c992f090bfce1d268752305d73aedb82d741"
-branch = "claude/issue-421-forge-checkout-hygiene"
-scope = ["quality/baseline.toml", "src/aco/checkout.py", "src/aco/forge.py"]
-opened_commit = "eacebb4bb8cb22ded2007c80fdb08daff178da0d"
-whole_reason = "Bundle of four audit #331 cards (#421 lead, #422, #423, #424) in forge.py and checkout.py"
