@@ -47,6 +47,7 @@ from board_fixtures import (
     unfilled_block_body,
     write_repository_config,
 )
+from claim_worktrees import assert_json_refusal_object
 from cli_fixtures import (
     GIT_FAILURE_INJECTIONS,
     ITEM_NEW_BODY,
@@ -7215,7 +7216,7 @@ def test_cli_board_family_reports_invalid_usage_when_repo_is_given_under_state_r
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -7243,7 +7244,7 @@ def test_cli_board_family_reports_unavailable_for_a_forge_adapter_failure(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: adapter failed\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 class _RefusingItemWriter:
@@ -8434,86 +8435,6 @@ def test_release_merged_bare_flag_parses_as_the_empty_sentinel() -> None:
 
 
 @pytest.mark.parametrize(
-    ("role_flags", "role"),
-    [
-        ((), cmd_claim.DEFAULT_CLAIM_ROLE),
-        (("--role", "builder"), "builder"),
-        (("--role", "coordinator"), "coordinator"),
-    ],
-)
-def test_cli_claim_omitted_role_posts_default_and_explicit_wins(
-    monkeypatch: pytest.MonkeyPatch,
-    role_flags: tuple[str, ...],
-    role: str,
-) -> None:
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Codex Sol",
-            *role_flags,
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "src",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-
-    assert claimed == 0
-    posted = _live_store_claim()
-    assert posted.role == role
-
-
-def test_cli_claim_empty_role_fails_closed_without_posting_builder(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    argv = [
-        "--repo",
-        REPOSITORY,
-        "claim",
-        "72",
-        "--agent",
-        "Codex Sol",
-        "--role",
-        "",
-        "--base",
-        BASE,
-        "--branch",
-        "codex/issue-72",
-        "--scope",
-        "src",
-        "--claim-id",
-        "cli-claim",
-    ]
-
-    claimed = issue_claim.main(argv)
-    captured = capsys.readouterr()
-
-    assert claimed == 2
-    assert captured.out == ""
-    assert "ERROR:" in captured.err
-    assert re.search(r"role.+must be one bounded non-empty line", captured.err)
-    assert not store.fetch_state(worktree=Path("."), remote="origin").claims
-
-
-@pytest.mark.parametrize(
     "arguments",
     [
         ["claim", "42", "--role", "builder", "--scope", "src/widget.py"],
@@ -8523,60 +8444,6 @@ def test_cli_claim_empty_role_fails_closed_without_posting_builder(
 def test_claim_and_release_parse_omitted_agent(arguments: list[str]) -> None:
     parsed = issue_claim._parser().parse_args(arguments)
     assert parsed.agent is None
-
-
-@pytest.mark.parametrize(
-    ("explicit", "environ", "agent"),
-    [
-        (
-            "Ada",
-            {
-                "ACO_AGENT": "Other",
-                "GROK_SESSION_ID": "grok-session",
-                "CLAUDE_CODE_SESSION_ID": "claude-session",
-            },
-            "Ada",
-        ),
-        (None, {"ACO_AGENT": "Ada"}, "Ada"),
-        (None, {"ACO_AGENT": "", "GROK_SESSION_ID": "sess-1"}, "Grok sess-1"),
-        (
-            None,
-            {"GROK_SESSION_ID": "sess-1", "CLAUDE_CODE_SESSION_ID": "sess-2"},
-            "Grok sess-1",
-        ),
-        (None, {"CLAUDE_CODE_SESSION_ID": "sess-2"}, "Claude sess-2"),
-        (
-            None,
-            {
-                "ACO_AGENT": "",
-                "GROK_SESSION_ID": "",
-                "CLAUDE_CODE_SESSION_ID": "sess-2",
-            },
-            "Claude sess-2",
-        ),
-    ],
-)
-def test_cli_claim_fills_agent_from_documented_else_chain(
-    monkeypatch: pytest.MonkeyPatch,
-    explicit: str | None,
-    environ: dict[str, str],
-    agent: str,
-) -> None:
-    set_agent_identity_env(monkeypatch, environ)
-    git_values = git_checkout()
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    command = _claim_without_agent_args()
-    if explicit is not None:
-        command.extend(["--agent", explicit])
-
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    assert issue_claim.main(["--repo", REPOSITORY, *command]) == 0
-    posted = _live_store_claim()
-    assert posted.agent == agent
 
 
 @pytest.mark.parametrize(
@@ -8648,109 +8515,6 @@ def test_missing_agent_identity_fails_closed_without_github(
         assert captured.out == ""
         assert captured.err.startswith("ERROR:")
         assert_missing_identity_message(captured.err)
-
-
-def test_cli_same_filled_agent_can_claim_and_release_without_flag(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    set_agent_identity_env(monkeypatch, {"GROK_SESSION_ID": "session-1"})
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "src",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-    released = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "release",
-            "72",
-            "--role",
-            "builder",
-            "--abandoned",
-            "stopped",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-
-    assert (claimed, released) == (0, 0)
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
-
-
-def test_cli_two_session_claimants_cannot_release_without_extra_comment(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    set_agent_identity_env(monkeypatch, {"GROK_SESSION_ID": "session-1"})
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    assert (
-        issue_claim.main(
-            [
-                "--repo",
-                REPOSITORY,
-                "claim",
-                "72",
-                "--role",
-                "builder",
-                "--base",
-                BASE,
-                "--branch",
-                "codex/issue-72",
-                "--scope",
-                "src",
-                "--claim-id",
-                "cli-claim",
-            ]
-        )
-        == 0
-    )
-    capsys.readouterr()
-
-    monkeypatch.delenv(checkout.GROK_SESSION_ID_ENV)
-    set_agent_identity_env(monkeypatch, {"CLAUDE_CODE_SESSION_ID": "session-2"})
-    released = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "release",
-            "72",
-            "--role",
-            "builder",
-            "--abandoned",
-            "stopped",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-    captured = capsys.readouterr()
-
-    assert released == 2
-    assert "original claimant" in captured.err
-    live = _live_store_claim()
-    assert live.agent == "Grok session-1"
 
 
 @pytest.mark.parametrize("role", ["builder", "reviewer"])
@@ -8927,92 +8691,6 @@ def test_cli_release_omitted_claim_id_fails_closed_on_detached_head(
     assert captured.out == ""
     assert "ERROR:" in captured.err
     assert "pass --claim-id" in captured.err
-
-
-def test_cli_claim_omitted_base_and_branch_posts_filled_checkout(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    client = FakeForge()
-    git_values = git_checkout()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Codex Sol",
-            "--role",
-            "builder",
-            "--scope",
-            "src",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-
-    assert claimed == 0
-    assert "CLAIMED issue #72" in capsys.readouterr().out
-    posted = _live_store_claim()
-    assert posted.base == BASE
-    assert posted.branch == "codex/issue-72"
-    assert posted.scope == ("src",)
-
-
-def test_cli_claim_and_release_round_trip_exit_codes(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Codex Sol",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "src",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-    released = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "release",
-            "72",
-            "--agent",
-            "Codex Sol",
-            "--role",
-            "builder",
-            "--abandoned",
-            "stopped",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-
-    assert (claimed, released) == (0, 0)
 
 
 def test_cli_dispatch_adapter_error_denies_with_exit_code_two(
@@ -9338,55 +9016,6 @@ def test_every_output_names_a_github_item_by_its_number(
     output = captured.out + captured.err
     assert expected in output
     assert "aco-" not in output
-
-
-def test_cli_lane_claim_and_release_round_trip_without_issue_number(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """The `claim`/`release` scenario: a docs/ checkout claims
-    and releases again, all without ever passing an issue number. (The
-    `status` half -- that the store shows a live lane claim -- is proven
-    separately below.)"""
-    set_agent_identity_env(monkeypatch, {"ACO_AGENT": "Codex Sol"})
-    client = FakeForge()
-    _patch_status_cli(monkeypatch, client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    git_values = {
-        ("branch", "--show-current"): "docs/lane-cleanup",
-        ("rev-parse", "--show-toplevel"): "/repo",
-        ("rev-parse", "HEAD"): BASE,
-    }
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-
-    assert (
-        issue_claim.main(
-            [
-                "--repo",
-                REPOSITORY,
-                "claim",
-                "--role",
-                "builder",
-                "--base",
-                BASE,
-                "--branch",
-                "docs/lane-cleanup",
-                "--scope",
-                "docs",
-                "--claim-id",
-                "cli-lane-claim",
-            ]
-        )
-        == 0
-    )
-    capsys.readouterr()
-
-    released = issue_claim.main(["--repo", REPOSITORY, "release", "--abandoned", "stopped"])
-    assert released == 0
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
 
 
 @pytest.mark.parametrize("command", ["claim", "release"])
@@ -9743,7 +9372,7 @@ def test_cli_claim_without_scope_names_a_malformed_body_before_no_scope(
     assert status == 2
     captured = capsys.readouterr()
     assert captured.err == "ERROR: #72 body malformed: owner: unknown top-level key owner\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="body_invalid")
+    assert_json_refusal_object(captured.err, captured.out, reason="body_invalid")
 
 
 def test_cli_claim_without_scope_refuses_a_missing_target_by_name(
@@ -9760,7 +9389,7 @@ def test_cli_claim_without_scope_refuses_a_missing_target_by_name(
     assert status == 2
     captured = capsys.readouterr()
     assert captured.err == "ERROR: #72 does not exist\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="target_invalid")
+    assert_json_refusal_object(captured.err, captured.out, reason="target_invalid")
 
 
 def test_cli_claim_without_scope_reports_unavailable_for_a_forge_outage(
@@ -9782,7 +9411,7 @@ def test_cli_claim_without_scope_reports_unavailable_for_a_forge_outage(
 
     assert status == 2
     captured = capsys.readouterr()
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 def test_cli_claim_derives_whole_from_the_items_own_body_when_wide(
@@ -10954,7 +10583,7 @@ def test_cli_rescope_json_refuses_no_active_claim_with_precondition_failed(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: issue #72 has no active build claim\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 SCOPE_READ_FAILURE = "fatal: object database unreadable"
@@ -11187,79 +10816,6 @@ def test_cli_release_without_json_prints_the_released_line(
 
 
 @pytest.mark.parametrize(
-    ("issue_argument", "branch", "identity_fields"),
-    [
-        (["72"], "codex/issue-72", {"issue": 72, "lane": None}),
-        ([], "docs/lane-cleanup", {"issue": None, "lane": True}),
-    ],
-    ids=["issue", "lane"],
-)
-def test_cli_claim_json_prints_acquired_claim_object(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    issue_argument: list[str],
-    branch: str,
-    identity_fields: dict[str, object],
-) -> None:
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            *issue_argument,
-            "--agent",
-            "Codex Sol",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            branch,
-            "--scope",
-            "src",
-            "--scope",
-            "docs",
-            "--claim-id",
-            "cli-claim",
-            "--json",
-        ]
-    )
-
-    assert claimed == 0
-    assert (
-        capsys.readouterr().out
-        == json.dumps(
-            {
-                "ok": True,
-                "reason": "claimed",
-                **identity_fields,
-                "claim_id": "cli-claim",
-                "agent": "Codex Sol",
-                "role": "builder",
-                "base": BASE,
-                "branch": branch,
-                "scope": ["docs", "src"],
-                "resource": None,
-                "resource_value": None,
-                "versioned_files": 1,
-                "versioned_files_total": 4,
-                "share": 0.25,
-                "touches": [],
-                "checks": [],
-            }
-        )
-        + "\n"
-    )
-    posted = _live_store_claim()
-    assert posted.scope == ("docs", "src")
-
-
-@pytest.mark.parametrize(
     (
         "issue_argument",
         "branch",
@@ -11379,30 +10935,17 @@ def test_cli_release_json_prints_effective_posted_identity(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
 
 
-def _assert_json_refusal_object(err: str, out: str, *, reason: str) -> None:
-    """`ask`/`rule`/`brief`'s own `report.emit_json` refusal (
-    `specs/output.spec.md`): the identical sentence stderr already printed,
-    now under `message`, next to `reason` instead of a dropped `error`
-    key. Compares the raw JSON text, not a parsed dict, so a reordering of
-    OUT-01's `ok`, `reason`, `message` sequence would fail this assertion."""
-    assert err.startswith("ERROR: ")
-    message = err.removeprefix("ERROR: ").rstrip("\n")
-    expected = {"ok": False, "reason": reason, "message": message}
-    assert out == json.dumps(expected) + "\n"
-    assert json.loads(out) == expected
-
-
 @pytest.mark.parametrize(
     ("arguments", "assert_refusal"),
     [
         pytest.param(
             ["claim", "72", "--agent", "Ada", "--scope", "src", "--claim-id", "cli-claim"],
-            lambda err, out: _assert_json_refusal_object(err, out, reason="unavailable"),
+            lambda err, out: assert_json_refusal_object(err, out, reason="unavailable"),
             id="claim-envelope-refusal",
         ),
         pytest.param(
             ["release", "72", "--agent", "Ada", "--claim-id", "mine", "--abandoned", "stopped"],
-            lambda err, out: _assert_json_refusal_object(err, out, reason="precondition_failed"),
+            lambda err, out: assert_json_refusal_object(err, out, reason="precondition_failed"),
             id="release-precondition-failed",
         ),
     ],
@@ -11502,7 +11045,7 @@ def test_cli_identity_and_release_refusals_print_the_shared_envelope(
         assert text.err == f"ERROR: {sentence}\n"
         assert json.loads(envelope.out)["message"] == sentence
     assert envelope.err == text.err
-    _assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
+    assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
 
 
 @pytest.mark.parametrize(
@@ -11545,95 +11088,7 @@ def test_cli_repository_refusals_preserve_pin_and_handler_error_order(
     if reason is None:
         assert captured.out == ""
     else:
-        _assert_json_refusal_object(captured.err, captured.out, reason=reason)
-
-
-def test_cli_claim_json_conflict_prints_the_stdout_error_object_not_a_success_shape(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    standing = request(issue=72, scope=("src",))
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    _patch_store_write(monkeypatch, store_claim_from_request(standing))
-
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Grok 4.6",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "docs",
-            "--claim-id",
-            "challenger",
-            "--json",
-        ]
-    )
-    captured = capsys.readouterr()
-
-    assert claimed == 2
-    _assert_json_refusal_object(captured.err, captured.out, reason="claim_conflict")
-
-
-def test_cli_claim_json_transport_failure_reports_unavailable_not_conflict(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A transport/CAS failure surfacing from `store.commit_transition` is a
-    plain `protocol.ClaimError`, never `protocol.ClaimConflictError`
-    (CLM-27): `claim --json` reports `unavailable`, not
-    `claim_conflict`, exactly as `release`'s own retry-exhaustion refusal
-    does."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    _patch_store_write(monkeypatch)
-
-    def failing_commit_transition(*args: object, **kwargs: object) -> protocol.ClaimState:
-        raise protocol.ClaimUnavailableError(
-            f"{store.STATE_REF} moved 5 times while retrying: another writer on "
-            "origin keeps landing first; retry the command"
-        )
-
-    monkeypatch.setattr(store, "commit_transition", failing_commit_transition)
-
-    claimed = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Grok 4.6",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "docs",
-            "--claim-id",
-            "challenger",
-            "--json",
-        ]
-    )
-    captured = capsys.readouterr()
-
-    assert claimed == 2
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+        assert_json_refusal_object(captured.err, captured.out, reason=reason)
 
 
 def test_cli_module_entry_point_exits_with_mains_return_code(
@@ -13791,7 +13246,7 @@ def test_a_bad_choice_on_a_json_command_prints_the_invalid_usage_envelope(
     captured = capsys.readouterr()
     assert status == 2
     assert "argument --step: invalid choice:" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -13819,7 +13274,7 @@ def test_a_dash_dash_ends_the_options_of_its_own_level_only(
     assert status == 2
     assert captured.err.startswith("ERROR: ")
     if envelope:
-        _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+        assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
     else:
         assert captured.out == ""
 
@@ -13863,7 +13318,7 @@ def test_a_dash_dash_before_the_command_follows_the_parse_argparse_made(
 
     captured = capsys.readouterr()
     assert status == 2
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -14041,98 +13496,6 @@ def test_issue_check_labels_a_local_blocker_under_the_state_ref_pin() -> None:
     assert outcome.line == f"ISSUE {checked_label} blocked by {local_label}, other/repo#9"
 
 
-@pytest.mark.parametrize(
-    "json_flag", [pytest.param(False, id="without-json"), pytest.param(True, id="with-json")]
-)
-def test_cli_claim_refuses_a_missing_state_ref(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], json_flag: bool
-) -> None:
-    """A missing `refs/aco/state`: with `--json`, the stdout
-    envelope names the unchanged stderr sentence under `reason: unavailable`;
-    without it, stdout stays exactly as empty as it always
-    has."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    git_values = git_checkout()
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    _patch_store_write(monkeypatch, tip=None)
-
-    arguments = [
-        "--repo",
-        REPOSITORY,
-        "claim",
-        "72",
-        "--agent",
-        "Ada",
-        "--base",
-        BASE,
-        "--branch",
-        "codex/issue-72",
-        "--scope",
-        "src",
-        "--claim-id",
-        "cli-claim",
-    ]
-    if json_flag:
-        arguments.append("--json")
-
-    status = issue_claim.main(arguments)
-
-    captured = capsys.readouterr()
-    assert status == 2
-    assert protocol.MISSING_STATE_REF in captured.err
-    if json_flag:
-        _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
-    else:
-        assert captured.out == ""
-
-
-def test_cli_claim_refuses_canonical_remote_mismatch_and_writes_nothing(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    git_values = git_checkout()
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    fake = _patch_store_write(monkeypatch)
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: "git@github.com:other/repo.git"
-    )
-
-    status = issue_claim.main(
-        [
-            "--repo",
-            REPOSITORY,
-            "claim",
-            "72",
-            "--agent",
-            "Ada",
-            "--base",
-            BASE,
-            "--branch",
-            "codex/issue-72",
-            "--scope",
-            "src",
-            "--claim-id",
-            "cli-claim",
-        ]
-    )
-
-    assert status == 2
-    assert "forge target example/agent-coordination does not match canonical remote other/repo" in (
-        capsys.readouterr().err
-    )
-    assert fake.transitions == []
-
-
 def test_cli_rescope_refuses_a_missing_state_ref(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -14163,97 +13526,6 @@ def test_cli_release_refuses_a_missing_state_ref(
 
     assert status == 2
     assert protocol.MISSING_STATE_REF in capsys.readouterr().err
-
-
-# Lazy forge: a forge-free command never resolves a repository,
-# reads a remote's own URL, or calls `gh` -- proven here against a bare
-# `file://` canonical remote (the shape a repository with no forge adapter at
-# all still uses for its state ref) with `discover_repository`/`GitHubForge`
-# and `checkout.remote_url` all forbidden outright, never merely absent.
-
-
-def test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_remote(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A lane `claim`/`rescope`/`release` never resolves a forge target:
-    the round trip below runs entirely against a `file://`
-    canonical remote with the forge and the remote's own URL both forbidden,
-    and still claims, rescopes, and releases."""
-    set_agent_identity_env(monkeypatch, {"ACO_AGENT": "Codex Sol"})
-    monkeypatch.setattr(
-        checkout,
-        "versioned_paths",
-        lambda **_kwargs: (
-            "LICENSE",
-            "README.md",
-            "pyproject.toml",
-            "src/aco/__init__.py",
-        ),
-    )
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    # `rescope` fetches and commits real store state against its resolved
-    # checkout's own toplevel -- unlike
-    # `claim`'s cwd-based store observation above, still unaffected by this
-    # fix, this fake toplevel must therefore be a real directory the test's
-    # own real `store.fetch_state`/`commit_transition` calls can `-C` into,
-    # not the placeholder `"/repo"` every other checkout fact below stays.
-    real_toplevel = str(Path.cwd())
-    git_values = {
-        ("branch", "--show-current"): "docs/lane-cleanup",
-        ("rev-parse", "--show-toplevel"): real_toplevel,
-        ("rev-parse", "HEAD"): BASE,
-        ("rev-parse", "--verify", "--quiet", "HEAD"): BASE,
-        ("rev-parse", "--git-dir"): "/repo/.git/worktrees/lane-cleanup",
-        ("rev-parse", "--git-common-dir"): "/repo/.git",
-        # `rescope`'s path-based checkout resolution: the same
-        # toplevel/git-dir/common-dir facts above, combined in the one call
-        # `resolve_path_checkout` actually sends.
-        (
-            "rev-parse",
-            "--path-format=absolute",
-            "--show-toplevel",
-            "--git-dir",
-            "--git-common-dir",
-        ): f"{real_toplevel}\n/repo/.git/worktrees/lane-cleanup\n/repo/.git",
-        RECORDED_ORIGIN_HEAD_READ: "refs/remotes/origin/main",
-    }
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    forbid_forge_resolution(monkeypatch)
-
-    claimed = issue_claim.main(
-        [
-            "claim",
-            "--role",
-            "builder",
-            "--base",
-            BASE,
-            "--branch",
-            "docs/lane-cleanup",
-            "--scope",
-            "docs",
-            "--claim-id",
-            "cli-lane-claim",
-        ]
-    )
-    assert claimed == 0
-    capsys.readouterr()
-
-    rescoped = issue_claim.main(["rescope", "--add", f"{real_toplevel}/README.md"])
-    assert rescoped == 0
-    lane_key = protocol.claim_key(protocol.LaneIdentity(), "docs/lane-cleanup")
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims[lane_key].scope == (
-        "README.md",
-        "docs",
-    )
-    capsys.readouterr()
-
-    released = issue_claim.main(["release", "--abandoned", "stopped"])
-    assert released == 0
-    assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
 
 
 def test_cli_board_refuses_a_non_github_canonical_remote_by_host(
@@ -14504,7 +13776,7 @@ def test_untracked_board_config_refuses_item_show_in_its_own_json_envelope(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == _UNTRACKED_BOARD_CONFIG_ERROR
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def _scratch_lane_repository(
@@ -15106,7 +14378,7 @@ def test_cli_brief_step_refuses_with_no_usable_brief_config(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: no .aco/brief.toml in the repository\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 def test_cli_brief_refuses_a_non_github_canonical_remote_by_host(
@@ -15130,7 +14402,7 @@ def test_cli_brief_refuses_a_non_github_canonical_remote_by_host(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: no forge adapter for host file\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 def test_cli_brief_reports_invalid_usage_when_repo_is_given_under_state_ref(
@@ -15147,7 +14419,7 @@ def test_cli_brief_reports_invalid_usage_when_repo_is_given_under_state_ref(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -15908,7 +15180,7 @@ def test_item_edit_refuses_through_the_shared_precondition_failed_envelope(
     captured = capsys.readouterr()
     refusal = sentence.format(command=f"item edit {case.flag}")
     assert (exit_code, refusal in captured.err) == (2, True)
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def test_item_edit_size_refuses_an_invalid_value_before_any_write(
@@ -16048,7 +15320,7 @@ def test_item_show_refuses_when_the_parent_read_fails(
     assert (text_status, json_status) == (2, 2)
     assert (text.out, text.err) == ("", f"ERROR: {sentence}\n")
     assert envelope.err == text.err
-    _assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
+    assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
 
 
 def _item_new_github_storage_refusal(
@@ -16101,7 +15373,7 @@ def test_item_refuses_through_the_shared_precondition_failed_envelope(
 
     assert status == 2
     captured = capsys.readouterr()
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def _github_item_new(
