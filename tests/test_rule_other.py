@@ -71,8 +71,8 @@ class TestRuleOther:
         serve_written(monkeypatch, written)
         header = run_cli(["rulings"], capsys).stdout.splitlines()[0]
         line = line_two(run_cli(["rulings", "--json"], capsys).stdout)
-        assert header == "#7 1/2: Karte"
-        assert (line["ruling"], line["ruled_on"], line["via"], line["other"]) == (
+        assert (header, line["ruling"], line["ruled_on"], line["via"], line["other"]) == (
+            "#7 1/2: Karte",
             "other",
             today.isoformat(),
             via,
