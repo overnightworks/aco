@@ -3,6 +3,6 @@ agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
 role = "builder"
 base = "03d69226e0f449411d8d158b71811bffc1e2b4ca"
 branch = "claude/issue-454-card-rules"
-scope = ["specs/body-block.spec.md", "src/aco/card_rules.py", "src/aco/expectation_grammar.py", "tests/test_card_rules.py"]
+scope = ["pyproject.toml", "specs/body-block.spec.md", "src/aco/card_rules.py", "src/aco/expectation_grammar.py", "tests/test_card_rules.py"]
 opened_commit = "8f86aa865c5dd9bc1b9a9e38da6315b28587412e"
 whole_reason = "One owner for line 14's text rules: the new module, its one call in the grammar, its spec criteria and its tests change together."
