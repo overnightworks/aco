@@ -12,13 +12,15 @@ from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
     line,
+    option_line,
+    picture_option,
     row,
+    same_as_today_option,
     serving_two,
 )
 
 from aco.board.board import LINE_CHANGED
 
-_SVG = '<svg xmlns="http://www.w3.org/2000/svg"/>'
 _OPTION_LINE_KEYS = [
     "index",
     "form",
@@ -47,67 +49,6 @@ _RULE_17_SENTENCE = (
 )
 _RULE_18_SENTENCE = "line 1 has no option C; its options are A, B"
 _RULE_04_SENTENCE = "line 1 is already ruled; a changed ruling is a new line"
-
-
-def _picture_option(letter: str = "A", **changes: object) -> dict[str, object]:
-    return {
-        "letter": letter,
-        "name": "Song stays open",
-        "effect": "The app jumps itself.",
-        "picture": _SVG,
-        "caption": "Still open",
-        "notice": "You stay in your song.",
-        "cost": "More code.",
-        "undo": "reversible",
-        "undo_how": "Any time.",
-        "contract": "The song stays open.",
-        **changes,
-    }
-
-
-def _same_as_today_option(letter: str = "B", **changes: object) -> dict[str, object]:
-    return {
-        "letter": letter,
-        "name": "As today",
-        "effect": "The browser jumps.",
-        "same_as_today": True,
-        "notice": "You pick the song again.",
-        "cost": "None.",
-        "undo": "final",
-        "undo_how": "Nothing is built.",
-        "contract": "The link stays a link.",
-        **changes,
-    }
-
-
-def option_line(*, ruling: object = None, **changes: object) -> dict[str, object]:
-    """RUL-13's option line, E-RUL-07's card, open unless `ruling` is a letter or `other`."""
-    card_hash = "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a"
-    return {
-        "index": 1,
-        "form": "options",
-        "text": "The song stays open on the jump.",
-        "ruling": ruling,
-        "ruled_on": "2026-10-28" if ruling is not None else None,
-        "via": "board" if ruling is not None else None,
-        "other": None,
-        "returned_on": None,
-        "returned_note": None,
-        "default": None,
-        "card_hash": card_hash,
-        "stored_card_hash": card_hash if ruling is not None else None,
-        "question": "Keep the song open?",
-        "problem": "The jump closes your song.",
-        "picture": _SVG,
-        "caption": "Today",
-        "decision_kind": "product",
-        "area": "Song page",
-        "topic": "Jump",
-        "recommended": "A",
-        "reason": "Ends the loss.",
-        "options": [_picture_option(), _same_as_today_option()],
-        **changes,
-    }
 
 
 def _without_key(stored: dict[str, object], key: str) -> dict[str, object]:
@@ -307,17 +248,17 @@ def test_a_yes_no_decision_on_an_option_line_writes_nothing_and_says_why(
         option_line(recommended="C"),
         option_line(recommended="E"),
         option_line(recommended=None),
-        option_line(options=[_picture_option("B"), _same_as_today_option("A")]),
-        option_line(options=[_picture_option("A"), _same_as_today_option("C")]),
+        option_line(options=[picture_option("B"), same_as_today_option("A")]),
+        option_line(options=[picture_option("A"), same_as_today_option("C")]),
         option_line(options=[]),
-        option_line(options=[_picture_option(letter) for letter in "ABCDE"]),
+        option_line(options=[picture_option(letter) for letter in "ABCDE"]),
         option_line(options="none"),
         option_line(options=["A"]),
-        option_line(options=[_picture_option(), _same_as_today_option(cost=5)]),
-        option_line(options=[_picture_option(), _same_as_today_option(same_as_today=False)]),
+        option_line(options=[picture_option(), same_as_today_option(cost=5)]),
+        option_line(options=[picture_option(), same_as_today_option(same_as_today=False)]),
         option_line(problem=5),
         option_line(picture=5),
-        option_line(options=[_picture_option(picture=5), _same_as_today_option()]),
+        option_line(options=[picture_option(picture=5), same_as_today_option()]),
         option_line(ruling="A", ruled_on="tomorrow"),
         option_line(form="cards"),
         option_line(form=None),

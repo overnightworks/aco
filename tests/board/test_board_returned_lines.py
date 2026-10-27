@@ -7,8 +7,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, FakeAcoRepository, row
-from test_board_option_lines import option_line
+from aco_board_fixtures import BoardClient, FakeAcoRepository, option_line, row
 
 
 def _listed_line(board: BoardClient) -> dict[str, Any]:
