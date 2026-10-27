@@ -11,22 +11,26 @@ import pytest
 from board_fixtures import board_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
 from github_fixtures import FakeForge, assert_github_world, serve_forge
-from test_option_lines import (
+from option_cards import (
+    ALREADY_RULED,
     GOLDEN_CARD_HASH,
     OTHER_ANSWER,
+    STALE_CARD_HASH,
+    YES_NO_LINE,
     card,
-    card_body,
+    decide,
+    item_body,
+    other_arguments,
     other_card,
-    returned_card,
+    returned_today,
     ruled_card,
+    serve_item,
+    unclear,
 )
 
-from aco import body, forge
+from aco import body
 
-STALE_CARD_HASH = "sha256:" + "0" * 64
-YES_NO_LINE = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
 RULED_YES_NO_LINE = '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2026-10-01\n'
-ALREADY_RULED = "line 2 is already ruled; a changed ruling is a new line"
 ALREADY_WITH_HEAD = "line 2 is already with its head; it comes back once revised"
 CARD_CHANGED = "line 2 changed since its card was shown; show it again and rule what it shows now"
 
@@ -34,44 +38,6 @@ CARD_CHANGED = "line 2 changed since its card was shown; show it again and rule 
 @pytest.fixture
 def github_world(github_clone: Path, bare_remote: Path) -> None:
     assert_github_world(github_clone, bare_remote)
-
-
-def item_body(option_line: str, *, yes_no_line: str = YES_NO_LINE, newline: str = "\n") -> str:
-    """Issue #7's body: line 1 a yes/no line, line 2 `option_line`."""
-    return card_body(option_line, before="\n" + yes_no_line, newline=newline)
-
-
-def serve_item(monkeypatch: pytest.MonkeyPatch, raw_body: str) -> FakeForge:
-    reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", raw_body)
-    return serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
-
-
-def decide(letter: str, via: str, shown: str = GOLDEN_CARD_HASH, *, line: int = 2) -> list[str]:
-    """`rule`'s arguments after the item for one option choice."""
-    return ["--line", str(line), "--option", letter, "--via", via, "--card-hash", shown]
-
-
-def other_arguments(
-    answer: str, via: str = "chat", shown: str = GOLDEN_CARD_HASH, *, line: int = 2
-) -> list[str]:
-    """`rule`'s arguments after the item for one Other answer; `=` keeps a leading dash."""
-    return ["--line", str(line), f"--other={answer}", "--via", via, "--card-hash", shown]
-
-
-TODAY = FROZEN_CLI_NOW.date().isoformat()
-NOTE = "Was kostet B im Betrieb?"
-
-
-def returned_today(note: str | None = NOTE) -> str:
-    """The open option line as `--unclear` writes it on the frozen day."""
-    note_key = "" if note is None else f"returned_note = {json.dumps(note, ensure_ascii=False)}\n"
-    return returned_card(f"returned_on = {TODAY}\n{note_key}")
-
-
-def unclear(note: str | None = None, shown: str = GOLDEN_CARD_HASH, *, line: int = 2) -> list[str]:
-    """`rule`'s arguments after the item for one send-back; `=` keeps a leading dash."""
-    note_flags = [] if note is None else [f"--note={note}"]
-    return ["--line", str(line), "--unclear", *note_flags, "--card-hash", shown]
 
 
 def decided_state(rulings_stdout: str) -> tuple[object, ...]:
