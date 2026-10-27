@@ -57,6 +57,7 @@ export function optionLine(overrides: Partial<OptionLine> = {}): OptionLine {
 		ruling: null,
 		ruled_on: null,
 		via: null,
+		other: null,
 		fingerprint: 'fingerprint-option',
 		...overrides
 	};
