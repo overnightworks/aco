@@ -61,7 +61,7 @@ def test_claim_json_lists_each_overlapping_standing_claim_with_its_full_scope(
     own_scope: tuple[str, ...],
     touches: list[dict[str, object]],
 ) -> None:
-    """Spec: CLM-19, CLAIM-31, CLAIM-32."""
+    """Spec: CLM-19."""
     stand_in(standing=(standing,))
     serve_item(monkeypatch, own_scope)
 
@@ -96,7 +96,11 @@ def test_claim_resource_allocates_the_next_value_and_prints_it(
     status = claim("--resource", RESOURCE, "--json", scope=("src/work.py",))
 
     assert status == 0
-    assert json.loads(capsys.readouterr().out)["resource_value"] == values[-1]
+    payload = json.loads(capsys.readouterr().out)
+    assert {key: payload[key] for key in ("resource", "resource_value")} == {
+        "resource": RESOURCE,
+        "resource_value": values[-1],
+    }
     assert claimed_here(standpoint).resource == protocol.ResourceHold(RESOURCE, values[-1])
     held = sorted(
         held.resource.value

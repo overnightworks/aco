@@ -46,7 +46,7 @@ def test_replay_of_a_wide_scope_without_whole_reads_only_its_own_item(
     stand_in: StandIn,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: CLAIM-13, CLM-37."""
+    """Spec: CLAIM-13, CLM-15."""
     standpoint = stand_in()
     served = serve_item(monkeypatch, ("src",))
     assert claim("--claim-id", CLAIM_ID) == 0
@@ -148,8 +148,8 @@ def test_replay_with_different_retry_fields_is_refused_and_the_live_claim_stays(
     status = claim("--role", role, agent=agent, scope=scope)
 
     assert status == 2
-    holder = f"Ada (builder) on issue #{ISSUE} branch {LANE_BRANCH}"
-    assert capsys.readouterr().err == f"ERROR: issue #{ISSUE} is claimed by {holder}\n"
+    held_by = f"Ada (builder) on issue #{ISSUE} branch {LANE_BRANCH}"
+    assert capsys.readouterr().err == f"ERROR: issue #{ISSUE} is claimed by {held_by}\n"
     assert standing_claims(standpoint) == before
 
 

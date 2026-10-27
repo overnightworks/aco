@@ -10589,29 +10589,18 @@ def test_cli_release_json_prints_effective_posted_identity(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
 
 
-@pytest.mark.parametrize(
-    ("arguments", "assert_refusal"),
-    [
-        pytest.param(
-            ["release", "72", "--agent", "Ada", "--claim-id", "mine", "--abandoned", "stopped"],
-            lambda err, out: assert_json_refusal_object(err, out, reason="precondition_failed"),
-            id="release-precondition-failed",
-        ),
-    ],
-)
-def test_cli_claim_and_release_json_errors_choose_their_own_shape(
+def test_cli_release_json_generic_refusal_reports_precondition_failed(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    arguments: list[str],
-    assert_refusal: Callable[[str, str], None],
 ) -> None:
     """`release`'s own generic refusal bucket reports
     `reason: precondition_failed`."""
     _patch_status_cli(monkeypatch, FakeForge())
+    arguments = ["release", "72", "--agent", "Ada", "--claim-id", "mine", "--abandoned", "stopped"]
 
     assert issue_claim.main(["--repo", REPOSITORY, *arguments, "--json"]) == 2
     captured = capsys.readouterr()
-    assert_refusal(captured.err, captured.out)
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def _prepare_identity_or_release_branch_refusal(
