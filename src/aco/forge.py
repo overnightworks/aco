@@ -1,12 +1,10 @@
 """The forge port: repository identity, typed failures, and the read/write surface.
 
 `ForgeReader`/`ForgeWriter` are the contract that `github.GitHubForge` and
-`state_board.StateRefBoard` both implement; `ForgeOperation` names every
-operation on that contract and `Capability` answers, per operation and adapter,
-whether an adapter can perform it at all. The GitHub adapter never answers
-`UNSUPPORTED`. `cmd_land` depends on `GitHubForge` directly, `cmd_item` on
-`StateRefBoard`, and `cmd_release` on both, so a further forge needs its own
-contract for them first.
+`state_board.StateRefBoard` both implement. An adapter that cannot perform an
+operation raises `ForgeUnsupportedError`. `cmd_land` depends on `GitHubForge`
+directly, `cmd_item` on `StateRefBoard`, and `cmd_release` on both, so a
+further forge needs its own contract for them first.
 """
 
 from __future__ import annotations
@@ -260,38 +258,9 @@ class LandingReadiness:
     checks: tuple[CheckRun, ...]
 
 
-class Capability(StrEnum):
-    UNSUPPORTED = "unsupported"
-    READ_ONLY = "read_only"
-    READ_WRITE = "read_write"
-
-
-class ForgeOperation(StrEnum):
-    """Every port operation; each member's value is its Protocol method name."""
-
-    ITEM_REFERENCE = "item_reference"
-    ITEM_REFERENCES = "item_references"
-    LANDING = "landing"
-    PULL_REQUEST_CHANGES = "pull_request_changes"
-    PARENT_ISSUE = "parent_issue"
-    PARENT_NUMBER = "parent_number"
-    LIST_CHILDREN = "list_children"
-    DEFAULT_BRANCH = "default_branch"
-    LIST_OPEN_BOARD_ISSUES = "list_open_board_issues"
-    LIST_BOARD_DEPENDENCIES = "list_board_dependencies"
-    LIST_OPEN_BOARD_PULL_REQUESTS = "list_open_board_pull_requests"
-    LIST_RECENT_MERGED_BOARD_PULL_REQUESTS = "list_recent_merged_board_pull_requests"
-    LIST_RECENTLY_CLOSED_ISSUES = "list_recently_closed_issues"
-    LINK_CHILD = "link_child"
-    CREATE_ISSUE = "create_issue"
-    CREATE_CHILD = "create_child"
-    UPDATE_ITEM_BODY = "update_item_body"
-    SET_ITEM_KIND = "set_item_kind"
-
-
 class BoardSource(Protocol):
-    """The read surface `board_read.build_board` actually calls: the repository identity, its
-    capability answers, and the board list operations, not every
+    """The read surface `board_read.build_board` actually calls: the repository identity, whether
+    it lists pull requests, and the board list operations, not every
     `ForgeReader` operation. Every `ForgeReader` already satisfies it
     structurally; a board-only fake needs nothing more.
     """
@@ -307,7 +276,11 @@ class BoardSource(Protocol):
         answers "how many round trips did this cost"."""
         ...
 
-    def capability(self, operation: ForgeOperation) -> Capability: ...
+    @property
+    def lists_pull_requests(self) -> bool:
+        """This adapter can list open and merged pull requests; a source that
+        cannot has no landed signal for a board row."""
+        ...
 
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]: ...
 

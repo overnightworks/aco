@@ -16,12 +16,13 @@ compare-and-swap write to `items/<id>.md`, implemented in `session._StoreItemWri
 `close_item` and an `ItemCloseIntent`) -- so this module still
 never imports `store` itself.
 
-`LANDING` and the two pull-request listings answer `Capability.UNSUPPORTED`:
-this adapter has no data for any of them. The two pull-request listings
+`landing` and `pull_request_changes` raise `ForgeUnsupportedError`: this adapter has
+no data for them; `create_issue` raises it because `compose_item` mints a state-ref
+item's id and records its parent and origin in one write. The two pull-request listings
 still return an empty tuple rather than raising: `board_read.build_board` calls them
-unconditionally for every board read, and "no pull requests exist here" is
-this adapter's honest answer, not a refusal. `Board.recovery` -- purely
-pull-request-body-declared -- stays empty from that same emptiness.
+unconditionally for every board read, and "no pull requests exist here" is this adapter's
+honest answer, not a refusal; `lists_pull_requests` is `False`.
+`Board.recovery` -- purely pull-request-body-declared -- stays empty from that same emptiness.
 `Stage.CODE_LANDED` and the board's own Landungen view do not: both read
 `checkout.trunk_landings`'s trailer block straight from local git history
 instead, independent of this adapter's own missing
@@ -33,7 +34,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from types import MappingProxyType
 from typing import Protocol, cast
 
 from . import forge, items, workboard
@@ -58,31 +58,6 @@ from .protocol import (
     MalformedStateTreeError,
     ObjectId,
     item_id_of_filename,
-)
-
-STATE_REF_CAPABILITIES: Mapping[forge.ForgeOperation, forge.Capability] = MappingProxyType(
-    {
-        forge.ForgeOperation.ITEM_REFERENCE: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.ITEM_REFERENCES: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.PARENT_ISSUE: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.PARENT_NUMBER: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.LIST_CHILDREN: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.DEFAULT_BRANCH: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.LIST_OPEN_BOARD_ISSUES: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.LIST_BOARD_DEPENDENCIES: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.LANDING: forge.Capability.UNSUPPORTED,
-        forge.ForgeOperation.PULL_REQUEST_CHANGES: forge.Capability.UNSUPPORTED,
-        forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS: forge.Capability.UNSUPPORTED,
-        forge.ForgeOperation.LIST_RECENT_MERGED_BOARD_PULL_REQUESTS: forge.Capability.UNSUPPORTED,
-        forge.ForgeOperation.LIST_RECENTLY_CLOSED_ISSUES: forge.Capability.READ_ONLY,
-        forge.ForgeOperation.LINK_CHILD: forge.Capability.READ_WRITE,
-        # `item new` creates a state-ref item through `compose_item` and `create_item`, which
-        # mint its id and record its parent and origin in one write.
-        forge.ForgeOperation.CREATE_ISSUE: forge.Capability.UNSUPPORTED,
-        forge.ForgeOperation.CREATE_CHILD: forge.Capability.READ_WRITE,
-        forge.ForgeOperation.UPDATE_ITEM_BODY: forge.Capability.READ_WRITE,
-        forge.ForgeOperation.SET_ITEM_KIND: forge.Capability.READ_WRITE,
-    }
 )
 
 
@@ -342,6 +317,8 @@ class StateRefBoard:
     """The `state-ref` storage pin's `BoardSource`/`ForgeReader`/`ForgeWriter`
     adapter."""
 
+    lists_pull_requests = False
+
     def __init__(
         self,
         *,
@@ -379,9 +356,6 @@ class StateRefBoard:
         by `session._state_ref_forge` before construction -- no
         method below costs a further round trip."""
         return 0
-
-    def capability(self, operation: forge.ForgeOperation) -> forge.Capability:
-        return STATE_REF_CAPABILITIES[operation]
 
     def holds(self, number: int) -> bool:
         """Whether `items/` carries `number` at all, malformed or not: the
@@ -762,8 +736,7 @@ class StateRefBoard:
         return write.item_id
 
     def create_issue(self, *, title: str, body: str, kind: ItemKind) -> int:
-        """Unsupported (`STATE_REF_CAPABILITIES`): `compose_item` mints a
-        state-ref item's id and records its parent and origin in one write."""
+        """Unsupported: `compose_item` mints the id and records parent and origin in one write."""
         raise forge.ForgeUnsupportedError(NO_BARE_ISSUE)
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:

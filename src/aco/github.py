@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
-from types import MappingProxyType
 from typing import TypeVar
 
 from . import forge, process, protocol, workboard
@@ -460,39 +459,9 @@ def body_write_outcome(error: ClaimError) -> BodyWriteOutcome:
     return BodyWriteOutcome.REFUSED if refused else BodyWriteOutcome.UNKNOWN
 
 
-_READ_ONLY_OPERATIONS = (
-    forge.ForgeOperation.ITEM_REFERENCE,
-    forge.ForgeOperation.ITEM_REFERENCES,
-    forge.ForgeOperation.LANDING,
-    forge.ForgeOperation.PULL_REQUEST_CHANGES,
-    forge.ForgeOperation.PARENT_ISSUE,
-    forge.ForgeOperation.PARENT_NUMBER,
-    forge.ForgeOperation.LIST_CHILDREN,
-    forge.ForgeOperation.DEFAULT_BRANCH,
-    forge.ForgeOperation.LIST_OPEN_BOARD_ISSUES,
-    forge.ForgeOperation.LIST_BOARD_DEPENDENCIES,
-    forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS,
-    forge.ForgeOperation.LIST_RECENT_MERGED_BOARD_PULL_REQUESTS,
-    forge.ForgeOperation.LIST_RECENTLY_CLOSED_ISSUES,
-)
-_READ_WRITE_OPERATIONS = (
-    forge.ForgeOperation.LINK_CHILD,
-    forge.ForgeOperation.CREATE_ISSUE,
-    forge.ForgeOperation.CREATE_CHILD,
-    forge.ForgeOperation.UPDATE_ITEM_BODY,
-    forge.ForgeOperation.SET_ITEM_KIND,
-)
-# The GitHub adapter never refuses an operation: every member answers
-# READ_ONLY or READ_WRITE, never UNSUPPORTED (decision record 0001 §2).
-GITHUB_CAPABILITIES: Mapping[forge.ForgeOperation, forge.Capability] = MappingProxyType(
-    {
-        **dict.fromkeys(_READ_ONLY_OPERATIONS, forge.Capability.READ_ONLY),
-        **dict.fromkeys(_READ_WRITE_OPERATIONS, forge.Capability.READ_WRITE),
-    }
-)
-
-
 class GitHubForge:
+    lists_pull_requests = True
+
     def __init__(
         self,
         repository: forge.RepositoryId,
@@ -533,9 +502,6 @@ class GitHubForge:
         if input_data is None:
             return self._perform(arguments)
         return self._perform(arguments, input_data=input_data)
-
-    def capability(self, operation: forge.ForgeOperation) -> forge.Capability:
-        return GITHUB_CAPABILITIES[operation]
 
     def item_reference(self, number: int) -> forge.ItemReference:
         try:

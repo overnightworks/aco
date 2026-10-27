@@ -61,6 +61,7 @@ from store_fixtures import (
 )
 
 from aco import (
+    board_read,
     checkout,
     cmd_cut,
     cmd_rulings,
@@ -1002,33 +1003,6 @@ class TestStateRefBoardMethods:
     def test_requests_is_always_zero(self, state_ref_board: StateRefBoard) -> None:
         assert state_ref_board.requests == 0
 
-    def test_capability_matches_the_state_ref_surface(self, state_ref_board: StateRefBoard) -> None:
-        assert (
-            state_ref_board.capability(forge.ForgeOperation.PULL_REQUEST_CHANGES)
-            is forge.Capability.UNSUPPORTED
-        )
-        with pytest.raises(forge.ForgeUnsupportedError):
-            state_ref_board.pull_request_changes(12)
-        assert (
-            state_ref_board.capability(forge.ForgeOperation.LIST_OPEN_BOARD_ISSUES)
-            is forge.Capability.READ_ONLY
-        )
-        assert (
-            state_ref_board.capability(forge.ForgeOperation.LANDING) is forge.Capability.UNSUPPORTED
-        )
-        assert (
-            state_ref_board.capability(forge.ForgeOperation.CREATE_CHILD)
-            is forge.Capability.READ_WRITE
-        )
-        assert (
-            state_ref_board.capability(forge.ForgeOperation.LINK_CHILD)
-            is forge.Capability.READ_WRITE
-        )
-        assert (
-            state_ref_board.capability(forge.ForgeOperation.UPDATE_ITEM_BODY)
-            is forge.Capability.READ_WRITE
-        )
-
     def test_item_reference_reports_an_open_items_title_and_body(
         self, state_ref_board: StateRefBoard
     ) -> None:
@@ -1050,6 +1024,11 @@ class TestStateRefBoardMethods:
         [
             pytest.param(
                 lambda adapter: adapter.landing(CHILD_A_NUMBER), "not yet derived", id="landing"
+            ),
+            pytest.param(
+                lambda adapter: adapter.pull_request_changes(CHILD_A_NUMBER),
+                "no pull request file listings",
+                id="pull_request_changes",
             ),
             pytest.param(
                 lambda adapter: adapter.create_issue(title="T", body="", kind=ItemKind.TASK),
@@ -1278,9 +1257,9 @@ def _projected(
     """`projected_board` fed entirely from `client`'s own read methods --
     the one assembly both parametrized cases below share, mirroring what
     `board_read.build_board` does at the CLI layer without that layer's filesystem and
-    network concerns. `open_pull_requests_supported` comes from
-    `client.capability`, the same read `board_read.build_board` makes,
-    never from the storage pin `config.storage` also carries."""
+    network concerns. `open_pull_requests_supported` comes from `client.lists_pull_requests`,
+    the same read `board_read.build_board` makes, never from the storage pin `config.storage`
+    also carries."""
     issues = client.list_open_board_issues()
     children = {
         issue.number: client.list_children(issue.number)
@@ -1302,10 +1281,7 @@ def _projected(
         now=OBSERVED_AT,
         children=children,
         dependencies=dependencies,
-        open_pull_requests_supported=(
-            client.capability(forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS)
-            is not forge.Capability.UNSUPPORTED
-        ),
+        open_pull_requests_supported=client.lists_pull_requests,
     )
 
 
@@ -1349,7 +1325,7 @@ EXPECTED_BOARD_PAYLOAD_BY_STORAGE = {
 # The same scenario plus `LIVE_CLAIM`, GitHub-side, as the shared expectation
 # for `test_a_live_claim_is_in_flight_identically_on_both_adapters` below:
 # GitHub reaches `Stage.IN_FLIGHT` via `LIVE_CLAIM_OPEN_PULL_REQUEST`'s
-# matching branch, never via the state-ref-only capability fallback.
+# matching branch, never via the state-ref-only no-pull-request-listing fallback.
 # `state-ref`'s own expectation is a fresh build under `Storage.STATE_REF`
 # (same reasoning as `EXPECTED_STATE_REF_BOARD_PAYLOAD` above), so the only
 # sanctioned difference stays the id-shaped pins.
@@ -2574,15 +2550,12 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """`aco cut` on a state-ref container runs
-        through to a freshly minted child -- `create_child`'s single CAS
-        write -- with no `KeyError` from a missing `LINK_CHILD` capability
-        and no refusal; this container's own `[record]` carries no `slice`
-        rows, so it creates an untied child exactly like GitHub does for the
+        """`aco cut` on a state-ref container runs through to a freshly minted child --
+        `create_child`'s single CAS write -- with no refusal; this container's own `[record]`
+        carries no `slice` rows, so it creates an untied child exactly like GitHub does for the
         same shape (see `tests/test_cut.py::test_cut_creates_the_child_and_removes_its_row`
-        with case `untied-without-a-slice-key`).
-        The byte-exact `[[slice]]` row removal itself is proved
-        below."""
+        with case `untied-without-a-slice-key`). The byte-exact `[[slice]]` row removal itself
+        is proved below."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
         status = issue_claim.main(["cut", str(CONTAINER_NUMBER), "--title", "Slice C"])
@@ -3294,6 +3267,29 @@ class TestCliStateRefForge:
 
         assert status == 0
         assert json.loads(capsys.readouterr().out)["requests"] == 0
+
+    def test_build_board_reads_a_live_claim_with_no_pull_request_as_in_flight_under_state_ref(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        bare_remote: Path,
+        worktree: Path,
+    ) -> None:
+        """`board_read.build_board` reads `lists_pull_requests` (`False`): a live claim with
+        a branch and no pull request is in flight, not waiting for a landed signal.
+
+        Spec: defect:#447
+        """
+        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
+
+        built = board_read.build_board(
+            session.run_context(None),
+            (LIVE_CLAIM,),
+            history=board_read.ClaimHistory(ages={LIVE_CLAIM.claim_id: OBSERVED_AT}),
+        )
+
+        item = next(item for item in built.items if item.number == CHILD_A_NUMBER)
+        assert item.stage is workboard.Stage.IN_FLIGHT
 
     def test_board_marks_a_state_ref_item_landed_by_a_trailer_carrying_trunk_commit(
         self,

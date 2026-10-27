@@ -210,9 +210,7 @@ class _MinimalForgeReader:
     requests: int = 0
     observed_children_lookups: list[int] = field(default_factory=list)
     observed_merged_pull_request_floors: list[datetime] = field(default_factory=list)
-
-    def capability(self, operation: forge.ForgeOperation) -> forge.Capability:
-        return github.GITHUB_CAPABILITIES[operation]
+    lists_pull_requests: bool = True
 
     def item_reference(self, number: int) -> forge.ItemReference:
         return forge.ItemReference(state=forge.ItemState.MISSING)
@@ -6947,18 +6945,12 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
 
 @dataclass
 class _MinimalBoardSource:
-    """The smallest real `forge.BoardSource` -- every read empty, `capability`
-    and the dependency fetch injectable -- for tests that exercise exactly
-    one of `board_read.load_board_config`/`board_read.fetch_dependencies` in isolation."""
+    """The smallest real `forge.BoardSource`, every read empty, for `fetch_dependencies` tests."""
 
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     requests: int = 0
-    capability_result: forge.Capability = forge.Capability.READ_ONLY
+    lists_pull_requests: bool = True
     dependencies_fetcher: Callable[[int], tuple[IssueDependency, ...]] = lambda _number: ()
-
-    def capability(self, operation: forge.ForgeOperation) -> forge.Capability:
-        del operation
-        return self.capability_result
 
     def list_open_board_issues(self) -> tuple[Issue, ...]:
         return ()
@@ -6978,16 +6970,6 @@ class _MinimalBoardSource:
     def list_children(self, number: int) -> tuple[ChildItem, ...]:
         del number
         return ()
-
-
-def test_load_board_config_refuses_a_block_pin_the_forge_cannot_support(tmp_path: Path) -> None:
-    write_repository_config(tmp_path, 'body_contract = "block"\n')
-
-    client = _MinimalBoardSource(capability_result=forge.Capability.UNSUPPORTED)
-    context = session.run_context(None)
-
-    with pytest.raises(ClaimError, match="list_board_dependencies"):
-        board_read.load_board_config(client, context)
 
 
 def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
@@ -16683,20 +16665,33 @@ def test_item_edit_json_reports_the_item_and_the_field(
 
 
 @_ITEM_FIELD_EDIT_CASES
+@pytest.mark.parametrize(
+    ("reference", "sentence"),
+    [
+        (forge.ItemReference(forge.ItemState.MISSING), f"#{RULE_ITEM} does not exist"),
+        (
+            forge.ItemReference(forge.ItemState.OPEN, "T", block_body(MINIMAL_BLOCK_TOML), True),
+            f"#{RULE_ITEM} is a pull request, not an issue; {{command}} needs an issue",
+        ),
+    ],
+)
 def test_item_edit_refuses_through_the_shared_precondition_failed_envelope(
     case: _ItemFieldEdit,
+    reference: forge.ItemReference,
+    sentence: str,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """The forge refusing `update_item_body` reports as `precondition_failed`."""
-    client = _client_with_item(monkeypatch, tmp_path, RULE_ITEM, block_body(MINIMAL_BLOCK_TOML))
-    client.capability_overrides[forge.ForgeOperation.UPDATE_ITEM_BODY] = forge.Capability.READ_ONLY
+    """A target `item edit --size`/`--whole` cannot write reports as `precondition_failed`.
+
+    Spec: ITEM-17"""
+    _configured_board_client(monkeypatch, tmp_path).issue_references[RULE_ITEM] = reference
 
     exit_code = _edit_item_field(case, "--json")
 
     captured = capsys.readouterr()
-    refusal = f"this forge cannot update_item_body; item edit {case.flag} by hand"
+    refusal = sentence.format(command=f"item edit {case.flag}")
     assert (exit_code, refusal in captured.err) == (2, True)
     _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 

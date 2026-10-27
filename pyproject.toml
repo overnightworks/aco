@@ -93,7 +93,7 @@ layers = [
 # and CLAIM-31; brief.spec BRIEF-26 cites
 # STAT-19..21 and BRIEF-10 cites STAT-22; item.spec ITEM-32/34 cite CUT-17/28
 # and ITEM-33 cites CUT-29..31;
-# ask.spec ASK-09 cites rule.spec RULE-06..08.
+# ask.spec ASK-09 cites rule.spec RULE-07..08.
 ignore_imports = [
     "aco.cmd_adopt -> aco.cmd_claim",
     "aco.cmd_ask -> aco.cmd_rule",
