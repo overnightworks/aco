@@ -465,6 +465,39 @@ for (const viewport of [
 			await expect(page.locator('.stage')).toBeFocused();
 		});
 
+		test('[ABRD-59] an older window that ends in a refused post, while a newer pick stays pending, leaves focus on the stage', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await page.route('**/api/rule', (route) =>
+				route.fulfill({ status: 503, body: 'Unavailable' })
+			);
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide A:/ })
+				.click();
+			await page.clock.runFor(5000);
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.locator('.tracks').getByTitle(OTHER_QUESTION).click();
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.focus();
+			await page.keyboard.press('Enter');
+			const strips = page.locator('.strip');
+			await expect(strips).toHaveCount(2);
+			await expect(strips.last().getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			await page.keyboard.press('Shift+Tab');
+			await expect(strips.first().getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			await page.clock.runFor((UNDO_SECONDS - 5) * 1000 + 500);
+
+			await expect(strips).toHaveCount(1);
+			await expect(strips.first()).toContainText('B — Browser-Sprung bleibt');
+			// Short timeout: the newer window must still be open when focus is judged.
+			await expect(page.locator('.stage')).toBeFocused({ timeout: 1000 });
+		});
+
 		test('[ABRD-59] a window that ends with focus on Undo leaves focus on the stage, not on the page', async ({
 			page
 		}) => {
@@ -477,10 +510,13 @@ for (const viewport of [
 				.focus();
 			await page.keyboard.press('Enter');
 			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeFocused();
+			const ruled = page.waitForResponse('**/api/rule');
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.locator('.strip')).toHaveCount(0);
 			await expect(page.locator('.stage')).toBeFocused();
+			// The post outlives the strip; let it land before the next test rewrites the rulings.
+			await ruled;
 		});
 
 		test('[ABRD-44] a ruled card inside an open picture dialog leaves the stage focused', async ({
