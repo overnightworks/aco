@@ -78,7 +78,7 @@ class TestRuleOther:
             via,
             OTHER_ANSWER,
         )
-        assert (line["stored_card_hash"], line["card_hash"]) == (GOLDEN_CARD_HASH,) * 2
+        assert (line["stored_card_hash"], line["card_hash"]) == (GOLDEN_CARD_HASH, GOLDEN_CARD_HASH)
 
     def test_the_json_answer_names_other(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
