@@ -1,7 +1,0 @@
-claim_id = "1c918aa9635f48a7b307a5f9aa1ddef3"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "d6df3b719252467ad4df352683499f6428c877d2"
-branch = "claude/issue-482-state-ref-claim-real-worktree"
-scope = ["quality/baseline.toml", "tests/test_state_board.py"]
-opened_commit = "9a1accef7c88ef50812930c9c39731cc1355d0da"
