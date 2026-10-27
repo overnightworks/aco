@@ -148,12 +148,11 @@ def test_a_rescope_reads_a_comma_inside_one_path_literally(
 
     result = run_cli(rescope(*flags), capsys)
 
-    expected = (
+    assert (result.status, result.stdout, result.stderr) == (
         (0, f"RESCOPED issue #72: {before.claim_id}\n", "")
         if case.refusal is None
         else (2, "", f"ERROR: {case.refusal}\n")
     )
-    assert (result.status, result.stdout, result.stderr) == expected
     assert claimed_here(standpoint).scope == case.scope
 
 
