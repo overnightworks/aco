@@ -5,6 +5,7 @@ stores that call."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
@@ -126,6 +127,28 @@ def test_a_null_other_or_unclear_names_nothing_so_the_option_beside_it_decides(
     assert repository.stored_line(12, 1)["ruling"] == "A"
 
 
+@pytest.mark.parametrize(
+    ("answer", "stored_key"),
+    [
+        ({"other": f" {'x' * 280} "}, "other"),
+        ({"unclear": True, "note": f" {'x' * 280} "}, "returned_note"),
+    ],
+    ids=["other", "unclear"],
+)
+def test_an_answer_of_exactly_the_bound_after_trimming_is_accepted(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    listed: dict[str, Any],
+    answer: dict[str, object],
+    stored_key: str,
+) -> None:
+    """ABRD-05, ABRD-42, ABRD-65."""
+    posted = board.post_rule({**listed, **answer})
+
+    assert posted.json() == {"status": "ruled", "message": None}
+    assert repository.stored_line(12, 1)[stored_key] == "x" * 280
+
+
 _ANSWERS = pytest.mark.parametrize(
     "answer", [{"other": _ANSWER}, {"unclear": True}], ids=["other", "unclear"]
 )
@@ -172,14 +195,30 @@ def test_a_post_for_no_option_line_is_refused_as_changed(
 
 @pytest.mark.usefixtures("github_world")
 @pytest.mark.parametrize("text", ["-n first", "a\nb", 'say "hi" ä'])
+@pytest.mark.parametrize(
+    ("answer", "stored"),
+    [
+        (
+            lambda text: {"other": f" {text} "},
+            lambda text: {"ruling": "other", "other": text, "via": "board"},
+        ),
+        (
+            lambda text: {"unclear": True, "note": f" {text} "},
+            lambda text: {"ruling": None, "via": None, "returned_note": text},
+        ),
+    ],
+    ids=["other", "unclear"],
+)
 def test_the_real_aco_rule_stores_what_the_board_sent(
     repository: FakeAcoRepository,
     board: BoardClient,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     text: str,
+    answer: Callable[[str], dict[str, object]],
+    stored: Callable[[str], dict[str, object]],
 ) -> None:
-    """ABRD-64, RULE-15, RULE-21: the board's argv is lawful for the real command."""
+    """ABRD-64, ABRD-70, RULE-15, RULE-21, RULE-22, RULE-23: the argv is lawful for aco."""
     repository.set_rulings(
         row(7, "Karte", option_line(index=2, card_hash=GOLDEN_CARD_HASH, topic="Sprung"))
     )
@@ -190,7 +229,7 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
             "item": 7,
             "line": 2,
             "fingerprint": shown["fingerprint"],
-            "other": f" {text} ",
+            **answer(text),
         }
     )
     [sent] = repository.rule_calls()
@@ -200,5 +239,4 @@ def test_the_real_aco_rule_stores_what_the_board_sent(
 
     assert ruled.status == 0
     entry = body.block_expectation_dicts(body.locate_block(forge.item_bodies[7]).data)[1]
-    assert (entry["ruling"], entry["other"], entry["via"]) == ("other", text, "board")
-    assert "note" not in entry
+    assert {key: entry.get(key) for key in stored(text)} == stored(text)
