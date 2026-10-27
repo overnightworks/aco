@@ -5,16 +5,21 @@ is made from."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from board_fixtures import REPOSITORY, board_issue, complete_contract
 from cli_fixtures import real_git, redirect_toplevel, track_board_config
+from github_fixtures import FakeForge, serve_forge
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
-from aco import protocol
+from aco import cli as issue_claim
+from aco import forge, protocol, store
 
+ISSUE = 72
 LANE_BRANCH = "codex/issue-72-claims"
 
 
@@ -91,6 +96,54 @@ def make_stand_in(
         return Standpoint(directory, head)
 
     return place
+
+
+def serve_item(monkeypatch: pytest.MonkeyPatch, scope: tuple[str, ...]) -> None:
+    body = complete_contract("Build it.", scope=list(scope), whole="The scenario claims it as one.")
+    served = FakeForge(
+        board_issues=(board_issue(ISSUE, "Claims", body),),
+        issue_references={ISSUE: forge.ItemReference(forge.ItemState.OPEN, "Claims", body)},
+    )
+    serve_forge(monkeypatch, served)
+
+
+def claim(
+    *flags: str,
+    scope: tuple[str, ...] = ("src",),
+    agent: str | None = "Codex Sol",
+    issue: int | None = ISSUE,
+) -> int:
+    """`aco claim` as an agent runs it: the item `issue` (none for a lane
+    claim), `agent` (none leaves the identity to the environment) and `scope`."""
+    number = [] if issue is None else [str(issue)]
+    agent_flags = [] if agent is None else ["--agent", agent]
+    scope_flags = [part for path in scope for part in ("--scope", path)]
+    return issue_claim.main(
+        ["--repo", REPOSITORY, "claim", *number, *agent_flags, *scope_flags, *flags]
+    )
+
+
+def standing_claims(standpoint: Standpoint) -> list[protocol.ActiveClaim]:
+    state = store.fetch_state(worktree=standpoint.directory, remote="origin")
+    return list(state.claims.values())
+
+
+def claimed_here(standpoint: Standpoint) -> protocol.ActiveClaim:
+    [claimed] = [
+        held
+        for held in standing_claims(standpoint)
+        if held.identity == protocol.IssueIdentity(ISSUE)
+    ]
+    return claimed
+
+
+def assert_json_refusal_object(err: str, out: str, *, reason: str) -> None:
+    """`--json` refusal (`specs/output.spec.md` OUT-01, OUT-03): stdout holds
+    the object `ok`, `reason`, `message` in that order, its `message` the
+    sentence stderr printed after `ERROR: `."""
+    assert err.startswith("ERROR: ")
+    message = err.removeprefix("ERROR: ").rstrip("\n")
+    assert out == json.dumps({"ok": False, "reason": reason, "message": message}) + "\n"
 
 
 def _commit_trunk(clone: Path, trunk_files: tuple[str, ...]) -> None:
