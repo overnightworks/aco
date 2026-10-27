@@ -8,7 +8,7 @@ proposed `[[expectation]]` line to ruled (or, with `--unclear`, sends an open
 option line back to its head), transcribing the operator's own word (`aco ask` proposes; this command decides). `--via` says how the
 decision reached aco: `board` the operator clicked, `chat` a head transcribes
 his word, `default` he left the card unanswered and its recommendation stands.
-`--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This CLI invocation is the
+`--help` lists every flag here except `--unclear`. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This CLI invocation is the
 one write path for a ruling (`board --serve`'s own
 in-process `POST /rule` form is retired; `aco serve`'s decision board shells out to
 this exact command instead, `specs/serve.spec.md` ABRD-01). This
@@ -113,7 +113,7 @@ the same sentence; RULE-07's sentence is identical for both commands.
 
 ## Never
 
-- `aco rule` never accepts two outcome flags, or none: `--yes`/`--no`/`--later`/`--option`/`--other`/`--unclear` are one mutually exclusive, required group, and `--option`, `--other` and `--unclear` stay out of `--help` and the usage line.
+- `aco rule` never accepts two outcome flags, or none: `--yes`/`--no`/`--later`/`--option`/`--other`/`--unclear` are one mutually exclusive, required group, and `--option`, `--other`, `--via` and `--card-hash` appear in `--help` with a help line each, while `--unclear` stays out of `--help` and the usage line.
 - `aco rule --unclear` never stores `via` or `card_hash`: it decides nothing.
 - `aco rule` never checks who typed `--via`: it records what the writer was told. By operator ruling it is a tripwire for cooperative agents; an agent of the operator's own user that types `--via board` is not stopped, and the forge's edit history is the record after the fact.
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
