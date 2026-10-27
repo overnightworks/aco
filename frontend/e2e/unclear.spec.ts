@@ -127,7 +127,7 @@ for (const viewport of [
 			await expect(noteField(page)).toHaveValue(NOTE);
 		});
 
-		test('[ABRD-75, ABRD-76] after the window the stage moves to the next open card, and the sent card lists with its head', async ({
+		test('[ABRD-75, ABRD-76] after the window the stage moves to the next open card, and the sent card lists with its head, and selecting it again leaves the stage alone', async ({
 			page
 		}) => {
 			arrange(readBoardRuntime().repoDirectory, true);

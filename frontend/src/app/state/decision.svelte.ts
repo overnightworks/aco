@@ -236,9 +236,9 @@ export class DecisionStore {
 	}
 
 	#dropDrafts(key: string, kinds: EscapeKind[]): void {
-		const dropped = kinds.map((kind) => draftKey(key, kind));
+		const dropped = new Set(kinds.map((kind) => draftKey(key, kind)));
 		this.#drafts = Object.fromEntries(
-			Object.entries(this.#drafts).filter(([draft]) => !dropped.includes(draft))
+			Object.entries(this.#drafts).filter(([draft]) => !dropped.has(draft))
 		);
 	}
 }
