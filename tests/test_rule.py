@@ -591,7 +591,7 @@ def test_context_refusal(
     [
         pytest.param(
             ["rule", "90", "--line", "1"],
-            "aco rule: error: one of the arguments --yes --no --later is required",
+            "aco rule: error: one of the arguments --yes --no --later --option --other is required",
             id="no-outcome",
         ),
         pytest.param(
@@ -648,10 +648,17 @@ def test_parser_refusal(
     assert observed == {"code": 2, "sentence": sentence, "usage": usage, "stdout": ""}
 
 
-def test_legacy_refusal_usage_names_no_option_flag(capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: Never 1 — the yes/no refusal usage stays byte-identical, naming no option flag."""
+def test_usage_and_help_name_the_chat_transcription_flags_but_not_unclear(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: Never 1 — usage and --help name the four chat flags and keep --unclear hidden."""
     with pytest.raises(SystemExit):
         cli.main(["rule", "90", "--line", "1"])
     usage_text = capsys.readouterr().err
-    hidden = ("--option", "--other", "--unclear", "--via", "--card-hash")
-    assert [flag in usage_text for flag in hidden] == [False] * len(hidden)
+    with pytest.raises(SystemExit):
+        cli.main(["rule", "--help"])
+    help_text = capsys.readouterr().out
+    shown = ("--option", "--other", "--via", "--card-hash")
+    assert [flag in usage_text for flag in ("--option", "--other")] == [True, True]
+    assert [flag in help_text for flag in shown] == [True] * len(shown)
+    assert "--unclear" not in usage_text + help_text
