@@ -1,6 +1,6 @@
 """`aco rule --other` through the real CLI: it decides an open option line with
-the operator's own answer, stores it verbatim, and refuses every misuse
-before any write (RULE-20, RULE-21, BODY-91, BODY-92, RUL-16)."""
+the operator's own answer, stores it verbatim, keeps a later write
+byte-identical and stands (RULE-20, RULE-04, BODY-92, BODY-87, RUL-16)."""
 
 from __future__ import annotations
 

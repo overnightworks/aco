@@ -316,12 +316,12 @@ class TestRuleOption:
             pytest.param(
                 other_arguments("   "),
                 "--other needs a non-empty answer",
-                id="other-blank",
+                id="RULE-21-blank",
             ),
             pytest.param(
                 other_arguments("\n"),
                 "--other needs a non-empty answer",
-                id="other-lone-newline",
+                id="RULE-21-lone-newline",
             ),
         ],
     )
@@ -332,7 +332,7 @@ class TestRuleOption:
         arguments: list[str],
         message: str,
     ) -> None:
-        """Spec: RULE-15, RULE-09 -- an item no forge knows would refuse RULE-07 if reached."""
+        """Spec: RULE-15, RULE-21, RULE-09 -- an item no forge knows refuses RULE-07 if reached."""
         client = serve_forge(monkeypatch, FakeForge())
         command = ["rule", "7", *arguments]
         text = run_cli(command, capsys)
