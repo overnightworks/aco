@@ -3,6 +3,6 @@ agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
 role = "builder"
 base = "03d69226e0f449411d8d158b71811bffc1e2b4ca"
 branch = "claude/issue-455-next-with-head"
-scope = ["specs/next.spec.md", "src/aco/cmd_next.py", "src/aco/expectations.py", "tests/test_cmd_next_with_head.py"]
+scope = ["quality/baseline.toml", "specs/next.spec.md", "src/aco/cmd_next.py", "src/aco/expectations.py", "tests/test_cli.py", "tests/test_cmd_next_with_head.py"]
 opened_commit = "785e1ae6a24fa873df4c12ecc5744c629b57dba6"
 whole_reason = "One public output: the command, the helper that reads returned lines, its spec criterion and its tests change together."
