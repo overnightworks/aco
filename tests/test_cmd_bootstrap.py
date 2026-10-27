@@ -15,7 +15,7 @@ from cli_fixtures import (
 )
 from store_fixtures import claim_intent, state_ref_listing, state_ref_tip
 
-from aco import protocol, store
+from aco import lineage_stamp, protocol, store
 
 BOOTSTRAP_REPOSITORY = "example/agent-coordination"
 
@@ -226,7 +226,7 @@ def test_bootstrap_refuses_on_stderr_alone_when_its_lineage_stamp_cannot_be_writ
     def failing_stamp(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr(store, "_write_lineage_stamp", failing_stamp)
+    monkeypatch.setattr(lineage_stamp, "advance", failing_stamp)
 
     refused = run_cli(["bootstrap"], capsys)
 

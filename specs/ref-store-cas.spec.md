@@ -30,6 +30,9 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | a sent push whose outcome the store cannot tell | CAS-56 | CAS-56 | — |
 | a rejected push re-read without its `operation_id`, then refused | — | CAS-57 | — |
 | worktree stamp not an ancestor of the fetched tip | — | — | CAS-11 |
+| writer in the same worktree stamps inside a fetch's window | — | CAS-75, CAS-76 | CAS-75 |
+| a landed push finds the stamp diverged | — | CAS-76 | — |
+| reset clears while a fetch or write holds the lock | — | — | CAS-77 |
 | ref previously observed, now absent | CAS-12 | CAS-12 | CAS-12 |
 | `schema.toml` malformed or unsupported | — | — | CAS-22..26, CAS-74 |
 | a subtree malformed | — | — | CAS-27..33 |
@@ -79,7 +82,10 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 - [ ] [CAS-11] A fetched tip that is not a descendant of this worktree's own stamp refuses `refs/aco/state moved from <old> to <new> without <old> as an ancestor of the new tip; the ref may have been rewritten`.
 - [ ] [CAS-48] A lineage check that cannot run refuses `cannot check whether <old> is an ancestor of <new>: <detail>`, never "the ref may have been rewritten" (see E-CAS-07).
 - [ ] [CAS-12] A worktree that observed the ref, then fetches again after it was deleted, refuses `refs/aco/state was previously observed at <old> but is now absent; the ref may have been deleted`.
-- [ ] [CAS-49] A `land` claim observation, or `reset`, reads the remote's current tip directly, without touching this worktree's own anchor or lineage stamp; only a fetch that advances local state moves them.
+- [ ] [CAS-49] A `land` claim observation, or `reset`, reads the remote's tip directly and moves neither this worktree's anchor nor its stamp; a fetch moves both, a landed write only the stamp (CAS-76).
+- [ ] [CAS-75] A fetch's probe, fetch, lineage check and stamp run as one step per worktree under an exclusive lock beside the stamp; a peek never takes it.
+- [ ] [CAS-76] Under CAS-75's lock a writer's stamp after a landed push writes a missing stamp, advances to a descendant, keeps one already past it, else refuses as CAS-56 with CAS-11's sentence.
+- [ ] [CAS-77] Reset's clear (CAS-44) removes each worktree's stamp and anchor while holding that worktree's CAS-75 lock.
 
 ## The compare-and-swap transition and its retries
 
@@ -196,7 +202,7 @@ cannot read needs `--force-unreadable` besides (`specs/reset.spec.md`).
 - A worktree's own lineage stamp and fetch anchor are never shared with another linked worktree of the same checkout: each has its own git-dir.
 - A malformed fetched tree is never partially trusted: the whole read fails loud (CAS-22..38), never a single quarantined claim or resource; a malformed item file alone is refused only by its own read (`specs/item.spec.md` ITEM-38) and the writes `specs/storage-pin.spec.md` PIN-29 names, every board read lists it (`specs/board.spec.md` BOARD-54), and ITEM-42 alone reads its still-valid `record.title`.
 - No state-store fetch ever lands a tag or `FETCH_HEAD` or starts git maintenance: each carries `--no-tags --no-write-fetch-head --no-auto-maintenance`, and `--refmap=` sets aside the remote's configured fetch refspecs, so it writes only objects and the ref its own refspec names, and never repacks the object store linked worktrees share under another agent's concurrent object write.
-- A read that does not advance local state (CAS-49) never writes this worktree's fetch anchor or lineage stamp; only an anchoring fetch (CAS-07) moves `refs/worktree/aco/state` and that stamp.
+- A read that does not advance local state (CAS-49) never writes this worktree's fetch anchor or lineage stamp; only an anchoring fetch (CAS-07) moves the anchor, and only such a fetch or this worktree's own landed write (CAS-76) moves the stamp. Writers never move the anchor.
 
 ## Examples
 

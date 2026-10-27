@@ -50,7 +50,7 @@ from store_fixtures import (
 )
 
 from aco import cli as issue_claim
-from aco import github, process, protocol, store
+from aco import github, lineage_stamp, process, protocol, store
 
 # Syntactically valid but locally unresolvable object ids, for tests that
 # exercise a failure path where the actual value never reaches an assertion.
@@ -399,7 +399,7 @@ def test_peek_state_reads_the_current_tip_without_touching_the_anchor_or_lineage
     first_tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     store.fetch_state(worktree=worktree, remote=str(bare_remote))
     anchor_before = real_git(worktree, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip()
-    stamp_before = store._read_lineage_stamp(worktree)
+    stamp_before = lineage_stamp.read(store._stamp_directory(worktree))
     assert (anchor_before, stamp_before) == (first_tip, first_tip)
     tree = real_git(worktree, "rev-parse", f"{first_tip}^{{tree}}").stdout.strip()
     second_tip = real_git(
@@ -411,7 +411,7 @@ def test_peek_state_reads_the_current_tip_without_touching_the_anchor_or_lineage
 
     assert state.tip == second_tip
     assert real_git(worktree, "rev-parse", store._FETCH_ANCHOR_REF).stdout.strip() == anchor_before
-    assert store._read_lineage_stamp(worktree) == stamp_before
+    assert lineage_stamp.read(store._stamp_directory(worktree)) == stamp_before
 
 
 def test_peek_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
@@ -515,7 +515,7 @@ def test_peeking_a_remote_without_a_state_ref_reads_the_empty_state_and_writes_n
 
     assert observed == protocol.EMPTY_STATE
     assert real_git(worktree, "for-each-ref").stdout == refs_before
-    assert store._read_lineage_stamp(worktree) is None
+    assert lineage_stamp.read(store._stamp_directory(worktree)) is None
     assert not fetch_head.exists()
 
 
@@ -633,7 +633,7 @@ def test_fetch_state_rejects_schema_version_one_without_stamping_its_lineage(
     ):
         store.fetch_state(worktree=worktree, remote=str(bare_remote))
 
-    assert store._read_lineage_stamp(worktree) is None
+    assert lineage_stamp.read(store._stamp_directory(worktree)) is None
 
 
 def test_fetch_state_rejects_a_tree_missing_schema_toml(bare_remote: Path, worktree: Path) -> None:
@@ -1046,7 +1046,7 @@ def test_lineage_check_fails_loud_when_merge_base_cannot_be_read_at_all(
     failure, not a lineage fact, and must refuse CAS-48's exact sentence,
     never "the ref may have been rewritten"."""
     tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    store._write_lineage_stamp(worktree, _UNRESOLVABLE_OBJECT_ID)
+    lineage_stamp.write(store._stamp_directory(worktree), _UNRESOLVABLE_OBJECT_ID)
     assert tip != _UNRESOLVABLE_OBJECT_ID
     real_run_captured = process.run_captured
 
@@ -1252,7 +1252,7 @@ def _fail_the_lineage_stamp(monkeypatch: pytest.MonkeyPatch) -> None:
     def failing_stamp(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr(store, "_write_lineage_stamp", failing_stamp)
+    monkeypatch.setattr(lineage_stamp, "advance", failing_stamp)
 
 
 @pytest.mark.parametrize(
@@ -1728,22 +1728,6 @@ def test_parse_state_tree_fails_loud_when_a_blob_is_missing_from_the_object_data
 
     with pytest.raises(protocol.MalformedStateTreeError, match="cannot read the state tree"):
         store._parse_state_tree(worktree, commit_oid)
-
-
-def test_write_lineage_stamp_cleans_up_its_temp_file_on_failure(
-    monkeypatch: pytest.MonkeyPatch, worktree: Path
-) -> None:
-    def fail_replace(*_args: object, **_kwargs: object) -> None:
-        raise OSError("simulated replace failure")
-
-    monkeypatch.setattr(store.os, "replace", fail_replace)
-    tip = protocol.ObjectId("a" * 40)
-
-    with pytest.raises(OSError, match="simulated replace failure"):
-        store._write_lineage_stamp(worktree, tip)
-
-    stamp_directory = store._git_dir(worktree) / "aco"
-    assert list(stamp_directory.glob(".last-oid-*")) == []
 
 
 @pytest.mark.parametrize(
@@ -3655,7 +3639,7 @@ def test_fetch_state_git_call_count_is_independent_of_claim_count(
     assert dict(git_call_spy) == {
         "ls-remote": 1,
         "fetch": 1,
-        "rev-parse": 4,
+        "rev-parse": 3,
         "ls-tree": 1,
         "archive": 1,
     }
@@ -3689,7 +3673,7 @@ def test_fetch_state_populates_items_from_the_one_existing_ls_tree_call(
     assert dict(git_call_spy) == {
         "ls-remote": 1,
         "fetch": 1,
-        "rev-parse": 4,
+        "rev-parse": 3,
         "ls-tree": 1,
         "archive": 1,
     }
@@ -3723,7 +3707,7 @@ def test_status_git_call_count_is_independent_of_claim_count(
     assert dict(git_call_spy) == {
         "ls-remote": 1,
         "fetch": 1,
-        "rev-parse": 4,
+        "rev-parse": 3,
         "ls-tree": 1,
         "archive": 1,
         "log": 1,
@@ -3797,7 +3781,7 @@ def test_commit_transition_git_call_count_is_independent_of_claim_count(
     assert git_call_spy["hash-object"] == expected_hash_object
     assert git_call_spy["mktree"] == expected_mktree
     assert git_call_spy["commit-tree"] == 1
-    assert git_call_spy["merge-base"] == 0
+    assert git_call_spy["merge-base"] == 1  # the writer's stamp step asks ancestry once (CAS-76)
 
 
 def test_commit_transition_reuses_an_unchanged_claims_blob_byte_for_byte(
@@ -5415,14 +5399,14 @@ def test_clear_lineage_stamps_clears_every_worktrees_stamp_and_anchor(
     store.fetch_state(worktree=worktree, remote=str(bare_remote))
     store.fetch_state(worktree=linked, remote=str(bare_remote))
     for worktree_path in (worktree, linked):
-        assert store._read_lineage_stamp(worktree_path) is not None
+        assert lineage_stamp.read(store._stamp_directory(worktree_path)) is not None
         assert _has_ref(worktree_path, store._FETCH_ANCHOR_REF)
 
     cleared = store.clear_lineage_stamps(worktree=worktree)
 
     assert set(cleared) == {worktree, linked}
     for worktree_path in (worktree, linked):
-        assert store._read_lineage_stamp(worktree_path) is None
+        assert lineage_stamp.read(store._stamp_directory(worktree_path)) is None
         assert not _has_ref(worktree_path, store._FETCH_ANCHOR_REF)
 
 

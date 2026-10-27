@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 from cli_fixtures import fresh_observation, real_git
 
-from aco import protocol, store
+from aco import lineage_stamp, protocol, store
 
 TIP = protocol.ObjectId("a" * 40)
 CLAIM_BASE = protocol.ObjectId("c" * 40)
@@ -84,7 +84,7 @@ def lineage_observation(repository: Path) -> tuple[protocol.ObjectId | None, str
     """This worktree's lineage stamp and fetch anchor -- the two
     per-worktree values a reset dry run, a live-claim refusal, or a failed
     export must leave byte-identical to whatever `fetch_state` last wrote."""
-    stamp = store._read_lineage_stamp(repository)
+    stamp = lineage_stamp.read(store._stamp_directory(repository))
     anchor = store._run_git(repository, ["rev-parse", store._FETCH_ANCHOR_REF])
     return stamp, anchor.stdout.decode().strip() if anchor.exit_status == 0 else None
 

@@ -83,6 +83,7 @@ layers = [
     "metrics | expectation_grammar",
     "card_rules",
     "usage",
+    "lineage_stamp",
     "protocol | process | board",
 ]
 # `metrics` sits below `body` so the body-block codec can reach `metrics.Size` for its own

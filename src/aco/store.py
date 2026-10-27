@@ -6,7 +6,7 @@ local (`rev-parse`, `ls-files`, `status`, `branch`). This module's owner is
 repository-global state: a remote compare-and-swap ref, reached through
 `ls-remote`, its own per-worktree anchor ref, plumbing, push, and retry.
 Folding the two would let a worktree-local module own repository-global
-state -- exactly the linked-worktree stamp collision `_lineage_stamp_path`
+state -- exactly the linked-worktree stamp collision `_stamp_directory`
 exists to avoid.
 
 `cmd_bootstrap` and `cmd_reset` call `bootstrap`; `session` calls
@@ -37,7 +37,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Protocol, TypeVar
 
-from . import metrics, process
+from . import lineage_stamp, metrics, process
 from .protocol import (
     CLAIM_ID_PATTERN,
     EMPTY_STATE,
@@ -162,7 +162,7 @@ _CLAIM_SHAPED_LABELS: frozenset[str] = frozenset(
 _LS_REMOTE_EXIT_NO_MATCH = 2
 
 # `git merge-base --is-ancestor` (git(1)): exit 1 is the one documented "not
-# an ancestor" outcome `_check_lineage` reads as a rewritten ref. Any other
+# an ancestor" outcome `_is_ancestor` reads as a rewritten ref. Any other
 # nonzero exit -- 128 when `previous` or `tip` cannot be read, a pruned
 # object among them -- is a git failure, not a lineage fact, and must fail
 # loud with its own detail instead.
@@ -179,7 +179,6 @@ _MAX_BOOTSTRAP_ATTEMPTS = 8
 _MAX_TRANSITION_ATTEMPTS = 32
 
 _LINEAGE_STAMP_DIRECTORY = "aco"
-_LINEAGE_STAMP_FILENAME = "last-oid"
 
 # The options every state-store fetch carries, so a fetch writes only objects
 # and the ref its own refspec names. `--no-tags` and `--no-write-fetch-head`
@@ -210,13 +209,13 @@ _STATE_FETCH_OPTIONS = (
 #   fetch out of that shared file in turn (`aco
 #   rescope` once read a fixer agent's own concurrent `git fetch origin`
 #   as the state tip because both shared this worktree's `FETCH_HEAD`).
-#   The fetch itself lands the anchor in one atomic git ref update, but
-#   the read-back that follows, the lineage check against this worktree's
-#   stamp, and the stamp write are three separate steps: two concurrent
-#   `aco` processes in this same worktree are not serialised across them.
+#   The fetch itself lands the anchor in one atomic git ref update; the
+#   read-back, the lineage check and the stamp write that follow run under
+#   the worktree's stamp lock (CAS-75), so no concurrent `aco` process in
+#   this worktree interleaves with them.
 # `refs/worktree/*` is git's own per-worktree ref namespace (never shared
 # across linked worktrees), the same worktree-private guarantee
-# `_lineage_stamp_path` already relies on, so anchoring here never touches
+# `_stamp_directory` already relies on, so anchoring here never touches
 # the shared local namespace `STATE_REF` reserves. `fetch_state`'s own
 # anchoring is the sole production writer and reader of this name --
 # `export_state_bundle` below has its own, separate ref in the same private
@@ -325,57 +324,41 @@ def _git_dir(worktree: Path) -> Path:
     return Path(result.stdout.decode().strip())
 
 
-def _lineage_stamp_path(worktree: Path) -> Path:
-    return _git_dir(worktree) / _LINEAGE_STAMP_DIRECTORY / _LINEAGE_STAMP_FILENAME
+def _stamp_directory(worktree: Path) -> Path:
+    return _git_dir(worktree) / _LINEAGE_STAMP_DIRECTORY
 
 
-def _read_lineage_stamp(worktree: Path) -> ObjectId | None:
-    try:
-        content = _lineage_stamp_path(worktree).read_text().strip()
-    except FileNotFoundError:
-        return None
-    return ObjectId(content) if content else None
+def _is_ancestor(worktree: Path) -> lineage_stamp.IsAncestor:
+    """The ancestry predicate `lineage_stamp` judges with: `merge-base
+    --is-ancestor`, whose exit `1` is the one documented "no" (CAS-11); any
+    other nonzero exit is a git failure (CAS-48)."""
+
+    def is_ancestor(ancestor: ObjectId, descendant: ObjectId) -> bool:
+        result = _run_git(worktree, ["merge-base", "--is-ancestor", str(ancestor), str(descendant)])
+        if result.exit_status == _MERGE_BASE_EXIT_NOT_ANCESTOR:
+            return False
+        if result.exit_status != 0:
+            detail = process.git_failure_detail_from_stderr(result)
+            raise ClaimError(
+                f"cannot check whether {ancestor} is an ancestor of {descendant}: {detail}"
+            )
+        return True
+
+    return is_ancestor
 
 
-def _write_lineage_stamp(worktree: Path, tip: ObjectId) -> None:
-    """Record this worktree's last-observed tip via temp file + `os.replace`.
-
-    The write is local to this worktree's own git-dir, so two linked
-    worktrees fetching concurrently write two distinct files and never race
-    each other's stamp.
-    """
-    stamp_path = _lineage_stamp_path(worktree)
-    stamp_path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temp_name = tempfile.mkstemp(dir=stamp_path.parent, prefix=".last-oid-")
-    try:
-        with os.fdopen(descriptor, "w") as handle:
-            handle.write(f"{tip}\n")
-        os.replace(temp_name, stamp_path)
-    except BaseException:
-        with suppress(OSError):
-            os.remove(temp_name)
-        raise
+def _lineage_break(previous: ObjectId, tip: ObjectId) -> StateLineageError:
+    return StateLineageError(
+        f"{STATE_REF} moved from {previous} to {tip} without {previous} as an "
+        "ancestor of the new tip; the ref may have been rewritten"
+    )
 
 
-def _check_lineage(worktree: Path, tip: ObjectId) -> None:
-    """Refuse a fetched tip this worktree's own history cannot reach.
-
-    Cannot see: a rewrite that branched before this worktree's first fetch,
-    or one this worktree has simply never observed before -- a missing stamp
-    is silently accepted as a first observation, not a lineage break.
-    """
-    previous = _read_lineage_stamp(worktree)
-    if previous is None or previous == tip:
-        return
-    result = _run_git(worktree, ["merge-base", "--is-ancestor", str(previous), str(tip)])
-    if result.exit_status == _MERGE_BASE_EXIT_NOT_ANCESTOR:
-        raise StateLineageError(
-            f"{STATE_REF} moved from {previous} to {tip} without {previous} as an "
-            "ancestor of the new tip; the ref may have been rewritten"
-        )
-    if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
-        raise ClaimError(f"cannot check whether {previous} is an ancestor of {tip}: {detail}")
+def _stamp_after_landing(worktree: Path, commit: ObjectId) -> None:
+    """A writer's stamp once its push landed `commit` (CAS-76)."""
+    verdict = lineage_stamp.advance(_stamp_directory(worktree), commit, _is_ancestor(worktree))
+    if isinstance(verdict, lineage_stamp.Diverged):
+        raise _lineage_break(verdict.previous, commit)
 
 
 # Field separator for the batched `git log` read below: %x09 is git's own
@@ -1091,19 +1074,22 @@ def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
     lineage-checked against this worktree's own last observation, and
     re-stamped.
     """
-    probed = _ls_remote_state(worktree, remote)
-    if probed is None:
-        stamp = _read_lineage_stamp(worktree)
-        if stamp is not None:
-            raise StateLineageError(
-                f"{STATE_REF} was previously observed at {stamp} but is now absent; "
-                "the ref may have been deleted"
-            )
-        return EMPTY_STATE
-    tip = _fetch_into_anchor(worktree, remote)
-    state = _parse_state_tree(worktree, tip)
-    _check_lineage(worktree, tip)
-    _write_lineage_stamp(worktree, tip)
+    stamp_directory = _stamp_directory(worktree)
+    with lineage_stamp.locked(stamp_directory):
+        probed = _ls_remote_state(worktree, remote)
+        if probed is None:
+            stamp = lineage_stamp.read(stamp_directory)
+            if stamp is not None:
+                raise StateLineageError(
+                    f"{STATE_REF} was previously observed at {stamp} but is now absent; "
+                    "the ref may have been deleted"
+                )
+            return EMPTY_STATE
+        tip = _fetch_into_anchor(worktree, remote)
+        state = _parse_state_tree(worktree, tip)
+        verdict = lineage_stamp.check_and_stamp(stamp_directory, tip, _is_ancestor(worktree))
+    if isinstance(verdict, lineage_stamp.Diverged):
+        raise _lineage_break(verdict.previous, tip)
     return state
 
 
@@ -1125,7 +1111,7 @@ def peek_state(*, worktree: Path, remote: str) -> ClaimState:
     shared local `refs/tags/*` namespace during this read.
 
     `reset` reads this way, through `peek_state_for_reset`, to recover from
-    exactly what `_check_lineage` refuses -- a rewritten or deleted ref this
+    exactly what `fetch_state`'s lineage check refuses -- a rewritten or deleted ref this
     worktree's own stamp disagrees with -- so it reads and acts on whatever
     tip is on `remote` right now, never against this worktree's history.
     `land`'s preflight uses it to observe a live claim before its first
@@ -1134,7 +1120,7 @@ def peek_state(*, worktree: Path, remote: str) -> ClaimState:
     callers share the same requirement -- a dry run, a live-claim refusal, a
     failed export, or a refused merge must change nothing durable -- so this
     performs no per-worktree write at all: no anchor write, no
-    `_write_lineage_stamp`, no local tag, no `FETCH_HEAD`. `fetch_state`
+    `lineage_stamp` write, no local tag, no `FETCH_HEAD`. `fetch_state`
     stays the write-capable read every live transition (`claim`, `release`,
     ...) still needs, since those callers go on to write and must keep this
     worktree's own lineage current.
@@ -1652,7 +1638,7 @@ def _pushed(
                 operation_id=operation_id,
             )
             return _Rejection(refreshed, already_applied=bool(found))
-        _write_lineage_stamp(worktree, new_commit)
+        _stamp_after_landing(worktree, new_commit)
     return None
 
 
@@ -1762,7 +1748,7 @@ def bootstrap(
                 if (tip := fetch_state(worktree=worktree, remote=remote).tip) is not None:
                     return tip
                 continue
-            _write_lineage_stamp(worktree, creation_commit)
+            _stamp_after_landing(worktree, creation_commit)
             return creation_commit
     raise _retry_exhaustion_error(
         remote=remote,
@@ -1861,7 +1847,7 @@ def _write_and_publish_bundle(
     `export_state_bundle`'s step 1 of 5.
 
     Publishes atomically: the bundle is written in full to `temporary` first
-    (`tempfile.mkstemp`, the same idiom `_write_lineage_stamp` uses), then
+    (`tempfile.mkstemp`, the same idiom `lineage_stamp` uses), then
     linked into place with `os.link`, whose no-clobber semantics are this
     function's `destination`-already-exists check -- a reader can never
     observe a half-written or empty `destination`, because nothing is ever
@@ -2086,7 +2072,7 @@ def clear_lineage_stamps(*, worktree: Path) -> tuple[Path, ...]:
     nothing.
 
     Both must go in every worktree, not just this one: `fetch_state`'s own
-    lineage guard (`_check_lineage` above) refuses a fresh bootstrap tip as
+    lineage guard (`fetch_state` above) refuses a fresh bootstrap tip as
     unrelated to whatever a worktree last observed, and a stale anchor keeps
     the old, now-orphaned objects reachable there for a later `git gc` to
     spare and a later fetch to see as a second, disconnected line of
@@ -2094,8 +2080,10 @@ def clear_lineage_stamps(*, worktree: Path) -> tuple[Path, ...]:
     """
     worktrees = list_worktrees(worktree)
     for path in worktrees:
-        _lineage_stamp_path(path).unlink(missing_ok=True)
-        result = _run_git(path, ["update-ref", "-d", _FETCH_ANCHOR_REF])
+        stamp_directory = _stamp_directory(path)
+        with lineage_stamp.locked(stamp_directory):
+            lineage_stamp.remove(stamp_directory)
+            result = _run_git(path, ["update-ref", "-d", _FETCH_ANCHOR_REF])
         if result.exit_status != 0:
             detail = process.git_failure_detail_from_stderr(result)
             raise ClaimError(f"cannot clear {_FETCH_ANCHOR_REF} in {path}: {detail}")
