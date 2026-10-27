@@ -102,15 +102,24 @@ REFUSALS = [
         id="a-directory-beside-its-child",
     ),
     pytest.param(
-        Refusal(WidthCase(Command.CLAIM, ("docs",), body=CUT_BODY)),
+        Refusal(
+            WidthCase(Command.CLAIM, ("docs",), body=CUT_BODY),
+            wide("1 directory in scope (docs)"),
+        ),
         id="a-directory-of-a-cut-item",
     ),
     pytest.param(
-        Refusal(WidthCase(Command.CLAIM, ("docs",), body=UNCUT_BODY)),
+        Refusal(
+            WidthCase(Command.CLAIM, ("docs",), body=UNCUT_BODY),
+            wide("1 directory in scope (docs)"),
+        ),
         id="a-directory-under-a-schnitt-heading-without-a-slice",
     ),
     pytest.param(
-        Refusal(WidthCase(Command.CLAIM, ("docs",), trunk=SMALL_TREE_WITH_TWO_DOCS, body=CUT_BODY)),
+        Refusal(
+            WidthCase(Command.CLAIM, ("docs",), trunk=SMALL_TREE_WITH_TWO_DOCS, body=CUT_BODY),
+            wide("1 directory in scope (docs)"),
+        ),
         id="a-directory-of-a-cut-item-holding-a-high-share",
     ),
     pytest.param(Refusal(WidthCase(Command.LANE, ("docs",)), None), id="a-directory-in-lane-mode"),
