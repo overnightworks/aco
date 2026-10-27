@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
-import stat
 import sys
 from dataclasses import dataclass
 from enum import StrEnum
@@ -41,31 +39,11 @@ def _body_shape_defects(
     return body.body_shape_check(raw_body, storage=storage).defects
 
 
-def _stdin_file_mode() -> int | None:
-    """The type bits of the descriptor on stdin, told without reading, since
-    an idle pipe or socket a harness holds open would block a read forever;
-    `None` for a closed stdin."""
-    try:
-        return os.fstat(sys.stdin.fileno()).st_mode
-    except (AttributeError, OSError, ValueError):
-        return None
-
-
-def _stdin_carries_a_body() -> bool:
-    """Whether stdin carries a body a command reads:
-    a redirected file (`< body.md`) or a pipe
-    (`printf ... |`). A socket -- what Claude Code's Bash tool hands a
-    command -- a terminal, `/dev/null` or a closed stdin carry none, so the
-    command never waits on an idle harness stdin."""
-    mode = _stdin_file_mode()
-    return mode is not None and (stat.S_ISREG(mode) or stat.S_ISFIFO(mode))
-
-
 def _refuse_a_body_on_stdin(command: str) -> None:
     """Refuses, before any write, a body `command` would otherwise drop
     unread: it reads no stdin, so a file or pipe there carrying
-    one (`_stdin_carries_a_body`) is a mistake the person must see."""
-    if _stdin_carries_a_body():
+    one (`report.stdin_carries_a_body`) is a mistake the person must see."""
+    if report.stdin_carries_a_body():
         raise protocol.ClaimUnavailableError(f"{command} reads no stdin; drop the redirect")
 
 
@@ -144,8 +122,8 @@ class _ItemBodyInvalidError(protocol.ClaimError):
 
 def _read_item_new_input() -> str:
     """`item new`'s piped body under either storage, or `""` when stdin
-    carries none (`_stdin_carries_a_body`)."""
-    return report.read_piped_body() if _stdin_carries_a_body() else ""
+    carries none (`report.stdin_carries_a_body`)."""
+    return report.read_piped_body() if report.stdin_carries_a_body() else ""
 
 
 def _item_new_block_fields(parsed: argparse.Namespace) -> dict[str, object]:
@@ -368,10 +346,10 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
 
 def _read_item_edit_body(number: int) -> str:
     """`item edit`'s new body, read only when stdin carries one
-    (`_stdin_carries_a_body`): an idle socket, a terminal,
+    (`report.stdin_carries_a_body`): an idle socket, a terminal,
     `/dev/null` or a closed stdin refuses at once, naming the redirect,
     rather than hanging on a read or replacing the body with nothing."""
-    if not _stdin_carries_a_body():
+    if not report.stdin_carries_a_body():
         item_id = items.format_item_id(number)
         raise protocol.ClaimUnavailableError(
             f"item edit {item_id} needs the new body on stdin: aco item edit {item_id} < body.md"
