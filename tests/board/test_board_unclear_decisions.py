@@ -5,7 +5,7 @@ post's shape and refusals, the exact `aco rule --unclear` it runs, and that real
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from aco_board_fixtures import (
@@ -39,7 +39,8 @@ def listed(repository: FakeAcoRepository, board: BoardClient) -> dict[str, Any]:
 
 
 def _first_listed_line(board: BoardClient) -> dict[str, Any]:
-    return board.get_board_json().json()["repos"][0]["items"][0]["lines"][0]
+    shown_repos = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+    return shown_repos[0]["items"][0]["lines"][0]
 
 
 def test_an_unclear_post_leaves_the_line_open_with_its_head_and_the_trimmed_note(
