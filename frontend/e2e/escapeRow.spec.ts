@@ -1,9 +1,15 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
+import {
+	optionLine,
+	row,
+	writeRulings,
+	type OptionRulingLine,
+	type RulingOption
+} from './rulingsFixture';
 import { decidedList, expectDecidedAnswer } from './decidedView';
 import { readBoardRuntime } from './runtime';
-import { UNDO_SECONDS } from '../src/app/model/decision';
+import { LINE_CHANGED_MESSAGE, UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
 // global-setup.ts); each test overwrites the whole of rulings.json.
@@ -17,6 +23,7 @@ const BOARD_ANSWER_HOW = 'Board · 03.10.2026';
 
 const QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const ANSWER = 'Nur auf dem Desktop offen lassen.';
+const OTHER_QUESTION = 'Welcher Weg für die Altdaten?';
 
 const OPTIONS: RulingOption[] = ['A', 'B'].map((letter) => ({
 	letter,
@@ -30,7 +37,11 @@ const OPTIONS: RulingOption[] = ['A', 'B'].map((letter) => ({
 	contract: 'Der Song bleibt offen.'
 }));
 
-function arrange(directory: string, withHead = false): void {
+function arrange(
+	directory: string,
+	withHead = false,
+	overrides: Partial<OptionRulingLine> = {}
+): void {
 	writeRulings(directory, [
 		row(
 			2002,
@@ -41,7 +52,13 @@ function arrange(directory: string, withHead = false): void {
 				area: 'Song-Seite',
 				topic: 'Sprung',
 				options: OPTIONS,
-				...(withHead ? { returned_on: '2026-10-27', returned_note: 'Warum?' } : {})
+				...(withHead ? { returned_on: '2026-10-27', returned_note: 'Warum?' } : {}),
+				...overrides
+			}),
+			optionLine(2, 'Eine zweite offene Frage.', {
+				question: OTHER_QUESTION,
+				topic: 'Altdaten',
+				options: OPTIONS
 			})
 		)
 	]);
@@ -144,6 +161,50 @@ for (const viewport of [
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			await decidedList(page).getByRole('button').click();
 			await expectDecidedAnswer(page, `Other: „${ANSWER}“`, BOARD_ANSWER_HOW);
+		});
+
+		test('[ABRD-66] the typed answer survives closing the panel and switching cards, per card', async ({
+			page
+		}) => {
+			arrange(readBoardRuntime().repoDirectory);
+			await open(page, phone);
+
+			const other = page.getByRole('button', { name: 'Other…' });
+			await other.click();
+			await answerField(page).fill(ANSWER);
+			await other.click();
+			await expect(answerField(page)).toHaveCount(0);
+			await other.click();
+			await expect(answerField(page)).toHaveValue(ANSWER);
+
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.locator('.tracks').getByTitle(OTHER_QUESTION).click();
+			await page.getByRole('button', { name: 'Other…' }).click();
+			await expect(answerField(page)).toHaveValue('');
+
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.locator('.tracks').getByTitle(QUESTION).click();
+			await expect(answerField(page)).toHaveValue(ANSWER);
+		});
+
+		test('[ABRD-68] a card changed while the panel is open is refused on Send and the answer stays in the draft', async ({
+			page
+		}) => {
+			const { repoDirectory } = readBoardRuntime();
+			arrange(repoDirectory);
+			await open(page, phone);
+
+			await page.getByRole('button', { name: 'Other…' }).click();
+			await answerField(page).fill(ANSWER);
+			arrange(repoDirectory, false, { card_hash: 'card-hash-changed' });
+			await page.getByRole('button', { name: 'Send' }).click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			await expect(page.getByRole('alert')).toHaveText(LINE_CHANGED_MESSAGE);
+			await page.getByRole('button', { name: 'Neu laden' }).click();
+			await expect(page.getByRole('alert')).toHaveCount(0);
+			await page.getByRole('button', { name: 'Other…' }).click();
+			await expect(answerField(page)).toHaveValue(ANSWER);
 		});
 
 		test('[ABRD-69] a card with its head offers Other… too', async ({ page }) => {
