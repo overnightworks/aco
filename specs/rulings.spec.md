@@ -5,7 +5,7 @@
 row and per-line text, its ordering, its `--json` shape, and its empty-board
 sentence. It cites the forge-resolution precondition `specs/board.spec.md`
 owns (BOARD-01/BOARD-02/BOARD-42) rather than restating it, and the
-`RULE-01`/`ASK-01` write paths that fill the lines this command only reads;
+`RULE-01` write path that rules the lines this command only reads;
 `specs/output.spec.md` owns the `--json` envelope itself (OUT-nn: key
 order, `ok`, `message`) that wraps RUL-05's own `rulings` array. `<n>` is an
 item number, `<label>` an item as `specs/landing-grammar.spec.md` prints
@@ -40,8 +40,8 @@ it, `<k>` an expectation line's 1-based index.
 
 - [ ] [RUL-05] `rulings --json` wraps OUT-nn (`reason: "listed"`) around a `rulings` array (see E-RUL-03, E-RUL-05).
 - [ ] [RUL-10] A row is `{"number", "title", "open", "total", "lines"}`; a yes/no line is `{"index", "text", "ruling", "ruled_on", "default"}` (see E-RUL-03).
-- [ ] [RUL-12] An open line has `ruling`/`ruled_on` `null`; a yes/no line's `default` is its proposed outcome (ASK-02) until ruled, an option line's always `null` (see E-RUL-03, E-RUL-05, E-RUL-07).
-- [ ] [RUL-06] A yes/no line's `question`/`example`/`picture` (`aco ask`, ASK-03) each add their own key, present only when that field was given.
+- [ ] [RUL-12] An open line has `ruling`/`ruled_on` `null`; a yes/no line's `default` is its proposed outcome until ruled, an option line's always `null` (see E-RUL-03, E-RUL-05, E-RUL-07).
+- [ ] [RUL-06] A yes/no line's `question`/`example`/`picture` each add their own key, present only when that field was given.
 - [ ] [RUL-13] An option line adds `question` to `reason` and `options`, each option keyed as listed below, its `letter` derived from its position (see E-RUL-07).
 - [ ] [RUL-14] An option line also starts with `"form": "options"`, `"card_hash"` (the card now, BODY-89) and `"stored_card_hash"` (its ruling's, `null` while open); a ruled line's two are equal (BODY-87).
 - [ ] [RUL-15] An option line carries `"via"` (`board`, `chat` or `default`, BODY-90) right after `"stored_card_hash"`, `null` while open; a yes/no line never carries it (see E-RUL-07).

@@ -411,7 +411,7 @@ class TestGithubRule:
         as_json: bool,
     ) -> None:
         """Spec: RULE-04, RULE-05, RULE-07, RULE-08, RULE-09, RULE-11,
-        ASK-05, Never 2, OUT-01 — refuse invalid targets and failed writes with ERROR.
+        RULE-28, Never 2, OUT-01 — refuse invalid targets and failed writes with ERROR.
         """
         reference = forge.ItemReference(state, "Decide something", initial, is_landing)
         client = serve_forge(

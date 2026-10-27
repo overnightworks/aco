@@ -5,7 +5,7 @@ line `aco rule ITEM --line N --option X --via board|chat|default --card-hash HAS
 `aco rule ITEM --line N --other TEXT --via board|chat --card-hash HASH`, or
 `aco rule ITEM --line N --unclear [--note TEXT] --card-hash HASH`, moves one
 proposed `[[expectation]]` line to ruled (or, with `--unclear`, sends an open
-option line back to its head), transcribing the operator's own word (`aco ask` proposes; this command decides). `--via` says how the
+option line back to its head), transcribing the operator's own word (a head proposes by editing the body; this command decides). `--via` says how the
 decision reached aco: `board` the operator clicked, `chat` a head transcribes
 his word, `default` he left the card unanswered and its recommendation stands.
 `--help` lists every flag here except `--unclear`. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This CLI invocation is the
@@ -14,18 +14,15 @@ in-process `POST /rule` form is retired; `aco serve`'s decision board shells out
 this exact command instead, `specs/serve.spec.md` ABRD-01). This
 file owns the ruling's own refusals -- an already-ruled
 line, an out-of-range one -- the `RULED` line, its own `reason` vocabulary,
-and every refusal `aco ask` shares only by substituting `command` ("rule"
-where ask's own reads "ask"): a missing item and a pull-request target.
+and the target refusals: a missing item, a pull-request target and a
+malformed body.
 `specs/output.spec.md` owns the `--json`
 envelope itself (OUT-nn: key order, `ok`, `message`); this file names only
-`rule`'s own `reason` values. `specs/ask.spec.md` owns the
-malformed-body-target refusal the two commands share verbatim (ASK-05);
-this file cites it rather than restating it. `specs/storage-pin.spec.md`
-owns the state-ref forge gate (PIN-04) `rule` shares with `ask` and
-`brief`; this file cites it rather than restating it. `<n>` is the item's
+`rule`'s own `reason` values. `specs/storage-pin.spec.md`
+owns the state-ref forge gate (PIN-04) `rule` shares with `brief`; this file cites it rather than restating it. `<n>` is the item's
 own number, a printed `#<n>` its `storage = "github"` form and the item id
 under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` names, the same index
-`aco ask`'s own `ASKED` line and `rulings` print.
+`rulings` prints.
 
 ## Behavior table
 
@@ -51,7 +48,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 | `--via default` names another letter than the recommended one | RULE-19 | RULE-09 | — |
 | item does not exist | RULE-07 | RULE-09 | — |
 | item is a pull request | RULE-08 | RULE-09 | — |
-| item body malformed | ASK-05 (cited) | RULE-09 | — |
+| item body malformed | RULE-28 | RULE-09 | — |
 | `--repo` given, `storage = "state-ref"` | RULE-10 | RULE-09 | — |
 | the body write itself fails | RULE-11 | RULE-11 | — |
 
@@ -68,9 +65,6 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 - [ ] [RULE-20] `--other TEXT` on an open option line prints RULE-01/RULE-02 with `other` as `<ruling>`; the line gains RULE-14's four keys with `ruling = "other"`, then `other`, TEXT verbatim (see E-RULE-11).
 
 ## Refusals this command owns
-
-`aco ask`'s equivalent of RULE-08 substitutes `ask` for `rule` in
-the same sentence; RULE-07's sentence is identical for both commands.
 
 - [ ] [RULE-04] `--line N` naming an already-ruled entry refuses `line <k> is already ruled; a changed ruling is a new line`, exit `2`, before any write (see E-RULE-03).
 - [ ] [RULE-05] `--line N` outside the item's own expectation lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write (see E-RULE-04).
@@ -95,8 +89,9 @@ the same sentence; RULE-07's sentence is identical for both commands.
 - [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-26] A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
 - [ ] [RULE-27] `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.
-- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 13, 15..19, 21, 24, 26, 27, ASK-05) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
-- [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `aco ask`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
+- [ ] [RULE-28] A MALFORMED item body refuses `#<n> <body defect sentence>; rule needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref` (see E-OUT-02).
+- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 13, 15..19, 21, 24, 26, 27, 28) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
+- [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `brief`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 
 `reason`, by which refusal fired:
@@ -105,7 +100,7 @@ the same sentence; RULE-07's sentence is identical for both commands.
 |---|---|
 | RULE-04 (already ruled) | `already_ruled` |
 | RULE-05 (out of range) | `line_out_of_range` |
-| RULE-07 (missing item), RULE-08 (pull-request target), ASK-05 (malformed body, cited) | `invalid_item` |
+| RULE-07 (missing item), RULE-08 (pull-request target), RULE-28 (malformed body) | `invalid_item` |
 | RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-13 (an option line), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter) | `invalid_usage` |
 | RULE-17 (the card changed) | `card_changed` |
 | RULE-24 (already with its head), RULE-27 (`--via default` on such a line) | `with_head` |
@@ -134,7 +129,7 @@ neither.
 
 ### E-RULE-01 — ruling a still-open line, text and `--json`
 
-Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with two proposed lines (`aco ask <item-id> --text "Ship it?"`, `aco ask <item-id> --text "Ship it too?"`)
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with two proposed lines, texts `Ship it?` and `Ship it too?`
 
 ```console
 $ aco rule <item-id> --line 1 --yes

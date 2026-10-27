@@ -1,5 +1,5 @@
 """Every body rewrite keeps option lines value for value (BODY-88): the canonical
-rendering itself, then each command that rewrites a block -- `rule`, `ask`,
+rendering itself, then each command that rewrites a block -- `rule`,
 `cut`, `rescope`, `item new`/`edit` and the state-ref `[record]` write -- on
 old-only, new-only and mixed items, LF and CRLF, `github` and `state-ref`."""
 
@@ -85,28 +85,24 @@ def github_world(github_clone: Path, bare_remote: Path) -> Path:
 
 @pytest.mark.usefixtures(github_world.__name__)
 @pytest.mark.parametrize("newline", NEWLINES)
+def test_rule_keeps_option_lines(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    newline: str,
+) -> None:
+    """Spec: BODY-88, RULE-12 -- `rule` on a yes/no line rewrites only that line."""
+    raw = item_body("mixed", newline=newline)
+    reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", raw)
+    client = serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
+    ruled = run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
+    assert ruled.status == 0, ruled.stderr
+    assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
+
+
+@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.parametrize("newline", NEWLINES)
 @pytest.mark.parametrize("item", ["mixed", "new-only"])
 class TestCommandRewrites:
-    def test_rule_and_ask_keep_option_lines(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        item: str,
-        newline: str,
-    ) -> None:
-        """Spec: BODY-88, RULE-12 -- `rule` on a yes/no line, then `ask` appending one."""
-        raw = item_body(item, newline=newline)
-        reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", raw)
-        client = serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
-        if item == "mixed":
-            ruled = run_cli(["rule", "7", "--line", "1", "--yes"], capsys)
-            assert ruled.status == 0, ruled.stderr
-            assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
-            client.issue_references[7] = dataclasses.replace(reference, body=client.item_bodies[7])
-        asked = run_cli(["ask", "7", "--text", "Neue Frage?"], capsys)
-        assert asked.status == 0, asked.stderr
-        assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
-
     def test_cut_keeps_option_lines(
         self,
         monkeypatch: pytest.MonkeyPatch,

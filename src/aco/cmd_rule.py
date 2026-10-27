@@ -52,18 +52,16 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 class InvalidTargetError(protocol.ClaimError):
     """`require_writable_target`'s own "no such writable item" refusal -- missing, a pull request,
-    or a malformed body -- so
-    `ask`/`rule` can each choose their own `invalid_item` without parsing
+    or a malformed body -- so `rule` can choose its `invalid_item` without parsing
     prose."""
 
 
 def require_writable_target(
     client: forge.ForgeWriter, context: RunContext, number: int, *, command: str
 ) -> tuple[str, workboard.BoardConfig]:
-    """`ask` and `rule`'s shared target gate (RULE-07, RULE-08, cited verbatim by
-    `specs/ask.spec.md`): the item must exist and not be a pull request, and
-    its body must parse. Returns the live body and the board configuration `ask`/
-    `rule` still need for their own write."""
+    """`rule`'s target gate (RULE-07, RULE-08): the item must exist and not be a
+    pull request, and its body must parse. Returns the live body and the board
+    configuration `rule` still needs for its write."""
     config = context.config
     try:
         body = board_read.item_body_or_refuse(
