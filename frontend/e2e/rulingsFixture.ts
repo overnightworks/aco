@@ -1,6 +1,6 @@
 /**
  * Builds and writes the fake `aco`'s own `rulings.json`
- * (`tests/aco_board/aco_board_fixtures.py`'s `_FAKE_ACO` reads this file
+ * (`tests/support/aco_board_fixtures.py`'s `_FAKE_ACO` reads this file
  * directly), the wire shape `aco rulings --json` answers with
  * (`specs/rulings.spec.md` RUL-10). A spec rewrites it mid-test to simulate
  * an agent editing a line while the operator is deciding it.

@@ -1,7 +1,7 @@
 """The real board server behind a fake `aco`, for Playwright's E2E harness.
 
 `frontend/e2e/global-setup.ts` spawns this as `uv run python
-tests/aco_board/e2e_server.py` and points every spec straight at the port it
+tests/support/e2e_server.py` and points every spec straight at the port it
 prints -- no dev server, no proxy: it serves the same committed, built SPA a
 live `aco serve` does. It speaks the same protocol, too
 (`aco.board.server.start_board`), so a spec drives the real wire form
@@ -11,7 +11,7 @@ is `aco` itself (`aco_board_fixtures.install_fake_aco`).
 One line of JSON on stdout once the server is listening:
 `{"host", "port", "token", "repo_directory"}`. The repo directory lets a spec
 toggle the fake `aco`'s answers between runs (`FakeAcoRepository`'s own
-methods), the same arrangement `tests/aco_board/test_aco_board_server.py`
+methods), the same arrangement `tests/board/test_board_server.py`
 uses. Stops on SIGTERM or SIGINT, which the launcher sends on teardown.
 """
 
