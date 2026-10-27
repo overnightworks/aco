@@ -8,11 +8,10 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, row
+from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, option_line, row
 from cli_fixtures import run_cli
 from github_fixtures import assert_github_world
 from option_cards import GOLDEN_CARD_HASH, card, item_body, serve_item
-from test_board_option_lines import option_line
 
 from aco import body
 from aco.board.board import LINE_CHANGED
