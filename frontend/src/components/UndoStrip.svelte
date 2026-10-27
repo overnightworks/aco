@@ -8,7 +8,7 @@
 	// A strip mounts when a pick starts its undo window, so this is focus after a
 	// pick: the pressed pick is disabled by now and Undo is the one action left.
 	$effect(() => {
-		undo?.focus({ preventScroll: true });
+		undo?.focus();
 	});
 </script>
 
