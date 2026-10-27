@@ -26,11 +26,11 @@
 "src/aco/store.py" = 2102
 "src/aco/workboard.py" = 3138
 "tests/board/test_board_api.py" = 1059
-"tests/support/cli_fixtures.py" = 969
+"tests/support/cli_fixtures.py" = 944
 "tests/support/github_fixtures.py" = 835
 "tests/test_board.py" = 4187
 "tests/test_checkout.py" = 2046
-"tests/test_cli.py" = 17482
+"tests/test_cli.py" = 16871
 "tests/test_cmd_adopt.py" = 1650
 "tests/test_cmd_cut.py" = 1072
 "tests/test_cmd_land_after_merge_rerun.py" = 880
@@ -89,7 +89,6 @@
 
 [function_lines."tests/test_cli.py"]
 "_board_fixture_environment" = 122
-"_run_scope_width_command" = 75
 "test_cli_claim_json_prints_acquired_claim_object" = 63
 "test_cli_claim_scope_derivation_against_the_items_own_body" = 69
 "test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_remote" = 82

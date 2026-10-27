@@ -678,31 +678,6 @@ def forbid_forge_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     _forbid_remote_url(monkeypatch)
 
 
-def arrange_scope_width(
-    monkeypatch: pytest.MonkeyPatch,
-    client: object,
-    *,
-    directories: frozenset[str] = frozenset(),
-    versioned: tuple[str, ...] | None = None,
-    validate_checkout: bool = True,
-) -> None:
-    """The monkeypatch quadruple every scope-width `claim`/`rescope` case in
-    `test_cli.py`'s wide-scope tables shares: a GitHub forge, a directory
-    classifier, an optional versioned-file listing, and -- for a fresh
-    `claim` -- a no-op checkout validator (`rescope` patches the store and
-    git output for its own standing claim instead, so it passes
-    `validate_checkout=False`)."""
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(
-        checkout,
-        "scope_directories",
-        lambda paths, **_kwargs: tuple(path for path in paths if path in directories),
-    )
-    monkeypatch.setattr(checkout, "versioned_paths", lambda **_kwargs: versioned or ())
-    if validate_checkout:
-        monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-
-
 ADOPTED_PULL_REQUEST = 45
 ADOPTED_BRANCH = "dependabot/uv/x"
 

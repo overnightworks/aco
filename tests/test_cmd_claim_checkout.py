@@ -5,20 +5,16 @@ the standing claims a new scope overlaps. The forge is the only fake."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract
-from cli_fixtures import real_git, redirect_toplevel
+from claim_worktrees import LANE_BRANCH, StandIn, Standing, Standpoint, make_stand_in
 from github_fixtures import FakeForge, serve_forge
-from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
 from aco import checkout, forge, protocol, store
 from aco import cli as issue_claim
 
-LANE_BRANCH = "codex/issue-72-claims"
 ISSUE = 72
 TRUNK_FILES = (
     "src/widget.py",
@@ -35,69 +31,11 @@ NON_MAIN_REFUSAL = (
 )
 
 
-@dataclass(frozen=True)
-class Standing:
-    """A live claim another agent holds before this one is made."""
-
-    scope: tuple[str, ...]
-    issue: int | None = None
-    branch: str = "claude/issue-55-held"
-
-    def intent(self, claim_id: str) -> protocol.ClaimIntent:
-        identity = (
-            protocol.LaneIdentity() if self.issue is None else protocol.IssueIdentity(self.issue)
-        )
-        return claim_intent(
-            identity=identity,
-            branch=self.branch,
-            scope=self.scope,
-            claim_id=claim_id,
-            operation_id=f"op-{claim_id}",
-        )
-
-
-@dataclass(frozen=True)
-class Standpoint:
-    """The checkout `aco claim` is made in, and the head it stands at."""
-
-    directory: Path
-    head: str
-
-
-StandIn = Callable[..., Standpoint]
-
-
 @pytest.fixture
 def stand_in(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, github_clone: Path, bare_remote: Path
 ) -> StandIn:
-    """Where the claim is made: a linked worktree on `branch`, or, unlinked,
-    the repository's own checkout switched to it. The trunk carries the
-    files the scenarios claim and is pushed, so `origin/HEAD` names `main`."""
-    for name in TRUNK_FILES:
-        (github_clone / name).parent.mkdir(parents=True, exist_ok=True)
-        (github_clone / name).write_text("committed\n")
-    real_git(github_clone, "add", ".")
-    real_git(github_clone, "commit", "-q", "-m", "trunk files")
-    real_git(github_clone, "push", "-q", "origin", "main")
-
-    def place(
-        *, branch: str = LANE_BRANCH, linked: bool = True, standing: tuple[Standing, ...] = ()
-    ) -> Standpoint:
-        intents = tuple(held.intent(f"held-{position}") for position, held in enumerate(standing))
-        publish_claims_from_a_second_clone(github_clone, bare_remote, intents)
-        directory = github_clone
-        if linked:
-            directory = tmp_path / "lane"
-            real_git(github_clone, "worktree", "add", "-q", "-b", branch, str(directory))
-        elif branch != "main":
-            real_git(github_clone, "checkout", "-q", "-b", branch)
-        redirect_toplevel(monkeypatch, directory)
-        monkeypatch.chdir(directory)
-        head = real_git(directory, "rev-parse", "HEAD").stdout.strip()
-        return Standpoint(directory, head)
-
-    return place
+    return make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, TRUNK_FILES)
 
 
 def serve_item(monkeypatch: pytest.MonkeyPatch, scope: tuple[str, ...]) -> None:
