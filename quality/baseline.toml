@@ -23,7 +23,7 @@
 "src/aco/github.py" = 1730
 "src/aco/protocol.py" = 1877
 "src/aco/state_board.py" = 930
-"src/aco/store.py" = 2102
+"src/aco/store.py" = 2090
 "src/aco/workboard.py" = 3138
 "tests/board/test_board_api.py" = 1059
 "tests/support/cli_fixtures.py" = 944
@@ -41,7 +41,7 @@
 "tests/test_github.py" = 3181
 "tests/test_protocol.py" = 802
 "tests/test_state_board.py" = 6002
-"tests/test_store.py" = 5459
+"tests/test_store.py" = 5443
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 101
@@ -100,7 +100,7 @@
 "test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line" = 62
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
 "test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 71
-"test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 67
+"test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 66
 "test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 61
 
 [function_lines."tests/test_cmd_cut.py"]
