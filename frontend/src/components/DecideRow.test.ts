@@ -165,12 +165,15 @@ test('[ABRD-63] a row given no escapes offers no Other…', () => {
 test.each([
 	['changed', { kind: 'changed', message: LINE_CHANGED_MESSAGE }],
 	['already ruled', { kind: 'already-ruled', message: 'Schon entschieden' }]
-] as const)('[ABRD-65] Other… and Unclear hide with the picks once the card is %s', (_name, banner) => {
-	renderRow({ escapes, banner });
+] as const)(
+	'[ABRD-65] Other… and Unclear hide with the picks once the card is %s',
+	(_name, banner) => {
+		renderRow({ escapes, banner });
 
-	expect(screen.queryByRole('button', { name: 'Other…' })).toBeNull();
-	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
-});
+		expect(screen.queryByRole('button', { name: 'Other…' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
+	}
+);
 
 test('[ABRD-65] a failed post keeps Other… and Unclear for a retry', () => {
 	renderRow({ escapes, banner: { kind: 'failed', message: 'aco unavailable' } });
