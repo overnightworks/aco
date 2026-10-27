@@ -21,6 +21,7 @@ from aco import forge, protocol, store
 
 ISSUE = 72
 LANE_BRANCH = "codex/issue-72-claims"
+LANE_MODE_BRANCH = "docs/lane-cleanup"
 
 
 @dataclass(frozen=True)
@@ -140,10 +141,13 @@ def claimed_here(standpoint: Standpoint) -> protocol.ActiveClaim:
 def assert_json_refusal_object(err: str, out: str, *, reason: str) -> None:
     """`--json` refusal (`specs/output.spec.md` OUT-01, OUT-03): stdout holds
     the object `ok`, `reason`, `message` in that order, its `message` the
-    sentence stderr printed after `ERROR: `."""
+    sentence stderr printed after `ERROR: `. Compares the raw JSON text, so a
+    reordering of that sequence fails."""
     assert err.startswith("ERROR: ")
     message = err.removeprefix("ERROR: ").rstrip("\n")
-    assert out == json.dumps({"ok": False, "reason": reason, "message": message}) + "\n"
+    expected = {"ok": False, "reason": reason, "message": message}
+    assert out == json.dumps(expected) + "\n"
+    assert json.loads(out) == expected
 
 
 def _commit_trunk(clone: Path, trunk_files: tuple[str, ...]) -> None:

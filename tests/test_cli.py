@@ -47,6 +47,7 @@ from board_fixtures import (
     unfilled_block_body,
     write_repository_config,
 )
+from claim_worktrees import assert_json_refusal_object
 from cli_fixtures import (
     GIT_FAILURE_INJECTIONS,
     ITEM_NEW_BODY,
@@ -7215,7 +7216,7 @@ def test_cli_board_family_reports_invalid_usage_when_repo_is_given_under_state_r
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -7243,7 +7244,7 @@ def test_cli_board_family_reports_unavailable_for_a_forge_adapter_failure(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: adapter failed\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 class _RefusingItemWriter:
@@ -9371,7 +9372,7 @@ def test_cli_claim_without_scope_names_a_malformed_body_before_no_scope(
     assert status == 2
     captured = capsys.readouterr()
     assert captured.err == "ERROR: #72 body malformed: owner: unknown top-level key owner\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="body_invalid")
+    assert_json_refusal_object(captured.err, captured.out, reason="body_invalid")
 
 
 def test_cli_claim_without_scope_refuses_a_missing_target_by_name(
@@ -9388,7 +9389,7 @@ def test_cli_claim_without_scope_refuses_a_missing_target_by_name(
     assert status == 2
     captured = capsys.readouterr()
     assert captured.err == "ERROR: #72 does not exist\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="target_invalid")
+    assert_json_refusal_object(captured.err, captured.out, reason="target_invalid")
 
 
 def test_cli_claim_without_scope_reports_unavailable_for_a_forge_outage(
@@ -9410,7 +9411,7 @@ def test_cli_claim_without_scope_reports_unavailable_for_a_forge_outage(
 
     assert status == 2
     captured = capsys.readouterr()
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 def test_cli_claim_derives_whole_from_the_items_own_body_when_wide(
@@ -10582,7 +10583,7 @@ def test_cli_rescope_json_refuses_no_active_claim_with_precondition_failed(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: issue #72 has no active build claim\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 SCOPE_READ_FAILURE = "fatal: object database unreadable"
@@ -10934,30 +10935,17 @@ def test_cli_release_json_prints_effective_posted_identity(
     assert store.fetch_state(worktree=Path("."), remote="origin").claims == {}
 
 
-def _assert_json_refusal_object(err: str, out: str, *, reason: str) -> None:
-    """`ask`/`rule`/`brief`'s own `report.emit_json` refusal (
-    `specs/output.spec.md`): the identical sentence stderr already printed,
-    now under `message`, next to `reason` instead of a dropped `error`
-    key. Compares the raw JSON text, not a parsed dict, so a reordering of
-    OUT-01's `ok`, `reason`, `message` sequence would fail this assertion."""
-    assert err.startswith("ERROR: ")
-    message = err.removeprefix("ERROR: ").rstrip("\n")
-    expected = {"ok": False, "reason": reason, "message": message}
-    assert out == json.dumps(expected) + "\n"
-    assert json.loads(out) == expected
-
-
 @pytest.mark.parametrize(
     ("arguments", "assert_refusal"),
     [
         pytest.param(
             ["claim", "72", "--agent", "Ada", "--scope", "src", "--claim-id", "cli-claim"],
-            lambda err, out: _assert_json_refusal_object(err, out, reason="unavailable"),
+            lambda err, out: assert_json_refusal_object(err, out, reason="unavailable"),
             id="claim-envelope-refusal",
         ),
         pytest.param(
             ["release", "72", "--agent", "Ada", "--claim-id", "mine", "--abandoned", "stopped"],
-            lambda err, out: _assert_json_refusal_object(err, out, reason="precondition_failed"),
+            lambda err, out: assert_json_refusal_object(err, out, reason="precondition_failed"),
             id="release-precondition-failed",
         ),
     ],
@@ -11057,7 +11045,7 @@ def test_cli_identity_and_release_refusals_print_the_shared_envelope(
         assert text.err == f"ERROR: {sentence}\n"
         assert json.loads(envelope.out)["message"] == sentence
     assert envelope.err == text.err
-    _assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
+    assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
 
 
 @pytest.mark.parametrize(
@@ -11100,7 +11088,7 @@ def test_cli_repository_refusals_preserve_pin_and_handler_error_order(
     if reason is None:
         assert captured.out == ""
     else:
-        _assert_json_refusal_object(captured.err, captured.out, reason=reason)
+        assert_json_refusal_object(captured.err, captured.out, reason=reason)
 
 
 def test_cli_module_entry_point_exits_with_mains_return_code(
@@ -13258,7 +13246,7 @@ def test_a_bad_choice_on_a_json_command_prints_the_invalid_usage_envelope(
     captured = capsys.readouterr()
     assert status == 2
     assert "argument --step: invalid choice:" in captured.err
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -13286,7 +13274,7 @@ def test_a_dash_dash_ends_the_options_of_its_own_level_only(
     assert status == 2
     assert captured.err.startswith("ERROR: ")
     if envelope:
-        _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+        assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
     else:
         assert captured.out == ""
 
@@ -13330,7 +13318,7 @@ def test_a_dash_dash_before_the_command_follows_the_parse_argparse_made(
 
     captured = capsys.readouterr()
     assert status == 2
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -13788,7 +13776,7 @@ def test_untracked_board_config_refuses_item_show_in_its_own_json_envelope(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == _UNTRACKED_BOARD_CONFIG_ERROR
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def _scratch_lane_repository(
@@ -14390,7 +14378,7 @@ def test_cli_brief_step_refuses_with_no_usable_brief_config(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: no .aco/brief.toml in the repository\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 def test_cli_brief_refuses_a_non_github_canonical_remote_by_host(
@@ -14414,7 +14402,7 @@ def test_cli_brief_refuses_a_non_github_canonical_remote_by_host(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: no forge adapter for host file\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
+    assert_json_refusal_object(captured.err, captured.out, reason="unavailable")
 
 
 def test_cli_brief_reports_invalid_usage_when_repo_is_given_under_state_ref(
@@ -14431,7 +14419,7 @@ def test_cli_brief_reports_invalid_usage_when_repo_is_given_under_state_ref(
     captured = capsys.readouterr()
     assert status == 2
     assert captured.err == "ERROR: --repo is meaningless under storage = state-ref\n"
-    _assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
 
 
 @pytest.mark.parametrize(
@@ -15192,7 +15180,7 @@ def test_item_edit_refuses_through_the_shared_precondition_failed_envelope(
     captured = capsys.readouterr()
     refusal = sentence.format(command=f"item edit {case.flag}")
     assert (exit_code, refusal in captured.err) == (2, True)
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def test_item_edit_size_refuses_an_invalid_value_before_any_write(
@@ -15332,7 +15320,7 @@ def test_item_show_refuses_when_the_parent_read_fails(
     assert (text_status, json_status) == (2, 2)
     assert (text.out, text.err) == ("", f"ERROR: {sentence}\n")
     assert envelope.err == text.err
-    _assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
+    assert_json_refusal_object(envelope.err, envelope.out, reason="precondition_failed")
 
 
 def _item_new_github_storage_refusal(
@@ -15385,7 +15373,7 @@ def test_item_refuses_through_the_shared_precondition_failed_envelope(
 
     assert status == 2
     captured = capsys.readouterr()
-    _assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
+    assert_json_refusal_object(captured.err, captured.out, reason="precondition_failed")
 
 
 def _github_item_new(
