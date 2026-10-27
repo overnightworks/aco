@@ -410,7 +410,6 @@ class TestBodyCheck:
         assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
         assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
 
-    @pytest.mark.usefixtures("untrusted_pin")
     def test_check_stdin_refuses_the_pin_before_a_stdin_that_carries_no_body(
         self,
         monkeypatch: pytest.MonkeyPatch,

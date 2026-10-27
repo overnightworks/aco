@@ -125,6 +125,44 @@ def test_status_of_a_path_prints_its_holder_escaped(
     assert ESCAPED_WHOLE in result.stdout.splitlines()
 
 
+def test_status_of_a_path_json_carries_a_stored_claim_as_stored(
+    seeded_claim: protocol.ClaimIntent, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STAT-32"""
+    result = run_cli(["status", "--path", "src/aco/protocol.py", "--json"], capsys)
+
+    [claim] = json.loads(result.stdout)["claims"]
+    assert (result.status, claim["agent"], claim["role"], claim["branch"], claim["whole"]) == (
+        0,
+        seeded_claim.agent,
+        seeded_claim.role,
+        seeded_claim.branch,
+        seeded_claim.whole_reason,
+    )
+
+
+def test_a_coordinator_override_releases_a_stored_claim_holding_a_display_control(
+    seeded_claim: protocol.ClaimIntent, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: CLAIM-74, REL-13"""
+    released = run_cli(
+        [
+            "release",
+            str(ITEM),
+            "--role",
+            "coordinator",
+            "--coordinator-override",
+            "--abandoned",
+            "legacy holder",
+        ],
+        capsys,
+    )
+    status = run_cli(["status", str(ITEM)], capsys)
+
+    assert (released.status, released.stderr) == (0, "")
+    assert (status.status, status.stdout) == (0, f"UNCLAIMED issue #{ITEM}\n")
+
+
 def test_status_of_a_lane_claim_prints_its_branch_escaped_in_the_subject(
     github_clone: Path, bare_remote: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

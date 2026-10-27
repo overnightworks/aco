@@ -407,85 +407,79 @@ def test_checkout_validation_rejects_false_or_late_claims(
         checkout.validate_checkout(candidate, default_branch=lambda: "main")
 
 
-def test_checkout_validation_names_the_base_repair(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The base-mismatch refusal names both SHAs (unchanged) and the repair
-    an agent reading it needs: omitting `--base` binds it to checkout HEAD."""
-    values = {
-        ("rev-parse", "HEAD"): "b" * 40,
-        ("branch", "--show-current"): "codex/issue-71-claims",
-        ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
-        ("rev-parse", "--git-common-dir"): "/repo/.git",
-        ("status", "--porcelain"): "",
-    }
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
-    )
-    candidate = request()
-
-    with pytest.raises(ClaimError) as error:
-        checkout.validate_checkout(candidate, default_branch=lambda: "main")
-
-    assert str(error.value) == (
-        f"claim base {BASE} does not match checkout HEAD {'b' * 40}; "
-        "omit --base to use checkout HEAD"
-    )
-
-
 @pytest.mark.parametrize(
-    ("branch", "default_branch"),
+    ("values", "branch", "default_branch", "sentence"),
     [
-        pytest.param("main", None, id="guessed-main"),
-        pytest.param("trunk", "trunk", id="repository-default-trunk"),
+        pytest.param(
+            {
+                ("rev-parse", "HEAD"): "b" * 40,
+                ("branch", "--show-current"): "codex/issue-71-claims",
+                ("rev-parse", "--git-dir"): "/repo/.git/worktrees/issue-71",
+                ("rev-parse", "--git-common-dir"): "/repo/.git",
+                ("status", "--porcelain"): "",
+            },
+            None,
+            "main",
+            # The base-mismatch refusal names both SHAs and the repair: omitting
+            # `--base` binds it to checkout HEAD.
+            f"claim base {BASE} does not match checkout HEAD {'b' * 40}; "
+            "omit --base to use checkout HEAD",
+            id="base-repair",
+        ),
+        pytest.param(
+            {("rev-parse", "HEAD"): BASE, ("branch", "--show-current"): "main"},
+            "main",
+            None,
+            # Claiming from the default branch names the `git worktree add` recipe.
+            "build claims require an isolated non-main worktree branch; "
+            f"run {checkout.ISOLATED_WORKTREE_RECIPE}",
+            id="default-branch-recipe-guessed-main",
+        ),
+        pytest.param(
+            {("rev-parse", "HEAD"): BASE, ("branch", "--show-current"): "trunk"},
+            "trunk",
+            "trunk",
+            # A repository whose recorded default is `trunk` refuses `trunk` the same way.
+            "build claims require an isolated non-main worktree branch; "
+            f"run {checkout.ISOLATED_WORKTREE_RECIPE}",
+            id="default-branch-recipe-repository-default-trunk",
+        ),
+        pytest.param(
+            {
+                ("rev-parse", "HEAD"): BASE,
+                ("branch", "--show-current"): "codex/issue-71-claims",
+                ("rev-parse", "--git-dir"): "/repo/.git",
+                ("rev-parse", "--git-common-dir"): "/repo/.git",
+                ("status", "--porcelain"): "",
+            },
+            None,
+            "main",
+            # A git-dir that is the shared common dir (not a linked worktree)
+            # names the same recipe as the trunk-branch refusal.
+            "build claims require a linked isolated worktree checkout; "
+            f"run {checkout.ISOLATED_WORKTREE_RECIPE}",
+            id="shared-checkout-recipe",
+        ),
     ],
 )
-def test_checkout_validation_names_the_isolated_worktree_recipe_for_the_default_branch(
+def test_checkout_validation_names_the_repair_it_refuses_with(
     monkeypatch: pytest.MonkeyPatch,
-    branch: str,
+    values: dict[tuple[str, ...], str],
+    branch: str | None,
     default_branch: str | None,
+    sentence: str,
 ) -> None:
-    """Claiming from a checkout of the repository's default branch names the
-    exact `git worktree add` recipe, not just the rule it violates --
-    whether that default is the guessed `main` or a recorded one: a repository
-    whose default is `trunk` refuses a claim from `trunk` the same way."""
-    values = {("rev-parse", "HEAD"): BASE, ("branch", "--show-current"): branch}
+    """Each refusal names the repair an agent reading it needs, not just the rule
+    it violates."""
     monkeypatch.setattr(
         checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
     )
-    candidate = request(branch=branch)
+    candidate = request() if branch is None else request(branch=branch)
 
     with pytest.raises(ClaimError) as error:
         checkout.validate_checkout(candidate, default_branch=lambda: default_branch)
 
-    assert str(error.value) == (
-        "build claims require an isolated non-main worktree branch; "
-        f"run {checkout.ISOLATED_WORKTREE_RECIPE}"
-    )
-
-
-def test_checkout_validation_names_the_isolated_worktree_recipe_for_a_shared_checkout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A checkout whose git-dir is the shared common dir (not a linked
-    worktree) names the same recipe as the trunk-branch refusal above."""
-    values = {
-        ("rev-parse", "HEAD"): BASE,
-        ("branch", "--show-current"): "codex/issue-71-claims",
-        ("rev-parse", "--git-dir"): "/repo/.git",
-        ("rev-parse", "--git-common-dir"): "/repo/.git",
-        ("status", "--porcelain"): "",
-    }
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: values[tuple(arguments)]
-    )
-    candidate = request()
-
-    with pytest.raises(ClaimError) as error:
-        checkout.validate_checkout(candidate, default_branch=lambda: "main")
-
-    assert str(error.value) == (
-        "build claims require a linked isolated worktree checkout; "
-        f"run {checkout.ISOLATED_WORKTREE_RECIPE}"
-    )
+    assert str(error.value) == sentence
 
 
 @pytest.mark.usefixtures("isolated_global_git_config")
