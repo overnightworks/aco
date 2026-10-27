@@ -1,0 +1,8 @@
+claim_id = "e79c8d80568b4a93af0a64aebc030694"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "4b04b376e4b17901037a01d29d7448630a35b6e3"
+branch = "claude/issue-496-board-unclear-button"
+scope = ["docs/board/README.md", "docs/board/mockup.html", "frontend/e2e/unclear.spec.ts", "frontend/src/App.svelte", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/decision.test.ts", "frontend/src/app/model/decision.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/app/state/decision.svelte.test.ts", "frontend/src/app/state/decision.svelte.ts", "frontend/src/app/state/decisionOption.svelte.test.ts", "frontend/src/app/state/decisionUnclear.svelte.test.ts", "frontend/src/components/DecideRow.svelte", "frontend/src/components/DecideRow.test.ts", "frontend/src/components/EscapeRow.svelte", "frontend/src/components/EscapeRow.test.ts", "frontend/src/components/Stage.svelte", "frontend/src/components/UndoStrip.svelte", "frontend/src/components/UndoStrip.test.ts", "frontend/src/types.ts", "specs/serve.spec.md", "src/aco/board/static", "src/aco/cmd_rule.py", "tests/board/test_board_other_decisions.py"]
+opened_commit = "c4f29df606bf40d7946222af4a1d073ef2403b76"
+whole_reason = "One button path end to end: the escape row's Unclear and panel, the store's Unclear window and returned reading, the grey strip, the stage rule, the spec criteria, picture, README and the rebuilt static change together, or the button has no honest strip or the answer is acted out as a decision."
