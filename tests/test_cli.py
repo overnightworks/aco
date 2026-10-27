@@ -17248,10 +17248,10 @@ def _claim_comma_scope_refusal_command(
     return _CountedRun(_claim_argv("--scope", "a,b"), {}, {}, observations={}, exit_code=2)
 
 
-def _check_stdin_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
+def _check_stdin_command(_monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
     """`check -` judges a piped body without the state ref."""
-    monkeypatch.setattr(sys, "stdin", io.StringIO(complete_contract("Check #10.")))
-    return _read_once(["check", "-"], toplevel=tmp_path, observes=False)
+    run = _read_once(["check", "-"], toplevel=tmp_path, observes=False)
+    return replace(run, piped=complete_contract("Check #10."))
 
 
 def _rule_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:

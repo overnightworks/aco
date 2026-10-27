@@ -4,6 +4,8 @@ the piped-body reader every stdin-fed command shares."""
 from __future__ import annotations
 
 import json
+import os
+import stat
 import sys
 from enum import StrEnum
 
@@ -14,6 +16,26 @@ REFUSAL_LINE_LENGTH_LIMIT = 200
 _REFUSAL_SENTENCE_LENGTH_LIMIT = REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
 
 JSON_FLAG = "--json"
+
+
+def _stdin_file_mode() -> int | None:
+    """The type bits of the descriptor on stdin, told without reading, since
+    an idle pipe or socket a harness holds open would block a read forever;
+    `None` for a closed stdin."""
+    try:
+        return os.fstat(sys.stdin.fileno()).st_mode
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def stdin_carries_a_body() -> bool:
+    """Whether stdin carries a body a command reads:
+    a redirected file (`< body.md`) or a pipe
+    (`printf ... |`). A socket -- what Claude Code's Bash tool hands a
+    command -- a terminal, `/dev/null` or a closed stdin carry none, so the
+    command never waits on an idle harness stdin."""
+    mode = _stdin_file_mode()
+    return mode is not None and (stat.S_ISREG(mode) or stat.S_ISFIFO(mode))
 
 
 def read_piped_body() -> str:
