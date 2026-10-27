@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date
 from enum import StrEnum
 from typing import TypeAlias, cast
 
@@ -417,7 +417,7 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
     report."""
     named = _line_outcomes(parsed)
     number = int(parsed.item)
-    ruled, open_remaining = _rule_item(context, number, named, datetime.now(UTC).date())
+    ruled, open_remaining = _rule_item(context, number, named, context.today())
     storage = context.config.storage
     if isinstance(named[0].outcome, expectations.HeadReturn):
         returned = cast(tuple[expectations.OptionLine, ...], ruled)

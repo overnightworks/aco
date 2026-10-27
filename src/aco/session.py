@@ -26,6 +26,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from functools import cached_property
 from pathlib import Path
 from typing import cast
@@ -136,6 +137,10 @@ def _build_forge(context: RunContext) -> forge.ForgeReader:
     if context.config.storage is body.Storage.STATE_REF:
         return _state_ref_forge(context)
     return github.GitHubForge(context.repository_id)
+
+
+def utc_today() -> date:
+    return datetime.now(UTC).date()
 
 
 def run_context(repo: forge.RepositoryId | None) -> RunContext:
@@ -358,6 +363,7 @@ class RunContext:
     `directory` is the checkout this context answers for, or `None` for
     the calling process's own cwd. `build_forge` turns this context's facts
     into the storage pin's forge adapter; the context holds what it builds.
+    `today` is the run's clock: a command that stamps a date reads it.
     """
 
     def __init__(
@@ -366,9 +372,11 @@ class RunContext:
         *,
         build_forge: ForgeBuilder,
         directory: Path | None = None,
+        today: Callable[[], date] = utc_today,
     ) -> None:
         self.repo = repo
         self.directory = directory
+        self.today = today
         self._build_forge = build_forge
         self._fetched_trunk_remote: str | None = None
 
@@ -378,7 +386,9 @@ class RunContext:
         context read carries over. `is_toplevel` says the caller already
         resolved `directory` as its checkout's toplevel (`rescope`), so the
         child holds it as read instead of asking git a second time."""
-        child = RunContext(self.repo, build_forge=self._build_forge, directory=directory)
+        child = RunContext(
+            self.repo, build_forge=self._build_forge, directory=directory, today=self.today
+        )
         if is_toplevel:
             child.toplevel = directory
         return child
@@ -390,7 +400,12 @@ class RunContext:
         the fresh context resolves the trunk anew without fetching that
         remote a second time, yet fetches the canonical remote its reread
         configuration names when that is another."""
-        child = RunContext(self.repo, build_forge=self._build_forge, directory=self.directory)
+        child = RunContext(
+            self.repo,
+            build_forge=self._build_forge,
+            directory=self.directory,
+            today=self.today,
+        )
         child._fetched_trunk_remote = self._fetched_trunk_remote
         return child
 

@@ -4,6 +4,7 @@ all are written in one body write with one date, or none is (RULE-29..36, E-RULE
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 
 import pytest
 from cli_fixtures import FROZEN_CLI_NOW, CliRun, freeze_cli_now, run_cli
@@ -22,7 +23,7 @@ from option_cards import (
     serve_item,
 )
 
-from aco import body, expectations
+from aco import body, expectations, session
 
 TODAY = FROZEN_CLI_NOW.date().isoformat()
 ANSWER = "Nur am Desktop."
@@ -257,6 +258,30 @@ class TestSeveralLinesInOneWrite:
                 set(),
             )
 
+    def test_every_line_takes_the_first_date_when_the_clock_steps(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: RULE-29, RULE-32 -- one date per write, however often the clock is read."""
+        reads: list[date] = []
+
+        def stepping_today() -> date:
+            reads.append(FROZEN_CLI_NOW.date() + timedelta(days=len(reads)))
+            return reads[-1]
+
+        client = serve_item(monkeypatch, group_body())
+        monkeypatch.setattr(
+            session,
+            "run_context",
+            lambda repo: session.RunContext(
+                repo, build_forge=lambda _: client, today=stepping_today
+            ),
+        )
+        arguments = lines_of("option", (2, "A", HASH_2), (3, "B", HASH_3))
+        result = run_cli(["rule", "7", *arguments, "--json"], capsys)
+        first_day = FROZEN_CLI_NOW.date().isoformat()
+        assert (result.status, json.loads(result.stdout)["ruled_on"]) == (0, first_day)
+        assert [str(stored(client, index)["ruled_on"]) for index in (2, 3)] == [first_day] * 2
+
     def test_a_failing_write_stores_neither_line(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -461,7 +486,7 @@ def refusal_call(
 
 
 @pytest.mark.usefixtures("github_clone")
-class TestRefusedOnTheSecondLine:
+class TestOneRefusedLineStoresNone:
     @pytest.mark.parametrize(
         ("kind", "third", "shown", "letter", "via", "message", "reason", "refused"),
         [

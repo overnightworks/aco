@@ -27,11 +27,11 @@ from aco import (
     cmd_brief,
     cmd_cut,
     cmd_reset,
-    cmd_rule,
     cmd_status,
     forge,
     github,
     process,
+    session,
     store,
     workboard,
 )
@@ -54,7 +54,7 @@ class FixedDateTime(datetime):
 
 def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin CLI dates without installing a global autouse fixture."""
-    for owner in (cmd_rule, board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
+    for owner in (session, board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
         monkeypatch.setattr(owner, "datetime", FixedDateTime)
 
 
