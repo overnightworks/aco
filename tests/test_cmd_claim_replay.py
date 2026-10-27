@@ -9,24 +9,27 @@ import json
 from pathlib import Path
 
 import pytest
-from board_fixtures import board_issue, complete_contract
+from board_fixtures import complete_contract
 from claim_worktrees import (
     ISSUE,
     ITEM_WHOLE_REASON,
     LANE_BRANCH,
     StandIn,
     Standing,
+    assert_no_item_body_written,
     claim,
     claimed_here,
     make_stand_in,
     release,
+    replace_item_body,
+    serve_body,
     serve_item,
     standing_claims,
 )
 from cli_fixtures import forbid_forge_resolution
 from store_fixtures import fail_every_state_ref_push
 
-from aco import forge, protocol
+from aco import protocol
 
 TRUNK_FILES = ("src/widget.py", "src/other.py", "tests/test_widget.py")
 CLAIM_ID = "live-claim"
@@ -76,15 +79,53 @@ def test_replay_without_scope_takes_the_live_claims_own_stored_scope(
     served = serve_item(monkeypatch, ("src/widget.py",))
     assert claim("--claim-id", CLAIM_ID, scope=("src/widget.py",)) == 0
     capsys.readouterr()
-    changed = complete_contract("Build it.", scope=["src/other.py"])
-    served.board_issues = (board_issue(ISSUE, "Claims", changed),)
-    served.issue_references[ISSUE] = forge.ItemReference(forge.ItemState.OPEN, "Claims", changed)
+    replace_item_body(served, complete_contract("Build it.", scope=["src/other.py"]))
     forbid_forge_resolution(monkeypatch)
 
     status = claim("--claim-id", CLAIM_ID, "--json", scope=())
 
     assert status == 0
     assert json.loads(capsys.readouterr().out)["scope"] == ["src/widget.py"]
+
+
+@pytest.mark.parametrize(
+    ("scope", "refused"),
+    [
+        pytest.param(("a.py", "b.py", "c.py", "d.py"), True, id="wide"),
+        pytest.param(("a.py",), False, id="narrow"),
+    ],
+)
+def test_replay_refuses_a_wide_scope_whose_body_whole_went_bad_and_keeps_a_narrow_one(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    capsys: pytest.CaptureFixture[str],
+    scope: tuple[str, ...],
+    refused: bool,
+) -> None:
+    """Spec: CLM-15, CLM-37. Only a wide replay reads the item body, and the
+    live claim stays as it was."""
+    standpoint = stand_in(more_trunk_files=("a.py", "b.py", "c.py", "d.py"))
+    served = serve_body(monkeypatch, complete_contract("Ship it.", scope=list(scope), whole="ok"))
+    assert claim("--claim-id", CLAIM_ID, scope=()) == 0
+    capsys.readouterr()
+    before = standing_claims(standpoint)
+    replace_item_body(served, complete_contract("Ship it.", scope=list(scope), whole="x" * 513))
+
+    status = claim("--claim-id", CLAIM_ID, scope=())
+
+    captured = capsys.readouterr()
+    assert status == (2 if refused else 0)
+    if refused:
+        assert captured.err == (
+            f"ERROR: #{ISSUE} body malformed: whole: "
+            "whole reason must be one bounded non-empty line\n"
+        )
+        assert claim("--claim-id", CLAIM_ID, "--json", scope=()) == 2
+        assert json.loads(capsys.readouterr().out)["reason"] == "body_invalid"
+    else:
+        assert captured.out.startswith(f"CLAIMED issue #{ISSUE}: {CLAIM_ID}\n")
+    assert standing_claims(standpoint) == before
+    assert_no_item_body_written(served)
 
 
 def test_replay_reports_the_live_claim_after_an_interrupted_response(

@@ -102,13 +102,30 @@ def make_stand_in(
     return place
 
 
-def serve_item(monkeypatch: pytest.MonkeyPatch, scope: tuple[str, ...]) -> FakeForge:
-    body = complete_contract("Build it.", scope=list(scope), whole=ITEM_WHOLE_REASON)
+def serve_body(monkeypatch: pytest.MonkeyPatch, body: str) -> FakeForge:
+    """The forge serving item `ISSUE` open with `body`, in the board listing
+    and as an item reference."""
     served = FakeForge(
         board_issues=(board_issue(ISSUE, "Claims", body),),
         issue_references={ISSUE: forge.ItemReference(forge.ItemState.OPEN, "Claims", body)},
     )
     return serve_forge(monkeypatch, served)
+
+
+def serve_item(monkeypatch: pytest.MonkeyPatch, scope: tuple[str, ...]) -> FakeForge:
+    body = complete_contract("Build it.", scope=list(scope), whole=ITEM_WHOLE_REASON)
+    return serve_body(monkeypatch, body)
+
+
+def replace_item_body(served: FakeForge, body: str) -> None:
+    """The item's body edited on the forge after a claim was made."""
+    served.board_issues = (board_issue(ISSUE, "Claims", body),)
+    served.issue_references[ISSUE] = forge.ItemReference(forge.ItemState.OPEN, "Claims", body)
+
+
+def assert_no_item_body_written(served: FakeForge) -> None:
+    assert served.body_writes == []
+    assert served.created_issues == []
 
 
 def claim(
