@@ -11,7 +11,7 @@
 [ccn."src/aco/workboard.py"]
 "build_board" = 32
 
-[ccn."tests/test_status.py"]
+[ccn."tests/test_cmd_status.py"]
 "check_status.check" = 19
 
 [file_lines]
@@ -28,18 +28,18 @@
 "tests/aco_board/test_aco_board_api.py" = 1059
 "tests/support/cli_fixtures.py" = 969
 "tests/support/github_fixtures.py" = 835
-"tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4315
 "tests/test_checkout.py" = 2047
 "tests/test_cli.py" = 17656
-"tests/test_cut.py" = 1072
+"tests/test_cmd_adopt.py" = 1650
+"tests/test_cmd_cut.py" = 1072
+"tests/test_cmd_land_after_merge_rerun.py" = 880
+"tests/test_cmd_land_preflight_claim.py" = 858
+"tests/test_cmd_release_cleanup.py" = 807
+"tests/test_cmd_rescope_checkout.py" = 1087
+"tests/test_cmd_reset.py" = 954
 "tests/test_github.py" = 3181
-"tests/test_land_after_merge_rerun.py" = 880
-"tests/test_land_preflight_claim.py" = 858
 "tests/test_protocol.py" = 802
-"tests/test_release_cleanup.py" = 807
-"tests/test_rescope_checkout.py" = 1087
-"tests/test_reset.py" = 954
 "tests/test_state_board.py" = 6105
 "tests/test_store.py" = 5459
 
@@ -104,32 +104,36 @@
 "test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 67
 "test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 61
 
-[function_lines."tests/test_cut.py"]
+[function_lines."tests/test_cmd_cut.py"]
 "cut_check" = 61
 
-[function_lines."tests/test_github.py"]
-"test_github_adapter_item_references_reads_every_number_from_one_batch" = 64
-
-[function_lines."tests/test_land_after_merge_rerun.py"]
+[function_lines."tests/test_cmd_land_after_merge_rerun.py"]
 "separate_world" = 77
 
-[function_lines."tests/test_land_merge.py"]
+[function_lines."tests/test_cmd_land_merge.py"]
 "world" = 105
 
-[function_lines."tests/test_land_merge_message.py"]
+[function_lines."tests/test_cmd_land_merge_message.py"]
 "world" = 110
 "world.arrange" = 67
 
-[function_lines."tests/test_land_preflight_claim.py"]
+[function_lines."tests/test_cmd_land_preflight_claim.py"]
 "world" = 104
 
-[function_lines."tests/test_release_cleanup.py"]
+[function_lines."tests/test_cmd_release_cleanup.py"]
 "verify_cleanup" = 85
 
-[function_lines."tests/test_reset.py"]
+[function_lines."tests/test_cmd_reset.py"]
 "test_reset_bundle_restores_the_released_history" = 64
 "test_reset_plans_or_performs_each_state" = 70
 "test_reset_refuses_live_claims_and_touches_nothing" = 95
+
+[function_lines."tests/test_cmd_status.py"]
+"check_status" = 91
+"check_status.check" = 72
+
+[function_lines."tests/test_github.py"]
+"test_github_adapter_item_references_reads_every_number_from_one_batch" = 64
 
 [function_lines."tests/test_state_board.py"]
 "TestCliStateRefForge.test_cut_adopts_the_child_after_a_partial_failure_from_a_competing_write" = 110
@@ -139,10 +143,6 @@
 "TestCliStateRefForge.test_next_status_and_rulings_print_state_ref_ids_where_github_prints_hash_n" = 61
 "TestCliStateRefForge.test_readme_week_without_a_forge_runs_end_to_end_against_a_fresh_bare_remote" = 154
 "TestCliStateRefForge.test_whole_state_ref_paths_preserve_state" = 111
-
-[function_lines."tests/test_status.py"]
-"check_status" = 91
-"check_status.check" = 72
 
 [function_lines."tests/test_store.py"]
 "test_claim_lifecycle_reads_intervals_from_real_ref_history" = 62
