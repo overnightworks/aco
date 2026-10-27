@@ -30,7 +30,7 @@
 "tests/support/github_fixtures.py" = 835
 "tests/test_board.py" = 4111
 "tests/test_checkout.py" = 2046
-"tests/test_cli.py" = 16871
+"tests/test_cli.py" = 16155
 "tests/test_cmd_adopt.py" = 1650
 "tests/test_cmd_cut.py" = 1072
 "tests/test_cmd_land_after_merge_rerun.py" = 880
@@ -89,9 +89,7 @@
 
 [function_lines."tests/test_cli.py"]
 "_board_fixture_environment" = 122
-"test_cli_claim_json_prints_acquired_claim_object" = 63
 "test_cli_claim_scope_derivation_against_the_items_own_body" = 69
-"test_cli_lane_claim_rescope_and_release_are_forge_free_against_a_non_github_remote" = 82
 "test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state" = 60
 "test_next_close_names_every_zero_cost_action_regardless_of_rank" = 62
 "test_next_names_a_nested_containers_repair_where_cut_refuses_its_row" = 60
