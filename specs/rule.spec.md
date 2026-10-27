@@ -4,7 +4,7 @@
 `aco rule ITEM --line N --other TEXT --via board|chat --card-hash HASH`, or
 `aco rule ITEM --line N --unclear [--note TEXT] --card-hash HASH`, moves one
 proposed `[[expectation]]` line to ruled (or, with `--unclear`, sends an open
-option line back to its head); `--line` may repeat to rule several lines of one item in one body write, all or none, transcribing the operator's own word (a head proposes by editing the body; this command decides). `--via` says how the
+option line back to its head), transcribing the operator's own word (a head proposes by editing the body; this command decides); `--line` may repeat to rule several lines of one item in one body write, all or none. `--via` says how the
 decision reached aco: `board` the operator clicked, `chat` a head transcribes
 his word, `default` he left the card unanswered and its recommendation stands.
 `--help` lists every flag here, `--unclear` included, each with a help line. A yes/no line cannot be ruled by this command. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This CLI invocation is the
@@ -84,7 +84,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 - RULE-13 (retired 27.10.2026): the refusal of a yes/no outcome on an option line went with the yes/no outcome flags, which now fail as unrecognized arguments (exit `2`).
 - [ ] [RULE-15] A flag combination below refuses its sentence, exit `2`, before any forge call, after RULE-33 and RULE-34 (see E-RULE-10, E-RULE-13):
   - with several `--line` and `--option` given, a named line without its own `--option` after it: `line <k> needs its own --option after it`
-  - with several `--line`, a named line without its own `--card-hash` after it: `line <k> needs its own --card-hash after it`
+  - with several `--line`, a named line without its own `--card-hash` after it: `line <k> needs its own --card-hash after it`; the two count bullets are judged line by line in written order, `--option` before `--card-hash`, so line 2 without a hash refuses before line 3 without an option
   - `--option` without `--via` or `--card-hash`: `--option needs --via and --card-hash`
   - `--other` without `--via` or `--card-hash`: `--other needs --via and --card-hash`
   - `--note` with `--option`: `--note does not go with --option; keep the operator's word in the item's journal`
