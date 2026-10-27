@@ -267,6 +267,22 @@ def prepare_separate_rerun(
     return str(merge), release
 
 
+def assert_rerun_race_guard(
+    world: SeparateWorld, release: SeparateRelease, *, follow_up_checkout: Path
+) -> None:
+    observed_guard = {
+        "race.publications.after": release.publications,
+        "follow-up.cwd": Path.cwd(),
+        "follow-up.toplevel": Path(checkout.git_output(["rev-parse", "--show-toplevel"])),
+    }
+    expected_guard = {
+        "race.publications.after": world.case.publications,
+        "follow-up.cwd": follow_up_checkout,
+        "follow-up.toplevel": follow_up_checkout,
+    }
+    assert observed_guard == expected_guard
+
+
 def assert_separate_rerun_outcome(
     world: SeparateWorld,
     release: SeparateRelease,
@@ -276,22 +292,11 @@ def assert_separate_rerun_outcome(
     land_result: CliRun,
     land_tip: str | None,
     follow_up_checkout: Path,
-    release_result: CliRun | None = None,
 ) -> None:
-    """Assert the race guard, then the land (and, when it ran, the release) outcome
-    of a rerun in a separate checkout against the world's case."""
+    """Assert the race guard, then the land outcome of a rerun in a separate
+    checkout against the world's case."""
     case = world.case
-    observed_guard = {
-        "race.publications.after": release.publications,
-        "follow-up.cwd": Path.cwd(),
-        "follow-up.toplevel": Path(checkout.git_output(["rev-parse", "--show-toplevel"])),
-    }
-    expected_guard = {
-        "race.publications.after": case.publications,
-        "follow-up.cwd": follow_up_checkout,
-        "follow-up.toplevel": follow_up_checkout,
-    }
-    assert observed_guard == expected_guard
+    assert_rerun_race_guard(world, release, follow_up_checkout=follow_up_checkout)
     observed = {
         "land.exit": land_result.status,
         "land.stdout": land_result.stdout,
@@ -320,17 +325,6 @@ def assert_separate_rerun_outcome(
         "lane.exists": case.lane_exists,
         "lane.branch.exists": case.branch_exists,
     }
-    if release_result is not None:
-        observed |= {
-            "release.exit": release_result.status,
-            "release.stdout": release_result.stdout,
-            "release.stderr": release_result.stderr,
-        }
-        expected |= {
-            "release.exit": case.release_status,
-            "release.stdout": case.release_stdout,
-            "release.stderr": case.release_stderr,
-        }
     assert observed == expected
 
 
@@ -677,7 +671,11 @@ class TestLandAfterMergeRerun:
             land_result=land_result,
             land_tip=land_tip,
             follow_up_checkout=world.original,
-            release_result=release_result,
+        )
+        assert (release_result.status, release_result.stdout, release_result.stderr) == (
+            world.case.release_status,
+            world.case.release_stdout,
+            world.case.release_stderr,
         )
 
     @pytest.mark.parametrize(
