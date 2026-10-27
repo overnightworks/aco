@@ -642,8 +642,8 @@ def test_parser_refusal(
     arguments: list[str],
     sentence: str,
 ) -> None:
-    """Spec: Never 1 — parser requires exactly one of --yes, --no, --later, --option and a known
-    --via before command entry."""
+    """Spec: Never 1 — parser requires exactly one of --yes, --no, --later, --option, --other and
+    a known --via before command entry."""
 
     def forbidden(*args, **kwargs):
         pytest.fail("invalid outcomes reached the rule command entry")
@@ -668,4 +668,6 @@ def test_legacy_refusal_usage_names_no_option_flag(capsys: pytest.CaptureFixture
     with pytest.raises(SystemExit):
         cli.main(["rule", "90", "--line", "1"])
     usage_text = capsys.readouterr().err
-    assert [flag in usage_text for flag in ("--option", "--via", "--card-hash")] == [False] * 3
+    assert [flag in usage_text for flag in ("--option", "--other", "--via", "--card-hash")] == [
+        False
+    ] * 4

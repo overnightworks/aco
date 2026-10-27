@@ -225,12 +225,12 @@ class TestRuleOption:
             ),
             pytest.param(
                 ["--line", "1", "--yes", "--via", "chat"],
-                "--via and --card-hash go only with --option",
+                "--via and --card-hash go only with --option or --other",
                 id="via-without-option",
             ),
             pytest.param(
                 ["--line", "1", "--no", "--card-hash", GOLDEN_CARD_HASH],
-                "--via and --card-hash go only with --option",
+                "--via and --card-hash go only with --option or --other",
                 id="card-hash-without-option",
             ),
             pytest.param(

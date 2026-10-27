@@ -242,7 +242,7 @@ class TestOptionLineCheck:
             ),
             pytest.param(
                 ruled_card(('ruling = "A"', 'ruling = "C"')),
-                [malformed(f"{E}.ruling", f"{E}.ruling must be one of A, B")],
+                [malformed(f"{E}.ruling", f"{E}.ruling must be one of A, B, or other")],
                 id="BODY-78",
             ),
             pytest.param(
@@ -543,6 +543,7 @@ class TestOptionLineRulings:
             "card_hash": GOLDEN_CARD_HASH,
             "stored_card_hash": None,
             "via": None,
+            "other": None,
             "question": "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?",
             "problem": "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg.",
             "picture": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'

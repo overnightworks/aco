@@ -42,6 +42,9 @@ EXPECTATION_PICTURE_MAXIMUM_BYTES = 8 * 1024
 # (today plus four results), about 3 KB each.
 OPTION_LINE_PICTURES_MAXIMUM_BYTES = 16 * 1024
 OPTION_LETTERS = "ABCD"
+# The `ruling` of an option line decided with the operator's own answer, and
+# the key that holds that answer.
+OTHER = "other"
 OPTION_COUNT_MINIMUM = 2
 _CARD_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 _PICTURE = "picture"
@@ -320,6 +323,7 @@ _OPTION_LINE_KNOWN_KEYS = frozenset(
         "text",
         _OPTION_TABLES,
         *_OPTION_LINE_DECISION_KEYS,
+        OTHER,
         *OPTION_LINE_KEYS,
         *_OPTION_LINE_REFUSED_KEYS,
     }
@@ -380,20 +384,44 @@ def _card_hash_defect(value: object) -> str | None:
     return "must be sha256: followed by 64 lowercase hex digits"
 
 
+def _ruling_defect(letters: tuple[str, ...]) -> Callable[[object], str | None]:
+    """The check that a `ruling` is one of the line's present `letters` or
+    `other`; without a valid option count the count's own refusal stands alone."""
+
+    def defect(value: object) -> str | None:
+        if not letters or value == OTHER or value in letters:
+            return None
+        return f"must be one of {_one_of((*letters, OTHER))}"
+
+    return defect
+
+
+def _other_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
+    """`other` belongs exactly to a line ruled `other` and is then a non-empty string."""
+    path = f"{prefix}.{OTHER}"
+    if entry.get("ruling") != OTHER:
+        reason = f"belongs only to a line ruled {OTHER}" if OTHER in entry else None
+        return _field_defect(path, reason)
+    if OTHER not in entry:
+        return _field_defect(path, f"is required when ruling is {OTHER}")
+    return _field_defect(path, _non_empty_string_defect(entry[OTHER]))
+
+
 def _option_line_decision_defects(
     prefix: str, entry: dict[str, object], letters: tuple[str, ...]
 ) -> list[FieldDefect]:
     present = tuple(key in entry for key in _OPTION_LINE_DECISION_KEYS)
     if not any(present):
-        return []
+        return _other_defects(prefix, entry)
     if not all(present):
         return [_partial_decision_defect(prefix, entry)]
     ruled_on_reason = None if type(entry["ruled_on"]) is date else "must be a TOML local date"
     return [
-        *_field_defect(f"{prefix}.ruling", _letter_defect(letters)(entry["ruling"])),
+        *_field_defect(f"{prefix}.ruling", _ruling_defect(letters)(entry["ruling"])),
         *_field_defect(f"{prefix}.ruled_on", ruled_on_reason),
         *_field_defect(f"{prefix}.card_hash", _card_hash_defect(entry["card_hash"])),
         *_field_defect(f"{prefix}.via", _member_defect(tuple(RulingVia))(entry["via"])),
+        *_other_defects(prefix, entry),
     ]
 
 
@@ -633,7 +661,7 @@ def render_expectations(data: Mapping[str, object]) -> list[str]:
         option_line = is_option_line(expectation)
         lines.extend(("", "[[expectation]]"))
         lines.extend(
-            _rendered_present(expectation, ("text", "default", *_OPTION_LINE_DECISION_KEYS))
+            _rendered_present(expectation, ("text", "default", *_OPTION_LINE_DECISION_KEYS, OTHER))
         )
         card_keys = OPTION_LINE_KEYS if option_line else ("question", "example", _PICTURE)
         lines.extend(_rendered_present(expectation, card_keys))

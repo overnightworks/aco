@@ -39,6 +39,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     outcome.add_argument("--later", action="store_const", dest="ruling", const="later")
     # The option flags stay out of --help and usage so the yes/no refusals stay byte-identical.
     outcome.add_argument("--option", metavar="X", help=argparse.SUPPRESS)
+    outcome.add_argument("--other", metavar="TEXT", help=argparse.SUPPRESS)
     parser.add_argument("--note", help="appended to the line's own text as ' Anmerkung: TEXT'")
     parser.add_argument(
         "--via",
@@ -107,8 +108,9 @@ class _RuleReason(StrEnum):
 
 
 class FlagCombinationError(protocol.ClaimError):
-    """RULE-15: `--option` without `--via` and `--card-hash`, either of them
-    without `--option`, or `--note` beside `--option`."""
+    """RULE-15, RULE-21: `--option` or `--other` without `--via` and
+    `--card-hash`, either of them without one of the two, `--note` beside
+    either, `--via default` beside `--other`, or a blank `--other`."""
 
 
 @dataclass(frozen=True)
@@ -122,22 +124,43 @@ class YesNoOutcome:
 Outcome: TypeAlias = YesNoOutcome | expectations.OptionChoice
 
 
-def _outcome(parsed: argparse.Namespace) -> Outcome:
-    """The one outcome the flags name, or RULE-15's refusal of their
-    combination -- before any forge call."""
-    option_flags = (parsed.via, parsed.card_hash)
-    if parsed.option is None:
-        if any(flag is not None for flag in option_flags):
-            raise FlagCombinationError("--via and --card-hash go only with --option")
-        return YesNoOutcome(parsed.ruling, parsed.note)
+def _require_via_and_card_hash(parsed: argparse.Namespace, flag: str) -> None:
     if parsed.via is None or parsed.card_hash is None:
-        raise FlagCombinationError("--option needs --via and --card-hash")
+        raise FlagCombinationError(f"{flag} needs --via and --card-hash")
+
+
+def _letter_choice(parsed: argparse.Namespace) -> expectations.OptionChoice:
+    _require_via_and_card_hash(parsed, "--option")
     if parsed.note is not None:
         raise FlagCombinationError(
             "--note does not go with --option; keep the operator's word in the item's journal"
         )
     via = expectation_grammar.RulingVia(parsed.via)
     return expectations.OptionChoice(parsed.option, via, parsed.card_hash)
+
+
+def _other_choice(parsed: argparse.Namespace) -> expectations.OptionChoice:
+    _require_via_and_card_hash(parsed, "--other")
+    if parsed.note is not None:
+        raise FlagCombinationError("--note does not go with --other; its text is the answer")
+    via = expectation_grammar.RulingVia(parsed.via)
+    if via is expectation_grammar.RulingVia.DEFAULT:
+        raise FlagCombinationError("--via default keeps only the recommended option, not --other")
+    if not parsed.other.strip():
+        raise FlagCombinationError("--other needs a non-empty answer")
+    return expectations.OptionChoice(expectations.OtherAnswer(parsed.other), via, parsed.card_hash)
+
+
+def _outcome(parsed: argparse.Namespace) -> Outcome:
+    """The one outcome the flags name, or RULE-15's refusal of their
+    combination -- before any forge call."""
+    if parsed.option is not None:
+        return _letter_choice(parsed)
+    if parsed.other is not None:
+        return _other_choice(parsed)
+    if parsed.via is not None or parsed.card_hash is not None:
+        raise FlagCombinationError("--via and --card-hash go only with --option or --other")
+    return YesNoOutcome(parsed.ruling, parsed.note)
 
 
 def _emit_rule_result(

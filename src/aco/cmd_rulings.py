@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-from . import board_read, body, expectations, protocol, report, workboard
+from . import board_read, body, expectation_grammar, expectations, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -123,6 +123,7 @@ def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
         "card_hash": line.card_hash,
         "stored_card_hash": None if decision is None else decision.card_hash,
         "via": None if decision is None else decision.via.value,
+        expectation_grammar.OTHER: line.other_answer,
         **_rulings_option_line_card_json(line),
     }
 
