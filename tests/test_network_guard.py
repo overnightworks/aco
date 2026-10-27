@@ -1,4 +1,4 @@
-"""Behavioral tests for `tests/network_guard.py`.
+"""Behavioral tests for `tests/support/network_guard.py`.
 
 Git and gh are the boundaries the guard constrains, so each proof runs the
 real binary under `tmp_path`. The refused remotes point at a closed

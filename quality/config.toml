@@ -15,3 +15,8 @@ reason = "the web client, built apart from the Python package"
 [[root.allow]]
 entry = "specs/"
 reason = "the command specs that own each command's behaviour and printed literals"
+
+[[layout.allow]]
+path = "tests/test_network_guard.py"
+rule = "test-layout"
+reason = "tests the suite's own network guard plugin (tests/support/network_guard.py), which no src/aco module owns"

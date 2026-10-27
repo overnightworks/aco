@@ -1,8 +1,8 @@
 """The board's HTTP transport, driven beneath any route's own behaviour.
 
 Every scenario here is about the wire, not a particular route's decision
-rules (owned by `test_aco_board_api.py`) or its static files (owned by
-`test_aco_board_static.py`): a malformed or stalled request, a client that
+rules (owned by `test_board_api.py`) or its static files (owned by
+`test_board_static.py`): a malformed or stalled request, a client that
 leaves mid-answer, a broken decision source, loopback-only binding, and
 draining a stalled connection on shutdown. Only `aco` is a fake
 (`aco_board_fixtures.install_fake_aco`); the server, wire form, and adapter

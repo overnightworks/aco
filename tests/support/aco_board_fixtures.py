@@ -469,3 +469,67 @@ class BoardClient:
             )
         finally:
             connection.close()
+
+
+_SVG = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+
+
+def picture_option(letter: str = "A", **changes: object) -> dict[str, object]:
+    return {
+        "letter": letter,
+        "name": "Song stays open",
+        "effect": "The app jumps itself.",
+        "picture": _SVG,
+        "caption": "Still open",
+        "notice": "You stay in your song.",
+        "cost": "More code.",
+        "undo": "reversible",
+        "undo_how": "Any time.",
+        "contract": "The song stays open.",
+        **changes,
+    }
+
+
+def same_as_today_option(letter: str = "B", **changes: object) -> dict[str, object]:
+    return {
+        "letter": letter,
+        "name": "As today",
+        "effect": "The browser jumps.",
+        "same_as_today": True,
+        "notice": "You pick the song again.",
+        "cost": "None.",
+        "undo": "final",
+        "undo_how": "Nothing is built.",
+        "contract": "The link stays a link.",
+        **changes,
+    }
+
+
+def option_line(*, ruling: object = None, **changes: object) -> dict[str, object]:
+    """RUL-13's option line, E-RUL-07's card, open unless `ruling` is a letter or `other`."""
+    card_hash = "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a"
+    return {
+        "index": 1,
+        "form": "options",
+        "text": "The song stays open on the jump.",
+        "ruling": ruling,
+        "ruled_on": "2026-10-28" if ruling is not None else None,
+        "via": "board" if ruling is not None else None,
+        "other": None,
+        "returned_on": None,
+        "returned_note": None,
+        "default": None,
+        "card_hash": card_hash,
+        "stored_card_hash": card_hash if ruling is not None else None,
+        "question": "Keep the song open?",
+        "problem": "The jump closes your song.",
+        "picture": _SVG,
+        "caption": "Today",
+        "decision_kind": "product",
+        "area": "Song page",
+        "topic": "Jump",
+        "recommended": "A",
+        "reason": "Ends the loss.",
+        "options": [picture_option(), same_as_today_option()],
+        **changes,
+    }
