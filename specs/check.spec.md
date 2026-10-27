@@ -56,6 +56,8 @@ vocabulary is `valid`, `malformed`, `incomplete` and `unavailable`.
 | `-`, stdin is malformed or incomplete | CHECK-18 (BODY-01..56) | CHECK-19 |
 | `-`, stdin is not valid UTF-8 | CHECK-20 | CHECK-20 |
 | `-`, `.aco/board.toml` absent, or present but untracked or ignored | CHECK-21 (PIN-32, PIN-01) | CHECK-21 |
+| `-`, stdin is a socket, terminal, `/dev/null` or closed | CHECK-24 | CHECK-24 |
+| `-`, outside a git checkout | CHECK-25 (CHECK-10) | CHECK-25 |
 | `-`, `storage = "state-ref"` vs default `"github"` | CHECK-22 (BODY-15, BODY-16) | CHECK-22 |
 | `-`, `--repo` given | CHECK-23 | CHECK-23 |
 | `aco body`, the command this one replaced | CHECK-16 | CHECK-16 |
@@ -86,7 +88,7 @@ vocabulary is `valid`, `malformed`, `incomplete` and `unavailable`.
 | `-`, stdin valid and complete (CHECK-17) | `valid` | `0` |
 | `-`, stdin malformed (CHECK-18; BODY-01..56's own schema defect) | `malformed` | `2` |
 | `-`, stdin structurally valid but unfilled (CHECK-18) | `incomplete` | `2` |
-| `-`, stdin not UTF-8, or the pin untrusted (CHECK-20, CHECK-21) | `unavailable` | `2` |
+| `-`, stdin not UTF-8, the pin untrusted, stdin carries no body, or no checkout (CHECK-20, CHECK-21, CHECK-24, CHECK-25) | `unavailable` | `2` |
 | `--repo` given, `storage = "state-ref"`, `<n>` or `<sha>` (CHECK-11) | `invalid_usage` | `2` |
 | `<n>` past `aco-ffffff`, `storage = "state-ref"` (PIN-31) | `invalid_usage` | `2` |
 
@@ -137,6 +139,20 @@ owns only the CLI-level framing around it.
 - [ ] [CHECK-21] `aco check -` refuses PIN-32's sentence on an absent `.aco/board.toml`, PIN-01's on a present but untracked or ignored one, `--json` `reason: "unavailable"`, before stdin is ever read.
 - [ ] [CHECK-22] `aco check -` reads the storage pin for `[record]`'s validity: unknown under default `storage = "github"` (BODY-15), field-checked under `storage = "state-ref"` (BODY-16).
 - [ ] [CHECK-23] `aco check -` never reads the global `--repo`: it neither uses nor refuses it, under either storage.
+- [ ] [CHECK-24] A socket, terminal, `/dev/null` or closed stdin refuses `check - needs the body on stdin: aco check - < body.md`, `--json` `reason: "unavailable"`, exit `2`, unread, after CHECK-21's refusal.
+
+  ```console
+  $ aco check - < /dev/null
+  2> ERROR: check - needs the body on stdin: aco check - < body.md
+  exit 2
+  ```
+- [ ] [CHECK-25] `aco check -` outside a git checkout refuses CHECK-10's sentence, `--json` `reason: "unavailable"`, exit `2`, before stdin is read; the storage pin (CHECK-22) is the one repository fact it needs.
+
+  ```console
+  $ cd /tmp && printf 'x' | aco check -
+  2> ERROR: this command reads the repository's body contract from .aco/board.toml and needs a checkout (a shallow one is enough): <git detail>
+  exit 2
+  ```
 
 ## Never
 

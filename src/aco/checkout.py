@@ -35,17 +35,9 @@ IDENTITY_ENVIRONMENT_ORDER = (
 )
 
 
-# One owner for every git-subprocess failure sentence: `_git_run` launches
-# every `git` subprocess this module runs and translates the same three
-# launch-failure shapes -- a missing executable, a timeout, and any other
-# OS-level launch failure -- to the same `ClaimError` text (Sonar
-# S1192). `versioned_paths` and `path_is_tracked` fold into this one owner too.
-# `process.run_git` and
-# `process.git_failure_detail` own the argv shape and the
-# fallback reading `store.py` needs too; the `ClaimError` translation stays
-# here since `checkout`/`store` share one import-linter layer. `git_output`,
-# `versioned_paths`, and `path_is_tracked` each interpret a successful
-# launch's exit status their own way.
+# `_git_run` turns every launch failure of a git subprocess this module starts into a
+# `ClaimError`; `store` words its own, since the Layers contract lets neither
+# `checkout` nor `store` import the other.
 _GIT_MISSING_EXECUTABLE_ERROR = "git is required for issue claims"
 
 
@@ -939,7 +931,7 @@ def validate_checkout(
         raise ClaimError(f"claim must be acquired before the first worktree edit: {named}")
 
 
-DEFAULT_BRANCH_FALLBACK = frozenset({"main", "master"})
+DEFAULT_BRANCH_FALLBACK = ("main", "master")
 
 # `rescope`'s own denial when a resolved checkout's default branch cannot be
 # determined at all: unlike `claim`'s
@@ -1102,7 +1094,7 @@ def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) 
     if recorded_head is not None:
         return recorded_head
     remote_trunk = _first_resolving_ref(
-        (remote_tracking_ref(remote, "main"), remote_tracking_ref(remote, "master")),
+        tuple(remote_tracking_ref(remote, branch) for branch in DEFAULT_BRANCH_FALLBACK),
         directory=directory,
     )
     if remote_trunk is not None:
@@ -1112,7 +1104,7 @@ def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) 
             f"{TRUNK_UNKNOWN_REASON}: no {remote}/HEAD, {remote}/main or "
             f"{remote}/master resolves; run git remote set-head {remote} -a"
         )
-    local_trunk = _first_resolving_ref(("main", "master"), directory=directory)
+    local_trunk = _first_resolving_ref(DEFAULT_BRANCH_FALLBACK, directory=directory)
     if local_trunk is not None:
         return local_trunk
     raise TrunkUnknownError(

@@ -1,15 +1,12 @@
 """The forge port: repository identity, typed failures, and the read/write surface.
 
-`ForgeReader`/`ForgeWriter` are the contract the GitHub adapter, the only
-adapter, implements; `ForgeOperation` names every operation on that contract
-and `Capability` answers, per operation, whether an adapter can perform it at
-all. The GitHub adapter never itself refuses an operation. `cmd_land`,
-`cmd_release` and `cmd_item` depend on `GitHubForge` or `StateRefBoard`
-directly, so a second forge needs its own contract for them first.
-`board_read.load_board_config` is the one caller that branches on a capability
-answer -- reading a work-item body's dependencies requires
-`LIST_BOARD_DEPENDENCIES` at `READ_ONLY` or better, so a forge without it
-cannot serve a board at all.
+`ForgeReader`/`ForgeWriter` are the contract that `github.GitHubForge` and
+`state_board.StateRefBoard` both implement; `ForgeOperation` names every
+operation on that contract and `Capability` answers, per operation and adapter,
+whether an adapter can perform it at all. The GitHub adapter never answers
+`UNSUPPORTED`. `cmd_land` depends on `GitHubForge` directly, `cmd_item` on
+`StateRefBoard`, and `cmd_release` on both, so a further forge needs its own
+contract for them first.
 """
 
 from __future__ import annotations
@@ -325,17 +322,7 @@ class BoardSource(Protocol):
     def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]: ...
 
 
-class ForgeReader(Protocol):
-    @property
-    def repository(self) -> RepositoryId: ...
-
-    @property
-    def requests(self) -> int:
-        """See `BoardSource.requests`."""
-        ...
-
-    def capability(self, operation: ForgeOperation) -> Capability: ...
-
+class ForgeReader(BoardSource, Protocol):
     def item_reference(self, number: int) -> ItemReference: ...
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, ItemReference]:
@@ -361,19 +348,7 @@ class ForgeReader(Protocol):
         can decode never stops it."""
         ...
 
-    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]: ...
-
     def default_branch(self) -> str: ...
-
-    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]: ...
-
-    def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]: ...
-
-    def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]: ...
-
-    def list_recent_merged_board_pull_requests(
-        self, since: datetime
-    ) -> tuple[workboard.PullRequest, ...]: ...
 
     def list_recently_closed_issues(self, since: datetime) -> tuple[ClosedIssue, ...]:
         """Every issue closed at or after `since`, never a pull request --

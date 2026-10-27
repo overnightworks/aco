@@ -12,6 +12,7 @@ from . import board_read, body, checkout, forge, policy, protocol, report, workb
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 STDIN_SUBJECT = "-"
+_STDIN_CARRIES_NO_BODY = "check - needs the body on stdin: aco check - < body.md"
 
 
 class CheckInput(Enum):
@@ -253,8 +254,12 @@ def _check_piped_body(parsed: argparse.Namespace, context: RunContext) -> int:
     its forge. It still reads the repository's own storage pin: `[record]` is
     a known key under `storage = "state-ref"` and an unknown one under
     `storage = "github"`, the same gate `session._state_ref_forge`'s own items
-    already read through `state_board._decode_item`."""
+    already read through `state_board._decode_item`. A stdin that carries no
+    body (an idle harness socket, a terminal, `/dev/null`) is refused after
+    the pin and before any read, so the command never waits on it (CHECK-24)."""
     storage = context.config.storage
+    if not report.stdin_carries_a_body():
+        raise protocol.ClaimUnavailableError(_STDIN_CARRIES_NO_BODY)
     check = body.body_shape_check(report.read_piped_body(), storage=storage)
     return _body_check_report(check, as_json=parsed.json)
 
