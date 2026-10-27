@@ -33,8 +33,9 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
-| option line defective | BODY-69..BODY-84, BODY-86, BODY-87, BODY-90 | BODY-50 | BODY-52 |
+| option line defective | BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91 | BODY-50 | BODY-52 |
 | complete option line, open or ruled | BODY-85, BODY-89 | — | — |
+| option line ruled `other` | BODY-92 | — | — |
 | a rewrite of a block carrying expectation lines | BODY-88 | — | — |
 | `[[slice]]` defective | BODY-43..BODY-48, BODY-65 | BODY-50 | BODY-52 |
 | a `[[slice]]` title holding a display control (`specs/next.spec.md`) | BODY-63 | BODY-64 | BODY-64 |
@@ -112,12 +113,13 @@ An entry carrying `option` is an option line; any other is a yes/no line,
 judged by BODY-26..BODY-42 exactly as before. Its keys, in the order a rewrite
 writes them:
 
-- `text`, then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open);
+- `text`, then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open), and `other` exactly when `ruling` is `other`;
 - `question`, `problem`, `picture` (TODAY), `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required;
 - 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then either `picture` with an optional `caption` or `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
 
 The options' letters are `A`..`D` by position and never stored; `<L>` below
-is the present letters, for example `A, B`. Inside one entry the refusals print
+is the present letters, for example `A, B`. A line ruled `other` is bound by
+`other`, not by its `text` or options. Inside one entry the refusals print
 in this order: `text`, decided state, line keys, options, pictures, picture
 budget, unknown keys, and last BODY-87, only when no other refusal fired.
 
@@ -130,7 +132,7 @@ budget, unknown keys, and last BODY-87, only when no other refusal fired.
 - [ ] [BODY-75] Another `decision_kind` prints `body malformed: expectation[0].decision_kind: expectation[0].decision_kind must be product, technical, data_risk, money, access, wording, or release` (see E-BODY-11).
 - [ ] [BODY-76] An `undo` other than `reversible` or `final` prints `body malformed: expectation[0].option[0].undo: expectation[0].option[0].undo must be reversible or final` (see E-BODY-11).
 - [ ] [BODY-77] A `recommended` that is not a present letter prints `body malformed: expectation[0].recommended: expectation[0].recommended must be one of <L>`, exit `2` (see E-BODY-11).
-- [ ] [BODY-78] A `ruling` that is not a present letter prints `body malformed: expectation[0].ruling: expectation[0].ruling must be one of <L>`, exit `2`; a bad `ruled_on` keeps BODY-32 (see E-BODY-12).
+- [ ] [BODY-78] A `ruling` outside <L> and `other` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be one of <L>, or other`, exit `2`; a bad `ruled_on` keeps BODY-32 (see E-BODY-12).
 - [ ] [BODY-79] A `default` or `example` on an option line prints `body malformed: expectation[0].<key>: expectation[0].<key> does not belong on an option line`, exit `2` (see E-BODY-11).
 - [ ] [BODY-80] An option's result breaking one rule prints that rule's sentence below, exit `2` (see E-BODY-11):
   - neither `picture` nor `same_as_today`: `body malformed: expectation[0].option[1].picture: expectation[0].option[1] must carry exactly one of picture and same_as_today = true`
@@ -154,10 +156,17 @@ budget, unknown keys, and last BODY-87, only when no other refusal fired.
 - [ ] [BODY-88] A rewrite writes each present key in the order above, line keys before option tables; it re-reads to the same values, and a second rewrite changes no byte, LF or CRLF.
 - [ ] [BODY-89] `card_hash` is `sha256:` and the SHA-256 hex of the shown card's present keys as compact, key-sorted UTF-8 JSON, the option tables under `options` (see E-BODY-10).
 - [ ] [BODY-90] A `via` other than `board`, `chat` or `default` prints `body malformed: expectation[0].via: expectation[0].via must be board, chat, or default`, exit `2` (see E-BODY-12).
+- [ ] [BODY-91] An `other` breaking one rule prints that rule's sentence below, exit `2`; it is checked after the rest of the decided state (see E-BODY-14):
+  - `expectation[0].other is required when ruling is other`
+  - `expectation[0].other belongs only to a line ruled other`
+  - `expectation[0].other must be a non-empty string`
+
+  Each is prefixed `body malformed: expectation[0].other: `.
+- [ ] [BODY-92] An option line ruled `other` with `ruled_on`, its card's `card_hash`, `via` and a non-empty `other` prints `body ok`, exit `0`; its card edited later prints BODY-87 (see E-BODY-14).
 
 The card hash belongs to option lines and covers every key listed above except
 the decided state. It never covers the item title, the index, `ruling`, `ruled_on`,
-`card_hash` or `via`, and it reads parsed values, so TOML quoting, key order and line
+`card_hash`, `via` or `other`, and it reads parsed values, so TOML quoting, key order and line
 endings cannot change it.
 
 ## `[[slice]]`
@@ -670,7 +679,7 @@ exit 2
 ````
 
 The same card with `ruling = "C"`, `ruled_on = 2026-10-28`, the hash
-above and `via = "board"` prints `2> body malformed: expectation[0].ruling: expectation[0].ruling must be one of A, B`, exit `2`.
+above and `via = "board"` prints `2> body malformed: expectation[0].ruling: expectation[0].ruling must be one of A, B, or other`, exit `2`.
 Ruled `A` with `via = "phone"` it prints
 `2> body malformed: expectation[0].via: expectation[0].via must be board, chat, or default`, exit `2`,
 and without `via` it prints `2> body malformed: expectation[0].via: expectation[0] is ruled without via`, exit `2`.
@@ -729,3 +738,63 @@ BODY
 2> body malformed: expectation[0].card_hash: expectation[0] was edited after its ruling; a changed ruling is a new line
 exit 2
 ````
+
+### E-BODY-14 — an option line decided with the operator's own answer
+
+Setup: bare-remote, `storage = "github"`; E-BODY-12's card ruled `other` on 2026-10-28
+with its hash, `via = "chat"` and the operator's answer in `other`:
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Der Song bleibt beim Sprung offen."
+ruling = "other"
+ruled_on = 2026-10-28
+card_hash = "sha256:6308916341e71850961411f654688124981f4854f6380da12f456a216ac97908"
+via = "chat"
+other = "Nur auf dem Desktop offen lassen; auf dem Handy wie heute."
+question = "Song offen lassen?"
+problem = "Der Song schließt sich."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+caption = "Heute"
+decision_kind = "product"
+area = "Song-Seite"
+topic = "Sprung"
+recommended = "A"
+reason = "Behebt den Verlust."
+
+[[expectation.option]]
+name = "Song bleibt offen"
+effect = "Die App springt selbst."
+picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+notice = "Du bleibst im Song."
+cost = "Mehr Code."
+undo = "reversible"
+undo_how = "jederzeit."
+contract = "Der Song bleibt offen."
+
+[[expectation.option]]
+name = "Wie heute"
+effect = "Der Browser springt."
+same_as_today = true
+notice = "Du wählst neu."
+cost = "Keine."
+undo = "final"
+undo_how = "nichts gebaut."
+contract = "Der Link bleibt."
+```
+BODY
+body ok
+exit 0
+````
+
+The same card without `other` prints `2> body malformed: expectation[0].other: expectation[0].other is required when ruling is other`, exit `2`.
+With `other = "  "` it prints `2> body malformed: expectation[0].other: expectation[0].other must be a non-empty string`, exit `2`.
+With `ruling = "A"` beside `other`, or `other` on an open line, it prints `2> body malformed: expectation[0].other: expectation[0].other belongs only to a line ruled other`, exit `2`.
+With `area = "Song-Liste"` it prints BODY-87's sentence, exit `2`: the answer is not part of the hash.
