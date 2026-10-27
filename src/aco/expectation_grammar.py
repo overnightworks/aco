@@ -45,6 +45,9 @@ OPTION_LETTERS = "ABCD"
 # The `ruling` of an option line decided with the operator's own answer, and
 # the key that holds that answer.
 OTHER = "other"
+# The keys of an open option line sent back to its head, and its optional note.
+RETURNED_ON = "returned_on"
+RETURNED_NOTE = "returned_note"
 OPTION_COUNT_MINIMUM = 2
 _CARD_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 _PICTURE = "picture"
@@ -318,12 +321,16 @@ _EXPECTATION_KNOWN_KEYS = frozenset(
 )
 _OPTION_TABLES = "option"
 _OPTION_LINE_DECISION_KEYS = ("ruling", "ruled_on", "card_hash", "via")
+# Everything an option line says about its state, in rendering order after `text`.
+_OPTION_LINE_STATE_KEYS = (*_OPTION_LINE_DECISION_KEYS, OTHER, RETURNED_ON, RETURNED_NOTE)
 _OPTION_LINE_KNOWN_KEYS = frozenset(
     {
         "text",
         _OPTION_TABLES,
         *_OPTION_LINE_DECISION_KEYS,
         OTHER,
+        RETURNED_ON,
+        RETURNED_NOTE,
         *OPTION_LINE_KEYS,
         *_OPTION_LINE_REFUSED_KEYS,
     }
@@ -407,12 +414,42 @@ def _other_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
     return _field_defect(path, _non_empty_string_defect(entry[OTHER]))
 
 
+def _returned_defects(
+    prefix: str, entry: dict[str, object], *, open_line: bool
+) -> list[FieldDefect]:
+    """`returned_on` and `returned_note` belong to an open line: a date, and
+    beside it an optional non-empty note."""
+    on_path, note_path = f"{prefix}.{RETURNED_ON}", f"{prefix}.{RETURNED_NOTE}"
+    if not open_line:
+        return [
+            *_field_defect(
+                on_path, "belongs only to an open line" if RETURNED_ON in entry else None
+            ),
+            *_field_defect(
+                note_path, "belongs only to an open line" if RETURNED_NOTE in entry else None
+            ),
+        ]
+    on_reason = None
+    if RETURNED_ON in entry and type(entry[RETURNED_ON]) is not date:
+        on_reason = "must be a TOML local date"
+    if RETURNED_NOTE not in entry:
+        note_reason = None
+    elif RETURNED_ON not in entry:
+        note_reason = "needs returned_on beside it"
+    else:
+        note_reason = _non_empty_string_defect(entry[RETURNED_NOTE])
+    return [*_field_defect(on_path, on_reason), *_field_defect(note_path, note_reason)]
+
+
 def _option_line_decision_defects(
     prefix: str, entry: dict[str, object], letters: tuple[str, ...]
 ) -> list[FieldDefect]:
     present = tuple(key in entry for key in _OPTION_LINE_DECISION_KEYS)
     if not any(present):
-        return _other_defects(prefix, entry)
+        return [
+            *_other_defects(prefix, entry),
+            *_returned_defects(prefix, entry, open_line=True),
+        ]
     if not all(present):
         return [_partial_decision_defect(prefix, entry)]
     ruled_on_reason = None if type(entry["ruled_on"]) is date else "must be a TOML local date"
@@ -422,6 +459,7 @@ def _option_line_decision_defects(
         *_field_defect(f"{prefix}.card_hash", _card_hash_defect(entry["card_hash"])),
         *_field_defect(f"{prefix}.via", _member_defect(tuple(RulingVia))(entry["via"])),
         *_other_defects(prefix, entry),
+        *_returned_defects(prefix, entry, open_line=False),
     ]
 
 
@@ -660,9 +698,7 @@ def render_expectations(data: Mapping[str, object]) -> list[str]:
     for expectation in cast(list[dict[str, object]], data.get("expectation", [])):
         option_line = is_option_line(expectation)
         lines.extend(("", "[[expectation]]"))
-        lines.extend(
-            _rendered_present(expectation, ("text", "default", *_OPTION_LINE_DECISION_KEYS, OTHER))
-        )
+        lines.extend(_rendered_present(expectation, ("text", "default", *_OPTION_LINE_STATE_KEYS)))
         card_keys = OPTION_LINE_KEYS if option_line else ("question", "example", _PICTURE)
         lines.extend(_rendered_present(expectation, card_keys))
         for option in cast(list[dict[str, object]], expectation.get(_OPTION_TABLES, [])):
