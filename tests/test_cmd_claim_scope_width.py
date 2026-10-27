@@ -140,7 +140,7 @@ REFUSALS = [
             WidthCase(
                 Command.RESCOPE,
                 ("LICENSE", "README.md"),
-                trunk=TRUNK_OF_TWELVE,
+                trunk=("src/widget.py", "LICENSE", "README.md"),
                 standing_scope=("src",),
             )
         ),
@@ -408,12 +408,14 @@ def test_an_untracked_scope_entry_outside_a_working_tree_keeps_the_checkout_refu
 ) -> None:
     case = WidthCase(Command.CLAIM, ("scratch",))
     standpoint = arrange(stand_in, monkeypatch, case)
-    reading_the_toplevel = checkout.git_output
+    read_git = checkout.git_output
 
-    def outside_a_working_tree(arguments: list[str], **options: object) -> str:
+    def outside_a_working_tree(
+        arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+    ) -> str:
         if arguments == ["rev-parse", "--show-toplevel"]:
             raise ClaimError("fatal: this operation must be run in a work tree")
-        return reading_the_toplevel(arguments, **options)
+        return read_git(arguments, directory=directory, literal_pathspecs=literal_pathspecs)
 
     monkeypatch.setattr(checkout, "git_output", outside_a_working_tree)
 
