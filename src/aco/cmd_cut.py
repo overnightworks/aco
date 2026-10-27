@@ -143,7 +143,7 @@ class PartialWriteError(protocol.ClaimError):
     """Wraps `forge.ForgePartialCreationError` so `cut` and `item new`
     can choose `partial_write`'s own structured `--json` shape (`written`,
     `failed`) without parsing the wrapped error's prose (mirrors `ask`/
-    `rule`'s own `cmd_rule.TargetUnavailableError`/`cmd_rule.InvalidTargetError`);
+    `rule`'s own `cmd_rule.InvalidTargetError`);
     `recovery` is the caller's own way to finish the write."""
 
     def __init__(self, error: forge.ForgePartialCreationError, *, recovery: str) -> None:
@@ -478,16 +478,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     try:
         client = context.forge_writer
         number = int(parsed.issue)
-        for operation in (
-            forge.ForgeOperation.CREATE_CHILD,
-            forge.ForgeOperation.LINK_CHILD,
-            forge.ForgeOperation.UPDATE_ITEM_BODY,
-        ):
-            if client.capability(operation) is not forge.Capability.READ_WRITE:
-                raise protocol.ClaimUnavailableError(
-                    f"this forge cannot {operation.value}; cut the slice by hand"
-                )
-        config = board_read.load_board_config(client, context)
+        config = context.config
         open_issues = client.list_open_board_issues()
         target = _cut_target(client, open_issues, number, config.storage)
         return _cut_slice(client, target, open_issues, parsed, config)

@@ -106,16 +106,6 @@ def _read_picture_file(path: str) -> str:
         raise _PictureFileError(f"--picture {path} could not be read: {error}") from error
 
 
-def _ask_target_reason(
-    error: cmd_rule.TargetUnavailableError | cmd_rule.InvalidTargetError,
-) -> _AskReason:
-    """`run`'s own mapping from `cmd_rule.require_writable_target`'s two
-    target refusals to their `--json` `reason`."""
-    if isinstance(error, cmd_rule.TargetUnavailableError):
-        return _AskReason.UNAVAILABLE
-    return _AskReason.INVALID_ITEM
-
-
 def _ask_expectation_reason(
     error: expectations.ExpectationTextError | expectations.ExpectationFieldError,
 ) -> _AskReason:
@@ -161,8 +151,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         return _append_expectation_card(parsed, context)
     except _PictureFileError as error:
         return report.refuse(_AskReason.INVALID_PICTURE, error, as_json=as_json)
-    except (cmd_rule.TargetUnavailableError, cmd_rule.InvalidTargetError) as error:
-        return report.refuse(_ask_target_reason(error), error, as_json=as_json)
+    except cmd_rule.InvalidTargetError as error:
+        return report.refuse(_AskReason.INVALID_ITEM, error, as_json=as_json)
     except (expectations.ExpectationTextError, expectations.ExpectationFieldError) as error:
         return report.refuse(_ask_expectation_reason(error), error, as_json=as_json)
     except RepoMeaninglessUnderStateRefError as error:

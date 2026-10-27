@@ -20,31 +20,31 @@
 "src/aco/cli.py" = 849
 "src/aco/cmd_claim.py" = 1136
 "src/aco/cmd_release.py" = 921
-"src/aco/github.py" = 1764
+"src/aco/github.py" = 1730
 "src/aco/protocol.py" = 1877
-"src/aco/state_board.py" = 957
+"src/aco/state_board.py" = 930
 "src/aco/store.py" = 2102
 "src/aco/workboard.py" = 3138
 "tests/aco_board/test_aco_board_api.py" = 1059
 "tests/cli_fixtures.py" = 969
-"tests/github_fixtures.py" = 838
+"tests/github_fixtures.py" = 835
 "tests/test_adopt.py" = 1650
 "tests/test_board.py" = 4315
 "tests/test_checkout.py" = 2047
-"tests/test_cli.py" = 17661
-"tests/test_cut.py" = 1124
-"tests/test_github.py" = 3203
+"tests/test_cli.py" = 17656
+"tests/test_cut.py" = 1072
+"tests/test_github.py" = 3181
 "tests/test_land_after_merge_rerun.py" = 880
 "tests/test_land_preflight_claim.py" = 858
 "tests/test_protocol.py" = 802
 "tests/test_release_cleanup.py" = 807
 "tests/test_rescope_checkout.py" = 1087
 "tests/test_reset.py" = 954
-"tests/test_state_board.py" = 6109
+"tests/test_state_board.py" = 6105
 "tests/test_store.py" = 5459
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 104
+"build_board" = 101
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 84
@@ -81,9 +81,6 @@
 "landed_observations" = 61
 "lane_landing_world" = 71
 
-[function_lines."tests/test_ask.py"]
-"TestGithubAsk.test_refusal" = 61
-
 [function_lines."tests/test_board.py"]
 "test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change" = 61
 
@@ -108,7 +105,7 @@
 "test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 61
 
 [function_lines."tests/test_cut.py"]
-"cut_check" = 63
+"cut_check" = 61
 
 [function_lines."tests/test_github.py"]
 "test_github_adapter_item_references_reads_every_number_from_one_batch" = 64

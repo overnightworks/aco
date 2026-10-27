@@ -71,22 +71,6 @@ def validated_dependencies(
     return validated
 
 
-def load_board_config(client: forge.BoardSource, context: RunContext) -> workboard.BoardConfig:
-    """`context`'s board configuration, validated against what `client`
-    can actually do: reading a body's dependencies requires
-    `list_board_dependencies` at read-only or better, and the typed block is
-    the one body grammar, so every repository needs it."""
-    config = context.config
-    if (
-        client.capability(forge.ForgeOperation.LIST_BOARD_DEPENDENCIES)
-        is forge.Capability.UNSUPPORTED
-    ):
-        raise protocol.ClaimError(
-            "reading work-item bodies requires forge operation list_board_dependencies"
-        )
-    return config
-
-
 def fetch_issue_reference(client: forge.ForgeReader, number: int) -> forge.ItemReference:
     """The live state, title, and body of issue `number` from `client`.
 
@@ -262,7 +246,7 @@ def build_board(
     history = history or ClaimHistory()
     now = datetime.now(UTC)
     client = context.forge
-    config = load_board_config(client, context)
+    config = context.config
     if issues is None:
         issues = client.list_open_board_issues()
     since = workboard.merged_pull_request_floor(issues, now)
@@ -349,10 +333,7 @@ def build_board(
             lane_events=history.lane_events,
             unparsed_lifecycle_commits=history.unparsed_lifecycle_commits,
             closed_item_sizes=closed_item_sizes,
-            open_pull_requests_supported=(
-                client.capability(forge.ForgeOperation.LIST_OPEN_BOARD_PULL_REQUESTS)
-                is not forge.Capability.UNSUPPORTED
-            ),
+            open_pull_requests_supported=client.lists_pull_requests,
         )
     )
 
@@ -484,10 +465,3 @@ def require_readable_item(client: forge.ForgeReader, issue: workboard.Issue | No
     unreadable, so this does nothing there."""
     if issue is not None and issue.unreadable is not None:
         client.item_reference(issue.number)
-
-
-def require_update_item_body(client: forge.ForgeWriter, *, command: str) -> None:
-    if client.capability(forge.ForgeOperation.UPDATE_ITEM_BODY) is not forge.Capability.READ_WRITE:
-        raise protocol.ClaimUnavailableError(
-            f"this forge cannot update_item_body; {command} by hand"
-        )

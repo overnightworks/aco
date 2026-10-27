@@ -280,14 +280,11 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
             return _check_trunk_commit(parsed, context)
         number = int(parsed.number)
         client = context.forge
-        # Read for its refusals only: a repository pinned to a grammar this
-        # tool no longer reads, or a forge that cannot answer `blocked_by`,
-        # must fail here rather than hand back a half-read answer. Every
-        # further forge read (the reference itself, the PR/issue body it
-        # dispatches to) stays inside this handler too, so a forge failure
+        # Every forge read (the reference itself, the PR/issue body it
+        # dispatches to) stays inside this handler, so a forge failure
         # anywhere on the check path reports `unavailable` through the
         # shared envelope rather than the plain sentence alone.
-        config = board_read.load_board_config(client, context)
+        config = context.config
         repository = client.repository.path
         reference = client.item_reference(number)
         if reference.state is forge.ItemState.MISSING:

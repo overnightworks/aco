@@ -158,8 +158,8 @@ class FakeForge:
     scripted_item_reads: list[str | forge.ForgeError | None] = field(default_factory=list)
     fail_create_child_relation: bool = False
     fail_set_item_kind: bool = False
+    lists_pull_requests: bool = True
     drop_created_issue_type: bool = False
-    capability_overrides: dict[forge.ForgeOperation, forge.Capability] = field(default_factory=dict)
     readiness_by_number: dict[int, forge.LandingReadiness] = field(default_factory=dict)
     # What each read after the first answers, the last state repeating: GitHub
     # settling a pull request's `mergeable_state` between two reads.
@@ -197,9 +197,6 @@ class FakeForge:
         fans these reads out across worker threads."""
         with self._requests_lock:
             self.requests += 1
-
-    def capability(self, operation: forge.ForgeOperation) -> forge.Capability:
-        return self.capability_overrides.get(operation, github.GITHUB_CAPABILITIES[operation])
 
     def create_issue(self, *, title: str, body: str, kind: body.ItemKind) -> int:
         """This fake's mirror of `GitHubForge.create_issue`: a fresh issue
