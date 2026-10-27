@@ -22,6 +22,7 @@ from typing import TypeVar
 from .ports import (
     OPTION_LETTERS,
     OPTIONS_FORM,
+    OTHER_RULING,
     CardChanged,
     CardOption,
     Decision,
@@ -32,6 +33,7 @@ from .ports import (
     OptionDecision,
     OptionLetter,
     OptionLine,
+    OptionRuling,
     Outcome,
     RulingVia,
     YesNoLine,
@@ -248,11 +250,22 @@ def _option_line(item: int, title: str, fields: dict[str, object]) -> OptionLine
         recommended=recommended,
         reason=_required(fields, "reason", str),
         options=options,
-        ruling=None if fields["ruling"] is None else _letter(fields, "ruling", letters),
+        ruling=_option_ruling(fields, letters),
         ruled_on=_optional_date(fields, "ruled_on"),
         via=_optional_member(fields, "via", RulingVia, "board, chat or default"),
         card_hash=_required(fields, "card_hash", str),
+        other=_optional_text(fields, "other"),
     )
+
+
+def _option_ruling(
+    fields: dict[str, object], letters: tuple[OptionLetter, ...]
+) -> OptionRuling | None:
+    if fields["ruling"] is None:
+        return None
+    if fields["ruling"] == OTHER_RULING:
+        return OTHER_RULING
+    return _letter(fields, "ruling", letters)
 
 
 def _letter(fields: dict[str, object], key: str, letters: tuple[OptionLetter, ...]) -> OptionLetter:

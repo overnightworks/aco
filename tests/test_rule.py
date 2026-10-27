@@ -630,6 +630,11 @@ def test_context_refusal(
             id="yes-and-option",
         ),
         pytest.param(
+            ["rule", "90", "--line", "1", "--other", "Anders", "--option", "A"],
+            "aco rule: error: argument --option: not allowed with argument --other",
+            id="other-and-option",
+        ),
+        pytest.param(
             ["rule", "90", "--line", "1", "--option", "A", "--via", "phone"],
             "aco rule: error: argument --via: invalid choice: 'phone'",
             id="unknown-via",

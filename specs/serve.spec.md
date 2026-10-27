@@ -56,7 +56,7 @@ resolved directory's name.
 - [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
 - [ ] [ABRD-07] A yes/no line with a `default` or `ruling` that is no outcome, a malformed option line (below), another `form`, or a `ruled_on` that is no ISO date shows `aco rulings --json is unreadable: <detail>`.
 
-An option line is malformed when its `ruling` or `recommended` is no letter of its options, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
+An option line is malformed when its `recommended` is no letter of its options, its `ruling` is neither `other` nor such a letter, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
 ## Browser decision flow
 
