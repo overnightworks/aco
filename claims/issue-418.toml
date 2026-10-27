@@ -1,8 +1,0 @@
-claim_id = "500cd436d7fa4e989832ad962f9ba2fd"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "0e50c992f090bfce1d268752305d73aedb82d741"
-branch = "claude/issue-418-check-stdin-idle"
-scope = ["quality/baseline.toml", "specs/check.spec.md", "src/aco/cmd_check.py", "src/aco/cmd_item.py", "src/aco/report.py", "tests/test_check_stdin.py", "tests/test_cli.py", "tests/test_state_board.py"]
-opened_commit = "66dbace477f2f1913a4e8ca387ce86ee6658b6ef"
-whole_reason = "One fix to one stdin guard: its single owner moves to report.py and check - uses it, with CHECK-24 and CHECK-25, their tests, and the three small test-fixture edits that put a real pipe where a StringIO stood."
