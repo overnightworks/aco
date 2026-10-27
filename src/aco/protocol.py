@@ -278,9 +278,24 @@ def terminal_block(text: str) -> str:
     return "\n".join(terminal_text(line) for line in text.split("\n"))
 
 
+def has_line_control(text: str) -> bool:
+    """Whether `text` holds what a one-line field refuses: TAB or any
+    `is_display_control` character (CLAIM-20, CLAIM-58)."""
+    return any(character == "\t" or is_display_control(character) for character in text)
+
+
 def has_control_character(text: str) -> bool:
     return any(
         ord(character) < ASCII_PRINTABLE_MIN or ord(character) == ASCII_DEL for character in text
+    )
+
+
+def _is_bounded_line(value: str, maximum: int) -> bool:
+    return (
+        bool(value)
+        and value == value.strip()
+        and len(value) <= maximum
+        and not has_line_control(value)
     )
 
 
@@ -288,31 +303,19 @@ def _required_text(payload: dict[str, object], key: str, *, maximum: int = 512) 
     value = payload.get(key)
     if not isinstance(value, str):
         raise InvalidClaimMarkerError(f"claim marker field {key!r} must be text")
-    normalized = value.strip()
-    if (
-        not normalized
-        or normalized != value
-        or len(normalized) > maximum
-        or has_control_character(normalized)
-    ):
+    if not _is_bounded_line(value, maximum):
         raise InvalidClaimMarkerError(
             f"claim marker field {key!r} must be one bounded non-empty line"
         )
-    return normalized
+    return value
 
 
 def outbound_text(value: object, field: str, *, maximum: int) -> str:
     if not isinstance(value, str):
         raise ClaimError(f"{field} must be text")
-    normalized = value.strip()
-    if (
-        not normalized
-        or normalized != value
-        or len(normalized) > maximum
-        or has_control_character(normalized)
-    ):
+    if not _is_bounded_line(value, maximum):
         raise ClaimError(f"{field} must be one bounded non-empty line")
-    return normalized
+    return value
 
 
 def outbound_resource_name(value: object) -> str:
@@ -400,12 +403,7 @@ def valid_scope(scope: object) -> tuple[str, ...]:
     either was typed in."""
     result: list[str] = []
     for path in _scope_list_entries(scope):
-        if (
-            len(path) > MAX_SCOPE_PATH_LENGTH
-            or "\\" in path
-            # A path also refuses TAB, which a display keeps (CLAIM-20).
-            or any(character == "\t" or is_display_control(character) for character in path)
-        ):
+        if len(path) > MAX_SCOPE_PATH_LENGTH or "\\" in path or has_line_control(path):
             raise InvalidClaimMarkerError(SCOPE_ENTRIES_MUST_BE_CANONICAL)
         parsed = PurePosixPath(path)
         windows_path = PureWindowsPath(path)

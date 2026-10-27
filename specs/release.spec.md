@@ -63,7 +63,7 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 ## Flags and outcome
 
 - [ ] [REL-01] `aco release` with neither `--merged PULL_REQUEST` nor `--abandoned REASON`, or with both, is refused by the parser itself before anything runs, exit `2`; with `--json`, through OUT-06.
-- [ ] [REL-02] An `--abandoned` value blank, padded, with a control character, multiline, or over 512 characters refuses `abandoned reason must be one bounded non-empty line`, exit `2`.
+- [ ] [REL-02] An `--abandoned` value blank, padded, with a control character or display control (NEXT-37), multiline, or over 512 characters refuses `abandoned reason must be one bounded non-empty line`, exit `2`.
 
 ## Identity and branch resolution
 
