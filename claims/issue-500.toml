@@ -1,8 +1,0 @@
-claim_id = "aae4a5d11a2e4e058c246490dcc1af0e"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "24f451cf2e16a01352175e3d709c22c19217d49e"
-branch = "claude/issue-500-rescope-item-body-real-worktree"
-scope = ["quality/baseline.toml", "tests/test_cli.py", "tests/test_cmd_item_whole.py", "tests/test_cmd_rescope_item_body.py"]
-opened_commit = "d3b82010df681f70c6102b2c625e97b9921c96ad"
-whole_reason = "quality v0.7.0 forbids one test module importing another and holds tests/test_cli.py to its baseline, so the deletion from tests/test_cli.py, the two new owner modules and the rewritten baseline land together."
