@@ -1,8 +1,0 @@
-claim_id = "5c536c0b58db40ca9bbc1260cbc9f3f9"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "3be1e40b8d87cd5c1ab6b0f0645d49025baf23e8"
-branch = "claude/issue-433-fold-test-families"
-scope = ["quality/baseline.toml", "tests/test_board.py", "tests/test_check_stdin.py", "tests/test_checkout.py", "tests/test_claim_display_controls.py", "tests/test_github.py", "tests/test_land_after_merge_rerun.py", "tests/test_store.py"]
-opened_commit = "7ef4bdc8a56b5b935c54b2fe4b0bde6b61941abc"
-whole_reason = "Test-only bundle: six near-identical test families across five test files, one redundant fixture marker, two missing display-control drives, and the size baseline those files are listed in."
