@@ -265,7 +265,7 @@ def container_with_children(
 ) -> tuple[workboard.Issue, tuple[workboard.ChildItem, ...]]:
     """A container whose child-count summary matches its sub-issue list: the
     `open_children` numbers listed open, then `closed` closed children
-    numbered above 1000."""
+    numbered from 1000."""
     listed = (
         *(workboard.ChildItem(child, workboard.ChildState.OPEN) for child in open_children),
         *(
