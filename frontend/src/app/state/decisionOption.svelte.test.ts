@@ -107,5 +107,5 @@ test('[ABRD-44] a pending pick names its letter, option and topic for the strip'
 
 	store.decideOption('repo', 42, card, optionB);
 
-	expect(store.pendingEntries).toEqual([{ key, message: 'B — As today · Jump' }]);
+	expect(store.pendingEntries).toEqual([{ key, message: 'B — As today · Jump', state: 'done' }]);
 });

@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { NOTE_MAX_LENGTH } from '../app/model/decision';
-	import { ESCAPE_LABEL } from '../app/model/optionCard';
+	import {
+		ESCAPE_LABEL,
+		sendsBlank,
+		type EscapeKind,
+		type EscapePanel
+	} from '../app/model/optionCard';
 	import type { OptionLine } from '../types';
 
 	let {
@@ -16,55 +21,67 @@
 		onSend
 	}: {
 		line: OptionLine;
-		/** The card as shown when the panel opened; null while it is closed. */
-		panel: OptionLine | null;
+		/** The open panel with the card as shown when it opened; null while closed. */
+		panel: EscapePanel | null;
+		/** The text of the open panel's kind. */
 		draft: string;
 		pending: boolean;
 		refreshing: boolean;
-		onOpen: (shown: OptionLine) => void;
+		onOpen: (kind: EscapeKind, shown: OptionLine) => void;
 		onClose: () => void;
 		onDraft: (text: string) => void;
-		onSend: (shown: OptionLine, text: string) => void;
+		onSend: (open: EscapePanel, text: string) => void;
 	} = $props();
 
 	let textarea: HTMLTextAreaElement | undefined = $state();
 
-	async function toggle() {
+	// A card with its head is not sent back again (ABRD-61).
+	const kinds: EscapeKind[] = $derived(
+		line.returned_on === null ? ['other', 'unclear'] : ['other']
+	);
+
+	async function toggle(kind: EscapeKind) {
 		if (refreshing) return;
-		if (panel !== null) {
+		if (panel?.kind === kind) {
 			onClose();
 			return;
 		}
-		onOpen(line);
+		onOpen(kind, line);
 		await tick();
 		textarea?.focus();
 	}
 
-	function send(shown: OptionLine) {
-		if (refreshing || pending || draft.trim() === '') return;
-		onSend(shown, draft);
+	function blocked(open: EscapePanel): boolean {
+		return pending || (draft.trim() === '' && !sendsBlank(open.kind));
+	}
+
+	function send(open: EscapePanel) {
+		if (refreshing || blocked(open)) return;
+		onSend(open, draft);
 	}
 </script>
 
 <div class="escapes">
-	<button
-		type="button"
-		class="quiet"
-		aria-expanded={panel !== null}
-		disabled={pending}
-		aria-disabled={refreshing}
-		onclick={toggle}
-	>
-		{ESCAPE_LABEL.other}
-	</button>
+	{#each kinds as kind (kind)}
+		<button
+			type="button"
+			class="quiet"
+			aria-expanded={panel?.kind === kind}
+			disabled={pending}
+			aria-disabled={refreshing}
+			onclick={() => toggle(kind)}
+		>
+			{ESCAPE_LABEL[kind].button}
+		</button>
+	{/each}
 </div>
-{#if panel !== null}
-	{@const shown = panel}
+{#if panel !== null && kinds.includes(panel.kind)}
+	{@const open = panel}
 	<div class="panel">
 		<textarea
 			bind:this={textarea}
-			aria-label={ESCAPE_LABEL.answer}
-			placeholder={ESCAPE_LABEL.placeholder}
+			aria-label={ESCAPE_LABEL[open.kind].field}
+			placeholder={ESCAPE_LABEL[open.kind].placeholder}
 			maxlength={NOTE_MAX_LENGTH}
 			value={draft}
 			oninput={(event) => onDraft(event.currentTarget.value)}></textarea>
@@ -72,9 +89,9 @@
 			<button
 				type="button"
 				class="send"
-				disabled={pending || draft.trim() === ''}
+				disabled={blocked(open)}
 				aria-disabled={refreshing}
-				onclick={() => send(shown)}
+				onclick={() => send(open)}
 			>
 				{ESCAPE_LABEL.send}
 			</button>

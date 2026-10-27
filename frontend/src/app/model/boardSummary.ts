@@ -66,6 +66,10 @@ type OpenRowState = 'open' | 'back' | 'todo';
 /** The two tabs that list rows. */
 export type ListView = 'open' | 'decided';
 
+/** How a waiting decision's strip reads: `done` for a ruling, `back` for a card
+ * on its way to its head. */
+export type StripState = Extract<RowState, 'done' | 'back'>;
+
 export const STATE_LABEL: Record<RowState, string> = {
 	open: 'Open',
 	back: 'With head',
@@ -224,6 +228,12 @@ export function nextOpenAfter(repos: RepoReading[], key: string): string | null 
 	const others = listedRows(repos).filter((row) => row.key !== key);
 	const bestRank = Math.min(...others.map((row) => ROW_RANK[row.state]));
 	return others.find((row) => ROW_RANK[row.state] === bestRank)?.key ?? null;
+}
+
+/** Where the stage goes once `key` is sent back to its head: the first other
+ * open row, else the card itself, which now reads `with head`. */
+export function stageAfterReturned(repos: RepoReading[], key: string): string {
+	return listedRows(repos).find((row) => row.key !== key && row.state === 'open')?.key ?? key;
 }
 
 /** What the header's two tabs count: the rows the open list shows and the

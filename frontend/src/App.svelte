@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import {
 		nextOpenAfter,
+		stageAfterReturned,
 		firstDecidedKey,
 		firstOpenKey,
 		type ListView,
@@ -126,6 +127,20 @@
 			void resetQuestion(question);
 		}
 	});
+
+	// A card this tab sent back to its head stays on the stage unless another
+	// card is open; the report is taken once, so selecting it again later never
+	// moves the stage.
+	$effect(() => {
+		const returned = decisions?.justReturned ?? null;
+		if (decisions !== null && returned !== null) {
+			if (returned === selectedKey) {
+				selectedKey = stageAfterReturned(board.repos, returned);
+				void resetQuestion(question);
+			}
+			decisions.acknowledgeReturned();
+		}
+	});
 </script>
 
 <svelte:window onresize={keepFocusVisible} />
@@ -176,7 +191,7 @@
 			</div>
 			<div class="strips" aria-live="polite">
 				{#each decisions.pendingEntries as entry (entry.key)}
-					<UndoStrip message={entry.message} onUndo={() => undo(entry.key)} />
+					<UndoStrip message={entry.message} kind={entry.state} onUndo={() => undo(entry.key)} />
 				{/each}
 			</div>
 			<div class="question-pane" bind:this={question} tabindex="-1">

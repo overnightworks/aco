@@ -125,12 +125,29 @@ export function pendingOptionText(line: OptionLine, option: CardOption): string 
 	return `${decidedText(option)} · ${line.topic}`;
 }
 
+export type EscapeKind = 'other' | 'unclear';
+
+/** The escape row's open panel: its kind, and the card as shown when it opened
+ * -- the card `Send` posts. */
+export interface EscapePanel {
+	kind: EscapeKind;
+	shown: OptionLine;
+}
+
 export const ESCAPE_LABEL = {
-	other: 'Other…',
 	send: 'Send',
-	answer: 'Your answer',
-	placeholder: 'What should apply instead?'
+	other: { button: 'Other…', field: 'Your answer', placeholder: 'What should apply instead?' },
+	unclear: {
+		button: 'Unclear',
+		field: 'What is unclear? (optional)',
+		placeholder: 'Optional: what is unclear?'
+	}
 } as const;
+
+/** Unclear sends the card back with or without a note; Other needs its answer. */
+export function sendsBlank(kind: EscapeKind): boolean {
+	return kind === 'unclear';
+}
 
 /** The strip text of an Other answer waiting out the undo window. */
 export function pendingOtherText(line: OptionLine): string {
