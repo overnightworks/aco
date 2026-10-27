@@ -22,6 +22,7 @@ from aco import forge, protocol, store
 ISSUE = 72
 LANE_BRANCH = "codex/issue-72-claims"
 LANE_MODE_BRANCH = "docs/lane-cleanup"
+ITEM_WHOLE_REASON = "The scenario claims it as one."
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class Standing:
     issue: int | None = None
     branch: str = "claude/issue-55-held"
     agent: str = "Ada"
+    resource: str | None = None
 
     def intent(self, claim_id: str) -> protocol.ClaimIntent:
         identity = (
@@ -44,6 +46,7 @@ class Standing:
             scope=self.scope,
             claim_id=claim_id,
             operation_id=f"op-{claim_id}",
+            resource_name=self.resource,
         )
 
 
@@ -99,13 +102,13 @@ def make_stand_in(
     return place
 
 
-def serve_item(monkeypatch: pytest.MonkeyPatch, scope: tuple[str, ...]) -> None:
-    body = complete_contract("Build it.", scope=list(scope), whole="The scenario claims it as one.")
+def serve_item(monkeypatch: pytest.MonkeyPatch, scope: tuple[str, ...]) -> FakeForge:
+    body = complete_contract("Build it.", scope=list(scope), whole=ITEM_WHOLE_REASON)
     served = FakeForge(
         board_issues=(board_issue(ISSUE, "Claims", body),),
         issue_references={ISSUE: forge.ItemReference(forge.ItemState.OPEN, "Claims", body)},
     )
-    serve_forge(monkeypatch, served)
+    return serve_forge(monkeypatch, served)
 
 
 def claim(
@@ -121,6 +124,12 @@ def claim(
     scope_flags = [part for path in scope for part in ("--scope", path)]
     return issue_claim.main(
         ["--repo", REPOSITORY, "claim", *number, *agent_flags, *scope_flags, *flags]
+    )
+
+
+def release(*flags: str) -> int:
+    return issue_claim.main(
+        ["--repo", REPOSITORY, "release", str(ISSUE), "--abandoned", "stopped", *flags]
     )
 
 

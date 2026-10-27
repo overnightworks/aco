@@ -5586,7 +5586,7 @@ class TestCliStateRefForge:
         closing it, and releasing the unclaimed `CHILD_B` refuse naming the
         item by the id the next command takes back, never `#<n>`. The github
         half keeps `#<n>` through the same entry:
-        `test_cli_claim_replay_refuses_a_live_claim_with_different_retry_fields`
+        `test_replay_with_different_retry_fields_is_refused_and_the_live_claim_stays`
         (CLAIM-11) and
         `test_cli_release_without_a_claim_names_the_github_item_by_its_forge_number`
         (REL-09). `item close` under github refuses outright

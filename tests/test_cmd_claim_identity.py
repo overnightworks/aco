@@ -8,19 +8,16 @@ import re
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY
 from claim_worktrees import (
-    ISSUE,
     StandIn,
     claim,
     claimed_here,
     make_stand_in,
+    release,
     serve_item,
     standing_claims,
 )
 from cli_fixtures import AGENT_IDENTITY_ENV_NAMES, set_agent_identity_env
-
-from aco import cli as issue_claim
 
 TRUNK_FILES = ("src/widget.py",)
 
@@ -38,12 +35,6 @@ def identity_from(monkeypatch: pytest.MonkeyPatch, environ: dict[str, str]) -> N
     for name in AGENT_IDENTITY_ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
     set_agent_identity_env(monkeypatch, environ)
-
-
-def release(*flags: str) -> int:
-    return issue_claim.main(
-        ["--repo", REPOSITORY, "release", str(ISSUE), "--abandoned", "stopped", *flags]
-    )
 
 
 @pytest.mark.parametrize(

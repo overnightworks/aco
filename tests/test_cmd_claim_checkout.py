@@ -172,6 +172,18 @@ def test_claim_refuses_a_checkout_edited_before_the_claim_and_names_the_path(
             id="an-issue-claim-and-a-lane-claim",
         ),
         pytest.param(
+            (Standing(("src/widget.py",), issue=55),),
+            ("src/widget.py",),
+            "overlaps issue #55 on src/widget.py",
+            id="an-identical-file",
+        ),
+        pytest.param(
+            (Standing(("src",), issue=55),),
+            ("src",),
+            "overlaps issue #55 on src",
+            id="an-identical-directory",
+        ),
+        pytest.param(
             (Standing(("tests/adapters/test_claim_cli.py",), issue=1400),),
             ("tests",),
             "overlaps issue #1400 on tests/adapters/test_claim_cli.py",
