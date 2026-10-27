@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 from cli_fixtures import run_cli
-from github_fixtures import FakeForge
+from github_fixtures import FakeForge, serve_forge
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
-from aco import body, forge, github, protocol
+from aco import body, forge, protocol
 
 ITEM = 417
 STORED_AGENT = "Bo\u202eb"
@@ -57,7 +57,7 @@ def test_a_block_whole_reason_refuses_tab_and_every_display_control(character: s
 
 @pytest.mark.parametrize("character", DISPLAY_CONTROLS, ids=CONTROL_IDS)
 def test_a_branch_refuses_tab_and_every_display_control(character: str) -> None:
-    """Spec: CLAIM-58"""
+    """Spec: defect:#417"""
     payload: dict[str, object] = {"branch": f"ada/{character}work"}
 
     with pytest.raises(protocol.ClaimError, match="must be one bounded non-empty line"):
@@ -92,7 +92,7 @@ def seeded_claim(
     control: the write rule of before this one let each of them in."""
     client = FakeForge()
     client.issue_references[ITEM] = forge.ItemReference(forge.ItemState.OPEN, "Item", "The body.")
-    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
+    serve_forge(monkeypatch, client)
     intent = _escaping_claim(protocol.IssueIdentity(ITEM))
     publish_claims_from_a_second_clone(github_clone, bare_remote, (intent,))
     return intent
