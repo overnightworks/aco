@@ -1,7 +1,0 @@
-claim_id = "e30fcd0d51944046bb6fc58da25e18ef"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "b361cf88725cf62b593e4a53c59ff5a3342a23e6"
-branch = "claude/issue-458-show-rule-flags"
-scope = ["specs/rule.spec.md", "src/aco/cmd_rule.py", "tests/test_rule.py"]
-opened_commit = "d0f886eace8299fb7a44603fd62862629656f1c2"
