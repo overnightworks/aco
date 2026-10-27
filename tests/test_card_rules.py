@@ -8,7 +8,7 @@ import re
 import tomllib
 
 import pytest
-from test_option_lines import (
+from option_cards import (
     GOLDEN_CARD_HASH,
     RETURNED_NOTE,
     RETURNED_ON,
