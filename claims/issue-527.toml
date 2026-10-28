@@ -1,8 +1,0 @@
-claim_id = "ab4f19359bc44c639b01066f2ec47adc"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "cbcf059f3c4d3b8aecc358de3b8494546f9a9df7"
-branch = "claude/issue-527-redirect-toplevel-goes"
-scope = ["quality/baseline.toml", "tests/support/claim_worktrees.py", "tests/support/cli_fixtures.py", "tests/test_cli.py", "tests/test_cmd_adopt.py", "tests/test_cmd_land_after_merge_rerun.py", "tests/test_cmd_release_cleanup.py", "tests/test_cmd_reset.py", "tests/test_state_board.py", "tests/test_store.py"]
-opened_commit = "03d4aed2291405847c35d2fc0379f4d9836e66fb"
-whole_reason = "One helper has 44 callers in nine test files and its definition in a shared support module; a partial change leaves the helper defined and half its callers on it, so the deletion lands in one commit."
