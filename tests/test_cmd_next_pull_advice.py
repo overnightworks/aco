@@ -39,10 +39,10 @@ def served_item(
     return serve_forge(monkeypatch, FakeForge(board_issues=(item,)))
 
 
-def lane_worktree(clone: Path) -> Path:
-    push_lane_branch(clone, LANE_BRANCH)
+def lane_worktree(clone: Path, branch: str = LANE_BRANCH) -> Path:
+    push_lane_branch(clone, branch)
     lane = clone.parent / "lane"
-    add_lane_worktree(clone, lane, LANE_BRANCH)
+    add_lane_worktree(clone, lane, branch)
     return lane
 
 
@@ -92,6 +92,41 @@ def test_next_advises_claim_only_in_a_linked_worktree_on_a_lane_branch(
     assert expected in stdout
 
 
+def nested_contract(top_level_scope: tuple[str, ...] | None) -> str:
+    row = [{"index": 1, "title": "Scheibe Z", "scope": list(ROW_SCOPE)}]
+    if top_level_scope is None:
+        return complete_contract("keiner", slice=row)
+    return complete_contract("keiner", slice=row, scope=list(top_level_scope))
+
+
+def nested_container(contract: str) -> Issue:
+    return Issue(
+        NESTED,
+        "Nested epic",
+        (),
+        contract,
+        "2026-08-20T00:00:00Z",
+        "2026-08-20T00:00:00Z",
+        kind=body.ItemKind.CONTAINER,
+        children_closed=1,
+        children_total=1,
+    )
+
+
+def serve_nested_container(monkeypatch: pytest.MonkeyPatch, nested: Issue) -> FakeForge:
+    parent = workboard.ParentIssue(
+        workboard.IssueReference(REPOSITORY, 298), "", body.ItemKind.CONTAINER
+    )
+    return serve_forge(
+        monkeypatch,
+        FakeForge(
+            board_issues=(nested,),
+            children={NESTED: (ChildItem(300, ChildState.CLOSED),)},
+            parents={NESTED: parent},
+        ),
+    )
+
+
 @pytest.mark.parametrize(
     ("top_level_scope", "expected_claim"),
     [
@@ -115,39 +150,11 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
     """Spec: NEXT-03, NEXT-27, NEXT-29, NEXT-16."""
     assert_github_world(github_clone, bare_remote)
     publish_claims_from_a_second_clone(github_clone, bare_remote, ())
-    push_lane_branch(github_clone, NESTED_LANE_BRANCH)
-    lane = tmp_path / "lane"
-    add_lane_worktree(github_clone, lane, NESTED_LANE_BRANCH)
+    lane = lane_worktree(github_clone, NESTED_LANE_BRANCH)
     monkeypatch.chdir(lane)
-    row = [{"index": 1, "title": "Scheibe Z", "scope": list(ROW_SCOPE)}]
-    contract = (
-        complete_contract("keiner", slice=row)
-        if top_level_scope is None
-        else complete_contract("keiner", slice=row, scope=list(top_level_scope))
-    )
-    nested = Issue(
-        NESTED,
-        "Nested epic",
-        (),
-        contract,
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=1,
-        children_total=1,
-    )
-    served = serve_forge(
-        monkeypatch,
-        FakeForge(
-            board_issues=(nested,),
-            children={NESTED: (ChildItem(300, ChildState.CLOSED),)},
-            parents={
-                NESTED: workboard.ParentIssue(
-                    workboard.IssueReference(REPOSITORY, 298), "", body.ItemKind.CONTAINER
-                )
-            },
-        ),
-    )
+    contract = nested_contract(top_level_scope)
+    nested = nested_container(contract)
+    served = serve_nested_container(monkeypatch, nested)
 
     before_retype = run_cli(["next"], capsys)
     repair = before_retype.stdout.split(f"\n#{NESTED}: ", 1)[1].splitlines()[0]
