@@ -1,7 +1,7 @@
 """The board's JSON wire form, free of any socket.
 
 Turns a `BoardSnapshot` into the answer of `GET /api/board`, a request body
-into a `DecisionRequest` for one line or a `CardRequest` for a whole option
+into a `DecisionRequest` for one yes/no line or a `CardRequest` for a whole option
 card, and a decision's result or a refusal into its JSON answer. The transport
 decides when to answer; this module owns what the answer and the request look like.
 """
@@ -25,18 +25,14 @@ from .ports import (
     Decision,
     DecisionResult,
     ExpectationLine,
-    OptionDecision,
     OptionLetter,
     OptionLine,
-    OptionLineDecision,
     OtherAnswer,
     OtherCardAnswer,
-    OtherDecision,
     Outcome,
     PostedCard,
     PostedLine,
     UnclearCardAnswer,
-    UnclearDecision,
 )
 
 JSON_CONTENT_TYPE = "application/json"
@@ -56,7 +52,7 @@ class DecisionRequest:
     """The label of the configured repo this decision belongs to."""
     fingerprint: str
     """The fingerprint of the card as it was shown when the operator chose."""
-    decision: Decision | OptionLineDecision
+    decision: Decision
 
 
 @dataclass(frozen=True)
@@ -190,54 +186,19 @@ def _card_answer(fields: dict[str, object], *, picked: bool) -> tuple[CardAnswer
     return None
 
 
-def _decision(
-    item: int, line: int, fields: dict[str, object]
-) -> Decision | OptionLineDecision | None:
-    """Exactly one of `outcome` (with an optional note), `option` (with none),
-    `other` (with neither) and `unclear` (with an optional note only); an absent
-    key and a `null` both name nothing, but a post carrying both `outcome` and
-    `option` keys is refused whatever their values."""
-    for key, decide_alone in _ALONE_DECISIONS:
-        if fields.get(key) is not None:
-            return decide_alone(item, line, fields)
-    if "outcome" in fields and "option" in fields:
+def _decision(item: int, line: int, fields: dict[str, object]) -> Decision | None:
+    """An `outcome` with an optional note and nothing else: a non-null `other` or `unclear`,
+    or any `option` key, names an option line's answer, which only a card carries."""
+    if any(fields.get(key) is not None for key in (OTHER, UNCLEAR)) or "option" in fields:
         return None
-    outcome, option, note = fields.get("outcome"), fields.get("option"), fields.get("note")
-    if option is None:
-        if (
-            isinstance(outcome, str)
-            and outcome in _VALID_OUTCOME_VALUES
-            and (note is None or _is_note_text(note))
-        ):
-            return Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
-        return None
-    if outcome is None and _is_option_letter(option) and (note is None or _is_blank_text(note)):
-        return OptionDecision(item=item, index=line, letter=option)
+    outcome, note = fields.get("outcome"), fields.get("note")
+    if (
+        isinstance(outcome, str)
+        and outcome in _VALID_OUTCOME_VALUES
+        and (note is None or _is_note_text(note))
+    ):
+        return Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
     return None
-
-
-def _unclear_decision(item: int, line: int, fields: dict[str, object]) -> UnclearDecision | None:
-    """`unclear: true` alone, with at most a note within ABRD-05's bounds."""
-    note = fields.get("note")
-    named_elsewhere = any(fields.get(key) is not None for key in ("outcome", "option", OTHER))
-    if fields[UNCLEAR] is not True or named_elsewhere or not (note is None or _is_note_text(note)):
-        return None
-    return UnclearDecision(item=item, index=line, note=_note(note))
-
-
-def _other_decision(item: int, line: int, fields: dict[str, object]) -> OtherDecision | None:
-    """The operator's own words alone: stripped, non-blank and within ABRD-05's bounds."""
-    text = fields[OTHER]
-    named_elsewhere = any(fields.get(key) is not None for key in ("outcome", "option", "note"))
-    if named_elsewhere or not _is_note_text(text) or not text.strip():
-        return None
-    return OtherDecision(item=item, index=line, text=text.strip())
-
-
-_ALONE_DECISIONS = (
-    (UNCLEAR, _unclear_decision),
-    (OTHER, _other_decision),
-)
 
 
 def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:
@@ -335,10 +296,6 @@ def _is_note_text(note: object) -> TypeGuard[str]:
 
 def _is_option_letter(value: object) -> TypeGuard[OptionLetter]:
     return isinstance(value, str) and value in OPTION_LETTERS
-
-
-def _is_blank_text(value: object) -> bool:
-    return isinstance(value, str) and not value.strip()
 
 
 def _note(raw: str | None) -> str | None:

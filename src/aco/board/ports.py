@@ -167,36 +167,6 @@ class Decision:
 
 
 @dataclass(frozen=True)
-class OptionDecision:
-    """An option line's chosen letter; an option carries no note."""
-
-    item: int
-    index: int
-    letter: OptionLetter
-
-
-@dataclass(frozen=True)
-class OtherDecision:
-    """An option line answered in the operator's own words, stripped."""
-
-    item: int
-    index: int
-    text: str
-
-
-@dataclass(frozen=True)
-class UnclearDecision:
-    """An option line sent back to its head; nothing is decided."""
-
-    item: int
-    index: int
-    note: str | None
-
-
-OptionLineDecision = OptionDecision | OtherDecision | UnclearDecision
-
-
-@dataclass(frozen=True)
 class OtherCardAnswer:
     """One text in the operator's own words for every line of a card, stripped."""
 
@@ -284,13 +254,6 @@ class DecisionPort(Protocol):
     def rule(self, decision: Decision) -> DecisionResult:
         """Write one decision; the source itself refuses an already-ruled line,
         an unknown item, or a line the item does not have."""
-        ...
-
-    def rule_option(
-        self, decision: OptionLineDecision, card_hash: str
-    ) -> DecisionResult | CardChanged:
-        """Write one option, Other or Unclear decision for the card `card_hash` names; the
-        source compares that hash again at its write and refuses a changed card."""
         ...
 
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:

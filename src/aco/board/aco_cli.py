@@ -1,8 +1,7 @@
 """`DecisionPort` over the installed `aco` command line.
 
 Reads with `aco rulings --json` (specs/rulings.spec.md) and writes with
-`aco rule ITEM --line N --yes|--no|--later [--note TEXT] --json` or
-`aco rule ITEM --line N --option X --via board --card-hash=HASH --json`;
+`aco rule ITEM --line N --yes|--no|--later [--note TEXT] --json`;
 a whole card is one `aco rule ITEM` naming every line, each with its own `--option`
 and `--card-hash=HASH`, then the card's one `--via board`, `--other=TEXT --via board`
 or `--unclear` (specs/rule.spec.md).
@@ -38,14 +37,11 @@ from .ports import (
     ExpectationLine,
     OptionLetter,
     OptionLine,
-    OptionLineDecision,
     OtherAnswer,
     OtherCardAnswer,
-    OtherDecision,
     Outcome,
     RulingVia,
     UnclearCardAnswer,
-    UnclearDecision,
     YesNoLine,
 )
 
@@ -74,21 +70,6 @@ class _RuleAnswer:
     card_changed: bool
 
 
-def _answer_arguments(decision: OptionLineDecision) -> list[str]:
-    """The answer flags; an answer also says `--via board`, an Unclear decides nothing."""
-    if isinstance(decision, UnclearDecision):
-        # One argument: a note starting with "-" would otherwise read as an option.
-        note = [] if decision.note is None else [f"--note={decision.note}"]
-        return ["--unclear", *note]
-    # The only `--via` the board writes: the cooperative path, never `chat` or
-    # `default`, which belong to the operator's other writers.
-    via = ["--via", RulingVia.BOARD]
-    if isinstance(decision, OtherDecision):
-        # One argument: an answer starting with "-" would otherwise read as an option.
-        return [f"--other={decision.text}", *via]
-    return ["--option", decision.letter, *via]
-
-
 def _card_line_arguments(line: CardLine) -> list[str]:
     picked = [] if line.letter is None else ["--option", line.letter]
     # One argument: a hash from aco's output can never read as an option.
@@ -96,11 +77,15 @@ def _card_line_arguments(line: CardLine) -> list[str]:
 
 
 def _card_answer_arguments(answer: CardAnswer) -> list[str]:
-    """The flags given once for the whole card, as `_answer_arguments` says for a line."""
+    """The flags given once for the whole card; an Unclear decides nothing, so no `--via`."""
     if isinstance(answer, UnclearCardAnswer):
+        # One argument: a note starting with "-" would otherwise read as an option.
         note = [] if answer.note is None else [f"--note={answer.note}"]
         return ["--unclear", *note]
+    # One argument: an answer starting with "-" would otherwise read as an option.
     other = [f"--other={answer.text}"] if isinstance(answer, OtherCardAnswer) else []
+    # The only `--via` the board writes: the cooperative path, never `chat` or
+    # `default`, which belong to the operator's other writers.
     return [*other, "--via", RulingVia.BOARD]
 
 
@@ -130,22 +115,6 @@ class AcoCli:
             # One argument: a note starting with "-" would otherwise read as an option.
             arguments.append(f"--note={decision.note}")
         return self._write(arguments).result
-
-    def rule_option(
-        self, decision: OptionLineDecision, card_hash: str
-    ) -> DecisionResult | CardChanged:
-        answer = self._write(
-            [
-                "rule",
-                str(decision.item),
-                "--line",
-                str(decision.index),
-                *_answer_arguments(decision),
-                # One argument: a hash from aco's output can never read as an option.
-                f"--card-hash={card_hash}",
-            ]
-        )
-        return CardChanged() if answer.card_changed else answer.result
 
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
         answer = self._write(
