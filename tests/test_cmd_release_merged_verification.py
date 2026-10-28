@@ -235,9 +235,11 @@ def test_release_merged_closes_the_still_open_work_item(
 
     result = release_merged(capsys, "72")
 
-    assert result.status == 0
-    assert landing.forge.closed_issues == {WORK_ITEM_ISSUE}
-    assert landing.forge.landing_comments == {WORK_ITEM_ISSUE: github.landing_comment(12)}
+    assert (result.status, landing.forge.closed_issues, landing.forge.landing_comments) == (
+        0,
+        {WORK_ITEM_ISSUE},
+        {WORK_ITEM_ISSUE: github.landing_comment(12)},
+    )
     assert not state_ref_claims(github_clone, bare_remote)
 
 
