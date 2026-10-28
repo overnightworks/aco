@@ -4,7 +4,8 @@ import {
 	cardHeading,
 	cardSentence,
 	decidedList,
-	findSelectedLine,
+	findSelection,
+	selectionHeading,
 	firstDecidedKey,
 	firstOpenKey,
 	nextOpenAfter,
@@ -33,7 +34,7 @@ test('first selection follows configured order, skipping failed repos and ruled-
 	expect(firstOpenKey([repo({ items: [item({ lines: [line({ ruling: 'yes' })] })] })])).toBeNull();
 });
 
-test('[ABRD-29] first selection is the option line that follows a yes/no line in the same repository', () => {
+test('[ABRD-29] first selection is the option card that follows a yes/no line in the same repository', () => {
 	const repos = [
 		repo({
 			name: 'first',
@@ -44,7 +45,7 @@ test('[ABRD-29] first selection is the option line that follows a yes/no line in
 		})
 	];
 
-	expect(firstOpenKey(repos)).toBe('first:3:1');
+	expect(firstOpenKey(repos)).toBe('first:3:card');
 });
 
 describe('openList', () => {
@@ -80,12 +81,62 @@ describe('openList', () => {
 			{
 				repo: 'a',
 				rows: [
-					{ key: 'a:7:2', state: 'open', label: 'Sprung', title: 'Keep the song open?' },
+					{ key: 'a:7:card', state: 'open', label: 'Sprung', title: 'Keep the song open?' },
 					{ key: 'a:7:3', state: 'todo', label: 'Guests allowed?', title: 'Guests allowed?' },
 					{ key: 'a:7:4', state: 'todo', label: 'Plain sentence.', title: 'Plain sentence.' }
 				]
 			}
 		]);
+	});
+
+	test('[ABRD-82] the open option lines of one item are one row named by area and count, its title the same', () => {
+		const { groups } = openList([
+			repo({
+				name: 'a',
+				items: [
+					item({
+						number: 7,
+						lines: [
+							optionLine({ index: 2, area: 'Song-Seite' }),
+							optionLine({ index: 3, area: 'Song-Seite' }),
+							optionLine({ index: 4, area: 'Song-Seite' }),
+							line({ index: 5 })
+						]
+					})
+				]
+			})
+		]);
+
+		const name = 'Song-Seite · 3 points';
+		expect(groups).toEqual([
+			{
+				repo: 'a',
+				rows: [
+					{ key: 'a:7:card', state: 'open', label: name, title: name },
+					{ key: 'a:7:5', state: 'todo', label: 'Guests?', title: 'Guests?' }
+				]
+			}
+		]);
+	});
+
+	test('[ABRD-82] a ruled option line is no point of its item’s row', () => {
+		const { groups } = openList([
+			repo({
+				name: 'a',
+				items: [
+					item({
+						number: 7,
+						lines: [
+							optionLine({ index: 2, topic: 'Sprung' }),
+							optionLine({ index: 3, ruling: 'A', ruled_on: '2026-10-01' })
+						]
+					})
+				]
+			})
+		]);
+
+		const [group] = groups;
+		expect(group && 'rows' in group ? group.rows.map((row) => row.label) : []).toEqual(['Sprung']);
 	});
 
 	test('[ABRD-29] option rows come before yes/no rows in one repository, each in aco order', () => {
@@ -104,39 +155,59 @@ describe('openList', () => {
 
 		const [group] = groups;
 		expect(group && 'rows' in group ? group.rows.map((row) => row.key) : []).toEqual([
-			'a:1:2',
-			'a:2:1',
+			'a:1:card',
+			'a:2:card',
 			'a:1:1',
 			'a:1:3',
 			'a:2:2'
 		]);
 	});
 
-	test('[ABRD-61] a returned option line is a back row ranked after open and before todo', () => {
+	test('[ABRD-61] a card with a returned line is a back row ranked after open and before todo', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
 				items: [
+					item({ number: 1, lines: [line({ index: 1 })] }),
 					item({
-						number: 1,
-						lines: [
-							line({ index: 1 }),
-							optionLine({ index: 2, topic: 'Sprung', returned_on: '2026-10-27' }),
-							optionLine({ index: 3 })
-						]
-					})
+						number: 2,
+						lines: [optionLine({ index: 1, topic: 'Sprung', returned_on: '2026-10-27' })]
+					}),
+					item({ number: 3, lines: [optionLine({ index: 1 })] })
 				]
 			})
 		]);
 
 		const [group] = groups;
 		expect(group && 'rows' in group ? group.rows.map((row) => row.key) : []).toEqual([
-			'a:1:3',
-			'a:1:2',
+			'a:3:card',
+			'a:2:card',
 			'a:1:1'
 		]);
 		expect(group && 'rows' in group ? group.rows[1]?.state : null).toBe('back');
 		expect(STATE_LABEL.back).toBe('With head');
+	});
+
+	test('[ABRD-61] a card is with its head while any of its points is', () => {
+		const { groups } = openList([
+			repo({
+				name: 'a',
+				items: [
+					item({
+						number: 1,
+						lines: [optionLine({ index: 1 }), optionLine({ index: 2, returned_on: '2026-10-27' })]
+					}),
+					item({ number: 2, lines: [optionLine({ index: 1 })] })
+				]
+			})
+		]);
+
+		const [group] = groups;
+		expect(group && 'rows' in group ? group.rows.map((row) => row.key) : []).toEqual([
+			'a:2:card',
+			'a:1:card'
+		]);
+		expect(group && 'rows' in group ? group.rows[1]?.state : null).toBe('back');
 	});
 
 	test('[ABRD-49] readable repositories with no open line are quiet, a ruled-only one included', () => {
@@ -334,41 +405,97 @@ describe('pictureDataUri', () => {
 	});
 });
 
-describe('findSelectedLine', () => {
+describe('findSelection', () => {
 	const openLine = line({ index: 1 });
-	const openItem = item({ number: 42, title: 'Share page', lines: [openLine] });
+	const optionPoint = optionLine({ index: 2 });
+	const openItem = item({ number: 42, title: 'Share page', lines: [openLine, optionPoint] });
 	const repos = [
 		repo({ name: 'a', items: [openItem] }),
 		repo({ name: 'b', error: 'down', items: [] })
 	];
 
 	test('no key selects nothing', () => {
-		expect(findSelectedLine(repos, null)).toBeNull();
+		expect(findSelection(repos, null)).toBeNull();
 	});
 
 	test('a key naming no line, or one in a failed repo, selects nothing', () => {
-		expect(findSelectedLine(repos, 'a:42:9')).toBeNull();
-		expect(findSelectedLine(repos, 'b:1:1')).toBeNull();
+		expect(findSelection(repos, 'a:42:9')).toBeNull();
+		expect(findSelection(repos, 'a:43:card')).toBeNull();
+		expect(findSelection(repos, 'b:1:1')).toBeNull();
 	});
 
-	test('a key naming an open line resolves its repo, item and line', () => {
-		expect(findSelectedLine(repos, 'a:42:1')).toEqual({
+	test('a key naming an open yes/no line resolves its repo, item and line as a question', () => {
+		expect(findSelection(repos, 'a:42:1')).toEqual({
+			kind: 'question',
 			repo: 'a',
 			item: openItem,
 			line: openLine
 		});
 	});
 
+	test('[ABRD-82] a card key resolves the open option lines of its item as the card’s points', () => {
+		const other = optionLine({ index: 3 });
+		const grouped = item({ number: 42, lines: [optionPoint, other] });
+
+		expect(findSelection([repo({ name: 'a', items: [grouped] })], 'a:42:card')).toEqual({
+			kind: 'card',
+			repo: 'a',
+			item: grouped,
+			points: [optionPoint, other]
+		});
+	});
+
+	test('[ABRD-50] a card key selects nothing once its item has no open option line', () => {
+		const ruled = item({
+			number: 42,
+			lines: [optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01' }), openLine]
+		});
+
+		expect(findSelection([repo({ name: 'a', items: [ruled] })], 'a:42:card')).toBeNull();
+	});
+
+	test('an open option line is a point of its card, never selected on its own', () => {
+		expect(findSelection(repos, 'a:42:2')).toBeNull();
+	});
+
 	test('a key naming an already-ruled line still resolves it, so Stage can show it read-only', () => {
-		const ruledLine = line({ index: 2, ruling: 'yes', ruled_on: '2026-10-01' });
+		const ruledLine = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01' });
 		const ruledItem = item({ number: 42, title: 'Share page', lines: [ruledLine] });
 		const withRuled = [repo({ name: 'a', items: [ruledItem] })];
 
-		expect(findSelectedLine(withRuled, 'a:42:2')).toEqual({
+		expect(findSelection(withRuled, 'a:42:2')).toEqual({
+			kind: 'decided',
 			repo: 'a',
 			item: ruledItem,
 			line: ruledLine
 		});
+	});
+});
+
+describe('selectionHeading', () => {
+	const members = item({ number: 42, lines: [] });
+
+	test('[ABRD-83] a one-point card is headed by its question, a card of points by its name', () => {
+		const single = optionLine({ index: 2, question: 'Keep the song open?' });
+		const points = [
+			optionLine({ index: 2, area: 'Song-Seite' }),
+			optionLine({ index: 3, area: 'Song-Seite' })
+		];
+
+		expect(selectionHeading({ kind: 'card', repo: 'a', item: members, points: [single] })).toBe(
+			'Keep the song open?'
+		);
+		expect(selectionHeading({ kind: 'card', repo: 'a', item: members, points })).toBe(
+			'Song-Seite · 2 points'
+		);
+	});
+
+	test('a line is headed by its question, else by its sentence', () => {
+		const question = line({ question: 'Guests allowed?' });
+
+		expect(selectionHeading({ kind: 'question', repo: 'a', item: members, line: question })).toBe(
+			'Guests allowed?'
+		);
 	});
 });
 
@@ -386,24 +513,19 @@ describe('nextOpenAfter', () => {
 		expect(nextOpenAfter(repos, 'repo:42:3')).toBe('repo:42:1');
 	});
 
-	test('[ABRD-61] a returned option line comes after an open one and before a yes/no line', () => {
+	test('[ABRD-61] a card with its head comes after an open card and before a yes/no line', () => {
 		const withHead = [
 			repo({
 				items: [
-					item({
-						number: 1,
-						lines: [
-							line({ index: 1 }),
-							optionLine({ index: 2, returned_on: '2026-10-27' }),
-							optionLine({ index: 3 })
-						]
-					})
+					item({ number: 1, lines: [line({ index: 1 })] }),
+					item({ number: 2, lines: [optionLine({ index: 1, returned_on: '2026-10-27' })] }),
+					item({ number: 3, lines: [optionLine({ index: 1 })] })
 				]
 			})
 		];
 
-		expect(nextOpenAfter(withHead, 'repo:1:3')).toBe('repo:1:2');
-		expect(nextOpenAfter(withHead, 'repo:1:2')).toBe('repo:1:3');
+		expect(nextOpenAfter(withHead, 'repo:3:card')).toBe('repo:2:card');
+		expect(nextOpenAfter(withHead, 'repo:2:card')).toBe('repo:3:card');
 	});
 
 	test('returns null once no line is open any more', () => {
@@ -442,7 +564,7 @@ describe('nextOpenAfter', () => {
 			repo({ name: 'b', items: [item({ number: 2, lines: [optionLine({ index: 1 })] })] })
 		];
 
-		expect(nextOpenAfter(mixed, 'a:1:1')).toBe('b:2:1');
+		expect(nextOpenAfter(mixed, 'a:1:1')).toBe('b:2:card');
 	});
 
 	test('[ABRD-50] with only yes/no lines left it returns the first of them', () => {
@@ -507,27 +629,27 @@ describe('tabCounts', () => {
 });
 
 describe('stageAfterReturned', () => {
-	const cards = (...options: (ReturnType<typeof optionLine> | ReturnType<typeof line>)[]) => [
-		repo({ items: [item({ number: 1, lines: options })] })
+	const cards = (...members: ReturnType<typeof optionLine | typeof line>[]) => [
+		repo({ items: members.map((member, number) => item({ number: number + 1, lines: [member] })) })
 	];
 
 	test('[ABRD-76] the first other open card comes next, skipping cards with their head', () => {
 		const repos = cards(
 			optionLine({ index: 1, returned_on: '2026-10-27' }),
-			optionLine({ index: 2 }),
-			optionLine({ index: 3 })
+			optionLine({ index: 1 }),
+			optionLine({ index: 1 })
 		);
 
-		expect(stageAfterReturned(repos, 'repo:1:3')).toBe('repo:1:2');
+		expect(stageAfterReturned(repos, 'repo:3:card')).toBe('repo:2:card');
 	});
 
 	test('[ABRD-76] with no other open card the stage stays on the card itself', () => {
 		const repos = cards(
 			optionLine({ index: 1, returned_on: '2026-10-27' }),
-			optionLine({ index: 2, returned_on: '2026-10-27' }),
-			line({ index: 3 })
+			optionLine({ index: 1, returned_on: '2026-10-27' }),
+			line({ index: 1 })
 		);
 
-		expect(stageAfterReturned(repos, 'repo:1:2')).toBe('repo:1:2');
+		expect(stageAfterReturned(repos, 'repo:2:card')).toBe('repo:2:card');
 	});
 });

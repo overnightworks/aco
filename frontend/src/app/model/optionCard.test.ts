@@ -5,6 +5,7 @@ import {
 	cardMeta,
 	chosenOption,
 	GROUP_LABEL,
+	hasHead,
 	CONTRACT_SUMMARY,
 	contractTexts,
 	decidedText,
@@ -61,6 +62,13 @@ describe('cardMeta', () => {
 		expect(KIND_LABEL[kind]).toBe(label);
 		expect(cardMeta('repo', optionLine({ decision_kind: kind })).kind).toBe(label);
 	});
+});
+
+test('[ABRD-61] a card is with its head while any of its points is', () => {
+	const open = optionLine();
+	const back = optionLine({ returned_on: '2026-10-27' });
+
+	expect([hasHead([open]), hasHead([open, back]), hasHead([back])]).toEqual([false, true, true]);
 });
 
 describe('pointsMeta', () => {

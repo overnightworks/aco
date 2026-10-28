@@ -67,6 +67,11 @@ export interface CardMeta extends FrameMeta {
 	undo: Undo;
 }
 
+/** A card is with its head while any of its points is (ABRD-61). */
+export function hasHead(points: readonly OptionLine[]): boolean {
+	return points.some((point) => point.returned_on !== null);
+}
+
 /** The areas of a card's points, each once, in point order, joined by a slash
  * (the middle dot already separates a card's name from its count). */
 export function joinedAreas(points: readonly OptionLine[]): string {
@@ -80,7 +85,7 @@ export function pointsMeta(repo: string, points: readonly OptionLine[]): CardMet
 	return {
 		where: `${repo} › ${joinedAreas(points)}`,
 		kind: kinds.join(JOIN_SEPARATOR),
-		...(points.some((point) => point.returned_on !== null) && { withHead: true as const }),
+		...(hasHead(points) && { withHead: true as const }),
 		undo: points.some((point) => point.options.some((option) => option.undo === 'final'))
 			? 'final'
 			: 'reversible'
