@@ -83,7 +83,8 @@ other key is refused by name (`specs/storage-pin.spec.md`).
 `aco board --json` projects the open work board read-only for agents and
 scripts. `aco serve [--port N] [--repo PATH]...` serves the open
 expectation lines of one or more repositories as decision cards on 127.0.0.1
-(an option line is decided by its letter); the
+(an item's open option lines are one card, decided by a letter per line, Accept all,
+Other… or Unclear, stored all or none); the
 access token travels only in the printed URL's `#` fragment
 (`specs/serve.spec.md`). The browser app lives in `frontend/`; its build
 output is committed under `src/aco/board/static/`.

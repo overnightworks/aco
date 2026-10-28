@@ -6,7 +6,7 @@ as #13 line 12). It is a static page with sample data from public repositories;
 it is self-contained: it loads nothing from the network, talks to no aco and
 stores nothing.
 
-The shipped board shows an option line as the picture's card: meta line,
+The shipped board shows a card of one option line as the picture's card: meta line,
 question, PROBLEM, TODAY, OPTIONS A to D with name and effect, RECOMMENDATION and
 DECIDE with one pick per option. Every ruled line shows the picture's decided card:
 Decided, How with the way and the date or `not recorded`, and Contract behind Show. A line decided with the operator's own answer reads `Other: „…“` under Decided and binds that answer alone. Each
@@ -20,12 +20,16 @@ The Decide row ends with "Other…" and "Unclear". "Other…" opens a panel for 
 answer, sent through `aco rule --other` with the same undo window as a pick. "Unclear" opens
 a note panel, optional to fill, and sends the card to its head through `aco rule --unclear`
 after the same window, under a grey "With head" strip; a card already with its head hides
-"Unclear" and keeps its picks and "Other…". It still lacks Mitsprache, the agent list and group decisions. An open yes/no line keeps its card.
-The list groups open and decided lines per project with the picture's Open,
+"Unclear" and keeps its picks and "Other…". An item's open option lines are one card, posted
+once, all or none. A card of points shows its name (area and count) as title and the picture's
+point rows: one point open at a time, a pick per point, "Accept all" with the number chosen,
+and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
+point is chosen. It still lacks Mitsprache and the agent list. An open yes/no line keeps its card.
+The list groups open cards and decided lines per project with the picture's Open,
 With-head, Not-ready and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its
-colour tokens. With-head is a line the operator sent back: muted, listed after
-the open ones, its card says `with head`. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
+colour tokens. With-head is a card one of whose lines the operator sent back: muted, listed after
+the open cards, its card says `with head`. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
 What the board does today is in the "Browser decision flow" of
 [`specs/serve.spec.md`](../../specs/serve.spec.md).
 
