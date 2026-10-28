@@ -1,8 +1,0 @@
-claim_id = "ff05359ce8084f4e92543101f0b3ea0c"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "aef666c5013777c1a2fa80d3608c3db0d58b3f4e"
-branch = "claude/issue-537-lane-mode-cells"
-scope = ["quality/baseline.toml", "tests/support/claim_worktrees.py", "tests/test_cli.py", "tests/test_cmd_claim_lane_mode.py", "tests/test_cmd_release_lane_mode.py", "tests/test_cmd_rescope_lane_mode.py"]
-opened_commit = "e35f567f77b1ea2c24c9d4e08a3e7d7fd8e4930c"
-whole_reason = "Six paths for one move: three small test modules arrive together with their three shared names in claim_worktrees.py as the cells leave test_cli.py, and the baseline follows the shrink; none can land without the others."
