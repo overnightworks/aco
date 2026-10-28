@@ -92,7 +92,6 @@
 "test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state" = 60
 "test_next_close_names_every_zero_cost_action_regardless_of_rank" = 62
 "test_next_names_a_nested_containers_repair_where_cut_refuses_its_row" = 60
-"test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed" = 64
 "test_next_parallel_set_uses_a_cut_proposals_own_row_scope" = 68
 "test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line" = 62
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
