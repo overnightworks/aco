@@ -1,7 +1,0 @@
-claim_id = "f15f9d7bfb1c469ab11646cc9c678202"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "1a6db636f0032561b20880f5bd0361b8f39ccb9e"
-branch = "claude/issue-547-blocker-bar-once"
-scope = ["quality/baseline.toml", "src/aco/workboard.py", "tests/test_cmd_next_blocked_container.py"]
-opened_commit = "7fff9f6b0cc8c9f82d568df7781b95548b353c05"
