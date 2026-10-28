@@ -1,7 +1,0 @@
-claim_id = "de1d730ba9e84483966d2d4622e48373"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "9331777c72e5063574764f8a0066d2358a7a418b"
-branch = "claude/issue-543-brief-tests"
-scope = ["quality/baseline.toml", "tests/test_cli.py", "tests/test_cmd_brief.py"]
-opened_commit = "bb21331959db58eec05096a06aff0ff658db051e"
