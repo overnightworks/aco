@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "overnightworks-aco"
@@ -15,16 +15,16 @@ dependencies = []
 [project.scripts]
 aco = "aco.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.version]
+path = "src/aco/__init__.py"
 
 # The board's built assets are committed under src/aco/board/static/ so a
 # Python-only install needs no Node; scripts/package_smoke.sh proves they ship.
-[tool.setuptools.package-data]
-"aco.board" = ["static/**"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/aco"]
 
-[tool.setuptools.dynamic]
-version = {attr = "aco.__version__"}
+[tool.hatch.build.targets.sdist]
+only-include = ["src/aco"]
 
 # uv invalidates builds of path sources only via pyproject.toml's mtime by
 # default, so `uv tool install --from .` can silently reinstall a cached wheel
