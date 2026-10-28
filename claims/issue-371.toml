@@ -1,0 +1,7 @@
+claim_id = "c6153984ebb943f59ac13c91cde4e4db"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "5630c2bd654e5af13b4897160e2d5e5349d142e7"
+branch = "claude/issue-371-hatchling-backend"
+scope = ["pyproject.toml", "scripts/package_smoke.sh"]
+opened_commit = "4872201c8a933a0c6505d7c376d996de79ada21f"
