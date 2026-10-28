@@ -22,7 +22,7 @@ def github_world(github_clone: Path, bare_remote: Path) -> None:
 
 def serve_blocked_container(monkeypatch: pytest.MonkeyPatch) -> None:
     """Container `#844`: closed children only and a `Next` that names work,
-    blocked by `#9`."""
+    blocked by `BLOCKER`."""
     container, children = container_with_children(
         844, closed=2, body=complete_contract("Scheibe D schneiden.")
     )
@@ -50,7 +50,7 @@ class TestNextBlockedContainer:
         lines = result.stdout.splitlines()
         assert result.status == 3
         assert lines[0] == "No actionable item."
-        assert lines[-2:] == ["SKIPPED", "#844: blocked by #9"]
+        assert lines[-2:] == ["SKIPPED", f"#844: blocked by #{BLOCKER}"]
 
     def test_json_lists_the_container_as_skipped_with_its_blocker(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -61,4 +61,4 @@ class TestNextBlockedContainer:
         payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
 
         assert payload["reason"] == "nothing_actionable"
-        assert payload["skipped"] == [{"number": 844, "reason": "blocked by #9"}]
+        assert payload["skipped"] == [{"number": 844, "reason": f"blocked by #{BLOCKER}"}]

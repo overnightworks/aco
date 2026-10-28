@@ -1702,12 +1702,8 @@ def _board_item(
     )
     open_blockers = context.blockers[issue.number]
     container_progress = context.container_progress.get(issue.number)
-    childless_verdict = (
-        None
-        if container_progress is None or container_progress.open_children
-        else _childless_container_verdict(
-            parsed.slices, contract.next, context.nesting_parents.get(issue.number)
-        )
+    childless_verdict = _childless_verdict_of(
+        container_progress, parsed, contract, context.nesting_parents.get(issue.number)
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
@@ -1727,6 +1723,7 @@ def _board_item(
         childless_container_reason=_childless_container_reason(
             issue.number, childless_verdict, parsed, config.storage
         ),
+        blocker_bars_check=_check_barred(childless_verdict, open_blockers),
         unreadable_container_reason=_unreadable_children_reason(
             container_progress, context.unreadable_numbers, config.storage
         ),
@@ -2406,7 +2403,7 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
             next_line = item.contract.next
             next_step = next_line if has_further_work(next_line) else cut_title
             return CutSliceAction(item, container, next_step, cut_title)
-        case CheckVerdict(next_step=next_step) if not item.open_blockers:
+        case CheckVerdict(next_step=next_step) if not _check_barred(verdict, item.open_blockers):
             return CheckContainerAction(item, container, next_step)
         case CloseVerdict():
             return CloseContainerAction(item, container)
@@ -2727,6 +2724,7 @@ class _ActionabilityFacts:
     read_state: BodyReadState = BodyReadState.VALID
     malformed_defect: ContractDefect | None = None
     childless_container_reason: str | None = None
+    blocker_bars_check: bool = False
     unreadable_container_reason: str | None = None
 
 
@@ -2852,6 +2850,25 @@ def childless_containers_with_uncut_rows(
     )
 
 
+def _childless_verdict_of(
+    progress: ContainerProgress | None,
+    parsed: ParsedBody,
+    contract: Contract,
+    parent: IssueReference | None,
+) -> ChildlessContainerVerdict | None:
+    """The verdict of a container with no open child, `None` for any other item."""
+    if progress is None or progress.open_children:
+        return None
+    return _childless_container_verdict(parsed.slices, contract.next, parent)
+
+
+def _check_barred(
+    verdict: ChildlessContainerVerdict | None, blockers: tuple[IssueReference, ...]
+) -> bool:
+    """Whether an open blocker bars the `done_when` check `verdict` asks for (NEXT-47)."""
+    return isinstance(verdict, CheckVerdict) and bool(blockers)
+
+
 def _childless_container_reason(
     number: int,
     verdict: ChildlessContainerVerdict | None,
@@ -2965,7 +2982,7 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
-        if facts.open_blockers and facts.childless_container_reason == CHECK_DONE_WHEN:
+        if facts.blocker_bars_check:
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason
