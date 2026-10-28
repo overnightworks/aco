@@ -42,6 +42,20 @@ def serve_board(
     publish_claims_from_a_second_clone(github_clone, bare_remote, claims)
 
 
+def parallel_items() -> tuple[workboard.Issue, ...]:
+    return (
+        board_issue(
+            50, "Alpha", complete_contract("Ship Alpha.", scope=["src/alpha1.py", "src/alpha2.py"])
+        ),
+        board_issue(51, "Beta", complete_contract("Ship Beta.", scope=["src/shared.py"])),
+        board_issue(52, "Gamma", complete_contract("Ship Gamma.", scope=["src/shared.py"])),
+        board_issue(53, "Delta", complete_contract("Ship Delta.")),
+        board_issue(
+            54, "Epsilon", complete_contract("Ship Epsilon.", scope=["claimed/deep/file.py"])
+        ),
+    )
+
+
 def test_next_names_an_item_under_a_live_claim_as_claimed_and_pulls_nothing(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -68,22 +82,11 @@ def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_ever
     bare_remote: Path,
 ) -> None:
     """Spec: NEXT-09, NEXT-15, NEXT-17, NEXT-21, NEXT-22."""
-    issues = (
-        board_issue(
-            50, "Alpha", complete_contract("Ship Alpha.", scope=["src/alpha1.py", "src/alpha2.py"])
-        ),
-        board_issue(51, "Beta", complete_contract("Ship Beta.", scope=["src/shared.py"])),
-        board_issue(52, "Gamma", complete_contract("Ship Gamma.", scope=["src/shared.py"])),
-        board_issue(53, "Delta", complete_contract("Ship Delta.")),
-        board_issue(
-            54, "Epsilon", complete_contract("Ship Epsilon.", scope=["claimed/deep/file.py"])
-        ),
-    )
     serve_board(
         monkeypatch,
         github_clone,
         bare_remote,
-        issues,
+        parallel_items(),
         claim_of(990, ("claimed",)),
         claim_of(991, ("claimed/two.py",)),
     )
