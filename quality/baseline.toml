@@ -9,7 +9,7 @@
 "GitHubForge._landing" = 28
 
 [ccn."src/aco/workboard.py"]
-"build_board" = 32
+"build_board" = 31
 
 [ccn."tests/test_cmd_status.py"]
 "check_status.check" = 19
@@ -20,9 +20,9 @@
 "src/aco/cli.py" = 841
 "src/aco/cmd_claim.py" = 1136
 "src/aco/cmd_release.py" = 921
-"src/aco/github.py" = 1729
+"src/aco/github.py" = 1630
 "src/aco/protocol.py" = 1877
-"src/aco/state_board.py" = 930
+"src/aco/state_board.py" = 928
 "src/aco/store.py" = 2090
 "src/aco/workboard.py" = 3132
 "tests/board/test_board_api.py" = 1059
@@ -30,7 +30,7 @@
 "tests/support/github_fixtures.py" = 834
 "tests/test_board.py" = 4111
 "tests/test_checkout.py" = 2046
-"tests/test_cli.py" = 14407
+"tests/test_cli.py" = 14382
 "tests/test_cmd_adopt.py" = 1650
 "tests/test_cmd_cut.py" = 1072
 "tests/test_cmd_land_after_merge_rerun.py" = 880
@@ -44,7 +44,7 @@
 "tests/test_store.py" = 5443
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 101
+"build_board" = 96
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 84

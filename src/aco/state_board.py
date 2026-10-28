@@ -660,16 +660,14 @@ class StateRefBoard:
     def list_recent_merged_board_pull_requests(
         self, since: datetime
     ) -> tuple[workboard.PullRequest, ...]:
-        # `since` stays the `BoardSource` protocol's own parameter name
-        # (positional identity matters for structural conformance) even
-        # though this adapter never filters by it: `state-ref` cannot list
-        # merged pull requests at all, so this empty tuple is this
-        # adapter's own honest answer -- `Board.recovery` (purely
-        # pull-request-declared) stays empty from it, while `Stage.CODE_LANDED`
-        # and the board's own Landungen view read the trunk walk instead
-        # and never depend on this listing at all.
+        # `since` keeps the protocol's parameter name. State-ref cannot list merged
+        # pull requests, so `Board.recovery` stays empty, while `Stage.CODE_LANDED`
+        # and the Landungen view read the trunk walk instead.
         del since
         return ()
+
+    def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
+        return dict.fromkeys(numbers)
 
     def link_child(self, parent: int, child: int) -> None:
         """A no-op: parentage has exactly one owner here,

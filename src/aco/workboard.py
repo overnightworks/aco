@@ -1169,17 +1169,38 @@ def body_with_classification(body: str, kind: NoItemKind) -> str:
     return f"{body}{separator}{classification}"
 
 
-def declared_work_items(pull_requests: tuple[PullRequest, ...], repository: str) -> frozenset[int]:
-    """The issues of `repository` that these pull requests declare as their work item."""
-    declared: set[int] = set()
+def declared_work_item_merges(
+    pull_requests: tuple[PullRequest, ...], repository: str
+) -> dict[int, datetime | None]:
+    """The issues of `repository` that these pull requests declare as their work
+    item, each with the latest merge of a declaring pull request; `None` when one
+    of them carries no merge time."""
+    merges: dict[int, datetime | None] = {}
     for pull_request in pull_requests:
         classification = parse_pull_request_classification(pull_request.body, repository)
-        if (
+        if not (
             isinstance(classification, WorkItemClassification)
             and classification.item.repository == repository
         ):
-            declared.add(classification.item.number)
-    return frozenset(declared)
+            continue
+        number = classification.item.number
+        merged = None if pull_request.merged_at is None else _timestamp(pull_request.merged_at)
+        earlier = merges.get(number, merged)
+        merges[number] = None if earlier is None or merged is None else max(earlier, merged)
+    return merges
+
+
+def _is_recovery(
+    item: BoardItem,
+    declared_merges: Mapping[int, datetime | None],
+    reopened_at: Mapping[int, datetime | None],
+) -> bool:
+    """Whether `item` is landed but open: declared by a merged pull request and
+    not reopened after the last such merge (LAND-81)."""
+    if item.idea or item.number not in declared_merges:
+        return False
+    merged, reopened = declared_merges[item.number], reopened_at.get(item.number)
+    return merged is None or reopened is None or reopened <= merged
 
 
 def slice_title_match(title: str) -> tuple[int, int] | None:
@@ -1438,21 +1459,12 @@ def _pull_request_landing_rows(
     already_landed: frozenset[int],
     repository: str,
 ) -> tuple[LandingRow, ...]:
-    """`github`'s own supplement to the trunk walk: one
-    `LandingRow` per item a merged pull request plainly closes, declares, or
-    lands -- LAND-41's own closing/landing keywords, never a `Refs`/`Part of`
-    touch (LAND-45; a touch confers only the board's in-flight/landed
-    *stage*, `_touched_without_closing`, not a Landungen row) -- that no
-    trunk commit's trailer already names (`already_landed`, the trunk
-    walk's own dedup, trailer path first). The first pull request naming a
-    given item wins when more than one plausibly could, sorted by its own
-    merge time (oldest first, so "first" means whichever pull request
-    actually landed the item first) with the pull request number as a
-    stable tie-break for two merged at the same instant -- never
-    `recent_merged_pull_requests`' own possibly-unordered adapter order.
-    `_merged_at` is read only for a pull request that names at least one
-    item this way: one that never does carries no landing evidence and so
-    is never required to carry a merge date either."""
+    """`github`'s supplement to the trunk walk: one `LandingRow` per item a merged
+    pull request plainly closes, declares, or lands (LAND-41's keywords, never a
+    `Refs`/`Part of` touch, LAND-45) that no trunk trailer already names
+    (`already_landed`). The pull request merged first wins an item, with its
+    number as the tie-break, never the adapter's own order. `_merged_at` is read
+    only for a pull request that names an item this way."""
     claims_by_pull_request = {
         pull_request: _associated_issues((pull_request,), repository) - already_landed
         for pull_request in recent_merged_pull_requests
@@ -1776,24 +1788,21 @@ class BoardBuildInputs:
     repository: str
     now: datetime
     trunk_landings: tuple[datetime, ...] = ()
-    # Every item a trunk commit's own trailer names as landed, `sha` and all --
-    # the one source of both `landing_rows` (the board's
-    # Landungen view, under both storages) and the set of items trunk already
-    # lands. `trunk_landings` above carries only each commit's timestamp, for
-    # ruling-freshness, never its classification.
+    # Every item a trunk commit's trailer names as landed, `sha` and all: the one
+    # source of `landing_rows` and of the items trunk already lands, while
+    # `trunk_landings` carries only timestamps, for ruling-freshness.
     trunk_landing_items: tuple[TrunkLandingItem, ...] = ()
     children: Mapping[int, tuple[ChildItem, ...]] = field(default_factory=dict)
-    # The forge parent of each `childless_containers_with_uncut_rows`
-    # container that has one, read by the caller through the
-    # same `parent_issue` relation `cut` refuses a nested container on
-    # (CUT-03) -- whatever that parent's type, state, or repository, which
-    # the board's own open-container view cannot see.
+    # The forge parent of each `childless_containers_with_uncut_rows` container
+    # that has one, read through the `parent_issue` relation `cut` refuses a
+    # nested container on (CUT-03), whatever that parent's type or state.
     nesting_parents: Mapping[int, IssueReference] = field(default_factory=dict)
     dependencies: Mapping[int, tuple[IssueDependency, ...]] = field(default_factory=dict)
     requests: int = 0
-    # Each live claim's age: a committer date the caller
-    # already read from the store's git history, since workboard.py's own build
-    # stays pure and never reaches for git itself. Keyed by claim_id.
+    # Each declared open item's last reopen, `None` when never reopened.
+    reopened_at: Mapping[int, datetime | None] = field(default_factory=dict)
+    # Each live claim's age, a committer date the caller read from the store's
+    # git history because this build stays pure. Keyed by claim_id.
     claim_ages: Mapping[str, datetime] = field(default_factory=dict)
     # The board source's own fact (`BoardSource.lists_pull_requests`), never the storage
     # pin: a source that cannot list pull requests at all -- `state-ref`
@@ -1801,26 +1810,17 @@ class BoardBuildInputs:
     # claim with a branch) but no landed one, so the two stay independent
     # booleans instead of one storage-shaped flag.
     open_pull_requests_supported: bool = True
-    # Every claim's own ref-history lifecycle
-    # (`store.claim_lifecycle`): `size` still `None` exactly as that reader
-    # leaves it -- `build_board` is the one place it is already known (an
-    # item's own current size), so it joins it before ever calling
-    # `metrics.measure`.
+    # Every claim's ref-history lifecycle (`store.claim_lifecycle`), `size` still
+    # `None`: `build_board` joins the item's current size before `metrics.measure`.
     lane_events: tuple[metrics.LaneEvent, ...] = ()
-    # Every completed lane's own item's *current* size, for an item that is
-    # no longer among `issues` at all -- closed, or vanished
-    # -- read once by the caller through the forge/state for exactly the
-    # numbers `lane_events` names outside `issues`, since a closed item's
-    # own current size is still readable there even though `build_board`
-    # never re-fetches its body itself. An open item's own size always
-    # comes from `issues`/`parsed_bodies` instead; this map is consulted
-    # only for a number that map does not carry.
+    # The current size of each completed lane's item that is no longer among
+    # `issues` (closed or vanished), read once by the caller for the numbers
+    # `lane_events` names outside `issues`. An open item's size comes from
+    # `issues`; this map is consulted only for a number that map lacks.
     closed_item_sizes: Mapping[int, metrics.Size | None] = field(default_factory=dict)
-    # Claim-shaped `refs/aco/state` commits `store.claim_lifecycle` could
-    # not parse: older history predating its `item:`
-    # trailer, or a foreign commit merely shaped like one -- counted here
-    # rather than silently dropped, and shown beside `Measurements.unfinished`
-    # in the board's own Messungen section.
+    # Claim-shaped `refs/aco/state` commits `store.claim_lifecycle` could not parse
+    # (history predating its `item:` trailer, or a foreign commit shaped like one),
+    # counted rather than dropped and shown beside `Measurements.unfinished`.
     unparsed_lifecycle_commits: int = 0
 
 
@@ -1994,7 +1994,7 @@ def build_board(inputs: BoardBuildInputs) -> Board:
             issue.number for issue in issues if issue.unreadable is not None
         ),
     )
-    landed_work_items = declared_work_items(recent_merged_pull_requests, repository)
+    declared_merges = declared_work_item_merges(recent_merged_pull_requests, repository)
     ordered = tuple(
         sorted(
             (_board_item(issue, context, config, observed_at) for issue in issues),
@@ -2019,7 +2019,7 @@ def build_board(inputs: BoardBuildInputs) -> Board:
             if item.idle_days > STALE_IDLE_DAYS and item.stage is Stage.TEXT_ONLY
         ),
         recovery=tuple(
-            item for item in ordered if item.number in landed_work_items and not item.idea
+            item for item in ordered if _is_recovery(item, declared_merges, inputs.reopened_at)
         ),
         landings=landing_rows(
             inputs.trunk_landing_items, recent_merged_pull_requests, repository, config.storage

@@ -294,6 +294,12 @@ class BoardSource(Protocol):
 
     def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]: ...
 
+    def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
+        """When each of `numbers` was last reopened, `None` for one never
+        reopened; every number is answered, none dropped silently. Nothing
+        asked costs no round trip."""
+        ...
+
 
 class ForgeReader(BoardSource, Protocol):
     def item_reference(self, number: int) -> ItemReference: ...

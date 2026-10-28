@@ -77,6 +77,7 @@ matching line.
 | `--abandoned` outcome | — | — | LAND-39 | — |
 | issue-less lane, `storage = "state-ref"` | — | — | LAND-56 | — |
 | still-open item a merged PR already declared | — | — | — | LAND-43, LAND-51, LAND-53 |
+| that item reopened after the last merge declaring it | — | — | — | LAND-81 |
 | the Landungen view's own rows | — | — | — | LAND-44, LAND-45, LAND-54 |
 
 ## The trunk's own trailer block
@@ -192,8 +193,9 @@ then LAND-79 and LAND-21, and only then LAND-19.
 
 - [ ] [LAND-41] `aco board` marks an item `code-landed` when a merged pull request carries a closing or landing keyword (`Lands`/`Implements` too) naming it — wider than `check`'s own closing reference.
 - [ ] [LAND-42] `aco board` also marks an item `code-landed` from the trunk's own trailer block alone (LAND-01/LAND-02), independent of any pull request — one union, never two disagreeing sets.
-- [ ] [LAND-43] `aco board`'s `RECOVERY` names a still-open item there from a merged pull request's typed `Work-Item:` line (why one can be open there is CLAIM-52's fact, `specs/claim-record.spec.md`).
-- [ ] [LAND-51] `aco board`'s recovery reading is keyed on that typed `Work-Item:` line alone, never on the trunk trailer and never on an issue's update time.
+- [ ] [LAND-43] `aco board`'s `RECOVERY` names a still-open item there from a merged pull request's typed `Work-Item:` line, unless LAND-81 applies (CLAIM-52 says why one can be open there).
+- [ ] [LAND-51] `aco board`'s recovery reading is keyed on that typed `Work-Item:` line and its merge time, and per LAND-81 on the item's last reopen, never on the trunk trailer and never on an issue's update time.
+- [ ] [LAND-81] An open item whose last reopen is later than the merge of every pull request that declares it is not recovery; its stage and rank are unchanged.
 - [ ] [LAND-53] `aco next` names every recovery item first, each as `RECOVERY\n<label>: close or re-project`, ahead of the item it recommends next.
 - [ ] [LAND-44] `aco board`'s Landungen view lists one row per trunk-trailer-landed item, sha and date from that commit, under both storages, item open or closed.
 - [ ] [LAND-45] Under `github` only, Landungen adds one row per item a merged pull request plainly landed (LAND-41) with no trailer, deduped against trailer rows, which always win.

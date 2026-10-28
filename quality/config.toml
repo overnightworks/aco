@@ -8,6 +8,12 @@ item = "#334"
 date = 2026-10-24
 reason = "the operator ruled the unused efficiency gates and the spec-lint exemption ledger out; spec-lint stays a pytest test in the check job"
 
+[[gate.loosened]]
+what = 'import contract "Layers" changes layers'
+item = "#241"
+date = 2026-10-28
+reason = "the GraphQL transport moves out of github into its own layer github_graphql between github and forge; github imports it and it imports only forge, so no import direction loosens"
+
 [[root.allow]]
 entry = "frontend/"
 reason = "the web client, built apart from the Python package"

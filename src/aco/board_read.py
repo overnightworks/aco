@@ -233,6 +233,31 @@ def _closed_item_sizes(
     }
 
 
+def _trunk_landing_items(
+    trunk_landings: tuple[checkout.TrunkLanding, ...],
+) -> tuple[workboard.TrunkLandingItem, ...]:
+    """Sha and date of every item a trunk commit's trailer lands: the Landungen
+    view and `Stage.CODE_LANDED` read these, while `trunk_landings` keeps the
+    timestamps of commits that classify no work item too."""
+    return tuple(
+        workboard.TrunkLandingItem(number, landing.sha, landing.committed_at)
+        for landing in trunk_landings
+        if isinstance(landing.classification, workboard.TrunkWorkItemClassification)
+        for number in landing.classification.numbers
+    )
+
+
+def _reopen_candidates(
+    issues: tuple[workboard.Issue, ...],
+    merged_pull_requests: tuple[workboard.PullRequest, ...],
+    repository: str,
+) -> tuple[int, ...]:
+    """The open issues a merged pull request declares: the only ones whose reopen
+    time the recovery reading asks for."""
+    declared = workboard.declared_work_item_merges(merged_pull_requests, repository)
+    return tuple(issue.number for issue in issues if issue.number in declared)
+
+
 def build_board(
     context: RunContext,
     claims: tuple[protocol.ActiveClaim, ...],
@@ -303,14 +328,8 @@ def build_board(
     trunk_landings = checkout.trunk_landings(
         trunk_ref, TRUNK_LANDING_DEPTH, directory=context.toplevel
     )
-    # `trunk_landing_items` (sha and all) drives the Landungen view and
-    # `Stage.CODE_LANDED`; `trunk_landings` below keeps only the timestamps,
-    # also of commits that classify no work item.
-    trunk_landing_items = tuple(
-        workboard.TrunkLandingItem(number, landing.sha, landing.committed_at)
-        for landing in trunk_landings
-        if isinstance(landing.classification, workboard.TrunkWorkItemClassification)
-        for number in landing.classification.numbers
+    reopened_at = client.reopened_at(
+        _reopen_candidates(issues, merged_pull_request_rows, client.repository.path)
     )
     return workboard.build_board(
         workboard.BoardBuildInputs(
@@ -322,11 +341,12 @@ def build_board(
             repository=client.repository.path,
             now=now,
             trunk_landings=tuple(landing.committed_at for landing in trunk_landings),
-            trunk_landing_items=trunk_landing_items,
+            trunk_landing_items=_trunk_landing_items(trunk_landings),
             children=children,
             nesting_parents=nesting_parents,
             dependencies=dependencies,
             requests=client.requests,
+            reopened_at=reopened_at,
             claim_ages=history.ages,
             lane_events=history.lane_events,
             unparsed_lifecycle_commits=history.unparsed_lifecycle_commits,

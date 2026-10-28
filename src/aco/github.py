@@ -8,14 +8,14 @@ import os
 import re
 import sys
 import threading
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import TypeVar
 
-from . import forge, process, protocol, workboard
+from . import forge, github_graphql, process, protocol, workboard
 from .body import ItemKind
 from .protocol import REPOSITORY_PATTERN, ClaimError
 
@@ -30,10 +30,6 @@ MAX_RECENT_MERGED_PULL_REQUESTS = 1000
 # instead. This bounds how many `gh` subprocesses run at once, comfortably
 # under GitHub's secondary rate limit for concurrent requests.
 PARALLEL_FETCH_CONCURRENCY = 20
-# GraphQL aliases every number into one query field, so a block this size
-# stays one round trip; GitHub's own guidance keeps a query's alias count in
-# the 50-100 range rather than one huge query per repository.
-GRAPHQL_ITEM_REFERENCE_BATCH_SIZE = 100
 # `Repository.issueOrPullRequest`'s own `state` enum spans both `Issue`
 # (`OPEN`/`CLOSED`) and `PullRequest` (`OPEN`/`CLOSED`/`MERGED`); `forge.
 # ItemReference.state` only ever distinguishes open from not, matching the
@@ -50,7 +46,6 @@ _GRAPHQL_ITEM_STATES_BY_TYPENAME: dict[str, dict[str, forge.ItemState]] = {
         "MERGED": forge.ItemState.CLOSED,
     },
 }
-_MALFORMED_BATCHED_ITEM_REFERENCE = "GitHub returned a malformed batched item reference"
 GH_TIMEOUT_SECONDS = 60
 GH_QUIET_ENVIRONMENT = {
     "NO_COLOR": "1",
@@ -232,39 +227,13 @@ def _query_days(start: date, end: date) -> tuple[date, ...]:
     return tuple(start + timedelta(days=offset) for offset in range((end - start).days + 1))
 
 
-_ITEM_REFERENCE_FIELDS = (
-    "__typename ... on Issue { state title body } ... on PullRequest { state title body }"
-)
-
-
-def _item_reference_query(numbers: Sequence[int]) -> str:
-    """One GraphQL query reading every one of `numbers` through its own
-    alias: `issueOrPullRequest` -- unlike the narrower `issue`
-    field -- answers for a pull request number too, matching `item_reference`'s
-    own REST read of a single number. GraphQL's own schema answers `null` in
-    `data` for a number that exists in neither space, but `gh api graphql`
-    still exits nonzero whenever any alias produced a `NOT_FOUND` entry in
-    `errors` -- `_item_reference_block`/`_not_found_batch_nodes` read that
-    exit back as the partial success it actually carries."""
-    aliases = "\n".join(
-        f"n{index}: issueOrPullRequest(number: {number}) {{ {_ITEM_REFERENCE_FIELDS} }}"
-        for index, number in enumerate(numbers)
-    )
-    return (
-        "query($owner: String!, $name: String!) { "
-        f"repository(owner: $owner, name: $name) {{ {aliases} }} }}"
-    )
-
-
 def _parsed_item_reference_node(node: object) -> forge.ItemReference:
-    """One alias's own value from `_item_reference_query`'s response: `None`
-    for a number GitHub could resolve to neither an issue nor a pull request
-    (`item_reference`'s own `ForgeNotFoundError` case), a malformed shape
-    raised loud, never guessed at."""
+    """One alias's value: `MISSING` for a number that is neither an issue nor a
+    pull request, a malformed shape raised loud."""
     if node is None:
         return forge.ItemReference(forge.ItemState.MISSING)
     if not isinstance(node, dict):
-        raise forge.ForgeMalformedResponseError(_MALFORMED_BATCHED_ITEM_REFERENCE)
+        raise github_graphql.malformed_response(_ITEM_REFERENCE_SUBJECT)
     typename = node.get("__typename")
     state = node.get("state")
     title = node.get("title")
@@ -276,7 +245,7 @@ def _parsed_item_reference_node(node: object) -> forge.ItemReference:
         or not isinstance(title, str)
         or (body is not None and not isinstance(body, str))
     ):
-        raise forge.ForgeMalformedResponseError(_MALFORMED_BATCHED_ITEM_REFERENCE)
+        raise github_graphql.malformed_response(_ITEM_REFERENCE_SUBJECT)
     return forge.ItemReference(
         _GRAPHQL_ITEM_STATES_BY_TYPENAME[typename][state],
         title,
@@ -285,86 +254,40 @@ def _parsed_item_reference_node(node: object) -> forge.ItemReference:
     )
 
 
-def _aliased_node(nodes: Mapping[str, object], index: int) -> object:
-    """One alias's own raw node out of a batch's `nodes` mapping:
-    an omitted key is a malformed response -- GitHub always answers
-    every alias a query names, `null` included for one it cannot resolve --
-    never silently read the same as that explicit `null` (`_parsed_item_
-    reference_node`'s own `MISSING` case)."""
-    alias = f"n{index}"
-    if alias not in nodes:
-        raise forge.ForgeMalformedResponseError(_MALFORMED_BATCHED_ITEM_REFERENCE)
-    return nodes[alias]
-
-
-def _item_references_from_nodes(
-    nodes: Mapping[str, object], numbers: Sequence[int]
-) -> dict[int, forge.ItemReference]:
-    """`_item_reference_block`'s own mapping from a batch response's raw
-    `nodes` to every requested number's parsed reference -- the one shape
-    both a clean response and a recovered `_not_found_batch_nodes` response
-    are read through."""
-    return {
-        number: _parsed_item_reference_node(_aliased_node(nodes, index))
-        for index, number in enumerate(numbers)
-    }
-
-
-# A NOT_FOUND error's own `path`: `["repository", "nN"]`,
-# the field GraphQL walked to reach the alias it could not resolve.
-_ITEM_REFERENCE_ERROR_PATH_LENGTH = 2
-
-
-def _is_recovered_not_found_error(
-    error: object, aliases: frozenset[str], repository: Mapping[str, object]
-) -> bool:
-    """Whether `error` is one `_not_found_batch_nodes` can recover: `NOT_
-    FOUND` on one of this call's own aliases, at the alias `repository`
-    already answers `null` for."""
-    if not isinstance(error, dict) or error.get("type") != "NOT_FOUND":
-        return False
-    path = error.get("path")
-    if not isinstance(path, list) or len(path) != _ITEM_REFERENCE_ERROR_PATH_LENGTH:
-        return False
-    section, alias = path
-    if not isinstance(section, str) or not isinstance(alias, str):
-        return False
-    return section == "repository" and alias in aliases and repository.get(alias) is None
-
-
-def _not_found_batch_nodes(message: str, numbers: Sequence[int]) -> Mapping[str, object] | None:
-    """`_item_reference_block`'s own recovery: `gh api
-    graphql` exits nonzero whenever any alias in `_item_reference_query`
-    resolved to neither an issue nor a pull request, even though GraphQL's
-    own response already answers `null` for it in `data` rather than ending
-    the query. `_bounded_command` has no way to tell that apart from a real
-    failure, so it folds `message` through as an unclassified `ForgeError`;
-    this reads `message` back as the GraphQL response it actually is.
-
-    Returns the batch's `nodes` mapping -- ready for `_item_references_from_
-    nodes`, `null` exactly at every not-found alias -- only when `message`
-    parses as JSON carrying that response shape, every one of `errors` is a
-    `NOT_FOUND` on one of this call's own aliases (`_is_recovered_not_found_
-    error`), and `data.repository` already holds every alias this call asked
-    for. Any other shape returns `None` so the caller re-raises its original
-    error instead of guessing at recovery.
-    """
-    try:
-        decoded, _ = json.JSONDecoder().raw_decode(message)
-    except json.JSONDecodeError:
+def _parsed_reopened_node(node: object) -> datetime | None:
+    """One issue's last reopen: `None` when it was never reopened. A missing
+    issue or a time that is no RFC 3339 instant raises loud, never read as
+    "not reopened"."""
+    timeline = node.get("timelineItems") if isinstance(node, dict) else None
+    events = timeline.get("nodes") if isinstance(timeline, dict) else None
+    if not isinstance(events, list) or len(events) > 1:
+        raise github_graphql.malformed_response(_REOPENED_SUBJECT)
+    if not events:
         return None
-    if not isinstance(decoded, dict):
-        return None
-    data = decoded.get("data")
-    repository = data.get("repository") if isinstance(data, dict) else None
-    errors = decoded.get("errors")
-    if not isinstance(repository, dict) or not isinstance(errors, list) or not errors:
-        return None
-    aliases = frozenset(f"n{index}" for index in range(len(numbers)))
-    if not aliases.issubset(repository):
-        return None
-    recovered = all(_is_recovered_not_found_error(error, aliases, repository) for error in errors)
-    return repository if recovered else None
+    created_at = events[0].get("createdAt") if isinstance(events[0], dict) else None
+    if (
+        not isinstance(created_at, str)
+        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(created_at) is None
+    ):
+        raise github_graphql.malformed_response(_REOPENED_SUBJECT)
+    return datetime.fromisoformat(created_at)
+
+
+_ITEM_REFERENCE_SUBJECT = "item reference"
+_REOPENED_SUBJECT = "reopen time"
+ITEM_REFERENCE_READ = github_graphql.BatchedRead(
+    "issueOrPullRequest",
+    "__typename ... on Issue { state title body } ... on PullRequest { state title body }",
+    _ITEM_REFERENCE_SUBJECT,
+    _parsed_item_reference_node,
+)
+REOPENED_AT_READ = github_graphql.BatchedRead(
+    "issue",
+    "timelineItems(itemTypes: [REOPENED_EVENT], last: 1) "
+    "{ nodes { ... on ReopenedEvent { createdAt } } }",
+    _REOPENED_SUBJECT,
+    _parsed_reopened_node,
+)
 
 
 def _decoded(result: process.BoundedResult, purpose: str) -> str:
@@ -539,61 +462,39 @@ class GitHubForge:
             is_landing,
         )
 
-    def _item_reference_block(self, numbers: tuple[int, ...]) -> dict[int, forge.ItemReference]:
-        """One `numbers`-sized GraphQL round trip: `item_
-        references`' own block, never called with more than `GRAPHQL_ITEM_
-        REFERENCE_BATCH_SIZE` numbers. A number that resolves to neither an
-        issue nor a pull request makes `gh` exit nonzero even though GraphQL
-        itself already answered the rest -- `_not_found_batch_nodes` reads
-        that failure back as the partial success it is
-        rather than this call failing the whole block loud."""
-        try:
-            raw = self._run(
-                [
-                    "api",
-                    "graphql",
-                    "-f",
-                    f"query={_item_reference_query(numbers)}",
-                    "-f",
-                    f"owner={self.repository.namespace[0]}",
-                    "-f",
-                    f"name={self.repository.name}",
-                    "--jq",
-                    ".data.repository",
-                ]
-            )
-        except forge.ForgeError as error:
-            nodes = _not_found_batch_nodes(str(error), numbers)
-            if nodes is None:
-                raise
-            return _item_references_from_nodes(nodes, numbers)
-        values = self._json_lines(raw, "batched item reference")
-        if len(values) != 1 or not isinstance(values[0], dict):
-            raise forge.ForgeMalformedResponseError(_MALFORMED_BATCHED_ITEM_REFERENCE)
-        return _item_references_from_nodes(values[0], numbers)
+    def _graphql_block(self, query: str, description: str) -> tuple[object, ...]:
+        """One GraphQL round trip: the `repository` object `query` answers."""
+        raw = self._run(
+            [
+                "api",
+                "graphql",
+                "-f",
+                f"query={query}",
+                "-f",
+                f"owner={self.repository.namespace[0]}",
+                "-f",
+                f"name={self.repository.name}",
+                "--jq",
+                ".data.repository",
+            ]
+        )
+        return self._json_lines(raw, description)
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        """Every one of `numbers`, batched into GraphQL blocks of
-        `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE`: the 32-call, fully
-        serial `gh api .../issues/N` walk `board_read._closed_item_sizes` used to pay
-        (12.8 of an 18s board build) collapses to one round trip for any
-        repository whose closed-item history still fits one block, and stays
-        flat as that history grows -- a repository large enough to need more
-        than one block fetches them concurrently, capped the same way every
-        other sharded board read already is (`PARALLEL_FETCH_CONCURRENCY`)."""
-        ordered = tuple(dict.fromkeys(numbers))
-        if not ordered:
-            return {}
-        blocks = tuple(
-            ordered[start : start + GRAPHQL_ITEM_REFERENCE_BATCH_SIZE]
-            for start in range(0, len(ordered), GRAPHQL_ITEM_REFERENCE_BATCH_SIZE)
+        return github_graphql.read_batched(
+            ITEM_REFERENCE_READ,
+            numbers,
+            fetch=self._graphql_block,
+            concurrency=PARALLEL_FETCH_CONCURRENCY,
         )
-        with ThreadPoolExecutor(max_workers=min(len(blocks), PARALLEL_FETCH_CONCURRENCY)) as pool:
-            results = list(pool.map(self._item_reference_block, blocks))
-        references: dict[int, forge.ItemReference] = {}
-        for result in results:
-            references.update(result)
-        return references
+
+    def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
+        return github_graphql.read_batched(
+            REOPENED_AT_READ,
+            numbers,
+            fetch=self._graphql_block,
+            concurrency=PARALLEL_FETCH_CONCURRENCY,
+        )
 
     def _json_lines(self, raw: str, description: str) -> tuple[object, ...]:
         """Parse compact NDJSON, pretty JSON, or a concatenated JSON sequence."""

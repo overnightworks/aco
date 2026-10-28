@@ -195,9 +195,13 @@ class _MinimalForgeReader:
     observed_children_lookups: list[int] = field(default_factory=list)
     observed_merged_pull_request_floors: list[datetime] = field(default_factory=list)
     lists_pull_requests: bool = True
+    dependencies_fetcher: Callable[[int], tuple[IssueDependency, ...]] = lambda _number: ()
 
     def item_reference(self, number: int) -> forge.ItemReference:
         return forge.ItemReference(state=forge.ItemState.MISSING)
+
+    def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
+        return dict.fromkeys(numbers)
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
         return dict.fromkeys(numbers, forge.ItemReference(state=forge.ItemState.MISSING))
@@ -218,7 +222,7 @@ class _MinimalForgeReader:
         return "main"
 
     def list_board_dependencies(self, number: int) -> tuple[IssueDependency, ...]:
-        return ()
+        return self.dependencies_fetcher(number)
 
     def list_open_board_issues(self) -> tuple[Issue, ...]:
         return self.open_issues
@@ -6883,35 +6887,6 @@ def test_blocked_check_labels_a_local_dependency_under_the_state_ref_pin() -> No
     assert "#9" not in check.text
 
 
-@dataclass
-class _MinimalBoardSource:
-    """The smallest real `forge.BoardSource`, every read empty, for `fetch_dependencies` tests."""
-
-    repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
-    requests: int = 0
-    lists_pull_requests: bool = True
-    dependencies_fetcher: Callable[[int], tuple[IssueDependency, ...]] = lambda _number: ()
-
-    def list_open_board_issues(self) -> tuple[Issue, ...]:
-        return ()
-
-    def list_board_dependencies(self, number: int) -> tuple[IssueDependency, ...]:
-        return self.dependencies_fetcher(number)
-
-    def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
-        return ()
-
-    def list_recent_merged_board_pull_requests(
-        self, since: datetime
-    ) -> tuple[workboard.PullRequest, ...]:
-        del since
-        return ()
-
-    def list_children(self, number: int) -> tuple[ChildItem, ...]:
-        del number
-        return ()
-
-
 def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
     concurrency = board_read.BOARD_CHILD_FETCH_CONCURRENCY
     release = threading.Barrier(concurrency)
@@ -6933,7 +6908,7 @@ def test_fetch_dependencies_bounds_concurrency_at_the_shared_constant() -> None:
             active -= 1
         return ()
 
-    client = _MinimalBoardSource(dependencies_fetcher=fetch)
+    client = _MinimalForgeReader(dependencies_fetcher=fetch)
 
     board_read.fetch_dependencies(client, tuple(range(concurrency * 2)))
 
