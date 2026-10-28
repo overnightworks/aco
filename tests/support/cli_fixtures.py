@@ -40,7 +40,6 @@ from aco.session import RunContext
 
 # Captured at import, before any test's stub replaces it.
 _REAL_PATH_IS_TRACKED = checkout.path_is_tracked
-_REAL_GIT_OUTPUT = checkout.git_output
 
 
 FROZEN_CLI_NOW = datetime(2026, 8, 21, tzinfo=UTC)
@@ -83,10 +82,8 @@ def stub_one_git_call(
     to reproduce with real git state.
 
     Returns the calls it answered: a test asserts it is non-empty, because
-    a read that never reaches `_git_run` (the synthetic world of
-    `conftest._isolate_git_toplevel` answers the remote-HEAD read before
-    it, until the test makes its toplevel a repository) would otherwise
-    pass without the injection ever firing."""
+    a read that never reaches `_git_run` would otherwise pass without the
+    injection ever firing."""
     real_git_run = checkout._git_run
     stubbed_directory = directory
     answered: list[list[str]] = []
@@ -429,14 +426,19 @@ def push_repository_trunk(repo: Path, remote_name: str) -> None:
 
 
 @pytest.fixture
+def empty_checkout(tmp_path: Path) -> Path:
+    """`tmp_path` as a repository with no commit and no remote, the toplevel
+    a command started there resolves."""
+    real_git(tmp_path, "init", "-q", "-b", "main")
+    return tmp_path
+
+
+@pytest.fixture
 def outside_a_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     """A working directory no git repository holds, answered by the real
-    `git rev-parse --show-toplevel` in git's untranslated words -- the one
-    session `conftest.py`'s `_isolate_git_toplevel` otherwise makes
-    unreachable."""
+    `git rev-parse --show-toplevel` in git's untranslated words."""
     nowhere = tmp_path / "nowhere"
     nowhere.mkdir()
-    monkeypatch.setattr(checkout, "git_output", _REAL_GIT_OUTPUT)
     monkeypatch.setenv("LC_ALL", "C")
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
     monkeypatch.chdir(nowhere)
@@ -530,7 +532,7 @@ def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
     `test_an_untrusted_board_config_refuses_every_store_command_by_name`, which
     overrides this stub back to `False`. Each caller wraps this in its own
     `@pytest.fixture(autouse=True)` (matching `conftest.py`'s "everything but
-    git-toplevel isolation stays local to its test module"). Only the index
+    isolation stays local to its test module"). Only the index
     question is stubbed: whether a revision's tree holds a file stays with the
     real helper, so a test's faked `ls-tree` answer or real repository decides it."""
 
@@ -839,19 +841,11 @@ ITEM_NEW_BODY = complete_contract("Ship it.")
 
 
 def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
-    """Point `RunContext.toplevel` (`rev-parse --show-toplevel`) at a real
-    repository this test built, over `conftest.py`'s autouse
-    `_isolate_git_toplevel` fake. Every other git call, including `start`'s
+    """Stand in `toplevel`, a real repository this test built, so `RunContext.toplevel`
+    (`rev-parse --show-toplevel`) names it. Every git call, including `start`'s
     worktree creation, reaches real git, and the trunk is resolved and fetched
     for real, undoing `test_cli.py`'s autouse `_stub_trunk`."""
-    real_git_output = checkout.git_output
-
-    def fake(arguments: list[str], *, directory: Path | None = None, **options: bool) -> str:
-        if arguments == ["rev-parse", "--show-toplevel"] and directory is None:
-            return str(toplevel)
-        return real_git_output(arguments, directory=directory, **options)
-
-    monkeypatch.setattr(checkout, "git_output", fake)
+    monkeypatch.chdir(toplevel)
     monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
     monkeypatch.setattr(checkout, "fetch_remote", LIVE_FETCH_REMOTE)
 
