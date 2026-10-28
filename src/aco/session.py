@@ -363,7 +363,7 @@ class RunContext:
     `directory` is the checkout this context answers for, or `None` for
     the calling process's own cwd. `build_forge` turns this context's facts
     into the storage pin's forge adapter; the context holds what it builds.
-    `today` is the run's clock: a command that stamps a date reads it.
+    `today` is the run's clock; `rule` reads its one date from it.
     """
 
     def __init__(
