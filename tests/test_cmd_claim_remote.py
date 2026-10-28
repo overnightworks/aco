@@ -72,7 +72,7 @@ def test_claim_refuses_a_forge_target_that_is_not_the_canonical_remote_and_write
     capsys: pytest.CaptureFixture[str],
     json_flag: bool,
 ) -> None:
-    """Spec: CLM-27, OUT-03."""
+    """Spec: CLM-27, OUT-03, PIN-53."""
     standpoint = stand_in()
     serve_item(monkeypatch, ("src",))
     other = "git@github.com:other/repo.git"
