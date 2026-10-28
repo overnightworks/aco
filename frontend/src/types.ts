@@ -105,39 +105,42 @@ export interface YesNoDecisionRequest {
 	note: string | null;
 }
 
-/** The same body for an option line: the picked letter instead of an outcome
- * and a note (ABRD-39, ABRD-42). */
-export interface OptionDecisionRequest {
-	repo: string;
-	item: number;
+/** A line of a posted card (ABRD-77), as shown: `fingerprint` is the line's own. */
+interface ShownCardLine {
 	line: number;
 	fingerprint: string;
+}
+
+interface PickedCardLine extends ShownCardLine {
 	option: OptionLetter;
 }
 
-/** The same body for the operator's own answer to an option card: the trimmed
- * text instead of a letter (ABRD-64). */
-export interface OtherDecisionRequest {
+interface CardRequestHead {
 	repo: string;
 	item: number;
-	line: number;
-	fingerprint: string;
+}
+
+/** A card decided by a letter on every one of its lines (ABRD-77). */
+export interface CardPicksRequest extends CardRequestHead {
+	lines: PickedCardLine[];
+}
+
+/** The operator's own answer to the whole card: the trimmed text on every line (ABRD-77). */
+export interface CardOtherRequest extends CardRequestHead {
+	lines: ShownCardLine[];
 	other: string;
 }
 
-/** The same body for sending an option card back to its head with an optional
- * note (ABRD-70). */
-export interface UnclearDecisionRequest {
-	repo: string;
-	item: number;
-	line: number;
-	fingerprint: string;
+/** The whole card sent back to its head with an optional note (ABRD-77). */
+export interface CardUnclearRequest extends CardRequestHead {
+	lines: ShownCardLine[];
 	unclear: true;
 	note: string | null;
 }
 
-export type DecisionRequest =
-	YesNoDecisionRequest | OptionDecisionRequest | OtherDecisionRequest | UnclearDecisionRequest;
+export type CardDecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearRequest;
+
+export type DecisionRequest = YesNoDecisionRequest | CardDecisionRequest;
 
 export interface DecisionResult {
 	/** `aco.board.ports.DecisionStatus`'s four values, the only ones `POST

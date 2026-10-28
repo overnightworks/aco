@@ -1,14 +1,16 @@
 import { describe, expect, test } from 'vitest';
-import { line, optionLine } from '../../test-support/board';
+import { cardOption, line, optionLine } from '../../test-support/board';
 import {
 	ALREADY_RULED_MESSAGE,
+	cardKey,
+	cardOtherRequest,
+	cardPicksRequest,
+	cardUnclearRequest,
 	decisionRequest,
 	LINE_CHANGED_MESSAGE,
 	lineKey,
 	noteOrNull,
-	otherDecisionRequest,
-	readDecisionResult,
-	unclearDecisionRequest
+	readDecisionResult
 } from './decision';
 
 describe('lineKey / decisionRequest', () => {
@@ -30,45 +32,48 @@ describe('lineKey / decisionRequest', () => {
 	});
 });
 
-describe('otherDecisionRequest', () => {
-	test('[ABRD-64] an Other answer carries the trimmed text and the card fingerprint, no letter or note', () => {
-		const request = otherDecisionRequest(
-			'repo',
-			42,
-			optionLine({ index: 4, fingerprint: 'fp-song' }),
-			'  Only on desktop \n'
-		);
+describe('card requests', () => {
+	const first = optionLine({ index: 4, fingerprint: 'fp-song' });
+	const second = optionLine({ index: 6, fingerprint: 'fp-library' });
+	const shown = [
+		{ line: 4, fingerprint: 'fp-song' },
+		{ line: 6, fingerprint: 'fp-library' }
+	];
+
+	test('[ABRD-77] a card key is one per item and never a line key', () => {
+		expect(cardKey('repo', 42)).toBe('repo:42:card');
+		expect(cardKey('repo', 42)).not.toBe(lineKey('repo', 42, first));
+	});
+
+	test('[ABRD-77] the picks name each point as it was shown with its letter, nothing else', () => {
+		const request = cardPicksRequest('repo', 42, [
+			{ shown: first, option: cardOption({ letter: 'B' }) },
+			{ shown: second, option: cardOption({ letter: 'A' }) }
+		]);
 
 		expect(request).toEqual({
 			repo: 'repo',
 			item: 42,
-			line: 4,
-			fingerprint: 'fp-song',
-			other: 'Only on desktop'
+			lines: [
+				{ line: 4, fingerprint: 'fp-song', option: 'B' },
+				{ line: 6, fingerprint: 'fp-library', option: 'A' }
+			]
 		});
 	});
-});
 
-describe('unclearDecisionRequest', () => {
+	test('[ABRD-92] an Other answer names every point and carries the trimmed text once', () => {
+		const request = cardOtherRequest('repo', 42, [first, second], '  Only on desktop \n');
+
+		expect(request).toEqual({ repo: 'repo', item: 42, lines: shown, other: 'Only on desktop' });
+	});
+
 	test.each([
 		['  Why two options? \n', 'Why two options?'],
 		['   ', null]
-	])('[ABRD-75] the note %j goes as %j, with the card fingerprint and no letter', (raw, note) => {
-		const request = unclearDecisionRequest(
-			'repo',
-			42,
-			optionLine({ index: 4, fingerprint: 'fp-song' }),
-			raw
-		);
+	])('[ABRD-75] the note %j goes as %j on every point, with no letter', (raw, note) => {
+		const request = cardUnclearRequest('repo', 42, [first, second], raw);
 
-		expect(request).toEqual({
-			repo: 'repo',
-			item: 42,
-			line: 4,
-			fingerprint: 'fp-song',
-			unclear: true,
-			note
-		});
+		expect(request).toEqual({ repo: 'repo', item: 42, lines: shown, unclear: true, note });
 	});
 });
 

@@ -7,17 +7,17 @@
  */
 
 import type {
+	CardOtherRequest,
+	CardPicksRequest,
+	CardUnclearRequest,
 	DecisionResult,
-	CardOption,
 	ExpectationLine,
-	OptionDecisionRequest,
 	OptionLine,
-	OtherDecisionRequest,
 	Outcome,
-	UnclearDecisionRequest,
 	YesNoDecisionRequest,
 	YesNoLine
 } from '../../types';
+import type { Pick } from './card';
 
 export const UNDO_SECONDS = 8;
 /** The operator's window to change their mind before a decision writes; the
@@ -58,41 +58,51 @@ export function decisionRequest(
 	return { repo, item, line: line.index, fingerprint: line.fingerprint, outcome, note };
 }
 
-/** Only an option line can be asked for a letter, and only one of its own. */
-export function optionDecisionRequest(
-	repo: string,
-	item: number,
-	line: OptionLine,
-	option: CardOption
-): OptionDecisionRequest {
-	return { repo, item, line: line.index, fingerprint: line.fingerprint, option: option.letter };
+/** Every option card, one-point included, posts as one card: one key per item. */
+export function cardKey(repo: string, item: number): string {
+	return `${repo}:${item}:card`;
 }
 
-/** The operator's own answer to the option card as shown; `fingerprint` is the card's. */
-export function otherDecisionRequest(
-	repo: string,
-	item: number,
-	line: OptionLine,
-	answer: string
-): OtherDecisionRequest {
-	return { repo, item, line: line.index, fingerprint: line.fingerprint, other: answer.trim() };
+/** The card as shown: each of its points with the fingerprint it was read with. */
+function shownLines(points: readonly OptionLine[]): CardOtherRequest['lines'] {
+	return points.map((point) => ({ line: point.index, fingerprint: point.fingerprint }));
 }
 
-/** The card as shown, sent back to its head; a blank note is no note. */
-export function unclearDecisionRequest(
+/** The picks of a complete card; each entry carries its point as it was shown when picked. */
+export function cardPicksRequest(
 	repo: string,
 	item: number,
-	line: OptionLine,
-	note: string
-): UnclearDecisionRequest {
+	picks: readonly Pick[]
+): CardPicksRequest {
 	return {
 		repo,
 		item,
-		line: line.index,
-		fingerprint: line.fingerprint,
-		unclear: true,
-		note: noteOrNull(note)
+		lines: picks.map(({ shown, option }) => ({
+			line: shown.index,
+			fingerprint: shown.fingerprint,
+			option: option.letter
+		}))
 	};
+}
+
+/** The operator's own answer to the card as shown. */
+export function cardOtherRequest(
+	repo: string,
+	item: number,
+	points: readonly OptionLine[],
+	answer: string
+): CardOtherRequest {
+	return { repo, item, lines: shownLines(points), other: answer.trim() };
+}
+
+/** The card as shown, sent back to its head; a blank note is no note. */
+export function cardUnclearRequest(
+	repo: string,
+	item: number,
+	points: readonly OptionLine[],
+	note: string
+): CardUnclearRequest {
+	return { repo, item, lines: shownLines(points), unclear: true, note: noteOrNull(note) };
 }
 
 /** A blank note, trimmed, is no note (mirrors `aco.board.api._note`). */
