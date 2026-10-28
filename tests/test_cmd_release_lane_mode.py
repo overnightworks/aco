@@ -17,8 +17,12 @@ from claim_worktrees import (
     make_stand_in,
     standing_claims,
 )
-from cli_fixtures import count_context_reads, run_cli
+from cli_fixtures import count_context_reads, forbid_forge_resolution, real_git, run_cli
+from github_fixtures import MERGE_COMMIT_SHA
+from merged_release import arrange_merged_pull_request, state_ref_claims
 from store_fixtures import state_ref_tip
+
+from aco import protocol
 
 TRUNK_FILES = ("src/widget.py",)
 HELD_SCOPE = ("src/widget.py",)
@@ -113,3 +117,151 @@ def test_a_lane_release_on_a_docs_branch_reads_the_state_ref_once(
         "",
     )
     assert sum(reads.observations.values()) == 1
+
+
+@pytest.mark.parametrize(
+    ("storage_pin", "landing", "extra_flags"),
+    [
+        pytest.param(None, "12", ("--claim-id", "X"), id="claim-id-names-one-claim"),
+        pytest.param('storage = "state-ref"\n', MERGE_COMMIT_SHA, (), id="state-ref-storage"),
+    ],
+)
+def test_a_merged_lane_release_is_no_rerun_when_the_claim_id_or_the_storage_rules_it_out(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+    storage_pin: str | None,
+    landing: str,
+    extra_flags: tuple[str, ...],
+) -> None:
+    """Spec: REL-03, REL-58. Only a github `--merged <pr>` without `--claim-id`
+    reads a branch outside `docs/` and `fix/` that no claim holds as a rerun; the
+    refusal comes before the forge is asked anything."""
+    stand_in(branch=OUTSIDE_LANE_BRANCH, board_config=storage_pin)
+    forbid_forge_resolution(monkeypatch)
+    tip_before = state_ref_tip(bare_remote)
+
+    result = run_cli(
+        [
+            "--repo",
+            REPOSITORY,
+            "release",
+            "--agent",
+            "Ada",
+            "--branch",
+            OUTSIDE_LANE_BRANCH,
+            "--merged",
+            landing,
+            *extra_flags,
+        ],
+        capsys,
+    )
+
+    assert (result.status, result.stdout, result.stderr) == (
+        2,
+        "",
+        issueless_lane_refusal(OUTSIDE_LANE_BRANCH),
+    )
+    assert state_ref_tip(bare_remote) == tip_before
+
+
+def test_a_merged_release_refuses_a_lane_claim_that_sits_on_another_branch_than_the_pull_requests(
+    monkeypatch: pytest.MonkeyPatch,
+    github_clone: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: REL-48, REL-57. The lane claim on `dependabot/x` is not the one
+    pull request #12, merged from `dependabot/y`, landed; it stays."""
+    arrange_merged_pull_request(
+        monkeypatch,
+        github_clone,
+        bare_remote,
+        identity=protocol.LaneIdentity(),
+        trailers=("No-Item: fix",),
+        pull_request_body="No-Item: fix",
+        branch="dependabot/y",
+        claim_branch=OUTSIDE_LANE_BRANCH,
+    )
+    claims_before = state_ref_claims(github_clone, bare_remote)
+
+    result = run_cli(
+        [
+            "--repo",
+            REPOSITORY,
+            "release",
+            "--agent",
+            "Ada",
+            "--branch",
+            OUTSIDE_LANE_BRANCH,
+            "--merged",
+            "12",
+        ],
+        capsys,
+    )
+
+    assert (result.status, result.stdout, result.stderr) == (
+        2,
+        "",
+        "ERROR: lane 'dependabot/x' is claimed on 'dependabot/x', not on pull request #12's "
+        "branch 'dependabot/y'; release that claim by itself\n",
+    )
+    assert state_ref_claims(github_clone, bare_remote) == claims_before
+
+
+@pytest.mark.parametrize(
+    ("output_flags", "expected_stdout"),
+    [
+        pytest.param(
+            (),
+            "LANDED pull request #12 already; nothing left to release\n"
+            "worktree: kept -- release ran from inside it\n",
+            id="text",
+        ),
+        pytest.param(
+            ("--json",),
+            json.dumps(
+                {
+                    "ok": True,
+                    "reason": "merged",
+                    "outcome": "nothing left to release",
+                    "issue": None,
+                    "lane": True,
+                    "branch": DOCS_BRANCH,
+                    "worktree": "kept -- release ran from inside it",
+                }
+            )
+            + "\n",
+            id="json",
+        ),
+    ],
+)
+def test_a_merged_lane_release_with_no_claim_left_reports_nothing_left_to_release(
+    monkeypatch: pytest.MonkeyPatch,
+    github_clone: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+    output_flags: tuple[str, ...],
+    expected_stdout: str,
+) -> None:
+    """Spec: REL-47, REL-49, REL-51. A rerun on a `docs/` lane whose claim the
+    first release removed closes nothing and writes no state."""
+    arrange_merged_pull_request(
+        monkeypatch,
+        github_clone,
+        bare_remote,
+        identity=None,
+        trailers=("No-Item: docs",),
+        pull_request_body="No-Item: docs",
+        branch=DOCS_BRANCH,
+    )
+    real_git(github_clone, "checkout", "-q", DOCS_BRANCH)
+    tip_before = state_ref_tip(bare_remote)
+
+    result = run_cli(
+        ["--repo", REPOSITORY, "release", "--agent", "Ada", "--merged", "12", *output_flags], capsys
+    )
+
+    assert (result.status, result.stdout, result.stderr) == (0, expected_stdout, "")
+    assert state_ref_tip(bare_remote) == tip_before
