@@ -50,15 +50,13 @@ TRUNK_LANDING_DEPTH = 5000
 def validated_dependencies(
     issues: tuple[workboard.Issue, ...], fetched: dict[int, tuple[workboard.IssueDependency, ...]]
 ) -> dict[int, tuple[workboard.IssueDependency, ...]]:
-    """`fetched`, keyed by exactly the positive-`blocked_by_count` issues,
-    each list checked against its own listing count: a length
+    """`fetched`, keyed by the given issues, each list checked against its
+    own listing count: a length
     mismatch or a duplicated dependency is the same class of malformed
     forge response as a disagreeing container summary -- named loud rather
     than guessed through."""
     validated: dict[int, tuple[workboard.IssueDependency, ...]] = {}
     for issue in issues:
-        if issue.blocked_by_count <= 0:
-            continue
         dependencies = fetched.get(issue.number, ())
         distinct = {dependency.reference for dependency in dependencies}
         length = len(dependencies)
@@ -175,8 +173,9 @@ def fetch_validated_dependencies(
 ) -> dict[int, tuple[workboard.IssueDependency, ...]]:
     """The validated `blocked_by` dependencies of every issue that reports a
     positive blocker count: the one place that picks the issues to fetch."""
-    candidates = tuple(issue.number for issue in issues if issue.blocked_by_count > 0)
-    return validated_dependencies(issues, fetch_dependencies(client, candidates))
+    candidates = tuple(issue for issue in issues if issue.blocked_by_count > 0)
+    fetched = fetch_dependencies(client, tuple(issue.number for issue in candidates))
+    return validated_dependencies(candidates, fetched)
 
 
 @dataclass(frozen=True)
