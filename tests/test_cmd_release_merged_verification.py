@@ -89,7 +89,7 @@ def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
     result = release_merged(capsys)
 
     assert (result.status, result.stderr) == (0, "")
-    assert not state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) == {}
 
 
 def test_release_merged_refuses_an_issueless_lane_landing_off_trunk(
@@ -114,7 +114,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_off_trunk(
         f"ERROR: merge commit {MERGE_COMMIT_SHA} of pull request #12 "
         "is not on the first-parent trunk\n",
     )
-    assert state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) != {}
 
 
 def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_defect(
@@ -135,7 +135,7 @@ def test_release_merged_refuses_an_issueless_lane_landing_with_a_classification_
         f"ERROR: merge commit {landing.merge_commit} of pull request #12 "
         "carries more than one `No-Item:` trailer\n",
     )
-    assert state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) != {}
 
 
 @pytest.mark.parametrize(
@@ -197,7 +197,7 @@ def test_release_merged_refuses_a_landing_it_cannot_verify(
     result = release_merged(capsys, "72")
 
     assert (result.status, result.stderr) == (2, f"ERROR: {reason.format(reported=reported)}\n")
-    assert state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) != {}
 
 
 @pytest.mark.parametrize(
@@ -221,7 +221,7 @@ def test_release_merged_ignores_the_pull_requests_own_body_for_an_issue(
     result = release_merged(capsys, "72")
 
     assert (result.status, result.stderr, landing.forge.closed_issues) == (0, "", {WORK_ITEM_ISSUE})
-    assert not state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) == {}
 
 
 def test_release_merged_closes_the_still_open_work_item(
@@ -235,12 +235,13 @@ def test_release_merged_closes_the_still_open_work_item(
 
     result = release_merged(capsys, "72")
 
+    expected_comment = github.landing_comment(12)
     assert (result.status, landing.forge.closed_issues, landing.forge.landing_comments) == (
         0,
         {WORK_ITEM_ISSUE},
-        {WORK_ITEM_ISSUE: github.landing_comment(12)},
+        {WORK_ITEM_ISSUE: expected_comment},
     )
-    assert not state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) == {}
 
 
 @pytest.mark.parametrize(
@@ -279,11 +280,13 @@ def test_release_merged_refuses_a_lane_whose_merge_commit_names_a_work_item(
 
     result = release_merged(capsys, output=output)
 
-    assert result.status == 2
-    assert (result.stdout, result.stderr) == (
-        (printed + "\n", f"ERROR: {refusal}\n") if output else ("", f"ERROR: {refusal}\n")
+    expected_stdout = printed + "\n" if output else ""
+    assert (result.status, result.stdout, result.stderr) == (
+        2,
+        expected_stdout,
+        f"ERROR: {refusal}\n",
     )
-    assert state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) != {}
 
 
 def test_release_merged_refuses_an_unclassified_lane_merge_commit(
@@ -302,7 +305,7 @@ def test_release_merged_refuses_an_unclassified_lane_merge_commit(
         f"ERROR: merge commit {landing.merge_commit} of pull request #12 carries no "
         "`Work-Item:` or `No-Item:` trailer\n",
     )
-    assert state_ref_claims(github_clone, bare_remote)
+    assert state_ref_claims(github_clone, bare_remote) != {}
 
 
 @pytest.mark.parametrize(
