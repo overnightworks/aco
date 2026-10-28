@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract
 from cli_fixtures import real_git, set_agent_identity_env
-from github_fixtures import FakeForge
+from github_fixtures import FakeForge, serve_forge
 from store_fixtures import publish_claims_from_a_second_clone, state_ref_tip
 
 from aco import board_read, checkout, forge, github, workboard
@@ -224,9 +224,7 @@ def test_start_on_a_sub_issue_of_a_stale_clone_refuses_and_builds_nothing(
     )
     site = SITES["parent"]
     over_gh = GitHubForge(run_repository, run=ScriptedGitHub(CURRENT, site.reply(CURRENT)))
-    monkeypatch.setattr(
-        github, "GitHubForge", lambda _repository: _ForgeWhoseParentsAreGitHubs(fake, over_gh)
-    )
+    serve_forge(monkeypatch, _ForgeWhoseParentsAreGitHubs(fake, over_gh))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     monkeypatch.chdir(github_clone)
     publish_claims_from_a_second_clone(github_clone, bare_remote, ())

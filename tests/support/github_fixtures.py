@@ -79,7 +79,7 @@ def landing_readiness(
     return forge.LandingReadiness(number, True, head_sha, mergeable_state, checks)
 
 
-ServedForge = TypeVar("ServedForge", bound="FakeForge | github.GitHubForge")
+ServedForge = TypeVar("ServedForge")
 
 
 def serve_forge(monkeypatch: pytest.MonkeyPatch, forge: ServedForge) -> ServedForge:
