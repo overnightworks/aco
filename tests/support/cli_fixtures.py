@@ -27,11 +27,11 @@ from aco import (
     cmd_brief,
     cmd_cut,
     cmd_reset,
-    cmd_rule,
     cmd_status,
     forge,
     github,
     process,
+    session,
     store,
     workboard,
 )
@@ -54,8 +54,16 @@ class FixedDateTime(datetime):
 
 def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin CLI dates without installing a global autouse fixture."""
-    for owner in (cmd_rule, board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
+    for owner in (board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
         monkeypatch.setattr(owner, "datetime", FixedDateTime)
+    real_run_context = session.run_context
+
+    def frozen_run_context(repo: forge.RepositoryId | None) -> RunContext:
+        context = real_run_context(repo)
+        context.today = FROZEN_CLI_NOW.date
+        return context
+
+    monkeypatch.setattr(session, "run_context", frozen_run_context)
 
 
 def stub_one_git_call(
@@ -99,8 +107,7 @@ def fail_git_launch(
     monkeypatch: pytest.MonkeyPatch, leading_arguments: list[str], failure: Exception
 ) -> list[list[str]]:
     """Record matching Git launches and raise the supplied boundary failure;
-    the returned list is empty when no launch matched (see
-    `stub_one_git_call`), which a test asserts against."""
+    the list is empty when none matched (see `stub_one_git_call`)."""
     run_git = process.run_git
     matched: list[list[str]] = []
 
@@ -135,8 +142,7 @@ GIT_FAILURE_INJECTIONS = [
 ]
 """Each way a git read can fail, with the detail every refusal carries:
 `(inject(monkeypatch, arguments), detail)`, `inject` returning the calls it
-answered. The timeout detail names `rev-parse`, so use these for reads
-of that subcommand."""
+answered. The timeout detail names `rev-parse`: use these for its reads."""
 
 
 def recorded_head_read(remote: str) -> tuple[str, ...]:
@@ -516,20 +522,17 @@ def dangle_recorded_head(repo: Path, remote_name: str) -> None:
 
 def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every store-command test reads a tracked `board.toml` by default,
-    whichever of `test_cli.py`'s faked worktree or
-    `test_store.py`'s real scratch checkout it runs against -- neither actually `git add`s the
-    file, so a real `git ls-files` check would otherwise always read "not
-    tracked" here. The untracked/ignored refusal is its own axis, proven by
-    `checkout.path_is_tracked`'s own tests in `test_checkout.py` and by
-    `test_cli.py`'s `test_an_untrusted_board_config_refuses_every_store_command_by_name`,
-    which overrides this stub back to `False`. Each caller wraps this in its
-    own `@pytest.fixture(autouse=True)` (never placed here itself, matching
-    `conftest.py`'s "everything but git-toplevel isolation stays local to its
-    test module") so every test file states in its own body that it reads a
-    tracked board.toml by default. Only that index question is stubbed:
-    whether a revision's tree holds a file (the trunk's committed
-    `lane_shared`) stays with the real helper, so a test's faked
-    `ls-tree` answer or its real repository decides it."""
+    whichever of `test_cli.py`'s faked worktree or `test_store.py`'s real
+    scratch checkout it runs against -- neither `git add`s the file, so a real
+    `git ls-files` check would read "not tracked". The untracked/ignored
+    refusal is proven by `checkout.path_is_tracked`'s own tests in
+    `test_checkout.py` and by `test_cli.py`'s
+    `test_an_untrusted_board_config_refuses_every_store_command_by_name`, which
+    overrides this stub back to `False`. Each caller wraps this in its own
+    `@pytest.fixture(autouse=True)` (matching `conftest.py`'s "everything but
+    git-toplevel isolation stays local to its test module"). Only the index
+    question is stubbed: whether a revision's tree holds a file stays with the
+    real helper, so a test's faked `ls-tree` answer or real repository decides it."""
 
     def tracked_in_the_index(
         path: str, *, directory: Path | None = None, revision: str | None = None
@@ -634,10 +637,9 @@ def hub_canonical_worktree_file(
 ) -> Path:
     """A file in a linked worktree on `branch` of a repository with the
     remotes `origin` and `hub` whose tracked `board.toml` makes `canonical`
-    canonical, with `origin/HEAD` naming `main` and `<canonical>/HEAD`
-    naming `canonical_head` -- or never recorded. A recorded
-    `HEAD` of a canonical remote the repository never configured is one a
-    removed remote left behind."""
+    canonical, with `origin/HEAD` naming `main` and `<canonical>/HEAD` naming
+    `canonical_head` -- or never recorded. A recorded `HEAD` of a canonical
+    remote the repository never configured is one a removed remote left behind."""
     main = tmp_path / "repo"
     main.mkdir()
     real_git(main, "init", "-q", "-b", "main")
@@ -838,12 +840,10 @@ ITEM_NEW_BODY = complete_contract("Ship it.")
 
 def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
     """Point `RunContext.toplevel` (`rev-parse --show-toplevel`) at a real
-    repository this test built itself, taking precedence over
-    `conftest.py`'s autouse `_isolate_git_toplevel` fake -- every other real
-    git call `start`'s own worktree creation runs still reaches real git,
-    unlike a fully faked `checkout.git_output`, and the trunk is resolved
-    and fetched for real there, undoing `test_cli.py`'s autouse
-    `_stub_trunk`."""
+    repository this test built, over `conftest.py`'s autouse
+    `_isolate_git_toplevel` fake. Every other git call, including `start`'s
+    worktree creation, reaches real git, and the trunk is resolved and fetched
+    for real, undoing `test_cli.py`'s autouse `_stub_trunk`."""
     real_git_output = checkout.git_output
 
     def fake(arguments: list[str], *, directory: Path | None = None, **options: bool) -> str:
