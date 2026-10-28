@@ -44,11 +44,6 @@ _OPTION_LINE_KEYS = [
     "fingerprint",
 ]
 _RULE_13_SENTENCE = "line 1 is an option line; --yes, --no and --later rule only a yes/no line"
-_RULE_17_SENTENCE = (
-    "line 1 changed since its card was shown; show it again and rule what it shows now"
-)
-_RULE_18_SENTENCE = "line 1 has no option C; its options are A, B"
-_RULE_04_SENTENCE = "line 1 is already ruled; a changed ruling is a new line"
 
 
 def _without_key(stored: dict[str, object], key: str) -> dict[str, object]:
@@ -354,4 +349,24 @@ def test_a_post_without_lines_naming_no_outcome_or_one_beside_an_option_is_refus
 
     assert answer.status == 400
     assert answer.json() == {"error": "bad request: decision"}
+    assert repository.calls() == calls_before
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"other": "x", "outcome": "yes"}, {"unclear": True, "outcome": "yes"}],
+    ids=["other-beside-outcome", "unclear-beside-outcome"],
+)
+def test_a_post_naming_an_outcome_beside_another_decision_is_refused_before_any_aco_call(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    listed: dict[str, Any],
+    fields: dict[str, object],
+) -> None:
+    """ABRD-42."""
+    calls_before = repository.calls()
+
+    answer = board.post_rule({**listed, **fields})
+
+    assert (answer.status, answer.json()) == (400, {"error": "bad request: decision"})
     assert repository.calls() == calls_before

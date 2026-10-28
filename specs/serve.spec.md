@@ -379,7 +379,7 @@ aco calls: aco rulings --json, then aco rule 12 --line 1 --card-hash=<card_hash 
 answer 200: {"status": "ruled", "message": null}
 ```
 
-A blank answer, one past 280 characters after trimming, or one beside `option` or `note` answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
+A blank answer, one past 280 characters after trimming, or one beside `outcome`, `option` or `note` answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
 
 ### E-ABRD-14 -- sending an option line back to its head
 
@@ -392,7 +392,7 @@ aco calls: aco rulings --json, then aco rule 12 --line 1 --card-hash=<card_hash 
 answer 200: {"status": "returned", "message": null}
 ```
 
-The line stays open, now with its head. Posting Unclear again answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is already with its head; it comes back once revised"}`. An `unclear` that is not `true`, or one beside `option` or `other`, or a note past 280 characters after trimming, answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
+The line stays open, now with its head. Posting Unclear again answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is already with its head; it comes back once revised"}`. An `unclear` that is not `true`, or one beside `outcome`, `option` or `other`, or a note past 280 characters after trimming, answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
 
 ### E-ABRD-15 -- deciding a whole card
 
