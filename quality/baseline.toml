@@ -20,7 +20,7 @@
 "src/aco/cli.py" = 841
 "src/aco/cmd_claim.py" = 1136
 "src/aco/cmd_release.py" = 921
-"src/aco/github.py" = 1630
+"src/aco/github.py" = 1580
 "src/aco/protocol.py" = 1877
 "src/aco/state_board.py" = 928
 "src/aco/store.py" = 2090
@@ -38,7 +38,7 @@
 "tests/test_cmd_release_cleanup.py" = 804
 "tests/test_cmd_rescope_checkout.py" = 1087
 "tests/test_cmd_reset.py" = 952
-"tests/test_github.py" = 3181
+"tests/test_github.py" = 3105
 "tests/test_protocol.py" = 802
 "tests/test_state_board.py" = 5999
 "tests/test_store.py" = 5440
