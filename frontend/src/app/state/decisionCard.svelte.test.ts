@@ -323,6 +323,18 @@ describe('picks across re-reads', () => {
 		expect(store.picks(key, points)).toHaveLength(1);
 	});
 
+	test('[ABRD-91] a repo whose name extends a readable repo name keeps its picks while it fails to read', () => {
+		const { store } = setup();
+		store.choose('repo:child', 7, points, pickOf(points[0]));
+
+		store.reconcilePicks([
+			repo({ name: 'repo', items: [] }),
+			repo({ name: 'repo:child', error: 'offline', items: [] })
+		]);
+
+		expect(store.picks('repo:child:7:card', points)).toHaveLength(1);
+	});
+
 	test('[ABRD-91] a re-read keeps the picks of unchanged points', () => {
 		const { store } = setup();
 		store.choose('repo', 7, points, pickOf(points[0]));

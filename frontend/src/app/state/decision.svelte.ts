@@ -71,7 +71,10 @@ function draftKey(key: string, kind: EscapeKind): string {
  * read without error (the card is ruled or removed), kept while that repo is unavailable. */
 function unreadPicks(repos: RepoReading[], key: string, picks: Pick[]): Pick[] {
 	const repoWasRead = repos.some(
-		(reading) => reading.error === null && key.startsWith(`${reading.name}:`)
+		(reading) =>
+			reading.error === null &&
+			key.startsWith(`${reading.name}:`) &&
+			/^\d+:/.test(key.slice(reading.name.length + 1))
 	);
 	return repoWasRead ? [] : picks;
 }
