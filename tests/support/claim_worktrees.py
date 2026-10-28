@@ -22,6 +22,7 @@ from aco import forge, protocol, store
 ISSUE = 72
 LANE_BRANCH = "codex/issue-72-claims"
 LANE_MODE_BRANCH = "docs/lane-cleanup"
+OUTSIDE_LANE_BRANCH = "dependabot/x"
 ITEM_WHOLE_REASON = "The scenario claims it as one."
 
 
@@ -157,6 +158,20 @@ def rescope_arguments(*flags: str) -> list[str]:
 def held_by_ada(scope: tuple[str, ...]) -> tuple[Standing, ...]:
     """The claim Ada holds on item `ISSUE` from `LANE_BRANCH` over `scope`."""
     return (Standing(scope, issue=ISSUE, agent="Ada", branch=LANE_BRANCH),)
+
+
+def lane_held_by_ada(branch: str, scope: tuple[str, ...]) -> tuple[Standing, ...]:
+    """The lane claim Ada holds on `branch` over `scope`."""
+    return (Standing(scope, branch=branch, agent="Ada"),)
+
+
+def issueless_lane_refusal(branch: str) -> str:
+    """The refusal of a lane command on `branch` outside `docs/` and `fix/`
+    that no lane claim holds (`specs/claim.spec.md` CLM-07), as stderr."""
+    return (
+        f"ERROR: branch '{branch}' is not an issueless lane; pass an issue number, or "
+        "check out a branch prefixed 'docs/' or 'fix/'\n"
+    )
 
 
 def standing_claims(standpoint: Standpoint) -> list[protocol.ActiveClaim]:
