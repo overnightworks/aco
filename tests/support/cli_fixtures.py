@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TextIO
 
 import pytest
-from board_fixtures import BASE, REPOSITORY, complete_contract, write_repository_config
+from board_fixtures import REPOSITORY, complete_contract, write_repository_config
 
 from aco import (
     board_read,
@@ -551,39 +551,6 @@ def stub_every_remote_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     proving a remote with no URL configured restores
     `checkout.unconfigured_remote_refusal`, so real git answers it."""
     monkeypatch.setattr(checkout, "unconfigured_remote_refusal", lambda _remote, **_kwargs: None)
-
-
-def git_checkout(
-    *,
-    toplevel: str = "/repo",
-    head: str = BASE,
-    branch: str = "codex/issue-72",
-    git_directory: str = "/repo/.git/worktrees/issue-72",
-    common_directory: str = "/repo/.git",
-    dirty: str = "",
-) -> dict[tuple[str, ...], str]:
-    return {
-        ("rev-parse", "HEAD"): head,
-        ("rev-parse", "--verify", "--quiet", "HEAD"): head,
-        ("rev-parse", "--show-toplevel"): toplevel,
-        ("branch", "--show-current"): branch,
-        ("rev-parse", "--git-dir"): git_directory,
-        ("rev-parse", "--git-common-dir"): common_directory,
-        # `resolve_path_checkout`'s one combined call: the same
-        # three facts above, in the order it requests them via
-        # `-C`/`--path-format=absolute`, so `rescope`'s path-based checkout
-        # resolution reads the identical fixture the separate keys above
-        # already describe.
-        (
-            "rev-parse",
-            "--path-format=absolute",
-            "--show-toplevel",
-            "--git-dir",
-            "--git-common-dir",
-        ): "\n".join((toplevel, git_directory, common_directory)),
-        ("status", "--porcelain"): dirty,
-        RECORDED_ORIGIN_HEAD_READ: "refs/remotes/origin/main",
-    }
 
 
 AGENT_IDENTITY_ENV_NAMES = (
