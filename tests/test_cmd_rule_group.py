@@ -14,6 +14,7 @@ from option_cards import (
     NOTE,
     STALE_CARD_HASH,
     YES_NO_LINE,
+    assert_refusal_writes_nothing,
     card,
     card_body,
     card_head,
@@ -691,12 +692,4 @@ class TestOneRefusedLineStoresNone:
         """Spec: RULE-29, RULE-04..05, RULE-16..19, RULE-24, RULE-27, RULE-09 -- all or nothing."""
         client = serve_item(monkeypatch, group_body(third))
         arguments = refusal_call(kind, shown, letter, via, refused, position)
-        command = ["rule", "7", *arguments]
-        text = run_cli(command, capsys)
-        wire = run_cli([*command, "--json"], capsys)
-        assert (text.status, text.stderr) == (2, f"ERROR: {message}\n")
-        assert (wire.status, json.loads(wire.stdout)) == (
-            2,
-            {"ok": False, "reason": reason, "message": message},
-        )
-        assert client.body_writes == []
+        assert_refusal_writes_nothing(client, capsys, arguments, message, reason)

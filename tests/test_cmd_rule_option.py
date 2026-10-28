@@ -17,6 +17,7 @@ from option_cards import (
     OTHER_ANSWER,
     STALE_CARD_HASH,
     YES_NO_LINE,
+    assert_refusal_writes_nothing,
     card,
     decide,
     item_body,
@@ -287,15 +288,7 @@ class TestRuleOption:
     ) -> None:
         """Spec: RULE-04, RULE-05, RULE-09, RULE-16..RULE-19, RULE-24 -- in that check order."""
         client = serve_item(monkeypatch, item_body(option_line, yes_no_line=yes_no_line))
-        command = ["rule", "7", *arguments]
-        text = run_cli(command, capsys)
-        wire = run_cli([*command, "--json"], capsys)
-        assert (text.status, text.stderr) == (2, f"ERROR: {message}\n")
-        assert (wire.status, json.loads(wire.stdout)) == (
-            2,
-            {"ok": False, "reason": reason, "message": message},
-        )
-        assert client.body_writes == []
+        assert_refusal_writes_nothing(client, capsys, arguments, message, reason)
 
     @pytest.mark.parametrize(
         ("arguments", "message"),
