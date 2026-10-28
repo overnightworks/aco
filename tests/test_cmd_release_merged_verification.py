@@ -89,7 +89,7 @@ def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
     result = release_merged(capsys)
 
     assert (result.status, result.stderr) == (0, "")
-    assert state_ref_claims(github_clone, bare_remote) == {}
+    assert not state_ref_claims(github_clone, bare_remote)
 
 
 def test_release_merged_refuses_an_issueless_lane_landing_off_trunk(
@@ -222,7 +222,7 @@ def test_release_merged_ignores_the_pull_requests_own_body_for_an_issue(
 
     assert (result.status, result.stderr) == (0, "")
     assert landing.forge.closed_issues == {WORK_ITEM_ISSUE}
-    assert state_ref_claims(github_clone, bare_remote) == {}
+    assert not state_ref_claims(github_clone, bare_remote)
 
 
 def test_release_merged_closes_the_still_open_work_item(
@@ -239,7 +239,7 @@ def test_release_merged_closes_the_still_open_work_item(
     assert result.status == 0
     assert landing.forge.closed_issues == {WORK_ITEM_ISSUE}
     assert landing.forge.landing_comments == {WORK_ITEM_ISSUE: github.landing_comment(12)}
-    assert state_ref_claims(github_clone, bare_remote) == {}
+    assert not state_ref_claims(github_clone, bare_remote)
 
 
 @pytest.mark.parametrize(
