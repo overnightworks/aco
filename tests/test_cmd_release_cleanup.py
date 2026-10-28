@@ -13,7 +13,6 @@ import pytest
 from cli_fixtures import (
     fail_git_launch,
     real_git,
-    redirect_toplevel,
     run_cli,
     stub_one_git_call,
 )
@@ -286,12 +285,10 @@ class CleanupIntervention:
         real_git(
             self.clone, "worktree", "add", "-q", str(bystander), "-b", "codex/issue-1-bystander"
         )
-        redirect_toplevel(self.monkeypatch, bystander)
         self.monkeypatch.chdir(bystander)
         self.record.bystander = str(bystander)
 
     def run_from_inside(self) -> None:
-        redirect_toplevel(self.monkeypatch, self.world.lane)
         self.monkeypatch.chdir(self.world.lane)
 
     def remove_lane_worktree(self) -> None:

@@ -378,7 +378,6 @@ def clone(
     real_git(repo, "remote", "add", "origin", str(bare_remote))
     track_board_config(repo, "")
     push_repository_trunk(repo, "origin")
-    redirect_toplevel(monkeypatch, repo)
     monkeypatch.chdir(repo)
     return repo
 
@@ -833,21 +832,7 @@ def fresh_observation(worktree: Path, remote: Path | str) -> store.Observation:
     )
 
 
-# Captured at import, before `_stub_trunk` replaces them.
-LIVE_TRUNK_REF_AFTER = checkout.trunk_ref_after
-LIVE_FETCH_REMOTE = checkout.fetch_remote
-
 ITEM_NEW_BODY = complete_contract("Ship it.")
-
-
-def redirect_toplevel(monkeypatch: pytest.MonkeyPatch, toplevel: Path) -> None:
-    """Stand in `toplevel`, a real repository this test built, so `RunContext.toplevel`
-    (`rev-parse --show-toplevel`) names it. Every git call, including `start`'s
-    worktree creation, reaches real git, and the trunk is resolved and fetched
-    for real, undoing `test_cli.py`'s autouse `_stub_trunk`."""
-    monkeypatch.chdir(toplevel)
-    monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
-    monkeypatch.setattr(checkout, "fetch_remote", LIVE_FETCH_REMOTE)
 
 
 def arguments_bash_hands_aco(advice: str, tmp_path: Path) -> tuple[int, list[str]]:

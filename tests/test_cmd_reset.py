@@ -20,7 +20,6 @@ from cli_fixtures import (
     init_bare_repository,
     push_repository_trunk,
     real_git,
-    redirect_toplevel,
     run_cli,
     track_board_config,
 )
@@ -934,7 +933,6 @@ def test_reset_bundle_restores_the_released_history(
     track_board_config(fresh_repository, "")
     push_repository_trunk(fresh_repository, "origin")
     monkeypatch.chdir(fresh_repository)
-    redirect_toplevel(monkeypatch, fresh_repository)
     status = run_cli(["status"], capsys)
     state = store.fetch_state(worktree=fresh_repository, remote="origin")
     assert (
