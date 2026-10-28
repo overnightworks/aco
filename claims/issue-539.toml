@@ -1,8 +1,0 @@
-claim_id = "c61b9d227279419a8e35bf6ed53bb72f"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "8567c532c0c9938e21de740f42c1d257981392f0"
-branch = "claude/issue-539-single-line-path-gone"
-scope = ["specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/ports.py", "tests/board/test_board_card_decisions.py", "tests/board/test_board_core.py", "tests/board/test_board_option_lines.py", "tests/board/test_board_other_decisions.py", "tests/board/test_board_server.py", "tests/board/test_board_unclear_decisions.py", "tests/support/aco_board_fixtures.py"]
-opened_commit = "d902993e7c4283221abe3e17450a469ed82faf75"
-whole_reason = "One type's removal: the port method, its adapter, the parser branch and the board's caller go together, or pyright and the API disagree about a form the board still half accepts."
