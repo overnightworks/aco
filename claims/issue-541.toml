@@ -1,0 +1,8 @@
+claim_id = "9fed78d945b042c6ae44624ab1977753"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "c724e16320b65a0f03d3a717c7be4c206daf203a"
+branch = "claude/issue-541-merged-lane-cells"
+scope = ["quality/baseline.toml", "tests/support/merged_release.py", "tests/test_cli.py", "tests/test_cmd_release_lane_mode.py"]
+opened_commit = "2c9207ee8cd8357c401401fe7a4e591c0e8bfd58"
+whole_reason = "Four paths for one move: the three tests and the helper's optional identity arrive together as the stubbed test leaves test_cli.py, and the baseline follows the shrink; none can land without the others."
