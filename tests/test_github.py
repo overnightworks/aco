@@ -1919,6 +1919,25 @@ def test_github_board_dependency_fails_loud_on_a_malformed_shape(raw: str) -> No
         client.list_board_dependencies(150)
 
 
+def test_github_board_dependency_reads_a_closed_timestamp_as_an_aware_instant() -> None:
+    client = GitHubForge(
+        github.repository_id("example/agent-coordination"),
+        run=lambda _arguments: json.dumps(
+            {
+                "number": 151,
+                "state": "closed",
+                "closedAt": "2026-09-05T00:00:00Z",
+                "repository": "example/agent-coordination",
+                "isPullRequest": False,
+            }
+        ),
+    )
+
+    dependencies = client.list_board_dependencies(150)
+
+    assert dependencies[0].closed_at == datetime(2026, 9, 5, tzinfo=UTC)
+
+
 def test_github_board_dependency_fails_loud_on_an_uncalendared_closed_timestamp() -> None:
     """`closedAt` can pass the timestamp-shape check (digits in the right
     places) while still naming no real calendar date; `datetime.fromisoformat`
