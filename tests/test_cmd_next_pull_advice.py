@@ -157,6 +157,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
     served = serve_nested_container(monkeypatch, nested)
 
     before_retype = run_cli(["next"], capsys)
+    assert before_retype.status == 3, before_retype.stderr
     repair = before_retype.stdout.split(f"\n#{NESTED}: ", 1)[1].splitlines()[0]
     retyped = replace(nested, kind=body.ItemKind.TASK, children_closed=None, children_total=None)
     served.board_issues = (retyped,)
@@ -164,6 +165,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
         forge.ItemState.OPEN, "Nested epic", contract
     )
     after_retype = run_cli(["next"], capsys)
+    assert after_retype.status == 0, after_retype.stderr
     run_line = after_retype.stdout.split("\nRun: ", 1)[1].splitlines()[0]
     bash_status, claim_arguments = arguments_bash_hands_aco(run_line, tmp_path)
     claimed = run_cli(claim_arguments, capsys)

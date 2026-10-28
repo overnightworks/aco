@@ -14,7 +14,6 @@ from github_fixtures import FakeForge, assert_github_world, serve_forge
 
 RULED_ON = date(2020, 1, 1)
 LANE_BRANCH = "codex/issue-10-work"
-LANDING_DAYS = 10
 
 
 def land_on_the_trunk(monkeypatch: pytest.MonkeyPatch, clone: Path, *committed_at: str) -> None:
