@@ -198,15 +198,14 @@ def test_a_lookup_answer_that_names_no_repository_is_a_malformed_forge_response(
         client.parent_issue(72)
 
 
-class _ForgeWhoseParentsAreGitHubs:
+@dataclass(kw_only=True)
+class _ForgeWhoseParentsAreGitHubs(FakeForge):
     """`start`'s fake forge, its parent read answered by the real adapter over `gh`."""
 
-    def __init__(self, fake: FakeForge, over_gh: GitHubForge) -> None:
-        self._fake = fake
-        self.parent_issue = over_gh.parent_issue
+    parents_over_gh: GitHubForge
 
-    def __getattr__(self, name: str) -> object:
-        return getattr(self._fake, name)
+    def parent_issue(self, number: int) -> workboard.ParentIssue | None:
+        return self.parents_over_gh.parent_issue(number)
 
 
 def test_start_on_a_sub_issue_of_a_stale_clone_refuses_and_builds_nothing(
@@ -218,13 +217,14 @@ def test_start_on_a_sub_issue_of_a_stale_clone_refuses_and_builds_nothing(
     """Spec: PIN-52 (E-PIN-42)."""
     run_repository = github.repository_id(REPOSITORY)
     title = "Port the thing (#434 slice 13)"
-    fake = FakeForge(
-        board_issues=(board_issue(437, title, complete_contract("Build it.", scope=["base.txt"])),),
-        issue_references={437: forge.ItemReference(forge.ItemState.OPEN, title, "")},
-    )
     site = SITES["parent"]
     over_gh = GitHubForge(run_repository, run=ScriptedGitHub(CURRENT, site.reply(CURRENT)))
-    serve_forge(monkeypatch, _ForgeWhoseParentsAreGitHubs(fake, over_gh))
+    fake = _ForgeWhoseParentsAreGitHubs(
+        board_issues=(board_issue(437, title, complete_contract("Build it.", scope=["base.txt"])),),
+        issue_references={437: forge.ItemReference(forge.ItemState.OPEN, title, "")},
+        parents_over_gh=over_gh,
+    )
+    serve_forge(monkeypatch, fake)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     monkeypatch.chdir(github_clone)
     publish_claims_from_a_second_clone(github_clone, bare_remote, ())
