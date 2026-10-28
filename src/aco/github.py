@@ -316,6 +316,33 @@ class GitHubForge:
         self._perform = run if run is not None else self._gh
         self.requests = 0
         self._requests_lock = threading.Lock()
+        self._current_name: str | None = None
+
+    def _require_current_name(self, reference: str) -> None:
+        """Refuse when `reference`, a repository name GitHub answered with, differs
+        from the run's and GitHub also calls the run's repository by another name.
+        Asks GitHub only for a differing reference, and at most once per forge
+        (concurrent reads may repeat the one idempotent lookup)."""
+        if reference == self.repository.path:
+            return
+        if self._current_name is None:
+            answer = self._run(["api", f"repos/{self.repository}", "--jq", ".full_name"])
+            try:
+                self._current_name = repository_id(answer.strip()).path
+            except ClaimError as error:
+                raise forge.ForgeMalformedResponseError(
+                    "GitHub returned a malformed repository name"
+                ) from error
+        if self._current_name != self.repository.path:
+            raise forge.ForgeRepositoryRenamedError(self.repository.path, self._current_name)
+
+    def _current_head_repository(
+        self, pull_request: dict[str, object]
+    ) -> forge.RepositoryId | None:
+        head = _head_repository(pull_request)
+        if head is not None:
+            self._require_current_name(head.path)
+        return head
 
     def _gh(self, arguments: list[str], *, input_data: bytes | None = None) -> str:
         return _bounded_command(
@@ -578,7 +605,7 @@ class GitHubForge:
         base_ref_name = value.get("baseRefName")
         head_ref_name = value.get("headRefName")
         head_sha = value.get("headRefOid")
-        source_repository = _head_repository(value)
+        source_repository = self._current_head_repository(value)
         author = value.get("author")
         login = author.get("login") if isinstance(author, dict) else None
         merged_at = value.get("mergedAt")
@@ -1064,6 +1091,7 @@ class GitHubForge:
             or re.fullmatch(REPOSITORY_PATTERN, repository) is None
         ):
             raise forge.ForgeMalformedResponseError(f"GitHub returned a malformed {description}")
+        self._require_current_name(repository)
         return workboard.IssueReference(repository, number)
 
     def _issue_state(self, value: object, description: str) -> workboard.BlockerState:
@@ -1207,6 +1235,7 @@ class GitHubForge:
             except ValueError as error:
                 raise forge.ForgeMalformedResponseError(self.MALFORMED_BOARD_DEPENDENCY) from error
             parsed_closed_at = parsed_closed_at.astimezone(UTC)
+        self._require_current_name(repository)
         return workboard.IssueDependency(
             workboard.IssueReference(repository, number),
             blocker_state,

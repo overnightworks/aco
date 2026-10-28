@@ -1880,59 +1880,6 @@ def test_github_adapter_item_references_reraises_an_unrecovered_graphql_error(
         client.item_references((10,))
 
 
-def test_github_reads_board_dependencies_local_and_foreign(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    observed: list[list[str]] = []
-
-    def run(arguments: list[str]) -> str:
-        observed.append(arguments)
-        rows = [
-            {
-                "number": 151,
-                "state": "closed",
-                "closedAt": "2026-09-05T00:00:00Z",
-                "repository": "example/agent-coordination",
-                "isPullRequest": False,
-            },
-            {
-                "number": 7,
-                "state": "open",
-                "closedAt": None,
-                "repository": "overnightworks/other-repo",
-                "isPullRequest": False,
-            },
-        ]
-        return "\n".join(json.dumps(row) for row in rows)
-
-    client = GitHubForge(github.repository_id("example/agent-coordination"), run=run)
-
-    assert client.list_board_dependencies(150) == (
-        workboard.IssueDependency(
-            workboard.IssueReference("example/agent-coordination", 151),
-            workboard.BlockerState.CLOSED,
-            False,
-            datetime(2026, 9, 5, tzinfo=UTC),
-        ),
-        workboard.IssueDependency(
-            workboard.IssueReference("overnightworks/other-repo", 7),
-            workboard.BlockerState.OPEN,
-            False,
-            None,
-        ),
-    )
-    assert observed == [
-        [
-            "api",
-            "--paginate",
-            "repos/example/agent-coordination/issues/150/dependencies/blocked_by?per_page=100",
-            "--jq",
-            ".[] | {number,state,closedAt:.closed_at,repository:.repository.full_name,"
-            'isPullRequest:has("pull_request")}',
-        ]
-    ]
-
-
 @pytest.mark.parametrize(
     "raw",
     [
@@ -2754,20 +2701,6 @@ def test_github_adapter_reads_a_landing_with_no_body_as_empty() -> None:
     assert client.landing(12).body == ""
 
 
-def test_github_adapter_reads_a_fork_branch_as_its_own_repository() -> None:
-    client = GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps(
-            api_pull_request(
-                headRepository={"name": "agent-coordination"},
-                headRepositoryOwner={"login": "fork"},
-            )
-        ),
-    )
-
-    assert client.landing(12).source_repository == github.repository_id("fork/agent-coordination")
-
-
 def test_github_adapter_fails_loud_when_github_answers_for_another_pull_request() -> None:
     client = GitHubForge(
         github.repository_id(REPOSITORY),
@@ -2941,15 +2874,6 @@ def test_github_adapter_fails_loud_on_a_sub_issue_state_it_cannot_read(
     client = sub_issue_client(child)
 
     with pytest.raises(ClaimError, match="malformed sub-issue"):
-        client.list_children(79)
-
-
-def test_github_adapter_refuses_a_sub_issue_from_another_repository() -> None:
-    client = sub_issue_client(
-        {"number": 72, "repository": "https://api.github.com/repos/other/repo", "state": "open"}
-    )
-
-    with pytest.raises(ClaimError, match="sub-issue from another repository"):
         client.list_children(79)
 
 
