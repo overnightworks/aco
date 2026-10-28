@@ -1,5 +1,6 @@
 """A merged pull request arranged in the order the forge does: a real merge or squash
-commit on the bare remote, then the claim on the real state ref."""
+commit on the bare remote, then the claim on the real state ref (none when `identity` is
+None: the state a rerun finds after a completed release)."""
 
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ def arrange_merged_pull_request(
     clone: Path,
     remote: Path,
     *,
-    identity: protocol.ClaimIdentity,
+    identity: protocol.ClaimIdentity | None,
     trailers: tuple[str, ...],
     pull_request_body: str,
     branch: str = LANDING_BRANCH,
@@ -73,13 +74,19 @@ def arrange_merged_pull_request(
         title=LANDING_TITLE,
     )
     forge = serve_forge(monkeypatch, FakeForge(landings={PULL_REQUEST: landing}))
-    intent = claim_intent(
-        identity=identity,
-        branch=claim_branch or branch,
-        claim_id="landing",
-        base=protocol.ObjectId(claim_base),
+    intents = (
+        ()
+        if identity is None
+        else (
+            claim_intent(
+                identity=identity,
+                branch=claim_branch or branch,
+                claim_id="landing",
+                base=protocol.ObjectId(claim_base),
+            ),
+        )
     )
-    publish_claims_from_a_second_clone(clone, remote, (intent,))
+    publish_claims_from_a_second_clone(clone, remote, intents)
     return MergedPullRequest(forge, merge_commit, claim_base)
 
 
