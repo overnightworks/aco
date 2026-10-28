@@ -1,8 +1,0 @@
-claim_id = "9a43151ca1a3469c8202b9b2e108c60c"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "5630c2bd654e5af13b4897160e2d5e5349d142e7"
-branch = "claude/issue-295-blocked-container-skipped"
-scope = ["quality/baseline.toml", "specs/next.spec.md", "src/aco/workboard.py", "tests/test_cmd_next_blocked_container.py"]
-opened_commit = "64de0b73951264329dd2504d78e396ed1eafb032"
-whole_reason = "The fix, its criterion and its test land together, and the baseline must be rewritten in the same commit if workboard.py shrinks."
