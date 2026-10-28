@@ -395,7 +395,7 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
 
 
 def test_board_json_shards_the_merged_pull_request_query_by_day_without_writes(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     observed = _board_fixture_environment(monkeypatch)
 
@@ -418,7 +418,7 @@ def test_board_json_shards_the_merged_pull_request_query_by_day_without_writes(
 
 
 def test_board_projects_fixture_json_without_github_writes(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     _board_fixture_environment(monkeypatch)
 
@@ -601,7 +601,7 @@ def test_board_projects_with_no_state_ref_bootstrapped_at_all(
 
 
 def test_board_reports_requests_equal_to_the_adapters_own_invocation_count(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """`observed` is the fixture's own independent tally of every
     `gh` call the injected `run` actually received -- never read from the
@@ -1545,7 +1545,6 @@ def _stand_in_another_lane(monkeypatch: pytest.MonkeyPatch, repo: Path, tmp_path
     other_lane = tmp_path / "other-lane"
     real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-9-other", str(other_lane))
     redirect_toplevel(monkeypatch, other_lane)
-    monkeypatch.chdir(other_lane)
     return other_lane
 
 
@@ -1558,7 +1557,6 @@ def _stand_in_the_items_released_lane(
     assert issue_claim.main(["--repo", REPOSITORY, "release", "314", "--abandoned", "paused"]) == 0
     lane = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     redirect_toplevel(monkeypatch, lane)
-    monkeypatch.chdir(lane)
     return lane
 
 
@@ -1617,7 +1615,6 @@ def test_start_inside_its_own_lane_worktree_reprints_the_live_claim(
     worktree = repo.parent / f"{repo.name}-worktrees" / "issue-314-own-lane"
     (worktree / "work.txt").write_text("in progress\n")
     redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
     before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
@@ -1871,7 +1868,6 @@ def test_a_detached_head_is_named_and_nothing_is_written(
     -- and writes no claim, worktree, or branch."""
     repo, worktree, fake = _detached_start_worktree(monkeypatch, tmp_path)
     redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
     before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, *arguments])
@@ -3741,7 +3737,7 @@ def test_claim_ignores_a_closed_dependency(
     assert "ERROR:" not in capsys.readouterr().err
 
 
-def test_claim_allows_an_open_dependency_with_out_of_order_and_records_it(
+def test_claim_allows_an_open_dependency_with_out_of_order(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
@@ -3867,7 +3863,7 @@ def test_claim_ignores_body_size_and_closed_next_references(
 
 
 def test_release_ignores_body_contract_defects(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     client = FakeForge()
     client.board_issues = (
@@ -7129,21 +7125,19 @@ def test_status_scope_index_never_rescans_scope_pairs(
 
 def _write_state_ref_pin(toplevel: Path) -> None:
     """`.aco/board.toml` pinned to `storage = "state-ref"` in
-    `toplevel`: the isolated toplevel `_isolate_git_toplevel` (conftest.py)
-    already redirects this process's `rev-parse --show-toplevel` to,
-    or a repository `redirect_toplevel` points it at."""
+    `toplevel`, the repository this test stands in."""
     write_repository_config(toplevel, 'storage = "state-ref"\n')
 
 
 def test_lazy_forge_builds_a_state_ref_board_under_the_state_ref_pin(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, empty_checkout: Path
 ) -> None:
     """The `session.RunContext`'s forge chooses its adapter by the repository's own `storage`
     pin, never by the canonical remote's host: a state-ref
     pin must never build a `github.GitHubForge`, even when nothing else
     about the checkout looks unusual."""
-    _write_state_ref_pin(tmp_path)
-    stub = FakeForge(repository=forge.RepositoryId("file", (), str(tmp_path)))
+    _write_state_ref_pin(empty_checkout)
+    stub = FakeForge(repository=forge.RepositoryId("file", (), str(empty_checkout)))
     monkeypatch.setattr(session, "_state_ref_forge", lambda _context: stub)
 
     def unused(*_args: object, **_kwargs: object) -> None:
@@ -7155,12 +7149,12 @@ def test_lazy_forge_builds_a_state_ref_board_under_the_state_ref_pin(
 
 
 def test_repo_is_refused_under_the_state_ref_pin(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """`--repo` names a GitHub target; under `storage = "state-ref"` there
     is no host-based target to override, refused before this
     ever resolves a repository identity or touches the state ref."""
-    _write_state_ref_pin(tmp_path)
+    _write_state_ref_pin(empty_checkout)
 
     status = issue_claim.main(["--repo", "acme/items", "board", "--json"])
 
@@ -7174,7 +7168,7 @@ def test_repo_is_refused_under_the_state_ref_pin(
 def test_cli_board_family_reports_invalid_usage_when_repo_is_given_under_state_ref(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
+    empty_checkout: Path,
     command: list[str],
 ) -> None:
     """Spec: BOARD-42, PIN-04, RUL-09, E-RUL-06 -- state-ref refuses --repo.
@@ -7184,7 +7178,7 @@ def test_cli_board_family_reports_invalid_usage_when_repo_is_given_under_state_r
     `board` does, so `--repo` under `storage = state-ref` reports the same
     `invalid_usage` `ask`/`rule`/`brief` already do, never their broad
     `unavailable` catch-all."""
-    _write_state_ref_pin(tmp_path)
+    _write_state_ref_pin(empty_checkout)
 
     status = issue_claim.main(["--repo", "acme/items", *command])
 
@@ -7201,6 +7195,7 @@ def test_cli_board_family_reports_unavailable_for_a_forge_adapter_failure(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     command: list[str],
+    empty_checkout: Path,
 ) -> None:
     """Spec: RUL-09, BOARD-02 -- adapter failure reports unavailable.
 
@@ -8278,8 +8273,8 @@ def test_release_merged_under_the_state_ref_pin_requires_an_issue(
     """An issue-less lane has no state-ref item to close, so
     `--merged` under `storage = "state-ref"` refuses it by name rather than
     resolving a trunk walk that could never apply."""
-    _write_state_ref_pin(tmp_path)
     repo = _landing_repository(tmp_path)
+    _write_state_ref_pin(repo)
     monkeypatch.chdir(repo)
 
     status = issue_claim.main(["release", "--merged", "--agent", "Codex Sol", "--branch", "docs/x"])
@@ -8671,6 +8666,7 @@ def test_cli_release_omitted_claim_id_fails_closed_on_detached_head(
 def test_cli_dispatch_adapter_error_denies_with_exit_code_two(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    empty_checkout: Path,
 ) -> None:
     """`cli.main`'s shared error handling: a forge adapter construction
     failure denies loud with exit 2, never a traceback."""
@@ -8734,8 +8730,7 @@ def _default_open_issue_reference(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-# A test's toplevel is a scratch directory with no trunk (`conftest.py`'s
-# `_isolate_git_toplevel`), so the live trunk reads would fail loud; tests of
+# A test's checkout has no trunk, so the live trunk reads would fail loud; tests of
 # the trunk itself (tests/test_checkout.py, tests/test_session.py) and the
 # real-repository scenarios here (`redirect_toplevel`) read it live. That
 # trunk holds no committed board configuration, so no file is lane-shared;
@@ -9382,6 +9377,7 @@ def test_cli_release_json_prints_effective_posted_identity(
 def test_cli_release_json_generic_refusal_reports_precondition_failed(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    empty_checkout: Path,
 ) -> None:
     """`release`'s own generic refusal bucket reports
     `reason: precondition_failed`."""
@@ -9490,7 +9486,7 @@ def test_cli_identity_and_release_refusals_print_the_shared_envelope(
 )
 def test_cli_repository_refusals_preserve_pin_and_handler_error_order(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
+    empty_checkout: Path,
     capsys: pytest.CaptureFixture[str],
     item: str,
     agent: str | None,
@@ -9498,7 +9494,7 @@ def test_cli_repository_refusals_preserve_pin_and_handler_error_order(
     reason: str | None,
 ) -> None:
     """PIN-31 precedes identity resolution; handler errors keep their plain report."""
-    _write_state_ref_pin(tmp_path)
+    _write_state_ref_pin(empty_checkout)
     set_agent_identity_env(monkeypatch, {} if agent is None else {checkout.ACO_AGENT_ENV: agent})
 
     def refuse_handler(parsed: argparse.Namespace, context: RunContext) -> int:
@@ -9582,8 +9578,9 @@ def test_next_names_an_old_ruling_when_the_item_is_pulled(
 
 
 def test_no_path_class_list_is_read_or_written() -> None:
-    assert not Path("src/aco").joinpath("single_writer.py").exists()
-    text = Path("src/aco/protocol.py").read_text()
+    package = Path(__file__).parent.parent / "src" / "aco"
+    assert not package.joinpath("single_writer.py").exists()
+    text = package.joinpath("protocol.py").read_text()
     assert "single-writer" not in text
     assert "single_writer" not in text
 
@@ -11807,7 +11804,7 @@ def test_cli_release_refuses_a_missing_state_ref(
 
 
 def test_cli_board_refuses_a_non_github_canonical_remote_by_host(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """`board` is a forge command: a canonical remote on any
     host but GitHub refuses by that host's own name, before ever calling
@@ -12039,14 +12036,14 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
 def test_untracked_board_config_refuses_item_show_in_its_own_json_envelope(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
+    empty_checkout: Path,
     item: str,
 ) -> None:
     """ITEM-17: an untracked pin is `item show`'s own
     `precondition_failed` refusal under `--json` whatever number it names --
     PIN-31's guard reads no pin it cannot trust, so it never takes the
     refusal from the command."""
-    _write_untracked_board_config(tmp_path)
+    _write_untracked_board_config(empty_checkout)
     monkeypatch.setattr(checkout, "path_is_tracked", lambda _path, **_kwargs: False)
 
     status = issue_claim.main(["item", "show", item, "--json"])
@@ -12063,11 +12060,10 @@ def _scratch_lane_repository(
     """A repository with a base commit on `main` and a lane branch one commit
     ahead of it -- `brief`'s own real reads (`rev-parse --verify`, `diff
     --name-only`) run against real git history here, never a hand-typed
-    `git_output` fake. It is the isolated toplevel itself (`conftest.py`'s
-    `_isolate_git_toplevel`), so the run's context resolves its trunk -- the
-    local `main`, since its configured `origin` was never fetched -- in the
-    lane's own repository. Given `board_config`, the
-    base commit carries it as the trunk's `.aco/board.toml`."""
+    `git_output` fake. A run standing in it resolves its trunk -- the local
+    `main`, since its configured `origin` was never fetched -- in the lane's
+    own repository. Given `board_config`, the base commit carries it as the
+    trunk's `.aco/board.toml`."""
     monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
     repository = tmp_path
     real_git(repository, "init", "-q", "-b", "main")
@@ -12660,7 +12656,7 @@ def test_cli_brief_step_refuses_with_no_usable_brief_config(
 
 
 def test_cli_brief_refuses_a_non_github_canonical_remote_by_host(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """`brief` is a forge command through the same `RunContext.forge` gate `board`
     uses: a canonical remote on any host but GitHub refuses by
@@ -12684,13 +12680,13 @@ def test_cli_brief_refuses_a_non_github_canonical_remote_by_host(
 
 
 def test_cli_brief_reports_invalid_usage_when_repo_is_given_under_state_ref(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """BRIEF-09 cites `specs/storage-pin.spec.md`'s PIN-04: under `storage =
     state-ref`, `--repo` is the wrong flag for this run, reported through
     `--json` as `invalid_usage` -- brief's one refusal that is not this
     environment being generically `unavailable`."""
-    _write_state_ref_pin(tmp_path)
+    _write_state_ref_pin(empty_checkout)
 
     status = issue_claim.main(["--repo", "acme/items", "brief", "258", "--json"])
 
@@ -13314,12 +13310,12 @@ def test_item_new_rerun_on_github_meets_its_own_issue_as_a_twin(
 
 
 def test_item_new_json_reports_ok_reason_created(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """A fresh item's own `--json` success carries `reason:
     "created"` first, ahead of the minted `item`/`number` pair."""
-    _write_state_ref_pin(tmp_path)
-    client = FakeForge(repository=forge.RepositoryId("file", (), str(tmp_path)))
+    _write_state_ref_pin(empty_checkout)
+    client = FakeForge(repository=forge.RepositoryId("file", (), str(empty_checkout)))
     item_id = items.format_item_id(42)
     monkeypatch.setattr(client, "compose_item", lambda **_kwargs: None, raising=False)
     monkeypatch.setattr(client, "create_item", lambda _write: item_id, raising=False)
@@ -13354,7 +13350,7 @@ def test_item_new_json_reports_ok_reason_created(
     ],
 )
 def test_item_mutation_refuses_under_github_storage(
-    capsys: pytest.CaptureFixture[str], command: str, sentence: str
+    capsys: pytest.CaptureFixture[str], command: str, sentence: str, empty_checkout: Path
 ) -> None:
     """The forge owns whole-body edits and closing."""
     status = issue_claim.main(["item", command, "42"])
@@ -13472,7 +13468,7 @@ def test_item_edit_size_refuses_an_invalid_value_before_any_write(
 
 
 def test_item_close_prints_json_under_the_state_ref_pin(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """`item close ITEM --json` under `storage = "state-ref"`
     prints the shared envelope, `reason: "closed"`, then `{"item", "number",
@@ -13481,8 +13477,8 @@ def test_item_close_prints_json_under_the_state_ref_pin(
     `test_item_mutation_refuses_under_github_storage[close]`'s refusal never reaches.
     `parent_closable` is `null` here: `42` names no parent on
     this fake."""
-    _write_state_ref_pin(tmp_path)
-    client = FakeForge(repository=forge.RepositoryId("file", (), str(tmp_path)))
+    _write_state_ref_pin(empty_checkout)
+    client = FakeForge(repository=forge.RepositoryId("file", (), str(empty_checkout)))
     client.issue_references[42] = forge.ItemReference(
         forge.ItemState.OPEN, "Title", "Body text.\n", False
     )
@@ -13505,7 +13501,10 @@ def test_item_close_prints_json_under_the_state_ref_pin(
 
 @pytest.mark.parametrize("number", [42, 16777216], ids=["in-the-id-space", "past-the-id-space"])
 def test_item_show_reads_the_fake_forge_body_under_github_storage(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], number: int
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    number: int,
+    empty_checkout: Path,
 ) -> None:
     """Under `storage = "github"`, `item show` reads
     the issue body through the ordinary forge reader -- the same output
@@ -13529,7 +13528,7 @@ def test_item_show_reads_the_fake_forge_body_under_github_storage(
 
 
 def test_item_show_as_json_reads_the_fake_forge_body_under_github_storage(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     client = FakeForge()
     client.issue_references[42] = forge.ItemReference(
@@ -13554,7 +13553,7 @@ def test_item_show_as_json_reads_the_fake_forge_body_under_github_storage(
 
 
 def test_item_show_refuses_an_unknown_id(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     client = FakeForge()
     client.issue_references[42] = forge.ItemReference(forge.ItemState.MISSING)
@@ -13567,7 +13566,7 @@ def test_item_show_refuses_an_unknown_id(
 
 
 def test_item_show_refuses_when_the_parent_read_fails(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """The parent read the header needs is inside `item
     show`'s own refusal boundary, so a forge that fails it reports the same
@@ -13639,13 +13638,13 @@ def _item_show_unknown_id_refusal(monkeypatch: pytest.MonkeyPatch, _tmp_path: Pa
 def test_item_refuses_through_the_shared_precondition_failed_envelope(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
+    empty_checkout: Path,
     build_arguments: Callable[[pytest.MonkeyPatch, Path], list[str]],
 ) -> None:
     """Every runtime refusal from `item new`/`edit`/`close`/
     `show`, reached with `--json`, reports through the shared envelope as
     `precondition_failed` -- never a bare object."""
-    arguments = build_arguments(monkeypatch, tmp_path)
+    arguments = build_arguments(monkeypatch, empty_checkout)
 
     status = issue_claim.main(arguments)
 
@@ -13713,7 +13712,7 @@ def _state_ref_item_close(
 )
 def test_an_item_command_works_through_the_one_forge_its_run_context_builds(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
+    empty_checkout: Path,
     pipe_onto_stdin: Callable[[str], None],
     arrange: Callable[
         [pytest.MonkeyPatch, Path, Callable[[str], None]], tuple[FakeForge, list[str]]
@@ -13722,7 +13721,7 @@ def test_an_item_command_works_through_the_one_forge_its_run_context_builds(
     """`session._build_forge`, asked through `RunContext.forge`,
     is the one place a run's forge is constructed -- an item command never
     builds a `GitHubForge` or a state-ref board of its own beside it."""
-    client, argv = arrange(monkeypatch, tmp_path, pipe_onto_stdin)
+    client, argv = arrange(monkeypatch, empty_checkout, pipe_onto_stdin)
     built: list[RunContext] = []
 
     def build_forge(context: RunContext) -> forge.ForgeReader:
@@ -13740,12 +13739,12 @@ def test_an_item_command_works_through_the_one_forge_its_run_context_builds(
 
 
 def test_item_edit_json_reports_body_invalid_with_defects(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     """`item edit`'s own malformed piped body reports
     `reason: "body_invalid"`, with `check -`'s own `defects` list as a
     structured sibling, before any forge is ever resolved."""
-    _write_state_ref_pin(tmp_path)
+    _write_state_ref_pin(empty_checkout)
     result = run_cli(["item", "edit", "42", "--json"], capsys, stdin="no block")
 
     assert result.status == 2
@@ -14015,7 +14014,7 @@ def _start_lost_answer_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 )
 def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
+    empty_checkout: Path,
     capsys: pytest.CaptureFixture[str],
     pipe_onto_stdin: Callable[[str], None],
     arrange: Callable[[pytest.MonkeyPatch, Path], _CountedRun],
@@ -14028,7 +14027,7 @@ def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(
     same holds for its observation of `refs/aco/state`, which its
     transitions write onto rather than read again and which a
     command refused before it needs the state ref never makes (CAS-53)."""
-    run = arrange(monkeypatch, tmp_path)
+    run = arrange(monkeypatch, empty_checkout)
     if run.piped is not None:
         pipe_onto_stdin(run.piped)
     reads = count_context_reads(monkeypatch)

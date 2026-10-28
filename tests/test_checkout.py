@@ -520,8 +520,8 @@ def test_claim_judges_the_canonical_remotes_recorded_default_branch(
     """Spec: CLM-29. With `hub` canonical and `origin/HEAD`
     naming `main`, a worktree on `hub`'s default branch is refused; without a
     recorded `hub/HEAD`, `claim` guesses `main`/`master` -- `origin/HEAD`
-    never answers for `hub`. `claim` stands in the worktree: its toplevel
-    read asks that worktree, past the autouse toplevel isolation."""
+    never answers for `hub`. `claim` stands in the worktree, so its toplevel
+    read asks that worktree."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
@@ -530,12 +530,6 @@ def test_claim_judges_the_canonical_remotes_recorded_default_branch(
         tmp_path, canonical="hub", canonical_head=canonical_head, branch=branch
     )
     monkeypatch.setattr(store, "fetch_state", store_must_not_be_read)
-    isolated_git_output = checkout.git_output
-
-    def git_output(arguments: list[str], *, directory: Path | None = None) -> str:
-        return isolated_git_output(arguments, directory=directory or path.parent)
-
-    monkeypatch.setattr(checkout, "git_output", git_output)
     monkeypatch.chdir(path.parent)
 
     status = issue_claim.main(["claim", "72", "--scope", path.name])

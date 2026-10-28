@@ -14,61 +14,18 @@ from pathlib import Path
 
 import pytest
 
-from aco import checkout, process
-
 # Registers `bare_remote` and `worktree` for every module by name: an import
 # of a fixture only to receive it as a parameter reads as unused to ruff.
 pytest_plugins = ["cli_fixtures"]
 
 
-_SHOW_TOPLEVEL_ARGUMENTS = ["rev-parse", "--show-toplevel"]
-_RECORDED_HEAD_READ_PREFIX = ["rev-parse", "--verify", "--quiet", "--symbolic-full-name"]
-
-
-def _is_recorded_head_read(arguments: list[str]) -> bool:
-    return (
-        len(arguments) == len(_RECORDED_HEAD_READ_PREFIX) + 1
-        and arguments[:4] == _RECORDED_HEAD_READ_PREFIX
-        and arguments[4].endswith("/HEAD")
-    )
-
-
 @pytest.fixture(autouse=True)
-def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """No test may resolve this repository's own board configuration.
-
-    `board.CONFIG_PATH` is read relative to `rev-parse --show-toplevel`, so a
-    test that never overrides it would otherwise load and be governed by this
-    checkout's own `board.CONFIG_PATH`. A test that needs a specific
-    toplevel keeps its own `monkeypatch.setattr(checkout, "git_output", ...)`,
-    which takes precedence over this default.
-
-    The world is synthetic exactly while that toplevel is no repository (no
-    `.git` entry, file or directory, checked at call time): there a remote
-    never recorded a `HEAD`, which a real git answers with exit 1. As soon
-    as a test makes the toplevel a repository, the read reaches real git.
-    """
-    real_git_output = checkout.git_output
-
-    def fake_git_output(
-        arguments: list[str], *, directory: Path | None = None, **options: bool
-    ) -> str:
-        outside = not Path.cwd().is_relative_to(tmp_path)
-        if arguments == _SHOW_TOPLEVEL_ARGUMENTS and directory is None:
-            if outside:
-                pytest.fail("census toplevel")
-            return str(tmp_path)
-        if (
-            _is_recorded_head_read(arguments)
-            and directory in (None, tmp_path)
-            and not (tmp_path / ".git").exists()
-        ):
-            if outside:
-                pytest.fail("census head")
-            raise checkout.GitExitError(process.CapturedResult(1, b"", b""))
-        return real_git_output(arguments, directory=directory, **options)
-
-    monkeypatch.setattr(checkout, "git_output", fake_git_output)
+def _start_outside_every_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Every test starts in its own empty directory. A command started from the
+    checkout pytest runs in reads and writes that checkout's board
+    configuration, remotes and object store, so a test that needs a checkout
+    builds one and stands in it."""
+    monkeypatch.chdir(tmp_path)
 
 
 @pytest.fixture
