@@ -1,7 +1,0 @@
-claim_id = "99b3b7f0bd694b1d8a8136e441b61531"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "246cae677496df8e36f223cf83f78ab2f57acd5c"
-branch = "claude/issue-529-out-of-order-claim-tests"
-scope = ["quality/baseline.toml", "tests/test_cli.py", "tests/test_cmd_claim_out_of_order.py"]
-opened_commit = "54c216c31e7164570df38ccb8615da69aef5f6ee"
