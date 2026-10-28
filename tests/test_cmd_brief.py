@@ -445,13 +445,28 @@ def test_brief_step_json_adds_rules_and_checks_to_the_object(
 
     result = brief(capsys, "--step", "build", "--json")
 
-    payload = json.loads(result.stdout)
-    assert (result.status, result.stderr) == (0, "")
-    assert (list(payload)[-2:], payload["rules"], payload["checks"]) == (
-        ["rules", "checks"],
-        ["Stay in scope."],
-        ["ruff check ."],
-    )
+    expected = {
+        "ok": True,
+        "reason": "composed",
+        "body": BODY,
+        "claim": {
+            "agent": "Codex Sol",
+            "role": "builder",
+            "branch": LANE_BRANCH,
+            "base": lane.base,
+            "scope": ["README.md"],
+            "whole": None,
+            "age": "24h 0m",
+            "lane_shared": [],
+            "lane_shared_unavailable": None,
+        },
+        "tip": lane.tip,
+        "touched": ["README.md"],
+        "outside_claim": [],
+        "rules": ["Stay in scope."],
+        "checks": ["ruff check ."],
+    }
+    assert (result.status, result.stderr, result.stdout) == (0, "", json.dumps(expected) + "\n")
 
 
 @pytest.mark.parametrize("on_disk", [False, True], ids=["missing", "untracked"])
@@ -486,7 +501,7 @@ def test_brief_refuses_a_canonical_remote_whose_host_has_no_forge_adapter(
     real_git(clone, "remote", "set-url", "origin", "file:///srv/git/agent-coordination.git")
     forbid_github_construction(monkeypatch)
 
-    result = brief(capsys, "--json")
+    result = run_cli(["brief", str(ITEM), "--json"], capsys)
 
     assert (result.status, result.stderr) == (2, "ERROR: no forge adapter for host file\n")
     assert (
