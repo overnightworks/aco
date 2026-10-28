@@ -30,7 +30,7 @@
 "tests/support/github_fixtures.py" = 834
 "tests/test_board.py" = 4111
 "tests/test_checkout.py" = 2040
-"tests/test_cli.py" = 13182
+"tests/test_cli.py" = 12537
 "tests/test_cmd_adopt.py" = 1646
 "tests/test_cmd_cut.py" = 1072
 "tests/test_cmd_land_after_merge_rerun.py" = 877
