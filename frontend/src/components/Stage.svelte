@@ -2,17 +2,18 @@
 	import {
 		cardHeading,
 		cardSentence,
-		findSelectedLine,
+		findSelection,
 		NO_SELECTION_MESSAGE,
-		pictureDataUri
+		pictureDataUri,
+		selectionHeading
 	} from '../app/model/boardSummary';
-	import { NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
-	import { isOptionLine } from '../app/model/optionCard';
+	import { cardKey, NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
 	import { locksCard, type DecisionStore } from '../app/state/decision.svelte';
 	import type { Outcome, RepoReading } from '../types';
 	import ChoiceButtons from './ChoiceButtons.svelte';
 	import DecideRow from './DecideRow.svelte';
 	import DecidedCard from './DecidedCard.svelte';
+	import GroupCard from './GroupCard.svelte';
 	import OptionCard from './OptionCard.svelte';
 	import RefusalBanner from './RefusalBanner.svelte';
 
@@ -29,54 +30,81 @@
 	} = $props();
 
 	let noteText = $state('');
+	let decideRow: DecideRow | undefined = $state();
 
-	const selected = $derived(findSelectedLine(repos, selectedKey));
+	const selected = $derived(findSelection(repos, selectedKey));
 </script>
 
 <section
 	class="stage"
 	aria-live="polite"
 	tabindex="-1"
-	aria-label={selected === null ? NO_SELECTION_MESSAGE : cardHeading(selected.line)}
+	aria-label={selected === null ? NO_SELECTION_MESSAGE : selectionHeading(selected)}
 >
 	{#if selected === null}
 		<p>{NO_SELECTION_MESSAGE}</p>
-	{:else if selected.line.ruling !== null}
+	{:else if selected.kind === 'decided'}
 		{@const ruledLine = selected.line}
 		{#key lineKey(selected.repo, selected.item.number, ruledLine)}
 			<DecidedCard repo={selected.repo} item={selected.item} line={ruledLine} />
 		{/key}
-	{:else if isOptionLine(selected.line)}
-		{@const optionLine = selected.line}
+	{:else if selected.kind === 'card'}
+		{@const points = selected.points}
 		{@const repoName = selected.repo}
 		{@const itemNumber = selected.item.number}
-		{@const optionKey = lineKey(repoName, itemNumber, optionLine)}
+		{@const optionKey = cardKey(repoName, itemNumber)}
+		{@const banner = decisions.banner(optionKey)}
+		{@const picks = decisions.picks(optionKey, points)}
 		{@const openPanel = decisions.panel(optionKey)}
+		{#snippet decide()}
+			<DecideRow
+				bind:this={decideRow}
+				{points}
+				chosen={picks.length}
+				pending={decisions.isPending(optionKey)}
+				{refreshing}
+				{banner}
+				onPick={(shown, pick) => decisions.choose(repoName, itemNumber, shown, pick)}
+				onAcceptAll={(shown) => decisions.acceptAll(repoName, itemNumber, shown)}
+				onReload={() => decisions.reloadAfterBanner(optionKey)}
+				escapes={{
+					panel: openPanel,
+					draft: openPanel === null ? '' : decisions.draft(optionKey, openPanel.kind),
+					onOpen: (kind, shown) => decisions.openPanel(optionKey, { kind, shown }),
+					onClose: () => decisions.closePanel(optionKey),
+					onDraft: (text) => {
+						if (openPanel !== null) decisions.setDraft(optionKey, openPanel.kind, text);
+					},
+					onSend: ({ kind, shown }, text) =>
+						kind === 'other'
+							? decisions.decideOther(repoName, itemNumber, shown, text)
+							: decisions.decideUnclear(repoName, itemNumber, shown, text)
+				}}
+			/>
+		{/snippet}
 		{#key optionKey}
-			<OptionCard repo={repoName} item={itemNumber} line={optionLine}>
-				<DecideRow
-					line={optionLine}
+			{#if points.length > 1}
+				<GroupCard
+					repo={repoName}
+					item={itemNumber}
+					{points}
+					open={decisions.openPoint(optionKey)}
+					{picks}
+					locked={locksCard(banner)}
 					pending={decisions.isPending(optionKey)}
 					{refreshing}
-					banner={decisions.banner(optionKey)}
-					onDecide={(shownLine, option) =>
-						decisions.decideOption(repoName, itemNumber, shownLine, option)}
-					onReload={() => decisions.reloadAfterBanner(optionKey)}
-					escapes={{
-						panel: openPanel,
-						draft: openPanel === null ? '' : decisions.draft(optionKey, openPanel.kind),
-						onOpen: (kind, shown) => decisions.openPanel(optionKey, { kind, shown }),
-						onClose: () => decisions.closePanel(optionKey),
-						onDraft: (text) => {
-							if (openPanel !== null) decisions.setDraft(optionKey, openPanel.kind, text);
-						},
-						onSend: ({ kind, shown }, text) =>
-							kind === 'other'
-								? decisions.decideOther(repoName, itemNumber, shown, text)
-								: decisions.decideUnclear(repoName, itemNumber, shown, text)
-					}}
-				/>
-			</OptionCard>
+					onToggle={(index) => decisions.togglePoint(optionKey, index)}
+					onPick={(shown, option) => decideRow?.choose({ shown, option })}
+				>
+					{@render decide()}
+				</GroupCard>
+			{:else}
+				{#each points as only (only.index)}
+					<OptionCard repo={repoName} item={itemNumber} line={only}>
+						{@render decide()}
+					</OptionCard>
+				{/each}
+			{/if}
 		{/key}
 	{:else}
 		{@const yesNoLine = selected.line}

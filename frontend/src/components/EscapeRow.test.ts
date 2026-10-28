@@ -3,13 +3,14 @@ import { expect, test, vi } from 'vitest';
 import { optionLine } from '../test-support/board';
 import EscapeRow from './EscapeRow.svelte';
 
-const shown = optionLine({ fingerprint: 'fp-shown' });
+const card = optionLine({ fingerprint: 'fp-shown' });
+const shown = [card];
 const otherPanel = { kind: 'other', shown } as const;
 const unclearPanel = { kind: 'unclear', shown } as const;
 
 function renderRow(
 	overrides: Partial<{
-		line: typeof shown;
+		points: (typeof card)[];
 		panel: typeof otherPanel | typeof unclearPanel | null;
 		draft: string;
 		pending: boolean;
@@ -23,7 +24,7 @@ function renderRow(
 		onSend: vi.fn()
 	};
 	render(EscapeRow, {
-		line: shown,
+		points: shown,
 		panel: null,
 		draft: '',
 		pending: false,
@@ -71,7 +72,7 @@ test('[ABRD-66] typing reports the text for the draft', async () => {
 
 test('[ABRD-68] Send posts the card the panel opened with, not the one shown now', async () => {
 	const { onSend } = renderRow({
-		line: optionLine({ fingerprint: 'fp-revised' }),
+		points: [optionLine({ fingerprint: 'fp-revised' })],
 		panel: otherPanel,
 		draft: 'Only on desktop'
 	});
@@ -109,8 +110,8 @@ test('[ABRD-72] an open card offers Other… then Unclear, and Unclear opens its
 });
 
 test('[ABRD-72] a card with its head offers no Unclear and no Unclear panel, and keeps Other…', () => {
-	const withHead = optionLine({ returned_on: '2026-10-26', returned_note: null });
-	renderRow({ line: withHead, panel: { kind: 'unclear', shown: withHead } });
+	const withHead = [optionLine({ returned_on: '2026-10-26', returned_note: null })];
+	renderRow({ points: withHead, panel: { kind: 'unclear', shown: withHead } });
 
 	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
 	expect(screen.queryByRole('textbox')).toBeNull();
@@ -152,4 +153,12 @@ test('[ABRD-75] while the board refreshes Unclear and its Send do nothing', asyn
 
 	expect(onSend).not.toHaveBeenCalled();
 	expect(onOpen).not.toHaveBeenCalled();
+});
+
+test('[ABRD-72] a card of points offers no Unclear once any point is with its head', () => {
+	const points = [optionLine({ index: 2 }), optionLine({ index: 3, returned_on: '2026-10-26' })];
+	renderRow({ points });
+
+	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
+	expect(screen.getByRole('button', { name: 'Other…' })).toBeTruthy();
 });

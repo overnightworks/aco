@@ -5,6 +5,7 @@ import {
 	cardMeta,
 	chosenOption,
 	GROUP_LABEL,
+	hasFinalOption,
 	hasHead,
 	CONTRACT_SUMMARY,
 	contractTexts,
@@ -62,6 +63,12 @@ describe('cardMeta', () => {
 		expect(KIND_LABEL[kind]).toBe(label);
 		expect(cardMeta('repo', optionLine({ decision_kind: kind })).kind).toBe(label);
 	});
+});
+
+test('[ABRD-84] a point warns when one of its options cannot be taken back', () => {
+	const final = optionLine({ options: [cardOption(), cardOption({ letter: 'B', undo: 'final' })] });
+
+	expect([hasFinalOption(final), hasFinalOption(optionLine())]).toEqual([true, false]);
 });
 
 test('[ABRD-61] a card is with its head while any of its points is', () => {

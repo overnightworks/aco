@@ -3,6 +3,7 @@
 	import { NOTE_MAX_LENGTH } from '../app/model/decision';
 	import {
 		ESCAPE_LABEL,
+		hasHead,
 		sendsBlank,
 		type EscapeKind,
 		type EscapePanel
@@ -10,7 +11,7 @@
 	import type { OptionLine } from '../types';
 
 	let {
-		line,
+		points,
 		panel,
 		draft,
 		pending,
@@ -20,14 +21,15 @@
 		onDraft,
 		onSend
 	}: {
-		line: OptionLine;
+		/** The card's points as shown now. */
+		points: readonly OptionLine[];
 		/** The open panel with the card as shown when it opened; null while closed. */
 		panel: EscapePanel | null;
 		/** The text of the open panel's kind. */
 		draft: string;
 		pending: boolean;
 		refreshing: boolean;
-		onOpen: (kind: EscapeKind, shown: OptionLine) => void;
+		onOpen: (kind: EscapeKind, shown: readonly OptionLine[]) => void;
 		onClose: () => void;
 		onDraft: (text: string) => void;
 		onSend: (open: EscapePanel, text: string) => void;
@@ -36,9 +38,7 @@
 	let textarea: HTMLTextAreaElement | undefined = $state();
 
 	// A card with its head is not sent back again (ABRD-61).
-	const kinds: EscapeKind[] = $derived(
-		line.returned_on === null ? ['other', 'unclear'] : ['other']
-	);
+	const kinds: EscapeKind[] = $derived(hasHead(points) ? ['other'] : ['other', 'unclear']);
 
 	async function toggle(kind: EscapeKind) {
 		if (refreshing) return;
@@ -46,7 +46,7 @@
 			onClose();
 			return;
 		}
-		onOpen(kind, line);
+		onOpen(kind, points);
 		await tick();
 		textarea?.focus();
 	}

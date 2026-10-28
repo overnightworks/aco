@@ -138,7 +138,7 @@ export interface CardUnclearRequest extends CardRequestHead {
 	note: string | null;
 }
 
-export type CardDecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearRequest;
+type CardDecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearRequest;
 
 export type DecisionRequest = YesNoDecisionRequest | CardDecisionRequest;
 

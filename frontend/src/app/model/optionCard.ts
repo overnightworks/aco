@@ -67,6 +67,11 @@ export interface CardMeta extends FrameMeta {
 	undo: Undo;
 }
 
+/** Whether any option of the point cannot be taken back. */
+export function hasFinalOption(point: OptionLine): boolean {
+	return point.options.some((option) => option.undo === 'final');
+}
+
 /** A card is with its head while any of its points is (ABRD-61). */
 export function hasHead(points: readonly OptionLine[]): boolean {
 	return points.some((point) => point.returned_on !== null);
@@ -86,9 +91,7 @@ export function pointsMeta(repo: string, points: readonly OptionLine[]): CardMet
 		where: `${repo} › ${joinedAreas(points)}`,
 		kind: kinds.join(JOIN_SEPARATOR),
 		...(hasHead(points) && { withHead: true as const }),
-		undo: points.some((point) => point.options.some((option) => option.undo === 'final'))
-			? 'final'
-			: 'reversible'
+		undo: points.some(hasFinalOption) ? 'final' : 'reversible'
 	};
 }
 

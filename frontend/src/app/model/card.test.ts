@@ -9,6 +9,7 @@ import {
 	livePicks,
 	nextOpenAfterPick,
 	openPoints,
+	pickedLetter,
 	pickedText,
 	pointNumber,
 	recommendedPicks,
@@ -159,6 +160,13 @@ describe('the open point', () => {
 
 		expect(nextOpenAfterPick(open, threePoints, live, shown)).toBe(expected);
 	});
+});
+
+test('[ABRD-86] a point shows the letter picked for it, none while unchosen', () => {
+	const live = [pick(threePoints[0] as OptionLine, optionB)];
+
+	expect(pickedLetter(live, threePoints[0] as OptionLine)).toBe('B');
+	expect(pickedLetter(live, threePoints[1] as OptionLine)).toBeNull();
 });
 
 describe('Accept all', () => {

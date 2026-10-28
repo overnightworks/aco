@@ -87,6 +87,14 @@ export function nextOpenAfterPick(
 	return open === picked.index ? firstUnchosen(points, live) : open;
 }
 
+/** The letter picked for `point`, or none while it is unchosen. */
+export function pickedLetter(
+	live: readonly Pick[],
+	point: OptionLine
+): CardOption['letter'] | null {
+	return live.find((pick) => pick.shown.index === point.index)?.option.letter ?? null;
+}
+
 /** Accept all's picks: every point's recommended option, as shown. */
 export function recommendedPicks(points: readonly OptionLine[]): Pick[] {
 	return points.flatMap((shown) =>
