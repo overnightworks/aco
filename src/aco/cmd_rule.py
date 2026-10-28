@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, date, datetime
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 from typing import TypeAlias, cast
 
@@ -19,6 +21,36 @@ from . import (
 )
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
+_LINE = "--line"
+_OPTION = "--option"
+_OTHER = "--other"
+_NOTE = "--note"
+_VIA = "--via"
+_CARD_HASH = "--card-hash"
+_GIVEN_FLAGS = "given_flags"
+
+
+@dataclass(frozen=True)
+class _GivenFlag:
+    """One flag and its value as the command line wrote it."""
+
+    name: str
+    value: str | int
+
+
+class _RecordGivenFlag(argparse.Action):
+    """Records each flag it parses, with its value, in the order written, in
+    one tuple on the namespace: `--option` and `--card-hash` belong to the
+    `--line` written before them, which separate attributes cannot say."""
+
+    def __init__(self, option_strings, dest, **kwargs):
+        super().__init__(option_strings, _GIVEN_FLAGS, default=argparse.SUPPRESS, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        given = getattr(namespace, _GIVEN_FLAGS, ())
+        flag = _GivenFlag(cast(str, option_string), cast(str | int, values))
+        setattr(namespace, _GIVEN_FLAGS, (*given, flag))
+
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """`rule`'s own flags; the `--json` flag stays `cli`'s one declaration."""
@@ -26,27 +58,45 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "item", type=workboard.parse_item_reference, help="the item whose expectation line is ruled"
     )
     parser.add_argument(
-        "--line",
+        _LINE,
+        action=_RecordGivenFlag,
         type=int,
         required=True,
         metavar="N",
-        help="the 1-based expectation line index, as rulings prints it",
+        help="the 1-based expectation line index, as rulings prints it; "
+        "repeat it to rule several lines of the item in one write",
     )
     outcome = parser.add_mutually_exclusive_group(required=True)
-    outcome.add_argument("--option", metavar="X", help="the letter of the option card's answer")
-    outcome.add_argument("--other", metavar="TEXT", help="a free-text answer")
+    outcome.add_argument(
+        _OPTION,
+        action=_RecordGivenFlag,
+        metavar="X",
+        help="the letter of the option card's answer; with several --line, after its --line",
+    )
+    outcome.add_argument(_OTHER, action=_RecordGivenFlag, metavar="TEXT", help="a free-text answer")
     outcome.add_argument(
         "--unclear",
         action="store_true",
         help="send an open option line back to its head; --note says why",
     )
-    parser.add_argument("--note", help="the note sent back to the head, with --unclear")
     parser.add_argument(
-        "--via",
+        _NOTE,
+        action=_RecordGivenFlag,
+        metavar="NOTE",
+        help="the note sent back to the head, with --unclear",
+    )
+    parser.add_argument(
+        _VIA,
+        action=_RecordGivenFlag,
         choices=[via.value for via in expectation_grammar.RulingVia],
         help="board, chat, or default when a presented card stayed unanswered",
     )
-    parser.add_argument("--card-hash", metavar="HASH", help="the hash of the card the decider saw")
+    parser.add_argument(
+        _CARD_HASH,
+        action=_RecordGivenFlag,
+        metavar="HASH",
+        help="the hash of the card the decider saw; with several --line, after its --line",
+    )
 
 
 class InvalidTargetError(protocol.ClaimError):
@@ -96,91 +146,197 @@ class _RuleReason(StrEnum):
 
 
 class FlagCombinationError(protocol.ClaimError):
-    """RULE-15, RULE-21, RULE-26: `--option` or `--other` without `--via` and
-    `--card-hash`, either of them without one of the two, `--note` beside
-    either, `--via default` beside `--other`, a blank `--other`, `--unclear`
-    without `--card-hash` or with `--via`, or a blank `--note` beside it."""
+    """RULE-15, RULE-21, RULE-26, RULE-33..35: `--option` or `--other` without
+    `--via` and `--card-hash`, either of them without one of the two, `--note`
+    beside either, `--via default` beside `--other`, a blank `--other`,
+    `--unclear` without `--card-hash` or with `--via`, a blank `--note` beside
+    it, a line named twice, a flag with no line or twice for one, and a flag
+    given once given twice."""
 
 
 Outcome: TypeAlias = expectations.OptionChoice | expectations.HeadReturn
 
 
-def _require_via_and_card_hash(parsed: argparse.Namespace, flag: str) -> None:
-    if parsed.via is None or parsed.card_hash is None:
+@dataclass(frozen=True)
+class _NamedLine:
+    """A `--line` with the `--option` and `--card-hash` that belong to it."""
+
+    index: int
+    option: str | None
+    card_hash: str | None
+
+
+@dataclass(frozen=True)
+class _SharedFlags:
+    """The flags given once, which apply to every named line (RULE-35, RULE-36)."""
+
+    other: str | None
+    note: str | None
+    via: str | None
+
+
+@dataclass(frozen=True)
+class _LineOutcome:
+    index: int
+    outcome: Outcome
+
+
+_GIVEN_ONCE = (_OTHER, _NOTE, _VIA)
+_PER_LINE = (_OPTION, _CARD_HASH)
+
+
+def _refuse_a_repeated_shared_flag(given: Sequence[_GivenFlag]) -> None:
+    seen: set[str] = set()
+    for flag in given:
+        if flag.name in _GIVEN_ONCE and flag.name in seen:
+            raise FlagCombinationError(f"{flag.name} is given twice; give it once")
+        seen.add(flag.name)
+
+
+def _store_a_line_flag(
+    flags_of: dict[int, dict[str, str]], owner: int | None, flag: _GivenFlag
+) -> None:
+    if owner is None:
+        raise FlagCombinationError(f"{flag.name} before the first --line belongs to no line")
+    if flag.name in flags_of[owner]:
+        raise FlagCombinationError(f"line {owner} has a second {flag.name}")
+    flags_of[owner][flag.name] = cast(str, flag.value)
+
+
+def _flags_of_each_line(given: Sequence[_GivenFlag]) -> dict[int, dict[str, str]]:
+    """Each named line's `--option` and `--card-hash`: with several `--line` the
+    ones written after it, with one `--line` wherever they stand. Refuses in
+    written order what pairs with no line or twice (RULE-33, RULE-34)."""
+    indexes = [cast(int, flag.value) for flag in given if flag.name == _LINE]
+    flags_of: dict[int, dict[str, str]] = {index: {} for index in indexes}
+    owner = indexes[0] if len(indexes) == 1 else None
+    named: set[int] = set()
+    for flag in given:
+        if flag.name == _LINE:
+            index = cast(int, flag.value)
+            if index in named:
+                raise FlagCombinationError(f"line {index} is named twice")
+            named.add(index)
+            owner = index if len(indexes) > 1 else owner
+        elif flag.name in _PER_LINE:
+            _store_a_line_flag(flags_of, owner, flag)
+    return flags_of
+
+
+def _named_lines(given: Sequence[_GivenFlag]) -> tuple[_NamedLine, ...]:
+    lines = tuple(
+        _NamedLine(index, flags.get(_OPTION), flags.get(_CARD_HASH))
+        for index, flags in _flags_of_each_line(given).items()
+    )
+    if len(lines) > 1:
+        _refuse_a_line_without_its_own_flags(lines)
+    return lines
+
+
+def _refuse_a_line_without_its_own_flags(lines: Sequence[_NamedLine]) -> None:
+    """RULE-15's count bullets, line by line in written order."""
+    letters_given = any(line.option is not None for line in lines)
+    for line in lines:
+        if letters_given and line.option is None:
+            raise FlagCombinationError(f"line {line.index} needs its own --option after it")
+        if line.card_hash is None:
+            raise FlagCombinationError(f"line {line.index} needs its own --card-hash after it")
+
+
+def _shared_flags(given: Sequence[_GivenFlag]) -> _SharedFlags:
+    once = {flag.name: cast(str, flag.value) for flag in given if flag.name in _GIVEN_ONCE}
+    return _SharedFlags(once.get(_OTHER), once.get(_NOTE), once.get(_VIA))
+
+
+def _via_and_card_hash(
+    shared: _SharedFlags, line: _NamedLine, flag: str
+) -> tuple[expectation_grammar.RulingVia, str]:
+    if shared.via is None or line.card_hash is None:
         raise FlagCombinationError(f"{flag} needs --via and --card-hash")
+    return expectation_grammar.RulingVia(shared.via), line.card_hash
 
 
-def _letter_choice(parsed: argparse.Namespace) -> expectations.OptionChoice:
-    _require_via_and_card_hash(parsed, "--option")
-    if parsed.note is not None:
+def _letter_choice(
+    letter: str, line: _NamedLine, shared: _SharedFlags
+) -> expectations.OptionChoice:
+    via, card_hash = _via_and_card_hash(shared, line, _OPTION)
+    if shared.note is not None:
         raise FlagCombinationError(
             "--note does not go with --option; keep the operator's word in the item's journal"
         )
-    via = expectation_grammar.RulingVia(parsed.via)
-    return expectations.OptionChoice(parsed.option, via, parsed.card_hash)
+    return expectations.OptionChoice(letter, via, card_hash)
 
 
-def _other_choice(parsed: argparse.Namespace) -> expectations.OptionChoice:
-    _require_via_and_card_hash(parsed, "--other")
-    if parsed.note is not None:
+def _other_choice(text: str, line: _NamedLine, shared: _SharedFlags) -> expectations.OptionChoice:
+    via, card_hash = _via_and_card_hash(shared, line, _OTHER)
+    if shared.note is not None:
         raise FlagCombinationError("--note does not go with --other; its text is the answer")
-    via = expectation_grammar.RulingVia(parsed.via)
     if via is expectation_grammar.RulingVia.DEFAULT:
         raise FlagCombinationError("--via default keeps only the recommended option, not --other")
-    if not parsed.other.strip():
+    if not text.strip():
         raise FlagCombinationError("--other needs a non-empty answer")
-    return expectations.OptionChoice(expectations.OtherAnswer(parsed.other), via, parsed.card_hash)
+    return expectations.OptionChoice(expectations.OtherAnswer(text), via, card_hash)
 
 
-def _head_return(parsed: argparse.Namespace) -> expectations.HeadReturn:
-    if parsed.card_hash is None:
+def _head_return(line: _NamedLine, shared: _SharedFlags) -> expectations.HeadReturn:
+    if line.card_hash is None:
         raise FlagCombinationError("--unclear needs --card-hash")
-    if parsed.via is not None:
+    if shared.via is not None:
         raise FlagCombinationError("--via does not go with --unclear; nothing is decided")
-    if parsed.note is not None and not parsed.note.strip():
+    if shared.note is not None and not shared.note.strip():
         raise FlagCombinationError("a blank --note says nothing; leave it out")
-    return expectations.HeadReturn(parsed.note, parsed.card_hash)
+    return expectations.HeadReturn(shared.note, line.card_hash)
 
 
-def _outcome(parsed: argparse.Namespace) -> Outcome:
-    """The one outcome the flags name, or RULE-15's refusal of their
+def _outcome(line: _NamedLine, shared: _SharedFlags) -> Outcome:
+    """The one outcome the flags name for `line`, or RULE-15's refusal of their
     combination -- before any forge call."""
-    if parsed.option is not None:
-        return _letter_choice(parsed)
-    if parsed.other is not None:
-        return _other_choice(parsed)
-    return _head_return(parsed)
+    if line.option is not None:
+        return _letter_choice(line.option, line, shared)
+    if shared.other is not None:
+        return _other_choice(shared.other, line, shared)
+    return _head_return(line, shared)
+
+
+def _line_outcomes(parsed: argparse.Namespace) -> tuple[_LineOutcome, ...]:
+    """Every named line with its outcome, refused in RULE-35, RULE-33/34, RULE-15
+    order -- before any forge call."""
+    given: tuple[_GivenFlag, ...] = parsed.given_flags
+    _refuse_a_repeated_shared_flag(given)
+    lines = _named_lines(given)
+    shared = _shared_flags(given)
+    return tuple(_LineOutcome(line.index, _outcome(line, shared)) for line in lines)
 
 
 def _emit_rule_result(
     number: int,
-    line: expectations.ExpectationLine,
+    lines: Sequence[expectations.ExpectationLine],
     open_remaining: int,
     storage: body.Storage,
     *,
     as_json: bool,
 ) -> None:
-    ruling = cast(str, line.ruling)
-    ruled_on = cast(date, line.ruled_on)
+    ruled_on = cast(date, lines[0].ruled_on).isoformat()
+    rulings = [(line.index, cast(str, line.ruling)) for line in lines]
     if as_json:
+        which = (
+            {"index": rulings[0][0], "ruling": rulings[0][1]}
+            if len(rulings) == 1
+            else {"lines": [{"index": index, "ruling": ruling} for index, ruling in rulings]}
+        )
         report.emit_json(
-            True,
-            _RuleReason.RULED,
-            item=number,
-            index=line.index,
-            ruling=ruling,
-            ruled_on=ruled_on.isoformat(),
-            open=open_remaining,
+            True, _RuleReason.RULED, item=number, **which, ruled_on=ruled_on, open=open_remaining
         )
         return
+    noun = "line" if len(rulings) == 1 else "lines"
+    named = ", ".join(f"{index} {ruling}" for index, ruling in rulings)
     print(
-        f"RULED {workboard.item_label(number, storage)} line {line.index} {ruling}; "
+        f"RULED {workboard.item_label(number, storage)} {noun} {named}; "
         f"{open_remaining} line(s) still open"
     )
 
 
-def _written_body(current_body: str, line: int, outcome: Outcome) -> str:
-    today = datetime.now(UTC).date()
+def _written_body(current_body: str, line: int, outcome: Outcome, today: date) -> str:
     if isinstance(outcome, expectations.HeadReturn):
         return expectations.return_to_head(current_body, line, outcome, today)
     return expectations.rule_option(current_body, line, outcome, today)
@@ -188,43 +344,54 @@ def _written_body(current_body: str, line: int, outcome: Outcome) -> str:
 
 def _emit_returned_result(
     number: int,
-    line: expectations.OptionLine,
+    lines: Sequence[expectations.OptionLine],
     open_remaining: int,
     storage: body.Storage,
     *,
     as_json: bool,
 ) -> None:
-    returned = cast(expectations.ReturnedToHead, line.returned)
+    returned_on = cast(expectations.ReturnedToHead, lines[0].returned).returned_on.isoformat()
+    indexes = [line.index for line in lines]
     if as_json:
+        which = (
+            {"index": indexes[0]}
+            if len(indexes) == 1
+            else {"lines": [{"index": index} for index in indexes]}
+        )
         report.emit_json(
             True,
             _RuleReason.RETURNED,
             item=number,
-            index=line.index,
-            returned_on=returned.returned_on.isoformat(),
+            **which,
+            returned_on=returned_on,
             open=open_remaining,
         )
         return
+    noun = "line" if len(indexes) == 1 else "lines"
     print(
-        f"RETURNED {workboard.item_label(number, storage)} line {line.index} to its head; "
-        f"{open_remaining} line(s) still open"
+        f"RETURNED {workboard.item_label(number, storage)} {noun} "
+        f"{', '.join(map(str, indexes))} to its head; {open_remaining} line(s) still open"
     )
 
 
 def _rule_item(
-    context: RunContext, number: int, line: int, outcome: Outcome
-) -> tuple[expectations.ExpectationLine, int]:
-    """`run`'s own write: returns the newly ruled line and
-    how many the item still has open; raises `protocol.ClaimError` by name
-    for every refusal (already ruled, out of range, a bad outcome, a
-    malformed or missing item), which `run` turns into its own
-    by-name response."""
+    context: RunContext, number: int, named: Sequence[_LineOutcome], today: date
+) -> tuple[tuple[expectations.ExpectationLine, ...], int]:
+    """`run`'s own write: folds every named line over the body read once, with the
+    one date `today`, and writes it once; returns the newly ruled lines and how many the
+    item still has open. Raises `protocol.ClaimError` by name for every refusal
+    (already ruled, out of range, a bad outcome, a malformed or missing item)
+    before the write, so none of the lines is stored, which `run` turns into
+    its own by-name response."""
     client = context.forge_writer
     current_body, config = require_writable_target(client, context, number, command="rule")
-    new_body = _written_body(current_body, line, outcome)
+    new_body = current_body
+    for line in named:
+        new_body = _written_body(new_body, line.index, line.outcome, today)
     client.update_item_body(number, new_body)
-    ruled_line = expectations.expectation_lines(new_body, storage=config.storage)[line - 1]
-    return ruled_line, _rule_remaining_open(new_body, storage=config.storage)
+    lines = expectations.expectation_lines(new_body, storage=config.storage)
+    ruled = tuple(lines[line.index - 1] for line in named)
+    return ruled, _rule_remaining_open(new_body, storage=config.storage)
 
 
 # Each refusal's `--json` `reason`, by its type; any other refusal is a
@@ -249,18 +416,18 @@ def _refusal_reason(error: protocol.ClaimError) -> _RuleReason:
     )
 
 
-def _rule_expectation_line(parsed: argparse.Namespace, context: RunContext) -> int:
+def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> int:
     """`rule`'s own work, every refusal raised by name for `run` to
     report."""
-    outcome = _outcome(parsed)
+    named = _line_outcomes(parsed)
     number = int(parsed.item)
-    ruled_line, open_remaining = _rule_item(context, number, parsed.line, outcome)
+    ruled, open_remaining = _rule_item(context, number, named, context.today())
     storage = context.config.storage
-    if isinstance(outcome, expectations.HeadReturn):
-        returned_line = cast(expectations.OptionLine, ruled_line)
-        _emit_returned_result(number, returned_line, open_remaining, storage, as_json=parsed.json)
+    if isinstance(named[0].outcome, expectations.HeadReturn):
+        returned = cast(tuple[expectations.OptionLine, ...], ruled)
+        _emit_returned_result(number, returned, open_remaining, storage, as_json=parsed.json)
     else:
-        _emit_rule_result(number, ruled_line, open_remaining, storage, as_json=parsed.json)
+        _emit_rule_result(number, ruled, open_remaining, storage, as_json=parsed.json)
     return 0
 
 
@@ -270,6 +437,6 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     ruling path can fail like any other forge call, and a failure there names
     this command's own `unavailable` rather than escaping the envelope."""
     try:
-        return _rule_expectation_line(parsed, context)
+        return _rule_expectation_lines(parsed, context)
     except protocol.ClaimError as error:
         return report.refuse(_refusal_reason(error), error, as_json=parsed.json)

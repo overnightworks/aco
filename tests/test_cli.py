@@ -9096,74 +9096,6 @@ def test_cli_claim_and_release_accept_json_while_parent_and_bootstrap_reject_it(
     assert refused_bootstrap.value.code == 2
 
 
-def _arranged_claim_client(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
-    """The GitHub-storage `claim` arrangement the comma, rescope, read-count
-    and `--whole` tests share: a fake forge, a no-op checkout validator, a
-    fixed versioned-file listing via `git_checkout`, and a fresh in-memory
-    store, so each test states only what makes it different."""
-    client = FakeForge()
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(checkout, "validate_checkout", lambda request, **_where: None)
-    monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    git_values = git_checkout()
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    _patch_store_write(monkeypatch)
-    return client
-
-
-def _claim_argv(*flags: str, issue: int = 72, claim_id: str = "cli-claim") -> list[str]:
-    return [
-        "--repo",
-        REPOSITORY,
-        "claim",
-        str(issue),
-        "--agent",
-        "Codex Sol",
-        "--role",
-        "builder",
-        "--base",
-        BASE,
-        "--branch",
-        f"codex/issue-{issue}",
-        "--claim-id",
-        claim_id,
-        *flags,
-    ]
-
-
-def _serve_whole_claim_body(client: FakeForge, raw_body: str) -> None:
-    client.board_issues = (board_issue(72, "Work", raw_body),)
-    client.issue_references[72] = forge.ItemReference(forge.ItemState.OPEN, "Work", raw_body)
-    client.item_bodies[72] = raw_body
-
-
-def _assert_whole_body_unchanged(client: FakeForge, raw_body: str) -> None:
-    assert client.board_issues[0].body == raw_body
-    assert client.issue_references[72].body == raw_body
-    assert client.item_bodies[72] == raw_body
-    assert not client.created_issues
-
-
-def test_whole_github_next_and_board_report_the_defect(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: BODY-52, NEXT-36. T4: matrix 30."""
-    client = _arranged_claim_client(monkeypatch)
-    raw_body = complete_contract("Ship it.", scope=["a.py"], whole="x" * 513)
-    _serve_whole_claim_body(client, raw_body)
-    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 3
-    output = capsys.readouterr().out
-    defect = "body malformed: whole: whole reason must be one bounded non-empty line"
-    assert "SKIPPED" in output
-    assert f"#72: {defect}" in output
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
-    row = next(row for row in json.loads(capsys.readouterr().out)["items"] if row["number"] == 72)
-    assert (row["actionable"], row["actionable_reason"]) == (False, defect)
-    _assert_whole_body_unchanged(client, raw_body)
-
-
 @pytest.mark.parametrize(
     "mode",
     ["standing", "rebuild", "invalid-flag", "invalid-flag-standing"],
@@ -9302,12 +9234,6 @@ def test_cli_claim_replay_does_not_bypass_out_of_order_for_another_agent(
 
     assert "ERROR: higher-priority actionable item #11" in capsys.readouterr().err
     assert store.fetch_state(worktree=Path("."), remote="origin").claims
-
-
-def _serve_rescoped_item(client: FakeForge) -> None:
-    client.issue_references[72] = forge.ItemReference(
-        forge.ItemState.OPEN, "Rescoped item", complete_contract("Build it.")
-    )
 
 
 SCOPE_READ_FAILURE = "fatal: object database unreadable"
@@ -13987,14 +13913,6 @@ def _github_item_close_refusal_command(
     return _CountedRun(argv, {None: 1}, {tmp_path: 1}, observations={}, exit_code=2)
 
 
-def _claim_comma_scope_refusal_command(
-    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
-) -> _CountedRun:
-    """A scope shape refusal reads nothing of the repository at all."""
-    _arranged_claim_client(monkeypatch)
-    return _CountedRun(_claim_argv("--scope", "a,b"), {}, {}, observations={}, exit_code=2)
-
-
 def _check_stdin_command(_monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
     """`check -` judges a piped body without the state ref."""
     run = _read_once(["check", "-"], toplevel=tmp_path, observes=False)
@@ -14007,11 +13925,6 @@ def _rule_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRu
     return _read_once(argv, toplevel=tmp_path, observes=False)
 
 
-def _claim_command(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> _CountedRun:
-    _arranged_claim_client(monkeypatch)
-    return _read_once(_claim_argv("--scope", "README.md"), toplevel=Path("/repo"))
-
-
 def _claim_untracked_scope_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
     """A scope entry that is no git tree sends the width
     gate to the run's own held toplevel, never to a second git read."""
@@ -14021,29 +13934,6 @@ def _claim_untracked_scope_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     return _read_once(["claim", "314", "--scope", "src/x.py"], toplevel=worktree)
-
-
-def _rescope_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
-    """`rescope` reads the checkout its own `--add` path resolves to, never
-    the process's cwd, and the toplevel that resolution already read is the
-    one its store context uses, never read there a second time. The fake
-    checkout sits in a `tmp_path` child that is never created, so the
-    resolution reads from its nearest existing ancestor, `tmp_path` itself
-    (RESC-18)."""
-    _serve_rescoped_item(_arranged_claim_client(monkeypatch))
-    repo = tmp_path / "repo"
-    git_values = git_checkout(
-        toplevel=str(repo),
-        git_directory=str(repo / ".git" / "worktrees" / "issue-72"),
-        common_directory=str(repo / ".git"),
-    )
-    monkeypatch.setattr(
-        checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
-    )
-    claimed = request(agent="Ada", issue=72, branch="codex/issue-72", scope=("src/widget.py",))
-    _patch_store_write(monkeypatch, store_claim_from_request(claimed))
-    argv = ["--repo", REPOSITORY, "rescope", "72", "--agent", "Ada", "--add", str(repo / "new.py")]
-    return _read_once(argv, toplevel=repo, directory=tmp_path)
 
 
 def _cut_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
@@ -14138,16 +14028,13 @@ def _start_lost_answer_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
         pytest.param(_state_ref_item_edit_command, id="item-edit"),
         pytest.param(_state_ref_release_merged_command, id="state-ref-release-merged"),
         pytest.param(_rule_command, id="one-write-rule"),
-        pytest.param(_claim_command, id="github-claim"),
         pytest.param(_claim_untracked_scope_command, id="claim-untracked-scope-entry"),
-        pytest.param(_rescope_command, id="rescope"),
         pytest.param(_release_command, id="release"),
         pytest.param(_cut_command, id="two-write-cut"),
         pytest.param(_start_command, id="two-directory-state-ref-start"),
         pytest.param(_start_lost_answer_command, id="state-ref-start-lost-answer"),
         pytest.param(_land_command, id="land-rereads-after-its-fast-forward"),
         pytest.param(_github_item_close_refusal_command, id="item-close-github-refusal"),
-        pytest.param(_claim_comma_scope_refusal_command, id="claim-scope-shape-refusal"),
         pytest.param(_check_stdin_command, id="check-stdin"),
     ],
 )

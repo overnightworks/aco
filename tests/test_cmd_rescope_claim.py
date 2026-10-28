@@ -10,19 +10,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY, complete_contract
+from board_fixtures import complete_contract
 from claim_worktrees import (
     ISSUE,
-    LANE_BRANCH,
     StandIn,
-    Standing,
     assert_json_refusal_object,
     assert_no_item_body_written,
     claimed_here,
+    held_by_ada,
     make_stand_in,
+    rescope_arguments,
     serve_body,
 )
-from cli_fixtures import real_git, run_cli
+from cli_fixtures import count_context_reads, real_git, run_cli
 from store_fixtures import state_ref_tip
 
 from aco import protocol, store
@@ -39,14 +39,6 @@ def stand_in(
     return make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, TRUNK_FILES)
 
 
-def rescope(*flags: str) -> list[str]:
-    return ["--repo", REPOSITORY, "rescope", str(ISSUE), *flags]
-
-
-def held_by_ada(scope: tuple[str, ...] = HELD_SCOPE) -> tuple[Standing, ...]:
-    return (Standing(scope, issue=ISSUE, agent="Ada", branch=LANE_BRANCH),)
-
-
 def test_a_rescope_adds_a_path_whatever_the_head_and_the_working_tree_stand_at(
     monkeypatch: pytest.MonkeyPatch,
     stand_in: StandIn,
@@ -54,13 +46,13 @@ def test_a_rescope_adds_a_path_whatever_the_head_and_the_working_tree_stand_at(
 ) -> None:
     """Spec: RESC-12. A rescope never reads the checkout's head
     against the claim's base, and never refuses a dirty working tree."""
-    standpoint = stand_in(standing=held_by_ada())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     serve_body(monkeypatch, complete_contract("Build it."))
     (standpoint.directory / "src/widget.py").write_text("edited, not committed\n")
     before = claimed_here(standpoint)
     assert before.base != standpoint.head
 
-    result = run_cli(rescope("--add", f"{standpoint.directory}/{NEW_FILE}"), capsys)
+    result = run_cli(rescope_arguments("--add", f"{standpoint.directory}/{NEW_FILE}"), capsys)
 
     assert (result.status, result.stdout, result.stderr) == (
         0,
@@ -146,7 +138,7 @@ def test_a_rescope_reads_a_comma_inside_one_path_literally(
     before = claimed_here(standpoint)
     flags = tuple(part.replace("{root}", str(standpoint.directory)) for part in case.flags)
 
-    result = run_cli(rescope(*flags), capsys)
+    result = run_cli(rescope_arguments(*flags), capsys)
 
     if case.refusal is None:
         assert (result.status, result.stdout, result.stderr) == (
@@ -166,13 +158,13 @@ def test_a_rescope_with_json_prints_the_updated_scope_and_the_same_claim_id(
 ) -> None:
     """Spec: RESC-13. The envelope keeps the claim's own fields in
     their order, and only `scope` differs from what the claim held."""
-    standpoint = stand_in(standing=held_by_ada())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     serve_body(monkeypatch, complete_contract("Build it."))
     before = claimed_here(standpoint)
     root = standpoint.directory
     flags = ("--add", f"{root}/docs/PRODUCT.md", "--add", f"{root}/{NEW_FILE}")
 
-    result = run_cli(rescope(*flags, "--drop", f"{root}/src/widget.py", "--json"), capsys)
+    result = run_cli(rescope_arguments(*flags, "--drop", f"{root}/src/widget.py", "--json"), capsys)
 
     assert result.status == 0
     assert (
@@ -206,7 +198,7 @@ def test_a_rescope_by_another_agent_than_the_claimant_refuses_and_changes_nothin
     served = serve_body(monkeypatch, complete_contract("Build it."))
     tip = state_ref_tip(bare_remote)
 
-    result = run_cli(rescope("--agent", "Grok 4.6", "--add", NEW_FILE), capsys)
+    result = run_cli(rescope_arguments("--agent", "Grok 4.6", "--add", NEW_FILE), capsys)
 
     assert (result.status, result.stdout, result.stderr) == (
         2,
@@ -231,7 +223,7 @@ def test_a_rescope_with_json_and_no_claim_on_the_item_refuses_as_a_failed_precon
     served = serve_body(monkeypatch, complete_contract("Build it."))
     tip = state_ref_tip(bare_remote)
 
-    result = run_cli(rescope("--add", NEW_FILE, "--json"), capsys)
+    result = run_cli(rescope_arguments("--add", NEW_FILE, "--json"), capsys)
 
     assert result.status == 2
     assert result.stderr == "ERROR: issue #72 has no active build claim\n"
@@ -247,11 +239,11 @@ def test_a_rescope_that_names_neither_add_nor_drop_changes_nothing(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Spec: RESC-08."""
-    standpoint = stand_in(standing=held_by_ada())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     served = serve_body(monkeypatch, complete_contract("Build it."))
     tip = state_ref_tip(bare_remote)
 
-    result = run_cli(rescope(), capsys)
+    result = run_cli(rescope_arguments(), capsys)
 
     assert (result.status, result.stdout, result.stderr) == (
         2,
@@ -272,12 +264,12 @@ def test_a_rescope_in_a_checkout_without_a_branch_refuses_even_with_an_issue_num
     """Spec: RESC-02. Rescope always operates on the checked-out worktree's own
     claim, so a detached checkout refuses -- unlike release, it never falls
     back to the issue alone."""
-    standpoint = stand_in(standing=held_by_ada())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     served = serve_body(monkeypatch, complete_contract("Build it."))
     real_git(standpoint.directory, "switch", "--detach")
     tip = state_ref_tip(bare_remote)
 
-    result = run_cli(rescope("--add", NEW_FILE), capsys)
+    result = run_cli(rescope_arguments("--add", NEW_FILE), capsys)
 
     assert (result.status, result.stdout, result.stderr) == (
         2,
@@ -300,7 +292,7 @@ def test_a_rescope_refuses_a_missing_state_ref(
     served = serve_body(monkeypatch, complete_contract("Build it."))
     real_git(bare_remote, "update-ref", "-d", store.STATE_REF)
 
-    result = run_cli(rescope("--add", NEW_FILE), capsys)
+    result = run_cli(rescope_arguments("--add", NEW_FILE), capsys)
 
     assert (result.status, result.stdout, result.stderr) == (
         2,
@@ -309,3 +301,24 @@ def test_a_rescope_refuses_a_missing_state_ref(
     )
     assert state_ref_tip(bare_remote) is None
     assert_no_item_body_written(served)
+
+
+def test_a_rescope_reads_the_checkout_its_path_names_never_the_working_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    github_clone: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: RESC-18, CAS-53. The checkout comes from the nearest existing
+    ancestor of the path, here `src` under a lane worktree while the process
+    stands in the repository's own checkout; its toplevel is read there once and
+    is the one the board configuration and the state ref are read from."""
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
+    serve_body(monkeypatch, complete_contract("Build it."))
+    monkeypatch.chdir(github_clone)
+    reads = count_context_reads(monkeypatch)
+    root = standpoint.directory
+
+    result = run_cli(rescope_arguments("--add", f"{root}/src/not/yet/there.py"), capsys)
+
+    assert (result.status, *reads.drain()) == (0, {root / "src": 1}, {root: 1}, {root: 1})

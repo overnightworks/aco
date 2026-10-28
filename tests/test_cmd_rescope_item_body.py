@@ -8,15 +8,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY, complete_contract
+from board_fixtures import complete_contract
 from claim_worktrees import (
     ISSUE,
     StandIn,
-    Standing,
     assert_json_refusal_object,
     assert_no_item_body_written,
     claimed_here,
+    held_by_ada,
     make_stand_in,
+    rescope_arguments,
     serve_body,
 )
 from cli_fixtures import run_cli
@@ -38,14 +39,6 @@ def stand_in(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, github_clone: Path, bare_remote: Path
 ) -> StandIn:
     return make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, TRUNK_FILES)
-
-
-def rescope(*flags: str) -> list[str]:
-    return ["--repo", REPOSITORY, "rescope", str(ISSUE), *flags]
-
-
-def held_claim() -> tuple[Standing, ...]:
-    return (Standing(HELD_SCOPE, issue=ISSUE, agent="Ada"),)
 
 
 def written_scope_and_whole(served: FakeForge) -> tuple[tuple[str, ...] | None, str | None]:
@@ -111,14 +104,14 @@ def test_a_rescope_moves_the_claim_and_the_item_body_scope_together(
     """Spec: RESC-12, RESC-22, RESC-25. One call writes both owners of the
     scope; a relative entry is read against the checkout's toplevel, never the
     working directory."""
-    standpoint = stand_in(standing=held_claim())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     if from_source:
         monkeypatch.chdir(standpoint.directory / "src")
     entries = {} if body_whole is None else {"whole": body_whole}
     served = serve_body(monkeypatch, complete_contract("Build it.", **entries))
     flags = tuple(part.replace("{root}", str(standpoint.directory)) for part in argv_tail)
 
-    result = run_cli(rescope(*flags), capsys)
+    result = run_cli(rescope_arguments(*flags), capsys)
 
     assert (result.status, result.stderr) == (0, "")
     claimed = claimed_here(standpoint)
@@ -156,7 +149,7 @@ def test_a_rescope_names_what_went_through_when_a_write_fails(
     """Spec: RESC-23, RESC-17, RESC-24. The body is written first, so a failed
     body write leaves the claim as it stood, and a failed claim write after it
     says the body already moved and how to bring the claim in step."""
-    standpoint = stand_in(standing=held_claim())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     served = serve_body(monkeypatch, complete_contract("Build it."))
     tip = state_ref_tip(bare_remote)
     if body_write_fails:
@@ -164,7 +157,7 @@ def test_a_rescope_names_what_went_through_when_a_write_fails(
     else:
         fail_every_state_ref_push(monkeypatch, ClaimError("push rejected (simulated)"))
 
-    result = run_cli(rescope("--add", NEW_FILE), capsys)
+    result = run_cli(rescope_arguments("--add", NEW_FILE), capsys)
 
     assert (result.status, result.stderr) == (2, refusal)
     assert state_ref_tip(bare_remote) == tip
@@ -181,11 +174,11 @@ def test_a_rescope_refuses_an_item_body_without_a_block_before_any_write(
 ) -> None:
     """Spec: RESC-24, RESC-16. A body that cannot carry the scope refuses with
     both owners as they stood."""
-    standpoint = stand_in(standing=held_claim())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     served = serve_body(monkeypatch, "Prose only, no block.\n")
     tip = state_ref_tip(bare_remote)
 
-    result = run_cli(rescope("--add", NEW_FILE, "--json"), capsys)
+    result = run_cli(rescope_arguments("--add", NEW_FILE, "--json"), capsys)
 
     assert result.status == 2
     assert_json_refusal_object(result.stderr, result.stdout, reason="precondition_failed")
@@ -231,13 +224,13 @@ def test_a_rescope_with_a_defective_whole_changes_neither_the_claim_nor_the_body
 ) -> None:
     """Spec: CLM-36, RESC-17, RESC-24, BODY-62. The stored body's `whole` and
     the flag's hold one bound, and a refusal writes nothing."""
-    standpoint = stand_in(standing=held_claim())
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     entries = {} if body_whole is None else {"whole": body_whole}
     raw_body = complete_contract("Ship it.", **entries)
     served = serve_body(monkeypatch, raw_body)
     tip = state_ref_tip(bare_remote)
 
-    result = run_cli(rescope(*flags, *(("--json",) if as_json else ())), capsys)
+    result = run_cli(rescope_arguments(*flags, *(("--json",) if as_json else ())), capsys)
 
     assert result.status == 2
     if as_json:

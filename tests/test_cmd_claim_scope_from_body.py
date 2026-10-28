@@ -226,11 +226,7 @@ def test_claim_without_scope_refuses_a_malformed_body_a_missing_target_and_an_ou
     if arrange == "missing":
         served.issue_references[ISSUE] = forge.ItemReference(forge.ItemState.MISSING, "", "")
     if arrange == "outage":
-
-        def unreachable(number: int) -> forge.ItemReference:
-            raise forge.ForgeTransientError("gh: connection reset")
-
-        monkeypatch.setattr(served, "item_reference", unreachable)
+        served.scripted_item_reads = [forge.ForgeTransientError("gh: connection reset")]
 
     status = claim("--json", scope=())
 

@@ -157,6 +157,25 @@ def serve_item(monkeypatch: pytest.MonkeyPatch, raw_body: str) -> FakeForge:
     return serve_forge(monkeypatch, FakeForge(issue_references={7: reference}))
 
 
+def assert_refusal_writes_nothing(
+    client: FakeForge,
+    capsys: pytest.CaptureFixture[str],
+    arguments: list[str],
+    message: str,
+    reason: str,
+) -> None:
+    """`rule 7 <arguments>` refuses with `message` in both forms and writes no body."""
+    command = ["rule", "7", *arguments]
+    text = run_cli(command, capsys)
+    wire = run_cli([*command, "--json"], capsys)
+    assert (text.status, text.stderr) == (2, f"ERROR: {message}\n")
+    assert (wire.status, json.loads(wire.stdout)) == (
+        2,
+        {"ok": False, "reason": reason, "message": message},
+    )
+    assert client.body_writes == []
+
+
 def decide(letter: str, via: str, shown: str = GOLDEN_CARD_HASH, *, line: int = 2) -> list[str]:
     """`rule`'s arguments after the item for one option choice."""
     return ["--line", str(line), "--option", letter, "--via", via, "--card-hash", shown]

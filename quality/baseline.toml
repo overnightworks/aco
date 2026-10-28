@@ -24,13 +24,13 @@
 "src/aco/protocol.py" = 1877
 "src/aco/state_board.py" = 930
 "src/aco/store.py" = 2090
-"src/aco/workboard.py" = 3138
+"src/aco/workboard.py" = 3132
 "tests/board/test_board_api.py" = 1059
 "tests/support/cli_fixtures.py" = 944
 "tests/support/github_fixtures.py" = 834
 "tests/test_board.py" = 4111
 "tests/test_checkout.py" = 2046
-"tests/test_cli.py" = 14520
+"tests/test_cli.py" = 14407
 "tests/test_cmd_adopt.py" = 1650
 "tests/test_cmd_cut.py" = 1072
 "tests/test_cmd_land_after_merge_rerun.py" = 880
