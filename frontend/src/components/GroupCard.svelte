@@ -60,7 +60,7 @@
 						onclick={() => onToggle(point.index)}
 					>
 						<span class="number">{number}</span>
-						<span class="question">
+						<span class="point-question">
 							{point.question}
 							{#if hasFinalOption(point)}
 								<span class="final"><WarnMark /></span>
@@ -115,7 +115,7 @@
 		align-items: center;
 		gap: 12px;
 	}
-	button.toggle {
+	.point button.toggle {
 		display: grid;
 		grid-template-columns: 20px minmax(0, 1fr);
 		column-gap: 8px;
@@ -132,10 +132,10 @@
 		font-weight: 700;
 		color: var(--fg-3);
 	}
-	.question {
+	.point-question {
 		font-weight: 600;
 	}
-	button.toggle:hover .question {
+	.point button.toggle:hover .point-question {
 		text-decoration: underline;
 		text-underline-offset: 3px;
 	}

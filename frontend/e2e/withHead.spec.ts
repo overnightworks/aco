@@ -43,18 +43,22 @@ for (const viewport of [
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			writeRulings(repoDirectory, [
+				row(7, 'Gäste', line(1, 'Gäste dürfen teilnehmen.', { question: 'Gäste einladen?' })),
 				row(
-					7,
+					8,
 					'Sprung',
-					line(1, 'Gäste dürfen teilnehmen.', { question: 'Gäste einladen?' }),
-					optionLine(2, 'Der Song bleibt offen.', {
+					optionLine(1, 'Der Song bleibt offen.', {
 						topic: 'Zurückgegeben',
 						question: 'Soll der Song offen bleiben?',
 						options: OPTIONS,
 						returned_on: '2026-10-27',
 						returned_note: 'Welcher Sprung ist gemeint?'
-					}),
-					optionLine(3, 'Der Link bleibt ein Link.', {
+					})
+				),
+				row(
+					9,
+					'Link',
+					optionLine(1, 'Der Link bleibt ein Link.', {
 						topic: 'Offen',
 						question: 'Soll der Link ein Link bleiben?',
 						options: OPTIONS
