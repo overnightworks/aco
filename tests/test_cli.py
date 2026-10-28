@@ -51,7 +51,6 @@ from claim_worktrees import assert_json_refusal_object
 from cli_fixtures import (
     GIT_FAILURE_INJECTIONS,
     ITEM_NEW_BODY,
-    LIVE_TRUNK_REF_AFTER,
     RECORDED_ORIGIN_HEAD_READ,
     FixedDateTime,
     arguments_bash_hands_aco,
@@ -80,7 +79,6 @@ from cli_fixtures import (
     real_git,
     real_repository_with_bare_remote,
     recorded_head_read,
-    redirect_toplevel,
     run_cli,
     run_context_over,
     set_agent_identity_env,
@@ -162,9 +160,11 @@ GitHubForge = github.GitHubForge
 # monkeypatches `checkout.trunk_landings` to `()`: the atomic-landing tests
 # need the real first-parent walk against a real repository,
 # the same way `test_checkout.py`'s own `_LIVE_TRUNK_LANDINGS` does. A test
-# on a real repository (`redirect_toplevel`) resolves and fetches its trunk
-# for real as well.
+# on a real repository (`_stand_in_with_the_live_trunk`) resolves and fetches
+# its trunk for real as well.
 _LIVE_TRUNK_LANDINGS = checkout.trunk_landings
+_LIVE_TRUNK_REF_AFTER = checkout.trunk_ref_after
+_LIVE_FETCH_REMOTE = checkout.fetch_remote
 _LIVE_UNCONFIGURED_REMOTE_REFUSAL = checkout.unconfigured_remote_refusal
 _LIVE_PATH_IS_TRACKED = checkout.path_is_tracked
 _LIVE_FILE_AT_REVISION = checkout.file_at_revision
@@ -1442,7 +1442,7 @@ def _start_scenario(
     _serve_start_board(monkeypatch, _start_item())
     _patch_store_write(monkeypatch)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: agent})
-    redirect_toplevel(monkeypatch, repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     return repo
 
 
@@ -1544,7 +1544,7 @@ def _stand_in_another_lane(monkeypatch: pytest.MonkeyPatch, repo: Path, tmp_path
     """Run from a linked worktree of `repo` on another item's lane."""
     other_lane = tmp_path / "other-lane"
     real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-9-other", str(other_lane))
-    redirect_toplevel(monkeypatch, other_lane)
+    _stand_in_with_the_live_trunk(monkeypatch, other_lane)
     return other_lane
 
 
@@ -1556,7 +1556,7 @@ def _stand_in_the_items_released_lane(
     assert issue_claim.main(["--repo", REPOSITORY, "start", "314"]) == 0
     assert issue_claim.main(["--repo", REPOSITORY, "release", "314", "--abandoned", "paused"]) == 0
     lane = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    redirect_toplevel(monkeypatch, lane)
+    _stand_in_with_the_live_trunk(monkeypatch, lane)
     return lane
 
 
@@ -1614,7 +1614,7 @@ def test_start_inside_its_own_lane_worktree_reprints_the_live_claim(
     claim_id = _claimed_line_id(capsys.readouterr().out, "issue #314")
     worktree = repo.parent / f"{repo.name}-worktrees" / "issue-314-own-lane"
     (worktree / "work.txt").write_text("in progress\n")
-    redirect_toplevel(monkeypatch, worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
@@ -1867,7 +1867,7 @@ def test_a_detached_head_is_named_and_nothing_is_written(
     refuses by naming its own detached HEAD -- never a claim marker field
     -- and writes no claim, worktree, or branch."""
     repo, worktree, fake = _detached_start_worktree(monkeypatch, tmp_path)
-    redirect_toplevel(monkeypatch, worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, *arguments])
@@ -1919,8 +1919,7 @@ def test_start_names_a_runnable_command_for_a_detached_worktree(
     repo, worktree, fake = _detached_start_worktree(monkeypatch, parent_with_space)
     if branch_exists:
         real_git(repo, "branch", _START_BRANCH)
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     before = worktrees_and_branches(repo)
 
     status = issue_claim.main(["--repo", REPOSITORY, "start", "314"])
@@ -2396,8 +2395,7 @@ def test_start_resumes_a_wide_claim_without_repeating_whole(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     _patch_store_write(monkeypatch)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     assert (
         issue_claim.main(["--repo", REPOSITORY, "start", "314", "--whole", "the whole thing"]) == 0
     )
@@ -2487,8 +2485,7 @@ def test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     _patch_store_write(monkeypatch)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     assert issue_claim.main(["--repo", REPOSITORY, "start", "72"]) == 0
     first_claim_id = _claimed_line_id(capsys.readouterr().out, "issue #72")
     worktree = repo.parent / f"{repo.name}-worktrees" / _CLEANUP_WORKTREE_NAME
@@ -2668,8 +2665,7 @@ def _real_state_ref_repository(
         for number, content in item_bodies.items()
     }
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     return repo, remote, seeded
 
 
@@ -2711,7 +2707,7 @@ def test_state_ref_reads_answer_from_a_subdirectory_as_from_the_checkout_root(
     answers: list[tuple[int, str]] = []
     for toplevel, directory in readings:
         directory.mkdir(exist_ok=True)
-        redirect_toplevel(monkeypatch, toplevel)
+        _stand_in_with_the_live_trunk(monkeypatch, toplevel)
         monkeypatch.chdir(directory)
         status = issue_claim.main(command)
         answers.append((status, capsys.readouterr().out))
@@ -2899,8 +2895,7 @@ def _lane_on_a_state_ref_board_with_registries(
     real_git(repo, "commit", "-q", "-am", "trunk configuration")
     push_repository_trunk(repo, "origin")
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     monkeypatch.setattr(checkout, "file_at_revision", _LIVE_FILE_AT_REVISION)
     monkeypatch.setattr(checkout, "versioned_paths", _REAL_VERSIONED_PATHS)
 
@@ -3038,7 +3033,7 @@ def test_rescope_under_state_ref_moves_the_claim_and_the_item_body_scope_togethe
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
     (worktree / "src").mkdir()
-    redirect_toplevel(monkeypatch, worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     monkeypatch.chdir(worktree / "src")
     capsys.readouterr()
 
@@ -3083,8 +3078,7 @@ def test_rescope_refuses_a_relative_entry_that_climbs_out_of_the_run_checkout(
     repo, _remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
     worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     entry = os.path.relpath(target(worktree), worktree)
     state_before = store.fetch_state(worktree=worktree, remote="origin").tip
     capsys.readouterr()
@@ -3362,8 +3356,7 @@ def _claim_in_lane_worktree(
 ) -> list[str]:
     worktree = tmp_path / "lane"
     real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
-    redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     return ["claim", "314", "--scope", "src/x.py"]
 
 
@@ -5515,8 +5508,7 @@ def test_next_advises_a_pull_that_runs_as_printed_where_it_stands(
     if stands_in_lane:
         lane = tmp_path / "lane"
         real_git(repo, "worktree", "add", "-q", "-b", _START_BRANCH, str(lane))
-        redirect_toplevel(monkeypatch, lane)
-        monkeypatch.chdir(lane)
+        _stand_in_with_the_live_trunk(monkeypatch, lane)
 
     next_exit_code = issue_claim.main(["next"])
     run_line = capsys.readouterr().out.split("\nRun: ", 1)[1].splitlines()[0]
@@ -6174,8 +6166,7 @@ def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item
     )
     lane = tmp_path / "repo-worktrees" / "issue-21-nested"
     real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-21-nested")
-    redirect_toplevel(monkeypatch, lane)
-    monkeypatch.chdir(lane)
+    _stand_in_with_the_live_trunk(monkeypatch, lane)
     nested = items.format_item_id(21)
 
     next_exit_code = issue_claim.main(["next"])
@@ -6226,8 +6217,7 @@ def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_doe
     )
     lane = tmp_path / "repo-worktrees" / "issue-11-work"
     real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-11-work")
-    redirect_toplevel(monkeypatch, lane)
-    monkeypatch.chdir(lane)
+    _stand_in_with_the_live_trunk(monkeypatch, lane)
     waiting, pullable = items.format_item_id(10), items.format_item_id(11)
 
     next_exit_code = issue_claim.main(["next"])
@@ -7346,7 +7336,7 @@ def _landing_scenario(
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo = _landing_repository(tmp_path)
     _write_state_ref_pin(repo)
-    redirect_toplevel(monkeypatch, repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     item_ids = {number: items.format_item_id(number) for number in _LANDING_ITEM_NUMBERS}
     item_files = {
         f"{item_id}.md": _landing_item_body(f"Item {number}").encode()
@@ -7569,7 +7559,7 @@ def _real_landing_scenario(
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo = _landing_repository(tmp_path)
     _write_state_ref_pin(repo)
-    redirect_toplevel(monkeypatch, repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     remote = tmp_path / "remote.git"
     store.bootstrap(worktree=repo, remote=str(remote))
     for number in numbers:
@@ -7742,8 +7732,7 @@ def test_start_under_state_ref_refuses_a_failed_head_read_and_keeps_the_standing
     if lane_stands:
         real_git(repo, "worktree", "add", "-q", "-b", branch, str(lane_worktree), "feature")
     if starts_in_lane:
-        redirect_toplevel(monkeypatch, lane_worktree)
-        monkeypatch.chdir(lane_worktree)
+        _stand_in_with_the_live_trunk(monkeypatch, lane_worktree)
     tip_before = _state_ref_tip(repo, remote)
     injected = stub_one_git_call(
         monkeypatch, list(RECORDED_ORIGIN_HEAD_READ), exit_status=128, stderr="fatal: broken"
@@ -8732,7 +8721,7 @@ def _default_open_issue_reference(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # A test's checkout has no trunk, so the live trunk reads would fail loud; tests of
 # the trunk itself (tests/test_checkout.py, tests/test_session.py) and the
-# real-repository scenarios here (`redirect_toplevel`) read it live. That
+# real-repository scenarios here (`_stand_in_with_the_live_trunk`) read it live. That
 # trunk holds no committed board configuration, so no file is lane-shared;
 # a test of the lane-shared lines restores the live read.
 @pytest.fixture(autouse=True)
@@ -8745,6 +8734,12 @@ def _stub_trunk(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda remote, _recorded_head, **_kwargs: f"refs/remotes/{remote}/main",
     )
     monkeypatch.setattr(checkout, "fetch_remote", lambda *_args, **_kwargs: None)
+
+
+def _stand_in_with_the_live_trunk(monkeypatch: pytest.MonkeyPatch, directory: Path) -> None:
+    monkeypatch.chdir(directory)
+    monkeypatch.setattr(checkout, "trunk_ref_after", _LIVE_TRUNK_REF_AFTER)
+    monkeypatch.setattr(checkout, "fetch_remote", _LIVE_FETCH_REMOTE)
 
 
 @pytest.fixture(autouse=True)
@@ -10588,8 +10583,7 @@ def _refused_trailer_repository(
     real_git(repo, "add", "work.txt")
     real_git(repo, "commit", "-q", "-m", "refused landing", "-m", trailer)
     push_repository_trunk(repo, "origin")
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     return repo
 
 
@@ -10718,8 +10712,7 @@ def _release_cleanup_scenario(
     )
     _patch_store_write(monkeypatch, store_claim_from_request(standing))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     return worktree
 
 
@@ -10991,8 +10984,7 @@ def _claim_in_a_linked_worktree_on_main(
     real_git(repo, "checkout", "-q", "--detach")
     real_git(repo, "worktree", "add", "-q", str(worktree), "main")
     _name_hub_as_the_canonical_remote(worktree)
-    redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     return ["--repo", REPOSITORY, "claim", "314", "--scope", "src/x.py"]
 
 
@@ -11154,8 +11146,7 @@ def test_check_never_takes_a_local_branch_for_the_trunk_of_a_remote_with_branche
     arrange_remote(repo, remote)
     real_git(repo, "commit", "-q", "--allow-empty", "-m", "unpushed", "-m", "No-Item: docs")
     sha = real_git(repo, "rev-parse", "HEAD").stdout.strip()
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
 
     status = issue_claim.main(["check", sha])
 
@@ -11234,8 +11225,7 @@ def _land_scenario(
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     _patch_store_write(monkeypatch, store_claim_from_request(standing))
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     return repo, client
 
 
@@ -11761,8 +11751,7 @@ def _check_sha(
     """Real history and its resolver for trunk-tip and unpushed-commit checks."""
     monkeypatch.setattr(checkout, "trunk_landings", _LIVE_TRUNK_LANDINGS)
     repo = _check_trunk_repository(tmp_path)
-    redirect_toplevel(monkeypatch, repo)
-    monkeypatch.chdir(repo)
+    _stand_in_with_the_live_trunk(monkeypatch, repo)
     return repo, lambda ref: real_git(repo, "rev-parse", ref).stdout.strip()
 
 
@@ -11881,8 +11870,7 @@ def test_an_untrusted_board_config_refuses_every_store_command_by_name(
     push_repository_trunk(repository, "origin")
     if config_on_disk:
         _write_untracked_board_config(repository)
-    redirect_toplevel(monkeypatch, repository)
-    monkeypatch.chdir(repository)
+    _stand_in_with_the_live_trunk(monkeypatch, repository)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     monkeypatch.setattr(checkout, "path_is_tracked", lambda _path, **_kwargs: False)
 
@@ -12016,8 +12004,7 @@ def test_a_checkout_without_the_pin_is_told_its_pin_32_repair(
         real_git(lane, "commit", "-q", "-m", "drop the pin")
     if lane_history.trunk_moved_on:
         _advance_origin_main(repository, lane)
-    redirect_toplevel(monkeypatch, lane)
-    monkeypatch.chdir(lane)
+    _stand_in_with_the_live_trunk(monkeypatch, lane)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Ada"})
     monkeypatch.setattr(checkout, "path_is_tracked", _LIVE_PATH_IS_TRACKED)
     _ask_git_which_remotes_are_configured(monkeypatch)
@@ -12064,7 +12051,7 @@ def _scratch_lane_repository(
     `main`, since its configured `origin` was never fetched -- in the lane's
     own repository. Given `board_config`, the base commit carries it as the
     trunk's `.aco/board.toml`."""
-    monkeypatch.setattr(checkout, "trunk_ref_after", LIVE_TRUNK_REF_AFTER)
+    monkeypatch.setattr(checkout, "trunk_ref_after", _LIVE_TRUNK_REF_AFTER)
     repository = tmp_path
     real_git(repository, "init", "-q", "-b", "main")
     real_git(repository, "remote", "add", "origin", str(tmp_path / "origin.git"))
@@ -13792,7 +13779,7 @@ def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[
     real_git(repository, "add", "README.md")
     real_git(repository, "commit", "-q", "-m", "initial")
     real_git(repository, "remote", "add", "origin", str(bare_remote))
-    redirect_toplevel(monkeypatch, repository)
+    _stand_in_with_the_live_trunk(monkeypatch, repository)
     return repository, bare_remote
 
 
@@ -13905,8 +13892,7 @@ def _claim_untracked_scope_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     repo, _remote, _oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
     worktree = tmp_path / "lane"
     real_git(repo, "worktree", "add", "-q", "-b", "codex/issue-314-lane", str(worktree))
-    redirect_toplevel(monkeypatch, worktree)
-    monkeypatch.chdir(worktree)
+    _stand_in_with_the_live_trunk(monkeypatch, worktree)
     return _read_once(["claim", "314", "--scope", "src/x.py"], toplevel=worktree)
 
 

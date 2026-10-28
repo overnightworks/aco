@@ -29,7 +29,6 @@ from cli_fixtures import (
     fresh_observation,
     init_bare_repository,
     real_git,
-    redirect_toplevel,
     set_git_identity,
     stub_board_config_tracked,
 )
@@ -1623,7 +1622,6 @@ def test_cli_bootstrap_creates_the_empty_state_ref_without_a_ledger(
         lambda remote: "git@github.com:example/agent-coordination.git",
     )
     real_git(worktree, "remote", "add", "origin", str(bare_remote))
-    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
 
     status = issue_claim.main(["--repo", "example/agent-coordination", "bootstrap"])
@@ -1646,7 +1644,6 @@ def test_cli_bootstrap_is_idempotent_on_a_second_run(
         lambda remote: "git@github.com:example/agent-coordination.git",
     )
     real_git(worktree, "remote", "add", "origin", str(bare_remote))
-    redirect_toplevel(monkeypatch, worktree)
     monkeypatch.chdir(worktree)
     issue_claim.main(["--repo", "example/agent-coordination", "bootstrap"])
     first_output = capsys.readouterr().out

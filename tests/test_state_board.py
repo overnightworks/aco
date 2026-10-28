@@ -45,7 +45,6 @@ from cli_fixtures import (
     piped_body_on_stdin,
     piping,
     real_git,
-    redirect_toplevel,
     run_cli,
     set_git_identity,
     stub_board_config_tracked,
@@ -1881,7 +1880,6 @@ def _enter_claim_lane(
     real_git(worktree, "commit", "-q", "--allow-empty", "-m", "pin state-ref storage")
     lane = worktree.parent / name
     real_git(worktree, "worktree", "add", "-q", "-b", branch, str(lane))
-    redirect_toplevel(monkeypatch, lane)
     monkeypatch.chdir(lane)
     return head_sha(lane)
 
@@ -2015,7 +2013,6 @@ class TestCliStateRefForge:
             worktree, f'storage = "state-ref"\ncanonical_remote = "{canonical_remote}"\n'
         )
         stub_board_config_tracked(monkeypatch)
-        redirect_toplevel(monkeypatch, worktree)
         monkeypatch.chdir(worktree)
 
     def _live_state_ref_checkout(

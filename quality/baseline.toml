@@ -26,22 +26,22 @@
 "src/aco/store.py" = 2090
 "src/aco/workboard.py" = 3132
 "tests/board/test_board_api.py" = 1059
-"tests/support/cli_fixtures.py" = 938
+"tests/support/cli_fixtures.py" = 923
 "tests/support/github_fixtures.py" = 834
 "tests/test_board.py" = 4111
 "tests/test_checkout.py" = 2040
-"tests/test_cli.py" = 14381
-"tests/test_cmd_adopt.py" = 1650
+"tests/test_cli.py" = 14367
+"tests/test_cmd_adopt.py" = 1646
 "tests/test_cmd_cut.py" = 1072
-"tests/test_cmd_land_after_merge_rerun.py" = 880
+"tests/test_cmd_land_after_merge_rerun.py" = 877
 "tests/test_cmd_land_preflight_claim.py" = 858
-"tests/test_cmd_release_cleanup.py" = 807
+"tests/test_cmd_release_cleanup.py" = 804
 "tests/test_cmd_rescope_checkout.py" = 1087
-"tests/test_cmd_reset.py" = 954
+"tests/test_cmd_reset.py" = 952
 "tests/test_github.py" = 3181
 "tests/test_protocol.py" = 802
-"tests/test_state_board.py" = 6002
-"tests/test_store.py" = 5443
+"tests/test_state_board.py" = 5999
+"tests/test_store.py" = 5440
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 96
@@ -98,13 +98,13 @@
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
 "test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 71
 "test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 66
-"test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 61
+"test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 60
 
 [function_lines."tests/test_cmd_cut.py"]
 "cut_check" = 61
 
 [function_lines."tests/test_cmd_land_after_merge_rerun.py"]
-"separate_world" = 77
+"separate_world" = 76
 
 [function_lines."tests/test_cmd_land_merge.py"]
 "world" = 105
@@ -120,7 +120,7 @@
 "verify_cleanup" = 85
 
 [function_lines."tests/test_cmd_reset.py"]
-"test_reset_bundle_restores_the_released_history" = 64
+"test_reset_bundle_restores_the_released_history" = 63
 "test_reset_plans_or_performs_each_state" = 70
 "test_reset_refuses_live_claims_and_touches_nothing" = 95
 
