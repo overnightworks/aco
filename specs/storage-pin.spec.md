@@ -26,6 +26,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | `idea_label` absent or invalid | PIN-49 | PIN-49 | PIN-49 | PIN-49 | — |
 | `canonical_remote` absent or invalid | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | — |
 | `storage = "github"`, the canonical remote still names a repository GitHub has renamed | PIN-52 | PIN-52 | PIN-52 | PIN-52 | — |
+| `storage = "github"`, a forge target other than the canonical remote's | PIN-53 | PIN-53 | PIN-53 | PIN-53 | — |
 | only the trunk's committed copy refuses | PIN-42 | PIN-42 | PIN-42 | PIN-42 | — |
 | `storage = "state-ref"` | PIN-04\*, PIN-05\*, PIN-30 | PIN-18..21 | PIN-22..28 | —\*\* | PIN-08, PIN-31 |
 | a state-ref item file itself is malformed | PIN-14..17, PIN-34, PIN-29 | ITEM-37 | ITEM-39, PIN-29 | BOARD-54 | — |
@@ -97,6 +98,7 @@ whether it needs one. `status` and `brief` list them.
 - [ ] [PIN-50] Without a `canonical_remote` entry the canonical remote is `origin`; a named one is taken as written.
 - [ ] [PIN-51] A blank, padded or non-string `canonical_remote`, or one starting with `-`, refuses `board configuration <path> canonical_remote must be a non-empty remote name not starting with '-'`.
 - [ ] [PIN-52] A parent, child, blocker or pull request head naming another repository refuses `GitHub renamed <old> to <new>; point the canonical remote at <new>` (after a write: LAND-38; see E-PIN-42).
+- [ ] [PIN-53] Under `github` storage a forge target other than the canonical remote's refuses `forge target <t> does not match canonical remote <c>; run aco from that repository's checkout`, exit `2`.
 
 ## `storage = "state-ref"` is forge-free
 

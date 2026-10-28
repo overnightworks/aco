@@ -1266,11 +1266,7 @@ def _projected(
         for issue in issues
         if issue.kind is ItemKind.CONTAINER
     }
-    dependencies = {
-        issue.number: client.list_board_dependencies(issue.number)
-        for issue in issues
-        if issue.blocked_by_count > 0
-    }
+    dependencies = board_read.fetch_validated_dependencies(client, issues)
     return projected_board(
         issues,
         client.list_open_board_pull_requests(),

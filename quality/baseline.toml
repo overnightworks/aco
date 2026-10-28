@@ -40,7 +40,7 @@
 "tests/test_cmd_reset.py" = 952
 "tests/test_github.py" = 3124
 "tests/test_protocol.py" = 802
-"tests/test_state_board.py" = 5999
+"tests/test_state_board.py" = 5995
 "tests/test_store.py" = 5440
 
 [function_lines."src/aco/board_read.py"]

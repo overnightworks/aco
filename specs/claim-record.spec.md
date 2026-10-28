@@ -17,7 +17,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 
 | state \ trigger | `aco claim <n> --scope P` | `aco status` | `aco rescope`/`aco release` |
 |---|---|---|---|
-| no live claim | CLAIM-01, CLAIM-05, CLAIM-57, CLAIM-58 | CLAIM-36 | CLAIM-16, CLAIM-17 |
+| no live claim | CLAIM-01, CLAIM-05, CLAIM-57, CLAIM-58, CLAIM-75 | CLAIM-36 | CLAIM-16, CLAIM-17 |
 | issue already claimed | CLAIM-11 | CLAIM-31 | — |
 | lane branch already claimed | CLAIM-12 | — | — |
 | same claim id, same fields | CLAIM-13 | — | — |
@@ -52,6 +52,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-03] A lane claim's entry name percent-encodes its branch, so the lane `docs/tidy-readme` is stored as `claims/lane-docs%2Ftidy-readme.toml` (see E-CLAIM-02).
 - [ ] [CLAIM-04] The two key prefixes never collide: a lane branch literally named `issue-1` is stored as `claims/lane-issue-1.toml`, never as the entry of issue `#1`.
 - [ ] [CLAIM-05] A claim file carries `claim_id`, `agent`, `role`, `base`, `branch`, `scope`, `opened_commit`, and only then the optional `whole_reason`, `resource_name`, `resource_value`.
+- [ ] [CLAIM-75] Without `--agent`, the agent is `$ACO_AGENT`, else `Grok $GROK_SESSION_ID`, else `Claude $CLAUDE_CODE_SESSION_ID`, the first of them non-empty; none refuses as OUT-05.
 - [ ] [CLAIM-10] A lane claim and an issue claim never conflict by identity, so a `docs/` lane claims cleanly beside a live issue claim and `aco status` lists both; only CLAIM-71 refuses that.
 - [ ] [CLAIM-57] A branch that is not a safe Git ref — a leading `-`, `..`, `//`, `@{`, a `.lock` suffix, a dot-segment — refuses `claim marker branch is not a safe Git ref: '<branch>'`, exit `2`.
 - [ ] [CLAIM-58] An agent or role that is blank, padded, holds a control character or display control (NEXT-37) or exceeds its bound refuses `agent must be one bounded non-empty line`, exit `2`, before any write.

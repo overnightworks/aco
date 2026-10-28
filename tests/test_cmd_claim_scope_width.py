@@ -21,6 +21,7 @@ from claim_worktrees import (
     Standing,
     Standpoint,
     make_stand_in,
+    rescope_arguments,
     serve_body,
     standing_claims,
 )
@@ -266,7 +267,7 @@ def arguments(case: WidthCase, standpoint: Standpoint) -> list[str]:
         added = [
             flag for path in case.scope for flag in ("--add", str(standpoint.directory / path))
         ]
-        return ["--repo", REPOSITORY, "rescope", str(ISSUE), *added, *tail]
+        return rescope_arguments(*added, *tail)
     scoped = [flag for path in case.scope for flag in ("--scope", path)]
     number = [] if case.command is Command.LANE else [str(ISSUE)]
     return ["--repo", REPOSITORY, "claim", *number, *scoped, *tail]
