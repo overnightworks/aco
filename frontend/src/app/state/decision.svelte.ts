@@ -74,7 +74,7 @@ function unreadPicks(repos: RepoReading[], key: string, picks: Pick[]): Pick[] {
 		(reading) =>
 			reading.error === null &&
 			key.startsWith(`${reading.name}:`) &&
-			/^\d+:/.test(key.slice(reading.name.length + 1))
+			/^\d+:card$/.test(key.slice(reading.name.length + 1))
 	);
 	return repoWasRead ? [] : picks;
 }
