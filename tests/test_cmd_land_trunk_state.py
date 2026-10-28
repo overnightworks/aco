@@ -92,3 +92,23 @@ class TestLandTrunkState:
             "",
         )
         assert observed == expected
+
+    def test_a_rerun_ending_in_nothing_to_release_prints_no_trunk_line(
+        self,
+        github_clone: Path,
+        bare_remote: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Spec: LANDCMD-38, LANDCMD-54."""
+        first_parent = real_git(github_clone, "rev-parse", "main").stdout.strip()
+
+        def arrange(client: FakeForge, _head: str) -> None:
+            client.commit_checks_by_sha[first_parent] = (FAILED,)
+
+        landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+        capsys.readouterr()
+        first = run_cli(["land", "12"], capsys)
+        rerun = run_cli(["land", "12"], capsys)
+        assert "trunk: red" in first.stdout
+        assert "trunk:" not in rerun.stdout
