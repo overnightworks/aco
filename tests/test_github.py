@@ -34,7 +34,7 @@ def test_only_the_github_adapter_speaks_gh_argv() -> None:
     grepping every other module for the literal command name instead. Every
     module in the package is enumerated, not a fixed list, so a new module
     is covered the day it is added."""
-    package = Path("src/aco")
+    package = Path(__file__).parent.parent / "src" / "aco"
     other_modules = sorted(p for p in package.glob("*.py") if p.name != "github.py")
     assert len(other_modules) >= 7
     for module in other_modules:

@@ -61,11 +61,9 @@ def _checkout_configuring(tmp_path: Path, remote: str, board_config: str) -> Pat
 
 
 def test_remote_location_parses_the_canonical_remote_url(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: "git@github.com:owner/repo.git"
-    )
+    monkeypatch.chdir(_checkout_configuring(tmp_path, "origin", ""))
 
     location = _context().remote_location
 
@@ -105,14 +103,14 @@ def test_refuse_canonical_remote_mismatch_names_both_repositories() -> None:
 
 
 def test_repository_id_refuses_before_asking_gh_on_a_non_github_host(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The GitHub repository gates on the canonical remote's own host
     before it ever calls `discover_repository`: a `gh` call
     here would fail the test outright."""
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: "file:///srv/git/repo.git"
-    )
+    worktree = _checkout_configuring(tmp_path, "origin", "")
+    real_git(worktree, "remote", "set-url", "origin", "file:///srv/git/repo.git")
+    monkeypatch.chdir(worktree)
 
     def unused(*_args: object, **_kwargs: object) -> forge.RepositoryId:
         pytest.fail("a non-GitHub canonical remote must refuse before discover_repository runs")
@@ -125,11 +123,9 @@ def test_repository_id_refuses_before_asking_gh_on_a_non_github_host(
 
 
 def test_repository_id_checks_erwartung_6_against_a_github_remote(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(
-        checkout, "remote_url", lambda remote, **_kwargs: "git@github.com:owner/repo.git"
-    )
+    monkeypatch.chdir(_checkout_configuring(tmp_path, "origin", ""))
     monkeypatch.setattr(
         github,
         "discover_repository",

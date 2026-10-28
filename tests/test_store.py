@@ -4364,7 +4364,7 @@ def test_claim_key_round_trips_a_lane_branch_with_slash_and_percent() -> None:
     assert protocol.parse_claim_key(key) == protocol.LaneIdentity()
 
 
-def test_claim_key_round_trips_a_255_character_lane_branch() -> None:
+def test_claim_key_round_trips_a_255_character_lane_branch(empty_checkout: Path) -> None:
     branch = "docs/" + "a" * 248 + "/z"
     assert len(branch) == 255
 
@@ -4372,12 +4372,12 @@ def test_claim_key_round_trips_a_255_character_lane_branch() -> None:
 
     assert "/" not in key
     assert protocol.parse_claim_key(key) == protocol.LaneIdentity()
-    # The tree-entry name is one segment, safe for `hash-object`/`mktree`/`ls-tree`
-    # (`--missing`: this placeholder blob need not itself exist).
+    # One tree-entry segment for `hash-object`/`mktree`/`ls-tree`; `--missing`: no blob needed.
     entries = subprocess.run(
         ["git", "mktree", "--missing"],
         input=f"100644 blob {'0' * 40}\t{key}\n".encode(),
         check=False,
+        cwd=empty_checkout,
         capture_output=True,
     )
     assert entries.returncode == 0
