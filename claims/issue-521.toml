@@ -1,0 +1,8 @@
+claim_id = "d1dafdf52f1849899b6c68df78e29c2e"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "0dcd9968f130892192cb61360571cdae84ffdb23"
+branch = "claude/issue-521-tests-own-tmp-path"
+scope = ["quality/baseline.toml", "tests/conftest.py", "tests/support/cli_fixtures.py", "tests/test_checkout.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_session.py", "tests/test_store.py"]
+opened_commit = "b21c66b6875745700bfe8e715b15e3e73a0f4ecf"
+whole_reason = "Deleting the fake moves every test's working directory at once; the tests it leaves without a toplevel and the starting-checkout reads it exposes must change in the same commit for the suite to stay green."
