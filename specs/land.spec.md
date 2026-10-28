@@ -70,6 +70,7 @@ order `merge`, `squash`, `rebase`.
 | GitHub refuses the merge | LANDCMD-37 |
 | a step after the merge fails | LANDCMD-15, LANDCMD-16 |
 | this repository's own pull request | LANDCMD-17 |
+| a RELEASED ending | LANDCMD-54, LANDCMD-55 |
 | a pull request already merged (rerun) | LANDCMD-18 |
 | the head branch is no safe name, or a merged pull request comes from another repository | LANDCMD-50, LANDCMD-51, LANDCMD-52, LANDCMD-53 |
 | a rerun whose release already succeeded | LANDCMD-38 |
@@ -137,9 +138,11 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-26] LANDCMD-15's `<error>` is the failed step's own sentence (for `release`, the one `release --merged` would print, without `ERROR: `), display controls escaped as NEXT-37 shows them.
 - [ ] [LANDCMD-21] The fast-forward fetches the canonical remote `<remote>` once per run and moves `<branch>` to `<remote>/<branch>`; the delegated release walks that same ref.
 - [ ] [LANDCMD-16] Deleting the merged branch is idempotent: a forge already reporting it absent is success, not a refusal.
-- [ ] [LANDCMD-17] In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing further.
+- [ ] [LANDCMD-17] In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing after LANDCMD-54's line.
 - [ ] [LANDCMD-18] A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25 and 33, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
-- [ ] [LANDCMD-38] A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-17 line follows (see E-LANDCMD-18a).
+- [ ] [LANDCMD-38] A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-17 or LANDCMD-54 line follows (see E-LANDCMD-18a).
+- [ ] [LANDCMD-54] After a RELEASED ending, a trunk red at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)`, naming its first failed check; nothing when it is not red (E-LANDCMD-54).
+- [ ] [LANDCMD-55] A trunk check read that fails after the merge prints `trunk: unreadable at <sha7>: <error>` instead and keeps exit `0`; the merge and release stand.
 
 Accepted residual: a squash-landed local branch behind or ahead of the pull request's recorded
 head is no clean lane on it (REL-42, REL-43), so its worktree still reads `kept -- not merged into
@@ -419,6 +422,21 @@ $ aco land 57
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
+exit 0
+```
+
+### E-LANDCMD-54 — a red trunk is named after the release
+
+Setup: bare-remote, fake `gh`, the default branch's tip `9b09880` before the merge has the check
+`quality / verdict` concluded `failure`
+
+```console
+$ aco land 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+worktree: removed
+trunk: red at 9b09880: quality / verdict (failure)
 exit 0
 ```
 

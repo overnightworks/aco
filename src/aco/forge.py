@@ -234,8 +234,8 @@ CHECK_CONCLUSION_SUCCESS = "success"
 
 @dataclass(frozen=True)
 class CheckRun:
-    """One CI check GitHub reports against a pull request's pinned head
-    commit (`landing_readiness`): `conclusion` is `None` while
+    """One CI check GitHub reports against a commit (`commit_checks`):
+    `conclusion` is `None` while
     the check has not reached `status: "completed"`, GitHub's own
     conclusion string (`CHECK_CONCLUSION_SUCCESS` or another) once it has."""
 

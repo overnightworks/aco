@@ -36,10 +36,8 @@ from aco.workboard import IssueDependency, MergeMethod
 
 WORK_ITEM_ISSUE = 72
 LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"
-# A well-formed 40-hex sha: the merge commit a merged `Landing`
-# carries, matching `protocol.COMMIT_PATTERN` -- its own digits never mean
-# anything beyond "a plausible sha", so every scenario that just needs one
-# shares this instead of inventing a fresh, equally arbitrary string.
+# A well-formed 40-hex sha (`protocol.COMMIT_PATTERN`) for every scenario that
+# just needs one.
 MERGE_COMMIT_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
 
 
@@ -55,10 +53,8 @@ def landing_pull_request(
     merge_commit: str | None = None,
     title: str = "feat: land the lane",
 ) -> forge.Landing:
-    """`merge_commit` defaults to a shared, well-formed sha once `merged` is
-    true (a real merged pull request always carries one) and to `None`
-    otherwise; a test proving the merge commit's own authority
-    passes its own sha instead."""
+    """`merge_commit` defaults to a shared sha once `merged` is true and to
+    `None` otherwise."""
     return forge.Landing(
         number,
         author,
@@ -167,6 +163,9 @@ class FakeForge:
         default_factory=dict
     )
     readiness_reads: dict[int, int] = field(default_factory=dict)
+    commit_checks_by_sha: dict[str, tuple[forge.CheckRun, ...] | forge.ForgeError] = field(
+        default_factory=dict
+    )
     merge_calls: list[tuple[int, str, MergeMethod, str, str]] = field(default_factory=list)
     merge_requests: list[tuple[str, MergeMethod]] = field(default_factory=list)
     merge_error: forge.ForgeError | None = None
@@ -199,13 +198,10 @@ class FakeForge:
             self.requests += 1
 
     def create_issue(self, *, title: str, body: str, kind: body.ItemKind) -> int:
-        """This fake's mirror of `GitHubForge.create_issue`: a fresh issue
-        with no recorded parent, immediately visible to
-        `list_open_board_issues` -- the orphan shape a failed `link_child`
-        leaves behind. Carries `kind`, since a
-        repeat `cut`'s orphan scan refuses to adopt anything but a `TASK`.
-        `drop_created_issue_type` simulates GitHub silently dropping that
-        type: the issue exists untyped and the create raises."""
+        """This fake's mirror of `GitHubForge.create_issue`: a fresh issue with no
+        recorded parent, the orphan shape a failed `link_child` leaves behind.
+        `drop_created_issue_type` simulates GitHub dropping the type: the issue
+        exists untyped and the create raises."""
         number = self.next_created_child_number
         self.next_created_child_number += 1
         self.created_issues.append((title, body, kind))
@@ -222,11 +218,8 @@ class FakeForge:
 
     def link_child(self, parent: int, child: int) -> None:
         """This fake's mirror of `GitHubForge.link_child`: records `child` as
-        `parent`'s open sub-issue, so a later `list_children`/`parent_issue`
-        call sees it exactly as real GitHub would after the sub-issue POST
-        succeeds. `fail_create_child_relation` simulates that POST itself
-        failing, leaving `child` the orphan a repeat `cut` must adopt.
-        """
+        `parent`'s open sub-issue; `fail_create_child_relation` simulates the
+        POST failing, leaving `child` the orphan a repeat `cut` must adopt."""
         self.linked_children.append((parent, child))
         if self.fail_create_child_relation:
             raise protocol.ClaimError("relation POST failed (simulated)")
@@ -240,8 +233,7 @@ class FakeForge:
 
     def create_child(self, *, parent: int, title: str, body: str, kind: body.ItemKind) -> int:
         """This fake's mirror of `GitHubForge.create_child`: composed from
-        `create_issue` and `link_child` exactly as the real adapter is, so a relation failure
-        leaves the same real orphan behind for a repeat `cut` to find."""
+        `create_issue` and `link_child` as the real adapter is."""
         self.created_children.append((parent, title, body, kind))
         number = self.create_issue(title=title, body=body, kind=kind)
         try:
@@ -288,9 +280,7 @@ class FakeForge:
 
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
         """This fake's mirror of `GitHubForge.landing_readiness`: a test seeds
-        `readiness_by_number` directly, one
-        `forge.LandingReadiness` per scenario, rather than reconstructing it
-        from other fields."""
+        `readiness_by_number` directly."""
         self._run()
         readiness = self.readiness_by_number.get(number)
         if readiness is None:
@@ -301,6 +291,15 @@ class FakeForge:
         if reads > 0 and later:
             return later[min(reads - 1, len(later) - 1)]
         return readiness
+
+    def commit_checks(self, sha: str) -> tuple[forge.CheckRun, ...]:
+        """This fake's mirror of `GitHubForge.commit_checks`: scripted per sha,
+        no checks (or the scripted error) otherwise."""
+        self._run()
+        checks = self.commit_checks_by_sha.get(sha, ())
+        if isinstance(checks, forge.ForgeError):
+            raise checks
+        return checks
 
     def allowed_merge_methods(self) -> frozenset[MergeMethod] | None:
         """This fake's mirror of `GitHubForge.allowed_merge_methods`:
