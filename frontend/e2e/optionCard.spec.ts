@@ -100,7 +100,15 @@ function arrange(directory: string): void {
 			1843,
 			'Sprung zum Ursprungs-Take',
 			songCard(1),
-			optionLine(2, 'Eine Datenfrage mit einem endgültigen Weg.', {
+			line(3, 'Gäste dürfen am Gespräch teilnehmen.', {
+				question: 'Gäste einladen?',
+				default: 'yes'
+			})
+		),
+		row(
+			1844,
+			'Altdaten',
+			optionLine(1, 'Eine Datenfrage mit einem endgültigen Weg.', {
 				question: 'Welcher Weg für die Altdaten?',
 				problem: 'Die Altdaten passen nicht mehr.',
 				decision_kind: 'data_risk',
@@ -108,10 +116,6 @@ function arrange(directory: string): void {
 				recommended: 'B',
 				reason: 'Weg B ist der sichere.',
 				options: FOUR_OPTIONS
-			}),
-			line(3, 'Gäste dürfen am Gespräch teilnehmen.', {
-				question: 'Gäste einladen?',
-				default: 'yes'
 			})
 		),
 		row(

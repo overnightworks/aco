@@ -23,6 +23,8 @@ resolved directory's name.
 | an open line | ABRD-06 | ABRD-01, ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
+| an item with open option lines | ABRD-82 | ABRD-77 |
+| an item with two or more open option lines | ABRD-83, ABRD-84, ABRD-85 | ABRD-86, ABRD-87, ABRD-88, ABRD-89, ABRD-90, ABRD-91, ABRD-92 |
 | an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-39 (option) |
 | a withdrawn line | ABRD-60 | — |
 | an `option`, `other` or `unclear` posted for a line that is no option line | — | ABRD-40 |
@@ -72,56 +74,67 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 
 ## Reading the lines
 
-- [ ] [ABRD-06] Every page load reads `aco rulings --json` afresh, for every configured repo, and shows each line whose `ruling` is `null` as a card, in aco's own order within its repo; the board keeps no copy.
+- [ ] [ABRD-06] Each page load reads `aco rulings --json` anew per configured repo and shows each line whose `ruling` is `null` in aco's order, option lines as one card per item (ABRD-82); no copy is kept.
 - [ ] [ABRD-07] A yes/no line with a non-outcome `default` or `ruling`, a malformed option line (below, ABRD-62), a `form` but ABRD-60's, or a non-ISO `ruled_on` shows `aco rulings --json is unreadable: <detail>`.
 
 An option line is malformed when its `recommended` is no letter of its options, its `ruling` is neither such a letter nor `other`, its `other` is not non-blank text on a line ruled `other` or is neither absent nor `null` on any other, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
 ## Browser decision flow
 
-- [ ] [ABRD-28] The decision list groups open lines by repository under its name and open count; a row shows its state shape and an option line's topic, or a yes/no line's short question or sentence.
-- [ ] [ABRD-29] Within a repository, open option lines come before yes/no lines, each in aco's order. First load selects the first row; desktop shows its card, phones the list until a row is tapped.
+- [ ] [ABRD-28] The decision list groups open rows by repository under its name and count; a row shows its state shape and an option card's name (ABRD-82), or a yes/no line's short question or sentence.
+- [ ] [ABRD-29] Within a repository, option cards come before yes/no lines, each in aco's order. First load selects the first row; desktop shows its card, phones the list until a row is tapped.
 - [ ] [ABRD-30] Decided groups the ruled lines of open board items by repository under its name and count; a row shows the Decided shape and an option line's topic, or a yes/no line's short question or sentence.
 - [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending, missing dates last; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
 - [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided. A stored “Später” stays there and is not automatically presented again.
-- [ ] [ABRD-36] An open option line shows its card: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, question, Problem, Today, options A-D, Recommendation and Decide (ABRD-44).
+- [ ] [ABRD-36] A card with one open option line shows: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, question, Problem, Today, options A-D, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), else `not recorded`; then ` · ` and the ruling date as `DD.MM.YYYY` when known.
 - [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
 - [ ] [ABRD-38] Each option on an option card is a button that opens its Result (picture or `= TODAY`), You notice, Cost, Undo and Contract behind `Show`; opening one closes the other.
 - [ ] [ABRD-43] Each Today and Result picture on an option card is an `Enlarge picture` button opening it with its caption in a modal dialog; `Close` or `Esc` closes it and focus returns to the button.
-- [ ] [ABRD-44] An open option card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts `option` (ABRD-39); once stored, the card moves to Decided.
-- [ ] [ABRD-45] A refused pick shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide the picks behind `Neu laden`, and any other failure keeps them.
-- [ ] [ABRD-46] A pick on a `final` option first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` starts the undo window (ABRD-44).
-- [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` posts the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
-- [ ] [ABRD-58] A pick shows a strip above the card until its 8 s undo window ends: the Decided shape, `Decided: <letter> — <name> · <topic>` and `Undo`, in view while the card scrolls and atop a phone's list.
-- [ ] [ABRD-59] A pick moves focus to its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. A window that ends removes its strip, and ABRD-50 applies.
-- [ ] [ABRD-48] An option line's row carries the Open or With head (ABRD-61) shape; a yes/no line's the dashed Not ready shape in muted text. Each shape names its state; a row's title is its full question.
-- [ ] [ABRD-61] An open option line with `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option lines; its card shows `with head`. Decide stays.
+- [ ] [ABRD-44] A one-point card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts the card (ABRD-77); once stored, it moves to Decided.
+- [ ] [ABRD-45] A refused post shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide the picks and `Accept all` behind `Neu laden`, and any other failure keeps them.
+- [ ] [ABRD-46] A `final` pick first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` records it, and the window starts once every point is chosen (ABRD-87).
+- [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` keeps the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
+- [ ] [ABRD-58] A one-point card's pick shows a strip above it for its 8 s window: the Decided shape, `Decided: <letter> — <option> · <topic>` and `Undo`, in view as the card scrolls and atop a phone's list.
+- [ ] [ABRD-59] A pick that starts a window focuses its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. An ended window removes its strip; ABRD-50 applies.
+- [ ] [ABRD-48] Option card rows carry the Open or With head (ABRD-61) shape, yes/no rows the dashed Not ready one in muted text; each shape names its state, each row's title is its question or name (ABRD-82).
+- [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
-- [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option line, else to its first row; a card selected meanwhile stays (ABRD-32).
+- [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board` and the tabs `Open n` and `Decided n`: n counts the open list's rows and the ruled lines Decided lists.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
-- [ ] [ABRD-63] An open option card's Decide row ends with `Other…`, beside the picks; it opens a panel with one textarea (`Your answer`, at most 280 characters, focused) and `Send`, disabled while blank.
+- [ ] [ABRD-63] An open option card's Decide row ends in `Other…`, beside the picks or `Accept all`; it opens a panel with a textarea (`Your answer`, up to 280 characters, focused) and `Send`, disabled while blank.
 - [ ] [ABRD-64] An `other` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --other=<T> --via board --card-hash=<H> --json`, `<T>` the trimmed answer, `<H>` as ABRD-39 (E-ABRD-13).
-- [ ] [ABRD-65] `Other…` and `Send` hide with the picks (ABRD-45), disable while a decision on the card waits and ignore clicks while the board reloads, so a pick and an Other never both post.
+- [ ] [ABRD-65] `Other…` and `Send` hide with the picks and `Accept all` (ABRD-45), disable while a decision on the card waits and ignore clicks while the board reloads, so a pick and an Other never both post.
 - [ ] [ABRD-66] The typed answer is kept per card: closing the panel, switching cards, `Undo` and a failed post keep it; `Undo` reopens the panel with it, and a stored decision drops it.
-- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Decided: Other · <topic>` and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
+- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Decided: Other · <name>` (ABRD-82) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
 - [ ] [ABRD-68] `Send` posts the card as shown when the panel opened, so a card changed since is refused (ABRD-02); the answer stays in the draft.
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
 - [ ] [ABRD-70] An `unclear` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --unclear [--note=<T>] --card-hash=<H> --json`, no `--via`, `<T>` the trimmed note (E-ABRD-14).
 - [ ] [ABRD-71] An `unclear` aco stores answers 200 `{"status": "returned", "message": null}`: the line stays open, with its head; only a stored `option` or `other` answers `ruled`.
 - [ ] [ABRD-72] An open option card's Decide row ends with `Other…` and `Unclear`; a card with its head (ABRD-61) shows no `Unclear` and no Unclear panel, and keeps its picks and `Other…`.
 - [ ] [ABRD-73] `Unclear` opens the panel with one focused textarea (`What is unclear? (optional)`, at most 280 characters) and `Send`, enabled while blank; it closes `Other…`'s panel; each keeps its draft.
-- [ ] [ABRD-74] `Send` closes the panel and starts the undo window with a grey strip: the With head shape, `With head: <topic>` and `Undo` (ABRD-59); `Undo` posts nothing and reopens the panel with the note.
-- [ ] [ABRD-75] After the window it posts `unclear` with the trimmed note, none if blank (ABRD-70); `Unclear` locks, and the card is posted and refused as ABRD-65, ABRD-66 and ABRD-68 say for `Other…`.
+- [ ] [ABRD-74] `Send` closes the panel and starts the window with a grey strip: the With head shape, `With head: <name>` (ABRD-82) and `Undo` (ABRD-59); `Undo` posts nothing and reopens the panel with the note.
+- [ ] [ABRD-75] After the window it posts the card with `unclear` and the trimmed note, none if blank (ABRD-77); `Unclear` locks, and posting and refusal follow ABRD-65, ABRD-66 and ABRD-68 for `Other…`.
 - [ ] [ABRD-76] Once the post answers `returned` (ABRD-71), the stage moves to the list's first Open row, else stays on the card, now with its head; a card selected meanwhile stays (ABRD-32).
+- [ ] [ABRD-82] An item's open option lines (its points) are one card with one Open row and one name: a one-point card's topic, else `<area> · <n> points`, distinct areas joined by ` / ` in point order.
+- [ ] [ABRD-83] A card of two or more points has its name as title and no Problem; its meta reads `<repo> › ` with ABRD-82's areas, its distinct kinds, `with head` (ABRD-61), `final` or `reversible`.
+- [ ] [ABRD-84] Its points are rows in aco's order: `<k>`, the question, a warn mark when an option is `final`, one pick per option (the recommended one in the accent); no point is open at first.
+- [ ] [ABRD-85] Activating a point's question opens its Problem, Today, Options and Recommendation as on a one-point card and closes any other point; activating it again closes it.
+- [ ] [ABRD-86] A pick marks its point chosen (`aria-pressed`) and posts nothing; the Decide row reads `<c> of <n> chosen` on desktop; a pick on the open point opens the first unchosen point instead.
+- [ ] [ABRD-87] Once every point is chosen, the undo window starts with one strip `Decided: 1A 2B … · <name>` and `Undo`, which posts nothing and clears the picks; then the card posts every pick (ABRD-77).
+- [ ] [ABRD-88] A point's pick on a `final` option first asks as ABRD-46, its line reading `Point <k>: <consequence>`; `Cancel` leaves the point as it was.
+- [ ] [ABRD-89] `Accept all` leads a card of points' Decide row, in the accent: it picks each recommended letter, replacing earlier picks, and starts ABRD-87's window, after ABRD-90's confirm where one applies.
+- [ ] [ABRD-90] When a recommended option is `final`, `Accept all` first asks `Accept all recommendations?` with `Point <k>: <consequence>` per such point, focus on `Cancel`; `Cancel` or `Esc` posts nothing.
+- [ ] [ABRD-91] Picks keep their points as shown and the post names those fingerprints, so a point changed, added or ruled since is refused (ABRD-79, ABRD-80); a re-read drops a changed point's pick.
+- [ ] [ABRD-92] `Other…` and `Unclear` answer a card of points with one text: strips `Decided: Other · <name>` and `With head: <name>`; each posts every point of the card (ABRD-77).
 - [ ] [ABRD-52] An option card's Decide row sticks to the pane's foot while the card runs on beneath it and then casts a shadow over that content; at the card's end it rests in place without one.
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`,
-`frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`,
+`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`,
 `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 

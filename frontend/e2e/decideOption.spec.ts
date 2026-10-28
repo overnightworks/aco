@@ -70,11 +70,11 @@ function songCard(overrides: Partial<OptionRulingLine> = {}): OptionRulingLine {
 
 function arrange(directory: string, song: Partial<OptionRulingLine> = {}): void {
 	writeRulings(directory, [
+		row(2001, 'Sprung', songCard(song)),
 		row(
-			2001,
-			'Sprung',
-			songCard(song),
-			optionLine(2, 'Eine zweite offene Frage.', {
+			2002,
+			'Altdaten',
+			optionLine(1, 'Eine zweite offene Frage.', {
 				question: OTHER_QUESTION,
 				recommended: 'B',
 				options: SONG_OPTIONS
@@ -297,7 +297,7 @@ for (const viewport of [
 			arrange(repoDirectory);
 			const posted: string[] = [];
 			page.on('request', (request) => {
-				if (request.method() === 'POST') posted.push(request.postDataJSON().option);
+				if (request.method() === 'POST') posted.push(request.postDataJSON().lines[0].option);
 			});
 			await open(page, phone);
 

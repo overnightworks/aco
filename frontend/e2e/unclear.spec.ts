@@ -38,17 +38,21 @@ function arrange(directory: string, withSecondCard: boolean): void {
 				area: 'Song-Seite',
 				topic: 'Sprung',
 				options: OPTIONS
-			}),
-			...(withSecondCard
-				? [
-						optionLine(2, 'Eine zweite offene Frage.', {
+			})
+		),
+		...(withSecondCard
+			? [
+					row(
+						2003,
+						'Altdaten',
+						optionLine(1, 'Eine zweite offene Frage.', {
 							question: OTHER_QUESTION,
 							topic: 'Altdaten',
 							options: OPTIONS
 						})
-					]
-				: [])
-		)
+					)
+				]
+			: [])
 	]);
 }
 

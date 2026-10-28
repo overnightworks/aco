@@ -1,33 +1,41 @@
 /**
  * Owns the 8 s undo window and the one write it allows: a chosen outcome
  * waits here, cancellable, until `UNDO_SECONDS` elapse, then becomes exactly
- * one `POST /api/rule`. `Stage.svelte` reads whether a line is mid-undo or
+ * one `POST /api/rule`. An option card is decided as a whole: the store holds
+ * its picks and its open point, and starts the window once every point is
+ * chosen. `Stage.svelte` reads whether a card or line is mid-undo or
  * refused; `App.svelte` renders one `UndoStrip` per still-pending entry.
  * `reload` is `BoardStore.load` (`board.svelte.ts`): the one source of
  * truth this re-reads from after a write, rather than mutating a copy.
  */
 
+import { untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import { postDecision } from '../../client';
-import type { CardOption, DecisionRequest, OptionLine, Outcome, YesNoLine } from '../../types';
-import { cardHeading, outcomeLabel, type StripState } from '../model/boardSummary';
+import type { DecisionRequest, OptionLine, Outcome, RepoReading, YesNoLine } from '../../types';
+import { cardHeading, findSelection, outcomeLabel, type StripState } from '../model/boardSummary';
+import {
+	cardName,
+	livePicks,
+	nextOpenAfterPick,
+	pickedText,
+	recommendedPicks,
+	withPick,
+	type Pick
+} from '../model/card';
 import {
 	BOARD_UNREACHABLE_MESSAGE,
+	cardKey,
+	cardOtherRequest,
+	cardPicksRequest,
+	cardUnclearRequest,
 	decisionRequest,
 	lineKey,
-	optionDecisionRequest,
-	otherDecisionRequest,
 	readDecisionResult,
 	UNDO_SECONDS,
-	unclearDecisionRequest,
 	type DecisionOutcome
 } from '../model/decision';
-import {
-	pendingOptionText,
-	pendingOtherText,
-	type EscapeKind,
-	type EscapePanel
-} from '../model/optionCard';
+import { nextOpen, pendingOtherText, type EscapeKind, type EscapePanel } from '../model/optionCard';
 
 export interface DecisionBanner {
 	kind: 'already-ruled' | 'changed' | 'failed';
@@ -59,6 +67,18 @@ function draftKey(key: string, kind: EscapeKind): string {
 	return `${kind}:${key}`;
 }
 
+/** The picks of a card the reading does not show: gone for good when its repo was
+ * read without error (the card is ruled or removed), kept while that repo is unavailable. */
+function unreadPicks(repos: RepoReading[], key: string, picks: Pick[]): Pick[] {
+	const repoWasRead = repos.some(
+		(reading) =>
+			reading.error === null &&
+			key.startsWith(`${reading.name}:`) &&
+			/^\d+:card$/.test(key.slice(reading.name.length + 1))
+	);
+	return repoWasRead ? [] : picks;
+}
+
 function withoutKey<Value>(record: Record<string, Value>, key: string): Record<string, Value> {
 	return Object.fromEntries(Object.entries(record).filter(([entryKey]) => entryKey !== key));
 }
@@ -78,6 +98,10 @@ export class DecisionStore {
 	#drafts: Record<string, string> = $state({});
 	/** The one open escape panel per card, with the card as shown when it opened. */
 	#panels: Record<string, EscapePanel> = $state({});
+	/** The picks made per card, each with its point as shown when picked. */
+	#picks: Record<string, Pick[]> = $state({});
+	/** The one open point per card, by line index; none until one is activated. */
+	#openPoints: Record<string, number | null> = $state({});
 
 	constructor(
 		private readonly token: string,
@@ -146,37 +170,97 @@ export class DecisionStore {
 		);
 	}
 
-	/** The same window for the letter picked on an option card. */
-	decideOption(repo: string, item: number, line: OptionLine, option: CardOption): void {
-		this.#startUndoWindow(
-			lineKey(repo, item, line),
-			optionDecisionRequest(repo, item, line, option),
-			pendingOptionText(line, option),
-			'done'
+	/** The picks that still count for the card's points as shown now. */
+	picks(key: string, points: readonly OptionLine[]): Pick[] {
+		return livePicks(this.#picks[key] ?? [], points);
+	}
+
+	/** Drops, for good, the picks of every shown card whose point changed or closed:
+	 * a point that later returns to its old fingerprint does not revive its pick. */
+	reconcilePicks(repos: RepoReading[]): void {
+		const stored = untrack(() => this.#picks);
+		const kept: Record<string, Pick[]> = {};
+		let dropped = false;
+		for (const [key, picks] of Object.entries(stored)) {
+			const selection = findSelection(repos, key);
+			const live =
+				selection?.kind === 'card'
+					? livePicks(picks, selection.points)
+					: unreadPicks(repos, key, picks);
+			dropped ||= live.length !== picks.length;
+			kept[key] = live;
+		}
+		if (dropped) {
+			this.#picks = kept;
+		}
+	}
+
+	/** The line index of the card's open point, or null while none is open. */
+	openPoint(key: string): number | null {
+		return this.#openPoints[key] ?? null;
+	}
+
+	/** Activating a point opens it and closes any other; activating it again closes it. */
+	togglePoint(key: string, index: number): void {
+		this.#openPoints = { ...this.#openPoints, [key]: nextOpen(this.openPoint(key), index) };
+	}
+
+	/** Records a pick; once every point is chosen the undo window starts for the card. */
+	choose(repo: string, item: number, points: readonly OptionLine[], pick: Pick): void {
+		const key = cardKey(repo, item);
+		this.#picks = { ...this.#picks, [key]: withPick(this.#picks[key] ?? [], pick) };
+		const open = nextOpenAfterPick(
+			this.openPoint(key),
+			points,
+			this.picks(key, points),
+			pick.shown
 		);
+		this.#openPoints = { ...this.#openPoints, [key]: open };
+		this.#decideWhenComplete(repo, item, points);
+	}
+
+	/** Every point picks its recommended option, replacing earlier picks. */
+	acceptAll(repo: string, item: number, points: readonly OptionLine[]): void {
+		const key = cardKey(repo, item);
+		this.#picks = { ...this.#picks, [key]: recommendedPicks(points) };
+		this.#openPoints = { ...this.#openPoints, [key]: null };
+		this.#decideWhenComplete(repo, item, points);
+	}
+
+	#decideWhenComplete(repo: string, item: number, points: readonly OptionLine[]): void {
+		const key = cardKey(repo, item);
+		const picks = this.picks(key, points);
+		if (picks.length === points.length) {
+			this.#startUndoWindow(
+				key,
+				cardPicksRequest(repo, item, picks),
+				pickedText(points, picks),
+				'done'
+			);
+		}
 	}
 
 	/** The same window for the operator's own answer; the panel closes and the draft stays. */
-	decideOther(repo: string, item: number, shown: OptionLine, answer: string): void {
-		const key = lineKey(repo, item, shown);
+	decideOther(repo: string, item: number, shown: readonly OptionLine[], answer: string): void {
+		const key = cardKey(repo, item);
 		this.closePanel(key);
 		this.#startUndoWindow(
 			key,
-			otherDecisionRequest(repo, item, shown, answer),
-			pendingOtherText(shown),
+			cardOtherRequest(repo, item, shown, answer),
+			pendingOtherText(cardName(shown)),
 			'done',
 			{ kind: 'other', shown }
 		);
 	}
 
 	/** The same window for sending the card back to its head; the note may be blank. */
-	decideUnclear(repo: string, item: number, shown: OptionLine, note: string): void {
-		const key = lineKey(repo, item, shown);
+	decideUnclear(repo: string, item: number, shown: readonly OptionLine[], note: string): void {
+		const key = cardKey(repo, item);
 		this.closePanel(key);
 		this.#startUndoWindow(
 			key,
-			unclearDecisionRequest(repo, item, shown, note),
-			shown.topic,
+			cardUnclearRequest(repo, item, shown, note),
+			cardName(shown),
 			'back',
 			{ kind: 'unclear', shown }
 		);
@@ -194,7 +278,8 @@ export class DecisionStore {
 		this.#pending = { ...this.#pending, [key]: { request, message, state, timer, reopens } };
 	}
 
-	/** Cancels a still-pending decision; a no-op once it already wrote or was undone. */
+	/** Cancels a still-pending decision; a no-op once it already wrote or was undone.
+	 * Undoing a card's picks clears them; undoing an escape answer reopens its panel. */
 	undo(key: string): void {
 		const entry = this.#pending[key];
 		if (entry === undefined) {
@@ -202,12 +287,15 @@ export class DecisionStore {
 		}
 		clearTimeout(entry.timer);
 		this.#pending = withoutKey(this.#pending, key);
-		if (entry.reopens !== null) {
+		if (entry.reopens === null) {
+			this.#picks = withoutKey(this.#picks, key);
+		} else {
 			this.openPanel(key, entry.reopens);
 		}
 	}
 
-	/** The operator's own "Neu laden" after a refusal: drop it and re-read afresh. */
+	/** The operator's own "Neu laden" after a refusal: drop it and re-read; the
+	 * picks of unchanged points stay, those of changed points go with the re-read. */
 	async reloadAfterBanner(key: string): Promise<void> {
 		this.#banners = withoutKey(this.#banners, key);
 		await this.reload();
@@ -222,6 +310,7 @@ export class DecisionStore {
 			outcome = { kind: 'failed', message: BOARD_UNREACHABLE_MESSAGE };
 		}
 		if (outcome.kind === 'ruled') {
+			this.#picks = withoutKey(this.#picks, key);
 			this.#dropDrafts(key, ['other', 'unclear']);
 			await this.reload();
 			this.#justRuled = key;

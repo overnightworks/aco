@@ -4,15 +4,21 @@ import type { CardOption, DecisionKind } from '../../types';
 import {
 	cardMeta,
 	chosenOption,
+	GROUP_LABEL,
+	hasFinalOption,
+	hasHead,
 	CONTRACT_SUMMARY,
 	contractTexts,
 	decidedText,
 	isOptionLine,
 	isStuck,
+	joinedAreas,
 	KIND_LABEL,
-	nextOpenOption,
+	nextOpen,
 	pendingOtherText,
-	type OpenOption,
+	pointsMeta,
+	pointGroupLabel,
+	pointPrefix,
 	resultAltText,
 	ROW_LABEL,
 	SAME_AS_TODAY_MARK,
@@ -59,6 +65,45 @@ describe('cardMeta', () => {
 	});
 });
 
+test('[ABRD-84] a point warns when one of its options cannot be taken back', () => {
+	const final = optionLine({ options: [cardOption(), cardOption({ letter: 'B', undo: 'final' })] });
+
+	expect([hasFinalOption(final), hasFinalOption(optionLine())]).toEqual([true, false]);
+});
+
+test('[ABRD-61] a card is with its head while any of its points is', () => {
+	const open = optionLine();
+	const back = optionLine({ returned_on: '2026-10-27' });
+
+	expect([hasHead([open]), hasHead([open, back]), hasHead([back])]).toEqual([false, true, true]);
+});
+
+describe('pointsMeta', () => {
+	test('[ABRD-83] joins the areas, the distinct kinds in point order and names final if any option of any point is', () => {
+		const points = [
+			optionLine({ area: 'Song-Seite', decision_kind: 'product' }),
+			optionLine({ area: 'Bibliothek', decision_kind: 'technical' }),
+			optionLine({
+				area: 'Song-Seite',
+				decision_kind: 'product',
+				options: [cardOption({ undo: 'final' })]
+			})
+		];
+
+		expect(pointsMeta('songmaker', points)).toEqual({
+			where: 'songmaker › Song-Seite / Bibliothek',
+			kind: 'Product / Technical',
+			undo: 'final'
+		});
+	});
+
+	test('[ABRD-83] says with head as soon as one point is', () => {
+		const points = [optionLine(), optionLine({ returned_on: '2026-10-27' })];
+
+		expect(pointsMeta('songmaker', points).withHead).toBe(true);
+	});
+});
+
 describe('the chosen option', () => {
 	const ruled = optionLine({
 		ruling: 'B',
@@ -79,8 +124,37 @@ describe('the chosen option', () => {
 	});
 });
 
-test('[ABRD-67] the strip text of an Other answer names Other and the topic', () => {
-	expect(pendingOtherText(optionLine({ topic: 'Jump' }))).toBe('Other · Jump');
+test('[ABRD-67] the strip text of an Other answer names Other and the card’s name', () => {
+	expect(pendingOtherText('Song-Seite · 3 points')).toBe('Other · Song-Seite · 3 points');
+});
+
+describe('the words of a card of points', () => {
+	test('[ABRD-84] the point rows, the count and Accept all have their one owner', () => {
+		expect([
+			GROUP_LABEL.points,
+			GROUP_LABEL.count,
+			GROUP_LABEL.acceptAll,
+			GROUP_LABEL.acceptAllName,
+			GROUP_LABEL.acceptAllTitle
+		]).toEqual([
+			'Points',
+			'points',
+			'Accept all',
+			'Accept all recommendations',
+			'Accept all recommendations?'
+		]);
+	});
+
+	test('[ABRD-88] a point’s line in a confirm starts with its number', () => {
+		expect(pointPrefix(2)).toBe('Point 2: ');
+		expect(pointGroupLabel(2)).toBe('Point 2');
+	});
+
+	test('[ABRD-82] areas join in point order with a slash, each once', () => {
+		const areas = ['Song-Seite', 'Bibliothek', 'Song-Seite'];
+
+		expect(joinedAreas(areas.map((area) => optionLine({ area })))).toBe('Song-Seite / Bibliothek');
+	});
 });
 
 test('only a line carrying form options is an option line', () => {
@@ -142,13 +216,15 @@ describe('the detail rows of an option', () => {
 	});
 });
 
-describe('nextOpenOption', () => {
-	test.each<[string, OpenOption, CardOption['letter'], OpenOption]>([
+describe('nextOpen', () => {
+	test.each<[string, string | number | null, string | number, string | number | null]>([
 		['opens a closed option', null, 'A', 'A'],
 		['switches from one option to another', 'A', 'B', 'B'],
-		['closes the open option', 'B', 'B', null]
-	])('%s', (_name, open, letter, expected) => {
-		expect(nextOpenOption(open, letter)).toBe(expected);
+		['closes the open option', 'B', 'B', null],
+		['opens a closed point', null, 3, 3],
+		['closes the open point', 3, 3, null]
+	])('[ABRD-85] %s', (_name, open, id, expected) => {
+		expect(nextOpen(open, id)).toBe(expected);
 	});
 });
 

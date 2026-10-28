@@ -4,10 +4,9 @@ import { cardOption, optionLine } from '../../test-support/board';
 import type { DecisionResult } from '../../types';
 import {
 	ALREADY_RULED_MESSAGE,
+	cardKey,
 	LINE_CHANGED_MESSAGE,
-	UNDO_SECONDS,
-	lineKey,
-	optionDecisionRequest
+	UNDO_SECONDS
 } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
 
@@ -19,7 +18,8 @@ const card = optionLine({
 	topic: 'Jump',
 	options: [optionA, optionB]
 });
-const key = lineKey('repo', 42, card);
+const key = cardKey('repo', 42);
+const points = [card];
 
 function sender(result: DecisionResult): typeof postDecision {
 	return vi.fn(async () => result) as unknown as typeof postDecision;
@@ -33,7 +33,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-test('[ABRD-44] a pick sends nothing before the window ends, then exactly the picked letter', async () => {
+test('[ABRD-44] a one-point card’s pick sends nothing before the window ends, then exactly the card with the picked letter', async () => {
 	const send = sender({ status: 'ruled', message: null });
 	const store = new DecisionStore(
 		'token',
@@ -41,13 +41,17 @@ test('[ABRD-44] a pick sends nothing before the window ends, then exactly the pi
 		send
 	);
 
-	store.decideOption('repo', 42, card, optionB);
+	store.choose('repo', 42, points, { shown: card, option: optionB });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000 - 1);
 	expect(send).not.toHaveBeenCalled();
 	await vi.advanceTimersByTimeAsync(1);
 
 	expect(send).toHaveBeenCalledTimes(1);
-	expect(send).toHaveBeenCalledWith('token', optionDecisionRequest('repo', 42, card, optionB));
+	expect(send).toHaveBeenCalledWith('token', {
+		repo: 'repo',
+		item: 42,
+		lines: [{ line: 3, fingerprint: 'fp-option', option: 'B' }]
+	});
 });
 
 test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is no longer pending', async () => {
@@ -55,7 +59,7 @@ test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is 
 	const reload = vi.fn(async () => {});
 	const store = new DecisionStore('token', reload, send);
 
-	store.decideOption('repo', 42, card, optionA);
+	store.choose('repo', 42, points, { shown: card, option: optionA });
 	expect(store.isPending(key)).toBe(true);
 	store.undo(key);
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -69,7 +73,7 @@ test('[ABRD-44] a stored pick reloads the board and names the card as just ruled
 	const reload = vi.fn(async () => {});
 	const store = new DecisionStore('token', reload, sender({ status: 'ruled', message: null }));
 
-	store.decideOption('repo', 42, card, optionA);
+	store.choose('repo', 42, points, { shown: card, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(reload).toHaveBeenCalledTimes(1);
@@ -91,7 +95,7 @@ test.each([
 		sender(result)
 	);
 
-	store.decideOption('repo', 42, card, optionA);
+	store.choose('repo', 42, points, { shown: card, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(store.banner(key)).toEqual({ kind, message });
@@ -105,7 +109,7 @@ test('[ABRD-44] a pending pick names its letter, option and topic for the strip'
 		sender({ status: 'ruled', message: null })
 	);
 
-	store.decideOption('repo', 42, card, optionB);
+	store.choose('repo', 42, points, { shown: card, option: optionB });
 
 	expect(store.pendingEntries).toEqual([{ key, message: 'B — As today · Jump', state: 'done' }]);
 });

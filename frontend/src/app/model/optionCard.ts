@@ -50,6 +50,8 @@ export function isOptionLine(line: ExpectationLine): line is OptionLine {
 	return 'form' in line;
 }
 
+const JOIN_SEPARATOR = ' / ';
+
 /** What the frame's meta line shows; a card without a kind or an undo token
  * leaves it out. */
 export interface FrameMeta {
@@ -65,15 +67,37 @@ export interface CardMeta extends FrameMeta {
 	undo: Undo;
 }
 
-/** The meta line above the card: where the decision lives, what kind it is,
- * and whether any answer cannot be taken back. */
-export function cardMeta(repo: string, line: OptionLine): CardMeta {
+/** Whether any option of the point cannot be taken back. */
+export function hasFinalOption(point: OptionLine): boolean {
+	return point.options.some((option) => option.undo === 'final');
+}
+
+/** A card is with its head while any of its points is (ABRD-61). */
+export function hasHead(points: readonly OptionLine[]): boolean {
+	return points.some((point) => point.returned_on !== null);
+}
+
+/** The areas of a card's points, each once, in point order, joined by a slash
+ * (the middle dot already separates a card's name from its count). */
+export function joinedAreas(points: readonly OptionLine[]): string {
+	return [...new Set(points.map((point) => point.area))].join(JOIN_SEPARATOR);
+}
+
+/** The meta line above a card: where its decisions live, what kinds they are,
+ * whether any point is with its head, and whether any answer cannot be taken back. */
+export function pointsMeta(repo: string, points: readonly OptionLine[]): CardMeta {
+	const kinds = [...new Set(points.map((point) => KIND_LABEL[point.decision_kind]))];
 	return {
-		where: `${repo} › ${line.area}`,
-		kind: KIND_LABEL[line.decision_kind],
-		...(line.returned_on !== null && { withHead: true as const }),
-		undo: line.options.some((option) => option.undo === 'final') ? 'final' : 'reversible'
+		where: `${repo} › ${joinedAreas(points)}`,
+		kind: kinds.join(JOIN_SEPARATOR),
+		...(hasHead(points) && { withHead: true as const }),
+		undo: points.some(hasFinalOption) ? 'final' : 'reversible'
 	};
+}
+
+/** The meta line above one option line. */
+export function cardMeta(repo: string, line: OptionLine): CardMeta {
+	return pointsMeta(repo, [line]);
 }
 
 /** The option a ruled line chose; `undefined` while the line is open. */
@@ -120,18 +144,13 @@ export function consequenceText(option: CardOption): string {
 	return option.undo_how.charAt(0).toUpperCase() + option.undo_how.slice(1);
 }
 
-/** The strip text of a pick waiting out the undo window. */
-export function pendingOptionText(line: OptionLine, option: CardOption): string {
-	return `${decidedText(option)} · ${line.topic}`;
-}
-
 export type EscapeKind = 'other' | 'unclear';
 
-/** The escape row's open panel: its kind, and the card as shown when it opened
- * -- the card `Send` posts. */
+/** The escape row's open panel: its kind, and the card's points as shown when
+ * it opened -- the card `Send` posts. */
 export interface EscapePanel {
 	kind: EscapeKind;
-	shown: OptionLine;
+	shown: readonly OptionLine[];
 }
 
 export const ESCAPE_LABEL = {
@@ -150,8 +169,37 @@ export function sendsBlank(kind: EscapeKind): boolean {
 }
 
 /** The strip text of an Other answer waiting out the undo window. */
-export function pendingOtherText(line: OptionLine): string {
-	return `Other · ${line.topic}`;
+export function pendingOtherText(cardName: string): string {
+	return `Other · ${cardName}`;
+}
+
+/** The words only a card of points has: its rows, its count and Accept all. */
+export const GROUP_LABEL = {
+	points: 'Points',
+	count: 'points',
+	acceptAll: 'Accept all',
+	acceptAllName: 'Accept all recommendations',
+	acceptAllTitle: 'Accept all recommendations?'
+} as const;
+
+/** `1 of 3 chosen`. */
+export function chosenText(chosen: number, total: number): string {
+	return `${chosen} of ${total} chosen`;
+}
+
+/** The start of a point's line in a confirm: `Point 2: `. */
+export function pointPrefix(number: number): string {
+	return `Point ${number}: `;
+}
+
+/** A point's pick is named by the point, its letter and the option. */
+export function pointPickLabel(number: number, option: CardOption): string {
+	return `Point ${number}: ${option.letter} – ${option.name}`;
+}
+
+/** The name of the group of picks of point `number`. */
+export function pointGroupLabel(number: number): string {
+	return `Point ${number}`;
 }
 
 export const SAME_AS_TODAY_MARK = '= TODAY';
@@ -161,10 +209,10 @@ export const UNDO_SEPARATOR = ' — ';
 /** The letter of the one option that is open on a card, or none. */
 export type OpenOption = CardOption['letter'] | null;
 
-/** Activating an option opens it and closes any other; activating the open
- * one closes it. */
-export function nextOpenOption(open: OpenOption, letter: CardOption['letter']): OpenOption {
-	return open === letter ? null : letter;
+/** Activating an option or a point opens it and closes any other; activating
+ * the open one closes it. */
+export function nextOpen<Id extends string | number>(open: Id | null, id: Id): Id | null {
+	return open === id ? null : id;
 }
 
 /** An option's RESULT alt text: its caption, else the picture's own

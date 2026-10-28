@@ -54,8 +54,12 @@ function arrange(
 				options: OPTIONS,
 				...(withHead ? { returned_on: '2026-10-27', returned_note: 'Warum?' } : {}),
 				...overrides
-			}),
-			optionLine(2, 'Eine zweite offene Frage.', {
+			})
+		),
+		row(
+			2003,
+			'Altdaten',
+			optionLine(1, 'Eine zweite offene Frage.', {
 				question: OTHER_QUESTION,
 				topic: 'Altdaten',
 				options: OPTIONS

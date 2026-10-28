@@ -1,45 +1,55 @@
 <script lang="ts">
 	import { tick, type ComponentProps } from 'svelte';
 	import {
-		asksToConfirm,
+		acceptAllConfirmation,
+		confirmationFor,
+		type Confirmation,
+		type Pick
+	} from '../app/model/card';
+	import {
 		CONFIRM_LABEL,
-		confirmTitle,
-		confirmVerb,
-		consequenceText,
+		chosenText,
+		GROUP_LABEL,
 		isStuck,
 		pickLabel,
 		ROW_LABEL
 	} from '../app/model/optionCard';
 	import { locksCard, type DecisionBanner } from '../app/state/decision.svelte';
-	import type { CardOption, OptionLine } from '../types';
+	import type { OptionLine } from '../types';
 	import EscapeRow from './EscapeRow.svelte';
 	import RefusalBanner from './RefusalBanner.svelte';
 	import WarnMark from './WarnMark.svelte';
 
 	let {
-		line,
+		points,
+		chosen,
 		pending,
 		refreshing,
 		banner,
-		onDecide,
+		onPick,
+		onAcceptAll,
 		onReload,
 		escapes
 	}: {
-		line: OptionLine;
+		/** The card's points as shown now. */
+		points: readonly OptionLine[];
+		/** How many of the points have a live pick. */
+		chosen: number;
 		pending: boolean;
 		refreshing: boolean;
 		banner: DecisionBanner | null;
-		onDecide: (line: OptionLine, option: CardOption) => void;
+		onPick: (shown: readonly OptionLine[], pick: Pick) => void;
+		onAcceptAll: (shown: readonly OptionLine[]) => void;
 		onReload: () => void;
 		/** The escapes (Other…, Unclear) and their panel; absent where the card offers none. */
-		escapes?: Omit<ComponentProps<typeof EscapeRow>, 'line' | 'pending' | 'refreshing'>;
+		escapes?: Omit<ComponentProps<typeof EscapeRow>, 'points' | 'pending' | 'refreshing'>;
 	} = $props();
 
 	const titleId = $props.id();
 	let dialog: HTMLDialogElement | undefined = $state();
 	// The card as shown when the confirm opened: a reload under the open
-	// dialog must not change what `Decide <X>` posts.
-	let confirming: { line: OptionLine; option: CardOption } | null = $state(null);
+	// dialog must not change what the confirmed verb posts.
+	let confirming: { confirmation: Confirmation; confirmed: () => void } | null = $state(null);
 
 	let row: HTMLDivElement | undefined = $state();
 	let stuck = $state(false);
@@ -79,20 +89,39 @@
 		};
 	});
 
-	async function pick(option: CardOption) {
-		if (refreshing) return;
-		if (!asksToConfirm(option)) {
-			onDecide(line, option);
-			return;
-		}
-		confirming = { line, option };
+	async function ask(confirmation: Confirmation, confirmed: () => void) {
+		confirming = { confirmation, confirmed };
 		await tick();
 		dialog?.showModal();
 	}
 
-	function decideConfirmed(shown: { line: OptionLine; option: CardOption }) {
+	/** A pick of the card, from this row or from a point's row: asks first when
+	 * the option cannot be taken back. */
+	export async function choose(pick: Pick) {
+		if (refreshing) return;
+		const shown = points;
+		const confirmation = confirmationFor(shown, pick);
+		if (confirmation === null) {
+			onPick(shown, pick);
+			return;
+		}
+		await ask(confirmation, () => onPick(shown, pick));
+	}
+
+	async function acceptAll() {
+		if (refreshing) return;
+		const shown = points;
+		const confirmation = acceptAllConfirmation(shown);
+		if (confirmation === null) {
+			onAcceptAll(shown);
+			return;
+		}
+		await ask(confirmation, () => onAcceptAll(shown));
+	}
+
+	function decideConfirmed(shown: { confirmed: () => void }) {
 		dialog?.close();
-		onDecide(shown.line, shown.option);
+		shown.confirmed();
 	}
 </script>
 
@@ -104,23 +133,39 @@
 		{/if}
 		{#if !locksCard(banner)}
 			<div class="bar">
-				<div class="picks" role="group" aria-label={ROW_LABEL.decide}>
-					{#each line.options as option (option.letter)}
-						<button
-							type="button"
-							class="pick"
-							class:recommended={option.letter === line.recommended}
-							disabled={pending}
-							aria-disabled={refreshing}
-							aria-label={pickLabel(option)}
-							onclick={() => pick(option)}
-						>
-							{option.letter}
-						</button>
+				{#if points.length > 1}
+					<button
+						type="button"
+						class="pick recommended wide"
+						disabled={pending}
+						aria-disabled={refreshing}
+						aria-label={GROUP_LABEL.acceptAllName}
+						onclick={acceptAll}
+					>
+						{GROUP_LABEL.acceptAll}
+					</button>
+					<span class="count">{chosenText(chosen, points.length)}</span>
+				{:else}
+					{#each points as line (line.index)}
+						<div class="picks" role="group" aria-label={ROW_LABEL.decide}>
+							{#each line.options as option (option.letter)}
+								<button
+									type="button"
+									class="pick"
+									class:recommended={option.letter === line.recommended}
+									disabled={pending}
+									aria-disabled={refreshing}
+									aria-label={pickLabel(option)}
+									onclick={() => choose({ shown: line, option })}
+								>
+									{option.letter}
+								</button>
+							{/each}
+						</div>
 					{/each}
-				</div>
+				{/if}
 				{#if escapes !== undefined}
-					<EscapeRow {line} {pending} {refreshing} {...escapes} />
+					<EscapeRow {points} {pending} {refreshing} {...escapes} />
 				{/if}
 			</div>
 		{/if}
@@ -133,14 +178,16 @@
 		>
 			{#if confirming !== null}
 				{@const shown = confirming}
-				<h2 id={titleId}>{confirmTitle(shown.option)}</h2>
-				<p class="cline"><WarnMark /><span>{consequenceText(shown.option)}</span></p>
+				<h2 id={titleId}>{shown.confirmation.title}</h2>
+				{#each shown.confirmation.lines as consequence (consequence)}
+					<p class="cline"><WarnMark /><span>{consequence}</span></p>
+				{/each}
 				<div class="actions">
 					<button type="button" class="confirm alt" onclick={() => dialog?.close()}>
 						{CONFIRM_LABEL.cancel}
 					</button>
 					<button type="button" class="confirm" onclick={() => decideConfirmed(shown)}>
-						{confirmVerb(shown.option)}
+						{shown.confirmation.verb}
 					</button>
 				</div>
 			{/if}
@@ -208,6 +255,16 @@
 		border-color: var(--accent);
 		color: var(--accent);
 	}
+	.decide-row button.pick.wide {
+		padding: 0 20px;
+		font-weight: 600;
+	}
+	.count {
+		align-self: center;
+		font-size: 13px;
+		line-height: 18px;
+		color: var(--fg-3);
+	}
 	dialog {
 		max-width: min(420px, calc(100vw - 32px));
 		padding: 24px;
@@ -255,6 +312,9 @@
 		color: var(--fg);
 	}
 	@media (max-width: 760px) {
+		.count {
+			display: none;
+		}
 		.decide-row {
 			grid-template-columns: minmax(0, 1fr);
 			padding-top: 12px;

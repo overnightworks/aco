@@ -5,9 +5,17 @@
  * is where the behaviour lives instead).
  */
 
-import type { BoardItem, ExpectationLine, Outcome, RepoReading } from '../../types';
-import { lineKey } from './decision';
-import { isOptionLine } from './optionCard';
+import type {
+	BoardItem,
+	ExpectationLine,
+	OptionLine,
+	Outcome,
+	RepoReading,
+	YesNoLine
+} from '../../types';
+import { cardName, cardTitle, openPoints } from './card';
+import { cardKey, lineKey } from './decision';
+import { hasHead, isOptionLine } from './optionCard';
 
 export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
 export const OPEN_TAB_LABEL = 'Open';
@@ -51,14 +59,33 @@ export function pictureDataUri(svg: string): string {
 	return `data:image/svg+xml;base64,${btoa(binary)}`;
 }
 
-export interface SelectedLine {
+interface Located {
 	repo: string;
 	item: BoardItem;
+}
+
+/** An item's open option lines, shown as one card (ABRD-82). */
+interface CardSelection extends Located {
+	kind: 'card';
+	points: OptionLine[];
+}
+
+/** A ruled line, shown read-only. */
+interface DecidedSelection extends Located {
+	kind: 'decided';
 	line: ExpectationLine;
 }
 
-/** How a row reads at a glance: an option line is `open`, or `back` once the
- * operator sent it to its head; a yes/no line is `todo` because its head still
+/** An open yes/no line. */
+interface QuestionSelection extends Located {
+	kind: 'question';
+	line: YesNoLine;
+}
+
+export type Selection = CardSelection | DecidedSelection | QuestionSelection;
+
+/** How a row reads at a glance: an option card is `open`, or `back` once the
+ * operator sent one of its lines to its head; a yes/no line is `todo` because its head still
  * has to rewrite it as an option card; a ruled line is `done`. */
 export type RowState = OpenRowState | 'done';
 type OpenRowState = 'open' | 'back' | 'todo';
@@ -111,20 +138,28 @@ function listRow<State extends RowState>(
 	};
 }
 
-function openState(line: ExpectationLine): OpenRowState {
-	if (!isOptionLine(line)) {
-		return 'todo';
-	}
-	return line.returned_on === null ? 'open' : 'back';
+function cardRow(repo: string, itemNumber: number, points: OptionLine[]): ListRow<OpenRowState> {
+	return {
+		key: cardKey(repo, itemNumber),
+		state: hasHead(points) ? 'back' : 'open',
+		label: cardName(points),
+		title: cardTitle(points)
+	};
+}
+
+/** An item's card row, if it has open option lines, then its open yes/no rows. */
+function itemRows(repo: string, item: BoardItem): ListRow<OpenRowState>[] {
+	const points = openPoints(item);
+	const questions = item.lines.filter((line) => !isOptionLine(line) && line.ruling === null);
+	return [
+		...(points.length > 0 ? [cardRow(repo, item.number, points)] : []),
+		...questions.map((line) => listRow(repo, item.number, line, 'todo' as const))
+	];
 }
 
 function openRows(reading: RepoReading): ListRow<OpenRowState>[] {
 	return reading.items
-		.flatMap((item) =>
-			item.lines
-				.filter((line) => line.ruling === null)
-				.map((line) => listRow(reading.name, item.number, line, openState(line)))
-		)
+		.flatMap((item) => itemRows(reading.name, item))
 		.sort((left, right) => ROW_RANK[left.state] - ROW_RANK[right.state]);
 }
 
@@ -196,28 +231,39 @@ export function firstDecidedKey(repos: RepoReading[]): string | null {
 	return rowsOf(decidedList(repos))[0]?.key ?? null;
 }
 
-/** The one line `key` (`decision.ts`'s own) names, matched regardless of its
- * ruling -- a ruled line still resolves, so `Stage.svelte` can render it
- * read-only -- or `null` once no line in `repos` carries that key at all: a
- * key for a line that has disappeared from the data reads the same as no
- * selection, rather than showing data that no longer exists. */
-export function findSelectedLine(repos: RepoReading[], key: string | null): SelectedLine | null {
+function lineSelection(repo: string, item: BoardItem, line: ExpectationLine): Selection | null {
+	if (line.ruling !== null) {
+		return { kind: 'decided', repo, item, line };
+	}
+	return isOptionLine(line) ? null : { kind: 'question', repo, item, line };
+}
+
+/** What the stage shows for `key`: a card key names the open option lines of
+ * its item, a line key a ruled line (shown read-only) or an open yes/no line.
+ * An open option line is a point of its card and never selected on its own.
+ * A key whose data has disappeared reads the same as no selection. */
+export function findSelection(repos: RepoReading[], key: string | null): Selection | null {
 	if (key === null) {
 		return null;
 	}
-	for (const repoReading of repos) {
-		if (repoReading.error !== null) {
-			continue;
-		}
-		for (const item of repoReading.items) {
-			for (const line of item.lines) {
-				if (lineKey(repoReading.name, item.number, line) === key) {
-					return { repo: repoReading.name, item, line };
-				}
+	for (const reading of repos) {
+		for (const item of reading.error === null ? reading.items : []) {
+			const points = openPoints(item);
+			if (points.length > 0 && cardKey(reading.name, item.number) === key) {
+				return { kind: 'card', repo: reading.name, item, points };
+			}
+			const found = item.lines.find((line) => lineKey(reading.name, item.number, line) === key);
+			if (found !== undefined) {
+				return lineSelection(reading.name, item, found);
 			}
 		}
 	}
 	return null;
+}
+
+/** The stage's heading: a card's title, else the tapped question. */
+export function selectionHeading(selection: Selection): string {
+	return selection.kind === 'card' ? cardTitle(selection.points) : cardHeading(selection.line);
 }
 
 /** The line the stage moves to once `key` is decided: of the other open
