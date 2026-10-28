@@ -13,9 +13,10 @@ Landungen pairing rule (LAND-41..54); the absent- and untracked-pin
 refusals are `specs/storage-pin.spec.md`'s (PIN-01/PIN-32);
 `specs/output.spec.md` owns the `--json` envelope itself (OUT-nn: key
 order, `ok`, `message`) that wraps BOARD-11's own top-level keys. `board`'s
-own ranking, scoring, and per-item field semantics (`score`,
-`priority_bucket`, `age_days`, ...) are pre-existing, untouched behaviour
-this lane does not re-derive into criteria; each item's own
+own ranking, scoring, and per-item field semantics (`score`, ...) are
+not graded here; the per-item fields `age_days`, `claim_age`, `freed_days`
+and `priority_bucket` and the top-level `stale` key are public output
+(operator ruling 25.10.2026); each item's own
 `actionable`/`actionable_reason` fields are the one pair this file grades,
 since `next`'s own SKIPPED list (`specs/next.spec.md`) reuses that exact
 reason text.
