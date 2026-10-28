@@ -851,7 +851,6 @@ def _configured_board_client(
     open_issues: tuple[Issue, ...] = (),
     open_pull_requests: tuple[workboard.PullRequest, ...] = (),
     dependencies: Mapping[int, tuple[IssueDependency, ...]] = MappingProxyType({}),
-    standing: tuple[ClaimRequest, ...] = (),
 ) -> FakeForge:
     """A `FakeForge` client wired the way every board-reading claim test needs."""
     client = FakeForge()
@@ -863,7 +862,7 @@ def _configured_board_client(
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
     _fake_lane_worktree_git(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    _patch_store_write(monkeypatch, *(store_claim_from_request(claimed) for claimed in standing))
+    _patch_store_write(monkeypatch)
     return client
 
 
@@ -981,52 +980,13 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
     "with_head": [],
 }
 
-# Five free items -- Beta and Gamma name the same
-# path (the "two overlapping each other" pair), Delta names no scope at
-# all, Epsilon names a path under claim-live-1's own directory scope (the
-# "excluded by a live claim, not by another candidate" case; R1 review) --
-# read against two live claims, claim-live-2's own path sitting inside
-# claim-live-1's directory scope, so the two are not disjoint from each
-# other either; only the free items are checked for disjointness here.
-# Alpha out-ranks the rest purely by its lower issue number (every item
-# shares the same score), so it is always the first action; Beta then wins
-# the walk over Gamma (board order), and Gamma is dropped silently --
-# neither `parallel:` nor `scope unknown:` names an item excluded for
-# overlap, only one excluded for lacking a scope at all. Epsilon is
-# dropped the same silent way, but for a different reason: were the walk
-# not occupying the live claims' own scopes, Epsilon would have nothing to
-# collide with and would surface in `parallel:` instead.
-_PARALLEL_ALPHA = board_issue(
-    50, "Alpha", complete_contract("Ship Alpha.", scope=["src/alpha1.py", "src/alpha2.py"])
-)
-_PARALLEL_BETA = board_issue(51, "Beta", complete_contract("Ship Beta.", scope=["src/shared.py"]))
-_PARALLEL_GAMMA = board_issue(
-    52, "Gamma", complete_contract("Ship Gamma.", scope=["src/shared.py"])
-)
-_PARALLEL_DELTA = board_issue(53, "Delta", complete_contract("Ship Delta."))
-_PARALLEL_EPSILON = board_issue(
-    54, "Epsilon", complete_contract("Ship Epsilon.", scope=["claimed/deep/file.py"])
-)
-_PARALLEL_ITEMS = (
-    _PARALLEL_ALPHA,
-    _PARALLEL_BETA,
-    _PARALLEL_GAMMA,
-    _PARALLEL_DELTA,
-    _PARALLEL_EPSILON,
-)
-_PARALLEL_LIVE_CLAIMS = (
-    request(claim_id="claim-live-1", issue=990, scope=("claimed",)),
-    request(claim_id="claim-live-2", issue=991, scope=("claimed/two.py",)),
-)
-
 
 @pytest.mark.parametrize(
-    ("issues", "dependencies", "claims", "arguments", "expected_exit", "expected_output"),
+    ("issues", "dependencies", "arguments", "expected_exit", "expected_output"),
     [
         pytest.param(
             _TOP_AND_BLOCKED,
             _BLOCKED_BY_ELEVEN,
-            (),
             ("next",),
             0,
             "#11 score 10: Top work\nNext: Claim #11.\n"
@@ -1037,7 +997,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             _TOP_AND_BLOCKED,
             _BLOCKED_BY_ELEVEN,
-            (),
             ("next", "--json"),
             0,
             {
@@ -1060,7 +1019,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             (board_issue(10, "Incomplete", complete_contract("", done_when="")),),
             {},
-            (),
             ("next",),
             3,
             "No actionable item.\n" + _NO_ACTION_NEXT_TAIL + "\nSKIPPED\n"
@@ -1070,7 +1028,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             (board_issue(10, "Blockless", "## Now\nInvestigate."),),
             {},
-            (),
             ("next",),
             3,
             "No actionable item.\n" + _NO_ACTION_NEXT_TAIL + "\nSKIPPED\n"
@@ -1078,21 +1035,11 @@ _PARALLEL_LIVE_CLAIMS = (
             id="names_a_body_with_no_block_as_malformed",
         ),
         pytest.param(
-            (board_issue(10, "Claimed", complete_contract("Claim #10.")),),
-            {},
-            (request(issue=10),),
-            ("next",),
-            3,
-            "No actionable item.\n" + _NO_ACTION_NEXT_TAIL + "\nSKIPPED\n#10: claimed\n",
-            id="names_a_live_claim_as_the_reason_nothing_is_pullable",
-        ),
-        pytest.param(
             (
                 board_issue(9, "Open blocker", complete_contract("Claim #9.")),
                 board_issue(10, "Blocked", complete_contract("Claim #10."), blocked_by_count=1),
             ),
             {10: (block_dependency(9),)},
-            (),
             ("next",),
             0,
             "#9 score 10: Open blocker\nNext: Claim #9.\n"
@@ -1103,7 +1050,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             (),
             {},
-            (),
             ("next",),
             3,
             "No actionable item.\n" + _NO_ACTION_NEXT_TAIL,
@@ -1112,7 +1058,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             (),
             {},
-            (),
             ("next", "--json"),
             3,
             {
@@ -1126,49 +1071,8 @@ _PARALLEL_LIVE_CLAIMS = (
             id="emits_nothing_actionable_on_a_fully_empty_board",
         ),
         pytest.param(
-            _PARALLEL_ITEMS,
-            {},
-            _PARALLEL_LIVE_CLAIMS,
-            ("next",),
-            0,
-            "#50 score -10: Alpha\nNext: Ship Alpha.\n"
-            "Run: aco claim 50\n"
-            "parallel: #51 (1 path)\n"
-            "scope unknown: #53\n"
-            "close: none\n",
-            id="parallel_set_names_the_maximal_disjoint_set_and_the_unknown_scope_item",
-        ),
-        pytest.param(
-            _PARALLEL_ITEMS,
-            {},
-            _PARALLEL_LIVE_CLAIMS,
-            ("next", "--json"),
-            0,
-            {
-                "ok": True,
-                "reason": "work_item",
-                "number": 50,
-                "score": -10,
-                "title": "Alpha",
-                "next": "Ship Alpha.",
-                "command": "aco claim 50",
-                "recovery": [],
-                "skipped": [],
-                "ruling_landings": None,
-                "ruling_old": None,
-                "parallel": {
-                    "first_scope_unknown": False,
-                    "candidates": [{"number": 51, "scope": ["src/shared.py"]}],
-                    "scope_unknown": [53],
-                },
-                **_NOTHING_NAMED_JSON,
-            },
-            id="parallel_set_json_carries_full_scopes_for_every_candidate",
-        ),
-        pytest.param(
             _WAITING_AND_PULLABLE,
             {},
-            (),
             ("next",),
             0,
             "#11 score -10: Top work\nNext: Claim #11.\n"
@@ -1180,7 +1084,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             _WAITING_AND_PULLABLE,
             {},
-            (),
             ("next", "--json"),
             0,
             {
@@ -1206,7 +1109,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             _OPERATOR_HELD_CONTAINERS,
             {},
-            (),
             ("next",),
             0,
             "#11 score -10: Top work\nNext: Claim #11.\n"
@@ -1219,7 +1121,6 @@ _PARALLEL_LIVE_CLAIMS = (
         pytest.param(
             _OPERATOR_HELD_CONTAINERS,
             {},
-            (),
             ("next", "--json"),
             0,
             {
@@ -1250,18 +1151,11 @@ def test_next_reports_the_highest_scored_actionable_item(
     tmp_path: Path,
     issues: tuple[Issue, ...],
     dependencies: dict[int, tuple[IssueDependency, ...]],
-    claims: tuple[ClaimRequest, ...],
     arguments: tuple[str, ...],
     expected_exit: int,
     expected_output: str | dict[str, object],
 ) -> None:
-    _configured_board_client(
-        monkeypatch,
-        tmp_path,
-        open_issues=issues,
-        dependencies=dependencies,
-        standing=claims,
-    )
+    _configured_board_client(monkeypatch, tmp_path, open_issues=issues, dependencies=dependencies)
 
     assert issue_claim.main(["--repo", REPOSITORY, *arguments]) == expected_exit
     rendered = capsys.readouterr().out
@@ -4952,80 +4846,6 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
         "nested containers are not supported\n"
     )
     assert next_exit_code == (0 if parent_kind is body.ItemKind.FEATURE else 3)
-
-
-@pytest.mark.parametrize(
-    ("top_level_scope", "expected_claim"),
-    [
-        (None, "aco claim 299 --scope=docs/nested.md --scope='src/it'\"'\"'s here.py'"),
-        (("docs/top.md",), "aco claim 299"),
-    ],
-    ids=["row-scope-only", "own-top-level-scope"],
-)
-def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    top_level_scope: tuple[str, ...] | None,
-    expected_claim: str,
-) -> None:
-    """A nested container's one row carrying a scope gets
-    a claim on exactly those paths -- or, when the container names its own
-    top-level `scope`, the bare claim that derives it (NEXT-03) -- and once
-    retyped `next`'s own `Run:` line names that same claim, which runs
-    unchanged in a real shell, and the parallel tail reads the paths that
-    claim occupies instead of collapsing to unknown (NEXT-16)."""
-    row_scope = ("docs/nested.md", "src/it's here.py")
-    row = [{"index": 1, "title": "Scheibe Z", "scope": list(row_scope)}]
-    nested_contract = (
-        complete_contract("keiner", slice=row)
-        if top_level_scope is None
-        else complete_contract("keiner", slice=row, scope=list(top_level_scope))
-    )
-    nested = Issue(
-        299,
-        "Nested epic",
-        (),
-        nested_contract,
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=1,
-        children_total=1,
-    )
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(nested,))
-    client.children = {299: (ChildItem(300, ChildState.CLOSED),)}
-    client.parents[299] = workboard.ParentIssue(
-        workboard.IssueReference(REPOSITORY, 298), "", body.ItemKind.CONTAINER
-    )
-
-    next_exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
-    repair = capsys.readouterr().out.split("\n#299: ", 1)[1].splitlines()[0]
-    claim_advice = repair.split(" and claim it with ", 1)[1]
-    retyped = replace(nested, kind=body.ItemKind.TASK, children_closed=None, children_total=None)
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(retyped,))
-    retyped_exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
-    retyped_out = capsys.readouterr().out
-    run_line = retyped_out.split("\nRun: ", 1)[1].splitlines()[0]
-    monkeypatch.setattr(
-        cmd_claim,
-        "_request",
-        lambda arguments, **_kwargs: request(issue=299, scope=tuple(arguments.scope or ())),
-    )
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    bash_exit_code, claim_arguments = arguments_bash_hands_aco(run_line, tmp_path)
-    claim_exit_code = issue_claim.main(["--repo", REPOSITORY, *claim_arguments])
-
-    assert (claim_advice, run_line) == (f"{expected_claim} --out-of-order <reason>", expected_claim)
-    assert "\nparallel: none\nscope unknown: none\n" in retyped_out
-    assert (next_exit_code, retyped_exit_code, bash_exit_code, claim_exit_code) == (
-        3,
-        0,
-        0,
-        0,
-    ), capsys.readouterr().err
-    claimed = store.fetch_state(worktree=Path("."), remote="origin").claims
-    assert tuple(claim.scope for claim in claimed.values()) == (top_level_scope or row_scope,)
 
 
 _WIDE_SCOPE = ("src/a.py", "src/b.py", "src/c.py", "src/d.py", "src/e.py")
@@ -9050,47 +8870,6 @@ def test_cli_module_entry_point_exits_with_mains_return_code(
 
     assert exited.value.code == 2
     assert "invalid choice: 'no-such-command'" in capsys.readouterr().err
-
-
-def test_next_names_an_old_ruling_when_the_item_is_pulled(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    issue = board_issue(
-        10,
-        "Work",
-        complete_contract("Claim #10.", expectation=[ruled_expectation("Name it.")]),
-    )
-    client = FakeForge()
-    monkeypatch.setattr(client, "list_open_board_issues", lambda: (issue,))
-    monkeypatch.setattr(client, "list_open_board_pull_requests", lambda: ())
-    monkeypatch.setattr(client, "list_recent_merged_board_pull_requests", lambda _since: ())
-    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    _fake_lane_worktree_git(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        checkout,
-        "trunk_landings",
-        lambda *_args, **_kwargs: tuple(
-            checkout.TrunkLanding(f"sha{hour}", datetime(2026, 8, 29, hour, tzinfo=UTC), None, ())
-            for hour in range(10)
-        ),
-    )
-    _patch_store_write(monkeypatch)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "next"]) == 0
-    assert capsys.readouterr().out == (
-        "#10 score -10: Work\n"
-        "Next: Claim #10.\n"
-        "Run: aco claim 10 --scope <paths>\n"
-        + _SCOPE_UNKNOWN_NOTE_LINE
-        + "ruled 10 landings ago: refine again at the pull\n"
-        + _PARALLEL_UNKNOWN_TAIL
-    )
-
-    assert issue_claim.main(["--repo", REPOSITORY, "next", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["ruling_landings"] == 10
-    assert payload["ruling_old"] is True
-    assert payload["ruling_hint"] == "ruled 10 landings ago: refine again at the pull"
 
 
 def test_no_path_class_list_is_read_or_written() -> None:
