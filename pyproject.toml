@@ -42,6 +42,7 @@ addopts = ["-p", "network_guard"]
 
 [tool.coverage.run]
 branch = true
+omit = ["scripts/vulture_whitelist.py"]
 
 [tool.ruff]
 target-version = "py311"
