@@ -1,0 +1,7 @@
+claim_id = "9e2792b16634449796d68a9ef9ad3786"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "5630c2bd654e5af13b4897160e2d5e5349d142e7"
+branch = "claude/issue-508-allow-deepmerge-advisory"
+scope = ["quality/config.toml"]
+opened_commit = "468c75596a793c1861dfb18b654c35c0abf5238e"
