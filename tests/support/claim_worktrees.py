@@ -150,6 +150,16 @@ def release(*flags: str) -> int:
     )
 
 
+def rescope_arguments(*flags: str) -> list[str]:
+    """`aco rescope` on item `ISSUE` with `flags`, for `run_cli`."""
+    return ["--repo", REPOSITORY, "rescope", str(ISSUE), *flags]
+
+
+def held_by_ada(scope: tuple[str, ...]) -> tuple[Standing, ...]:
+    """The claim Ada holds on item `ISSUE` from `LANE_BRANCH` over `scope`."""
+    return (Standing(scope, issue=ISSUE, agent="Ada", branch=LANE_BRANCH),)
+
+
 def standing_claims(standpoint: Standpoint) -> list[protocol.ActiveClaim]:
     state = store.fetch_state(worktree=standpoint.directory, remote="origin")
     return list(state.claims.values())
