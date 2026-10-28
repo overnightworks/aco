@@ -912,11 +912,8 @@ class GitHubForge:
         return self._json_lines(raw, "check run")
 
     def _check_runs(self, sha: str) -> tuple[forge.CheckRun, ...]:
-        """Every check run against `sha`, not merely its first page:
-        GitHub's own `check-runs` listing paginates
-        like every other collection this adapter reads, so a run reported
-        only on a later page must count toward readiness exactly as one on
-        the first page does."""
+        """Every check run against `sha`, not merely its first page: a run
+        reported only on a later page counts exactly as one on the first."""
         values = self._fetch_pages(
             lambda page: self._check_run_page(sha, page), per_page=ISSUES_PER_PAGE
         )
@@ -1010,14 +1007,16 @@ class GitHubForge:
         conclusion = None if state == "pending" else state
         return tuple(forge.CheckRun(name, conclusion) for name in names)
 
+    def commit_checks(self, sha: str) -> tuple[forge.CheckRun, ...]:
+        """Every check against any commit `sha`: its check runs plus its
+        combined commit status (external contexts such as SonarCloud)."""
+        return self._check_runs(sha) + self._combined_status_checks(sha)
+
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
-        """Whether pull request `number` is safe to merge with its own
-        pinned head sha (`aco land`'s preflight): read from the
-        pull request itself (open state, head sha, mergeable state), every
-        page of the check-runs endpoint, and the combined commit status
-        (external contexts such as SonarCloud) against that same head sha --
-        GitHub answers all three from separate resources, and a merge is
-        safe only once every one of them agrees."""
+        """Whether pull request `number` is safe to merge with its own pinned
+        head sha (`aco land`'s preflight): the pull request itself (open state,
+        head sha, mergeable state) and `commit_checks` of that same head sha --
+        a merge is safe only once they all agree."""
         raw = self._run(
             [
                 "api",
@@ -1041,7 +1040,7 @@ class GitHubForge:
             or not mergeable_state
         ):
             raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
-        checks = self._check_runs(head_sha) + self._combined_status_checks(head_sha)
+        checks = self.commit_checks(head_sha)
         return forge.LandingReadiness(number, state == "open", head_sha, mergeable_state, checks)
 
     def allowed_merge_methods(self) -> frozenset[workboard.MergeMethod] | None:

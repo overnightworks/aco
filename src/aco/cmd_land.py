@@ -585,6 +585,34 @@ def _land_peek_claims(context: RunContext) -> protocol.ClaimState:
     return observed
 
 
+def _land_trunk_state_line(
+    client: github.GitHubForge, merge_sha: str, toplevel: Path
+) -> str | None:
+    """LANDCMD-54, LANDCMD-55: the line naming the first failed check of the
+    default branch at `merge_sha`'s first parent (its tip just before the
+    merge, whose checks have finished), or why that read failed; `None`
+    when the trunk is not red."""
+    first_parent = checkout.git_output(["rev-parse", f"{merge_sha}^1"], directory=toplevel)
+    try:
+        failed = _land_failed_check(client.commit_checks(first_parent))
+    except protocol.ClaimError as error:
+        return f"trunk: unreadable at {first_parent[:7]}: {protocol.terminal_text(str(error))}"
+    if failed is None:
+        return None
+    name = protocol.terminal_text(failed.name)
+    conclusion = protocol.terminal_text(str(failed.conclusion))
+    return f"trunk: red at {first_parent[:7]}: {name} ({conclusion})"
+
+
+def _land_print_released_notes(client: github.GitHubForge, merge_sha: str, toplevel: Path) -> None:
+    """What follows a RELEASED ending: LANDCMD-54's line, then LANDCMD-17's."""
+    trunk_line = _land_trunk_state_line(client, merge_sha, toplevel)
+    if trunk_line is not None:
+        print(trunk_line)
+    if _land_is_own_repository(toplevel):
+        print(_LAND_REINSTALL_LINE)
+
+
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`aco land <pr>`: preflight every ruled precondition
     read-only, merge with a pinned head sha and a commit message this tool
@@ -653,6 +681,6 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         ),
     )
     # The run whose release succeeded already printed it (LANDCMD-38).
-    if ending is cmd_release.ReleaseEnding.RELEASED and _land_is_own_repository(toplevel):
-        print(_LAND_REINSTALL_LINE)
+    if ending is cmd_release.ReleaseEnding.RELEASED:
+        _land_print_released_notes(client, merge_sha, toplevel)
     return 0
