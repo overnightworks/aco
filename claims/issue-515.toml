@@ -1,0 +1,7 @@
+claim_id = "a3750946d99846dc83c7be68a6d3e50b"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "5630c2bd654e5af13b4897160e2d5e5349d142e7"
+branch = "claude/issue-515-kind-area-topic-meaning"
+scope = ["specs/body-block.spec.md"]
+opened_commit = "6ab1a2741eaf46f92e29b7d1ce2d7ce3b29bd100"
