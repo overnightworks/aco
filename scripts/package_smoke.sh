@@ -22,12 +22,13 @@ fi
 mkdir -p "$out_dir"
 out_dir="$(cd "$out_dir" && pwd)"
 
-# The committed assets are the manifest both archives must match exactly; a file
-# that exists only in the working tree (a stray build output, a sourcemap) would
-# otherwise ship unproven. Read before the narrowed PATH hides git.
-expected_static="$scratch/expected-static"
-git -C "$repository_root" ls-files -- src/aco/board/static \
-    | sed 's|^src/aco/board/static/||' | sort >"$expected_static"
+# The committed package tree is the manifest every archive must match exactly; a
+# file that exists only in the working tree (a module deleted since an earlier
+# build, a stray build output, a sourcemap) would otherwise ship unproven, and a
+# committed file an ignore rule hides would go missing. Read before the narrowed
+# PATH hides git.
+expected_package="$scratch/expected-package"
+git -C "$repository_root" ls-files -- src/aco | sed 's|^src/||' | sort >"$expected_package"
 
 # A PATH holding only the tools this script needs proves the install path never
 # reaches for Node, which a developer machine or CI runner usually has.
@@ -46,6 +47,10 @@ if command -v node >/dev/null; then
 fi
 
 uv build --quiet --out-dir "$out_dir" "$repository_root"
+# `uv tool install --from .` builds its wheel from the working tree, not from the
+# sdist, so that path is proven on its own build.
+tree_wheel_dir="$scratch/tree-wheel"
+uv build --quiet --wheel --out-dir "$tree_wheel_dir" "$repository_root"
 
 # The release uploads every distribution in OUT_DIR, so it must hold exactly
 # the one wheel and one sdist proven below.
@@ -53,14 +58,20 @@ shopt -s nullglob
 distributions=("$out_dir"/*)
 wheels=("$out_dir"/*.whl)
 sdists=("$out_dir"/*.tar.gz)
+tree_wheels=("$tree_wheel_dir"/*.whl)
 shopt -u nullglob
 if ((${#wheels[@]} != 1 || ${#sdists[@]} != 1 || ${#distributions[@]} != 2)); then
     echo "ERROR: $out_dir must hold exactly one wheel and one sdist, found:" >&2
     printf '  %s\n' "${distributions[@]##*/}" >&2
     exit 1
 fi
+if ((${#tree_wheels[@]} != 1)); then
+    echo "ERROR: $tree_wheel_dir must hold exactly one wheel, found ${#tree_wheels[@]}" >&2
+    exit 1
+fi
 wheel="${wheels[0]}"
 sdist="${sdists[0]}"
+tree_wheel="${tree_wheels[0]}"
 
 # Listings are read whole before grep: `lister | grep -q` lets grep close the
 # pipe early, and pipefail would report the lister's SIGPIPE as a missing file.
@@ -78,23 +89,24 @@ check_no_build_inputs() {
     fi
 }
 
-# Compares an archive's static files, relative to aco/board/static/, with the
-# committed manifest and names every missing or extra file.
-check_static_manifest() {
-    local archive="$1" listing="$2" static_prefix="$3" shipped
-    shipped="$(grep -E "^${static_prefix}[^/]" <<<"$listing" | grep -v '/$' \
-        | sed -E "s|^${static_prefix}||" | sort || true)"
-    if ! diff -u --label committed --label "$archive" "$expected_static" - <<<"$shipped" >&2; then
-        echo "ERROR: $archive static files differ from src/aco/board/static (see diff above)" >&2
+# Compares an archive's package files, relative to the directory holding aco/,
+# with the committed manifest and names every missing or extra file.
+check_package_manifest() {
+    local archive="$1" listing="$2" package_prefix="$3" shipped
+    shipped="$(grep -E "^${package_prefix}aco/" <<<"$listing" | grep -v '/$' \
+        | sed -E "s|^${package_prefix}||" | sort || true)"
+    if ! diff -u --label committed --label "$archive" "$expected_package" - <<<"$shipped" >&2; then
+        echo "ERROR: $archive package files differ from git ls-files src/aco (see diff above)" >&2
         exit 1
     fi
 }
 
 check_no_build_inputs "${wheel##*/}" "$wheel_listing"
 check_no_build_inputs "${sdist##*/}" "$sdist_listing"
-check_static_manifest "${wheel##*/}" "$wheel_listing" 'aco/board/static/'
-check_static_manifest "${sdist##*/}" "$sdist_listing" '[^/]+/src/aco/board/static/'
-echo "wheel and sdist carry exactly the committed board assets"
+check_package_manifest "${wheel##*/}" "$wheel_listing" ''
+check_package_manifest "${sdist##*/}" "$sdist_listing" '[^/]+/src/'
+check_package_manifest "working-tree ${tree_wheel##*/}" "$(unzip -Z1 "$tree_wheel")" ''
+echo "wheels and sdist carry exactly the committed aco package"
 
 UV_TOOL_DIR="$scratch/tools" UV_TOOL_BIN_DIR="$scratch/bin" \
     uv tool install --force "$wheel"
