@@ -74,7 +74,7 @@
 "commit_transition" = 62
 
 [function_lines."src/aco/workboard.py"]
-"_board_item" = 103
+"_board_item" = 98
 "build_board" = 112
 
 [function_lines."tests/support/github_fixtures.py"]

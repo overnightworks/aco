@@ -1680,26 +1680,20 @@ def _board_item(
     parsed = context.parsed_bodies[issue.number]
     freed_at = context.freed_on[issue.number]
     ruling_landings, ruling_old = _ruling_freshness_from(parsed.ruling_date, context.trunk_landings)
-    frozen = parsed.frozen_trigger
     claim = context.claims_by_issue.get(issue.number)
     stage = _board_stage(issue, claim, context)
-    single_next = _single_concrete_next(contract.next)
     idea = has_label(issue.labels, config.idea_label)
     unblocks_count = context.unblocks[issue.number]
-    container_parent = context.child_container.get(issue.number)
-    completes_container = _completes_container(
-        issue.number, context.child_container, context.container_progress
-    )
     rank = _priority_bucket(
         issue.labels,
         config,
         unblocks_count,
         kind=issue.kind,
-        completes_container=completes_container,
+        completes_container=_completes_container(
+            issue.number, context.child_container, context.container_progress
+        ),
     )
-    active_claim, claim_age_text, claim_old = _claim_projection(
-        claim, context.claim_ages, observed_at
-    )
+    active_claim, claim_age, claim_old = _claim_projection(claim, context.claim_ages, observed_at)
     open_blockers = context.blockers[issue.number]
     container_progress = context.container_progress.get(issue.number)
     childless_verdict = (
@@ -1711,7 +1705,7 @@ def _board_item(
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
-        frozen_trigger=frozen,
+        frozen_trigger=parsed.frozen_trigger,
         active_claim=active_claim,
         open_blockers=open_blockers,
         repository=context.repository,
@@ -1727,6 +1721,7 @@ def _board_item(
         childless_container_reason=_childless_container_reason(
             issue.number, childless_verdict, parsed, config.storage
         ),
+        childless_verdict=childless_verdict,
         unreadable_container_reason=_unreadable_children_reason(
             container_progress, context.unreadable_numbers, config.storage
         ),
@@ -1741,7 +1736,7 @@ def _board_item(
         priority_bucket=rank.bucket,
         priority_order=rank.order,
         container=container_progress,
-        container_parent=container_parent,
+        container_parent=context.child_container.get(issue.number),
         scope=parsed.scope,
         whole=parsed.whole,
         contract=contract,
@@ -1752,7 +1747,7 @@ def _board_item(
         expectation_progress=parsed.expectation_progress,
         ruling_landings=ruling_landings,
         ruling_old=ruling_old,
-        frozen_trigger=frozen,
+        frozen_trigger=parsed.frozen_trigger,
         open_blockers=open_blockers,
         freed_on=freed_at,
         freed_days=(None if freed_at is None else max(0, (observed_at - freed_at).days)),
@@ -1760,10 +1755,10 @@ def _board_item(
         age_days=max(0, (observed_at - _timestamp(issue.created_at)).days),
         idle_days=max(0, (observed_at - _timestamp(issue.updated_at)).days),
         active_claim=active_claim,
-        claim_age=claim_age_text,
+        claim_age=claim_age,
         claim_old=claim_old,
         unblocks_count=unblocks_count,
-        score=_board_score(stage, unblocks_count, single_next),
+        score=_board_score(stage, unblocks_count, _single_concrete_next(contract.next)),
         actionable=actionable_reason is None,
         actionable_reason=actionable_reason,
         waits_on_operator=_waits_on_operator(actionability),
@@ -2406,8 +2401,8 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
             next_line = item.contract.next
             next_step = next_line if has_further_work(next_line) else cut_title
             return CutSliceAction(item, container, next_step, cut_title)
-        case CheckVerdict(next_step=next_step) if not item.open_blockers:
-            return CheckContainerAction(item, container, next_step)
+        case CheckVerdict(next_step=step) if not _check_barred(verdict, bool(item.open_blockers)):
+            return CheckContainerAction(item, container, step)
         case CloseVerdict():
             return CloseContainerAction(item, container)
         case _:
@@ -2727,6 +2722,7 @@ class _ActionabilityFacts:
     read_state: BodyReadState = BodyReadState.VALID
     malformed_defect: ContractDefect | None = None
     childless_container_reason: str | None = None
+    childless_verdict: ChildlessContainerVerdict | None = None
     unreadable_container_reason: str | None = None
 
 
@@ -2852,6 +2848,10 @@ def childless_containers_with_uncut_rows(
     )
 
 
+def _check_barred(verdict: ChildlessContainerVerdict | None, blocked: bool) -> bool:
+    return isinstance(verdict, CheckVerdict) and blocked
+
+
 def _childless_container_reason(
     number: int,
     verdict: ChildlessContainerVerdict | None,
@@ -2965,7 +2965,7 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
-        if facts.open_blockers and facts.childless_container_reason == CHECK_DONE_WHEN:
+        if _check_barred(facts.childless_verdict, bool(facts.open_blockers)):
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason
