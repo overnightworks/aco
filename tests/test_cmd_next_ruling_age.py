@@ -87,13 +87,15 @@ def test_next_names_an_old_ruling_in_text_and_json_when_the_item_is_pulled(
     hint = "ruled 10 landings ago: refine again at the pull"
 
     text = run_cli(["next"], capsys)
-    payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
+    as_json = run_cli(["next", "--json"], capsys)
+    payload = json.loads(as_json.stdout)
 
     assert (text.status, text.stdout) == (
         0,
         "#10 score -10: Work\nNext: Claim #10.\nRun: aco claim 10 --scope <paths>\n"
         f"scope unknown\n{hint}\nparallel: unknown (first action names no scope)\nclose: none\n",
     )
+    assert as_json.status == 0
     assert (payload["ruling_landings"], payload["ruling_old"], payload["ruling_hint"]) == (
         10,
         True,

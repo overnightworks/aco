@@ -89,7 +89,7 @@ def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_ever
     )
 
     text = run_cli(["next"], capsys)
-    payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
+    as_json = run_cli(["next", "--json"], capsys)
 
     assert (text.status, text.stdout) == (
         0,
@@ -97,8 +97,28 @@ def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_ever
         "Run: aco start 50 --slug=alpha\n"
         "parallel: #51 (1 path)\nscope unknown: #53\nclose: none\n",
     )
-    assert payload["parallel"] == {
-        "first_scope_unknown": False,
-        "candidates": [{"number": 51, "scope": ["src/shared.py"]}],
-        "scope_unknown": [53],
-    }
+    assert (as_json.status, json.loads(as_json.stdout)) == (
+        0,
+        {
+            "ok": True,
+            "reason": "work_item",
+            "number": 50,
+            "score": -10,
+            "title": "Alpha",
+            "next": "Ship Alpha.",
+            "command": "aco start 50 --slug=alpha",
+            "recovery": [],
+            "skipped": [],
+            "ruling_landings": None,
+            "ruling_old": None,
+            "parallel": {
+                "first_scope_unknown": False,
+                "candidates": [{"number": 51, "scope": ["src/shared.py"]}],
+                "scope_unknown": [53],
+            },
+            "close": [],
+            "waiting_on_operator": [],
+            "ideas": [],
+            "with_head": [],
+        },
+    )
