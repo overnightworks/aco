@@ -18,7 +18,8 @@ and `canonical_remote` (`priority_labels`, `idea_label`, `body_contract`, and
 `merge_method` may change), `<title>` the pull request's own title, a "head" the pull request's own head commit read during
 preflight, `<actual>` that head's full sha, and `<reviewed>` the head its reviewers saw, the `--head` value lowercased: its
 full sha or a prefix of at least 7 hex digits. "Checks" is every check run GitHub reports for the head sha
-(every page of `check-runs`) plus every combined-status context
+(every page of `check-runs`), keeping the newest run (highest id) of each check
+name, plus every combined-status context
 (`commits/<actual>/status`; an external context such as SonarCloud counts);
 "no checks" means both are empty. GitHub owns a check's own name -- no
 length this tool controls -- so each name is truncated to 40 characters
@@ -103,6 +104,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
 - [ ] [LANDCMD-06] A pull request whose checks all completed, at least one without success, refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
+- [ ] [LANDCMD-56] Of several check runs with one name on the head, only the newest (highest id) counts: a red run a later green one replaced never refuses, a newer red one always does.
 - [ ] [LANDCMD-07] This pull request's own shape decides its classification, exactly as `check <pr>` reads it (LAND-06..13, 32): a shape defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
 - [ ] [LANDCMD-22] After LANDCMD-07, a head without `<path>` refuses `pull request #<n> removes <path>; aco land cannot release its claim across that change`, exit `2` (E-LANDCMD-22).
 - [ ] [LANDCMD-23] A head changing `storage` or `canonical_remote` in `<path>` refuses `pull request #<n> changes <setting> in <path>; aco land cannot release its claim across that change`, exit `2`.
