@@ -11,11 +11,14 @@ already be clean under this gate.
 
 from __future__ import annotations
 
+import json
+import runpy
+import sys
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
-from spec_lint import analyze, load_spec_dir, load_spec_file
+from spec_lint import analyze, load_spec_dir, load_spec_file, main
 
 _REPOSITORY_SPEC_DIR = Path(__file__).parent.parent.parent / "specs"
 
@@ -69,6 +72,25 @@ RED_ID_SEQUENCE = GREEN_SPEC.replace(
     "- [ ] [SAMPLE-01] `sample` prints `ok`, exit `0` (see E-SAMPLE-01).",
     "- [ ] [SAMPLE-01] `sample` prints `ok`, exit `0` (see E-SAMPLE-01).\n"
     "- [ ] [SAMPLE-03] `sample --other` prints `ok`, exit `0`.",
+)
+_CRITERION_LINE_MARKUP = "- [ ] " + _CRITERION_LINE_TEXT
+RED_TWO_ID_PREFIXES = GREEN_SPEC.replace(
+    _CRITERION_LINE_MARKUP,
+    _CRITERION_LINE_MARKUP + "\n- [ ] [OTHER-01] `sample --other` prints `ok`, exit `0`.",
+)
+RED_DUPLICATED_ID = GREEN_SPEC.replace(
+    _CRITERION_LINE_MARKUP,
+    _CRITERION_LINE_MARKUP + "\n- [ ] [SAMPLE-01] `sample --again` prints `ok`, exit `0`.",
+)
+_BEHAVIOR_TABLE_BLOCK = "| state \\ trigger | `sample` |\n|---|---|\n| default | SAMPLE-01 |\n"
+GREEN_WITHOUT_BEHAVIOR_TABLE = GREEN_SPEC.replace(
+    f"## Behavior table\n\n{_BEHAVIOR_TABLE_BLOCK}\n", ""
+)
+GREEN_TABLE_ENDS_THE_FILE = (
+    GREEN_WITHOUT_BEHAVIOR_TABLE + f"\n## Behavior table\n\n{_BEHAVIOR_TABLE_BLOCK}"
+)
+RED_EXAMPLE_HEADING_ENDS_THE_FILE = (
+    GREEN_SPEC[: GREEN_SPEC.index("Setup: bare-remote")].rstrip("\n") + "\n"
 )
 RED_UNRESOLVED_REFERENCE = GREEN_SPEC.replace("(see E-SAMPLE-01)", "(see E-SAMPLE-99)")
 RED_MISSING_SECTION = GREEN_SPEC.replace("## Never\n\n- `sample` never prints twice.\n\n", "")
@@ -124,6 +146,20 @@ RULE_FAMILY_CASES: tuple[tuple[str, str, tuple[_ExpectedFinding, ...]], ...] = (
         RED_ID_SEQUENCE,
         (_ExpectedFinding("id_sequence", 1, "SAMPLE-02 is missing"),),
     ),
+    (
+        "id_sequence:two_prefixes",
+        RED_TWO_ID_PREFIXES,
+        (_ExpectedFinding("id_sequence", 1, "OTHER, SAMPLE"),),
+    ),
+    (
+        "id_sequence:duplicated_id",
+        RED_DUPLICATED_ID,
+        (
+            _ExpectedFinding(
+                "id_sequence", CRITERION_LINE + 1, f"duplicates SAMPLE-01 at line {CRITERION_LINE}"
+            ),
+        ),
+    ),
     ("id_sequence:green", GREEN_SPEC, ()),
     (
         "unresolved_reference:red",
@@ -131,10 +167,16 @@ RULE_FAMILY_CASES: tuple[tuple[str, str, tuple[_ExpectedFinding, ...]], ...] = (
         (_ExpectedFinding("unresolved_reference", CRITERION_LINE, "E-SAMPLE-99"),),
     ),
     ("unresolved_reference:green", GREEN_SPEC, ()),
+    ("unresolved_reference:table_ends_the_file", GREEN_TABLE_ENDS_THE_FILE, ()),
     (
         "missing_section:red",
         RED_MISSING_SECTION,
         (_ExpectedFinding("missing_section", 1, "no `## Never` section"),),
+    ),
+    (
+        "missing_section:no_behavior_table_is_only_a_missing_section",
+        GREEN_WITHOUT_BEHAVIOR_TABLE,
+        (_ExpectedFinding("missing_section", 1, "no `## Behavior table` section"),),
     ),
     ("missing_section:green", GREEN_SPEC, ()),
     (
@@ -146,6 +188,11 @@ RULE_FAMILY_CASES: tuple[tuple[str, str, tuple[_ExpectedFinding, ...]], ...] = (
     (
         "missing_setup:red",
         RED_MISSING_SETUP,
+        (_ExpectedFinding("missing_setup", EXAMPLE_HEADING_LINE, "no `Setup:` line"),),
+    ),
+    (
+        "missing_setup:heading_ends_the_file",
+        RED_EXAMPLE_HEADING_ENDS_THE_FILE,
         (_ExpectedFinding("missing_setup", EXAMPLE_HEADING_LINE, "no `Setup:` line"),),
     ),
     ("missing_setup:green", GREEN_SPEC, ()),
@@ -238,3 +285,65 @@ def test_repository_specs_are_clean_under_the_gate() -> None:
     findings = analyze(load_spec_dir(_REPOSITORY_SPEC_DIR))
 
     assert findings == []
+
+
+def _red_specs_tree(tmp_path: Path) -> Path:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    (specs / "sample.spec.md").write_text(RED_MISSING_SETUP, encoding="utf-8")
+    return tmp_path
+
+
+def test_main_reports_no_findings_on_the_repository_specs(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_REPOSITORY_SPEC_DIR.parent)
+
+    exit_code = main([])
+
+    assert exit_code == 0
+    assert "spec_lint: no findings" in capsys.readouterr().out
+
+
+def test_main_report_groups_findings_by_rule_and_ci_fails_on_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_red_specs_tree(tmp_path))
+    location = f"sample.spec.md:{EXAMPLE_HEADING_LINE}"
+
+    plain_exit = main([])
+    plain_output = capsys.readouterr().out
+    ci_exit = main(["--ci"])
+
+    assert plain_exit == 0
+    assert "missing_setup (1 finding(s))" in plain_output
+    assert location in plain_output
+    assert ci_exit == 1
+
+
+def test_main_json_prints_the_findings_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_red_specs_tree(tmp_path))
+
+    exit_code = main(["--json"])
+
+    findings = json.loads(capsys.readouterr().out)["findings"]
+    assert exit_code == 0
+    assert [(f["rule"], f["file"], f["line"]) for f in findings] == [
+        ("missing_setup", "sample.spec.md", EXAMPLE_HEADING_LINE)
+    ]
+    assert "no `Setup:` line" in findings[0]["detail"]
+
+
+def test_script_run_as_a_program_exits_with_the_ci_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script = Path(sys.modules["spec_lint"].__file__ or "")
+    monkeypatch.chdir(_red_specs_tree(tmp_path))
+    monkeypatch.setattr(sys, "argv", [str(script), "--ci"])
+
+    with pytest.raises(SystemExit) as exited:
+        runpy.run_path(str(script), run_name="__main__")
+
+    assert exited.value.code == 1

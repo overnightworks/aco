@@ -43,7 +43,7 @@ jobs:
         run: uv run --locked pytest -n auto
       - if: matrix.python == '3.12'
         run: >-
-          uv run --locked pytest -n auto --cov=aco --cov-branch
+          uv run --locked pytest -n auto --cov=aco --cov=scripts --cov-branch
           --cov-report=xml:coverage.xml --cov-report=term-missing:skip-covered --cov-fail-under=100
       - if: ${{ !cancelled() && matrix.python == '3.12' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
