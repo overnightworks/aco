@@ -15,7 +15,6 @@ from cli_fixtures import (
     fresh_observation,
     local_branches,
     real_git,
-    redirect_toplevel,
     run_cli,
     without_git_identity,
 )
@@ -115,7 +114,6 @@ def separate_world(
     without_git_identity(monkeypatch, clone)
     real_git(clone, "config", "user.name", "Lander")
     real_git(clone, "config", "user.email", "lander@example.com")
-    redirect_toplevel(monkeypatch, clone)
     monkeypatch.chdir(clone)
     landing = landing_world(
         clone,
@@ -188,7 +186,6 @@ class SeparateRelease:
 
     def run(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CliRun:
         case = self.world.case
-        redirect_toplevel(monkeypatch, self.world.original)
         monkeypatch.chdir(self.world.original)
         race_claim = case.race_claim
         if race_claim is not None:

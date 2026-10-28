@@ -22,7 +22,6 @@ from cli_fixtures import (
     pull_request_listing,
     push_repository_trunk,
     real_git,
-    redirect_toplevel,
     run_cli,
     run_context_over,
     track_board_config,
@@ -517,7 +516,6 @@ def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkou
     lane = tmp_path / "lane"
     real_git(kept_elsewhere, "worktree", "add", "-q", str(lane), "-b", "lane")
     monkeypatch.chdir(lane)
-    redirect_toplevel(monkeypatch, lane)
 
     result = adopt(capsys)
 
@@ -705,7 +703,6 @@ def test_adopt_judges_the_main_checkouts_pin_when_a_linked_worktree_pins_state_r
     real_git(world.clone, "worktree", "add", "-q", str(lane), "-b", "linked-lane")
     (lane / ".aco" / "board.toml").write_text('storage = "state-ref"\n')
     monkeypatch.chdir(lane)
-    redirect_toplevel(monkeypatch, lane)
 
     result = adopt(capsys)
 
@@ -864,7 +861,6 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
     lane = world.clone.parent / "linked-lane"
     real_git(world.clone, "worktree", "add", "-q", str(lane), "-b", "linked-lane")
     monkeypatch.chdir(lane)
-    redirect_toplevel(monkeypatch, lane)
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract
-from cli_fixtures import real_git, redirect_toplevel, track_board_config
+from cli_fixtures import real_git, track_board_config
 from github_fixtures import FakeForge, serve_forge
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
@@ -94,7 +94,6 @@ def make_stand_in(
             real_git(github_clone, "worktree", "add", "-q", "-b", branch, str(directory))
         elif branch != "main":
             real_git(github_clone, "checkout", "-q", "-b", branch)
-        redirect_toplevel(monkeypatch, directory)
         monkeypatch.chdir(directory)
         head = real_git(directory, "rev-parse", "HEAD").stdout.strip()
         return Standpoint(directory, head)
