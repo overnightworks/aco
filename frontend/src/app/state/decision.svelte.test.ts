@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
 import { line, optionLine } from '../../test-support/board';
 import type { DecisionResult } from '../../types';
-import { LINE_CHANGED_MESSAGE, UNDO_SECONDS, lineKey } from '../model/decision';
+import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS, lineKey } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
 
 const card = line({ index: 3, text: 'Guests?', question: 'Guests allowed?', fingerprint: 'fp' });
@@ -203,17 +203,18 @@ test('two lines pending at once each write exactly once, and undoing one leaves 
 });
 
 const songCard = optionLine({ index: 4, fingerprint: 'fp-shown', topic: 'Jump' });
-const songKey = lineKey('repo', 42, songCard);
+const songKey = cardKey('repo', 42);
+const songPoints = [songCard];
 
 function otherStore(result: DecisionResult = { status: 'ruled', message: null }) {
 	const send = sender(result);
 	return { send, store: new DecisionStore('token', async () => {}, send) };
 }
 
-test('[ABRD-67] an Other answer waits out the window, names Other and the topic, then posts once', async () => {
+test('[ABRD-67] an Other answer waits out the window, names Other and the card’s name, then posts once', async () => {
 	const { send, store } = otherStore();
 
-	store.decideOther('repo', 42, songCard, '  Only on desktop ');
+	store.decideOther('repo', 42, songPoints, '  Only on desktop ');
 	expect(store.pendingEntries).toEqual([{ key: songKey, message: 'Other · Jump', state: 'done' }]);
 	expect(send).not.toHaveBeenCalled();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -222,50 +223,52 @@ test('[ABRD-67] an Other answer waits out the window, names Other and the topic,
 	expect(send).toHaveBeenCalledWith('token', {
 		repo: 'repo',
 		item: 42,
-		line: 4,
-		fingerprint: 'fp-shown',
+		lines: [{ line: 4, fingerprint: 'fp-shown' }],
 		other: 'Only on desktop'
 	});
 });
 
 test('[ABRD-68] Send posts the card the panel opened with, though the board shows a revised one', async () => {
 	const { send, store } = otherStore();
-	store.openPanel(songKey, { kind: 'other', shown: songCard });
+	store.openPanel(songKey, { kind: 'other', shown: songPoints });
 
 	const opened = store.panel(songKey);
 	if (opened === null) throw new Error('the panel should be open');
 	store.decideOther('repo', 42, opened.shown, 'x');
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(send).toHaveBeenCalledWith('token', expect.objectContaining({ fingerprint: 'fp-shown' }));
+	expect(send).toHaveBeenCalledWith(
+		'token',
+		expect.objectContaining({ lines: [{ line: 4, fingerprint: 'fp-shown' }] })
+	);
 });
 
 test('[ABRD-67] sending closes the panel and undoing posts nothing and reopens it with the draft', async () => {
 	const { send, store } = otherStore();
-	store.openPanel(songKey, { kind: 'other', shown: songCard });
+	store.openPanel(songKey, { kind: 'other', shown: songPoints });
 	store.setDraft(songKey, 'other', 'Only on desktop');
 
-	store.decideOther('repo', 42, songCard, store.draft(songKey, 'other'));
+	store.decideOther('repo', 42, songPoints, store.draft(songKey, 'other'));
 	expect(store.panel(songKey)).toBeNull();
 	store.undo(songKey);
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(send).not.toHaveBeenCalled();
-	expect(store.panel(songKey)).toEqual({ kind: 'other', shown: songCard });
+	expect(store.panel(songKey)).toEqual({ kind: 'other', shown: songPoints });
 	expect(store.draft(songKey, 'other')).toBe('Only on desktop');
 });
 
 test('[ABRD-66] the draft is kept per card and survives a failed post, and a stored decision drops it', async () => {
 	const failing = otherStore({ status: 'failed', message: 'aco unavailable' });
 	failing.store.setDraft(songKey, 'other', 'Only on desktop');
-	failing.store.decideOther('repo', 42, songCard, 'Only on desktop');
+	failing.store.decideOther('repo', 42, songPoints, 'Only on desktop');
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 	expect(failing.store.draft(songKey, 'other')).toBe('Only on desktop');
-	expect(failing.store.draft('repo:42:5', 'other')).toBe('');
+	expect(failing.store.draft(cardKey('repo', 43), 'other')).toBe('');
 
 	const ruling = otherStore();
 	ruling.store.setDraft(songKey, 'other', 'Only on desktop');
-	ruling.store.decideOther('repo', 42, songCard, 'Only on desktop');
+	ruling.store.decideOther('repo', 42, songPoints, 'Only on desktop');
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 	expect(ruling.store.draft(songKey, 'other')).toBe('');
 });
@@ -273,7 +276,7 @@ test('[ABRD-66] the draft is kept per card and survives a failed post, and a sto
 test('[ABRD-65] a pending Other answer marks the card pending so no pick can join it', () => {
 	const { store } = otherStore();
 
-	store.decideOther('repo', 42, songCard, 'x');
+	store.decideOther('repo', 42, songPoints, 'x');
 
 	expect(store.isPending(songKey)).toBe(true);
 });
