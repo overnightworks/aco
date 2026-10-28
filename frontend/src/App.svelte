@@ -108,6 +108,10 @@
 	});
 
 	$effect(() => {
+		decisions?.reconcilePicks(board.repos);
+	});
+
+	$effect(() => {
 		if (token === null) {
 			board.setNoAccess();
 			decisions = null;

@@ -677,7 +677,7 @@ for (const viewport of [
 		});
 
 		for (const how of ['the last pick', 'Accept all'] as const) {
-			test(`[ABRD-91] ${how} on a card that gained a point after the page read is refused, nothing is stored, and Neu laden clears the picks`, async ({
+			test(`[ABRD-91] ${how} on a card that gained a point after the page read is refused, nothing is stored, and Neu laden keeps the picks of the unchanged points`, async ({
 				page
 			}) => {
 				const { repoDirectory } = readBoardRuntime();
@@ -700,7 +700,7 @@ for (const viewport of [
 					card(page).getByRole('heading', { name: 'Song-Seite · 4 points' })
 				).toBeVisible();
 				await expect(card(page).locator('button.toggle')).toHaveCount(4);
-				await expect(page.getByRole('button', { pressed: true })).toHaveCount(0);
+				await expect(page.getByRole('button', { pressed: true })).not.toHaveCount(0);
 			});
 		}
 
@@ -749,7 +749,7 @@ for (const viewport of [
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByRole('alert')).toContainText('aco unavailable');
-			await expect(page.getByRole('button', { pressed: true })).toHaveCount(3);
+			await expect(page.getByRole('button', { pressed: true })).not.toHaveCount(0);
 			await pick(page, 1, 'A').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 

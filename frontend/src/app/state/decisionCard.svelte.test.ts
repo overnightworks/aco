@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
-import { cardOption, optionLine } from '../../test-support/board';
+import { cardOption, item, optionLine, repo } from '../../test-support/board';
 import type { DecisionResult, OptionLine } from '../../types';
 import type { Pick } from '../model/card';
 import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS } from '../model/decision';
@@ -282,8 +282,39 @@ describe('the card as shown', () => {
 	});
 });
 
+function readingOf(shown: OptionLine[]) {
+	return [repo({ name: 'repo', items: [item({ number: 7, lines: shown })] })];
+}
+
+describe('picks across re-reads', () => {
+	test('[ABRD-91] a point that changed and returned to its old fingerprint does not revive its pick', () => {
+		const { store } = setup();
+		store.choose('repo', 7, points, pickOf(points[0]));
+		store.choose('repo', 7, points, pickOf(points[1]));
+		const changed = [
+			points[0] as OptionLine,
+			point(3, { fingerprint: 'fp-new' }),
+			points[2] as OptionLine
+		];
+
+		store.reconcilePicks(readingOf(changed));
+		store.reconcilePicks(readingOf([...points]));
+
+		expect(store.picks(key, points).map((pick) => pick.shown.index)).toEqual([2]);
+	});
+
+	test('[ABRD-91] a re-read keeps the picks of unchanged points', () => {
+		const { store } = setup();
+		store.choose('repo', 7, points, pickOf(points[0]));
+
+		store.reconcilePicks(readingOf([...points]));
+
+		expect(store.picks(key, points)).toHaveLength(1);
+	});
+});
+
 describe('a refused card', () => {
-	test('[ABRD-45] "Neu laden" after a changed refusal drops the banner and clears the picks', async () => {
+	test('[ABRD-45] "Neu laden" after a changed refusal drops the banner and keeps the picks of unchanged points', async () => {
 		const { reload, store } = setup({ status: 'failed', message: LINE_CHANGED_MESSAGE });
 		chooseAll(store);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -293,7 +324,7 @@ describe('a refused card', () => {
 		await store.reloadAfterBanner(key);
 
 		expect(store.banner(key)).toBeNull();
-		expect(store.picks(key, points)).toEqual([]);
+		expect(store.picks(key, points)).toHaveLength(3);
 		expect(reload).toHaveBeenCalledTimes(1);
 	});
 

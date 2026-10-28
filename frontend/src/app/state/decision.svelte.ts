@@ -9,10 +9,11 @@
  * truth this re-reads from after a write, rather than mutating a copy.
  */
 
+import { untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import { postDecision } from '../../client';
-import type { DecisionRequest, OptionLine, Outcome, YesNoLine } from '../../types';
-import { cardHeading, outcomeLabel, type StripState } from '../model/boardSummary';
+import type { DecisionRequest, OptionLine, Outcome, RepoReading, YesNoLine } from '../../types';
+import { cardHeading, findSelection, outcomeLabel, type StripState } from '../model/boardSummary';
 import {
 	cardName,
 	livePicks,
@@ -162,6 +163,23 @@ export class DecisionStore {
 		return livePicks(this.#picks[key] ?? [], points);
 	}
 
+	/** Drops, for good, the picks of every shown card whose point changed or closed:
+	 * a point that later returns to its old fingerprint does not revive its pick. */
+	reconcilePicks(repos: RepoReading[]): void {
+		const stored = untrack(() => this.#picks);
+		const kept: Record<string, Pick[]> = {};
+		let dropped = false;
+		for (const [key, picks] of Object.entries(stored)) {
+			const selection = findSelection(repos, key);
+			const live = selection?.kind === 'card' ? livePicks(picks, selection.points) : picks;
+			dropped ||= live.length !== picks.length;
+			kept[key] = live;
+		}
+		if (dropped) {
+			this.#picks = kept;
+		}
+	}
+
 	/** The line index of the card's open point, or null while none is open. */
 	openPoint(key: string): number | null {
 		return this.#openPoints[key] ?? null;
@@ -261,11 +279,10 @@ export class DecisionStore {
 		}
 	}
 
-	/** The operator's own "Neu laden" after a refusal: drop it and the card's
-	 * picks, which may be stale, and re-read afresh. */
+	/** The operator's own "Neu laden" after a refusal: drop it and re-read; the
+	 * picks of unchanged points stay, those of changed points go with the re-read. */
 	async reloadAfterBanner(key: string): Promise<void> {
 		this.#banners = withoutKey(this.#banners, key);
-		this.#picks = withoutKey(this.#picks, key);
 		await this.reload();
 	}
 
