@@ -6,7 +6,7 @@ import re
 import shlex
 import tomllib
 from collections import Counter
-from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
@@ -2401,8 +2401,8 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
             next_line = item.contract.next
             next_step = next_line if has_further_work(next_line) else cut_title
             return CutSliceAction(item, container, next_step, cut_title)
-        case CheckVerdict(next_step=next_step) if not _check_barred(verdict, item.open_blockers):
-            return CheckContainerAction(item, container, next_step)
+        case CheckVerdict(next_step=step) if not _check_barred(verdict, bool(item.open_blockers)):
+            return CheckContainerAction(item, container, step)
         case CloseVerdict():
             return CloseContainerAction(item, container)
         case _:
@@ -2848,8 +2848,8 @@ def childless_containers_with_uncut_rows(
     )
 
 
-def _check_barred(verdict: ChildlessContainerVerdict | None, blockers: Sized) -> bool:
-    return isinstance(verdict, CheckVerdict) and bool(blockers)
+def _check_barred(verdict: ChildlessContainerVerdict | None, blocked: bool) -> bool:
+    return isinstance(verdict, CheckVerdict) and blocked
 
 
 def _childless_container_reason(
@@ -2965,7 +2965,7 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
-        if _check_barred(facts.childless_verdict, facts.open_blockers):
+        if _check_barred(facts.childless_verdict, bool(facts.open_blockers)):
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason
