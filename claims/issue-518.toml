@@ -1,8 +1,0 @@
-claim_id = "89621ab115024b13a0908da27ae4d094"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "069d6a46fe1b2e826d2b2ac31e31bfe391bb393c"
-branch = "claude/issue-518-newest-check-run-per-name"
-scope = ["quality/baseline.toml", "specs/land.spec.md", "src/aco/github.py", "tests/test_cmd_land_newest_check.py", "tests/test_github.py", "tests/test_github_newest_check.py"]
-opened_commit = "7563006e41f756c47396affd46baa9a23221ea29"
-whole_reason = "The read, its criterion and its two tests change together; the baseline follows if github.py shrinks."
