@@ -120,6 +120,20 @@ writes them:
 - `question`, `problem`, `picture` (TODAY), `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required;
 - 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then either `picture` with an optional `caption` or `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
 
+`decision_kind` names what the choice puts at stake. Pick the first that fits, in this order:
+
+- `data_risk`: stored data can be lost, exposed or corrupted, or security is weakened;
+- `money`: something is paid or earned;
+- `access`: who may see or do what, including a step only the operator can take;
+- `release`: what goes live or is published, and when;
+- `product`: what a person can do or sees happen;
+- `technical`: how the work is built, with nothing a person notices;
+- `wording`: only visible text changes.
+
+`area` names the part of the product the line belongs to, in the operator's
+words, for example `Song page`. Points of one card share it. `topic` names this
+one decision in two to five words, for example `Song stays open`.
+
 The options' letters are `A`..`D` by position and never stored; `<L>` below
 is the present letters, for example `A, B`. A line ruled `other` is bound by
 `other`, not by its `text` or options. Inside one entry the refusals print
