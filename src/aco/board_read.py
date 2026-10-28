@@ -50,11 +50,10 @@ TRUNK_LANDING_DEPTH = 5000
 def validated_dependencies(
     issues: tuple[workboard.Issue, ...], fetched: dict[int, tuple[workboard.IssueDependency, ...]]
 ) -> dict[int, tuple[workboard.IssueDependency, ...]]:
-    """`fetched`, keyed by the given issues, each list checked against its
-    own listing count: a length
-    mismatch or a duplicated dependency is the same class of malformed
-    forge response as a disagreeing container summary -- named loud rather
-    than guessed through."""
+    """`fetched`, keyed by the given issues, each list checked against its own
+    listing count: a length mismatch or a duplicated dependency is the same
+    class of malformed forge response as a disagreeing container summary --
+    named loud rather than guessed through."""
     validated: dict[int, tuple[workboard.IssueDependency, ...]] = {}
     for issue in issues:
         dependencies = fetched.get(issue.number, ())
