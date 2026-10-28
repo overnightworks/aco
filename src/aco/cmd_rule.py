@@ -193,6 +193,16 @@ def _refuse_a_repeated_shared_flag(given: Sequence[_GivenFlag]) -> None:
         seen.add(flag.name)
 
 
+def _store_a_line_flag(
+    flags_of: dict[int, dict[str, str]], owner: int | None, flag: _GivenFlag
+) -> None:
+    if owner is None:
+        raise FlagCombinationError(f"{flag.name} before the first --line belongs to no line")
+    if flag.name in flags_of[owner]:
+        raise FlagCombinationError(f"line {owner} has a second {flag.name}")
+    flags_of[owner][flag.name] = cast(str, flag.value)
+
+
 def _flags_of_each_line(given: Sequence[_GivenFlag]) -> dict[int, dict[str, str]]:
     """Each named line's `--option` and `--card-hash`: with several `--line` the
     ones written after it, with one `--line` wherever they stand. Refuses in
@@ -209,13 +219,7 @@ def _flags_of_each_line(given: Sequence[_GivenFlag]) -> dict[int, dict[str, str]
             named.add(index)
             owner = index if len(indexes) > 1 else owner
         elif flag.name in _PER_LINE:
-            if owner is None:
-                raise FlagCombinationError(
-                    f"{flag.name} before the first --line belongs to no line"
-                )
-            if flag.name in flags_of[owner]:
-                raise FlagCombinationError(f"line {owner} has a second {flag.name}")
-            flags_of[owner][flag.name] = cast(str, flag.value)
+            _store_a_line_flag(flags_of, owner, flag)
     return flags_of
 
 
