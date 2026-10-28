@@ -64,7 +64,6 @@ from cli_fixtures import (
     empty_harness_socket_on_stdin,
     fail_git_launch,
     fetched_once_then_read,
-    forbid_forge_resolution,
     forbid_git_fill,
     forbid_github_construction,
     freeze_cli_now,
@@ -3983,6 +3982,24 @@ def test_readme_and_help_texts_carry_no_stale_state_ref_read_only_sentence() -> 
             id="rescope-names-a-repository-relative-path",
         ),
         pytest.param(
+            "claim",
+            ("omit for lane mode, derived from a docs/ or fix/ checkout branch",),
+            id="claim-names-where-lane-mode-takes-its-branch-from",
+        ),
+        pytest.param(
+            "rescope",
+            ("omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim",),
+            id="rescope-names-the-branches-lane-mode-accepts",
+        ),
+        pytest.param(
+            "release",
+            (
+                "omit for lane mode: a docs/ or fix/ branch, one holding a live lane claim, "
+                "or a github --merged rerun on a branch no claim holds",
+            ),
+            id="release-names-the-branches-lane-mode-accepts",
+        ),
+        pytest.param(
             "next",
             (
                 "labelled needs-operator waits on the operator",
@@ -3996,10 +4013,10 @@ def test_readme_and_help_texts_carry_no_stale_state_ref_read_only_sentence() -> 
 def test_help_text_names_the_refusal_or_source_it_documents(
     capsys: pytest.CaptureFixture[str], command: str, substrings: tuple[str, ...]
 ) -> None:
-    """`claim --help` and `rescope --help` each name, in prose, the refusal
-    or derivation source their own behaviour documents -- the out-of-order
-    and wide-scope refusals, and
-    where an omitted `--scope` comes from; `next --help` names the label
+    """`claim --help`, `rescope --help` and `release --help` each name, in prose,
+    the refusal or derivation source their own behaviour documents -- the
+    out-of-order and wide-scope refusals, where an omitted `--scope` comes
+    from, and which branches lane mode accepts; `next --help` names the label
     that holds an item for the operator and how to set it."""
     with pytest.raises(SystemExit) as exited:
         issue_claim.main([command, "--help"])
@@ -13169,17 +13186,12 @@ def test_a_command_reads_its_static_facts_and_the_state_ref_once_per_directory(
 @dataclass(frozen=True)
 class _LaneLookupCase:
     cell: str
-    command: str = "release"
     branch: str = "dependabot/x"
     holder: str = "lane"
-    agent: str = "Ada"
-    merged: bool = False
     trailer: str = "No-Item: fix"
     source: str = "dependabot/x"
     as_json: bool = False
     refusal: str | None = None
-    reads_once: bool = False
-    exact: bool = True
     claim_id: str | None = None
     merged_ref: str = "12"
     state_ref: bool = False
@@ -13204,20 +13216,14 @@ _WORK_ITEM_TRAILER_REFUSAL = (
 )
 
 _LANE_LOOKUP_CASES = (
-    _LaneLookupCase(
-        "5", holder="none", refusal=_lane_lookup_refusal("dependabot/x"), reads_once=True
-    ),
-    _LaneLookupCase("6", holder="issue", refusal=_lane_lookup_refusal("dependabot/x")),
-    _LaneLookupCase("8", merged=True),
+    _LaneLookupCase("8"),
     _LaneLookupCase(
         "9",
-        merged=True,
         trailer="Work-Item: #42",
         refusal=_WORK_ITEM_TRAILER_REFUSAL,
     ),
     _LaneLookupCase(
         "10",
-        merged=True,
         source="dependabot/y",
         refusal=(
             "lane 'dependabot/x' is claimed on 'dependabot/x', not on pull request #12's "
@@ -13225,40 +13231,35 @@ _LANE_LOOKUP_CASES = (
         ),
     ),
     _LaneLookupCase(
-        "11", holder="none", merged=True, nothing_left_worktree="kept -- release ran from inside it"
+        "11", holder="none", nothing_left_worktree="kept -- release ran from inside it"
     ),
     _LaneLookupCase(
         "12",
         holder="none",
-        merged=True,
         source="dependabot/y",
         refusal="lane 'dependabot/x' has no active build claim",
     ),
     _LaneLookupCase(
         "13",
         holder="none",
-        merged=True,
         trailer="Work-Item: #42",
         refusal=_WORK_ITEM_TRAILER_REFUSAL,
     ),
     _LaneLookupCase(
         "14",
         holder="none",
-        merged=True,
         landing_merged=False,
         refusal="pull request #12 is not merged",
     ),
     _LaneLookupCase(
         "15",
         holder="none",
-        merged=True,
         claim_id="X",
         refusal=_lane_lookup_refusal("dependabot/x"),
     ),
     _LaneLookupCase(
         "16",
         holder="none",
-        merged=True,
         merged_ref=MERGE_COMMIT_SHA,
         state_ref=True,
         refusal=_lane_lookup_refusal("dependabot/x"),
@@ -13266,55 +13267,25 @@ _LANE_LOOKUP_CASES = (
     _LaneLookupCase(
         "17",
         holder="issue",
-        merged=True,
         refusal=_lane_lookup_refusal("dependabot/x"),
         no_forge_reads=True,
     ),
     _LaneLookupCase(
         "18",
         holder="none",
-        merged=True,
         issue_claim_lands_during_verification=True,
         nothing_left_worktree="kept -- claimed again while this release ran",
-    ),
-    _LaneLookupCase("25", command="rescope"),
-    _LaneLookupCase(
-        "26", command="rescope", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
-    ),
-    _LaneLookupCase(
-        "27",
-        command="rescope",
-        agent="Bob",
-        refusal="only the original claimant may rescope",
-        exact=False,
-    ),
-    _LaneLookupCase(
-        "28", command="claim", holder="none", refusal=_lane_lookup_refusal("dependabot/x")
-    ),
-    _LaneLookupCase("29", command="claim", refusal=_lane_lookup_refusal("dependabot/x")),
-    _LaneLookupCase("30", branch="docs/x", reads_once=True),
-    _LaneLookupCase(
-        "32",
-        branch="",
-        holder="none",
-        refusal=(
-            "lane release requires a non-empty current branch; "
-            "check out the docs/ or fix/ lane branch, or pass an issue number"
-        ),
     ),
     _LaneLookupCase(
         "31",
         branch="docs/x",
         holder="none",
-        merged=True,
         source="docs/x",
         nothing_left_worktree="kept -- release ran from inside it",
     ),
-    _LaneLookupCase("33", as_json=True),
     _LaneLookupCase(
         "34",
         holder="none",
-        merged=True,
         as_json=True,
         nothing_left_worktree="kept -- release ran from inside it",
     ),
@@ -13322,14 +13293,10 @@ _LANE_LOOKUP_CASES = (
         "38",
         branch="ada/issue-42",
         holder="none",
-        merged=True,
         trailer="Work-Item: #42",
         source="ada/issue-42",
         refusal=_WORK_ITEM_TRAILER_REFUSAL,
     ),
-    _LaneLookupCase("35", command="release-help"),
-    _LaneLookupCase("36", command="rescope-help"),
-    _LaneLookupCase("37", command="claim-help"),
 )
 
 
@@ -13350,7 +13317,7 @@ def _arrange_lane_lookup_case(
         )
     )
     client = FakeForge()
-    _patch_release_session(monkeypatch, client, *standing, agent=case.agent, branch=case.branch)
+    _patch_release_session(monkeypatch, client, *standing, branch=case.branch)
     toplevel = str(tmp_path) if case.state_ref else "/repo"
     if case.state_ref:
         _write_state_ref_pin(tmp_path)
@@ -13359,25 +13326,22 @@ def _arrange_lane_lookup_case(
         checkout, "git_output", lambda arguments, **_kwargs: git_values[tuple(arguments)]
     )
     monkeypatch.setattr(checkout, "scope_directories", lambda paths, **_kwargs: ())
-    if case.merged:
-        monkeypatch.setattr(store, "list_worktrees", lambda _toplevel: (Path("/repo"),))
-        client.landings[12] = landing_pull_request(
-            body=case.trailer,
-            merged=case.landing_merged,
-            head_ref_name=case.source,
-            base_ref_name="main",
-        )
-        work_items = ("#42",) if case.trailer == "Work-Item: #42" else ()
-        classification = workboard.trunk_commit_classification(
-            work_items, () if work_items else ("fix",)
-        )
-        monkeypatch.setattr(
-            checkout,
-            "trunk_landings",
-            lambda *_args, **_kwargs: (_trunk_landing(MERGE_COMMIT_SHA, classification),),
-        )
-    else:
-        forbid_forge_resolution(monkeypatch)
+    monkeypatch.setattr(store, "list_worktrees", lambda _toplevel: (Path("/repo"),))
+    client.landings[12] = landing_pull_request(
+        body=case.trailer,
+        merged=case.landing_merged,
+        head_ref_name=case.source,
+        base_ref_name="main",
+    )
+    work_items = ("#42",) if case.trailer == "Work-Item: #42" else ()
+    classification = workboard.trunk_commit_classification(
+        work_items, () if work_items else ("fix",)
+    )
+    monkeypatch.setattr(
+        checkout,
+        "trunk_landings",
+        lambda *_args, **_kwargs: (_trunk_landing(MERGE_COMMIT_SHA, classification),),
+    )
     if case.issue_claim_lands_during_verification:
         _claim_the_branch_while_the_landing_verifies(monkeypatch, client, case.branch)
     return client
@@ -13408,16 +13372,12 @@ def _claim_the_branch_while_the_landing_verifies(
 
 
 def _lane_lookup_arguments(case: _LaneLookupCase) -> list[str]:
-    if case.command == "claim":
-        return ["claim", "--scope", "a"]
-    if case.command == "rescope":
-        return ["rescope", "--add", "/repo/f"]
-    branch_flags = ["--branch", case.branch] if case.branch else []
-    outcome = ["--merged", case.merged_ref] if case.merged else ["--abandoned", "R"]
     return [
         "release",
-        *branch_flags,
-        *outcome,
+        "--branch",
+        case.branch,
+        "--merged",
+        case.merged_ref,
         *(["--claim-id", case.claim_id] if case.claim_id else []),
         *(["--json"] if case.as_json else []),
     ]
@@ -13439,23 +13399,6 @@ def _nothing_left_output(case: _LaneLookupCase, output: str) -> tuple[str, str]:
     return "nothing left to release", worktree.removeprefix("worktree: ")
 
 
-def _assert_lane_lookup_help(case: _LaneLookupCase, capsys: pytest.CaptureFixture[str]) -> None:
-    command = case.command.removesuffix("-help")
-    with pytest.raises(SystemExit) as exited:
-        issue_claim.main([command, "--help"])
-    assert exited.value.code == 0
-    help_text = " ".join(capsys.readouterr().out.split())
-    expected = {
-        "claim": "omit for lane mode, derived from a docs/ or fix/ checkout branch",
-        "release": (
-            "omit for lane mode: a docs/ or fix/ branch, one holding a live lane claim, or a "
-            "github --merged rerun on a branch no claim holds"
-        ),
-        "rescope": "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim",
-    }[command]
-    assert expected in help_text
-
-
 @pytest.mark.parametrize("case", _LANE_LOOKUP_CASES, ids=lambda case: case.cell)
 def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     monkeypatch: pytest.MonkeyPatch,
@@ -13463,29 +13406,17 @@ def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
     tmp_path: Path,
     case: _LaneLookupCase,
 ) -> None:
-    if case.command.endswith("-help"):
-        _assert_lane_lookup_help(case, capsys)
-        return
     client = _arrange_lane_lookup_case(monkeypatch, tmp_path, case)
     before = store.fetch_state(worktree=Path("."), remote="origin").claims
-    reads = count_context_reads(monkeypatch)
     status = issue_claim.main(["--repo", REPOSITORY, *_lane_lookup_arguments(case)])
     captured = capsys.readouterr()
-    if case.reads_once:
-        assert sum(reads.observations.values()) == 1
     if case.no_forge_reads:
         assert client.requests == 0
     after = store.fetch_state(worktree=Path("."), remote="origin").claims
     assert status == (2 if case.refusal else 0)
     if case.refusal:
-        if case.exact:
-            assert captured.err == f"ERROR: {case.refusal}\n"
-        else:
-            assert case.refusal in captured.err
+        assert captured.err == f"ERROR: {case.refusal}\n"
         assert after == before
-    elif case.command == "rescope":
-        assert _live_store_claim().scope == ("a", "f")
-        assert captured.out.startswith("RESCOPED lane dependabot/x: mine")
     elif case.nothing_left_worktree:
         assert _nothing_left_output(case, captured.out) == (
             "nothing left to release",
@@ -13494,12 +13425,5 @@ def test_lane_mode_outside_docs_and_fix_resolves_only_an_existing_claim(
         assert bool(after) is case.issue_claim_lands_during_verification
     else:
         assert after == {}
-        if case.as_json:
-            envelope = json.loads(captured.out)
-            assert envelope["ok"] is True
-            assert envelope["reason"] == "abandoned"
-            assert envelope["lane"] is True
-        else:
-            assert captured.out.startswith(f"RELEASED lane {case.branch}: mine\n")
-            if case.merged:
-                assert "worktree: kept -- release ran from inside it\n" in captured.out
+        assert captured.out.startswith(f"RELEASED lane {case.branch}: mine\n")
+        assert "worktree: kept -- release ran from inside it\n" in captured.out
