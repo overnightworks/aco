@@ -885,18 +885,18 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError("GitHub returned duplicate changed files")
         return forge.PullRequestChanges(before, after, files)
 
-    def _check_run(self, value: object) -> forge.CheckRun:
+    def _check_run(self, value: object) -> tuple[int, forge.CheckRun]:
         if not isinstance(value, dict):
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed check run")
-        name = value.get("name")
-        conclusion = value.get("conclusion")
+        run_id, name, conclusion = (value.get(key) for key in ("id", "name", "conclusion"))
         if (
-            not isinstance(name, str)
+            not isinstance(run_id, int)
+            or not isinstance(name, str)
             or not name
             or (conclusion is not None and (not isinstance(conclusion, str) or not conclusion))
         ):
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed check run")
-        return forge.CheckRun(name, conclusion)
+        return run_id, forge.CheckRun(name, conclusion)
 
     def _check_run_page(self, sha: str, page: int) -> tuple[object, ...]:
         raw = self._run(
@@ -905,19 +905,19 @@ class GitHubForge:
                 f"repos/{self.repository}/commits/{sha}/check-runs"
                 f"?per_page={ISSUES_PER_PAGE}&page={page}",
                 "--jq",
-                '.check_runs[] | {name,conclusion:(if .status == "completed" '
+                '.check_runs[] | {id,name,conclusion:(if .status == "completed" '
                 "then .conclusion else null end)}",
             ]
         )
         return self._json_lines(raw, "check run")
 
     def _check_runs(self, sha: str) -> tuple[forge.CheckRun, ...]:
-        """Every check run against `sha`, not merely its first page: a run
-        reported only on a later page counts exactly as one on the first."""
+        """Each check name's newest run (highest id) against `sha`, over every page."""
         values = self._fetch_pages(
             lambda page: self._check_run_page(sha, page), per_page=ISSUES_PER_PAGE
         )
-        return tuple(self._check_run(value) for value in values)
+        oldest_first = sorted(map(self._check_run, values), key=lambda pair: pair[0])
+        return tuple({run.name: run for _, run in oldest_first}.values())
 
     def _combined_status_summary(self, sha: str) -> tuple[str, int]:
         """`sha`'s combined-status verdict and true total:
