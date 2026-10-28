@@ -1,10 +1,10 @@
 """The decision board's own rules, free of any transport.
 
 `Board` reads every expectation line afresh from its `DecisionPort` and
-writes one decision at a time through it, with no concurrency state of its
-own. `Boards` composes one or more `Board`s under their repo labels: it reads
-every repo in parallel, isolating a failing repo to its own `RepoUnavailable`
-entry, and owns the one write turn and drain shared across all of them --
+writes one decision, or one whole option card, at a time through it, with no
+concurrency state of its own. `Boards` composes one or more `Board`s under their
+repo labels: it reads every repo in parallel, isolating a failing repo to its own
+`RepoUnavailable` entry, and owns the one write turn and drain shared across all of them --
 including the single-repo case, so that lock never exists twice.
 """
 
@@ -13,12 +13,14 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 
 from .ports import (
     CardChanged,
+    CardDecision,
+    CardLine,
     Decision,
     DecisionPort,
     DecisionResult,
@@ -27,6 +29,7 @@ from .ports import (
     ExpectationLine,
     OptionLine,
     OptionLineDecision,
+    PostedCard,
 )
 
 LINE_CHANGED = "Diese Zeile hat sich geändert, bitte neu laden"
@@ -123,6 +126,51 @@ class Board:
             return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
         return written
 
+    def decide_card(self, posted: PostedCard, repo: str) -> DecisionResult:
+        """Write `posted` with one call unless it no longer reads as the card shown.
+
+        The check and the write share one fresh read, so each hash written is the
+        one the check compared; callers serialize writes as for `decide_one`.
+        """
+        try:
+            lines = self._decisions.expectation_lines()
+        except DecisionSourceUnavailableError as error:
+            return DecisionResult(DecisionStatus.FAILED, str(error))
+        checked = checked_card(posted, repo, lines)
+        if checked is None:
+            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
+        written = self._decisions.rule_card(checked)
+        if isinstance(written, CardChanged):
+            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
+        return written
+
+
+def checked_card(
+    posted: PostedCard, repo: str, lines: Sequence[ExpectationLine]
+) -> CardDecision | None:
+    """The posted card as a decision on the lines just read, or None when it no
+    longer reads as shown: every posted line must be an option line of the item,
+    each open one with its posted fingerprint, and every open option line of the
+    item must be posted. A posted line that is no longer open is the source's own
+    refusal to make, as in `Board.decide_one`."""
+    options = {
+        line.index: line
+        for line in lines
+        if isinstance(line, OptionLine) and line.item == posted.item
+    }
+    checked: list[CardLine] = []
+    for posted_line in posted.lines:
+        shown = options.get(posted_line.index)
+        if shown is None or (
+            shown.is_open and wire_fingerprint(repo, shown) != posted_line.fingerprint
+        ):
+            return None
+        checked.append(CardLine(posted_line.index, shown.card_hash, posted_line.letter))
+    posted_indexes = {posted_line.index for posted_line in posted.lines}
+    if any(line.is_open and index not in posted_indexes for index, line in options.items()):
+        return None
+    return CardDecision(posted.item, tuple(checked), posted.answer)
+
 
 class Boards:
     """One or more repos' `Board`s under their labels, sharing one write turn.
@@ -166,10 +214,17 @@ class Boards:
         binding during its own fresh read, so an identical line read under
         another configured repo's label never satisfies it.
         """
+        return self._in_turn(lambda: self._boards[repo].decide_one(decision, repo, fingerprint))
+
+    def decide_card(self, repo: str, posted: PostedCard) -> DecisionResult:
+        """Write a whole card through `repo`'s board in one turn, as `decide` does a line."""
+        return self._in_turn(lambda: self._boards[repo].decide_card(posted, repo))
+
+    def _in_turn(self, write: Callable[[], DecisionResult]) -> DecisionResult:
         if not self._take_turn():
             return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
         try:
-            return self._boards[repo].decide_one(decision, repo, fingerprint)
+            return write()
         finally:
             self._end_turn()
 

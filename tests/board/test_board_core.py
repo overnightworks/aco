@@ -15,18 +15,21 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import pytest
-from aco_board_fixtures import FakeAcoRepository, line, row
+from aco_board_fixtures import FakeAcoRepository, line, option_line, row
 
 from aco.board.aco_cli import AcoCli
-from aco.board.board import SHUTTING_DOWN, Board, Boards
+from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
+    CardDecision,
     Decision,
     DecisionResult,
     DecisionStatus,
     ExpectationLine,
     OptionLineDecision,
     Outcome,
+    PostedCard,
+    PostedLine,
     YesNoLine,
 )
 
@@ -78,9 +81,11 @@ class _HeldDecisions:
         self.writing = threading.Event()
         self.may_finish = threading.Event()
         self.ruled: list[Decision] = []
+        self.ruled_cards: list[CardDecision] = []
+        self.lines: tuple[ExpectationLine, ...] = ()
 
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
-        return ()
+        return self.lines
 
     def rule(self, decision: Decision) -> DecisionResult:
         self.writing.set()
@@ -92,6 +97,12 @@ class _HeldDecisions:
         self, decision: OptionLineDecision, card_hash: str
     ) -> DecisionResult | CardChanged:
         raise AssertionError("an option is never ruled here")
+
+    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+        self.writing.set()
+        assert self.may_finish.wait(_WAIT_SECONDS)
+        self.ruled_cards.append(decision)
+        return DecisionResult(DecisionStatus.RULED)
 
 
 def _signal_when_a_decision_waits_for_its_turn(
@@ -143,6 +154,38 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
 
     assert running_answer.result().status is DecisionStatus.RULED
     assert decisions.ruled == [running]
+
+
+def test_a_card_write_holds_the_turn_against_a_decision_waiting_behind_it(
+    repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ABRD-17, ABRD-18, ABRD-77: a card is written inside the one turn, and stopping
+    refuses what waits behind it while the card write still completes."""
+    repository.set_rulings(row(7, "Karte", option_line(index=2)))
+    decisions = _HeldDecisions()
+    [shown] = Board(AcoCli(directory=repository.directory)).snapshot().lines
+    decisions.lines = (shown,)
+    boards = Boards({_LABEL: Board(decisions)})
+    waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
+    posted = PostedCard(7, (PostedLine(2, wire_fingerprint(_LABEL, shown), "A"),), None)
+
+    with ThreadPoolExecutor(max_workers=3) as threads:
+        running_card = threads.submit(boards.decide_card, _LABEL, posted)
+        assert decisions.writing.wait(_WAIT_SECONDS)
+        waiting_answer = threads.submit(
+            boards.decide, _LABEL, Decision(7, 1, Outcome.YES, None), "shown"
+        )
+        assert waiting_for_turn.wait(_WAIT_SECONDS)
+        stopping = threads.submit(boards.close_writes)
+
+        assert waiting_answer.result(_WAIT_SECONDS) == DecisionResult(
+            DecisionStatus.FAILED, SHUTTING_DOWN
+        )
+        decisions.may_finish.set()
+        stopping.result(_WAIT_SECONDS)
+
+    assert running_card.result().status is DecisionStatus.RULED
+    assert [card.item for card in decisions.ruled_cards] == [7]
 
 
 def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(

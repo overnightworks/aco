@@ -20,7 +20,7 @@ import stat
 import struct
 import sys
 import threading
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from email.message import Message
@@ -46,31 +46,56 @@ with (repository / "aco-calls.jsonl").open("a", encoding="utf-8") as calls:
     calls.write(json.dumps(sys.argv[1:]) + "\\n")
 rulings = repository / "rulings.json"
 
+
+class NamedLine(argparse.Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        namespace.named.append({"line": int(value), "option": None, "card_hash": None})
+
+
+class OfLastLine(argparse.Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        if not namespace.named:
+            parser.error(option_string + " follows its --line")
+        namespace.named[-1][self.dest] = value
+
+
 parser = argparse.ArgumentParser(prog="aco")
 commands = parser.add_subparsers(dest="command", required=True)
 listing = commands.add_parser("rulings")
 listing.add_argument("--json", action="store_true")
 rule = commands.add_parser("rule")
 rule.add_argument("item")
-rule.add_argument("--line", type=int, required=True)
-outcomes = rule.add_mutually_exclusive_group(required=True)
+rule.set_defaults(named=[])
+rule.add_argument("--line", action=NamedLine, required=True)
+rule.add_argument("--option", action=OfLastLine)
+rule.add_argument("--card-hash", dest="card_hash", action=OfLastLine)
+outcomes = rule.add_mutually_exclusive_group()
 for outcome in ("yes", "no", "later"):
     outcomes.add_argument("--" + outcome, dest="ruling", action="store_const", const=outcome)
-outcomes.add_argument("--option", dest="ruling")
 outcomes.add_argument("--other")
 outcomes.add_argument("--unclear", action="store_true")
 rule.add_argument("--via")
-rule.add_argument("--card-hash")
 rule.add_argument("--note")
 rule.add_argument("--json", action="store_true")
 arguments = parser.parse_args()
+if arguments.command == "rule":
+    picks = [named["option"] is not None for named in arguments.named]
+    if getattr(arguments, "ruling", None) is None and not any(picks) and (
+        getattr(arguments, "other", None) is None and not getattr(arguments, "unclear", False)
+    ):
+        parser.error("name an outcome")
+    if any(picks) and not all(picks):
+        parser.error("--option belongs to every --line or to none")
+    if any(picks):
+        arguments.ruling = "option"
+all_hashed = all(named["card_hash"] is not None for named in getattr(arguments, "named", []))
 if getattr(arguments, "other", None) is not None:
     arguments.ruling = "other"
-    if arguments.via != "board" or arguments.card_hash is None or arguments.note is not None:
+    if arguments.via != "board" or not all_hashed or arguments.note is not None:
         parser.error("--other needs --via board and --card-hash, and takes no --note")
 if getattr(arguments, "unclear", False) and (
     arguments.via is not None
-    or arguments.card_hash is None
+    or not all_hashed
     or (arguments.note is not None and not arguments.note.strip())
 ):
     parser.error("--unclear needs --card-hash and takes no --via and no blank --note")
@@ -111,35 +136,45 @@ wait_if_asked("rule-delay-seconds")
 row = next((row for row in rows if str(row["number"]) == arguments.item), None)
 if row is None:
     refuse("invalid_item", "#" + arguments.item + " does not exist")
-line = next((line for line in row["lines"] if line["index"] == arguments.line), None)
-if line is None:
-    refuse("line_out_of_range", "line %d out of range: this item has %d expectation line(s)"
-           % (arguments.line, len(row["lines"])))
-if line["ruling"] is not None:
-    refuse("already_ruled",
-           "line %d is already ruled; a changed ruling is a new line" % arguments.line)
-if getattr(arguments, "unclear", False):
-    if line["returned_on"] is not None:
+targets = []
+for named in arguments.named:
+    line = next((line for line in row["lines"] if line["index"] == named["line"]), None)
+    if line is None:
+        refuse("line_out_of_range", "line %d out of range: this item has %d expectation line(s)"
+               % (named["line"], len(row["lines"])))
+    if line["ruling"] is not None:
+        refuse("already_ruled",
+               "line %d is already ruled; a changed ruling is a new line" % named["line"])
+    if getattr(arguments, "unclear", False) and line["returned_on"] is not None:
         refuse("with_head", "line %d is already with its head; it comes back once revised"
-               % arguments.line)
-    line["returned_on"], line["returned_note"] = "2026-10-03", arguments.note
+               % named["line"])
+    targets.append((named, line))
+indexes = [named["line"] for named in arguments.named]
+still_open = sum(1 for entry in row["lines"] if entry["ruling"] is None)
+if getattr(arguments, "unclear", False):
+    for named, line in targets:
+        line["returned_on"], line["returned_note"] = "2026-10-03", arguments.note
     rulings.write_text(json.dumps(rows), encoding="utf-8")
     print(json.dumps({"ok": True, "reason": "returned", "item": row["number"],
-                      "index": arguments.line, "returned_on": "2026-10-03",
-                      "open": sum(1 for entry in row["lines"] if entry["ruling"] is None)}))
+                      "index": indexes[0], "lines": indexes, "returned_on": "2026-10-03",
+                      "open": still_open}))
     sys.exit(0)
-line["ruling"], line["ruled_on"] = arguments.ruling, "2026-10-03"
-if arguments.via is not None:
-    line["via"] = arguments.via
-if arguments.other is not None:
-    line["other"] = arguments.other
-if arguments.note is not None:
-    line["text"] += " Anmerkung: " + arguments.note
+for named, line in targets:
+    line["ruling"] = named["option"] or arguments.ruling
+    line["ruled_on"] = "2026-10-03"
+    if "returned_on" in line:
+        line["returned_on"], line["returned_note"] = None, None
+    if arguments.via is not None:
+        line["via"] = arguments.via
+    if arguments.other is not None:
+        line["other"] = arguments.other
+    if arguments.note is not None:
+        line["text"] += " Anmerkung: " + arguments.note
 rulings.write_text(json.dumps(rows), encoding="utf-8")
-still_open = sum(1 for entry in row["lines"] if entry["ruling"] is None)
 print(json.dumps({"ok": True, "reason": "ruled", "item": row["number"],
-                  "index": arguments.line, "ruling": arguments.ruling,
-                  "ruled_on": "2026-10-03", "open": still_open}))
+                  "index": indexes[0], "lines": indexes,
+                  "ruling": targets[0][0]["option"] or arguments.ruling,
+                  "ruled_on": "2026-10-03", "open": still_open - len(targets)}))
 """
 
 
@@ -462,6 +497,32 @@ class BoardClient:
                 "line": line["index"],
                 "fingerprint": line["fingerprint"],
                 "option": option,
+            }
+        )
+
+    def decide_card_through_api(
+        self,
+        item: int,
+        lines: Sequence[Mapping[str, object]],
+        options: Sequence[str] | None = None,
+        answer: Mapping[str, object] | None = None,
+        *,
+        repo: str | None = None,
+    ) -> Response:
+        """Post a card for `lines` exactly as `GET /api/board` listed them: a letter
+        from `options` per line, or `answer` (`other` or `unclear`) for all of them."""
+        letters: Sequence[Mapping[str, str]] = (
+            [{} for _ in lines] if options is None else [{"option": letter} for letter in options]
+        )
+        return self.post_rule(
+            {
+                "repo": self.repo if repo is None else repo,
+                "item": item,
+                "lines": [
+                    {"line": shown["index"], "fingerprint": shown["fingerprint"], **letter}
+                    for shown, letter in zip(lines, letters, strict=True)
+                ],
+                **(answer or {}),
             }
         )
 

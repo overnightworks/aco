@@ -1,9 +1,9 @@
 """The board's JSON wire form, free of any socket.
 
 Turns a `BoardSnapshot` into the answer of `GET /api/board`, a request body
-into a `DecisionRequest`, and a decision's result or a refusal into its JSON
-answer. The transport decides when to answer; this module owns what the
-answer and the request look like.
+into a `DecisionRequest` for one line or a `CardRequest` for a whole option
+card, and a decision's result or a refusal into its JSON answer. The transport
+decides when to answer; this module owns what the answer and the request look like.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from .ports import (
     OPTIONS_FORM,
     OTHER,
     UNCLEAR,
+    CardAnswer,
     CardOption,
     Decision,
     DecisionResult,
@@ -29,8 +30,12 @@ from .ports import (
     OptionLine,
     OptionLineDecision,
     OtherAnswer,
+    OtherCardAnswer,
     OtherDecision,
     Outcome,
+    PostedCard,
+    PostedLine,
+    UnclearCardAnswer,
     UnclearDecision,
 )
 
@@ -52,6 +57,20 @@ class DecisionRequest:
     fingerprint: str
     """The fingerprint of the card as it was shown when the operator chose."""
     decision: Decision | OptionLineDecision
+
+
+@dataclass(frozen=True)
+class CardRequest:
+    repo: str
+    """The label of the configured repo the card belongs to."""
+    card: PostedCard
+
+
+RuleRequest = DecisionRequest | CardRequest
+
+_CARD_ENTRY_KEYS = frozenset({"line", "fingerprint", "option"})
+_KEYS_OF_ONE_LINE = ("line", "fingerprint", "option", "outcome")
+"""Keys a card post never carries beside `lines`, even as `null`."""
 
 
 def board_json(readings: Sequence[RepoReading]) -> str:
@@ -80,15 +99,22 @@ def error_json(sentence: str) -> str:
     return json.dumps({"error": sentence})
 
 
-def parse_decision_request(raw: bytes) -> DecisionRequest | None:
+def parse_rule_request(raw: bytes) -> RuleRequest | None:
     """The decision a request body names, or None unless every field is well-formed.
 
-    `repo` is checked here only for its shape; whether it names a configured
-    repo is the caller's own lookup, made before any `aco` call.
+    A body with `lines` is a whole card, any other body one line. `repo` is
+    checked here only for its shape; whether it names a configured repo is the
+    caller's own lookup, made before any `aco` call.
     """
     fields = _json_object(raw)
     if fields is None:
         return None
+    if "lines" in fields:
+        return _card_request(fields)
+    return _line_request(fields)
+
+
+def _line_request(fields: dict[str, object]) -> DecisionRequest | None:
     repo = fields.get("repo")
     fingerprint, item, line = fields.get("fingerprint"), fields.get("item"), fields.get("line")
     if (
@@ -101,6 +127,66 @@ def parse_decision_request(raw: bytes) -> DecisionRequest | None:
         decision = _decision(item, line, fields)
         if decision is not None:
             return DecisionRequest(repo=repo, fingerprint=fingerprint, decision=decision)
+    return None
+
+
+def _card_request(fields: dict[str, object]) -> CardRequest | None:
+    """ABRD-81's card key rules: `lines` of picked or plain entries, and the one
+    answer kind that goes with them."""
+    repo, item = fields.get("repo"), fields.get("item")
+    if (
+        not isinstance(repo, str)
+        or repo == ""
+        or not _is_position(item)
+        or any(key in fields for key in _KEYS_OF_ONE_LINE)
+    ):
+        return None
+    lines = _posted_lines(fields["lines"])
+    if lines is None:
+        return None
+    answer = _card_answer(fields, picked=lines[0].letter is not None)
+    if answer is None:
+        return None
+    return CardRequest(repo, PostedCard(item, lines, answer[0]))
+
+
+def _posted_lines(entries: object) -> tuple[PostedLine, ...] | None:
+    """Each entry's line named once; a letter on every entry or on none."""
+    if not isinstance(entries, list) or not entries:
+        return None
+    lines = [_posted_line(entry) for entry in entries]
+    if any(line is None for line in lines):
+        return None
+    posted = cast(list[PostedLine], lines)
+    named_once = len({line.index for line in posted}) == len(posted)
+    lettered = {line.letter is not None for line in posted}
+    return tuple(posted) if named_once and len(lettered) == 1 else None
+
+
+def _posted_line(entry: object) -> PostedLine | None:
+    if not isinstance(entry, dict) or not set(entry) <= _CARD_ENTRY_KEYS:
+        return None
+    index, fingerprint = entry.get("line"), entry.get("fingerprint")
+    if not _is_position(index) or not isinstance(fingerprint, str):
+        return None
+    if "option" not in entry:
+        return PostedLine(index, fingerprint, None)
+    letter = entry["option"]
+    return PostedLine(index, fingerprint, letter) if _is_option_letter(letter) else None
+
+
+def _card_answer(fields: dict[str, object], *, picked: bool) -> tuple[CardAnswer] | None:
+    """The card's answer in a one-tuple, None when the keys break the rules: picks
+    name no `other`, `unclear` or `note`; otherwise exactly one of `other` (no
+    note) and `unclear` (an optional note) is named."""
+    other, unclear, note = fields.get(OTHER), fields.get(UNCLEAR), fields.get("note")
+    if picked:
+        return (None,) if other is unclear is note is None else None
+    if other is not None:
+        text = other.strip() if _is_note_text(other) else ""
+        return (OtherCardAnswer(text),) if text and unclear is None and note is None else None
+    if unclear is True and (note is None or _is_note_text(note)):
+        return (UnclearCardAnswer(_note(note)),)
     return None
 
 
