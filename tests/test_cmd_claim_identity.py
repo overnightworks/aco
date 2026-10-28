@@ -121,7 +121,7 @@ def test_claim_fills_the_agent_from_the_documented_chain(
     environ: dict[str, str],
     agent: str,
 ) -> None:
-    """Spec: CLAIM-05."""
+    """Spec: CLAIM-05, CLAIM-75."""
     standpoint = stand_in()
     serve_item(monkeypatch, ("src",))
     identity_from(monkeypatch, environ)
