@@ -20,3 +20,11 @@ reason = "the command specs that own each command's behaviour and printed litera
 path = "tests/test_network_guard.py"
 rule = "test-layout"
 reason = "tests the suite's own network guard plugin (tests/support/network_guard.py), which no src/aco module owns"
+
+[[advisories.allow]]
+id = "GHSA-gcqx-w48m-w2h4"
+lock = "frontend/pnpm-lock.yaml"
+until = 2027-01-31
+date = 2026-10-28
+item = "#508"
+reason = "Transitive dev-only dependency of @sveltejs/vite-plugin-svelte, absent from the board bundle; it merges only our own Svelte config; no fixed version exists."
