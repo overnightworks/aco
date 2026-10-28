@@ -54,8 +54,16 @@ class FixedDateTime(datetime):
 
 def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin CLI dates without installing a global autouse fixture."""
-    for owner in (session, board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
+    for owner in (board_read, cmd_reset, cmd_status, cmd_brief, cmd_cut):
         monkeypatch.setattr(owner, "datetime", FixedDateTime)
+    real_run_context = session.run_context
+
+    def frozen_run_context(repo: forge.RepositoryId | None) -> RunContext:
+        context = real_run_context(repo)
+        context.today = FROZEN_CLI_NOW.date
+        return context
+
+    monkeypatch.setattr(session, "run_context", frozen_run_context)
 
 
 def stub_one_git_call(
