@@ -111,4 +111,11 @@ class TestLandTrunkState:
         first = run_cli(["land", "12"], capsys)
         rerun = run_cli(["land", "12"], capsys)
         assert "trunk: red" in first.stdout
+        observed = (rerun.status, rerun.stdout.splitlines()[0], rerun.stderr)
+        expected = (
+            0,
+            "LANDED pull request #12 already; nothing left to release",
+            "",
+        )
+        assert observed == expected
         assert "trunk:" not in rerun.stdout
