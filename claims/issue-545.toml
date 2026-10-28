@@ -1,8 +1,0 @@
-claim_id = "9e05048c8eda42559d4d79678f040b4c"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "003169797a77857238ed7c360095138f44125780"
-branch = "claude/issue-545-next-real-arrangements"
-scope = ["quality/baseline.toml", "tests/test_cli.py", "tests/test_cmd_next_live_claims.py", "tests/test_cmd_next_pull_advice.py", "tests/test_cmd_next_ruling_age.py"]
-opened_commit = "197a68a11536f0110b04706562bc17deec28d98c"
-whole_reason = "Three new test modules plus the one file they come out of and its baseline entry; the five cells and the three modules prove one set of mutants, so no part lands alone."
