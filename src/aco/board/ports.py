@@ -196,6 +196,61 @@ class UnclearDecision:
 OptionLineDecision = OptionDecision | OtherDecision | UnclearDecision
 
 
+@dataclass(frozen=True)
+class OtherCardAnswer:
+    """One text in the operator's own words for every line of a card, stripped."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class UnclearCardAnswer:
+    """Every line of a card sent back to its head, with one optional note."""
+
+    note: str | None
+
+
+CardAnswer = OtherCardAnswer | UnclearCardAnswer | None
+"""What a card answers as a whole; None means each line carries its own letter."""
+
+
+@dataclass(frozen=True)
+class PostedLine:
+    """A line of a posted card: the fingerprint it was shown with and, when the
+    card answers with letters, its own letter."""
+
+    index: int
+    fingerprint: str
+    letter: OptionLetter | None
+
+
+@dataclass(frozen=True)
+class PostedCard:
+    """A card as the browser posted it, before it is checked against a fresh read."""
+
+    item: int
+    lines: tuple[PostedLine, ...]
+    answer: CardAnswer
+
+
+@dataclass(frozen=True)
+class CardLine:
+    """A checked line of a card: the `card_hash` just read and its letter, if any."""
+
+    index: int
+    card_hash: str
+    letter: OptionLetter | None
+
+
+@dataclass(frozen=True)
+class CardDecision:
+    """A checked card, ready for one write that stores every line or none."""
+
+    item: int
+    lines: tuple[CardLine, ...]
+    answer: CardAnswer
+
+
 class DecisionStatus(StrEnum):
     RULED = "ruled"
     RETURNED = "returned"
@@ -236,4 +291,9 @@ class DecisionPort(Protocol):
     ) -> DecisionResult | CardChanged:
         """Write one option, Other or Unclear decision for the card `card_hash` names; the
         source compares that hash again at its write and refuses a changed card."""
+        ...
+
+    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+        """Write every line of one card in a single call: the source stores all of
+        them or none, and compares each line's hash again at its write."""
         ...

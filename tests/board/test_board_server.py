@@ -24,6 +24,7 @@ from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, r
 from aco.board.aco_cli import AcoCli
 from aco.board.ports import (
     CardChanged,
+    CardDecision,
     Decision,
     DecisionResult,
     ExpectationLine,
@@ -236,6 +237,9 @@ class _HugeLineSource:
     ) -> DecisionResult | CardChanged:
         raise AssertionError("listing the board must not write")
 
+    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+        raise AssertionError("listing the board must not write")
+
 
 def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
     capsys: pytest.CaptureFixture[str],
@@ -266,6 +270,9 @@ class _BrokenPipeSource:
     def rule_option(
         self, decision: OptionLineDecision, card_hash: str
     ) -> DecisionResult | CardChanged:
+        raise AssertionError("the board must not write after a failed read")
+
+    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
         raise AssertionError("the board must not write after a failed read")
 
 

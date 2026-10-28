@@ -6,7 +6,7 @@ loopback interface, carrying no decision data, so they need no token; the
 JSON API under `/api/` takes the per-start access token in exactly one
 `X-Board-Token` header and checks it before any other work, whatever the
 method: `GET /api/board` answers every line from a fresh read of the
-decision source, `POST /api/rule` submits one decision, and every other
+decision source, `POST /api/rule` submits one decision or one whole option card, and every other
 method is refused. A malformed or stalled request gets a fixed 4xx answer,
 never a traceback; every answer, the HTTP layer's own refusals included,
 carries the same guard headers, and none carries a cross-origin header, so a
@@ -72,8 +72,9 @@ def _allowed_methods(path: str) -> str:
 
 
 _MAX_REQUEST_BYTES = 16 * 1024
-"""A decision is two numbers, an outcome, a fingerprint, and a short note;
-anything larger is refused before it is read."""
+"""A decision is two numbers, an outcome, a fingerprint, and a short note, and a
+card is a fingerprint and a letter per line; anything larger is refused before it
+is read."""
 REQUEST_DEADLINE_SECONDS = 10.0
 """How long one socket read or write on a connection may wait, and how long
 a whole request body may take to arrive; a browser sends its small request
@@ -327,7 +328,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         raw = self._read_body(self._refuse_as_json)
         if raw is None:
             return
-        request = api.parse_decision_request(raw)
+        request = api.parse_rule_request(raw)
         if request is None or not self._repo_known(request.repo):
             self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
             return
@@ -358,8 +359,12 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return None
         return body
 
-    def _decide(self, request: api.DecisionRequest) -> None:
-        result = self._server().boards.decide(request.repo, request.decision, request.fingerprint)
+    def _decide(self, request: api.RuleRequest) -> None:
+        boards = self._server().boards
+        if isinstance(request, api.CardRequest):
+            result = boards.decide_card(request.repo, request.card)
+        else:
+            result = boards.decide(request.repo, request.decision, request.fingerprint)
         self._respond(
             HTTPStatus.OK, api.decision_result_json(result).encode("utf-8"), api.JSON_CONTENT_TYPE
         )

@@ -8,7 +8,7 @@ served. This file owns the board's decision rules: which outcomes it writes,
 when it refuses a decision, how writes are ordered and stopped, and the note
 it may carry -- across every configured repository, since one write turn and
 one drain span all of them. It cites the read shape `specs/rulings.spec.md`
-owns (RUL-10) and the write `specs/rule.spec.md` owns (RULE-01, RULE-14, RULE-20)
+owns (RUL-10) and the write `specs/rule.spec.md` owns (RULE-01, RULE-14, RULE-20, RULE-29)
 rather than restating them. It also owns the JSON API under `/api/` -- its
 shapes, token, and headers -- and the shell's own delivery contract (who may
 fetch it, and how it is contained to its own files); the SPA's own behaviour
@@ -30,6 +30,10 @@ resolved directory's name.
 | a post naming not exactly one of `outcome`, `option`, `other`, `unclear`, another letter, or a note beside an `option` or `other` | — | ABRD-42 |
 | an `other` posted with an open option line's fingerprint | — | ABRD-64 |
 | an `unclear` posted with an open option line's fingerprint | — | ABRD-70, ABRD-71 |
+| a card post naming every open option line of its item | — | ABRD-77, ABRD-78, ABRD-80 |
+| a card post missing an open option line, or naming a changed or non-option line | — | ABRD-79 |
+| a card post naming a line already ruled | — | ABRD-80 |
+| a malformed card post | — | ABRD-81 |
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
@@ -55,6 +59,16 @@ resolved directory's name.
 - [ ] [ABRD-42] A post not naming exactly one answer (the key rules below) answers 400 `bad request: decision`; an `option` not `A`-`D` is refused the same way.
 
 The key rules for ABRD-42: `outcome` (with an optional `note`), `option` (with no note or a blank one), `other` (its text, with no non-null `outcome`, `option` or `note`) and `unclear` (literally `true`, with an optional note and no non-null `outcome`, `option` or `other`) each name one answer; a blank note on `unclear` is no note. An absent key and a `null` value name nothing, so a valid `other` alongside `outcome: null` and `option: null` is accepted. A post carrying both `outcome` and `option` keys is refused whatever their values, unless its `other` or `unclear` is non-null, which then decides as above.
+
+ABRD-39, ABRD-40, ABRD-42, ABRD-64 and ABRD-70 describe a post without `lines`; a post naming `lines` is a card and follows ABRD-77 to ABRD-81 in their place.
+
+- [ ] [ABRD-77] A post with `lines` decides one card: `repo`, `item`, and `lines` of `{"line", "fingerprint"}`, each with its own `option`, or one `other` or `unclear` for all (card key rules, see E-ABRD-15).
+- [ ] [ABRD-78] It runs one `aco rule <n>` with, per line in posted order, `--line <k> [--option <X>] --card-hash=<H>` (ABRD-39), then `--via board`, `--other=<T> --via board` or `--unclear [--note=<T>]`; `--json`.
+- [ ] [ABRD-79] A card post is refused as ABRD-02, no `aco rule` run, unless each posted line reads as an option line, each open one with its posted fingerprint, and every open option line of its item is posted.
+- [ ] [ABRD-80] A posted line already ruled is left to aco, whose RULE-04 refuses the card `already_ruled`; aco's answer maps once for the card as ABRD-41 and ABRD-71 say, and aco stores all lines or none (RULE-29).
+- [ ] [ABRD-81] A card post that breaks the card key rules (no line, a line named twice, a misplaced or unknown key, not exactly one answer kind) answers 400 `bad request: decision`, and no `aco` runs.
+
+The card key rules: `lines` is a non-empty list of objects, each with a positive `line` named once and a string `fingerprint`. An entry holds only `line`, `fingerprint` and an optional `option`; any other key in an entry refuses, and an entry's `option`, when present, is `A`-`D`; `null` refuses. Either every entry carries an `option` `A`-`D` and the post names no `other`, `unclear` or `note`, or no entry does and the post names exactly one of `other` (ABRD-05, no `note`) or `unclear` (literally `true`, an optional note, a blank one none). Beside `lines`, a top-level `line`, `fingerprint`, `option` or `outcome` refuses, even when `null`; for `other`, `unclear` and `note` an absent key and `null` name nothing.
 
 ## Reading the lines
 
@@ -124,7 +138,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## The JSON API
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's failure sentence, `items: []` (E-ABRD-06).
-- [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint` and one answer (ABRD-42); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12, -13, -14).
+- [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint` and one answer (ABRD-42), or a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the start token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
@@ -155,6 +169,7 @@ and no `card_hash`; pictures are SVG text as stored.
 
 - The board never writes a decision for a line it did not just read as open with the same shown fields: ABRD-02 compares before every write.
 - An option's `--card-hash` is the hash the board just read from the line whose fingerprint was posted, and aco compares it again at its write (RULE-17).
+- The board never splits a card: a card post is one `aco rule` naming every posted line, which stores all or none (RULE-29), Accept all included.
 - The board never sends `--via chat` or `--via default`. Its `--via board` is the cooperative record of `specs/rule.spec.md`'s Never, not proof that a person clicked.
 - The board never runs two `aco rule` commands at once across any configured repo, and never starts one after stopping began (ABRD-03, ABRD-04, ABRD-17, ABRD-18).
 - No answer carries an `Access-Control-*` header, so a page from another origin can neither read an answer nor send the token header (ABRD-10).
@@ -367,3 +382,16 @@ answer 200: {"status": "returned", "message": null}
 ```
 
 The line stays open, now with its head. Posting Unclear again answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is already with its head; it comes back once revised"}`. An `unclear` that is not `true`, or one beside `outcome`, `option` or `other`, or a note past 280 characters after trimming, answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
+
+### E-ABRD-15 -- deciding a whole card
+
+Setup: fake-aco, item `#7` with two open option lines (2 and 3); the operator posts a pick for each
+
+```text
+request: POST /api/rule, header X-Board-Token: <start token>
+body: {"repo": "<repo>", "item": 7, "lines": [{"line": 2, "fingerprint": "<as listed>", "option": "A"}, {"line": 3, "fingerprint": "<as listed>", "option": "B"}]}
+aco calls: aco rulings --json, then aco rule 7 --line 2 --option A --card-hash=<card_hash of line 2> --line 3 --option B --card-hash=<card_hash of line 3> --via board --json
+answer 200: {"status": "ruled", "message": null}
+```
+
+A post naming only line 2 while line 3 is open answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}` and only `aco rulings --json` runs. Posting `"other": "Nur am Desktop."` with no `option` on the entries runs `aco rule 7 --line 2 --card-hash=<card_hash of line 2> --line 3 --card-hash=<card_hash of line 3> --other=Nur am Desktop. --via board --json`; posting `"unclear": true` runs it with `--unclear` instead and answers `{"status": "returned", "message": null}`.

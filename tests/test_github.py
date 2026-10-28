@@ -747,7 +747,7 @@ def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_ch
     which reads the pull request's current head rather than the one this
     call pins."""
     client, calls = _readiness_client(
-        check_run_pages={1: [{"name": "build", "conclusion": "success"}]},
+        check_run_pages={1: [{"id": 1, "name": "build", "conclusion": "success"}]},
         statuses=[],
     )
 
@@ -764,7 +764,7 @@ def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_ch
             "api",
             f"{_READINESS_CHECK_RUNS_PATH}?per_page=100&page=1",
             "--jq",
-            '.check_runs[] | {name,conclusion:(if .status == "completed" '
+            '.check_runs[] | {id,name,conclusion:(if .status == "completed" '
             "then .conclusion else null end)}",
         ],
         [
@@ -788,8 +788,8 @@ def test_github_adapter_reads_a_check_run_reported_only_on_a_later_page(
     monkeypatch.setattr(github, "ISSUES_PER_PAGE", 1)
     client, _calls = _readiness_client(
         check_run_pages={
-            1: [{"name": "build", "conclusion": "success"}],
-            2: [{"name": "lint", "conclusion": None}],
+            1: [{"id": 1, "name": "build", "conclusion": "success"}],
+            2: [{"id": 2, "name": "lint", "conclusion": None}],
         },
         statuses=[],
     )
@@ -807,7 +807,7 @@ def test_github_adapter_reads_a_pending_status_context() -> None:
     say) still `pending` reads as a not-yet-completed check, exactly as a
     check run with no conclusion does."""
     client, _calls = _readiness_client(
-        check_run_pages={1: [{"name": "build", "conclusion": "success"}]},
+        check_run_pages={1: [{"id": 1, "name": "build", "conclusion": "success"}]},
         statuses=[{"name": "sonarcloud", "conclusion": None}],
     )
 
@@ -824,7 +824,7 @@ def test_github_adapter_reads_a_failing_status_context() -> None:
     reads as a completed, non-successful check, so `aco land`'s preflight
     refuses on it exactly as it would a failed check run."""
     client, _calls = _readiness_client(
-        check_run_pages={1: [{"name": "build", "conclusion": "success"}]},
+        check_run_pages={1: [{"id": 1, "name": "build", "conclusion": "success"}]},
         statuses=[{"name": "sonarcloud", "conclusion": "failure"}],
     )
 
