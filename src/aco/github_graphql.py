@@ -10,9 +10,10 @@ import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Generic, TypeVar
 
-from . import forge
+from . import forge, protocol
 
 # GraphQL aliases every number into one query field, so a block this size
 # stays one round trip; GitHub's own guidance keeps a query's alias count in
@@ -152,3 +153,84 @@ def read_batched(
     for result in results:
         merged.update(result)
     return merged
+
+
+# `Repository.issueOrPullRequest`'s own `state` enum spans both `Issue`
+# (`OPEN`/`CLOSED`) and `PullRequest` (`OPEN`/`CLOSED`/`MERGED`); `forge.
+# ItemReference.state` only ever distinguishes open from not, matching the
+# REST issues endpoint `item_reference` reads a single number through, so a
+# merged pull request reads exactly like a closed one here too. GraphQL's own
+# schema has `MERGED` solely on `PullRequestState`, so an `Issue` node
+# claiming it is impossible on the wire and a malformed response, never a
+# state to normalize.
+_ITEM_STATES_BY_TYPENAME: dict[str, dict[str, forge.ItemState]] = {
+    "Issue": {"OPEN": forge.ItemState.OPEN, "CLOSED": forge.ItemState.CLOSED},
+    "PullRequest": {
+        "OPEN": forge.ItemState.OPEN,
+        "CLOSED": forge.ItemState.CLOSED,
+        "MERGED": forge.ItemState.CLOSED,
+    },
+}
+
+
+def _parsed_item_reference_node(node: object) -> forge.ItemReference:
+    """One alias's value: `MISSING` for a number that is neither an issue nor a
+    pull request, a malformed shape raised loud."""
+    if node is None:
+        return forge.ItemReference(forge.ItemState.MISSING)
+    if not isinstance(node, dict):
+        raise malformed_response(_ITEM_REFERENCE_SUBJECT)
+    typename = node.get("__typename")
+    state = node.get("state")
+    title = node.get("title")
+    body = node.get("body")
+    if (
+        not isinstance(typename, str)
+        or not isinstance(state, str)
+        or state not in _ITEM_STATES_BY_TYPENAME.get(typename, {})
+        or not isinstance(title, str)
+        or (body is not None and not isinstance(body, str))
+    ):
+        raise malformed_response(_ITEM_REFERENCE_SUBJECT)
+    return forge.ItemReference(
+        _ITEM_STATES_BY_TYPENAME[typename][state],
+        title,
+        body or "",
+        typename == "PullRequest",
+    )
+
+
+def _parsed_reopened_node(node: object) -> datetime | None:
+    """One issue's last reopen: `None` when it was never reopened. A missing
+    issue or a time that is no RFC 3339 instant raises loud, never read as
+    "not reopened"."""
+    timeline = node.get("timelineItems") if isinstance(node, dict) else None
+    events = timeline.get("nodes") if isinstance(timeline, dict) else None
+    if not isinstance(events, list) or len(events) > 1:
+        raise malformed_response(_REOPENED_SUBJECT)
+    if not events:
+        return None
+    created_at = events[0].get("createdAt") if isinstance(events[0], dict) else None
+    if (
+        not isinstance(created_at, str)
+        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(created_at) is None
+    ):
+        raise malformed_response(_REOPENED_SUBJECT)
+    return datetime.fromisoformat(created_at)
+
+
+_ITEM_REFERENCE_SUBJECT = "item reference"
+_REOPENED_SUBJECT = "reopen time"
+ITEM_REFERENCE_READ = BatchedRead(
+    "issueOrPullRequest",
+    "__typename ... on Issue { state title body } ... on PullRequest { state title body }",
+    _ITEM_REFERENCE_SUBJECT,
+    _parsed_item_reference_node,
+)
+REOPENED_AT_READ = BatchedRead(
+    "issue",
+    "timelineItems(itemTypes: [REOPENED_EVENT], last: 1) "
+    "{ nodes { ... on ReopenedEvent { createdAt } } }",
+    _REOPENED_SUBJECT,
+    _parsed_reopened_node,
+)
