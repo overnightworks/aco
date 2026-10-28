@@ -1,0 +1,8 @@
+claim_id = "e687104ba6e449bfa567d8ff9e29b40e"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "1a6db636f0032561b20880f5bd0361b8f39ccb9e"
+branch = "claude/issue-548-owners-and-spec-criteria"
+scope = ["quality/baseline.toml", "specs/claim-record.spec.md", "specs/storage-pin.spec.md", "tests/test_cmd_claim_identity.py", "tests/test_cmd_claim_remote.py", "tests/test_cmd_claim_scope_width.py", "tests/test_state_board.py"]
+opened_commit = "5b505ca4fdd2a89abc622cc6e007fb91bee111f8"
+whole_reason = "Bundle of three small cards (#548: two test helpers call their owners; #549: two spec criteria for printed behaviour the claim tests already drive); each is a few lines in disjoint files, and one lane amortizes claim, review and landing."
