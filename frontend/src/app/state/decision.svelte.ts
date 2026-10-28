@@ -67,6 +67,15 @@ function draftKey(key: string, kind: EscapeKind): string {
 	return `${kind}:${key}`;
 }
 
+/** The picks of a card the reading does not show: gone for good when its repo was
+ * read without error (the card is ruled or removed), kept while that repo is unavailable. */
+function unreadPicks(repos: RepoReading[], key: string, picks: Pick[]): Pick[] {
+	const repoWasRead = repos.some(
+		(reading) => reading.error === null && key.startsWith(`${reading.name}:`)
+	);
+	return repoWasRead ? [] : picks;
+}
+
 function withoutKey<Value>(record: Record<string, Value>, key: string): Record<string, Value> {
 	return Object.fromEntries(Object.entries(record).filter(([entryKey]) => entryKey !== key));
 }
@@ -171,7 +180,10 @@ export class DecisionStore {
 		let dropped = false;
 		for (const [key, picks] of Object.entries(stored)) {
 			const selection = findSelection(repos, key);
-			const live = selection?.kind === 'card' ? livePicks(picks, selection.points) : picks;
+			const live =
+				selection?.kind === 'card'
+					? livePicks(picks, selection.points)
+					: unreadPicks(repos, key, picks);
 			dropped ||= live.length !== picks.length;
 			kept[key] = live;
 		}

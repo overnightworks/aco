@@ -303,6 +303,26 @@ describe('picks across re-reads', () => {
 		expect(store.picks(key, points).map((pick) => pick.shown.index)).toEqual([2]);
 	});
 
+	test('[ABRD-91] a card that disappears from a successful re-read does not revive its picks', () => {
+		const { store } = setup();
+		store.choose('repo', 7, points, pickOf(points[0]));
+
+		store.reconcilePicks(readingOf([]));
+		store.reconcilePicks(readingOf([...points]));
+
+		expect(store.picks(key, points)).toHaveLength(0);
+	});
+
+	test('[ABRD-91] a repo that failed to read keeps the picks of its cards', () => {
+		const { store } = setup();
+		store.choose('repo', 7, points, pickOf(points[0]));
+
+		store.reconcilePicks([repo({ name: 'repo', error: 'offline', items: [] })]);
+		store.reconcilePicks(readingOf([...points]));
+
+		expect(store.picks(key, points)).toHaveLength(1);
+	});
+
 	test('[ABRD-91] a re-read keeps the picks of unchanged points', () => {
 		const { store } = setup();
 		store.choose('repo', 7, points, pickOf(points[0]));
