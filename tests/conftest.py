@@ -53,13 +53,18 @@ def _isolate_git_toplevel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     def fake_git_output(
         arguments: list[str], *, directory: Path | None = None, **options: bool
     ) -> str:
+        outside = not Path.cwd().is_relative_to(tmp_path)
         if arguments == _SHOW_TOPLEVEL_ARGUMENTS and directory is None:
+            if outside:
+                pytest.fail("census toplevel")
             return str(tmp_path)
         if (
             _is_recorded_head_read(arguments)
             and directory in (None, tmp_path)
             and not (tmp_path / ".git").exists()
         ):
+            if outside:
+                pytest.fail("census head")
             raise checkout.GitExitError(process.CapturedResult(1, b"", b""))
         return real_git_output(arguments, directory=directory, **options)
 
