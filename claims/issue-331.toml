@@ -1,0 +1,7 @@
+claim_id = "4ef4c81813674b248cfd49934d3bfde0"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "d54f4fb601272267f0371f03dbd3c2eccc88a602"
+branch = "claude/issue-331-board-fields-ruling-harvest"
+scope = ["specs/board.spec.md"]
+opened_commit = "f17bb9fc85c7c53b383bc21873f82347e3f5eaad"
