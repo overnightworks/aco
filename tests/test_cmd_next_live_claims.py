@@ -61,25 +61,6 @@ def test_next_names_an_item_under_a_live_claim_as_claimed_and_pulls_nothing(
     )
 
 
-def test_next_occupies_every_live_claims_scope_before_it_places_a_parallel_candidate(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    github_clone: Path,
-    bare_remote: Path,
-) -> None:
-    """Spec: NEXT-21, NEXT-22."""
-    issues = (
-        board_issue(50, "Alpha", complete_contract("Ship Alpha.", scope=["src/alpha.py"])),
-        board_issue(51, "Beta", complete_contract("Ship Beta.", scope=["src/beta.py"])),
-        board_issue(52, "Gamma", complete_contract("Ship Gamma.", scope=["claimed/deep/file.py"])),
-    )
-    serve_board(monkeypatch, github_clone, bare_remote, issues, claim_of(990, ("claimed",)))
-
-    payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
-
-    assert payload["parallel"]["candidates"] == [{"number": 51, "scope": ["src/beta.py"]}]
-
-
 def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_every_live_claim(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
