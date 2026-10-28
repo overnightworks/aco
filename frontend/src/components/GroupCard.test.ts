@@ -185,5 +185,7 @@ test('[ABRD-84] hostile texts render as text, never as markup', () => {
 	});
 
 	expect(container.querySelector('img')).toBeNull();
-	expect(screen.getByText(hostile, { exact: false, selector: '.point-question' })).toBeInTheDocument();
+	expect(
+		screen.getByText(hostile, { exact: false, selector: '.point-question' })
+	).toBeInTheDocument();
 });
