@@ -1,8 +1,0 @@
-claim_id = "d5d7c38f1de94eb4896853e264be7bb8"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "069d6a46fe1b2e826d2b2ac31e31bfe391bb393c"
-branch = "claude/issue-241-reopened-after-merge-not-recovery"
-scope = ["pyproject.toml", "quality/baseline.toml", "quality/config.toml", "specs/landing-grammar.spec.md", "src/aco/board_read.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_graphql.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests/support/github_fixtures.py", "tests/test_cli.py", "tests/test_cmd_next_reopened_recovery.py", "tests/test_github.py", "tests/test_github_reopen.py"]
-opened_commit = "6e9025bd652ddcebb04924e84b5528ffc0324f72"
-whole_reason = "One signal crosses the port, the GitHub adapter, the board read and the decider; a slice without any one of them either never reads the time or never uses it."
