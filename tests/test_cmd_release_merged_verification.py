@@ -220,8 +220,7 @@ def test_release_merged_ignores_the_pull_requests_own_body_for_an_issue(
 
     result = release_merged(capsys, "72")
 
-    assert (result.status, result.stderr) == (0, "")
-    assert landing.forge.closed_issues == {WORK_ITEM_ISSUE}
+    assert (result.status, result.stderr, landing.forge.closed_issues) == (0, "", {WORK_ITEM_ISSUE})
     assert not state_ref_claims(github_clone, bare_remote)
 
 
