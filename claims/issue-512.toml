@@ -1,0 +1,8 @@
+claim_id = "0b11dc49b4e643e0b83e9cdfed62a894"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "fa3455c253bd4746f04adeb75d74d2d549be7c13"
+branch = "claude/issue-512-the-board-stores-a-whole-option-card-in"
+scope = ["specs/serve.spec.md", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/ports.py", "src/aco/board/server.py", "tests/board/test_board_card_decisions.py", "tests/board/test_board_core.py", "tests/board/test_board_server.py", "tests/support/aco_board_fixtures.py", "tests/support/option_cards.py", "tests/test_cmd_rule_group.py"]
+opened_commit = "3413a941255d6d47869ce0367cf49ed1cd761f3a"
+whole_reason = "One request path: the card parser, the board's stale and completeness check, the one-call argv and the spec criteria change together, or a card can be posted that the board splits, stores in part, or decides against a set the operator never saw."
