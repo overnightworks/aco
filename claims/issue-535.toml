@@ -1,7 +1,0 @@
-claim_id = "272096b0d2c0467b8d0206fca8c6faf9"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "8b11fda8dfa061c4cd4de94d22baef0ea43a0af4"
-branch = "claude/issue-535-spec-lint-coverage"
-scope = [".github/workflows/ci.yml", "pyproject.toml", "tests/scripts/test_spec_lint.py"]
-opened_commit = "0a4aadf16ec91f1f02186851afd17cc5b1ea6e6f"
