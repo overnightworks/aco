@@ -1,8 +1,0 @@
-claim_id = "1aab3b58c1144464824605cd41518985"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "f1ecdf3eaca17e9f06f40ed2df2374d1ac069392"
-branch = "claude/issue-533-merged-release-verification"
-scope = ["quality/baseline.toml", "tests/support/merged_release.py", "tests/test_cli.py", "tests/test_cmd_release_merged_verification.py"]
-opened_commit = "b0fd98047b5c4930bbd6a210df4c7ce301f96761"
-whole_reason = "Four paths for one move: the old tests leave test_cli.py, the new module and its one support helper arrive together, and the baseline follows the shrink; none can land without the others."
