@@ -26,7 +26,7 @@
 "src/aco/store.py" = 2090
 "src/aco/workboard.py" = 3132
 "tests/board/test_board_api.py" = 1059
-"tests/support/cli_fixtures.py" = 923
+"tests/support/cli_fixtures.py" = 890
 "tests/support/github_fixtures.py" = 834
 "tests/test_board.py" = 4111
 "tests/test_checkout.py" = 2040
