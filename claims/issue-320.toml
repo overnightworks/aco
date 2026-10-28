@@ -1,8 +1,0 @@
-claim_id = "6d0d4ce96fb149148cf62d29d93a070a"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "246cae677496df8e36f223cf83f78ab2f57acd5c"
-branch = "claude/issue-320-renamed-repository"
-scope = ["quality/baseline.toml", "specs/storage-pin.spec.md", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_graphql.py", "tests/test_github.py", "tests/test_github_renamed_repository.py"]
-opened_commit = "afde276ccaf4d6b87457ddac85d9829c05b1ca04"
-whole_reason = "One refusal across the adapter, its error type, the spec and the tests that pin the adapter; the extraction into github_graphql.py and the baseline rewrite cannot land apart from the code, because the size ratchet forbids github.py to grow."
