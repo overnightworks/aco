@@ -1,7 +1,0 @@
-claim_id = "2343a4c3dc2e4bc9a354548546ab04b2"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "5630c2bd654e5af13b4897160e2d5e5349d142e7"
-branch = "claude/issue-510-one-blocker-decider"
-scope = ["src/aco/board_read.py"]
-opened_commit = "675668a4708ac25dcc313189b328e917c95a0e09"
