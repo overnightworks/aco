@@ -121,13 +121,12 @@ class TestSeveralLinesInOneWrite:
         assert (checked.status, checked.stdout) == (0, "body ok\n")
 
     @pytest.mark.parametrize(
-        ("kind", "letters", "via", "extra", "envelope"),
+        ("kind", "letters", "via", "envelope"),
         [
             pytest.param(
                 "option",
                 "AB",
                 via,
-                [],
                 {
                     "reason": "ruled",
                     "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "B"}],
@@ -143,7 +142,6 @@ class TestSeveralLinesInOneWrite:
                 "option",
                 "AA",
                 "default",
-                [],
                 {
                     "reason": "ruled",
                     "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "A"}],
@@ -156,7 +154,6 @@ class TestSeveralLinesInOneWrite:
                 "other",
                 "  ",
                 "chat",
-                [],
                 {
                     "reason": "ruled",
                     "lines": [{"index": 2, "ruling": "other"}, {"index": 3, "ruling": "other"}],
@@ -169,7 +166,6 @@ class TestSeveralLinesInOneWrite:
                 "unclear",
                 "  ",
                 "chat",
-                [],
                 {
                     "reason": "returned",
                     "lines": [{"index": 2}, {"index": 3}],
@@ -179,10 +175,9 @@ class TestSeveralLinesInOneWrite:
                 id="unclear",
             ),
             pytest.param(
-                "unclear",
+                "unclear-note",
                 "  ",
                 "chat",
-                ["--note", NOTE],
                 {
                     "reason": "returned",
                     "lines": [{"index": 2}, {"index": 3}],
@@ -200,14 +195,13 @@ class TestSeveralLinesInOneWrite:
         kind: str,
         letters: str,
         via: str,
-        extra: list[str],
         envelope: dict[str, object],
     ) -> None:
         """Spec: RULE-32, E-RULE-14 -- `lines` replaces `index` and `ruling`, beside one date."""
         freeze_cli_now(monkeypatch)
         serve_item(monkeypatch, group_body())
         arguments = lines_of(kind, (2, letters[0], HASH_2), (3, letters[1], HASH_3), via=via)
-        result = run_cli(["rule", "7", *arguments, *extra, "--json"], capsys)
+        result = run_cli(["rule", "7", *arguments, "--json"], capsys)
         assert (result.status, json.loads(result.stdout)) == (
             0,
             {"ok": True, "item": 7, **envelope},
