@@ -125,6 +125,7 @@ class FakeForge:
     board_open_pull_requests: tuple[workboard.PullRequest, ...] = ()
     board_merged_pull_requests: tuple[workboard.PullRequest, ...] = ()
     board_dependencies: dict[int, tuple[IssueDependency, ...]] = field(default_factory=dict)
+    board_reopened: dict[int, datetime] = field(default_factory=dict)
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
     default_branch_name: str = "main"
     default_branch_error: forge.ForgeError | None = None
@@ -189,11 +190,8 @@ class FakeForge:
     )
 
     def _run(self) -> None:
-        """This fake's mirror of `GitHubForge._run`: every board
-        read that would cost a real round trip calls this once, so a test can
-        assert `requests` against a hand-counted expectation the same way it
-        would against the real adapter. Locked for the same reason: `board`
-        fans these reads out across worker threads."""
+        """Mirrors `GitHubForge._run`: every read that would cost a round trip
+        calls this once. Locked because `board` fans reads out across threads."""
         with self._requests_lock:
             self.requests += 1
 
@@ -421,11 +419,7 @@ class FakeForge:
         return served if scripted is None else replace(served, body=scripted)
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        """This fake's mirror of `GitHubForge.item_references`:
-        one `_run()` for the whole batch -- never one per number -- so a
-        test can assert `requests` against the same one-round-trip count the
-        real adapter now pays for any closed-item history that fits one
-        GraphQL block."""
+        """One `_run()` for the whole batch, like the real adapter's one GraphQL block."""
         ordered = tuple(dict.fromkeys(numbers))
         if not ordered:
             return {}
@@ -459,6 +453,12 @@ class FakeForge:
     def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
         self._run()
         return self.board_open_pull_requests
+
+    def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
+        asked = dict.fromkeys(numbers)
+        if asked:
+            self._run()
+        return {number: self.board_reopened.get(number) for number in asked}
 
     def list_recent_merged_board_pull_requests(
         self, since: datetime

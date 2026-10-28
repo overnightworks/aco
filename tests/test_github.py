@@ -21,7 +21,7 @@ from board_fixtures import REPOSITORY
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
 from process_fixtures import UnstoppableProcess, reap
 
-from aco import forge, github, process, workboard
+from aco import forge, github, github_graphql, process, workboard
 from aco.body import ItemKind
 from aco.protocol import ClaimError
 
@@ -1702,7 +1702,7 @@ def test_github_adapter_item_references_splits_into_blocks_of_the_batch_size(
     """A closed-item history larger than one GraphQL block still
     resolves every number, fetched over more than one round trip rather than
     one query that keeps growing forever."""
-    numbers = tuple(range(1, github.GRAPHQL_ITEM_REFERENCE_BATCH_SIZE + 11))
+    numbers = tuple(range(1, github_graphql.GRAPHQL_ITEM_REFERENCE_BATCH_SIZE + 11))
     observed: list[list[str]] = []
 
     def run(arguments: list[str]) -> str:
@@ -1863,7 +1863,7 @@ def test_github_adapter_item_references_fails_loud_on_a_malformed_response(
 def test_github_adapter_item_references_reraises_an_unrecovered_graphql_error(
     message: str, match: str
 ) -> None:
-    """`_not_found_batch_nodes` only recovers a batch
+    """`github_graphql.not_found_batch_nodes` only recovers a batch
     whose response parses as the shape a not-found alias actually produces,
     every error on it is `NOT_FOUND` on one of this call's own aliases, and
     `data.repository` already holds every alias asked for. Anything else --

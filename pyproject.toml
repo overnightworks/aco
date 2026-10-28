@@ -76,6 +76,7 @@ layers = [
     "session",
     "checkout | store",
     "github | state_board",
+    "github_graphql",
     "forge",
     "workboard",
     "items | expectations",
