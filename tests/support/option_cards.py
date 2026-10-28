@@ -222,3 +222,17 @@ def assert_rewritten_alike(before: str, after: str, storage: body.Storage) -> No
         for line in expectation_lines(after, storage=storage)
         if isinstance(line, OptionLine)
     } <= {GOLDEN_CARD_HASH}
+
+
+SECOND_CARD = card(card_head(("Soll dein Song", "Soll dein Lied")))
+
+
+def group_body(third: str = SECOND_CARD) -> str:
+    """Issue #7: line 1 a yes/no line, lines 2 and 3 open option lines."""
+    return card_body(third, before="\n" + YES_NO_LINE + "\n" + card())
+
+
+def shown_hash(raw: str, index: int) -> str:
+    line = expectation_lines(raw)[index - 1]
+    assert isinstance(line, OptionLine)
+    return line.card_hash

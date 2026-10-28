@@ -13,36 +13,21 @@ from option_cards import (
     GOLDEN_CARD_HASH,
     NOTE,
     STALE_CARD_HASH,
-    YES_NO_LINE,
     assert_refusal_writes_nothing,
     card,
-    card_body,
-    card_head,
+    group_body,
     other_card,
     returned_today,
     ruled_card,
     serve_item,
+    shown_hash,
 )
 
-from aco import body, expectations, session
+from aco import body, session
 
 TODAY = FROZEN_CLI_NOW.date().isoformat()
 ANSWER = "Nur am Desktop."
 NOT_GIVEN_TWICE = "{flag} is given twice; give it once"
-SECOND_CARD = card(card_head(("Soll dein Song", "Soll dein Lied")))
-
-
-def group_body(third: str = SECOND_CARD) -> str:
-    """Issue #7: line 1 a yes/no line, lines 2 and 3 open option lines."""
-    return card_body(third, before="\n" + YES_NO_LINE + "\n" + card())
-
-
-def shown_hash(raw: str, index: int) -> str:
-    line = expectations.expectation_lines(raw)[index - 1]
-    assert isinstance(line, expectations.OptionLine)
-    return line.card_hash
-
-
 HASH_2 = shown_hash(group_body(), 2)
 HASH_3 = shown_hash(group_body(), 3)
 
