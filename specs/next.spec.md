@@ -50,6 +50,7 @@ other printable space are text.
 | that container is itself a child of another item | NEXT-25, NEXT-29, NEXT-33 | NEXT-14 |
 | a childless container has no further `Next` work | NEXT-07 | NEXT-13 |
 | that same container still names further work | NEXT-06 | NEXT-13 |
+| that container has an open blocker | NEXT-47 | NEXT-14 |
 | a landed-but-open item exists | LAND-53 (cited) | NEXT-14 |
 | an unworkable item exists beside the top action | NEXT-08 | NEXT-14 |
 | an item carries the label `needs-operator` | NEXT-39, NEXT-40 | NEXT-14 |
@@ -96,6 +97,7 @@ other printable space are text.
 
 - [ ] [NEXT-08] Every other unworkable item is named once under a trailing `SKIPPED` block, `<label>: <reason>`; a container `next` itself recommends cutting or closing is left out of that list.
 - [ ] [NEXT-26] A NEXT-06 container that is not the first action reads `no open children; check done_when` under `SKIPPED`, never `container; claim a child` and never `close:`.
+- [ ] [NEXT-47] An open blocker beats NEXT-06 and NEXT-26: such a container is never `check_container`; `SKIPPED` reads `blocked by <blockers>`, in text and `--json`, as for a work item (see E-NEXT-04).
 - [ ] [NEXT-34] A NEXT-05 container not the first action reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` in `<title>` escaped in text and `--json`; never `container; claim a child`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] An unclaimed, unfrozen item or any container labelled `needs-operator`, or a frozen container, is never pulled, cut or checked; `waiting on operator: <labels>` names it (E-NEXT-13, E-NEXT-15).
@@ -226,6 +228,20 @@ parallel: none
 scope unknown: none
 close: none
 exit 0
+```
+
+The same container blocked by open `#9`:
+
+```console
+$ aco next
+No actionable item.
+parallel: none
+scope unknown: none
+close: none
+
+SKIPPED
+#182: blocked by #9
+exit 3
 ```
 
 ### E-NEXT-05 — five disjoint candidates, capped at three

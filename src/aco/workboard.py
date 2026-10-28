@@ -2393,9 +2393,9 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
     `childless_verdict`, or `None` to skip it: a non-`VALID` body names its
     own finding elsewhere and is never guessed through, a
     `NestedRepairVerdict` names its repair under `SKIPPED` instead of a `cut`
-    that `cut` refuses, and a container waiting on the operator
-    is only ever closed, never cut or checked. A container
-    labelled as an idea is none of the three."""
+    that `cut` refuses, a container waiting on the operator is only ever
+    closed, never cut or checked, and an open blocker bars the check
+    (NEXT-47). An idea container is none of these."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
@@ -2406,7 +2406,7 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
             next_line = item.contract.next
             next_step = next_line if has_further_work(next_line) else cut_title
             return CutSliceAction(item, container, next_step, cut_title)
-        case CheckVerdict(next_step=next_step):
+        case CheckVerdict(next_step=next_step) if not item.open_blockers:
             return CheckContainerAction(item, container, next_step)
         case CloseVerdict():
             return CloseContainerAction(item, container)
@@ -2922,15 +2922,6 @@ def _nested_container_repair(
     )
 
 
-def _read_state_actionable_reason(facts: _ActionabilityFacts) -> str | None:
-    """The one refusal a malformed body gets, ahead of every other reason --
-    including the container rule, so a container whose body itself cannot
-    be read is never offered as "claim a child"."""
-    if facts.read_state is BodyReadState.MALFORMED and facts.malformed_defect is not None:
-        return body_defect_text(facts.malformed_defect)
-    return None
-
-
 def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
     if facts.frozen_trigger is not None:
         return f"frozen: {facts.frozen_trigger}"
@@ -2967,12 +2958,15 @@ def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
 def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if facts.idea:
         return IDEA_REASON
-    read_state_reason = _read_state_actionable_reason(facts)
-    if read_state_reason is not None:
-        return read_state_reason
+    # A malformed body is refused before the container rule, so it is never
+    # offered as "claim a child".
+    if facts.read_state is BodyReadState.MALFORMED and facts.malformed_defect is not None:
+        return body_defect_text(facts.malformed_defect)
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
+        if facts.open_blockers and facts.childless_container_reason == CHECK_DONE_WHEN:
+            return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason
             or facts.unreadable_container_reason
