@@ -44,6 +44,16 @@ class ForgeMalformedResponseError(ForgeError):
     """The forge's response could not be parsed into the expected shape."""
 
 
+class ForgeRepositoryRenamedError(ForgeError):
+    """An answer names the run's repository by the name GitHub now gives it,
+    so the canonical remote still spells the old one."""
+
+    def __init__(self, stale: str, current: str) -> None:
+        super().__init__(
+            f"GitHub renamed {stale} to {current}; point the canonical remote at {current}"
+        )
+
+
 class ForgeMergeConflictError(ForgeError):
     """`merge_landing` refused a pinned merge because the pull request
     changed since its head sha was read (HTTP 409): `aco land`'s own

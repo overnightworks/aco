@@ -30,22 +30,6 @@ MAX_RECENT_MERGED_PULL_REQUESTS = 1000
 # instead. This bounds how many `gh` subprocesses run at once, comfortably
 # under GitHub's secondary rate limit for concurrent requests.
 PARALLEL_FETCH_CONCURRENCY = 20
-# `Repository.issueOrPullRequest`'s own `state` enum spans both `Issue`
-# (`OPEN`/`CLOSED`) and `PullRequest` (`OPEN`/`CLOSED`/`MERGED`); `forge.
-# ItemReference.state` only ever distinguishes open from not, matching the
-# REST issues endpoint `item_reference` reads a single number through, so a
-# merged pull request reads exactly like a closed one here too. GraphQL's own
-# schema has `MERGED` solely on `PullRequestState`, so an `Issue` node
-# claiming it is impossible on the wire and a malformed response, never a
-# state to normalize.
-_GRAPHQL_ITEM_STATES_BY_TYPENAME: dict[str, dict[str, forge.ItemState]] = {
-    "Issue": {"OPEN": forge.ItemState.OPEN, "CLOSED": forge.ItemState.CLOSED},
-    "PullRequest": {
-        "OPEN": forge.ItemState.OPEN,
-        "CLOSED": forge.ItemState.CLOSED,
-        "MERGED": forge.ItemState.CLOSED,
-    },
-}
 GH_TIMEOUT_SECONDS = 60
 GH_QUIET_ENVIRONMENT = {
     "NO_COLOR": "1",
@@ -227,69 +211,6 @@ def _query_days(start: date, end: date) -> tuple[date, ...]:
     return tuple(start + timedelta(days=offset) for offset in range((end - start).days + 1))
 
 
-def _parsed_item_reference_node(node: object) -> forge.ItemReference:
-    """One alias's value: `MISSING` for a number that is neither an issue nor a
-    pull request, a malformed shape raised loud."""
-    if node is None:
-        return forge.ItemReference(forge.ItemState.MISSING)
-    if not isinstance(node, dict):
-        raise github_graphql.malformed_response(_ITEM_REFERENCE_SUBJECT)
-    typename = node.get("__typename")
-    state = node.get("state")
-    title = node.get("title")
-    body = node.get("body")
-    if (
-        not isinstance(typename, str)
-        or not isinstance(state, str)
-        or state not in _GRAPHQL_ITEM_STATES_BY_TYPENAME.get(typename, {})
-        or not isinstance(title, str)
-        or (body is not None and not isinstance(body, str))
-    ):
-        raise github_graphql.malformed_response(_ITEM_REFERENCE_SUBJECT)
-    return forge.ItemReference(
-        _GRAPHQL_ITEM_STATES_BY_TYPENAME[typename][state],
-        title,
-        body or "",
-        typename == "PullRequest",
-    )
-
-
-def _parsed_reopened_node(node: object) -> datetime | None:
-    """One issue's last reopen: `None` when it was never reopened. A missing
-    issue or a time that is no RFC 3339 instant raises loud, never read as
-    "not reopened"."""
-    timeline = node.get("timelineItems") if isinstance(node, dict) else None
-    events = timeline.get("nodes") if isinstance(timeline, dict) else None
-    if not isinstance(events, list) or len(events) > 1:
-        raise github_graphql.malformed_response(_REOPENED_SUBJECT)
-    if not events:
-        return None
-    created_at = events[0].get("createdAt") if isinstance(events[0], dict) else None
-    if (
-        not isinstance(created_at, str)
-        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(created_at) is None
-    ):
-        raise github_graphql.malformed_response(_REOPENED_SUBJECT)
-    return datetime.fromisoformat(created_at)
-
-
-_ITEM_REFERENCE_SUBJECT = "item reference"
-_REOPENED_SUBJECT = "reopen time"
-ITEM_REFERENCE_READ = github_graphql.BatchedRead(
-    "issueOrPullRequest",
-    "__typename ... on Issue { state title body } ... on PullRequest { state title body }",
-    _ITEM_REFERENCE_SUBJECT,
-    _parsed_item_reference_node,
-)
-REOPENED_AT_READ = github_graphql.BatchedRead(
-    "issue",
-    "timelineItems(itemTypes: [REOPENED_EVENT], last: 1) "
-    "{ nodes { ... on ReopenedEvent { createdAt } } }",
-    _REOPENED_SUBJECT,
-    _parsed_reopened_node,
-)
-
-
 def _decoded(result: process.BoundedResult, purpose: str) -> str:
     try:
         return strip_ansi(result.output.decode("utf-8")).strip()
@@ -395,6 +316,33 @@ class GitHubForge:
         self._perform = run if run is not None else self._gh
         self.requests = 0
         self._requests_lock = threading.Lock()
+        self._current_name: str | None = None
+
+    def _require_current_name(self, reference: str) -> None:
+        """Refuse when `reference`, a repository name GitHub answered with, differs
+        from the run's and GitHub also calls the run's repository by another name.
+        Asks GitHub only for a differing reference, and at most once per forge
+        (concurrent reads may repeat the one idempotent lookup)."""
+        if reference == self.repository.path:
+            return
+        if self._current_name is None:
+            answer = self._run(["api", f"repos/{self.repository}", "--jq", ".full_name"])
+            try:
+                self._current_name = repository_id(answer.strip()).path
+            except ClaimError as error:
+                raise forge.ForgeMalformedResponseError(
+                    "GitHub returned a malformed repository name"
+                ) from error
+        if self._current_name != self.repository.path:
+            raise forge.ForgeRepositoryRenamedError(self.repository.path, self._current_name)
+
+    def _current_head_repository(
+        self, pull_request: dict[str, object]
+    ) -> forge.RepositoryId | None:
+        head = _head_repository(pull_request)
+        if head is not None:
+            self._require_current_name(head.path)
+        return head
 
     def _gh(self, arguments: list[str], *, input_data: bytes | None = None) -> str:
         return _bounded_command(
@@ -482,7 +430,7 @@ class GitHubForge:
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
         return github_graphql.read_batched(
-            ITEM_REFERENCE_READ,
+            github_graphql.ITEM_REFERENCE_READ,
             numbers,
             fetch=self._graphql_block,
             concurrency=PARALLEL_FETCH_CONCURRENCY,
@@ -490,7 +438,7 @@ class GitHubForge:
 
     def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
         return github_graphql.read_batched(
-            REOPENED_AT_READ,
+            github_graphql.REOPENED_AT_READ,
             numbers,
             fetch=self._graphql_block,
             concurrency=PARALLEL_FETCH_CONCURRENCY,
@@ -657,7 +605,7 @@ class GitHubForge:
         base_ref_name = value.get("baseRefName")
         head_ref_name = value.get("headRefName")
         head_sha = value.get("headRefOid")
-        source_repository = _head_repository(value)
+        source_repository = self._current_head_repository(value)
         author = value.get("author")
         login = author.get("login") if isinstance(author, dict) else None
         merged_at = value.get("mergedAt")
@@ -1143,6 +1091,7 @@ class GitHubForge:
             or re.fullmatch(REPOSITORY_PATTERN, repository) is None
         ):
             raise forge.ForgeMalformedResponseError(f"GitHub returned a malformed {description}")
+        self._require_current_name(repository)
         return workboard.IssueReference(repository, number)
 
     def _issue_state(self, value: object, description: str) -> workboard.BlockerState:
@@ -1286,6 +1235,7 @@ class GitHubForge:
             except ValueError as error:
                 raise forge.ForgeMalformedResponseError(self.MALFORMED_BOARD_DEPENDENCY) from error
             parsed_closed_at = parsed_closed_at.astimezone(UTC)
+        self._require_current_name(repository)
         return workboard.IssueDependency(
             workboard.IssueReference(repository, number),
             blocker_state,
