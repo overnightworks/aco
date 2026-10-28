@@ -1,4 +1,5 @@
-"""The board decides a whole option card with one `aco rule` (ABRD-09, ABRD-77 to ABRD-81):
+"""The board decides a whole option card with one `aco rule` (ABRD-09, ABRD-39, ABRD-40,
+ABRD-64, ABRD-70, ABRD-77 to ABRD-81):
 the post's shape, the refusals before any `aco rule`, aco's own refusals relayed once for the
 card, and that real `aco rule` stores what the board sent in one write."""
 
@@ -101,6 +102,30 @@ def _expected_call(
             "ruled",
             ("other", "other"),
         ),
+        (
+            (2, 3),
+            ("", ""),
+            {"other": " -n starts like an option "},
+            ("--other=-n starts like an option", "--via", "board"),
+            "ruled",
+            ("other", "other"),
+        ),
+        (
+            (2, 3),
+            ("", ""),
+            {"other": 'a\n"b" ä'},
+            ('--other=a\n"b" ä', "--via", "board"),
+            "ruled",
+            ("other", "other"),
+        ),
+        (
+            (2, 3),
+            ("", ""),
+            {"other": f" {'x' * 280} "},
+            (f"--other={'x' * 280}", "--via", "board"),
+            "ruled",
+            ("other", "other"),
+        ),
         ((2, 3), ("", ""), {"unclear": True}, ("--unclear",), "returned", (None, None)),
         (
             (2, 3),
@@ -110,8 +135,37 @@ def _expected_call(
             "returned",
             (None, None),
         ),
+        (
+            (2, 3),
+            ("", ""),
+            {"unclear": True, "note": "  \n"},
+            ("--unclear",),
+            "returned",
+            (None, None),
+        ),
+        (
+            (2, 3),
+            ("", ""),
+            {"unclear": True, "note": "a\nb"},
+            ("--unclear", "--note=a\nb"),
+            "returned",
+            (None, None),
+        ),
     ],
-    ids=["picks", "four-picks", "accept-all", "one-line-card", "other", "unclear", "unclear-note"],
+    ids=[
+        "picks",
+        "four-picks",
+        "accept-all",
+        "one-line-card",
+        "other",
+        "other-like-an-option-flag",
+        "other-with-a-newline-and-quote",
+        "other-at-the-bound",
+        "unclear",
+        "unclear-note",
+        "unclear-blank-note",
+        "unclear-note-with-a-newline",
+    ],
 )
 def test_a_card_post_runs_one_aco_rule_naming_every_line_and_stores_them_all(
     repository: FakeAcoRepository,
@@ -417,6 +471,31 @@ def test_a_card_post_breaking_the_card_key_rules_is_refused_before_any_aco_call(
     calls_before = repository.calls()
 
     answered = board.post_rule(change(valid))
+
+    assert (answered.status, answered.json()) == (400, {"error": _BAD_REQUEST})
+    assert repository.calls() == calls_before
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [{"option": "A"}, {"other": _ANSWER}, {"unclear": True}, {"unclear": True, "note": "x"}],
+    ids=["option", "other", "unclear", "unclear-note"],
+)
+def test_an_option_line_posted_without_lines_is_refused_before_any_aco_call(
+    repository: FakeAcoRepository, board: BoardClient, answer: dict[str, object]
+) -> None:
+    """ABRD-40."""
+    listed = _show(repository, board, 2)
+    payload = {
+        "repo": board.repo,
+        "item": _ITEM,
+        "line": 2,
+        "fingerprint": listed[2]["fingerprint"],
+        **answer,
+    }
+    calls_before = repository.calls()
+
+    answered = board.post_rule(payload)
 
     assert (answered.status, answered.json()) == (400, {"error": _BAD_REQUEST})
     assert repository.calls() == calls_before

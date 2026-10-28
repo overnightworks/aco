@@ -481,25 +481,6 @@ class BoardClient:
         }
         return self.post_rule(payload)
 
-    def decide_option_through_api(
-        self,
-        line: Mapping[str, object],
-        item: int,
-        option: str,
-        *,
-        repo: str | None = None,
-    ) -> Response:
-        """Post `option` for a line exactly as `GET /api/board` listed it."""
-        return self.post_rule(
-            {
-                "repo": self.repo if repo is None else repo,
-                "item": item,
-                "line": line["index"],
-                "fingerprint": line["fingerprint"],
-                "option": option,
-            }
-        )
-
     def decide_card_through_api(
         self,
         item: int,

@@ -26,7 +26,6 @@ from aco.board.ports import (
     DecisionResult,
     DecisionStatus,
     ExpectationLine,
-    OptionLineDecision,
     Outcome,
     PostedCard,
     PostedLine,
@@ -92,11 +91,6 @@ class _HeldDecisions:
         assert self.may_finish.wait(_WAIT_SECONDS)
         self.ruled.append(decision)
         return DecisionResult(DecisionStatus.RULED, "ruled")
-
-    def rule_option(
-        self, decision: OptionLineDecision, card_hash: str
-    ) -> DecisionResult | CardChanged:
-        raise AssertionError("an option is never ruled here")
 
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
         self.writing.set()

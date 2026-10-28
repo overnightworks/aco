@@ -25,13 +25,13 @@ resolved directory's name.
 | a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
 | an item with open option lines | ABRD-82 | ABRD-77 |
 | an item with two or more open option lines | ABRD-83, ABRD-84, ABRD-85 | ABRD-86, ABRD-87, ABRD-88, ABRD-89, ABRD-90, ABRD-91, ABRD-92 |
-| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-39 (option) |
+| an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-39 |
 | a withdrawn line | ABRD-60 | — |
-| an `option`, `other` or `unclear` posted for a line that is no option line | — | ABRD-40 |
+| an `option`, `other` or `unclear` posted without `lines` | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
-| a post naming not exactly one of `outcome`, `option`, `other`, `unclear`, another letter, or a note beside an `option` or `other` | — | ABRD-42 |
-| an `other` posted with an open option line's fingerprint | — | ABRD-64 |
-| an `unclear` posted with an open option line's fingerprint | — | ABRD-70, ABRD-71 |
+| a post without `lines` naming no `outcome`, or one beside another key | — | ABRD-42 |
+| a card post answering `other` | — | ABRD-64 |
+| a card post answering `unclear` | — | ABRD-70, ABRD-71 |
 | a card post naming every open option line of its item | — | ABRD-77, ABRD-78, ABRD-80 |
 | a card post missing an open option line, or naming a changed or non-option line | — | ABRD-79 |
 | a card post naming a line already ruled | — | ABRD-80 |
@@ -55,14 +55,12 @@ resolved directory's name.
 - [ ] [ABRD-03] The board runs one `aco rule` at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
 - [ ] [ABRD-04] Stopping the board waits for an `aco rule` already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, no `aco rule` run.
 - [ ] [ABRD-05] A note or answer is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other refuses the decision before any `aco` call; a blank note is no note, a blank answer is refused.
-- [ ] [ABRD-39] An `option` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --option <X> --via board --card-hash=<H> --json`, `<H>` that line's `card_hash` just read (E-ABRD-12).
-- [ ] [ABRD-40] An `option`, `other` or `unclear` posted for a line that is no option line, or for no line at all, is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run: no card hash to name.
+- [ ] [ABRD-39] In a card post's argv (ABRD-78), each `<H>` is the `card_hash` the board just read for that line, never one the browser sent (E-ABRD-12).
+- [ ] [ABRD-40] A post without `lines` naming `option`, `other` or `unclear` answers 400 `bad request: decision`, no `aco` call: an option line is decided only as a card (ABRD-77).
 - [ ] [ABRD-41] An `aco rule` refusal `card_changed` (RULE-17) answers `failed` with `Diese Zeile hat sich geändert, bitte neu laden`; every other answer keeps its mapping, `already_ruled` (RULE-04) included.
-- [ ] [ABRD-42] A post not naming exactly one answer (the key rules below) answers 400 `bad request: decision`; an `option` not `A`-`D` is refused the same way.
+- [ ] [ABRD-42] A post without `lines` names exactly one `outcome`, `yes`, `no` or `later`, with an optional note (key rules below); anything else answers 400 `bad request: decision`.
 
-The key rules for ABRD-42: `outcome` (with an optional `note`), `option` (with no note or a blank one), `other` (its text, with no non-null `outcome`, `option` or `note`) and `unclear` (literally `true`, with an optional note and no non-null `outcome`, `option` or `other`) each name one answer; a blank note on `unclear` is no note. An absent key and a `null` value name nothing, so a valid `other` alongside `outcome: null` and `option: null` is accepted. A post carrying both `outcome` and `option` keys is refused whatever their values, unless its `other` or `unclear` is non-null, which then decides as above.
-
-ABRD-39, ABRD-40, ABRD-42, ABRD-64 and ABRD-70 describe a post without `lines`; a post naming `lines` is a card and follows ABRD-77 to ABRD-81 in their place.
+The key rules for ABRD-42: `outcome` (with an optional `note`) names the one answer; an absent key and a `null` value name nothing. A post carrying both `outcome` and `option` keys is refused whatever their values.
 
 - [ ] [ABRD-77] A post with `lines` decides one card: `repo`, `item`, and `lines` of `{"line", "fingerprint"}`, each with its own `option`, or one `other` or `unclear` for all (card key rules, see E-ABRD-15).
 - [ ] [ABRD-78] It runs one `aco rule <n>` with, per line in posted order, `--line <k> [--option <X>] --card-hash=<H>` (ABRD-39), then `--via board`, `--other=<T> --via board` or `--unclear [--note=<T>]`; `--json`.
@@ -106,13 +104,13 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board` and the tabs `Open n` and `Decided n`: n counts the open list's rows and the ruled lines Decided lists.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
 - [ ] [ABRD-63] An open option card's Decide row ends in `Other…`, beside the picks or `Accept all`; it opens a panel with a textarea (`Your answer`, up to 280 characters, focused) and `Send`, disabled while blank.
-- [ ] [ABRD-64] An `other` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --other=<T> --via board --card-hash=<H> --json`, `<T>` the trimmed answer, `<H>` as ABRD-39 (E-ABRD-13).
+- [ ] [ABRD-64] A card post's `other` (ABRD-78) is the trimmed answer within ABRD-05, written once for every posted line with `--via board` (E-ABRD-13).
 - [ ] [ABRD-65] `Other…` and `Send` hide with the picks and `Accept all` (ABRD-45), disable while a decision on the card waits and ignore clicks while the board reloads, so a pick and an Other never both post.
 - [ ] [ABRD-66] The typed answer is kept per card: closing the panel, switching cards, `Undo` and a failed post keep it; `Undo` reopens the panel with it, and a stored decision drops it.
 - [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Decided: Other · <name>` (ABRD-82) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
 - [ ] [ABRD-68] `Send` posts the card as shown when the panel opened, so a card changed since is refused (ABRD-02); the answer stays in the draft.
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
-- [ ] [ABRD-70] An `unclear` posted with an open option line's fingerprint runs `aco rule <n> --line <k> --unclear [--note=<T>] --card-hash=<H> --json`, no `--via`, `<T>` the trimmed note (E-ABRD-14).
+- [ ] [ABRD-70] A card post's `unclear` (ABRD-78) runs with no `--via`; its note is trimmed, a blank one is none, and every posted line returns to its head (E-ABRD-14).
 - [ ] [ABRD-71] An `unclear` aco stores answers 200 `{"status": "returned", "message": null}`: the line stays open, with its head; only a stored `option` or `other` answers `ruled`.
 - [ ] [ABRD-72] An open option card's Decide row ends with `Other…` and `Unclear`; a card with its head (ABRD-61) shows no `Unclear` and no Unclear panel, and keeps its picks and `Other…`.
 - [ ] [ABRD-73] `Unclear` opens the panel with one focused textarea (`What is unclear? (optional)`, at most 280 characters) and `Send`, enabled while blank; it closes `Other…`'s panel; each keeps its draft.
@@ -151,7 +149,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## The JSON API
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's failure sentence, `items: []` (E-ABRD-06).
-- [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint` and one answer (ABRD-42), or a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
+- [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint` and an `outcome` (ABRD-42), or a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the start token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
@@ -359,42 +357,42 @@ Posting `yes` for `#12` line `1` with the listed fingerprint still forwards `--y
 
 ### E-ABRD-12 -- deciding an option line
 
-Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts option `A` for that card
+Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts option `A` for that one-point card
 
 ```text
 request: POST /api/rule, header X-Board-Token: <start token>
-body: {"repo": "<repo>", "item": 12, "line": 1, "fingerprint": "<as listed>", "option": "A"}
-aco calls: aco rulings --json, then aco rule 12 --line 1 --option A --via board --card-hash=<card_hash of that line> --json
+body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>", "option": "A"}]}
+aco calls: aco rulings --json, then aco rule 12 --line 1 --option A --card-hash=<card_hash of that line> --via board --json
 answer 200: {"status": "ruled", "message": null}
 ```
 
-Posting the same body after aco answers `card_changed` (RULE-17) because the card changed between the board's read and aco's write answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`; the stored line is unchanged.
+Posting the same body after aco answers `card_changed` (RULE-17) because the card changed between the board's read and aco's write answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`; the stored line is unchanged. The single-line body `{"repo": "<repo>", "item": 12, "line": 1, "fingerprint": "<as listed>", "option": "A"}` answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
 
 ### E-ABRD-13 -- answering an option line with Other
 
-Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts his own answer for that card
+Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts his own answer for that one-point card
 
 ```text
 request: POST /api/rule, header X-Board-Token: <start token>
-body: {"repo": "<repo>", "item": 12, "line": 1, "fingerprint": "<as listed>", "other": "  Nur am Desktop.  "}
-aco calls: aco rulings --json, then aco rule 12 --line 1 --other=Nur am Desktop. --via board --card-hash=<card_hash of that line> --json
+body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>"}], "other": "  Nur am Desktop.  "}
+aco calls: aco rulings --json, then aco rule 12 --line 1 --card-hash=<card_hash of that line> --other=Nur am Desktop. --via board --json
 answer 200: {"status": "ruled", "message": null}
 ```
 
-A blank answer, one past 280 characters after trimming, or one beside `outcome`, `option` or `note` answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
+A blank answer, one past 280 characters after trimming, or one beside `option` or `note` answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
 
 ### E-ABRD-14 -- sending an option line back to its head
 
-Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts Unclear with a note
+Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts Unclear with a note for that one-point card
 
 ```text
 request: POST /api/rule, header X-Board-Token: <start token>
-body: {"repo": "<repo>", "item": 12, "line": 1, "fingerprint": "<as listed>", "unclear": true, "note": "  Mobile fehlt.  "}
-aco calls: aco rulings --json, then aco rule 12 --line 1 --unclear --note=Mobile fehlt. --card-hash=<card_hash of that line> --json
+body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>"}], "unclear": true, "note": "  Mobile fehlt.  "}
+aco calls: aco rulings --json, then aco rule 12 --line 1 --card-hash=<card_hash of that line> --unclear --note=Mobile fehlt. --json
 answer 200: {"status": "returned", "message": null}
 ```
 
-The line stays open, now with its head. Posting Unclear again answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is already with its head; it comes back once revised"}`. An `unclear` that is not `true`, or one beside `outcome`, `option` or `other`, or a note past 280 characters after trimming, answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
+The line stays open, now with its head. Posting Unclear again answers 200 `{"status": "failed", "message": "aco rule failed: line 1 is already with its head; it comes back once revised"}`. An `unclear` that is not `true`, or one beside `option` or `other`, or a note past 280 characters after trimming, answers 400 `{"error": "bad request: decision"}` and runs no `aco` call.
 
 ### E-ABRD-15 -- deciding a whole card
 

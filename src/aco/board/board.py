@@ -28,7 +28,6 @@ from .ports import (
     DecisionStatus,
     ExpectationLine,
     OptionLine,
-    OptionLineDecision,
     PostedCard,
 )
 
@@ -83,9 +82,7 @@ class Board:
         """A fresh read of the source; raises `DecisionSourceUnavailableError`."""
         return BoardSnapshot(self._decisions.expectation_lines())
 
-    def decide_one(
-        self, decision: Decision | OptionLineDecision, repo: str, fingerprint: str
-    ) -> DecisionResult:
+    def decide_one(self, decision: Decision, repo: str, fingerprint: str) -> DecisionResult:
         """Write `decision` unless the open line it names no longer reads as shown.
 
         The fingerprint comparison is the board's own stale check: the card was
@@ -96,12 +93,6 @@ class Board:
         that is no longer open skips the comparison on purpose: whether it is
         already ruled, out of range, or its item unknown is the source's own
         refusal, which `rule` reports.
-
-        An option is written with the `card_hash` of the option line this same
-        read holds: the fingerprint comparison binds that hash to the card the
-        browser showed, and the source compares it once more at its write. A
-        line that is no option line leaves the board no hash to name, so it is
-        refused like a changed card.
 
         Callers serialize writes across every repo (`Boards`); this method
         itself holds no lock, so it must never run concurrently with another
@@ -117,14 +108,7 @@ class Board:
         )
         if named is not None and named.is_open and wire_fingerprint(repo, named) != fingerprint:
             return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-        if isinstance(decision, Decision):
-            return self._decisions.rule(decision)
-        if not isinstance(named, OptionLine):
-            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-        written = self._decisions.rule_option(decision, named.card_hash)
-        if isinstance(written, CardChanged):
-            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-        return written
+        return self._decisions.rule(decision)
 
     def decide_card(self, posted: PostedCard, repo: str) -> DecisionResult:
         """Write `posted` with one call unless it no longer reads as the card shown.
@@ -152,7 +136,7 @@ def checked_card(
     longer reads as shown: every posted line must be an option line of the item,
     each open one with its posted fingerprint, and every open option line of the
     item must be posted. A posted line that is no longer open is the source's own
-    refusal to make, as in `Board.decide_one`."""
+    refusal to make."""
     options = {
         line.index: line
         for line in lines
@@ -204,9 +188,7 @@ class Boards:
             }
             return tuple(_reading(label, futures[label]) for label in self._boards)
 
-    def decide(
-        self, repo: str, decision: Decision | OptionLineDecision, fingerprint: str
-    ) -> DecisionResult:
+    def decide(self, repo: str, decision: Decision, fingerprint: str) -> DecisionResult:
         """Write through `repo`'s board; `repo` must already be one of `labels`.
 
         `fingerprint` is `wire_fingerprint`'s value for the card as shown,
