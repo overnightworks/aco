@@ -19,7 +19,7 @@ import {
 
 test('first selection follows configured order, skipping failed repos and ruled-only groups', () => {
 	const repos = [
-		repo({ name: 'failed', error: 'Read failed' }),
+		repo({ name: 'failed', error: 'Read failed', items: [item({ lines: [optionLine()] })] }),
 		repo({
 			name: 'first',
 			items: [
@@ -244,7 +244,11 @@ describe('decidedList', () => {
 					})
 				]
 			}),
-			repo({ name: 'broken', error: 'down' }),
+			repo({
+				name: 'broken',
+				error: 'down',
+				items: [item({ lines: [optionLine({ ruling: 'A', ruled_on: '2026-10-01' })] })]
+			}),
 			repo({ name: 'untouched', items: [item({ lines: [optionLine()] })] }),
 			repo({
 				name: 'last',
@@ -345,7 +349,11 @@ describe('decidedList', () => {
 describe('firstDecidedKey', () => {
 	test('[ABRD-32] is the first row of the decided list', () => {
 		const repos = [
-			repo({ name: 'broken', error: 'down' }),
+			repo({
+				name: 'broken',
+				error: 'down',
+				items: [item({ lines: [optionLine({ ruling: 'A', ruled_on: '2026-10-01' })] })]
+			}),
 			repo({ name: 'open', items: [item({ lines: [optionLine()] })] }),
 			repo({
 				name: 'ruled',
@@ -366,7 +374,14 @@ describe('firstDecidedKey', () => {
 
 	test('[ABRD-32] is null with nothing ruled or only failed repositories', () => {
 		expect(firstDecidedKey([])).toBeNull();
-		expect(firstDecidedKey([repo({ error: 'down' })])).toBeNull();
+		expect(
+			firstDecidedKey([
+				repo({
+					error: 'down',
+					items: [item({ lines: [optionLine({ ruling: 'A', ruled_on: '2026-10-01' })] })]
+				})
+			])
+		).toBeNull();
 		expect(firstDecidedKey([repo({ items: [item({ lines: [optionLine()] })] })])).toBeNull();
 	});
 });
@@ -424,11 +439,9 @@ describe('pictureDataUri', () => {
 });
 
 describe('findSelection', () => {
-	const openLine = line({ index: 1 });
 	const optionPoint = optionLine({ index: 2 });
-	const openItem = item({ number: 42, title: 'Share page', lines: [openLine, optionPoint] });
 	const repos = [
-		repo({ name: 'a', items: [openItem] }),
+		repo({ name: 'a', items: [item({ number: 42, title: 'Share page', lines: [optionPoint] })] }),
 		repo({ name: 'b', error: 'down', items: [] })
 	];
 
@@ -443,7 +456,11 @@ describe('findSelection', () => {
 	});
 
 	test('a key naming an open yes/no line resolves its repo, item and line as a question', () => {
-		expect(findSelection(repos, 'a:42:1')).toEqual({
+		const openLine = line({ index: 1 });
+		const openItem = item({ number: 42, title: 'Share page', lines: [openLine, optionPoint] });
+		const withOpenLine = [repo({ name: 'a', items: [openItem] })];
+
+		expect(findSelection(withOpenLine, 'a:42:1')).toEqual({
 			kind: 'question',
 			repo: 'a',
 			item: openItem,
