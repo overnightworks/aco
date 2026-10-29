@@ -27,7 +27,7 @@ def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 def _item_file(
     item_id: str, *, expectations: bool, kind: str = "task", **links: object
 ) -> tuple[str, bytes]:
-    """A container carries an uncut `[[slice]]` row, the shape whose parent the board read."""
+    """A container carries one uncut `[[slice]]`: the shape whose parent `aco board` looks up."""
     record = item_record(title=f"Item {item_id}", state="open", kind=kind)
     data: dict[str, object] = {
         "version": 1,
@@ -63,15 +63,18 @@ def _checkout_listing(
 
 @pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
 @pytest.mark.parametrize(
-    "links",
+    "kind, links",
     [
         pytest.param(
-            {"kind": "container", "parent": MISSING_ID},
+            "container",
+            {"parent": MISSING_ID},
             id="childless-container-with-uncut-slice-names-a-missing-parent",
         ),
-        pytest.param({"blocked_by": [MISSING_ID]}, id="blocker-names-a-missing-id"),
+        pytest.param("task", {"blocked_by": [MISSING_ID]}, id="blocker-names-a-missing-id"),
         pytest.param(
-            {"blocked_by": [EXISTING_BLOCKER_ID, EXISTING_BLOCKER_ID]}, id="blocker-named-twice"
+            "task",
+            {"blocked_by": [EXISTING_BLOCKER_ID, EXISTING_BLOCKER_ID]},
+            id="blocker-named-twice",
         ),
     ],
 )
@@ -81,6 +84,7 @@ def test_rulings_lists_an_item_whose_record_links_do_not_resolve(
     tmp_path: Path,
     bare_remote: Path,
     worktree: Path,
+    kind: str,
     links: dict[str, object],
     as_json: bool,
 ) -> None:
@@ -88,7 +92,7 @@ def test_rulings_lists_an_item_whose_record_links_do_not_resolve(
     A broken `record.parent` or `record.blocked_by` does not keep the item out of `aco rulings`."""
     files = dict(
         [
-            _item_file(LISTED_ID, expectations=True, **links),
+            _item_file(LISTED_ID, expectations=True, kind=kind, **links),
             _item_file(EXISTING_BLOCKER_ID, expectations=False),
         ]
     )
