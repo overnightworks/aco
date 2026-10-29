@@ -27,7 +27,11 @@ _ITEM = 42
 
 
 def _listed_items(board: BoardClient) -> list[dict[str, Any]]:
-    [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+    response = board.get_board_json()
+    assert response.status == 200
+    [repo] = cast(list[dict[str, Any]], response.json()["repos"])
+    assert repo["name"] == board.repo
+    assert repo["error"] is None
     return cast(list[dict[str, Any]], repo["items"])
 
 
