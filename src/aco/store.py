@@ -1718,13 +1718,12 @@ def bootstrap(
     before either branch runs. A worktree that has observed the ref and
     later finds it absent is a lineage error, not a fresh bootstrap.
 
-    After a rejected creation push the ref is read afresh: a present ref,
-    whoever wrote it -- a rival, or this very push whose response was lost --
-    is returned as it stands, and only a proven absence earns another
-    attempt with the same commit, so no creation commit is ever parented on
-    an existing tip. A push that was sent but whose outcome cannot be judged
-    -- no answer, a failed re-read, a failed lineage stamp -- refuses as an
-    `UncertainWriteError` (CAS-56, CAS-69).
+    After a rejected creation push the ref is read afresh: a present ref, whoever wrote it -- a
+    rival, or this very push whose response was lost -- is returned as it stands, and only a
+    proven absence earns another attempt with the same commit, so no creation commit is ever
+    parented on an existing tip. A push that was sent but whose outcome cannot be judged -- no
+    answer, a failed re-read, a failed lineage stamp -- refuses as an `UncertainWriteError`
+    (CAS-56, CAS-69).
     """
     if (tip := fetch_state(worktree=worktree, remote=remote).tip) is not None:
         return tip
@@ -1742,8 +1741,9 @@ def bootstrap(
                     worktree=worktree, remote=remote, ref=STATE_REF, new_oid=creation_commit
                 )
             except PushRejectedError:
-                if (tip := fetch_state(worktree=worktree, remote=remote).tip) is not None:
-                    return tip
+                raced_tip = fetch_state(worktree=worktree, remote=remote).tip
+                if raced_tip is not None:
+                    return raced_tip
                 continue
             _stamp_after_landing(worktree, creation_commit)
             return creation_commit
