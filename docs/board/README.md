@@ -34,12 +34,12 @@ once, all or none. A card of points shows its name (area and count) as title and
 point rows: one point open at a time, a pick per point, "Accept all" with the number chosen,
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
 point is chosen. It still lacks Mitsprache and the agent list, and the v5 additions: asked dates,
-newest-first order, the Refresh button with the time of the last read, and
-Self-refresh.
+newest-first order, the Refresh button with the time of the last read, Self-refresh, and
+a card's own saving state.
 The list groups open cards and decided lines per project with the picture's Open,
-With-head, Not-ready and Decided shapes (Decided shows the selected line's card in the
+With-head and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its
-colour tokens. An open yes/no line keeps its card and lists with the dashed Not-ready shape. With-head is a card one of whose lines the operator sent back: muted, listed after
+colour tokens. An open yes/no line keeps its card and lists with v4's dashed Not-ready shape. With-head is a card one of whose lines the operator sent back: muted, listed after
 the open cards, its card says `with head`. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
 What the board does today is in the "Browser decision flow" of
 [`specs/serve.spec.md`](../../specs/serve.spec.md).
