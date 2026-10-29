@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -261,3 +262,64 @@ def push_claim_record(
     )
     commit = real_git(worktree, "commit-tree", tree, "-p", tip, "-m", "edited claim").stdout.strip()
     real_git(worktree, "push", "-q", str(remote), f"{commit}:{store.STATE_REF}")
+
+
+def item_record(
+    *,
+    title: str,
+    state: str,
+    kind: str,
+    parent: str | None = None,
+    labels: tuple[str, ...] = (),
+    blocked_by: tuple[str, ...] = (),
+    closed_at: str | None = None,
+) -> dict[str, object]:
+    record: dict[str, object] = {
+        "title": title,
+        "state": state,
+        "kind": kind,
+        "labels": list(labels),
+        "blocked_by": list(blocked_by),
+        "parent": parent,
+        "created_at": "2026-09-10T00:00:00Z",
+        "updated_at": "2026-09-15T00:00:00Z",
+    }
+    if closed_at is not None:
+        record["closed_at"] = closed_at
+    return record
+
+
+def push_item_tree(remote: Path, worktree_path: Path, item_files: dict[str, bytes]) -> str:
+    """Push a state tree carrying `schema.toml` and `items/`,
+    built through the exact plumbing `store.py` itself uses -- one blob per
+    file, one `items/` subtree, one top-level tree, one commit -- never a
+    hand-crafted archive or a bypass of `store.read_item_files`'s own read
+    path."""
+    item_entries = [
+        ("100644", "blob", blob(worktree_path, content), name)
+        for name, content in item_files.items()
+    ]
+    items_tree = raw_tree(worktree_path, item_entries)
+    schema_blob = blob(worktree_path, protocol.serialize_empty_schema_toml().encode())
+    return push_raw_state_tree(
+        remote,
+        worktree_path,
+        [
+            ("100644", "blob", schema_blob, "schema.toml"),
+            ("040000", "tree", items_tree, "items"),
+        ],
+    )
+
+
+def path_without_gh(tmp_path: Path) -> str:
+    """A `PATH` carrying a real `git` and `bash` and nothing else -- proof
+    that a run never shells out to `gh` under `storage = state-ref` rather
+    than an assertion resting on a fake that could never have called it
+    anyway; `bash` runs printed advice as printed."""
+    bin_directory = tmp_path / "bin"
+    bin_directory.mkdir()
+    for tool in ("git", "bash"):
+        executable = shutil.which(tool)
+        assert executable is not None, f"this test needs a real {tool} on PATH to symlink"
+        (bin_directory / tool).symlink_to(executable)
+    return str(bin_directory)

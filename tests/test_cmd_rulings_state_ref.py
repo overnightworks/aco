@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
-from board_fixtures import block_body, write_repository_config
-from cli_fixtures import real_git, run_cli, set_git_identity, stub_board_config_tracked
+from board_fixtures import block_body
+from cli_fixtures import real_git, run_cli, set_git_identity, track_board_config
 from option_cards import open_option_entry
-from store_fixtures import blob, push_raw_state_tree, raw_tree
+from store_fixtures import item_record, path_without_gh, push_item_tree
 
-from aco import items, protocol
+from aco import items
 from aco.body import render_block
 
 LISTED_ID = "aco-000004"
@@ -26,22 +25,13 @@ def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _item_file(item_id: str, *, expectations: bool, **links: object) -> tuple[str, bytes]:
+    record = item_record(title=f"Item {item_id}", state="open", kind="task")
     data: dict[str, object] = {
         "version": 1,
         "now": "Now.",
         "next": "Next.",
         "done_when": "Done.",
-        "record": {
-            "title": f"Item {item_id}",
-            "state": "open",
-            "kind": "task",
-            "labels": [],
-            "blocked_by": [],
-            "parent": None,
-            "created_at": "2026-09-10T00:00:00Z",
-            "updated_at": "2026-09-15T00:00:00Z",
-            **links,
-        },
+        "record": {**record, **links},
     }
     if expectations:
         data["expectation"] = [open_option_entry()]
@@ -57,31 +47,13 @@ def _checkout_listing(
     item_files: dict[str, bytes],
 ) -> None:
     """A real checkout pinned to `storage = "state-ref"` whose `origin` carries `item_files`."""
-    entries = [
-        ("100644", "blob", blob(worktree, content), name) for name, content in item_files.items()
-    ]
-    schema = blob(worktree, protocol.serialize_empty_schema_toml().encode())
-    push_raw_state_tree(
-        bare_remote,
-        worktree,
-        [
-            ("100644", "blob", schema, "schema.toml"),
-            ("040000", "tree", raw_tree(worktree, entries), "items"),
-        ],
-    )
+    push_item_tree(bare_remote, worktree, item_files)
     real_git(worktree, "remote", "add", "origin", f"file://{bare_remote}")
     real_git(worktree, "push", "origin", "main")
     real_git(worktree, "remote", "set-head", "origin", "main")
-    write_repository_config(worktree, 'storage = "state-ref"\ncanonical_remote = "origin"\n')
-    stub_board_config_tracked(monkeypatch)
+    track_board_config(worktree, 'storage = "state-ref"\ncanonical_remote = "origin"\n')
     monkeypatch.chdir(worktree)
-    bin_directory = tmp_path / "bin"
-    bin_directory.mkdir()
-    for tool in ("git", "bash"):
-        executable = shutil.which(tool)
-        assert executable is not None
-        (bin_directory / tool).symlink_to(executable)
-    monkeypatch.setenv("PATH", str(bin_directory))
+    monkeypatch.setenv("PATH", path_without_gh(tmp_path))
 
 
 @pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])

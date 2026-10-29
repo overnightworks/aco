@@ -15,7 +15,6 @@ import io
 import json
 import re
 import shlex
-import shutil
 import sys
 import uuid
 from collections.abc import Callable, Mapping
@@ -54,9 +53,9 @@ from cli_fixtures import (
 from github_fixtures import FakeForge
 from option_cards import decide, open_option_entry
 from store_fixtures import (
-    blob,
-    push_raw_state_tree,
-    raw_tree,
+    item_record,
+    path_without_gh,
+    push_item_tree,
     state_ref_listing,
 )
 
@@ -160,31 +159,6 @@ def _state_ref_body(projection: _Projection, record: dict[str, object]) -> str:
     return _prose_body(render_block(data))
 
 
-def _record(
-    *,
-    title: str,
-    state: str,
-    kind: str,
-    parent: str | None = None,
-    labels: tuple[str, ...] = (),
-    blocked_by: tuple[str, ...] = (),
-    closed_at: str | None = None,
-) -> dict[str, object]:
-    record: dict[str, object] = {
-        "title": title,
-        "state": state,
-        "kind": kind,
-        "labels": list(labels),
-        "blocked_by": list(blocked_by),
-        "parent": parent,
-        "created_at": "2026-09-10T00:00:00Z",
-        "updated_at": "2026-09-15T00:00:00Z",
-    }
-    if closed_at is not None:
-        record["closed_at"] = closed_at
-    return record
-
-
 # The one logical scenario every test below reads: a
 # container with two children, one of the children blocked by its sibling,
 # and the other carrying an open expectation line. Built once as plain
@@ -253,15 +227,15 @@ GITHUB_DEPENDENCIES = {
 
 def _item_files() -> dict[str, bytes]:
     container_body = _state_ref_body(
-        _CONTAINER_PROJECTION, _record(title="Epic", state="open", kind="container")
+        _CONTAINER_PROJECTION, item_record(title="Epic", state="open", kind="container")
     )
     child_a_body = _state_ref_body(
         _CHILD_A_PROJECTION,
-        _record(title="Slice A", state="open", kind="task", parent=CONTAINER_ID),
+        item_record(title="Slice A", state="open", kind="task", parent=CONTAINER_ID),
     )
     child_b_body = _state_ref_body(
         _CHILD_B_PROJECTION,
-        _record(
+        item_record(
             title="Slice B",
             state="open",
             kind="task",
@@ -291,7 +265,7 @@ def _container_body_with_slices(
         "slice": [
             {"index": index, "title": title, "done_when": "D"} for index, title in slice_rows
         ],
-        "record": _record(
+        "record": item_record(
             title="Epic", state="open", kind="container", blocked_by=blocked_by, parent=parent
         ),
     }
@@ -330,7 +304,7 @@ def _item_files_with_container_block(fields: Mapping[str, object]) -> dict[str, 
     data = {
         **_CONTAINER_PROJECTION.block_data(),
         **fields,
-        "record": _record(title="Epic", state="open", kind="container"),
+        "record": item_record(title="Epic", state="open", kind="container"),
     }
     container_body = _prose_body(render_block(data))
     return {**_item_files(), f"{CONTAINER_ID}.md": container_body.encode()}
@@ -372,7 +346,7 @@ def _item_files_with_a_malformed_item(
 def _task_item(parent: str | None, title: str = "Slice A") -> bytes:
     """An open task's file under `parent`, projected like `CHILD_A_ID`."""
     return _state_ref_body(
-        _CHILD_A_PROJECTION, _record(title=title, state="open", kind="task", parent=parent)
+        _CHILD_A_PROJECTION, item_record(title=title, state="open", kind="task", parent=parent)
     ).encode()
 
 
@@ -410,7 +384,7 @@ def _whole_state_item(reason: str, *, wide: bool = False) -> bytes:
         **_Projection("Build it.", "Ship it.", "It ships.").block_data(),
         "scope": ["a.py", "b.py", "c.py", "d.py"] if wide else ["a.py"],
         "whole": reason,
-        "record": _record(title="Whole boundary", state="open", kind="task"),
+        "record": item_record(title="Whole boundary", state="open", kind="task"),
     }
     return _prose_body(render_block(data)).encode()
 
@@ -508,7 +482,9 @@ _RULABLE_PROJECTION = _Projection(
 
 
 def _rulable_item_files() -> dict[str, bytes]:
-    body = _state_ref_body(_RULABLE_PROJECTION, _record(title="Rulable", state="open", kind="task"))
+    body = _state_ref_body(
+        _RULABLE_PROJECTION, item_record(title="Rulable", state="open", kind="task")
+    )
     return {f"{RULABLE_ID}.md": body.encode()}
 
 
@@ -535,7 +511,9 @@ def _edit_target_body(
     reaches the reader decoded, as an operator's escaped TOML delivers it."""
     data: dict[str, object] = {
         **_EDIT_TARGET_PROJECTION.block_data(),
-        "record": _record(title="RECORD-TITLE", state="open", kind="task", blocked_by=blocked_by),
+        "record": item_record(
+            title="RECORD-TITLE", state="open", kind="task", blocked_by=blocked_by
+        ),
     }
     if slice_title is not None:
         data["slice"] = [{"index": 1, "title": "SLICE-TITLE"}]
@@ -549,10 +527,10 @@ def _edit_target_body(
 
 def _edit_target_item_files() -> dict[str, bytes]:
     target_body = _state_ref_body(
-        _EDIT_TARGET_PROJECTION, _record(title="Target", state="open", kind="task")
+        _EDIT_TARGET_PROJECTION, item_record(title="Target", state="open", kind="task")
     )
     blocker_body = _state_ref_body(
-        _EDIT_BLOCKER_PROJECTION, _record(title="Blocker", state="open", kind="task")
+        _EDIT_BLOCKER_PROJECTION, item_record(title="Blocker", state="open", kind="task")
     )
     return {
         f"{EDIT_TARGET_ID}.md": target_body.encode(),
@@ -575,11 +553,11 @@ _CLOSE_TARGET_PROJECTION = _Projection("Ship the target.", "Land it.", "Target i
 
 def _close_scenario_item_files() -> dict[str, bytes]:
     blocker_body = _state_ref_body(
-        _CLOSE_BLOCKER_PROJECTION, _record(title="Blocker", state="open", kind="task")
+        _CLOSE_BLOCKER_PROJECTION, item_record(title="Blocker", state="open", kind="task")
     )
     target_body = _state_ref_body(
         _CLOSE_TARGET_PROJECTION,
-        _record(title="Target", state="open", kind="task", blocked_by=(CLOSE_BLOCKER_ID,)),
+        item_record(title="Target", state="open", kind="task", blocked_by=(CLOSE_BLOCKER_ID,)),
     )
     return {
         f"{CLOSE_BLOCKER_ID}.md": blocker_body.encode(),
@@ -601,11 +579,11 @@ _CLOSE_CHILD_PROJECTION = _Projection("Ship the slice.", "Land it.", "Slice is d
 
 def _close_parent_scenario_item_files() -> dict[str, bytes]:
     parent_body = _state_ref_body(
-        _CLOSE_PARENT_PROJECTION, _record(title="Parent", state="open", kind="container")
+        _CLOSE_PARENT_PROJECTION, item_record(title="Parent", state="open", kind="container")
     )
     child_body = _state_ref_body(
         _CLOSE_CHILD_PROJECTION,
-        _record(title="Child", state="open", kind="task", parent=CLOSE_PARENT_ID),
+        item_record(title="Child", state="open", kind="task", parent=CLOSE_PARENT_ID),
     )
     return {
         f"{CLOSE_PARENT_ID}.md": parent_body.encode(),
@@ -620,28 +598,6 @@ def _decoded_record(body: str, item_id: str) -> items.ItemRecord:
     parsed = parse_body(body, storage=Storage.STATE_REF)
     assert parsed.record is not None
     return items.parse_item_record(item_id, parsed.record)
-
-
-def _push_item_tree(remote: Path, worktree_path: Path, item_files: dict[str, bytes]) -> str:
-    """Push a state tree carrying `schema.toml` and `items/`,
-    built through the exact plumbing `store.py` itself uses -- one blob per
-    file, one `items/` subtree, one top-level tree, one commit -- never a
-    hand-crafted archive or a bypass of `store.read_item_files`'s own read
-    path."""
-    item_entries = [
-        ("100644", "blob", blob(worktree_path, content), name)
-        for name, content in item_files.items()
-    ]
-    items_tree = raw_tree(worktree_path, item_entries)
-    schema_blob = blob(worktree_path, protocol.serialize_empty_schema_toml().encode())
-    return push_raw_state_tree(
-        remote,
-        worktree_path,
-        [
-            ("100644", "blob", schema_blob, "schema.toml"),
-            ("040000", "tree", items_tree, "items"),
-        ],
-    )
 
 
 class _UnusedItemWriter:
@@ -744,7 +700,7 @@ def _store_item_writer(remote: Path, worktree_path: Path) -> ItemWriter:
 
 @pytest.fixture
 def state_ref_board(bare_remote: Path, worktree: Path) -> StateRefBoard:
-    _push_item_tree(bare_remote, worktree, _item_files())
+    push_item_tree(bare_remote, worktree, _item_files())
     return _fetch_state_ref_board(bare_remote, worktree)
 
 
@@ -868,7 +824,8 @@ class TestMalformedItem:
         child's `[record].parent` still reading, never reads as childless,
         so no close or cut verdict guesses past it."""
         unreadable_child = _state_ref_body(
-            _CHILD_A_PROJECTION, _record(title="", state="open", kind="task", parent=CONTAINER_ID)
+            _CHILD_A_PROJECTION,
+            item_record(title="", state="open", kind="task", parent=CONTAINER_ID),
         )
         container_file = f"{CONTAINER_ID}.md"
         adapter = _state_ref_board(
@@ -890,29 +847,31 @@ class TestMalformedItem:
         ("record", "refusal"),
         [
             pytest.param(
-                _record(title="Repaired", state="open", kind="task", parent="aco-ffffff"),
+                item_record(title="Repaired", state="open", kind="task", parent="aco-ffffff"),
                 "item aco-ffffff is referenced as a parent but does not exist",
                 id="missing-parent",
             ),
             pytest.param(
-                _record(title="Repaired", state="open", kind="task", blocked_by=("aco-ffffff",)),
+                item_record(
+                    title="Repaired", state="open", kind="task", blocked_by=("aco-ffffff",)
+                ),
                 f"item {MALFORMED_ID} lists blocker aco-ffffff, which does not exist",
                 id="missing-blocker",
             ),
             pytest.param(
-                _record(
+                item_record(
                     title="Repaired", state="open", kind="task", blocked_by=(CHILD_A_ID, CHILD_A_ID)
                 ),
                 f"item {MALFORMED_ID} lists blocker {CHILD_A_ID} more than once",
                 id="repeated-blocker",
             ),
             pytest.param(
-                _record(title="Repaired", state="open", kind="task", parent=MALFORMED_ID),
+                item_record(title="Repaired", state="open", kind="task", parent=MALFORMED_ID),
                 _malformed_item_refusal(_malformed_block(BLANK_TITLE_DEFECT)),
                 id="itself-as-parent",
             ),
             pytest.param(
-                _record(
+                item_record(
                     title="Repaired", state="closed", kind="task", closed_at="2026-09-20T00:00:00Z"
                 ),
                 f'a repair records state = "open"; close {MALFORMED_ID} afterwards '
@@ -942,7 +901,7 @@ class TestMalformedItem:
         adapter = _state_ref_board(_item_files_with_a_malformed_item(_blank_title_item()))
         edit = _state_ref_body(
             _CHILD_A_PROJECTION,
-            _record(title="Slice A", state="open", kind="task", blocked_by=(MALFORMED_ID,)),
+            item_record(title="Slice A", state="open", kind="task", blocked_by=(MALFORMED_ID,)),
         )
 
         with pytest.raises(MalformedStateTreeError) as refused:
@@ -955,7 +914,7 @@ class TestMalformedItem:
         title in `item new`'s twin search, so no exact duplicate of it can
         be created unnamed."""
         content = _state_ref_body(
-            _CHILD_A_PROJECTION, _record(title="Duplicate me", state="unknown", kind="task")
+            _CHILD_A_PROJECTION, item_record(title="Duplicate me", state="unknown", kind="task")
         ).encode()
         adapter = _state_ref_board(_item_files_with_a_malformed_item(content))
 
@@ -1012,7 +971,7 @@ class TestStateRefBoardMethods:
         assert reference.is_landing is False
 
     def test_item_reference_reports_a_closed_item(self) -> None:
-        closed_record = _record(title="Closed", state="closed", kind="task")
+        closed_record = item_record(title="Closed", state="closed", kind="task")
         closed_record["closed_at"] = "2026-09-14T00:00:00Z"
         body = _state_ref_body(_CHILD_A_PROJECTION, closed_record)
         adapter = _state_ref_board({f"{CHILD_A_ID}.md": body.encode()})
@@ -1052,7 +1011,7 @@ class TestStateRefBoardMethods:
         assert state_ref_board.parent_issue(CONTAINER_NUMBER) is None
 
     def test_parent_issue_fails_loud_for_a_dangling_reference(self) -> None:
-        record = _record(title="Orphan", state="open", kind="task", parent="aco-999999")
+        record = item_record(title="Orphan", state="open", kind="task", parent="aco-999999")
         body = _state_ref_body(_CHILD_A_PROJECTION, record)
         adapter = _state_ref_board({f"{CHILD_A_ID}.md": body.encode()})
 
@@ -1082,7 +1041,7 @@ class TestStateRefBoardMethods:
         assert state_ref_board.list_board_dependencies(999999) == ()
 
     def test_list_board_dependencies_fails_loud_for_a_dangling_blocker(self) -> None:
-        record = _record(
+        record = item_record(
             title="Orphan blocker", state="open", kind="task", blocked_by=("aco-999999",)
         )
         body = _state_ref_body(_CHILD_B_PROJECTION, record)
@@ -1095,10 +1054,10 @@ class TestStateRefBoardMethods:
             adapter.list_board_dependencies(CHILD_B_NUMBER)
 
     def test_list_board_dependencies_reads_a_closed_blockers_closed_at(self) -> None:
-        closed_blocker = _record(title="Closed blocker", state="closed", kind="task")
+        closed_blocker = item_record(title="Closed blocker", state="closed", kind="task")
         closed_blocker["closed_at"] = "2026-09-14T00:00:00Z"
         blocker_body = _state_ref_body(_CHILD_A_PROJECTION, closed_blocker)
-        blocked = _record(title="Blocked", state="open", kind="task", blocked_by=(CHILD_A_ID,))
+        blocked = item_record(title="Blocked", state="open", kind="task", blocked_by=(CHILD_A_ID,))
         blocked_body = _state_ref_body(_CHILD_B_PROJECTION, blocked)
         adapter = _state_ref_board(
             {
@@ -1117,10 +1076,10 @@ class TestStateRefBoardMethods:
     ) -> None:
         """An item closed before `since` is past the
         window and never listed; one closed exactly at it is."""
-        closed_in_window = _record(
+        closed_in_window = item_record(
             title="In window", state="closed", kind="task", closed_at="2026-09-01T00:00:00Z"
         )
-        closed_before = _record(
+        closed_before = item_record(
             title="Before", state="closed", kind="task", closed_at="2026-08-31T23:59:59Z"
         )
         adapter = _state_ref_board(
@@ -1139,7 +1098,7 @@ class TestStateRefBoardMethods:
         assert state_ref_board.list_recent_merged_board_pull_requests(OBSERVED_AT) == ()
 
     def test_an_item_whose_record_carries_the_idea_label_is_listed_as_an_idea(self) -> None:
-        record = _record(title="Wish", state="open", kind="task", labels=("idea",))
+        record = item_record(title="Wish", state="open", kind="task", labels=("idea",))
         body = _state_ref_body(_CHILD_A_PROJECTION, record)
         adapter = _state_ref_board({f"{CHILD_A_ID}.md": body.encode()})
 
@@ -1214,7 +1173,7 @@ class TestStateRefBoardAgainstARealStateTree:
         monkeypatch.setattr(
             store.process, "run_bounded_captured", spy(process.run_bounded_captured)
         )
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
 
         adapter = _fetch_state_ref_board(bare_remote, worktree)
         adapter.list_open_board_issues()
@@ -1430,7 +1389,7 @@ class TestStateRefBoardWrites:
     def test_update_item_body_refreshes_updated_at_preserves_the_rest_and_is_visible_immediately(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         adapter = _fetch_state_ref_board(
             bare_remote, worktree, writer=self._writer(bare_remote, worktree)
         )
@@ -1462,7 +1421,7 @@ class TestStateRefBoardWrites:
         """CAS-71: the push landed, another writer edited the item before the
         store re-read it, and the writer still answers with the blob it
         submitted -- never the later editor's -- for a write and a close."""
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         read_oid = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}").items[
             CHILD_A_ID
@@ -1510,7 +1469,7 @@ class TestStateRefBoardWrites:
         writes land only onto the store it checked -- its own write still
         lands, but an item another writer turned malformed since refuses
         the next one before anything is written."""
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         adapter = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
         adapter.hold_items()
@@ -1539,7 +1498,7 @@ class TestStateRefBoardWrites:
     def _full_delivered_record_body(self) -> str:
         return _state_ref_body(
             _CHILD_B_PROJECTION,
-            _record(
+            item_record(
                 title="Renamed B",
                 state="closed",
                 kind="task",
@@ -1611,7 +1570,7 @@ class TestStateRefBoardWrites:
         `parent` in that same table never takes, an omitted key (or no
         `[record]` at all, every `rule`/`ask`/`cut` write) keeps this
         item's own stored value. `updated_at` always moves regardless."""
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         adapter = _fetch_state_ref_board(
             bare_remote, worktree, writer=self._writer(bare_remote, worktree)
         )
@@ -1652,14 +1611,16 @@ class TestStateRefBoardWrites:
         resolving one -- the edit is never refused for what it carried."""
         stored_unknown = "aco-ffffff"
         item_files = _item_files_with_container_slices((), blocked_by=(stored_unknown,))
-        _push_item_tree(bare_remote, worktree, item_files)
+        push_item_tree(bare_remote, worktree, item_files)
         adapter = _fetch_state_ref_board(
             bare_remote, worktree, writer=self._writer(bare_remote, worktree)
         )
         delivered_blockers = (stored_unknown, CHILD_A_ID)
         delivered_body = _state_ref_body(
             _CONTAINER_PROJECTION,
-            _record(title="Epic", state="open", kind="container", blocked_by=delivered_blockers),
+            item_record(
+                title="Epic", state="open", kind="container", blocked_by=delivered_blockers
+            ),
         )
 
         adapter.update_item_body(CONTAINER_NUMBER, delivered_body)
@@ -1675,7 +1636,7 @@ class TestStateRefBoardWrites:
         first write lands, the second -- still holding that now-stale oid --
         refuses with the CAS-20 sentence, and the remote keeps the first
         writer's content."""
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         first = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
         second = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
@@ -1702,7 +1663,7 @@ class TestStateRefBoardWrites:
         theirs past any piped-body pre-check -- so a body whose block the
         read would set aside refuses by its first defect and the remote
         keeps the stored item."""
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         adapter = _fetch_state_ref_board(
             bare_remote, worktree, writer=self._writer(bare_remote, worktree)
         )
@@ -1731,7 +1692,7 @@ class TestStateRefBoardWrites:
         before ever reaching the writer (no second write reaches the
         remote -- the oid this proof reads back is still the first
         close's)."""
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         adapter = _fetch_state_ref_board(
             bare_remote, worktree, writer=self._writer(bare_remote, worktree)
         )
@@ -1773,7 +1734,7 @@ class TestStateRefBoardWrites:
         and the new child shows up under the container's `list_children` --
         both on this same instance and on a freshly re-fetched one. A
         follow-up `link_child` call is the no-op it is ruled to be."""
-        _push_item_tree(bare_remote, worktree, _item_files())
+        push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         adapter = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
         body = unfilled_block_body(f"Parent: #{CONTAINER_NUMBER}")
@@ -1828,7 +1789,7 @@ class TestStateRefBoardAtomicLanding:
         closed_at = "2026-09-01T00:00:00Z"
         closed_body = _state_ref_body(
             _CHILD_A_PROJECTION,
-            _record(title="Slice A", state="closed", kind="task", closed_at=closed_at),
+            item_record(title="Slice A", state="closed", kind="task", closed_at=closed_at),
         )
         adapter = _state_ref_board({f"{CHILD_A_ID}.md": closed_body.encode()})
 
@@ -1892,20 +1853,6 @@ def _filled_body(template: str, *, now: str, next_step: str, done_when: str) -> 
         .replace('next = ""', f'next = "{next_step}"')
         .replace('done_when = ""', f'done_when = "{done_when}"')
     )
-
-
-def _path_without_gh(tmp_path: Path) -> str:
-    """A `PATH` carrying a real `git` and `bash` and nothing else -- proof
-    that a run never shells out to `gh` under `storage = state-ref` rather
-    than an assertion resting on a fake that could never have called it
-    anyway; `bash` runs printed advice as printed."""
-    bin_directory = tmp_path / "bin"
-    bin_directory.mkdir()
-    for tool in ("git", "bash"):
-        executable = shutil.which(tool)
-        assert executable is not None, f"this test needs a real {tool} on PATH to symlink"
-        (bin_directory / tool).symlink_to(executable)
-    return str(bin_directory)
 
 
 class _PushScript:
@@ -2018,12 +1965,12 @@ class TestCliStateRefForge:
         `origin/HEAD` set, and `PATH` carrying no `gh` -- the one setup
         every write proof below shares."""
         remote_url = f"file://{bare_remote}"
-        _push_item_tree(bare_remote, worktree, item_files)
+        push_item_tree(bare_remote, worktree, item_files)
         real_git(worktree, "remote", "add", "origin", remote_url)
         real_git(worktree, "push", "origin", "main")
         real_git(worktree, "remote", "set-head", "origin", "main")
         self._enter_pinned_checkout(monkeypatch, worktree)
-        monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
+        monkeypatch.setenv("PATH", path_without_gh(tmp_path))
 
     @pytest.mark.parametrize(
         ("cell", "operation"),
@@ -2630,11 +2577,13 @@ class TestCliStateRefForge:
                     **_item_files(),
                     "aco-0000aa.md": _state_ref_body(
                         _CONTAINER_PROJECTION,
-                        _record(title="Outer", state="open", kind="container"),
+                        item_record(title="Outer", state="open", kind="container"),
                     ).encode(),
                     f"{CONTAINER_ID}.md": _state_ref_body(
                         _CONTAINER_PROJECTION,
-                        _record(title="Epic", state="open", kind="container", parent="aco-0000aa"),
+                        item_record(
+                            title="Epic", state="open", kind="container", parent="aco-0000aa"
+                        ),
                     ).encode(),
                 },
                 [],
@@ -2746,7 +2695,7 @@ class TestCliStateRefForge:
         outer_id = "aco-0000aa"
         return outer_id, {
             f"{outer_id}.md": _state_ref_body(
-                _CONTAINER_PROJECTION, _record(title="Outer", state="open", kind="container")
+                _CONTAINER_PROJECTION, item_record(title="Outer", state="open", kind="container")
             ).encode(),
             f"{CONTAINER_ID}.md": _container_body_with_slices(slice_rows, parent=outer_id).encode(),
         }
@@ -3012,7 +2961,7 @@ class TestCliStateRefForge:
                     **_CONTAINER_PROJECTION.block_data(),
                     "now": "Competing edit landed mid-cut.",
                     "slice": [{"index": 1, "title": "Slice C", "done_when": "D"}],
-                    "record": _record(title="Epic", state="open", kind="container"),
+                    "record": item_record(title="Epic", state="open", kind="container"),
                 }
                 competing_body = _prose_body(render_block(competing_data)).encode()
                 competing_intent = protocol.ItemWriteIntent(
@@ -3163,7 +3112,7 @@ class TestCliStateRefForge:
         real_git(worktree, "remote", "set-head", "origin", "main")
         store.bootstrap(worktree=worktree, remote=remote_url)
         self._enter_pinned_checkout(monkeypatch, worktree)
-        monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
+        monkeypatch.setenv("PATH", path_without_gh(tmp_path))
 
         status = issue_claim.main(["board", "--json"])
 
@@ -3211,7 +3160,7 @@ class TestCliStateRefForge:
         item_files = {
             f"{item_id}.md": _state_ref_body(
                 _Projection("Ship it.", "Land it.", "It is done."),
-                _record(title="Trailer-landed", state="open", kind="task"),
+                item_record(title="Trailer-landed", state="open", kind="task"),
             ).encode()
         }
         real_git(worktree, "commit", "--allow-empty", "-m", f"Land it.\n\nWork-Item: {item_id}")
@@ -3241,7 +3190,7 @@ class TestCliStateRefForge:
         item_files = {
             f"{item_id}.md": _state_ref_body(
                 _Projection("Ship it.", "Land it.", "It is done."),
-                _record(title=title, state="open", kind="task"),
+                item_record(title=title, state="open", kind="task"),
             ).encode()
             for item_id, title in ((first_id, "First"), (second_id, "Second"))
         }
@@ -3282,7 +3231,7 @@ class TestCliStateRefForge:
         real_git(worktree, "push", canonical_remote, "main")
         store.bootstrap(worktree=worktree, remote=remote_url)
         self._enter_pinned_checkout(monkeypatch, worktree, canonical_remote=canonical_remote)
-        monkeypatch.setenv("PATH", _path_without_gh(tmp_path))
+        monkeypatch.setenv("PATH", path_without_gh(tmp_path))
 
         status = issue_claim.main(["board", "--json"])
 
@@ -3741,7 +3690,7 @@ class TestCliStateRefForge:
         never deletes it); the body is printed byte-exact."""
         closed_id = "aco-000005"
         closed_number = items.item_number(closed_id)
-        closed_record = _record(
+        closed_record = item_record(
             title="Shipped",
             state="closed",
             kind="task",
@@ -4196,7 +4145,7 @@ class TestCliStateRefForge:
         `item close` refuses, and names that item as what holds it."""
         closed_child = _state_ref_body(
             _CHILD_A_PROJECTION,
-            _record(
+            item_record(
                 title="Slice A",
                 state="closed",
                 kind="task",
@@ -4242,7 +4191,7 @@ class TestCliStateRefForge:
         item_files = _item_files_with_a_malformed_item(_blank_title_item())
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
         repaired = _state_ref_body(
-            _CHILD_A_PROJECTION, _record(title="Repaired", state="open", kind="task")
+            _CHILD_A_PROJECTION, item_record(title="Repaired", state="open", kind="task")
         )
         edited = run_cli(["item", "edit", MALFORMED_ID], capsys, stdin=repaired)
 
@@ -4506,7 +4455,7 @@ class TestCliStateRefForge:
         created id. A closed parent keeps its kind."""
         parent_body = _state_ref_body(
             _CHILD_A_PROJECTION,
-            _record(
+            item_record(
                 title="Slice A",
                 state=parent_state,
                 kind="task",
@@ -4598,7 +4547,7 @@ class TestCliStateRefForge:
             store.read_item_files(worktree, before_state.tip)[f"{CHILD_B_ID}.md"].decode(),
             CHILD_B_ID,
         )
-        hostile_record = _record(
+        hostile_record = item_record(
             title="Renamed via edit",
             state="closed",
             kind="task",
@@ -4640,7 +4589,7 @@ class TestCliStateRefForge:
         )
         blocked_body = _state_ref_body(
             _EDIT_TARGET_PROJECTION,
-            _record(title="Target", state="open", kind="task", blocked_by=(EDIT_BLOCKER_ID,)),
+            item_record(title="Target", state="open", kind="task", blocked_by=(EDIT_BLOCKER_ID,)),
         )
         edit_target = ["item", "edit", str(EDIT_TARGET_NUMBER)]
         assert run_cli(edit_target, capsys, stdin=blocked_body).status == 0
@@ -4654,7 +4603,7 @@ class TestCliStateRefForge:
         assert f"#{EDIT_BLOCKER_NUMBER}" not in blocked_out
 
         freed_body = _state_ref_body(
-            _EDIT_TARGET_PROJECTION, _record(title="Target", state="open", kind="task")
+            _EDIT_TARGET_PROJECTION, item_record(title="Target", state="open", kind="task")
         )
         assert run_cli(edit_target, capsys, stdin=freed_body).status == 0
 
@@ -5044,7 +4993,9 @@ class TestCliStateRefForge:
         unrelated_id = "aco-000010"
         unrelated_body = _state_ref_body(
             _CLOSE_TARGET_PROJECTION,
-            _record(title="Unrelated", state="open", kind="task", blocked_by=unrelated_blocked_by),
+            item_record(
+                title="Unrelated", state="open", kind="task", blocked_by=unrelated_blocked_by
+            ),
         )
         item_files = {
             **_close_scenario_item_files(),
@@ -5110,7 +5061,7 @@ class TestCliStateRefForge:
         parent as closable."""
         parent_with_uncut_row = _state_ref_body(
             replace(_CLOSE_PARENT_PROJECTION, slices=({"index": 1, "title": "Scheibe 1"},)),
-            _record(title="Parent", state="open", kind="container"),
+            item_record(title="Parent", state="open", kind="container"),
         )
         item_files = {
             **_close_parent_scenario_item_files(),
@@ -5168,7 +5119,7 @@ class TestCliStateRefForge:
                 {
                     f"{CLOSE_PARENT_ID}.md": _state_ref_body(
                         _CLOSE_PARENT_PROJECTION,
-                        _record(
+                        item_record(
                             title="Parent",
                             state="open",
                             kind="container",
