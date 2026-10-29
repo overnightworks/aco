@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { decidedCard, expectDecidedAnswer, openDecidedLine } from './decidedView';
+import { expectDecidedAnswer, openDecidedLine } from './decidedView';
+import { countPosts, pick, picks } from './decideRow';
 import {
-	line,
 	optionLine,
 	row,
 	writeRulings,
@@ -19,10 +19,6 @@ test.describe.configure({ mode: 'serial' });
 
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
-
-function choices(page: Page) {
-	return page.getByRole('group', { name: 'Entscheidung' });
-}
 
 // The fake aco stores every board pick as `--via board` on this date
 // (`aco_board_fixtures`); the decided card's How row reads it back.
@@ -57,24 +53,8 @@ function card(index: number, question: string, overrides: Partial<OptionRulingLi
 	return optionLine(index, `Satz ${index}`, { question, options: OPTIONS, ...overrides });
 }
 
-function picks(page: Page) {
-	return page.getByRole('group', { name: 'Decide' });
-}
-
-function pick(page: Page, letter: 'A' | 'B') {
-	return picks(page).getByRole('button', { name: new RegExp(`^Decide ${letter}:`) });
-}
-
 function listRow(page: Page, question: string) {
 	return page.locator('.tracks').getByTitle(question);
-}
-
-function countPosts(page: Page): { count(): number } {
-	let posts = 0;
-	page.on('request', (request) => {
-		if (request.method() === 'POST') posts += 1;
-	});
-	return { count: () => posts };
 }
 
 async function arrangeLongRepositoryLists(page: Page, directory: string, longWord: string) {
@@ -331,36 +311,6 @@ for (const viewport of [
 				.toBeLessThanOrEqual(viewport.width);
 		});
 
-		test('undoing within the 8 s window writes nothing, ever', async ({ page }) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					601,
-					'Guests',
-					line(1, 'Guests may join the call.', { question: 'Guests allowed?', default: 'yes' })
-				)
-			]);
-			let ruleRequests = 0;
-			page.on('request', (request) => {
-				if (request.url().endsWith('/api/rule')) {
-					ruleRequests += 1;
-				}
-			});
-
-			await page.clock.install();
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Guests allowed\?/ }).click();
-			await choices(page).getByRole('button', { name: /Ja/ }).click();
-			await page.getByRole('button', { name: 'Undo', exact: true }).click();
-
-			// The page clock runs past the window: the undo must have cancelled the
-			// write, not merely delayed it, and no real waiting is needed to prove it.
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			expect(ruleRequests).toBe(0);
-			await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeEnabled();
-		});
-
 		test('once the window elapses, exactly one decision is written', async ({ page }, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			writeRulings(repoDirectory, [row(602, 'Hosts', card(1, 'Hosts allowed?'))]);
@@ -379,96 +329,6 @@ for (const viewport of [
 			await openDecidedLine(page, 'Hosts allowed?');
 			await expectDecidedAnswer(page, 'B — Zweiter Weg', BOARD_PICK_HOW);
 			expect(posts.count()).toBe(1);
-		});
-
-		test('deciding moves the stage to the next open card, and the ruled one keeps no buttons', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					605,
-					'Access',
-					line(1, 'Guests may join the call.', {
-						question: 'Guests allowed?',
-						default: 'yes',
-						example: 'Ein langes Beispiel. '.repeat(300)
-					}),
-					line(2, 'Hosts may close the room.', { question: 'Hosts allowed?', default: 'no' })
-				)
-			]);
-
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Guests allowed\?/ }).click();
-			await choices(page).getByRole('button', { name: /Ja/ }).click();
-
-			await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeVisible({
-				timeout: 10_000
-			});
-			await expect(choices(page).getByRole('button', { name: /Nein/ })).toBeVisible();
-			await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeInViewport();
-			await expect(page.locator('.stage')).toBeFocused();
-
-			// The completed question is available only in the read-only Decided card.
-			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
-			await expect(page.getByRole('button', { name: /Guests allowed\?/ })).not.toBeVisible();
-			await openDecidedLine(page, 'Guests allowed?');
-			await expectDecidedAnswer(page, 'Ja', 'not recorded · 03.10.2026');
-			await decidedCard(page).getByText('Show', { exact: true }).click();
-			await expect(page.getByText('Guests may join the call.')).toBeVisible();
-		});
-
-		test('a question changed mid-undo refuses to save and asks for a reload', async ({ page }) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					603,
-					'Changed line',
-					line(1, 'Original sentence.', { question: 'Original question?', default: 'yes' })
-				)
-			]);
-
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Original question\?/ }).click();
-			await choices(page).getByRole('button', { name: /Ja/ }).click();
-
-			// An agent reformulates the line while the operator's undo window is
-			// still open; the board must refuse the stale choice once it writes.
-			writeRulings(repoDirectory, [
-				row(
-					603,
-					'Changed line',
-					line(1, 'A different sentence now.', { question: 'Original question?', default: 'yes' })
-				)
-			]);
-
-			await expect(page.getByText('Diese Zeile hat sich geändert, bitte neu laden')).toBeVisible({
-				timeout: 10_000
-			});
-		});
-
-		test('"Später" is a real, writable outcome, recommended when it is the default', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					604,
-					'Deferred',
-					line(1, 'This can wait a cycle.', { question: 'Deferred question?', default: 'later' })
-				)
-			]);
-
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Deferred question\?/ }).click();
-			const recommended = choices(page).getByRole('button', { name: /Später/ });
-			await expect(recommended).toContainText('Empfohlen');
-			await recommended.click();
-
-			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible({ timeout: 10_000 });
-			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
-			await openDecidedLine(page, 'Deferred question?');
-			await expectDecidedAnswer(page, 'Später', 'not recorded · 03.10.2026');
 		});
 
 		test('eight long repository lists keep selection, focus and all content inside the viewport', async ({

@@ -98,7 +98,7 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` keeps the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
 - [ ] [ABRD-58] A one-point card's pick shows a strip above it for its 8 s window: the Decided shape, `Decided: <letter> — <option> · <topic>` and `Undo`, in view as the card scrolls and atop a phone's list.
 - [ ] [ABRD-59] A pick that starts a window focuses its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. An ended window removes its strip; ABRD-50 applies.
-- [ ] [ABRD-48] Option card rows carry the Open or With head (ABRD-61) shape; each shape names its state, and each row's title is its card's name (ABRD-82).
+- [ ] [ABRD-48] Option card rows carry the Open or With head (ABRD-61) shape; each shape names its state, each row's title is its question or name (ABRD-82).
 - [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).

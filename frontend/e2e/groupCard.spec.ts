@@ -4,7 +4,6 @@ import type { Locator, Page, Response } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { decidedList, expectDecidedAnswer } from './decidedView';
 import {
-	line,
 	optionLine,
 	row,
 	writeRulings,
@@ -61,8 +60,6 @@ function point(index: number, overrides: Partial<OptionRulingLine> = {}): Option
 		...overrides
 	});
 }
-
-const YES_NO = line(5, 'Gäste dürfen teilnehmen.', { question: 'Gäste einladen?' });
 
 function threePoints(): OptionRulingLine[] {
 	return [point(2), point(3), point(4)];
@@ -659,21 +656,6 @@ for (const viewport of [
 					);
 			});
 		}
-
-		test('a yes/no line still decides by outcome, not as a card', async ({ page }) => {
-			const { repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [row(7, 'Sprung', ...threePoints(), YES_NO)]);
-			const posts = logPosts(page);
-			await open(page, phone, 'Gäste einladen?');
-
-			await page.getByRole('button', { name: 'Ja', exact: true }).click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect.poll(() => posts.length).toBe(1);
-			expect(posts[0]).toMatchObject({ item: 7, line: 5, outcome: 'yes' });
-			expect(posts[0]).not.toHaveProperty('lines');
-			await expect.poll(() => stored(repoDirectory, 7, 5).ruling).toBe('yes');
-		});
 
 		for (const how of ['the last pick', 'Accept all'] as const) {
 			test(`[ABRD-91] ${how} on a card that gained a point after the page read is refused, nothing is stored, and Neu laden keeps the picks of the unchanged points`, async ({

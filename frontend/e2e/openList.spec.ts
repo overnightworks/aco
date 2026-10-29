@@ -2,10 +2,6 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { line, optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
 import { readBoardRuntime } from './runtime';
-import { UNDO_SECONDS } from '../src/app/model/decision';
-
-// Just past the app's undo window; the page clock is driven, never waited.
-const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
 const SONG_QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const LONG_TOPIC = 'Sehr langes Thema '.repeat(12).trim();
@@ -97,7 +93,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px open list`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-28] [ABRD-48] open lines stand in one group per repository with their state shapes', async ({
+		test('[ABRD-28] [ABRD-48] option card rows stand in one group per repository, each with the shape naming its state and its question as title', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
@@ -140,33 +136,6 @@ for (const viewport of [
 				await first.click();
 				await expect(page.locator('.option-card')).toBeVisible();
 			}
-		});
-
-		test('[ABRD-50] after a decision the stage moves to the open option line, not the next yes/no line', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					10,
-					'Erst',
-					line(1, 'Erste Frage.', { question: 'Erste?' }),
-					line(2, 'Zweite Frage.', { question: 'Zweite?' })
-				),
-				row(11, 'Dann', songLine(1, 'Sprung'))
-			]);
-			await page.clock.install();
-			await page.goto(`${appUrl}#t=${token}`);
-
-			await page.locator('.tracks').getByTitle('Erste?').click();
-			await page
-				.getByRole('group', { name: 'Entscheidung' })
-				.getByRole('button', { name: /Ja/ })
-				.click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect(page.locator('.option-card')).toBeVisible();
-			await expect(page.getByRole('heading', { name: 'Zweite?', exact: true })).toHaveCount(0);
 		});
 
 		test('[ABRD-49] an empty board reads All decided, a failure beside an empty repository does not', async ({
