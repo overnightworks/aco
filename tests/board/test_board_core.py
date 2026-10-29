@@ -22,6 +22,7 @@ from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
     CardDecision,
+    CardLine,
     Decision,
     DecisionResult,
     DecisionStatus,
@@ -164,7 +165,10 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
         stopping.result(_WAIT_SECONDS)
 
     assert running_answer.result().status is DecisionStatus.RULED
-    assert [card.item for card in decisions.ruled_cards] == [running.item]
+    [shown] = decisions.lines
+    assert decisions.ruled_cards == [
+        CardDecision(running.item, (CardLine(shown.index, shown.card_hash, "A"),), None)
+    ]
 
 
 def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(
