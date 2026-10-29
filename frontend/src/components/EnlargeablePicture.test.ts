@@ -90,13 +90,13 @@ test('a hostile picture, alt and caption render as text and one image', () => {
 });
 
 test.each([
-	['0 0 200 140', '200', '140'],
-	['0,0,96.5,80', '96.5', '80']
+	['viewBox="0 0 200 140"', '200', '140'],
+	["viewBox='0,0,96.5,80'", '96.5', '80']
 ])(
-	'a picture with only the viewBox %s is drawn at the viewBox size in both places',
-	async (viewBox, width, height) => {
+	'a picture with only %s is drawn at the viewBox size in both places',
+	async (viewBoxAttribute, width, height) => {
 		render(EnlargeablePicture, {
-			picture: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"/>`,
+			picture: `<svg xmlns="http://www.w3.org/2000/svg" ${viewBoxAttribute}/>`,
 			alt: 'alt text',
 			caption: undefined
 		});

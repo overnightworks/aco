@@ -1,5 +1,6 @@
 <script module lang="ts">
-	const VIEW_BOX = /<svg\b[^>]*\sviewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/;
+	const VIEW_BOX =
+		/<svg\b[^>]*\sviewBox=["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/;
 
 	/** An SVG with only a viewBox has no size of its own, so its image would resolve to 0x0. */
 	function viewBoxSize(svg: string): { width?: string; height?: string } | undefined {
