@@ -530,12 +530,12 @@ class TestOptionLineRulings:
             "default": "no",
         }
         assert lines[1]["form"] == "options"
-        assert lines[1]["default"] is None
         assert lines[1] == {
             "index": 2,
             "form": "options",
             "text": "Ein Klick auf den Ursprungs-Link springt in der App: die Version klappt "
             "auf, der Take ist markiert, der Song bleibt offen.",
+            "asked_on": "2026-10-28",
             "ruling": None,
             "ruled_on": None,
             "default": None,
