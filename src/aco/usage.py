@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable, Iterable
-from typing import NoReturn, TypedDict, TypeVar, Unpack, cast, overload
+from typing import NoReturn, TypedDict, Unpack, cast, overload
 
 from . import protocol
 
@@ -22,9 +22,6 @@ class UsageError(protocol.ClaimError):
     def __init__(self, parser: argparse.ArgumentParser, message: str) -> None:
         super().__init__(message)
         self.parser = parser
-
-
-_Namespace = TypeVar("_Namespace")
 
 
 class _ArgumentOptions(TypedDict, total=False):
@@ -84,21 +81,23 @@ class UsageErrorParser(argparse.ArgumentParser):
     ) -> tuple[argparse.Namespace, list[str]]: ...
 
     @overload
-    def parse_known_args(
-        self, args: Iterable[str] | None, namespace: _Namespace
-    ) -> tuple[_Namespace, list[str]]: ...
+    def parse_known_args[NamespaceT](
+        self, args: Iterable[str] | None, namespace: NamespaceT
+    ) -> tuple[NamespaceT, list[str]]: ...
 
     @overload
-    def parse_known_args(self, *, namespace: _Namespace) -> tuple[_Namespace, list[str]]: ...
+    def parse_known_args[NamespaceT](
+        self, *, namespace: NamespaceT
+    ) -> tuple[NamespaceT, list[str]]: ...
 
-    def parse_known_args(
-        self, args: Iterable[str] | None = None, namespace: _Namespace | None = None
-    ) -> tuple[_Namespace | argparse.Namespace, list[str]]:
+    def parse_known_args[NamespaceT](
+        self, args: Iterable[str] | None = None, namespace: NamespaceT | None = None
+    ) -> tuple[NamespaceT | argparse.Namespace, list[str]]:
         if self.subcommands:
             self.subcommands.forget_received_tokens()
         self.received_tokens = tuple(sys.argv[1:] if args is None else args)
         parsed = super().parse_known_args(self.received_tokens, namespace)
-        return cast("tuple[_Namespace | argparse.Namespace, list[str]]", parsed)
+        return cast("tuple[NamespaceT | argparse.Namespace, list[str]]", parsed)
 
     def error(self, message: str) -> NoReturn:
         raise UsageError(self, message)
