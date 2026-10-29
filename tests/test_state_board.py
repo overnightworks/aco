@@ -63,11 +63,11 @@ from aco import (
     board_read,
     checkout,
     cmd_cut,
-    cmd_rulings,
     forge,
     items,
     process,
     protocol,
+    rulings,
     session,
     store,
     workboard,
@@ -1241,8 +1241,8 @@ def _projected(
 
 
 def _rulings_lines(client: forge.BoardSource, *, storage: Storage) -> tuple[str, ...]:
-    rows = cmd_rulings._rulings_rows(client.list_open_board_issues(), storage=storage)
-    return tuple(cmd_rulings._rulings_row_text(row, storage) for row in rows)
+    rows = rulings.rows(client.list_open_board_issues(), storage=storage)
+    return tuple(rulings.row_text(row, storage) for row in rows)
 
 
 _EXPECTED_BOARD = _projected(_github_fake(), storage=Storage.GITHUB)

@@ -80,7 +80,7 @@ layers = [
     "checkout | store",
     "github | state_board",
     "github_graphql",
-    "forge",
+    "forge | rulings",
     "workboard",
     "items | expectations",
     "body",
