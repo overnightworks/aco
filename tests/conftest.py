@@ -1,7 +1,8 @@
 """Shared test isolation.
 
 Only isolation fixtures live here -- the autouse ones and the isolation more
-than one module asks for by name; everything else stays local to its test
+than one module asks for by name -- plus `github_world`, the GitHub-checkout
+world check many modules share; everything else stays local to its test
 module. The one exception is registration: `cli_fixtures` is loaded as a
 pytest plugin (`pytest_plugins` below), so its `bare_remote` and `worktree`
 fixtures resolve by name in every test module, and its autouse
