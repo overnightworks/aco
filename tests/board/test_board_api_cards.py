@@ -73,11 +73,17 @@ def test_the_board_lists_every_option_line_under_its_item_in_acos_order(
 def test_the_board_reads_fresh_on_every_listing(
     repository: BoardForge, board: BoardClient, listed_items: Lister
 ) -> None:
-    for raw_body, indexes in [(_OPEN_CARD, [1]), (item_body(_YES_NO, open_option_entry()), [1, 2])]:
-        repository.put_item(_ITEM, raw_body, title="Changed between loads")
+    repository.put_item(1, _OPEN_CARD, title="Removed between loads")
+    first = listed_items(board)
+    repository.remove_item(1)
+    repository.put_item(2, item_body(_YES_NO, open_option_entry()), title="Added between loads")
 
-        [listed_item] = listed_items(board)
-        assert [entry["index"] for entry in listed_item["lines"]] == indexes
+    second = listed_items(board)
+
+    assert [
+        [(item["number"], [entry["index"] for entry in item["lines"]]) for item in listing]
+        for listing in (first, second)
+    ] == [[(1, [1])], [(2, [1, 2])]]
 
 
 def test_the_board_keeps_no_copy_of_a_decision(

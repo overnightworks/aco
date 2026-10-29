@@ -102,6 +102,12 @@ class BoardForge:
         state.items[number] = _StoredItem(title, raw_body)
         self._replace_state(state)
 
+    def remove_item(self, number: int) -> None:
+        """Item `number` leaves the open listing, as a closed issue does."""
+        state = self._state()
+        del state.items[number]
+        self._replace_state(state)
+
     def fail_listing(self, message: str) -> None:
         """Every later listing raises a forge failure carrying `message`."""
         state = self._state()
