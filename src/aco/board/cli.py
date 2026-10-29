@@ -6,6 +6,7 @@ and calls `serve`."""
 from __future__ import annotations
 
 import contextlib
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -14,6 +15,7 @@ from .aco_cli import AcoCli
 from .board import Board, Boards
 from .server import LOOPBACK_HOST, start_board
 from .static import StaticAssetsMissingError
+from .token_store import MalformedTokenFileError, board_token, token_path
 
 
 class _DuplicateRepositoryError(Exception):
@@ -51,7 +53,15 @@ def serve(port: int, paths: Sequence[Path]) -> int:
         {label: Board(AcoCli(directory=directory)) for label, directory in labelled.items()}
     )
     try:
-        running = start_board(port, boards)
+        token = board_token(token_path(os.environ, Path.home()))
+    except MalformedTokenFileError as error:
+        print(
+            f"ERROR: {error.path} holds no board token; delete it to start with a new one",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        running = start_board(port, boards, token)
     except OSError as error:
         print(
             f"ERROR: cannot listen on {LOOPBACK_HOST}:{port}: {error.strerror}",
