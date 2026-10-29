@@ -1,8 +1,0 @@
-claim_id = "d75f259682a74fa6b8bc02bfc1e6ce4c"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "0e191c065c07efa733b3f72375becb990d49c5bc"
-branch = "claude/issue-568-asked-on"
-scope = ["specs/body-block.spec.md", "specs/rulings.spec.md", "src/aco/cmd_rulings.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/support/option_cards.py", "tests/test_cmd_check_option_lines.py", "tests/test_expectation_grammar_asked_on.py"]
-opened_commit = "b4d9d6d7940a00bdde3fa6d434a65c28f4696ac9"
-whole_reason = "One grammar key: its rule, its rendering, its rulings JSON key, both specs and the shared card fixture change together, or every open-card test turns malformed."
