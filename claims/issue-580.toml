@@ -1,8 +1,0 @@
-claim_id = "a7f4ad5e2eae480b9ef667f808495149"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "40614fcbee4798113098c26126e261b09fd9f69a"
-branch = "claude/issue-580-k2b-e2e-off-yes-no"
-scope = ["frontend/e2e/decide.spec.ts", "frontend/e2e/decided.spec.ts", "frontend/e2e/groupCard.spec.ts", "frontend/e2e/openList.spec.ts", "frontend/e2e/optionCard.spec.ts", "frontend/e2e/pageFrame.spec.ts", "frontend/e2e/withHead.spec.ts"]
-opened_commit = "21e1ce8bf5edd6fc651d58b9db318ddae1dc57cf"
-whole_reason = "Seven Playwright specs carry the page's generic proofs on open yes/no lines; one test-only conversion, nothing to share with another lane."
