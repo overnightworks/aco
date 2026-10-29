@@ -1,0 +1,8 @@
+claim_id = "4346e14982284d9094d6f88d21d99a0f"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "6ec37c5dff8f71ae0d4fe73aaa450c459d3a0df3"
+branch = "claude/issue-565-decide-write-owner"
+scope = ["pyproject.toml", "src/aco/cmd_cut.py", "src/aco/cmd_rule.py", "src/aco/decide.py", "tests/test_decide.py"]
+opened_commit = "7f1f1644e80a3c35a41a548d401a564ec980976f"
+whole_reason = "One extraction: the moved gate, fold and write, their one caller, its docstring pointer and the layer row that admits the new module change together or lint-imports fails."
