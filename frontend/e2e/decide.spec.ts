@@ -143,7 +143,8 @@ test('reactivating the selected desktop row restores the question heading and fo
 	const selected = listRow(page, 'First?');
 	await selected.click();
 	await expect(page.locator('.stage')).toBeFocused();
-	for (const _ of ['picture', 'option A', 'option B', 'pick A']) await page.keyboard.press('Tab');
+	// The stage's tab stops before the first pick: the picture, then the two option disclosures.
+	for (let stop = 0; stop < 4; stop += 1) await page.keyboard.press('Tab');
 	await expect(pick(page, 'A')).toBeFocused();
 	await expect
 		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
