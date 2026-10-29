@@ -1,4 +1,5 @@
 """The `rescope` command (`specs/rescope.spec.md`)."""
+# ruff: noqa: T201 - the rescope command writes its result lines to stdout
 
 from __future__ import annotations
 

@@ -1,4 +1,5 @@
 """The `release` command (`specs/release.spec.md`)."""
+# ruff: noqa: T201 - the release command writes its result lines to stdout
 
 from __future__ import annotations
 
@@ -204,7 +205,7 @@ def _verify_merged_release(
             f"pull request #{detail.number} merged into {detail.target_branch!r}, "
             f"not the default branch {default_branch!r}"
         )
-    assert detail.merge_commit is not None  # `detail.merged` is true; github.py guarantees this.
+    assert detail.merge_commit is not None  # noqa: S101 - `detail.merged` is true; github.py guarantees this.
     landings = checkout.trunk_landings(
         context.fetched_default_branch_ref(),
         board_read.TRUNK_LANDING_DEPTH,
@@ -471,8 +472,7 @@ def release_transition(
         store.transition_subject("release", resolved.selected.identity, resolved.selected.branch),
         intent,
     )
-    # The run already fetched the canonical remote and asked the forge's
-    # default branch to verify the merge, so this ref costs no read.
+    # The run already fetched the remote and asked the forge's default branch: no extra read.
     landing = (
         None
         if lane is None

@@ -1,4 +1,5 @@
 """GitHub adapter for the forge port."""
+# ruff: noqa: T201 - the forge adapter's one operator warning goes to stderr
 
 from __future__ import annotations
 
@@ -69,9 +70,8 @@ MALFORMED_CLOSED_ISSUE = "GitHub returned a malformed closed issue"
 # The combined-status endpoint's own aggregate `state` can be `pending`,
 # `failure`, or `error` with a `statuses` page that, this instant, names no
 # context at all -- a status posted after this read, say.
-# A refusal still needs one name to print, so an
-# unnamed non-passing verdict prints this stand-in rather than reading as
-# "no checks" and passing silently.
+# A refusal still needs one name to print, so an unnamed non-passing verdict
+# prints this stand-in rather than reading as "no checks" and passing silently.
 EXTERNAL_STATUS_FALLBACK_NAME = "external status checks"
 # For `HTTP 5xx`, gh's combined output names the status
 # code but never its class, so any 5xx is matched by digit rather than by an

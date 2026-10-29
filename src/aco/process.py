@@ -123,7 +123,7 @@ def _start_bounded_process(
     separate_stderr: bool,
 ) -> subprocess.Popen[bytes]:
     try:
-        return subprocess.Popen(
+        return subprocess.Popen(  # noqa: S603 - every caller passes an argv list and never a shell string
             command,
             stdin=subprocess.PIPE if input_data is not None else None,
             stdout=subprocess.PIPE,
@@ -141,13 +141,13 @@ def _register_process_streams(
     process_handle: subprocess.Popen[bytes],
     input_data: bytes | None,
 ) -> memoryview | None:
-    assert process_handle.stdout is not None
+    assert process_handle.stdout is not None  # noqa: S101 - stdout is requested as a pipe in Popen
     selector.register(process_handle.stdout, selectors.EVENT_READ, _STDOUT_KEY)
     if process_handle.stderr is not None:
         selector.register(process_handle.stderr, selectors.EVENT_READ, _STDERR_KEY)
     if input_data is None:
         return None
-    assert process_handle.stdin is not None
+    assert process_handle.stdin is not None  # noqa: S101 - stdin is requested as a pipe when input is given
     os.set_blocking(process_handle.stdin.fileno(), False)
     selector.register(process_handle.stdin, selectors.EVENT_WRITE, _STDIN_KEY)
     return memoryview(input_data)
@@ -183,7 +183,7 @@ def _write_process_input(
     # streams (`_register_process_streams`), so the concretely typed stream comes
     # from there instead of narrowing the selector's wider protocol.
     stream = process_handle.stdin
-    assert stream is not None
+    assert stream is not None  # noqa: S101 - narrows an optional for the type checker
     try:
         written = os.write(stream.fileno(), pending_input)
     except BrokenPipeError:
@@ -205,7 +205,7 @@ def _read_process_output(
     process_handle: subprocess.Popen[bytes],
 ) -> None:
     stream = process_handle.stdout if key.data == _STDOUT_KEY else process_handle.stderr
-    assert stream is not None
+    assert stream is not None  # noqa: S101 - narrows an optional for the type checker
     try:
         chunk = os.read(stream.fileno(), _OUTPUT_CHUNK_BYTES)
     except OSError as error:
@@ -255,7 +255,7 @@ def _exchange_bounded_io(
             events = _await_process_io_events(selector, process_handle, deadline)
             for key, _ in events:
                 if key.data == _STDIN_KEY:
-                    assert pending_input is not None
+                    assert pending_input is not None  # noqa: S101 - pending input stays set while stdin is registered
                     pending_input = _write_process_input(
                         key, pending_input, selector, process_handle
                     )
@@ -337,7 +337,7 @@ def run_captured(
     the bounded I/O machinery `run_bounded` needs for streamed input.
     """
     try:
-        completed = subprocess.run(
+        completed = subprocess.run(  # noqa: S603 - every caller passes an argv list and never a shell string
             command, check=False, capture_output=True, timeout=timeout, env=env, cwd=cwd
         )
     except FileNotFoundError as error:

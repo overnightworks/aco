@@ -61,7 +61,7 @@
 
 [function_lines."src/aco/cmd_release.py"]
 "_cmd_release_landed" = 98
-"release_transition" = 74
+"release_transition" = 73
 
 [function_lines."src/aco/cmd_rescope.py"]
 "_rescope_write" = 69

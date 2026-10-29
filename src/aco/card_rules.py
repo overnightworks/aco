@@ -30,8 +30,8 @@ PROBLEM_MAXIMUM_WORDS = 20
 OPTION_NAME_MINIMUM_WORDS = 2
 OPTION_NAME_MAXIMUM_WORDS = 5
 _ONE_LINE_KEYS = frozenset({"area", "topic", "name"})
-_TOKEN_OPENERS = "„“”\"'»«([{"
-_TOKEN_CLOSERS = "„“”\"'»«)]},;:!?."
+_OPENING_PUNCTUATION = "„“”\"'»«([{"
+_CLOSING_PUNCTUATION = "„“”\"'»«)]},;:!?."
 _EXTENSIONS = "|".join(FILE_EXTENSIONS)
 _ISSUE_NUMBER = re.compile(r"(?<!\w)#\d+")
 _PATH = re.compile(rf"^(?:\./|~/|/[A-Za-z])|://|/[^/]*\.(?:{_EXTENSIONS})$")
@@ -46,7 +46,7 @@ def _tokens(text: str) -> Iterator[str]:
     """The whitespace-separated words of `text` without the quotes, brackets and
     sentence punctuation around them."""
     for word in text.split():
-        yield word.lstrip(_TOKEN_OPENERS).rstrip(_TOKEN_CLOSERS)
+        yield word.lstrip(_OPENING_PUNCTUATION).rstrip(_CLOSING_PUNCTUATION)
 
 
 def _has_token(pattern: re.Pattern[str]) -> Callable[[str], bool]:

@@ -828,7 +828,7 @@ def _direct_children(entries: dict[str, _ListedEntry], directory: str) -> dict[s
 
 def _extract_archive_member(archive: tarfile.TarFile, member: tarfile.TarInfo) -> bytes:
     handle = archive.extractfile(member)
-    assert handle is not None  # `member.isfile()` guarantees an extractable stream
+    assert handle is not None  # noqa: S101 - `member.isfile()` guarantees an extractable stream
     return handle.read()
 
 
@@ -1464,7 +1464,7 @@ def _write_incremental_state_tree(
     Unlike `_write_bootstrap_tree`, which has no prior commit to diff
     against on a ref's very first write.
     """
-    assert observed.tip is not None  # commit_transition already refused a missing ref
+    assert observed.tip is not None  # noqa: S101 - commit_transition already refused a missing ref
     existing = _list_tree(worktree, observed.tip, tip=observed.tip, context="state")
     top_entries: list[_TreeEntry] = [_carried_entry(existing, SCHEMA_TOML_FILENAME)]
     items_subtree = _patch_items_subtree(
@@ -1562,7 +1562,7 @@ def _transition_message(
     as a bug, not a second place callers must get right.
     """
     kind = _TRANSITION_KINDS[type(intent)]
-    assert kind.claim_shaped == isinstance(subject, ClaimTransitionSubject), (
+    assert kind.claim_shaped == isinstance(subject, ClaimTransitionSubject), (  # noqa: S101 - an intent is always paired with its own subject kind
         f"{type(intent).__name__} is claim_shaped={kind.claim_shaped} but its subject is "
         f"{type(subject).__name__}"
     )

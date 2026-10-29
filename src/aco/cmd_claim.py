@@ -1,4 +1,5 @@
 """The `claim` command (`specs/claim.spec.md`)."""
+# ruff: noqa: T201 - the claim command writes its result lines to stdout
 
 from __future__ import annotations
 
@@ -357,11 +358,10 @@ def _body_checks(item: workboard.BoardItem, storage: body.Storage) -> tuple[_Sli
     checks: list[_SliceCheck] = []
     # Read the two atomic facts directly rather than `item.actionable_reason`:
     # that reason is the *first* one `workboard._actionable_reason` finds (frozen,
-    # claimed, blocked, then incomplete), so an item that is both blocked and
-    # incomplete would report only "blocked" there -- masking the incomplete
-    # body this check exists to name. A freshly `cut` child (an incomplete
-    # but defect-free skeleton) is refused here exactly as it is invisible to
-    # `next`, regardless of what else may also be true of it.
+    # claimed, blocked, then incomplete), so an item both blocked and incomplete
+    # would report only "blocked" there -- masking the incomplete body this check
+    # exists to name. A freshly `cut` child (an incomplete but defect-free
+    # skeleton) is refused here exactly as it is invisible to `next`.
     if not item.contract_complete:
         missing = ", ".join(body.missing_or_empty_sections(contract))
         checks.append(

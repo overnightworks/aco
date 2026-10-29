@@ -685,7 +685,7 @@ def _fake_oid(seed: str) -> protocol.ObjectId:
     stands in for a real blob oid in the ad hoc scenarios below that never
     push their bytes through real git: only its shape, never
     its actual content-addressing, matters to a test that never writes."""
-    return protocol.ObjectId(hashlib.sha1(seed.encode()).hexdigest())
+    return protocol.ObjectId(hashlib.sha1(seed.encode()).hexdigest())  # noqa: S324 - a git object id is SHA-1 by definition
 
 
 def _item_oids(item_files: Mapping[str, bytes]) -> dict[str, protocol.ObjectId]:
@@ -1973,8 +1973,8 @@ class _CompetingRun:
         self.exit_codes.append(issue_claim.main(self._argv))
         own = self._capsys.readouterr()
         self.outputs.append((own.out, own.err))
-        print(outer.out, end="")
-        print(outer.err, end="", file=sys.stderr)
+        sys.stdout.write(outer.out)
+        sys.stderr.write(outer.err)
 
 
 def _item_new_child_argv(parent_id: str) -> list[str]:

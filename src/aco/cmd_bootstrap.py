@@ -1,4 +1,5 @@
 """The `bootstrap` command (`specs/bootstrap.spec.md`)."""
+# ruff: noqa: T201 - the bootstrap command writes its result lines to stdout
 
 from __future__ import annotations
 

@@ -1,4 +1,5 @@
 """The `next` command (`specs/next.spec.md`)."""
+# ruff: noqa: T201 - the next command writes its result lines to stdout
 
 from __future__ import annotations
 

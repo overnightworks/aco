@@ -889,7 +889,7 @@ class StateRefBoard:
         self._items[write.item_id] = _DecodedItem(
             record=write.record, body=write.content.decode("utf-8"), oid=new_oid
         )
-        assert write.record.closed_at is not None  # `_closing_write` just set it
+        assert write.record.closed_at is not None  # noqa: S101 - `_closing_write` just set it
         return write.record.closed_at
 
     def prepare_landing(self, number: int) -> LandingWrite:
