@@ -3,6 +3,6 @@ agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
 role = "builder"
 base = "57735b4d583221532ee143736811025e054bcf42"
 branch = "claude/issue-572-lean-rulings"
-scope = ["quality/baseline.toml", "specs/rulings.spec.md", "specs/storage-pin.spec.md", "src/aco/board/aco_cli.py", "src/aco/board_read.py", "src/aco/cmd_rulings.py", "tests/support/github_pages.py", "tests/test_cmd_rulings.py", "tests/test_github.py", "tests/test_state_board.py"]
+scope = ["quality/baseline.toml", "specs/rulings.spec.md", "specs/storage-pin.spec.md", "src/aco/board/aco_cli.py", "src/aco/board_read.py", "src/aco/cmd_rulings.py", "tests/support/github_pages.py", "tests/test_cmd_rulings.py", "tests/test_cmd_rulings_state_ref.py", "tests/test_github.py", "tests/test_state_board.py"]
 opened_commit = "76aaae0cd7ccda028790d1cc14b150b384935ddd"
 whole_reason = "One read path and its order: the lean read, the new key, the spec sentences that state them and the tests that pin them change together, or RUL-03 states an order the code no longer makes."
