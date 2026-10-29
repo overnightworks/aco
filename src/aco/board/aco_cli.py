@@ -18,7 +18,6 @@ from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 from pathlib import Path
-from typing import TypeVar
 
 from .ports import (
     OPTION_LETTERS,
@@ -52,9 +51,6 @@ seconds against a forge; a call still running after this is treated as hung."""
 _ALREADY_RULED_REASON = "already_ruled"
 _CARD_CHANGED_REASON = "card_changed"
 _RETURNED_REASON = "returned"
-
-_Field = TypeVar("_Field")
-_Member = TypeVar("_Member", bound=StrEnum)
 
 
 @dataclass(frozen=True)
@@ -364,7 +360,7 @@ def _as_object(value: object) -> dict[str, object] | None:
     return {str(key): field for key, field in value.items()}
 
 
-def _required(fields: dict[str, object], key: str, kind: type[_Field]) -> _Field:
+def _required[Field](fields: dict[str, object], key: str, kind: type[Field]) -> Field:
     value = fields.get(key)
     # bool is an int subclass; a JSON true is never an item or line number.
     if not isinstance(value, kind) or isinstance(value, bool):
@@ -381,9 +377,9 @@ def _optional_text(fields: dict[str, object], key: str) -> str | None:
     return value
 
 
-def _optional_member(
-    fields: dict[str, object], key: str, vocabulary: type[_Member], noun: str
-) -> _Member | None:
+def _optional_member[Member: StrEnum](
+    fields: dict[str, object], key: str, vocabulary: type[Member], noun: str
+) -> Member | None:
     value = _optional_text(fields, key)
     if value is None:
         return None

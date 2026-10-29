@@ -8,7 +8,7 @@ import time
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar, cast
+from typing import cast
 
 from . import (
     board_read,
@@ -420,9 +420,6 @@ def _land_merge(
         ) from error
 
 
-_LandStepResult = TypeVar("_LandStepResult")
-
-
 _LAND_READ_FAILURE_ERRORS = frozenset(
     {forge.ForgeError, forge.ForgeTransientError, forge.ForgeMalformedResponseError}
 )
@@ -450,7 +447,9 @@ def _land_read_head_checked(
     return detail
 
 
-def _land_read(number: int, what: str, read: Callable[[], _LandStepResult]) -> _LandStepResult:
+def _land_read[LandStepResult](
+    number: int, what: str, read: Callable[[], LandStepResult]
+) -> LandStepResult:
     """A read `aco land` runs before its merge: a forge failure
     of exactly the unclassified, transient or malformed kind refuses naming
     what was read and that nothing was merged, so a re-run helps. Any other
@@ -467,9 +466,9 @@ def _land_read(number: int, what: str, read: Callable[[], _LandStepResult]) -> _
         ) from error
 
 
-def _land_step(
-    number: int, sha: str, step: str, action: Callable[[], _LandStepResult]
-) -> _LandStepResult:
+def _land_step[LandStepResult](
+    number: int, sha: str, step: str, action: Callable[[], LandStepResult]
+) -> LandStepResult:
     """Every step `aco land` runs once its merge already landed: a failure here never means "not
     merged" -- the merge already
     happened -- so it reports the one ruled recovery line instead of the
@@ -569,7 +568,7 @@ def _land_is_own_repository(toplevel: Path) -> bool:
     try:
         with (toplevel / "pyproject.toml").open("rb") as stream:
             data = tomllib.load(stream)
-    except (OSError, tomllib.TOMLDecodeError):
+    except OSError, tomllib.TOMLDecodeError:
         return False
     project = data.get("project")
     return isinstance(project, dict) and project.get("name") == _LAND_SELF_PACKAGE_NAME

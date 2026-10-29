@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import TypeAlias, cast
+from typing import cast
 
 from . import (
     board_read,
@@ -155,7 +155,7 @@ class FlagCombinationError(protocol.ClaimError):
     given once given twice."""
 
 
-Outcome: TypeAlias = expectations.OptionChoice | expectations.HeadReturn
+type Outcome = expectations.OptionChoice | expectations.HeadReturn
 
 
 @dataclass(frozen=True)

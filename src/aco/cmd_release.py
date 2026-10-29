@@ -472,7 +472,7 @@ def release_transition(
         store.transition_subject("release", resolved.selected.identity, resolved.selected.branch),
         intent,
     )
-    # The run already fetched the remote and asked the forge's default branch: no extra read.
+    # Verifying the merge already fetched this ref, so reading it costs nothing.
     landing = (
         None
         if lane is None

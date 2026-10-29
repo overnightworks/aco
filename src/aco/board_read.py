@@ -9,7 +9,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TypeVar
 
 from . import body, checkout, forge, metrics, protocol, store, workboard
 from .session import RunContext
@@ -80,10 +79,7 @@ def fetch_issue_reference(client: forge.ForgeReader, number: int) -> forge.ItemR
     return client.item_reference(number)
 
 
-_BoardRead = TypeVar("_BoardRead")
-
-
-def board_read_after_write(read: Callable[[], _BoardRead]) -> _BoardRead | str:
+def board_read_after_write[BoardRead](read: Callable[[], BoardRead]) -> BoardRead | str:
     """`read`'s result, or the one hint that replaces it, for a board read a
     command runs once its own write already committed (`release --merged`,
     `item close`): a forge hiccup (LAND-38) or a

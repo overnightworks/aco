@@ -11,7 +11,6 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, TypeVar
 
 from . import forge, protocol
 
@@ -20,7 +19,6 @@ from . import forge, protocol
 # the 50-100 range rather than one huge query per repository.
 GRAPHQL_ITEM_REFERENCE_BATCH_SIZE = 100
 
-_Value = TypeVar("_Value")
 
 # One round trip: the query and what the response is called in a refusal, answering
 # `data.repository` as the values `gh` printed.
@@ -28,20 +26,20 @@ FetchBlock = Callable[[str, str], tuple[object, ...]]
 
 
 @dataclass(frozen=True)
-class BatchedRead(Generic[_Value]):
+class BatchedRead[Value]:
     """One read of every requested number through a single top-level field."""
 
     field: str
     selection: str
     subject: str
-    parse_node: Callable[[object], _Value]
+    parse_node: Callable[[object], Value]
 
 
 def malformed_response(subject: str) -> forge.ForgeMalformedResponseError:
     return forge.ForgeMalformedResponseError(f"GitHub returned a malformed batched {subject}")
 
 
-def _query(read: BatchedRead[_Value], numbers: Sequence[int]) -> str:
+def _query[Value](read: BatchedRead[Value], numbers: Sequence[int]) -> str:
     aliases = "\n".join(
         f"n{index}: {read.field}(number: {number}) {{ {read.selection} }}"
         for index, number in enumerate(numbers)
@@ -52,13 +50,13 @@ def _query(read: BatchedRead[_Value], numbers: Sequence[int]) -> str:
     )
 
 
-def _values_from_nodes(
-    read: BatchedRead[_Value], nodes: Mapping[str, object], numbers: Sequence[int]
-) -> dict[int, _Value]:
+def _values_from_nodes[Value](
+    read: BatchedRead[Value], nodes: Mapping[str, object], numbers: Sequence[int]
+) -> dict[int, Value]:
     """Every requested number's parsed value. An omitted alias is a malformed
     response, never read as the explicit `null` GitHub answers for a number it
     cannot resolve."""
-    values: dict[int, _Value] = {}
+    values: dict[int, Value] = {}
     for index, number in enumerate(numbers):
         alias = f"n{index}"
         if alias not in nodes:
@@ -118,9 +116,9 @@ def not_found_batch_nodes(message: str, numbers: Sequence[int]) -> Mapping[str, 
     return repository if recovered else None
 
 
-def _read_block(
-    read: BatchedRead[_Value], numbers: tuple[int, ...], fetch: FetchBlock
-) -> dict[int, _Value]:
+def _read_block[Value](
+    read: BatchedRead[Value], numbers: tuple[int, ...], fetch: FetchBlock
+) -> dict[int, Value]:
     """One round trip for at most `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE` numbers."""
     try:
         values = fetch(_query(read, numbers), f"batched {read.subject}")
@@ -134,9 +132,9 @@ def _read_block(
     return _values_from_nodes(read, values[0], numbers)
 
 
-def read_batched(
-    read: BatchedRead[_Value], numbers: Iterable[int], *, fetch: FetchBlock, concurrency: int
-) -> dict[int, _Value]:
+def read_batched[Value](
+    read: BatchedRead[Value], numbers: Iterable[int], *, fetch: FetchBlock, concurrency: int
+) -> dict[int, Value]:
     """Every one of `numbers`, in blocks of `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE`
     fetched concurrently, at most `concurrency` at once. Nothing requested costs
     no round trip."""
@@ -149,7 +147,7 @@ def read_batched(
     )
     with ThreadPoolExecutor(max_workers=min(len(blocks), concurrency)) as pool:
         results = list(pool.map(lambda block: _read_block(read, block, fetch), blocks))
-    merged: dict[int, _Value] = {}
+    merged: dict[int, Value] = {}
     for result in results:
         merged.update(result)
     return merged

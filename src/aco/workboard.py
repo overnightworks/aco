@@ -13,7 +13,7 @@ from enum import StrEnum
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from typing import NoReturn, TypeGuard, TypeVar, cast
+from typing import NoReturn, TypeGuard, cast
 
 from . import items, metrics, protocol
 
@@ -2532,10 +2532,11 @@ def _project_measurements(measurements: dict[str, object]) -> None:
 
 # The forge form an item takes under `GITHUB`: text for a label or a
 # command argument, a bare number for a `--json` field.
-_ForgeName = TypeVar("_ForgeName", int, str)
 
 
-def _storage_item_name(number: int, storage: Storage, forge_name: _ForgeName) -> str | _ForgeName:
+def _storage_item_name[ForgeName: (int, str)](
+    number: int, storage: Storage, forge_name: ForgeName
+) -> str | ForgeName:
     """The one storage switch every item name below asks: under
     `storage = STATE_REF` `items.format_item_id`'s `aco-xxxxxx` -- an id
     `parse_item_reference` accepts right back, so what a command prints is

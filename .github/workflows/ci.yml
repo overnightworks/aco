@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ['3.11', '3.12', '3.13', '3.14']
+        python: ['3.14']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
@@ -39,13 +39,10 @@ jobs:
         run: test -n "$(find src -name '*.py' -print -quit)" && uv run --locked vulture src scripts/vulture_whitelist.py --min-confidence 60
       - name: Check architecture contracts
         run: uv run --locked lint-imports
-      - if: matrix.python != '3.12'
-        run: uv run --locked pytest -n auto
-      - if: matrix.python == '3.12'
-        run: >-
+      - run: >-
           uv run --locked pytest -n auto --cov=aco --cov=scripts --cov-branch
           --cov-report=xml:coverage.xml --cov-report=term-missing:skip-covered --cov-fail-under=100
-      - if: ${{ !cancelled() && matrix.python == '3.12' }}
+      - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: python-coverage
@@ -63,7 +60,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
-          python-version: '3.11'
+          python-version: '3.14'
       - run: bash scripts/package_smoke.sh
 
   frontend:
@@ -121,7 +118,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
-          python-version: '3.12'
+          python-version: '3.14'
       # The fake board server (tests/support/e2e_server.py) the launcher
       # spawns is the only Python side this job needs; no Node is involved.
       - run: uv sync --locked --group dev

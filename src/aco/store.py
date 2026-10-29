@@ -35,7 +35,7 @@ from enum import StrEnum
 from io import BytesIO
 from pathlib import Path
 from types import MappingProxyType
-from typing import Protocol, TypeVar
+from typing import Protocol
 
 from . import lineage_stamp, metrics, process
 from .protocol import (
@@ -1329,9 +1329,6 @@ def _write_bootstrap_tree(worktree: Path) -> ObjectId:
     return _mktree(worktree, [("100644", "blob", schema_blob, SCHEMA_TOML_FILENAME)])
 
 
-_SubtreeValueT = TypeVar("_SubtreeValueT")
-
-
 @dataclass(frozen=True)
 class _ExistingSubtree:
     """One subtree's already-committed shape from `observed.tip`:
@@ -1360,13 +1357,13 @@ def _carried_entry(entries: Mapping[str, _ListedEntry], name: str) -> _TreeEntry
     return (entry.mode, entry.kind, entry.oid, name)
 
 
-def _reuse_or_write_mapping_subtree(
+def _reuse_or_write_mapping_subtree[SubtreeValueT](
     worktree: Path,
     *,
     existing: _ExistingSubtree,
-    old_members: Mapping[str, _SubtreeValueT],
-    new_members: Mapping[str, _SubtreeValueT],
-    serialize: Callable[[_SubtreeValueT], str],
+    old_members: Mapping[str, SubtreeValueT],
+    new_members: Mapping[str, SubtreeValueT],
+    serialize: Callable[[SubtreeValueT], str],
 ) -> ObjectId | None:
     """A `claims/`- or `resources/`-shaped subtree's new oid, reusing every
     member unchanged since `old_members`: frozen-dataclass

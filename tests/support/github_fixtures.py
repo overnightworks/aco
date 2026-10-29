@@ -11,7 +11,6 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue
@@ -79,10 +78,9 @@ def landing_readiness(
     return forge.LandingReadiness(number, True, head_sha, mergeable_state, checks)
 
 
-ServedForge = TypeVar("ServedForge", bound="FakeForge | github.GitHubForge")
-
-
-def serve_forge(monkeypatch: pytest.MonkeyPatch, forge: ServedForge) -> ServedForge:
+def serve_forge[ServedForge: "FakeForge | github.GitHubForge"](
+    monkeypatch: pytest.MonkeyPatch, forge: ServedForge
+) -> ServedForge:
     """Install one arranged forge, a fake or a real adapter over a fake transport, at the
     GitHub adapter boundary."""
     monkeypatch.setattr(github, "GitHubForge", lambda repository: forge)

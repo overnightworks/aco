@@ -1,5 +1,5 @@
 [gate]
-mandatory_jobs = ["check (3.11)", "check (3.12)", "check (3.13)", "check (3.14)", "Package smoke (wheel, sdist, tool install without Node)", "Frontend (svelte-check, lint, knip, vitest, assets fresh)", "E2E (Playwright, desktop)"]
+mandatory_jobs = ["check (3.14)", "Package smoke (wheel, sdist, tool install without Node)", "Frontend (svelte-check, lint, knip, vitest, assets fresh)", "E2E (Playwright, desktop)"]
 legacy = "fail"
 
 [[gate.loosened]]
@@ -7,6 +7,12 @@ what = 'mandatory job "Test-efficiency gates (test-budget, similar-methods, test
 item = "#334"
 date = 2026-10-24
 reason = "the operator ruled the unused efficiency gates and the spec-lint exemption ledger out; spec-lint stays a pytest test in the check job"
+
+[[gate.loosened]]
+what = 'mandatory jobs "check (3.11)", "check (3.12)" and "check (3.13)" removed'
+item = "#560"
+date = 2026-10-29
+reason = "the Python floor rose to 3.14, so the check job runs on that one version"
 
 [[gate.loosened]]
 what = 'import contract "Layers" changes layers'
