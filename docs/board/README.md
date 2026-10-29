@@ -8,7 +8,7 @@ loads nothing from the network, talks to no aco and stores nothing.
 
 Every card shows the day it was asked, in its list row and its meta line; a card
 of points shows its newest point's day. The list keeps one group per project; the
-project with the newest card waiting on the operator leads, and each group shows
+project with the newest open card leads, and each group shows
 its open cards newest first, then its With-head cards newest first. A card whose
 answer is saving turns its shape and holds its picks while every other card stays
 usable. A project whose read failed stands as its own group with the error. The
@@ -33,11 +33,13 @@ after the same window, under a grey "With head" strip; a card already with its h
 once, all or none. A card of points shows its name (area and count) as title and the picture's
 point rows: one point open at a time, a pick per point, "Accept all" with the number chosen,
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
-point is chosen. It still lacks Mitsprache and the agent list.
+point is chosen. It still lacks Mitsprache and the agent list, and the v5 additions: asked dates,
+newest-first order, the Refresh button with the time of the last read, and
+Self-refresh.
 The list groups open cards and decided lines per project with the picture's Open,
-With-head and Decided shapes (Decided shows the selected line's card in the
+With-head, Not-ready and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its
-colour tokens. With-head is a card one of whose lines the operator sent back: muted, listed after
+colour tokens. An open yes/no line keeps its card and lists with the dashed Not-ready shape. With-head is a card one of whose lines the operator sent back: muted, listed after
 the open cards, its card says `with head`. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.
 What the board does today is in the "Browser decision flow" of
 [`specs/serve.spec.md`](../../specs/serve.spec.md).
