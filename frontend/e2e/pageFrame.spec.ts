@@ -33,9 +33,13 @@ const BOARD = {
 					title: 'Song-Seite',
 					lines: [
 						TALL_CARD,
-						line({ index: 2, text: 'Gäste einladen?' }),
 						line({ index: 3, text: 'Gespräch beenden?', ruling: 'yes', ruled_on: '2026-10-01' })
 					]
+				}),
+				item({
+					number: 43,
+					title: 'Gäste',
+					lines: [optionLine({ question: 'Gäste einladen?', topic: 'Gäste' })]
 				})
 			]
 		}),
