@@ -623,7 +623,7 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
     path: str,
     body: str | None,
 ) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository.set_rulings(row(42, "Share page", option_line()))
 
     response = board.call_api(method, path.format(token=board.token), body, presented=presented)
 
