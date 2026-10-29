@@ -11,11 +11,10 @@ from enum import StrEnum
 from typing import cast
 
 from . import (
-    board_read,
     body,
+    decide,
     expectation_grammar,
     expectations,
-    forge,
     protocol,
     report,
     workboard,
@@ -100,37 +99,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-class InvalidTargetError(protocol.ClaimError):
-    """`require_writable_target`'s own "no such writable item" refusal -- missing, a pull request,
-    or a malformed body -- so `rule` can choose its `invalid_item` without parsing
-    prose."""
-
-
-def require_writable_target(
-    client: forge.ForgeWriter, context: RunContext, number: int, *, command: str
-) -> tuple[str, workboard.BoardConfig]:
-    """`rule`'s target gate (RULE-07, RULE-08): the item must exist and not be a
-    pull request, and its body must parse. Returns the live body and the board
-    configuration `rule` still needs for its write."""
-    config = context.config
-    try:
-        body = board_read.item_body_or_refuse(
-            client, number, command=command, storage=config.storage
-        )
-        workboard.located_block_or_refuse(number, body, command=command, storage=config.storage)
-    except protocol.ClaimError as error:
-        raise InvalidTargetError(str(error)) from error
-    return body, config
-
-
-def _rule_remaining_open(new_body: str, *, storage: body.Storage) -> int:
-    return sum(
-        1
-        for line in expectations.expectation_lines(new_body, storage=storage)
-        if line.ruling is None
-    )
-
-
 class _RuleReason(StrEnum):
     """`aco rule`'s own `--json` `reason` vocabulary (`specs/rule.spec.md`):
     `ruled` and `returned` are the successes."""
@@ -155,9 +123,6 @@ class FlagCombinationError(protocol.ClaimError):
     given once given twice."""
 
 
-type Outcome = expectations.OptionChoice | expectations.HeadReturn
-
-
 @dataclass(frozen=True)
 class _NamedLine:
     """A `--line` with the `--option` and `--card-hash` that belong to it."""
@@ -174,12 +139,6 @@ class _SharedFlags:
     other: str | None
     note: str | None
     via: str | None
-
-
-@dataclass(frozen=True)
-class _LineOutcome:
-    index: int
-    outcome: Outcome
 
 
 _GIVEN_ONCE = (_OTHER, _NOTE, _VIA)
@@ -289,7 +248,7 @@ def _head_return(line: _NamedLine, shared: _SharedFlags) -> expectations.HeadRet
     return expectations.HeadReturn(shared.note, line.card_hash)
 
 
-def _outcome(line: _NamedLine, shared: _SharedFlags) -> Outcome:
+def _outcome(line: _NamedLine, shared: _SharedFlags) -> decide.Outcome:
     """The one outcome the flags name for `line`, or RULE-15's refusal of their
     combination -- before any forge call."""
     if line.option is not None:
@@ -299,14 +258,14 @@ def _outcome(line: _NamedLine, shared: _SharedFlags) -> Outcome:
     return _head_return(line, shared)
 
 
-def _line_outcomes(parsed: argparse.Namespace) -> tuple[_LineOutcome, ...]:
+def _line_outcomes(parsed: argparse.Namespace) -> tuple[decide.LineOutcome, ...]:
     """Every named line with its outcome, refused in RULE-35, RULE-33/34, RULE-15
     order -- before any forge call."""
     given: tuple[_GivenFlag, ...] = parsed.given_flags
     _refuse_a_repeated_shared_flag(given)
     lines = _named_lines(given)
     shared = _shared_flags(given)
-    return tuple(_LineOutcome(line.index, _outcome(line, shared)) for line in lines)
+    return tuple(decide.LineOutcome(line.index, _outcome(line, shared)) for line in lines)
 
 
 def _emit_rule_result(
@@ -335,12 +294,6 @@ def _emit_rule_result(
         f"RULED {workboard.item_label(number, storage)} {noun} {named}; "
         f"{open_remaining} line(s) still open"
     )
-
-
-def _written_body(current_body: str, line: int, outcome: Outcome, today: date) -> str:
-    if isinstance(outcome, expectations.HeadReturn):
-        return expectations.return_to_head(current_body, line, outcome, today)
-    return expectations.rule_option(current_body, line, outcome, today)
 
 
 def _emit_returned_result(
@@ -375,30 +328,10 @@ def _emit_returned_result(
     )
 
 
-def _rule_item(
-    context: RunContext, number: int, named: Sequence[_LineOutcome], today: date
-) -> tuple[tuple[expectations.ExpectationLine, ...], int]:
-    """`run`'s own write: folds every named line over the body read once, with the
-    one date `today`, and writes it once; returns the newly ruled lines and how many the
-    item still has open. Raises `protocol.ClaimError` by name for every refusal
-    (already ruled, out of range, a bad outcome, a malformed or missing item)
-    before the write, so none of the lines is stored, which `run` turns into
-    its own by-name response."""
-    client = context.forge_writer
-    current_body, config = require_writable_target(client, context, number, command="rule")
-    new_body = current_body
-    for line in named:
-        new_body = _written_body(new_body, line.index, line.outcome, today)
-    client.update_item_body(number, new_body)
-    lines = expectations.expectation_lines(new_body, storage=config.storage)
-    ruled = tuple(lines[line.index - 1] for line in named)
-    return ruled, _rule_remaining_open(new_body, storage=config.storage)
-
-
 # Each refusal's `--json` `reason`, by its type; any other refusal is a
 # forge that failed, `unavailable`.
 _REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _RuleReason], ...] = (
-    (InvalidTargetError, _RuleReason.INVALID_ITEM),
+    (decide.InvalidTargetError, _RuleReason.INVALID_ITEM),
     (expectations.ExpectationAlreadyRuledError, _RuleReason.ALREADY_RULED),
     (expectations.ExpectationOutOfRangeError, _RuleReason.LINE_OUT_OF_RANGE),
     (expectations.ExpectationCardChangedError, _RuleReason.CARD_CHANGED),
@@ -422,8 +355,11 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
     report."""
     named = _line_outcomes(parsed)
     number = int(parsed.item)
-    ruled, open_remaining = _rule_item(context, number, named, context.today())
-    storage = context.config.storage
+    fresh = decide.fresh_item(context, number)
+    committed = decide.rule(context, fresh, named, context.today())
+    ruled = tuple(committed.lines[line.index - 1] for line in named)
+    open_remaining = committed.open_remaining
+    storage = fresh.storage
     if isinstance(named[0].outcome, expectations.HeadReturn):
         returned = cast(tuple[expectations.OptionLine, ...], ruled)
         _emit_returned_result(number, returned, open_remaining, storage, as_json=parsed.json)
