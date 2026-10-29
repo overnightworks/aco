@@ -25,7 +25,8 @@ once, all or none. A card of points shows its name (area and count) as title and
 point rows: one point open at a time, a pick per point, "Accept all" with the number chosen,
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
 point is chosen. It still lacks Mitsprache and the agent list. A ruled yes/no line is read-only
-history in Decided; an open one turns its project's group into an error naming it.
+history in Decided; an open one is refused by aco's grammar, so its item drops from the board
+like any malformed item.
 The list groups open cards and decided lines per project with the picture's Open,
 With-head and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its

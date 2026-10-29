@@ -438,7 +438,7 @@ exit 0
 
 ### E-NEXT-16 — a line sent back to its head
 
-Setup: bare-remote, fake `gh`, `#7` with an open yes/no line 1 and an option line 2 sent back with `aco rule 7 --line 2 --unclear`; `#11` a scopeless open item
+Setup: bare-remote, fake `gh`, `#7` with a ruled yes/no line 1 and an option line 2 sent back with `aco rule 7 --line 2 --unclear`; `#11` a scopeless open item
 
 ```console
 $ aco next
