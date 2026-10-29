@@ -20,7 +20,7 @@ from aco_board_fixtures import (
     serving_two,
 )
 from cli_fixtures import run_cli
-from option_cards import check_defects, group_body, serve_item, shown_hash
+from option_cards import YES_NO_LINE, check_defects, group_body, serve_item, shown_hash
 
 from aco import body
 from aco.board.aco_cli import AcoCli
@@ -556,6 +556,12 @@ def test_a_card_post_after_stopping_began_is_refused_and_runs_no_aco_rule(
     assert repository.rule_calls() == []
 
 
+def _group_body_with_ruled_yes_no() -> str:
+    """Issue #7 with its yes/no neighbour ruled, so only the option lines are open."""
+    ruled_yes_no = '[[expectation]]\ntext = "Alt"\nruling = "yes"\nruled_on = 2026-10-28\n'
+    return group_body().replace(YES_NO_LINE, ruled_yes_no)
+
+
 @pytest.mark.usefixtures("github_world")
 @pytest.mark.parametrize(
     ("answer", "options", "stored"),
@@ -589,14 +595,14 @@ def test_the_real_aco_rule_stores_the_whole_card_in_one_body_write(
             _ITEM,
             "Karte",
             line(1, "Alt", ruling="yes"),
-            option_line(index=2, card_hash=shown_hash(group_body(), 2)),
-            option_line(index=3, card_hash=shown_hash(group_body(), 3)),
+            option_line(index=2, card_hash=shown_hash(_group_body_with_ruled_yes_no(), 2)),
+            option_line(index=3, card_hash=shown_hash(_group_body_with_ruled_yes_no(), 3)),
         )
     )
     shown = _listed_lines(board)[1:]
     posted = board.decide_card_through_api(_ITEM, shown, options, answer)
     [sent] = repository.rule_calls()
-    forge = serve_item(monkeypatch, group_body())
+    forge = serve_item(monkeypatch, _group_body_with_ruled_yes_no())
 
     ruled = run_cli(sent, capsys)
 
