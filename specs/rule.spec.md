@@ -10,7 +10,7 @@ his word, `default` he left the card unanswered and its recommendation stands.
 `--help` lists every flag here, `--unclear` included, each with a help line. A yes/no line cannot be ruled by this command. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This CLI invocation is the
 one write path for a ruling (`board --serve`'s own
 in-process `POST /rule` form is retired; `aco serve`'s decision board shells out to
-this exact command instead, `specs/serve.spec.md` ABRD-01). This
+this exact command instead, `specs/serve.spec.md` ABRD-78). This
 file owns the ruling's own refusals -- an already-ruled
 line, an out-of-range one -- the `RULED` line, its own `reason` vocabulary,
 and the target refusals: a missing item, a pull-request target and a
@@ -130,7 +130,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
 - `aco rule` never rewrites a byte outside the ruled entries: the body's surrounding bytes stay exactly as written.
 - `aco rule` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it ever resolves the forge or the item.
-- `aco serve`'s own decision board (`specs/serve.spec.md` ABRD-01) is transport only: it shells out to this exact command, never a second write path of its own, so a line already ruled through it refuses the same RULE-04 sentence a direct `aco rule` would.
+- `aco serve`'s own decision board (`specs/serve.spec.md` ABRD-78) is transport only: it shells out to this exact command, never a second write path of its own, so a line already ruled through it refuses the same RULE-04 sentence a direct `aco rule` would.
 
 ## Examples
 

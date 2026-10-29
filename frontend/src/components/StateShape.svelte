@@ -19,15 +19,7 @@
 				stroke-linejoin="round"
 			/>
 		{:else}
-			<circle
-				cx="7"
-				cy="7"
-				r="5.6"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.6"
-				stroke-dasharray={state === 'todo' ? '2.4 2.2' : undefined}
-			/>
+			<circle cx="7" cy="7" r="5.6" fill="none" stroke="currentColor" stroke-width="1.6" />
 			{#if state === 'back'}
 				<path
 					d="M8.6 4.6 6.2 7l2.4 2.4"
@@ -48,7 +40,6 @@
 		flex: none;
 		color: var(--fg-2);
 	}
-	.todo,
 	.back {
 		color: var(--fg-3);
 	}

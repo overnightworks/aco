@@ -8,6 +8,7 @@ import {
 	type RulingOption
 } from './rulingsFixture';
 import { decidedList, expectDecidedAnswer } from './decidedView';
+import { countPosts, picks } from './decideRow';
 import { readBoardRuntime } from './runtime';
 import {
 	ALREADY_RULED_MESSAGE,
@@ -96,14 +97,6 @@ function confirm(page: Page): Locator {
 	return page.getByRole('dialog', { name: 'Decide B?' });
 }
 
-function countPosts(page: Page): { count(): number } {
-	let posts = 0;
-	page.on('request', (request) => {
-		if (request.method() === 'POST') posts += 1;
-	});
-	return { count: () => posts };
-}
-
 async function dialogInsideViewport(page: Page, viewportWidth: number): Promise<void> {
 	expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 		viewportWidth
@@ -135,10 +128,6 @@ async function open(page: Page, phone: boolean, question = SONG_QUESTION): Promi
 	await page.goto(`${appUrl}#t=${token}`);
 	await page.locator('.tracks').getByTitle(question).click();
 	if (phone) await expect(page.locator('.question-pane')).toBeVisible();
-}
-
-function picks(page: Page): Locator {
-	return page.getByRole('group', { name: 'Decide' });
 }
 
 async function shoot(page: Page, testInfo: { outputPath(name: string): string }, name: string) {

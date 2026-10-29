@@ -4,7 +4,7 @@
 more repositories' open expectation lines in a browser SPA and writes each
 decision through the installed `aco` command line, never through aco's own
 modules; without `--repo`, the current directory is the one repository
-served. This file owns the board's decision rules: which outcomes it writes,
+served. This file owns the board's decision rules: which answers it writes,
 when it refuses a decision, how writes are ordered and stopped, and the note
 it may carry -- across every configured repository, since one write turn and
 one drain span all of them. It cites the read shape `specs/rulings.spec.md`
@@ -20,16 +20,17 @@ resolved directory's name.
 
 | state \ trigger | load the page | decide a shown card |
 |---|---|---|
-| an open line | ABRD-06 | ABRD-01, ABRD-58, ABRD-59 |
+| an open line | ABRD-06 | ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
-| a ruled line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
+| a ruled option line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
+| a ruled yes/no line | ABRD-30, ABRD-37, ABRD-54 | — (read-only) |
+| an open yes/no line | ABRD-07 | — |
 | an item with open option lines | ABRD-82 | ABRD-77 |
 | an item with two or more open option lines | ABRD-83, ABRD-84, ABRD-85 | ABRD-86, ABRD-87, ABRD-88, ABRD-89, ABRD-90, ABRD-91, ABRD-92 |
 | an option line, open or ruled | ABRD-07, ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-39 |
 | a withdrawn line | ABRD-60 | — |
-| an `option`, `other` or `unclear` posted without `lines` | — | ABRD-40 |
+| a post without `lines` | — | ABRD-40 |
 | its card changed between the board's read and aco's write | — | ABRD-41 |
-| a post without `lines` naming no `outcome`, or one beside another key | — | ABRD-42 |
 | a card post answering `other` | — | ABRD-64 |
 | a card post answering `unclear` | — | ABRD-70, ABRD-71 |
 | a card post naming every open option line of its item | — | ABRD-77, ABRD-78, ABRD-80 |
@@ -50,17 +51,15 @@ resolved directory's name.
 
 ## Writing a decision
 
-- [ ] [ABRD-01] Deciding a shown open yes/no card with outcome `yes`, `no`, or `later` runs `aco rule <n> --line <k>` with `--yes`, `--no`, or `--later` and `--json` (see E-ABRD-01).
+- ABRD-01 (removed 29.10.2026): the board writes no yes/no outcome; a card post runs one `aco rule` (ABRD-78).
 - [ ] [ABRD-02] A card whose shown fields changed since it was shown -- an option line's `card_hash` (ABRD-35) -- is refused `Diese Zeile hat sich geändert, bitte neu laden`, no `aco rule` run (see E-ABRD-02).
 - [ ] [ABRD-03] The board runs one `aco rule` at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
 - [ ] [ABRD-04] Stopping the board waits for an `aco rule` already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, no `aco rule` run.
 - [ ] [ABRD-05] A note or answer is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other refuses the decision before any `aco` call; a blank note is no note, a blank answer is refused.
 - [ ] [ABRD-39] In a card post's argv (ABRD-78), each `<H>` is the `card_hash` the board just read for that line, never one the browser sent (E-ABRD-12).
-- [ ] [ABRD-40] A post without `lines` naming `option`, `other` or `unclear` answers 400 `bad request: decision`, no `aco` call: an option line is decided only as a card (ABRD-77).
+- [ ] [ABRD-40] A post without `lines` answers 400 `bad request: decision`, no `aco` call (ABRD-77).
 - [ ] [ABRD-41] An `aco rule` refusal `card_changed` (RULE-17) answers `failed` with `Diese Zeile hat sich geändert, bitte neu laden`; every other answer keeps its mapping, `already_ruled` (RULE-04) included.
-- [ ] [ABRD-42] A post without `lines` names exactly one `outcome`, `yes`, `no` or `later`, with an optional note (key rules below); anything else answers 400 `bad request: decision`.
-
-The key rules for ABRD-42: `outcome` (with an optional `note`) names the one answer; an absent key and a `null` value name nothing. A post carrying both `outcome` and `option` keys is refused whatever their values.
+- ABRD-42 (removed 29.10.2026): folded into ABRD-40.
 
 - [ ] [ABRD-77] A post with `lines` decides one card: `repo`, `item`, and `lines` of `{"line", "fingerprint"}`, each with its own `option`, or one `other` or `unclear` for all (card key rules, see E-ABRD-15).
 - [ ] [ABRD-78] It runs one `aco rule <n>` with, per line in posted order, `--line <k> [--option <X>] --card-hash=<H>` (ABRD-39), then `--via board`, `--other=<T> --via board` or `--unclear [--note=<T>]`; `--json`.
@@ -73,18 +72,20 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 ## Reading the lines
 
 - [ ] [ABRD-06] Each page load reads `aco rulings --json` anew per configured repo and shows each line whose `ruling` is `null` in aco's order, option lines as one card per item (ABRD-82); no copy is kept.
-- [ ] [ABRD-07] A yes/no line with a non-outcome `default` or `ruling`, a malformed option line (below, ABRD-62), a `form` but ABRD-60's, or a non-ISO `ruled_on` shows `aco rulings --json is unreadable: <detail>`.
+- [ ] [ABRD-07] An open yes/no line, one with a non-outcome `ruling`, a malformed option line (below, ABRD-62), a `form` but ABRD-60's, or a non-ISO `ruled_on` shows `aco rulings --json is unreadable: <detail>`.
+
+An open yes/no line has no writer left on the board: its `<detail>` is `#<n> line <k> is an open yes/no line; write an option card`. Only its own repository's group shows the sentence (ABRD-15) and the others stay usable; once every repository fails, ABRD-20's 502 carries it.
 
 An option line is malformed when its `recommended` is no letter of its options, its `ruling` is neither such a letter nor `other`, its `other` is not non-blank text on a line ruled `other` or is neither absent nor `null` on any other, an option's `letter` is not A, B, C, D by position, a card field has the wrong type, or its `via` is missing or neither `null` nor `board`, `chat` or `default`.
 
 ## Browser decision flow
 
-- [ ] [ABRD-28] The decision list groups open rows by repository under its name and count; a row shows its state shape and an option card's name (ABRD-82), or a yes/no line's short question or sentence.
-- [ ] [ABRD-29] Within a repository, option cards come before yes/no lines, each in aco's order. First load selects the first row; desktop shows its card, phones the list until a row is tapped.
+- [ ] [ABRD-28] The decision list groups open rows by repository under its name and count; a row shows its state shape and an option card's name (ABRD-82).
+- [ ] [ABRD-29] Within a repository, option cards come in aco's order, with-head cards after (ABRD-61). First load selects the first row; desktop shows its card, phones the list until a row is tapped.
 - [ ] [ABRD-30] Decided groups the ruled lines of open board items by repository under its name and count; a row shows the Decided shape and an option line's topic, or a yes/no line's short question or sentence.
 - [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending, missing dates last; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
-- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided. A stored “Später” stays there and is not automatically presented again.
+- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided.
 - [ ] [ABRD-36] A card with one open option line shows: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, question, Problem, Today, options A-D, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), else `not recorded`; then ` · ` and the ruling date as `DD.MM.YYYY` when known.
@@ -97,7 +98,7 @@ An option line is malformed when its `recommended` is no letter of its options, 
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` keeps the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
 - [ ] [ABRD-58] A one-point card's pick shows a strip above it for its 8 s window: the Decided shape, `Decided: <letter> — <option> · <topic>` and `Undo`, in view as the card scrolls and atop a phone's list.
 - [ ] [ABRD-59] A pick that starts a window focuses its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. An ended window removes its strip; ABRD-50 applies.
-- [ ] [ABRD-48] Option card rows carry the Open or With head (ABRD-61) shape, yes/no rows the dashed Not ready one in muted text; each shape names its state, each row's title is its question or name (ABRD-82).
+- [ ] [ABRD-48] Option card rows carry the Open or With head (ABRD-61) shape; each shape names its state, each row's title is its question or name (ABRD-82).
 - [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
@@ -149,7 +150,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## The JSON API
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's failure sentence, `items: []` (E-ABRD-06).
-- [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint` and an `outcome` (ABRD-42), or a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
+- [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
 - [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
@@ -159,7 +160,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
-- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` stays a yes/no line as before. The board offers no yes/no outcome on an option line.
+- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` is a ruled yes/no line, listed without `default` (E-ABRD-03). No line offers an outcome.
 - [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via`, `returned_on`, `returned_note`, unknown keys leave it be.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open; any other value, or none, is unreadable (ABRD-07). A yes/no line lists none.
 - [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`. A bad date, blank note, note without date, or either when ruled is unreadable.
@@ -196,53 +197,45 @@ and no `card_hash`; pictures are SVG text as stored.
 `Setup: fake-aco` is a repository directory whose `aco` on PATH is a fake
 answering `aco rulings --json` from a stored list and applying `aco rule`
 to it with aco's own refusals, logging every call; `aco serve` runs
-in that directory (E-ABRD-01 through E-ABRD-05: `--repo` not given, so the
+in that directory (E-ABRD-02 through E-ABRD-05: `--repo` not given, so the
 one repo is labelled by that directory's name) and each example posts one
 decision to it.
 
-### E-ABRD-01 -- deciding later
+- E-ABRD-01 (removed 29.10.2026): the board writes no yes/no outcome, so there is no example (ABRD-01).
 
-Setup: fake-aco, item `#42` with one open line `Guests?`; the operator posts outcome `later` for card `#42` line `1`
+### E-ABRD-02 -- a changed card refuses the stale post
 
-```text
-decide: #42 line 1, outcome later, the shown card's fingerprint
-aco calls: aco rulings --json, then aco rule 42 --line 1 --later --json
-answer: {"status": "ruled", "message": null}
-```
-
-### E-ABRD-02 -- a changed recommendation refuses the stale card
-
-Setup: fake-aco, item `#42` line `1` shown with recommended outcome `yes`, then changed to `no` before the operator posts `yes` for that card
+Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line shown, then its `card_hash` changed before the operator posts option `A` for that card
 
 ```text
-decide: #42 line 1, outcome yes, the fingerprint of the card as first shown
+decide: #12 line 1, option A, the fingerprint of the card as first shown
 aco calls: aco rulings --json only
 answer: {"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}
 ```
 
 ### E-ABRD-03 -- listing the board
 
-Setup: fake-aco, item `#42` titled `Share page` with open line `Guests?` recommending `yes`, and ruled line `Hosts?` (`no` on 2026-10-01)
+Setup: fake-aco, item `#42` titled `Share page` with ruled lines `Guests?` (`yes` on 2026-10-01) and `Hosts?` (`no` on 2026-10-01)
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
 aco calls: aco rulings --json
 answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
-   "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"},
+   "ruling": "yes", "ruled_on": "2026-10-01", "fingerprint": "<hex>"},
   {"index": 2, "text": "Hosts?", "question": null, "example": null, "picture": null,
-   "default": null, "ruling": "no", "ruled_on": "2026-10-01", "fingerprint": "<hex>"}]}]}]}
+   "ruling": "no", "ruled_on": "2026-10-01", "fingerprint": "<hex>"}]}]}]}
 ```
 
-### E-ABRD-04 -- deciding through the API
+### E-ABRD-04 -- a post naming an outcome is refused
 
-Setup: fake-aco, item `#42` with one open line `Guests?` as listed by `GET /api/board`
+Setup: fake-aco, item `#42` with ruled line `Guests?` as listed by `GET /api/board`
 
 ```text
 request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 42, "line": 1, "fingerprint": "<as listed>", "outcome": "no", "note": null}
-aco calls: aco rulings --json, then aco rule 42 --line 1 --no --json
-answer 200: {"status": "ruled", "message": null}
+aco calls: none
+answer 400: {"error": "bad request: decision"}
 ```
 
 ### E-ABRD-05 -- a request without the token
@@ -257,7 +250,7 @@ answer 403: {"error": "forbidden: missing or wrong token"}
 
 ### E-ABRD-06 -- two repos, one down
 
-Setup: `aco serve --repo a --repo b`; repo `a`'s fake-aco lists item `#42` with one open line `Guests?`; repo `b`'s fake-aco fails `aco rulings` with `ERROR: no forge adapter for host`
+Setup: `aco serve --repo a --repo b`; repo `a`'s fake-aco lists item `#42` with one line `Guests?` ruled `yes` on 2026-10-01; repo `b`'s fake-aco fails `aco rulings` with `ERROR: no forge adapter for host`
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
@@ -265,20 +258,22 @@ aco calls: aco rulings --json in a, aco rulings --json in b
 answer 200: {"repos": [
   {"name": "a", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
     {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
-     "default": null, "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]},
+     "ruling": "yes", "ruled_on": "2026-10-01", "fingerprint": "<hex>"}]}]},
   {"name": "b", "error": "aco rulings failed: ERROR: no forge adapter for host", "items": []}]}
 ```
+
+Had `b`'s fake-aco listed an open yes/no line instead, say `#7` line `2`, `b`'s entry would read `{"name": "b", "error": "aco rulings --json is unreadable: #7 line 2 is an open yes/no line; write an option card", "items": []}` (ABRD-07).
 
 Had `a`'s fake-aco failed too, the answer would be 502 with the same two-entry `repos[]` envelope (ABRD-20).
 
 ### E-ABRD-07 -- a decision routes only into its named repo
 
-Setup: `aco serve --repo a --repo b`; repo `a` and repo `b`'s fake-acos each list an identical item `#42` with one open line `Guests?`
+Setup: `aco serve --repo a --repo b`; repo `a` and repo `b`'s fake-acos each list an identical item `#12` with E-RUL-07's open option line
 
 ```text
 request: POST /api/rule, header X-Board-Token: <board token>
-body: {"repo": "a", "item": 42, "line": 1, "fingerprint": "<as listed in a>", "outcome": "yes", "note": null}
-aco calls: aco rule 42 --line 1 --yes --json in a; no call in b
+body: {"repo": "a", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed in a>", "option": "A"}]}
+aco calls: aco rulings --json, then aco rule 12 --line 1 --option A --card-hash=<H> --via board --json in a; no call in b
 answer 200: {"status": "ruled", "message": null}
 ```
 
@@ -331,9 +326,9 @@ $ aco --repo overnightworks/aco serve
 exit 2
 ```
 
-### E-ABRD-11 -- listing an option line beside a yes/no line
+### E-ABRD-11 -- listing an option line beside a ruled yes/no line
 
-Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line, and item `#42` titled `Share page` with open line `Guests?` recommending `yes`
+Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line, and item `#42` titled `Share page` with line `Guests?` ruled `yes` on 2026-10-01
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
@@ -354,10 +349,8 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
    "ruling": null, "ruled_on": null, "via": null, "other": null, "returned_on": null, "returned_note": null, "fingerprint": "<hex>"}]},
   {"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
-   "default": "yes", "ruling": null, "ruled_on": null, "fingerprint": "<hex>"}]}]}]}
+   "ruling": "yes", "ruled_on": "2026-10-01", "fingerprint": "<hex>"}]}]}]}
 ```
-
-Posting `yes` for `#12` line `1` with the listed fingerprint still forwards `--yes` to `aco rule` until the board's argv path is re-pointed (K2); aco refuses the call as a usage error (one of the arguments `--option --other` is required), exit `2`, and the board answers 200 `{"status": "failed"}` carrying aco's message, with no write.
 
 ### E-ABRD-12 -- deciding an option line
 

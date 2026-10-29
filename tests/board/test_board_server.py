@@ -26,7 +26,6 @@ from aco.board.aco_cli import AcoCli
 from aco.board.ports import (
     CardChanged,
     CardDecision,
-    Decision,
     DecisionResult,
     ExpectationLine,
     OptionLine,
@@ -216,9 +215,6 @@ class _HugeLineSource:
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         return (self._huge_line,)
 
-    def rule(self, decision: Decision) -> DecisionResult:
-        raise AssertionError("listing the board must not write")
-
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
         raise AssertionError("listing the board must not write")
 
@@ -250,9 +246,6 @@ class _BrokenPipeSource:
 
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         raise BrokenPipeError("aco's pipe broke")
-
-    def rule(self, decision: Decision) -> DecisionResult:
-        raise AssertionError("the board must not write after a failed read")
 
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
         raise AssertionError("the board must not write after a failed read")

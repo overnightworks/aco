@@ -62,6 +62,8 @@ WITHDRAWN_FORM = "withdrawn"
 
 @dataclass(frozen=True)
 class YesNoLine:
+    """A ruled yes/no line: read-only history the board shows and never writes."""
+
     item: int
     item_title: str
     index: int
@@ -69,20 +71,14 @@ class YesNoLine:
     question: str | None
     example: str | None
     picture: str | None
-    default: Outcome | None
-    """The outcome the source recommends for an open line; None when it names none."""
-    ruling: Outcome | None
+    ruling: Outcome
     ruled_on: date | None
 
     @property
-    def is_open(self) -> bool:
-        return self.ruling is None
-
-    @property
     def fingerprint(self) -> str:
-        """Names exactly what a decision card shows the operator: every field it
-        renders. The ruling and its date are left out on purpose: a ruled line
-        is no longer decidable, so no card for it is ever submitted."""
+        """Names the fields the line's decided card renders as its text. The
+        ruling and its date are left out: a yes/no line is read-only history,
+        so no card for it is ever submitted."""
         shown = json.dumps(
             [
                 self.item,
@@ -92,7 +88,6 @@ class YesNoLine:
                 self.question,
                 self.example,
                 self.picture,
-                self.default,
             ],
             ensure_ascii=False,
         )
@@ -156,14 +151,6 @@ NOTE_MAX_LENGTH = 280
 """The longest note a decision may carry, after trimming. A note travels to
 the source as one command-line argument, so it is also free of NUL and
 encodable as UTF-8."""
-
-
-@dataclass(frozen=True)
-class Decision:
-    item: int
-    index: int
-    outcome: Outcome
-    note: str | None
 
 
 @dataclass(frozen=True)
@@ -249,11 +236,6 @@ class DecisionPort(Protocol):
 
         Raises `DecisionSourceUnavailableError` when the source cannot answer.
         """
-        ...
-
-    def rule(self, decision: Decision) -> DecisionResult:
-        """Write one decision; the source itself refuses an already-ruled line,
-        an unknown item, or a line the item does not have."""
         ...
 
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:

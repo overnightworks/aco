@@ -12,10 +12,7 @@ import type {
 	CardUnclearRequest,
 	DecisionResult,
 	ExpectationLine,
-	OptionLine,
-	Outcome,
-	YesNoDecisionRequest,
-	YesNoLine
+	OptionLine
 } from '../../types';
 import type { Pick } from './card';
 
@@ -46,16 +43,6 @@ export const BOARD_UNREACHABLE_MESSAGE = 'Das Board ist nicht erreichbar.';
 
 export function lineKey(repo: string, item: number, line: ExpectationLine): string {
 	return `${repo}:${item}:${line.index}`;
-}
-
-export function decisionRequest(
-	repo: string,
-	item: number,
-	line: YesNoLine,
-	outcome: Outcome,
-	note: string | null
-): YesNoDecisionRequest {
-	return { repo, item, line: line.index, fingerprint: line.fingerprint, outcome, note };
 }
 
 /** Every option card, one-point included, posts as one card: one key per item. */

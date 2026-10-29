@@ -5,19 +5,11 @@
  * is where the behaviour lives instead).
  */
 
-import type {
-	BoardItem,
-	ExpectationLine,
-	OptionLine,
-	Outcome,
-	RepoReading,
-	YesNoLine
-} from '../../types';
+import type { BoardItem, ExpectationLine, OptionLine, Outcome, RepoReading } from '../../types';
 import { cardName, cardTitle, openPoints } from './card';
 import { cardKey, lineKey } from './decision';
 import { hasHead, isOptionLine } from './optionCard';
 
-export const OUTCOMES: readonly Outcome[] = ['yes', 'no', 'later'];
 export const OPEN_TAB_LABEL = 'Open';
 export const DECIDED_TAB_LABEL = 'Decided';
 export const LIST_REGION_LABEL = 'Decisions';
@@ -42,13 +34,6 @@ export function outcomeLabel(outcome: Outcome): string {
  * the source names no distinct question. */
 export function cardHeading(line: ExpectationLine): string {
 	return line.question ?? line.text;
-}
-
-/** The stage's own sentence, shown only when a distinct question already
- * carries the heading -- never duplicated when the sentence *is* the
- * heading. */
-export function cardSentence(line: ExpectationLine): string | null {
-	return line.question !== null ? line.text : null;
 }
 
 /** An SVG picture as a data URI: a browser never runs script inside an
@@ -76,19 +61,12 @@ interface DecidedSelection extends Located {
 	line: ExpectationLine;
 }
 
-/** An open yes/no line. */
-interface QuestionSelection extends Located {
-	kind: 'question';
-	line: YesNoLine;
-}
-
-export type Selection = CardSelection | DecidedSelection | QuestionSelection;
+export type Selection = CardSelection | DecidedSelection;
 
 /** How a row reads at a glance: an option card is `open`, or `back` once the
- * operator sent one of its lines to its head; a yes/no line is `todo` because its head still
- * has to rewrite it as an option card; a ruled line is `done`. */
+ * operator sent one of its lines to its head; a ruled line is `done`. */
 export type RowState = OpenRowState | 'done';
-type OpenRowState = 'open' | 'back' | 'todo';
+type OpenRowState = 'open' | 'back';
 
 /** The two tabs that list rows. */
 export type ListView = 'open' | 'decided';
@@ -100,12 +78,11 @@ export type StripState = Extract<RowState, 'done' | 'back'>;
 export const STATE_LABEL: Record<RowState, string> = {
 	open: 'Open',
 	back: 'With head',
-	todo: 'Not ready · head to fill',
 	done: 'Decided'
 };
 
 /** Lower comes first; `nextOpenAfter` and the open list both order by it. */
-const ROW_RANK: Record<OpenRowState, number> = { open: 0, back: 1, todo: 2 };
+const ROW_RANK: Record<OpenRowState, number> = { open: 0, back: 1 };
 
 interface ListRow<State extends RowState = RowState> {
 	key: string;
@@ -124,15 +101,10 @@ export interface RowList<Row extends ListRow = ListRow> {
 	quiet: string[];
 }
 
-function listRow<State extends RowState>(
-	repo: string,
-	itemNumber: number,
-	line: ExpectationLine,
-	state: State
-): ListRow<State> {
+function decidedRow(repo: string, itemNumber: number, line: ExpectationLine): ListRow<'done'> {
 	return {
 		key: lineKey(repo, itemNumber, line),
-		state,
+		state: 'done',
 		label: isOptionLine(line) ? line.topic : cardHeading(line),
 		title: cardHeading(line)
 	};
@@ -147,14 +119,10 @@ function cardRow(repo: string, itemNumber: number, points: OptionLine[]): ListRo
 	};
 }
 
-/** An item's card row, if it has open option lines, then its open yes/no rows. */
+/** An item's card row, if it has open option lines. */
 function itemRows(repo: string, item: BoardItem): ListRow<OpenRowState>[] {
 	const points = openPoints(item);
-	const questions = item.lines.filter((line) => !isOptionLine(line) && line.ruling === null);
-	return [
-		...(points.length > 0 ? [cardRow(repo, item.number, points)] : []),
-		...questions.map((line) => listRow(repo, item.number, line, 'todo' as const))
-	];
+	return points.length > 0 ? [cardRow(repo, item.number, points)] : [];
 }
 
 function openRows(reading: RepoReading): ListRow<OpenRowState>[] {
@@ -176,7 +144,7 @@ function decidedRows(reading: RepoReading): ListRow<'done'>[] {
 				right.item.number - left.item.number ||
 				right.line.index - left.line.index
 		)
-		.map(({ item, line }) => listRow(reading.name, item.number, line, 'done'));
+		.map(({ item, line }) => decidedRow(reading.name, item.number, line));
 }
 
 /** One group per repository that failed or has a row, in configured order; a
@@ -202,8 +170,8 @@ function groupedRows<Row extends ListRow>(
 	return { groups, quiet };
 }
 
-/** The open list: one group per repository that failed or has an open line,
- * its option rows before its yes/no rows, each in aco's order. */
+/** The open list: one group per repository that failed or has an open card,
+ * its cards in aco's order, those with their head after the others. */
 export function openList(repos: RepoReading[]): RowList<ListRow<OpenRowState>> {
 	return groupedRows(repos, openRows);
 }
@@ -232,14 +200,11 @@ export function firstDecidedKey(repos: RepoReading[]): string | null {
 }
 
 function lineSelection(repo: string, item: BoardItem, line: ExpectationLine): Selection | null {
-	if (line.ruling !== null) {
-		return { kind: 'decided', repo, item, line };
-	}
-	return isOptionLine(line) ? null : { kind: 'question', repo, item, line };
+	return line.ruling === null ? null : { kind: 'decided', repo, item, line };
 }
 
 /** What the stage shows for `key`: a card key names the open option lines of
- * its item, a line key a ruled line (shown read-only) or an open yes/no line.
+ * its item, a line key a ruled line (shown read-only).
  * An open option line is a point of its card and never selected on its own.
  * A key whose data has disappeared reads the same as no selection. */
 export function findSelection(repos: RepoReading[], key: string | null): Selection | null {
@@ -261,15 +226,14 @@ export function findSelection(repos: RepoReading[], key: string | null): Selecti
 	return null;
 }
 
-/** The stage's heading: a card's title, else the tapped question. */
+/** The stage's heading: a card's title, else the ruled line's question. */
 export function selectionHeading(selection: Selection): string {
 	return selection.kind === 'card' ? cardTitle(selection.points) : cardHeading(selection.line);
 }
 
-/** The line the stage moves to once `key` is decided: of the other open
+/** The card the stage moves to once `key` is decided: of the other open
  * rows, the first with the best rank in list order, so an option card comes
- * before one with its head, and that before a yes/no line the head must still fill; `null` once nothing else is
- * open. */
+ * before one with its head; `null` once nothing else is open. */
 export function nextOpenAfter(repos: RepoReading[], key: string): string | null {
 	const others = listedRows(repos).filter((row) => row.key !== key);
 	const bestRank = Math.min(...others.map((row) => ROW_RANK[row.state]));

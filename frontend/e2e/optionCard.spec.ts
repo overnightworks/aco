@@ -1,7 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import {
-	line,
 	optionLine,
 	row,
 	writeRulings,
@@ -185,10 +184,6 @@ for (const viewport of [
 			await expect(card).toContainText('Behebt den Verlust; Strg- und Mittelklick');
 			await expect(card.getByText('Decided')).toHaveCount(0);
 
-			await expect(page.getByRole('button', { name: 'Ja', exact: true })).toHaveCount(0);
-			await expect(page.getByRole('button', { name: 'Nein', exact: true })).toHaveCount(0);
-			await expect(page.getByRole('button', { name: 'Später', exact: true })).toHaveCount(0);
-			await expect(page.getByText('Notiz', { exact: true })).toHaveCount(0);
 			await expect(card.getByRole('group', { name: 'Decide' }).getByRole('button')).toHaveCount(2);
 			await expect(card.getByRole('button', { name: 'Enlarge picture' })).toHaveCount(1);
 			const disclosures = options.locator('button[aria-expanded]');
@@ -392,32 +387,6 @@ for (const viewport of [
 			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 				viewport.width
 			);
-		});
-
-		test('a yes/no line keeps Ja, Nein, Später and its note beside option cards', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					1843,
-					'Sprung zum Ursprungs-Take',
-					songCard(1),
-					line(3, 'Gäste dürfen am Gespräch teilnehmen.', {
-						question: 'Gäste einladen?',
-						default: 'yes'
-					})
-				)
-			]);
-			await page.goto(`${appUrl}#t=${token}`);
-			await openFromList(page, 'Gäste einladen?', phone);
-
-			const choices = page.getByRole('group', { name: 'Entscheidung' });
-			for (const name of ['Ja', 'Nein', 'Später']) {
-				await expect(choices.getByRole('button', { name })).toBeVisible();
-			}
-			await expect(page.getByText('Notiz', { exact: true })).toBeVisible();
-			await expect(page.locator('.option-card')).toHaveCount(0);
 		});
 
 		test('[ABRD-37] a ruled option line leaves the open list and Decided lists it under its project', async ({

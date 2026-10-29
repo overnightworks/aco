@@ -65,6 +65,7 @@ export function optionLine(overrides: Partial<OptionLine> = {}): OptionLine {
 	};
 }
 
+/** A ruled yes/no line: the only kind the board still lists (ABRD-34). */
 export function line(overrides: Partial<YesNoLine> = {}): YesNoLine {
 	return {
 		index: 1,
@@ -72,9 +73,8 @@ export function line(overrides: Partial<YesNoLine> = {}): YesNoLine {
 		question: null,
 		example: null,
 		picture: null,
-		default: null,
-		ruling: null,
-		ruled_on: null,
+		ruling: 'yes',
+		ruled_on: '2026-10-01',
 		fingerprint: 'fingerprint-1',
 		...overrides
 	};

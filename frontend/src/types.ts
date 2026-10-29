@@ -6,14 +6,14 @@
 
 export type Outcome = 'yes' | 'no' | 'later';
 
+/** A ruled yes/no line: read-only history the board shows and never writes (ABRD-34). */
 export interface YesNoLine {
 	index: number;
 	text: string;
 	question: string | null;
 	example: string | null;
 	picture: string | null;
-	default: Outcome | null;
-	ruling: Outcome | null;
+	ruling: Outcome;
 	ruled_on: string | null;
 	/** Bound to the repo it was read under (ABRD-21); opaque to this client. */
 	fingerprint: string;
@@ -93,19 +93,8 @@ export interface BoardResponse {
 	repos: RepoReading[];
 }
 
-/** `POST /api/rule`'s body (`specs/serve.spec.md` ABRD-09): `fingerprint`
- * is the card's own, bound to `repo` as read (ABRD-21) -- never the line's
- * bare fingerprint. */
-export interface YesNoDecisionRequest {
-	repo: string;
-	item: number;
-	line: number;
-	fingerprint: string;
-	outcome: Outcome;
-	note: string | null;
-}
-
-/** A line of a posted card (ABRD-77), as shown: `fingerprint` is the line's own. */
+/** A line of a posted card (ABRD-77), as shown: `fingerprint` is the line's own,
+ * bound to `repo` as read (ABRD-21). */
 interface ShownCardLine {
 	line: number;
 	fingerprint: string;
@@ -138,9 +127,8 @@ export interface CardUnclearRequest extends CardRequestHead {
 	note: string | null;
 }
 
-type CardDecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearRequest;
-
-export type DecisionRequest = YesNoDecisionRequest | CardDecisionRequest;
+/** `POST /api/rule`'s body (`specs/serve.spec.md` ABRD-09): always one card. */
+export type DecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearRequest;
 
 export interface DecisionResult {
 	/** `aco.board.ports.DecisionStatus`'s four values, the only ones `POST

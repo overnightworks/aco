@@ -6,6 +6,7 @@ missing or hung `aco` does to a card post."""
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,6 +14,7 @@ import pytest
 from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
+    Lister,
     first_listed_line,
     option_line,
     row,
@@ -24,7 +26,6 @@ from aco.board.aco_cli import AcoCli
 from aco.board.board import LINE_CHANGED
 
 _ITEM = 42
-Lister = Callable[[BoardClient], list[dict[str, Any]]]
 
 
 def _rule_call(item: int, index: int, letter: str) -> list[str]:
@@ -108,6 +109,30 @@ def test_the_board_keeps_no_copy_of_a_decision(
     repository.set_rulings(row(_ITEM, "Share page", option_line()))
 
     assert [item["number"] for item in listed_items(board)] == [_ITEM]
+
+
+def test_card_posts_on_two_items_at_once_are_both_stored_one_at_a_time(
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    listed_items: Lister,
+) -> None:
+    """ABRD-03, ABRD-17."""
+    repository.set_rulings(row(_ITEM, "Share page", option_line()), row(7, "Login", option_line()))
+    items = listed_items(board)
+    # Each `aco rule` waits between reading and rewriting the listing, so two
+    # unserialized writes would overlap and the later one would drop the first.
+    repository.delay("rule", 0.3)
+
+    with ThreadPoolExecutor(max_workers=2) as clicks:
+        answers = list(
+            clicks.map(
+                lambda item: board.decide_card_through_api(item["number"], item["lines"], ["A"]),
+                items,
+            )
+        )
+
+    assert [answer.json()["status"] for answer in answers] == ["ruled", "ruled"]
+    assert [repository.stored_line(item, 1)["ruling"] for item in (_ITEM, 7)] == ["A", "A"]
 
 
 def _aco_missing_from_path(

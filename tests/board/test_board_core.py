@@ -13,7 +13,6 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
-from pathlib import Path
 
 import pytest
 from aco_board_fixtures import FakeAcoRepository, line, option_line, row
@@ -24,7 +23,6 @@ from aco.board.ports import (
     CardChanged,
     CardDecision,
     CardLine,
-    Decision,
     DecisionResult,
     DecisionStatus,
     ExpectationLine,
@@ -39,53 +37,15 @@ _WAIT_SECONDS = 5
 _LABEL = "repo"
 
 
-@pytest.mark.parametrize(
-    ("stored", "read"),
-    [
-        (line(1, "Guests?", default="later"), (Outcome.LATER, None, None, True)),
-        (line(1, "Links?", ruling="no"), (None, Outcome.NO, date(2026, 10, 1), False)),
-        (line(1, "Older aco without a recommendation?"), (None, None, None, True)),
-    ],
-    ids=["open-with-recommendation", "ruled", "open-without-recommendation"],
-)
-def test_a_snapshot_reads_a_lines_recommendation_and_ruling(
+def test_a_snapshot_reads_a_ruled_yes_no_lines_ruling_and_date(
     repository: FakeAcoRepository,
-    stored: dict[str, object],
-    read: tuple[Outcome | None, Outcome | None, date | None, bool],
 ) -> None:
-    repository.set_rulings(row(42, "Share page", stored))
+    repository.set_rulings(row(42, "Share page", line(1, "Links?", ruling="no")))
 
     [read_line] = Board(AcoCli(directory=repository.directory)).snapshot().lines
 
     assert isinstance(read_line, YesNoLine)
-    assert read == (read_line.default, read_line.ruling, read_line.ruled_on, read_line.is_open)
-
-
-def test_a_decision_after_writes_closed_is_refused_without_writing(
-    repository: FakeAcoRepository,
-) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    board = Board(AcoCli(directory=repository.directory))
-    boards = Boards({_LABEL: board})
-    [shown] = board.snapshot().lines
-
-    boards.close_writes()
-
-    result = boards.decide(_LABEL, Decision(42, 1, Outcome.YES, None), shown.fingerprint)
-    assert result == DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
-    assert repository.rule_calls() == []
-
-
-def test_a_decision_is_failed_with_one_sentence_when_aco_cannot_be_run(tmp_path: Path) -> None:
-    not_a_directory = tmp_path / "file"
-    not_a_directory.write_text("")
-    board = Board(AcoCli(directory=not_a_directory))
-
-    result = board.decide_one(Decision(42, 1, Outcome.YES, None), _LABEL, "shown")
-
-    assert result == DecisionResult(
-        DecisionStatus.FAILED, "aco rulings could not be run: Not a directory"
-    )
+    assert (read_line.ruling, read_line.ruled_on) == (Outcome.NO, date(2026, 10, 1))
 
 
 class _HeldDecisions:
@@ -94,18 +54,11 @@ class _HeldDecisions:
     def __init__(self) -> None:
         self.writing = threading.Event()
         self.may_finish = threading.Event()
-        self.ruled: list[Decision] = []
         self.ruled_cards: list[CardDecision] = []
         self.lines: tuple[ExpectationLine, ...] = ()
 
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         return self.lines
-
-    def rule(self, decision: Decision) -> DecisionResult:
-        self.writing.set()
-        assert self.may_finish.wait(_WAIT_SECONDS)
-        self.ruled.append(decision)
-        return DecisionResult(DecisionStatus.RULED, "ruled")
 
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
         self.writing.set()
