@@ -1,16 +1,16 @@
-"""The board's JSON API served in-process against a fake `aco` on PATH.
+"""The board's JSON API served in-process against the real `aco` over a fake forge.
 
-Each test drives the real server, wire form, and `aco` adapter; only the
-`aco` executable is a fake whose state and call log the test reads
-(specs/serve.spec.md).
+Each test drives the real server, wire form, `aco` adapter and `aco`
+itself; only the forge is a fake whose items and request log the test
+reads, beside the calls at the board's port (specs/serve.spec.md).
 """
 
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any, cast
 
@@ -18,27 +18,18 @@ import pytest
 from aco_board_fixtures import (
     DEFAULT_LABEL,
     BoardClient,
-    FakeAcoRepository,
     Lister,
+    RecordedPort,
     Response,
-    install_fake_aco,
-    line,
-    option_line,
-    row,
+    decision_port,
     serving,
     serving_two,
 )
-
-from aco.board.aco_cli import AcoCli
-from aco.board.ports import (
-    CardDecision,
-    CardLine,
-    DecisionResult,
-    DecisionSourceUnavailableError,
-    DecisionStatus,
-)
+from board_forge import BoardForge, item_body
+from option_cards import open_option_entry
 
 _ORIGIN_ELSEWHERE = {"Origin": "http://elsewhere.example"}
+_OPEN_CARD = item_body(open_option_entry())
 
 
 def _card_body(**overrides: object) -> str:
@@ -77,19 +68,23 @@ def _listed_line(index: int, text: str, ruling: str, **shown: str) -> dict[str, 
     }
 
 
+def _ruled_yes_no(text: str, ruling: str, **card: str) -> dict[str, object]:
+    return {"text": text, "ruling": ruling, "ruled_on": date(2026, 10, 1), **card}
+
+
+def _assert_no_call(port: RecordedPort, repository: BoardForge) -> None:
+    """Nothing reached the board's port, and the forge saw no request."""
+    assert (port.calls(), repository.request_log()) == ((), ())
+
+
 def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
-    repository: FakeAcoRepository, board: BoardClient, listed_items: Lister
+    repository: BoardForge, board: BoardClient, port: RecordedPort, listed_items: Lister
 ) -> None:
     """ABRD-34, E-ABRD-03: no `default` on the wire."""
-    repository.set_rulings(
-        row(
-            42,
-            "Share page",
-            line(1, "Guests?", ruling="yes", question="Gäste?", example="Ja", picture="<svg/>"),
-            line(2, "Hosts?", ruling="no"),
-        ),
-        row(7, "Login", line(1, "Remember me?", ruling="later")),
-    )
+    guests = _ruled_yes_no("Guests?", "yes", question="Gäste?", example="Ja", picture="<svg/>")
+    hosts = _ruled_yes_no("Hosts?", "no")
+    repository.put_item(42, item_body(guests, hosts), title="Share page")
+    repository.put_item(7, item_body(_ruled_yes_no("Remember me?", "later")), title="Login")
 
     listed = listed_items(board)
 
@@ -109,75 +104,7 @@ def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
         },
         {"number": 7, "title": "Login", "lines": [_listed_line(1, "Remember me?", "later")]},
     ]
-    assert repository.rule_calls() == []
-
-
-def _aco_without_execute_permission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    bin_directory = tmp_path / "bin-without-execute"
-    bin_directory.mkdir()
-    (bin_directory / "aco").write_text("#!/bin/sh\n", encoding="utf-8")
-    monkeypatch.setenv("PATH", str(bin_directory))
-    return tmp_path
-
-
-def _working_directory_that_is_a_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    install_fake_aco(tmp_path / "bin")
-    monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}")
-    file_instead_of_directory = tmp_path / "repository"
-    file_instead_of_directory.write_text("", encoding="utf-8")
-    return file_instead_of_directory
-
-
-def _aco_answering_bytes_that_are_not_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    bin_directory = tmp_path / "bin-not-utf8"
-    bin_directory.mkdir()
-    executable = bin_directory / "aco"
-    executable.write_text("#!/bin/sh\nprintf '\\377\\376'\n", encoding="utf-8")
-    executable.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_directory}{os.pathsep}{os.environ['PATH']}")
-    return tmp_path
-
-
-_ACO_CANNOT_BE_RUN = pytest.mark.parametrize(
-    ("arrange", "reason"),
-    [
-        (_aco_without_execute_permission, "could not be run: Permission denied"),
-        (_working_directory_that_is_a_file, "could not be run: Not a directory"),
-        (_aco_answering_bytes_that_are_not_utf8, "answered output that is not UTF-8"),
-    ],
-    ids=["no-execute-permission", "working-directory-is-a-file", "output-not-utf8"],
-)
-
-
-@_ACO_CANNOT_BE_RUN
-def test_an_aco_that_cannot_be_run_makes_the_rulings_read_unavailable(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    arrange: Callable[[Path, pytest.MonkeyPatch], Path],
-    reason: str,
-) -> None:
-    decisions = AcoCli(directory=arrange(tmp_path, monkeypatch))
-
-    with pytest.raises(DecisionSourceUnavailableError) as unavailable:
-        decisions.expectation_lines()
-
-    assert str(unavailable.value) == f"aco rulings {reason}"
-
-
-@_ACO_CANNOT_BE_RUN
-def test_an_aco_that_cannot_be_run_fails_the_card_with_one_sentence(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    arrange: Callable[[Path, pytest.MonkeyPatch], Path],
-    reason: str,
-) -> None:
-    decisions = AcoCli(directory=arrange(tmp_path, monkeypatch))
-    card_hash = cast(str, option_line()["card_hash"])
-    decision = CardDecision(42, (CardLine(1, card_hash, "A"),), None)
-
-    result = decisions.rule_card(decision)
-
-    assert result == DecisionResult(DecisionStatus.FAILED, f"aco rule {reason}")
+    assert port.ruled_items() == []
 
 
 def _make_a_file(directory: Path) -> None:
@@ -190,20 +117,16 @@ def _make_unenterable(directory: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("break_directory", "error"),
-    [
-        (_make_a_file, "aco rulings could not be run: Not a directory"),
-        (_make_unenterable, "aco rulings could not be run: Permission denied"),
-    ],
+    "break_directory",
+    [_make_a_file, _make_unenterable],
     ids=["directory-is-a-file", "directory-not-enterable"],
 )
 def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_others_keep_theirs(
-    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
-    break_directory: Callable[[Path], None],
-    error: str,
+    two_repositories: tuple[BoardForge, BoardForge], break_directory: Callable[[Path], None]
 ) -> None:
+    """ABRD-15; the exact sentences are `aco_cli`'s (test_board_aco_cli)."""
     repository_a, repository_b = two_repositories
-    repository_a.set_rulings(row(42, "Share page", option_line()))
+    repository_a.put_item(42, _OPEN_CARD, title="Share page")
     break_directory(repository_b.directory)
 
     try:
@@ -214,105 +137,11 @@ def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_othe
 
     assert response.status == 200
     repos = cast(list[dict[str, Any]], response.json()["repos"])
-    assert [(repo["name"], repo["error"]) for repo in repos] == [("a", None), ("b", error)]
+    assert [repo["name"] for repo in repos] == ["a", "b"]
+    assert repos[0]["error"] is None
+    assert repos[1]["error"]
     assert [item["number"] for item in repos[0]["items"]] == [42]
     assert repos[1]["items"] == []
-
-
-@pytest.mark.parametrize(
-    ("stdout", "error"),
-    [
-        ("not json", "aco rulings failed: exit 0 without a message"),
-        ('{"ok": true, "rulings": {}}', "aco rulings --json is unreadable: rulings is not a list"),
-        (
-            '{"ok": true, "rulings": [1]}',
-            "aco rulings --json is unreadable: a rulings row is not an object",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": true, "title": "T", "lines": []}]}',
-            "aco rulings --json is unreadable: number is not a int",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 1, "title": "T"}]}',
-            "aco rulings --json is unreadable: #1 lines is not a list",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": [2]}]}',
-            "aco rulings --json is unreadable: #1 has a line that is not an object",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": "yes", "ruled_on": "2026-10-01", '
-            '"question": 3}]}]}',
-            "aco rulings --json is unreadable: question is not text",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruled_on": null}]}]}',
-            "aco rulings --json is unreadable: #1 line has no ruling",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": "yes"}]}]}',
-            "aco rulings --json is unreadable: #1 line has no ruled_on",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": "perhaps", "ruled_on": "2026-10-01"}]}]}',
-            "aco rulings --json is unreadable: ruling is not an outcome",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-            '[{"index": 1, "text": "Q?", "ruling": "yes", "ruled_on": "gestern"}]}]}',
-            "aco rulings --json is unreadable: ruled_on is not a date",
-        ),
-        (
-            '{"ok": true, "rulings": [{"number": 7, "title": "T", "lines": '
-            '[{"index": 2, "text": "Q?", "default": null, "ruling": null, "ruled_on": null}]}]}',
-            "aco rulings --json is unreadable: #7 line 2 is an open yes/no line; "
-            "write an option card",
-        ),
-    ],
-    ids=[
-        "not-json",
-        "rulings-not-a-list",
-        "row-not-an-object",
-        "number-not-an-int",
-        "lines-not-a-list",
-        "line-not-an-object",
-        "question-not-text",
-        "ruling-missing",
-        "ruled-on-missing",
-        "ruling-not-an-outcome",
-        "ruled-on-not-a-date",
-        "open-yes-no-line",
-    ],
-)
-def test_unreadable_rulings_json_answers_502_with_why(
-    repository: FakeAcoRepository, board: BoardClient, stdout: str, error: str
-) -> None:
-    repository.answer_rulings_with(stdout)
-
-    response = board.get_board_json()
-
-    assert response.status == 502
-    assert response.json() == {"repos": [{"name": DEFAULT_LABEL, "error": error, "items": []}]}
-
-
-def test_a_ruled_yes_no_line_without_a_default_key_is_listed(
-    repository: FakeAcoRepository, board: BoardClient, listed_items: Lister
-) -> None:
-    """The board reads no `default`, so aco dropping the key changes nothing."""
-    repository.answer_rulings_with(
-        '{"ok": true, "rulings": [{"number": 1, "title": "T", "lines": '
-        '[{"index": 1, "text": "Q?", "ruling": "no", "ruled_on": "2026-10-01"}]}]}'
-    )
-
-    [item] = listed_items(board)
-
-    assert [(entry["ruling"], entry["ruled_on"]) for entry in item["lines"]] == [
-        ("no", "2026-10-01")
-    ]
 
 
 @pytest.mark.parametrize("presented", [None, "wrong", "ä" * 43], ids=["none", "wrong", "latin-1"])
@@ -344,20 +173,21 @@ def test_a_ruled_yes_no_line_without_a_default_key_is_listed(
     ],
 )
 def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
-    repository: FakeAcoRepository,
+    repository: BoardForge,
+    port: RecordedPort,
     board: BoardClient,
     presented: str | None,
     method: str,
     path: str,
     body: str | None,
 ) -> None:
-    repository.set_rulings(row(42, "Share page", option_line()))
+    repository.put_item(42, _OPEN_CARD, title="Share page")
 
     response = board.call_api(method, path.format(token=board.token), body, presented=presented)
 
     assert response.status == 403
     assert response.json() == {"error": "forbidden: missing or wrong token"}
-    assert repository.calls() == []
+    _assert_no_call(port, repository)
 
 
 @pytest.mark.parametrize(
@@ -376,7 +206,8 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
     ],
 )
 def test_a_malformed_api_decision_is_refused_with_an_error_envelope_without_aco(
-    repository: FakeAcoRepository,
+    repository: BoardForge,
+    port: RecordedPort,
     board: BoardClient,
     body: str,
     headers: dict[str, str],
@@ -385,11 +216,11 @@ def test_a_malformed_api_decision_is_refused_with_an_error_envelope_without_aco(
     response = board.call_api("POST", "/api/rule", body, presented=board.token, headers=headers)
 
     assert (response.status, response.json()) == (400, {"error": error})
-    assert repository.calls() == []
+    _assert_no_call(port, repository)
 
 
 def test_a_repeated_token_header_is_refused_even_when_both_carry_the_token(
-    repository: FakeAcoRepository, board: BoardClient
+    repository: BoardForge, board: BoardClient, port: RecordedPort
 ) -> None:
     token_header = b"X-Board-Token: " + board.token.encode() + b"\r\n"
     answer = board.send_raw(b"GET /api/board HTTP/1.1\r\nHost: x\r\n" + token_header * 2 + b"\r\n")
@@ -399,7 +230,7 @@ def test_a_repeated_token_header_is_refused_even_when_both_carry_the_token(
         403,
         {"error": "forbidden: missing or wrong token"},
     )
-    assert repository.calls() == []
+    _assert_no_call(port, repository)
 
 
 _NOT_FOUND = (404, {"error": "not found"})
@@ -419,7 +250,8 @@ _METHOD_NOT_ALLOWED = (405, {"error": "method not allowed"})
     ids=["unknown", "rule-by-get", "board-by-post", "put", "delete", "options"],
 )
 def test_an_api_request_outside_its_routes_answers_why_as_json(
-    repository: FakeAcoRepository,
+    repository: BoardForge,
+    port: RecordedPort,
     board: BoardClient,
     method: str,
     path: str,
@@ -432,7 +264,7 @@ def test_an_api_request_outside_its_routes_answers_why_as_json(
     assert response.status == status
     assert response.json() == body
     assert response.headers.get("Allow") == allow
-    assert repository.calls() == []
+    _assert_no_call(port, repository)
 
 
 _BODY_LENGTH = 40
@@ -454,9 +286,10 @@ def _drip_slower_than_the_deadline(board: BoardClient, head: bytes) -> bytes:
     ids=["stalled", "dripping"],
 )
 def test_an_api_body_not_complete_by_the_deadline_answers_408_as_json(
-    repository: FakeAcoRepository, send_body: Callable[[BoardClient, bytes], bytes]
+    repository: BoardForge, send_body: Callable[[BoardClient, bytes], bytes]
 ) -> None:
-    with serving(AcoCli(directory=repository.directory), request_deadline_seconds=0.2) as board:
+    port = decision_port(repository)
+    with serving(port, request_deadline_seconds=0.2) as board:
         answer = send_body(
             board,
             b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: "
@@ -470,58 +303,38 @@ def test_an_api_body_not_complete_by_the_deadline_answers_408_as_json(
         {"error": "request timeout: body incomplete"},
     )
     _assert_guarded(response)
-    assert repository.calls() == []
+    _assert_no_call(port, repository)
 
 
-def _fail_rulings(repository: FakeAcoRepository) -> None:
-    repository.fail_rulings("ERROR: no forge adapter for host")
-
-
-def _answer_rulings_unreadably(repository: FakeAcoRepository) -> None:
-    repository.answer_rulings_with('{"ok": true, "rulings": {}}')
-
-
-def _hang_rulings(repository: FakeAcoRepository) -> None:
-    repository.delay("rulings", 30)
-
-
-@pytest.mark.parametrize(
-    ("break_aco", "timeout_seconds", "error"),
-    [
-        (_fail_rulings, 120.0, "aco rulings failed: ERROR: no forge adapter for host"),
-        (
-            _answer_rulings_unreadably,
-            120.0,
-            "aco rulings --json is unreadable: rulings is not a list",
-        ),
-        (_hang_rulings, 1.0, "aco rulings did not answer within 1 seconds"),
-    ],
-    ids=["aco-fails", "aco-unreadable", "aco-hangs"],
-)
-def test_an_unavailable_aco_answers_502_with_its_reason(
-    repository: FakeAcoRepository,
-    break_aco: Callable[[FakeAcoRepository], None],
-    timeout_seconds: float,
-    error: str,
+def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
+    repository: BoardForge, board: BoardClient
 ) -> None:
-    break_aco(repository)
-    decisions = AcoCli(directory=repository.directory, timeout_seconds=timeout_seconds)
+    """ABRD-20."""
+    repository.fail_listing("no forge adapter for host")
 
-    with serving(decisions) as board:
-        response = board.get_board_json()
+    response = board.get_board_json()
 
     assert response.status == 502
-    assert response.json() == {"repos": [{"name": DEFAULT_LABEL, "error": error, "items": []}]}
+    assert response.json() == {
+        "repos": [
+            {
+                "name": DEFAULT_LABEL,
+                "error": "aco rulings failed: no forge adapter for host",
+                "items": [],
+            }
+        ]
+    }
     assert response.headers["Content-Type"] == "application/json"
     _assert_guarded(response)
 
 
 def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
-    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+    two_repositories: tuple[BoardForge, BoardForge],
 ) -> None:
+    """ABRD-15."""
     repository_a, repository_b = two_repositories
-    repository_a.set_rulings(row(42, "Share page", option_line()))
-    repository_b.fail_rulings("ERROR: no forge adapter for host")
+    repository_a.put_item(42, _OPEN_CARD, title="Share page")
+    repository_b.fail_listing("no forge adapter for host")
 
     with serving_two(two_repositories) as board:
         response = board.get_board_json()
@@ -535,17 +348,17 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
     assert (item["number"], [listed["index"] for listed in item["lines"]]) == (42, [1])
     assert repos[1] == {
         "name": "b",
-        "error": "aco rulings failed: ERROR: no forge adapter for host",
+        "error": "aco rulings failed: no forge adapter for host",
         "items": [],
     }
 
 
 def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
-    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+    two_repositories: tuple[BoardForge, BoardForge],
 ) -> None:
     repository_a, repository_b = two_repositories
-    repository_a.fail_rulings("a is down")
-    repository_b.fail_rulings("b is down")
+    repository_a.fail_listing("a is down")
+    repository_b.fail_listing("b is down")
 
     with serving_two(two_repositories) as board:
         response = board.get_board_json()
@@ -624,14 +437,18 @@ def test_every_answer_is_uncached_unreferred_framed_by_none_and_never_cross_orig
     ids=["version-unsupported", "request-line-malformed", "too-many-headers", "line-too-long"],
 )
 def test_a_request_the_http_layer_cannot_parse_is_refused_with_every_guard_header(
-    repository: FakeAcoRepository, board: BoardClient, request_bytes: bytes, status: int
+    repository: BoardForge,
+    board: BoardClient,
+    port: RecordedPort,
+    request_bytes: bytes,
+    status: int,
 ) -> None:
     response = Response.from_raw(board.send_raw(request_bytes))
 
     assert response.status == status
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
     _assert_guarded(response)
-    assert repository.calls() == []
+    _assert_no_call(port, repository)
 
 
 def test_a_head_request_answers_with_headers_only(board: BoardClient) -> None:
@@ -641,7 +458,7 @@ def test_a_head_request_answers_with_headers_only(board: BoardClient) -> None:
 
 
 def test_a_cross_origin_preflight_is_granted_nothing(
-    repository: FakeAcoRepository, board: BoardClient
+    repository: BoardForge, board: BoardClient, port: RecordedPort
 ) -> None:
     preflight = {
         **_ORIGIN_ELSEWHERE,
@@ -653,4 +470,4 @@ def test_a_cross_origin_preflight_is_granted_nothing(
 
     assert response.status >= 400
     assert _cross_origin_headers(response) == []
-    assert repository.calls() == []
+    _assert_no_call(port, repository)

@@ -19,6 +19,7 @@ import pytest
 from aco_board_fixtures import (
     DEFAULT_LABEL,
     BoardClient,
+    Response,
     serving,
     serving_two,
 )
@@ -124,7 +125,7 @@ def _rule_calls(directory: Path) -> list[list[str]]:
     return [call for call in logged_calls(directory) if call[0] == "rule"]
 
 
-def _repos(response: Any) -> list[dict[str, Any]]:
+def _repos(response: Response) -> list[dict[str, Any]]:
     return cast(list[dict[str, Any]], response.json()["repos"])
 
 
