@@ -45,10 +45,7 @@ test('posts a decision to POST /api/rule with the token only in the header', asy
 	const decision: DecisionRequest = {
 		repo: 'repo',
 		item: 42,
-		line: 1,
-		fingerprint: 'fp',
-		outcome: 'later',
-		note: null
+		lines: [{ line: 1, fingerprint: 'fp', option: 'A' }]
 	};
 	const fetchImpl = fakeFetch(200, { status: 'ruled', message: null });
 
@@ -69,9 +66,8 @@ test('a non-OK answer to a decision raises BoardApiError naming the status', asy
 	const decision: DecisionRequest = {
 		repo: 'repo',
 		item: 42,
-		line: 1,
-		fingerprint: 'fp',
-		outcome: 'yes',
+		lines: [{ line: 1, fingerprint: 'fp' }],
+		unclear: true,
 		note: null
 	};
 	const fetchImpl = fakeFetch(403, { error: 'forbidden: missing or wrong token' });
