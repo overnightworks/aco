@@ -27,9 +27,9 @@
 "src/aco/workboard.py" = 3131
 "tests/support/cli_fixtures.py" = 890
 "tests/support/github_fixtures.py" = 832
-"tests/test_board.py" = 4111
+"tests/test_board.py" = 4069
 "tests/test_checkout.py" = 2040
-"tests/test_cli.py" = 12316
+"tests/test_cli.py" = 12313
 "tests/test_cmd_adopt.py" = 1646
 "tests/test_cmd_cut.py" = 1069
 "tests/test_cmd_land_after_merge_rerun.py" = 877

@@ -475,13 +475,50 @@ class TestOptionLineCheck:
                 [malformed(E, f"{E} is an open yes/no line; write an option card")],
                 id="BODY-29-yes-no-only",
             ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\ndefault = "yes"\n',
+                [
+                    malformed(E, f"{E} is an open yes/no line; write an option card"),
+                    malformed(f"{E}.default", f"unknown key {E}.default"),
+                ],
+                id="BODY-29-open-with-default",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\n'
+                'default = "yes"\n',
+                [malformed(f"{E}.default", f"unknown key {E}.default")],
+                id="BODY-33-ruled-with-default",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "no"\n',
+                [malformed(f"{E}.ruled_on", f"{E}.ruled_on must be a TOML local date")],
+                id="BODY-32-ruling-alone",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruled_on = 2026-10-01\n',
+                [malformed(f"{E}.ruling", f"{E}.ruling must be yes, no, or later")],
+                id="BODY-31-ruled-on-alone",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\n'
+                'question = "Q?"\nexample = "E"\n'
+                'picture = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>"""\n',
+                [],
+                id="ruled-with-card-fields",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "later"\nruled_on = 2026-10-01\n',
+                [],
+                id="ruled-later",
+            ),
         ],
     )
     def test_a_yes_no_line_keeps_its_own_grammar(
         self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
     ) -> None:
-        """Spec: BODY-29, BODY-33, BODY-83."""
-        assert check_defects(capsys, card_body(line)) == (2, defects)
+        """Spec: BODY-29, BODY-31, BODY-32, BODY-33, BODY-83 -- an open yes/no line is refused;
+        a ruled one stays readable history."""
+        assert check_defects(capsys, card_body(line)) == (2 if defects else 0, defects)
 
 
 def option_json(**card_values: object) -> dict[str, object]:
