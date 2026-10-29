@@ -1,0 +1,8 @@
+claim_id = "c0a9dcb004ef4b9c90fa6081905f90a2"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "c442f12e3deeaa1f21348ebe837bbed780e65308"
+branch = "claude/issue-589-s3a-rulings-owner"
+scope = ["pyproject.toml", "src/aco/cmd_rulings.py", "src/aco/rulings.py", "tests/test_cmd_rule.py", "tests/test_state_board.py"]
+opened_commit = "eb41f86392d2c5c8c19402621a302989d72bddfc"
+whole_reason = "One move: the rulings row, its order and both renderings leave cmd_rulings.py for one pure owner together, its one test reader follows and the Layers contract names the new module; the test_cmd_rule.py line is slice 3's one-line follow-up that no later sub-slice touches."
