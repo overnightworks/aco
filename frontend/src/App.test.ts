@@ -29,10 +29,10 @@ test('[ABRD-51] a ready board offers the Open and Decided tabs with their counts
 					number: 42,
 					lines: [
 						optionLine({ index: 1 }),
-						line({ index: 2 }),
 						line({ index: 3, ruling: 'yes', ruled_on: '2026-10-01' })
 					]
-				})
+				}),
+				item({ number: 43, lines: [optionLine({ topic: 'Zweiter' })] })
 			]
 		})
 	];
@@ -91,7 +91,7 @@ test('a board with no open or ruled lines shows the empty message', async () => 
 });
 
 test('a board with lines shows the track list', async () => {
-	const repos = [repo({ items: [item({ number: 42, title: 'Share page', lines: [line()] })] })];
+	const repos = [repo({ items: [item({ number: 42, title: 'Share page', lines: [optionLine()] })] })];
 	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
 
 	render(App, { token: 'a-token' });
@@ -100,12 +100,12 @@ test('a board with lines shows the track list', async () => {
 });
 
 test('selecting an open line opens it in the stage', async () => {
-	const openLine = line({ index: 1, text: 'Guests?', question: 'Guests allowed?' });
+	const openLine = optionLine({ index: 1, topic: 'Gäste', question: 'Guests allowed?' });
 	const repos = [repo({ items: [item({ number: 42, title: 'Share page', lines: [openLine] })] })];
 	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
 
 	render(App, { token: 'a-token' });
-	(await screen.findByRole('button', { name: /Guests allowed\?/ })).click();
+	(await screen.findByRole('button', { name: /Gäste/ })).click();
 
 	expect(await screen.findByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
 });

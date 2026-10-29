@@ -21,7 +21,10 @@ function renderList(
 test('[ABRD-28] a repository is a heading with its name and open count', () => {
 	renderList([
 		repo({
-			items: [item({ lines: [line({ index: 1 }), line({ index: 2, text: 'Second?' })] })]
+			items: [
+				item({ number: 42, lines: [optionLine()] }),
+				item({ number: 43, lines: [optionLine({ topic: 'Zweiter' })] })
+			]
 		})
 	]);
 
@@ -60,16 +63,27 @@ test('[ABRD-61] a returned option row shows its topic, the With head shape and a
 	expect(within(row).getByText('Sprung')).toHaveClass('muted');
 });
 
-test('[ABRD-28] a short question labels the row instead of the full sentence', () => {
+test('[ABRD-28] a short topic labels the row and the question titles it instead of the full sentence', () => {
 	renderList([
 		repo({
 			items: [
-				item({ lines: [line({ question: 'Guests allowed?', text: 'Guests may join the call.' })] })
+				item({
+					lines: [
+						optionLine({
+							topic: 'Gäste',
+							question: 'Guests allowed?',
+							text: 'Guests may join the call.'
+						})
+					]
+				})
 			]
 		})
 	]);
 
-	expect(screen.getByText('Guests allowed?')).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: 'Open Gäste' })).toHaveAttribute(
+		'title',
+		'Guests allowed?'
+	);
 	expect(screen.queryByText('Guests may join the call.')).not.toBeInTheDocument();
 });
 
@@ -91,7 +105,7 @@ test('[ABRD-29] the option row comes before the yes/no row of its repository', (
 
 test('[ABRD-49] ruled lines and ruled-only repositories leave the groups and stand in the quiet line', () => {
 	renderList([
-		repo({ name: 'busy', items: [item({ lines: [line()] })] }),
+		repo({ name: 'busy', items: [item({ lines: [optionLine()] })] }),
 		repo({
 			name: 'done',
 			items: [item({ lines: [line({ ruling: 'no', ruled_on: '2026-10-01' })] })]
@@ -136,10 +150,12 @@ test('[ABRD-15] hostile titles, topics, repository names and errors are shown as
 			name: 'clean',
 			items: [
 				item({
-					lines: [
-						optionLine({ index: 1, topic: hostileTopic, question: hostileQuestion }),
-						line({ index: 2, text: hostileQuestion })
-					]
+					number: 42,
+					lines: [optionLine({ topic: hostileTopic, question: hostileQuestion })]
+				}),
+				item({
+					number: 43,
+					lines: [optionLine({ topic: 'Other', question: hostileQuestion })]
 				})
 			]
 		})
@@ -155,22 +171,25 @@ test('[ABRD-15] hostile titles, topics, repository names and errors are shown as
 
 test('[ABRD-28] a row is a button that selects its line by the repository-bound key', () => {
 	const { onSelect } = renderList([
-		repo({ name: 'a', items: [item({ number: 42, lines: [line({ index: 3 })] })] })
+		repo({ name: 'a', items: [item({ number: 42, lines: [optionLine({ index: 3 })] })] })
 	]);
 
 	screen.getByRole('button').click();
 
-	expect(onSelect).toHaveBeenCalledWith('a:42:3');
+	expect(onSelect).toHaveBeenCalledWith('a:42:card');
 });
 
 test('[ABRD-28] the selected row is marked current among several open ones', () => {
 	renderList(
 		[
 			repo({
-				items: [item({ number: 42, lines: [line({ index: 1 }), line({ index: 2 })] })]
+				items: [
+					item({ number: 42, lines: [optionLine()] }),
+					item({ number: 43, lines: [optionLine({ topic: 'Zweiter' })] })
+				]
 			})
 		],
-		{ selectedKey: 'repo:42:2' }
+		{ selectedKey: 'repo:43:card' }
 	);
 
 	const [first, second] = screen.getAllByRole('button');
@@ -186,10 +205,10 @@ test('[ABRD-30] a decided row is named Decided with its label, carries the Decid
 					item({
 						lines: [
 							optionLine({ index: 1, topic: 'Sprung', ruling: 'A', ruled_on: '2026-10-02' }),
-							line({ index: 2, text: 'Guests?', ruling: 'later', ruled_on: '2026-10-01' }),
-							line({ index: 3, text: 'Still open?' })
+							line({ index: 2, text: 'Guests?', ruling: 'later', ruled_on: '2026-10-01' })
 						]
-					})
+					}),
+					item({ number: 43, lines: [optionLine({ topic: 'Still open' })] })
 				]
 			})
 		],
@@ -206,7 +225,7 @@ test('[ABRD-30] a decided row is named Decided with its label, carries the Decid
 });
 
 test('[ABRD-31] with nothing ruled the decided list reads Nothing decided yet and says what shows here', () => {
-	renderList([repo({ items: [item({ lines: [line()] })] })], { view: 'decided' });
+	renderList([repo({ items: [item({ lines: [optionLine()] })] })], { view: 'decided' });
 
 	expect(screen.getByText('Nothing decided yet')).toBeInTheDocument();
 	expect(
