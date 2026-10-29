@@ -43,6 +43,8 @@ OPTION_LETTERS = "ABCD"
 # The `ruling` of an option line decided with the operator's own answer, and
 # the key that holds that answer.
 OTHER = "other"
+# The day the head asked an option line; required until the line is ruled.
+ASKED_ON = "asked_on"
 # The keys of an open option line sent back to its head, and its optional note.
 RETURNED_ON = "returned_on"
 RETURNED_NOTE = "returned_note"
@@ -319,15 +321,18 @@ _EXPECTATION_KNOWN_KEYS = frozenset(
 _OPTION_TABLES = "option"
 _OPTION_LINE_DECISION_KEYS = ("ruling", "ruled_on", "card_hash", "via")
 # Everything an option line says about its state, in rendering order after `text`.
-_OPTION_LINE_STATE_KEYS = (*_OPTION_LINE_DECISION_KEYS, OTHER, RETURNED_ON, RETURNED_NOTE)
+_OPTION_LINE_STATE_KEYS = (
+    ASKED_ON,
+    *_OPTION_LINE_DECISION_KEYS,
+    OTHER,
+    RETURNED_ON,
+    RETURNED_NOTE,
+)
 _OPTION_LINE_KNOWN_KEYS = frozenset(
     {
         "text",
         _OPTION_TABLES,
-        *_OPTION_LINE_DECISION_KEYS,
-        OTHER,
-        RETURNED_ON,
-        RETURNED_NOTE,
+        *_OPTION_LINE_STATE_KEYS,
         *OPTION_LINE_KEYS,
         *_OPTION_LINE_REFUSED_KEYS,
     }
@@ -576,12 +581,24 @@ def _card_rule_field_defects(prefix: str, entry: dict[str, object]) -> list[Fiel
     ]
 
 
+def _asked_on_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
+    """`asked_on` is a TOML local date, and required until the line is ruled."""
+    path = f"{prefix}.{ASKED_ON}"
+    if ASKED_ON not in entry:
+        return _field_defect(path, None if "ruling" in entry else "is required")
+    return _field_defect(
+        path, None if type(entry[ASKED_ON]) is date else "must be a TOML local date"
+    )
+
+
 def _option_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
     """An option line's defects after `text`, in the fixed order: decided
-    state, line keys, options, pictures, picture budget, unknown keys, card rules."""
+    asked day, decided state, line keys, options, pictures, picture budget,
+    unknown keys, card rules."""
     options = entry[_OPTION_TABLES]
     letters = _present_letters(options)
     return [
+        *_asked_on_defects(prefix, entry),
         *_option_line_decision_defects(prefix, entry, letters),
         *_option_line_key_defects(prefix, entry, letters),
         *_options_defects(prefix, options),

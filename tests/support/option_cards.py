@@ -26,6 +26,7 @@ def card_head(*edits: tuple[str, str]) -> str:
         "[[expectation]]\n"
         'text = "Ein Klick auf den Ursprungs-Link springt in der App: die Version klappt auf, '
         'der Take ist markiert, der Song bleibt offen."\n'
+        "asked_on = 2026-10-28\n"
         'question = "Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?"\n'
         'problem = "Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg."\n'
         'picture = """\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">'

@@ -2338,14 +2338,14 @@ class TestCliStateRefForge:
         lines = capsys.readouterr().out.splitlines()
         assert any(line.strip().startswith("1 ruled A") for line in lines)
 
-        remote_url = f"file://{bare_remote}"
-        state = store.fetch_state(worktree=worktree, remote=remote_url)
+        state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
         assert state.tip is not None
         stored = store.read_item_files(worktree, state.tip)[f"{RULABLE_ID}.md"].decode()
         assert stored.startswith("Prose.\n\n```aco\n")
         record = _decoded_record(stored, RULABLE_ID)
         assert record.title == "Rulable"
         assert record.updated_at.startswith(datetime.now(UTC).date().isoformat())
+        assert "asked_on = 2026-10-28\n" in stored
 
     def test_next_status_and_rulings_print_state_ref_ids_where_github_prints_hash_n(
         self,

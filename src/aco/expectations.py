@@ -22,6 +22,7 @@ from .body import (
     replace_block,
 )
 from .expectation_grammar import (
+    ASKED_ON,
     OPTION_LETTERS,
     OTHER,
     RETURNED_NOTE,
@@ -131,6 +132,7 @@ class OptionLine:
     form: ClassVar[LineForm] = LineForm.OPTIONS
     index: int
     text: str
+    asked_on: date | None
     question: str
     problem: str
     picture: str
@@ -224,6 +226,7 @@ def _option_line(index: int, entry: dict[str, object]) -> OptionLine:
     return OptionLine(
         index=index,
         text=cast(str, entry["text"]),
+        asked_on=cast(date | None, entry.get(ASKED_ON)),
         question=cast(str, entry["question"]),
         problem=cast(str, entry["problem"]),
         picture=cast(str, entry["picture"]),

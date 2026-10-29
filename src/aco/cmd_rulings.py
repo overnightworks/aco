@@ -119,7 +119,10 @@ def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
     return {
         "index": line.index,
         "form": line.form.value,
-        **{key: shared[key] for key in ("text", "ruling", "ruled_on")},
+        "text": shared["text"],
+        expectation_grammar.ASKED_ON: None if line.asked_on is None else line.asked_on.isoformat(),
+        "ruling": shared["ruling"],
+        "ruled_on": shared["ruled_on"],
         "default": None,
         "card_hash": line.card_hash,
         "stored_card_hash": None if decision is None else decision.card_hash,
