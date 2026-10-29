@@ -25,7 +25,6 @@
 "src/aco/state_board.py" = 928
 "src/aco/store.py" = 2087
 "src/aco/workboard.py" = 3131
-"tests/board/test_board_api.py" = 944
 "tests/support/cli_fixtures.py" = 890
 "tests/support/github_fixtures.py" = 832
 "tests/test_board.py" = 4111

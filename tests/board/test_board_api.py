@@ -64,6 +64,12 @@ def _cross_origin_headers(response: Response) -> list[str]:
     return [name for name in response.headers if name.lower().startswith("access-control-")]
 
 
+def _listed_line(index: int, text: str, ruling: str, **shown: str) -> dict[str, object]:
+    """A ruled yes/no line as the board lists it, without its fingerprint."""
+    absent = {"question": None, "example": None, "picture": None}
+    return {"index": index, "text": text, **absent, **shown, "ruling": ruling, "ruled_on": "2026-10-01"}
+
+
 def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
     repository: FakeAcoRepository, board: BoardClient, listed_items: Lister
 ) -> None:
@@ -88,41 +94,11 @@ def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
             "number": 42,
             "title": "Share page",
             "lines": [
-                {
-                    "index": 1,
-                    "text": "Guests?",
-                    "question": "Gäste?",
-                    "example": "Ja",
-                    "picture": "<svg/>",
-                    "ruling": "yes",
-                    "ruled_on": "2026-10-01",
-                },
-                {
-                    "index": 2,
-                    "text": "Hosts?",
-                    "question": None,
-                    "example": None,
-                    "picture": None,
-                    "ruling": "no",
-                    "ruled_on": "2026-10-01",
-                },
+                _listed_line(1, "Guests?", "yes", question="Gäste?", example="Ja", picture="<svg/>"),
+                _listed_line(2, "Hosts?", "no"),
             ],
         },
-        {
-            "number": 7,
-            "title": "Login",
-            "lines": [
-                {
-                    "index": 1,
-                    "text": "Remember me?",
-                    "question": None,
-                    "example": None,
-                    "picture": None,
-                    "ruling": "later",
-                    "ruled_on": "2026-10-01",
-                }
-            ],
-        },
+        {"number": 7, "title": "Login", "lines": [_listed_line(1, "Remember me?", "later")]},
     ]
     assert repository.rule_calls() == []
 
