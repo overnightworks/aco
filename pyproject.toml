@@ -74,6 +74,7 @@ exhaustive = true
 layers = [
     "cli",
     "cmd_adopt | cmd_board | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_status",
+    "decide",
     "board_read | policy | report",
     "session",
     "checkout | store",

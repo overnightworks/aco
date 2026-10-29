@@ -453,10 +453,10 @@ def observed_board(
     return _ObservedBoard(projected, live_claims)
 
 
-def item_body_or_refuse(
+def item_or_refuse(
     client: forge.ForgeReader, number: int, *, command: str, storage: body.Storage
-) -> str:
-    """The live body of issue `number`, or a by-name refusal before any
+) -> forge.ItemReference:
+    """The live reference of issue `number`, or a by-name refusal before any
     write: `rule` and `ask` both target one existing issue, never a pull
     request -- a pull request exists only on a forge, so that refusal
     keeps the forge's own `#n`."""
@@ -469,7 +469,14 @@ def item_body_or_refuse(
         raise protocol.ClaimUnavailableError(
             f"#{number} is a pull request, not an issue; {command} needs an issue"
         )
-    return reference.body or ""
+    return reference
+
+
+def item_body_or_refuse(
+    client: forge.ForgeReader, number: int, *, command: str, storage: body.Storage
+) -> str:
+    """The live body of issue `number`, or `item_or_refuse`'s refusal."""
+    return item_or_refuse(client, number, command=command, storage=storage).body or ""
 
 
 def require_readable_item(client: forge.ForgeReader, issue: workboard.Issue | None) -> None:
