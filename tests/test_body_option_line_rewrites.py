@@ -13,7 +13,7 @@ from typing import cast
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, container_issue
 from cli_fixtures import real_git, run_cli, track_board_config
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import assert_rewritten_alike, card, decide, ruled_card
 
 from aco import body, cmd_item, cmd_rescope, forge, items, session, state_board
@@ -77,13 +77,7 @@ def test_a_rewrite_writes_the_keys_in_the_order_the_card_names() -> None:
     assert written_keys(body.replace_block(raw, located, located.data)) == written_keys(raw)
 
 
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> Path:
-    assert_github_world(github_clone, bare_remote)
-    return github_clone
-
-
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 @pytest.mark.parametrize("newline", NEWLINES)
 def test_rule_keeps_option_lines(
     monkeypatch: pytest.MonkeyPatch,
@@ -104,7 +98,7 @@ def test_rule_keeps_option_lines(
     assert (expectations_after[1]["ruling"], ("\r\n" in written) is ("\r\n" in raw)) == ("A", True)
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 @pytest.mark.parametrize("newline", NEWLINES)
 @pytest.mark.parametrize("item", ["mixed", "new-only"])
 class TestCommandRewrites:

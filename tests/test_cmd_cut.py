@@ -12,10 +12,12 @@ from pathlib import Path
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue, container_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, track_board_config
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 
 from aco import body, forge, workboard
 from aco.workboard import IssueReference, ParentIssue
+
+pytestmark = pytest.mark.usefixtures("github_world")
 
 
 class ForgeEvent(Enum):
@@ -106,11 +108,6 @@ def rendered(identifier: str, case: CutCase) -> tuple[object, ...]:
         )
 
     return (pytest.param(case, id=identifier), pytest.param(as_json(case), id=identifier + "-json"))
-
-
-@pytest.fixture(autouse=True)
-def _github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
 
 
 CutCheck = Callable[[CutCase], None]

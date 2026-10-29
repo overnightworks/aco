@@ -5,12 +5,11 @@ letter or a wrong flag combination before any write (RULE-14..RULE-19)."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from board_fixtures import board_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import (
     ALREADY_RULED,
     GOLDEN_CARD_HASH,
@@ -36,11 +35,6 @@ ALREADY_WITH_HEAD = "line 2 is already with its head; it comes back once revised
 CARD_CHANGED = "line 2 changed since its card was shown; show it again and rule what it shows now"
 
 
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
-
-
 def decided_state(rulings_stdout: str) -> tuple[object, ...]:
     """Line 2's `rulings --json` decision as (ruling, ruled_on, via, stored, current hash)."""
     line = json.loads(rulings_stdout)["rulings"][0]["lines"][1]
@@ -53,7 +47,7 @@ def decided_state(rulings_stdout: str) -> tuple[object, ...]:
     )
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestRuleOption:
     @pytest.mark.parametrize("via", ["board", "chat", "default"])
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])

@@ -39,3 +39,15 @@ def isolated_global_git_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     global_config.touch()
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_config))
     return global_config
+
+
+@pytest.fixture
+def github_world(github_clone: Path, bare_remote: Path) -> Path:
+    """The checkout and bare remote of a GitHub-hosted board, asserted to be
+    a consistent world; a module that only needs the check ignores the path."""
+    # Imported here: at module level it would import `cli_fixtures` before the
+    # plugin registration above rewrites its asserts.
+    from github_fixtures import assert_github_world  # noqa: PLC0415
+
+    assert_github_world(github_clone, bare_remote)
+    return github_clone

@@ -18,16 +18,13 @@ from board_fixtures import (
     ruled_expectation,
 )
 from cli_fixtures import real_git, run_cli, track_board_config
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from github_pages import raw_board_issue
 from option_cards import RETURNED_NOTE, RETURNED_ON, card, card_body, card_head, ruled_card
 
 from aco import body, github, store, workboard
 
-
-@pytest.fixture(autouse=True)
-def _github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
+pytestmark = pytest.mark.usefixtures("github_world")
 
 
 @pytest.mark.parametrize(

@@ -5,12 +5,11 @@ them, and the card hash pins the card the operator decided
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from board_fixtures import board_issue
 from cli_fixtures import run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import (
     GOLDEN_CARD_HASH,
     OTHER_ANSWER,
@@ -485,11 +484,6 @@ class TestOptionLineCheck:
         assert check_defects(capsys, card_body(line)) == (2, defects)
 
 
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
-
-
 def option_json(**card_values: object) -> dict[str, object]:
     return {
         "letter": "A",
@@ -509,7 +503,7 @@ def option_json(**card_values: object) -> dict[str, object]:
     }
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestOptionLineRulings:
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
     def test_rulings_json_carries_every_card_field_and_the_card_hash(
