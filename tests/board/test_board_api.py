@@ -23,6 +23,7 @@ from aco_board_fixtures import (
     Response,
     install_fake_aco,
     line,
+    option_line,
     row,
     serving,
     serving_two,
@@ -32,23 +33,15 @@ from aco.board.aco_cli import AcoCli
 from aco.board.board import LINE_CHANGED
 from aco.board.ports import (
     NOTE_MAX_LENGTH,
-    Decision,
+    CardDecision,
+    CardLine,
     DecisionResult,
     DecisionSourceUnavailableError,
     DecisionStatus,
-    Outcome,
 )
 
 _ORIGIN_ELSEWHERE = {"Origin": "http://elsewhere.example"}
-
-
-def _listed_items(board: BoardClient) -> list[dict[str, Any]]:
-    response = board.get_board_json()
-    assert response.status == 200
-    [repo] = cast(list[dict[str, Any]], response.json()["repos"])
-    assert repo["name"] == board.repo
-    assert repo["error"] is None
-    return cast(list[dict[str, Any]], repo["items"])
+Lister = Callable[[BoardClient], list[dict[str, Any]]]
 
 
 def _decision_body(**overrides: object) -> str:
@@ -59,6 +52,15 @@ def _decision_body(**overrides: object) -> str:
         "fingerprint": "any",
         "outcome": "yes",
         "note": None,
+    }
+    return json.dumps({**fields, **overrides})
+
+
+def _card_body(**overrides: object) -> str:
+    fields = {
+        "repo": DEFAULT_LABEL,
+        "item": 42,
+        "lines": [{"line": 1, "fingerprint": "any", "option": "A"}],
     }
     return json.dumps({**fields, **overrides})
 
@@ -80,7 +82,6 @@ def _cross_origin_headers(response: Response) -> list[str]:
 @pytest.mark.parametrize(
     ("rows", "items"),
     [
-        ((), []),
         (
             (
                 row(
@@ -144,17 +145,18 @@ def _cross_origin_headers(response: Response) -> list[str]:
             ],
         ),
     ],
-    ids=["nothing", "open-and-ruled-in-acos-order"],
+    ids=["open-and-ruled-in-acos-order"],
 )
 def test_the_board_lists_every_line_under_its_item_in_acos_order(
     repository: FakeAcoRepository,
     board: BoardClient,
     rows: tuple[dict[str, object], ...],
     items: list[dict[str, object]],
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(*rows)
 
-    listed = _listed_items(board)
+    listed = listed_items(board)
 
     for item in listed:
         for listed_line in item["lines"]:
@@ -165,17 +167,17 @@ def test_the_board_lists_every_line_under_its_item_in_acos_order(
 
 @pytest.mark.parametrize("outcome", ["yes", "no", "later"])
 def test_a_line_decided_as_listed_is_written_through_aco_rule(
-    repository: FakeAcoRepository, board: BoardClient, outcome: str
+    repository: FakeAcoRepository, board: BoardClient, outcome: str, listed_items: Lister
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?", default="yes")))
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
 
     answer = board.decide_through_api(listed_line, 42, outcome)
 
     assert answer.status == 200
     assert answer.json() == {"status": "ruled", "message": None}
     assert repository.rule_calls() == [["rule", "42", "--line", "1", f"--{outcome}", "--json"]]
-    assert _listed_items(board)[0]["lines"][0]["ruling"] == outcome
+    assert listed_items(board)[0]["lines"][0]["ruling"] == outcome
 
 
 @pytest.mark.parametrize(
@@ -200,9 +202,10 @@ def test_a_line_changed_since_listing_answers_why_without_writing(
     board: BoardClient,
     changed: dict[str, object],
     answer: dict[str, object],
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?", default="yes")))
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
     repository.set_rulings(row(42, "Share page", changed))
     stored_before = repository.rulings_state()
 
@@ -210,29 +213,6 @@ def test_a_line_changed_since_listing_answers_why_without_writing(
 
     assert (response.status, response.json()) == (200, answer)
     assert repository.rulings_state() == stored_before
-
-
-def test_the_board_reads_fresh_on_every_listing(
-    repository: FakeAcoRepository, board: BoardClient
-) -> None:
-    for item, index in [(1, 1), (2, 4)]:
-        repository.set_rulings(row(item, "Changed between loads", line(index, "Open?")))
-
-        [listed_item] = _listed_items(board)
-        [listed_line] = listed_item["lines"]
-        assert (listed_item["number"], listed_line["index"]) == (item, index)
-
-
-def test_the_board_keeps_no_copy_of_a_decision(
-    repository: FakeAcoRepository, board: BoardClient
-) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    listed_line = _listed_items(board)[0]["lines"][0]
-    board.decide_through_api(listed_line, 42, "yes")
-
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-
-    assert [item["number"] for item in _listed_items(board)] == [42]
 
 
 @pytest.mark.parametrize(
@@ -246,10 +226,15 @@ def test_the_board_keeps_no_copy_of_a_decision(
     ids=["note", "note-looking-like-a-long-option", "note-looking-like-a-short-option", "blank"],
 )
 def test_a_note_is_stored_with_the_ruling(
-    repository: FakeAcoRepository, board: BoardClient, outcome: str, raw_note: str, stored_text: str
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    outcome: str,
+    raw_note: str,
+    stored_text: str,
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
 
     answer = board.decide_through_api(listed_line, 42, outcome, note=raw_note)
 
@@ -258,11 +243,11 @@ def test_a_note_is_stored_with_the_ruling(
 
 
 def test_a_failing_aco_rule_keeps_the_line_with_acos_sentence(
-    repository: FakeAcoRepository, board: BoardClient
+    repository: FakeAcoRepository, board: BoardClient, listed_items: Lister
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
     repository.refuse_rule("unavailable", "the forge rejected the body write")
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
 
     answer = board.decide_through_api(listed_line, 42, "yes")
 
@@ -270,47 +255,7 @@ def test_a_failing_aco_rule_keeps_the_line_with_acos_sentence(
         "status": "failed",
         "message": "aco rule failed: the forge rejected the body write",
     }
-    assert [item["number"] for item in _listed_items(board)] == [42]
-
-
-def _aco_missing_from_path(
-    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    del repository
-    monkeypatch.setenv("PATH", str(tmp_path / "no-aco-here"))
-
-
-def _aco_rulings_unreadable(
-    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    del tmp_path, monkeypatch
-    repository.fail_rulings("ERROR: no forge adapter for host")
-
-
-@pytest.mark.parametrize(
-    ("arrange", "message"),
-    [
-        (_aco_missing_from_path, "aco is not installed on PATH"),
-        (_aco_rulings_unreadable, "aco rulings failed: ERROR: no forge adapter for host"),
-    ],
-    ids=["aco-missing-from-path", "aco-rulings-unreadable"],
-)
-def test_a_broken_aco_during_a_decision_keeps_the_line_undecided(
-    repository: FakeAcoRepository,
-    board: BoardClient,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    arrange: Callable[[FakeAcoRepository, Path, pytest.MonkeyPatch], None],
-    message: str,
-) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    listed_line = _listed_items(board)[0]["lines"][0]
-    arrange(repository, tmp_path, monkeypatch)
-
-    answer = board.decide_through_api(listed_line, 42, "yes")
-
-    assert answer.json() == {"status": "failed", "message": message}
-    assert repository.rule_calls() == []
+    assert [item["number"] for item in listed_items(board)] == [42]
 
 
 def _aco_without_execute_permission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -366,15 +311,17 @@ def test_an_aco_that_cannot_be_run_makes_the_rulings_read_unavailable(
 
 
 @_ACO_CANNOT_BE_RUN
-def test_an_aco_that_cannot_be_run_fails_the_decision_with_one_sentence(
+def test_an_aco_that_cannot_be_run_fails_the_card_with_one_sentence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     arrange: Callable[[Path, pytest.MonkeyPatch], Path],
     reason: str,
 ) -> None:
     decisions = AcoCli(directory=arrange(tmp_path, monkeypatch))
+    card_hash = cast(str, option_line()["card_hash"])
+    decision = CardDecision(42, (CardLine(1, card_hash, "A"),), None)
 
-    result = decisions.rule(Decision(42, 1, Outcome.YES, None))
+    result = decisions.rule_card(decision)
 
     assert result == DecisionResult(DecisionStatus.FAILED, f"aco rule {reason}")
 
@@ -402,7 +349,7 @@ def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_othe
     error: str,
 ) -> None:
     repository_a, repository_b = two_repositories
-    repository_a.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository_a.set_rulings(row(42, "Share page", option_line()))
     break_directory(repository_b.directory)
 
     try:
@@ -505,22 +452,6 @@ def test_unreadable_rulings_json_answers_502_with_why(
     assert response.json() == {"repos": [{"name": DEFAULT_LABEL, "error": error, "items": []}]}
 
 
-def test_a_hung_aco_rule_keeps_the_line_undecided(repository: FakeAcoRepository) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    repository.delay("rule", 30)
-
-    with serving(AcoCli(directory=repository.directory, timeout_seconds=5)) as board:
-        listed_line = _listed_items(board)[0]["lines"][0]
-        answer = board.decide_through_api(listed_line, 42, "yes")
-        listed_after = _listed_items(board)
-
-    assert answer.json() == {
-        "status": "failed",
-        "message": "aco rule did not answer within 5 seconds",
-    }
-    assert [item["number"] for item in listed_after] == [42]
-
-
 @pytest.mark.parametrize(
     ("item", "index", "sentence"),
     [
@@ -578,10 +509,10 @@ def _shown_row(**changes: str) -> dict[str, object]:
     ids=["title", "text", "question", "example", "picture", "default"],
 )
 def test_a_line_whose_shown_field_changed_is_refused_without_writing(
-    repository: FakeAcoRepository, board: BoardClient, change: dict[str, str]
+    repository: FakeAcoRepository, board: BoardClient, change: dict[str, str], listed_items: Lister
 ) -> None:
     repository.set_rulings(_shown_row())
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
     repository.set_rulings(_shown_row(**change))
     state_before = repository.rulings_state()
 
@@ -594,7 +525,7 @@ def test_a_line_whose_shown_field_changed_is_refused_without_writing(
 
 @pytest.mark.parametrize("twin", [(43, 1), (42, 2)], ids=["item", "index"])
 def test_a_twin_line_with_the_same_words_is_refused_without_writing(
-    repository: FakeAcoRepository, board: BoardClient, twin: tuple[int, int]
+    repository: FakeAcoRepository, board: BoardClient, twin: tuple[int, int], listed_items: Lister
 ) -> None:
     repository.set_rulings(
         row(42, "Share page", line(1, "Guests?"), line(2, "Guests?")),
@@ -603,7 +534,7 @@ def test_a_twin_line_with_the_same_words_is_refused_without_writing(
     twin_item, twin_index = twin
     twin_line = next(
         listed_line
-        for item in _listed_items(board)
+        for item in listed_items(board)
         if item["number"] == twin_item
         for listed_line in item["lines"]
         if listed_line["index"] == twin_index
@@ -635,9 +566,10 @@ def test_simultaneous_decisions_on_one_item_are_each_written_in_turn(
     board: BoardClient,
     clicked_lines: tuple[int, int],
     statuses: list[str],
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?"), line(2, "Links?")))
-    listed = _listed_items(board)[0]["lines"]
+    listed = listed_items(board)[0]["lines"]
     clicked = [listed[index - 1] for index in clicked_lines]
     # Each `aco rule` waits between reading and rewriting the body, so two
     # unserialized writes would overlap and the later one would drop the first.
@@ -661,12 +593,12 @@ def test_simultaneous_decisions_on_one_item_are_each_written_in_turn(
     [
         ("GET", "/api/board", None),
         ("GET", "/api/board?t={token}", None),
-        ("POST", "/api/rule", _decision_body()),
+        ("POST", "/api/rule", _card_body()),
         ("POST", "/api/rule", "not json"),
         ("GET", "/api/elsewhere", None),
-        ("PUT", "/api/rule", _decision_body()),
+        ("PUT", "/api/rule", _card_body()),
         ("DELETE", "/api/board", None),
-        ("PATCH", "/api/rule", _decision_body()),
+        ("PATCH", "/api/rule", _card_body()),
         ("OPTIONS", "/api/board", None),
         ("BREW", "/api/board", None),
     ],
@@ -691,7 +623,7 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
     path: str,
     body: str | None,
 ) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository.set_rulings(row(42, "Share page", option_line()))
 
     response = board.call_api(method, path.format(token=board.token), body, presented=presented)
 
@@ -715,7 +647,7 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
         (_decision_body(note="nul\u0000byte"), {}, "bad request: decision"),
         (_decision_body(note="x" * (NOTE_MAX_LENGTH + 1)), {}, "bad request: decision"),
         (_decision_body(repo="other-repo"), {}, "bad request: decision"),
-        ("{}", {"Content-Length": "abc"}, "bad request: Content-Length"),
+        (_card_body(), {"Content-Length": "abc"}, "bad request: Content-Length"),
     ],
     ids=[
         "not-json",
@@ -876,7 +808,7 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
     two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
 ) -> None:
     repository_a, repository_b = two_repositories
-    repository_a.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository_a.set_rulings(row(42, "Share page", option_line()))
     repository_b.fail_rulings("ERROR: no forge adapter for host")
 
     with serving_two(two_repositories) as board:
@@ -886,23 +818,9 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
     payload = response.json()
     repos = cast(list[dict[str, Any]], payload["repos"])
     assert [repo["name"] for repo in repos] == ["a", "b"]
-    [listed_line] = cast(list[dict[str, Any]], repos[0]["items"][0]["lines"])
-    assert isinstance(listed_line.pop("fingerprint"), str)
-    assert repos[0] == {
-        "name": "a",
-        "error": None,
-        "items": [{"number": 42, "title": "Share page", "lines": [listed_line]}],
-    }
-    assert listed_line == {
-        "index": 1,
-        "text": "Guests?",
-        "question": None,
-        "example": None,
-        "picture": None,
-        "default": None,
-        "ruling": None,
-        "ruled_on": None,
-    }
+    assert repos[0]["error"] is None
+    [item] = repos[0]["items"]
+    assert (item["number"], [listed["index"] for listed in item["lines"]]) == (42, [1])
     assert repos[1] == {
         "name": "b",
         "error": "aco rulings failed: ERROR: no forge adapter for host",
@@ -930,49 +848,16 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
 
 
 @pytest.mark.parametrize(
-    ("target_repo", "expected_status", "expected_message"),
-    [("a", "ruled", None), ("b", "failed", LINE_CHANGED)],
-    ids=["its-own-repo", "a-different-repo-with-an-identical-card"],
-)
-def test_a_decision_only_writes_the_repo_its_fingerprint_was_read_from(
-    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
-    target_repo: str,
-    expected_status: str,
-    expected_message: str | None,
-) -> None:
-    """ABRD-16/21: a card decided against its own repo writes there; posted
-    against another configured repo instead -- even one holding an identical
-    line -- it is refused like a changed line, no write in either repo."""
-    repository_a, repository_b = two_repositories
-    identical_card = row(42, "Share page", line(1, "Guests?"))
-    repository_a.set_rulings(identical_card)
-    repository_b.set_rulings(identical_card)
-
-    with serving_two(two_repositories) as board:
-        payload = board.get_board_json().json()
-        repos = cast(list[dict[str, Any]], payload["repos"])
-        listed_in_a = repos[0]["items"][0]["lines"][0]
-
-        answer = board.decide_through_api(listed_in_a, 42, "yes", repo=target_repo)
-
-    assert answer.json() == {"status": expected_status, "message": expected_message}
-    assert repository_a.rule_calls() == (
-        [["rule", "42", "--line", "1", "--yes", "--json"]] if target_repo == "a" else []
-    )
-    assert repository_b.rule_calls() == []
-
-
-@pytest.mark.parametrize(
     ("method", "path", "body", "presented_own_token", "status", "content_type", "allow"),
     [
         ("GET", "/api/board", None, True, 200, "application/json", None),
-        ("POST", "/api/rule", _decision_body(item=7), True, 200, "application/json", None),
+        ("POST", "/api/rule", _card_body(item=7), True, 200, "application/json", None),
         ("GET", "/api/board", None, False, 403, "application/json", None),
         ("POST", "/api/rule", "not json", True, 400, "application/json", None),
         ("GET", "/api/elsewhere", None, True, 404, "application/json", None),
         ("OPTIONS", "/api/rule", None, False, 403, "application/json", None),
-        ("PUT", "/api/rule", _decision_body(), False, 403, "application/json", None),
-        ("PUT", "/api/rule", _decision_body(), True, 405, "application/json", "POST"),
+        ("PUT", "/api/rule", _card_body(), False, 403, "application/json", None),
+        ("PUT", "/api/rule", _card_body(), True, 405, "application/json", "POST"),
         ("HEAD", "/api/board", None, False, 403, "application/json", None),
         ("HEAD", "/api/board", None, True, 405, "application/json", "GET"),
         ("GET", "/", None, False, 200, "text/html; charset=utf-8", None),

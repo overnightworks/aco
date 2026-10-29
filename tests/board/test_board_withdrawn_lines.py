@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, FakeAcoRepository, line, row
+from aco_board_fixtures import BoardClient, FakeAcoRepository, line, option_line, row
 
 
 def _withdrawn(index: int, **keys: object) -> dict[str, object]:
@@ -28,7 +28,7 @@ def test_a_withdrawn_line_is_skipped_and_its_neighbours_keep_their_indexes(
         row(
             12,
             "Song jump",
-            line(1, "Guests?", default="yes"),
+            option_line(index=1, text="Guests?"),
             _withdrawn(2, text=7, unknown={"nested": True}),
             line(3, "Share page?", ruling="yes"),
         )
@@ -49,7 +49,7 @@ def test_an_item_with_only_withdrawn_lines_is_absent(
 ) -> None:
     repository.set_rulings(
         row(12, "Song jump", _withdrawn(1)),
-        row(42, "Share page", line(1, "Guests?", default="yes")),
+        row(42, "Share page", option_line(index=1, text="Guests?")),
     )
 
     repo = _board_repo(board)
