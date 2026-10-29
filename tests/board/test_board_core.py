@@ -13,6 +13,7 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from pathlib import Path
 
 import pytest
 from aco_board_fixtures import FakeAcoRepository, line, option_line, row
@@ -73,6 +74,18 @@ def test_a_decision_after_writes_closed_is_refused_without_writing(
     result = boards.decide(_LABEL, Decision(42, 1, Outcome.YES, None), shown.fingerprint)
     assert result == DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
     assert repository.rule_calls() == []
+
+
+def test_a_decision_is_failed_with_one_sentence_when_aco_cannot_be_run(tmp_path: Path) -> None:
+    not_a_directory = tmp_path / "file"
+    not_a_directory.write_text("")
+    board = Board(AcoCli(directory=not_a_directory))
+
+    result = board.decide_one(Decision(42, 1, Outcome.YES, None), _LABEL, "shown")
+
+    assert result == DecisionResult(
+        DecisionStatus.FAILED, "aco rulings could not be run: Not a directory"
+    )
 
 
 class _HeldDecisions:
