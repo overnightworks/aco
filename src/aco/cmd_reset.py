@@ -1,4 +1,5 @@
 """The `reset` command (`specs/reset.spec.md`)."""
+# ruff: noqa: T201 - the reset command writes its result lines to stdout
 
 from __future__ import annotations
 

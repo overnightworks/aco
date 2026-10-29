@@ -6702,7 +6702,7 @@ def _landing_item_oid(number: int) -> protocol.ObjectId:
     same value seeds both the fake `state_board.StateRefBoard` and the fake store's own
     `ClaimState.items`, so `protocol.LandingIntent`'s CAS agrees with what
     `prepare_landing` reads."""
-    return protocol.ObjectId(hashlib.sha1(f"landing-item-{number}".encode()).hexdigest())
+    return protocol.ObjectId(hashlib.sha1(f"landing-item-{number}".encode()).hexdigest())  # noqa: S324 - a git object id is SHA-1 by definition
 
 
 _LANDING_ITEM_NUMBERS = (10, 11, 13)  # merge (#10), squash (#11, #12), rebase (#13)

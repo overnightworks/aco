@@ -44,6 +44,7 @@ Usage:
     uv run scripts/spec_lint.py --json      # machine-readable
     uv run scripts/spec_lint.py --ci        # exit non-zero on any finding
 """
+# ruff: noqa: T201 - the spec lint writes its findings to stdout
 
 from __future__ import annotations
 

@@ -1,4 +1,5 @@
 """The `start` command (`specs/start.spec.md`)."""
+# ruff: noqa: T201 - the start command writes its result lines to stdout
 
 from __future__ import annotations
 

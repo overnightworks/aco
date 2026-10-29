@@ -610,7 +610,7 @@ def test_a_command_that_needs_no_repository_reads_no_context(
 @pytest.mark.parametrize(
     ("repo", "command", "envelope"),
     [
-        pytest.param("/tmp/x", ["bootstrap"], "", id="absolute-path"),
+        pytest.param("/srv/x", ["bootstrap"], "", id="absolute-path"),
         pytest.param("./x", ["bootstrap"], "", id="relative-path"),
         pytest.param("owner", ["status"], "", id="bare-owner"),
         pytest.param("", ["status"], "", id="empty"),

@@ -1,4 +1,5 @@
 """The `land` command (`specs/land.spec.md`)."""
+# ruff: noqa: T201 - the land command writes its result lines to stdout
 
 from __future__ import annotations
 
@@ -121,7 +122,7 @@ def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str
     failed = _land_failed_check(checks)
     if failed is not None:
         conclusion = failed.conclusion
-        assert conclusion is not None  # `_land_failed_check` only returns a completed check.
+        assert conclusion is not None  # noqa: S101 - `_land_failed_check` only returns a completed check.
         return report.bounded_refusal(
             f"pull request #{number} has non-successful checks: "
             f"{workboard.truncated_display_name(failed.name)} ({conclusion}); "
@@ -639,7 +640,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     detail = _land_read_head_checked(client, number, repository)
     classification: workboard.Classification | None
     if detail.merged:
-        assert detail.merge_commit is not None  # `merged` is true; github.py guarantees this.
+        assert detail.merge_commit is not None  # noqa: S101 - `merged` is true; github.py guarantees this.
         merge_sha = detail.merge_commit
         checkout.refuse_unlandable_checkout(context.default_branch, directory=toplevel)
         # A rerun: this run's own preflight never ran, so it never verified a

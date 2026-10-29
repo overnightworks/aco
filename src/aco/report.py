@@ -1,5 +1,6 @@
 """The CLI's output envelope, refusal rendering (`specs/output.spec.md`) and
 the piped-body reader every stdin-fed command shares."""
+# ruff: noqa: T201 - the one owner of the JSON envelope and the error line
 
 from __future__ import annotations
 

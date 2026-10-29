@@ -1,4 +1,5 @@
 """The `brief` command (`specs/brief.spec.md`)."""
+# ruff: noqa: T201 - the brief command writes its result lines to stdout
 
 from __future__ import annotations
 

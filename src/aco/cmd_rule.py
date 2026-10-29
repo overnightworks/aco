@@ -1,4 +1,5 @@
 """The `rule` command (`specs/rule.spec.md`)."""
+# ruff: noqa: T201 - the rule command writes its result lines to stdout
 
 from __future__ import annotations
 

@@ -1,4 +1,5 @@
 """The `item` command (`specs/item.spec.md`)."""
+# ruff: noqa: T201 - the item command writes its result lines to stdout
 
 from __future__ import annotations
 
