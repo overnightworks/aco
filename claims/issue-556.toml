@@ -1,8 +1,0 @@
-claim_id = "fe6cc45e42bb4124ac43078946a534d8"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "7e0e073453ef1f3277629ce89a8523da8c98732c"
-branch = "claude/issue-556-card-pictures-zero-size"
-scope = ["frontend/src/components/EnlargeablePicture.svelte", "frontend/src/components/EnlargeablePicture.test.ts", "src/aco/board/static"]
-opened_commit = "6097489d4fd01445e51b4ec7dd3965daae96f3bf"
-whole_reason = "One component, its test and the committed build output that CI requires to match it."
