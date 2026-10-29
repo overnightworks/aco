@@ -15,7 +15,7 @@
 "check_status.check" = 19
 
 [file_lines]
-"src/aco/body.py" = 1237
+"src/aco/body.py" = 1235
 "src/aco/checkout.py" = 2025
 "src/aco/cli.py" = 841
 "src/aco/cmd_claim.py" = 1136

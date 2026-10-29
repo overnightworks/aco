@@ -958,7 +958,7 @@ BODY
 exit 2
 ````
 
-With the card's `ruling`, `ruled_on`, `card_hash` and `via` of E-BODY-12 it prints `body ok`, exit `0`: a ruled line is exempt.
+With the `ruling`, `ruled_on` and `via` of E-BODY-12 and its own `card_hash`, `sha256:2fb10d4689bb90d307db918bfdfa9653732a50400136c5bfca201ffa9618c608`, it prints `body ok`, exit `0`: a ruled line is exempt.
 
 ### E-BODY-17 — the day an option line was asked
 
