@@ -19,6 +19,7 @@ from typing import Any, cast
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
+from github_pages import board_issue_page_client, raw_board_issue
 from process_fixtures import UnstoppableProcess, reap
 
 from aco import forge, github, github_graphql, process, workboard
@@ -39,31 +40,6 @@ def test_only_the_github_adapter_speaks_gh_argv() -> None:
     assert len(other_modules) >= 7
     for module in other_modules:
         assert '"gh"' not in module.read_text(), f"{module.name} must not construct a gh argv"
-
-
-def board_issue_page_client(*rows: dict[str, object]) -> GitHubForge:
-    return GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: "\n".join(json.dumps(row) for row in rows),
-    )
-
-
-def raw_board_issue(**overrides: object) -> dict[str, object]:
-    base: dict[str, object] = {
-        "number": 1,
-        "title": "Title",
-        "labels": [],
-        "body": "",
-        "createdAt": "2026-08-20T00:00:00Z",
-        "updatedAt": "2026-08-20T00:00:00Z",
-        "isPullRequest": False,
-        "kind": None,
-        "childrenClosed": None,
-        "childrenTotal": None,
-        "blockedByCount": 0,
-    }
-    base.update(overrides)
-    return base
 
 
 def test_github_adapter_reads_the_native_issue_type_and_sub_issue_counts() -> None:

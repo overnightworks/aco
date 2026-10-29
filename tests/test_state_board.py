@@ -1281,18 +1281,15 @@ def _projected(
     )
 
 
-def _rulings_lines(
-    client: forge.BoardSource, built: workboard.Board, *, storage: Storage
-) -> tuple[str, ...]:
-    bodies = {issue.number: issue.body for issue in client.list_open_board_issues()}
-    rows = cmd_rulings._rulings_rows(built, bodies, storage=storage)
+def _rulings_lines(client: forge.BoardSource, *, storage: Storage) -> tuple[str, ...]:
+    rows = cmd_rulings._rulings_rows(client.list_open_board_issues(), storage=storage)
     return tuple(cmd_rulings._rulings_row_text(row, storage) for row in rows)
 
 
 _EXPECTED_BOARD = _projected(_github_fake(), storage=Storage.GITHUB)
 EXPECTED_BOARD_PAYLOAD = board_payload(_EXPECTED_BOARD)
 EXPECTED_NEXT_ACTION = workboard.next_action(_EXPECTED_BOARD)
-EXPECTED_RULINGS_LINES = _rulings_lines(_github_fake(), _EXPECTED_BOARD, storage=Storage.GITHUB)
+EXPECTED_RULINGS_LINES = _rulings_lines(_github_fake(), storage=Storage.GITHUB)
 # `rulings`' own header line names the item under the pin:
 # `aco-xxxxxx` under state-ref, `#n` unchanged under github -- the same
 # shared scenario re-rendered under each storage, so the only sanctioned
@@ -1300,7 +1297,7 @@ EXPECTED_RULINGS_LINES = _rulings_lines(_github_fake(), _EXPECTED_BOARD, storage
 # expectation.
 EXPECTED_RULINGS_LINES_BY_STORAGE = {
     Storage.GITHUB: EXPECTED_RULINGS_LINES,
-    Storage.STATE_REF: _rulings_lines(_github_fake(), _EXPECTED_BOARD, storage=Storage.STATE_REF),
+    Storage.STATE_REF: _rulings_lines(_github_fake(), storage=Storage.STATE_REF),
 }
 # `state-ref` projects the identical scenario, never `_EXPECTED_BOARD` itself
 # `replace`d: `item.actionable_reason` is now baked
@@ -1387,10 +1384,7 @@ class TestTwoAdapterParity:
 
         assert board_payload(built) == EXPECTED_BOARD_PAYLOAD_BY_STORAGE[storage]
         assert workboard.next_action(built) == EXPECTED_NEXT_ACTION
-        assert (
-            _rulings_lines(client, built, storage=storage)
-            == EXPECTED_RULINGS_LINES_BY_STORAGE[storage]
-        )
+        assert _rulings_lines(client, storage=storage) == EXPECTED_RULINGS_LINES_BY_STORAGE[storage]
 
     @pytest.mark.parametrize(
         ("client_kind", "storage"),

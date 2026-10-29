@@ -130,9 +130,9 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 - [ ] [PIN-14] A read of an `items/<id>.md` entry whose bytes are not valid UTF-8 refuses `item <id> is not valid UTF-8`, then ITEM-38's repair clause.
 - [ ] [PIN-15] A read of an `items/<id>.md` entry with no valid `aco` block and `[record]` refuses `item <id> has a malformed aco block (<defect>)`, then ITEM-38's repair clause (see E-PIN-07).
 - [ ] [PIN-43] PIN-15's `<defect>` shows each display control escaped as NEXT-37 does, in the sentence and in `--json`'s `message`.
-- [ ] [PIN-16] An item whose own `record.parent` names an id no `items/` entry carries refuses `item <parent-id> is referenced as a parent but does not exist`.
-- [ ] [PIN-17] An item whose own `record.blocked_by` names an id no `items/` entry carries refuses `item <item-id> lists blocker <blocker-id>, which does not exist`, naming the listing item as PIN-34 does.
-- [ ] [PIN-34] An item whose own `record.blocked_by` names one id twice refuses ITEM-43's `item <item-id> lists blocker <blocker-id> more than once` (see E-PIN-38).
+- [ ] [PIN-16] An item whose own `record.parent` names an id no `items/` entry carries refuses `item <parent-id> is referenced as a parent but does not exist`, except in `aco rulings` (RUL-21).
+- [ ] [PIN-17] An item whose own `record.blocked_by` names an id no `items/` entry carries refuses `item <item-id> lists blocker <blocker-id>, which does not exist` (as PIN-34), except in `aco rulings` (RUL-21).
+- [ ] [PIN-34] An item whose own `record.blocked_by` names one id twice refuses ITEM-43's `item <item-id> lists blocker <blocker-id> more than once` (see E-PIN-38), except in `aco rulings` (RUL-21).
 - [ ] [PIN-29] While PIN-14/PIN-15 refuse an item, only the `item close` and `item edit --kind` ITEM-53 names, a child as ITEM-54 decides, refuse, lowest id, before any write (E-PIN-07).
 
 ## Writing a fresh state-ref item

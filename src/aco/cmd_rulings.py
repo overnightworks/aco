@@ -4,57 +4,72 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 
-from . import board_read, body, expectation_grammar, expectations, protocol, report, workboard
+from . import body, expectation_grammar, expectations, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
 @dataclass(frozen=True)
 class _RulingsRow:
-    """One `rulings` row: the item, its open/total counts, and every one of
-    its `[[expectation]]` lines (open and already-ruled alike) in block
-    order -- the detail `rulings` prints beneath the item's own summary."""
+    """One `rulings` row: the item's number and title, its open/total counts,
+    and every one of its `[[expectation]]` lines (open and already-ruled
+    alike) in block order -- the detail `rulings` prints beneath the item's
+    own summary."""
 
-    item: workboard.BoardItem
+    number: int
+    title: str
     progress: body.ExpectationProgress
     lines: tuple[expectations.ExpectationLine, ...]
 
+    @property
+    def newest_open_card_day(self) -> date | None:
+        """The day the item's open card was last asked: the newest `asked_on`
+        among its open option lines, `None` when none carries one."""
+        return max(
+            (
+                line.asked_on
+                for line in self.lines
+                if isinstance(line, expectations.OptionLine)
+                and line.ruling is None
+                and line.asked_on is not None
+            ),
+            default=None,
+        )
+
+
+def _rulings_order(row: _RulingsRow) -> tuple[int, int, int]:
+    """RUL-03: rows with a dated open card first, newest day first; then rows
+    whose open lines carry no date; then fully ruled rows; each group by
+    descending number."""
+    day = row.newest_open_card_day
+    if day is not None:
+        return (0, -day.toordinal(), -row.number)
+    return (1 if row.progress.open > 0 else 2, 0, -row.number)
+
 
 def _rulings_rows(
-    projected: workboard.Board, bodies: Mapping[int, str], *, storage: body.Storage
+    issues: Iterable[workboard.Issue], *, storage: body.Storage
 ) -> tuple[_RulingsRow, ...]:
-    """Every open board item that carries at least one `[[expectation]]`
-    line, fully ruled ones included -- items with an open line
-    first, board-ranked then by fewer open lines then issue number,
-    then the fully ruled items in that same
-    order. Each row is paired with its lines read fresh from `bodies` --
-    `projected.items` itself carries only the open/total counters. `storage`
-    is forwarded to `expectations.expectation_lines` unchanged: a state-ref
-    body's `[record]` table must read as a known key, not a malformed one."""
-    ranked = sorted(
-        (
-            (item, item.expectation_progress)
-            for item in projected.items
-            if item.expectation_progress.total > 0
-        ),
-        key=lambda entry: (
-            0 if entry[1].open > 0 else 1,
-            *workboard.board_rank(entry[0])[:2],
-            entry[1].open,
-            entry[0].number,
-        ),
-    )
-    return tuple(
+    """Every readable open item that carries at least one `[[expectation]]`
+    line, fully ruled ones included, in RUL-03's order. An unreadable item is
+    skipped before any parse. `storage` is forwarded to `body.parse_body` and
+    `expectations.expectation_lines` unchanged: a state-ref body's `[record]`
+    table must read as a known key, not a malformed one."""
+    rows = (
         _RulingsRow(
-            item,
-            progress,
-            expectations.expectation_lines(bodies.get(item.number, ""), storage=storage),
+            issue.number,
+            issue.title,
+            body.parse_body(issue.body, storage=storage).expectation_progress,
+            expectations.expectation_lines(issue.body, storage=storage),
         )
-        for item, progress in ranked
+        for issue in issues
+        if issue.unreadable is None
     )
+    return tuple(sorted((row for row in rows if row.progress.total > 0), key=_rulings_order))
 
 
 def _rulings_option_json(option: expectations.CardOption) -> dict[str, object]:
@@ -143,24 +158,22 @@ def _rulings_line_text(line: expectations.ExpectationLine) -> str:
 
 
 def _rulings_row_text(row: _RulingsRow, storage: body.Storage) -> str:
-    label = workboard.item_label(row.item.number, storage)
-    title = protocol.terminal_text(row.item.title)
+    label = workboard.item_label(row.number, storage)
+    title = protocol.terminal_text(row.title)
     header = f"{label} {row.progress.open}/{row.progress.total}: {title}"
     return "\n".join((header, *(_rulings_line_text(line) for line in row.lines)))
 
 
-def _rulings(
-    projected: workboard.Board, bodies: Mapping[int, str], *, as_json: bool, storage: body.Storage
-) -> None:
-    rows = _rulings_rows(projected, bodies, storage=storage)
+def _rulings(issues: Iterable[workboard.Issue], *, as_json: bool, storage: body.Storage) -> None:
+    rows = _rulings_rows(issues, storage=storage)
     if as_json:
         report.emit_json(
             True,
             _RulingsReason.LISTED,
             rulings=[
                 {
-                    "number": row.item.number,
-                    "title": row.item.title,
+                    "number": row.number,
+                    "title": row.title,
                     "open": row.progress.open,
                     "total": row.progress.total,
                     "lines": [_rulings_line_json(line) for line in row.lines],
@@ -192,12 +205,10 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     as_json = parsed.json
     try:
         issues = context.forge.list_open_board_issues()
-        projected = board_read.observed_board(context, issues=issues).board
-        bodies = {issue.number: issue.body for issue in issues}
         storage = context.config.storage
     except RepoMeaninglessUnderStateRefError as error:
         return report.refuse(_RulingsReason.INVALID_USAGE, error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(_RulingsReason.UNAVAILABLE, error, as_json=as_json)
-    _rulings(projected, bodies, as_json=as_json, storage=storage)
+    _rulings(issues, as_json=as_json, storage=storage)
     return 0
