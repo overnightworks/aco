@@ -21,7 +21,7 @@ from aco_board_fixtures import (
     serving_many,
 )
 from board_forge import BoardForge, item_body
-from option_cards import SECOND_CARD, YES_NO_LINE, card, card_head, group_body
+from option_cards import SECOND_CARD, YES_NO_LINE, card, card_head, check_defects, group_body
 
 from aco.board.board import LINE_CHANGED, SHUTTING_DOWN, Board, Boards
 from aco.board.ports import PostedCard, PostedLine
@@ -148,9 +148,11 @@ def test_a_card_post_stores_every_line_in_one_body_write(
     status: str,
     stored: list[tuple[object, ...]],
     show: _Show,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """ABRD-39, ABRD-64, ABRD-70, ABRD-77, RULE-29: a stored ruling also proves
-    aco took the card hash the board sent."""
+    aco took the card hash the board sent, and the stored body passes `aco check`."""
     shown = show(_cards(*_CARDS[:count]))
     indexes = tuple(range(2, 2 + count))
 
@@ -161,6 +163,8 @@ def test_a_card_post_stores_every_line_in_one_body_write(
     assert answered.json() == {"status": status, "message": None}
     assert _stored(repository, indexes) == stored
     assert repository.body_writes() == [_ITEM]
+    monkeypatch.chdir(repository.directory)
+    assert check_defects(capsys, repository.stored_body(_ITEM)) == (0, [])
 
 
 @pytest.mark.parametrize(
