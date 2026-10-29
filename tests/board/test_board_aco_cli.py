@@ -263,8 +263,13 @@ def _fingerprint_of(board: BoardClient, repository: BoardForge, stored: dict[str
 
 @pytest.mark.parametrize(
     "changes",
-    [{"default": "yes"}, {"provenance": "x"}, {"text": "Another wording."}],
-    ids=["default", "unknown-key", "text-not-in-the-hash"],
+    [
+        {"stored_card_hash": "sha256:other"},
+        {"default": "yes"},
+        {"provenance": "x"},
+        {"text": "Another wording."},
+    ],
+    ids=["stored-card-hash", "default", "unknown-key", "text-not-in-the-hash"],
 )
 def test_an_option_lines_fingerprint_ignores_what_its_card_hash_does_not_cover(
     repository: BoardForge, board: BoardClient, changes: dict[str, object]
