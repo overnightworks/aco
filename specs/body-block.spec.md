@@ -41,6 +41,8 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | an open or returned option line keeping them, a ruled line | BODY-100 | — | — |
 | a ruled option line without `asked_on`, and the card hash with or without it | BODY-103 | — | — |
 | a rewrite of a block carrying expectation lines | BODY-88 | — | — |
+| a withdrawn line | BODY-104 | — | — |
+| a withdrawn line defective | BODY-105, BODY-106 | BODY-50 | BODY-52 |
 | `[[slice]]` defective | BODY-43..BODY-48, BODY-65 | BODY-50 | BODY-52 |
 | a `[[slice]]` title holding a display control (`specs/next.spec.md`) | BODY-63 | BODY-64 | BODY-64 |
 | a `[[slice]]` `done_when` holding a display control | BODY-66 | BODY-64 | BODY-64 |
@@ -113,7 +115,8 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 
 ## Option lines
 
-An entry carrying `option` is an option line; any other is a ruled yes/no
+An entry carrying `withdrawn_on` is a withdrawn line (BODY-104..BODY-106);
+otherwise one carrying `option` is an option line; any other is a ruled yes/no
 line, read-only history judged by BODY-26..BODY-42. Its keys, in the order a rewrite
 writes them:
 
@@ -172,7 +175,7 @@ other refusal fired.
   - `ruling`, `ruled_on` and `card_hash`: `body malformed: expectation[0].via: expectation[0] is ruled without via`
   - `via` alone: `body malformed: expectation[0].ruling: expectation[0] carries via without ruling`
 - [ ] [BODY-87] A ruled card edited later prints `body malformed: expectation[0].card_hash: expectation[0] was edited after its ruling; a changed ruling is a new line` until reverted (see E-BODY-13).
-- [ ] [BODY-88] A rewrite writes each present key in the order above, line keys before option tables; it re-reads to the same values, and a second rewrite changes no byte, LF or CRLF.
+- [ ] [BODY-88] A rewrite writes each present key in the order above, `withdrawn_on` right after `text`, line keys before option tables; it re-reads alike, a second rewrite changes no byte, LF or CRLF.
 - [ ] [BODY-89] `card_hash` is `sha256:` and the SHA-256 hex of the shown card's present keys as compact, key-sorted UTF-8 JSON, the option tables under `options` (see E-BODY-10).
 - [ ] [BODY-90] A `via` other than `board`, `chat` or `default` prints `body malformed: expectation[0].via: expectation[0].via must be board, chat, or default`, exit `2` (see E-BODY-12).
 - [ ] [BODY-91] An `other` breaking one rule prints that rule's sentence below, exit `2`; it is checked after the rest of the decided state (see E-BODY-14):
@@ -211,6 +214,17 @@ The card hash belongs to option lines and covers every key listed above except
 the decided state. It never covers the item title, the index, `asked_on`, `ruling`, `ruled_on`,
 `card_hash`, `via`, `other`, `returned_on` or `returned_note`, and it reads parsed values, so TOML quoting, key order and line
 endings cannot change it.
+
+## Withdrawn lines
+
+A head may withdraw a line nobody has ruled: the entry
+keeps its place and its `text` and gains `withdrawn_on`, so every later line
+keeps its index. Inside one entry the refusals print in this order: `text`,
+`withdrawn_on`, then every other key in the order the entry writes them.
+
+- [ ] [BODY-104] An entry of `text` and a local-date `withdrawn_on`, nothing else, prints `body ok`, exit `0`, its index kept; BODY-29..33 and BODY-69..103 do not judge it (see E-BODY-19).
+- [ ] [BODY-105] Any other key beside them prints `body malformed: expectation[0].<key>: expectation[0].<key> does not belong on a withdrawn line`, one per key, exit `2` (see E-BODY-19).
+- [ ] [BODY-106] A `withdrawn_on` that is no TOML local date (a datetime too) prints `body malformed: expectation[0].withdrawn_on: expectation[0].withdrawn_on must be a TOML local date`, exit `2` (see E-BODY-19).
 
 ## `[[slice]]`
 
@@ -1004,4 +1018,43 @@ question = "Ship it now?"
 BODY
 body ok
 exit 0
+````
+
+### E-BODY-19 — a withdrawn line
+
+Setup: bare-remote, `storage = "github"`.
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Asked."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Ship it?"
+withdrawn_on = 2026-10-29
+```
+BODY
+body ok
+exit 0
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Asked."
+next = "Decide it."
+done_when = "It is decided."
+
+[[expectation]]
+text = "Ship it?"
+withdrawn_on = 2026-10-29T10:00:00
+ruling = "yes"
+asked_on = 2026-10-28
+```
+BODY
+2> body malformed: expectation[0].withdrawn_on: expectation[0].withdrawn_on must be a TOML local date
+2> body malformed: expectation[0].ruling: expectation[0].ruling does not belong on a withdrawn line
+2> body malformed: expectation[0].asked_on: expectation[0].asked_on does not belong on a withdrawn line
+exit 2
 ````

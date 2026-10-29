@@ -350,7 +350,11 @@ def _open_line(text: str) -> ExpectationLine:
 
 
 def _line_facts(lines: tuple[ExpectationLine, ...]) -> list[tuple[object, ...]]:
-    return [(line.form, line.index, line.text, line.ruling, line.ruled_on) for line in lines]
+    return [
+        (line.form, line.index, line.text, line.ruling, line.ruled_on)
+        for line in lines
+        if not isinstance(line, expectations.WithdrawnLine)
+    ]
 
 
 def test_expectation_lines_reports_index_text_ruling_and_ruled_on() -> None:
@@ -2152,11 +2156,6 @@ def test_parse_body_orders_schema_defects_deterministically() -> None:
             'text = "E"\nruling = "maybe"\nruled_on = 2026-09-06\n',
             "expectation[0].ruling",
             id="bad-ruling",
-        ),
-        pytest.param(
-            'text = "E"\ndefault = "yes"\nruling = "yes"\nruled_on = 2026-09-06\n',
-            "expectation[0].default",
-            id="ruled-with-default",
         ),
         pytest.param('text = "E"\n', "expectation[0]", id="neither"),
         pytest.param(

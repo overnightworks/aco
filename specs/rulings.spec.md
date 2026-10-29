@@ -21,8 +21,9 @@ it, `<k>` an expectation line's 1-based index.
 | several such items | RUL-03 | RUL-05, RUL-10 |
 | an item whose block is malformed or unreadable | RUL-20 | RUL-20 |
 | a state-ref item whose record link names a missing id, or one blocker twice | RUL-21 | RUL-21 |
-| an item whose every line is already ruled | RUL-01, RUL-04 | RUL-05, RUL-10 |
+| an item whose every line is already ruled or withdrawn | RUL-01, RUL-04 | RUL-05, RUL-10 |
 | a ruled line | RUL-02 | RUL-05, RUL-10, RUL-12 |
+| a withdrawn line | RUL-22 | RUL-23 |
 | a line's `question`/`example`/`picture` | — | RUL-06 |
 | an option line, open or ruled | RUL-02 | RUL-10, RUL-12, RUL-13, RUL-14, RUL-15, RUL-19 |
 | an option line ruled `other` | RUL-02, RUL-16 | RUL-16 |
@@ -32,11 +33,12 @@ it, `<k>` an expectation line's 1-based index.
 
 ## Rows and lines
 
-- [ ] [RUL-01] Each listed item prints one header, `<label> <open>/<total>: <title>`, then one line per expectation entry -- ruled ones too -- in block order (see E-RUL-01, E-RUL-05).
+- [ ] [RUL-01] Each listed item prints one header, `<label> <open>/<total>: <title>`, then one line per expectation entry -- ruled or withdrawn ones too -- in block order (see E-RUL-01, E-RUL-05).
 - [ ] [RUL-02] An open line prints `  <k> open: <summary>`, ruled `  <k> ruled <outcome> <date>: <summary>`, `<outcome>` a letter, `other`, `yes`, `no`, `later`; `<summary>` caps at 100, `…` if cut (see E-RUL-01).
 - [ ] [RUL-11] Text shows `<title>` and `<summary>` with each display control escaped (NEXT-37), `<summary>` after its cap; `--json` carries both as stored.
 - [ ] [RUL-03] Rows with a dated open option line come first, newest `asked_on` first; then fully ruled rows (RUL-04); ties and groups by descending `<n>` (see E-RUL-02).
-- [ ] [RUL-04] An item whose every expectation line is already ruled is listed, in both text and `--json`, in the fully-ruled group RUL-03 orders last (see E-RUL-02, E-RUL-05).
+- [ ] [RUL-04] An item whose every expectation line is already ruled or withdrawn is listed, in text and `--json`, in the fully-ruled group RUL-03 orders last (see E-RUL-02, E-RUL-05, E-RUL-08).
+- [ ] [RUL-22] A withdrawn line prints `  <k> withdrawn <date>: <summary>`, capped and escaped as RUL-02 and RUL-11; it counts in `<total>`, never in `<open>` (see E-RUL-08).
 - [ ] [RUL-20] An item whose block is malformed, or which the store cannot read (PIN-14, PIN-15), is listed in neither text nor `--json`.
 - [ ] [RUL-21] Under `storage = "state-ref"`, `aco rulings` validates no record link: a missing `record.parent`/`blocked_by` id or a doubled blocker still lists the item; a foreign file name refuses (PIN-36).
 
@@ -53,6 +55,7 @@ it, `<k>` an expectation line's 1-based index.
 - [ ] [RUL-17] An option line carries `"returned_on"` and `"returned_note"` after `"other"`: its date and note while with its head, else `null`; a yes/no line never carries them (see E-RUL-07).
 - [ ] [RUL-18] Text prints a line with its head `  <k> with head <date>: <summary>`, `<summary>` its note, else its text, capped and escaped as RUL-02 and RUL-11; it still counts as open (see E-RUL-07).
 - [ ] [RUL-19] An option line carries `"asked_on"` right after `"text"`: the day its head asked it (aco never writes it), `null` only on a ruled line stored without it; a yes/no line never has it (E-RUL-07).
+- [ ] [RUL-23] A withdrawn line is exactly `{"index", "form": "withdrawn", "text", "withdrawn_on"}`; it never carries `ruling`, which would read as open (see E-RUL-08).
 
 An option line's keys after `returned_note` are `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`,
@@ -226,3 +229,18 @@ Ruled `other` on 2026-10-28 with `via = "chat"` and `other = "Only on desktop."`
 and carries `"ruling": "other"`, `"via": "chat"` and `"other": "Only on desktop."`.
 Sent back to its head on 2026-10-28 with the note `Was kostet B?`, it prints `  1 with head 2026-10-28: Was kostet B?`
 and carries `"ruling": null`, `"returned_on": "2026-10-28"` and `"returned_note": "Was kostet B?"`; the header still counts it open.
+
+### E-RUL-08 — a withdrawn line
+
+Setup: bare-remote, fake `gh`, issue `#13` "Withdrawn question" open, its line 1 a yes/no line ruled `yes` on 2026-09-19, its line 2 `text = "Ship it?"` with `withdrawn_on = 2026-10-29`
+
+```console
+$ aco rulings
+#13 0/2: Withdrawn question
+  1 ruled yes 2026-09-19: Settled decision 0.
+  2 withdrawn 2026-10-29: Ship it?
+exit 0
+$ aco rulings --json
+{"ok": true, "reason": "listed", "rulings": [{"number": 13, "title": "Withdrawn question", "open": 0, "total": 2, "lines": [{"index": 1, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19"}, {"index": 2, "form": "withdrawn", "text": "Ship it?", "withdrawn_on": "2026-10-29"}]}]}
+exit 0
+```

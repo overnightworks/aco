@@ -49,6 +49,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 | `--other`, `--note` or `--via` given twice | RULE-35 | RULE-09 | — |
 | line `N` is a yes/no line, `--option`, `--other` or `--unclear` | RULE-16 | RULE-09 | — |
 | its card changed since it was shown | RULE-17 | RULE-09 | — |
+| line `N` was withdrawn by its head | RULE-37 | RULE-09 | — |
 | `--option` names a letter not on the card | RULE-18 | RULE-09 | — |
 | `--via default` names another letter than the recommended one | RULE-19 | RULE-09 | — |
 | item does not exist | RULE-07 | RULE-09 | — |
@@ -77,7 +78,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 ## Refusals this command owns
 
 - [ ] [RULE-04] `--line N` naming an already-ruled entry refuses `line <k> is already ruled; a changed ruling is a new line`, exit `2`, before any write (see E-RULE-03).
-- [ ] [RULE-05] `--line N` outside the item's own expectation lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write (see E-RULE-04).
+- [ ] [RULE-05] `--line N` outside the item's own expectation lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write (see E-RULE-04); `<m>` counts withdrawn lines.
 - RULE-06 (retired 27.10.2026): the refusal for a forge that cannot write the item body went with the forge capability table, which no adapter ever answered `UNSUPPORTED` for the body write (audit #331 finding 17).
 - [ ] [RULE-07] An item no reference resolves refuses `#<n> does not exist`, exit `2`, before any write.
 - [ ] [RULE-08] An item that is a pull request refuses `#<n> is a pull request, not an issue; rule needs an issue`, exit `2`, before any write.
@@ -101,13 +102,14 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 - [ ] [RULE-26] A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
 - [ ] [RULE-27] `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-28] A MALFORMED item body refuses `#<n> <body defect sentence>; rule needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref` (see E-OUT-02).
-- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 24, 26..28, 33..35) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
+- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 24, 26..28, 33..35, 37) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
 - [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `brief`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
 - [ ] [RULE-33] A `--line` naming a line an earlier `--line` named refuses `line <k> is named twice`, exit `2`, before any forge call, after RULE-35 (see E-RULE-13).
 - [ ] [RULE-34] A misplaced `--option` or `--card-hash` refuses its sentence below, exit `2`, before any forge call, after RULE-35; it and RULE-33 judge the flags in the order written (see E-RULE-13):
   - with several `--line`, one written before the first `--line`: `<flag> before the first --line belongs to no line`
   - a second one for the same line, with one `--line` too: `line <k> has a second <flag>`; `--line 2 --option A --option B` refuses `line 2 has a second --option`
 - [ ] [RULE-35] A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call and any other refusal of this file (see E-RULE-13).
+- [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 
 `reason`, by which refusal fired:
@@ -118,7 +120,7 @@ under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` na
 | RULE-05 (out of range) | `line_out_of_range` |
 | RULE-07 (missing item), RULE-08 (pull-request target), RULE-28 (malformed body) | `invalid_item` |
 | RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter), RULE-33 (a line named twice), RULE-34 (a misplaced `--option` or `--card-hash`), RULE-35 (a flag given twice) | `invalid_usage` |
-| RULE-17 (the card changed) | `card_changed` |
+| RULE-17 (the card changed), RULE-37 (the line was withdrawn) | `card_changed` |
 | RULE-24 (already with its head), RULE-27 (`--via default` on such a line) | `with_head` |
 | RULE-11 (the write itself fails) | `unavailable` |
 
@@ -384,3 +386,20 @@ exit 0
 ```
 
 Both lines carry the one text and lose `returned_on` and `returned_note` (RULE-25).
+
+### E-RULE-15 — a withdrawn line refuses before any write
+
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with a ruled yes/no line 1, a withdrawn line 2 and an open option line 3
+
+```console
+$ aco rule <item-id> --line 2 --option A --via chat --card-hash <hash>
+2> ERROR: line 2 was withdrawn by its head
+exit 2
+$ aco rule <item-id> --line 2 --unclear --card-hash <hash> --json
+2> ERROR: line 2 was withdrawn by its head
+{"ok": false, "reason": "card_changed", "message": "line 2 was withdrawn by its head"}
+exit 2
+$ aco rule <item-id> --line 3 --option A --via chat --card-hash <hash>
+RULED <item-id> line 3 A; 0 line(s) still open
+exit 0
+```

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
 from typing import cast
@@ -154,21 +154,23 @@ def _refuse_a_repeated_shared_flag(given: Sequence[_GivenFlag]) -> None:
 
 
 def _store_a_line_flag(
-    flags_of: dict[int, dict[str, str]], owner: int | None, flag: _GivenFlag
+    flags_of: dict[int, _NamedLine], owner: int | None, flag: _GivenFlag
 ) -> None:
     if owner is None:
         raise FlagCombinationError(f"{flag.name} before the first --line belongs to no line")
-    if flag.name in flags_of[owner]:
+    line, value = flags_of[owner], cast(str, flag.value)
+    is_option = flag.name == _OPTION
+    if (line.option if is_option else line.card_hash) is not None:
         raise FlagCombinationError(f"line {owner} has a second {flag.name}")
-    flags_of[owner][flag.name] = cast(str, flag.value)
+    flags_of[owner] = replace(line, option=value) if is_option else replace(line, card_hash=value)
 
 
-def _flags_of_each_line(given: Sequence[_GivenFlag]) -> dict[int, dict[str, str]]:
-    """Each named line's `--option` and `--card-hash`: with several `--line` the
-    ones written after it, with one `--line` wherever they stand. Refuses in
+def _flags_of_each_line(given: Sequence[_GivenFlag]) -> dict[int, _NamedLine]:
+    """Each named line with its `--option` and `--card-hash`: with several `--line`
+    the ones written after it, with one `--line` wherever they stand. Refuses in
     written order what pairs with no line or twice (RULE-33, RULE-34)."""
     indexes = [cast(int, flag.value) for flag in given if flag.name == _LINE]
-    flags_of: dict[int, dict[str, str]] = {index: {} for index in indexes}
+    flags_of = {index: _NamedLine(index, None, None) for index in indexes}
     owner = indexes[0] if len(indexes) == 1 else None
     named: set[int] = set()
     for flag in given:
@@ -184,10 +186,7 @@ def _flags_of_each_line(given: Sequence[_GivenFlag]) -> dict[int, dict[str, str]
 
 
 def _named_lines(given: Sequence[_GivenFlag]) -> tuple[_NamedLine, ...]:
-    lines = tuple(
-        _NamedLine(index, flags.get(_OPTION), flags.get(_CARD_HASH))
-        for index, flags in _flags_of_each_line(given).items()
-    )
+    lines = tuple(_flags_of_each_line(given).values())
     if len(lines) > 1:
         _refuse_a_line_without_its_own_flags(lines)
     return lines
@@ -270,7 +269,7 @@ def _line_outcomes(parsed: argparse.Namespace) -> tuple[decide.LineOutcome, ...]
 
 def _emit_rule_result(
     number: int,
-    lines: Sequence[expectations.ExpectationLine],
+    lines: Sequence[expectations.OptionLine],
     open_remaining: int,
     storage: body.Storage,
     *,
@@ -335,6 +334,7 @@ _REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _RuleReason], ...] = (
     (expectations.ExpectationAlreadyRuledError, _RuleReason.ALREADY_RULED),
     (expectations.ExpectationOutOfRangeError, _RuleReason.LINE_OUT_OF_RANGE),
     (expectations.ExpectationCardChangedError, _RuleReason.CARD_CHANGED),
+    (expectations.ExpectationWithdrawnError, _RuleReason.CARD_CHANGED),
     (expectations.ExpectationLineFormError, _RuleReason.INVALID_USAGE),
     (expectations.ExpectationWithHeadError, _RuleReason.WITH_HEAD),
     (expectations.ExpectationOptionChoiceError, _RuleReason.INVALID_USAGE),
@@ -357,12 +357,15 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
     number = int(parsed.item)
     fresh = decide.fresh_item(context, number)
     committed = decide.rule(context, fresh, named, context.today())
-    ruled = tuple(committed.lines[line.index - 1] for line in named)
+    # A successful write names only option lines: every other form refused before it.
+    ruled = cast(
+        tuple[expectations.OptionLine, ...],
+        tuple(committed.lines[line.index - 1] for line in named),
+    )
     open_remaining = committed.open_remaining
     storage = fresh.storage
     if isinstance(named[0].outcome, expectations.HeadReturn):
-        returned = cast(tuple[expectations.OptionLine, ...], ruled)
-        _emit_returned_result(number, returned, open_remaining, storage, as_json=parsed.json)
+        _emit_returned_result(number, ruled, open_remaining, storage, as_json=parsed.json)
     else:
         _emit_rule_result(number, ruled, open_remaining, storage, as_json=parsed.json)
     return 0

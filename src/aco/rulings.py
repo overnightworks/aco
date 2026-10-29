@@ -39,9 +39,9 @@ class Row:
 
 
 def _order(row: Row) -> tuple[int, int, int]:
-    """RUL-03: rows with a dated open card first, newest day first; then fully
-    ruled rows; each group by descending number. Every open line is an option
-    line asked on a day, so a row without one is fully ruled."""
+    """RUL-03: rows with a dated open card first, newest day first; then rows
+    fully ruled or withdrawn; each group by descending number. Every open line
+    is an option line asked on a day, so a row without one has none open."""
     day = row.newest_open_card_day
     if day is not None:
         return (0, -day.toordinal(), -row.number)
@@ -112,9 +112,17 @@ def _yes_no_card_json(line: expectations.YesNoLine) -> dict[str, object]:
 
 
 def line_json(line: expectations.ExpectationLine) -> dict[str, object]:
-    """RUL-10, RUL-12..RUL-17, RUL-19: a yes/no line keeps its original keys; an option line
-    adds `form`, `asked_on`, the current and the stored card hash, how it was decided,
-    whether it is with its head, then its card."""
+    """RUL-10, RUL-12..RUL-17, RUL-19, RUL-23: a yes/no line keeps its original keys; an
+    option line adds `form`, `asked_on`, the current and the stored card hash, how it was
+    decided, whether it is with its head, then its card; a withdrawn line carries no
+    `ruling` key, which would read as open."""
+    if isinstance(line, expectations.WithdrawnLine):
+        return {
+            "index": line.index,
+            "form": line.form.value,
+            "text": line.text,
+            expectation_grammar.WITHDRAWN_ON: line.withdrawn_on.isoformat(),
+        }
     shared = {
         "index": line.index,
         "text": line.text,
