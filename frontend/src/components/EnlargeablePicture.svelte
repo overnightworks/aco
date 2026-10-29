@@ -1,3 +1,17 @@
+<script module lang="ts">
+	const ROOT_TAG = /^\s*<svg\b[^>]*>/;
+	const VIEW_BOX = /\sviewBox=["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/;
+	const OWN_SIZE = /\s(?:width|height)\s*=/;
+
+	/** A root <svg> with a viewBox and no width or height has no size of its own, so its image would resolve to 0x0. */
+	function viewBoxSize(svg: string): { width?: string; height?: string } | undefined {
+		const rootTag = ROOT_TAG.exec(svg)?.[0];
+		if (rootTag === undefined || OWN_SIZE.test(rootTag)) return undefined;
+		const match = VIEW_BOX.exec(rootTag);
+		return match ? { width: match[1], height: match[2] } : undefined;
+	}
+</script>
+
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { pictureDataUri } from '../app/model/boardSummary';
@@ -12,6 +26,7 @@
 
 	let dialog: HTMLDialogElement | undefined = $state();
 	let isOpen = $state(false);
+	const size = $derived(viewBoxSize(picture));
 
 	async function enlarge() {
 		isOpen = true;
@@ -28,7 +43,7 @@
 		aria-label={PICTURE_LABEL.enlarge}
 		onclick={enlarge}
 	>
-		<img src={pictureDataUri(picture)} {alt} />
+		<img src={pictureDataUri(picture)} {alt} width={size?.width} height={size?.height} />
 		{#if thumbnail}
 			<svg class="mark" aria-hidden="true" viewBox="0 0 22 22" width="22" height="22">
 				<path
@@ -52,7 +67,7 @@
 	>
 		{#if isOpen}
 			<div class="big">
-				<img src={pictureDataUri(picture)} {alt} />
+				<img src={pictureDataUri(picture)} {alt} width={size?.width} height={size?.height} />
 			</div>
 			<p class="caption">{alt}</p>
 			<div class="actions">
