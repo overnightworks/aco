@@ -3,9 +3,9 @@ on PATH, and the real board server running against it."""
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from aco_board_fixtures import (
@@ -33,6 +33,21 @@ def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeAcoReposi
 def board(repository: FakeAcoRepository) -> Iterator[BoardClient]:
     with serving(AcoCli(directory=repository.directory)) as client:
         yield client
+
+
+@pytest.fixture
+def listed_items() -> Callable[[BoardClient], list[dict[str, Any]]]:
+    """Reads the items one board lists for its single repository, checking the listing succeeded."""
+
+    def read(board: BoardClient) -> list[dict[str, Any]]:
+        response = board.get_board_json()
+        assert response.status == 200
+        [repo] = cast(list[dict[str, Any]], response.json()["repos"])
+        assert repo["name"] == board.repo
+        assert repo["error"] is None
+        return cast(list[dict[str, Any]], repo["items"])
+
+    return read
 
 
 @pytest.fixture

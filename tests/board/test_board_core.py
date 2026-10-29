@@ -13,6 +13,7 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from pathlib import Path
 
 import pytest
 from aco_board_fixtures import FakeAcoRepository, line, option_line, row
@@ -22,10 +23,12 @@ from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
     CardDecision,
+    CardLine,
     Decision,
     DecisionResult,
     DecisionStatus,
     ExpectationLine,
+    OptionLine,
     Outcome,
     PostedCard,
     PostedLine,
@@ -73,6 +76,18 @@ def test_a_decision_after_writes_closed_is_refused_without_writing(
     assert repository.rule_calls() == []
 
 
+def test_a_decision_is_failed_with_one_sentence_when_aco_cannot_be_run(tmp_path: Path) -> None:
+    not_a_directory = tmp_path / "file"
+    not_a_directory.write_text("")
+    board = Board(AcoCli(directory=not_a_directory))
+
+    result = board.decide_one(Decision(42, 1, Outcome.YES, None), _LABEL, "shown")
+
+    assert result == DecisionResult(
+        DecisionStatus.FAILED, "aco rulings could not be run: Not a directory"
+    )
+
+
 class _HeldDecisions:
     """A `DecisionPort` whose first ruling stays inside its write until released."""
 
@@ -99,6 +114,23 @@ class _HeldDecisions:
         return DecisionResult(DecisionStatus.RULED)
 
 
+def _card_held_in(
+    repository: FakeAcoRepository, label: str, item: int = 7
+) -> tuple[_HeldDecisions, PostedCard]:
+    """A held port that reads item `item`'s one option line, and that card posted for `label`."""
+    repository.set_rulings(row(item, "Karte", option_line()))
+    [shown] = Board(AcoCli(directory=repository.directory)).snapshot().lines
+    decisions = _HeldDecisions()
+    decisions.lines = (shown,)
+    posted = PostedCard(item, (PostedLine(shown.index, wire_fingerprint(label, shown), "A"),), None)
+    return decisions, posted
+
+
+def _card_waiting_for_its_turn(item: int) -> PostedCard:
+    """A card that is refused for the stopped turn before it is ever read."""
+    return PostedCard(item, (PostedLine(1, "shown", "A"),), None)
+
+
 def _signal_when_a_decision_waits_for_its_turn(
     boards: Boards, monkeypatch: pytest.MonkeyPatch
 ) -> threading.Event:
@@ -120,20 +152,20 @@ def _signal_when_a_decision_waits_for_its_turn(
 
 
 def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
-    monkeypatch: pytest.MonkeyPatch,
+    repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ABRD-17/18: one write turn spans every configured repo, and a staged,
+    """ABRD-17/18/77: one write turn spans every configured repo, and a staged,
     event-driven drain refuses a still-waiting decision the moment stopping
     begins, without waiting for the decision already being written."""
-    decisions = _HeldDecisions()
+    decisions, running = _card_held_in(repository, _LABEL)
     boards = Boards({_LABEL: Board(decisions)})
     waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
-    running, waiting = Decision(42, 1, Outcome.YES, None), Decision(42, 2, Outcome.NO, None)
+    waiting = _card_waiting_for_its_turn(8)
 
     with ThreadPoolExecutor(max_workers=3) as threads:
-        running_answer = threads.submit(boards.decide, _LABEL, running, "shown")
+        running_answer = threads.submit(boards.decide_card, _LABEL, running)
         assert decisions.writing.wait(_WAIT_SECONDS)
-        waiting_answer = threads.submit(boards.decide, _LABEL, waiting, "shown")
+        waiting_answer = threads.submit(boards.decide_card, _LABEL, waiting)
         assert waiting_for_turn.wait(_WAIT_SECONDS)
         stopping = threads.submit(boards.close_writes)
 
@@ -147,56 +179,32 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
         stopping.result(_WAIT_SECONDS)
 
     assert running_answer.result().status is DecisionStatus.RULED
-    assert decisions.ruled == [running]
-
-
-def test_a_card_write_holds_the_turn_against_a_decision_waiting_behind_it(
-    repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """ABRD-17, ABRD-18, ABRD-77: a card is written inside the one turn, and stopping
-    refuses what waits behind it while the card write still completes."""
-    repository.set_rulings(row(7, "Karte", option_line(index=2)))
-    decisions = _HeldDecisions()
-    [shown] = Board(AcoCli(directory=repository.directory)).snapshot().lines
-    decisions.lines = (shown,)
-    boards = Boards({_LABEL: Board(decisions)})
-    waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
-    posted = PostedCard(7, (PostedLine(2, wire_fingerprint(_LABEL, shown), "A"),), None)
-
-    with ThreadPoolExecutor(max_workers=3) as threads:
-        running_card = threads.submit(boards.decide_card, _LABEL, posted)
-        assert decisions.writing.wait(_WAIT_SECONDS)
-        waiting_answer = threads.submit(
-            boards.decide, _LABEL, Decision(7, 1, Outcome.YES, None), "shown"
+    [shown] = decisions.lines
+    assert isinstance(shown, OptionLine)
+    assert decisions.ruled_cards == [
+        CardDecision(
+            running.item,
+            (CardLine(shown.index, shown.card_hash, running.lines[0].letter),),
+            None,
         )
-        assert waiting_for_turn.wait(_WAIT_SECONDS)
-        stopping = threads.submit(boards.close_writes)
-
-        assert waiting_answer.result(_WAIT_SECONDS) == DecisionResult(
-            DecisionStatus.FAILED, SHUTTING_DOWN
-        )
-        decisions.may_finish.set()
-        stopping.result(_WAIT_SECONDS)
-
-    assert running_card.result().status is DecisionStatus.RULED
-    assert [card.item for card in decisions.ruled_cards] == [7]
+    ]
 
 
 def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(
-    monkeypatch: pytest.MonkeyPatch,
+    repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """ABRD-17: the write turn is global, not per repo -- a decision for repo
     B waits while repo A's decision is being written, even though the two
     repos never touch the same state."""
-    decisions_a, decisions_b = _HeldDecisions(), _HeldDecisions()
+    decisions_a, card_in_a = _card_held_in(repository, "a")
+    decisions_b, card_in_b = _card_held_in(repository, "b")
     boards = Boards({"a": Board(decisions_a), "b": Board(decisions_b)})
     waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
-    decision = Decision(1, 1, Outcome.YES, None)
 
     with ThreadPoolExecutor(max_workers=2) as threads:
-        running_in_a = threads.submit(boards.decide, "a", decision, "shown")
+        running_in_a = threads.submit(boards.decide_card, "a", card_in_a)
         assert decisions_a.writing.wait(_WAIT_SECONDS)
-        waiting_in_b = threads.submit(boards.decide, "b", decision, "shown")
+        waiting_in_b = threads.submit(boards.decide_card, "b", card_in_b)
         assert waiting_for_turn.wait(_WAIT_SECONDS)
 
         assert not waiting_in_b.done()
