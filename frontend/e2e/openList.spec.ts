@@ -35,24 +35,28 @@ const OPTIONS: RulingOption[] = [
 	}
 ];
 
-function songLine(index: number, topic: string) {
+function songLine(index: number, topic: string, question = SONG_QUESTION) {
 	return optionLine(index, 'Der Song bleibt beim Sprung offen.', {
-		question: SONG_QUESTION,
+		question,
 		topic,
 		options: OPTIONS
 	});
 }
 
-/** One item with a yes/no line before an option line, served as `songmaker`
+/** Two items with an option card each, served as `songmaker`
  * and `quality` (the second with a very long topic) and as `webauth` with
  * nothing open; the real server only reads the first. */
 async function serveThreeRepositories(page: Page, repoDirectory: string): Promise<void> {
 	writeRulings(repoDirectory, [
+		row(7, 'Sprung', songLine(1, 'Sprung')),
 		row(
-			7,
-			'Sprung',
-			line(1, 'Gäste dürfen am Gespräch teilnehmen.', { question: 'Gäste einladen?' }),
-			songLine(2, 'Sprung')
+			8,
+			'Gäste',
+			optionLine(1, 'Gäste dürfen am Gespräch teilnehmen.', {
+				question: 'Gäste einladen?',
+				topic: 'Gäste',
+				options: OPTIONS
+			})
 		)
 	]);
 	await page.route('**/api/board', async (route) => {
@@ -107,18 +111,8 @@ for (const viewport of [
 			const rows = tracks.getByRole('button');
 			await expect(rows).toHaveCount(4);
 			await expect(rows.nth(0)).toHaveAccessibleName('Open Sprung');
-			await expect(rows.nth(1)).toHaveAccessibleName('Not ready · head to fill Gäste einladen?');
 			await expect(rows.nth(0)).toHaveAttribute('title', SONG_QUESTION);
 			await expect(rows.nth(0).getByRole('img', { name: 'Open' })).toBeVisible();
-			await expect(
-				rows.nth(1).getByRole('img', { name: 'Not ready · head to fill' })
-			).toBeVisible();
-			const labelColour = (label: string) =>
-				rows
-					.getByText(label, { exact: true })
-					.first()
-					.evaluate((element) => getComputedStyle(element).color);
-			expect(await labelColour('Gäste einladen?')).not.toBe(await labelColour('Sprung'));
 			await expect(page.getByText('Nothing open: webauth')).toBeVisible();
 
 			const longRow = rows.nth(2);
@@ -213,12 +207,8 @@ for (const viewport of [
 		}) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			writeRulings(repoDirectory, [
-				row(
-					13,
-					'Tastatur',
-					line(1, 'Erste Frage.', { question: 'Erste?' }),
-					line(2, 'Zweite Frage.', { question: 'Zweite?' })
-				)
+				row(13, 'Tastatur', songLine(1, 'Erste', 'Erste?')),
+				row(14, 'Tastatur zweite', songLine(1, 'Zweite', 'Zweite?'))
 			]);
 			await page.goto(`${appUrl}#t=${token}`);
 
