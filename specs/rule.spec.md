@@ -4,7 +4,7 @@
 `aco rule ITEM --line N --other TEXT --via board|chat --card-hash HASH`, or
 `aco rule ITEM --line N --unclear [--note TEXT] --card-hash HASH`, moves one
 proposed `[[expectation]]` line to ruled (or, with `--unclear`, sends an open
-option line back to its head), transcribing the operator's own word (a head proposes by editing the body; this command decides); `--line` may repeat to rule several lines of one item in one body write, all or none. `--via` says how the
+option line back to its head), transcribing the operator's own word (a head proposes by editing the body and withdraws with `aco withdraw`; this command decides); `--line` may repeat to rule several lines of one item in one body write, all or none. `--via` says how the
 decision reached aco: `board` the operator clicked, `chat` a head transcribes
 his word, `default` he left the card unanswered and its recommendation stands.
 `--help` lists every flag here, `--unclear` included, each with a help line. A yes/no line cannot be ruled by this command. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This CLI invocation is the
@@ -21,7 +21,8 @@ envelope itself (OUT-nn: key order, `ok`, `message`); this file names only
 owns the state-ref forge gate (PIN-04) `rule` shares with `brief`; this file cites it rather than restating it. `<n>` is the item's
 own number, a printed `#<n>` its `storage = "github"` form and the item id
 under `storage = "state-ref"` (PIN-30); `<k>` the 1-based line index `--line` names, the same index
-`rulings` prints.
+`rulings` prints. `<m>` in a success line counts the open lines left, never a
+withdrawn one.
 
 ## Behavior table
 
