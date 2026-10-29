@@ -500,9 +500,8 @@ def test_aco_failing_with_only_stderr_is_relayed_with_that_sentence(
     response = board.get_board_json()
 
     assert response.status == 502
-    assert response.json()["repos"][0]["error"] == (
-        "aco rulings failed: ERROR: no forge adapter for host"
-    )
+    error = _repos(response)[0]["error"]
+    assert error == "aco rulings failed: ERROR: no forge adapter for host"
 
 
 def test_a_hung_aco_rulings_answers_502_with_its_timeout(repository: BoardForge) -> None:
