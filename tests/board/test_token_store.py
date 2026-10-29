@@ -115,7 +115,27 @@ def test_board_token_leaves_no_temporary_file_behind(tmp_path: Path) -> None:
     path = tmp_path / "aco" / "board-token"
 
     board_token(path)
+    board_token(path)
 
+    assert [entry.name for entry in path.parent.iterdir()] == ["board-token"]
+
+
+def test_board_token_returns_the_token_a_concurrent_first_start_stored_meanwhile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "aco" / "board-token"
+    winner = "w" * 43
+    real_link = os.link
+
+    def link_after_the_winner_stored_its_token(source: Path, target: Path) -> None:
+        target.write_text(winner)
+        real_link(source, target)
+
+    monkeypatch.setattr(os, "link", link_after_the_winner_stored_its_token)
+
+    token = board_token(path)
+
+    assert token == winner
     assert [entry.name for entry in path.parent.iterdir()] == ["board-token"]
 
 
