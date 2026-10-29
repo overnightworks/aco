@@ -1,0 +1,8 @@
+claim_id = "f5d8c4215b694182a0d2b2e6b95c6fd0"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "45b5f57d6d05deab648a373fbefbaee206e9d8da"
+branch = "claude/issue-576-test-helper-owner"
+scope = ["specs/storage-pin.spec.md", "tests/board/conftest.py", "tests/conftest.py", "tests/test_body_local_date_refusals.py", "tests/test_body_option_line_rewrites.py", "tests/test_cmd_check_option_lines.py", "tests/test_cmd_cut.py", "tests/test_cmd_next_blocked_container.py", "tests/test_cmd_next_live_claims.py", "tests/test_cmd_next_reopened_recovery.py", "tests/test_cmd_next_with_head.py", "tests/test_cmd_rule.py", "tests/test_cmd_rule_option.py", "tests/test_cmd_rule_other.py", "tests/test_cmd_rule_unclear.py", "tests/test_cmd_rulings.py", "tests/test_cmd_rulings_state_ref.py", "tests/test_expectation_grammar_asked_on.py", "tests/test_state_board.py"]
+opened_commit = "f92e7477a84e3a1d2e83b3293ba792e71d751f98"
+whole_reason = "One test-helper owner: removing the fixture copies touches each of its modules, and the other three findings are wording in files the same lane already reads."
