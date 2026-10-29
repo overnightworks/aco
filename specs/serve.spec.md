@@ -201,9 +201,7 @@ in that directory (E-ABRD-02 through E-ABRD-05: `--repo` not given, so the
 one repo is labelled by that directory's name) and each example posts one
 decision to it.
 
-### E-ABRD-01 (removed 29.10.2026)
-
-The board writes no yes/no outcome, so there is no example (ABRD-01).
+- E-ABRD-01 (removed 29.10.2026): the board writes no yes/no outcome, so there is no example (ABRD-01).
 
 ### E-ABRD-02 -- a changed card refuses the stale post
 
