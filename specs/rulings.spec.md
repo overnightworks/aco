@@ -48,7 +48,7 @@ it, `<k>` an expectation line's 1-based index.
 - [ ] [RUL-16] An option line carries `"other"` after `"via"`: the answer verbatim once ruled `other`, else `null`; text prints `other` as `<outcome>` and the answer as `<summary>` (see E-RUL-07).
 - [ ] [RUL-17] An option line carries `"returned_on"` and `"returned_note"` after `"other"`: its date and note while with its head, else `null`; a yes/no line never carries them (see E-RUL-07).
 - [ ] [RUL-18] Text prints a line with its head `  <k> with head <date>: <summary>`, `<summary>` its note, else its text, capped and escaped as RUL-02 and RUL-11; it still counts as open (see E-RUL-07).
-- [ ] [RUL-19] An option line carries `"asked_on"` right after `"text"`: the day its head asked it (aco never writes it; the key list in body-block.spec.md owns its meaning), `null` only on a ruled line stored without it; a yes/no line never carries it (see E-RUL-07).
+- [ ] [RUL-19] An option line carries `"asked_on"` right after `"text"`: the day its head asked it (aco never writes it), `null` only on a ruled line stored without it; a yes/no line never has it (E-RUL-07).
 
 An option line's keys after `returned_note` are `question`, `problem`, `picture`,
 `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`,
