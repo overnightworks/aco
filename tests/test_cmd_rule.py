@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import tomllib
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
@@ -16,7 +15,7 @@ from cli_fixtures import (
     run_cli,
     track_board_config,
 )
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import (
     GOLDEN_CARD_HASH,
     YES_NO_LINE,
@@ -34,11 +33,6 @@ def json_wire(stdout: str) -> dict[str, object]:
     return json.loads(stdout) if stdout else {}
 
 
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
-
-
 def option_item(*lines: str) -> str:
     """An item body whose expectation lines are `lines`, in order."""
     return block_body(MINIMAL_BLOCK_TOML + "\n".join(lines))
@@ -49,7 +43,7 @@ def decision(letter: str = "A", *, line: int = 1) -> list[str]:
     return decide(letter, "chat", line=line)
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestGithubRule:
     def test_rule_preserves_card_and_other_body_values(
         self,

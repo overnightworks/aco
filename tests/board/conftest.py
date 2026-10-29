@@ -20,7 +20,6 @@ from aco_board_fixtures import (
     row,
     serving,
 )
-from github_fixtures import assert_github_world
 
 from aco.board.aco_cli import AcoCli
 
@@ -57,8 +56,3 @@ def listed(repository: FakeAcoRepository, board: BoardClient) -> dict[str, Any]:
         "line": shown["index"],
         "fingerprint": shown["fingerprint"],
     }
-
-
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)

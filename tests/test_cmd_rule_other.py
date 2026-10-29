@@ -5,12 +5,11 @@ byte-identical and stands (RULE-20, RULE-04, BODY-92, BODY-88, BODY-87, RUL-16).
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from board_fixtures import board_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import (
     ALREADY_RULED,
     GOLDEN_CARD_HASH,
@@ -30,11 +29,6 @@ from option_cards import (
 from aco import body
 
 
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
-
-
 def line_two(rulings_stdout: str) -> dict[str, object]:
     return json.loads(rulings_stdout)["rulings"][0]["lines"][1]
 
@@ -43,7 +37,7 @@ def serve_written(monkeypatch: pytest.MonkeyPatch, written: str) -> None:
     serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(7, "Karte", written),)))
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestRuleOther:
     @pytest.mark.parametrize("via", ["board", "chat"])
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])

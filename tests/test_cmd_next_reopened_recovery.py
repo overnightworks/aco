@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import board_issue, complete_contract
 from cli_fixtures import freeze_cli_now, run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 
 from aco import workboard
 
@@ -20,8 +20,7 @@ ONE_HOUR = timedelta(hours=1)
 
 
 @pytest.fixture(autouse=True)
-def github_world(github_clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    assert_github_world(github_clone, bare_remote)
+def _freeze_clock(monkeypatch: pytest.MonkeyPatch, github_world: Path) -> None:
     freeze_cli_now(monkeypatch)
 
 

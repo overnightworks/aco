@@ -9,15 +9,14 @@ from pathlib import Path
 import pytest
 from board_fixtures import board_issue, complete_contract
 from cli_fixtures import freeze_cli_now, run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
 from aco import protocol, workboard
 
 
 @pytest.fixture(autouse=True)
-def github_world(monkeypatch: pytest.MonkeyPatch, github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
+def _freeze_clock(monkeypatch: pytest.MonkeyPatch, github_world: Path) -> None:
     freeze_cli_now(monkeypatch)
 
 
