@@ -4,8 +4,8 @@ Every scenario here is about the wire, not a particular route's decision
 rules (owned by `test_board_api.py`) or its static files (owned by
 `test_board_static.py`): a malformed or stalled request, a client that
 leaves mid-answer, a broken decision source, loopback-only binding, and
-draining a stalled connection on shutdown. Only `aco` is a fake
-(`aco_board_fixtures.install_fake_aco`); the server, wire form, and adapter
+draining a stalled connection on shutdown. Only the forge is a fake
+(`board_forge.BoardForge`); the server, wire form, adapter and `aco` itself
 are real.
 """
 
@@ -20,9 +20,18 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, option_line, row, serving
+from aco_board_fixtures import (
+    BoardClient,
+    CallPhase,
+    PortOperation,
+    RecordedPort,
+    Response,
+    decision_port,
+    serving,
+)
+from board_forge import BoardForge, item_body
+from option_cards import open_option_entry
 
-from aco.board.aco_cli import AcoCli
 from aco.board.ports import (
     CardChanged,
     CardDecision,
@@ -31,6 +40,13 @@ from aco.board.ports import (
     OptionLine,
 )
 from aco.board.server import LOOPBACK_HOST, read_before_deadline
+
+_OPEN_CARD = item_body(open_option_entry())
+
+
+def _assert_never_written(port: RecordedPort, repository: BoardForge) -> None:
+    """No `rule_card` reached the port, and the forge saw no body write."""
+    assert (port.ruled_items(), repository.body_writes()) == ([], [])
 
 
 def _post(body: bytes, length: bytes | None = None) -> bytes:
@@ -76,8 +92,9 @@ _NO_CONTENT_LENGTH = b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: {tok
     ],
 )
 def test_a_malformed_api_request_gets_a_fixed_400_without_a_traceback(
-    repository: FakeAcoRepository,
+    repository: BoardForge,
     board: BoardClient,
+    port: RecordedPort,
     capsys: pytest.CaptureFixture[str],
     request_template: bytes,
 ) -> None:
@@ -88,7 +105,7 @@ def test_a_malformed_api_request_gets_a_fixed_400_without_a_traceback(
     assert b"Traceback" not in rest
     assert str(Path(__file__).parents[2]).encode() not in rest
     assert "Traceback" not in capsys.readouterr().err
-    assert repository.rule_calls() == []
+    _assert_never_written(port, repository)
 
 
 def _decision_json(board: BoardClient) -> bytes:
@@ -116,28 +133,28 @@ _SHORT_DEADLINE_SECONDS = 0.2
     ids=["headers-unfinished", "body-unfinished"],
 )
 def test_a_stalled_request_is_dropped_after_the_deadline_without_a_traceback(
-    repository: FakeAcoRepository,
+    repository: BoardForge,
     capsys: pytest.CaptureFixture[str],
     unfinished_template: bytes,
     status: bytes | None,
 ) -> None:
-    decisions = AcoCli(directory=repository.directory)
+    decisions = decision_port(repository)
     with serving(decisions, request_deadline_seconds=_SHORT_DEADLINE_SECONDS) as board:
         filled = unfinished_template.replace(b"{token}", board.token.encode())
         answer = board.send_unfinished(filled)
 
     assert (answer.split(b" ")[1] if answer else None) == status
     assert "Traceback" not in capsys.readouterr().err
-    assert repository.calls() == []
+    assert (decisions.calls(), repository.request_log()) == ((), ())
 
 
 @pytest.mark.parametrize(
     "truncate", [False, True], ids=["valid-decision-ending-early", "cut-mid-object"]
 )
 def test_a_body_ending_before_its_declared_length_answers_408_and_rules_nothing(
-    repository: FakeAcoRepository, board: BoardClient, truncate: bool
+    repository: BoardForge, board: BoardClient, port: RecordedPort, truncate: bool
 ) -> None:
-    repository.set_rulings(row(42, "Share page", option_line()))
+    repository.put_item(42, _OPEN_CARD, title="Share page")
     decision = _decision_json(board)
     body = decision[: len(decision) // 2] if truncate else decision
     declared_length = str(len(decision) + 25).encode()
@@ -149,7 +166,7 @@ def test_a_body_ending_before_its_declared_length_answers_408_and_rules_nothing(
         408,
         {"error": "request timeout: body incomplete"},
     )
-    assert repository.rule_calls() == []
+    _assert_never_written(port, repository)
 
 
 def test_a_body_still_arriving_when_its_deadline_has_passed_times_out() -> None:
@@ -161,9 +178,9 @@ def test_a_body_still_arriving_when_its_deadline_has_passed_times_out() -> None:
             read_before_deadline(rfile, reader_end, 40, deadline_seconds=0.0)
 
 
-def test_a_stalled_request_does_not_hold_up_shutdown(repository: FakeAcoRepository) -> None:
+def test_a_stalled_request_does_not_hold_up_shutdown(repository: BoardForge) -> None:
     def serve_and_stop_beneath(stalled_clients: ExitStack) -> None:
-        with serving(AcoCli(directory=repository.directory)) as board:
+        with serving(decision_port(repository)) as board:
             stalled_clients.enter_context(board.holding_unfinished(b"GET /?t="))
             # Connections are accepted in order, so this answer means the
             # stalled one already holds a handler.
@@ -180,20 +197,24 @@ def test_a_stalled_request_does_not_hold_up_shutdown(repository: FakeAcoReposito
 
 
 def test_a_browser_leaving_mid_answer_prints_no_traceback(
-    repository: FakeAcoRepository, capsys: pytest.CaptureFixture[str]
+    repository: BoardForge, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    repository.set_rulings(row(42, "Share page", option_line()))
+    repository.put_item(42, _OPEN_CARD, title="Share page")
     browser_left, read_returned = threading.Event(), threading.Event()
+    port = decision_port(repository)
 
-    class ReadAfterTheBrowserLeft(AcoCli):
+    class ReadAfterTheBrowserLeft:
         def expectation_lines(self) -> tuple[ExpectationLine, ...]:
             assert browser_left.wait(timeout=10)
             try:
-                return super().expectation_lines()
+                return port.expectation_lines()
             finally:
                 read_returned.set()
 
-    with serving(ReadAfterTheBrowserLeft(directory=repository.directory)) as board:
+        def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+            return port.rule_card(decision)
+
+    with serving(ReadAfterTheBrowserLeft()) as board:
         board.send_and_reset(
             f"GET /api/board HTTP/1.1\r\nHost: x\r\nX-Board-Token: {board.token}\r\n\r\n".encode()
         )
@@ -202,7 +223,8 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
         assert read_returned.wait(timeout=10)
         _wait_for_request_handlers()
 
-    assert repository.calls() == [["rulings", "--json"]]
+    entered = [call.operation for call in port.calls() if call.phase is CallPhase.ENTERED]
+    assert entered == [PortOperation.EXPECTATION_LINES]
     assert "Traceback" not in capsys.readouterr().err
 
 
@@ -220,10 +242,10 @@ class _HugeLineSource:
 
 
 def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
-    repository: FakeAcoRepository, capsys: pytest.CaptureFixture[str]
+    repository: BoardForge, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    repository.set_rulings(row(42, "Share page", option_line()))
-    [small_line] = AcoCli(directory=repository.directory).expectation_lines()
+    repository.put_item(42, _OPEN_CARD, title="Share page")
+    [small_line] = decision_port(repository).expectation_lines()
     assert isinstance(small_line, OptionLine)
     with (
         serving(
@@ -274,10 +296,12 @@ def test_the_board_listens_on_loopback_only(board: BoardClient) -> None:
     assert board.host == LOOPBACK_HOST
 
 
-def test_loading_the_board_never_writes(repository: FakeAcoRepository, board: BoardClient) -> None:
-    repository.set_rulings(row(42, "Share page", option_line()))
+def test_loading_the_board_never_writes(
+    repository: BoardForge, board: BoardClient, port: RecordedPort
+) -> None:
+    repository.put_item(42, _OPEN_CARD, title="Share page")
 
     board.get_board_json()
     board.get_board_json()
 
-    assert repository.rule_calls() == []
+    _assert_never_written(port, repository)

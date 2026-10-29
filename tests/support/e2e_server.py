@@ -10,9 +10,9 @@ is `aco` itself (`aco_board_fixtures.install_fake_aco`).
 
 One line of JSON on stdout once the server is listening:
 `{"host", "port", "token", "repo_directory"}`. The repo directory lets a spec
-toggle the fake `aco`'s answers between runs (`FakeAcoRepository`'s own
-methods), the same arrangement `tests/board/test_board_server.py`
-uses. Stops on SIGTERM or SIGINT, which the launcher sends on teardown.
+toggle the fake `aco`'s answers between runs through the files it reads
+there (`rulings.json`, `rulings-failure.txt`). Stops on SIGTERM or SIGINT,
+which the launcher sends on teardown.
 """
 # ruff: noqa: T201 - the server announces its address to the test that starts it
 
