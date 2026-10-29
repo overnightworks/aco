@@ -1,8 +1,0 @@
-claim_id = "0d9ed933721e4b99b57e61487f6ab6b0"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "bfdefb697dd6dd896194b7aa48ff56931cfc91e3"
-branch = "claude/issue-558-quality-090-markers"
-scope = ["pyproject.toml", "quality/baseline.toml", "scripts/spec_lint.py", "src/aco/card_rules.py", "src/aco/cmd_adopt.py", "src/aco/cmd_bootstrap.py", "src/aco/cmd_brief.py", "src/aco/cmd_check.py", "src/aco/cmd_claim.py", "src/aco/cmd_cut.py", "src/aco/cmd_item.py", "src/aco/cmd_land.py", "src/aco/cmd_next.py", "src/aco/cmd_release.py", "src/aco/cmd_rescope.py", "src/aco/cmd_reset.py", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/cmd_start.py", "src/aco/cmd_status.py", "src/aco/github.py", "src/aco/process.py", "src/aco/report.py", "src/aco/state_board.py", "src/aco/store.py", "tests/support/e2e_server.py", "tests/test_cli.py", "tests/test_session.py", "tests/test_state_board.py"]
-opened_commit = "3c79c40e05ce03cf1e0f1d85d2b45909dbc0e6b9"
-whole_reason = "One mechanical sweep of comment-only markers (a directive or a noqa per site) across 28 files; no file gets more than a handful of lines, and splitting it would leave the same linter red in the rest."
