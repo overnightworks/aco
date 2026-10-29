@@ -197,8 +197,8 @@ class TestOptionLineCheck:
             pytest.param(
                 card(card_head(("question = ", 'default = "yes"\nexample = "E"\nquestion = '))),
                 [
-                    malformed(f"{E}.default", f"{E}.default does not belong on an option line"),
                     malformed(f"{E}.example", f"{E}.example does not belong on an option line"),
+                    malformed(f"{E}.default", f"unknown key {E}.default"),
                 ],
                 id="BODY-79",
             ),
@@ -459,8 +459,8 @@ class TestOptionLineCheck:
         ("line", "defects"),
         [
             pytest.param(
-                '[[expectation]]\ntext = "T"\ndefault = "yes"\nproblem = "P"\ncard_hash = "H"\n'
-                'via = "chat"\n',
+                '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\nproblem = "P"\n'
+                'card_hash = "H"\nvia = "chat"\n',
                 [
                     malformed(
                         f"{E}.problem", f"{E}.problem belongs to an option line; this line has none"
@@ -472,16 +472,53 @@ class TestOptionLineCheck:
             ),
             pytest.param(
                 '[[expectation]]\ntext = "T"\n',
-                [malformed(f"{E}.default", f"{E} must carry default, or both ruling and ruled_on")],
+                [malformed(E, f"{E} is an open yes/no line; write an option card")],
                 id="BODY-29-yes-no-only",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\ndefault = "yes"\n',
+                [
+                    malformed(E, f"{E} is an open yes/no line; write an option card"),
+                    malformed(f"{E}.default", f"unknown key {E}.default"),
+                ],
+                id="BODY-29-open-with-default",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\n'
+                'default = "yes"\n',
+                [malformed(f"{E}.default", f"unknown key {E}.default")],
+                id="BODY-33-ruled-with-default",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "no"\n',
+                [malformed(f"{E}.ruled_on", f"{E}.ruled_on must be a TOML local date")],
+                id="BODY-32-ruling-alone",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruled_on = 2026-10-01\n',
+                [malformed(f"{E}.ruling", f"{E}.ruling must be yes, no, or later")],
+                id="BODY-31-ruled-on-alone",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\n'
+                'question = "Q?"\nexample = "E"\n'
+                'picture = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>"""\n',
+                [],
+                id="ruled-with-card-fields",
+            ),
+            pytest.param(
+                '[[expectation]]\ntext = "T"\nruling = "later"\nruled_on = 2026-10-01\n',
+                [],
+                id="ruled-later",
             ),
         ],
     )
     def test_a_yes_no_line_keeps_its_own_grammar(
         self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
     ) -> None:
-        """Spec: BODY-29, BODY-33, BODY-83."""
-        assert check_defects(capsys, card_body(line)) == (2, defects)
+        """Spec: BODY-29, BODY-31, BODY-32, BODY-33, BODY-83 -- an open yes/no line is refused;
+        a ruled one stays readable history."""
+        assert check_defects(capsys, card_body(line)) == (2 if defects else 0, defects)
 
 
 def option_json(**card_values: object) -> dict[str, object]:
@@ -510,19 +547,13 @@ class TestOptionLineRulings:
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], newline: str
     ) -> None:
         """Spec: RUL-10, RUL-12..RUL-15, BODY-89 -- a mixed item, the golden hash."""
-        yes_no = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
+        yes_no = '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2026-10-01\n'
         raw_body = card_body(card(), before="\n" + yes_no, newline=newline)
         serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(7, "Karte", raw_body),)))
         result = run_cli(["rulings", "--json"], capsys)
         assert result.status == 0, result.stderr
         lines = json.loads(result.stdout)["rulings"][0]["lines"]
-        assert lines[0] == {
-            "index": 1,
-            "text": "Alt",
-            "ruling": None,
-            "ruled_on": None,
-            "default": "no",
-        }
+        assert lines[0] == {"index": 1, "text": "Alt", "ruling": "no", "ruled_on": "2026-10-01"}
         assert lines[1]["form"] == "options"
         assert lines[1] == {
             "index": 2,
@@ -532,7 +563,6 @@ class TestOptionLineRulings:
             "asked_on": "2026-10-28",
             "ruling": None,
             "ruled_on": None,
-            "default": None,
             "card_hash": GOLDEN_CARD_HASH,
             "stored_card_hash": None,
             "via": None,
@@ -582,11 +612,10 @@ class TestOptionLineRulings:
         assert (
             line["ruling"],
             line["ruled_on"],
-            line["default"],
             line["card_hash"],
             line["stored_card_hash"],
             line["via"],
-        ) == ("A", "2026-10-28", None, GOLDEN_CARD_HASH, GOLDEN_CARD_HASH, "board")
+        ) == ("A", "2026-10-28", GOLDEN_CARD_HASH, GOLDEN_CARD_HASH, "board")
 
     def test_a_caption_less_option_hashes_without_the_caption(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

@@ -46,13 +46,11 @@ class LineForm(StrEnum):
 
 @dataclass(frozen=True)
 class YesNoLine:
-    """One `[[expectation]]` entry as `rule --line`, `ask`, and `rulings`
-    see it: `index` is its 1-based position in block order -- what `rule
+    """One ruled yes/no `[[expectation]]` entry as `rule --line`, `ask`, and
+    `rulings` see it -- read-only history, since the grammar refuses an open
+    one: `index` is its 1-based position in block order -- what `rule
     --line` accepts and what `rulings` prints -- `text` its full prose, and
-    `ruling`/`ruled_on` present only once a `rule` call has replaced its
-    `default`. `default` is the line's own default (`str | None`, `None`
-    once ruled) -- `aco rulings --json`'s own line payload reads it from
-    here rather than re-parsing the block. `question`/`example`/`picture`
+    `ruling`/`ruled_on` its outcome and day. `question`/`example`/`picture`
     are the card's optional operator-language heading, illustration
     sentence, and inline SVG -- `None` when the line carries none,
     in which case a card falls back to `text`."""
@@ -60,9 +58,8 @@ class YesNoLine:
     form: ClassVar[LineForm] = LineForm.YES_NO
     index: int
     text: str
-    ruling: str | None
-    ruled_on: date | None
-    default: str | None = None
+    ruling: str
+    ruled_on: date
     question: str | None = None
     example: str | None = None
     picture: str | None = None
@@ -247,9 +244,8 @@ def _yes_no_line(index: int, entry: dict[str, object]) -> YesNoLine:
     return YesNoLine(
         index=index,
         text=cast(str, entry["text"]),
-        ruling=cast(str | None, entry.get("ruling")),
-        ruled_on=cast("date | None", entry.get("ruled_on")),
-        default=cast(str | None, entry.get("default")),
+        ruling=cast(str, entry["ruling"]),
+        ruled_on=cast(date, entry["ruled_on"]),
         question=cast(str | None, entry.get("question")),
         example=cast(str | None, entry.get("example")),
         picture=cast(str | None, entry.get("picture")),

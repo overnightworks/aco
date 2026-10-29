@@ -53,7 +53,7 @@ class TestRuleOther:
         today = FROZEN_CLI_NOW.date()
         client = serve_item(monkeypatch, item_body(card(), newline=newline))
         ruled = run_cli(["rule", "7", *other_arguments(OTHER_ANSWER, via)], capsys)
-        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 other; 1 line(s) still open\n")
+        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 other; 0 line(s) still open\n")
         written = client.item_bodies[7]
         entry = body.block_expectation_dicts(body.locate_block(written).data)[1]
         assert (
@@ -70,7 +70,7 @@ class TestRuleOther:
         header = run_cli(["rulings"], capsys).stdout.splitlines()[0]
         line = line_two(run_cli(["rulings", "--json"], capsys).stdout)
         assert (header, line["ruling"], line["ruled_on"], line["via"], line["other"]) == (
-            "#7 1/2: Karte",
+            "#7 0/2: Karte",
             "other",
             today.isoformat(),
             via,
@@ -94,7 +94,7 @@ class TestRuleOther:
                 "index": 2,
                 "ruling": "other",
                 "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
-                "open": 1,
+                "open": 0,
             },
         )
 

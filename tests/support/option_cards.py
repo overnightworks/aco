@@ -95,9 +95,11 @@ def ruled_card(*edits: tuple[str, str]) -> str:
     return card(card_head(("question = ", RULED_KEYS + "question = "), *edits))
 
 
-def open_option_entry() -> dict[str, object]:
-    """The open option card as the `[[expectation]]` entry a block projection carries."""
-    return tomllib.loads(card())["expectation"][0]
+def open_option_entry(text: str | None = None) -> dict[str, object]:
+    """The open option card as the `[[expectation]]` entry a block projection carries,
+    its `text` replaced when one is given."""
+    entry: dict[str, object] = tomllib.loads(card())["expectation"][0]
+    return entry if text is None else {**entry, "text": text}
 
 
 def card_body(line: str, *, before: str = "", newline: str = "\n") -> str:
@@ -145,7 +147,7 @@ def returned_card(keys: str = RETURNED_ON + RETURNED_NOTE) -> str:
 
 STALE_CARD_HASH = "sha256:" + "0" * 64
 ALREADY_RULED = "line 2 is already ruled; a changed ruling is a new line"
-YES_NO_LINE = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
+YES_NO_LINE = '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2026-10-01\n'
 
 
 def item_body(option_line: str, *, yes_no_line: str = YES_NO_LINE, newline: str = "\n") -> str:

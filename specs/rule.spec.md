@@ -224,7 +224,7 @@ exactly; `ruling` is `A` and `ruled_on` is today's UTC date.
 
 ### E-RULE-10 — deciding an option line
 
-Setup: bare-remote, fake `gh`, issue `#7` open, its line 1 a yes/no line and its line 2 the open option line of `specs/body-block.spec.md` E-BODY-10, recommending `A`; `<hash>` is its `card_hash`, `sha256:f7f1db4c507733e34c58d64de61fd482ad3d308db7ce3bf14bc503179c26519d`, and `<stale>` any other
+Setup: bare-remote, fake `gh`, issue `#7` open, its line 1 a ruled yes/no line and its line 2 the open option line of `specs/body-block.spec.md` E-BODY-10, recommending `A`; `<hash>` is its `card_hash`, `sha256:f7f1db4c507733e34c58d64de61fd482ad3d308db7ce3bf14bc503179c26519d`, and `<stale>` any other
 
 ```console
 $ aco rule 7 --line 2 --option A --via chat
@@ -250,7 +250,7 @@ $ aco rule 7 --line 2 --option B --via default --card-hash <hash>
 2> ERROR: --via default keeps only the recommended option A, not B
 exit 2
 $ aco rule 7 --line 2 --option A --via chat --card-hash <hash>
-RULED #7 line 2 A; 1 line(s) still open
+RULED #7 line 2 A; 0 line(s) still open
 exit 0
 ```
 
@@ -283,7 +283,7 @@ $ aco rule 7 --line 2 --other "Nur am Desktop." --via board --card-hash <stale> 
 {"ok": false, "reason": "card_changed", "message": "line 2 changed since its card was shown; show it again and rule what it shows now"}
 exit 2
 $ aco rule 7 --line 2 --other "Nur am Desktop." --via chat --card-hash <hash>
-RULED #7 line 2 other; 1 line(s) still open
+RULED #7 line 2 other; 0 line(s) still open
 exit 0
 $ aco rule 7 --line 2 --option A --via chat --card-hash <hash>
 2> ERROR: line 2 is already ruled; a changed ruling is a new line
@@ -317,7 +317,7 @@ $ aco rule 7 --line 2 --unclear --card-hash <stale> --json
 {"ok": false, "reason": "card_changed", "message": "line 2 changed since its card was shown; show it again and rule what it shows now"}
 exit 2
 $ aco rule 7 --line 2 --unclear --note "Was kostet B?" --card-hash <hash>
-RETURNED #7 line 2 to its head; 2 line(s) still open
+RETURNED #7 line 2 to its head; 1 line(s) still open
 exit 0
 $ aco rule 7 --line 2 --unclear --card-hash <hash>
 2> ERROR: line 2 is already with its head; it comes back once revised
@@ -326,7 +326,7 @@ $ aco rule 7 --line 2 --option A --via default --card-hash <hash>
 2> ERROR: line 2 was answered Unclear; --via default records no answer
 exit 2
 $ aco rule 7 --line 2 --option A --via chat --card-hash <hash>
-RULED #7 line 2 A; 1 line(s) still open
+RULED #7 line 2 A; 0 line(s) still open
 exit 0
 ```
 
@@ -338,7 +338,7 @@ and line 2 carries RULE-14's four keys.
 
 ### E-RULE-13 — ruling several lines in one write
 
-Setup: bare-remote, fake `gh`, issue `#7` open, its line 1 a yes/no line and its lines 2 and 3 open option lines like E-RULE-10's line 2, both recommending `A`, line 3's question changed so its card hash differs; `<hash-2>` and `<hash-3>` are their `card_hash` values as `aco rulings --json` prints them, and `<stale>` any other
+Setup: bare-remote, fake `gh`, issue `#7` open, its line 1 a ruled yes/no line and its lines 2 and 3 open option lines like E-RULE-10's line 2, both recommending `A`, line 3's question changed so its card hash differs; `<hash-2>` and `<hash-3>` are their `card_hash` values as `aco rulings --json` prints them, and `<stale>` any other
 
 ```console
 $ aco rule 7 --line 2 --card-hash <hash-2> --line 3 --option B --card-hash <hash-3> --option A --via chat
@@ -364,7 +364,7 @@ $ aco rule 7 --line 2 --option A --card-hash <hash-2> --line 3 --option B --card
 {"ok": false, "reason": "card_changed", "message": "line 3 changed since its card was shown; show it again and rule what it shows now"}
 exit 2
 $ aco rule 7 --line 2 --option A --card-hash <hash-2> --line 3 --option B --card-hash <hash-3> --via chat
-RULED #7 lines 2 A, 3 B; 1 line(s) still open
+RULED #7 lines 2 A, 3 B; 0 line(s) still open
 exit 0
 ```
 
@@ -376,10 +376,10 @@ Setup: E-RULE-13's, and `<today>` the runner's own today's date
 
 ```console
 $ aco rule 7 --line 2 --card-hash <hash-2> --line 3 --card-hash <hash-3> --unclear --note "Was kostet B?" --json
-{"ok": true, "reason": "returned", "item": 7, "lines": [{"index": 2}, {"index": 3}], "returned_on": "<today>", "open": 3}
+{"ok": true, "reason": "returned", "item": 7, "lines": [{"index": 2}, {"index": 3}], "returned_on": "<today>", "open": 2}
 exit 0
 $ aco rule 7 --line 2 --card-hash <hash-2> --line 3 --card-hash <hash-3> --other "Nur am Desktop." --via chat --json
-{"ok": true, "reason": "ruled", "item": 7, "lines": [{"index": 2, "ruling": "other"}, {"index": 3, "ruling": "other"}], "ruled_on": "<today>", "open": 1}
+{"ok": true, "reason": "ruled", "item": 7, "lines": [{"index": 2, "ruling": "other"}, {"index": 3, "ruling": "other"}], "ruled_on": "<today>", "open": 0}
 exit 0
 ```
 

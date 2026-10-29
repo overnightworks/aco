@@ -95,7 +95,7 @@ class TestGithubRule:
     ) -> None:
         """Spec: RULE-01 — RULED line; the other line stays open."""
         freeze_cli_now(monkeypatch)
-        initial = option_item(card(), YES_NO_LINE)
+        initial = option_item(card(), card())
         reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)
         client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
         result = run_cli(["rule", "90", *arguments], capsys)
@@ -112,7 +112,7 @@ class TestGithubRule:
         "lines,open_remaining",
         [
             pytest.param((card(),), 0, id="none-open"),
-            pytest.param((card(), YES_NO_LINE), 1, id="open-remaining"),
+            pytest.param((card(), card()), 1, id="open-remaining"),
         ],
     )
     def test_json(

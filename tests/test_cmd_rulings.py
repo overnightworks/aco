@@ -14,13 +14,20 @@ from board_fixtures import (
     block_body,
     board_issue,
     complete_contract,
-    proposed_expectation,
     ruled_expectation,
 )
 from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, serve_forge
 from github_pages import raw_board_issue
-from option_cards import RETURNED_NOTE, RETURNED_ON, card, card_body, card_head, ruled_card
+from option_cards import (
+    RETURNED_NOTE,
+    RETURNED_ON,
+    card,
+    card_body,
+    card_head,
+    open_option_entry,
+    ruled_card,
+)
 
 from aco import body, github, store, workboard
 
@@ -38,7 +45,7 @@ pytestmark = pytest.mark.usefixtures("github_world")
                     complete_contract(
                         "Ship #10.",
                         expectation=[
-                            proposed_expectation("Open decision 0."),
+                            open_option_entry("Open decision 0."),
                             ruled_expectation("Settled decision 0."),
                         ],
                     ),
@@ -81,7 +88,7 @@ pytestmark = pytest.mark.usefixtures("github_world")
                     "Block-only expectations",
                     block_body(
                         f"{MINIMAL_BLOCK_TOML}[[expectation]]\n"
-                        'text = "Proposed"\ndefault = "later"\n'
+                        'text = "Deferred"\nruling = "later"\nruled_on = 2026-08-28\n'
                     )
                     + (
                         "\n\n## Erwartungen (refine-Lauf 28.08.2026)\n"
@@ -90,7 +97,7 @@ pytestmark = pytest.mark.usefixtures("github_world")
                     ),
                 ),
             ),
-            "#400 1/1: Block-only expectations\n  1 open: Proposed\n",
+            "#400 0/1: Block-only expectations\n  1 ruled later 2026-08-28: Deferred\n",
             'body_contract = "block"\n',
             id="stale-prose-text",
         ),
@@ -107,7 +114,7 @@ pytestmark = pytest.mark.usefixtures("github_world")
                     10,
                     "Before\u202eAfter",
                     complete_contract(
-                        "Ship #10.", expectation=[proposed_expectation("A" * 98 + "\u202eBC")]
+                        "Ship #10.", expectation=[open_option_entry("A" * 98 + "\u202eBC")]
                     ),
                 ),
             ),
@@ -142,51 +149,6 @@ def test_rulings_lists_items_and_lines(
         pytest.param(
             (
                 board_issue(
-                    10,
-                    "Open expectation",
-                    complete_contract(
-                        "Ship #10.",
-                        expectation=[
-                            proposed_expectation("Open decision 0."),
-                            ruled_expectation("Settled decision 0."),
-                        ],
-                    ),
-                ),
-            ),
-            {
-                "ok": True,
-                "reason": "listed",
-                "rulings": [
-                    {
-                        "number": 10,
-                        "title": "Open expectation",
-                        "open": 1,
-                        "total": 2,
-                        "lines": [
-                            {
-                                "index": 1,
-                                "text": "Open decision 0.",
-                                "ruling": None,
-                                "ruled_on": None,
-                                "default": "later",
-                            },
-                            {
-                                "index": 2,
-                                "text": "Settled decision 0.",
-                                "ruling": "yes",
-                                "ruled_on": RULED_ON.isoformat(),
-                                "default": None,
-                            },
-                        ],
-                    }
-                ],
-            },
-            None,
-            id="open-json",
-        ),
-        pytest.param(
-            (
-                board_issue(
                     11,
                     "Fully ruled",
                     complete_contract(
@@ -213,14 +175,12 @@ def test_rulings_lists_items_and_lines(
                                 "text": "Settled decision 0.",
                                 "ruling": "yes",
                                 "ruled_on": RULED_ON.isoformat(),
-                                "default": None,
                             },
                             {
                                 "index": 2,
                                 "text": "Settled decision 1.",
                                 "ruling": "yes",
                                 "ruled_on": RULED_ON.isoformat(),
-                                "default": None,
                             },
                         ],
                     }
@@ -245,12 +205,12 @@ def test_rulings_lists_items_and_lines(
             (
                 board_issue(
                     10,
-                    "Open expectation",
+                    "Ruled expectation",
                     complete_contract(
                         "Ship #10.",
                         expectation=[
-                            proposed_expectation(
-                                "Open decision.",
+                            ruled_expectation(
+                                "Settled decision.",
                                 question="Ship it?",
                                 example="Release on Friday.",
                                 picture=(
@@ -268,16 +228,15 @@ def test_rulings_lists_items_and_lines(
                 "rulings": [
                     {
                         "number": 10,
-                        "title": "Open expectation",
-                        "open": 1,
+                        "title": "Ruled expectation",
+                        "open": 0,
                         "total": 1,
                         "lines": [
                             {
                                 "index": 1,
-                                "text": "Open decision.",
-                                "ruling": None,
-                                "ruled_on": None,
-                                "default": "later",
+                                "text": "Settled decision.",
+                                "ruling": "yes",
+                                "ruled_on": RULED_ON.isoformat(),
                                 "question": "Ship it?",
                                 "example": "Release on Friday.",
                                 "picture": (
@@ -313,7 +272,6 @@ def test_rulings_json(
         assert result.stdout == raw
 
 
-OPEN_YES_NO = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
 RULED_YES_NO = '[[expectation]]\ntext = "Alt"\nruling = "yes"\nruled_on = 2026-10-28\n'
 CARD_DAY = "asked_on = 2026-10-28"
 
@@ -368,7 +326,7 @@ def _returned_card(day: str) -> str:
             (
                 _item_of(10, _returned_card("2026-10-29")),
                 _item_of(20, _open_card("2026-10-28")),
-                _item_of(30, _open_card("2026-10-30"), OPEN_YES_NO),
+                _item_of(30, _open_card("2026-10-30"), RULED_YES_NO),
             ),
             [30, 10, 20],
             id="card-with-its-head-and-card-plus-yes-no-ordered-by-card-date",
@@ -376,14 +334,13 @@ def _returned_card(day: str) -> str:
         pytest.param(
             (
                 _item_of(10, _ruled_card("2026-10-31")),
-                _item_of(20, OPEN_YES_NO),
                 _item_of(30, _ruled_card(None)),
                 _item_of(40, _open_card("2026-10-01")),
-                _item_of(50, OPEN_YES_NO, RULED_YES_NO),
+                _item_of(50, RULED_YES_NO, _open_card("2026-10-02")),
                 _item_of(60, RULED_YES_NO),
             ),
-            [40, 50, 20, 60, 30, 10],
-            id="dated-cards-then-undated-open-rows-then-fully-ruled-rows",
+            [50, 40, 60, 30, 10],
+            id="dated-cards-then-fully-ruled-rows",
         ),
         pytest.param(
             (
@@ -398,6 +355,7 @@ def _returned_card(day: str) -> str:
                     unreadable=body.ContractDefect("items/30", "cannot be read"),
                 ),
                 board_issue(40, "No block", "Prose only."),
+                _item_of(50, '[[expectation]]\ntext = "Alt"\n'),
             ),
             [10],
             id="malformed-unreadable-and-block-less-rows-are-not-listed",
@@ -412,9 +370,9 @@ def test_rulings_orders_items(
     as_json: bool,
     numbers: list[int],
 ) -> None:
-    """Spec: RUL-01, RUL-03, RUL-04, RUL-20 --
-    Newest open card first, then undated open rows, then fully ruled rows, in text
-    and `--json`; malformed and unreadable rows are not listed."""
+    """Spec: RUL-01, RUL-03, RUL-04, RUL-20, BODY-29 --
+    Newest open card first, then fully ruled rows, in text and `--json`; malformed rows,
+    an open yes/no line's among them, and unreadable rows are not listed."""
     serve_forge(monkeypatch, FakeForge(board_issues=issues))
     capsys.readouterr()
     result = run_cli(["rulings", *(["--json"] if as_json else [])], capsys)
@@ -466,7 +424,7 @@ def test_rulings_reads_one_listing_page_and_no_claim_state(
                     10,
                     "Before\u202eAfter",
                     complete_contract(
-                        "Ship #10.", expectation=[proposed_expectation("A" * 98 + "\u202eBC")]
+                        "Ship #10.", expectation=[open_option_entry("A" * 98 + "\u202eBC")]
                     ),
                 ),
             ),
@@ -478,20 +436,19 @@ def test_rulings_reads_one_listing_page_and_no_claim_state(
             (
                 board_issue(
                     10,
-                    "Defaults",
+                    "Open expectation",
                     complete_contract(
                         "Ship #10.",
                         expectation=[
-                            proposed_expectation("Yes", default="yes"),
-                            proposed_expectation("No", default="no"),
-                            proposed_expectation("Later", default="later"),
+                            open_option_entry("Open decision 0."),
+                            ruled_expectation("Settled decision 0."),
                         ],
                     ),
                 ),
             ),
-            ("default",),
-            (["yes", "no", "later"],),
-            id="defaults-json",
+            ("open", "total", "ruling", "ruled_on"),
+            (1, 2, [None, "yes"], [None, RULED_ON.isoformat()]),
+            id="open-json",
         ),
     ],
 )
@@ -504,14 +461,14 @@ def test_rulings_preserves_json_content(
     expected: tuple[object, ...],
 ) -> None:
     """Spec: RUL-10, RUL-11, RUL-12 --
-    Stored controls, untruncated text and every proposed outcome."""
+    Stored controls, untruncated text, and an open line's counts and null ruling."""
     serve_forge(monkeypatch, FakeForge(board_issues=issues))
     capsys.readouterr()
     result = run_cli(["rulings", "--json"], capsys)
     assert result.status == 0
     item = json.loads(result.stdout)["rulings"][0]
     observed = tuple(
-        item[field] if field == "title" else [line[field] for line in item["lines"]]
+        item[field] if field in item else [line[field] for line in item["lines"]]
         for field in fields
     )
     assert observed == expected
