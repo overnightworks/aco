@@ -1,7 +1,17 @@
 import { render, screen, within } from '@testing-library/svelte';
-import { expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
 import { PICTURE } from '../test-support/board';
 import EnlargeablePicture from './EnlargeablePicture.svelte';
+
+beforeEach(() => {
+	HTMLDialogElement.prototype.showModal = function showModal() {
+		this.setAttribute('open', '');
+	};
+});
+
+afterEach(() => {
+	Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+});
 
 function decode(source: string): string {
 	return Buffer.from(source.slice(source.indexOf(',') + 1), 'base64').toString('utf-8');
@@ -77,4 +87,38 @@ test('a hostile picture, alt and caption render as text and one image', () => {
 	expect(container.querySelectorAll('script, svg:not([aria-hidden="true"])')).toHaveLength(0);
 	expect(container.querySelector('[onload], [onerror]')).toBeNull();
 	expect(screen.getByText(hostile, { selector: 'p' })).toBeInTheDocument();
+});
+
+test.each([
+	['0 0 200 140', '200', '140'],
+	['0,0,96.5,80', '96.5', '80']
+])(
+	'a picture with only the viewBox %s is drawn at the viewBox size in both places',
+	async (viewBox, width, height) => {
+		render(EnlargeablePicture, {
+			picture: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"/>`,
+			alt: 'alt text',
+			caption: undefined
+		});
+
+		const thumbnail = within(screen.getByRole('button', { name: 'Enlarge picture' })).getByRole(
+			'img'
+		);
+		expect(thumbnail).toHaveAttribute('width', width);
+		expect(thumbnail).toHaveAttribute('height', height);
+
+		screen.getByRole('button', { name: 'Enlarge picture' }).click();
+		const dialog = await screen.findByRole('dialog', { hidden: true });
+		const enlarged = await within(dialog).findByRole('img', { hidden: true });
+		expect(enlarged).toHaveAttribute('width', width);
+		expect(enlarged).toHaveAttribute('height', height);
+	}
+);
+
+test('a picture without a usable viewBox gets no forced size', () => {
+	render(EnlargeablePicture, { picture: PICTURE, alt: 'alt text', caption: undefined });
+
+	const image = within(screen.getByRole('button', { name: 'Enlarge picture' })).getByRole('img');
+	expect(image).not.toHaveAttribute('width');
+	expect(image).not.toHaveAttribute('height');
 });
