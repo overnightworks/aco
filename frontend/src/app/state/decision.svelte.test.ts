@@ -1,12 +1,23 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
-import { line, optionLine } from '../../test-support/board';
+import { cardOption, line, optionLine } from '../../test-support/board';
 import type { DecisionResult } from '../../types';
 import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS, lineKey } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
 
 const card = line({ index: 3, text: 'Guests?', question: 'Guests allowed?', fingerprint: 'fp' });
 const key = lineKey('repo', 42, card);
+
+const optionA = cardOption();
+const optionB = cardOption({ letter: 'B', name: 'As today' });
+const songCard = optionLine({
+	index: 4,
+	fingerprint: 'fp-shown',
+	topic: 'Jump',
+	options: [optionA, optionB]
+});
+const songKey = cardKey('repo', 42);
+const songPoints = [songCard];
 
 function sender(result: DecisionResult): typeof postDecision {
 	return vi.fn(async () => result) as unknown as typeof postDecision;
@@ -49,20 +60,17 @@ test('once the window elapses, exactly one request is sent and the board reloads
 	const reload = vi.fn(async () => {});
 	const store = new DecisionStore('token', reload, send);
 
-	store.decide('repo', 42, card, 'yes', 'a note');
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(send).toHaveBeenCalledTimes(1);
 	expect(send).toHaveBeenCalledWith('token', {
 		repo: 'repo',
 		item: 42,
-		line: 3,
-		fingerprint: 'fp',
-		outcome: 'yes',
-		note: 'a note'
+		lines: [{ line: 4, fingerprint: 'fp-shown', option: 'B' }]
 	});
 	expect(reload).toHaveBeenCalledTimes(1);
-	expect(store.isPending(key)).toBe(false);
+	expect(store.isPending(songKey)).toBe(false);
 
 	// Nothing fires again later: the timer was consumed, not merely delayed.
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -74,10 +82,10 @@ test('an already-ruled answer becomes a banner, and reloads nothing on its own',
 	const reload = vi.fn(async () => {});
 	const store = new DecisionStore('token', reload, send);
 
-	store.decide('repo', 42, card, 'yes', null);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(store.banner(key)).toEqual({
+	expect(store.banner(songKey)).toEqual({
 		kind: 'already-ruled',
 		message: 'Schon entschieden: diese Zeile wurde inzwischen woanders entschieden.'
 	});
@@ -108,10 +116,10 @@ test('a network failure during the write becomes its own failed banner', async (
 		send
 	);
 
-	store.decide('repo', 42, card, 'yes', null);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(store.banner(key)).toEqual({ kind: 'failed', message: 'Das Board ist nicht erreichbar.' });
+	expect(store.banner(songKey)).toEqual({ kind: 'failed', message: 'Das Board ist nicht erreichbar.' });
 });
 
 test('deciding again clears a stale banner before the new window starts', async () => {
@@ -121,13 +129,13 @@ test('deciding again clears a stale banner before the new window starts', async 
 		vi.fn(async () => {}),
 		send
 	);
-	store.decide('repo', 42, card, 'yes', null);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-	expect(store.banner(key)).not.toBeNull();
+	expect(store.banner(songKey)).not.toBeNull();
 
-	store.decide('repo', 42, card, 'no', null);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
 
-	expect(store.banner(key)).toBeNull();
+	expect(store.banner(songKey)).toBeNull();
 });
 
 test('"Neu laden" after a refusal drops the banner and reloads', async () => {
@@ -170,14 +178,14 @@ test('justRuled names the key a successful write just resolved, for the stage to
 	expect(store.justRuled).toBe(key);
 });
 
-test('two lines pending at once each write exactly once, and undoing one leaves the other untouched', async () => {
-	const otherCard = line({
+test('two cards pending at once each write exactly once, and undoing one leaves the other untouched', async () => {
+	const otherCard = optionLine({
 		index: 5,
-		text: 'Hosts?',
-		question: 'Hosts allowed?',
-		fingerprint: 'fp2'
+		fingerprint: 'fp2',
+		topic: 'Hosts',
+		options: [optionA, optionB]
 	});
-	const otherKey = lineKey('repo', 42, otherCard);
+	const otherKey = cardKey('repo', 43);
 	const send = sender({ status: 'ruled', message: null });
 	const store = new DecisionStore(
 		'token',
@@ -185,26 +193,23 @@ test('two lines pending at once each write exactly once, and undoing one leaves 
 		send
 	);
 
-	store.decide('repo', 42, card, 'yes', null);
-	store.decide('repo', 42, otherCard, 'no', null);
-	expect(store.isPending(key)).toBe(true);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	store.choose('repo', 43, [otherCard], { shown: otherCard, option: optionB });
+	expect(store.isPending(songKey)).toBe(true);
 	expect(store.isPending(otherKey)).toBe(true);
 
-	store.undo(key);
+	store.undo(songKey);
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(store.isPending(key)).toBe(false);
+	expect(store.isPending(songKey)).toBe(false);
 	expect(store.isPending(otherKey)).toBe(false);
 	expect(send).toHaveBeenCalledTimes(1);
-	expect(send).toHaveBeenCalledWith(
-		'token',
-		expect.objectContaining({ line: otherCard.index, outcome: 'no' })
-	);
+	expect(send).toHaveBeenCalledWith('token', {
+		repo: 'repo',
+		item: 43,
+		lines: [{ line: 5, fingerprint: 'fp2', option: 'B' }]
+	});
 });
-
-const songCard = optionLine({ index: 4, fingerprint: 'fp-shown', topic: 'Jump' });
-const songKey = cardKey('repo', 42);
-const songPoints = [songCard];
 
 function otherStore(result: DecisionResult = { status: 'ruled', message: null }) {
 	const send = sender(result);
