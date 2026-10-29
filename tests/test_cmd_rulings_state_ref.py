@@ -27,7 +27,7 @@ def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 def _item_file(
     item_id: str, *, expectations: bool, kind: str = "task", **links: object
 ) -> tuple[str, bytes]:
-    """A container carries an uncut `[[slice]]` row: the shape whose forge parent the board reads."""
+    """A container carries an uncut `[[slice]]` row, the shape whose parent the board read."""
     record = item_record(title=f"Item {item_id}", state="open", kind=kind)
     data: dict[str, object] = {
         "version": 1,
