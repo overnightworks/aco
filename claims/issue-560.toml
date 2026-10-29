@@ -3,6 +3,6 @@ agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
 role = "builder"
 base = "ea3be5be08d0ecf06729e4bc835178339a133e53"
 branch = "claude/issue-560-python-floor-314"
-scope = [".aco/brief.toml", ".github/workflows/ci.yml", ".github/workflows/release.yml", ".python-version", "pyproject.toml", "quality/baseline.toml", "quality/config.toml", "sonar-project.properties", "src/aco/board/aco_cli.py", "src/aco/board_read.py", "src/aco/cmd_land.py", "src/aco/cmd_release.py", "src/aco/cmd_rule.py", "src/aco/expectations.py", "src/aco/github_graphql.py", "src/aco/items.py", "src/aco/protocol.py", "src/aco/store.py", "src/aco/workboard.py", "tests/support/github_fixtures.py", "uv.lock"]
+scope = [".aco/brief.toml", ".github/workflows/ci.yml", ".github/workflows/release.yml", ".python-version", "pyproject.toml", "quality/baseline.toml", "quality/config.toml", "sonar-project.properties", "src/aco/board/aco_cli.py", "src/aco/board/api.py", "src/aco/board_read.py", "src/aco/checkout.py", "src/aco/cmd_land.py", "src/aco/cmd_release.py", "src/aco/cmd_rule.py", "src/aco/expectations.py", "src/aco/github_graphql.py", "src/aco/items.py", "src/aco/protocol.py", "src/aco/report.py", "src/aco/store.py", "src/aco/workboard.py", "tests/support/github_fixtures.py", "uv.lock"]
 opened_commit = "57de8ee2a35ef68e65f332c9f23ea26186bcce23"
 whole_reason = "One floor: the version pin, its CI, its config and the type-syntax fixes the new target makes ruff demand must change together, or ruff or the gate turns red in between."
