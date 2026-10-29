@@ -20,6 +20,7 @@ from aco_board_fixtures import (
     DEFAULT_LABEL,
     BoardClient,
     Response,
+    assert_guarded,
     serving,
     serving_two,
 )
@@ -210,6 +211,8 @@ def test_unreadable_rulings_json_answers_502_with_why(
 
     assert response.status == 502
     assert response.json() == {"repos": [{"name": DEFAULT_LABEL, "error": error, "items": []}]}
+    assert response.headers["Content-Type"] == "application/json"
+    assert_guarded(response)
 
 
 _OPTION_LINE_KEYS = [
@@ -500,8 +503,17 @@ def test_aco_failing_with_only_stderr_is_relayed_with_that_sentence(
     response = board.get_board_json()
 
     assert response.status == 502
-    error = _repos(response)[0]["error"]
-    assert error == "aco rulings failed: ERROR: no forge adapter for host"
+    assert response.json() == {
+        "repos": [
+            {
+                "name": DEFAULT_LABEL,
+                "error": "aco rulings failed: ERROR: no forge adapter for host",
+                "items": [],
+            }
+        ]
+    }
+    assert response.headers["Content-Type"] == "application/json"
+    assert_guarded(response)
 
 
 def test_a_hung_aco_rulings_answers_502_with_its_timeout(repository: BoardForge) -> None:
@@ -520,6 +532,8 @@ def test_a_hung_aco_rulings_answers_502_with_its_timeout(repository: BoardForge)
             }
         ]
     }
+    assert response.headers["Content-Type"] == "application/json"
+    assert_guarded(response)
 
 
 def test_a_hung_aco_rule_keeps_the_line_undecided(repository: BoardForge) -> None:

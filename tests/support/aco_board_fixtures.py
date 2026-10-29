@@ -555,3 +555,17 @@ class Lister(Protocol):
 def first_listed_line(board: BoardClient) -> dict[str, Any]:
     [listed_repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
     return cast(dict[str, Any], listed_repo["items"][0]["lines"][0])
+
+
+def assert_guarded(response: Response) -> None:
+    """The headers every answer carries, whatever its status."""
+    policy = response.content_security_policy or ""
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    for directive in ("base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'"):
+        assert directive in policy
+    assert cross_origin_headers(response) == []
+
+
+def cross_origin_headers(response: Response) -> list[str]:
+    return [name for name in response.headers if name.lower().startswith("access-control-")]

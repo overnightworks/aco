@@ -21,6 +21,8 @@ from aco_board_fixtures import (
     Lister,
     RecordedPort,
     Response,
+    assert_guarded,
+    cross_origin_headers,
     decision_port,
     serving,
     serving_two,
@@ -39,20 +41,6 @@ def _card_body(**overrides: object) -> str:
         "lines": [{"line": 1, "fingerprint": "any", "option": "A"}],
     }
     return json.dumps({**fields, **overrides})
-
-
-def _assert_guarded(response: Response) -> None:
-    """The headers every answer carries, whatever its status."""
-    policy = response.content_security_policy or ""
-    assert response.headers["Cache-Control"] == "no-store"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
-    for directive in ("base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'"):
-        assert directive in policy
-    assert _cross_origin_headers(response) == []
-
-
-def _cross_origin_headers(response: Response) -> list[str]:
-    return [name for name in response.headers if name.lower().startswith("access-control-")]
 
 
 def _listed_line(index: int, text: str, ruling: str, **shown: str) -> dict[str, object]:
@@ -302,7 +290,7 @@ def test_an_api_body_not_complete_by_the_deadline_answers_408_as_json(
         408,
         {"error": "request timeout: body incomplete"},
     )
-    _assert_guarded(response)
+    assert_guarded(response)
     _assert_no_call(port, repository)
 
 
@@ -325,7 +313,7 @@ def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
         ]
     }
     assert response.headers["Content-Type"] == "application/json"
-    _assert_guarded(response)
+    assert_guarded(response)
 
 
 def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
@@ -423,7 +411,7 @@ def test_every_answer_is_uncached_unreferred_framed_by_none_and_never_cross_orig
     assert response.status == status
     assert response.headers["Content-Type"] == content_type
     assert response.headers.get("Allow") == allow
-    _assert_guarded(response)
+    assert_guarded(response)
 
 
 @pytest.mark.parametrize(
@@ -447,7 +435,7 @@ def test_a_request_the_http_layer_cannot_parse_is_refused_with_every_guard_heade
 
     assert response.status == status
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    _assert_guarded(response)
+    assert_guarded(response)
     _assert_no_call(port, repository)
 
 
@@ -469,5 +457,5 @@ def test_a_cross_origin_preflight_is_granted_nothing(
     response = board.call_api("OPTIONS", "/api/rule", presented=None, headers=preflight)
 
     assert response.status >= 400
-    assert _cross_origin_headers(response) == []
+    assert cross_origin_headers(response) == []
     _assert_no_call(port, repository)
