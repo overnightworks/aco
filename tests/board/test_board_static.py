@@ -185,9 +185,10 @@ def test_start_board_refuses_to_bind_once_the_shell_is_missing(
 ) -> None:
     monkeypatch.setattr(static, "STATIC_ROOT", tmp_path / "unbuilt")
     boards = Boards({})
+    token = secrets.token_urlsafe(32)
 
     with pytest.raises(static.StaticAssetsMissingError):
-        start_board(0, boards, secrets.token_urlsafe(32))
+        start_board(0, boards, token)
 
 
 @pytest.mark.parametrize(
