@@ -57,6 +57,21 @@ def test_board_token_reuses_the_token_the_file_holds(tmp_path: Path) -> None:
     assert second == first
 
 
+def test_board_token_reuses_the_token_in_a_directory_that_cannot_be_written(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "aco" / "board-token"
+    first = board_token(path)
+    path.parent.chmod(0o500)
+
+    try:
+        second = board_token(path)
+    finally:
+        path.parent.chmod(0o700)
+
+    assert second == first
+
+
 def test_board_token_keeps_an_existing_directory_mode(tmp_path: Path) -> None:
     existing = tmp_path / "aco"
     existing.mkdir(mode=0o755)

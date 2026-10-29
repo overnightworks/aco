@@ -2,7 +2,7 @@
 
 Deleting the file rotates the token. The file is the user's own state: it is
 created user-only and not policed afterwards, but its content may come from a
-file this process did not write, so it is validated before use (ABRD-93).
+file this process did not write, so it is validated before use (ABRD-96).
 """
 
 from __future__ import annotations
@@ -40,6 +40,10 @@ def board_token(path: Path) -> str:
     The file appears only through an exclusive link of a fully written temporary
     file, so a concurrent first start reads the winner's token.
     """
+    try:
+        return _read(path)
+    except FileNotFoundError:
+        pass
     _make_missing_directories(path.parent)
     token = secrets.token_urlsafe(_TOKEN_BYTES)
     # mkstemp creates the file 0600 and the write lands before the link, so no
