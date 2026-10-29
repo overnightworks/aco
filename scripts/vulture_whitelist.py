@@ -13,7 +13,7 @@ logging call reaches the override through `BaseHTTPRequestHandler`'s own
 `self.log_message(...)` -- never by a literal call this package writes, so
 vulture never sees a caller for any of the three.
 
-`argparse.Action.nargs`/`const`/`metavar` stand for the `_ArgumentOptions`
+`argparse.Action.nargs`/`const`/`default`/`metavar` stand for the `_ArgumentOptions`
 keys that `add_argument` receives through `**options`: vulture matches by
 attribute name, and argparse stores each of those keywords as the `Action`
 attribute of the same name, so the names are used.
@@ -181,5 +181,6 @@ _referenced_only_for_vulture = (
     _size_class_measurement_for_vulture.last_event_at,
     argparse.Action.nargs,
     argparse.Action.const,
+    argparse.Action.default,
     argparse.Action.metavar,
 )
