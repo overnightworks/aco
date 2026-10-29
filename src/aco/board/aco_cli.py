@@ -46,8 +46,8 @@ from .ports import (
 
 ACO_EXECUTABLE = "aco"
 DEFAULT_TIMEOUT_SECONDS = 120.0
-"""`aco rulings` builds the whole board projection, which can take tens of
-seconds against a forge; a call still running after this is treated as hung."""
+"""`aco rulings` reads the open-item listing, which can take seconds against a
+forge; a call still running after this is treated as hung."""
 _ALREADY_RULED_REASON = "already_ruled"
 _CARD_CHANGED_REASON = "card_changed"
 _RETURNED_REASON = "returned"

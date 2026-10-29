@@ -19,6 +19,8 @@ it, `<k>` an expectation line's 1-based index.
 | `--repo` under `storage = "state-ref"` | BOARD-42 (cited) | BOARD-42 (cited), RUL-09 |
 | an item with an open expectation line | RUL-01, RUL-02 | RUL-05, RUL-10, RUL-12 |
 | several such items | RUL-03 | RUL-05, RUL-10 |
+| an item whose block is malformed or unreadable | RUL-20 | RUL-20 |
+| a state-ref item whose record link names a missing id, or one blocker twice | RUL-21 | RUL-21 |
 | an item whose every line is already ruled | RUL-01, RUL-04 | RUL-05, RUL-10 |
 | a ruled line | RUL-02 | RUL-05, RUL-10, RUL-12 |
 | a line's `question`/`example`/`picture` | — | RUL-06 |
@@ -33,8 +35,10 @@ it, `<k>` an expectation line's 1-based index.
 - [ ] [RUL-01] Each listed item prints one header, `<label> <open>/<total>: <title>`, then one line per expectation entry -- ruled ones too -- in block order (see E-RUL-01, E-RUL-05).
 - [ ] [RUL-02] An open line prints `  <k> open: <summary>`, ruled `  <k> ruled <outcome> <date>: <summary>`, `<outcome>` an option line's letter or `other`; `<summary>` caps at 100, `…` last if cut (see E-RUL-01).
 - [ ] [RUL-11] Text shows `<title>` and `<summary>` with each display control escaped (NEXT-37), `<summary>` after its cap; `--json` carries both as stored.
-- [ ] [RUL-03] Rows rank by priority category, score, fewer open lines, ascending `<n>` (never `board --json`'s raw order); open-line items precede fully ruled ones, each group in that order (see E-RUL-02).
+- [ ] [RUL-03] Rows with a dated open option line come first, newest `asked_on` first; then rows with undated open lines; then fully ruled rows (RUL-04); ties and groups by descending `<n>` (see E-RUL-02).
 - [ ] [RUL-04] An item whose every expectation line is already ruled is listed, in both text and `--json`, in the fully-ruled group RUL-03 orders last (see E-RUL-02, E-RUL-05).
+- [ ] [RUL-20] An item whose block is malformed, or which the store cannot read (PIN-14, PIN-15), is listed in neither text nor `--json`.
+- [ ] [RUL-21] Under `storage = "state-ref"`, `aco rulings` validates no record link: a missing `record.parent`/`blocked_by` id or a doubled blocker still lists the item; a foreign file name refuses (PIN-36).
 
 ## `--json`
 
@@ -71,7 +75,8 @@ An option line's keys after `returned_note` are `question`, `problem`, `picture`
 
 ## Never
 
-- `aco rulings` never writes: it reads the same open-board projection `board`/`next` already build, and nothing else.
+- `aco rulings` never changes an item or a claim.
+- Under `storage = "github"` `aco rulings` reads only the open-item listing. Under `storage = "state-ref"` it reads the state snapshot and lists the items as the store does (BOARD-42), the store's own child counts included. It makes no further board-projection read (dependencies, parent lookups, pull requests, landings, claim history) and validates no record link (RUL-21).
 - `aco rulings` never re-scans an item's stale prose for its progress counts: a `## Erwartungen` heading left beside the block plays no part -- only the block's own `[[expectation]]` entries are read.
 
 ## Examples
@@ -95,19 +100,24 @@ $ aco rulings
 exit 0
 ```
 
-### E-RUL-02 — ranked rows, a fully-ruled item ordered last
+### E-RUL-02 — newest card first, undated rows then fully-ruled rows last
 
-Setup: bare-remote, fake `gh`, issue `#50` in-flight with two open lines, issue `#60` a lower-priority item with one open line, issue `#70` fully ruled
+Setup: bare-remote, fake `gh`, issue `#40` with an open card asked 2026-10-30 and one asked 2026-10-25, issues `#50` and `#60` each with one open card asked 2026-10-28, issue `#30` with one open yes/no line, issues `#20` and `#70` fully ruled
 
 ```console
 $ aco rulings
-#50 2/3: In-flight security work
+#40 2/2: Item 40
   1 open: Name it.
   2 open: Name it too.
-  3 ruled yes 2026-09-19: Settled.
-#60 1/1: Lower-priority product work
+#60 1/1: Item 60
   1 open: Ship it?
-#70 0/1: Fully ruled security work
+#50 1/1: Item 50
+  1 open: Ship it?
+#30 1/1: Item 30
+  1 open: Keep it?
+#70 0/1: Item 70
+  1 ruled yes 2026-09-19: Settled.
+#20 0/1: Item 20
   1 ruled yes 2026-09-19: Settled.
 exit 0
 ```

@@ -375,8 +375,8 @@ def _claim_lifecycle(worktree: Path, state: protocol.ClaimState) -> store.ClaimL
 
 def _claim_history(worktree: Path, state: protocol.ClaimState) -> ClaimHistory:
     """`build_board`'s own bundle of the two store history reads a full board
-    build needs, from one already-fetched state -- `board`, `rulings`, and
-    `next` all read this rather than `claim_ages` and `_claim_lifecycle`
+    build needs, from one already-fetched state -- `board` and
+    `next` both read this rather than `claim_ages` and `_claim_lifecycle`
     separately."""
     lifecycle = _claim_lifecycle(worktree, state)
     return ClaimHistory(
@@ -433,14 +433,14 @@ def observed_board(
     *,
     issues: tuple[workboard.Issue, ...] | None = None,
 ) -> _ObservedBoard:
-    """`board`/`rulings`/`next` share this: the store's live claims, projected
+    """`board`/`next` share this: the store's live claims, projected
     onto forge board data (claims no longer come from the
     ledger; the forge is still the board's own data source)."""
     if issues is None:
         fetched = _store_observation_and_issues(context)
         observed, issues = fetched.observed, fetched.issues
     else:
-        # A caller that already fetched `issues` itself (`rulings`) has
+        # A caller that already fetched `issues` itself (`next`) has
         # nothing left to overlap the state fetch with.
         observed = context.observation
     live_claims = tuple(observed.claims.values())

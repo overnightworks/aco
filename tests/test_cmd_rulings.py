@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 from board_fixtures import (
     MINIMAL_BLOCK_TOML,
+    REPOSITORY,
     RULED_ON,
     block_body,
     board_issue,
@@ -17,8 +19,10 @@ from board_fixtures import (
 )
 from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_pages import raw_board_issue
+from option_cards import RETURNED_NOTE, RETURNED_ON, card, card_body, card_head, ruled_card
 
-from aco import workboard
+from aco import body, github, store, workboard
 
 
 @pytest.fixture(autouse=True)
@@ -312,134 +316,94 @@ def test_rulings_json(
         assert result.stdout == raw
 
 
+OPEN_YES_NO = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
+RULED_YES_NO = '[[expectation]]\ntext = "Alt"\nruling = "yes"\nruled_on = 2026-10-28\n'
+CARD_DAY = "asked_on = 2026-10-28"
+
+
+def _item_of(number: int, *lines: str) -> workboard.Issue:
+    return board_issue(number, f"Item {number}", card_body("".join(lines)))
+
+
+def _open_card(day: str) -> str:
+    return card(card_head((CARD_DAY, f"asked_on = {day}")))
+
+
+def _ruled_card(day: str | None) -> str:
+    edit = (CARD_DAY + "\n", "") if day is None else (CARD_DAY, f"asked_on = {day}")
+    return ruled_card(edit)
+
+
+def _returned_card(day: str) -> str:
+    keys = RETURNED_ON + RETURNED_NOTE
+    return card(card_head(("question = ", keys + "question = "), (CARD_DAY, f"asked_on = {day}")))
+
+
 @pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
 @pytest.mark.parametrize(
-    "issues, headers, numbers",
+    "issues, numbers",
     [
         pytest.param(
             (
-                board_issue(
-                    50,
-                    "In-flight security work",
-                    complete_contract(
-                        "Ship #50.",
-                        expectation=[
-                            proposed_expectation("Open decision 0."),
-                            proposed_expectation("Open decision 1."),
-                            ruled_expectation("Settled decision 0."),
-                        ],
-                    ),
-                    labels=("security",),
-                ),
-                board_issue(
-                    30,
-                    "Later security tie",
-                    complete_contract(
-                        "Ship #30.",
-                        expectation=[
-                            proposed_expectation("Open decision 0."),
-                            ruled_expectation("Settled decision 0."),
-                        ],
-                    ),
-                    labels=("security",),
-                ),
-                board_issue(
-                    10,
-                    "Earlier security tie",
-                    complete_contract(
-                        "Ship #10.",
-                        expectation=[
-                            proposed_expectation("Open decision 0."),
-                            proposed_expectation("Open decision 1."),
-                            ruled_expectation("Settled decision 0."),
-                        ],
-                    ),
-                    labels=("security",),
-                ),
-                board_issue(
-                    40,
-                    "More open security work",
-                    complete_contract(
-                        "Ship #40.",
-                        expectation=[
-                            proposed_expectation("Open decision 0."),
-                            proposed_expectation("Open decision 1."),
-                            ruled_expectation("Settled decision 0."),
-                        ],
-                    ),
-                    labels=("security",),
-                ),
-                board_issue(
-                    60,
-                    "Lower-priority product work",
-                    complete_contract(
-                        "Ship #60.", expectation=[proposed_expectation("Open decision 0.")]
-                    ),
-                    labels=("product",),
-                ),
-                board_issue(
-                    70,
-                    "Fully ruled security work",
-                    complete_contract(
-                        "Ship #70.", expectation=[ruled_expectation("Settled decision 0.")]
-                    ),
-                    labels=("security",),
-                ),
+                _item_of(10, _open_card("2026-10-27")),
+                _item_of(20, _open_card("2026-10-29")),
+                _item_of(30, _open_card("2026-10-28")),
+                _item_of(40, _open_card("2026-10-28")),
             ),
-            [
-                "#50 2/3: In-flight security work",
-                "#30 1/2: Later security tie",
-                "#10 2/3: Earlier security tie",
-                "#40 2/3: More open security work",
-                "#60 1/1: Lower-priority product work",
-                "#70 0/1: Fully ruled security work",
-            ],
-            [50, 30, 10, 40, 60, 70],
-            id="priority",
+            [20, 40, 30, 10],
+            id="newest-card-first-same-day-by-descending-number",
         ),
         pytest.param(
             (
-                board_issue(
-                    50,
-                    "In-flight ruled",
-                    complete_contract(
-                        "Ship #50.", expectation=[ruled_expectation("Settled decision 0.")]
-                    ),
-                    labels=("security",),
+                _item_of(10, _open_card("2026-10-30")),
+                _item_of(
+                    20,
+                    _open_card("2026-10-25"),
+                    _open_card("2026-10-29"),
+                    _ruled_card("2026-10-31"),
                 ),
-                board_issue(
-                    10,
-                    "Earlier ruled",
-                    complete_contract(
-                        "Ship #10.", expectation=[ruled_expectation("Settled decision 0.")]
-                    ),
-                    labels=("security",),
-                ),
-                board_issue(
-                    40,
-                    "Later ruled",
-                    complete_contract(
-                        "Ship #40.", expectation=[ruled_expectation("Settled decision 0.")]
-                    ),
-                    labels=("security",),
-                ),
-                board_issue(
-                    5,
-                    "Product ruled",
-                    complete_contract(
-                        "Ship #5.", expectation=[ruled_expectation("Settled decision 0.")]
-                    ),
-                    labels=("product",),
-                ),
+                _item_of(30, _open_card("2026-10-28")),
             ),
-            [
-                "#50 0/1: In-flight ruled",
-                "#10 0/1: Earlier ruled",
-                "#40 0/1: Later ruled",
-                "#5 0/1: Product ruled",
-            ],
-            [50, 10, 40, 5],
-            id="fully-ranked",
+            [10, 20, 30],
+            id="multi-point-card-dated-by-its-newest-open-point",
+        ),
+        pytest.param(
+            (
+                _item_of(10, _returned_card("2026-10-29")),
+                _item_of(20, _open_card("2026-10-28")),
+                _item_of(30, _open_card("2026-10-30"), OPEN_YES_NO),
+            ),
+            [30, 10, 20],
+            id="card-with-its-head-and-card-plus-yes-no-ordered-by-card-date",
+        ),
+        pytest.param(
+            (
+                _item_of(10, _ruled_card("2026-10-31")),
+                _item_of(20, OPEN_YES_NO),
+                _item_of(30, _ruled_card(None)),
+                _item_of(40, _open_card("2026-10-01")),
+                _item_of(50, OPEN_YES_NO, RULED_YES_NO),
+                _item_of(60, RULED_YES_NO),
+            ),
+            [40, 50, 20, 60, 30, 10],
+            id="dated-cards-then-undated-open-rows-then-fully-ruled-rows",
+        ),
+        pytest.param(
+            (
+                _item_of(10, _open_card("2026-10-28")),
+                board_issue(
+                    20,
+                    "Malformed block",
+                    block_body(MINIMAL_BLOCK_TOML + "[[expectation\n" + card()),
+                ),
+                dataclasses.replace(
+                    _item_of(30, _open_card("2026-10-29")),
+                    unreadable=body.ContractDefect("items/30", "cannot be read"),
+                ),
+                board_issue(40, "No block", "Prose only."),
+            ),
+            [10],
+            id="malformed-unreadable-and-block-less-rows-are-not-listed",
         ),
     ],
 )
@@ -449,27 +413,51 @@ def test_rulings_orders_items(
     capsys: pytest.CaptureFixture[str],
     issues: tuple[workboard.Issue, ...],
     as_json: bool,
-    headers: list[str],
     numbers: list[int],
 ) -> None:
-    """Spec: RUL-01, RUL-03, RUL-04 --
-    Category, score, open count and numeric ties in both groups."""
-    serve_forge(
-        monkeypatch,
-        FakeForge(
-            board_issues=issues,
-            board_open_pull_requests=(workboard.PullRequest(200, "Fixes #50", "", "branch"),),
-        ),
-    )
+    """Spec: RUL-01, RUL-03, RUL-04, RUL-20 --
+    Newest open card first, then undated open rows, then fully ruled rows, in text
+    and `--json`; malformed and unreadable rows are not listed."""
+    serve_forge(monkeypatch, FakeForge(board_issues=issues))
     capsys.readouterr()
     result = run_cli(["rulings", *(["--json"] if as_json else [])], capsys)
     assert result.status == 0
     observed = (
         [item["number"] for item in json.loads(result.stdout)["rulings"]]
         if as_json
-        else [line for line in result.stdout.splitlines() if line.startswith("#")]
+        else [int(line[1:].split(" ")[0]) for line in result.stdout.splitlines() if line[:1] == "#"]
     )
-    assert observed == (numbers if as_json else headers)
+    assert observed == numbers
+
+
+@pytest.mark.usefixtures("github_clone")
+def test_rulings_reads_one_listing_page_and_no_claim_state(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: RUL-03, Never 1 -- One request for 99 raw entries; no board projection read."""
+    calls: list[list[str]] = []
+    carrying_card = raw_board_issue(number=7, body=_item_of(7, _open_card("2026-10-28")).body)
+    pull_request = raw_board_issue(number=8, isPullRequest=True)
+    filler = [raw_board_issue(number=number) for number in range(100, 197)]
+    page = "\n".join(json.dumps(row) for row in [carrying_card, pull_request, *filler])
+    assert len(page.splitlines()) == 99
+
+    def run(arguments: list[str], input_data: bytes | None = None) -> str:
+        calls.append(arguments)
+        return page
+
+    def refuse_claim_state(**_: object) -> object:
+        raise AssertionError("rulings must not read the claim state")
+
+    client = serve_forge(monkeypatch, github.GitHubForge(github.repository_id(REPOSITORY), run=run))
+    monkeypatch.setattr(store, "fetch_state", refuse_claim_state)
+    capsys.readouterr()
+    result = run_cli(["rulings", "--json"], capsys)
+    assert result.status == 0
+    assert [item["number"] for item in json.loads(result.stdout)["rulings"]] == [7]
+    assert client.requests == 1
+    assert len(calls) == 1
+    assert "issues?state=open" in calls[0][1]
 
 
 @pytest.mark.parametrize(
