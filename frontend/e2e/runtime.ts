@@ -12,8 +12,8 @@ export interface BoardRuntime {
 	appUrl: string;
 	/** The fake board's access token, as it belongs in a `#t=` fragment. */
 	token: string;
-	/** The fake `aco` repository's directory, for toggling its answers. */
-	repoDirectory: string;
+	/** The control endpoint's origin, where `itemFixture.ts` arranges the forge. */
+	controlUrl: string;
 }
 
 export const RUNTIME_FILE = path.join(import.meta.dirname, '.runtime.json');

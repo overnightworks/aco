@@ -26,7 +26,7 @@ import time
 import tomllib
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import NoReturn
@@ -44,6 +44,8 @@ _CANNED_FILE = "aco-canned.json"
 _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
 _EDITS_BEFORE_READ = "edits_before_read"
+RULING_DAY = date(2026, 10, 3)
+"""The day aco rules on over this forge, so a page shows a date it can name."""
 
 
 class ForgeOperation(StrEnum):
@@ -59,7 +61,7 @@ class ForgeRequest:
 
 
 @dataclass
-class _StoredItem:
+class StoredItem:
     title: str
     body: str
 
@@ -68,7 +70,7 @@ class _StoredItem:
 class _ForgeState:
     """Everything the forge file holds, keyed by item number."""
 
-    items: dict[int, _StoredItem] = field(default_factory=dict[int, _StoredItem])
+    items: dict[int, StoredItem] = field(default_factory=dict[int, StoredItem])
     listing_failure: str | None = None
     edits_before_read: dict[int, str] = field(default_factory=dict[int, str])
 
@@ -76,7 +78,7 @@ class _ForgeState:
     def from_json(cls, text: str) -> _ForgeState:
         stored = json.loads(text)
         return cls(
-            {int(number): _StoredItem(**item) for number, item in stored[_ITEMS].items()},
+            {int(number): StoredItem(**item) for number, item in stored[_ITEMS].items()},
             stored[_LISTING_FAILURE],
             {int(number): edit for number, edit in stored[_EDITS_BEFORE_READ].items()},
         )
@@ -99,8 +101,13 @@ class BoardForge:
 
     def put_item(self, number: int, raw_body: str, *, title: str = "Karte") -> None:
         state = self._state()
-        state.items[number] = _StoredItem(title, raw_body)
+        state.items[number] = StoredItem(title, raw_body)
         self._replace_state(state)
+
+    def replace_items(self, items: Mapping[int, StoredItem]) -> None:
+        """The forge holds exactly `items`, with no listing failure and no
+        pending edit, in one write."""
+        self._replace_state(_ForgeState(dict(items)))
 
     def remove_item(self, number: int) -> None:
         """Item `number` leaves the open listing, as a closed issue does."""
@@ -268,8 +275,9 @@ def _forge_of(context: session.RunContext) -> forge.ForgeWriter:
 
 
 def run_context(repo: forge.RepositoryId | None) -> session.RunContext:
-    """`session.run_context` over the checkout's own `BoardForge`."""
-    return session.RunContext(repo, build_forge=_forge_of)
+    """`session.run_context` over the checkout's own `BoardForge`, ruling on
+    `RULING_DAY`."""
+    return session.RunContext(repo, build_forge=_forge_of, today=lambda: RULING_DAY)
 
 
 def item_body(*entries: Mapping[str, object]) -> str:
