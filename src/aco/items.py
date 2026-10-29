@@ -24,7 +24,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import cast
+from typing import TypeAlias, cast
 
 from .body import ORIGIN_GRAMMAR_HINT, ORIGIN_PATTERN
 from .protocol import (
@@ -44,7 +44,9 @@ _MAX_MINT_ATTEMPTS = 3
 # `cast`'s type argument for every `ItemRecord` field `body.py`'s schema
 # leaves optional: named once as a real type, not a repeated string literal,
 # so the four call sites below share one owner.
-type _OptionalStr = str | None
+# `cast` evaluates its argument at runtime, which a PEP 695 `type` statement
+# would turn into a TypeAliasType; the assignment form keeps a plain union.
+_OptionalStr: TypeAlias = str | None  # noqa: UP040
 
 
 class RecordState(StrEnum):
