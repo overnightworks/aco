@@ -52,7 +52,7 @@ test('undoing a key with nothing pending is a no-op', () => {
 		vi.fn(async () => {})
 	);
 
-	expect(() => store.undo(key)).not.toThrow();
+	expect(() => store.undo(songKey)).not.toThrow();
 });
 
 test('once the window elapses, exactly one request is sent and the board reloads', async () => {

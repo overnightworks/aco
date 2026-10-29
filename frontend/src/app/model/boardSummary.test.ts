@@ -28,7 +28,7 @@ test('first selection follows configured order, skipping failed repos and ruled-
 				item({ number: 2, lines: [optionLine({ index: 1 })] })
 			]
 		}),
-		repo({ name: 'last' })
+		repo({ name: 'last', items: [item({ lines: [optionLine()] })] })
 	];
 	expect(firstOpenKey(repos)).toBe('first:5:card');
 	expect(firstOpenKey([])).toBeNull();

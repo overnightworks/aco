@@ -235,7 +235,7 @@ test('[ABRD-31] with nothing ruled the decided list reads Nothing decided yet an
 });
 
 test('[ABRD-31] a failed repository shows its alert in the decided list and no Nothing decided yet', () => {
-	renderList([repo({ name: 'broken', error: 'down', items: [] }), repo({ name: 'idle' })], {
+	renderList([repo({ name: 'broken', error: 'down', items: [] }), repo({ name: 'idle', items: [] })], {
 		view: 'decided'
 	});
 
