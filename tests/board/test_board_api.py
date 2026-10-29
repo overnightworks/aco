@@ -96,7 +96,7 @@ def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
     for item in listed:
         for listed_line in item["lines"]:
             assert isinstance(listed_line.pop("fingerprint"), str)
-    expected = [
+    assert listed == [
         {
             "number": 42,
             "title": "Share page",
@@ -109,7 +109,6 @@ def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
         },
         {"number": 7, "title": "Login", "lines": [_listed_line(1, "Remember me?", "later")]},
     ]
-    assert listed == expected
     assert repository.rule_calls() == []
 
 
