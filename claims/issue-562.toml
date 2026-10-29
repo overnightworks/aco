@@ -1,8 +1,0 @@
-claim_id = "b650c5ab968746d99ecb802bf6790e1d"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "d21e69ac9808e7df4fbd94e692e9d03adb373609"
-branch = "claude/issue-562-quality-090-pin"
-scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", "quality/baseline.toml", "src/aco/board/aco_cli.py", "src/aco/board/cli.py", "src/aco/board/server.py", "src/aco/usage.py", "tests/board/test_board_cli.py"]
-opened_commit = "9a042719098cfdeaf83083961d5087ff86baa646"
-whole_reason = "One gate move: the pin cannot move while any finding stays, and the findings are four markers and one line, so splitting would leave the gate red in between."
