@@ -1,0 +1,8 @@
+claim_id = "98d2316ec7e94175b877d6efc5974525"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "57735b4d583221532ee143736811025e054bcf42"
+branch = "claude/issue-573-date-refusal-owner"
+scope = ["quality/baseline.toml", "specs/body-block.spec.md", "src/aco/body.py", "src/aco/expectation_grammar.py"]
+opened_commit = "965bccd19fc4bb46ee6cceb848d585c19c54fa5e"
+whole_reason = "One printed phrase gets one owner across the two grammar modules, the spec example that states its output is corrected, and the size baseline follows if body.py shrinks."
