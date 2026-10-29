@@ -104,7 +104,9 @@ class TestGithubRule:
             "exit": result.status,
             "stdout": result.stdout,
             "stderr": result.stderr,
-            "rulings": [line.ruling for line in written],
+            "rulings": [
+                line.ruling for line in written if isinstance(line, expectations.OptionLine)
+            ],
         }
         assert observed == {"exit": 0, "stdout": sentence, "stderr": "", "rulings": [ruling, None]}
 

@@ -31,6 +31,11 @@ def choose(index: int, card_hash: str = GOLDEN_CARD_HASH) -> decide.LineOutcome:
     return decide.LineOutcome(index, choice)
 
 
+def option_rulings(lines: tuple[expectations.ExpectationLine, ...]) -> list[str | None]:
+    """The ruling of each option line of `lines`, in order."""
+    return [line.ruling for line in lines if isinstance(line, expectations.OptionLine)]
+
+
 def world(storage: body.Storage, item_body: str, clone: Path) -> tuple[RunContext, FakeForge]:
     """A checkout pinned to `storage` whose issue 90 is `item_body`, behind a fake forge."""
     track_board_config(clone, f'storage = "{storage.value}"\n')
@@ -48,7 +53,7 @@ class TestCommitted:
         committed = decide.rule(context, decide.fresh_item(context, 90), [choose(2)], TODAY)
         written = client.item_bodies[90]
         assert committed.lines == tuple(expectations.expectation_lines(written, storage=storage))
-        assert [line.ruling for line in committed.lines] == [None, "A"]
+        assert option_rulings(committed.lines) == [None, "A"]
 
     def test_committed_carries_the_title_of_the_item_the_gate_read(
         self, storage: body.Storage, clone: Path
@@ -70,7 +75,7 @@ class TestCommitted:
             context, decide.fresh_item(context, 90), [choose(1), choose(2)], TODAY
         )
         assert len(client.body_writes) == 1
-        assert [line.ruling for line in committed.lines] == ["A", "A"]
+        assert option_rulings(committed.lines) == ["A", "A"]
 
     @pytest.mark.parametrize(
         "item_body,named,refusal",

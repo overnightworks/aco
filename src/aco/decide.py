@@ -80,5 +80,5 @@ def rule(
         new_body = _written_body(new_body, line.index, line.outcome, today)
     context.forge_writer.update_item_body(fresh.number, new_body)
     lines = tuple(expectations.expectation_lines(new_body, storage=fresh.storage))
-    open_remaining = sum(1 for line in lines if line.ruling is None)
+    open_remaining = sum(map(expectations.is_open, lines))
     return Committed(fresh.number, fresh.title, lines, open_remaining)

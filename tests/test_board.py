@@ -350,7 +350,11 @@ def _open_line(text: str) -> ExpectationLine:
 
 
 def _line_facts(lines: tuple[ExpectationLine, ...]) -> list[tuple[object, ...]]:
-    return [(line.form, line.index, line.text, line.ruling, line.ruled_on) for line in lines]
+    return [
+        (line.form, line.index, line.text, line.ruling, line.ruled_on)
+        for line in lines
+        if not isinstance(line, expectations.WithdrawnLine)
+    ]
 
 
 def test_expectation_lines_reports_index_text_ruling_and_ruled_on() -> None:

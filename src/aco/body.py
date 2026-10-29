@@ -21,7 +21,7 @@ from datetime import date
 from enum import Enum, StrEnum
 from typing import TypeGuard, cast
 
-from . import metrics, protocol
+from . import expectation_grammar, metrics, protocol
 from .expectation_grammar import NOT_A_LOCAL_DATE, block_expectation_defects, render_expectations
 
 # CommonMark fence delimiters: at most 3 leading spaces, then a run of 3+
@@ -681,14 +681,14 @@ def block_expectation_dicts(data: dict[str, object]) -> list[dict[str, object]]:
 def _block_expectation_state(expectations: list[dict[str, object]]) -> ExpectationState:
     if not expectations:
         return ExpectationState.NONE
-    if any("ruling" not in entry for entry in expectations):
+    if any(map(expectation_grammar.is_open_line, expectations)):
         return ExpectationState.PROPOSED
     return ExpectationState.RULED
 
 
 def _block_expectation_progress(expectations: list[dict[str, object]]) -> ExpectationProgress:
     return ExpectationProgress(
-        open=sum(1 for entry in expectations if "ruling" not in entry), total=len(expectations)
+        open=sum(map(expectation_grammar.is_open_line, expectations)), total=len(expectations)
     )
 
 

@@ -27,21 +27,24 @@ from .expectation_grammar import (
     OTHER,
     RETURNED_NOTE,
     RETURNED_ON,
+    WITHDRAWN_ON,
     DecisionKind,
     RulingVia,
     Undo,
     card_hash,
     is_option_line,
+    is_withdrawn_line,
 )
 
 EXPECTATION_LINE_TEXT_MAXIMUM = 100
 
 
 class LineForm(StrEnum):
-    """Which of the two line forms an `[[expectation]]` entry takes."""
+    """Which of the three line forms an `[[expectation]]` entry takes."""
 
     YES_NO = "yes_no"
     OPTIONS = "options"
+    WITHDRAWN = "withdrawn"
 
 
 @dataclass(frozen=True)
@@ -172,7 +175,24 @@ class OptionLine:
         return self.text
 
 
-type ExpectationLine = YesNoLine | OptionLine
+@dataclass(frozen=True)
+class WithdrawnLine:
+    """A line its head took back before anyone ruled it: it keeps its index
+    and its text, and carries no ruling, so no reader can take it for an
+    open or a decided line."""
+
+    form: ClassVar[LineForm] = LineForm.WITHDRAWN
+    index: int
+    text: str
+    withdrawn_on: date
+
+
+type ExpectationLine = YesNoLine | OptionLine | WithdrawnLine
+
+
+def is_open(line: ExpectationLine) -> bool:
+    """Whether `line` still waits for a ruling: an option line without a decision."""
+    return isinstance(line, OptionLine) and line.decision is None
 
 
 def _card_option(position: int, option: dict[str, object]) -> CardOption:
@@ -252,6 +272,16 @@ def _yes_no_line(index: int, entry: dict[str, object]) -> YesNoLine:
     )
 
 
+def _withdrawn_line(index: int, entry: dict[str, object]) -> WithdrawnLine:
+    return WithdrawnLine(index, cast(str, entry["text"]), cast(date, entry[WITHDRAWN_ON]))
+
+
+def _expectation_line(index: int, entry: dict[str, object]) -> ExpectationLine:
+    if is_withdrawn_line(entry):
+        return _withdrawn_line(index, entry)
+    return _option_line(index, entry) if is_option_line(entry) else _yes_no_line(index, entry)
+
+
 def expectation_lines(
     body: str, *, storage: Storage = Storage.GITHUB
 ) -> tuple[ExpectationLine, ...]:
@@ -266,8 +296,7 @@ def expectation_lines(
         return ()
     entries = block_expectation_dicts(locate_block(body).data)
     return tuple(
-        _option_line(position, entry) if is_option_line(entry) else _yes_no_line(position, entry)
-        for position, entry in enumerate(entries, start=1)
+        _expectation_line(position, entry) for position, entry in enumerate(entries, start=1)
     )
 
 
@@ -282,9 +311,11 @@ def returned_line_indexes(body: str, *, storage: Storage = Storage.GITHUB) -> tu
 
 
 def expectation_line_state(line: ExpectationLine) -> str:
-    """`open`, `with head <returned_on>` or `ruled <ruling> <ruled_on>` -- the
-    one state text `rulings`' human form prints; `--json` carries
-    `ruling`/`ruled_on`/`returned_on` directly and does not call this."""
+    """`open`, `with head <returned_on>`, `ruled <ruling> <ruled_on>` or
+    `withdrawn <withdrawn_on>` -- the one state text `rulings`' human form
+    prints; `--json` carries the dates directly and does not call this."""
+    if isinstance(line, WithdrawnLine):
+        return f"withdrawn {line.withdrawn_on.isoformat()}"
     if isinstance(line, OptionLine) and line.returned is not None:
         return f"with head {line.returned.returned_on.isoformat()}"
     if line.ruling is None:
@@ -312,6 +343,10 @@ class ExpectationAlreadyRuledError(protocol.ClaimError):
 
 class ExpectationOutOfRangeError(protocol.ClaimError):
     """The out-of-range `--line` refusal."""
+
+
+class ExpectationWithdrawnError(protocol.ClaimError):
+    """A ruling aimed at a line its head withdrew: nobody answers it any more."""
 
 
 class ExpectationLineFormError(protocol.ClaimError):
@@ -343,13 +378,15 @@ def _open_entry(
     entries: list[dict[str, object]], index: int, option_flag: str
 ) -> dict[str, object]:
     """Line `index` of `entries`, still open and an option line; refuses an
-    out-of-range index, a yes/no line and an already-ruled line, in that
-    order -- the checks both writes share."""
+    out-of-range index, a withdrawn line, a yes/no line and an already-ruled
+    line, in that order -- the checks both writes share."""
     if not 1 <= index <= len(entries):
         raise ExpectationOutOfRangeError(
             f"line {index} out of range: this item has {len(entries)} expectation line(s)"
         )
     entry = entries[index - 1]
+    if is_withdrawn_line(entry):
+        raise ExpectationWithdrawnError(f"line {index} was withdrawn by its head")
     if not is_option_line(entry):
         verb = "returns" if option_flag == _UNCLEAR_FLAG else "rules"
         raise ExpectationLineFormError(
