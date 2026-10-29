@@ -1,7 +1,14 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { decidedCard, expectDecidedAnswer, openDecidedLine } from './decidedView';
-import { line, row, writeRulings } from './rulingsFixture';
+import {
+	line,
+	optionLine,
+	row,
+	writeRulings,
+	type OptionRulingLine,
+	type RulingOption
+} from './rulingsFixture';
 import { readBoardRuntime } from './runtime';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 
@@ -17,6 +24,59 @@ function choices(page: Page) {
 	return page.getByRole('group', { name: 'Entscheidung' });
 }
 
+// The fake aco stores every board pick as `--via board` on this date
+// (`aco_board_fixtures`); the decided card's How row reads it back.
+const BOARD_PICK_HOW = 'Board · 03.10.2026';
+
+const OPTIONS: RulingOption[] = [
+	{
+		letter: 'A',
+		name: 'Erster Weg',
+		effect: 'Der erste Weg gilt.',
+		same_as_today: true,
+		notice: 'Du merkst nichts.',
+		cost: 'Mehr Code.',
+		undo: 'reversible',
+		undo_how: 'jederzeit',
+		contract: 'Der erste Weg gilt.'
+	},
+	{
+		letter: 'B',
+		name: 'Zweiter Weg',
+		effect: 'Der zweite Weg gilt.',
+		same_as_today: true,
+		notice: 'Du merkst es.',
+		cost: 'Weniger Code.',
+		undo: 'reversible',
+		undo_how: 'jederzeit',
+		contract: 'Der zweite Weg gilt.'
+	}
+];
+
+function card(index: number, question: string, overrides: Partial<OptionRulingLine> = {}) {
+	return optionLine(index, `Satz ${index}`, { question, options: OPTIONS, ...overrides });
+}
+
+function picks(page: Page) {
+	return page.getByRole('group', { name: 'Decide' });
+}
+
+function pick(page: Page, letter: 'A' | 'B') {
+	return picks(page).getByRole('button', { name: new RegExp(`^Decide ${letter}:`) });
+}
+
+function listRow(page: Page, question: string) {
+	return page.locator('.tracks').getByTitle(question);
+}
+
+function countPosts(page: Page): { count(): number } {
+	let posts = 0;
+	page.on('request', (request) => {
+		if (request.method() === 'POST') posts += 1;
+	});
+	return { count: () => posts };
+}
+
 async function arrangeLongRepositoryLists(page: Page, directory: string, longWord: string) {
 	writeRulings(
 		directory,
@@ -24,12 +84,12 @@ async function arrangeLongRepositoryLists(page: Page, directory: string, longWor
 			row(
 				700 + index,
 				`Vorhaben ${index} ${longWord}`,
-				line(1, `Satz ${index} ${longWord}`, {
-					question: `Frage ${index}?`,
-					example: `${longWord}\n${'Vollständiges Beispiel. '.repeat(80)}`,
+				card(1, `Frage ${index}?`, {
+					text: `Satz ${index} ${longWord}`,
+					problem: `${longWord}\n${'Vollständiges Problem. '.repeat(80)}`,
+					options: OPTIONS.map((option) => ({ ...option, effect: longWord })),
 					picture:
-						'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="120"><rect width="1200" height="120" fill="#8a2a63"/></svg>',
-					default: 'yes'
+						'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="120"><rect width="1200" height="120" fill="#8a2a63"/></svg>'
 				})
 			)
 		)
@@ -61,7 +121,7 @@ async function expectReturnAndResizeFocus(
 		await expect.poll(() => tracks.evaluate((element) => element.scrollTop)).toBe(scrollPosition);
 		await expect(selected).toHaveAttribute('aria-current', 'true');
 		await page.setViewportSize({ width: 1280, height: 900 });
-		await page.getByText('Notiz', { exact: true }).focus();
+		await page.getByRole('button', { name: 'Other…' }).focus();
 		await page.setViewportSize(viewport);
 		await expect(tracks).toBeFocused();
 	} else {
@@ -77,23 +137,14 @@ test('reactivating the selected desktop row restores the question heading and fo
 	const { appUrl, token, repoDirectory } = readBoardRuntime();
 	await page.setViewportSize({ width: 1280, height: 900 });
 	writeRulings(repoDirectory, [
-		row(
-			950,
-			'Reselection',
-			line(1, 'First sentence', {
-				question: 'First?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			})
-		)
+		row(950, 'Reselection', card(1, 'First?', { problem: 'Long problem. '.repeat(500) }))
 	]);
 	await page.goto(`${appUrl}#t=${token}`);
-	const selected = page.getByRole('button', { name: /First\?/ });
+	const selected = listRow(page, 'First?');
 	await selected.click();
 	await expect(page.locator('.stage')).toBeFocused();
-	await page.keyboard.press('Tab');
-	await page.keyboard.press('Tab');
-	await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeFocused();
+	for (const _ of ['picture', 'option A', 'option B', 'pick A']) await page.keyboard.press('Tab');
+	await expect(pick(page, 'A')).toBeFocused();
 	await expect
 		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
 		.toBeGreaterThan(0);
@@ -113,28 +164,16 @@ test('advancing after phone list return and desktop resize focuses the next ques
 	const { appUrl, token, repoDirectory } = readBoardRuntime();
 	await page.setViewportSize({ width: 390, height: 844 });
 	writeRulings(repoDirectory, [
-		row(
-			951,
-			'Resize',
-			line(1, 'First sentence', {
-				question: 'First?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			}),
-			line(2, 'Second sentence', {
-				question: 'Second?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			})
-		)
+		row(951, 'Resize', card(1, 'First?', { problem: 'Long problem. '.repeat(500) })),
+		row(961, 'Resize second', card(1, 'Second?', { problem: 'Long problem. '.repeat(500) }))
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: /First\?/ }).click();
+	await listRow(page, 'First?').click();
 	await page.getByRole('button', { name: '‹ Open' }).click();
 	await page.screenshot({ path: testInfo.outputPath('phone-return.png') });
 	await page.setViewportSize({ width: 1280, height: 900 });
-	await choices(page).getByRole('button', { name: /Ja/ }).click();
+	await pick(page, 'A').click();
 	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 	await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeInViewport();
 	await expect(page.locator('.stage')).toBeFocused();
@@ -147,37 +186,30 @@ test('desktop completion preserves deliberately focused other list row', async (
 	const { appUrl, token, repoDirectory } = readBoardRuntime();
 	await page.setViewportSize({ width: 1280, height: 900 });
 	writeRulings(repoDirectory, [
+		row(954, 'Desktop completion', card(1, 'First?', { problem: 'Long problem. '.repeat(500) })),
 		row(
-			954,
-			'Desktop completion',
-			line(1, 'First sentence', {
-				question: 'First?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			}),
-			line(2, 'Second sentence', {
-				question: 'Second?',
-				example: 'Long example. '.repeat(500)
-			}),
-			line(3, 'Third sentence', { question: 'Third?' })
-		)
+			964,
+			'Desktop completion second',
+			card(1, 'Second?', { problem: 'Long problem. '.repeat(500) })
+		),
+		row(974, 'Desktop completion third', card(1, 'Third?'))
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: /First\?/ }).click();
-	await choices(page).getByRole('button', { name: /Ja/ }).click();
+	await listRow(page, 'First?').click();
+	await page.locator('.question-pane').evaluate((pane) => {
+		pane.scrollTop = pane.scrollHeight;
+	});
+	await pick(page, 'A').click();
 	await expect
 		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
 		.toBeGreaterThan(0);
-	const third = page.getByRole('button', { name: /Third\?/ });
+	const third = listRow(page, 'Third?');
 	await third.focus();
 	await expect(third).toBeFocused();
 	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-	await expect(page.getByRole('button', { name: /Second\?/ })).toHaveAttribute(
-		'aria-current',
-		'true'
-	);
-	await expect(page.locator('.tracks').getByRole('button', { name: /First\?/ })).toHaveCount(0);
+	await expect(listRow(page, 'Second?')).toHaveAttribute('aria-current', 'true');
+	await expect(listRow(page, 'First?')).toHaveCount(0);
 	await expect(third).toBeFocused();
 	await expect(third).toBeInViewport();
 	await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeInViewport();
@@ -191,22 +223,20 @@ for (const scenario of ['next question', 'exhausted list', 'focus elsewhere']) {
 	test(`phone list completion keeps visible focus: ${scenario}`, async ({ page }, testInfo) => {
 		const { appUrl, token, repoDirectory } = readBoardRuntime();
 		await page.setViewportSize({ width: 390, height: 844 });
-		const lines = [line(1, 'First sentence', { question: 'First?', default: 'yes' })];
+		const rows = [row(952, 'List completion', card(1, 'First?'))];
 		if (scenario !== 'exhausted list') {
-			lines.push(line(2, 'Second sentence', { question: 'Second?' }));
+			rows.push(row(962, 'List completion second', card(1, 'Second?')));
 		}
-		writeRulings(repoDirectory, [row(952, 'List completion', ...lines)]);
+		writeRulings(repoDirectory, rows);
 		await page.clock.install();
 		await page.goto(`${appUrl}#t=${token}`);
-		const first = page.getByRole('button', { name: /First\?/ });
+		const first = listRow(page, 'First?');
 		await first.click();
-		await choices(page).getByRole('button', { name: /Ja/ }).click();
+		await pick(page, 'A').click();
 		await page.getByRole('button', { name: '‹ Open' }).click();
 		await expect(first).toBeFocused();
 		const target =
-			scenario === 'focus elsewhere'
-				? page.getByRole('button', { name: /Second\?/ })
-				: page.locator('.tracks');
+			scenario === 'focus elsewhere' ? listRow(page, 'Second?') : page.locator('.tracks');
 		if (scenario === 'focus elsewhere') await target.focus();
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 		await expect(first).toHaveCount(0);
@@ -229,16 +259,12 @@ for (const viewport of [
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			writeRulings(repoDirectory, [
-				row(
-					953,
-					'Background reload',
-					line(1, 'First sentence', { question: 'First?', default: 'yes' }),
-					line(2, 'Second sentence', { question: 'Second?' })
-				)
+				row(953, 'Background reload', card(1, 'First?')),
+				row(963, 'Background reload second', card(1, 'Second?'))
 			]);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /First\?/ }).click();
+			await listRow(page, 'First?').click();
 			let release: (() => void) | undefined;
 			const held = new Promise<void>((resolve) => {
 				release = resolve;
@@ -248,9 +274,9 @@ for (const viewport of [
 				await route.continue();
 			});
 			try {
-				await choices(page).getByRole('button', { name: /Ja/ }).click();
+				await pick(page, 'A').click();
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
-				const second = page.getByRole('button', { name: /Second\?/ });
+				const second = listRow(page, 'Second?');
 				await second.focus();
 				const reload = page.waitForRequest('**/api/board');
 				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
@@ -258,7 +284,9 @@ for (const viewport of [
 				await expect(second).toBeFocused();
 				await second.press('Enter');
 				await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeVisible();
-				await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeDisabled();
+				await expect(picks(page).getByRole('button')).toHaveText(['A', 'B']);
+				await expect(pick(page, 'A')).toHaveAttribute('aria-disabled', 'true');
+				await expect(pick(page, 'B')).toHaveAttribute('aria-disabled', 'true');
 				await page.screenshot({ path: testInfo.outputPath('background-loading.png') });
 			} finally {
 				release?.();
@@ -334,24 +362,13 @@ for (const viewport of [
 
 		test('once the window elapses, exactly one decision is written', async ({ page }, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					602,
-					'Hosts',
-					line(1, 'Hosts may close the room.', { question: 'Hosts allowed?', default: 'no' })
-				)
-			]);
-			let ruleRequests = 0;
-			page.on('request', (request) => {
-				if (request.url().endsWith('/api/rule')) {
-					ruleRequests += 1;
-				}
-			});
+			writeRulings(repoDirectory, [row(602, 'Hosts', card(1, 'Hosts allowed?'))]);
+			const posts = countPosts(page);
 
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Hosts allowed\?/ }).click();
-			await choices(page).getByRole('button', { name: /Nein/ }).click();
+			await listRow(page, 'Hosts allowed?').click();
+			await pick(page, 'B').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible();
@@ -359,8 +376,8 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('unselected.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			await openDecidedLine(page, 'Hosts allowed?');
-			await expectDecidedAnswer(page, 'Nein', 'not recorded · 03.10.2026');
-			expect(ruleRequests).toBe(1);
+			await expectDecidedAnswer(page, 'B — Zweiter Weg', BOARD_PICK_HOW);
+			expect(posts.count()).toBe(1);
 		});
 
 		test('deciding moves the stage to the next open card, and the ruled one keeps no buttons', async ({
@@ -459,10 +476,7 @@ for (const viewport of [
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			const longWord = 'Entscheidungsgrundlage'.repeat(12);
 			await arrangeLongRepositoryLists(page, repoDirectory, longWord);
-			let writes = 0;
-			page.on('request', (request) => {
-				if (request.method() === 'POST') writes += 1;
-			});
+			const posts = countPosts(page);
 			await page.goto(`${appUrl}#t=${token}`);
 			if (viewport.width > 760) {
 				await expect(page.getByRole('heading', { name: 'Frage 0?', exact: true })).toBeVisible();
@@ -476,13 +490,10 @@ for (const viewport of [
 			await page.keyboard.press('Enter');
 			await expect(page.getByRole('heading', { name: 'Frage 11?' })).toBeInViewport();
 			await expect(page.locator('.stage')).toBeFocused();
-			await page.keyboard.press('Tab');
-			await expect(page.getByText('Notiz', { exact: true })).toBeFocused();
-			await page.keyboard.press('Enter');
-			await page.keyboard.press('Tab');
+			await page.getByRole('button', { name: 'Other…' }).click();
 			await expect(page.getByRole('textbox')).toBeFocused();
 			await page.getByRole('textbox').fill(longWord);
-			await expect(page.getByAltText('Bild zur Frage')).toBeVisible();
+			await expect(page.locator('.option-card').getByAltText('Heute').first()).toBeVisible();
 			await expect
 				.poll(() => page.evaluate(() => document.documentElement.scrollWidth))
 				.toBeLessThanOrEqual(viewport.width);
@@ -495,13 +506,11 @@ for (const viewport of [
 				element.scrollTop = 0;
 			});
 			await page.screenshot({ path: testInfo.outputPath('selected.png') });
-			await choices(page)
-				.getByRole('button', { name: 'Nein', exact: true })
-				.scrollIntoViewIfNeeded();
-			await expect(choices(page)).toBeInViewport();
+			await pick(page, 'B').scrollIntoViewIfNeeded();
+			await expect(picks(page)).toBeInViewport();
 			await page.screenshot({ path: testInfo.outputPath('note.png') });
 			await expectReturnAndResizeFocus(page, viewport, scrollPosition);
-			expect(writes).toBe(0);
+			expect(posts.count()).toBe(0);
 		});
 
 		test('separate undo notices stay reachable and cancel every pending write', async ({
@@ -509,17 +518,15 @@ for (const viewport of [
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			writeRulings(repoDirectory, [
-				row(720, 'Mehrere Fragen', line(1, 'Erste Frage'), line(2, 'Zweite Frage'))
+				row(720, 'Erste Karte', card(1, 'Erste Frage')),
+				row(721, 'Zweite Karte', card(1, 'Zweite Frage'))
 			]);
-			let writes = 0;
-			page.on('request', (request) => {
-				if (request.method() === 'POST') writes += 1;
-			});
+			const posts = countPosts(page);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
 			for (const name of ['Erste Frage', 'Zweite Frage']) {
-				await page.getByRole('button', { name: new RegExp(name) }).click();
-				await choices(page).getByRole('button', { name: 'Ja', exact: true }).click();
+				await listRow(page, name).click();
+				await pick(page, 'A').click();
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			}
 			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(2);
@@ -527,7 +534,7 @@ for (const viewport of [
 			await page.getByRole('button', { name: 'Undo', exact: true }).last().click();
 			await page.getByRole('button', { name: 'Undo', exact: true }).click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-			expect(writes).toBe(0);
+			expect(posts.count()).toBe(0);
 		});
 	});
 }
