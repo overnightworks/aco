@@ -41,15 +41,7 @@ from aco.board.ports import (
 )
 
 _ORIGIN_ELSEWHERE = {"Origin": "http://elsewhere.example"}
-
-
-def _listed_items(board: BoardClient) -> list[dict[str, Any]]:
-    response = board.get_board_json()
-    assert response.status == 200
-    [repo] = cast(list[dict[str, Any]], response.json()["repos"])
-    assert repo["name"] == board.repo
-    assert repo["error"] is None
-    return cast(list[dict[str, Any]], repo["items"])
+Lister = Callable[[BoardClient], list[dict[str, Any]]]
 
 
 def _decision_body(**overrides: object) -> str:
@@ -160,10 +152,11 @@ def test_the_board_lists_every_line_under_its_item_in_acos_order(
     board: BoardClient,
     rows: tuple[dict[str, object], ...],
     items: list[dict[str, object]],
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(*rows)
 
-    listed = _listed_items(board)
+    listed = listed_items(board)
 
     for item in listed:
         for listed_line in item["lines"]:
@@ -174,17 +167,17 @@ def test_the_board_lists_every_line_under_its_item_in_acos_order(
 
 @pytest.mark.parametrize("outcome", ["yes", "no", "later"])
 def test_a_line_decided_as_listed_is_written_through_aco_rule(
-    repository: FakeAcoRepository, board: BoardClient, outcome: str
+    repository: FakeAcoRepository, board: BoardClient, outcome: str, listed_items: Lister
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?", default="yes")))
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
 
     answer = board.decide_through_api(listed_line, 42, outcome)
 
     assert answer.status == 200
     assert answer.json() == {"status": "ruled", "message": None}
     assert repository.rule_calls() == [["rule", "42", "--line", "1", f"--{outcome}", "--json"]]
-    assert _listed_items(board)[0]["lines"][0]["ruling"] == outcome
+    assert listed_items(board)[0]["lines"][0]["ruling"] == outcome
 
 
 @pytest.mark.parametrize(
@@ -209,9 +202,10 @@ def test_a_line_changed_since_listing_answers_why_without_writing(
     board: BoardClient,
     changed: dict[str, object],
     answer: dict[str, object],
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?", default="yes")))
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
     repository.set_rulings(row(42, "Share page", changed))
     stored_before = repository.rulings_state()
 
@@ -232,10 +226,15 @@ def test_a_line_changed_since_listing_answers_why_without_writing(
     ids=["note", "note-looking-like-a-long-option", "note-looking-like-a-short-option", "blank"],
 )
 def test_a_note_is_stored_with_the_ruling(
-    repository: FakeAcoRepository, board: BoardClient, outcome: str, raw_note: str, stored_text: str
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    outcome: str,
+    raw_note: str,
+    stored_text: str,
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
 
     answer = board.decide_through_api(listed_line, 42, outcome, note=raw_note)
 
@@ -244,11 +243,11 @@ def test_a_note_is_stored_with_the_ruling(
 
 
 def test_a_failing_aco_rule_keeps_the_line_with_acos_sentence(
-    repository: FakeAcoRepository, board: BoardClient
+    repository: FakeAcoRepository, board: BoardClient, listed_items: Lister
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
     repository.refuse_rule("unavailable", "the forge rejected the body write")
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
 
     answer = board.decide_through_api(listed_line, 42, "yes")
 
@@ -256,7 +255,7 @@ def test_a_failing_aco_rule_keeps_the_line_with_acos_sentence(
         "status": "failed",
         "message": "aco rule failed: the forge rejected the body write",
     }
-    assert [item["number"] for item in _listed_items(board)] == [42]
+    assert [item["number"] for item in listed_items(board)] == [42]
 
 
 def _aco_without_execute_permission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -510,10 +509,10 @@ def _shown_row(**changes: str) -> dict[str, object]:
     ids=["title", "text", "question", "example", "picture", "default"],
 )
 def test_a_line_whose_shown_field_changed_is_refused_without_writing(
-    repository: FakeAcoRepository, board: BoardClient, change: dict[str, str]
+    repository: FakeAcoRepository, board: BoardClient, change: dict[str, str], listed_items: Lister
 ) -> None:
     repository.set_rulings(_shown_row())
-    listed_line = _listed_items(board)[0]["lines"][0]
+    listed_line = listed_items(board)[0]["lines"][0]
     repository.set_rulings(_shown_row(**change))
     state_before = repository.rulings_state()
 
@@ -526,7 +525,7 @@ def test_a_line_whose_shown_field_changed_is_refused_without_writing(
 
 @pytest.mark.parametrize("twin", [(43, 1), (42, 2)], ids=["item", "index"])
 def test_a_twin_line_with_the_same_words_is_refused_without_writing(
-    repository: FakeAcoRepository, board: BoardClient, twin: tuple[int, int]
+    repository: FakeAcoRepository, board: BoardClient, twin: tuple[int, int], listed_items: Lister
 ) -> None:
     repository.set_rulings(
         row(42, "Share page", line(1, "Guests?"), line(2, "Guests?")),
@@ -535,7 +534,7 @@ def test_a_twin_line_with_the_same_words_is_refused_without_writing(
     twin_item, twin_index = twin
     twin_line = next(
         listed_line
-        for item in _listed_items(board)
+        for item in listed_items(board)
         if item["number"] == twin_item
         for listed_line in item["lines"]
         if listed_line["index"] == twin_index
@@ -567,9 +566,10 @@ def test_simultaneous_decisions_on_one_item_are_each_written_in_turn(
     board: BoardClient,
     clicked_lines: tuple[int, int],
     statuses: list[str],
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(row(42, "Share page", line(1, "Guests?"), line(2, "Links?")))
-    listed = _listed_items(board)[0]["lines"]
+    listed = listed_items(board)[0]["lines"]
     clicked = [listed[index - 1] for index in clicked_lines]
     # Each `aco rule` waits between reading and rewriting the body, so two
     # unserialized writes would overlap and the later one would drop the first.

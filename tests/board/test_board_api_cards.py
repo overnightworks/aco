@@ -24,19 +24,7 @@ from aco.board.aco_cli import AcoCli
 from aco.board.board import LINE_CHANGED
 
 _ITEM = 42
-
-
-def _listed_items(board: BoardClient) -> list[dict[str, Any]]:
-    response = board.get_board_json()
-    assert response.status == 200
-    [repo] = cast(list[dict[str, Any]], response.json()["repos"])
-    assert repo["name"] == board.repo
-    assert repo["error"] is None
-    return cast(list[dict[str, Any]], repo["items"])
-
-
-def _item_numbers(board: BoardClient) -> list[int]:
-    return [item["number"] for item in _listed_items(board)]
+Lister = Callable[[BoardClient], list[dict[str, Any]]]
 
 
 def _rule_call(item: int, index: int, letter: str) -> list[str]:
@@ -79,10 +67,11 @@ def test_the_board_lists_every_option_line_under_its_item_in_acos_order(
     board: BoardClient,
     rows: tuple[dict[str, object], ...],
     listed: list[tuple[int, str, list[tuple[int, str | None]]]],
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(*rows)
 
-    items = _listed_items(board)
+    items = listed_items(board)
 
     assert [
         (
@@ -96,25 +85,29 @@ def test_the_board_lists_every_option_line_under_its_item_in_acos_order(
 
 
 def test_the_board_reads_fresh_on_every_listing(
-    repository: FakeAcoRepository, board: BoardClient
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    listed_items: Lister,
 ) -> None:
     for item, index in [(1, 1), (2, 4)]:
         repository.set_rulings(row(item, "Changed between loads", option_line(index=index)))
 
-        [listed_item] = _listed_items(board)
+        [listed_item] = listed_items(board)
         [listed_line] = listed_item["lines"]
         assert (listed_item["number"], listed_line["index"]) == (item, index)
 
 
 def test_the_board_keeps_no_copy_of_a_decision(
-    repository: FakeAcoRepository, board: BoardClient
+    repository: FakeAcoRepository,
+    board: BoardClient,
+    listed_items: Lister,
 ) -> None:
     repository.set_rulings(row(_ITEM, "Share page", option_line()))
     board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
 
     repository.set_rulings(row(_ITEM, "Share page", option_line()))
 
-    assert _item_numbers(board) == [_ITEM]
+    assert [item["number"] for item in listed_items(board)] == [_ITEM]
 
 
 def _aco_missing_from_path(
@@ -157,13 +150,15 @@ def test_a_broken_aco_during_a_card_post_keeps_the_line_undecided(
     assert repository.rule_calls() == []
 
 
-def test_a_hung_aco_rule_keeps_the_line_undecided(repository: FakeAcoRepository) -> None:
+def test_a_hung_aco_rule_keeps_the_line_undecided(
+    repository: FakeAcoRepository, listed_items: Lister
+) -> None:
     repository.set_rulings(row(_ITEM, "Share page", option_line()))
     repository.delay("rule", 30)
 
     with serving(AcoCli(directory=repository.directory, timeout_seconds=5)) as board:
         answer = board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
-        numbers_after = _item_numbers(board)
+        numbers_after = [item["number"] for item in listed_items(board)]
 
     assert answer.json() == {
         "status": "failed",
