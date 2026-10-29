@@ -205,17 +205,17 @@ test('choosing an outcome starts the undo window and disables the buttons', asyn
 });
 
 test('an already-ruled refusal hides the choices and offers a reload', async () => {
-	const card = line({ index: 1 });
+	const card = optionLine({ index: 2 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const reload = vi.fn(async () => {});
 	const decisions = storeAnswering({ status: 'already_ruled', message: null }, reload);
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
-	screen.getByRole('button', { name: 'Ja' }).click();
+	render(Stage, { repos, selectedKey: cardKey('repo', 42), decisions, refreshing: false });
+	screen.getByRole('button', { name: /^Decide A:/ }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(screen.getByRole('alert')).toHaveTextContent('Schon entschieden');
-	expect(screen.queryByRole('group', { name: 'Entscheidung' })).not.toBeInTheDocument();
+	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
 
 	screen.getByRole('button', { name: 'Neu laden' }).click();
 	expect(reload).toHaveBeenCalledTimes(1);
@@ -225,64 +225,67 @@ test('a hostile picture is embedded only as an image, never as markup', () => {
 	const hostile =
 		'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">' +
 		'<script>alert(2)</script><foreignObject><iframe/></foreignObject></svg>';
-	const card = line({ index: 1, question: 'Guests allowed?', picture: hostile });
+	const card = optionLine({ index: 2, picture: hostile, caption: 'Today the song is lost.' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	const { container } = render(Stage, {
 		repos,
-		selectedKey: lineKey('repo', 42, card),
+		selectedKey: cardKey('repo', 42),
 		decisions: storeAnswering({ status: 'ruled', message: null }),
 		refreshing: false
 	});
 
-	const image = screen.getByAltText('Bild zur Frage');
+	const image = screen.getByAltText('Today the song is lost.');
 	expect(image.tagName).toBe('IMG');
 	const source = image.getAttribute('src') ?? '';
 	expect(source.startsWith('data:image/svg+xml;base64,')).toBe(true);
 	const encoded = source.slice(source.indexOf(',') + 1);
 	expect(Buffer.from(encoded, 'base64').toString('utf-8')).toBe(hostile);
-	expect(container.querySelectorAll('svg, script, foreignObject, iframe')).toHaveLength(0);
+	expect(container.querySelectorAll('script, foreignObject, iframe')).toHaveLength(0);
+	expect(container.querySelectorAll('svg:not([aria-hidden="true"])')).toHaveLength(0);
 });
 
-test('hostile question, sentence, example and item title render as text, never as markup', () => {
+test('hostile question, problem and reason render as text, never as markup', () => {
 	const hostileQuestion = '"><img src=x onerror=alert(1)>';
-	const hostileSentence = '<script>alert(2)</script>';
-	const hostileExample = '<svg onload=alert(3)>';
-	const hostileTitle = '<img src=x onerror=alert(4)>';
-	const card = line({
-		index: 1,
+	const hostileProblem = '<script>alert(2)</script>';
+	const hostileReason = '<svg onload=alert(3)>';
+	const card = optionLine({
+		index: 2,
 		question: hostileQuestion,
-		text: hostileSentence,
-		example: hostileExample
+		problem: hostileProblem,
+		reason: hostileReason
 	});
-	const repos = [repo({ items: [item({ number: 42, title: hostileTitle, lines: [card] })] })];
+	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
 	const { container } = render(Stage, {
 		repos,
-		selectedKey: lineKey('repo', 42, card),
+		selectedKey: cardKey('repo', 42),
 		decisions: storeAnswering({ status: 'ruled', message: null }),
 		refreshing: false
 	});
 
 	expect(screen.getByRole('heading', { name: hostileQuestion })).toBeInTheDocument();
-	expect(screen.getByText(hostileSentence)).toBeInTheDocument();
-	expect(screen.getByText(hostileExample)).toBeInTheDocument();
-	expect(screen.getByText(`#42 · ${hostileTitle} · Zeile 1`)).toBeInTheDocument();
-	expect(container.querySelectorAll('script, svg, img')).toHaveLength(0);
+	expect(screen.getByText(hostileProblem)).toBeInTheDocument();
+	expect(screen.getByText(hostileReason)).toBeInTheDocument();
+	expect(container.querySelectorAll('script, img[src="x"]')).toHaveLength(0);
+	expect(container.querySelectorAll('svg:not([aria-hidden="true"])')).toHaveLength(0);
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
 test('a plain failure keeps the choices usable for a retry', async () => {
-	const card = line({ index: 1 });
+	const card = optionLine({ index: 2 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const decisions = storeAnswering({ status: 'failed', message: 'aco rule failed: boom' });
 
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
-	screen.getByRole('button', { name: 'Ja' }).click();
+	render(Stage, { repos, selectedKey: cardKey('repo', 42), decisions, refreshing: false });
+	screen.getByRole('button', { name: /^Decide A:/ }).click();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(screen.getByRole('alert')).toHaveTextContent('aco rule failed: boom');
-	expect(screen.getByRole('group', { name: 'Entscheidung' })).toBeInTheDocument();
+	expect(screen.getByRole('group', { name: 'Decide' })).toBeInTheDocument();
+	expect(
+		within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')[0]
+	).toBeEnabled();
 });
 
 function groupPoints() {
