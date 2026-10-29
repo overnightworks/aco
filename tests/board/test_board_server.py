@@ -15,11 +15,12 @@ import json
 import socket
 import threading
 from contextlib import ExitStack
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, line, row, serving
+from aco_board_fixtures import BoardClient, FakeAcoRepository, Response, option_line, row, serving
 
 from aco.board.aco_cli import AcoCli
 from aco.board.ports import (
@@ -28,7 +29,7 @@ from aco.board.ports import (
     Decision,
     DecisionResult,
     ExpectationLine,
-    YesNoLine,
+    OptionLine,
 )
 from aco.board.server import LOOPBACK_HOST, read_before_deadline
 
@@ -92,17 +93,14 @@ def test_a_malformed_api_request_gets_a_fixed_400_without_a_traceback(
 
 
 def _decision_json(board: BoardClient) -> bytes:
-    """A decision on item 42, line 1, with the fingerprint the board lists now."""
+    """A card on item 42's one option line, with the fingerprint the board lists now."""
     repos = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
     listed = repos[0]["items"][0]["lines"][0]
     return json.dumps(
         {
             "repo": board.repo,
             "item": 42,
-            "line": 1,
-            "fingerprint": listed["fingerprint"],
-            "outcome": "yes",
-            "note": None,
+            "lines": [{"line": 1, "fingerprint": listed["fingerprint"], "option": "A"}],
         }
     ).encode()
 
@@ -140,7 +138,7 @@ def test_a_stalled_request_is_dropped_after_the_deadline_without_a_traceback(
 def test_a_body_ending_before_its_declared_length_answers_408_and_rules_nothing(
     repository: FakeAcoRepository, board: BoardClient, truncate: bool
 ) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository.set_rulings(row(42, "Share page", option_line()))
     decision = _decision_json(board)
     body = decision[: len(decision) // 2] if truncate else decision
     declared_length = str(len(decision) + 25).encode()
@@ -185,7 +183,7 @@ def test_a_stalled_request_does_not_hold_up_shutdown(repository: FakeAcoReposito
 def test_a_browser_leaving_mid_answer_prints_no_traceback(
     repository: FakeAcoRepository, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository.set_rulings(row(42, "Share page", option_line()))
     browser_left, read_returned = threading.Event(), threading.Event()
 
     class ReadAfterTheBrowserLeft(AcoCli):
@@ -212,21 +210,11 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
 class _HugeLineSource:
     """One open line far larger than the socket buffers between board and client."""
 
+    def __init__(self, small_line: OptionLine) -> None:
+        self._huge_line = replace(small_line, text="x" * (32 * 1024 * 1024))
+
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
-        huge_text = "x" * (32 * 1024 * 1024)
-        huge_line = YesNoLine(
-            item=42,
-            item_title="Share page",
-            index=1,
-            text=huge_text,
-            question=None,
-            example=None,
-            picture=None,
-            default=None,
-            ruling=None,
-            ruled_on=None,
-        )
-        return (huge_line,)
+        return (self._huge_line,)
 
     def rule(self, decision: Decision) -> DecisionResult:
         raise AssertionError("listing the board must not write")
@@ -236,10 +224,15 @@ class _HugeLineSource:
 
 
 def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
-    capsys: pytest.CaptureFixture[str],
+    repository: FakeAcoRepository, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    repository.set_rulings(row(42, "Share page", option_line()))
+    [small_line] = AcoCli(directory=repository.directory).expectation_lines()
+    assert isinstance(small_line, OptionLine)
     with (
-        serving(_HugeLineSource(), request_deadline_seconds=_SHORT_DEADLINE_SECONDS) as board,
+        serving(
+            _HugeLineSource(small_line), request_deadline_seconds=_SHORT_DEADLINE_SECONDS
+        ) as board,
         board.holding_unread(
             f"GET /api/board HTTP/1.1\r\nHost: x\r\nX-Board-Token: {board.token}\r\n\r\n".encode()
         ),
@@ -289,7 +282,7 @@ def test_the_board_listens_on_loopback_only(board: BoardClient) -> None:
 
 
 def test_loading_the_board_never_writes(repository: FakeAcoRepository, board: BoardClient) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
+    repository.set_rulings(row(42, "Share page", option_line()))
 
     board.get_board_json()
     board.get_board_json()

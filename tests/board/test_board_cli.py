@@ -21,7 +21,7 @@ from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
     install_fake_aco,
-    line,
+    option_line,
     path_with,
     row,
 )
@@ -31,7 +31,7 @@ from aco.board import cli as board_cli
 from aco.board import static
 from aco.board.aco_cli import AcoCli
 from aco.board.board import Boards
-from aco.board.ports import Decision, DecisionResult
+from aco.board.ports import CardChanged, CardDecision, DecisionResult
 from aco.board.server import LOOPBACK_HOST
 
 _URL_WAIT_SECONDS = 30
@@ -112,8 +112,8 @@ def _repository(directory: Path, *rows: dict[str, object]) -> FakeAcoRepository:
 def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrupted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    here = _repository(tmp_path / "here", row(1, "Here", line(1, "Ours?")))
-    _repository(tmp_path / "elsewhere", row(2, "Elsewhere", line(1, "Theirs?")))
+    here = _repository(tmp_path / "here", row(1, "Here", option_line()))
+    _repository(tmp_path / "elsewhere", row(2, "Elsewhere", option_line()))
     seen: list[BoardClient] = []
 
     def look(board: BoardClient) -> None:
@@ -134,7 +134,7 @@ def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrup
 def test_serve_prints_the_same_token_after_a_restart_and_a_new_one_once_the_file_is_deleted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, board_token_file: Path
 ) -> None:
-    here = _repository(tmp_path / "here", row(1, "Here", line(1, "Ours?")))
+    here = _repository(tmp_path / "here", row(1, "Here", option_line()))
     tokens: list[str] = []
 
     def remember(board: BoardClient) -> None:
@@ -171,8 +171,8 @@ def test_serve_refuses_to_start_when_the_token_file_holds_no_token(
 def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repository_a = _repository(tmp_path / "a", row(1, "In a", line(1, "A?")))
-    repository_b = _repository(tmp_path / "b", row(2, "In b", line(1, "B?")))
+    repository_a = _repository(tmp_path / "a", row(1, "In a", option_line()))
+    repository_b = _repository(tmp_path / "b", row(2, "In b", option_line()))
 
     def decide_only_in_a(board: BoardClient) -> None:
         payload = board.get_board_json().json()
@@ -183,7 +183,7 @@ def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
         assert [item["number"] for item in repos["b"]["items"]] == [2]
 
         listed_line = repos["a"]["items"][0]["lines"][0]
-        answer = board.decide_through_api(listed_line, 1, "yes", repo="a")
+        answer = board.decide_card_through_api(1, [listed_line], ["A"], repo="a")
         assert answer.json() == {"status": "ruled", "message": None}
 
     exit_code = _serve_until_done(
@@ -197,13 +197,26 @@ def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
     )
 
     assert exit_code == 0
-    assert repository_a.rule_calls() == [["rule", "1", "--line", "1", "--yes", "--json"]]
+    assert repository_a.rule_calls() == [
+        [
+            "rule",
+            "1",
+            "--line",
+            "1",
+            "--option",
+            "A",
+            f"--card-hash={option_line()['card_hash']}",
+            "--via",
+            "board",
+            "--json",
+        ]
+    ]
     assert repository_b.rule_calls() == []
 
 
 def _two_directories_named_the_same(tmp_path: Path) -> list[str]:
-    first = _repository(tmp_path / "left" / "shared", row(1, "A", line(1, "A?")))
-    second = _repository(tmp_path / "right" / "shared", row(2, "B", line(1, "B?")))
+    first = _repository(tmp_path / "left" / "shared", row(1, "A", option_line()))
+    second = _repository(tmp_path / "right" / "shared", row(2, "B", option_line()))
     return ["--repo", str(first.directory), "--repo", str(second.directory)]
 
 
@@ -211,7 +224,7 @@ def _a_symlink_resolving_to_a_configured_directory(tmp_path: Path) -> list[str]:
     """A second `--repo` spelling that resolves to the same directory as the
     first: `ABRD-19`'s own-directory check must read
     the resolved path, not the string a symlink was given as."""
-    real = _repository(tmp_path / "shared", row(1, "A", line(1, "A?")))
+    real = _repository(tmp_path / "shared", row(1, "A", option_line()))
     alias = tmp_path / "alias"
     alias.symlink_to(real.directory, target_is_directory=True)
     return ["--repo", str(real.directory), "--repo", str(alias)]
@@ -257,16 +270,16 @@ def test_serve_refuses_a_bad_repo_argument_as_a_usage_error(
 def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repository = _repository(tmp_path / "here", row(42, "Share page", line(1, "Guests?")))
+    repository = _repository(tmp_path / "here", row(42, "Share page", option_line()))
     ruling_entered = threading.Event()
     ruling_may_finish = threading.Event()
     shutdown_waits = threading.Event()
 
     class HeldRuling(AcoCli):
-        def rule(self, decision: Decision) -> DecisionResult:
+        def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
             ruling_entered.set()
             assert ruling_may_finish.wait(_URL_WAIT_SECONDS)
-            return super().rule(decision)
+            return super().rule_card(decision)
 
     class ShutdownWatchedBoards(Boards):
         def close_writes(self) -> None:
@@ -288,14 +301,14 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
         def click_then_interrupt(board: BoardClient) -> None:
             repos = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
             repo_name, listed_line = repos[0]["name"], repos[0]["items"][0]["lines"][0]
-            clicks.submit(board.decide_through_api, listed_line, 42, "yes", repo=repo_name)
+            clicks.submit(board.decide_card_through_api, 42, [listed_line], ["A"], repo=repo_name)
             assert ruling_entered.wait(_URL_WAIT_SECONDS)
             releaser.start()
 
         assert _serve_until_done(monkeypatch, repository.directory, click_then_interrupt) == 0
         # Checked before the click's own answer is awaited: `main` returning
         # must already mean the ruling is stored.
-        assert repository.stored_line(42, 1)["ruling"] == "yes"
+        assert repository.stored_line(42, 1)["ruling"] == "A"
     releaser.join(_URL_WAIT_SECONDS)
     # Shutdown was already waiting while the held ruling had not yet called `aco rule`.
     assert seen_while_shutdown_waited == [[]]
