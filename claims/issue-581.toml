@@ -1,0 +1,7 @@
+claim_id = "72590ed5053a4e69a26dc0af42cfd4fb"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "40614fcbee4798113098c26126e261b09fd9f69a"
+branch = "claude/issue-581-board-picture-v5"
+scope = ["docs/board/README.md", "docs/board/mockup.html"]
+opened_commit = "280102aaf4d1f11485a2b0f59a7caf60dedeec62"
