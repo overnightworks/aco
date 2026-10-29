@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import signal
 import sys
 import tempfile
@@ -44,7 +45,7 @@ def main() -> None:
     repository = named_repository(workspace, DEFAULT_LABEL)
 
     boards = Boards({DEFAULT_LABEL: Board(AcoCli(directory=repository.directory))})
-    running = start_board(0, boards)
+    running = start_board(0, boards, secrets.token_urlsafe(32))
     server_thread = threading.Thread(
         target=running.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
     )

@@ -87,6 +87,14 @@ def _serve_until_done(
     return exit_code
 
 
+@pytest.fixture(autouse=True)
+def board_token_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep every serve run off the operator's real token file."""
+    state_home = tmp_path / "state-home"
+    monkeypatch.setenv("XDG_STATE_HOME", str(state_home))
+    return state_home / "aco" / "board-token"
+
+
 @pytest.fixture
 def fake_aco_on_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     install_fake_aco(tmp_path / "bin")
@@ -120,6 +128,43 @@ def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrup
     [board] = seen
     assert board.host == LOOPBACK_HOST
     assert board.token
+
+
+@pytest.mark.usefixtures("fake_aco_on_path")
+def test_serve_prints_the_same_token_after_a_restart_and_a_new_one_once_the_file_is_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, board_token_file: Path
+) -> None:
+    here = _repository(tmp_path / "here", row(1, "Here", line(1, "Ours?")))
+    tokens: list[str] = []
+
+    def remember(board: BoardClient) -> None:
+        board.get_board_json()
+        tokens.append(board.token)
+
+    for _ in range(2):
+        assert _serve_until_done(monkeypatch, here.directory, remember) == 0
+    board_token_file.unlink()
+    assert _serve_until_done(monkeypatch, here.directory, remember) == 0
+
+    first, second, third = tokens
+    assert second == first
+    assert third != first
+
+
+def test_serve_refuses_to_start_when_the_token_file_holds_no_token(
+    board_token_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    board_token_file.parent.mkdir(parents=True)
+    board_token_file.write_text("not a token")
+
+    exit_code = cli.main(["serve", "--port", "0"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err == (
+        f"ERROR: {board_token_file} holds no board token; delete it to start with a new one\n"
+    )
 
 
 @pytest.mark.usefixtures("fake_aco_on_path")

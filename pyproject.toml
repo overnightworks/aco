@@ -120,7 +120,7 @@ layers = [
     "cli",
     "server",
     "api | static",
-    "board | aco_cli",
+    "board | aco_cli | token_store",
     "ports",
 ]
 

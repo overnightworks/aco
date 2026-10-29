@@ -85,7 +85,8 @@ scripts. `aco serve [--port N] [--repo PATH]...` serves the open
 expectation lines of one or more repositories as decision cards on 127.0.0.1
 (an item's open option lines are one card, decided by a letter per line, Accept all,
 Other… or Unclear, stored all or none); the
-access token travels only in the printed URL's `#` fragment
+access token travels only in the printed URL's `#` fragment and survives
+restarts in a user-only file (deleting it rotates the token)
 (`specs/serve.spec.md`). The browser app lives in `frontend/`; its build
 output is committed under `src/aco/board/static/`.
 
