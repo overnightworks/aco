@@ -67,7 +67,14 @@ def _cross_origin_headers(response: Response) -> list[str]:
 def _listed_line(index: int, text: str, ruling: str, **shown: str) -> dict[str, object]:
     """A ruled yes/no line as the board lists it, without its fingerprint."""
     absent = {"question": None, "example": None, "picture": None}
-    return {"index": index, "text": text, **absent, **shown, "ruling": ruling, "ruled_on": "2026-10-01"}
+    return {
+        "index": index,
+        "text": text,
+        **absent,
+        **shown,
+        "ruling": ruling,
+        "ruled_on": "2026-10-01",
+    }
 
 
 def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
@@ -94,7 +101,9 @@ def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
             "number": 42,
             "title": "Share page",
             "lines": [
-                _listed_line(1, "Guests?", "yes", question="Gäste?", example="Ja", picture="<svg/>"),
+                _listed_line(
+                    1, "Guests?", "yes", question="Gäste?", example="Ja", picture="<svg/>"
+                ),
                 _listed_line(2, "Hosts?", "no"),
             ],
         },
@@ -419,7 +428,7 @@ def test_an_api_request_outside_its_routes_answers_why_as_json(
 ) -> None:
     response = board.call_api(method, path, presented=board.token)
 
-    assert answer == (response.status, response.json())
+    assert (response.status, response.json()) == answer
     assert response.headers.get("Allow") == allow
     assert repository.calls() == []
 
