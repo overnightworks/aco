@@ -17,21 +17,15 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import (
-    BoardClient,
-    FakeAcoRepository,
-    install_fake_aco,
-    option_line,
-    path_with,
-    row,
-)
+from aco_board_fixtures import BoardClient, HeldRuling, RecordedPort, board_checkout
+from board_forge import BoardForge, item_body
+from option_cards import open_option_entry
 
 from aco import cli
 from aco.board import cli as board_cli
 from aco.board import static
-from aco.board.aco_cli import AcoCli
-from aco.board.board import Boards
-from aco.board.ports import CardChanged, CardDecision, DecisionResult
+from aco.board.board import Board, Boards
+from aco.board.ports import DecisionPort
 from aco.board.server import LOOPBACK_HOST
 
 _URL_WAIT_SECONDS = 30
@@ -95,25 +89,18 @@ def board_token_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return state_home / "aco" / "board-token"
 
 
-@pytest.fixture
-def fake_aco_on_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    install_fake_aco(tmp_path / "bin")
-    monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
-
-
-def _repository(directory: Path, *rows: dict[str, object]) -> FakeAcoRepository:
-    directory.mkdir(parents=True)
-    repository = FakeAcoRepository(directory)
-    repository.set_rulings(*rows)
+def _repository(directory: Path, item: int, title: str) -> BoardForge:
+    """A board checkout at `directory` holding `item`, one open option card."""
+    repository = board_checkout(directory)
+    repository.put_item(item, item_body(open_option_entry()), title=title)
     return repository
 
 
-@pytest.mark.usefixtures("fake_aco_on_path")
 def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrupted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    here = _repository(tmp_path / "here", row(1, "Here", option_line()))
-    _repository(tmp_path / "elsewhere", row(2, "Elsewhere", option_line()))
+    here = _repository(tmp_path / "here", 1, "Here")
+    _repository(tmp_path / "elsewhere", 2, "Elsewhere")
     seen: list[BoardClient] = []
 
     def look(board: BoardClient) -> None:
@@ -130,11 +117,10 @@ def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrup
     assert board.token
 
 
-@pytest.mark.usefixtures("fake_aco_on_path")
 def test_serve_prints_the_same_token_after_a_restart_and_a_new_one_once_the_file_is_deleted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, board_token_file: Path
 ) -> None:
-    here = _repository(tmp_path / "here", row(1, "Here", option_line()))
+    here = _repository(tmp_path / "here", 1, "Here")
     tokens: list[str] = []
 
     def remember(board: BoardClient) -> None:
@@ -167,12 +153,11 @@ def test_serve_refuses_to_start_when_the_token_file_holds_no_token(
     )
 
 
-@pytest.mark.usefixtures("fake_aco_on_path")
 def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repository_a = _repository(tmp_path / "a", row(1, "In a", option_line()))
-    repository_b = _repository(tmp_path / "b", row(2, "In b", option_line()))
+    repository_a = _repository(tmp_path / "a", 1, "In a")
+    repository_b = _repository(tmp_path / "b", 2, "In b")
 
     def decide_only_in_a(board: BoardClient) -> None:
         payload = board.get_board_json().json()
@@ -197,26 +182,13 @@ def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
     )
 
     assert exit_code == 0
-    assert repository_a.rule_calls() == [
-        [
-            "rule",
-            "1",
-            "--line",
-            "1",
-            "--option",
-            "A",
-            f"--card-hash={option_line()['card_hash']}",
-            "--via",
-            "board",
-            "--json",
-        ]
-    ]
-    assert repository_b.rule_calls() == []
+    assert (repository_a.stored_entries(1)[0]["ruling"], repository_a.body_writes()) == ("A", [1])
+    assert repository_b.item_requests() == ()
 
 
 def _two_directories_named_the_same(tmp_path: Path) -> list[str]:
-    first = _repository(tmp_path / "left" / "shared", row(1, "A", option_line()))
-    second = _repository(tmp_path / "right" / "shared", row(2, "B", option_line()))
+    first = _repository(tmp_path / "left" / "shared", 1, "A")
+    second = _repository(tmp_path / "right" / "shared", 2, "B")
     return ["--repo", str(first.directory), "--repo", str(second.directory)]
 
 
@@ -224,7 +196,7 @@ def _a_symlink_resolving_to_a_configured_directory(tmp_path: Path) -> list[str]:
     """A second `--repo` spelling that resolves to the same directory as the
     first: `ABRD-19`'s own-directory check must read
     the resolved path, not the string a symlink was given as."""
-    real = _repository(tmp_path / "shared", row(1, "A", option_line()))
+    real = _repository(tmp_path / "shared", 1, "A")
     alias = tmp_path / "alias"
     alias.symlink_to(real.directory, target_is_directory=True)
     return ["--repo", str(real.directory), "--repo", str(alias)]
@@ -243,7 +215,6 @@ def _exit_code(arguments: list[str]) -> int:
         return cast(int, refused.code)
 
 
-@pytest.mark.usefixtures("fake_aco_on_path")
 @pytest.mark.parametrize(
     ("build_arguments", "expected_code", "expected_message"),
     [
@@ -266,52 +237,52 @@ def test_serve_refuses_a_bad_repo_argument_as_a_usage_error(
     assert expected_message in capsys.readouterr().err
 
 
-@pytest.mark.usefixtures("fake_aco_on_path")
 def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repository = _repository(tmp_path / "here", row(42, "Share page", option_line()))
-    ruling_entered = threading.Event()
-    ruling_may_finish = threading.Event()
+    repository = _repository(tmp_path / "here", 42, "Share page")
     shutdown_waits = threading.Event()
+    holds: list[HeldRuling] = []
 
-    class HeldRuling(AcoCli):
-        def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
-            ruling_entered.set()
-            assert ruling_may_finish.wait(_URL_WAIT_SECONDS)
-            return super().rule_card(decision)
+    def board_holding_its_next_ruling(decisions: DecisionPort) -> Board:
+        """The port `serve` built, wrapped so that its next `rule_card` is held."""
+        port = RecordedPort(decisions)
+        holds.append(port.hold_next_rule_card(_URL_WAIT_SECONDS))
+        return Board(port)
 
     class ShutdownWatchedBoards(Boards):
         def close_writes(self) -> None:
             shutdown_waits.set()
             super().close_writes()
 
-    monkeypatch.setattr(board_cli, "AcoCli", HeldRuling)
+    monkeypatch.setattr(board_cli, "Board", board_holding_its_next_ruling)
     monkeypatch.setattr(board_cli, "Boards", ShutdownWatchedBoards)
-    seen_while_shutdown_waited: list[list[list[str]]] = []
+    written_while_shutdown_waited: list[list[int | None]] = []
 
-    def release_once_shutdown_waits() -> None:
+    def release_once_shutdown_waits(held: HeldRuling) -> None:
         if shutdown_waits.wait(_URL_WAIT_SECONDS):
-            seen_while_shutdown_waited.append(repository.rule_calls())
-        ruling_may_finish.set()
+            written_while_shutdown_waited.append(repository.body_writes())
+        held.release.set()
 
-    releaser = threading.Thread(target=release_once_shutdown_waits)
+    releasers: list[threading.Thread] = []
     with ThreadPoolExecutor(max_workers=1) as clicks:
 
         def click_then_interrupt(board: BoardClient) -> None:
             repos = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
             repo_name, listed_line = repos[0]["name"], repos[0]["items"][0]["lines"][0]
             clicks.submit(board.decide_card_through_api, 42, [listed_line], ["A"], repo=repo_name)
-            assert ruling_entered.wait(_URL_WAIT_SECONDS)
-            releaser.start()
+            [held] = holds
+            assert held.entered.wait(_URL_WAIT_SECONDS)
+            releasers.append(threading.Thread(target=release_once_shutdown_waits, args=(held,)))
+            releasers[0].start()
 
         assert _serve_until_done(monkeypatch, repository.directory, click_then_interrupt) == 0
         # Checked before the click's own answer is awaited: `main` returning
         # must already mean the ruling is stored.
-        assert repository.stored_line(42, 1)["ruling"] == "A"
-    releaser.join(_URL_WAIT_SECONDS)
-    # Shutdown was already waiting while the held ruling had not yet called `aco rule`.
-    assert seen_while_shutdown_waited == [[]]
+        assert repository.stored_entries(42)[0]["ruling"] == "A"
+    releasers[0].join(_URL_WAIT_SECONDS)
+    # Shutdown was already waiting while the held ruling had not yet run `aco rule`.
+    assert written_while_shutdown_waited == [[]]
 
 
 _NOT_A_PORT = "is not a port between 0 and 65535"
