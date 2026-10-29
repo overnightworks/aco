@@ -27,7 +27,9 @@ def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
 def _item_file(
     item_id: str, *, expectations: bool, kind: str = "task", **links: object
 ) -> tuple[str, bytes]:
-    """A container carries one uncut `[[slice]]`: the shape whose parent `aco board` looks up."""
+    """The `items/<id>.md` entry for `item_id` as (file name, bytes): a task or container
+    whose `record` carries `links`, with one open option line when `expectations`; a
+    container carries one uncut `[[slice]]`, the shape whose parent `aco board` looks up."""
     record = item_record(title=f"Item {item_id}", state="open", kind=kind)
     data: dict[str, object] = {
         "version": 1,

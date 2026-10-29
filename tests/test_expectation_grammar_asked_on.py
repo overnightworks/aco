@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import board_issue
 from cli_fixtures import run_cli, run_context_over, track_board_config
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import (
     GOLDEN_CARD_HASH,
     RETURNED_NOTE,
@@ -44,11 +44,6 @@ def without_asked_on(line: str) -> str:
 
 def with_asked_on(line: str, value: str) -> str:
     return line.replace(ASKED_ON, f"asked_on = {value}\n", 1)
-
-
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
 
 
 @pytest.mark.usefixtures("clone")
@@ -100,7 +95,7 @@ class TestAskedOnCheck:
         assert card_hash(undated) == GOLDEN_CARD_HASH
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestAskedOnRulings:
     def line_json(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], line: str
@@ -128,7 +123,7 @@ class TestAskedOnRulings:
 
 
 class TestAskedOnKeptByRule:
-    @pytest.mark.usefixtures(github_world.__name__)
+    @pytest.mark.usefixtures("github_world")
     def test_a_line_ruled_by_rule_on_github_keeps_it(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:

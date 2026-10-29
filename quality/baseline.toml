@@ -32,7 +32,7 @@
 "tests/test_checkout.py" = 2040
 "tests/test_cli.py" = 12316
 "tests/test_cmd_adopt.py" = 1646
-"tests/test_cmd_cut.py" = 1072
+"tests/test_cmd_cut.py" = 1069
 "tests/test_cmd_land_after_merge_rerun.py" = 877
 "tests/test_cmd_land_preflight_claim.py" = 858
 "tests/test_cmd_release_cleanup.py" = 804

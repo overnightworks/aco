@@ -4,12 +4,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from board_fixtures import board_issue
 from cli_fixtures import freeze_cli_now, run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import RETURNED_ON, card_body, item_body, returned_today
 
 from aco import workboard
@@ -17,17 +16,12 @@ from aco import workboard
 NOT_RETURNED_LINE = '[[expectation]]\ntext = "T"\ndefault = "yes"\n'
 
 
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
-
-
 def serve_board(monkeypatch: pytest.MonkeyPatch, *issues: workboard.Issue) -> None:
     freeze_cli_now(monkeypatch)
     serve_forge(monkeypatch, FakeForge(board_issues=issues))
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestNextWithHead:
     def test_a_returned_line_is_named_after_waiting_on_operator(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

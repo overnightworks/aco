@@ -258,7 +258,7 @@ def _container_body_with_slices(
     """`CONTAINER_ID`'s own body, its `[[slice]]` table set to `slice_rows`,
     its stored `blocked_by` to `blocked_by` and its `parent` to `parent` --
     the one shape the `cut` proofs need and the flat
-    `_CONTAINER_PROJECTION`/`_record` pair above cannot express (neither
+    `_CONTAINER_PROJECTION`/`item_record` pair above cannot express (neither
     carries a `slice` array)."""
     data = {
         **_CONTAINER_PROJECTION.block_data(),
@@ -1512,7 +1512,7 @@ class TestStateRefBoardWrites:
     def _partial_delivered_record_body(self) -> str:
         """A delivered body whose `[record]` table genuinely omits
         `labels`/`blocked_by` -- spliced in as raw TOML rather than routed
-        through `_record`/`render_block`'s own `_render_record`, which
+        through `item_record`/`render_block`'s own `_render_record`, which
         always fills both in (defaulting to `[]`) even when the source
         dict never set them. The one way a test can tell "the key was
         never delivered" apart from "the key was delivered empty"."""

@@ -5,19 +5,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 from board_fixtures import block_dependency, complete_contract, container_with_children
 from cli_fixtures import freeze_cli_now, run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 
 BLOCKER = 9
-
-
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
 
 
 def serve_blocked_container(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -37,7 +31,7 @@ def serve_blocked_container(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestNextBlockedContainer:
     def test_text_names_the_container_under_skipped_with_its_blocker(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

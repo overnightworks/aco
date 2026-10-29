@@ -5,12 +5,11 @@ them (RULE-22..27) and `aco rulings` that reads them (RUL-17/18)."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from board_fixtures import board_issue
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
-from github_fixtures import FakeForge, assert_github_world, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import (
     GOLDEN_CARD_HASH,
     NOTE,
@@ -60,11 +59,6 @@ def line_two(raw: str) -> dict[str, object]:
     return body.block_expectation_dicts(body.locate_block(raw).data)[1]
 
 
-@pytest.fixture
-def github_world(github_clone: Path, bare_remote: Path) -> None:
-    assert_github_world(github_clone, bare_remote)
-
-
 def rulings_of(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], raw_body: str, *flags: str
 ) -> str:
@@ -73,7 +67,7 @@ def rulings_of(
     return run_cli(["rulings", *flags], capsys).stdout
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestRuleUnclear:
     @pytest.mark.parametrize("note", [None, NOTE], ids=["no-note", "note"])
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
@@ -209,7 +203,7 @@ class TestRuleUnclear:
         assert (sent.status, line_two(client.item_bodies[7])["returned_note"]) == (0, NOTE)
 
 
-@pytest.mark.usefixtures(github_world.__name__)
+@pytest.mark.usefixtures("github_world")
 class TestReturnedLineRewrites:
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
     def test_ruling_another_line_keeps_a_returned_line_byte_for_byte(
