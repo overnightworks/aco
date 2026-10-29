@@ -965,4 +965,4 @@ With the card's `ruling`, `ruled_on`, `card_hash` and `via` of E-BODY-12 it prin
 Setup: bare-remote, `storage = "github"`; E-BODY-10's card
 
 E-BODY-10's card without its `asked_on` line prints `2> body malformed: expectation[0].asked_on: expectation[0].asked_on is required`, exit `2`; the same with `asked_on = "2026-10-28"` or `asked_on = 2026-10-28T10:00:00` prints `2> body malformed: expectation[0].asked_on: expectation[0].asked_on must be a TOML local date`, exit `2`.
-With the `ruling`, `ruled_on`, `card_hash` and `via` of E-BODY-12 and no `asked_on` it prints `body ok`, exit `0`, and its `card_hash` is the one E-BODY-10's card shows with `asked_on`: the key is outside the hash.
+With the `ruling`, `ruled_on` and `via` of E-BODY-12, the `card_hash` E-BODY-10 states and no `asked_on` it prints `body ok`, exit `0`: the key is outside the hash.
