@@ -302,12 +302,6 @@ class TestBodyCheck:
                 "owner: unknown top-level key owner",
                 id="unknown-key",
             ),
-            pytest.param(
-                f'{MINIMAL_BLOCK_TOML}\n[[expectation]]\ntext = "x"\n'
-                'default = "yes"\nruling = "yes"\nruled_on = 2026-10-01\n',
-                "expectation[0].default: unknown key expectation[0].default",
-                id="ruled-with-default",
-            ),
             *(
                 pytest.param(
                     f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "Flip{control}side"\n',
@@ -341,7 +335,7 @@ class TestBodyCheck:
         toml_text: str,
         reason: str,
     ) -> None:
-        """Spec: CHECK-17, CHECK-18, BODY-33, BODY-58, BODY-59, BODY-61, BODY-62, BODY-63,
+        """Spec: CHECK-17, CHECK-18, BODY-58, BODY-59, BODY-61, BODY-62, BODY-63,
         BODY-65, BODY-66, BODY-67."""
         result = run_cli(["check", "-"], capsys, stdin=block_body(toml_text))
         if reason:

@@ -2153,11 +2153,6 @@ def test_parse_body_orders_schema_defects_deterministically() -> None:
             "expectation[0].ruling",
             id="bad-ruling",
         ),
-        pytest.param(
-            'text = "E"\ndefault = "yes"\nruling = "yes"\nruled_on = 2026-09-06\n',
-            "expectation[0].default",
-            id="ruled-with-default",
-        ),
         pytest.param('text = "E"\n', "expectation[0]", id="neither"),
         pytest.param(
             'text = "E"\nruling = "yes"\nruled_on = "not-a-date"\n',

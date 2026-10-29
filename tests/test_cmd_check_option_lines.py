@@ -456,11 +456,12 @@ class TestOptionLineCheck:
         assert check_defects(capsys, card_body(line)) == (2, defects)
 
     @pytest.mark.parametrize(
-        ("line", "defects"),
+        ("line", "status", "defects"),
         [
             pytest.param(
                 '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\nproblem = "P"\n'
                 'card_hash = "H"\nvia = "chat"\n',
+                2,
                 [
                     malformed(
                         f"{E}.problem", f"{E}.problem belongs to an option line; this line has none"
@@ -472,11 +473,13 @@ class TestOptionLineCheck:
             ),
             pytest.param(
                 '[[expectation]]\ntext = "T"\n',
+                2,
                 [malformed(E, f"{E} is an open yes/no line; write an option card")],
                 id="BODY-29-yes-no-only",
             ),
             pytest.param(
                 '[[expectation]]\ntext = "T"\ndefault = "yes"\n',
+                2,
                 [
                     malformed(E, f"{E} is an open yes/no line; write an option card"),
                     malformed(f"{E}.default", f"unknown key {E}.default"),
@@ -486,16 +489,19 @@ class TestOptionLineCheck:
             pytest.param(
                 '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\n'
                 'default = "yes"\n',
+                2,
                 [malformed(f"{E}.default", f"unknown key {E}.default")],
                 id="BODY-33-ruled-with-default",
             ),
             pytest.param(
                 '[[expectation]]\ntext = "T"\nruling = "no"\n',
+                2,
                 [malformed(f"{E}.ruled_on", f"{E}.ruled_on must be a TOML local date")],
                 id="BODY-32-ruling-alone",
             ),
             pytest.param(
                 '[[expectation]]\ntext = "T"\nruled_on = 2026-10-01\n',
+                2,
                 [malformed(f"{E}.ruling", f"{E}.ruling must be yes, no, or later")],
                 id="BODY-31-ruled-on-alone",
             ),
@@ -503,22 +509,24 @@ class TestOptionLineCheck:
                 '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\n'
                 'question = "Q?"\nexample = "E"\n'
                 'picture = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>"""\n',
+                0,
                 [],
                 id="ruled-with-card-fields",
             ),
             pytest.param(
                 '[[expectation]]\ntext = "T"\nruling = "later"\nruled_on = 2026-10-01\n',
+                0,
                 [],
                 id="ruled-later",
             ),
         ],
     )
     def test_a_yes_no_line_keeps_its_own_grammar(
-        self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
+        self, capsys: pytest.CaptureFixture[str], line: str, status: int, defects: list[str]
     ) -> None:
         """Spec: BODY-29, BODY-31, BODY-32, BODY-33, BODY-83 -- an open yes/no line is refused;
         a ruled one stays readable history."""
-        assert check_defects(capsys, card_body(line)) == (2 if defects else 0, defects)
+        assert check_defects(capsys, card_body(line)) == (status, defects)
 
 
 def option_json(**card_values: object) -> dict[str, object]:
