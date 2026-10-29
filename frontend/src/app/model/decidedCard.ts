@@ -7,14 +7,7 @@
  * checks for either.
  */
 
-import type {
-	BoardItem,
-	CardOption,
-	ExpectationLine,
-	OptionLine,
-	Outcome,
-	RulingVia
-} from '../../types';
+import type { BoardItem, CardOption, ExpectationLine, OptionLine, RulingVia } from '../../types';
 import { outcomeLabel } from './boardSummary';
 import {
 	cardMeta,
@@ -56,7 +49,7 @@ function otherAnswer(line: OptionLine): string | null {
 /** The answer the line was ruled with. */
 export function decidedAnswer(line: ExpectationLine): string {
 	if (!isOptionLine(line)) {
-		return outcomeLabel(line.ruling as Outcome);
+		return outcomeLabel(line.ruling);
 	}
 	const answer = otherAnswer(line);
 	return answer === null ? decidedText(chosenOption(line) as CardOption) : `Other: „${answer}“`;

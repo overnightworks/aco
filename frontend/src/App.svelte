@@ -380,36 +380,10 @@
 	.inner {
 		padding-bottom: 32px;
 	}
-	.question-pane :global(.card) {
-		max-width: 900px;
-		margin-inline: auto;
-	}
-	.question-pane :global(.item) {
-		color: #4d4759;
-		font-size: 13px;
-		margin-top: 0;
-	}
-	.question-pane :global(.question) {
-		font-size: clamp(26px, 3vw, 38px);
-		line-height: 1.12;
-		margin: 0 0 22px;
-	}
-	.question-pane :global(.sent) {
-		font-size: 17px;
-	}
-	.question-pane :global(.example) {
-		border-left: 2px solid #c9c4d4;
-		padding-left: 14px;
-		color: #4d4759;
-		white-space: pre-wrap;
-	}
 	.question-pane :global(img) {
 		display: block;
 		max-width: 100%;
 		height: auto;
-	}
-	.question-pane :global(.note) {
-		margin-block: 24px;
 	}
 	.question-pane :global(summary) {
 		cursor: pointer;
@@ -425,33 +399,11 @@
 		border-radius: 12px;
 		resize: vertical;
 	}
-	.question-pane :global(.choices) {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 12px;
-		margin-top: 24px;
-	}
 	.question-pane :global(button) {
 		padding: 10px 18px;
 		border: 1px solid #c9c4d4;
 		border-radius: 12px;
 		background: white;
-	}
-	.question-pane :global(.choices button) {
-		flex: 1;
-		min-width: 80px;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		font-weight: 600;
-	}
-	.question-pane :global(.choices button:has(.rec-tag)) {
-		border: 2px solid #8a2a63;
-	}
-	.question-pane :global(.rec-tag) {
-		font-size: 11px;
-		color: #8a2a63;
 	}
 	.question-pane :global(button:disabled) {
 		opacity: 0.55;

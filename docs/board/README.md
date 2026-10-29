@@ -24,9 +24,10 @@ after the same window, under a grey "With head" strip; a card already with its h
 once, all or none. A card of points shows its name (area and count) as title and the picture's
 point rows: one point open at a time, a pick per point, "Accept all" with the number chosen,
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
-point is chosen. It still lacks Mitsprache and the agent list. An open yes/no line keeps its card.
+point is chosen. It still lacks Mitsprache and the agent list. A ruled yes/no line is read-only
+history in Decided; an open one turns its project's group into an error naming it.
 The list groups open cards and decided lines per project with the picture's Open,
-With-head, Not-ready and Decided shapes (Decided shows the selected line's card in the
+With-head and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its
 colour tokens. With-head is a card one of whose lines the operator sent back: muted, listed after
 the open cards, its card says `with head`. On a phone an opened card stands edge to edge under a header whose ‹ Open or ‹ Decided returns to the list.

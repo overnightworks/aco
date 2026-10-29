@@ -1,9 +1,9 @@
 /**
- * Owns the 8 s undo window and the one write it allows: a chosen outcome
+ * Owns the 8 s undo window and the one write it allows: a decided card
  * waits here, cancellable, until `UNDO_SECONDS` elapse, then becomes exactly
  * one `POST /api/rule`. An option card is decided as a whole: the store holds
  * its picks and its open point, and starts the window once every point is
- * chosen. `Stage.svelte` reads whether a card or line is mid-undo or
+ * chosen. `Stage.svelte` reads whether a card is mid-undo or
  * refused; `App.svelte` renders one `UndoStrip` per still-pending entry.
  * `reload` is `BoardStore.load` (`board.svelte.ts`): the one source of
  * truth this re-reads from after a write, rather than mutating a copy.
@@ -12,8 +12,8 @@
 import { untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import { postDecision } from '../../client';
-import type { DecisionRequest, OptionLine, Outcome, RepoReading, YesNoLine } from '../../types';
-import { cardHeading, findSelection, outcomeLabel, type StripState } from '../model/boardSummary';
+import type { DecisionRequest, OptionLine, RepoReading } from '../../types';
+import { findSelection, type StripState } from '../model/boardSummary';
 import {
 	cardName,
 	livePicks,
@@ -29,8 +29,6 @@ import {
 	cardOtherRequest,
 	cardPicksRequest,
 	cardUnclearRequest,
-	decisionRequest,
-	lineKey,
 	readDecisionResult,
 	UNDO_SECONDS,
 	type DecisionOutcome
@@ -158,16 +156,6 @@ export class DecisionStore {
 
 	closePanel(key: string): void {
 		this.#panels = withoutKey(this.#panels, key);
-	}
-
-	/** Starts the undo window for one card as shown; never sends before it elapses. */
-	decide(repo: string, item: number, line: YesNoLine, outcome: Outcome, note: string | null): void {
-		this.#startUndoWindow(
-			lineKey(repo, item, line),
-			decisionRequest(repo, item, line, outcome, note),
-			`${outcomeLabel(outcome)}: ${cardHeading(line)}`,
-			'done'
-		);
 	}
 
 	/** The picks that still count for the card's points as shown now. */

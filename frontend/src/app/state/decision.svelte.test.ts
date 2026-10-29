@@ -1,12 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
-import { cardOption, line, optionLine } from '../../test-support/board';
+import { cardOption, optionLine } from '../../test-support/board';
 import type { DecisionResult } from '../../types';
-import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS, lineKey } from '../model/decision';
+import { cardKey, UNDO_SECONDS } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
-
-const card = line({ index: 3, text: 'Guests?', question: 'Guests allowed?', fingerprint: 'fp' });
-const key = lineKey('repo', 42, card);
 
 const optionA = cardOption();
 const optionB = cardOption({ letter: 'B', name: 'As today' });
@@ -29,21 +26,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.useRealTimers();
-});
-
-test('undoing within the window sends nothing, ever', async () => {
-	const send = sender({ status: 'ruled', message: null });
-	const reload = vi.fn(async () => {});
-	const store = new DecisionStore('token', reload, send);
-
-	store.decide('repo', 42, card, 'no', null);
-	expect(store.isPending(key)).toBe(true);
-	store.undo(key);
-	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-
-	expect(store.isPending(key)).toBe(false);
-	expect(send).not.toHaveBeenCalled();
-	expect(reload).not.toHaveBeenCalled();
 });
 
 test('undoing a key with nothing pending is a no-op', () => {
@@ -92,20 +74,6 @@ test('an already-ruled answer becomes a banner, and reloads nothing on its own',
 	expect(reload).not.toHaveBeenCalled();
 });
 
-test('a changed-line answer becomes a "changed" banner carrying the server’s own sentence', async () => {
-	const send = sender({ status: 'failed', message: LINE_CHANGED_MESSAGE });
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		send
-	);
-
-	store.decide('repo', 42, card, 'yes', null);
-	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-
-	expect(store.banner(key)).toEqual({ kind: 'changed', message: LINE_CHANGED_MESSAGE });
-});
-
 test('a network failure during the write becomes its own failed banner', async () => {
 	const send = vi.fn(async () => {
 		throw new Error('network down');
@@ -139,46 +107,6 @@ test('deciding again clears a stale banner before the new window starts', async 
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
 
 	expect(store.banner(songKey)).toBeNull();
-});
-
-test('"Neu laden" after a refusal drops the banner and reloads', async () => {
-	const send = sender({ status: 'already_ruled', message: null });
-	const reload = vi.fn(async () => {});
-	const store = new DecisionStore('token', reload, send);
-	store.decide('repo', 42, card, 'yes', null);
-	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-
-	await store.reloadAfterBanner(key);
-
-	expect(store.banner(key)).toBeNull();
-	expect(reload).toHaveBeenCalledTimes(1);
-});
-
-test('pendingEntries names what is waiting, for the strip to show', () => {
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		sender({ status: 'ruled', message: null })
-	);
-
-	store.decide('repo', 42, card, 'no', null);
-
-	expect(store.pendingEntries).toEqual([{ key, message: 'Nein: Guests allowed?', state: 'done' }]);
-});
-
-test('justRuled names the key a successful write just resolved, for the stage to move on from', async () => {
-	const send = sender({ status: 'ruled', message: null });
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		send
-	);
-
-	expect(store.justRuled).toBeNull();
-	store.decide('repo', 42, card, 'yes', null);
-	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-
-	expect(store.justRuled).toBe(key);
 });
 
 test('two cards pending at once each write exactly once, and undoing one leaves the other untouched', async () => {

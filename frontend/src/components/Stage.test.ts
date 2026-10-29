@@ -34,31 +34,6 @@ test('with nothing selected, the stage says no question is selected', () => {
 	expect(screen.getByText('Keine Frage ausgewählt.')).toBeInTheDocument();
 });
 
-test('a selected line shows only its own question, example, sentence and recommendation', () => {
-	const card = line({
-		index: 1,
-		text: 'Guests may join the call.',
-		question: 'Guests allowed?',
-		example: 'Anna invites a guest.',
-		default: 'yes'
-	});
-	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
-
-	render(Stage, {
-		repos,
-		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null }),
-		refreshing: false
-	});
-
-	expect(screen.getByRole('heading', { name: 'Guests allowed?' })).toBeInTheDocument();
-	expect(screen.getByText('Guests may join the call.')).toBeInTheDocument();
-	expect(screen.getByText('Anna invites a guest.')).toBeInTheDocument();
-	expect(screen.getByRole('button', { name: /Empfohlen/ })).toHaveTextContent('Ja');
-	// The note stays collapsed: its textarea is present but not shown open.
-	expect(screen.getByText('Notiz').closest('details')).not.toHaveAttribute('open');
-});
-
 test('[ABRD-44] a selected one-point card shows its card and offers the Decide picks, no outcome', () => {
 	const card = optionLine({ index: 2, question: 'Keep the song open?' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
@@ -139,26 +114,6 @@ test('[ABRD-45] a changed option card hides the picks until Neu laden reloads it
 	expect(reload).toHaveBeenCalledTimes(1);
 });
 
-test('a selected yes/no line still offers Ja, Nein and Später', () => {
-	const card = line({ index: 2, question: 'Guests allowed?' });
-	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
-
-	render(Stage, {
-		repos,
-		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null }),
-		refreshing: false
-	});
-
-	const choices = screen.getByRole('group', { name: 'Entscheidung' });
-	expect(
-		within(choices)
-			.getAllByRole('button')
-			.map((button) => button.textContent?.trim())
-	).toEqual(['Ja', 'Nein', 'Später']);
-	expect(screen.queryByText('Problem')).not.toBeInTheDocument();
-});
-
 test('[ABRD-37] an already-ruled line of either form shows the decided card, never live choices', () => {
 	const yesNo = line({
 		index: 1,
@@ -189,19 +144,6 @@ test('[ABRD-37] an already-ruled line of either form shows the decided card, nev
 	expect(screen.getByText('From chat · 01.10.2026')).toBeInTheDocument();
 	expect(screen.queryByText('Problem')).not.toBeInTheDocument();
 	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
-});
-
-test('choosing an outcome starts the undo window and disables the buttons', async () => {
-	const card = line({ index: 1 });
-	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
-	const decisions = storeAnswering({ status: 'ruled', message: null });
-
-	render(Stage, { repos, selectedKey: lineKey('repo', 42, card), decisions, refreshing: false });
-	screen.getByRole('button', { name: 'Ja' }).click();
-	await tick();
-
-	expect(screen.getByRole('button', { name: 'Ja' })).toBeDisabled();
-	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 });
 
 test('an already-ruled refusal hides the choices and offers a reload', async () => {
