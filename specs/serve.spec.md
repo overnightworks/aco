@@ -151,7 +151,10 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's failure sentence, `items: []` (E-ABRD-06).
 - [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint` and an `outcome` (ABRD-42), or a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
-- [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`. `aco serve` reads it before binding and creates it when absent, with a fresh token, mode `0600` and missing directories `0700`, written whole or not at all; a restart reuses the token, so an open tab keeps working, and deleting the file rotates it. A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional trailing newline) is refused `ERROR: <path> holds no board token; delete it to start with a new one`, exit `1`, nothing bound (see E-ABRD-16).
+- [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
+- [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
+- [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
+- [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
@@ -410,10 +413,10 @@ A post naming only line 2 while line 3 is open answers 200 `{"status": "failed",
 
 ### E-ABRD-16 -- a token file that holds no token
 
-Setup: `$XDG_STATE_HOME/aco/board-token` holds `not a token`
+Setup: the token file, `<state home>/aco/board-token`, holds `not a token`
 
 ```console
 $ aco serve
-2> ERROR: $XDG_STATE_HOME/aco/board-token holds no board token; delete it to start with a new one
+2> ERROR: <state home>/aco/board-token holds no board token; delete it to start with a new one
 exit 1
 ```

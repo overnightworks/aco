@@ -55,10 +55,7 @@ def serve(port: int, paths: Sequence[Path]) -> int:
     try:
         token = board_token(token_path(os.environ, Path.home()))
     except MalformedTokenFileError as error:
-        print(
-            f"ERROR: {error.path} holds no board token; delete it to start with a new one",
-            file=sys.stderr,
-        )
+        print(f"ERROR: {error}; delete it to start with a new one", file=sys.stderr)
         return 1
     try:
         running = start_board(port, boards, token)

@@ -124,7 +124,7 @@ echo "importlib.resources finds aco/board/static/index.html"
 # importlib.resources check above only proves the file ships, not that
 # `aco serve` can reach it.
 serve_log="$scratch/serve.log"
-"$scratch/bin/aco" serve --port 0 --repo "$scratch" >"$serve_log" 2>&1 &
+XDG_STATE_HOME="$scratch/state" "$scratch/bin/aco" serve --port 0 --repo "$scratch" >"$serve_log" 2>&1 &
 serve_pid=$!
 for ((attempt = 0; attempt < 50; attempt++)); do
     [[ -s "$serve_log" ]] && break
