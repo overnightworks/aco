@@ -541,7 +541,7 @@ def relative_scope_entry(absolute_path: str, *, toplevel: Path) -> str | None:
         if relative is None:
             return None
         return valid_scope([relative.as_posix()])[0]
-    except (InvalidClaimMarkerError, OSError, ValueError):
+    except InvalidClaimMarkerError, OSError, ValueError:
         return None
 
 

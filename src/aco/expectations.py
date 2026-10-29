@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import ClassVar, TypeAlias, cast
+from typing import ClassVar, cast
 
 from . import protocol
 from .body import (
@@ -173,7 +173,7 @@ class OptionLine:
         return self.text
 
 
-ExpectationLine: TypeAlias = YesNoLine | OptionLine
+type ExpectationLine = YesNoLine | OptionLine
 
 
 def _card_option(position: int, option: dict[str, object]) -> CardOption:
@@ -363,7 +363,7 @@ def _open_entry(
     return entry
 
 
-_Decide: TypeAlias = Callable[[dict[str, object]], dict[str, object]]
+type _Decide = Callable[[dict[str, object]], dict[str, object]]
 
 
 def _rule_entry(body: str, index: int, decide: _Decide, option_flag: str = _OPTION_FLAG) -> str:

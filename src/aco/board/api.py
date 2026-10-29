@@ -276,7 +276,7 @@ def _json_object(raw: bytes) -> dict[str, object] | None:
         fields: object = json.loads(raw)
     # ValueError covers undecodable bytes, invalid JSON, and an integer past
     # Python's digit limit; RecursionError a body nested deeper than the stack.
-    except (ValueError, RecursionError):
+    except ValueError, RecursionError:
         return None
     if not isinstance(fields, dict):
         return None

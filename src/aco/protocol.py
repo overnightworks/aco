@@ -11,7 +11,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import PurePosixPath, PureWindowsPath
 from types import MappingProxyType
-from typing import Protocol, TypeVar, cast
+from typing import Protocol, cast
 
 # Named refusal when a write-path command would otherwise create
 # `refs/aco/state` as a side effect. One owner so
@@ -579,17 +579,16 @@ def claims_overlap(left: ScopedClaim, right: ScopedClaim) -> bool:
     return scopes_overlap(left.scope, right.scope)
 
 
-def claims_holding_path(claims: tuple[_ScopedClaimT, ...], path: str) -> tuple[_ScopedClaimT, ...]:
+def claims_holding_path[ScopedClaimT: ScopedClaim](
+    claims: tuple[ScopedClaimT, ...], path: str
+) -> tuple[ScopedClaimT, ...]:
     target = valid_scope([path])
     return tuple(claim for claim in claims if scopes_overlap(claim.scope, target))
 
 
-_ScopedClaimT = TypeVar("_ScopedClaimT", bound=ScopedClaim)
-
-
-def blocking_claims(
-    claims: tuple[_ScopedClaimT, ...], candidate: ScopedClaim
-) -> tuple[_ScopedClaimT, ...]:
+def blocking_claims[ScopedClaimT: ScopedClaim](
+    claims: tuple[ScopedClaimT, ...], candidate: ScopedClaim
+) -> tuple[ScopedClaimT, ...]:
     return tuple(
         claim
         for claim in claims
@@ -597,9 +596,9 @@ def blocking_claims(
     )
 
 
-def overlapping_claims(
-    claims: tuple[_ScopedClaimT, ...], candidate: ScopedClaim
-) -> tuple[_ScopedClaimT, ...]:
+def overlapping_claims[ScopedClaimT: ScopedClaim](
+    claims: tuple[ScopedClaimT, ...], candidate: ScopedClaim
+) -> tuple[ScopedClaimT, ...]:
     return tuple(
         claim
         for claim in claims
@@ -607,9 +606,9 @@ def overlapping_claims(
     )
 
 
-def conflicting_claims(
-    claims: tuple[_ScopedClaimT, ...], candidate: ScopedClaim
-) -> tuple[_ScopedClaimT, ...]:
+def conflicting_claims[ScopedClaimT: ScopedClaim](
+    claims: tuple[ScopedClaimT, ...], candidate: ScopedClaim
+) -> tuple[ScopedClaimT, ...]:
     """Path-overlapping live claims, excluding identity. Used as the advisory note."""
     return overlapping_claims(claims, candidate)
 

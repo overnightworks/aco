@@ -25,7 +25,7 @@ def _stdin_file_mode() -> int | None:
     `None` for a closed stdin."""
     try:
         return os.fstat(sys.stdin.fileno()).st_mode
-    except (AttributeError, OSError, ValueError):
+    except AttributeError, OSError, ValueError:
         return None
 
 

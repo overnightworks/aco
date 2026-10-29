@@ -35,7 +35,7 @@ from enum import StrEnum
 from io import BytesIO
 from pathlib import Path
 from types import MappingProxyType
-from typing import Protocol, TypeVar
+from typing import Protocol
 
 from . import lineage_stamp, metrics, process
 from .protocol import (
@@ -1329,9 +1329,6 @@ def _write_bootstrap_tree(worktree: Path) -> ObjectId:
     return _mktree(worktree, [("100644", "blob", schema_blob, SCHEMA_TOML_FILENAME)])
 
 
-_SubtreeValueT = TypeVar("_SubtreeValueT")
-
-
 @dataclass(frozen=True)
 class _ExistingSubtree:
     """One subtree's already-committed shape from `observed.tip`:
@@ -1360,13 +1357,13 @@ def _carried_entry(entries: Mapping[str, _ListedEntry], name: str) -> _TreeEntry
     return (entry.mode, entry.kind, entry.oid, name)
 
 
-def _reuse_or_write_mapping_subtree(
+def _reuse_or_write_mapping_subtree[SubtreeValueT](
     worktree: Path,
     *,
     existing: _ExistingSubtree,
-    old_members: Mapping[str, _SubtreeValueT],
-    new_members: Mapping[str, _SubtreeValueT],
-    serialize: Callable[[_SubtreeValueT], str],
+    old_members: Mapping[str, SubtreeValueT],
+    new_members: Mapping[str, SubtreeValueT],
+    serialize: Callable[[SubtreeValueT], str],
 ) -> ObjectId | None:
     """A `claims/`- or `resources/`-shaped subtree's new oid, reusing every
     member unchanged since `old_members`: frozen-dataclass
@@ -1721,13 +1718,12 @@ def bootstrap(
     before either branch runs. A worktree that has observed the ref and
     later finds it absent is a lineage error, not a fresh bootstrap.
 
-    After a rejected creation push the ref is read afresh: a present ref,
-    whoever wrote it -- a rival, or this very push whose response was lost --
-    is returned as it stands, and only a proven absence earns another
-    attempt with the same commit, so no creation commit is ever parented on
-    an existing tip. A push that was sent but whose outcome cannot be judged
-    -- no answer, a failed re-read, a failed lineage stamp -- refuses as an
-    `UncertainWriteError` (CAS-56, CAS-69).
+    After a rejected creation push the ref is read afresh: a present ref, whoever wrote it -- a
+    rival, or this very push whose response was lost -- is returned as it stands, and only a
+    proven absence earns another attempt with the same commit, so no creation commit is ever
+    parented on an existing tip. A push that was sent but whose outcome cannot be judged -- no
+    answer, a failed re-read, a failed lineage stamp -- refuses as an `UncertainWriteError`
+    (CAS-56, CAS-69).
     """
     if (tip := fetch_state(worktree=worktree, remote=remote).tip) is not None:
         return tip
@@ -1745,8 +1741,9 @@ def bootstrap(
                     worktree=worktree, remote=remote, ref=STATE_REF, new_oid=creation_commit
                 )
             except PushRejectedError:
-                if (tip := fetch_state(worktree=worktree, remote=remote).tip) is not None:
-                    return tip
+                raced_tip = fetch_state(worktree=worktree, remote=remote).tip
+                if raced_tip is not None:
+                    return raced_tip
                 continue
             _stamp_after_landing(worktree, creation_commit)
             return creation_commit
