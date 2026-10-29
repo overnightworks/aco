@@ -32,8 +32,8 @@ from . import api, static
 from .board import Boards, all_repos_unavailable
 
 LOOPBACK_HOST = "127.0.0.1"
-TOKEN_FIELD = "t"
-TOKEN_HEADER = "X-Board-Token"
+TOKEN_FIELD = "t"  # noqa: S105 - names the query field that carries the token and holds no secret
+TOKEN_HEADER = "X-Board-Token"  # noqa: S105 - names the header that carries the token and holds no secret
 PAGE_PATH = "/"
 API_PREFIX = "/api/"
 API_BOARD_PATH = "/api/board"

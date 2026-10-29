@@ -1,6 +1,7 @@
 """Start the decision board for one or more repositories, one page and one
 URL for all of them. `aco serve` (`aco.cmd_serve`) parses the command line
 and calls `serve`."""
+# ruff: noqa: T201 - the board command line prints its URL and its refusals to the terminal
 
 from __future__ import annotations
 

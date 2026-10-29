@@ -262,7 +262,7 @@ _NOT_A_PORT = "is not a port between 0 and 65535"
 @pytest.mark.parametrize(
     ("arguments", "refusal"),
     [
-        pytest.param(["--host", "0.0.0.0"], "--host", id="no-way-to-listen-beyond-loopback"),
+        pytest.param(["--host", "0.0.0.0"], "--host", id="no-way-to-listen-beyond-loopback"),  # noqa: S104 - the case proves the refusal of a non-loopback host
         pytest.param(["--json"], "unrecognized arguments: --json", id="no-json-mode"),
         pytest.param(["--po", "1"], "unrecognized arguments: --po 1", id="no-abbreviated-flag"),
         pytest.param(["--port", "65536"], _NOT_A_PORT, id="port-above-65535"),

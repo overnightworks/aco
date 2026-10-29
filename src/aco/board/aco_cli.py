@@ -148,7 +148,7 @@ class AcoCli:
 
     def _run(self, arguments: list[str]) -> _Completed:
         try:
-            completed = subprocess.run(
+            completed = subprocess.run(  # noqa: S603 - the argv is aco's own command words plus values the board validated and never a shell
                 [ACO_EXECUTABLE, *arguments],
                 cwd=self.directory,
                 capture_output=True,
