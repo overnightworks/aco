@@ -96,15 +96,7 @@ const FOUR_OPTIONS: RulingOption[] = ['A', 'B', 'C', 'D'].map((letter, position)
 
 function arrange(directory: string): void {
 	writeRulings(directory, [
-		row(
-			1843,
-			'Sprung zum Ursprungs-Take',
-			songCard(1),
-			line(3, 'Gäste dürfen am Gespräch teilnehmen.', {
-				question: 'Gäste einladen?',
-				default: 'yes'
-			})
-		),
+		row(1843, 'Sprung zum Ursprungs-Take', songCard(1)),
 		row(
 			1844,
 			'Altdaten',
@@ -406,7 +398,17 @@ for (const viewport of [
 			page
 		}) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			writeRulings(repoDirectory, [
+				row(
+					1843,
+					'Sprung zum Ursprungs-Take',
+					songCard(1),
+					line(3, 'Gäste dürfen am Gespräch teilnehmen.', {
+						question: 'Gäste einladen?',
+						default: 'yes'
+					})
+				)
+			]);
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, 'Gäste einladen?', phone);
 

@@ -1,5 +1,5 @@
 import { expect, test } from './consoleGuard';
-import { line, optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
+import { optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
@@ -43,7 +43,6 @@ for (const viewport of [
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
 			writeRulings(repoDirectory, [
-				row(7, 'Gäste', line(1, 'Gäste dürfen teilnehmen.', { question: 'Gäste einladen?' })),
 				row(
 					8,
 					'Sprung',
@@ -68,10 +67,9 @@ for (const viewport of [
 			await page.goto(`${appUrl}#t=${token}`);
 
 			const rows = page.locator('.tracks').getByRole('button');
-			await expect(rows).toHaveCount(3);
+			await expect(rows).toHaveCount(2);
 			await expect(rows.nth(0)).toHaveAccessibleName('Open Offen');
 			await expect(rows.nth(1)).toHaveAccessibleName('With head Zurückgegeben');
-			await expect(rows.nth(2)).toHaveAccessibleName('Not ready · head to fill Gäste einladen?');
 			await expect(rows.nth(1).getByRole('img', { name: 'With head' })).toBeVisible();
 			const labelColour = (label: string) =>
 				rows

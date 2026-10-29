@@ -50,6 +50,10 @@ function ruledOption(index: number, overrides: Partial<OptionRulingLine>): Optio
 	});
 }
 
+function openOption(index: number, question: string): OptionRulingLine {
+	return ruledOption(index, { question, ruling: null, ruled_on: null });
+}
+
 /** Item 42: three ruled lines of both forms and one open line. */
 function arrangeMixed(repoDirectory: string): void {
 	writeRulings(repoDirectory, [
@@ -66,7 +70,7 @@ function arrangeMixed(repoDirectory: string): void {
 				ruling: 'later',
 				ruled_on: '2026-10-01'
 			}),
-			line(4, 'Der Gastgeber kann beenden.', { question: 'Offene Frage?' })
+			openOption(4, 'Offene Frage?')
 		)
 	]);
 }
@@ -324,7 +328,7 @@ for (const viewport of [
 			page
 		}, testInfo) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [row(9, 'Offen', line(1, 'Noch offen?'))]);
+			writeRulings(repoDirectory, [row(9, 'Offen', openOption(1, 'Noch offen?'))]);
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
 
@@ -366,14 +370,14 @@ for (const viewport of [
 				row(
 					42,
 					'Gäste im Gespräch',
-					line(1, 'Gäste dürfen über einen Link teilnehmen.', { question: 'Gäste einladen?' }),
-					line(2, 'Der Gastgeber kann das Gespräch beenden.', { question: 'Gespräch beenden?' }),
+					openOption(1, 'Gäste einladen?'),
 					line(3, 'Gastzugänge bleiben unverändert.', {
 						question: 'Gastzugänge ändern?',
 						ruling: 'later',
 						ruled_on: '2026-10-03'
 					})
 				),
+				row(43, 'Gesprächsende', openOption(1, 'Gespräch beenden?')),
 				row(
 					41,
 					'Aufzeichnung',
@@ -437,17 +441,14 @@ for (const viewport of [
 			page
 		}) => {
 			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					60,
-					'Eine Frage',
-					line(1, 'Die Gäste dürfen teilnehmen.', { question: 'Gäste zulassen?' })
-				)
-			]);
+			writeRulings(repoDirectory, [row(60, 'Eine Frage', openOption(1, 'Gäste zulassen?'))]);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Gäste zulassen/ }).click();
-			await page.getByRole('button', { name: 'Ja', exact: true }).click();
+			await page.locator('.tracks').getByTitle('Gäste zulassen?', { exact: true }).click();
+			await page
+				.getByRole('group', { name: 'Decide' })
+				.getByRole('button', { name: /^Decide A:/ })
+				.click();
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await decidedTab(page).click();
 			await expect(page.getByText('Nothing decided yet')).toBeVisible();
