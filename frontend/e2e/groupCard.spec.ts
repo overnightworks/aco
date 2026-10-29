@@ -69,10 +69,7 @@ function threePoints(): OptionRulingLine[] {
 }
 
 function arrange(directory: string, points: OptionRulingLine[] = threePoints()): void {
-	writeRulings(directory, [
-		row(7, 'Sprung', ...points),
-		row(9, 'Gäste', point(1, { question: 'Gäste einladen?', topic: 'Gäste' }))
-	]);
+	writeRulings(directory, [row(7, 'Sprung', ...points), row(9, 'Gäste', point(1))]);
 }
 
 function stored(directory: string, itemNumber: number, index: number): OptionRulingLine {
@@ -213,8 +210,7 @@ for (const viewport of [
 			await expect(rows).toHaveCount(2);
 			await expect(rows.nth(0)).toHaveAccessibleName(`Open ${CARD_NAME}`);
 			await expect(rows.nth(0)).toHaveAttribute('title', CARD_NAME);
-			await expect(rows.nth(1)).toHaveAccessibleName('Open Gäste');
-			await expect(rows.nth(1)).toHaveAttribute('title', 'Gäste einladen?');
+			await expect(rows.nth(1)).toHaveAccessibleName('Open Thema 1');
 			await expect(page.getByRole('button', { name: 'Open 2', exact: true })).toBeVisible();
 			await shoot(page, testInfo, 'list');
 		});
@@ -372,8 +368,7 @@ for (const viewport of [
 					])
 				]);
 			await expectRuled(repoDirectory, ['B', 'A', 'A']);
-			if (!phone)
-				await expect(page.getByRole('heading', { name: 'Gäste einladen?' })).toBeVisible();
+			if (!phone) await expect(page.getByRole('heading', { name: 'Frage 1?' })).toBeVisible();
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			const rows = decidedList(page).getByRole('button');
