@@ -1,0 +1,8 @@
+claim_id = "b1dd507f118b422482b0ea27a1ff5db1"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "34e6d8e68c8c011f5ac1d505f3ee17ac50b9b22c"
+branch = "claude/issue-588-k3-grammar-refuses-open-yes-no"
+scope = ["docs/board/README.md", "quality/baseline.toml", "specs/body-block.spec.md", "specs/next.spec.md", "specs/rule.spec.md", "specs/rulings.spec.md", "src/aco/cmd_rulings.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests/support/board_fixtures.py", "tests/support/option_cards.py", "tests/test_board.py", "tests/test_body_option_line_rewrites.py", "tests/test_cli.py", "tests/test_cmd_check_option_lines.py", "tests/test_cmd_check_stdin.py", "tests/test_cmd_claim_out_of_order.py", "tests/test_cmd_next_with_head.py", "tests/test_cmd_rule.py", "tests/test_cmd_rule_group.py", "tests/test_cmd_rule_option.py", "tests/test_cmd_rule_other.py", "tests/test_cmd_rule_unclear.py", "tests/test_cmd_rulings.py", "tests/test_expectation_grammar_yes_no.py", "tests/test_state_board.py"]
+opened_commit = "85ab3a19507e4d4a093d85c00ffd3c300f0b93d5"
+whole_reason = "One grammar change: the open yes/no form and the default key leave the grammar, the line model, rulings' JSON and their specs together, and every test that used an open yes/no line as its vehicle must move in the same landing or CI turns red; the production part is three files of about fifty lines."
