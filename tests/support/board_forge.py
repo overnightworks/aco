@@ -131,6 +131,18 @@ class BoardForge:
             for entry in map(json.loads, log.read_text(encoding="utf-8").splitlines())
         )
 
+    def item_requests(self) -> tuple[ForgeRequest, ...]:
+        """Every read or write of one item, leaving out the listings."""
+        return tuple(request for request in self.request_log() if request.item is not None)
+
+    def body_writes(self) -> list[int | None]:
+        """The item of every body write, in order."""
+        return [
+            request.item
+            for request in self.request_log()
+            if request.operation is ForgeOperation.WRITE_BODY
+        ]
+
     @property
     def repository(self) -> forge.RepositoryId:
         return forge.RepositoryId("github.com", ("board-forge",), self.directory.name)

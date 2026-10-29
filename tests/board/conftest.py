@@ -13,6 +13,7 @@ import pytest
 from aco_board_fixtures import (
     BoardClient,
     Lister,
+    RecordedPort,
     board_checkout,
     decision_port,
     path_with,
@@ -42,8 +43,14 @@ def repository(tmp_path: Path) -> BoardForge:
 
 
 @pytest.fixture
-def board(repository: BoardForge) -> Iterator[BoardClient]:
-    with serving(decision_port(repository)) as client:
+def port(repository: BoardForge) -> RecordedPort:
+    """The board's port over `repository`, every call to it recorded."""
+    return decision_port(repository)
+
+
+@pytest.fixture
+def board(port: RecordedPort) -> Iterator[BoardClient]:
+    with serving(port) as client:
         yield client
 
 
