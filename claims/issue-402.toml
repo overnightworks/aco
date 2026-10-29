@@ -3,6 +3,6 @@ agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
 role = "builder"
 base = "6ec37c5dff8f71ae0d4fe73aaa450c459d3a0df3"
 branch = "claude/issue-402-board-token-persists"
-scope = ["README.md", "specs/serve.spec.md", "src/aco/board/cli.py", "src/aco/board/server.py", "src/aco/board/token_store.py", "tests/board/test_board_cli.py", "tests/board/test_board_static.py", "tests/board/test_token_store.py", "tests/support/aco_board_fixtures.py", "tests/support/e2e_server.py"]
+scope = ["README.md", "pyproject.toml", "specs/serve.spec.md", "src/aco/board/cli.py", "src/aco/board/server.py", "src/aco/board/token_store.py", "tests/board/test_board_cli.py", "tests/board/test_board_static.py", "tests/board/test_token_store.py", "tests/support/aco_board_fixtures.py", "tests/support/e2e_server.py"]
 opened_commit = "3769b727c9a38181ebc7ebf303d593463dfe50be"
 whole_reason = "One behaviour: the token's store, its one reader at serve's composition root, the server taking it, the spec and README that state it, and the tests and fixtures whose start_board call changes with it."
