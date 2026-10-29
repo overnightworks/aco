@@ -122,3 +122,14 @@ test('a picture without a usable viewBox gets no forced size', () => {
 	expect(image).not.toHaveAttribute('width');
 	expect(image).not.toHaveAttribute('height');
 });
+
+test.each([
+	'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="160" viewBox="0 0 200 80"/>',
+	'<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><svg viewBox="0 0 200 80"/></svg>'
+])('a picture that sizes itself gets no forced size: %s', (picture) => {
+	render(EnlargeablePicture, { picture, alt: 'alt text', caption: undefined });
+
+	const image = within(screen.getByRole('button', { name: 'Enlarge picture' })).getByRole('img');
+	expect(image).not.toHaveAttribute('width');
+	expect(image).not.toHaveAttribute('height');
+});

@@ -1,10 +1,13 @@
 <script module lang="ts">
-	const VIEW_BOX =
-		/<svg\b[^>]*\sviewBox=["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/;
+	const ROOT_TAG = /^\s*<svg\b[^>]*>/;
+	const VIEW_BOX = /\sviewBox=["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/;
+	const OWN_SIZE = /\s(?:width|height)\s*=/;
 
-	/** An SVG with only a viewBox has no size of its own, so its image would resolve to 0x0. */
+	/** A root <svg> with a viewBox and no width or height has no size of its own, so its image would resolve to 0x0. */
 	function viewBoxSize(svg: string): { width?: string; height?: string } | undefined {
-		const match = VIEW_BOX.exec(svg);
+		const rootTag = ROOT_TAG.exec(svg)?.[0];
+		if (rootTag === undefined || OWN_SIZE.test(rootTag)) return undefined;
+		const match = VIEW_BOX.exec(rootTag);
 		return match ? { width: match[1], height: match[2] } : undefined;
 	}
 </script>
