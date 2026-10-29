@@ -567,6 +567,7 @@ done_when = "It is decided."
 
 [[expectation]]
 text = "Der Song bleibt beim Sprung offen."
+asked_on = 2026-10-28
 default = "yes"
 question = "Song offen lassen?"
 picture = '<svg xmlns="http://www.w3.org/2000/svg"/>'
