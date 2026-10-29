@@ -355,25 +355,25 @@ def _returned_card(day: str) -> str:
         ),
         pytest.param(
             (
-                _item_of(10, _open_card("2026-10-29")),
+                _item_of(10, _open_card("2026-10-30")),
                 _item_of(
                     20,
                     _open_card("2026-10-25"),
-                    _open_card("2026-10-30"),
+                    _open_card("2026-10-29"),
                     _ruled_card("2026-10-31"),
                 ),
                 _item_of(30, _open_card("2026-10-28")),
             ),
-            [20, 10, 30],
+            [10, 20, 30],
             id="multi-point-card-dated-by-its-newest-open-point",
         ),
         pytest.param(
             (
                 _item_of(10, _returned_card("2026-10-29")),
                 _item_of(20, _open_card("2026-10-28")),
-                _item_of(30, _open_card("2026-10-27"), OPEN_YES_NO),
+                _item_of(30, _open_card("2026-10-30"), OPEN_YES_NO),
             ),
-            [10, 20, 30],
+            [30, 10, 20],
             id="card-with-its-head-and-card-plus-yes-no-ordered-by-card-date",
         ),
         pytest.param(
