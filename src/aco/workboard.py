@@ -2532,8 +2532,6 @@ def _project_measurements(measurements: dict[str, object]) -> None:
 
 # The forge form an item takes under `GITHUB`: text for a label or a
 # command argument, a bare number for a `--json` field.
-
-
 def _storage_item_name[ForgeName: (int, str)](
     number: int, storage: Storage, forge_name: ForgeName
 ) -> str | ForgeName:
