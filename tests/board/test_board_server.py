@@ -23,13 +23,14 @@ import pytest
 from aco_board_fixtures import (
     BoardClient,
     CallPhase,
+    PortCall,
     PortOperation,
     RecordedPort,
     Response,
     decision_port,
     serving,
 )
-from board_forge import BoardForge, item_body
+from board_forge import BoardForge, ForgeRequest, item_body
 from option_cards import open_option_entry
 
 from aco.board.ports import (
@@ -47,6 +48,14 @@ _OPEN_CARD = item_body(open_option_entry())
 def _assert_never_written(port: RecordedPort, repository: BoardForge) -> None:
     """No `rule_card` reached the port, and the forge saw no body write."""
     assert (port.ruled_items(), repository.body_writes()) == ([], [])
+
+
+def _aco_traffic(
+    port: RecordedPort, repository: BoardForge
+) -> tuple[tuple[PortCall, ...], tuple[ForgeRequest, ...]]:
+    """Every call the port saw and every request the forge saw so far; equal
+    snapshots around a request mean it was answered before any aco call."""
+    return port.calls(), repository.request_log()
 
 
 def _post(body: bytes, length: bytes | None = None) -> bytes:
@@ -98,6 +107,8 @@ def test_a_malformed_api_request_gets_a_fixed_400_without_a_traceback(
     capsys: pytest.CaptureFixture[str],
     request_template: bytes,
 ) -> None:
+    arranged = _aco_traffic(port, repository)
+
     answer = board.send_raw(request_template.replace(b"{token}", board.token.encode()))
 
     status_line, _, rest = answer.partition(b"\r\n")
@@ -105,7 +116,7 @@ def test_a_malformed_api_request_gets_a_fixed_400_without_a_traceback(
     assert b"Traceback" not in rest
     assert str(Path(__file__).parents[2]).encode() not in rest
     assert "Traceback" not in capsys.readouterr().err
-    _assert_never_written(port, repository)
+    assert _aco_traffic(port, repository) == arranged
 
 
 def _decision_json(board: BoardClient) -> bytes:
@@ -158,6 +169,7 @@ def test_a_body_ending_before_its_declared_length_answers_408_and_rules_nothing(
     decision = _decision_json(board)
     body = decision[: len(decision) // 2] if truncate else decision
     declared_length = str(len(decision) + 25).encode()
+    arranged = _aco_traffic(port, repository)
 
     answer = board.send_raw(_post(body, declared_length).replace(b"{token}", board.token.encode()))
 
@@ -166,7 +178,7 @@ def test_a_body_ending_before_its_declared_length_answers_408_and_rules_nothing(
         408,
         {"error": "request timeout: body incomplete"},
     )
-    _assert_never_written(port, repository)
+    assert _aco_traffic(port, repository) == arranged
 
 
 def test_a_body_still_arriving_when_its_deadline_has_passed_times_out() -> None:
