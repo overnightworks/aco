@@ -1,0 +1,8 @@
+claim_id = "7f2fb90e48d14bc5b3bc3fcdbc866e7a"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "45b5f57d6d05deab648a373fbefbaee206e9d8da"
+branch = "claude/issue-578-k2a-vitest-off-yes-no"
+scope = ["frontend/src/App.test.ts", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/state/decision.svelte.test.ts", "frontend/src/client.test.ts", "frontend/src/components/Stage.test.ts", "frontend/src/components/TrackList.test.ts"]
+opened_commit = "15f2486b90fdbcc63c97f57e2327cba693c0fc66"
+whole_reason = "Six vitest modules carry the page's generic proofs on open yes/no lines; one test-only conversion, nothing to share with another lane."
