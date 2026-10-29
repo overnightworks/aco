@@ -293,7 +293,7 @@ class TestGithubRule:
             (
                 (github, "discover_repository"),
                 (github, "GitHubForge"),
-                (board_read, "item_body_or_refuse"),
+                (board_read, "item_or_refuse"),
             ),
             "this command reads the repository's body contract from .aco/board.toml and needs "
             "a checkout (a shallow one is enough): fatal: not a git repository "
