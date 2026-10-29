@@ -647,7 +647,7 @@ def test_an_api_request_without_the_header_token_is_refused_before_any_aco_call(
         (_decision_body(note="nul\u0000byte"), {}, "bad request: decision"),
         (_decision_body(note="x" * (NOTE_MAX_LENGTH + 1)), {}, "bad request: decision"),
         (_decision_body(repo="other-repo"), {}, "bad request: decision"),
-        ("{}", {"Content-Length": "abc"}, "bad request: Content-Length"),
+        (_card_body(), {"Content-Length": "abc"}, "bad request: Content-Length"),
     ],
     ids=[
         "not-json",
