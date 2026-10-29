@@ -91,7 +91,9 @@ test('a board with no open or ruled lines shows the empty message', async () => 
 });
 
 test('a board with lines shows the track list', async () => {
-	const repos = [repo({ items: [item({ number: 42, title: 'Share page', lines: [optionLine()] })] })];
+	const repos = [
+		repo({ items: [item({ number: 42, title: 'Share page', lines: [optionLine()] })] })
+	];
 	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
 
 	render(App, { token: 'a-token' });

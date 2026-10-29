@@ -283,7 +283,9 @@ test('a plain failure keeps the choices usable for a retry', async () => {
 
 	expect(screen.getByRole('alert')).toHaveTextContent('aco rule failed: boom');
 	expect(screen.getByRole('group', { name: 'Decide' })).toBeInTheDocument();
-	expect(within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')[0]).toBeEnabled();
+	expect(
+		within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')[0]
+	).toBeEnabled();
 });
 
 function groupPoints() {

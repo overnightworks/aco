@@ -119,7 +119,10 @@ test('a network failure during the write becomes its own failed banner', async (
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(store.banner(songKey)).toEqual({ kind: 'failed', message: 'Das Board ist nicht erreichbar.' });
+	expect(store.banner(songKey)).toEqual({
+		kind: 'failed',
+		message: 'Das Board ist nicht erreichbar.'
+	});
 });
 
 test('deciding again clears a stale banner before the new window starts', async () => {

@@ -24,12 +24,13 @@ test('first selection follows configured order, skipping failed repos and ruled-
 			name: 'first',
 			items: [
 				item({ number: 8, lines: [line({ ruling: 'yes' })] }),
-				item({ number: 2, lines: [line({ index: 3 }), line({ index: 1 })] })
+				item({ number: 5, lines: [optionLine({ index: 3 })] }),
+				item({ number: 2, lines: [optionLine({ index: 1 })] })
 			]
 		}),
 		repo({ name: 'last' })
 	];
-	expect(firstOpenKey(repos)).toBe('first:2:3');
+	expect(firstOpenKey(repos)).toBe('first:5:card');
 	expect(firstOpenKey([])).toBeNull();
 	expect(firstOpenKey([repo({ items: [item({ lines: [line({ ruling: 'yes' })] })] })])).toBeNull();
 });
@@ -51,9 +52,9 @@ test('[ABRD-29] first selection is the option card that follows a yes/no line in
 describe('openList', () => {
 	test('[ABRD-28] groups follow configured order, a failed repository as its error group', () => {
 		const { groups } = openList([
-			repo({ name: 'zeta', items: [item({ number: 1, lines: [line({ index: 1 })] })] }),
+			repo({ name: 'zeta', items: [item({ number: 1, lines: [optionLine({ index: 1 })] })] }),
 			repo({ name: 'broken', error: 'aco failed', items: [] }),
-			repo({ name: 'alpha', items: [item({ number: 2, lines: [line({ index: 1 })] })] })
+			repo({ name: 'alpha', items: [item({ number: 2, lines: [optionLine({ index: 1 })] })] })
 		]);
 
 		expect(groups.map((group) => group.repo)).toEqual(['zeta', 'broken', 'alpha']);
@@ -67,11 +68,11 @@ describe('openList', () => {
 				items: [
 					item({
 						number: 7,
-						lines: [
-							optionLine({ index: 2, topic: 'Sprung', question: 'Keep the song open?' }),
-							line({ index: 3, question: 'Guests allowed?', text: 'Guests may join.' }),
-							line({ index: 4, question: null, text: 'Plain sentence.' })
-						]
+						lines: [optionLine({ index: 2, topic: 'Sprung', question: 'Keep the song open?' })]
+					}),
+					item({
+						number: 8,
+						lines: [optionLine({ index: 3, topic: 'Gäste', question: 'Guests allowed?' })]
 					})
 				]
 			})
@@ -82,8 +83,7 @@ describe('openList', () => {
 				repo: 'a',
 				rows: [
 					{ key: 'a:7:card', state: 'open', label: 'Sprung', title: 'Keep the song open?' },
-					{ key: 'a:7:3', state: 'todo', label: 'Guests allowed?', title: 'Guests allowed?' },
-					{ key: 'a:7:4', state: 'todo', label: 'Plain sentence.', title: 'Plain sentence.' }
+					{ key: 'a:8:card', state: 'open', label: 'Gäste', title: 'Guests allowed?' }
 				]
 			}
 		]);
@@ -99,9 +99,12 @@ describe('openList', () => {
 						lines: [
 							optionLine({ index: 2, area: 'Song-Seite' }),
 							optionLine({ index: 3, area: 'Song-Seite' }),
-							optionLine({ index: 4, area: 'Song-Seite' }),
-							line({ index: 5 })
+							optionLine({ index: 4, area: 'Song-Seite' })
 						]
+					}),
+					item({
+						number: 8,
+						lines: [optionLine({ index: 5, topic: 'Gäste', question: 'Guests allowed?' })]
 					})
 				]
 			})
@@ -113,7 +116,7 @@ describe('openList', () => {
 				repo: 'a',
 				rows: [
 					{ key: 'a:7:card', state: 'open', label: name, title: name },
-					{ key: 'a:7:5', state: 'todo', label: 'Guests?', title: 'Guests?' }
+					{ key: 'a:8:card', state: 'open', label: 'Gäste', title: 'Guests allowed?' }
 				]
 			}
 		]);
@@ -212,7 +215,7 @@ describe('openList', () => {
 
 	test('[ABRD-49] readable repositories with no open line are quiet, a ruled-only one included', () => {
 		const { groups, quiet } = openList([
-			repo({ name: 'open', items: [item({ lines: [line()] })] }),
+			repo({ name: 'open', items: [item({ lines: [optionLine()] })] }),
 			repo({ name: 'empty', items: [] }),
 			repo({ name: 'broken', error: 'down', items: [] }),
 			repo({
@@ -236,11 +239,13 @@ describe('decidedList', () => {
 			repo({
 				name: 'first',
 				items: [
-					item({ lines: [line({ ruling: 'yes', ruled_on: '2026-10-01' }), line({ index: 2 })] })
+					item({
+						lines: [line({ ruling: 'yes', ruled_on: '2026-10-01' }), optionLine({ index: 2 })]
+					})
 				]
 			}),
 			repo({ name: 'broken', error: 'down' }),
-			repo({ name: 'untouched', items: [item({ lines: [line()] })] }),
+			repo({ name: 'untouched', items: [item({ lines: [optionLine()] })] }),
 			repo({
 				name: 'last',
 				items: [item({ lines: [optionLine({ ruling: 'A', ruled_on: '2026-10-02' })] })]
@@ -291,7 +296,10 @@ describe('decidedList', () => {
 	test('[ABRD-30] open lines are never listed', () => {
 		const { groups } = decidedList([
 			repo({
-				items: [item({ lines: [line({ index: 1 }), optionLine({ index: 2 })] })]
+				items: [
+					item({ number: 1, lines: [optionLine({ index: 2 })] }),
+					item({ number: 2, lines: [optionLine({ index: 3, returned_on: '2026-10-27' })] })
+				]
 			})
 		]);
 
@@ -315,7 +323,7 @@ describe('decidedList', () => {
 					items: ordered.map(([number, index, ruled_on]) =>
 						item({
 							number,
-							lines: [line({ index, ruling: 'later', ruled_on }), line({ index: 10 })]
+							lines: [line({ index, ruling: 'later', ruled_on }), optionLine({ index: 10 })]
 						})
 					)
 				})
@@ -338,7 +346,7 @@ describe('firstDecidedKey', () => {
 	test('[ABRD-32] is the first row of the decided list', () => {
 		const repos = [
 			repo({ name: 'broken', error: 'down' }),
-			repo({ name: 'open', items: [item({ lines: [line()] })] }),
+			repo({ name: 'open', items: [item({ lines: [optionLine()] })] }),
 			repo({
 				name: 'ruled',
 				items: [
@@ -359,7 +367,7 @@ describe('firstDecidedKey', () => {
 	test('[ABRD-32] is null with nothing ruled or only failed repositories', () => {
 		expect(firstDecidedKey([])).toBeNull();
 		expect(firstDecidedKey([repo({ error: 'down' })])).toBeNull();
-		expect(firstDecidedKey([repo({ items: [item({ lines: [line()] })] })])).toBeNull();
+		expect(firstDecidedKey([repo({ items: [item({ lines: [optionLine()] })] })])).toBeNull();
 	});
 });
 
@@ -375,7 +383,12 @@ describe('outcomeLabel', () => {
 
 describe('cardHeading / cardSentence', () => {
 	test('a distinct question becomes the heading, the sentence stays below it', () => {
-		const card = line({ question: 'Guests allowed?', text: 'Guests may join the call.' });
+		const card = line({
+			question: 'Guests allowed?',
+			text: 'Guests may join the call.',
+			ruling: 'yes',
+			ruled_on: '2026-10-01'
+		});
 
 		expect(cardHeading(card)).toBe('Guests allowed?');
 		expect(cardSentence(card)).toBe('Guests may join the call.');
@@ -388,7 +401,12 @@ describe('cardHeading / cardSentence', () => {
 	});
 
 	test('with no distinct question, the sentence itself is the heading, shown once', () => {
-		const card = line({ question: null, text: 'Guests may join the call.' });
+		const card = line({
+			question: null,
+			text: 'Guests may join the call.',
+			ruling: 'yes',
+			ruled_on: '2026-10-01'
+		});
 
 		expect(cardHeading(card)).toBe('Guests may join the call.');
 		expect(cardSentence(card)).toBeNull();
@@ -448,7 +466,10 @@ describe('findSelection', () => {
 	test('[ABRD-50] a card key selects nothing once its item has no open option line', () => {
 		const ruled = item({
 			number: 42,
-			lines: [optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01' }), openLine]
+			lines: [
+				optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01' }),
+				line({ index: 1, ruling: 'no', ruled_on: '2026-10-01' })
+			]
 		});
 
 		expect(findSelection([repo({ name: 'a', items: [ruled] })], 'a:42:card')).toBeNull();
@@ -504,13 +525,18 @@ describe('nextOpenAfter', () => {
 	const second = line({ index: 2 });
 	const third = line({ index: 3 });
 	const repos = [repo({ items: [item({ number: 42, lines: [first, second, third] })] })];
+	const cardRepos = [
+		repo({
+			items: [1, 2, 3].map((number) => item({ number, lines: [optionLine({ index: 1 })] }))
+		})
+	];
 
 	test('[ABRD-50] among yes/no lines only, the first other open line comes next', () => {
 		expect(nextOpenAfter(repos, 'repo:42:1')).toBe('repo:42:2');
 	});
 
-	test('[ABRD-50] the decided line is skipped, so from the last line the first one comes next', () => {
-		expect(nextOpenAfter(repos, 'repo:42:3')).toBe('repo:42:1');
+	test('[ABRD-50] the decided card is skipped, so from the last card the first one comes next', () => {
+		expect(nextOpenAfter(cardRepos, 'repo:3:card')).toBe('repo:1:card');
 	});
 
 	test('[ABRD-61] a card with its head comes after an open card and before a yes/no line', () => {
@@ -548,11 +574,11 @@ describe('nextOpenAfter', () => {
 
 	test('skips lines belonging to a repo that failed to read', () => {
 		const withAFailedRepo = [
-			...repos,
-			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [line()] })] })
+			...cardRepos,
+			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [optionLine()] })] })
 		];
 
-		expect(nextOpenAfter(withAFailedRepo, 'repo:42:1')).toBe('repo:42:2');
+		expect(nextOpenAfter(withAFailedRepo, 'repo:3:card')).toBe('repo:1:card');
 	});
 
 	test('[ABRD-50] an option line in a later repository wins over the next yes/no line', () => {
@@ -583,15 +609,14 @@ describe('nextOpenAfter', () => {
 		const withARuledMiddle = [
 			repo({
 				items: [
-					item({
-						number: 42,
-						lines: [first, line({ index: 2, ruling: 'yes', ruled_on: '2026-10-01' }), third]
-					})
+					item({ number: 1, lines: [optionLine({ index: 1 })] }),
+					item({ number: 2, lines: [line({ index: 1, ruling: 'yes', ruled_on: '2026-10-01' })] }),
+					item({ number: 3, lines: [optionLine({ index: 1 })] })
 				]
 			})
 		];
 
-		expect(nextOpenAfter(withARuledMiddle, 'repo:42:1')).toBe('repo:42:3');
+		expect(nextOpenAfter(withARuledMiddle, 'repo:1:card')).toBe('repo:3:card');
 	});
 });
 
@@ -604,10 +629,10 @@ describe('tabCounts', () => {
 						number: 1,
 						lines: [
 							optionLine({ index: 1 }),
-							line({ index: 2 }),
 							line({ index: 3, ruling: 'yes', ruled_on: '2026-10-01' })
 						]
-					})
+					}),
+					item({ number: 2, lines: [optionLine({ index: 1 })] })
 				]
 			})
 		];
@@ -617,7 +642,7 @@ describe('tabCounts', () => {
 
 	test('[ABRD-51] a failed repository adds to neither count', () => {
 		const repos = [
-			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [line()] })] })
+			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [optionLine()] })] })
 		];
 
 		expect(tabCounts(repos)).toEqual({ open: 0, decided: 0 });
@@ -647,7 +672,7 @@ describe('stageAfterReturned', () => {
 		const repos = cards(
 			optionLine({ index: 1, returned_on: '2026-10-27' }),
 			optionLine({ index: 1, returned_on: '2026-10-27' }),
-			line({ index: 1 })
+			line({ index: 1, ruling: 'yes', ruled_on: '2026-10-01' })
 		);
 
 		expect(stageAfterReturned(repos, 'repo:2:card')).toBe('repo:2:card');
