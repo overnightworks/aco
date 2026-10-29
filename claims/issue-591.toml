@@ -1,0 +1,8 @@
+claim_id = "275d87a415b542f9a73e9f7d504b68a6"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "c442f12e3deeaa1f21348ebe837bbed780e65308"
+branch = "claude/issue-591-s3b-board-tests-real-aco"
+scope = ["tests/board/conftest.py", "tests/board/test_board_aco_cli.py", "tests/board/test_board_api.py", "tests/board/test_board_api_cards.py", "tests/board/test_board_card_decisions.py", "tests/board/test_board_cli.py", "tests/board/test_board_core.py", "tests/board/test_board_option_lines.py", "tests/board/test_board_returned_lines.py", "tests/board/test_board_server.py", "tests/board/test_board_static.py", "tests/board/test_board_withdrawn_lines.py", "tests/support/aco_board_fixtures.py", "tests/support/board_forge.py", "tests/support/e2e_server.py"]
+opened_commit = "086ee64e9d35ecd04a63eec96afa56a416c6f308"
+whole_reason = "One harness flip: the board tests' shared fixtures (repository, board, two_repositories, serving_two) move from hand-written rulings rows to the real aco over one fake forge in a single landing, so no two harnesses coexist; the change is test-only and applies one rule per module."
