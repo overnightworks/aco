@@ -139,7 +139,7 @@ def _signal_when_a_decision_waits_for_its_turn(
 def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
     repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ABRD-17/18: one write turn spans every configured repo, and a staged,
+    """ABRD-17/18/77: one write turn spans every configured repo, and a staged,
     event-driven drain refuses a still-waiting decision the moment stopping
     begins, without waiting for the decision already being written."""
     decisions, running = _card_held_in(repository, _LABEL)
@@ -165,32 +165,6 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
 
     assert running_answer.result().status is DecisionStatus.RULED
     assert [card.item for card in decisions.ruled_cards] == [running.item]
-
-
-def test_a_card_write_holds_the_turn_against_a_decision_waiting_behind_it(
-    repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """ABRD-17, ABRD-18, ABRD-77: a card is written inside the one turn, and stopping
-    refuses what waits behind it while the card write still completes."""
-    decisions, posted = _card_held_in(repository, _LABEL)
-    boards = Boards({_LABEL: Board(decisions)})
-    waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
-
-    with ThreadPoolExecutor(max_workers=3) as threads:
-        running_card = threads.submit(boards.decide_card, _LABEL, posted)
-        assert decisions.writing.wait(_WAIT_SECONDS)
-        waiting_answer = threads.submit(boards.decide_card, _LABEL, _card_waiting_for_its_turn(8))
-        assert waiting_for_turn.wait(_WAIT_SECONDS)
-        stopping = threads.submit(boards.close_writes)
-
-        assert waiting_answer.result(_WAIT_SECONDS) == DecisionResult(
-            DecisionStatus.FAILED, SHUTTING_DOWN
-        )
-        decisions.may_finish.set()
-        stopping.result(_WAIT_SECONDS)
-
-    assert running_card.result().status is DecisionStatus.RULED
-    assert [card.item for card in decisions.ruled_cards] == [posted.item]
 
 
 def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(
