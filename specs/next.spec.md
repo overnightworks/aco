@@ -40,6 +40,7 @@ other printable space are text.
 | that action, run outside a linked non-default worktree | NEXT-41 | NEXT-11 |
 | that action's scope is wide and the body names no `whole` | NEXT-42 | NEXT-11 |
 | that item's expectations are proposed or old-ruled | NEXT-04 | NEXT-11 |
+| that item carries a withdrawn expectation line | NEXT-48 | NEXT-11 |
 | a container qualifies to be cut | NEXT-05, NEXT-31 | NEXT-12 |
 | an advice command carries an option value | NEXT-27, NEXT-31 | NEXT-11, NEXT-12 |
 | a title, `Next`, slice title or `SKIPPED` reason holds a display control | NEXT-37 | NEXT-11..14 |
@@ -77,6 +78,7 @@ other printable space are text.
 - [ ] [NEXT-03] An item naming its own top-level `scope` drops `--scope` from `Run:`; a scopeless item's `Run:` ends `--scope <paths>` and gains a further `scope unknown` line (see E-NEXT-02).
 - [ ] [NEXT-30] A scopeless item whose only `[[slice]]` row names paths -- a retyped nested container (NEXT-29) -- instead prints `--scope=<path>` per path of that row, with no `scope unknown`.
 - [ ] [NEXT-04] A still-proposed item adds `expectations unruled: refine before the pull`; a stale ruling adds `ruled <n> landings ago: refine again at the pull` -- never both (see E-NEXT-02).
+- [ ] [NEXT-48] A withdrawn line (BODY-104) never adds `expectations unruled` and never dates a ruling; an item of only withdrawn lines adds neither NEXT-04 hint.
 - [ ] [NEXT-23] A scopeless, sliceless item still qualifies as this action (`scope unknown`, NEXT-03); `claim`/`start`'s own precedence check reads a narrower rule (`specs/claim.spec.md` CLM-23).
 
 ## A container's own action
