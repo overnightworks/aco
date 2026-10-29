@@ -491,7 +491,10 @@ for (const viewport of [
 			await page.keyboard.press('Enter');
 			await expect(page.getByRole('heading', { name: 'Frage 11?' })).toBeInViewport();
 			await expect(page.locator('.stage')).toBeFocused();
-			await page.getByRole('button', { name: 'Other…' }).click();
+			await pick(page, 'B').focus();
+			await page.keyboard.press('Tab');
+			await expect(page.getByRole('button', { name: 'Other…' })).toBeFocused();
+			await page.keyboard.press('Enter');
 			await expect(page.getByRole('textbox')).toBeFocused();
 			await page.getByRole('textbox').fill(longWord);
 			await expect(page.locator('.option-card').getByAltText('Heute').first()).toBeVisible();
