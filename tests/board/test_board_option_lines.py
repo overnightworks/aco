@@ -305,7 +305,7 @@ def test_a_malformed_option_line_makes_only_its_repository_unreadable(
     """ABRD-07, ABRD-53."""
     repository_a, repository_b = two_repositories
     repository_a.set_rulings(row(12, "Song jump", malformed))
-    repository_b.set_rulings(row(42, "Share page", line(1, "Guests?", default="yes")))
+    repository_b.set_rulings(row(42, "Share page", option_line(index=1, text="Guests?")))
 
     with serving_two(two_repositories) as board:
         response = board.get_board_json()

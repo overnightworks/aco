@@ -43,7 +43,7 @@ def _hash(index: int) -> str:
 def _item(
     indexes: Sequence[int], *, rehashed: Sequence[int] = (), ruled: Sequence[int] = ()
 ) -> dict[str, object]:
-    """Item 7: a yes/no line 1 and an option line per index."""
+    """Item 7: a ruled yes/no line 1 and an option line per index."""
     options = [
         option_line(
             index=index,
@@ -52,7 +52,7 @@ def _item(
         )
         for index in indexes
     ]
-    return row(_ITEM, "Karte", line(1, "Alt"), *options)
+    return row(_ITEM, "Karte", line(1, "Alt", ruling="yes"), *options)
 
 
 def _listed_lines(board: BoardClient, repo: str | None = None) -> list[dict[str, Any]]:
@@ -449,6 +449,13 @@ _MALFORMED_CARDS: dict[str, Callable[[_Payload], _Payload]] = {
     },
     "unclear-note-nul": lambda payload: {**_plain(payload), "unclear": True, "note": "a\0b"},
     "item-zero": lambda payload: {**payload, "item": 0},
+    "item-true": lambda payload: {**payload, "item": True},
+    "unclear-note-number": lambda payload: {**_plain(payload), "unclear": True, "note": 7},
+    "unclear-note-lone-surrogate": lambda payload: {
+        **_plain(payload),
+        "unclear": True,
+        "note": "\ud800",
+    },
 }
 
 
@@ -581,7 +588,7 @@ def test_the_real_aco_rule_stores_the_whole_card_in_one_body_write(
         row(
             _ITEM,
             "Karte",
-            line(1, "Alt"),
+            line(1, "Alt", ruling="yes"),
             option_line(index=2, card_hash=shown_hash(group_body(), 2)),
             option_line(index=3, card_hash=shown_hash(group_body(), 3)),
         )
