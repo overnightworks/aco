@@ -407,7 +407,7 @@ _METHOD_NOT_ALLOWED = (405, {"error": "method not allowed"})
 
 
 @pytest.mark.parametrize(
-    ("method", "path", "answer", "allow"),
+    ("method", "path", "expected", "allow"),
     [
         ("GET", "/api/elsewhere", _NOT_FOUND, None),
         ("GET", "/api/rule", _NOT_FOUND, None),
@@ -423,12 +423,14 @@ def test_an_api_request_outside_its_routes_answers_why_as_json(
     board: BoardClient,
     method: str,
     path: str,
-    answer: tuple[int, dict[str, str]],
+    expected: tuple[int, dict[str, str]],
     allow: str | None,
 ) -> None:
+    status, body = expected
     response = board.call_api(method, path, presented=board.token)
 
-    assert (response.status, response.json()) == answer
+    assert response.status == status
+    assert response.json() == body
     assert response.headers.get("Allow") == allow
     assert repository.calls() == []
 
