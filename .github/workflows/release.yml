@@ -16,6 +16,8 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
           python-version: '3.14'
+      # setup-uv only sets UV_PYTHON; the script's `uv python find` needs the interpreter present.
+      - run: uv python install
       # Builds into dist/ and proves the distributions before they are uploaded.
       - run: bash scripts/package_smoke.sh dist
       - name: Publish the release
