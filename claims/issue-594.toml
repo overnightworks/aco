@@ -1,8 +1,0 @@
-claim_id = "1667923a84254688a2b6448b1dbe57cc"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "2884baca41b767aeb0301d1cc7a07fa8af6bb549"
-branch = "claude/issue-594-w2a-withdrawn-line-readers"
-scope = ["specs/body-block.spec.md", "specs/next.spec.md", "specs/rule.spec.md", "specs/rulings.spec.md", "src/aco/body.py", "src/aco/cmd_rule.py", "src/aco/decide.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "src/aco/rulings.py", "tests/test_board.py", "tests/test_cmd_check_option_lines.py", "tests/test_cmd_check_stdin.py", "tests/test_cmd_rule.py", "tests/test_decide.py", "tests/test_expectation_grammar_withdrawn.py", "tests/test_expectations_withdrawn.py"]
-opened_commit = "38471bb8a0a27490646b70732dc7a406aae669be"
-whole_reason = "One form reaches every reader at once: the grammar may accept a withdrawn line only in the landing where the renderer, the line model, rulings, rule and next read it, or a body that passes aco check - would break aco rulings or count as open; its specs and #590's two test fold-ins ride along."
