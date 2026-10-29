@@ -27,6 +27,7 @@ from aco.board.ports import (
     DecisionResult,
     DecisionStatus,
     ExpectationLine,
+    OptionLine,
     Outcome,
     PostedCard,
     PostedLine,
@@ -166,8 +167,13 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
 
     assert running_answer.result().status is DecisionStatus.RULED
     [shown] = decisions.lines
+    assert isinstance(shown, OptionLine)
     assert decisions.ruled_cards == [
-        CardDecision(running.item, (CardLine(shown.index, shown.card_hash, "A"),), None)
+        CardDecision(
+            running.item,
+            (CardLine(shown.index, shown.card_hash, running.lines[0].letter),),
+            None,
+        )
     ]
 
 
