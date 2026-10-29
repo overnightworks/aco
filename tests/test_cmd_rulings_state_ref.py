@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from board_fixtures import block_body
+from board_fixtures import block_body, slice_entries
 from cli_fixtures import real_git, run_cli, set_git_identity, track_board_config
 from option_cards import open_option_entry
 from store_fixtures import item_record, path_without_gh, push_item_tree
@@ -24,8 +24,11 @@ def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     set_git_identity(monkeypatch)
 
 
-def _item_file(item_id: str, *, expectations: bool, **links: object) -> tuple[str, bytes]:
-    record = item_record(title=f"Item {item_id}", state="open", kind="task")
+def _item_file(
+    item_id: str, *, expectations: bool, kind: str = "task", **links: object
+) -> tuple[str, bytes]:
+    """A container carries an uncut `[[slice]]` row: the shape whose forge parent the board reads."""
+    record = item_record(title=f"Item {item_id}", state="open", kind=kind)
     data: dict[str, object] = {
         "version": 1,
         "now": "Now.",
@@ -33,6 +36,8 @@ def _item_file(item_id: str, *, expectations: bool, **links: object) -> tuple[st
         "done_when": "Done.",
         "record": {**record, **links},
     }
+    if kind == "container":
+        data["slice"] = slice_entries("First slice")
     if expectations:
         data["expectation"] = [open_option_entry()]
     text = block_body(render_block(data).removesuffix("\n"), before="Prose.\n\n", after="")
@@ -60,7 +65,10 @@ def _checkout_listing(
 @pytest.mark.parametrize(
     "links",
     [
-        pytest.param({"parent": MISSING_ID}, id="parent-names-a-missing-id"),
+        pytest.param(
+            {"kind": "container", "parent": MISSING_ID},
+            id="childless-container-with-uncut-slice-names-a-missing-parent",
+        ),
         pytest.param({"blocked_by": [MISSING_ID]}, id="blocker-names-a-missing-id"),
         pytest.param(
             {"blocked_by": [EXISTING_BLOCKER_ID, EXISTING_BLOCKER_ID]}, id="blocker-named-twice"
