@@ -1,9 +1,11 @@
-"""The CLI's output envelope, refusal rendering (`specs/output.spec.md`) and
-the piped-body reader every stdin-fed command shares."""
+"""The CLI's `--json` flag, output envelope, refusal rendering
+(`specs/output.spec.md`) and the piped-body reader every stdin-fed command
+shares."""
 # ruff: noqa: T201 - the one owner of the JSON envelope and the error line
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import stat
@@ -17,6 +19,15 @@ REFUSAL_LINE_LENGTH_LIMIT = 200
 _REFUSAL_SENTENCE_LENGTH_LIMIT = REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
 
 JSON_FLAG = "--json"
+_JSON_HELP = "print the result as JSON instead of the human lines"
+
+
+def add_json_flag(parser: argparse.ArgumentParser) -> None:
+    """The one place `--json` is declared: a command that never calls this
+    has no JSON mode at all, and `cli.main` matches this same spelling when
+    argparse refuses before any namespace is filled, so the flag needs a
+    single owner."""
+    parser.add_argument(JSON_FLAG, action="store_true", help=_JSON_HELP)
 
 
 def _stdin_file_mode() -> int | None:
@@ -56,7 +67,7 @@ def emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:
     `ok` and `reason` always print first, in that order -- `reason` a
     stable enum token, never an `error` object -- then the payload in the
     order given, with an optional `message` (free prose) moved last so a
-    reader can stop before it. `ask`, `rule`, and `brief` are its first
+    reader can stop before it. `rule` and `brief` are its first
     callers, on success and on every refusal alike. `reason` is typed
     `StrEnum` -- the shared base every command's own reason vocabulary
     already subclasses -- so a loose string can never reach this envelope."""

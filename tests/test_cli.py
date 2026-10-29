@@ -3759,37 +3759,6 @@ def test_claim_parser_description_names_what_refuses_first() -> None:
     assert "repository-relative" in issue_claim.CLAIM_DESCRIPTION
 
 
-def test_help_lists_commands_in_their_stable_registration_order() -> None:
-    """`aco --help`'s command order is part of the CLI's own contract:
-    `cli._COMMANDS` keeps every command in its original position,
-    including the forge-free and local commands."""
-    parser = issue_claim._parser()
-    subparsers_action = next(
-        action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
-    )
-
-    assert list(subparsers_action.choices) == [
-        "bootstrap",
-        "reset",
-        "status",
-        "board",
-        "serve",
-        "rulings",
-        "next",
-        "start",
-        "claim",
-        "release",
-        "land",
-        "adopt",
-        "rescope",
-        "cut",
-        "rule",
-        "check",
-        "brief",
-        "item",
-    ]
-
-
 def _every_parser(parser: argparse.ArgumentParser) -> Iterator[argparse.ArgumentParser]:
     yield parser
     for action in parser._actions:

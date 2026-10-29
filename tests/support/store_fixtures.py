@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 from cli_fixtures import fresh_observation, real_git
 
-from aco import lineage_stamp, protocol, store
+from aco import items, lineage_stamp, protocol, store
 
 TIP = protocol.ObjectId("a" * 40)
 CLAIM_BASE = protocol.ObjectId("c" * 40)
@@ -287,6 +287,26 @@ def item_record(
     if closed_at is not None:
         record["closed_at"] = closed_at
     return record
+
+
+def decoded_item_record(
+    *, state: items.RecordState = items.RecordState.OPEN, closed_at: str | None = None
+) -> items.ItemRecord:
+    """Item 1's decoded `[record]`, titled `Karte`: what the state-ref store
+    composes into a body it writes."""
+    return items.ItemRecord(
+        number=1,
+        title="Karte",
+        state=state,
+        kind="task",
+        labels=(),
+        blocked_by=(),
+        parent=None,
+        origin=None,
+        created_at="2026-10-01T00:00:00Z",
+        updated_at="2026-10-03T00:00:00Z",
+        closed_at=closed_at,
+    )
 
 
 def push_item_tree(remote: Path, worktree_path: Path, item_files: dict[str, bytes]) -> str:

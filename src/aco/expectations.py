@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import ClassVar, cast
+from typing import ClassVar, TypeGuard, cast
 
 from . import protocol
 from .body import (
@@ -32,6 +32,7 @@ from .expectation_grammar import (
     RulingVia,
     Undo,
     card_hash,
+    is_open_line,
     is_option_line,
     is_withdrawn_line,
 )
@@ -190,7 +191,7 @@ class WithdrawnLine:
 type ExpectationLine = YesNoLine | OptionLine | WithdrawnLine
 
 
-def is_open(line: ExpectationLine) -> bool:
+def is_open(line: ExpectationLine) -> TypeGuard[OptionLine]:
     """Whether `line` still waits for a ruling: an option line without a decision."""
     return isinstance(line, OptionLine) and line.decision is None
 
@@ -318,7 +319,7 @@ def expectation_line_state(line: ExpectationLine) -> str:
         return f"withdrawn {line.withdrawn_on.isoformat()}"
     if isinstance(line, OptionLine) and line.returned is not None:
         return f"with head {line.returned.returned_on.isoformat()}"
-    if line.ruling is None:
+    if is_open(line):
         return "open"
     ruled_on = cast(date, line.ruled_on)
     return f"ruled {line.ruling} {ruled_on.isoformat()}"
@@ -374,12 +375,9 @@ _UNCLEAR_FLAG = "--unclear"
 _RETURNED_KEYS = (RETURNED_ON, RETURNED_NOTE)
 
 
-def _open_entry(
-    entries: list[dict[str, object]], index: int, option_flag: str
-) -> dict[str, object]:
-    """Line `index` of `entries`, still open and an option line; refuses an
-    out-of-range index, a withdrawn line, a yes/no line and an already-ruled
-    line, in that order -- the checks both writes share."""
+def _standing_entry(entries: list[dict[str, object]], index: int) -> dict[str, object]:
+    """Line `index` of `entries`, not withdrawn; refuses an out-of-range index,
+    then a withdrawn line -- the checks every write of one line shares."""
     if not 1 <= index <= len(entries):
         raise ExpectationOutOfRangeError(
             f"line {index} out of range: this item has {len(entries)} expectation line(s)"
@@ -387,6 +385,16 @@ def _open_entry(
     entry = entries[index - 1]
     if is_withdrawn_line(entry):
         raise ExpectationWithdrawnError(f"line {index} was withdrawn by its head")
+    return entry
+
+
+def _open_entry(
+    entries: list[dict[str, object]], index: int, option_flag: str
+) -> dict[str, object]:
+    """Line `index` of `entries`, still open and an option line; refuses as
+    `_standing_entry` does, then a yes/no line and an already-ruled line, in
+    that order -- the checks both rulings share."""
+    entry = _standing_entry(entries, index)
     if not is_option_line(entry):
         verb = "returns" if option_flag == _UNCLEAR_FLAG else "rules"
         raise ExpectationLineFormError(
@@ -400,17 +408,41 @@ def _open_entry(
 
 
 type _Decide = Callable[[dict[str, object]], dict[str, object]]
+type _Rewrite = Callable[[list[dict[str, object]]], dict[str, object]]
+
+
+def _replaced_entry(body: str, index: int, rewrite: _Rewrite) -> str:
+    """`body` with its line `index` replaced by the entry `rewrite` makes of
+    the block's entries; bytes outside the block are preserved."""
+    located = locate_block(body)
+    entries = block_expectation_dicts(located.data)
+    new_entries = [*entries[: index - 1], rewrite(entries), *entries[index:]]
+    new_data = {**located.data, "expectation": new_entries}
+    return replace_block(body, located, new_data)
 
 
 def _rule_entry(body: str, index: int, decide: _Decide, option_flag: str = _OPTION_FLAG) -> str:
     """`body` with its open option line `index` replaced by `decide`'s
-    ruled entry; bytes outside the block are preserved."""
-    located = locate_block(body)
-    entries = block_expectation_dicts(located.data)
-    ruled_entry = decide(_open_entry(entries, index, option_flag))
-    new_entries = [*entries[: index - 1], ruled_entry, *entries[index:]]
-    new_data = {**located.data, "expectation": new_entries}
-    return replace_block(body, located, new_data)
+    ruled entry."""
+    return _replaced_entry(
+        body, index, lambda entries: decide(_open_entry(entries, index, option_flag))
+    )
+
+
+def withdraw_line(body: str, index: int, withdrawn_on: date) -> str:
+    """Take back one line nobody has ruled, an open or a returned option line:
+    it keeps only its `text` and gains `withdrawn_on`, at its index. Refuses as
+    `_standing_entry` does, then a ruled line, before any write."""
+
+    def withdrawn(entries: list[dict[str, object]]) -> dict[str, object]:
+        entry = _standing_entry(entries, index)
+        if not is_open_line(entry):
+            raise ExpectationAlreadyRuledError(
+                f"line {index} is already ruled; a ruled line stays as it is"
+            )
+        return {"text": entry["text"], WITHDRAWN_ON: withdrawn_on}
+
+    return _replaced_entry(body, index, withdrawn)
 
 
 @dataclass(frozen=True)

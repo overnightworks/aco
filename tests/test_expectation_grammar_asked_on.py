@@ -141,5 +141,7 @@ class TestAskedOnKeptByRule:
         context = run_context_over(client)
         choice = expectations.OptionChoice("A", expectations.RulingVia.CHAT, GOLDEN_CARD_HASH)
         outcome = decide_module.LineOutcome(2, choice)
-        decide_module.rule(context, decide_module.fresh_item(context, 7), [outcome], TODAY)
+        decide_module.rule(
+            context, decide_module.fresh_item(context, 7, command="rule"), [outcome], TODAY
+        )
         assert ASKED_ON in client.item_bodies[7]

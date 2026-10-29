@@ -53,7 +53,7 @@ class _RecordGivenFlag(argparse.Action):
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """`rule`'s own flags; the `--json` flag stays `cli`'s one declaration."""
+    """`rule`'s own flags; the `--json` flag stays `report`'s one declaration."""
     parser.add_argument(
         "item", type=workboard.parse_item_reference, help="the item whose expectation line is ruled"
     )
@@ -355,7 +355,7 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
     report."""
     named = _line_outcomes(parsed)
     number = int(parsed.item)
-    fresh = decide.fresh_item(context, number)
+    fresh = decide.fresh_item(context, number, command="rule")
     committed = decide.rule(context, fresh, named, context.today())
     # A successful write names only option lines: every other form refused before it.
     ruled = cast(
