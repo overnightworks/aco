@@ -26,7 +26,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from email.message import Message
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -70,21 +70,15 @@ rule.set_defaults(named=[])
 rule.add_argument("--line", action=NamedLine, required=True)
 rule.add_argument("--option", action=OfLastLine)
 rule.add_argument("--card-hash", dest="card_hash", action=OfLastLine)
-outcomes = rule.add_mutually_exclusive_group()
-for outcome in ("yes", "no", "later"):
-    outcomes.add_argument("--" + outcome, dest="ruling", action="store_const", const=outcome)
-outcomes.add_argument("--other")
-outcomes.add_argument("--unclear", action="store_true")
+answers = rule.add_mutually_exclusive_group()
+answers.add_argument("--other")
+answers.add_argument("--unclear", action="store_true")
 rule.add_argument("--via")
 rule.add_argument("--note")
 rule.add_argument("--json", action="store_true")
 arguments = parser.parse_args()
 if arguments.command == "rule":
     picks = [named["option"] is not None for named in arguments.named]
-    if getattr(arguments, "ruling", None) is None and not any(picks) and (
-        getattr(arguments, "other", None) is None and not getattr(arguments, "unclear", False)
-    ):
-        parser.error("name an outcome")
     if any(picks) and not all(picks):
         parser.error("--option belongs to every --line or to none")
     if any(picks):
@@ -169,8 +163,6 @@ for named, line in targets:
         line["via"] = arguments.via
     if arguments.other is not None:
         line["other"] = arguments.other
-    if arguments.note is not None:
-        line["text"] += " Anmerkung: " + arguments.note
 rulings.write_text(json.dumps(rows), encoding="utf-8")
 print(json.dumps({"ok": True, "reason": "ruled", "item": row["number"],
                   "index": indexes[0], "lines": indexes,
@@ -462,26 +454,6 @@ class BoardClient:
     def get_board_json(self) -> Response:
         return self.call_api("GET", "/api/board", presented=self.token)
 
-    def decide_through_api(
-        self,
-        line: Mapping[str, object],
-        item: int,
-        outcome: str,
-        *,
-        repo: str | None = None,
-        note: str | None = None,
-    ) -> Response:
-        """Post `outcome` for a line exactly as `GET /api/board` listed it."""
-        payload = {
-            "repo": self.repo if repo is None else repo,
-            "item": item,
-            "line": line["index"],
-            "fingerprint": line["fingerprint"],
-            "outcome": outcome,
-            "note": note,
-        }
-        return self.post_rule(payload)
-
     def decide_card_through_api(
         self,
         item: int,
@@ -533,6 +505,15 @@ class BoardClient:
 
 
 _SVG = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+
+
+class Lister(Protocol):
+    """The `listed_items` fixture's reader."""
+
+    def __call__(self, board: BoardClient, repo: str | None = None) -> list[dict[str, Any]]:
+        """The items `board` lists for `repo`, its first repo unless named; the
+        listing must succeed and that repo must read without an error."""
+        ...
 
 
 def picture_option(letter: str = "A", **changes: object) -> dict[str, object]:

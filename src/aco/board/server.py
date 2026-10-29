@@ -71,9 +71,8 @@ def _allowed_methods(path: str) -> str:
 
 
 _MAX_REQUEST_BYTES = 16 * 1024
-"""A decision is two numbers, an outcome, a fingerprint, and a short note, and a
-card is a fingerprint and a letter per line; anything larger is refused before it
-is read."""
+"""A card is two numbers, a fingerprint and a letter per line, and at most one
+short text; anything larger is refused before it is read."""
 REQUEST_DEADLINE_SECONDS = 10.0
 """How long one socket read or write on a connection may wait, and how long
 a whole request body may take to arrive; a browser sends its small request
@@ -358,12 +357,8 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return None
         return body
 
-    def _decide(self, request: api.RuleRequest) -> None:
-        boards = self._server().boards
-        if isinstance(request, api.CardRequest):
-            result = boards.decide_card(request.repo, request.card)
-        else:
-            result = boards.decide(request.repo, request.decision, request.fingerprint)
+    def _decide(self, request: api.CardRequest) -> None:
+        result = self._server().boards.decide_card(request.repo, request.card)
         self._respond(
             HTTPStatus.OK, api.decision_result_json(result).encode("utf-8"), api.JSON_CONTENT_TYPE
         )

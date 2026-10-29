@@ -52,12 +52,16 @@ value (`DecisionKind(value)`) and by iteration when the grammar lists the
 accepted kinds; no code names one of them. `RulingVia.BOARD` and
 `RulingVia.CHAT` are reached the same way, from `--via` and from a stored
 `via`; so are the board's own `RulingVia.CHAT` and `RulingVia.DEFAULT`,
-reached only by construction from the `via` aco stored.
+reached only by construction from the `via` aco stored. The board's
+`Outcome.YES`, `Outcome.NO` and `Outcome.LATER` are reached only by
+construction from the ruling of a stored yes/no line, which the board shows
+and never writes.
 """
 
 import argparse
 from datetime import UTC, date, datetime
 
+from aco.board.ports import Outcome as BoardOutcome
 from aco.board.ports import RulingVia as BoardRulingVia
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
 from aco.expectation_grammar import DecisionKind, RulingVia
@@ -154,6 +158,9 @@ _referenced_only_for_vulture = (
     RulingVia.CHAT,
     BoardRulingVia.CHAT,
     BoardRulingVia.DEFAULT,
+    BoardOutcome.YES,
+    BoardOutcome.NO,
+    BoardOutcome.LATER,
     _BoardApiRequestHandler.do_GET,
     _BoardApiRequestHandler.do_POST,
     _BoardApiRequestHandler.log_message,

@@ -228,9 +228,9 @@ def assert_rewritten_alike(before: str, after: str, storage: body.Storage) -> No
 SECOND_CARD = card(card_head(("Soll dein Song", "Soll dein Lied")))
 
 
-def group_body(third: str = SECOND_CARD) -> str:
-    """Issue #7: line 1 a yes/no line, lines 2 and 3 open option lines."""
-    return card_body(third, before="\n" + YES_NO_LINE + "\n" + card())
+def group_body(third: str = SECOND_CARD, *, yes_no_line: str = YES_NO_LINE) -> str:
+    """Issue #7: line 1 `yes_no_line`, lines 2 and 3 open option lines."""
+    return card_body(third, before="\n" + yes_no_line + "\n" + card())
 
 
 def shown_hash(raw: str, index: int) -> str:

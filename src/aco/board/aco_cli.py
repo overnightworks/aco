@@ -1,8 +1,7 @@
 """`DecisionPort` over the installed `aco` command line.
 
-Reads with `aco rulings --json` (specs/rulings.spec.md) and writes with
-`aco rule ITEM --line N --yes|--no|--later [--note TEXT] --json`;
-a whole card is one `aco rule ITEM` naming every line, each with its own `--option`
+Reads with `aco rulings --json` (specs/rulings.spec.md) and writes a whole
+card with one `aco rule ITEM` naming every line, each with its own `--option`
 and `--card-hash=HASH`, then the card's one `--via board`, `--other=TEXT --via board`
 or `--unclear` (specs/rule.spec.md).
 Every call runs in the directory the board was started in, so the board only
@@ -29,7 +28,6 @@ from .ports import (
     CardDecision,
     CardLine,
     CardOption,
-    Decision,
     DecisionResult,
     DecisionSourceUnavailableError,
     DecisionStatus,
@@ -98,19 +96,6 @@ class AcoCli:
                 _failure_sentence("aco rulings", completed, envelope)
             )
         return _lines_from_rulings(envelope.get("rulings"))
-
-    def rule(self, decision: Decision) -> DecisionResult:
-        arguments = [
-            "rule",
-            str(decision.item),
-            "--line",
-            str(decision.index),
-            f"--{decision.outcome.value}",
-        ]
-        if decision.note is not None:
-            # One argument: a note starting with "-" would otherwise read as an option.
-            arguments.append(f"--note={decision.note}")
-        return self._write(arguments).result
 
     def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
         answer = self._write(
@@ -235,19 +220,24 @@ def _require_keys(item: int, fields: dict[str, object], keys: tuple[str, ...]) -
 
 
 def _yes_no_line(item: int, title: str, fields: dict[str, object]) -> YesNoLine:
-    # RUL-10 always names a line's default, ruling and ruling date, null while
-    # absent; a missing key is a broken shape, never an open line.
-    _require_keys(item, fields, ("default", "ruling", "ruled_on"))
+    """A ruled yes/no line, kept as read-only history; an open one has no writer
+    left on the board and makes the whole read unreadable (ABRD-07)."""
+    # RUL-10 always names a line's ruling and ruling date, null while absent; a
+    # missing key is a broken shape, never an open line.
+    _require_keys(item, fields, ("ruling", "ruled_on"))
+    index = _required(fields, "index", int)
+    ruling = _optional_member(fields, "ruling", Outcome, "an outcome")
+    if ruling is None:
+        raise _unreadable(f"#{item} line {index} is an open yes/no line; write an option card")
     return YesNoLine(
         item=item,
         item_title=title,
-        index=_required(fields, "index", int),
+        index=index,
         text=_required(fields, "text", str),
         question=_optional_text(fields, "question"),
         example=_optional_text(fields, "example"),
         picture=_optional_text(fields, "picture"),
-        default=_optional_member(fields, "default", Outcome, "an outcome"),
-        ruling=_optional_member(fields, "ruling", Outcome, "an outcome"),
+        ruling=ruling,
         ruled_on=_optional_date(fields, "ruled_on"),
     )
 

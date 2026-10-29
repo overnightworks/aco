@@ -3,7 +3,7 @@ on PATH, and the real board server running against it."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -11,13 +11,11 @@ import pytest
 from aco_board_fixtures import (
     BoardClient,
     FakeAcoRepository,
+    Lister,
     empty_repository_with_fake_aco,
-    first_listed_line,
     install_fake_aco,
     named_repository,
-    option_line,
     path_with,
-    row,
     serving,
 )
 
@@ -36,16 +34,16 @@ def board(repository: FakeAcoRepository) -> Iterator[BoardClient]:
 
 
 @pytest.fixture
-def listed_items() -> Callable[[BoardClient], list[dict[str, Any]]]:
-    """Reads the items one board lists for its single repository, checking the listing succeeded."""
+def listed_items() -> Lister:
+    """The one listing reader: the items a board lists for one of its repos."""
 
-    def read(board: BoardClient) -> list[dict[str, Any]]:
+    def read(board: BoardClient, repo: str | None = None) -> list[dict[str, Any]]:
         response = board.get_board_json()
         assert response.status == 200
-        [repo] = cast(list[dict[str, Any]], response.json()["repos"])
-        assert repo["name"] == board.repo
-        assert repo["error"] is None
-        return cast(list[dict[str, Any]], repo["items"])
+        repos = cast(list[dict[str, Any]], response.json()["repos"])
+        [shown] = [entry for entry in repos if entry["name"] == (repo or board.repo)]
+        assert shown["error"] is None
+        return cast(list[dict[str, Any]], shown["items"])
 
     return read
 
@@ -58,16 +56,3 @@ def two_repositories(
     install_fake_aco(tmp_path / "bin")
     monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
     return named_repository(tmp_path, "a"), named_repository(tmp_path, "b")
-
-
-@pytest.fixture
-def listed(repository: FakeAcoRepository, board: BoardClient) -> dict[str, Any]:
-    """The post payload naming item 12's first listed line, without a decision."""
-    repository.set_rulings(row(12, "Song jump", option_line()))
-    shown = first_listed_line(board)
-    return {
-        "repo": board.repo,
-        "item": 12,
-        "line": shown["index"],
-        "fingerprint": shown["fingerprint"],
-    }

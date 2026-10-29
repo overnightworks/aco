@@ -1,8 +1,8 @@
 """The board's JSON wire form, free of any socket.
 
 Turns a `BoardSnapshot` into the answer of `GET /api/board`, a request body
-into a `DecisionRequest` for one yes/no line or a `CardRequest` for a whole option
-card, and a decision's result or a refusal into its JSON answer. The transport
+into a `CardRequest` for a whole option card, and a decision's result or a
+refusal into its JSON answer. The transport
 decides when to answer; this module owns what the answer and the request look like.
 """
 
@@ -22,37 +22,18 @@ from .ports import (
     UNCLEAR,
     CardAnswer,
     CardOption,
-    Decision,
     DecisionResult,
     ExpectationLine,
     OptionLetter,
     OptionLine,
     OtherAnswer,
     OtherCardAnswer,
-    Outcome,
     PostedCard,
     PostedLine,
     UnclearCardAnswer,
 )
 
 JSON_CONTENT_TYPE = "application/json"
-
-_VALID_OUTCOME_VALUES = frozenset(
-    outcome.value for outcome in (Outcome.YES, Outcome.NO, Outcome.LATER)
-)
-"""The three outcomes a posted decision may name, spelled out by name rather
-than taken from a generic `Outcome` iteration: this is the one place that
-decides which wire values are valid, so it is also the one place every
-member needs to be named."""
-
-
-@dataclass(frozen=True)
-class DecisionRequest:
-    repo: str
-    """The label of the configured repo this decision belongs to."""
-    fingerprint: str
-    """The fingerprint of the card as it was shown when the operator chose."""
-    decision: Decision
 
 
 @dataclass(frozen=True)
@@ -61,8 +42,6 @@ class CardRequest:
     """The label of the configured repo the card belongs to."""
     card: PostedCard
 
-
-RuleRequest = DecisionRequest | CardRequest
 
 _CARD_ENTRY_KEYS = frozenset({"line", "fingerprint", "option"})
 _KEYS_OF_ONE_LINE = ("line", "fingerprint", "option", "outcome")
@@ -95,35 +74,17 @@ def error_json(sentence: str) -> str:
     return json.dumps({"error": sentence})
 
 
-def parse_rule_request(raw: bytes) -> RuleRequest | None:
-    """The decision a request body names, or None unless every field is well-formed.
+def parse_rule_request(raw: bytes) -> CardRequest | None:
+    """The card a request body names, or None unless every field is well-formed.
 
-    A body with `lines` is a whole card, any other body one line. `repo` is
+    A body without `lines` names no card and is refused (ABRD-40). `repo` is
     checked here only for its shape; whether it names a configured repo is the
     caller's own lookup, made before any `aco` call.
     """
     fields = _json_object(raw)
-    if fields is None:
+    if fields is None or "lines" not in fields:
         return None
-    if "lines" in fields:
-        return _card_request(fields)
-    return _line_request(fields)
-
-
-def _line_request(fields: dict[str, object]) -> DecisionRequest | None:
-    repo = fields.get("repo")
-    fingerprint, item, line = fields.get("fingerprint"), fields.get("item"), fields.get("line")
-    if (
-        isinstance(repo, str)
-        and repo != ""
-        and isinstance(fingerprint, str)
-        and _is_position(item)
-        and _is_position(line)
-    ):
-        decision = _decision(item, line, fields)
-        if decision is not None:
-            return DecisionRequest(repo=repo, fingerprint=fingerprint, decision=decision)
-    return None
+    return _card_request(fields)
 
 
 def _card_request(fields: dict[str, object]) -> CardRequest | None:
@@ -186,21 +147,6 @@ def _card_answer(fields: dict[str, object], *, picked: bool) -> tuple[CardAnswer
     return None
 
 
-def _decision(item: int, line: int, fields: dict[str, object]) -> Decision | None:
-    """An `outcome` with an optional note and nothing else: a non-null `other` or `unclear`,
-    or any `option` key, names an option line's answer, which only a card carries."""
-    if any(fields.get(key) is not None for key in (OTHER, UNCLEAR)) or "option" in fields:
-        return None
-    outcome, note = fields.get("outcome"), fields.get("note")
-    if (
-        isinstance(outcome, str)
-        and outcome in _VALID_OUTCOME_VALUES
-        and (note is None or _is_note_text(note))
-    ):
-        return Decision(item=item, index=line, outcome=Outcome(outcome), note=_note(note))
-    return None
-
-
 def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:
     first = lines[0]
     return {
@@ -219,7 +165,6 @@ def _line_json(line: ExpectationLine, repo: str) -> dict[str, object]:
         "question": line.question,
         "example": line.example,
         "picture": line.picture,
-        "default": line.default,
         "ruling": line.ruling,
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
         "fingerprint": wire_fingerprint(repo, line),
