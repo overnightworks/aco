@@ -42,13 +42,13 @@ class _RulingsRow:
 
 
 def _rulings_order(row: _RulingsRow) -> tuple[int, int, int]:
-    """RUL-03: rows with a dated open card first, newest day first; then rows
-    whose open lines carry no date; then fully ruled rows; each group by
-    descending number."""
+    """RUL-03: rows with a dated open card first, newest day first; then fully
+    ruled rows; each group by descending number. Every open line is an option
+    line asked on a day, so a row without one is fully ruled."""
     day = row.newest_open_card_day
     if day is not None:
         return (0, -day.toordinal(), -row.number)
-    return (1 if row.progress.open > 0 else 2, 0, -row.number)
+    return (1, 0, -row.number)
 
 
 def _rulings_rows(
@@ -129,7 +129,7 @@ def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
         "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
     }
     if isinstance(line, expectations.YesNoLine):
-        return {**shared, "default": line.default, **_rulings_yes_no_card_json(line)}
+        return {**shared, **_rulings_yes_no_card_json(line)}
     decision = line.decision
     return {
         "index": line.index,
@@ -138,7 +138,6 @@ def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
         expectation_grammar.ASKED_ON: None if line.asked_on is None else line.asked_on.isoformat(),
         "ruling": shared["ruling"],
         "ruled_on": shared["ruled_on"],
-        "default": None,
         "card_hash": line.card_hash,
         "stored_card_hash": None if decision is None else decision.card_hash,
         "via": None if decision is None else decision.via.value,

@@ -18,9 +18,9 @@ from option_cards import assert_rewritten_alike, card, decide, ruled_card
 
 from aco import body, cmd_item, cmd_rescope, forge, items, session, state_board
 
-OPEN_YES_NO = (
-    '[[expectation]]\ntext = "Alte Frage?"\ndefault = "later"\nquestion = "Alt?"\n'
-    'example = "Wie bisher."\npicture = """\n<svg xmlns="http://www.w3.org/2000/svg"/>"""\n'
+OLD_YES_NO_CARD = (
+    '[[expectation]]\ntext = "Alte Frage?"\nruling = "later"\nruled_on = 2026-10-01\n'
+    'question = "Alt?"\nexample = "Wie bisher."\npicture = """\n<svg xmlns="http://www.w3.org/2000/svg"/>"""\n'
 )
 RULED_YES_NO = '[[expectation]]\ntext = "Entschieden."\nruling = "no"\nruled_on = 2026-10-01\n'
 RECORD = (
@@ -28,9 +28,9 @@ RECORD = (
     'created_at = "2026-10-01T00:00:00Z"\nupdated_at = "2026-10-02T00:00:00Z"\n'
 )
 ITEMS = {
-    "old-only": (OPEN_YES_NO, RULED_YES_NO),
+    "old-only": (OLD_YES_NO_CARD, RULED_YES_NO),
     "new-only": (card(), ruled_card()),
-    "mixed": (OPEN_YES_NO, card(), RULED_YES_NO, ruled_card()),
+    "mixed": (OLD_YES_NO_CARD, card(), RULED_YES_NO, ruled_card()),
 }
 
 

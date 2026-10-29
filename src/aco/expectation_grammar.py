@@ -1,7 +1,8 @@
 """The `[[expectation]]` entry grammar of a work-item body's `aco` block: the
 accepted values, the card-field and picture rules, the defects a stored entry
 can carry, its card hash, and the canonical rendering of the entries. An entry
-carrying `option` tables is an option line; any other is a yes/no line. Pure;
+carrying `option` tables is an option line; any other is a ruled yes/no line,
+read-only history that no writer adds and no entry may hold open. Pure;
 it never imports `body`, which calls it while parsing and rendering a block and
 reports its `FieldDefect` pairs as `ContractDefect`s.
 """
@@ -27,7 +28,6 @@ class FieldDefect(NamedTuple):
     message: str
 
 
-BLOCK_EXPECTATION_DEFAULTS = frozenset({"yes", "no", "later"})
 # A ruled yes/no line stays readable: "later" is a legitimate final answer,
 # an explicit, dated decision to defer, like "yes" and "no".
 BLOCK_EXPECTATION_RULINGS = frozenset({"yes", "no", "later"})
@@ -100,7 +100,7 @@ OPTION_LINE_KEYS = (
     "reason",
 )
 _OPTION_LINE_ONLY_KEYS = frozenset(OPTION_LINE_KEYS) - {"question", _PICTURE}
-_OPTION_LINE_REFUSED_KEYS = ("default", "example")
+_OPTION_LINE_REFUSED_KEYS = ("example",)
 # Every key of one `[[expectation.option]]` table, in rendering order; an
 # option carries either `picture` or `same_as_today`, and `caption` only
 # beside a picture.
@@ -126,39 +126,19 @@ def _one_of(values: tuple[str, ...]) -> str:
     return f"{', '.join(values[:-1])}, or {values[-1]}"
 
 
-def _block_expectation_variant_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
-    has_default, has_ruling, has_ruled_on = (
-        "default" in entry,
-        "ruling" in entry,
-        "ruled_on" in entry,
-    )
-    if has_default and (has_ruling or has_ruled_on):
-        return [
-            FieldDefect(
-                f"{prefix}.default",
-                f"{prefix} must be proposed (default) or ruled (ruling, ruled_on), not both",
-            )
-        ]
-    if has_default:
-        if entry["default"] not in BLOCK_EXPECTATION_DEFAULTS:
-            return [FieldDefect(f"{prefix}.default", f"{prefix}.default must be yes, no, or later")]
-        return []
-    if has_ruling or has_ruled_on:
-        defects = []
-        if entry.get("ruling") not in BLOCK_EXPECTATION_RULINGS:
-            defects.append(
-                FieldDefect(f"{prefix}.ruling", f"{prefix}.ruling must be yes, no, or later")
-            )
-        if type(entry.get("ruled_on")) is not date:
-            defects.append(
-                FieldDefect(f"{prefix}.ruled_on", f"{prefix}.ruled_on {NOT_A_LOCAL_DATE}")
-            )
-        return defects
-    return [
-        FieldDefect(
-            f"{prefix}.default", f"{prefix} must carry default, or both ruling and ruled_on"
+def _yes_no_ruling_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
+    """A yes/no line is ruled history: one carrying neither `ruling` nor
+    `ruled_on` is an open line no writer may add any more."""
+    if "ruling" not in entry and "ruled_on" not in entry:
+        return [FieldDefect(prefix, f"{prefix} is an open yes/no line; write an option card")]
+    defects = []
+    if entry.get("ruling") not in BLOCK_EXPECTATION_RULINGS:
+        defects.append(
+            FieldDefect(f"{prefix}.ruling", f"{prefix}.ruling must be yes, no, or later")
         )
-    ]
+    if type(entry.get("ruled_on")) is not date:
+        defects.append(FieldDefect(f"{prefix}.ruled_on", f"{prefix}.ruled_on {NOT_A_LOCAL_DATE}"))
+    return defects
 
 
 def _expectation_question_defect(value: object) -> str | None:
@@ -317,7 +297,7 @@ EXPECTATION_OPTIONAL_FIELDS: tuple[tuple[str, Callable[[object], str | None]], .
     (_PICTURE, _expectation_picture_defect),
 )
 _EXPECTATION_KNOWN_KEYS = frozenset(
-    {"text", "default", "ruling", "ruled_on", *(key for key, _ in EXPECTATION_OPTIONAL_FIELDS)}
+    {"text", "ruling", "ruled_on", *(key for key, _ in EXPECTATION_OPTIONAL_FIELDS)}
 )
 _OPTION_TABLES = "option"
 _OPTION_LINE_DECISION_KEYS = ("ruling", "ruled_on", "card_hash", "via")
@@ -644,7 +624,7 @@ def _block_expectation_optional_field_defects(
 def _yes_no_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
     keys = set(entry)
     return [
-        *_block_expectation_variant_defects(prefix, entry),
+        *_yes_no_ruling_defects(prefix, entry),
         *_block_expectation_optional_field_defects(prefix, entry),
         *(
             FieldDefect(
@@ -723,7 +703,7 @@ def render_expectations(data: Mapping[str, object]) -> list[str]:
     for expectation in cast(list[dict[str, object]], data.get("expectation", [])):
         option_line = is_option_line(expectation)
         lines.extend(("", "[[expectation]]"))
-        lines.extend(_rendered_present(expectation, ("text", "default", *_OPTION_LINE_STATE_KEYS)))
+        lines.extend(_rendered_present(expectation, ("text", *_OPTION_LINE_STATE_KEYS)))
         card_keys = OPTION_LINE_KEYS if option_line else ("question", "example", _PICTURE)
         lines.extend(_rendered_present(expectation, card_keys))
         for option in cast(list[dict[str, object]], expectation.get(_OPTION_TABLES, [])):

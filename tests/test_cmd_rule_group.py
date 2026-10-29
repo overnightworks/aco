@@ -95,7 +95,7 @@ class TestSeveralLinesInOneWrite:
         result = run_cli(["rule", "7", *arguments], capsys)
         assert (result.status, result.stdout) == (
             0,
-            f"RULED #7 {text}; 1 line(s) still open\n",
+            f"RULED #7 {text}; 0 line(s) still open\n",
         )
         entries = [stored(client, 2), stored(client, 3)]
         assert [
@@ -117,7 +117,7 @@ class TestSeveralLinesInOneWrite:
                     "reason": "ruled",
                     "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "B"}],
                     "ruled_on": TODAY,
-                    "open": 1,
+                    "open": 0,
                 },
                 id=f"option-{via}",
             )
@@ -132,7 +132,7 @@ class TestSeveralLinesInOneWrite:
                     "reason": "ruled",
                     "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "A"}],
                     "ruled_on": TODAY,
-                    "open": 1,
+                    "open": 0,
                 },
                 id="option-default",
             ),
@@ -144,7 +144,7 @@ class TestSeveralLinesInOneWrite:
                     "reason": "ruled",
                     "lines": [{"index": 2, "ruling": "other"}, {"index": 3, "ruling": "other"}],
                     "ruled_on": TODAY,
-                    "open": 1,
+                    "open": 0,
                 },
                 id="other",
             ),
@@ -156,7 +156,7 @@ class TestSeveralLinesInOneWrite:
                     "reason": "returned",
                     "lines": [{"index": 2}, {"index": 3}],
                     "returned_on": TODAY,
-                    "open": 3,
+                    "open": 2,
                 },
                 id="unclear",
             ),
@@ -168,7 +168,7 @@ class TestSeveralLinesInOneWrite:
                     "reason": "returned",
                     "lines": [{"index": 2}, {"index": 3}],
                     "returned_on": TODAY,
-                    "open": 3,
+                    "open": 2,
                 },
                 id="unclear-note",
             ),
@@ -206,7 +206,7 @@ class TestSeveralLinesInOneWrite:
         sent = run_cli(["rule", "7", *arguments], capsys)
         assert (sent.status, sent.stdout) == (
             0,
-            "RETURNED #7 lines 2, 3 to its head; 3 line(s) still open\n",
+            "RETURNED #7 lines 2, 3 to its head; 2 line(s) still open\n",
         )
         for index in (2, 3):
             entry = stored(client, index)
@@ -285,7 +285,7 @@ class TestSeveralLinesInOneWrite:
         ):
             client = serve_item(monkeypatch, group_body())
             runs.append((run_cli(["rule", "7", *arguments], capsys), client.item_bodies[7]))
-        assert runs[0][0].stdout == "RULED #7 line 2 A; 2 line(s) still open\n"
+        assert runs[0][0].stdout == "RULED #7 line 2 A; 1 line(s) still open\n"
         assert (runs[1][0].status, runs[1][0].stdout, runs[1][1]) == (
             runs[0][0].status,
             runs[0][0].stdout,

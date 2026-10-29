@@ -171,7 +171,7 @@ _CHILD_A_PROJECTION = _Projection(
     "Build slice A.",
     "Ship slice A.",
     "Slice A is merged.",
-    expectations=({"text": EXPECTATION_TEXT, "default": "yes"},),
+    expectations=(open_option_entry(EXPECTATION_TEXT),),
 )
 _CHILD_B_PROJECTION = _Projection("Build slice B.", "Ship slice B.", "Slice B is merged.")
 
@@ -476,7 +476,7 @@ _RULABLE_PROJECTION = _Projection(
     "Done.",
     expectations=(
         open_option_entry(),
-        {"text": "A second, still-open question?", "default": "later"},
+        open_option_entry("A second, still-open question?"),
     ),
 )
 

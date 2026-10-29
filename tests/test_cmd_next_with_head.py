@@ -9,11 +9,11 @@ import pytest
 from board_fixtures import board_issue
 from cli_fixtures import freeze_cli_now, run_cli
 from github_fixtures import FakeForge, serve_forge
-from option_cards import RETURNED_ON, card_body, item_body, returned_today
+from option_cards import RETURNED_ON, YES_NO_LINE, card, card_body, item_body, returned_today
 
 from aco import workboard
 
-NOT_RETURNED_LINE = '[[expectation]]\ntext = "T"\ndefault = "yes"\n'
+NOT_RETURNED_LINE = card()
 
 
 def serve_board(monkeypatch: pytest.MonkeyPatch, *issues: workboard.Issue) -> None:
@@ -67,7 +67,7 @@ class TestNextWithHead:
         """Spec: NEXT-45 -- a body that does not read has no addressable line."""
         serve_board(
             monkeypatch,
-            board_issue(7, "Karte", card_body(NOT_RETURNED_LINE + RETURNED_ON)),
+            board_issue(7, "Karte", card_body(YES_NO_LINE + RETURNED_ON)),
         )
 
         text = run_cli(["next"], capsys).stdout
