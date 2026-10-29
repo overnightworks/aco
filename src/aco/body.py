@@ -22,7 +22,7 @@ from enum import Enum, StrEnum
 from typing import TypeGuard, cast
 
 from . import metrics, protocol
-from .expectation_grammar import block_expectation_defects, render_expectations
+from .expectation_grammar import NOT_A_LOCAL_DATE, block_expectation_defects, render_expectations
 
 # CommonMark fence delimiters: at most 3 leading spaces, then a run of 3+
 # backticks or 3+ tildes. An OPENING delimiter may carry an info string after
@@ -388,9 +388,7 @@ def _block_frozen_until_defects(data: dict[str, object]) -> list[ContractDefect]
     ruled_on = value.get("ruled_on")
     if type(ruled_on) is not date:
         defects.append(
-            ContractDefect(
-                "frozen_until.ruled_on", "frozen_until.ruled_on must be a TOML local date"
-            )
+            ContractDefect("frozen_until.ruled_on", f"frozen_until.ruled_on {NOT_A_LOCAL_DATE}")
         )
     unknown = sorted(set(value) - {"trigger", "ruled_on"})
     defects.extend(

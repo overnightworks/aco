@@ -53,7 +53,7 @@ _CARD_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 _PICTURE = "picture"
 _SAME_AS_TODAY = "same_as_today"
 _CAPTION = "caption"
-_NOT_A_LOCAL_DATE = "must be a TOML local date"
+NOT_A_LOCAL_DATE = "must be a TOML local date"
 
 
 class DecisionKind(StrEnum):
@@ -151,7 +151,7 @@ def _block_expectation_variant_defects(prefix: str, entry: dict[str, object]) ->
             )
         if type(entry.get("ruled_on")) is not date:
             defects.append(
-                FieldDefect(f"{prefix}.ruled_on", f"{prefix}.ruled_on must be a TOML local date")
+                FieldDefect(f"{prefix}.ruled_on", f"{prefix}.ruled_on {NOT_A_LOCAL_DATE}")
             )
         return defects
     return [
@@ -434,7 +434,7 @@ def _returned_defects(
         ]
     on_reason = None
     if RETURNED_ON in entry and type(entry[RETURNED_ON]) is not date:
-        on_reason = _NOT_A_LOCAL_DATE
+        on_reason = NOT_A_LOCAL_DATE
     if RETURNED_NOTE not in entry:
         note_reason = None
     elif RETURNED_ON not in entry:
@@ -455,7 +455,7 @@ def _option_line_decision_defects(
         ]
     if not all(present):
         return [_partial_decision_defect(prefix, entry)]
-    ruled_on_reason = None if type(entry["ruled_on"]) is date else _NOT_A_LOCAL_DATE
+    ruled_on_reason = None if type(entry["ruled_on"]) is date else NOT_A_LOCAL_DATE
     return [
         *_field_defect(f"{prefix}.ruling", _ruling_defect(letters)(entry["ruling"])),
         *_field_defect(f"{prefix}.ruled_on", ruled_on_reason),
@@ -587,7 +587,7 @@ def _asked_on_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect
     path = f"{prefix}.{ASKED_ON}"
     if ASKED_ON not in entry:
         return _field_defect(path, None if "ruling" in entry else "is required")
-    return _field_defect(path, None if type(entry[ASKED_ON]) is date else _NOT_A_LOCAL_DATE)
+    return _field_defect(path, None if type(entry[ASKED_ON]) is date else NOT_A_LOCAL_DATE)
 
 
 def _option_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
