@@ -264,6 +264,9 @@ dialog.big{max-width:calc(100vw - 32px);padding:var(--s4)}
 .refresh{display:inline-flex;align-items:center;gap:6px;height:32px;border:0;background:none;color:var(--fg-2);
   font-size:var(--fs-caption);font-weight:550;padding:0 var(--s2);border-radius:8px;white-space:nowrap}
 .refresh:hover{background:var(--surface-2);color:var(--fg)}
+.refresh .rat{color:var(--fg-3,var(--fg-2));font-weight:450}
+.refresh:disabled{cursor:progress}
+.refresh:disabled .gear{animation:turn 1s linear infinite;transform-origin:50% 50%}
 .setting{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5);padding-top:var(--s4);border-top:1px solid var(--line)}
 .pick:disabled{cursor:not-allowed}
 .pick:disabled:not(.sel){opacity:.4}
@@ -294,6 +297,7 @@ dialog.big{max-width:calc(100vw - 32px);padding:var(--s4)}
   .nav{margin-left:auto;gap:2px}
   .nav button{padding:6px 6px}
   .refresh{padding:0 2px;gap:3px}
+  .refresh .gear,.refresh .rat{display:none}
   .nav .mit{margin-left:var(--s1);padding:6px 7px}
   .nav .mitl{display:none}
   .app{grid-template-columns:1fr;height:calc(100vh - 52px)}
@@ -386,6 +390,7 @@ const S = {
   mit: Object.fromEntries(DATA.repos.map(r => [r, Object.fromEntries(DATA.kinds.map(k => [k, "you"]))])),
   saving: new Map(),     // card key -> picked option index, until the answer is applied
   readAt: new Date(),    // when the projects were last read
+  reading: false,        // a read is on its way right now
   selfRefresh: 30,       // minutes between reads on its own; 0 is off
 };
 S.mit.presentator.Wording = "agent";
@@ -717,9 +722,10 @@ function refreshSetting() {
 
 function renderRefresh() {
   const at = clock(S.readAt);
-  $("refresh").replaceChildren(h("span", {class: "gear", "aria-hidden": "true", html: '<svg viewBox="0 0 16 16" width="15" height="15"><path d="M13 8a5 5 0 1 1-1.5-3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 1.8v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'}), at);
+  $("refresh").replaceChildren(h("span", {class: "gear", "aria-hidden": "true", html: '<svg viewBox="0 0 16 16" width="15" height="15"><path d="M13 8a5 5 0 1 1-1.5-3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 1.8v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'}), h("span", {class: "rlab"}, S.reading ? "Reading…" : "Refresh"), h("span", {class: "rat"}, at));
   $("refresh").setAttribute("aria-label", "Refresh · read " + at);
   $("refresh").title = "Refresh · read " + at;
+  $("refresh").disabled = S.reading;
 }
 
 // ---------- actions ----------
@@ -903,7 +909,10 @@ function render() {
 }
 $("pane").addEventListener("scroll", markStuck, {passive: true});
 $("hback").addEventListener("click", () => { S.view = "card"; toList(); });
-$("refresh").addEventListener("click", () => { S.readAt = new Date(); render(); });
+$("refresh").addEventListener("click", () => {
+  S.reading = true; render();
+  setTimeout(() => { S.reading = false; S.readAt = new Date(); render(); }, 700);
+});
 window.addEventListener("resize", markStuck);
 
 // Hash parameters only open a given state for screenshots: tab, card, opt, pt, view, theme, panel, pick.
