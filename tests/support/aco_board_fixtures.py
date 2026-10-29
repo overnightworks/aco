@@ -14,6 +14,7 @@ import errno
 import http.client
 import json
 import os
+import secrets
 import select
 import socket
 import stat
@@ -290,7 +291,7 @@ def serving_many(
 ) -> Iterator[BoardClient]:
     """The real board server for every labelled repository, stopped on exit."""
     boards = Boards({label: Board(decisions) for label, decisions in decisions_by_label.items()})
-    running = start_board(0, boards, **board_options)
+    running = start_board(0, boards, secrets.token_urlsafe(32), **board_options)
     server_thread = threading.Thread(
         target=running.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
     )
@@ -508,7 +509,7 @@ class BoardClient:
         )
 
     def post_rule(self, payload: Mapping[str, object]) -> Response:
-        """Post `payload` to `/api/rule` with the start token, as given."""
+        """Post `payload` to `/api/rule` with the board token, as given."""
         return self.call_api("POST", "/api/rule", json.dumps(payload), presented=self.token)
 
     def _request(

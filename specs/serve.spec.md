@@ -150,7 +150,11 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's failure sentence, `items: []` (E-ABRD-06).
 - [ ] [ABRD-09] `POST /api/rule` takes `repo`, `item`, `line`, `fingerprint` and an `outcome` (ABRD-42), or a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
-- [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the start token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
+- [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any `aco` call (see E-ABRD-05).
+- [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
+- [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
+- [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
+- [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's `aco rulings` fails or hangs, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
@@ -221,7 +225,7 @@ answer: {"status": "failed", "message": "Diese Zeile hat sich geändert, bitte n
 Setup: fake-aco, item `#42` titled `Share page` with open line `Guests?` recommending `yes`, and ruled line `Hosts?` (`no` on 2026-10-01)
 
 ```text
-request: GET /api/board, header X-Board-Token: <start token>
+request: GET /api/board, header X-Board-Token: <board token>
 aco calls: aco rulings --json
 answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
@@ -235,7 +239,7 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 42
 Setup: fake-aco, item `#42` with one open line `Guests?` as listed by `GET /api/board`
 
 ```text
-request: POST /api/rule, header X-Board-Token: <start token>
+request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 42, "line": 1, "fingerprint": "<as listed>", "outcome": "no", "note": null}
 aco calls: aco rulings --json, then aco rule 42 --line 1 --no --json
 answer 200: {"status": "ruled", "message": null}
@@ -246,7 +250,7 @@ answer 200: {"status": "ruled", "message": null}
 Setup: fake-aco, item `#42` with one open line `Guests?`
 
 ```text
-request: GET /api/board?t=<start token>, no X-Board-Token header
+request: GET /api/board?t=<board token>, no X-Board-Token header
 aco calls: none
 answer 403: {"error": "forbidden: missing or wrong token"}
 ```
@@ -256,7 +260,7 @@ answer 403: {"error": "forbidden: missing or wrong token"}
 Setup: `aco serve --repo a --repo b`; repo `a`'s fake-aco lists item `#42` with one open line `Guests?`; repo `b`'s fake-aco fails `aco rulings` with `ERROR: no forge adapter for host`
 
 ```text
-request: GET /api/board, header X-Board-Token: <start token>
+request: GET /api/board, header X-Board-Token: <board token>
 aco calls: aco rulings --json in a, aco rulings --json in b
 answer 200: {"repos": [
   {"name": "a", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
@@ -272,7 +276,7 @@ Had `a`'s fake-aco failed too, the answer would be 502 with the same two-entry `
 Setup: `aco serve --repo a --repo b`; repo `a` and repo `b`'s fake-acos each list an identical item `#42` with one open line `Guests?`
 
 ```text
-request: POST /api/rule, header X-Board-Token: <start token>
+request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "a", "item": 42, "line": 1, "fingerprint": "<as listed in a>", "outcome": "yes", "note": null}
 aco calls: aco rule 42 --line 1 --yes --json in a; no call in b
 answer 200: {"status": "ruled", "message": null}
@@ -332,7 +336,7 @@ exit 2
 Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line, and item `#42` titled `Share page` with open line `Guests?` recommending `yes`
 
 ```text
-request: GET /api/board, header X-Board-Token: <start token>
+request: GET /api/board, header X-Board-Token: <board token>
 aco calls: aco rulings --json
 answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12, "title": "Song jump", "lines": [
   {"index": 1, "form": "options", "text": "The song stays open on the jump.",
@@ -360,7 +364,7 @@ Posting `yes` for `#12` line `1` with the listed fingerprint still forwards `--y
 Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts option `A` for that one-point card
 
 ```text
-request: POST /api/rule, header X-Board-Token: <start token>
+request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>", "option": "A"}]}
 aco calls: aco rulings --json, then aco rule 12 --line 1 --option A --card-hash=<card_hash of that line> --via board --json
 answer 200: {"status": "ruled", "message": null}
@@ -373,7 +377,7 @@ Posting the same body after aco answers `card_changed` (RULE-17) because the car
 Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts his own answer for that one-point card
 
 ```text
-request: POST /api/rule, header X-Board-Token: <start token>
+request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>"}], "other": "  Nur am Desktop.  "}
 aco calls: aco rulings --json, then aco rule 12 --line 1 --card-hash=<card_hash of that line> --other=Nur am Desktop. --via board --json
 answer 200: {"status": "ruled", "message": null}
@@ -386,7 +390,7 @@ A blank answer, one past 280 characters after trimming, or one beside `outcome`,
 Setup: fake-aco, item `#12` titled `Song jump` with E-RUL-07's open option line; the operator posts Unclear with a note for that one-point card
 
 ```text
-request: POST /api/rule, header X-Board-Token: <start token>
+request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>"}], "unclear": true, "note": "  Mobile fehlt.  "}
 aco calls: aco rulings --json, then aco rule 12 --line 1 --card-hash=<card_hash of that line> --unclear --note=Mobile fehlt. --json
 answer 200: {"status": "returned", "message": null}
@@ -399,10 +403,20 @@ The line stays open, now with its head. Posting Unclear again answers 200 `{"sta
 Setup: fake-aco, item `#7` with two open option lines (2 and 3); the operator posts a pick for each
 
 ```text
-request: POST /api/rule, header X-Board-Token: <start token>
+request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 7, "lines": [{"line": 2, "fingerprint": "<as listed>", "option": "A"}, {"line": 3, "fingerprint": "<as listed>", "option": "B"}]}
 aco calls: aco rulings --json, then aco rule 7 --line 2 --option A --card-hash=<card_hash of line 2> --line 3 --option B --card-hash=<card_hash of line 3> --via board --json
 answer 200: {"status": "ruled", "message": null}
 ```
 
 A post naming only line 2 while line 3 is open answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}` and only `aco rulings --json` runs. Posting `"other": "Nur am Desktop."` with no `option` on the entries runs `aco rule 7 --line 2 --card-hash=<card_hash of line 2> --line 3 --card-hash=<card_hash of line 3> --other=Nur am Desktop. --via board --json`; posting `"unclear": true` runs it with `--unclear` instead and answers `{"status": "returned", "message": null}`.
+
+### E-ABRD-16 -- a token file that holds no token
+
+Setup: the token file, `<state home>/aco/board-token`, holds `not a token`
+
+```console
+$ aco serve
+2> ERROR: <state home>/aco/board-token holds no board token; delete it to start with a new one
+exit 1
+```

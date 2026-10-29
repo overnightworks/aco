@@ -3,7 +3,7 @@
 Binds `127.0.0.1` only -- there is no host option. `/` and `/assets/**`
 deliver the SPA shell and its built assets (`static.py`) to anyone on the
 loopback interface, carrying no decision data, so they need no token; the
-JSON API under `/api/` takes the per-start access token in exactly one
+JSON API under `/api/` takes the board token in exactly one
 `X-Board-Token` header and checks it before any other work, whatever the
 method: `GET /api/board` answers every line from a fresh read of the
 decision source, `POST /api/rule` submits one decision or one whole option card, and every other
@@ -16,7 +16,6 @@ page from another origin can never read one.
 from __future__ import annotations
 
 import hmac
-import secrets
 import socket
 import sys
 import time
@@ -133,16 +132,16 @@ class RunningBoard:
 def start_board(
     port: int,
     boards: Boards,
+    token: str,
     *,
     request_deadline_seconds: float = REQUEST_DEADLINE_SECONDS,
 ) -> RunningBoard:
-    """Bind `127.0.0.1:port` (0 picks a free port) with a fresh token.
+    """Bind `127.0.0.1:port` (0 picks a free port) guarded by `token`.
 
     Raises `static.StaticAssetsMissingError` before binding if the frontend
     was never built, rather than start a board that can only answer its API.
     """
     static.ensure_built()
-    token = secrets.token_urlsafe(32)
     httpd = _BoardServer(port, token, boards, request_deadline_seconds)
     bound_port = httpd.server_address[1]
     # A fragment, not a query: the browser never sends it back to the server,
