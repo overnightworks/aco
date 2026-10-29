@@ -716,7 +716,7 @@ def _rendered_present(table: Mapping[str, object], keys: tuple[str, ...]) -> lis
 
 def render_expectations(data: Mapping[str, object]) -> list[str]:
     """Every `[[expectation]]` entry in canonical order (BODY-88): `text`,
-    the decided state, `other`, the open line's `returned_on` and
+    `asked_on`, the decided state, `other`, the open line's `returned_on` and
     `returned_note`, the card keys of its form, then each option table;
     a key is written only when present, and a line's own keys always come
     before its option tables, which TOML would otherwise bind them to."""

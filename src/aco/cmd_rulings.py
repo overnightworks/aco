@@ -104,8 +104,8 @@ def _rulings_yes_no_card_json(line: expectations.YesNoLine) -> dict[str, object]
 
 
 def _rulings_line_json(line: expectations.ExpectationLine) -> dict[str, object]:
-    """RUL-10, RUL-12..RUL-17: a yes/no line keeps its original keys; an option line
-    adds `form`, the current and the stored card hash, how it was decided,
+    """RUL-10, RUL-12..RUL-17, RUL-19: a yes/no line keeps its original keys; an option line
+    adds `form`, `asked_on`, the current and the stored card hash, how it was decided,
     whether it is with its head, then its card."""
     shared = {
         "index": line.index,
