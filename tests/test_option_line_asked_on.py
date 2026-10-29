@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import json
 import tomllib
+from datetime import date
 from pathlib import Path
 
 import pytest
 from board_fixtures import board_issue
-from cli_fixtures import run_cli
+from cli_fixtures import run_cli, run_context_over, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 from option_cards import (
     GOLDEN_CARD_HASH,
@@ -28,9 +29,12 @@ from option_cards import (
     serve_item,
 )
 
+from aco import body, expectations, forge
+from aco import decide as decide_module
 from aco.expectation_grammar import card_hash
 
 ASKED_ON = "asked_on = 2026-10-28\n"
+TODAY = date(2026, 10, 29)
 
 
 def without_asked_on(line: str) -> str:
@@ -122,6 +126,9 @@ class TestAskedOnRulings:
         listed = self.line_json(monkeypatch, capsys, without_asked_on(ruled_card()))
         assert listed["asked_on"] is None
 
+
+class TestAskedOnKeptByRule:
+    @pytest.mark.usefixtures(github_world.__name__)
     def test_a_line_ruled_by_rule_on_github_keeps_it(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -129,4 +136,15 @@ class TestAskedOnRulings:
         client = serve_item(monkeypatch, item_body(card()))
         ruled = run_cli(["rule", "7", *decide("A", "chat")], capsys)
         assert ruled.status == 0, ruled.stderr
+        assert ASKED_ON in client.item_bodies[7]
+
+    def test_a_line_ruled_in_a_state_ref_checkout_keeps_it(self, clone: Path) -> None:
+        """Spec: BODY-101, RUL-19 -- the shared writer drops no key on the state-ref pin."""
+        track_board_config(clone, f'storage = "{body.Storage.STATE_REF.value}"\n')
+        reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", item_body(card()))
+        client = FakeForge(issue_references={7: reference})
+        context = run_context_over(client)
+        choice = expectations.OptionChoice("A", expectations.RulingVia.CHAT, GOLDEN_CARD_HASH)
+        outcome = decide_module.LineOutcome(2, choice)
+        decide_module.rule(context, decide_module.fresh_item(context, 7), [outcome], TODAY)
         assert ASKED_ON in client.item_bodies[7]
