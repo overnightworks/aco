@@ -52,19 +52,19 @@ resolved directory's name.
 ## Writing a decision
 
 - ABRD-01 (removed 29.10.2026): the board writes no yes/no outcome; a card post is one write of its item (ABRD-78).
-- [ ] [ABRD-02] A card whose shown fields changed since it was shown -- an option line's `card_hash` (ABRD-35) -- is refused on the item's fresh read `Diese Zeile hat sich geändert, bitte neu laden`, nothing written (E-ABRD-02).
+- [ ] [ABRD-02] A card whose shown fields (an option line's `card_hash`, ABRD-35) changed since shown is refused on its fresh read `Diese Zeile hat sich geändert, bitte neu laden`, nothing written (E-ABRD-02).
 - [ ] [ABRD-03] The board writes one decision at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
 - [ ] [ABRD-04] Stopping the board waits for a write already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, nothing written.
-- [ ] [ABRD-05] A note or answer is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other refuses the decision before any forge request; a blank note is no note, a blank answer is refused.
+- [ ] [ABRD-05] A note or answer is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other refuses it before any forge request; a blank note is no note, a blank answer is refused.
 - ABRD-39 (removed 30.10.2026): there is no argv; the hash stored is the fresh read's (ABRD-78).
 - [ ] [ABRD-40] A post without `lines` answers 400 `bad request: decision`, no forge request (ABRD-77).
-- [ ] [ABRD-41] A card changed, withdrawn, gone, closed or unreadable on the fresh read answers `failed` `Diese Zeile hat sich geändert, bitte neu laden`; a ruled line `already_ruled`; any other refusal `failed` with aco's sentence.
+- [ ] [ABRD-41] A card changed, withdrawn, gone, closed or unreadable on its fresh read is `failed` `Diese Zeile hat sich geändert, bitte neu laden`; a ruled line `already_ruled`; else `failed`, aco's sentence.
 - ABRD-42 (removed 29.10.2026): folded into ABRD-40.
 
 - [ ] [ABRD-77] A post with `lines` decides one card: `repo`, `item`, and `lines` of `{"line", "fingerprint"}`, each with its own `option`, or one `other` or `unclear` for all (card key rules, see E-ABRD-15).
-- [ ] [ABRD-78] It reads item `<n>` once and writes its body once through aco's writer: every posted line, `via board` for an option or `other`, each with the card hash of that fresh read, or every line back to its head.
-- [ ] [ABRD-79] A card post is refused as ABRD-02 on the item's fresh read, nothing written, unless each posted line reads as an option line, each open one with its posted fingerprint, and every open option line is posted.
-- [ ] [ABRD-80] A posted line already ruled is left to aco's writer, whose RULE-04 refuses the whole card `already_ruled`; the answer maps once for the card as ABRD-41 and ABRD-71 say, and aco stores all lines or none (RULE-29).
+- [ ] [ABRD-78] It reads item `<n>` once and writes its body once through aco's writer: every posted line, `via board` for an option or `other`, each with that read's card hash, or every line back to its head.
+- [ ] [ABRD-79] A card post is refused as ABRD-02 on the fresh read, nothing written, unless each posted line reads as an option line, each open one with its posted fingerprint, and every open option line is posted.
+- [ ] [ABRD-80] A posted line already ruled is left to aco's writer: RULE-04 refuses the whole card `already_ruled`, the answer maps once as ABRD-41 and ABRD-71 say, and aco stores all lines or none (RULE-29).
 - [ ] [ABRD-81] A card post that breaks the card key rules (no line, a line named twice, a misplaced or unknown key, not exactly one answer kind) answers 400 `bad request: decision`, no forge request.
 
 The card key rules: `lines` is a non-empty list of objects, each with a positive `line` named once and a string `fingerprint`. An entry holds only `line`, `fingerprint` and an optional `option`; any other key in an entry refuses, and an entry's `option`, when present, is `A`-`D`; `null` refuses. Either every entry carries an `option` `A`-`D` and the post names no `other`, `unclear` or `note`, or no entry does and the post names exactly one of `other` (ABRD-05, no `note`) or `unclear` (literally `true`, an optional note, a blank one none). Beside `lines`, a top-level `line`, `fingerprint`, `option` or `outcome` refuses, even when `null`; for `other`, `unclear` and `note` an absent key and `null` name nothing.

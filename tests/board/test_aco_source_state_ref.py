@@ -21,7 +21,7 @@ from cli_fixtures import real_git, run_cli, set_git_identity, stub_board_config_
 from option_cards import open_option_entry
 from store_fixtures import item_record, path_without_gh, push_item_tree
 
-from aco import body, cli, decide, expectation_grammar, items, session, store
+from aco import body, cli, decide, expectation_grammar, items, protocol, session, store
 from aco.board.aco_source import AcoSource
 from aco.board.board import LINE_CHANGED
 
@@ -55,7 +55,7 @@ class _StateRefCheckout:
         """The state ref holds exactly `item_files`; only before anything read it."""
         push_item_tree(self.remote, self.worktree, item_files)
 
-    def tip(self) -> str | None:
+    def tip(self) -> protocol.ObjectId | None:
         return store.fetch_state(worktree=self.worktree, remote=f"file://{self.remote}").tip
 
     def commits(self) -> int:
