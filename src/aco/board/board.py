@@ -1,6 +1,6 @@
 """The decision board's own rules, free of any transport.
 
-`Board` reads every expectation line afresh from its `DecisionPort` and
+`Board` reads aco's rows afresh from its `DecisionPort` and
 writes one whole option card at a time through it, checking the card on
 that write's own read of its item, with no concurrency state of its own.
 `Boards` composes one or more `Board`s under their repo labels: it reads
@@ -19,6 +19,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 
+from .. import expectations, rulings
 from .ports import (
     CardChanged,
     CardDecision,
@@ -27,8 +28,6 @@ from .ports import (
     DecisionResult,
     DecisionSourceUnavailableError,
     DecisionStatus,
-    ExpectationLine,
-    OptionLine,
     PostedCard,
 )
 
@@ -36,28 +35,28 @@ LINE_CHANGED = "Diese Zeile hat sich geändert, bitte neu laden"
 SHUTTING_DOWN = "board is shutting down"
 
 
-def wire_fingerprint(repo: str, line: ExpectationLine) -> str:
-    """The fingerprint a card exposes across the wire: `line`'s own fingerprint
-    bound to the `repo` label it was read under. The JSON API and
-    `checked_card`'s own repo-binding check share this one function, so a
-    card's content being identical in two configured repos never lets its
-    fingerprint satisfy the other repo's check, even with the two labels
-    swapped."""
-    bound = json.dumps([repo, line.fingerprint], ensure_ascii=False)
-    return hashlib.sha256(bound.encode("utf-8", "surrogatepass")).hexdigest()
+def wire_fingerprint(repo: str, item: int, line: expectations.OptionLine) -> str:
+    """The fingerprint an option line carries across the wire (ABRD-35): it
+    follows the item, the line's index and its card hash, which already covers
+    every field the card shows, and binds the `repo` label it was read under
+    (ABRD-21). The JSON API and `checked_card` share this one function, so a
+    card identical in two configured repos never satisfies the other repo's
+    check, even with the two labels swapped."""
+    shown = json.dumps([repo, item, line.index, line.card_hash], ensure_ascii=False)
+    return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 @dataclass(frozen=True)
 class BoardSnapshot:
-    lines: tuple[ExpectationLine, ...]
-    """Every line, open and ruled, in the source's own order."""
+    rows: tuple[rulings.Row, ...]
+    """Every open item with expectation lines, in RUL-03's order."""
 
 
 @dataclass(frozen=True)
 class RepoSnapshot:
     name: str
-    lines: tuple[ExpectationLine, ...]
-    """Every line of this repo, open and ruled, in its source's own order."""
+    rows: tuple[rulings.Row, ...]
+    """This repo's open items with expectation lines, in RUL-03's order."""
 
 
 @dataclass(frozen=True)
@@ -81,7 +80,7 @@ class Board:
 
     def snapshot(self) -> BoardSnapshot:
         """A fresh read of the source; raises `DecisionSourceUnavailableError`."""
-        return BoardSnapshot(self._decisions.expectation_lines())
+        return BoardSnapshot(self._decisions.rows())
 
     def decide_card(self, posted: PostedCard, repo: str) -> DecisionResult:
         """Write `posted` with one call unless it no longer reads as the card shown.
@@ -99,28 +98,28 @@ class Board:
 
 
 def checked_card(
-    posted: PostedCard, repo: str, lines: Sequence[ExpectationLine]
+    posted: PostedCard, repo: str, lines: Sequence[expectations.ExpectationLine]
 ) -> CardDecision | None:
-    """The posted card as a decision on the lines just read, or None when it no
-    longer reads as shown: every posted line must be an option line of the item,
+    """The posted card as a decision on the lines of its item just read, or None
+    when it no longer reads as shown: every posted line must be an option line,
     each open one with its posted fingerprint, and every open option line of the
-    item must be posted. A posted line that is no longer open is the source's own
-    refusal to make."""
-    options = {
-        line.index: line
-        for line in lines
-        if isinstance(line, OptionLine) and line.item == posted.item
-    }
+    item must be posted. A withdrawn line is no option line (ABRD-41). A posted
+    line that is no longer open is the source's own refusal to make."""
+    options = {line.index: line for line in lines if isinstance(line, expectations.OptionLine)}
     checked: list[CardLine] = []
     for posted_line in posted.lines:
         shown = options.get(posted_line.index)
         if shown is None or (
-            shown.is_open and wire_fingerprint(repo, shown) != posted_line.fingerprint
+            expectations.is_open(shown)
+            and wire_fingerprint(repo, posted.item, shown) != posted_line.fingerprint
         ):
             return None
         checked.append(CardLine(posted_line.index, shown.card_hash, posted_line.letter))
     posted_indexes = {posted_line.index for posted_line in posted.lines}
-    if any(line.is_open and index not in posted_indexes for index, line in options.items()):
+    if any(
+        expectations.is_open(line) and index not in posted_indexes
+        for index, line in options.items()
+    ):
         return None
     return CardDecision(posted.item, tuple(checked), posted.answer)
 
@@ -197,6 +196,6 @@ class Boards:
 
 def _reading(label: str, future: Future[BoardSnapshot]) -> RepoReading:
     try:
-        return RepoSnapshot(label, future.result().lines)
+        return RepoSnapshot(label, future.result().rows)
     except DecisionSourceUnavailableError as error:
         return RepoUnavailable(label, str(error))

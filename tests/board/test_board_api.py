@@ -24,6 +24,7 @@ from aco_board_fixtures import (
     assert_guarded,
     cross_origin_headers,
     decision_port,
+    rulings_lines,
     serving,
     serving_two,
 )
@@ -43,19 +44,6 @@ def _card_body(**overrides: object) -> str:
     return json.dumps({**fields, **overrides})
 
 
-def _listed_line(index: int, text: str, ruling: str, **shown: str) -> dict[str, object]:
-    """A ruled yes/no line as the board lists it, without its fingerprint."""
-    absent = {"question": None, "example": None, "picture": None}
-    return {
-        "index": index,
-        "text": text,
-        **absent,
-        **shown,
-        "ruling": ruling,
-        "ruled_on": "2026-10-01",
-    }
-
-
 def _ruled_yes_no(text: str, ruling: str, **card: str) -> dict[str, object]:
     return {"text": text, "ruling": ruling, "ruled_on": date(2026, 10, 1), **card}
 
@@ -68,7 +56,8 @@ def _assert_no_call(port: RecordedPort, repository: BoardForge) -> None:
 def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
     repository: BoardForge, board: BoardClient, port: RecordedPort, listed_items: Lister
 ) -> None:
-    """ABRD-34, E-ABRD-03: no `default` on the wire."""
+    """ABRD-34, E-ABRD-03: each line is `aco rulings --json`'s line, with no
+    `default`, no unset card key and no fingerprint."""
     guests = _ruled_yes_no("Guests?", "yes", question="Gäste?", example="Ja", picture="<svg/>")
     hosts = _ruled_yes_no("Hosts?", "no")
     repository.put_item(42, item_body(guests, hosts), title="Share page")
@@ -76,22 +65,12 @@ def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
 
     listed = listed_items(board)
 
-    for item in listed:
-        for listed_line in item["lines"]:
-            assert isinstance(listed_line.pop("fingerprint"), str)
     assert listed == [
-        {
-            "number": 42,
-            "title": "Share page",
-            "lines": [
-                _listed_line(
-                    1, "Guests?", "yes", question="Gäste?", example="Ja", picture="<svg/>"
-                ),
-                _listed_line(2, "Hosts?", "no"),
-            ],
-        },
-        {"number": 7, "title": "Login", "lines": [_listed_line(1, "Remember me?", "later")]},
+        {"number": 42, "title": "Share page", "lines": rulings_lines(repository, 42)},
+        {"number": 7, "title": "Login", "lines": rulings_lines(repository, 7)},
     ]
+    assert [len(item["lines"]) for item in listed] == [2, 1]
+    assert all("fingerprint" not in line for item in listed for line in item["lines"])
     assert port.ruled_items() == []
 
 

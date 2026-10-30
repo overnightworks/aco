@@ -30,8 +30,8 @@ _STATE_FILE = "board-forge.json"
 _REQUEST_LOG = "board-forge-requests.jsonl"
 _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
-_EDITS_BEFORE_READ = "edits_before_read"
 _ITEM_READ_FAILURE = "item_read_failure"
+_WRITE_FAILURE = "write_failure"
 _CLOSED = "closed"
 RULING_DAY = date(2026, 10, 3)
 """The day aco rules on over this forge, so a page shows a date it can name."""
@@ -61,8 +61,8 @@ class _ForgeState:
 
     items: dict[int, StoredItem] = field(default_factory=dict[int, StoredItem])
     listing_failure: str | None = None
-    edits_before_read: dict[int, str] = field(default_factory=dict[int, str])
     item_read_failure: str | None = None
+    write_failure: str | None = None
     closed: set[int] = field(default_factory=set[int])
 
     @classmethod
@@ -71,8 +71,8 @@ class _ForgeState:
         return cls(
             {int(number): StoredItem(**item) for number, item in stored[_ITEMS].items()},
             stored[_LISTING_FAILURE],
-            {int(number): edit for number, edit in stored[_EDITS_BEFORE_READ].items()},
             stored[_ITEM_READ_FAILURE],
+            stored[_WRITE_FAILURE],
             set(stored[_CLOSED]),
         )
 
@@ -81,8 +81,8 @@ class _ForgeState:
             {
                 _ITEMS: {number: asdict(item) for number, item in self.items.items()},
                 _LISTING_FAILURE: self.listing_failure,
-                _EDITS_BEFORE_READ: self.edits_before_read,
                 _ITEM_READ_FAILURE: self.item_read_failure,
+                _WRITE_FAILURE: self.write_failure,
                 _CLOSED: sorted(self.closed),
             }
         )
@@ -101,7 +101,7 @@ class BoardForge:
 
     def replace_items(self, items: Mapping[int, StoredItem]) -> None:
         """The forge holds exactly `items`, open, with no listing or item-read
-        failure and no pending edit, in one write."""
+        failure and no pending write failure, in one write."""
         self._replace_state(_ForgeState(dict(items)))
 
     def remove_item(self, number: int) -> None:
@@ -129,11 +129,11 @@ class BoardForge:
         state.closed.add(number)
         self._replace_state(state)
 
-    def edit_before_next_read(self, number: int, raw_body: str) -> None:
-        """Item `number` holds `raw_body` from its next read on: a card changed
-        after the page read, first seen by the decision's one read of it."""
+    def break_next_write(self, message: str) -> None:
+        """The next body write is logged, then raises `RuntimeError(message)`
+        and stores nothing; the write after it stores again."""
         state = self._state()
-        state.edits_before_read[number] = raw_body
+        state.write_failure = message
         self._replace_state(state)
 
     def stored_body(self, number: int) -> str:
@@ -192,10 +192,6 @@ class BoardForge:
         state = self._state()
         if state.item_read_failure is not None:
             raise forge.ForgeError(state.item_read_failure)
-        edit = state.edits_before_read.pop(number, None)
-        if edit is not None:
-            state.items[number].body = edit
-            self._replace_state(state)
         item = state.items.get(number)
         if item is None:
             return forge.ItemReference(forge.ItemState.MISSING)
@@ -205,6 +201,11 @@ class BoardForge:
     def update_item_body(self, number: int, body: str) -> None:
         self._log(ForgeRequest(ForgeOperation.WRITE_BODY, number))
         state = self._state()
+        failure = state.write_failure
+        if failure is not None:
+            state.write_failure = None
+            self._replace_state(state)
+            raise RuntimeError(failure)
         state.items[number].body = body
         self._replace_state(state)
 

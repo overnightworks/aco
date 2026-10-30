@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { cardOption, item, line, optionLine } from '../../test-support/board';
-import type { ExpectationLine, Outcome, RulingVia } from '../../types';
+import { cardOption, item, line, optionLine, ruledOptionLine } from '../../test-support/board';
+import type { Outcome, RulingVia } from '../../types';
 import {
 	bindingSentences,
 	decidedAnswer,
@@ -11,8 +11,8 @@ import {
 	NOT_RECORDED
 } from './decidedCard';
 
-function ruledOption(via: RulingVia | null, ruledOn: string | null = '2026-10-25') {
-	return optionLine({ ruling: 'B', ruled_on: ruledOn, via });
+function ruledOption(via: RulingVia) {
+	return ruledOptionLine({ ruling: 'B', ruled_on: '2026-10-25', via });
 }
 
 describe('howText', () => {
@@ -25,16 +25,10 @@ describe('howText', () => {
 		expect(HOW_LABEL[via]).toBe(expected.split(' · ')[0]);
 	});
 
-	test.each<[string, ExpectationLine]>([
-		['[ABRD-54] an option line without via', ruledOption(null)],
-		['[ABRD-54] a yes/no line', line({ ruling: 'no', ruled_on: '2026-10-25' })]
-	])('%s reads not recorded and the date', (_name, ruled) => {
-		expect(howText(ruled)).toBe(`${NOT_RECORDED} · 25.10.2026`);
-	});
-
-	test('[ABRD-54] a line without a date reads the way alone', () => {
-		expect(howText(ruledOption('chat', null))).toBe('From chat');
-		expect(howText(line({ ruling: 'yes', ruled_on: null }))).toBe('not recorded');
+	test('[ABRD-54] a yes/no line reads not recorded and the date', () => {
+		expect(howText(line({ ruling: 'no', ruled_on: '2026-10-25' }))).toBe(
+			`${NOT_RECORDED} · 25.10.2026`
+		);
 	});
 });
 

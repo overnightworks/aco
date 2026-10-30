@@ -79,12 +79,12 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-28] The decision list groups open rows by repository under its name and count; a row shows its state shape and an option card's name (ABRD-82).
 - [ ] [ABRD-29] Within a repository, option cards come in aco's order, with-head cards after (ABRD-61). First load selects the first row; desktop shows its card, phones the list until a row is tapped.
 - [ ] [ABRD-30] Decided groups the ruled lines of open board items by repository under its name and count; a row shows the Decided shape and an option line's topic, or a yes/no line's short question or sentence.
-- [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending, missing dates last; with no ruled line and no failed repository it reads `Nothing decided yet`.
+- [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
 - [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided.
 - [ ] [ABRD-36] A card with one open option line shows: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, question, Problem, Today, options A-D, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
-- [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), else `not recorded`; then ` · ` and the ruling date as `DD.MM.YYYY` when known.
+- [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), `not recorded` for a yes/no line; then ` · ` and the ruling date as `DD.MM.YYYY`.
 - [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
 - [ ] [ABRD-38] Each option on an option card is a button that opens its Result (picture or `= TODAY`), You notice, Cost, Undo and Contract behind `Show`; opening one closes the other.
 - [ ] [ABRD-43] Each Today and Result picture on an option card is an `Enlarge picture` button opening it with its caption in a modal dialog; `Close` or `Esc` closes it and focus returns to the button.
@@ -145,7 +145,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 ## The JSON API
 
-- [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items` as before (E-ABRD-03); `error` is `null` once read, else aco's own failure sentence, `items: []` (E-ABRD-06).
+- [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items`: RUL-03's rows as `{"number", "title", "lines"}` (E-ABRD-03); `error`: `null` or a sentence, no items (E-ABRD-06).
 - [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
@@ -156,17 +156,15 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-20] Once every configured repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
-- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` is a ruled yes/no line, listed without `default` (E-ABRD-03). No line offers an outcome.
-- [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of `[item, index, card_hash]`, bound to its repo (ABRD-21); `stored_card_hash`, `default`, `via`, `returned_on`, `returned_note`, unknown keys leave it be.
+- [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` is a ruled yes/no line, with no `default` and no fingerprint (E-ABRD-03). No line offers an outcome.
+- [ ] [ABRD-35] An option line's fingerprint is the SHA-256 of `[repo, item, index, card_hash]` (ABRD-21); `ruling`, `via`, `returned_on`, `returned_note` and `stored_card_hash` leave it be.
 - [ ] [ABRD-53] An option line lists `via`, as `aco rulings --json` names it (RUL-15): `board`, `chat`, `default` or `null` while open. A yes/no line lists none.
 - [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`.
 - [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
 - [ ] [ABRD-60] A withdrawn line (BODY-104) is not listed: no list shows it, its repo stays readable, the item's other lines keep their `index`, and an item of only such lines is not listed.
 
-An option line's keys are `index`, `form`, `text`, `question`, `problem`, `picture`,
-`caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, `options`, `ruling`,
-`ruled_on`, `via`, `other`, `returned_on`, `returned_note`, `fingerprint`; each option is RUL-13's object. It has no `default`, no `example`
-and no `card_hash`; pictures are SVG text as stored.
+Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
+`fingerprint` last, a yes/no line has none; pictures are SVG text as stored.
 
 ## The SPA shell
 
@@ -216,10 +214,8 @@ Setup: test-forge, item `#42` titled `Share page` with ruled lines `Guests?` (`y
 request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing
 answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
-  {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
-   "ruling": "yes", "ruled_on": "2026-10-01", "fingerprint": "<hex>"},
-  {"index": 2, "text": "Hosts?", "question": null, "example": null, "picture": null,
-   "ruling": "no", "ruled_on": "2026-10-01", "fingerprint": "<hex>"}]}]}]}
+  {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"},
+  {"index": 2, "text": "Hosts?", "ruling": "no", "ruled_on": "2026-10-01"}]}]}]}
 ```
 
 ### E-ABRD-04 -- a post naming an outcome is refused
@@ -228,7 +224,7 @@ Setup: test-forge, item `#42` with ruled line `Guests?` as listed by `GET /api/b
 
 ```text
 request: POST /api/rule, header X-Board-Token: <board token>
-body: {"repo": "<repo>", "item": 42, "line": 1, "fingerprint": "<as listed>", "outcome": "no", "note": null}
+body: {"repo": "<repo>", "item": 42, "line": 1, "fingerprint": "<any>", "outcome": "no", "note": null}
 forge requests: none
 answer 400: {"error": "bad request: decision"}
 ```
@@ -252,8 +248,7 @@ request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing in a, the open-item listing in b
 answer 200: {"repos": [
   {"name": "a", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
-    {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
-     "ruling": "yes", "ruled_on": "2026-10-01", "fingerprint": "<hex>"}]}]},
+    {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}]},
   {"name": "b", "error": "no forge adapter for host", "items": []}]}
 ```
 
@@ -329,7 +324,10 @@ Setup: test-forge, item `#12` titled `Song jump` with E-RUL-07's open option lin
 request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing
 answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12, "title": "Song jump", "lines": [
-  {"index": 1, "form": "options", "text": "The song stays open on the jump.",
+  {"index": 1, "form": "options", "text": "The song stays open on the jump.", "asked_on": "2026-10-28",
+   "ruling": null, "ruled_on": null,
+   "card_hash": "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a",
+   "stored_card_hash": null, "via": null, "other": null, "returned_on": null, "returned_note": null,
    "question": "Keep the song open?", "problem": "The jump closes your song.",
    "picture": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "caption": "Today",
    "decision_kind": "product", "area": "Song page", "topic": "Jump", "recommended": "A",
@@ -341,10 +339,9 @@ answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12
     {"letter": "B", "name": "As today", "effect": "The browser jumps.", "same_as_today": true,
      "notice": "You pick the song again.", "cost": "None.", "undo": "final",
      "undo_how": "Nothing is built.", "contract": "The link stays a link."}],
-   "ruling": null, "ruled_on": null, "via": null, "other": null, "returned_on": null, "returned_note": null, "fingerprint": "<hex>"}]},
+   "fingerprint": "<hex>"}]},
   {"number": 42, "title": "Share page", "lines": [
-  {"index": 1, "text": "Guests?", "question": null, "example": null, "picture": null,
-   "ruling": "yes", "ruled_on": "2026-10-01", "fingerprint": "<hex>"}]}]}]}
+  {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}]}]}
 ```
 
 ### E-ABRD-12 -- deciding an option line

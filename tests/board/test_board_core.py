@@ -20,6 +20,7 @@ from aco_board_fixtures import CallPhase, PortCall, decision_port
 from board_forge import BoardForge, item_body
 from option_cards import open_option_entry
 
+from aco import expectations, rulings
 from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
@@ -28,12 +29,8 @@ from aco.board.ports import (
     CardLine,
     DecisionResult,
     DecisionStatus,
-    ExpectationLine,
-    OptionLine,
-    Outcome,
     PostedCard,
     PostedLine,
-    YesNoLine,
 )
 
 _WAIT_SECONDS = 5
@@ -44,10 +41,16 @@ def test_a_snapshot_reads_a_ruled_yes_no_lines_ruling_and_date(repository: Board
     links = {"text": "Links?", "ruling": "no", "ruled_on": date(2026, 10, 1)}
     repository.put_item(42, item_body(links), title="Share page")
 
-    [read_line] = Board(decision_port(repository)).snapshot().lines
+    [row] = Board(decision_port(repository)).snapshot().rows
 
-    assert isinstance(read_line, YesNoLine)
-    assert (read_line.ruling, read_line.ruled_on) == (Outcome.NO, date(2026, 10, 1))
+    [read_line] = row.lines
+    assert isinstance(read_line, expectations.YesNoLine)
+    assert (read_line.ruling, read_line.ruled_on) == ("no", date(2026, 10, 1))
+
+
+def _lines_of(rows: tuple[rulings.Row, ...], item: int) -> tuple[expectations.ExpectationLine, ...]:
+    [row] = [row for row in rows if row.number == item]
+    return row.lines
 
 
 class _HeldDecisions:
@@ -57,14 +60,14 @@ class _HeldDecisions:
         self.writing = threading.Event()
         self.may_finish = threading.Event()
         self.ruled_cards: list[CardDecision] = []
-        self.lines: tuple[ExpectationLine, ...] = ()
+        self.read: tuple[rulings.Row, ...] = ()
 
-    def expectation_lines(self) -> tuple[ExpectationLine, ...]:
-        return self.lines
+    def rows(self) -> tuple[rulings.Row, ...]:
+        return self.read
 
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
-        """Checks the posted card on its own lines, as the real source does on its read."""
-        decision = check(self.lines)
+        """Checks the posted card on its item's lines, as the real source does on its read."""
+        decision = check(_lines_of(self.read, item))
         assert decision is not None
         self.writing.set()
         assert self.may_finish.wait(_WAIT_SECONDS)
@@ -72,10 +75,12 @@ class _HeldDecisions:
         return DecisionResult(DecisionStatus.RULED)
 
 
-def _posted(lines: tuple[ExpectationLine, ...], label: str, item: int) -> PostedCard:
-    """Item `item`'s one line among `lines`, posted `A` for `label`."""
-    [shown] = [line for line in lines if line.item == item]
-    return PostedCard(item, (PostedLine(shown.index, wire_fingerprint(label, shown), "A"),), None)
+def _posted(rows: tuple[rulings.Row, ...], label: str, item: int) -> PostedCard:
+    """Item `item`'s one option line among `rows`, posted `A` for `label`."""
+    [shown] = _lines_of(rows, item)
+    assert isinstance(shown, expectations.OptionLine)
+    fingerprint = wire_fingerprint(label, item, shown)
+    return PostedCard(item, (PostedLine(shown.index, fingerprint, "A"),), None)
 
 
 def _card_held_in(
@@ -84,8 +89,8 @@ def _card_held_in(
     """A held port that reads item `item`'s one option line, and that card posted for `label`."""
     repository.put_item(item, item_body(open_option_entry()))
     decisions = _HeldDecisions()
-    decisions.lines = Board(decision_port(repository)).snapshot().lines
-    return decisions, _posted(decisions.lines, label, item)
+    decisions.read = Board(decision_port(repository)).snapshot().rows
+    return decisions, _posted(decisions.read, label, item)
 
 
 def _card_waiting_for_its_turn(item: int) -> PostedCard:
@@ -130,8 +135,8 @@ def test_card_posts_on_two_items_at_once_are_both_stored_one_at_a_time(
     for item in (42, 7):
         repository.put_item(item, item_body(open_option_entry()))
     port = decision_port(repository)
-    lines = Board(port).snapshot().lines
-    first, second = _posted(lines, _LABEL, 42), _posted(lines, _LABEL, 7)
+    rows = Board(port).snapshot().rows
+    first, second = _posted(rows, _LABEL, 42), _posted(rows, _LABEL, 7)
     boards = Boards({_LABEL: Board(port)})
     waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
     held = port.hold_next_rule_card(_WAIT_SECONDS)
@@ -180,8 +185,8 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
         stopping.result(_WAIT_SECONDS)
 
     assert running_answer.result().status is DecisionStatus.RULED
-    [shown] = decisions.lines
-    assert isinstance(shown, OptionLine)
+    [shown] = _lines_of(decisions.read, running.item)
+    assert isinstance(shown, expectations.OptionLine)
     assert decisions.ruled_cards == [
         CardDecision(
             running.item,

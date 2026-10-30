@@ -2,13 +2,13 @@
 	import { bindingSentences, decidedAnswer, decidedMeta, howText } from '../app/model/decidedCard';
 	import { cardHeading } from '../app/model/boardSummary';
 	import { ROW_LABEL, sourceLine } from '../app/model/optionCard';
-	import type { BoardItem, ExpectationLine } from '../types';
+	import type { BoardItem, RuledLine } from '../types';
 	import CardFrame from './CardFrame.svelte';
 	import CardRow from './CardRow.svelte';
 	import ContractFold from './ContractFold.svelte';
 	import StateShape from './StateShape.svelte';
 
-	let { repo, item, line }: { repo: string; item: BoardItem; line: ExpectationLine } = $props();
+	let { repo, item, line }: { repo: string; item: BoardItem; line: RuledLine } = $props();
 </script>
 
 <div class="decided-card">

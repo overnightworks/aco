@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { expect, test } from 'vitest';
-import { cardOption, item, line, optionLine } from '../test-support/board';
+import { cardOption, item, line, ruledOptionLine } from '../test-support/board';
 import DecidedCard from './DecidedCard.svelte';
 
 function ruledOption() {
-	return optionLine({
+	return ruledOptionLine({
 		index: 1,
 		question: 'Keep the song open?',
 		text: 'Rule 10.',

@@ -1,13 +1,20 @@
 /**
  * Pure projections of a ruled line as the decided card (`specs/serve.spec.md`
  * ABRD-37/54): the one owner of the words that say what was decided, by which
- * way and when. A way that aco did not store reads `not recorded`; it is never
- * guessed. Callers pass only ruled lines, and a ruling names an option of its
+ * way and when. A yes/no line stores no way, so it reads `not recorded`; it is
+ * never guessed. Callers pass only ruled lines, and a ruling names an option of its
  * line or is `other` with its answer (ABRD-07), so none of these projections
  * checks for either.
  */
 
-import type { BoardItem, CardOption, ExpectationLine, OptionLine, RulingVia } from '../../types';
+import type {
+	BoardItem,
+	CardOption,
+	ExpectationLine,
+	OptionLine,
+	RuledLine,
+	RulingVia
+} from '../../types';
 import { outcomeLabel } from './boardSummary';
 import {
 	cardMeta,
@@ -34,11 +41,11 @@ export function displayDate(isoDate: string): string {
 	return `${day}.${month}.${year}`;
 }
 
-/** The way a line was decided, then its date when known. Only an option line
- * can carry a `via`; a yes/no line never does. */
-export function howText(line: ExpectationLine): string {
-	const way = isOptionLine(line) && line.via !== null ? HOW_LABEL[line.via] : NOT_RECORDED;
-	return line.ruled_on === null ? way : `${way}${HOW_DATE_SEPARATOR}${displayDate(line.ruled_on)}`;
+/** The way a line was decided, then its date. Only an option line carries a
+ * `via`; a yes/no line never does. */
+export function howText(line: RuledLine): string {
+	const way = isOptionLine(line) ? HOW_LABEL[line.via] : NOT_RECORDED;
+	return `${way}${HOW_DATE_SEPARATOR}${displayDate(line.ruled_on)}`;
 }
 
 /** The operator's own answer of a line ruled `other` (ABRD-56, ABRD-57). */

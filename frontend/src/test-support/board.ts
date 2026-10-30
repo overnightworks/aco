@@ -4,7 +4,14 @@
  * `vite.config.ts`.
  */
 
-import type { BoardItem, CardOption, OptionLine, RepoReading, YesNoLine } from '../types';
+import type {
+	BoardItem,
+	CardOption,
+	OptionLine,
+	RepoReading,
+	RuledOptionLine,
+	YesNoLine
+} from '../types';
 
 export const PICTURE = '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>';
 
@@ -36,6 +43,9 @@ export function optionLine(overrides: Partial<OptionLine> = {}): OptionLine {
 		index: 1,
 		form: 'options',
 		text: 'The song stays open on the jump.',
+		asked_on: '2026-10-20',
+		card_hash: 'sha256:card-now',
+		stored_card_hash: null,
 		question: 'Keep the song open?',
 		problem: 'The jump closes your song.',
 		picture: PICTURE,
@@ -65,17 +75,25 @@ export function optionLine(overrides: Partial<OptionLine> = {}): OptionLine {
 	};
 }
 
-/** A ruled yes/no line: the only kind the board still lists (ABRD-34). */
+/** An option line ruled on a date by a way, as aco always stores one (BODY-86). */
+export function ruledOptionLine(overrides: Partial<RuledOptionLine> = {}): RuledOptionLine {
+	const shown = optionLine(overrides);
+	return {
+		...shown,
+		ruling: overrides.ruling ?? 'A',
+		ruled_on: overrides.ruled_on ?? '2026-10-25',
+		via: overrides.via ?? 'board',
+		stored_card_hash: overrides.stored_card_hash ?? shown.card_hash
+	};
+}
+
+/** A ruled yes/no line, dated as aco always stores one (BODY-32; ABRD-34). */
 export function line(overrides: Partial<YesNoLine> = {}): YesNoLine {
 	return {
 		index: 1,
 		text: 'Guests?',
-		question: null,
-		example: null,
-		picture: null,
 		ruling: 'yes',
 		ruled_on: '2026-10-01',
-		fingerprint: 'fingerprint-1',
 		...overrides
 	};
 }

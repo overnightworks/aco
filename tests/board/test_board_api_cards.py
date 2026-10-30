@@ -1,7 +1,7 @@
 """The board's JSON API deciding option cards through the real server, wire form and
 `aco` adapter against the real `aco` over a fake forge (specs/serve.spec.md): reading
 fresh on every listing, keeping no copy of a decision, the repos a card is written to,
-and what a forge that cannot list does to a card post."""
+and what a failed item read does to a card post."""
 
 from __future__ import annotations
 

@@ -30,16 +30,10 @@ from board_fixtures import write_repository_config
 from board_forge import BoardForge
 from cli_fixtures import real_git
 
-from aco import workboard
+from aco import expectations, rulings, workboard
 from aco.board.aco_source import AcoSource
 from aco.board.board import Board, Boards
-from aco.board.ports import (
-    CardChanged,
-    CardCheck,
-    DecisionPort,
-    DecisionResult,
-    ExpectationLine,
-)
+from aco.board.ports import CardChanged, CardCheck, DecisionPort, DecisionResult
 from aco.board.server import TOKEN_HEADER, start_board
 
 DEFAULT_LABEL = "repo"
@@ -57,7 +51,7 @@ def board_checkout(directory: Path) -> BoardForge:
 
 
 class PortOperation(StrEnum):
-    EXPECTATION_LINES = "expectation_lines"
+    ROWS = "rows"
     RULE_CARD = "rule_card"
 
 
@@ -111,12 +105,12 @@ class RecordedPort:
             self._held = held
         return held
 
-    def expectation_lines(self) -> tuple[ExpectationLine, ...]:
-        self._record(PortCall(PortOperation.EXPECTATION_LINES, CallPhase.ENTERED))
+    def rows(self) -> tuple[rulings.Row, ...]:
+        self._record(PortCall(PortOperation.ROWS, CallPhase.ENTERED))
         try:
-            return self._port.expectation_lines()
+            return self._port.rows()
         finally:
-            self._record(PortCall(PortOperation.EXPECTATION_LINES, CallPhase.COMPLETED))
+            self._record(PortCall(PortOperation.ROWS, CallPhase.COMPLETED))
 
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
         held = self._record(PortCall(PortOperation.RULE_CARD, CallPhase.ENTERED, item))
@@ -390,6 +384,13 @@ class Lister(Protocol):
 def first_listed_line(board: BoardClient) -> dict[str, Any]:
     [listed_repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
     return cast(dict[str, Any], listed_repo["items"][0]["lines"][0])
+
+
+def rulings_lines(repository: BoardForge, number: int) -> list[dict[str, Any]]:
+    """Item `number`'s stored lines as `aco rulings --json` renders them, read
+    back from JSON as a client reads them."""
+    lines = expectations.expectation_lines(repository.stored_body(number))
+    return cast(list[dict[str, Any]], json.loads(json.dumps(list(map(rulings.line_json, lines)))))
 
 
 def assert_guarded(response: Response) -> None:
