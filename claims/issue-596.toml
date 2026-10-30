@@ -1,8 +1,0 @@
-claim_id = "6b6ef1f524c545a2b100bd7f609c1114"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "d126acfc3f8b98163069342cdfc59fd123a4c66a"
-branch = "claude/issue-596-s3c-e2e-real-aco"
-scope = ["frontend/e2e/bootstrap.spec.ts", "frontend/e2e/decide.spec.ts", "frontend/e2e/decideOption.spec.ts", "frontend/e2e/decided.spec.ts", "frontend/e2e/escapeRow.spec.ts", "frontend/e2e/global-setup.ts", "frontend/e2e/groupCard.spec.ts", "frontend/e2e/itemFixture.ts", "frontend/e2e/openList.spec.ts", "frontend/e2e/optionCard.spec.ts", "frontend/e2e/pictureEnlargement.spec.ts", "frontend/e2e/rulingsFixture.ts", "frontend/e2e/runtime.ts", "frontend/e2e/unclear.spec.ts", "frontend/e2e/withHead.spec.ts", "tests/support/aco_board_fixtures.py", "tests/support/board_forge.py", "tests/support/e2e_server.py"]
-opened_commit = "a82b17823c6e4355c27c254f1868c839ebe7b491"
-whole_reason = "One harness flip: all E2E specs share one served repository, so the JSON-row fake and the forge cannot coexist for a landing; the change is test-only and applies one arrangement rule per spec."
