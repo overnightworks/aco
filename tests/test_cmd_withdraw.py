@@ -3,6 +3,7 @@ injecting only at the forge boundary."""
 
 from __future__ import annotations
 
+import argparse
 import json
 from collections.abc import Callable
 from functools import partial
@@ -22,7 +23,7 @@ from option_cards import (
     ruled_card,
 )
 
-from aco import board_read, body, forge, github, session, store
+from aco import board_read, body, cli, forge, github, session, store
 from aco.expectation_grammar import WITHDRAWN_ON
 
 WITHDRAWN_LINE = '[[expectation]]\ntext = "Zurück"\nwithdrawn_on = 2026-08-01\n'
@@ -406,8 +407,27 @@ def test_the_parser_refuses_before_the_command(
     assert (result.status, result.stderr.splitlines()[-1]) == (2, sentence)
 
 
-def test_help_names_each_flag_with_a_help_line(capsys: pytest.CaptureFixture[str]) -> None:
+def _withdraw_option(flag: str) -> argparse.Action:
+    """The action the built `aco` parser holds for `flag` under `withdraw`."""
+    commands = next(
+        action
+        for action in cli._parser()._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
+    return next(
+        action for action in commands.choices["withdraw"]._actions if flag in action.option_strings
+    )
+
+
+@pytest.mark.parametrize("flag", ["--line", "--json"])
+def test_help_names_each_flag_with_a_help_line(
+    capsys: pytest.CaptureFixture[str], flag: str
+) -> None:
     """Spec: the intro -- `--line` and `--json`, each with its own help line."""
+    option = _withdraw_option(flag)
+    invocation = " ".join([flag, *([str(option.metavar)] if option.metavar else [])])
+    help_line = " ".join((option.help or "").split())
     shown = " ".join(run_cli(["withdraw", "--help"], capsys).stdout.split())
-    assert "--line N the 1-based expectation line index" in shown
-    assert "--json print the result as JSON" in shown
+
+    assert help_line != ""
+    assert f"{invocation} {help_line}" in shown
