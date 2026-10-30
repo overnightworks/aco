@@ -217,7 +217,9 @@ class TestNextAndBoardNeverReadItAsOpenOrRuled:
     ) -> None:
         """Spec: NEXT-48 -- beside a ruled line, the age is the ruled line's alone: a
         withdrawal older than every trunk commit leaves a ruling newer than all of them."""
-        ruled_after_every_commit = YES_NO_LINE.replace("2026-10-01", "2099-12-31")
+        ruled_after_every_commit = (
+            '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2099-12-31\n'
+        )
         serve_board(
             monkeypatch,
             (7, lines_body(ruled_after_every_commit)),

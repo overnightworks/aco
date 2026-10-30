@@ -22,7 +22,7 @@ from option_cards import (
     ruled_card,
 )
 
-from aco import body, forge, github, session, store
+from aco import board_read, body, forge, github, session, store
 from aco.expectation_grammar import WITHDRAWN_ON
 
 WITHDRAWN_LINE = '[[expectation]]\ntext = "Zurück"\nwithdrawn_on = 2026-08-01\n'
@@ -318,22 +318,63 @@ def test_a_line_named_twice_refuses_before_any_forge_call(
     assert client.issue_reference_lookups == []
 
 
-def test_repo_under_state_ref_refuses_before_the_forge(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], clone: Path
+@pytest.mark.parametrize(
+    ("directory_fixture", "pin", "repo_flag", "boundaries", "message", "reason"),
+    [
+        pytest.param(
+            "clone",
+            'storage = "state-ref"\n',
+            ["--repo", "acme/items"],
+            ((github, "GitHubForge"), (store, "fetch_state")),
+            "--repo is meaningless under storage = state-ref",
+            "invalid_usage",
+            id="state-ref-repo",
+        ),
+        pytest.param(
+            "tmp_path",
+            None,
+            [],
+            (
+                (github, "discover_repository"),
+                (github, "GitHubForge"),
+                (board_read, "item_or_refuse"),
+            ),
+            "this command reads the repository's body contract from .aco/board.toml and needs "
+            "a checkout (a shallow one is enough): fatal: not a git repository "
+            "(or any of the parent directories): .git",
+            "unavailable",
+            id="checkout",
+        ),
+    ],
+)
+def test_context_refuses_before_the_forge(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    directory_fixture: str,
+    pin: str | None,
+    repo_flag: list[str],
+    boundaries: tuple[tuple[object, str], ...],
+    message: str,
+    reason: str,
 ) -> None:
-    """Spec: WITHDRAW-12, PIN-04 -- `--repo` names no state-ref store."""
-    monkeypatch.chdir(clone)
-    track_board_config(clone, 'storage = "state-ref"\n')
+    """Spec: WITHDRAW-12, PIN-04 -- `--repo` names no state-ref store; Never 7, CHECK-10 --
+    without a checkout, the refusal comes before the forge and the item."""
+    directory: Path = request.getfixturevalue(directory_fixture)
+    monkeypatch.chdir(directory)
+    monkeypatch.setenv("LC_ALL", "C")
+    monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
+    if pin is not None:
+        track_board_config(directory, pin)
 
     def forbidden(*args: object, **kwargs: object) -> None:
-        pytest.fail("the --repo refusal must precede the forge")
+        pytest.fail("the context refusal must precede this boundary")
 
-    monkeypatch.setattr(github, "GitHubForge", forbidden)
-    monkeypatch.setattr(store, "fetch_state", forbidden)
-    result = run_cli(["--repo", "acme/items", "withdraw", "258", "--line", "1", "--json"], capsys)
-    message = "--repo is meaningless under storage = state-ref"
+    for owner, name in boundaries:
+        monkeypatch.setattr(owner, name, forbidden)
+    result = run_cli([*repo_flag, "withdraw", "258", "--line", "1", "--json"], capsys)
     assert (result.status, result.stderr) == (2, f"ERROR: {message}\n")
-    assert json.loads(result.stdout) == {"ok": False, "reason": "invalid_usage", "message": message}
+    assert json.loads(result.stdout) == {"ok": False, "reason": reason, "message": message}
 
 
 @pytest.mark.parametrize(
@@ -359,14 +400,14 @@ def test_repo_under_state_ref_refuses_before_the_forge(
 def test_the_parser_refuses_before_the_command(
     capsys: pytest.CaptureFixture[str], arguments: list[str], sentence: str
 ) -> None:
-    """Spec: WITHDRAW-14, Never 4 -- `--line` is required; `--via` and `--card-hash` are no
-    flags of this command."""
+    """Spec: the reason table's parser row, Never 4 -- `--line` is required; `--via` and
+    `--card-hash` are no flags of this command."""
     result = run_cli(arguments, capsys)
     assert (result.status, result.stderr.splitlines()[-1]) == (2, sentence)
 
 
 def test_help_names_each_flag_with_a_help_line(capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: WITHDRAW-01 -- `--line` and `--json`, each with its own help line."""
+    """Spec: the intro -- `--line` and `--json`, each with its own help line."""
     shown = " ".join(run_cli(["withdraw", "--help"], capsys).stdout.split())
     assert "--line N the 1-based expectation line index" in shown
     assert "--json print the result as JSON" in shown
