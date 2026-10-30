@@ -1,28 +1,18 @@
-"""A file-backed forge for the decision board's tests, and the `aco` on PATH
-that runs aco's own `rulings` and `rule` over it.
+"""A file-backed forge for the decision board's tests.
 
 `BoardForge` holds what a GitHub issue holds -- number, title and body -- in
 one JSON file in the checkout it serves, replaced whole on every write, so a
-reader in another process never sees half a write. Every request is appended
+reader in another thread never sees half a write. Every request is appended
 to a log beside it. `run_context` is the one replacement for
-`session.run_context`: the launcher installs it before it runs `cli.main`,
-and the board tests' conftest installs it in the pytest process, so both
-reach this forge and never GitHub.
-
-The launcher logs its argv and answers a subcommand from a canned answer
-when one is set; only `aco_cli`'s own process-boundary tests set one.
-
-This module imports no pytest, so the launcher starts fast.
+`session.run_context`: the board tests' conftest and the E2E server install
+it, so the board's aco source reaches this forge and never GitHub.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import stat
-import sys
 import threading
-import time
 import tomllib
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
@@ -33,14 +23,11 @@ from typing import NoReturn
 
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
 
-import aco
-from aco import body, cli, expectation_grammar, forge, session, workboard
+from aco import body, expectation_grammar, forge, session, workboard
 from aco.body import ItemKind
 
 _STATE_FILE = "board-forge.json"
 _REQUEST_LOG = "board-forge-requests.jsonl"
-_CALL_LOG = "aco-calls.jsonl"
-_CANNED_FILE = "aco-canned.json"
 _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
 _EDITS_BEFORE_READ = "edits_before_read"
@@ -321,71 +308,3 @@ def _with_card_hash(entry: Mapping[str, object]) -> dict[str, object]:
     if "ruling" in entry and "card_hash" not in entry and expectation_grammar.is_option_line(entry):
         return {**entry, "card_hash": expectation_grammar.card_hash(entry)}
     return dict(entry)
-
-
-@dataclass(frozen=True)
-class CannedAnswer:
-    """What the launcher answers for one subcommand instead of running aco."""
-
-    stdout: str = ""
-    stderr: str = ""
-    exit_status: int = 0
-    wait_seconds: float = 0.0
-
-
-def set_canned_answer(directory: Path, subcommand: str, answer: CannedAnswer) -> None:
-    canned_file = directory / _CANNED_FILE
-    canned = json.loads(canned_file.read_text(encoding="utf-8")) if canned_file.exists() else {}
-    canned[subcommand] = asdict(answer)
-    canned_file.write_text(json.dumps(canned), encoding="utf-8")
-
-
-def logged_calls(directory: Path) -> list[list[str]]:
-    """Every argv the launcher ran with in `directory`, in order."""
-    log = directory / _CALL_LOG
-    if not log.exists():
-        return []
-    return [json.loads(entry) for entry in log.read_text(encoding="utf-8").splitlines()]
-
-
-def _canned_answer(directory: Path, subcommand: str) -> CannedAnswer | None:
-    canned_file = directory / _CANNED_FILE
-    if not canned_file.exists():
-        return None
-    answer = json.loads(canned_file.read_text(encoding="utf-8")).get(subcommand)
-    return None if answer is None else CannedAnswer(**answer)
-
-
-def install_launcher(bin_directory: Path) -> None:
-    """An `aco` in `bin_directory` that runs this process's own aco package
-    and this module, wherever the virtual environment's aco points."""
-    bin_directory.mkdir(parents=True, exist_ok=True)
-    import_paths = [
-        str(Path(aco.__file__).resolve().parents[1]),
-        str(Path(__file__).resolve().parent),
-    ]
-    executable = bin_directory / "aco"
-    executable.write_text(
-        f"#!{sys.executable}\n"
-        "import sys\n"
-        f"sys.path[:0] = {import_paths!r}\n"
-        "import board_forge\n"
-        "sys.exit(board_forge.launch(sys.argv[1:]))\n",
-        encoding="utf-8",
-    )
-    executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
-
-
-def launch(arguments: list[str]) -> int:
-    """The launcher's body: log `arguments`, then answer the canned answer
-    set for their subcommand or run aco's own CLI over this forge."""
-    directory = Path.cwd()
-    _append_line(directory / _CALL_LOG, json.dumps(arguments))
-    canned = _canned_answer(directory, arguments[0])
-    if canned is not None:
-        time.sleep(canned.wait_seconds)
-        sys.stdout.write(canned.stdout)
-        sys.stderr.write(canned.stderr)
-        return canned.exit_status
-    session.run_context = run_context
-    return cli.main(arguments)

@@ -11,7 +11,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .aco_cli import AcoCli
+from .aco_source import AcoSource
 from .board import Board, Boards
 from .server import LOOPBACK_HOST, start_board
 from .static import StaticAssetsMissingError
@@ -50,7 +50,7 @@ def serve(port: int, paths: Sequence[Path]) -> int:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
     boards = Boards(
-        {label: Board(AcoCli(directory=directory)) for label, directory in labelled.items()}
+        {label: Board(AcoSource(directory=directory)) for label, directory in labelled.items()}
     )
     try:
         token = board_token(token_path(os.environ, Path.home()))

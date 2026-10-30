@@ -112,7 +112,7 @@ def _make_unenterable(directory: Path) -> None:
 def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_others_keep_theirs(
     two_repositories: tuple[BoardForge, BoardForge], break_directory: Callable[[Path], None]
 ) -> None:
-    """ABRD-15; the exact sentences are `aco_cli`'s (test_board_aco_cli)."""
+    """ABRD-15; the sentence is aco's own failure to read that checkout."""
     repository_a, repository_b = two_repositories
     repository_a.put_item(42, _OPEN_CARD, title="Share page")
     break_directory(repository_b.directory)

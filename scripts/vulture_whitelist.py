@@ -51,8 +51,8 @@ The `DecisionKind` members are reached only by construction from a stored
 value (`DecisionKind(value)`) and by iteration when the grammar lists the
 accepted kinds; no code names one of them. `RulingVia.BOARD` and
 `RulingVia.CHAT` are reached the same way, from `--via` and from a stored
-`via`; so are the board's own `RulingVia.CHAT` and `RulingVia.DEFAULT`,
-reached only by construction from the `via` aco stored. The board's
+`via`; so are the board's own `RulingVia.BOARD`, `RulingVia.CHAT` and
+`RulingVia.DEFAULT`, reached only by construction from the `via` aco stored. The board's
 `Outcome.YES`, `Outcome.NO` and `Outcome.LATER` are reached only by
 construction from the ruling of a stored yes/no line, which the board shows
 and never writes.
@@ -156,6 +156,7 @@ _referenced_only_for_vulture = (
     DecisionKind.WORDING,
     RulingVia.BOARD,
     RulingVia.CHAT,
+    BoardRulingVia.BOARD,
     BoardRulingVia.CHAT,
     BoardRulingVia.DEFAULT,
     BoardOutcome.YES,

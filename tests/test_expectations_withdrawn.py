@@ -25,8 +25,7 @@ from option_cards import (
 )
 from store_fixtures import decoded_item_record
 
-from aco import body, expectations, rulings, state_board
-from aco.board import ports
+from aco import body, expectations, state_board
 
 WITHDRAWN_TEXT = "Soll der Song offen bleiben?"
 
@@ -97,12 +96,6 @@ class TestRulingsReadsAWithdrawnLine:
                 "withdrawn_on": "2026-10-29",
             },
         )
-
-
-def test_the_form_rulings_names_is_the_one_the_board_skips() -> None:
-    """Spec: RUL-23, ABRD-60 -- the board's reader and `rulings`' writer of the form agree."""
-    line = expectations.expectation_lines(lines_body(withdrawn()))[0]
-    assert rulings.line_json(line)["form"] == ports.WITHDRAWN_FORM
 
 
 REFUSED = "line 1 was withdrawn by its head"

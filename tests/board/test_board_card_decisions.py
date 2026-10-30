@@ -1,7 +1,7 @@
-"""The board decides a whole option card with one `aco rule` (ABRD-09, ABRD-39, ABRD-40,
-ABRD-41, ABRD-64, ABRD-70, ABRD-77, ABRD-79 to ABRD-81): the post's shape, the refusals
-before any port call, aco's own refusals relayed once for the card, and that the real
-`aco rule` stores what the board sent in one body write."""
+"""The board decides a whole option card with one write through aco's ruling writer
+(ABRD-09, ABRD-40, ABRD-41, ABRD-64, ABRD-70, ABRD-77 to ABRD-81): the post's shape, the
+refusals before any port call, aco's own refusals relayed once for the card, and that
+aco's writer stores what the board sent in one body write."""
 
 from __future__ import annotations
 
@@ -155,8 +155,8 @@ def test_a_card_post_stores_every_line_in_one_body_write(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ABRD-39, ABRD-64, ABRD-70, ABRD-77, RULE-29: a stored ruling also proves
-    aco took the card hash the board sent, and the stored body passes `aco check`."""
+    """ABRD-64, ABRD-70, ABRD-77, ABRD-78, RULE-29: a stored ruling also proves
+    aco took the card hash the board read, and the stored body passes `aco check`."""
     shown = show(_cards(*_CARDS[:count]))
     indexes = tuple(range(2, 2 + count))
 
@@ -543,7 +543,7 @@ def test_two_card_posts_for_one_item_store_it_once_and_refuse_the_other_as_alrea
     assert repository.body_writes() == [_ITEM]
 
 
-def test_a_card_post_after_stopping_began_is_refused_and_runs_no_aco_rule(
+def test_a_card_post_after_stopping_began_is_refused_and_reaches_no_source(
     repository: BoardForge, port: RecordedPort, show: _Show
 ) -> None:
     """ABRD-17, ABRD-18."""

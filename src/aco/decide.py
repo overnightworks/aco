@@ -31,12 +31,16 @@ class LineOutcome:
 
 @dataclass(frozen=True)
 class FreshItem:
-    """One item as the target gate read it from the forge."""
+    """One item as the target gate read it from the forge. `state` is open or
+    closed as that read saw it; `aco rule` and `aco withdraw` write either, and
+    the decision board refuses a card whose item was closed since its page
+    read it."""
 
     number: int
     title: str
     body: str
     storage: body.Storage
+    state: forge.ItemState
 
 
 @dataclass(frozen=True)
@@ -64,7 +68,7 @@ def fresh_item(context: RunContext, number: int, *, command: str) -> FreshItem:
         raise
     except protocol.ClaimError as error:
         raise InvalidTargetError(str(error)) from error
-    return FreshItem(number, reference.title or "", current_body, storage)
+    return FreshItem(number, reference.title or "", current_body, storage, reference.state)
 
 
 def _written_body(current_body: str, line: int, outcome: Outcome, today: date) -> str:

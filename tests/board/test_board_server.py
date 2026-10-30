@@ -35,7 +35,7 @@ from option_cards import open_option_entry
 
 from aco.board.ports import (
     CardChanged,
-    CardDecision,
+    CardCheck,
     DecisionResult,
     ExpectationLine,
     OptionLine,
@@ -223,8 +223,8 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
             finally:
                 read_returned.set()
 
-        def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
-            return port.rule_card(decision)
+        def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
+            return port.rule_card(item, check)
 
     with serving(ReadAfterTheBrowserLeft()) as board:
         board.send_and_reset(
@@ -249,7 +249,7 @@ class _HugeLineSource:
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         return (self._huge_line,)
 
-    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+    def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
         raise AssertionError("listing the board must not write")
 
 
@@ -281,7 +281,7 @@ class _BrokenPipeSource:
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         raise BrokenPipeError("aco's pipe broke")
 
-    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+    def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
         raise AssertionError("the board must not write after a failed read")
 
 

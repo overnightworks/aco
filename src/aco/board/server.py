@@ -114,9 +114,9 @@ class _BoardServer(ThreadingHTTPServer):
         """Stop listening, then wait for a ruling already being written.
 
         Handler threads are daemons, so the process may exit while one is
-        inside `aco rule`, leaving the ruling's outcome unknown. Closing the
-        boards' writes waits for that write -- as long as the source's own
-        timeout lets it run -- and refuses every later one.
+        inside a ruling's write, leaving its outcome unknown. Closing the
+        boards' writes waits for that write -- as long as aco's own bounded
+        gh and git calls let it run -- and refuses every later one.
         """
         super().server_close()
         self.boards.close_writes()

@@ -1,10 +1,11 @@
 """The decision board's own rules, free of any transport.
 
 `Board` reads every expectation line afresh from its `DecisionPort` and
-writes one whole option card at a time through it, with no
-concurrency state of its own. `Boards` composes one or more `Board`s under their
-repo labels: it reads every repo in parallel, isolating a failing repo to its own
-`RepoUnavailable` entry, and owns the one write turn and drain shared across all of them --
+writes one whole option card at a time through it, checking the card on
+that write's own read of its item, with no concurrency state of its own.
+`Boards` composes one or more `Board`s under their repo labels: it reads
+every repo in parallel, isolating a failing repo to its own `RepoUnavailable`
+entry, and owns the one write turn and drain shared across all of them --
 including the single-repo case, so that lock never exists twice.
 """
 
@@ -16,6 +17,7 @@ import threading
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 
 from .ports import (
     CardChanged,
@@ -84,19 +86,13 @@ class Board:
     def decide_card(self, posted: PostedCard, repo: str) -> DecisionResult:
         """Write `posted` with one call unless it no longer reads as the card shown.
 
-        The check and the write share one fresh read, so each hash written is the
-        one the check compared. Callers serialize writes across every repo
-        (`Boards`); this method itself holds no lock, so it must never run
-        concurrently with another call on the same `Board`.
+        The source reads the posted item once and runs `checked_card` on that
+        read before it writes, so each hash written is the one the check
+        compared. Callers serialize writes across every repo (`Boards`); this
+        method itself holds no lock, so it must never run concurrently with
+        another call on the same `Board`.
         """
-        try:
-            lines = self._decisions.expectation_lines()
-        except DecisionSourceUnavailableError as error:
-            return DecisionResult(DecisionStatus.FAILED, str(error))
-        checked = checked_card(posted, repo, lines)
-        if checked is None:
-            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-        written = self._decisions.rule_card(checked)
+        written = self._decisions.rule_card(posted.item, partial(checked_card, posted, repo))
         if isinstance(written, CardChanged):
             return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
         return written
@@ -132,7 +128,7 @@ def checked_card(
 class Boards:
     """One or more repos' `Board`s under their labels, sharing one write turn.
 
-    `aco rule` rewrites a whole item body, so two writes at once -- even in
+    A ruling rewrites a whole item body, so two writes at once -- even in
     different repos, since nothing here needs that to be safe -- could each
     leave the outcome of a stopped write unknown; this is the single owner of
     that rule, always, even when only one repo is configured.
