@@ -38,7 +38,7 @@ export function outcomeLabel(outcome: Outcome): string {
 }
 
 /** Whether `line` carries a ruling; a yes/no line always does. */
-export function isRuled(line: ExpectationLine): line is RuledLine {
+function isRuled(line: ExpectationLine): line is RuledLine {
 	return line.ruling !== null;
 }
 
