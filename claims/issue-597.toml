@@ -1,8 +1,0 @@
-claim_id = "90b646fae8d84bf185bcf68d09755424"
-agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
-role = "builder"
-base = "d126acfc3f8b98163069342cdfc59fd123a4c66a"
-branch = "claude/issue-597-w2b-aco-withdraw"
-scope = ["pyproject.toml", "quality/baseline.toml", "specs/body-block.spec.md", "specs/bootstrap.spec.md", "specs/check.spec.md", "specs/rule.spec.md", "specs/serve.spec.md", "specs/withdraw.spec.md", "src/aco/cli.py", "src/aco/cmd_rule.py", "src/aco/cmd_withdraw.py", "src/aco/decide.py", "src/aco/expectations.py", "src/aco/report.py", "src/aco/rulings.py", "tests/support/store_fixtures.py", "tests/test_body_option_line_rewrites.py", "tests/test_cli.py", "tests/test_cli_help.py", "tests/test_cmd_rule.py", "tests/test_cmd_withdraw.py", "tests/test_decide.py", "tests/test_expectation_grammar_asked_on.py", "tests/test_expectations_withdrawn.py"]
-opened_commit = "4506c55a451fe3b615c8c5e6dfdc66527bb550b9"
-whole_reason = "One writer reaches the bodies only with everything it needs: the line edit, decide's one write and the command are dead code apart, cli.py takes the registration only with the json-flag move, the spec and the usage lists that pin the command list change with it, and #13's four fold-ins ride along."
