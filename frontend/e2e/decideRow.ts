@@ -18,3 +18,12 @@ export function countPosts(page: Page): { count(): number } {
 	});
 	return { count: () => posts };
 }
+
+/** Counts every `GET /api/board` the page sends from now on. */
+export function countBoardReads(page: Page): { count(): number } {
+	let reads = 0;
+	page.on('request', (request) => {
+		if (request.method() === 'GET' && request.url().endsWith('/api/board')) reads += 1;
+	});
+	return { count: () => reads };
+}

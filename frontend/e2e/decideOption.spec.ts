@@ -624,11 +624,11 @@ test.describe('1280px confirm over a changing board', () => {
 		await expect(confirm(page)).toBeVisible();
 
 		await arrangeFinal({ problem: CHANGED_PROBLEM });
-		const reloaded = page.waitForResponse(
-			(response) => response.url().endsWith('/api/board') && response.request().method() === 'GET'
+		const answered = page.waitForResponse(
+			(response) => response.url().endsWith('/api/rule') && response.request().method() === 'POST'
 		);
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-		await reloaded;
+		await answered;
 		// The modal makes the page inert, so the board is read by CSS, not by role.
 		await expect(page.locator('.tracks').getByTitle(OTHER_QUESTION)).toHaveCount(0);
 		await expect(confirm(page)).toBeVisible();
@@ -643,7 +643,7 @@ test.describe('1280px confirm over a changing board', () => {
 		await expect(decidedList(page).getByTitle(SONG_QUESTION, { exact: true })).toHaveCount(0);
 	});
 
-	test('[ABRD-47] a slow background reload leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
+	test('[ABRD-47] a slow POST leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
 		page
 	}) => {
 		await arrangeFinal();
@@ -660,17 +660,16 @@ test.describe('1280px confirm over a changing board', () => {
 		const held = new Promise<void>((resolve) => {
 			release = resolve;
 		});
-		await page.route('**/api/board', async (route) => {
-			if (route.request().method() !== 'GET') return route.continue();
+		await page.route('**/api/rule', async (route) => {
 			await held;
 			return route.continue();
 		});
 		try {
-			const reload = page.waitForRequest(
-				(request) => request.url().endsWith('/api/board') && request.method() === 'GET'
+			const posted = page.waitForRequest(
+				(request) => request.url().endsWith('/api/rule') && request.method() === 'POST'
 			);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-			await reload;
+			await posted;
 
 			await expect(confirm(page)).toBeVisible();
 			await expect(confirm(page).getByRole('button', { name: 'Cancel' })).toBeFocused();

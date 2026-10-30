@@ -425,7 +425,7 @@ for (const viewport of [
 			expect(writes).toBe(0);
 		});
 
-		test('[ABRD-33] a pick waiting out its undo window is not in Decided, and once stored and reloaded it is', async ({
+		test('[ABRD-33] a pick waiting out its undo window is not in Decided, and once stored it is', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();

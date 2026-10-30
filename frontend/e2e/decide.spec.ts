@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { expectDecidedAnswer, openDecidedLine } from './decidedView';
-import { countPosts, pick, picks } from './decideRow';
+import { countBoardReads, countPosts, pick, picks } from './decideRow';
 import {
 	arrange,
 	item,
@@ -229,46 +229,110 @@ for (const viewport of [
 	test.describe(`${viewport.width}px selection flow`, () => {
 		test.use({ viewport });
 
-		test('selection during a background reload reaches the question without stale actions', async ({
+		test('[ABRD-97] a slow POST disables only its card and every other card stays usable without a read', async ({
 			page
-		}, testInfo) => {
+		}) => {
 			const { appUrl, token } = readBoardRuntime();
 			await arrange([
-				item(953, 'Background reload', card('First?')),
-				item(963, 'Background reload second', card('Second?'))
+				item(953, 'Slow post', card('First?')),
+				item(963, 'Slow post second', card('Second?')),
+				item(973, 'Slow post third', card('Third?'))
 			]);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await listRow(page, 'First?').click();
+			const board = countBoardReads(page);
+			let release: (() => void) | undefined;
+			const held = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			await page.route('**/api/rule', async (route) => {
+				await held;
+				await route.continue();
+			});
+			try {
+				await listRow(page, 'First?').click();
+				await pick(page, 'A').click();
+				const posted = page.waitForRequest('**/api/rule');
+				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+				await posted;
+				await expect(pick(page, 'A')).toHaveAttribute('aria-disabled', 'true');
+				await expect(pick(page, 'B')).toHaveAttribute('aria-disabled', 'true');
+				await expect(page.getByRole('button', { name: 'Other…' })).toBeDisabled();
+
+				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
+				await listRow(page, 'Second?').click();
+				await expect(pick(page, 'B')).not.toHaveAttribute('aria-disabled', 'true');
+				await pick(page, 'B').click();
+				await expect(page.locator('.strip')).toHaveCount(2);
+
+				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
+				await listRow(page, 'Third?').click();
+				await page.getByRole('button', { name: 'Other…' }).click();
+				await page.getByRole('textbox').fill('Nur am Desktop.');
+				await page.getByRole('button', { name: 'Send' }).click();
+				await expect(page.locator('.strip')).toHaveCount(3);
+			} finally {
+				release?.();
+			}
+			await expect(listRow(page, 'First?')).toHaveCount(0);
+			expect(board.count()).toBe(0);
+		});
+
+		test('[ABRD-98] a Neu laden read held across another card’s stored answer leaves that card in Decided', async ({
+			page
+		}) => {
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(983, 'Held read', card('Held B?')),
+				item(993, 'Held read changed', card('Held C?'))
+			]);
+			await page.clock.install();
+			await page.goto(`${appUrl}#t=${token}`);
+			await listRow(page, 'Held C?').click();
+			await arrange([
+				item(983, 'Held read', card('Held B?')),
+				item(993, 'Held read changed', card('Held C?', { problem: 'Geändert.' }))
+			]);
+			await pick(page, 'A').click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			const reload = page.getByRole('button', { name: 'Neu laden' });
+			await expect(reload).toBeVisible();
+			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
+			await listRow(page, 'Held B?').click();
+			await pick(page, 'A').click();
+			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
+			await listRow(page, 'Held C?').click();
+
 			let release: (() => void) | undefined;
 			const held = new Promise<void>((resolve) => {
 				release = resolve;
 			});
 			await page.route('**/api/board', async (route) => {
+				const response = await route.fetch();
+				const board = await response.json();
 				await held;
-				await route.continue();
+				for (const repository of board.repos) {
+					repository.items = repository.items.filter(
+						(entry: { number: number }) => entry.number !== 983
+					);
+				}
+				await route.fulfill({ response, json: board });
 			});
 			try {
-				await pick(page, 'A').click();
-				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
-				const second = listRow(page, 'Second?');
-				await second.focus();
-				const reload = page.waitForRequest('**/api/board');
+				const read = page.waitForRequest('**/api/board');
+				await reload.click();
+				await read;
+				const stored = page.waitForResponse('**/api/rule');
 				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-				await reload;
-				await expect(second).toBeFocused();
-				await second.press('Enter');
-				await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeVisible();
-				await expect(picks(page).getByRole('button')).toHaveText(['A', 'B']);
-				await expect(pick(page, 'A')).toHaveAttribute('aria-disabled', 'true');
-				await expect(pick(page, 'B')).toHaveAttribute('aria-disabled', 'true');
-				await page.screenshot({ path: testInfo.outputPath('background-loading.png') });
+				await stored;
 			} finally {
 				release?.();
 			}
-			await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeVisible();
-			await expect(page.locator('.stage')).toBeFocused();
-			await page.screenshot({ path: testInfo.outputPath('background-selected.png') });
+			await expect(page.getByRole('button', { name: 'Neu laden' })).toHaveCount(0);
+			await expect(listRow(page, 'Held B?')).toHaveCount(0);
+			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.getByRole('button', { name: /^Decided 1$/ }).click();
+			await expect(page.getByRole('button', { name: /Held B\?/ })).toBeVisible();
 		});
 
 		test('access, loading, empty and error messages remain readable', async ({
