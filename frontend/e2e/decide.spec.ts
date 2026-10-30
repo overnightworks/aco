@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { expectDecidedAnswer, openDecidedLine } from './decidedView';
+import { decidedList, expectDecidedAnswer, openDecidedLine } from './decidedView';
 import { countBoardReads, countPosts, pick, picks } from './decideRow';
 import {
 	arrange,
@@ -255,22 +255,22 @@ for (const viewport of [
 				const posted = page.waitForRequest('**/api/rule');
 				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 				await posted;
-				await expect(pick(page, 'A')).toHaveAttribute('aria-disabled', 'true');
-				await expect(pick(page, 'B')).toHaveAttribute('aria-disabled', 'true');
+				await expect(pick(page, 'A')).toBeDisabled();
+				await expect(pick(page, 'B')).toBeDisabled();
 				await expect(page.getByRole('button', { name: 'Other…' })).toBeDisabled();
 
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 				await listRow(page, 'Second?').click();
-				await expect(pick(page, 'B')).not.toHaveAttribute('aria-disabled', 'true');
+				await expect(pick(page, 'B')).toBeEnabled();
 				await pick(page, 'B').click();
-				await expect(page.locator('.strip')).toHaveCount(2);
+				await expect(page.locator('.strip')).toHaveCount(1);
 
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 				await listRow(page, 'Third?').click();
 				await page.getByRole('button', { name: 'Other…' }).click();
 				await page.getByRole('textbox').fill('Nur am Desktop.');
 				await page.getByRole('button', { name: 'Send' }).click();
-				await expect(page.locator('.strip')).toHaveCount(3);
+				await expect(page.locator('.strip')).toHaveCount(2);
 			} finally {
 				release?.();
 			}
@@ -332,7 +332,7 @@ for (const viewport of [
 			await expect(listRow(page, 'Held B?')).toHaveCount(0);
 			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			await page.getByRole('button', { name: /^Decided 1$/ }).click();
-			await expect(page.getByRole('button', { name: /Held B\?/ })).toBeVisible();
+			await expect(decidedList(page).getByRole('button')).toHaveCount(1);
 		});
 
 		test('access, loading, empty and error messages remain readable', async ({
