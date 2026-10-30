@@ -10,7 +10,7 @@ import path from 'node:path';
 export interface BoardRuntime {
 	/** The real board server's own origin, no path or fragment. */
 	appUrl: string;
-	/** The fake board's access token, as it belongs in a `#t=` fragment. */
+	/** The board's access token, as it belongs in a `#t=` fragment. */
 	token: string;
 	/** The control endpoint's origin, where `itemFixture.ts` arranges the forge. */
 	controlUrl: string;

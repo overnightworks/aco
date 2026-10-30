@@ -8,7 +8,7 @@ import { readBoardRuntime } from './runtime';
 // global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
-// The fake board's one repository label (`aco_board_fixtures.DEFAULT_LABEL`).
+// The E2E board's one repository label (`aco_board_fixtures.DEFAULT_LABEL`).
 const REPOSITORY = 'repo';
 
 const SONG_QUESTION = 'Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?';
