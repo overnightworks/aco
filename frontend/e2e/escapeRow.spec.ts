@@ -1,32 +1,25 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import {
-	optionLine,
-	row,
-	writeRulings,
-	type OptionRulingLine,
-	type RulingOption
-} from './rulingsFixture';
+import { arrange, item, optionEntry, type CardOption, type OptionEntry } from './itemFixture';
 import { decidedList, expectDecidedAnswer } from './decidedView';
 import { readBoardRuntime } from './runtime';
 import { LINE_CHANGED_MESSAGE, UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
-// The fake aco stores every board answer as `--via board` on this date.
+// aco rules every board answer `via board` on `board_forge.RULING_DAY`.
 const BOARD_ANSWER_HOW = 'Board · 03.10.2026';
 
 const QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const ANSWER = 'Nur auf dem Desktop offen lassen.';
 const OTHER_QUESTION = 'Welcher Weg für die Altdaten?';
 
-const OPTIONS: RulingOption[] = ['A', 'B'].map((letter) => ({
-	letter,
+const OPTIONS: CardOption[] = ['A', 'B'].map((letter) => ({
 	name: `Weg ${letter}`,
 	effect: 'Die App springt selbst.',
 	same_as_today: true,
@@ -37,32 +30,28 @@ const OPTIONS: RulingOption[] = ['A', 'B'].map((letter) => ({
 	contract: 'Der Song bleibt offen.'
 }));
 
-function arrange(
-	directory: string,
-	withHead = false,
-	overrides: Partial<OptionRulingLine> = {}
-): void {
-	writeRulings(directory, [
-		row(
+async function arrangeCards(withHead = false, overrides: Partial<OptionEntry> = {}): Promise<void> {
+	await arrange([
+		item(
 			2002,
 			'Sprung',
-			optionLine(1, 'Der Song bleibt beim Sprung offen.', {
+			optionEntry('Der Song bleibt beim Sprung offen.', {
 				question: QUESTION,
 				problem: 'Der Link schließt den Song.',
 				area: 'Song-Seite',
 				topic: 'Sprung',
-				options: OPTIONS,
+				option: OPTIONS,
 				...(withHead ? { returned_on: '2026-10-27', returned_note: 'Warum?' } : {}),
 				...overrides
 			})
 		),
-		row(
+		item(
 			2003,
 			'Altdaten',
-			optionLine(1, 'Eine zweite offene Frage.', {
+			optionEntry('Eine zweite offene Frage.', {
 				question: OTHER_QUESTION,
 				topic: 'Altdaten',
-				options: OPTIONS
+				option: OPTIONS
 			})
 		)
 	]);
@@ -91,7 +80,7 @@ for (const viewport of [
 		test('[ABRD-63] Other… opens the panel with focus in the field, Send waits for text, and the card stays reachable', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			const other = page.getByRole('button', { name: 'Other…' });
@@ -123,7 +112,7 @@ for (const viewport of [
 		test('[ABRD-67] Send shows the Other strip, Undo posts nothing and reopens the panel with the draft', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			let writes = 0;
 			page.on('request', (request) => {
 				if (request.method() === 'POST') writes += 1;
@@ -152,7 +141,7 @@ for (const viewport of [
 		test('[ABRD-64] after the window the answer is ruled through aco and the card moves to Decided', async ({
 			page
 		}) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await page.getByRole('button', { name: 'Other…' }).click();
@@ -170,7 +159,7 @@ for (const viewport of [
 		test('[ABRD-66] the typed answer survives closing the panel and switching cards, per card', async ({
 			page
 		}) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			const other = page.getByRole('button', { name: 'Other…' });
@@ -194,13 +183,12 @@ for (const viewport of [
 		test('[ABRD-68] a card changed while the panel is open is refused on Send and the answer stays in the draft', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await page.getByRole('button', { name: 'Other…' }).click();
 			await answerField(page).fill(ANSWER);
-			arrange(repoDirectory, false, { card_hash: 'card-hash-changed' });
+			await arrangeCards(false, { problem: 'Der Link schließt den Song sofort.' });
 			await page.getByRole('button', { name: 'Send' }).click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
@@ -212,7 +200,7 @@ for (const viewport of [
 		});
 
 		test('[ABRD-69] a card with its head offers Other… too', async ({ page }) => {
-			arrange(readBoardRuntime().repoDirectory, true);
+			await arrangeCards(true);
 			await open(page, phone);
 
 			await expect(page.getByRole('button', { name: 'Other…' })).toBeVisible();

@@ -1,14 +1,13 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { line, optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
+import { arrange, item, optionEntry, yesNoEntry, type CardOption } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 const SONG_QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const LONG_TOPIC = 'Sehr langes Thema '.repeat(12).trim();
 
-const OPTIONS: RulingOption[] = [
+const OPTIONS: CardOption[] = [
 	{
-		letter: 'A',
 		name: 'Song bleibt offen',
 		effect: 'Die App springt selbst.',
 		same_as_today: true,
@@ -19,7 +18,6 @@ const OPTIONS: RulingOption[] = [
 		contract: 'Der Song bleibt offen.'
 	},
 	{
-		letter: 'B',
 		name: 'Browser-Sprung bleibt',
 		effect: 'Der Browser springt weiter.',
 		same_as_today: true,
@@ -31,27 +29,27 @@ const OPTIONS: RulingOption[] = [
 	}
 ];
 
-function songLine(index: number, topic: string, question = SONG_QUESTION) {
-	return optionLine(index, 'Der Song bleibt beim Sprung offen.', {
+function songLine(topic: string, question = SONG_QUESTION) {
+	return optionEntry('Der Song bleibt beim Sprung offen.', {
 		question,
 		topic,
-		options: OPTIONS
+		option: OPTIONS
 	});
 }
 
 /** Two items with an option card each, served as `songmaker`
  * and `quality` (the second with a very long topic) and as `webauth` with
  * nothing open; the real server only reads the first. */
-async function serveThreeRepositories(page: Page, repoDirectory: string): Promise<void> {
-	writeRulings(repoDirectory, [
-		row(7, 'Sprung', songLine(1, 'Sprung')),
-		row(
+async function serveThreeRepositories(page: Page): Promise<void> {
+	await arrange([
+		item(7, 'Sprung', songLine('Sprung')),
+		item(
 			8,
 			'Gäste',
-			optionLine(1, 'Gäste dürfen am Gespräch teilnehmen.', {
+			optionEntry('Gäste dürfen am Gespräch teilnehmen.', {
 				question: 'Gäste einladen?',
 				topic: 'Gäste',
-				options: OPTIONS
+				option: OPTIONS
 			})
 		)
 	]);
@@ -96,8 +94,8 @@ for (const viewport of [
 		test('[ABRD-28] [ABRD-48] option card rows stand in one group per repository, each with the shape naming its state and its question as title', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			await serveThreeRepositories(page, repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await serveThreeRepositories(page);
 			await page.goto(`${appUrl}#t=${token}`);
 
 			const tracks = page.locator('.tracks');
@@ -122,8 +120,8 @@ for (const viewport of [
 		test('[ABRD-29] first load selects the first row, desktop shows its card and phones the list', async ({
 			page
 		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			await serveThreeRepositories(page, repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await serveThreeRepositories(page);
 			await page.goto(`${appUrl}#t=${token}`);
 
 			const first = page.locator('.tracks').getByRole('button').first();
@@ -141,13 +139,9 @@ for (const viewport of [
 		test('[ABRD-49] an empty board reads All decided, a failure beside an empty repository does not', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					12,
-					'Fertig',
-					line(1, 'Entschieden.', { question: 'Fertig?', ruling: 'yes', ruled_on: '2026-10-03' })
-				)
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(12, 'Fertig', yesNoEntry('Entschieden.', 'yes', '2026-10-03', { question: 'Fertig?' }))
 			]);
 			await page.goto(`${appUrl}#t=${token}`);
 			await expect(page.getByText('All decided')).toBeVisible();
@@ -174,10 +168,10 @@ for (const viewport of [
 		test('[ABRD-28] Tab moves from the first row to the second, Enter opens it and focuses the stage', async ({
 			page
 		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(13, 'Tastatur', songLine(1, 'Erste', 'Erste?')),
-				row(14, 'Tastatur zweite', songLine(1, 'Zweite', 'Zweite?'))
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(13, 'Tastatur', songLine('Erste', 'Erste?')),
+				item(14, 'Tastatur zweite', songLine('Zweite', 'Zweite?'))
 			]);
 			await page.goto(`${appUrl}#t=${token}`);
 

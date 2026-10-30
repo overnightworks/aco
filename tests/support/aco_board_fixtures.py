@@ -5,11 +5,6 @@ recorded, the real board server, and a client for it.
 `board_forge.BoardForge`; `decision_port` is the one construction of the
 board's port over such a checkout, wrapped in a `RecordedPort` that logs
 every call at the port.
-
-`_FAKE_ACO` is the JSON-row fake `aco` that `e2e_server.py` alone still
-installs: it answers `aco rulings --json` from `rulings.json` in its working
-directory, applies `aco rule` to that same file with aco's refusals, and
-appends every invocation to `aco-calls.jsonl`.
 """
 
 from __future__ import annotations
@@ -21,9 +16,7 @@ import os
 import secrets
 import select
 import socket
-import stat
 import struct
-import sys
 import threading
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
@@ -53,165 +46,9 @@ from aco.board.server import TOKEN_HEADER, start_board
 DEFAULT_LABEL = "repo"
 """The one repo label a single-repo test gets when it does not name its own."""
 
-_FAKE_ACO = """\
-import argparse, json, pathlib, sys, time
-
-repository = pathlib.Path.cwd()
-with (repository / "aco-calls.jsonl").open("a", encoding="utf-8") as calls:
-    calls.write(json.dumps(sys.argv[1:]) + "\\n")
-rulings = repository / "rulings.json"
-
-
-class NamedLine(argparse.Action):
-    def __call__(self, parser, namespace, value, option_string=None):
-        namespace.named.append({"line": int(value), "option": None, "card_hash": None})
-
-
-class OfLastLine(argparse.Action):
-    def __call__(self, parser, namespace, value, option_string=None):
-        if not namespace.named:
-            parser.error(option_string + " follows its --line")
-        namespace.named[-1][self.dest] = value
-
-
-parser = argparse.ArgumentParser(prog="aco")
-commands = parser.add_subparsers(dest="command", required=True)
-listing = commands.add_parser("rulings")
-listing.add_argument("--json", action="store_true")
-rule = commands.add_parser("rule")
-rule.add_argument("item")
-rule.set_defaults(named=[])
-rule.add_argument("--line", action=NamedLine, required=True)
-rule.add_argument("--option", action=OfLastLine)
-rule.add_argument("--card-hash", dest="card_hash", action=OfLastLine)
-answers = rule.add_mutually_exclusive_group()
-answers.add_argument("--other")
-answers.add_argument("--unclear", action="store_true")
-rule.add_argument("--via")
-rule.add_argument("--note")
-rule.add_argument("--json", action="store_true")
-arguments = parser.parse_args()
-if arguments.command == "rule":
-    picks = [named["option"] is not None for named in arguments.named]
-    if any(picks) and not all(picks):
-        parser.error("--option belongs to every --line or to none")
-    if any(picks):
-        arguments.ruling = "option"
-all_hashed = all(named["card_hash"] is not None for named in getattr(arguments, "named", []))
-if getattr(arguments, "other", None) is not None:
-    arguments.ruling = "other"
-    if arguments.via != "board" or not all_hashed or arguments.note is not None:
-        parser.error("--other needs --via board and --card-hash, and takes no --note")
-if getattr(arguments, "unclear", False) and (
-    arguments.via is not None
-    or not all_hashed
-    or (arguments.note is not None and not arguments.note.strip())
-):
-    parser.error("--unclear needs --card-hash and takes no --via and no blank --note")
-
-
-def refuse(reason, message):
-    print("ERROR: " + message, file=sys.stderr)
-    print(json.dumps({"ok": False, "reason": reason, "message": message}))
-    sys.exit(2)
-
-
-def wait_if_asked(name):
-    delay = repository / name
-    if delay.exists():
-        time.sleep(float(delay.read_text(encoding="utf-8")))
-
-
-if arguments.command == "rulings":
-    wait_if_asked("rulings-delay-seconds")
-    failure = repository / "rulings-failure.txt"
-    if failure.exists():
-        print(failure.read_text(encoding="utf-8"), file=sys.stderr)
-        sys.exit(2)
-    stdout = repository / "rulings-stdout.txt"
-    if stdout.exists():
-        print(stdout.read_text(encoding="utf-8"))
-        sys.exit(0)
-    rows = json.loads(rulings.read_text(encoding="utf-8"))
-    print(json.dumps({"ok": True, "reason": "listed", "rulings": rows}))
-    sys.exit(0)
-
-refusal = repository / "rule-refusal.json"
-if refusal.exists():
-    envelope = json.loads(refusal.read_text(encoding="utf-8"))
-    refuse(envelope["reason"], envelope["message"])
-rows = json.loads(rulings.read_text(encoding="utf-8"))
-wait_if_asked("rule-delay-seconds")
-row = next((row for row in rows if str(row["number"]) == arguments.item), None)
-if row is None:
-    refuse("invalid_item", "#" + arguments.item + " does not exist")
-targets = []
-for named in arguments.named:
-    line = next((line for line in row["lines"] if line["index"] == named["line"]), None)
-    if line is None:
-        refuse("line_out_of_range", "line %d out of range: this item has %d expectation line(s)"
-               % (named["line"], len(row["lines"])))
-    if line["ruling"] is not None:
-        refuse("already_ruled",
-               "line %d is already ruled; a changed ruling is a new line" % named["line"])
-    if getattr(arguments, "unclear", False) and line["returned_on"] is not None:
-        refuse("with_head", "line %d is already with its head; it comes back once revised"
-               % named["line"])
-    targets.append((named, line))
-indexes = [named["line"] for named in arguments.named]
-still_open = sum(1 for entry in row["lines"] if entry["ruling"] is None)
-if getattr(arguments, "unclear", False):
-    for named, line in targets:
-        line["returned_on"], line["returned_note"] = "2026-10-03", arguments.note
-    rulings.write_text(json.dumps(rows), encoding="utf-8")
-    print(json.dumps({"ok": True, "reason": "returned", "item": row["number"],
-                      "index": indexes[0], "lines": indexes, "returned_on": "2026-10-03",
-                      "open": still_open}))
-    sys.exit(0)
-for named, line in targets:
-    line["ruling"] = named["option"] or arguments.ruling
-    line["ruled_on"] = "2026-10-03"
-    if "returned_on" in line:
-        line["returned_on"], line["returned_note"] = None, None
-    if arguments.via is not None:
-        line["via"] = arguments.via
-    if arguments.other is not None:
-        line["other"] = arguments.other
-rulings.write_text(json.dumps(rows), encoding="utf-8")
-print(json.dumps({"ok": True, "reason": "ruled", "item": row["number"],
-                  "index": indexes[0], "lines": indexes,
-                  "ruling": targets[0][0]["option"] or arguments.ruling,
-                  "ruled_on": "2026-10-03", "open": still_open - len(targets)}))
-"""
-
-
-def install_fake_aco(bin_directory: Path) -> None:
-    bin_directory.mkdir(parents=True, exist_ok=True)
-    executable = bin_directory / "aco"
-    executable.write_text(f"#!{sys.executable}\n{_FAKE_ACO}", encoding="utf-8")
-    executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
-
 
 def path_with(bin_directory: Path) -> str:
     return f"{bin_directory}{os.pathsep}{os.environ.get('PATH', '')}"
-
-
-def named_repository(tmp_path: Path, name: str) -> FakeAcoRepository:
-    """A repository directory without expectation lines, for whichever
-    JSON-row fake `aco` is already on PATH."""
-    directory = tmp_path / name
-    directory.mkdir()
-    fake = FakeAcoRepository(directory)
-    fake.set_rulings()
-    return fake
-
-
-@dataclass(frozen=True)
-class FakeAcoRepository:
-    directory: Path
-
-    def set_rulings(self, *rows: dict[str, object]) -> None:
-        (self.directory / "rulings.json").write_text(json.dumps(list(rows)), encoding="utf-8")
 
 
 def board_checkout(directory: Path) -> BoardForge:

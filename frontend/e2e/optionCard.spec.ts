@@ -1,20 +1,14 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import {
-	optionLine,
-	row,
-	writeRulings,
-	type OptionRulingLine,
-	type RulingOption
-} from './rulingsFixture';
+import { arrange, item, optionEntry, type CardOption, type OptionEntry } from './itemFixture';
 import { decidedCard, decidedList, expectDecidedAnswer } from './decidedView';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
-// The fake board's one repository label (`aco_board_fixtures.DEFAULT_LABEL`).
+// The E2E board's one repository label (`aco_board_fixtures.DEFAULT_LABEL`).
 const REPOSITORY = 'repo';
 
 const SONG_QUESTION = 'Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?';
@@ -39,9 +33,8 @@ function resultPicture(label: string): string {
 	);
 }
 
-const SONG_OPTIONS: RulingOption[] = [
+const SONG_OPTIONS: CardOption[] = [
 	{
-		letter: 'A',
 		name: 'Song bleibt offen',
 		effect: 'Die App springt selbst: v5 klappt auf, Take 7 ist markiert.',
 		picture: resultPicture('Song offen'),
@@ -52,7 +45,6 @@ const SONG_OPTIONS: RulingOption[] = [
 		contract: SONG_CONTRACT
 	},
 	{
-		letter: 'B',
 		name: 'Browser-Sprung bleibt',
 		effect: 'Der Browser springt weiter selbst; der Song geht weiter verloren.',
 		same_as_today: true,
@@ -64,8 +56,8 @@ const SONG_OPTIONS: RulingOption[] = [
 	}
 ];
 
-function songCard(index: number, overrides: Partial<OptionRulingLine> = {}): OptionRulingLine {
-	return optionLine(index, 'Der Song bleibt beim Sprung zum Ursprungs-Take offen.', {
+function songCard(overrides: Partial<OptionEntry> = {}): OptionEntry {
+	return optionEntry('Der Song bleibt beim Sprung zum Ursprungs-Take offen.', {
 		question: SONG_QUESTION,
 		problem: 'Klickst du den Link zum Ursprungs-Take, ist dein geöffneter Song weg.',
 		picture: TODAY_PICTURE,
@@ -75,13 +67,12 @@ function songCard(index: number, overrides: Partial<OptionRulingLine> = {}): Opt
 		topic: 'Sprung zum Ursprungs-Take',
 		recommended: 'A',
 		reason: 'Behebt den Verlust; Strg- und Mittelklick bleiben normale Browser-Links.',
-		options: SONG_OPTIONS,
+		option: SONG_OPTIONS,
 		...overrides
 	});
 }
 
-const FOUR_OPTIONS: RulingOption[] = ['A', 'B', 'C', 'D'].map((letter, position) => ({
-	letter,
+const FOUR_OPTIONS: CardOption[] = ['A', 'B', 'C', 'D'].map((letter, position) => ({
 	name: `Weg ${letter}`,
 	effect: `Wirkung von Weg ${letter}.`,
 	picture: resultPicture(`Weg ${letter}`),
@@ -93,26 +84,26 @@ const FOUR_OPTIONS: RulingOption[] = ['A', 'B', 'C', 'D'].map((letter, position)
 	contract: `Vertrag ${letter}.`
 }));
 
-function arrange(directory: string): void {
-	writeRulings(directory, [
-		row(1843, 'Sprung zum Ursprungs-Take', songCard(1)),
-		row(
+async function arrangeCards(): Promise<void> {
+	await arrange([
+		item(1843, 'Sprung zum Ursprungs-Take', songCard()),
+		item(
 			1844,
 			'Altdaten',
-			optionLine(1, 'Eine Datenfrage mit einem endgültigen Weg.', {
+			optionEntry('Eine Datenfrage mit einem endgültigen Weg.', {
 				question: 'Welcher Weg für die Altdaten?',
 				problem: 'Die Altdaten passen nicht mehr.',
 				decision_kind: 'data_risk',
 				area: 'Bibliothek',
 				recommended: 'B',
 				reason: 'Weg B ist der sichere.',
-				options: FOUR_OPTIONS
+				option: FOUR_OPTIONS
 			})
 		),
-		row(
+		item(
 			1850,
 			'Schon entschieden',
-			songCard(1, {
+			songCard({
 				ruling: 'A',
 				ruled_on: '2026-10-26',
 				via: 'board',
@@ -143,8 +134,8 @@ for (const viewport of [
 		test('an open option line shows the whole card, every option closed, and offers the Decide picks', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
 
@@ -205,8 +196,8 @@ for (const viewport of [
 		});
 
 		test('a card with a final option says final in its meta line', async ({ page }, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
 
@@ -222,8 +213,8 @@ for (const viewport of [
 		test('each option opens its rows, one at a time, and folds the contract behind Show', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
 
@@ -287,8 +278,8 @@ for (const viewport of [
 		});
 
 		test('the disclosures work from the keyboard', async ({ page }) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
 
@@ -316,8 +307,8 @@ for (const viewport of [
 		test('a final option shows its warn mark beside the word, and a caption sits below its picture', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, 'Welcher Weg für die Altdaten?', phone);
 
@@ -339,8 +330,8 @@ for (const viewport of [
 		});
 
 		test('selecting another card shows it with every option closed', async ({ page }) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
 			await page
@@ -363,8 +354,8 @@ for (const viewport of [
 		test('the detail labels stand in the label column, or above their values on a phone', async ({
 			page
 		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
 
@@ -392,8 +383,8 @@ for (const viewport of [
 		test('[ABRD-37] a ruled option line leaves the open list and Decided lists it under its project', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await expect(page.locator('.tracks').getByTitle('Song offen lassen?')).toHaveCount(0);
 			await expect(page.locator('.tracks')).toContainText('Sprung zum Ursprungs-Take');
@@ -418,8 +409,8 @@ for (const viewport of [
 			test('on a phone each label stands above its value without sideways scrolling', async ({
 				page
 			}) => {
-				const { appUrl, token, repoDirectory } = readBoardRuntime();
-				arrange(repoDirectory);
+				const { appUrl, token } = readBoardRuntime();
+				await arrangeCards();
 				await page.goto(`${appUrl}#t=${token}`);
 				await openFromList(page, SONG_QUESTION, phone);
 
