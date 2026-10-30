@@ -44,6 +44,8 @@ _CANNED_FILE = "aco-canned.json"
 _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
 _EDITS_BEFORE_READ = "edits_before_read"
+_ITEM_READ_FAILURE = "item_read_failure"
+_CLOSED = "closed"
 RULING_DAY = date(2026, 10, 3)
 """The day aco rules on over this forge, so a page shows a date it can name."""
 
@@ -73,6 +75,8 @@ class _ForgeState:
     items: dict[int, StoredItem] = field(default_factory=dict[int, StoredItem])
     listing_failure: str | None = None
     edits_before_read: dict[int, str] = field(default_factory=dict[int, str])
+    item_read_failure: str | None = None
+    closed: set[int] = field(default_factory=set[int])
 
     @classmethod
     def from_json(cls, text: str) -> _ForgeState:
@@ -81,6 +85,8 @@ class _ForgeState:
             {int(number): StoredItem(**item) for number, item in stored[_ITEMS].items()},
             stored[_LISTING_FAILURE],
             {int(number): edit for number, edit in stored[_EDITS_BEFORE_READ].items()},
+            stored[_ITEM_READ_FAILURE],
+            set(stored[_CLOSED]),
         )
 
     def to_json(self) -> str:
@@ -89,6 +95,8 @@ class _ForgeState:
                 _ITEMS: {number: asdict(item) for number, item in self.items.items()},
                 _LISTING_FAILURE: self.listing_failure,
                 _EDITS_BEFORE_READ: self.edits_before_read,
+                _ITEM_READ_FAILURE: self.item_read_failure,
+                _CLOSED: sorted(self.closed),
             }
         )
 
@@ -105,8 +113,8 @@ class BoardForge:
         self._replace_state(state)
 
     def replace_items(self, items: Mapping[int, StoredItem]) -> None:
-        """The forge holds exactly `items`, with no listing failure and no
-        pending edit, in one write."""
+        """The forge holds exactly `items`, open, with no listing or item-read
+        failure and no pending edit, in one write."""
         self._replace_state(_ForgeState(dict(items)))
 
     def remove_item(self, number: int) -> None:
@@ -119,6 +127,19 @@ class BoardForge:
         """Every later listing raises a forge failure carrying `message`."""
         state = self._state()
         state.listing_failure = message
+        self._replace_state(state)
+
+    def fail_item_reads(self, message: str) -> None:
+        """Every later read of one item raises a forge failure carrying `message`."""
+        state = self._state()
+        state.item_read_failure = message
+        self._replace_state(state)
+
+    def close_item(self, number: int) -> None:
+        """Item `number` is closed: the listing leaves it out, and a read of
+        it answers closed with its title and body."""
+        state = self._state()
+        state.closed.add(number)
         self._replace_state(state)
 
     def edit_before_next_read(self, number: int, raw_body: str) -> None:
@@ -174,12 +195,16 @@ class BoardForge:
         if state.listing_failure is not None:
             raise forge.ForgeError(state.listing_failure)
         return tuple(
-            board_issue(number, item.title, item.body) for number, item in state.items.items()
+            board_issue(number, item.title, item.body)
+            for number, item in state.items.items()
+            if number not in state.closed
         )
 
     def item_reference(self, number: int) -> forge.ItemReference:
         self._log(ForgeRequest(ForgeOperation.READ_ITEM, number))
         state = self._state()
+        if state.item_read_failure is not None:
+            raise forge.ForgeError(state.item_read_failure)
         edit = state.edits_before_read.pop(number, None)
         if edit is not None:
             state.items[number].body = edit
@@ -187,7 +212,8 @@ class BoardForge:
         item = state.items.get(number)
         if item is None:
             return forge.ItemReference(forge.ItemState.MISSING)
-        return forge.ItemReference(forge.ItemState.OPEN, item.title, item.body)
+        item_state = forge.ItemState.CLOSED if number in state.closed else forge.ItemState.OPEN
+        return forge.ItemReference(item_state, item.title, item.body)
 
     def update_item_body(self, number: int, body: str) -> None:
         self._log(ForgeRequest(ForgeOperation.WRITE_BODY, number))
