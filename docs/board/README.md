@@ -1,10 +1,21 @@
 # Decision board: picture
 
 [`mockup.html`](mockup.html) is the frozen picture owner of the `aco serve`
-surface: the target picture of the decision board (v4, blessed 26.10.2026, ruled
-as #13 line 12). It is a static page with sample data from public repositories;
-it is self-contained: it loads nothing from the network, talks to no aco and
-stores nothing.
+surface: the target picture of the decision board (v5, drawn for #564's lines 2
+to 5 from v4, which was blessed 26.10.2026 and ruled as #13 line 12). It is a
+static page with sample data from public repositories; it is self-contained: it
+loads nothing from the network, talks to no aco and stores nothing.
+
+Every card shows the day it was asked, in its list row and its meta line; a card
+of points shows its newest point's day. The list keeps one group per project; the
+project with the newest open card leads, and each group shows
+its open cards newest first, then its With-head cards newest first. Decided orders
+the same way by the day of the decision, which its row shows, so what was just decided stands
+on top. A card whose
+answer is saving turns its shape and holds its picks while every other card stays
+usable. A project whose read failed stands as its own group with the error. The
+header's Refresh shows the time of the last read; Mitsprache holds Self-refresh,
+30 minutes by default.
 
 The shipped board shows a card of one option line as the picture's card: meta line,
 question, PROBLEM, TODAY, OPTIONS A to D with name and effect, RECOMMENDATION and
@@ -24,9 +35,10 @@ after the same window, under a grey "With head" strip; a card already with its h
 once, all or none. A card of points shows its name (area and count) as title and the picture's
 point rows: one point open at a time, a pick per point, "Accept all" with the number chosen,
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
-point is chosen. It still lacks Mitsprache and the agent list. A ruled yes/no line is read-only
-history in Decided; an open one is refused by aco's grammar, so its item drops from the board
-like any malformed item.
+point is chosen. It still lacks Mitsprache and the agent list, and the v5 additions: asked dates,
+newest-first order, the Refresh button with the time of the last read, Self-refresh, and
+a card's own saving state. A ruled yes/no line is read-only history in Decided; an open one is
+refused by aco's grammar, so its item drops from the board like any malformed item.
 The list groups open cards and decided lines per project with the picture's Open,
 With-head and Decided shapes (Decided shows the selected line's card in the
 pane), and the page has the picture's header with Open and Decided and its
