@@ -170,6 +170,24 @@ describe('the last pick', () => {
 		expect(store.picks(key, points)).toEqual([]);
 	});
 
+	test('[ABRD-98] a stored answer keeps the partial picks of another card', async () => {
+		const send = vi.fn(async () => storedAnswer(storedCard)) as unknown as typeof postDecision;
+		const neighbour = item({ number: 8, lines: points });
+		const { store: board, wiring } = readyBoard([
+			repo({ items: [item({ number: 7 }), neighbour] })
+		]);
+		const store = new DecisionStore('token', wiring, send);
+		const neighbourKey = cardKey('repo', 8);
+		store.choose('repo', 8, points, pickOf(points[0]));
+		chooseAll(store);
+
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+		store.reconcilePicks(board.repos);
+
+		expect(board.repos[0]?.items).toEqual([storedCard, neighbour]);
+		expect(store.picks(neighbourKey, points).map((pick) => pick.shown.index)).toEqual([2]);
+	});
+
 	test('[ABRD-44] a one-point card starts its window with the pick itself, named by letter, option and topic', async () => {
 		const { send, store } = setup();
 		const only = point(4, { topic: 'Jump' });
