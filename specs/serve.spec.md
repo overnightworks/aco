@@ -224,7 +224,7 @@ Setup: test-forge, item `#42` with ruled line `Guests?` as listed by `GET /api/b
 
 ```text
 request: POST /api/rule, header X-Board-Token: <board token>
-body: {"repo": "<repo>", "item": 42, "line": 1, "fingerprint": "<as listed>", "outcome": "no", "note": null}
+body: {"repo": "<repo>", "item": 42, "line": 1, "fingerprint": "<any>", "outcome": "no", "note": null}
 forge requests: none
 answer 400: {"error": "bad request: decision"}
 ```
