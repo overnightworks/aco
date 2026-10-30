@@ -300,8 +300,8 @@ for (const viewport of [
 		test('[ABRD-31] a repository lists the newest date first', async ({ page }) => {
 			const { appUrl, token } = readBoardRuntime();
 			await arrange([
-				item(7, 'Alt', yesNoEntry('Zweiter Oktober?', 'yes', '2026-10-02')),
-				item(8, 'Neu', yesNoEntry('Dritter Oktober?', 'no', '2026-10-03'))
+				item(8, 'Alt', yesNoEntry('Zweiter Oktober?', 'yes', '2026-10-02')),
+				item(7, 'Neu', yesNoEntry('Dritter Oktober?', 'no', '2026-10-03'))
 			]);
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
