@@ -4,9 +4,13 @@
  * `vite.config.ts`.
  */
 
+import { vi } from 'vitest';
+import { BoardStore } from '../app/state/board.svelte';
+import type { DecisionBoard } from '../app/state/decision.svelte';
 import type {
 	BoardItem,
 	CardOption,
+	DecisionResult,
 	OptionLine,
 	RepoReading,
 	RuledOptionLine,
@@ -114,4 +118,37 @@ export function repo(overrides: Partial<RepoReading> = {}): RepoReading {
 		items: [item()],
 		...overrides
 	};
+}
+
+/** `POST /api/rule`'s answer for a stored card: the written item as listed. */
+export function storedAnswer(
+	written: BoardItem,
+	status: 'ruled' | 'returned' = 'ruled'
+): DecisionResult {
+	return { status, message: null, item: written };
+}
+
+/** A `BoardStore` showing `repos` as ready, over a fake fetch that answers `repos`, and the
+ * `DecisionBoard` that wires a `DecisionStore` to it. `reads` counts the
+ * requests sent after the first load. */
+export function readyBoard(repos: RepoReading[] = [repo()]) {
+	const fetchImpl = vi.fn(async () => ({
+		ok: true,
+		status: 200,
+		json: async () => ({ repos })
+	})) as unknown as typeof fetch;
+	const store = new BoardStore();
+	store.repos = repos;
+	store.status = 'ready';
+	const wiring: DecisionBoard = {
+		reload: () => store.load('token', fetchImpl),
+		applyItem: (name, written) => store.applyItem(name, written)
+	};
+	return { store, wiring, reads: () => vi.mocked(fetchImpl).mock.calls.length };
+}
+
+/** A `DecisionBoard` for component tests that do not look at the board: a
+ * re-read that does nothing unless given, and an apply that shows nothing. */
+export function inertBoard(reload: () => Promise<void> = async () => {}): DecisionBoard {
+	return { reload, applyItem: () => {} };
 }

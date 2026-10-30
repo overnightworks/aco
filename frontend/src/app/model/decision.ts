@@ -7,6 +7,7 @@
  */
 
 import type {
+	BoardItem,
 	CardOtherRequest,
 	CardPicksRequest,
 	CardUnclearRequest,
@@ -99,8 +100,8 @@ export function noteOrNull(raw: string): string | null {
 }
 
 export type DecisionOutcome =
-	| { kind: 'ruled' }
-	| { kind: 'returned' }
+	| { kind: 'ruled'; item: BoardItem }
+	| { kind: 'returned'; item: BoardItem }
 	| { kind: 'already-ruled'; message: string }
 	| { kind: 'changed'; message: string }
 	| { kind: 'failed'; message: string };
@@ -108,9 +109,9 @@ export type DecisionOutcome =
 export function readDecisionResult(result: DecisionResult): DecisionOutcome {
 	switch (result.status) {
 		case 'ruled':
-			return { kind: 'ruled' };
+			return { kind: 'ruled', item: result.item };
 		case 'returned':
-			return { kind: 'returned' };
+			return { kind: 'returned', item: result.item };
 		case 'already_ruled':
 			return { kind: 'already-ruled', message: ALREADY_RULED_MESSAGE };
 		case 'failed':

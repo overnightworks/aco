@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
-import { optionLine } from '../../test-support/board';
+import { item, optionLine, readyBoard, repo, storedAnswer } from '../../test-support/board';
 import type { DecisionResult } from '../../types';
 import { cardKey, UNDO_SECONDS } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
@@ -9,10 +9,15 @@ const card = optionLine({ index: 4, fingerprint: 'fp-shown', topic: 'Jump' });
 const key = cardKey('repo', 42);
 const points = [card];
 
-function unclearStore(result: DecisionResult = { status: 'returned', message: null }) {
+const returnedCard = item({
+	number: 42,
+	lines: [optionLine({ index: 4, returned_on: '2026-10-29' })]
+});
+
+function unclearStore(result: DecisionResult = storedAnswer(returnedCard, 'returned')) {
 	const send = vi.fn(async () => result) as unknown as typeof postDecision;
-	const reload = vi.fn(async () => {});
-	return { send, reload, store: new DecisionStore('token', reload, send) };
+	const { store: board, wiring, reads } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	return { send, board, reads, store: new DecisionStore('token', wiring, send) };
 }
 
 beforeEach(() => {
@@ -77,15 +82,16 @@ test('[ABRD-75] the card is pending while its answer waits, so no pick can join 
 	expect(store.isPending(key)).toBe(true);
 });
 
-test('[ABRD-76] a returned answer reloads, drops the Unclear draft only and is reported once, never as a ruling', async () => {
-	const { reload, store } = unclearStore();
+test('[ABRD-76] a returned answer shows its item in place, drops the Unclear draft only and is reported once, never as a ruling', async () => {
+	const { board, reads, store } = unclearStore();
 	store.setDraft(key, 'unclear', 'Why?');
 	store.setDraft(key, 'other', 'Only on desktop');
 
 	store.decideUnclear('repo', 42, points, 'Why?');
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(reload).toHaveBeenCalledTimes(1);
+	expect(board.repos[0]?.items).toEqual([returnedCard]);
+	expect(reads()).toBe(0);
 	expect(store.banner(key)).toBeNull();
 	expect(store.justRuled).toBeNull();
 	expect(store.justReturned).toBe(key);

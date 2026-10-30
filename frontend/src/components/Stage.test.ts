@@ -3,7 +3,7 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { DecisionStore } from '../app/state/decision.svelte';
 import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS, lineKey } from '../app/model/decision';
-import { item, line, optionLine, repo } from '../test-support/board';
+import { inertBoard, item, line, optionLine, repo, storedAnswer } from '../test-support/board';
 import type { DecisionResult } from '../types';
 import Stage from './Stage.svelte';
 
@@ -18,7 +18,7 @@ afterEach(() => {
 function storeAnswering(result: DecisionResult, reload: () => Promise<void> = async () => {}) {
 	return new DecisionStore(
 		'token',
-		reload,
+		inertBoard(reload),
 		vi.fn(async () => result)
 	);
 }
@@ -27,7 +27,7 @@ test('with nothing selected, the stage says no question is selected', () => {
 	render(Stage, {
 		repos: [],
 		selectedKey: null,
-		decisions: storeAnswering({ status: 'ruled', message: null }),
+		decisions: storeAnswering(storedAnswer(item())),
 		refreshing: false
 	});
 
@@ -41,7 +41,7 @@ test('[ABRD-44] a selected one-point card shows its card and offers the Decide p
 	render(Stage, {
 		repos,
 		selectedKey: cardKey('repo', 42),
-		decisions: storeAnswering({ status: 'ruled', message: null }),
+		decisions: storeAnswering(storedAnswer(item())),
 		refreshing: false
 	});
 
@@ -69,7 +69,7 @@ test('[ABRD-44] a ruled option line offers no Decide group', () => {
 	render(Stage, {
 		repos,
 		selectedKey: lineKey('repo', 42, card),
-		decisions: storeAnswering({ status: 'ruled', message: null }),
+		decisions: storeAnswering(storedAnswer(item())),
 		refreshing: false
 	});
 
@@ -79,8 +79,8 @@ test('[ABRD-44] a ruled option line offers no Decide group', () => {
 test('[ABRD-44] picking an option disables the picks, then posts the card with exactly that letter', async () => {
 	const card = optionLine({ index: 2, fingerprint: 'fp-option' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
-	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
-	const decisions = new DecisionStore('token', async () => {}, send as never);
+	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
+	const decisions = new DecisionStore('token', inertBoard(), send as never);
 
 	render(Stage, { repos, selectedKey: cardKey('repo', 42), decisions, refreshing: false });
 	screen.getByRole('button', { name: /^Decide B:/ }).click();
@@ -123,7 +123,7 @@ test('[ABRD-37] an already-ruled line of either form shows the decided card, nev
 	});
 	const option = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01', via: 'chat' });
 	const repos = [repo({ items: [item({ number: 42, lines: [yesNo, option] })] })];
-	const decisions = storeAnswering({ status: 'ruled', message: null });
+	const decisions = storeAnswering(storedAnswer(item()));
 
 	const view = render(Stage, {
 		repos,
@@ -173,7 +173,7 @@ test('a hostile picture is embedded only as an image, never as markup', () => {
 	const { container } = render(Stage, {
 		repos,
 		selectedKey: cardKey('repo', 42),
-		decisions: storeAnswering({ status: 'ruled', message: null }),
+		decisions: storeAnswering(storedAnswer(item())),
 		refreshing: false
 	});
 
@@ -202,7 +202,7 @@ test('hostile question, problem and reason render as text, never as markup', () 
 	const { container } = render(Stage, {
 		repos,
 		selectedKey: cardKey('repo', 42),
-		decisions: storeAnswering({ status: 'ruled', message: null }),
+		decisions: storeAnswering(storedAnswer(item())),
 		refreshing: false
 	});
 
@@ -258,7 +258,7 @@ function renderGroup(
 }
 
 test('[ABRD-83] a card of points is titled by its name and offers Accept all, its count and the escapes, no pick of its own', () => {
-	renderGroup(storeAnswering({ status: 'ruled', message: null }));
+	renderGroup(storeAnswering(storedAnswer(item())));
 
 	expect(screen.getByRole('heading', { name: 'Song-Seite · 3 points' })).toBeInTheDocument();
 	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
@@ -271,7 +271,7 @@ test('[ABRD-83] a card of points is titled by its name and offers Accept all, it
 });
 
 test('[ABRD-85] activating a point opens it, and another point closes the first', async () => {
-	renderGroup(storeAnswering({ status: 'ruled', message: null }));
+	renderGroup(storeAnswering(storedAnswer(item())));
 	const first = screen.getByRole('button', { name: /Question 2\?/ });
 	const second = screen.getByRole('button', { name: /Question 3\?/ });
 
@@ -285,8 +285,8 @@ test('[ABRD-85] activating a point opens it, and another point closes the first'
 });
 
 test('[ABRD-86] a pick marks its point and counts it, and posts nothing', async () => {
-	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
-	renderGroup(new DecisionStore('token', async () => {}, send as never));
+	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
+	renderGroup(new DecisionStore('token', inertBoard(), send as never));
 
 	screen.getByRole('button', { name: 'Point 1: B – As today' }).click();
 	await tick();
@@ -301,8 +301,8 @@ test('[ABRD-86] a pick marks its point and counts it, and posts nothing', async 
 });
 
 test('[ABRD-87] the last pick waits out one window, then posts the whole card once', async () => {
-	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
-	const decisions = new DecisionStore('token', async () => {}, send as never);
+	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
+	const decisions = new DecisionStore('token', inertBoard(), send as never);
 	renderGroup(decisions);
 
 	for (const name of [
@@ -331,8 +331,8 @@ test('[ABRD-87] the last pick waits out one window, then posts the whole card on
 });
 
 test('[ABRD-89] Accept all picks each recommended letter and posts the card after the window', async () => {
-	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
-	const decisions = new DecisionStore('token', async () => {}, send as never);
+	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
+	const decisions = new DecisionStore('token', inertBoard(), send as never);
 	renderGroup(decisions);
 
 	screen.getByRole('button', { name: 'Accept all recommendations' }).click();
@@ -368,8 +368,8 @@ test('[ABRD-45] a changed card hides its picks and Accept all until Neu laden', 
 });
 
 test('[ABRD-92] Other… answers the whole card', async () => {
-	const send = vi.fn(async () => ({ status: 'ruled', message: null }) as DecisionResult);
-	renderGroup(new DecisionStore('token', async () => {}, send as never));
+	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
+	renderGroup(new DecisionStore('token', inertBoard(), send as never));
 
 	screen.getByRole('button', { name: 'Other…' }).click();
 	await tick();
@@ -394,7 +394,7 @@ test('[ABRD-92] Other… answers the whole card', async () => {
 test('[ABRD-61] a card of points with one point with its head offers no Unclear and keeps Accept all', () => {
 	const points = groupPoints();
 	points[1] = optionLine({ ...points[1], returned_on: '2026-10-27' });
-	renderGroup(storeAnswering({ status: 'ruled', message: null }), points);
+	renderGroup(storeAnswering(storedAnswer(item())), points);
 
 	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
 	expect(screen.getByRole('button', { name: 'Other…' })).toBeInTheDocument();

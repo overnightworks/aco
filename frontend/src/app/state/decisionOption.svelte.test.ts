@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
-import { cardOption, optionLine } from '../../test-support/board';
+import {
+	cardOption,
+	item,
+	optionLine,
+	readyBoard,
+	repo,
+	ruledOptionLine,
+	storedAnswer
+} from '../../test-support/board';
 import type { DecisionResult } from '../../types';
 import {
 	ALREADY_RULED_MESSAGE,
@@ -20,6 +28,7 @@ const card = optionLine({
 });
 const key = cardKey('repo', 42);
 const points = [card];
+const storedCard = item({ number: 42, lines: [ruledOptionLine({ index: 3 })] });
 
 function sender(result: DecisionResult): typeof postDecision {
 	return vi.fn(async () => result) as unknown as typeof postDecision;
@@ -34,12 +43,8 @@ afterEach(() => {
 });
 
 test('[ABRD-44] a one-point card’s pick sends nothing before the window ends, then exactly the card with the picked letter', async () => {
-	const send = sender({ status: 'ruled', message: null });
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		send
-	);
+	const send = sender(storedAnswer(storedCard));
+	const store = new DecisionStore('token', readyBoard().wiring, send);
 
 	store.choose('repo', 42, points, { shown: card, option: optionB });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000 - 1);
@@ -55,9 +60,9 @@ test('[ABRD-44] a one-point card’s pick sends nothing before the window ends, 
 });
 
 test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is no longer pending', async () => {
-	const send = sender({ status: 'ruled', message: null });
-	const reload = vi.fn(async () => {});
-	const store = new DecisionStore('token', reload, send);
+	const send = sender(storedAnswer(storedCard));
+	const { wiring, reads } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
 
 	store.choose('repo', 42, points, { shown: card, option: optionA });
 	expect(store.isPending(key)).toBe(true);
@@ -66,17 +71,18 @@ test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is 
 
 	expect(store.isPending(key)).toBe(false);
 	expect(send).not.toHaveBeenCalled();
-	expect(reload).not.toHaveBeenCalled();
+	expect(reads()).toBe(0);
 });
 
-test('[ABRD-44] a stored pick reloads the board and names the card as just ruled', async () => {
-	const reload = vi.fn(async () => {});
-	const store = new DecisionStore('token', reload, sender({ status: 'ruled', message: null }));
+test('[ABRD-44] a stored pick shows its item in place and names the card as just ruled', async () => {
+	const { store: board, wiring, reads } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const store = new DecisionStore('token', wiring, sender(storedAnswer(storedCard)));
 
 	store.choose('repo', 42, points, { shown: card, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(reload).toHaveBeenCalledTimes(1);
+	expect(board.repos[0]?.items).toEqual([storedCard]);
+	expect(reads()).toBe(0);
 	expect(store.justRuled).toBe(key);
 });
 
@@ -89,11 +95,7 @@ test.each([
 	],
 	[{ status: 'failed', message: 'aco unavailable' }, 'failed', 'aco unavailable']
 ] as const)('a refused pick (%j) shows a %s banner', async (result, kind, message) => {
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		sender(result)
-	);
+	const store = new DecisionStore('token', readyBoard().wiring, sender(result));
 
 	store.choose('repo', 42, points, { shown: card, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -103,11 +105,7 @@ test.each([
 });
 
 test('[ABRD-44] a pending pick names its letter, option and topic for the strip', () => {
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		sender({ status: 'ruled', message: null })
-	);
+	const store = new DecisionStore('token', readyBoard().wiring, sender(storedAnswer(storedCard)));
 
 	store.choose('repo', 42, points, { shown: card, option: optionB });
 
