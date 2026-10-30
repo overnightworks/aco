@@ -1,0 +1,8 @@
+claim_id = "b74c7b3a675d4323b1c2587e03a16bef"
+agent = "Claude 39074348-34ea-4061-8a02-0a1645199c16"
+role = "builder"
+base = "0891149eb649b0500fef025cddfdec4eceb253b8"
+branch = "claude/issue-601-s3d-board-in-process"
+scope = [".github/workflows/ci.yml", "docs/board/README.md", "pyproject.toml", "quality/config.toml", "scripts/vulture_whitelist.py", "specs/rule.spec.md", "specs/serve.spec.md", "src/aco/board/__init__.py", "src/aco/board/aco_cli.py", "src/aco/board/aco_source.py", "src/aco/board/board.py", "src/aco/board/cli.py", "src/aco/board/ports.py", "src/aco/board/server.py", "src/aco/cmd_serve.py", "src/aco/decide.py", "tests/board/conftest.py", "tests/board/test_aco_source.py", "tests/board/test_aco_source_state_ref.py", "tests/board/test_board_aco_cli.py", "tests/board/test_board_api.py", "tests/board/test_board_api_cards.py", "tests/board/test_board_card_decisions.py", "tests/board/test_board_core.py", "tests/board/test_board_server.py", "tests/support/aco_board_fixtures.py", "tests/support/board_forge.py", "tests/support/e2e_server.py", "tests/test_expectations_withdrawn.py"]
+opened_commit = "679da02cf232b4fd679b1180f0bee23c52c390c6"
+whole_reason = "One swap of the board's adapter: a read-only first half needs a composite port the write half deletes, each half would declare import-contract loosenings that only the operator's door lands, and leaving aco_cli for later leaves code only tests reach; the rest is the specs, contracts and test seams that pin the old boundary."
