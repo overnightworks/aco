@@ -69,10 +69,10 @@ def _checked_and_written(
     decision = check(expectations.expectation_lines(fresh.body, storage=fresh.storage))
     if decision is None:
         return CardChanged()
-    decide.rule(context, fresh, _line_outcomes(decision), context.today())
-    if isinstance(decision.answer, UnclearCardAnswer):
-        return DecisionResult(DecisionStatus.RETURNED)
-    return DecisionResult(DecisionStatus.RULED)
+    committed = decide.rule(context, fresh, _line_outcomes(decision), context.today())
+    returned = isinstance(decision.answer, UnclearCardAnswer)
+    status = DecisionStatus.RETURNED if returned else DecisionStatus.RULED
+    return DecisionResult(status, item=committed)
 
 
 def _line_outcomes(decision: CardDecision) -> tuple[decide.LineOutcome, ...]:

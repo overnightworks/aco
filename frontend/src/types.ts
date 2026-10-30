@@ -148,9 +148,9 @@ export interface CardUnclearRequest extends CardRequestHead {
 /** `POST /api/rule`'s body (`specs/serve.spec.md` ABRD-09): always one card. */
 export type DecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearRequest;
 
-export interface DecisionResult {
-	/** `aco.board.ports.DecisionStatus`'s four values, the only ones `POST
-	 * /api/rule` ever answers with a 200. */
-	status: 'ruled' | 'returned' | 'already_ruled' | 'failed';
-	message: string | null;
-}
+/** `POST /api/rule`'s 200 (`aco.board.ports.DecisionStatus`'s four values): a
+ * stored card carries the written item as `GET /api/board` lists it, a refusal
+ * only its sentence. */
+export type DecisionResult =
+	| { status: 'ruled' | 'returned'; message: null; item: BoardItem }
+	| { status: 'already_ruled' | 'failed'; message: string | null };

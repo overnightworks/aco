@@ -88,6 +88,8 @@
 	}
 
 	$effect(() => {
+		// Also after a stored answer is applied in place: its card may leave the list.
+		void board.repos;
 		if (board.status === 'ready' && !board.refreshing) {
 			if (!initialized) {
 				selectedKey = firstOpenKey(board.repos);
@@ -101,7 +103,7 @@
 	});
 
 	// A strip that leaves takes a focused Undo with it, whether its post ruled,
-	// was refused or failed; the board reload only covers the ruled case.
+	// was refused or failed; the applied answer only covers the ruled case.
 	$effect(() => {
 		void decisions?.pendingEntries;
 		void tick().then(keepFocusVisible);
@@ -117,11 +119,14 @@
 			decisions = null;
 		} else {
 			void board.load(token);
-			decisions = new DecisionStore(token, () => board.load(token));
+			decisions = new DecisionStore(token, {
+				reload: () => board.load(token),
+				applyItem: (repo, item) => board.applyItem(repo, item)
+			});
 		}
 	});
 
-	// Once a decision this tab made lands and the board re-reads from it, the
+	// Once a decision this tab made lands and its item is applied, the
 	// stage leaves the now-ruled card for the next open one -- but only while
 	// it is still the card shown, never yanking the operator off a different
 	// card they moved to in the meantime (picture: `nextOpenAfter`).

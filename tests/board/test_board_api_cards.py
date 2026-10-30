@@ -139,5 +139,8 @@ def test_a_card_only_writes_the_repo_its_fingerprint_was_read_from(
 
         answer = board.decide_card_through_api(_ITEM, [listed_in_a], ["A"], repo=target_repo)
 
-    assert answer.json() == {"status": expected_status, "message": expected_message}
+    assert answer.status_and_message() == {
+        "status": expected_status,
+        "message": expected_message,
+    }
     assert tuple(repository.item_requests() for repository in two_repositories) == requests

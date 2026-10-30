@@ -3,16 +3,16 @@
  * waits here, cancellable, until `UNDO_SECONDS` elapse, then becomes exactly
  * one `POST /api/rule`. An option card is decided as a whole: the store holds
  * its picks and its open point, and starts the window once every point is
- * chosen. `Stage.svelte` reads whether a card is mid-undo or
+ * chosen. `Stage.svelte` reads whether a card is mid-undo, posting or
  * refused; `App.svelte` renders one `UndoStrip` per still-pending entry.
- * `reload` is `BoardStore.load` (`board.svelte.ts`): the one source of
- * truth this re-reads from after a write, rather than mutating a copy.
+ * A stored answer carries the written item, which `BoardStore.applyItem`
+ * (`board.svelte.ts`) shows in place; `reload` re-reads only for `Neu laden`.
  */
 
 import { untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import { postDecision } from '../../client';
-import type { DecisionRequest, OptionLine, RepoReading } from '../../types';
+import type { BoardItem, DecisionRequest, OptionLine, RepoReading } from '../../types';
 import { findSelection, type StripState } from '../model/boardSummary';
 import {
 	cardName,
@@ -44,6 +44,12 @@ export interface DecisionBanner {
  * other refusal leaves the choices usable for a retry. */
 export function locksCard(banner: DecisionBanner | null): boolean {
 	return banner !== null && banner.kind !== 'failed';
+}
+
+/** What the decisions need of the board: a re-read, and a stored item shown in place. */
+export interface DecisionBoard {
+	reload: () => Promise<void>;
+	applyItem: (repo: string, item: BoardItem) => void;
 }
 
 export interface PendingDecision {
@@ -84,8 +90,10 @@ function withoutKey<Value>(record: Record<string, Value>, key: string): Record<s
 export class DecisionStore {
 	#pending: Record<string, PendingEntry> = $state({});
 	#banners: Record<string, DecisionBanner> = $state({});
-	/** The key this store itself just wrote a ruling for, reread and reloaded
-	 * -- `App.svelte` advances the stage off it (`boardSummary.nextOpenAfter`)
+	/** The cards whose window ended and whose POST has not been answered yet. */
+	readonly #posting = new SvelteSet<string>();
+	/** The key this store itself just wrote a ruling for, its item applied --
+	 * `App.svelte` advances the stage off it (`boardSummary.nextOpenAfter`)
 	 * when it is still the one shown, never for a manual reload after a
 	 * refusal banner. */
 	#justRuled: string | null = $state(null);
@@ -103,7 +111,7 @@ export class DecisionStore {
 
 	constructor(
 		private readonly token: string,
-		private readonly reload: () => Promise<void>,
+		private readonly board: DecisionBoard,
 		private readonly send: typeof postDecision = postDecision,
 		private readonly undoSeconds: number = UNDO_SECONDS
 	) {}
@@ -116,8 +124,9 @@ export class DecisionStore {
 		}));
 	}
 
+	/** Whether the card is in its undo window or posting. */
 	isPending(key: string): boolean {
-		return key in this.#pending;
+		return key in this.#pending || this.#posting.has(key);
 	}
 
 	banner(key: string): DecisionBanner | null {
@@ -286,31 +295,32 @@ export class DecisionStore {
 	 * picks of unchanged points stay, those of changed points go with the re-read. */
 	async reloadAfterBanner(key: string): Promise<void> {
 		this.#banners = withoutKey(this.#banners, key);
-		await this.reload();
+		await this.board.reload();
 	}
 
 	async #commit(key: string, request: DecisionRequest): Promise<void> {
 		this.#pending = withoutKey(this.#pending, key);
+		this.#posting.add(key);
 		let outcome: DecisionOutcome;
 		try {
 			outcome = readDecisionResult(await this.send(this.token, request));
 		} catch {
 			outcome = { kind: 'failed', message: BOARD_UNREACHABLE_MESSAGE };
 		}
+		// One synchronous step: the card leaves posting as its answer is applied.
+		this.#posting.delete(key);
 		if (outcome.kind === 'ruled') {
 			this.#picks = withoutKey(this.#picks, key);
 			this.#dropDrafts(key, ['other', 'unclear']);
-			await this.reload();
+			this.board.applyItem(request.repo, outcome.item);
 			this.#justRuled = key;
-			return;
-		}
-		if (outcome.kind === 'returned') {
+		} else if (outcome.kind === 'returned') {
 			this.#dropDrafts(key, ['unclear']);
-			await this.reload();
+			this.board.applyItem(request.repo, outcome.item);
 			this.#justReturned = key;
-			return;
+		} else {
+			this.#banners = { ...this.#banners, [key]: outcome };
 		}
-		this.#banners = { ...this.#banners, [key]: outcome };
 	}
 
 	#dropDrafts(key: string, kinds: EscapeKind[]): void {

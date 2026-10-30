@@ -34,6 +34,8 @@ resolved directory's name.
 | its card changed, withdrawn, gone or closed since the page read it | — | ABRD-41 |
 | a card post answering `other` | — | ABRD-64 |
 | a card post answering `unclear` | — | ABRD-70, ABRD-71 |
+| a card posting, from its undo window's end to its answer | — | ABRD-97 |
+| a read sent before an item's stored answer arrived | ABRD-98 | — |
 | a card post naming every open option line of its item | — | ABRD-77, ABRD-78, ABRD-80 |
 | a card post missing an open option line, or naming a changed or non-option line | — | ABRD-79 |
 | a card post naming a line already ruled | — | ABRD-80 |
@@ -81,7 +83,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-30] Decided groups the ruled lines of open board items by repository under its name and count; a row shows the Decided shape and an option line's topic, or a yes/no line's short question or sentence.
 - [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
-- [ ] [ABRD-33] During undo a question stays open; only successful storage and reload move it to Decided.
+- [ ] [ABRD-33] During undo a question stays open; only its stored answer, applied in place without a read, moves it to Decided.
 - [ ] [ABRD-36] A card with one open option line shows: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, question, Problem, Today, options A-D, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), `not recorded` for a yes/no line; then ` · ` and the ruling date as `DD.MM.YYYY`.
@@ -108,7 +110,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-68] `Send` posts the card as shown when the panel opened, so a card changed since is refused (ABRD-02); the answer stays in the draft.
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
 - [ ] [ABRD-70] A card post's `unclear` (ABRD-78) stores no `via`; its note is trimmed, a blank one is none, and every posted line returns to its head (E-ABRD-14).
-- [ ] [ABRD-71] An `unclear` aco stores answers 200 `{"status": "returned", "message": null}`: the line stays open, with its head; only a stored `option` or `other` answers `ruled`.
+- [ ] [ABRD-71] An `unclear` aco stores answers 200 `{"status": "returned", "message": null, "item"}` (ABRD-09): the line stays open, with its head; only a stored `option` or `other` answers `ruled`.
 - [ ] [ABRD-72] An open option card's Decide row ends with `Other…` and `Unclear`; a card with its head (ABRD-61) shows no `Unclear` and no Unclear panel, and keeps its picks and `Other…`.
 - [ ] [ABRD-73] `Unclear` opens the panel with one focused textarea (`What is unclear? (optional)`, at most 280 characters) and `Send`, enabled while blank; it closes `Other…`'s panel; each keeps its draft.
 - [ ] [ABRD-74] `Send` closes the panel and starts the window with a grey strip: the With head shape, `With head: <name>` (ABRD-82) and `Undo` (ABRD-59); `Undo` posts nothing and reopens the panel with the note.
@@ -146,12 +148,14 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## The JSON API
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items`: RUL-03's rows as `{"number", "title", "lines"}` (E-ABRD-03); `error`: `null` or a sentence, no items (E-ABRD-06).
-- [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
+- [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"`, the written item as ABRD-08 lists it, once stored; else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
 - [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
 - [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
 - [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
+- [ ] [ABRD-97] From the end of its undo window until its answer is applied, a card is posting: its picks, `Accept all`, `Other…`, `Unclear` and `Send` take no click; every other card stays usable.
+- [ ] [ABRD-98] A read's rows for an item apply only if the read was sent after that item's last stored answer arrived; until then the page keeps the item that answer carried.
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
@@ -264,7 +268,7 @@ Setup: `aco serve --repo a --repo b`; repo `a` and repo `b`'s test-forges each l
 request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "a", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed in a>", "option": "A"}]}
 forge requests: read #12, then one write of #12's body in a; none in b
-answer 200: {"status": "ruled", "message": null}
+answer 200: {"status": "ruled", "message": null, "item": <#12 as GET /api/board lists it after the write>}
 ```
 
 Posting the same body with `"repo": "c"` -- not a configured repo -- answers 400 `{"error": "bad request: decision"}`, no forge request in `a` or `b`.
@@ -352,7 +356,7 @@ Setup: test-forge, item `#12` titled `Song jump` with E-RUL-07's open option lin
 request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>", "option": "A"}]}
 forge requests: read #12, then one write of #12's body: line 1 ruled `A`, `via board`, the card hash just read
-answer 200: {"status": "ruled", "message": null}
+answer 200: {"status": "ruled", "message": null, "item": <#12 as GET /api/board lists it after the write>}
 ```
 
 Posting the same body after the card changed since the page read it answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}` on the item's fresh read; the stored line is unchanged. The single-line body `{"repo": "<repo>", "item": 12, "line": 1, "fingerprint": "<as listed>", "option": "A"}` answers 400 `{"error": "bad request: decision"}`, no forge request.
@@ -365,7 +369,7 @@ Setup: test-forge, item `#12` titled `Song jump` with E-RUL-07's open option lin
 request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>"}], "other": "  Nur am Desktop.  "}
 forge requests: read #12, then one write of #12's body: line 1 ruled `other` with `Nur am Desktop.`, `via board`, the card hash just read
-answer 200: {"status": "ruled", "message": null}
+answer 200: {"status": "ruled", "message": null, "item": <#12 as GET /api/board lists it after the write>}
 ```
 
 A blank answer, one past 280 characters after trimming, or one beside `outcome`, `option` or `note` answers 400 `{"error": "bad request: decision"}`, no forge request.
@@ -378,7 +382,7 @@ Setup: test-forge, item `#12` titled `Song jump` with E-RUL-07's open option lin
 request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed>"}], "unclear": true, "note": "  Mobile fehlt.  "}
 forge requests: read #12, then one write of #12's body: line 1 back to its head with the note `Mobile fehlt.`
-answer 200: {"status": "returned", "message": null}
+answer 200: {"status": "returned", "message": null, "item": <#12 as GET /api/board lists it after the write>}
 ```
 
 The line stays open, now with its head. Posting Unclear again answers 200 `{"status": "failed", "message": "line 1 is already with its head; it comes back once revised"}`. An `unclear` that is not `true`, or one beside `outcome`, `option` or `other`, or a note past 280 characters after trimming, answers 400 `{"error": "bad request: decision"}`, no forge request.
@@ -391,10 +395,10 @@ Setup: test-forge, item `#7` with two open option lines (2 and 3); the operator 
 request: POST /api/rule, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 7, "lines": [{"line": 2, "fingerprint": "<as listed>", "option": "A"}, {"line": 3, "fingerprint": "<as listed>", "option": "B"}]}
 forge requests: read #7, then one write of #7's body: line 2 ruled `A` and line 3 ruled `B`, each `via board` with its card hash just read
-answer 200: {"status": "ruled", "message": null}
+answer 200: {"status": "ruled", "message": null, "item": <#7 as GET /api/board lists it after the write>}
 ```
 
-A post naming only line 2 while line 3 is open answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`; #7 is read once and not written. Posting `"other": "Nur am Desktop."` with no `option` on the entries rules both lines `other` with that answer in the same one write; posting `"unclear": true` sends both back to their head instead and answers `{"status": "returned", "message": null}`.
+A post naming only line 2 while line 3 is open answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`; #7 is read once and not written. Posting `"other": "Nur am Desktop."` with no `option` on the entries rules both lines `other` with that answer in the same one write; posting `"unclear": true` sends both back to their head instead and answers `{"status": "returned", "message": null, "item": <#7 as listed>}`.
 
 ### E-ABRD-16 -- a token file that holds no token
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { cardOption, line, optionLine } from '../../test-support/board';
+import { cardOption, item, line, optionLine, storedAnswer } from '../../test-support/board';
 import {
 	ALREADY_RULED_MESSAGE,
 	cardKey,
@@ -74,13 +74,18 @@ describe('noteOrNull', () => {
 });
 
 describe('readDecisionResult', () => {
-	test('a ruled result needs no message', () => {
-		expect(readDecisionResult({ status: 'ruled', message: null })).toEqual({ kind: 'ruled' });
+	test('a ruled result carries the written item', () => {
+		const written = item({ number: 42 });
+
+		expect(readDecisionResult(storedAnswer(written))).toEqual({ kind: 'ruled', item: written });
 	});
 
-	test('[ABRD-76] a returned result is read as stored, not as a refusal', () => {
-		expect(readDecisionResult({ status: 'returned', message: null })).toEqual({
-			kind: 'returned'
+	test('[ABRD-76] a returned result carries its item and is read as stored, not as a refusal', () => {
+		const written = item({ number: 42 });
+
+		expect(readDecisionResult(storedAnswer(written, 'returned'))).toEqual({
+			kind: 'returned',
+			item: written
 		});
 	});
 

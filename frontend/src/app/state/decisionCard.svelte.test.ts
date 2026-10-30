@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
-import { cardOption, item, optionLine, repo } from '../../test-support/board';
+import {
+	cardOption,
+	item,
+	optionLine,
+	readyBoard,
+	repo,
+	ruledOptionLine,
+	storedAnswer
+} from '../../test-support/board';
 import type { DecisionResult, OptionLine } from '../../types';
 import type { Pick } from '../model/card';
 import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS } from '../model/decision';
@@ -28,10 +36,15 @@ function pickOf(shown: OptionLine | undefined, option = optionB): Pick {
 	return { shown, option };
 }
 
-function setup(result: DecisionResult = { status: 'ruled', message: null }) {
+const storedCard = item({
+	number: 7,
+	lines: points.map(({ index }) => ruledOptionLine({ index }))
+});
+
+function setup(result: DecisionResult = storedAnswer(storedCard)) {
 	const send = vi.fn(async () => result) as unknown as typeof postDecision;
-	const reload = vi.fn(async () => {});
-	return { send, reload, store: new DecisionStore('token', reload, send) };
+	const { store: board, wiring, reads } = readyBoard([repo({ items: [item({ number: 7 })] })]);
+	return { send, board, reads, store: new DecisionStore('token', wiring, send) };
 }
 
 function chooseAll(store: DecisionStore, letters: Pick[] = points.map((shown) => pickOf(shown))) {
@@ -145,15 +158,34 @@ describe('the last pick', () => {
 		expect(store.isPending(key)).toBe(false);
 	});
 
-	test('[ABRD-44] a stored card reloads the board, drops its picks and names the card as just ruled', async () => {
-		const { reload, store } = setup();
+	test('[ABRD-44] a stored card shows its item in place, drops its picks and names the card as just ruled', async () => {
+		const { board, reads, store } = setup();
 		chooseAll(store);
 
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-		expect(reload).toHaveBeenCalledTimes(1);
+		expect(board.repos[0]?.items).toEqual([storedCard]);
+		expect(reads()).toBe(0);
 		expect(store.justRuled).toBe(key);
 		expect(store.picks(key, points)).toEqual([]);
+	});
+
+	test('[ABRD-98] a stored answer keeps the partial picks of another card', async () => {
+		const send = vi.fn(async () => storedAnswer(storedCard)) as unknown as typeof postDecision;
+		const neighbour = item({ number: 8, lines: points });
+		const { store: board, wiring } = readyBoard([
+			repo({ items: [item({ number: 7 }), neighbour] })
+		]);
+		const store = new DecisionStore('token', wiring, send);
+		const neighbourKey = cardKey('repo', 8);
+		store.choose('repo', 8, points, pickOf(points[0]));
+		chooseAll(store);
+
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+		store.reconcilePicks(board.repos);
+
+		expect(board.repos[0]?.items).toEqual([storedCard, neighbour]);
+		expect(store.picks(neighbourKey, points).map((pick) => pick.shown.index)).toEqual([2]);
 	});
 
 	test('[ABRD-44] a one-point card starts its window with the pick itself, named by letter, option and topic', async () => {
@@ -359,7 +391,7 @@ describe('picks across re-reads', () => {
 
 describe('a refused card', () => {
 	test('[ABRD-45] "Neu laden" after a changed refusal drops the banner and keeps the picks of unchanged points', async () => {
-		const { reload, store } = setup({ status: 'failed', message: LINE_CHANGED_MESSAGE });
+		const { reads, store } = setup({ status: 'failed', message: LINE_CHANGED_MESSAGE });
 		chooseAll(store);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 		expect(store.banner(key)?.kind).toBe('changed');
@@ -369,7 +401,7 @@ describe('a refused card', () => {
 
 		expect(store.banner(key)).toBeNull();
 		expect(store.picks(key, points)).toHaveLength(3);
-		expect(reload).toHaveBeenCalledTimes(1);
+		expect(reads()).toBe(1);
 	});
 
 	test('[ABRD-45] any other failure keeps the picks, and picking again posts again', async () => {
@@ -416,7 +448,7 @@ describe('Other and Unclear for the whole card', () => {
 	});
 
 	test('[ABRD-92] Unclear waits as a With head strip and posts every point with the note', async () => {
-		const { send, store } = setup({ status: 'returned', message: null });
+		const { send, store } = setup(storedAnswer(storedCard, 'returned'));
 
 		store.decideUnclear('repo', 7, points, ' Why? ');
 

@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
-import { cardOption, optionLine } from '../../test-support/board';
+import {
+	cardOption,
+	item,
+	optionLine,
+	readyBoard,
+	repo,
+	ruledOptionLine,
+	storedAnswer
+} from '../../test-support/board';
 import type { DecisionResult } from '../../types';
 import { cardKey, UNDO_SECONDS } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
@@ -28,19 +36,19 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
+const storedSong = item({ number: 42, lines: [ruledOptionLine({ index: 4 })] });
+
 test('undoing a key with nothing pending is a no-op', () => {
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {})
-	);
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring);
 
 	expect(() => store.undo(songKey)).not.toThrow();
 });
 
-test('once the window elapses, exactly one request is sent and the board reloads', async () => {
-	const send = sender({ status: 'ruled', message: null });
-	const reload = vi.fn(async () => {});
-	const store = new DecisionStore('token', reload, send);
+test('once the window elapses, exactly one request is sent and the stored item shows in place', async () => {
+	const send = sender(storedAnswer(storedSong));
+	const { store: board, wiring, reads } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const store = new DecisionStore('token', wiring, send);
 
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -51,7 +59,8 @@ test('once the window elapses, exactly one request is sent and the board reloads
 		item: 42,
 		lines: [{ line: 4, fingerprint: 'fp-shown', option: 'B' }]
 	});
-	expect(reload).toHaveBeenCalledTimes(1);
+	expect(board.repos[0]?.items).toEqual([storedSong]);
+	expect(reads()).toBe(0);
 	expect(store.isPending(songKey)).toBe(false);
 
 	// Nothing fires again later: the timer was consumed, not merely delayed.
@@ -59,10 +68,10 @@ test('once the window elapses, exactly one request is sent and the board reloads
 	expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('an already-ruled answer becomes a banner, and reloads nothing on its own', async () => {
+test('an already-ruled answer becomes a banner, and reads nothing on its own', async () => {
 	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
-	const reload = vi.fn(async () => {});
-	const store = new DecisionStore('token', reload, send);
+	const { wiring, reads } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
 
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -71,18 +80,15 @@ test('an already-ruled answer becomes a banner, and reloads nothing on its own',
 		kind: 'already-ruled',
 		message: 'Schon entschieden: diese Zeile wurde inzwischen woanders entschieden.'
 	});
-	expect(reload).not.toHaveBeenCalled();
+	expect(reads()).toBe(0);
 });
 
-test('a network failure during the write becomes its own failed banner', async () => {
+test('a network failure during the write becomes its own failed banner and frees the card', async () => {
 	const send = vi.fn(async () => {
 		throw new Error('network down');
 	});
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		send
-	);
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
 
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -91,15 +97,13 @@ test('a network failure during the write becomes its own failed banner', async (
 		kind: 'failed',
 		message: 'Das Board ist nicht erreichbar.'
 	});
+	expect(store.isPending(songKey)).toBe(false);
 });
 
 test('deciding again clears a stale banner before the new window starts', async () => {
 	const send = sender({ status: 'already_ruled', message: null });
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		send
-	);
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 	expect(store.banner(songKey)).not.toBeNull();
@@ -117,12 +121,9 @@ test('two cards pending at once each write exactly once, and undoing one leaves 
 		options: [optionA, optionB]
 	});
 	const otherKey = cardKey('repo', 43);
-	const send = sender({ status: 'ruled', message: null });
-	const store = new DecisionStore(
-		'token',
-		vi.fn(async () => {}),
-		send
-	);
+	const send = sender(storedAnswer(storedSong));
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
 
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	store.choose('repo', 43, [otherCard], { shown: otherCard, option: optionB });
@@ -142,9 +143,10 @@ test('two cards pending at once each write exactly once, and undoing one leaves 
 	});
 });
 
-function otherStore(result: DecisionResult = { status: 'ruled', message: null }) {
+function otherStore(result: DecisionResult = storedAnswer(storedSong)) {
 	const send = sender(result);
-	return { send, store: new DecisionStore('token', async () => {}, send) };
+	const { wiring } = readyBoard();
+	return { send, store: new DecisionStore('token', wiring, send) };
 }
 
 test('[ABRD-67] an Other answer waits out the window, names Other and the card’s name, then posts once', async () => {
@@ -215,4 +217,40 @@ test('[ABRD-65] a pending Other answer marks the card pending so no pick can joi
 	store.decideOther('repo', 42, songPoints, 'x');
 
 	expect(store.isPending(songKey)).toBe(true);
+});
+
+test('[ABRD-97] a card posts from the end of its window until its answer is applied, and Undo then does nothing', async () => {
+	let answer: (result: DecisionResult) => void = () => {};
+	const held = new Promise<DecisionResult>((resolve) => {
+		answer = resolve;
+	});
+	const send = vi.fn(() => held) as unknown as typeof postDecision;
+	const { store: board, wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const store = new DecisionStore('token', wiring, send);
+
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.pendingEntries).toEqual([]);
+	expect(store.isPending(songKey)).toBe(true);
+	store.undo(songKey);
+	expect(store.isPending(songKey)).toBe(true);
+	expect(send).toHaveBeenCalledTimes(1);
+	answer(storedAnswer(storedSong));
+	await vi.advanceTimersByTimeAsync(0);
+	expect(store.isPending(songKey)).toBe(false);
+	expect(board.repos[0]?.items).toEqual([storedSong]);
+});
+
+test.each([
+	['a refused', { status: 'already_ruled', message: 'line 3 is already ruled' } as DecisionResult],
+	['a failed', { status: 'failed', message: 'aco unavailable' } as DecisionResult]
+])('[ABRD-97] %s answer releases the posting card', async (_name, refusal) => {
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, sender(refusal));
+
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.isPending(songKey)).toBe(false);
 });

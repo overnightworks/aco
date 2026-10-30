@@ -714,33 +714,26 @@ for (const viewport of [
 			await expect.poll(() => storedLine(7, 2)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 
-		test('[ABRD-91] a re-read after another card was decided drops a changed point’s pick, keeps the others, and the next post names the fresh point', async ({
+		test('[ABRD-91] Neu laden after a changed card drops the changed point’s pick, keeps the others, and the next post names the fresh point', async ({
 			page
 		}) => {
-			const second = item(8, 'Einzel', point(1, { topic: 'Einzel', question: 'Eine Frage?' }));
-			await arrange([sprung(...threePoints()), second]);
+			await arrange([sprung(...threePoints())]);
 			const posts = logPosts(page);
 			const boards = logBoards(page);
 			await open(page, phone);
 
 			await pickAll(page, ['B', 'B']);
-			await arrange([
-				sprung(point(2), point(3, { problem: 'Problem 3 geändert.' }), point(4)),
-				second
-			]);
-			await showCard(page, phone, 'Eine Frage?');
-			await page
-				.getByRole('group', { name: 'Decide' })
-				.getByRole('button', { name: /^Decide A:/ })
-				.click();
+			await arrange([sprung(point(2), point(3, { problem: 'Problem 3 geändert.' }), point(4))]);
+			await pick(page, 3, 'A').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-			await showCard(page, phone, CARD_NAME);
+			await page.getByRole('button', { name: 'Neu laden' }).click();
 
 			await expect(pick(page, 1, 'B')).toHaveAttribute('aria-pressed', 'true');
 			await expect(pick(page, 2, 'B')).toHaveAttribute('aria-pressed', 'false');
-			await expect(decideBar(page).getByText('1 of 3 chosen')).toBeAttached();
+			await expect(pick(page, 3, 'A')).toHaveAttribute('aria-pressed', 'true');
+			await expect(decideBar(page).getByText('2 of 3 chosen')).toBeAttached();
 			const changed = await fingerprintOf(boards.at(-1), 3);
-			await pickAll(page, ['B', 'B', 'A']);
+			await pick(page, 2, 'B').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect.poll(() => posts.length).toBe(2);
