@@ -270,10 +270,9 @@ describe('decidedList', () => {
 	});
 
 	test.each(['first', 'last'] as const)(
-		'[ABRD-31] a repository lists the newest date first, then item number and line index descending, missing dates last, from %s input',
+		'[ABRD-31] a repository lists the newest date first, then item number and line index descending, from %s input',
 		(position) => {
 			const entries = [
-				[9, 1, null],
 				[2, 1, '2026-10-02'],
 				[3, 1, '2026-10-02'],
 				[3, 2, '2026-10-02'],
@@ -293,13 +292,7 @@ describe('decidedList', () => {
 			];
 			const before = structuredClone(repos);
 
-			expect(rowKeys(decidedList(repos).groups[0])).toEqual([
-				'a:3:2',
-				'a:3:1',
-				'a:2:1',
-				'a:99:9',
-				'a:9:1'
-			]);
+			expect(rowKeys(decidedList(repos).groups[0])).toEqual(['a:3:2', 'a:3:1', 'a:2:1', 'a:99:9']);
 			expect(repos).toEqual(before);
 		}
 	);
@@ -375,7 +368,6 @@ describe('cardHeading', () => {
 
 	test('with no distinct question, the sentence itself is the heading', () => {
 		const card = line({
-			question: null,
 			text: 'Guests may join the call.',
 			ruling: 'yes',
 			ruled_on: '2026-10-01'

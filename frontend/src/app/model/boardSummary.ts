@@ -5,7 +5,14 @@
  * is where the behaviour lives instead).
  */
 
-import type { BoardItem, ExpectationLine, OptionLine, Outcome, RepoReading } from '../../types';
+import type {
+	BoardItem,
+	ExpectationLine,
+	OptionLine,
+	Outcome,
+	RepoReading,
+	RuledLine
+} from '../../types';
 import { cardName, cardTitle, openPoints } from './card';
 import { cardKey, lineKey } from './decision';
 import { hasHead, isOptionLine } from './optionCard';
@@ -28,6 +35,11 @@ const OUTCOME_LABEL: Record<Outcome, string> = {
 
 export function outcomeLabel(outcome: Outcome): string {
 	return OUTCOME_LABEL[outcome];
+}
+
+/** Whether `line` carries a ruling; a yes/no line always does. */
+export function isRuled(line: ExpectationLine): line is RuledLine {
+	return line.ruling !== null;
 }
 
 /** The stage's heading: the tapped question, or the line's own sentence when
@@ -58,7 +70,7 @@ interface CardSelection extends Located {
 /** A ruled line, shown read-only. */
 interface DecidedSelection extends Located {
 	kind: 'decided';
-	line: ExpectationLine;
+	line: RuledLine;
 }
 
 export type Selection = CardSelection | DecidedSelection;
@@ -131,16 +143,13 @@ function openRows(reading: RepoReading): ListRow<OpenRowState>[] {
 		.sort((left, right) => ROW_RANK[left.state] - ROW_RANK[right.state]);
 }
 
-/** Newest date first, then item number and line index descending; a missing
- * date last. */
+/** Newest date first, then item number and line index descending. */
 function decidedRows(reading: RepoReading): ListRow<'done'>[] {
 	return reading.items
-		.flatMap((item) =>
-			item.lines.filter((line) => line.ruling !== null).map((line) => ({ item, line }))
-		)
+		.flatMap((item) => item.lines.filter(isRuled).map((line) => ({ item, line })))
 		.sort(
 			(left, right) =>
-				(right.line.ruled_on ?? '').localeCompare(left.line.ruled_on ?? '') ||
+				right.line.ruled_on.localeCompare(left.line.ruled_on) ||
 				right.item.number - left.item.number ||
 				right.line.index - left.line.index
 		)
@@ -200,7 +209,7 @@ export function firstDecidedKey(repos: RepoReading[]): string | null {
 }
 
 function lineSelection(repo: string, item: BoardItem, line: ExpectationLine): Selection | null {
-	return line.ruling === null ? null : { kind: 'decided', repo, item, line };
+	return isRuled(line) ? { kind: 'decided', repo, item, line } : null;
 }
 
 /** What the stage shows for `key`: a card key names the open option lines of
