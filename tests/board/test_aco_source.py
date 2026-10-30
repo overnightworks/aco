@@ -1,10 +1,10 @@
 """The board's aco source over the real aco and the file-backed forge
-(specs/serve.spec.md): what one read lists (ABRD-06, ABRD-07, ABRD-60) and
-what a decision on a card changed since the page read does to the item
-(ABRD-02, ABRD-41)."""
+(specs/serve.spec.md): what one read lists (ABRD-06, ABRD-07, ABRD-60), and
+what one decision reads and writes (ABRD-02, ABRD-41, ABRD-78)."""
 
 from __future__ import annotations
 
+import http.client
 from collections.abc import Callable
 from datetime import date
 
@@ -20,6 +20,8 @@ _OTHER_ITEM = 42
 _WITHDRAWN = {"text": "Taken back.", "withdrawn_on": date(2026, 10, 2)}
 _MALFORMED = item_body({**_WITHDRAWN, "unknown": True})
 """A withdrawn line with a key BODY-105 refuses: the whole item is malformed."""
+_READ = ForgeRequest(ForgeOperation.READ_ITEM, _ITEM)
+_WRITE = ForgeRequest(ForgeOperation.WRITE_BODY, _ITEM)
 
 
 def test_a_withdrawn_line_is_not_listed_and_its_neighbours_keep_their_indexes(
@@ -98,4 +100,78 @@ def test_a_card_whose_item_changed_since_the_page_read_is_refused_and_nothing_wr
     answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
 
     assert answered.json() == {"status": "failed", "message": LINE_CHANGED}
-    assert repository.body_writes() == []
+    assert repository.item_requests() == (_READ,)
+
+
+def test_a_decision_reads_its_item_once_and_writes_it_once(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-78: no listing, one read of the item, one write of its body."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+    page_read = repository.requests
+
+    answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert answered.json() == {"status": "ruled", "message": None}
+    assert repository.request_log()[page_read:] == (_READ, _WRITE)
+
+
+def test_a_listing_that_fails_after_the_page_read_does_not_fail_a_decision(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-02: a decision reads its own item, never the listing."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+    repository.fail_listing("the listing is down")
+
+    answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert answered.json() == {"status": "ruled", "message": None}
+    assert repository.body_writes() == [_ITEM]
+
+
+def test_an_item_read_that_fails_during_a_decision_is_relayed_and_nothing_written(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-41, E-ABRD-06: the read's own sentence, with no prefix."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+    repository.fail_item_reads("the item read is down")
+
+    answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert answered.json() == {"status": "failed", "message": "the item read is down"}
+    assert repository.item_requests() == (_READ,)
+
+
+def _break_the_next_write(monkeypatch: pytest.MonkeyPatch, broken: Exception) -> None:
+    """The forge's next body write raises `broken`; the one after it writes."""
+    write = BoardForge.update_item_body
+
+    def break_once(forge: BoardForge, number: int, body: str) -> None:
+        monkeypatch.setattr(BoardForge, "update_item_body", write)
+        raise broken
+
+    monkeypatch.setattr(BoardForge, "update_item_body", break_once)
+
+
+def test_an_unexpected_error_inside_the_write_fails_the_request_and_frees_the_turn(
+    repository: BoardForge,
+    board: BoardClient,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """ABRD-03: the request fails loudly, the board answers the next one, and
+    the next decision is stored."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+    _break_the_next_write(monkeypatch, RuntimeError("the write broke"))
+
+    with pytest.raises(http.client.RemoteDisconnected):
+        board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert "RuntimeError: the write broke" in capsys.readouterr().err
+    answered = board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
+    assert answered.json() == {"status": "ruled", "message": None}
+    assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"

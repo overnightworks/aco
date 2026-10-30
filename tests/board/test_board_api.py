@@ -307,7 +307,7 @@ def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
         "repos": [
             {
                 "name": DEFAULT_LABEL,
-                "error": "aco rulings failed: no forge adapter for host",
+                "error": "no forge adapter for host",
                 "items": [],
             }
         ]
@@ -336,7 +336,7 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
     assert (item["number"], [listed["index"] for listed in item["lines"]]) == (42, [1])
     assert repos[1] == {
         "name": "b",
-        "error": "aco rulings failed: no forge adapter for host",
+        "error": "no forge adapter for host",
         "items": [],
     }
 
@@ -354,8 +354,8 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
     assert response.status == 502
     assert response.json() == {
         "repos": [
-            {"name": "a", "error": "aco rulings failed: a is down", "items": []},
-            {"name": "b", "error": "aco rulings failed: b is down", "items": []},
+            {"name": "a", "error": "a is down", "items": []},
+            {"name": "b", "error": "b is down", "items": []},
         ]
     }
 
