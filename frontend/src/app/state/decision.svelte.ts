@@ -91,7 +91,7 @@ export class DecisionStore {
 	#pending: Record<string, PendingEntry> = $state({});
 	#banners: Record<string, DecisionBanner> = $state({});
 	/** The cards whose window ended and whose POST has not been answered yet. */
-	#posting = new SvelteSet<string>();
+	readonly #posting = new SvelteSet<string>();
 	/** The key this store itself just wrote a ruling for, its item applied --
 	 * `App.svelte` advances the stage off it (`boardSummary.nextOpenAfter`)
 	 * when it is still the one shown, never for a manual reload after a
