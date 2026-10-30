@@ -328,6 +328,7 @@ for (const viewport of [
 			} finally {
 				release?.();
 			}
+			await expect(page.getByText('Geändert.')).toBeVisible();
 			await expect(page.getByRole('button', { name: 'Neu laden' })).toHaveCount(0);
 			await expect(listRow(page, 'Held B?')).toHaveCount(0);
 			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
