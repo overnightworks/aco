@@ -8,6 +8,7 @@ import argparse
 from collections.abc import Sequence
 from datetime import date
 from enum import StrEnum
+from functools import partial
 
 from . import body, decide, expectations, protocol, report, usage, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
@@ -56,7 +57,7 @@ class LineNamedTwiceError(protocol.ClaimError):
 
 # Each refusal's `--json` `reason`, by its type; any other refusal is a
 # forge that failed, `unavailable`.
-_REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _WithdrawReason], ...] = (
+_REFUSAL_REASONS: report.RefusalReasons[_WithdrawReason] = (
     (decide.InvalidTargetError, _WithdrawReason.INVALID_ITEM),
     (expectations.ExpectationOutOfRangeError, _WithdrawReason.LINE_OUT_OF_RANGE),
     (expectations.ExpectationWithdrawnError, _WithdrawReason.ALREADY_WITHDRAWN),
@@ -64,13 +65,6 @@ _REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _WithdrawReason], ...] 
     (LineNamedTwiceError, _WithdrawReason.INVALID_USAGE),
     (RepoMeaninglessUnderStateRefError, _WithdrawReason.INVALID_USAGE),
 )
-
-
-def _refusal_reason(error: protocol.ClaimError) -> _WithdrawReason:
-    return next(
-        (reason for kind, reason in _REFUSAL_REASONS if isinstance(error, kind)),
-        _WithdrawReason.UNAVAILABLE,
-    )
 
 
 def _named_once(indexes: Sequence[int]) -> tuple[int, ...]:
@@ -126,7 +120,9 @@ def _withdraw_lines(parsed: argparse.Namespace, context: RunContext) -> int:
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`withdraw` with its own `--json` refusals for the whole command, the
     body write inside the shared path included."""
-    try:
-        return _withdraw_lines(parsed, context)
-    except protocol.ClaimError as error:
-        return report.refuse(_refusal_reason(error), error, as_json=parsed.json)
+    return report.refusing_by_type(
+        partial(_withdraw_lines, parsed, context),
+        _REFUSAL_REASONS,
+        _WithdrawReason.UNAVAILABLE,
+        as_json=parsed.json,
+    )

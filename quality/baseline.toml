@@ -17,7 +17,7 @@
 [file_lines]
 "src/aco/body.py" = 1235
 "src/aco/checkout.py" = 2025
-"src/aco/cli.py" = 841
+"src/aco/cli.py" = 834
 "src/aco/cmd_claim.py" = 1136
 "src/aco/cmd_release.py" = 921
 "src/aco/github.py" = 1580
@@ -29,7 +29,7 @@
 "tests/support/github_fixtures.py" = 832
 "tests/test_board.py" = 4068
 "tests/test_checkout.py" = 2040
-"tests/test_cli.py" = 12313
+"tests/test_cli.py" = 12282
 "tests/test_cmd_adopt.py" = 1646
 "tests/test_cmd_cut.py" = 1069
 "tests/test_cmd_land_after_merge_rerun.py" = 877

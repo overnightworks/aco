@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
+from functools import partial
 from typing import cast
 
 from . import (
@@ -329,7 +330,7 @@ def _emit_returned_result(
 
 # Each refusal's `--json` `reason`, by its type; any other refusal is a
 # forge that failed, `unavailable`.
-_REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _RuleReason], ...] = (
+_REFUSAL_REASONS: report.RefusalReasons[_RuleReason] = (
     (decide.InvalidTargetError, _RuleReason.INVALID_ITEM),
     (expectations.ExpectationAlreadyRuledError, _RuleReason.ALREADY_RULED),
     (expectations.ExpectationOutOfRangeError, _RuleReason.LINE_OUT_OF_RANGE),
@@ -341,13 +342,6 @@ _REFUSAL_REASONS: tuple[tuple[type[protocol.ClaimError], _RuleReason], ...] = (
     (FlagCombinationError, _RuleReason.INVALID_USAGE),
     (RepoMeaninglessUnderStateRefError, _RuleReason.INVALID_USAGE),
 )
-
-
-def _refusal_reason(error: protocol.ClaimError) -> _RuleReason:
-    return next(
-        (reason for kind, reason in _REFUSAL_REASONS if isinstance(error, kind)),
-        _RuleReason.UNAVAILABLE,
-    )
 
 
 def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> int:
@@ -376,7 +370,9 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     not only its first steps: the body write inside the shared
     ruling path can fail like any other forge call, and a failure there names
     this command's own `unavailable` rather than escaping the envelope."""
-    try:
-        return _rule_expectation_lines(parsed, context)
-    except protocol.ClaimError as error:
-        return report.refuse(_refusal_reason(error), error, as_json=parsed.json)
+    return report.refusing_by_type(
+        partial(_rule_expectation_lines, parsed, context),
+        _REFUSAL_REASONS,
+        _RuleReason.UNAVAILABLE,
+        as_json=parsed.json,
+    )

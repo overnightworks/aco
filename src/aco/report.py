@@ -10,6 +10,7 @@ import json
 import os
 import stat
 import sys
+from collections.abc import Callable, Sequence
 from enum import StrEnum
 
 from . import protocol
@@ -123,3 +124,24 @@ def refuse(
     if as_json:
         emit_json(False, reason, **payload, message=str(error))
     return status
+
+
+type RefusalReasons[Reason: StrEnum] = Sequence[tuple[type[protocol.ClaimError], Reason]]
+
+
+def refusing_by_type[Reason: StrEnum](
+    work: Callable[[], int],
+    reasons: RefusalReasons[Reason],
+    otherwise: Reason,
+    *,
+    as_json: bool,
+) -> int:
+    """`work`'s exit status, or its refusal reported through `refuse` with the
+    reason of the first type in `reasons` it is an instance of, `otherwise`
+    for any other -- a command's whole run, so a failure inside its shared
+    write path still names that command's own reason."""
+    try:
+        return work()
+    except protocol.ClaimError as error:
+        reason = next((named for kind, named in reasons if isinstance(error, kind)), otherwise)
+        return refuse(reason, error, as_json=as_json)
