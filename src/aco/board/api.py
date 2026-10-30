@@ -72,7 +72,10 @@ def decision_result_json(result: DecisionResult, repo: str) -> str:
     item as `GET /api/board` lists it (ABRD-09)."""
     answer: dict[str, object] = {"status": result.status.value, "message": result.message}
     if result.item is not None:
-        answer["item"] = _item_json(result.item, repo)
+        item = _item_json(result.item, repo)
+        if item is None:
+            raise ValueError("a stored item lists no line")
+        answer["item"] = item
     return json.dumps(answer)
 
 

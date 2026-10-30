@@ -4,6 +4,8 @@ no item."""
 
 from __future__ import annotations
 
+from datetime import date
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -11,7 +13,10 @@ from aco_board_fixtures import BoardClient, Lister
 from board_forge import BoardForge, item_body
 from option_cards import group_body, open_option_entry
 
+from aco.board.api import decision_result_json
 from aco.board.board import LINE_CHANGED
+from aco.board.ports import DecisionResult, DecisionStatus
+from aco.expectations import WithdrawnLine
 
 _ITEM = 7
 _TITLE = "Share page"
@@ -80,3 +85,13 @@ def test_a_failed_item_read_answers_without_an_item(
     answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
 
     assert answered.json() == {"status": "failed", "message": "the item read is down"}
+
+
+def test_a_stored_item_of_only_withdrawn_lines_is_not_answered_without_an_item() -> None:
+    withdrawn = WithdrawnLine(index=0, text="Taken back.", withdrawn_on=date(2026, 10, 2))
+    stored = DecisionResult(
+        DecisionStatus.RULED, item=SimpleNamespace(number=_ITEM, title=_TITLE, lines=(withdrawn,))
+    )
+
+    with pytest.raises(ValueError, match="lists no line"):
+        decision_result_json(stored, "repo")
