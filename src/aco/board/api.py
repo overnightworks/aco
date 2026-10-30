@@ -21,6 +21,7 @@ from .ports import (
     NOTE_MAX_LENGTH,
     CardAnswer,
     DecisionResult,
+    ListedItem,
     OtherCardAnswer,
     PostedCard,
     PostedLine,
@@ -66,8 +67,16 @@ def _repo_json(reading: RepoReading) -> dict[str, object]:
     }
 
 
-def decision_result_json(result: DecisionResult) -> str:
-    return json.dumps({"status": result.status.value, "message": result.message})
+def decision_result_json(result: DecisionResult, repo: str) -> str:
+    """A refusal is `status` and `message`; a stored answer adds the written
+    item as `GET /api/board` lists it (ABRD-09)."""
+    answer: dict[str, object] = {"status": result.status.value, "message": result.message}
+    if result.item is not None:
+        item = _item_json(result.item, repo)
+        if item is None:
+            raise ValueError("a stored item lists no line")
+        answer["item"] = item
+    return json.dumps(answer)
 
 
 def error_json(sentence: str) -> str:
@@ -147,17 +156,17 @@ def _card_answer(fields: dict[str, object], *, picked: bool) -> tuple[CardAnswer
     return None
 
 
-def _item_json(row: rulings.Row, repo: str) -> dict[str, object] | None:
-    """The row with its withdrawn lines left out; None when no other line is
+def _item_json(item: ListedItem, repo: str) -> dict[str, object] | None:
+    """The item with its withdrawn lines left out; None when no other line is
     left, since an item of only withdrawn lines is not listed (ABRD-60)."""
     lines = [
-        _line_json(line, row.number, repo)
-        for line in row.lines
+        _line_json(line, item.number, repo)
+        for line in item.lines
         if not isinstance(line, expectations.WithdrawnLine)
     ]
     if not lines:
         return None
-    return {"number": row.number, "title": row.title, "lines": lines}
+    return {"number": item.number, "title": item.title, "lines": lines}
 
 
 def _line_json(

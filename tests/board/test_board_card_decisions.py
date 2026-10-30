@@ -164,7 +164,7 @@ def test_a_card_post_stores_every_line_in_one_body_write(
         _ITEM, [shown[index] for index in indexes], options, answer
     )
 
-    assert answered.json() == {"status": status, "message": None}
+    assert answered.status_and_message() == {"status": status, "message": None}
     assert _stored(repository, indexes) == stored
     assert repository.body_writes() == [_ITEM]
     monkeypatch.chdir(repository.directory)
@@ -500,7 +500,7 @@ def test_a_null_answer_key_beside_picks_names_nothing(
 
     answered = board.decide_card_through_api(_ITEM, [listed[2], listed[3]], ["A", "B"], top_level)
 
-    assert answered.json() == {"status": "ruled", "message": None}
+    assert answered.status_and_message() == {"status": "ruled", "message": None}
 
 
 def test_two_card_posts_for_one_item_store_it_once_and_refuse_the_other_as_already_ruled(

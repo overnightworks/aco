@@ -234,9 +234,21 @@ def test_after_a_withdrawal_a_fresh_read_lists_the_rest_of_the_card_and_it_posts
     answered = state_ref_board.decide_card_through_api(_FIRST, shown, ["B"])
 
     assert [(line["index"], line["text"]) for line in shown] == [(2, _QUESTION)]
-    assert answered.json() == {"status": "ruled", "message": None}
+    assert answered.status_and_message() == {"status": "ruled", "message": None}
     assert [entry.get("ruling") for entry in checkout.entries(_FIRST_ID)] == [None, "B"]
     assert checkout.commits() == commits + 1
+
+
+def test_a_state_ref_answer_carries_the_item_the_next_listing_shows(
+    state_ref_board: BoardClient, listed_items: Lister
+) -> None:
+    """ABRD-09: the item as written, after the state-ref `[record]` rewrite."""
+    shown = _first_card(state_ref_board, listed_items)
+
+    answered = state_ref_board.decide_card_through_api(_FIRST, shown, ["A", "B"])
+
+    [next_item] = [item for item in listed_items(state_ref_board) if item["number"] == _FIRST]
+    assert answered.json()["item"] == next_item
 
 
 def test_a_write_after_a_stale_read_refuses_and_keeps_the_other_writers_ruling(

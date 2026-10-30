@@ -360,7 +360,9 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
     def _decide(self, request: api.CardRequest) -> None:
         result = self._server().boards.decide_card(request.repo, request.card)
         self._respond(
-            HTTPStatus.OK, api.decision_result_json(result).encode("utf-8"), api.JSON_CONTENT_TYPE
+            HTTPStatus.OK,
+            api.decision_result_json(result, request.repo).encode("utf-8"),
+            api.JSON_CONTENT_TYPE,
         )
 
     def log_message(self, format: str, *_args: object) -> None:

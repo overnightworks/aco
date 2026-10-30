@@ -190,6 +190,11 @@ class Response:
         parsed: dict[str, object] = json.loads(self.body)
         return parsed
 
+    def status_and_message(self) -> dict[str, object]:
+        """A decision answer without its `item`."""
+        answer = self.json()
+        return {"status": answer["status"], "message": answer["message"]}
+
     @classmethod
     def from_raw(cls, answer: bytes) -> Response:
         """An answer read straight off the socket, beneath any HTTP client."""

@@ -169,7 +169,7 @@ def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
 
         listed_line = repos["a"]["items"][0]["lines"][0]
         answer = board.decide_card_through_api(1, [listed_line], ["A"], repo="a")
-        assert answer.json() == {"status": "ruled", "message": None}
+        assert answer.status_and_message() == {"status": "ruled", "message": None}
 
     exit_code = _serve_until_done(
         monkeypatch,

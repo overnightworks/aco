@@ -82,10 +82,27 @@ class DecisionStatus(StrEnum):
     FAILED = "failed"
 
 
+class ListedItem(Protocol):
+    """An item with its lines, as the board lists it: `rulings.Row` and
+    `decide.Committed` both satisfy it. Read-only properties, so frozen
+    dataclass fields and tuples fit."""
+
+    @property
+    def number(self) -> int: ...
+
+    @property
+    def title(self) -> str: ...
+
+    @property
+    def lines(self) -> Sequence[expectations.ExpectationLine]: ...
+
+
 @dataclass(frozen=True)
 class DecisionResult:
     status: DecisionStatus
     message: str | None = None
+    item: ListedItem | None = None
+    """The item as written, set on a stored answer (`ruled`, `returned`)."""
 
 
 @dataclass(frozen=True)

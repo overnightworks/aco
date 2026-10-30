@@ -120,7 +120,7 @@ def test_a_decision_reads_its_item_once_and_writes_it_once(
 
     answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
 
-    assert answered.json() == {"status": "ruled", "message": None}
+    assert answered.status_and_message() == {"status": "ruled", "message": None}
     assert repository.request_log()[page_read:] == (_READ, _WRITE)
 
 
@@ -134,7 +134,7 @@ def test_a_listing_that_fails_after_the_page_read_does_not_fail_a_decision(
 
     answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
 
-    assert answered.json() == {"status": "ruled", "message": None}
+    assert answered.status_and_message() == {"status": "ruled", "message": None}
     assert repository.body_writes() == [_ITEM]
 
 
@@ -166,5 +166,5 @@ def test_an_unexpected_error_inside_the_write_fails_the_request_and_frees_the_tu
 
     assert "RuntimeError: the write broke" in capsys.readouterr().err
     answered = board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
-    assert answered.json() == {"status": "ruled", "message": None}
+    assert answered.status_and_message() == {"status": "ruled", "message": None}
     assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"

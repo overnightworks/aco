@@ -260,7 +260,7 @@ def test_a_browser_leaving_during_a_held_ruling_still_rules_and_frees_the_turn(
     answered = board.decide_card_through_api(43, next_card["lines"], ["B"])
 
     assert [repository.stored_entries(item)[0].get("ruling") for item in (42, 43)] == ["A", "B"]
-    assert answered.json() == {"status": "ruled", "message": None}
+    assert answered.status_and_message() == {"status": "ruled", "message": None}
     assert "Traceback" not in capsys.readouterr().err
 
 

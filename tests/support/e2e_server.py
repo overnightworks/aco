@@ -42,10 +42,10 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import board_forge
-from aco_board_fixtures import DEFAULT_LABEL, board_checkout, decision_port
+from aco_board_fixtures import DEFAULT_LABEL, board_checkout, decision_port, rulings_lines
 from board_forge import BoardForge, StoredItem
 
-from aco import body, expectation_grammar, expectations, rulings, session
+from aco import body, expectation_grammar, session
 from aco.board.board import Board, Boards
 from aco.board.server import start_board
 
@@ -101,14 +101,6 @@ def arrange_board(repository: BoardForge, arrangement: Mapping[str, object]) -> 
         repository.fail_listing(str(listing_failure))
 
 
-def stored_lines(repository: BoardForge, number: int) -> list[dict[str, object]]:
-    """Item `number`'s stored lines as aco's own line JSON writes them."""
-    return [
-        rulings.line_json(line)
-        for line in expectations.expectation_lines(repository.stored_body(number))
-    ]
-
-
 def control_handler(repository: BoardForge) -> type[BaseHTTPRequestHandler]:
     class ControlHandler(BaseHTTPRequestHandler):
         def do_PUT(self) -> None:
@@ -129,7 +121,7 @@ def control_handler(repository: BoardForge) -> type[BaseHTTPRequestHandler]:
             if match is None:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            self._answer_json(HTTPStatus.OK, stored_lines(repository, int(match["number"])))
+            self._answer_json(HTTPStatus.OK, rulings_lines(repository, int(match["number"])))
 
         def _answer_json(self, status: HTTPStatus, answer: object) -> None:
             encoded = json.dumps(answer).encode("utf-8")
