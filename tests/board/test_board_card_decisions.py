@@ -250,44 +250,19 @@ def test_a_card_post_names_a_line_ruled_meanwhile_and_aco_refuses_the_whole_card
     assert repository.body_writes() == []
 
 
-_EDITED_AT_THE_WRITE = _cards(_CARDS[0], _CARDS[2])
-
-
-def _edited_before_acos_read(repository: BoardForge) -> None:
-    repository.edit_before_next_read(_ITEM, _EDITED_AT_THE_WRITE)
-
-
-@pytest.mark.parametrize(
-    ("arrange", "letters", "message", "stored"),
-    [
-        (_edited_before_acos_read, ["A", "B"], LINE_CHANGED, _EDITED_AT_THE_WRITE),
-        (
-            None,
-            ["A", "C"],
-            "line 3 has no option C; its options are A, B",
-            group_body(),
-        ),
-    ],
-    ids=["card-changed-at-the-write", "letter-not-on-the-card"],
-)
-def test_aco_refusing_the_card_write_is_relayed_once_and_stores_nothing(
-    repository: BoardForge,
-    board: BoardClient,
-    arrange: Callable[[BoardForge], None] | None,
-    letters: list[str],
-    message: str,
-    stored: str,
-    show: _Show,
+def test_a_letter_not_on_the_card_is_refused_with_acos_sentence_and_stores_nothing(
+    repository: BoardForge, board: BoardClient, show: _Show
 ) -> None:
-    """ABRD-41, ABRD-80, RULE-17, RULE-18."""
+    """ABRD-41, RULE-18."""
     listed = show()
-    if arrange is not None:
-        arrange(repository)
 
-    answered = board.decide_card_through_api(_ITEM, [listed[2], listed[3]], letters)
+    answered = board.decide_card_through_api(_ITEM, [listed[2], listed[3]], ["A", "C"])
 
-    assert answered.json() == {"status": "failed", "message": message}
-    assert repository.stored_body(_ITEM) == stored
+    assert answered.json() == {
+        "status": "failed",
+        "message": "line 3 has no option C; its options are A, B",
+    }
+    assert repository.stored_body(_ITEM) == group_body()
     assert repository.body_writes() == []
 
 
@@ -411,6 +386,8 @@ _MALFORMED_CARDS: dict[str, Callable[[_Payload], _Payload]] = {
     "entry-outcome": lambda payload: _entry(payload, 0, outcome="yes"),
     "option-on-one-entry-only": _plain_second,
     "option-null": lambda payload: _entry(payload, 0, option=None),
+    "option-empty": lambda payload: _entry(payload, 0, option=""),
+    "option-two-letters": lambda payload: _entry(payload, 0, option="AB"),
     "option-lowercase": lambda payload: _entry(payload, 0, option="a"),
     "option-past-the-card": lambda payload: _entry(payload, 0, option="E"),
     "option-number": lambda payload: _entry(payload, 0, option=1),

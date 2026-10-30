@@ -281,7 +281,7 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
         # must already mean the ruling is stored.
         assert repository.stored_entries(42)[0]["ruling"] == "A"
     releasers[0].join(_URL_WAIT_SECONDS)
-    # Shutdown was already waiting while the held ruling had not yet run `aco rule`.
+    # Shutdown was already waiting while the held ruling had not yet written its item.
     assert written_while_shutdown_waited == [[]]
 
 

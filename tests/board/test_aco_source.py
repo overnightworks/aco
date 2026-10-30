@@ -152,28 +152,14 @@ def test_an_item_read_that_fails_during_a_decision_is_relayed_and_nothing_writte
     assert repository.item_requests() == (_READ,)
 
 
-def _break_the_next_write(monkeypatch: pytest.MonkeyPatch, broken: Exception) -> None:
-    """The forge's next body write raises `broken`; the one after it writes."""
-    write = BoardForge.update_item_body
-
-    def break_once(forge: BoardForge, number: int, body: str) -> None:
-        monkeypatch.setattr(BoardForge, "update_item_body", write)
-        raise broken
-
-    monkeypatch.setattr(BoardForge, "update_item_body", break_once)
-
-
 def test_an_unexpected_error_inside_the_write_fails_the_request_and_frees_the_turn(
-    repository: BoardForge,
-    board: BoardClient,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    repository: BoardForge, board: BoardClient, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """ABRD-03: the request fails loudly, the board answers the next one, and
     the next decision is stored."""
     repository.put_item(_ITEM, item_body(open_option_entry()))
     shown = first_listed_line(board)
-    _break_the_next_write(monkeypatch, RuntimeError("the write broke"))
+    repository.break_next_write("the write broke")
 
     with pytest.raises(http.client.RemoteDisconnected):
         board.decide_card_through_api(_ITEM, [shown], ["A"])
