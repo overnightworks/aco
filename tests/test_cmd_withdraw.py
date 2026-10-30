@@ -9,7 +9,7 @@ from functools import partial
 from pathlib import Path
 
 import pytest
-from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli, track_board_config
+from cli_fixtures import FROZEN_CLI_NOW, run_cli, track_board_config
 from github_fixtures import FakeForge, serve_forge
 from option_cards import (
     SECOND_CARD,
@@ -22,7 +22,7 @@ from option_cards import (
     ruled_card,
 )
 
-from aco import body, forge, github, store
+from aco import body, forge, github, session, store
 from aco.expectation_grammar import WITHDRAWN_ON
 
 WITHDRAWN_LINE = '[[expectation]]\ntext = "Zurück"\nwithdrawn_on = 2026-08-01\n'
@@ -64,6 +64,18 @@ def surrounding_bytes(raw: str) -> tuple[str, str]:
     return raw[: located.content_start], raw[located.content_end :]
 
 
+@pytest.fixture
+def frozen_today(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The run's clock, `RunContext.today`, reads the frozen day; nothing else is patched."""
+    monkeypatch.setattr(
+        session,
+        "run_context",
+        lambda repo: session.RunContext(
+            repo, build_forge=session._build_forge, today=FROZEN_CLI_NOW.date
+        ),
+    )
+
+
 @pytest.mark.usefixtures("github_world")
 class TestWithdrawn:
     @pytest.mark.parametrize(
@@ -78,6 +90,7 @@ class TestWithdrawn:
             ),
         ],
     )
+    @pytest.mark.usefixtures("frozen_today")
     def test_one_line_becomes_its_text_and_today_and_nothing_else_changes(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -89,7 +102,6 @@ class TestWithdrawn:
     ) -> None:
         """Spec: WITHDRAW-01, WITHDRAW-02, Never 2, Never 3 -- one entry rewritten, every
         other entry and every byte outside the block kept, the body still valid."""
-        freeze_cli_now(monkeypatch)
         raw = three_lines(third, newline=newline)
         client = serve_forge(monkeypatch, item_forge(raw))
         result = run_cli(["withdraw", "7", "--line", str(line)], capsys)
@@ -104,11 +116,11 @@ class TestWithdrawn:
         assert body.replace_block(written, located, located.data) == written
         assert run_cli(["check", "-"], capsys, stdin=written).status == 0
 
+    @pytest.mark.usefixtures("frozen_today")
     def test_json_names_the_line_its_date_and_the_open_count(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: WITHDRAW-03, OUT-01 -- the envelope's keys in order."""
-        freeze_cli_now(monkeypatch)
         serve_forge(monkeypatch, item_forge(three_lines()))
         result = run_cli(["withdraw", "7", "--line", "2", "--json"], capsys)
         expected = {
@@ -142,6 +154,7 @@ class TestWithdrawn:
             ),
         ],
     )
+    @pytest.mark.usefixtures("frozen_today")
     def test_several_lines_land_in_one_write_with_one_date(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -150,7 +163,6 @@ class TestWithdrawn:
         printed: str,
     ) -> None:
         """Spec: WITHDRAW-04, WITHDRAW-05 -- an open and a returned line together."""
-        freeze_cli_now(monkeypatch)
         raw = three_lines(returned_card())
         client = serve_forge(monkeypatch, item_forge(raw))
         flags = ["--json"] if as_json else []
@@ -164,7 +176,6 @@ class TestWithdrawn:
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: RULE-37 -- once withdrawn, nobody answers the line."""
-        freeze_cli_now(monkeypatch)
         client = serve_forge(monkeypatch, item_forge(three_lines()))
         run_cli(["withdraw", "7", "--line", "2"], capsys).expect_success()
         serve_forge(monkeypatch, item_forge(client.item_bodies[7]))
