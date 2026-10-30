@@ -1,14 +1,13 @@
 import { expect, test } from './consoleGuard';
-import { optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
+import { arrange, item, optionEntry, type CardOption } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
-const OPTIONS: RulingOption[] = [
+const OPTIONS: CardOption[] = [
 	{
-		letter: 'A',
 		name: 'Song bleibt offen',
 		effect: 'Die App springt selbst.',
 		same_as_today: true,
@@ -19,7 +18,6 @@ const OPTIONS: RulingOption[] = [
 		contract: 'Der Song bleibt offen.'
 	},
 	{
-		letter: 'B',
 		name: 'Browser-Sprung bleibt',
 		effect: 'Der Browser springt weiter.',
 		same_as_today: true,
@@ -41,26 +39,26 @@ for (const viewport of [
 		test('[ABRD-61] a returned line lists muted with the With head shape after the open ones, and its card says with head and offers Decide', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(
 					8,
 					'Sprung',
-					optionLine(1, 'Der Song bleibt offen.', {
+					optionEntry('Der Song bleibt offen.', {
 						topic: 'Zurückgegeben',
 						question: 'Soll der Song offen bleiben?',
-						options: OPTIONS,
+						option: OPTIONS,
 						returned_on: '2026-10-27',
 						returned_note: 'Welcher Sprung ist gemeint?'
 					})
 				),
-				row(
+				item(
 					9,
 					'Link',
-					optionLine(1, 'Der Link bleibt ein Link.', {
+					optionEntry('Der Link bleibt ein Link.', {
 						topic: 'Offen',
 						question: 'Soll der Link ein Link bleiben?',
-						options: OPTIONS
+						option: OPTIONS
 					})
 				)
 			]);

@@ -1,12 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import {
-	optionLine,
-	row,
-	writeRulings,
-	type OptionRulingLine,
-	type RulingOption
-} from './rulingsFixture';
+import { arrange, item, optionEntry, type CardOption, type OptionEntry } from './itemFixture';
 import { decidedList, expectDecidedAnswer } from './decidedView';
 import { countPosts, picks } from './decideRow';
 import { readBoardRuntime } from './runtime';
@@ -17,22 +11,23 @@ import {
 } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
-// The fake aco stores every board pick as `--via board` on this date
-// (`aco_board_fixtures`); the decided card's How row reads it back.
+// aco rules every board pick `via board` on `board_forge.RULING_DAY`; the
+// decided card's How row reads it back.
 const BOARD_PICK_HOW = 'Board · 03.10.2026';
 
 const SONG_QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const OTHER_QUESTION = 'Welcher Weg für die Altdaten?';
+// The song card's problem as an agent rewrites it while the operator decides.
+const CHANGED_PROBLEM = 'Der Link schließt den Song sofort.';
 
-const SONG_OPTIONS: RulingOption[] = [
+const SONG_OPTIONS: CardOption[] = [
 	{
-		letter: 'A',
 		name: 'Song bleibt offen',
 		effect: 'Die App springt selbst.',
 		same_as_today: true,
@@ -43,7 +38,6 @@ const SONG_OPTIONS: RulingOption[] = [
 		contract: 'Der Song bleibt offen.'
 	},
 	{
-		letter: 'B',
 		name: 'Browser-Sprung bleibt',
 		effect: 'Der Browser springt weiter.',
 		same_as_today: true,
@@ -55,8 +49,8 @@ const SONG_OPTIONS: RulingOption[] = [
 	}
 ];
 
-function songCard(overrides: Partial<OptionRulingLine> = {}): OptionRulingLine {
-	return optionLine(1, 'Der Song bleibt beim Sprung offen.', {
+function songCard(overrides: Partial<OptionEntry> = {}): OptionEntry {
+	return optionEntry('Der Song bleibt beim Sprung offen.', {
 		question: SONG_QUESTION,
 		problem: 'Der Link schließt den Song.',
 		caption: 'Der Browser springt selbst.',
@@ -64,33 +58,33 @@ function songCard(overrides: Partial<OptionRulingLine> = {}): OptionRulingLine {
 		topic: 'Sprung',
 		recommended: 'A',
 		reason: 'Behebt den Verlust.',
-		options: SONG_OPTIONS,
+		option: SONG_OPTIONS,
 		...overrides
 	});
 }
 
-function arrange(directory: string, song: Partial<OptionRulingLine> = {}): void {
-	writeRulings(directory, [
-		row(2001, 'Sprung', songCard(song)),
-		row(
+async function arrangeCards(song: Partial<OptionEntry> = {}): Promise<void> {
+	await arrange([
+		item(2001, 'Sprung', songCard(song)),
+		item(
 			2002,
 			'Altdaten',
-			optionLine(1, 'Eine zweite offene Frage.', {
+			optionEntry('Eine zweite offene Frage.', {
 				question: OTHER_QUESTION,
 				recommended: 'B',
-				options: SONG_OPTIONS
+				option: SONG_OPTIONS
 			})
 		)
 	]);
 }
 
-const FINAL_OPTIONS: RulingOption[] = [
+const FINAL_OPTIONS: CardOption[] = [
 	SONG_OPTIONS[0],
 	{ ...SONG_OPTIONS[1], undo: 'final', undo_how: 'nicht rückholbar.' }
 ];
 
-function arrangeFinal(directory: string, song: Partial<OptionRulingLine> = {}): void {
-	arrange(directory, { options: FINAL_OPTIONS, ...song });
+async function arrangeFinal(song: Partial<OptionEntry> = {}): Promise<void> {
+	await arrangeCards({ option: FINAL_OPTIONS, ...song });
 }
 
 function confirm(page: Page): Locator {
@@ -152,8 +146,7 @@ for (const viewport of [
 		test('[ABRD-44] a pick waits out the undo window, then the card moves to Decided', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await expect(page.locator('.decide-row dt')).toHaveText('Decide');
@@ -195,8 +188,7 @@ for (const viewport of [
 		test('[ABRD-33] Undo inside the window posts nothing and leaves the picks usable', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			let writes = 0;
 			page.on('request', (request) => {
 				if (request.method() === 'POST') writes += 1;
@@ -224,8 +216,7 @@ for (const viewport of [
 		test('[ABRD-58] a pick shows the strip with the Decided shape and Undo above the card, in view while the card scrolls and over a phone list', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posts = countPosts(page);
 			await open(page, phone);
 
@@ -282,8 +273,7 @@ for (const viewport of [
 		test('[ABRD-58] two picks on two option cards show two strips in pick order and Undo on the first cancels only the first', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posted: string[] = [];
 			page.on('request', (request) => {
 				if (request.method() === 'POST') posted.push(request.postDataJSON().lines[0].option);
@@ -324,8 +314,7 @@ for (const viewport of [
 				test(`[ABRD-58] Undo keeps its full width beside a long topic at ${width}px`, async ({
 					page
 				}) => {
-					const { repoDirectory } = readBoardRuntime();
-					arrange(repoDirectory, { topic: 'Ein sehr langes Thema '.repeat(8) });
+					await arrangeCards({ topic: 'Ein sehr langes Thema '.repeat(8).trim() });
 					await page.setViewportSize({ width, height: 844 });
 					await open(page, phone);
 
@@ -350,14 +339,13 @@ for (const viewport of [
 		test('[ABRD-45] a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await picks(page)
 				.getByRole('button', { name: /^Decide A:/ })
 				.click();
-			arrange(repoDirectory, { card_hash: 'card-hash-changed' });
+			await arrangeCards({ problem: CHANGED_PROBLEM });
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByRole('alert')).toHaveText(LINE_CHANGED_MESSAGE);
@@ -372,14 +360,13 @@ for (const viewport of [
 		test('[ABRD-45] a card ruled elsewhere answers already ruled instead of a second write', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await picks(page)
 				.getByRole('button', { name: /^Decide A:/ })
 				.click();
-			arrange(repoDirectory, { ruling: 'B', ruled_on: '2026-10-01' });
+			await arrangeCards({ ruling: 'B', ruled_on: '2026-10-01', via: 'chat' });
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByRole('alert')).toHaveText(ALREADY_RULED_MESSAGE);
@@ -390,8 +377,7 @@ for (const viewport of [
 		test('[ABRD-44] the Decide row stays in view above a card taller than the pane', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await page
@@ -407,8 +393,7 @@ for (const viewport of [
 		test('[ABRD-59] Tab reaches the picks in letter order, Enter on a pick focuses its Undo and Enter again undoes it', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posts = countPosts(page);
 			await open(page, phone);
 			const undo = page.getByRole('button', { name: 'Undo', exact: true });
@@ -436,8 +421,7 @@ for (const viewport of [
 		test('[ABRD-59] a window that ends in a refused post leaves focus on the stage, not on the page', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await page.route('**/api/rule', (route) =>
 				route.fulfill({ status: 503, body: 'Unavailable' })
 			);
@@ -457,8 +441,7 @@ for (const viewport of [
 		test('[ABRD-59] an older window that ends in a refused post, while a newer pick stays pending, leaves focus on the stage', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await page.route('**/api/rule', (route) =>
 				route.fulfill({ status: 503, body: 'Unavailable' })
 			);
@@ -490,8 +473,7 @@ for (const viewport of [
 		test('[ABRD-59] a window that ends with focus on Undo leaves focus on the stage, not on the page', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await picks(page)
@@ -504,15 +486,14 @@ for (const viewport of [
 
 			await expect(page.locator('.strip')).toHaveCount(0);
 			await expect(page.locator('.stage')).toBeFocused();
-			// The post outlives the strip; let it land before the next test rewrites the rulings.
+			// The post outlives the strip; let it land before the next test arranges the board.
 			await ruled;
 		});
 
 		test('[ABRD-44] a ruled card inside an open picture dialog leaves the stage focused', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await picks(page)
@@ -529,8 +510,7 @@ for (const viewport of [
 		test('[ABRD-46] a final pick asks first and Decide B starts the undo window', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrangeFinal(repoDirectory);
+			await arrangeFinal();
 			const posts = countPosts(page);
 			await open(page, phone);
 
@@ -570,8 +550,7 @@ for (const viewport of [
 			test(`[ABRD-47] ${key} closes the confirm, posts nothing and returns focus to the pick`, async ({
 				page
 			}) => {
-				const { repoDirectory } = readBoardRuntime();
-				arrangeFinal(repoDirectory);
+				await arrangeFinal();
 				const posts = countPosts(page);
 				await open(page, phone);
 				const pickB = picks(page).getByRole('button', { name: /^Decide B:/ });
@@ -595,8 +574,7 @@ for (const viewport of [
 		test('[ABRD-46] Enter on the pick opens the confirm on Cancel and a second Enter cancels', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrangeFinal(repoDirectory);
+			await arrangeFinal();
 			const posts = countPosts(page);
 			await open(page, phone);
 			const pickB = picks(page).getByRole('button', { name: /^Decide B:/ });
@@ -615,8 +593,7 @@ for (const viewport of [
 		test('[ABRD-44] a reversible pick on a card with a final option opens no confirm', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrangeFinal(repoDirectory);
+			await arrangeFinal();
 			await open(page, phone);
 
 			await picks(page)
@@ -635,8 +612,7 @@ test.describe('1280px confirm over a changing board', () => {
 	test('[ABRD-47] a card changed under the open confirm is refused as changed, not decided', async ({
 		page
 	}) => {
-		const { repoDirectory } = readBoardRuntime();
-		arrangeFinal(repoDirectory);
+		await arrangeFinal();
 		await open(page, false, OTHER_QUESTION);
 		await picks(page)
 			.getByRole('button', { name: /^Decide B:/ })
@@ -647,7 +623,7 @@ test.describe('1280px confirm over a changing board', () => {
 			.click();
 		await expect(confirm(page)).toBeVisible();
 
-		arrangeFinal(repoDirectory, { card_hash: 'card-hash-changed' });
+		await arrangeFinal({ problem: CHANGED_PROBLEM });
 		const reloaded = page.waitForResponse(
 			(response) => response.url().endsWith('/api/board') && response.request().method() === 'GET'
 		);
@@ -670,8 +646,7 @@ test.describe('1280px confirm over a changing board', () => {
 	test('[ABRD-47] a slow background reload leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
 		page
 	}) => {
-		const { repoDirectory } = readBoardRuntime();
-		arrangeFinal(repoDirectory);
+		await arrangeFinal();
 		await open(page, false, OTHER_QUESTION);
 		await picks(page)
 			.getByRole('button', { name: /^Decide B:/ })

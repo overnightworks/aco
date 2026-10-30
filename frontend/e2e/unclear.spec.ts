@@ -1,11 +1,11 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
+import { arrange, item, optionEntry, type CardOption } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
 // Just past the app's undo window; the page clock is driven, never waited.
@@ -15,8 +15,7 @@ const QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const OTHER_QUESTION = 'Welcher Weg für die Altdaten?';
 const NOTE = 'Welcher Sprung ist gemeint?';
 
-const OPTIONS: RulingOption[] = ['A', 'B'].map((letter) => ({
-	letter,
+const OPTIONS: CardOption[] = ['A', 'B'].map((letter) => ({
 	name: `Weg ${letter}`,
 	effect: 'Die App springt selbst.',
 	same_as_today: true,
@@ -27,28 +26,28 @@ const OPTIONS: RulingOption[] = ['A', 'B'].map((letter) => ({
 	contract: 'Der Song bleibt offen.'
 }));
 
-function arrange(directory: string, withSecondCard: boolean): void {
-	writeRulings(directory, [
-		row(
+async function arrangeCards(withSecondCard: boolean): Promise<void> {
+	await arrange([
+		item(
 			2002,
 			'Sprung',
-			optionLine(1, 'Der Song bleibt beim Sprung offen.', {
+			optionEntry('Der Song bleibt beim Sprung offen.', {
 				question: QUESTION,
 				problem: 'Der Link schließt den Song.',
 				area: 'Song-Seite',
 				topic: 'Sprung',
-				options: OPTIONS
+				option: OPTIONS
 			})
 		),
 		...(withSecondCard
 			? [
-					row(
+					item(
 						2003,
 						'Altdaten',
-						optionLine(1, 'Eine zweite offene Frage.', {
+						optionEntry('Eine zweite offene Frage.', {
 							question: OTHER_QUESTION,
 							topic: 'Altdaten',
-							options: OPTIONS
+							option: OPTIONS
 						})
 					)
 				]
@@ -85,7 +84,7 @@ for (const viewport of [
 		test('[ABRD-73] Unclear opens a focused optional note panel whose Send is enabled while blank', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory, true);
+			await arrangeCards(true);
 			await open(page, phone);
 
 			await expect(page.getByRole('button', { name: 'Other…' })).toBeVisible();
@@ -109,7 +108,7 @@ for (const viewport of [
 		test('[ABRD-74] Send shows the grey With head strip with focus on Undo, and Undo posts nothing and reopens the note', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory, true);
+			await arrangeCards(true);
 			let writes = 0;
 			page.on('request', (request) => {
 				if (request.method() === 'POST') writes += 1;
@@ -134,7 +133,7 @@ for (const viewport of [
 		test('[ABRD-75, ABRD-76] after the window the stage moves to the next open card, and the sent card lists with its head, and selecting it again leaves the stage alone', async ({
 			page
 		}) => {
-			arrange(readBoardRuntime().repoDirectory, true);
+			await arrangeCards(true);
 			await open(page, phone);
 
 			await sendNote(page);
@@ -157,7 +156,7 @@ for (const viewport of [
 		test('[ABRD-72, ABRD-76] with no other open card the stage stays, and the card reads with head, offers no Unclear and keeps its picks and Other…', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory, false);
+			await arrangeCards(false);
 			await open(page, phone);
 
 			await sendNote(page);
