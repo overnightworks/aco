@@ -23,6 +23,7 @@ import pytest
 from aco_board_fixtures import (
     BoardClient,
     CallPhase,
+    Lister,
     PortCall,
     PortOperation,
     RecordedPort,
@@ -237,6 +238,34 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
 
     entered = [call.operation for call in port.calls() if call.phase is CallPhase.ENTERED]
     assert entered == [PortOperation.EXPECTATION_LINES]
+    assert "Traceback" not in capsys.readouterr().err
+
+
+def test_a_browser_leaving_during_a_held_ruling_still_rules_and_frees_the_turn(
+    repository: BoardForge,
+    board: BoardClient,
+    port: RecordedPort,
+    listed_items: Lister,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The browser resets its connection while its ruling waits inside the
+    port: the ruling is written, no traceback is printed, and the next
+    decision is answered."""
+    repository.put_item(42, _OPEN_CARD, title="Share page")
+    held = port.hold_next_rule_card(10)
+
+    board.send_and_reset(
+        _post(_decision_json(board)).replace(b"{token}", board.token.encode()),
+        reset_when=held.entered,
+    )
+    held.release.set()
+    _wait_for_request_handlers()
+    repository.put_item(43, _OPEN_CARD, title="Next card")
+    [next_card] = [item for item in listed_items(board) if item["number"] == 43]
+    answered = board.decide_card_through_api(43, next_card["lines"], ["B"])
+
+    assert [repository.stored_entries(item)[0].get("ruling") for item in (42, 43)] == ["A", "B"]
+    assert answered.json() == {"status": "ruled", "message": None}
     assert "Traceback" not in capsys.readouterr().err
 
 

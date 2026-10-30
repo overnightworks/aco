@@ -300,10 +300,13 @@ class BoardClient:
             connection.sendall(request)
             yield
 
-    def send_and_reset(self, request: bytes) -> None:
-        """Send a whole request, then hang up with a reset before any answer."""
+    def send_and_reset(self, request: bytes, *, reset_when: threading.Event | None = None) -> None:
+        """Send a whole request, then hang up with a reset before any answer,
+        once `reset_when` is set when one is given."""
         with self._connection() as connection:
             connection.sendall(request)
+            if reset_when is not None:
+                assert reset_when.wait(timeout=10)
             connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
 
     def _connection(self) -> socket.socket:
