@@ -7,8 +7,8 @@ prints -- no dev server, no proxy: it serves the same committed, built SPA a
 live `aco serve` does. It speaks the same protocol, too
 (`aco.board.server.start_board`), so a spec drives the real wire form
 (`specs/serve.spec.md` ABRD-08/09/21) end to end. The board's port runs
-aco's own `rulings` and `rule` through `board_forge`'s launcher; the only
-thing fake is the forge, a `board_forge.BoardForge` in a temporary checkout.
+aco's own library in this process; the only thing fake is the forge, a
+`board_forge.BoardForge` in a temporary checkout.
 
 A second server beside the board, the control endpoint, arranges that
 forge: `PUT /board` stores the items a spec names, rendered by aco and
@@ -42,10 +42,10 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import board_forge
-from aco_board_fixtures import DEFAULT_LABEL, board_checkout, decision_port, path_with
+from aco_board_fixtures import DEFAULT_LABEL, board_checkout, decision_port
 from board_forge import BoardForge, StoredItem
 
-from aco import body, expectation_grammar, expectations, rulings
+from aco import body, expectation_grammar, expectations, rulings, session
 from aco.board.board import Board, Boards
 from aco.board.server import start_board
 
@@ -154,10 +154,8 @@ def _serve_in_background(httpd: HTTPServer) -> threading.Thread:
 
 
 def _forge_checkout(workspace: Path) -> BoardForge:
-    """A board checkout in `workspace` whose `aco` is the launcher, with git
-    reading an empty global configuration."""
-    board_forge.install_launcher(workspace / "bin")
-    os.environ["PATH"] = path_with(workspace / "bin")
+    """A board checkout in `workspace`, with git reading an empty global
+    configuration."""
     global_git_config = workspace / "gitconfig"
     global_git_config.touch()
     os.environ["GIT_CONFIG_GLOBAL"] = str(global_git_config)
@@ -176,6 +174,7 @@ def _wait_for_stop_signal() -> None:
 
 
 def main() -> None:
+    session.run_context = board_forge.run_context
     repository = _forge_checkout(Path(tempfile.mkdtemp(prefix="aco-board-e2e-")))
     boards = Boards({DEFAULT_LABEL: Board(decision_port(repository))})
     running = start_board(0, boards, secrets.token_urlsafe(32))

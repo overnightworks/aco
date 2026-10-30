@@ -1,6 +1,6 @@
-"""The decision board's shared arrangement: the launcher first on PATH running
-the real `aco` over each checkout's own forge, board checkouts, and the real
-board server serving one of them."""
+"""The decision board's shared arrangement: the real aco library over each
+checkout's own forge, board checkouts, and the real board server serving one
+of them."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from aco_board_fixtures import (
     RecordedPort,
     board_checkout,
     decision_port,
-    path_with,
     serving,
 )
 from board_forge import BoardForge
@@ -25,14 +24,10 @@ from aco import session
 
 
 @pytest.fixture(autouse=True)
-def board_forge_seam(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_global_git_config: Path
-) -> Path:
-    """The launcher runs `aco` over the forge of the checkout it runs in, and
-    `aco` run in this process (`aco serve`) builds that same forge; aco's own
-    git reads the empty global configuration it returns."""
-    board_forge.install_launcher(tmp_path / "bin")
-    monkeypatch.setenv("PATH", path_with(tmp_path / "bin"))
+def board_forge_seam(monkeypatch: pytest.MonkeyPatch, isolated_global_git_config: Path) -> Path:
+    """Every context aco builds in this process -- the board's own and `aco
+    serve`'s -- reaches the forge of its checkout; aco's own git reads the
+    empty global configuration it returns."""
     monkeypatch.setattr(session, "run_context", board_forge.run_context)
     return isolated_global_git_config
 

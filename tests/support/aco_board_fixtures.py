@@ -12,7 +12,6 @@ from __future__ import annotations
 import errno
 import http.client
 import json
-import os
 import secrets
 import select
 import socket
@@ -32,11 +31,11 @@ from board_forge import BoardForge
 from cli_fixtures import real_git
 
 from aco import workboard
-from aco.board.aco_cli import AcoCli
+from aco.board.aco_source import AcoSource
 from aco.board.board import Board, Boards
 from aco.board.ports import (
     CardChanged,
-    CardDecision,
+    CardCheck,
     DecisionPort,
     DecisionResult,
     ExpectationLine,
@@ -45,10 +44,6 @@ from aco.board.server import TOKEN_HEADER, start_board
 
 DEFAULT_LABEL = "repo"
 """The one repo label a single-repo test gets when it does not name its own."""
-
-
-def path_with(bin_directory: Path) -> str:
-    return f"{bin_directory}{os.pathsep}{os.environ.get('PATH', '')}"
 
 
 def board_checkout(directory: Path) -> BoardForge:
@@ -80,8 +75,8 @@ class PortCall:
 
 @dataclass(frozen=True)
 class HeldRuling:
-    """`entered` is set once the held call is inside `rule_card`; it delegates
-    only after `release`."""
+    """`entered` is set once the held call is inside `rule_card(item, check)`;
+    it delegates, item read and write included, only after `release`."""
 
     entered: threading.Event
     release: threading.Event
@@ -123,16 +118,16 @@ class RecordedPort:
         finally:
             self._record(PortCall(PortOperation.EXPECTATION_LINES, CallPhase.COMPLETED))
 
-    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
-        held = self._record(PortCall(PortOperation.RULE_CARD, CallPhase.ENTERED, decision.item))
+    def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
+        held = self._record(PortCall(PortOperation.RULE_CARD, CallPhase.ENTERED, item))
         try:
             if held is not None:
                 held.entered.set()
                 if not held.release.wait(held.wait_seconds):
                     raise TimeoutError("the held ruling was never released")
-            return self._port.rule_card(decision)
+            return self._port.rule_card(item, check)
         finally:
-            self._record(PortCall(PortOperation.RULE_CARD, CallPhase.COMPLETED, decision.item))
+            self._record(PortCall(PortOperation.RULE_CARD, CallPhase.COMPLETED, item))
 
     def _record(self, call: PortCall) -> HeldRuling | None:
         """Logs `call`; an entering `rule_card` takes the hold set for it."""
@@ -146,7 +141,7 @@ class RecordedPort:
 
 def decision_port(repository: BoardForge) -> RecordedPort:
     """The board's port over `repository`'s checkout, recorded."""
-    return RecordedPort(AcoCli(directory=repository.directory))
+    return RecordedPort(AcoSource(directory=repository.directory))
 
 
 @contextmanager
@@ -305,10 +300,13 @@ class BoardClient:
             connection.sendall(request)
             yield
 
-    def send_and_reset(self, request: bytes) -> None:
-        """Send a whole request, then hang up with a reset before any answer."""
+    def send_and_reset(self, request: bytes, *, reset_when: threading.Event | None = None) -> None:
+        """Send a whole request, then hang up with a reset before any answer,
+        once `reset_when` is set when one is given."""
         with self._connection() as connection:
             connection.sendall(request)
+            if reset_when is not None:
+                assert reset_when.wait(timeout=10)
             connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
 
     def _connection(self) -> socket.socket:

@@ -17,8 +17,8 @@ confirm dialog. A pick shows the picture's strip with Undo for its 8-second
 window, as a row above the card (placement ruled by the operator on 27.10.2026)
 that stays in view while the card scrolls and, on a phone, above the list too.
 The Decide row ends with "Other…" and "Unclear". "Other…" opens a panel for his own
-answer, sent through `aco rule --other` with the same undo window as a pick. "Unclear" opens
-a note panel, optional to fill, and sends the card to its head through `aco rule --unclear`
+answer, stored through aco's writer with the same undo window as a pick. "Unclear" opens
+a note panel, optional to fill, and sends the card to its head through aco's writer
 after the same window, under a grey "With head" strip; a card already with its head hides
 "Unclear" and keeps its picks and "Other…". An item's open option lines are one card, posted
 once, all or none. A card of points shows its name (area and count) as title and the picture's

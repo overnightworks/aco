@@ -112,7 +112,7 @@ def _make_unenterable(directory: Path) -> None:
 def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_others_keep_theirs(
     two_repositories: tuple[BoardForge, BoardForge], break_directory: Callable[[Path], None]
 ) -> None:
-    """ABRD-15; the exact sentences are `aco_cli`'s (test_board_aco_cli)."""
+    """ABRD-15; the sentence is aco's own failure to read that checkout."""
     repository_a, repository_b = two_repositories
     repository_a.put_item(42, _OPEN_CARD, title="Share page")
     break_directory(repository_b.directory)
@@ -307,7 +307,7 @@ def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
         "repos": [
             {
                 "name": DEFAULT_LABEL,
-                "error": "aco rulings failed: no forge adapter for host",
+                "error": "no forge adapter for host",
                 "items": [],
             }
         ]
@@ -336,7 +336,7 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
     assert (item["number"], [listed["index"] for listed in item["lines"]]) == (42, [1])
     assert repos[1] == {
         "name": "b",
-        "error": "aco rulings failed: no forge adapter for host",
+        "error": "no forge adapter for host",
         "items": [],
     }
 
@@ -354,8 +354,8 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
     assert response.status == 502
     assert response.json() == {
         "repos": [
-            {"name": "a", "error": "aco rulings failed: a is down", "items": []},
-            {"name": "b", "error": "aco rulings failed: b is down", "items": []},
+            {"name": "a", "error": "a is down", "items": []},
+            {"name": "b", "error": "b is down", "items": []},
         ]
     }
 

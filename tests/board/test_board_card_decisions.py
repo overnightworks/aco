@@ -1,7 +1,7 @@
-"""The board decides a whole option card with one `aco rule` (ABRD-09, ABRD-39, ABRD-40,
-ABRD-41, ABRD-64, ABRD-70, ABRD-77, ABRD-79 to ABRD-81): the post's shape, the refusals
-before any port call, aco's own refusals relayed once for the card, and that the real
-`aco rule` stores what the board sent in one body write."""
+"""The board decides a whole option card with one write through aco's ruling writer
+(ABRD-09, ABRD-40, ABRD-41, ABRD-64, ABRD-70, ABRD-77 to ABRD-81): the post's shape, the
+refusals before any port call, aco's own refusals relayed once for the card, and that
+aco's writer stores what the board sent in one body write."""
 
 from __future__ import annotations
 
@@ -17,10 +17,9 @@ from aco_board_fixtures import (
     BoardClient,
     Lister,
     RecordedPort,
-    decision_port,
-    serving_many,
+    serving_two,
 )
-from board_forge import BoardForge, item_body
+from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body
 from option_cards import SECOND_CARD, YES_NO_LINE, card, card_head, check_defects, group_body
 
 from aco.board.board import LINE_CHANGED, SHUTTING_DOWN, Board, Boards
@@ -82,6 +81,11 @@ def _assert_untouched(port: RecordedPort, repository: BoardForge) -> None:
     """No `rule_card` reached the port, and no item was read or written."""
     assert port.ruled_items() == []
     assert repository.item_requests() == ()
+
+
+def _assert_read_once_and_unwritten(repository: BoardForge) -> None:
+    """The decision read item 7 once and wrote nothing."""
+    assert repository.item_requests() == (ForgeRequest(ForgeOperation.READ_ITEM, _ITEM),)
 
 
 def _picked(*letters: str) -> list[tuple[object, ...]]:
@@ -151,8 +155,8 @@ def test_a_card_post_stores_every_line_in_one_body_write(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ABRD-39, ABRD-64, ABRD-70, ABRD-77, RULE-29: a stored ruling also proves
-    aco took the card hash the board sent, and the stored body passes `aco check`."""
+    """ABRD-64, ABRD-70, ABRD-77, ABRD-78, RULE-29: a stored ruling also proves
+    aco took the card hash the board read, and the stored body passes `aco check`."""
     shown = show(_cards(*_CARDS[:count]))
     indexes = tuple(range(2, 2 + count))
 
@@ -210,10 +214,9 @@ def _rehashed_after_reading(repository: BoardForge) -> None:
     ],
     ids=["point-missing", "point-added", "card-changed", "line-not-listed", "yes-no-line"],
 )
-def test_a_card_post_missing_a_point_or_naming_a_changed_line_runs_no_aco_rule(
+def test_a_card_post_missing_a_point_or_naming_a_changed_line_reads_the_item_and_writes_nothing(
     repository: BoardForge,
     board: BoardClient,
-    port: RecordedPort,
     count: int,
     later: Callable[[BoardForge], None] | None,
     posted: tuple[int, ...],
@@ -229,7 +232,7 @@ def test_a_card_post_missing_a_point_or_naming_a_changed_line_runs_no_aco_rule(
     answered = board.decide_card_through_api(_ITEM, [listed[index] for index in posted], options)
 
     assert answered.json() == {"status": "failed", "message": LINE_CHANGED}
-    _assert_untouched(port, repository)
+    _assert_read_once_and_unwritten(repository)
 
 
 def test_a_card_post_names_a_line_ruled_meanwhile_and_aco_refuses_the_whole_card(
@@ -261,7 +264,7 @@ def _edited_before_acos_read(repository: BoardForge) -> None:
         (
             None,
             ["A", "C"],
-            "aco rule failed: line 3 has no option C; its options are A, B",
+            "line 3 has no option C; its options are A, B",
             group_body(),
         ),
     ],
@@ -298,39 +301,39 @@ def test_an_unclear_card_with_a_line_already_with_its_head_is_failed_with_acos_s
 
     answered = board.decide_card_through_api(_ITEM, [listed[2], listed[3]], None, {"unclear": True})
 
-    assert answered.json() == {"status": "failed", "message": f"aco rule failed: {_WITH_HEAD}"}
+    assert answered.json() == {"status": "failed", "message": _WITH_HEAD}
     assert repository.stored_body(_ITEM) == before
     assert repository.body_writes() == []
 
 
-def test_a_card_post_when_aco_cannot_be_read_is_failed_without_an_aco_rule(
-    repository: BoardForge, board: BoardClient, port: RecordedPort, show: _Show
+def test_a_card_post_whose_item_cannot_be_read_is_failed_with_the_reads_sentence(
+    repository: BoardForge, board: BoardClient, show: _Show
 ) -> None:
     """ABRD-79."""
     listed = show()
-    repository.fail_listing("boom")
+    repository.fail_item_reads("boom")
 
     answered = board.decide_card_through_api(_ITEM, [listed[2], listed[3]], ["A", "B"])
 
-    assert answered.json() == {"status": "failed", "message": "aco rulings failed: boom"}
-    _assert_untouched(port, repository)
+    assert answered.json() == {"status": "failed", "message": "boom"}
+    _assert_read_once_and_unwritten(repository)
 
 
 def test_a_fingerprint_read_under_another_repo_never_satisfies_a_card_post(
     two_repositories: tuple[BoardForge, BoardForge], listed_items: Lister
 ) -> None:
-    """ABRD-21, ABRD-79."""
-    ports = [decision_port(repository) for repository in two_repositories]
+    """ABRD-21, ABRD-79: `b` reads its item once and writes nothing; `a` is not touched."""
+    repository_a, repository_b = two_repositories
     for repository in two_repositories:
         repository.put_item(_ITEM, group_body())
 
-    with serving_many(dict(zip("ab", ports, strict=True))) as board:
+    with serving_two(two_repositories) as board:
         listed_in_a = listed_items(board, "a")[0]["lines"]
         answered = board.decide_card_through_api(_ITEM, listed_in_a[1:], ["A", "B"], repo="b")
 
     assert answered.json() == {"status": "failed", "message": LINE_CHANGED}
-    for port, repository in zip(ports, two_repositories, strict=True):
-        _assert_untouched(port, repository)
+    assert repository_a.item_requests() == ()
+    _assert_read_once_and_unwritten(repository_b)
 
 
 def _assert_nothing_after(
@@ -540,7 +543,7 @@ def test_two_card_posts_for_one_item_store_it_once_and_refuse_the_other_as_alrea
     assert repository.body_writes() == [_ITEM]
 
 
-def test_a_card_post_after_stopping_began_is_refused_and_runs_no_aco_rule(
+def test_a_card_post_after_stopping_began_is_refused_and_reaches_no_source(
     repository: BoardForge, port: RecordedPort, show: _Show
 ) -> None:
     """ABRD-17, ABRD-18."""

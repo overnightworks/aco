@@ -13,9 +13,8 @@ from aco_board_fixtures import (
     BoardClient,
     Lister,
     RecordedPort,
-    decision_port,
     first_listed_line,
-    serving_many,
+    serving_two,
 )
 from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body
 from option_cards import open_option_entry
@@ -25,6 +24,8 @@ from aco.board.board import LINE_CHANGED
 _ITEM = 42
 _OPEN_CARD = item_body(open_option_entry())
 _YES_NO = {"text": "Guests?", "ruling": "yes", "ruled_on": date(2026, 10, 1)}
+_READ = ForgeRequest(ForgeOperation.READ_ITEM, _ITEM)
+_WRITE = ForgeRequest(ForgeOperation.WRITE_BODY, _ITEM)
 
 
 def _ruled_a() -> dict[str, object]:
@@ -99,27 +100,23 @@ def test_the_board_keeps_no_copy_of_a_decision(
     ]
 
 
-def test_a_forge_that_cannot_list_during_a_card_post_keeps_the_line_undecided(
-    repository: BoardForge, board: BoardClient, port: RecordedPort
+def test_a_forge_that_cannot_read_the_item_during_a_card_post_keeps_the_line_undecided(
+    repository: BoardForge, board: BoardClient
 ) -> None:
     """ABRD-79."""
     repository.put_item(_ITEM, _OPEN_CARD, title="Share page")
     shown = first_listed_line(board)
-    repository.fail_listing("no forge adapter for host")
+    repository.fail_item_reads("no forge adapter for host")
 
     answer = board.decide_card_through_api(_ITEM, [shown], ["A"])
 
-    assert answer.json() == {
-        "status": "failed",
-        "message": "aco rulings failed: no forge adapter for host",
-    }
-    assert port.ruled_items() == []
-    assert repository.item_requests() == ()
+    assert answer.json() == {"status": "failed", "message": "no forge adapter for host"}
+    assert repository.item_requests() == (_READ,)
 
 
 @pytest.mark.parametrize(
-    ("target_repo", "expected_status", "expected_message", "ruled_in_a"),
-    [("a", "ruled", None, [_ITEM]), ("b", "failed", LINE_CHANGED, [])],
+    ("target_repo", "expected_status", "expected_message", "requests"),
+    [("a", "ruled", None, ((_READ, _WRITE), ())), ("b", "failed", LINE_CHANGED, ((), (_READ,)))],
     ids=["its-own-repo", "a-different-repo-with-an-identical-card"],
 )
 def test_a_card_only_writes_the_repo_its_fingerprint_was_read_from(
@@ -127,27 +124,20 @@ def test_a_card_only_writes_the_repo_its_fingerprint_was_read_from(
     target_repo: str,
     expected_status: str,
     expected_message: str | None,
-    ruled_in_a: list[int],
+    requests: tuple[tuple[ForgeRequest, ...], tuple[ForgeRequest, ...]],
 ) -> None:
     """ABRD-16/21: a card decided against its own repo writes there; posted
     against another configured repo instead -- even one holding an identical
-    card -- it is refused like a changed line, no write in either repo."""
-    repository_a, repository_b = two_repositories
-    port_a, port_b = decision_port(repository_a), decision_port(repository_b)
+    card -- it is refused like a changed line on that repo's one read, no
+    write in either repo."""
     for repository in two_repositories:
         repository.put_item(_ITEM, _OPEN_CARD, title="Share page")
 
-    with serving_many({"a": port_a, "b": port_b}) as board:
+    with serving_two(two_repositories) as board:
         [listed_repo_a, _] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
         listed_in_a = listed_repo_a["items"][0]["lines"][0]
 
         answer = board.decide_card_through_api(_ITEM, [listed_in_a], ["A"], repo=target_repo)
 
     assert answer.json() == {"status": expected_status, "message": expected_message}
-    assert (port_a.ruled_items(), port_b.ruled_items()) == (ruled_in_a, [])
-    assert repository_a.item_requests() == tuple(
-        ForgeRequest(operation, item)
-        for item in ruled_in_a
-        for operation in (ForgeOperation.READ_ITEM, ForgeOperation.WRITE_BODY)
-    )
-    assert repository_b.item_requests() == ()
+    assert tuple(repository.item_requests() for repository in two_repositories) == requests

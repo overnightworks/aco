@@ -23,6 +23,7 @@ from option_cards import open_option_entry
 from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
+    CardCheck,
     CardDecision,
     CardLine,
     DecisionResult,
@@ -61,7 +62,10 @@ class _HeldDecisions:
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         return self.lines
 
-    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+    def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
+        """Checks the posted card on its own lines, as the real source does on its read."""
+        decision = check(self.lines)
+        assert decision is not None
         self.writing.set()
         assert self.may_finish.wait(_WAIT_SECONDS)
         self.ruled_cards.append(decision)
