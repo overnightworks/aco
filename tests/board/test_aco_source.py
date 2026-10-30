@@ -86,8 +86,15 @@ def _closed(repository: BoardForge) -> None:
     repository.close_item(_ITEM)
 
 
+def _withdrawn(repository: BoardForge) -> None:
+    """ABRD-60: the posted line became a real tombstone (BODY-104)."""
+    repository.put_item(_ITEM, item_body(_WITHDRAWN))
+
+
 @pytest.mark.parametrize(
-    "change", [_removed, _made_malformed, _closed], ids=["removed", "malformed", "closed"]
+    "change",
+    [_removed, _made_malformed, _closed, _withdrawn],
+    ids=["removed", "malformed", "closed", "withdrawn"],
 )
 def test_a_card_whose_item_changed_since_the_page_read_is_refused_and_nothing_written(
     repository: BoardForge, board: BoardClient, change: Callable[[BoardForge], None]

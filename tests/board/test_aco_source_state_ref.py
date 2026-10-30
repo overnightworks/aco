@@ -181,17 +181,23 @@ def _line_ruled_in_chat(capsys: pytest.CaptureFixture[str]) -> None:
     assert run_cli(_chat_ruling(), capsys).status == 0
 
 
+def _line_withdrawn(capsys: pytest.CaptureFixture[str]) -> None:
+    """The head takes line 1 back through `aco withdraw` (BODY-104, ABRD-60)."""
+    assert run_cli(["withdraw", _FIRST_ID, "--line", "1"], capsys).status == 0
+
+
 @pytest.mark.parametrize(
     ("change", "status", "message"),
     [
         (_card_edited, "failed", LINE_CHANGED),
+        (_line_withdrawn, "failed", LINE_CHANGED),
         (
             _line_ruled_in_chat,
             "already_ruled",
             "line 2 is already ruled; a changed ruling is a new line",
         ),
     ],
-    ids=["card-changed", "line-ruled-in-chat"],
+    ids=["card-changed", "line-withdrawn", "line-ruled-in-chat"],
 )
 def test_a_card_changed_on_the_state_ref_since_the_page_read_writes_nothing(
     checkout: _StateRefCheckout,
