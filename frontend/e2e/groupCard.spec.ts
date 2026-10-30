@@ -1,17 +1,16 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import type { Locator, Page, Response } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { decidedList, expectDecidedAnswer } from './decidedView';
 import {
-	line,
-	optionLine,
-	row,
-	writeRulings,
-	type OptionRulingLine,
-	type RulingOption,
-	type RulingRow
-} from './rulingsFixture';
+	arrange,
+	item,
+	optionEntry,
+	storedLine,
+	withdrawnEntry,
+	type CardOption,
+	type Item,
+	type OptionEntry
+} from './itemFixture';
 import { readBoardRuntime } from './runtime';
 import {
 	ALREADY_RULED_MESSAGE,
@@ -20,21 +19,20 @@ import {
 } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
-// The fake aco stores every board pick as `--via board` on this date.
+// aco rules every board pick `via board` on `board_forge.RULING_DAY`.
 const BOARD_PICK_HOW = 'Board · 03.10.2026';
 
 const CARD_NAME = 'Song-Seite · 3 points';
 const ANSWER = 'Nur am Desktop';
 const NOTE = 'Warum drei Fragen?';
 
-const OPTIONS: RulingOption[] = (['A', 'B'] as const).map((letter) => ({
-	letter,
+const OPTIONS: CardOption[] = (['A', 'B'] as const).map((letter) => ({
 	name: `Weg ${letter}`,
 	effect: `Wirkung von Weg ${letter}.`,
 	same_as_today: true,
@@ -45,48 +43,46 @@ const OPTIONS: RulingOption[] = (['A', 'B'] as const).map((letter) => ({
 	contract: `Vertrag ${letter}.`
 }));
 
-const FINAL_OPTIONS: RulingOption[] = [
-	OPTIONS[0] as RulingOption,
-	{ ...(OPTIONS[1] as RulingOption), undo: 'final', undo_how: 'nicht rückholbar.' }
+const FINAL_OPTIONS: CardOption[] = [
+	OPTIONS[0] as CardOption,
+	{ ...(OPTIONS[1] as CardOption), undo: 'final', undo_how: 'nicht rückholbar.' }
 ];
 
-function point(index: number, overrides: Partial<OptionRulingLine> = {}): OptionRulingLine {
-	return optionLine(index, `Satz ${index}.`, {
+/** A point named after `index`, the block position it is arranged at. */
+function point(index: number, overrides: Partial<OptionEntry> = {}): OptionEntry {
+	return optionEntry(`Satz ${index}.`, {
 		question: `Frage ${index}?`,
 		problem: `Problem ${index}.`,
 		topic: `Thema ${index}`,
 		area: 'Song-Seite',
 		recommended: 'A',
-		options: OPTIONS,
+		option: OPTIONS,
 		...overrides
 	});
 }
 
-const YES_NO = line(5, 'Gäste dürfen teilnehmen.', { question: 'Gäste einladen?' });
+/** A withdrawn line the board hides, holding a block position before or between points. */
+function withdrawn(): Item['entries'][number] {
+	return withdrawnEntry('Ein zurückgezogener Punkt.', '2026-10-01');
+}
 
-function threePoints(): OptionRulingLine[] {
+function threePoints(): OptionEntry[] {
 	return [point(2), point(3), point(4)];
 }
 
-function arrange(directory: string, points: OptionRulingLine[] = threePoints()): void {
-	writeRulings(directory, [row(7, 'Sprung', ...points, YES_NO)]);
+/** Item 7, its line 1 withdrawn, so its points keep the indexes from 2 on. */
+function sprung(...points: Item['entries']): Item {
+	return item(7, 'Sprung', withdrawn(), ...points);
 }
 
-function stored(directory: string, itemNumber: number, index: number): OptionRulingLine {
-	const rows = JSON.parse(
-		readFileSync(path.join(directory, 'rulings.json'), 'utf-8')
-	) as RulingRow[];
-	const found = rows
-		.find((candidate) => candidate.number === itemNumber)
-		?.lines.find((candidate) => candidate.index === index);
-	if (found === undefined) throw new Error(`no line ${index} in item ${itemNumber}`);
-	return found as OptionRulingLine;
+async function arrangeCards(points: Item['entries'] = threePoints()): Promise<void> {
+	await arrange([sprung(...points), item(9, 'Gäste', point(1))]);
 }
 
-async function expectRuled(directory: string, letters: string[]): Promise<void> {
+async function expectRuled(letters: string[]): Promise<void> {
 	for (const [position, letter] of letters.entries()) {
 		await expect
-			.poll(() => stored(directory, 7, position + 2))
+			.poll(() => storedLine(7, position + 2))
 			.toMatchObject({ ruling: letter, via: 'board' });
 	}
 }
@@ -200,17 +196,17 @@ for (const viewport of [
 	test.describe(`${viewport.width}px card of points`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-82] an item’s open option lines are one Open row named by area and count, beside the yes/no row, and the tab counts rows', async ({
+		test('[ABRD-82] an item’s open option lines are one Open row named by area and count, beside another open row, and the tab counts rows', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			await visit(page);
 
 			const rows = page.locator('.tracks').getByRole('button');
 			await expect(rows).toHaveCount(2);
 			await expect(rows.nth(0)).toHaveAccessibleName(`Open ${CARD_NAME}`);
 			await expect(rows.nth(0)).toHaveAttribute('title', CARD_NAME);
-			await expect(rows.nth(1)).toHaveAccessibleName('Not ready · head to fill Gäste einladen?');
+			await expect(rows.nth(1)).toHaveAccessibleName('Open Thema 1');
 			await expect(page.getByRole('button', { name: 'Open 2', exact: true })).toBeVisible();
 			await shoot(page, testInfo, 'list');
 		});
@@ -218,7 +214,7 @@ for (const viewport of [
 		test('[ABRD-83] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all, the count, Other… and Unclear', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await expect(card(page).locator('.meta')).toHaveText(
@@ -252,7 +248,7 @@ for (const viewport of [
 		test('[ABRD-85] one point is open at a time, with its rows and a Today that enlarges, and a phone keeps the Decide row in view', async ({
 			page
 		}, testInfo) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await toggle(page, 1).click();
@@ -300,7 +296,7 @@ for (const viewport of [
 		test('[ABRD-84] the points, their picks and Accept all are reachable by keyboard with the right state', async ({
 			page
 		}) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
 
 			await toggle(page, 1).focus();
@@ -324,7 +320,7 @@ for (const viewport of [
 		test('[ABRD-86] a pick marks its point, posts nothing and opens the first unchosen point when it was the open one', async ({
 			page
 		}) => {
-			arrange(readBoardRuntime().repoDirectory);
+			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
@@ -345,8 +341,7 @@ for (const viewport of [
 		test('[ABRD-87] the last pick starts one window with one strip, then one post stores every point, and Decided lists each point', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
@@ -367,9 +362,8 @@ for (const viewport of [
 						{ line: 4, fingerprint: expect.any(String), option: 'A' }
 					])
 				]);
-			await expectRuled(repoDirectory, ['B', 'A', 'A']);
-			if (!phone)
-				await expect(page.getByRole('heading', { name: 'Gäste einladen?' })).toBeVisible();
+			await expectRuled(['B', 'A', 'A']);
+			if (!phone) await expect(page.getByRole('heading', { name: 'Frage 1?' })).toBeVisible();
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			const rows = decidedList(page).getByRole('button');
@@ -382,8 +376,7 @@ for (const viewport of [
 		test('[ABRD-87] Undo inside the window posts nothing and clears the picks', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
@@ -395,17 +388,13 @@ for (const viewport of [
 			await expect(strip(page)).toHaveCount(0);
 			await expect(pointPicks(page, 1).getByRole('button', { pressed: true })).toHaveCount(0);
 			await expect(decideBar(page).getByText('0 of 3 chosen')).toBeAttached();
-			expect(stored(repoDirectory, 7, 2).ruling).toBeNull();
+			expect((await storedLine(7, 2)).ruling).toBeNull();
 		});
 
 		test('[ABRD-88] a final pick asks first with its point, and Cancel leaves the point unchosen', async ({
 			page
 		}) => {
-			arrange(readBoardRuntime().repoDirectory, [
-				point(2),
-				point(3, { options: FINAL_OPTIONS }),
-				point(4)
-			]);
+			await arrangeCards([point(2), point(3, { option: FINAL_OPTIONS }), point(4)]);
 			const posts = logPosts(page);
 			await open(page, phone);
 
@@ -433,8 +422,7 @@ for (const viewport of [
 		test('[ABRD-89] Accept all with nothing final picks each recommended letter, shows the strip and posts once', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory, [point(2), point(3, { recommended: 'B' }), point(4)]);
+			await arrangeCards([point(2), point(3, { recommended: 'B' }), point(4)]);
 			const posts = logPosts(page);
 			await open(page, phone);
 			await pick(page, 1, 'B').click();
@@ -445,16 +433,15 @@ for (const viewport of [
 			await expect(strip(page)).toContainText(`Decided: 1A 2B 3A · ${CARD_NAME}`);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect.poll(() => posts.length).toBe(1);
-			await expectRuled(repoDirectory, ['A', 'B', 'A']);
+			await expectRuled(['A', 'B', 'A']);
 		});
 
 		test('[ABRD-90] Accept all with a final recommendation asks first, Cancel or Esc post nothing, and confirming stores the recommendations', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory, [
+			await arrangeCards([
 				point(2),
-				point(3, { options: FINAL_OPTIONS, recommended: 'B' }),
+				point(3, { option: FINAL_OPTIONS, recommended: 'B' }),
 				point(4)
 			]);
 			const posts = logPosts(page);
@@ -479,14 +466,13 @@ for (const viewport of [
 			await expect(strip(page)).toContainText(`Decided: 1A 2B 3A · ${CARD_NAME}`);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect.poll(() => posts.length).toBe(1);
-			await expectRuled(repoDirectory, ['A', 'B', 'A']);
+			await expectRuled(['A', 'B', 'A']);
 		});
 
 		test('[ABRD-92] Other… answers the whole card with one text, after one strip', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
@@ -505,7 +491,7 @@ for (const viewport of [
 				]);
 			for (const index of [2, 3, 4]) {
 				await expect
-					.poll(() => stored(repoDirectory, 7, index))
+					.poll(() => storedLine(7, index))
 					.toMatchObject({ ruling: 'other', other: ANSWER });
 			}
 		});
@@ -513,8 +499,7 @@ for (const viewport of [
 		test('[ABRD-92] Unclear sends the whole card back with its note, and the card is then with its head without Unclear', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
@@ -532,7 +517,7 @@ for (const viewport of [
 					)
 				]);
 			for (const index of [2, 3, 4]) {
-				await expect.poll(() => stored(repoDirectory, 7, index).returned_on).not.toBeNull();
+				await expect.poll(async () => (await storedLine(7, index)).returned_on).not.toBeNull();
 			}
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await expect(page.locator('.tracks').getByTitle(CARD_NAME)).toHaveAccessibleName(
@@ -548,15 +533,12 @@ for (const viewport of [
 		test('[ABRD-61] points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
 			page
 		}, testInfo) => {
-			const { repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					7,
-					'Sprung',
+			await arrange([
+				sprung(
 					point(2),
 					point(3, { area: 'Bibliothek', returned_on: '2026-10-27', returned_note: 'Warum?' })
 				),
-				row(8, 'Offen', point(1, { topic: 'Offen', question: 'Offene Frage?' }))
+				item(8, 'Offen', point(1, { topic: 'Offen', question: 'Offene Frage?' }))
 			]);
 			await visit(page);
 
@@ -581,9 +563,8 @@ for (const viewport of [
 		test('[ABRD-92] Other… on a card with a point with its head stores every point and drops the sent-back marks', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(7, 'Sprung', point(2), point(3, { returned_on: '2026-10-27', returned_note: 'Warum?' }))
+			await arrange([
+				sprung(point(2), point(3, { returned_on: '2026-10-27', returned_note: 'Warum?' }))
 			]);
 			await open(page, phone, 'Song-Seite · 2 points');
 
@@ -592,7 +573,7 @@ for (const viewport of [
 
 			for (const index of [2, 3]) {
 				await expect
-					.poll(() => stored(repoDirectory, 7, index))
+					.poll(() => storedLine(7, index))
 					.toMatchObject({ ruling: 'other', other: ANSWER, returned_on: null });
 			}
 		});
@@ -600,10 +581,7 @@ for (const viewport of [
 		test('[ABRD-36] a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(8, 'Offen', point(1, { topic: 'Einzel', question: 'Eine Frage?' }))
-			]);
+			await arrange([item(8, 'Offen', point(1, { topic: 'Einzel', question: 'Eine Frage?' }))]);
 			const posts = logPosts(page);
 			await visit(page);
 
@@ -632,15 +610,12 @@ for (const viewport of [
 			await expect
 				.poll(() => posts)
 				.toEqual([cardPost(8, [{ line: 1, fingerprint: expect.any(String), option: 'B' }])]);
-			await expect
-				.poll(() => stored(repoDirectory, 8, 1))
-				.toMatchObject({ ruling: 'B', via: 'board' });
+			await expect.poll(() => storedLine(8, 1)).toMatchObject({ ruling: 'B', via: 'board' });
 		});
 
 		for (const kind of ['other', 'unclear'] as const) {
 			test(`[ABRD-75] ${kind} on a one-point card posts one entry`, async ({ page }) => {
-				const { repoDirectory } = readBoardRuntime();
-				writeRulings(repoDirectory, [row(8, 'Offen', point(1, { topic: 'Einzel' }))]);
+				await arrange([item(8, 'Offen', point(1, { topic: 'Einzel' }))]);
 				const posts = logPosts(page);
 				await open(page, phone, 'Frage 1?');
 
@@ -654,36 +629,20 @@ for (const viewport of [
 						cardPost(8, entry, kind === 'other' ? { other: ANSWER } : { unclear: true, note: NOTE })
 					]);
 				await expect
-					.poll(() => stored(repoDirectory, 8, 1))
+					.poll(() => storedLine(8, 1))
 					.toMatchObject(
 						kind === 'other' ? { ruling: 'other' } : { returned_on: expect.any(String) }
 					);
 			});
 		}
 
-		test('a yes/no line still decides by outcome, not as a card', async ({ page }) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
-			const posts = logPosts(page);
-			await open(page, phone, 'Gäste einladen?');
-
-			await page.getByRole('button', { name: 'Ja', exact: true }).click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect.poll(() => posts.length).toBe(1);
-			expect(posts[0]).toMatchObject({ item: 7, line: 5, outcome: 'yes' });
-			expect(posts[0]).not.toHaveProperty('lines');
-			await expect.poll(() => stored(repoDirectory, 7, 5).ruling).toBe('yes');
-		});
-
 		for (const how of ['the last pick', 'Accept all'] as const) {
 			test(`[ABRD-91] ${how} on a card that gained a point after the page read is refused, nothing is stored, and Neu laden keeps the picks of the unchanged points`, async ({
 				page
 			}) => {
-				const { repoDirectory } = readBoardRuntime();
-				arrange(repoDirectory);
+				await arrangeCards();
 				await open(page, phone);
-				arrange(repoDirectory, [...threePoints(), point(6)]);
+				await arrangeCards([...threePoints(), withdrawn(), point(6)]);
 
 				if (how === 'Accept all') await acceptAll(page).click();
 				else await pickAll(page, ['B', 'A', 'A']);
@@ -693,7 +652,7 @@ for (const viewport of [
 				await expect(pointPicks(page, 1)).toHaveCount(0);
 				await expect(acceptAll(page)).toHaveCount(0);
 				for (const index of [2, 3, 4, 6]) {
-					expect(stored(repoDirectory, 7, index).ruling).toBeNull();
+					expect((await storedLine(7, index)).ruling).toBeNull();
 				}
 				await page.getByRole('button', { name: 'Neu laden' }).click();
 				await expect(
@@ -707,10 +666,9 @@ for (const viewport of [
 		test('[ABRD-80] a point ruled from chat meanwhile is refused as already ruled and nothing else is stored', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			await open(page, phone);
-			arrange(repoDirectory, [
+			await arrangeCards([
 				point(2),
 				point(3, { ruling: 'A', ruled_on: '2026-10-26', via: 'chat' }),
 				point(4)
@@ -720,15 +678,14 @@ for (const viewport of [
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByRole('alert')).toContainText(ALREADY_RULED_MESSAGE);
-			expect(stored(repoDirectory, 7, 2).ruling).toBeNull();
-			expect(stored(repoDirectory, 7, 4).ruling).toBeNull();
+			expect((await storedLine(7, 2)).ruling).toBeNull();
+			expect((await storedLine(7, 4)).ruling).toBeNull();
 		});
 
 		test('[ABRD-45] any other failure keeps the picks, and picking again posts again', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			arrange(repoDirectory);
+			await arrangeCards();
 			const posts = logPosts(page);
 			let failFirst = true;
 			await page.route('**/api/rule', async (route) => {
@@ -754,24 +711,21 @@ for (const viewport of [
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect.poll(() => posts.length).toBe(2);
-			await expect
-				.poll(() => stored(repoDirectory, 7, 2))
-				.toMatchObject({ ruling: 'A', via: 'board' });
+			await expect.poll(() => storedLine(7, 2)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 
 		test('[ABRD-91] a re-read after another card was decided drops a changed point’s pick, keeps the others, and the next post names the fresh point', async ({
 			page
 		}) => {
-			const { repoDirectory } = readBoardRuntime();
-			const second = row(8, 'Einzel', point(1, { topic: 'Einzel', question: 'Eine Frage?' }));
-			writeRulings(repoDirectory, [row(7, 'Sprung', ...threePoints()), second]);
+			const second = item(8, 'Einzel', point(1, { topic: 'Einzel', question: 'Eine Frage?' }));
+			await arrange([sprung(...threePoints()), second]);
 			const posts = logPosts(page);
 			const boards = logBoards(page);
 			await open(page, phone);
 
 			await pickAll(page, ['B', 'B']);
-			writeRulings(repoDirectory, [
-				row(7, 'Sprung', point(2), point(3, { card_hash: 'card-hash-changed' }), point(4)),
+			await arrange([
+				sprung(point(2), point(3, { problem: 'Problem 3 geändert.' }), point(4)),
 				second
 			]);
 			await showCard(page, phone, 'Eine Frage?');
@@ -793,7 +747,7 @@ for (const viewport of [
 			const cardPosted = posts.at(-1) as { lines: { line: number; fingerprint: string }[] };
 			expect(cardPosted.lines.find((entry) => entry.line === 3)?.fingerprint).toBe(changed);
 			expect(await fingerprintOf(boards[0], 3)).not.toBe(changed);
-			await expectRuled(repoDirectory, ['B', 'B', 'A']);
+			await expectRuled(['B', 'B', 'A']);
 		});
 	});
 }

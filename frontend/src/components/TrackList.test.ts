@@ -43,14 +43,6 @@ test('[ABRD-48] an option row shows its topic, the Open shape and its question a
 	expect(within(row).getByRole('img', { name: 'Open' })).toBeInTheDocument();
 });
 
-test('[ABRD-48] a yes/no row shows its question, the Not ready shape and a muted label', () => {
-	renderList([repo({ items: [item({ lines: [line({ text: 'Guests?' })] })] })]);
-
-	const row = screen.getByRole('button', { name: 'Not ready · head to fill Guests?' });
-	expect(within(row).getByRole('img', { name: 'Not ready · head to fill' })).toBeInTheDocument();
-	expect(within(row).getByText('Guests?')).toHaveClass('muted');
-});
-
 test('[ABRD-61] a returned option row shows its topic, the With head shape and a muted label', () => {
 	renderList([
 		repo({
@@ -85,22 +77,6 @@ test('[ABRD-28] a short topic labels the row and the question titles it instead 
 		'Guests allowed?'
 	);
 	expect(screen.queryByText('Guests may join the call.')).not.toBeInTheDocument();
-});
-
-test('[ABRD-29] the option row comes before the yes/no row of its repository', () => {
-	renderList([
-		repo({
-			items: [
-				item({
-					lines: [line({ index: 1, text: 'Guests?' }), optionLine({ index: 2, topic: 'Sprung' })]
-				})
-			]
-		})
-	]);
-
-	const [first, second] = screen.getAllByRole('button');
-	expect(first).toHaveAccessibleName('Open Sprung');
-	expect(second).toHaveAccessibleName('Not ready · head to fill Guests?');
 });
 
 test('[ABRD-49] ruled lines and ruled-only repositories leave the groups and stand in the quiet line', () => {

@@ -1,18 +1,13 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { line, optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
+import { arrange, item, optionEntry, yesNoEntry, type CardOption } from './itemFixture';
 import { readBoardRuntime } from './runtime';
-import { UNDO_SECONDS } from '../src/app/model/decision';
-
-// Just past the app's undo window; the page clock is driven, never waited.
-const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
 const SONG_QUESTION = 'Soll der Song beim Sprung offen bleiben?';
 const LONG_TOPIC = 'Sehr langes Thema '.repeat(12).trim();
 
-const OPTIONS: RulingOption[] = [
+const OPTIONS: CardOption[] = [
 	{
-		letter: 'A',
 		name: 'Song bleibt offen',
 		effect: 'Die App springt selbst.',
 		same_as_today: true,
@@ -23,7 +18,6 @@ const OPTIONS: RulingOption[] = [
 		contract: 'Der Song bleibt offen.'
 	},
 	{
-		letter: 'B',
 		name: 'Browser-Sprung bleibt',
 		effect: 'Der Browser springt weiter.',
 		same_as_today: true,
@@ -35,24 +29,28 @@ const OPTIONS: RulingOption[] = [
 	}
 ];
 
-function songLine(index: number, topic: string) {
-	return optionLine(index, 'Der Song bleibt beim Sprung offen.', {
-		question: SONG_QUESTION,
+function songLine(topic: string, question = SONG_QUESTION) {
+	return optionEntry('Der Song bleibt beim Sprung offen.', {
+		question,
 		topic,
-		options: OPTIONS
+		option: OPTIONS
 	});
 }
 
-/** One item with a yes/no line before an option line, served as `songmaker`
+/** Two items with an option card each, served as `songmaker`
  * and `quality` (the second with a very long topic) and as `webauth` with
  * nothing open; the real server only reads the first. */
-async function serveThreeRepositories(page: Page, repoDirectory: string): Promise<void> {
-	writeRulings(repoDirectory, [
-		row(
-			7,
-			'Sprung',
-			line(1, 'Gäste dürfen am Gespräch teilnehmen.', { question: 'Gäste einladen?' }),
-			songLine(2, 'Sprung')
+async function serveThreeRepositories(page: Page): Promise<void> {
+	await arrange([
+		item(7, 'Sprung', songLine('Sprung')),
+		item(
+			8,
+			'Gäste',
+			optionEntry('Gäste dürfen am Gespräch teilnehmen.', {
+				question: 'Gäste einladen?',
+				topic: 'Gäste',
+				option: OPTIONS
+			})
 		)
 	]);
 	await page.route('**/api/board', async (route) => {
@@ -93,11 +91,11 @@ for (const viewport of [
 	test.describe(`${viewport.width}px open list`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-28] [ABRD-48] open lines stand in one group per repository with their state shapes', async ({
+		test('[ABRD-28] [ABRD-48] option card rows stand in one group per repository, each with the shape naming its state and its question as title', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			await serveThreeRepositories(page, repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await serveThreeRepositories(page);
 			await page.goto(`${appUrl}#t=${token}`);
 
 			const tracks = page.locator('.tracks');
@@ -107,18 +105,8 @@ for (const viewport of [
 			const rows = tracks.getByRole('button');
 			await expect(rows).toHaveCount(4);
 			await expect(rows.nth(0)).toHaveAccessibleName('Open Sprung');
-			await expect(rows.nth(1)).toHaveAccessibleName('Not ready · head to fill Gäste einladen?');
 			await expect(rows.nth(0)).toHaveAttribute('title', SONG_QUESTION);
 			await expect(rows.nth(0).getByRole('img', { name: 'Open' })).toBeVisible();
-			await expect(
-				rows.nth(1).getByRole('img', { name: 'Not ready · head to fill' })
-			).toBeVisible();
-			const labelColour = (label: string) =>
-				rows
-					.getByText(label, { exact: true })
-					.first()
-					.evaluate((element) => getComputedStyle(element).color);
-			expect(await labelColour('Gäste einladen?')).not.toBe(await labelColour('Sprung'));
 			await expect(page.getByText('Nothing open: webauth')).toBeVisible();
 
 			const longRow = rows.nth(2);
@@ -132,8 +120,8 @@ for (const viewport of [
 		test('[ABRD-29] first load selects the first row, desktop shows its card and phones the list', async ({
 			page
 		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			await serveThreeRepositories(page, repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await serveThreeRepositories(page);
 			await page.goto(`${appUrl}#t=${token}`);
 
 			const first = page.locator('.tracks').getByRole('button').first();
@@ -148,43 +136,12 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-50] after a decision the stage moves to the open option line, not the next yes/no line', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					10,
-					'Erst',
-					line(1, 'Erste Frage.', { question: 'Erste?' }),
-					line(2, 'Zweite Frage.', { question: 'Zweite?' })
-				),
-				row(11, 'Dann', songLine(1, 'Sprung'))
-			]);
-			await page.clock.install();
-			await page.goto(`${appUrl}#t=${token}`);
-
-			await page.locator('.tracks').getByTitle('Erste?').click();
-			await page
-				.getByRole('group', { name: 'Entscheidung' })
-				.getByRole('button', { name: /Ja/ })
-				.click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect(page.locator('.option-card')).toBeVisible();
-			await expect(page.getByRole('heading', { name: 'Zweite?', exact: true })).toHaveCount(0);
-		});
-
 		test('[ABRD-49] an empty board reads All decided, a failure beside an empty repository does not', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					12,
-					'Fertig',
-					line(1, 'Entschieden.', { question: 'Fertig?', ruling: 'yes', ruled_on: '2026-10-03' })
-				)
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(12, 'Fertig', yesNoEntry('Entschieden.', 'yes', '2026-10-03', { question: 'Fertig?' }))
 			]);
 			await page.goto(`${appUrl}#t=${token}`);
 			await expect(page.getByText('All decided')).toBeVisible();
@@ -211,14 +168,10 @@ for (const viewport of [
 		test('[ABRD-28] Tab moves from the first row to the second, Enter opens it and focuses the stage', async ({
 			page
 		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					13,
-					'Tastatur',
-					line(1, 'Erste Frage.', { question: 'Erste?' }),
-					line(2, 'Zweite Frage.', { question: 'Zweite?' })
-				)
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(13, 'Tastatur', songLine('Erste', 'Erste?')),
+				item(14, 'Tastatur zweite', songLine('Zweite', 'Zweite?'))
 			]);
 			await page.goto(`${appUrl}#t=${token}`);
 

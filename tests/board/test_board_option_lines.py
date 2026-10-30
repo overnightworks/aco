@@ -1,25 +1,16 @@
-"""The decision board reads option lines beside yes/no lines and decides them
-(specs/serve.spec.md: ABRD-07, ABRD-34, ABRD-35, ABRD-41, ABRD-42, ABRD-53, ABRD-56,
-E-ABRD-11), driven through the real server, wire form and `aco` adapter against a fake `aco`
-on PATH."""
+"""The decision board reads option lines beside ruled yes/no lines (specs/serve.spec.md:
+ABRD-34, ABRD-35, ABRD-53, ABRD-56, E-ABRD-03), driven through the real server, wire form
+and `aco` adapter against the real `aco` over a fake forge."""
 
 from __future__ import annotations
 
-from typing import Any, cast
+from datetime import date
+from typing import cast
 
 import pytest
-from aco_board_fixtures import (
-    BoardClient,
-    FakeAcoRepository,
-    line,
-    option_line,
-    picture_option,
-    row,
-    same_as_today_option,
-    serving_two,
-)
-
-from aco.board.board import LINE_CHANGED
+from aco_board_fixtures import BoardClient, Lister
+from board_forge import BoardForge, item_body
+from option_cards import open_option_entry
 
 _OPTION_LINE_KEYS = [
     "index",
@@ -43,32 +34,56 @@ _OPTION_LINE_KEYS = [
     "returned_note",
     "fingerprint",
 ]
-_RULE_13_SENTENCE = "line 1 is an option line; --yes, --no and --later rule only a yes/no line"
+_CARD_KEYS = (
+    "text",
+    "question",
+    "problem",
+    "picture",
+    "caption",
+    "decision_kind",
+    "area",
+    "topic",
+    "recommended",
+    "reason",
+)
+_RULED_ON = date(2026, 10, 28)
+_YES_NO = {"text": "Guests?", "ruling": "yes", "ruled_on": date(2026, 10, 1)}
 
 
-def _without_key(stored: dict[str, object], key: str) -> dict[str, object]:
-    return {name: value for name, value in stored.items() if name != key}
+def _ruled(ruling: str, via: str, **answer: str) -> dict[str, object]:
+    return {**open_option_entry(), "ruling": ruling, "ruled_on": _RULED_ON, "via": via, **answer}
 
 
-def _listed_lines(board: BoardClient) -> list[dict[str, Any]]:
-    response = board.get_board_json()
-    assert response.status == 200
-    [repo] = cast(list[dict[str, Any]], response.json()["repos"])
-    assert repo["error"] is None
-    return [listed for item in repo["items"] for listed in item["lines"]]
+def _wire_options(entry: dict[str, object]) -> list[dict[str, object]]:
+    """`entry`'s options as the board lists them: each lettered by its position."""
+    options = cast(list[dict[str, object]], entry["option"])
+    return [{"letter": letter, **option} for letter, option in zip("ABCD", options, strict=False)]
 
 
-def test_a_yes_no_line_is_listed_in_the_bytes_it_always_was(
-    repository: FakeAcoRepository, board: BoardClient
+def _wire(entry: dict[str, object]) -> dict[str, object]:
+    """`entry` as the board lists it as line 1, without its fingerprint."""
+    ruled_on = entry.get("ruled_on")
+    return {
+        "index": 1,
+        "form": "options",
+        **{key: entry[key] for key in _CARD_KEYS},
+        "options": _wire_options(entry),
+        "ruling": entry.get("ruling"),
+        "ruled_on": ruled_on.isoformat() if isinstance(ruled_on, date) else None,
+        "via": entry.get("via"),
+        "other": entry.get("other"),
+        "returned_on": None,
+        "returned_note": None,
+    }
+
+
+def test_a_ruled_yes_no_line_is_listed_in_these_bytes_without_a_default(
+    repository: BoardForge, board: BoardClient
 ) -> None:
-    repository.set_rulings(
-        row(
-            42,
-            "Share page",
-            line(1, "Guests?", default="yes", question="Gäste?", example="Ja", picture="<svg/>"),
-            line(2, "Hosts?", ruling="no"),
-        )
-    )
+    """ABRD-34, E-ABRD-03."""
+    guests = {**_YES_NO, "question": "Gäste?", "example": "Ja", "picture": "<svg/>"}
+    hosts = {"text": "Hosts?", "ruling": "no", "ruled_on": date(2026, 10, 1)}
+    repository.put_item(42, item_body(guests, hosts), title="Share page")
 
     response = board.get_board_json()
 
@@ -76,297 +91,100 @@ def test_a_yes_no_line_is_listed_in_the_bytes_it_always_was(
         '{"repos": [{"name": "repo", "error": null, "items": [{"number": 42,'
         ' "title": "Share page", "lines": ['
         '{"index": 1, "text": "Guests?", "question": "G\\u00e4ste?", "example": "Ja",'
-        ' "picture": "<svg/>", "default": "yes", "ruling": null, "ruled_on": null,'
-        ' "fingerprint": "c669433f7b000568336634f65259156d38cbe612a358c9d061659917d9746574"},'
+        ' "picture": "<svg/>", "ruling": "yes", "ruled_on": "2026-10-01",'
+        ' "fingerprint": "9d1396572d67571a0688f719f1d30db85f2cd5d6a89399945fda04b9cf259a93"},'
         ' {"index": 2, "text": "Hosts?", "question": null, "example": null,'
-        ' "picture": null, "default": null, "ruling": "no", "ruled_on": "2026-10-01",'
-        ' "fingerprint": "6e4658aa8d30aa67c1fcf4b005d2f97a730b9cbf53cc4bfc1f6d951cc867f252"}]}]}]}'
+        ' "picture": null, "ruling": "no", "ruled_on": "2026-10-01",'
+        ' "fingerprint": "98be3926ecb0b8cf749b8a5a2450def8c02fae835eb262499c6c3b34590d1448"}]}]}]}'
     )
 
 
 @pytest.mark.parametrize(
     "stored",
     [
-        option_line(),
-        option_line(ruling="A"),
-        option_line(ruling="B"),
-        option_line(ruling="other", via="chat", other="Nur am Desktop.\n„Zitat“ \\ Ende"),
+        open_option_entry(),
+        _ruled("A", "board"),
+        _ruled("B", "board"),
+        _ruled("other", "chat", other="Nur am Desktop.\n„Zitat“ \\ Ende"),
     ],
     ids=["open", "ruled-A", "ruled-B", "ruled-other"],
 )
 def test_an_option_line_is_listed_with_its_card_in_the_wire_order(
-    repository: FakeAcoRepository, board: BoardClient, stored: dict[str, object]
+    repository: BoardForge, board: BoardClient, stored: dict[str, object], listed_items: Lister
 ) -> None:
     """ABRD-56: `other` follows `via`, verbatim."""
-    repository.set_rulings(row(12, "Song jump", stored))
+    repository.put_item(12, item_body(stored), title="Song jump")
 
-    [listed] = _listed_lines(board)
+    [listed] = listed_items(board)[0]["lines"]
 
     assert list(listed) == _OPTION_LINE_KEYS
     assert isinstance(listed.pop("fingerprint"), str)
-    assert listed == {key: stored[key] for key in listed}
-    stored_options = cast(list[dict[str, object]], stored["options"])
+    assert listed == _wire(stored)
     assert [list(option) for option in listed["options"]] == [
-        list(option) for option in stored_options
+        list(option) for option in _wire_options(stored)
     ]
 
 
 @pytest.mark.parametrize("via", ["board", "chat", "default"])
 def test_an_option_line_lists_via_as_acos_rulings_names_it(
-    repository: FakeAcoRepository, board: BoardClient, via: str
+    repository: BoardForge, board: BoardClient, via: str, listed_items: Lister
 ) -> None:
     """ABRD-53, line 18: `default` stays distinguishable from `board` and `chat`."""
-    repository.set_rulings(row(12, "Song jump", option_line(ruling="A", via=via)))
+    repository.put_item(12, item_body(_ruled("A", via)), title="Song jump")
 
-    [listed] = _listed_lines(board)
+    [listed] = listed_items(board)[0]["lines"]
 
     assert listed["via"] == via
 
 
-def test_an_option_line_stands_beside_a_yes_no_line_in_acos_order(
-    repository: FakeAcoRepository, board: BoardClient
+def test_an_option_line_stands_beside_a_ruled_yes_no_line_in_acos_order(
+    repository: BoardForge, board: BoardClient, listed_items: Lister
 ) -> None:
-    repository.set_rulings(
-        row(12, "Song jump", option_line()),
-        row(42, "Share page", line(1, "Guests?", default="yes")),
-    )
+    repository.put_item(12, item_body(open_option_entry()), title="Song jump")
+    repository.put_item(42, item_body(_YES_NO), title="Share page")
 
-    listed = _listed_lines(board)
+    listed = [entry for item in listed_items(board) for entry in item["lines"]]
 
     assert [(entry["text"], "form" in entry) for entry in listed] == [
-        ("The song stays open on the jump.", True),
+        (open_option_entry()["text"], True),
         ("Guests?", False),
     ]
 
 
-def test_an_unknown_key_and_a_default_on_an_option_line_do_not_matter(
-    repository: FakeAcoRepository, board: BoardClient
-) -> None:
-    repository.set_rulings(row(12, "Song jump", option_line(default="yes", provenance="x")))
-
-    [listed] = _listed_lines(board)
-
-    assert list(listed) == _OPTION_LINE_KEYS
-
-
 def _fingerprint_of(
-    repository: FakeAcoRepository, board: BoardClient, stored: dict[str, object], number: int = 12
+    board: BoardClient,
+    listed_items: Lister,
+    repository: BoardForge,
+    lines: tuple[dict[str, object], ...],
+    number: int = 12,
 ) -> str:
-    repository.set_rulings(row(number, "Song jump", stored))
-    [listed] = _listed_lines(board)
-    return cast(str, listed["fingerprint"])
+    repository.put_item(number, item_body(*lines), title="Song jump")
+    [item] = [item for item in listed_items(board) if item["number"] == number]
+    return str(item["lines"][-1]["fingerprint"])
 
 
 @pytest.mark.parametrize(
-    ("changes", "number", "changes_fingerprint"),
+    ("lines", "number", "changes_fingerprint"),
     [
-        ({"card_hash": "sha256:other"}, 12, True),
-        ({}, 13, True),
-        ({"index": 2}, 12, True),
-        ({"stored_card_hash": "sha256:other"}, 12, False),
-        ({"default": "yes"}, 12, False),
-        ({"via": "chat"}, 12, False),
-        ({"provenance": "x"}, 12, False),
-        ({"text": "Another wording."}, 12, False),
+        (({**open_option_entry(), "question": "Soll dein Lied offen bleiben?"},), 12, True),
+        ((open_option_entry(),), 13, True),
+        ((_YES_NO, open_option_entry()), 12, True),
+        ((_ruled("A", "board"),), 12, False),
+        ((_ruled("A", "chat"),), 12, False),
     ],
-    ids=[
-        "card-hash",
-        "item",
-        "index",
-        "stored-card-hash",
-        "default",
-        "via",
-        "unknown-key",
-        "text-not-in-the-hash",
-    ],
+    ids=["card-edit", "item", "index", "ruled", "via"],
 )
 def test_an_option_lines_fingerprint_follows_item_index_and_card_hash_only(
-    repository: FakeAcoRepository,
+    repository: BoardForge,
     board: BoardClient,
-    changes: dict[str, object],
+    lines: tuple[dict[str, object], ...],
     number: int,
     changes_fingerprint: bool,
+    listed_items: Lister,
 ) -> None:
     """ABRD-35: `via` is no part of the fingerprint."""
-    before = _fingerprint_of(repository, board, option_line())
+    before = _fingerprint_of(board, listed_items, repository, (open_option_entry(),))
 
-    after = _fingerprint_of(repository, board, option_line(**changes), number)
+    after = _fingerprint_of(board, listed_items, repository, lines, number)
 
     assert (after != before) is changes_fingerprint
-
-
-def test_an_option_lines_fingerprint_never_satisfies_another_repos_check(
-    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
-) -> None:
-    repository_a, repository_b = two_repositories
-    for repository in two_repositories:
-        repository.set_rulings(row(12, "Song jump", option_line()))
-    repository_a.refuse_rule("invalid_usage", _RULE_13_SENTENCE)
-    repository_b.refuse_rule("invalid_usage", _RULE_13_SENTENCE)
-
-    with serving_two(two_repositories) as board:
-        [listed_in_a] = [
-            entry
-            for repo in cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
-            if repo["name"] == "a"
-            for item in repo["items"]
-            for entry in item["lines"]
-        ]
-        answer = board.decide_through_api(listed_in_a, 12, "yes", repo="b")
-
-    assert answer.json() == {"status": "failed", "message": LINE_CHANGED}
-    assert repository_b.rule_calls() == []
-
-
-@pytest.mark.parametrize("ruling", [None, "A"], ids=["open", "ruled"])
-def test_a_yes_no_decision_on_an_option_line_writes_nothing_and_says_why(
-    repository: FakeAcoRepository, board: BoardClient, ruling: str | None
-) -> None:
-    repository.set_rulings(row(12, "Song jump", option_line(ruling=ruling)))
-    repository.refuse_rule("invalid_usage", _RULE_13_SENTENCE)
-    before = repository.rulings_state()
-    [listed] = _listed_lines(board)
-
-    answer = board.decide_through_api(listed, 12, "yes")
-
-    assert answer.status == 200
-    assert answer.json() == {"status": "failed", "message": f"aco rule failed: {_RULE_13_SENTENCE}"}
-    assert repository.rulings_state() == before
-
-
-@pytest.mark.parametrize(
-    "malformed",
-    [
-        option_line(ruling="C"),
-        option_line(ruling="yes"),
-        option_line(ruling=7),
-        option_line(recommended="C"),
-        option_line(recommended="E"),
-        option_line(recommended=None),
-        option_line(options=[picture_option("B"), same_as_today_option("A")]),
-        option_line(options=[picture_option("A"), same_as_today_option("C")]),
-        option_line(options=[]),
-        option_line(options=[picture_option(letter) for letter in "ABCDE"]),
-        option_line(options="none"),
-        option_line(options=["A"]),
-        option_line(options=[picture_option(), same_as_today_option(cost=5)]),
-        option_line(options=[picture_option(), same_as_today_option(same_as_today=False)]),
-        option_line(problem=5),
-        option_line(picture=5),
-        option_line(options=[picture_option(picture=5), same_as_today_option()]),
-        option_line(ruling="A", ruled_on="tomorrow"),
-        option_line(form="cards"),
-        option_line(form=None),
-        _without_key(option_line(), "via"),
-        option_line(ruling="A", via="phone"),
-        option_line(ruling="A", via="Board"),
-        option_line(ruling="A", via=5),
-        option_line(ruling="other", via="chat"),
-        option_line(ruling="other", via="chat", other="  "),
-        option_line(ruling="other", via="chat", other=5),
-        option_line(ruling="A", other="x"),
-        option_line(other="x"),
-    ],
-    ids=[
-        "ruling-not-a-letter-of-the-options",
-        "yes-no-ruling",
-        "ruling-not-text",
-        "recommended-not-a-letter-of-the-options",
-        "recommended-no-letter",
-        "recommended-null",
-        "letters-swapped",
-        "letter-out-of-position",
-        "no-options",
-        "more-options-than-letters",
-        "options-not-a-list",
-        "option-not-an-object",
-        "option-field-wrong-type",
-        "option-neither-picture-nor-same-as-today",
-        "line-field-wrong-type",
-        "picture-wrong-type",
-        "option-picture-wrong-type",
-        "ruled-on-not-a-date",
-        "unknown-form",
-        "form-null",
-        "via-missing",
-        "via-unknown-value",
-        "via-wrong-case",
-        "via-not-text",
-        "other-missing-on-a-line-ruled-other",
-        "other-blank",
-        "other-not-text",
-        "other-beside-a-letter",
-        "other-on-an-open-line",
-    ],
-)
-def test_a_malformed_option_line_makes_only_its_repository_unreadable(
-    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository], malformed: dict[str, object]
-) -> None:
-    """ABRD-07, ABRD-53."""
-    repository_a, repository_b = two_repositories
-    repository_a.set_rulings(row(12, "Song jump", malformed))
-    repository_b.set_rulings(row(42, "Share page", option_line(index=1, text="Guests?")))
-
-    with serving_two(two_repositories) as board:
-        response = board.get_board_json()
-
-    repos = cast(list[dict[str, Any]], response.json()["repos"])
-    assert response.status == 200
-    assert repos[0]["error"].startswith("aco rulings --json is unreadable: ")
-    assert repos[0]["items"] == []
-    assert repos[1]["error"] is None
-    assert [item["number"] for item in repos[1]["items"]] == [42]
-
-
-@pytest.mark.parametrize(
-    "decision",
-    [
-        {"outcome": "yes", "option": "A"},
-        {},
-        {"outcome": None, "option": None},
-        {"outcome": None, "option": "A"},
-        {"outcome": "yes", "option": None},
-    ],
-    ids=["both", "neither", "both-null", "outcome-null-with-option", "option-null-with-outcome"],
-)
-def test_a_post_without_lines_naming_no_outcome_or_one_beside_an_option_is_refused(
-    repository: FakeAcoRepository, board: BoardClient, decision: dict[str, object]
-) -> None:
-    """ABRD-42."""
-    repository.set_rulings(row(12, "Song jump", option_line()))
-    [listed] = _listed_lines(board)
-    calls_before = repository.calls()
-
-    answer = board.post_rule(
-        {
-            "repo": board.repo,
-            "item": 12,
-            "line": 1,
-            "fingerprint": listed["fingerprint"],
-            **decision,
-        }
-    )
-
-    assert answer.status == 400
-    assert answer.json() == {"error": "bad request: decision"}
-    assert repository.calls() == calls_before
-
-
-@pytest.mark.parametrize(
-    "fields",
-    [{"other": "x", "outcome": "yes"}, {"unclear": True, "outcome": "yes"}],
-    ids=["other-beside-outcome", "unclear-beside-outcome"],
-)
-def test_a_post_naming_an_outcome_beside_another_decision_is_refused_before_any_aco_call(
-    repository: FakeAcoRepository,
-    board: BoardClient,
-    listed: dict[str, Any],
-    fields: dict[str, object],
-) -> None:
-    """ABRD-42."""
-    calls_before = repository.calls()
-
-    answer = board.post_rule({**listed, **fields})
-
-    assert (answer.status, answer.json()) == (400, {"error": "bad request: decision"})
-    assert repository.calls() == calls_before

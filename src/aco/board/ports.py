@@ -1,14 +1,16 @@
 """The board's one narrow interface to its decision source.
 
 The board reads expectation lines and writes rulings through `DecisionPort`
-only; `aco_cli.AcoCli` is its one implementation. Truth stays with the
-source: the board keeps no copy of a line or a ruling.
+only; `aco_source.AcoSource` is its one implementation, running aco's own
+library in process. Truth stays with the source: the board keeps no copy of
+a line or a ruling.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -22,9 +24,8 @@ class Outcome(StrEnum):
 
 
 class RulingVia(StrEnum):
-    """`aco rulings --json` names an option line's `via` (RUL-15); the board
-    keeps its own copy of the vocabulary and reads aco only through its command
-    line."""
+    """How an option line's ruling reached aco (RUL-15), in the board's own
+    vocabulary."""
 
     BOARD = "board"
     CHAT = "chat"
@@ -33,8 +34,7 @@ class RulingVia(StrEnum):
 
 OTHER = "other"
 """Both the `ruling` value and the key that carries the operator's own answer
-(RUL-16); the board keeps its own copy and reads aco only through its command
-line."""
+(RUL-16) on the board's wire."""
 
 UNCLEAR = "unclear"
 """The key that sends an option line back to its head; never a `ruling` value."""
@@ -54,14 +54,13 @@ class OtherAnswer:
 
 
 OPTIONS_FORM = "options"
-"""The `form` that marks an option line in the source's own listing."""
-
-WITHDRAWN_FORM = "withdrawn"
-"""The `form` that marks a line its head withdrew; the board does not list it."""
+"""The `form` that marks an option line on the board's wire."""
 
 
 @dataclass(frozen=True)
 class YesNoLine:
+    """A ruled yes/no line: read-only history the board shows and never writes."""
+
     item: int
     item_title: str
     index: int
@@ -69,20 +68,14 @@ class YesNoLine:
     question: str | None
     example: str | None
     picture: str | None
-    default: Outcome | None
-    """The outcome the source recommends for an open line; None when it names none."""
-    ruling: Outcome | None
+    ruling: Outcome
     ruled_on: date | None
 
     @property
-    def is_open(self) -> bool:
-        return self.ruling is None
-
-    @property
     def fingerprint(self) -> str:
-        """Names exactly what a decision card shows the operator: every field it
-        renders. The ruling and its date are left out on purpose: a ruled line
-        is no longer decidable, so no card for it is ever submitted."""
+        """Names the fields the line's decided card renders as its text. The
+        ruling and its date are left out: a yes/no line is read-only history,
+        so no card for it is ever submitted."""
         shown = json.dumps(
             [
                 self.item,
@@ -92,7 +85,6 @@ class YesNoLine:
                 self.question,
                 self.example,
                 self.picture,
-                self.default,
             ],
             ensure_ascii=False,
         )
@@ -153,17 +145,8 @@ ExpectationLine = YesNoLine | OptionLine
 
 
 NOTE_MAX_LENGTH = 280
-"""The longest note a decision may carry, after trimming. A note travels to
-the source as one command-line argument, so it is also free of NUL and
-encodable as UTF-8."""
-
-
-@dataclass(frozen=True)
-class Decision:
-    item: int
-    index: int
-    outcome: Outcome
-    note: str | None
+"""The longest note a decision may carry, after trimming. The item body stores
+a note as UTF-8 text, so it is also free of NUL and encodable as UTF-8."""
 
 
 @dataclass(frozen=True)
@@ -236,11 +219,17 @@ class DecisionResult:
 
 @dataclass(frozen=True)
 class CardChanged:
-    """The source refused an option because its card changed since the hash was read."""
+    """The item's fresh read no longer shows the card as posted: a line changed,
+    went, or was withdrawn, or the item itself is gone, malformed or closed."""
 
 
 class DecisionSourceUnavailableError(Exception):
     """The source could not be read; the message says why in one sentence."""
+
+
+type CardCheck = Callable[[Sequence[ExpectationLine]], CardDecision | None]
+"""The board's own check of a posted card against an item's lines just read:
+the card as a decision on them, or None when it no longer reads as shown."""
 
 
 class DecisionPort(Protocol):
@@ -251,12 +240,8 @@ class DecisionPort(Protocol):
         """
         ...
 
-    def rule(self, decision: Decision) -> DecisionResult:
-        """Write one decision; the source itself refuses an already-ruled line,
-        an unknown item, or a line the item does not have."""
-        ...
-
-    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
-        """Write every line of one card in a single call: the source stores all of
-        them or none, and compares each line's hash again at its write."""
+    def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
+        """Read `item` once, run `check` on its lines, and write the decision it
+        returns in one write that stores every line or none; `CardChanged` when
+        the item no longer holds the card `check` was built for."""
         ...

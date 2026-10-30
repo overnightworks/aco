@@ -40,7 +40,7 @@ class TestReturnedLineGrammar:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: BODY-93, BODY-33 -- only an option line can be with its head."""
-        line = '[[expectation]]\ntext = "T"\ndefault = "yes"\n' + RETURNED_ON
+        line = '[[expectation]]\ntext = "T"\nruling = "no"\nruled_on = 2026-10-01\n' + RETURNED_ON
         assert check_defects(capsys, card_body(line)) == (
             2,
             [malformed(f"{E}.returned_on", f"unknown key {E}.returned_on")],
@@ -85,7 +85,7 @@ class TestRuleUnclear:
         sent = run_cli(["rule", "7", *unclear(note)], capsys)
         assert (sent.status, sent.stdout) == (
             0,
-            "RETURNED #7 line 2 to its head; 2 line(s) still open\n",
+            "RETURNED #7 line 2 to its head; 1 line(s) still open\n",
         )
         written = client.item_bodies[7]
         expected = item_body(returned_today(note), newline=newline)
@@ -102,7 +102,9 @@ class TestRuleUnclear:
         )
         text = rulings_of(monkeypatch, capsys, written)
         summary = LINE_TEXT_SUMMARY if note is None else note
-        assert text == (f"#7 2/2: Karte\n  1 open: Alt\n  2 with head {TODAY}: {summary}\n")
+        assert text == (
+            f"#7 1/2: Karte\n  1 ruled no 2026-10-01: Alt\n  2 with head {TODAY}: {summary}\n"
+        )
 
     def test_the_json_answer_names_the_day(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -119,7 +121,7 @@ class TestRuleUnclear:
                 "item": 7,
                 "index": 2,
                 "returned_on": TODAY,
-                "open": 2,
+                "open": 1,
             },
         )
 
@@ -185,7 +187,7 @@ class TestRuleUnclear:
         """Spec: RULE-14, RULE-27 -- the refusal is for a line with its head only."""
         serve_item(monkeypatch, item_body(card()))
         ruled = run_cli(["rule", "7", *decide("A", "default")], capsys)
-        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 A; 1 line(s) still open\n")
+        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 A; 0 line(s) still open\n")
 
     def test_the_heads_revising_edit_opens_the_line_again(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

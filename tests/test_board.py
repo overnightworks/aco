@@ -20,6 +20,7 @@ from board_fixtures import (
     FROZEN_UNTIL,
     MINIMAL_BLOCK_TOML,
     REPOSITORY,
+    RULED_ON,
     block_body,
     block_dependency,
     blocked_issue,
@@ -28,13 +29,13 @@ from board_fixtures import (
     container_with_children,
     idea_body,
     projected_board,
-    proposed_expectation,
     request,
     ruled_expectation,
     slice_entries,
     store_claim_from_request,
     unfilled_block_body,
 )
+from option_cards import open_option_entry
 
 from aco import body, checkout, expectation_grammar, expectations, metrics, protocol, workboard
 from aco.body import (
@@ -60,6 +61,8 @@ from aco.body import (
     replace_block,
 )
 from aco.expectations import (
+    ExpectationLine,
+    LineForm,
     YesNoLine,
     expectation_line_state,
     expectation_line_summary,
@@ -68,44 +71,8 @@ from aco.expectations import (
 from aco.protocol import ClaimError, ClaimRequest
 from aco.workboard import BoardConfig, ClassificationDefect, NoItemClassification, NoItemKind
 
-# A real expectation sentence from this repository's own issues (the
-# brief: take a real body as the fixture template rather than a synthetic
-# one) -- German prose, an em dash, and multiple sentences, none of which
-# need TOML escaping. The block interior itself is rendered through
-# `render_block`, the production serializer, never hand-typed.
-ISSUE_230_EXPECTATION_TEXT = (
-    "Ein gezogenes Forge-Issue wird von aco nie verändert, geschlossen oder "
-    "umgehängt; nur ein Marker-Kommentar, wenn der Spiegel eingeschaltet ist. "
-    "Beispiel: aco pull github#123, dann eine Woche Lane-Arbeit — das Issue "
-    "auf GitHub sieht aus wie vorher, bis der PR es schließt. Gegenbeispiel: "
-    "aco schreibt Now/Next in den GitHub-Body eines fremden Issues. Berührt "
-    "Rechte anderer."
-)
-ISSUE_230_PROSE = (
-    "Caller: Felix, Ruling 15.09.2026 („aco ist gerade auf github, aber warum "
-    "soll es nicht auch einfach wie markdown gehen?“). Neighbours: #238, #237.\n\n"
-    "Blocked by: #231, #241\n\n"
-)
-
-
-def issue_230_body(*, default: str = "later") -> str:
-    """A realistic excerpt of that issue's own body: its real prose and
-    `Blocked by` line, then a block carrying one still-*proposed* line built
-    from its real (later-ruled) expectation text -- `default` lets a test
-    ask for a body that is already fully ruled instead."""
-    interior = render_block(
-        {
-            "version": 1,
-            "now": "Konzept v3 (15.09.2026) nach Plan-Review und Regel-Gegen-Check.",
-            "next": "Scheibe 1 ist #240, wartet auf #238.",
-            "done_when": "Ein Repository ohne GitHub-Remote läuft vollständig aus refs/aco/state.",
-            "expectation": [{"text": ISSUE_230_EXPECTATION_TEXT, "default": default}],
-        }
-    ).rstrip("\n")
-    return block_body(interior, before=ISSUE_230_PROSE)
-
-
 VALID_SVG_PICTURE = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>'
+RULED_YES_NO_KEYS = 'ruling = "no"\nruled_on = 2026-10-01\n'
 
 
 @pytest.mark.parametrize(
@@ -234,7 +201,7 @@ def test_expectation_picture_is_refused_by_the_parser(picture: str, match: str) 
                 "now": "N",
                 "next": "X",
                 "done_when": "D",
-                "expectation": [proposed_expectation("E", picture=picture)],
+                "expectation": [ruled_expectation("E", picture=picture)],
             }
         ).rstrip("\n")
     )
@@ -278,7 +245,7 @@ def test_expectation_picture_allows_an_animated_href_with_every_values_segment_i
 def test_parse_body_still_refuses_an_unknown_expectation_key() -> None:
     """The expectation entry only widens the allowed set by `question`/`example`/
     `picture`; any other key stays refused by name, unchanged."""
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "yes"\nnote = "x"\n'
+    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\n{RULED_YES_NO_KEYS}note = "x"\n'
 
     parsed = parse_body(block_body(toml_text))
 
@@ -292,7 +259,9 @@ def test_parse_body_refuses_a_non_string_expectation_question() -> None:
     """`question` must be a string; a stored non-string value
     -- an integer, say -- is refused by the same defect the empty-string
     case uses, not a TOML type error."""
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "yes"\nquestion = 1\n'
+    toml_text = (
+        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\n{RULED_YES_NO_KEYS}question = 1\n'
+    )
 
     parsed = parse_body(block_body(toml_text))
 
@@ -307,7 +276,7 @@ def test_parse_body_refuses_a_non_string_expectation_question() -> None:
 def test_parse_body_refuses_a_non_string_expectation_picture() -> None:
     """`picture` must be a string; a stored non-string value
     is refused before any SVG-shape check runs."""
-    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "yes"\npicture = 1\n'
+    toml_text = f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\n{RULED_YES_NO_KEYS}picture = 1\n'
 
     parsed = parse_body(block_body(toml_text))
 
@@ -338,9 +307,7 @@ def test_render_block_round_trips_question_example_and_a_multiline_picture() -> 
         "next": "X",
         "done_when": "D",
         "expectation": [
-            proposed_expectation(
-                "Proposed", question="Ship it?", example="An example.", picture=picture
-            )
+            ruled_expectation("Ruled", question="Ship it?", example="An example.", picture=picture)
         ],
     }
 
@@ -367,9 +334,7 @@ def test_render_block_round_trips_a_picture_carrying_any_control_character(
         "next": "X",
         "done_when": "D",
         "expectation": [
-            proposed_expectation(
-                "Proposed", picture=f"<svg>\n  before{control_character}after\n</svg>"
-            )
+            ruled_expectation("Ruled", picture=f"<svg>\n  before{control_character}after\n</svg>")
         ],
     }
 
@@ -379,46 +344,46 @@ def test_render_block_round_trips_a_picture_carrying_any_control_character(
 # --- expectation_lines / expectation_line_state / expectation_line_summary ---
 
 
+def _open_line(text: str) -> ExpectationLine:
+    """The one open option line a block carrying `text` as its card's text reads as."""
+    return expectation_lines(complete_contract("N", expectation=[open_option_entry(text)]))[0]
+
+
+def _line_facts(lines: tuple[ExpectationLine, ...]) -> list[tuple[object, ...]]:
+    return [
+        (line.form, line.index, line.text, line.ruling, line.ruled_on)
+        for line in lines
+        if not isinstance(line, expectations.WithdrawnLine)
+    ]
+
+
 def test_expectation_lines_reports_index_text_ruling_and_ruled_on() -> None:
-    body = block_body(
-        f"{MINIMAL_BLOCK_TOML}"
-        '[[expectation]]\ntext = "Open one"\ndefault = "later"\n'
-        '[[expectation]]\ntext = "Settled one"\nruling = "no"\nruled_on = 2026-09-01\n'
+    body = complete_contract(
+        "N",
+        expectation=[
+            open_option_entry("Open one"),
+            ruled_expectation("Settled one", ruling="no", ruled_on=date(2026, 9, 1)),
+        ],
     )
 
-    assert expectation_lines(body) == (
-        YesNoLine(1, "Open one", None, None, default="later"),
-        YesNoLine(2, "Settled one", "no", date(2026, 9, 1)),
-    )
+    assert _line_facts(expectation_lines(body)) == [
+        (LineForm.OPTIONS, 1, "Open one", None, None),
+        (LineForm.YES_NO, 2, "Settled one", "no", date(2026, 9, 1)),
+    ]
 
 
 def test_expectation_lines_reads_question_example_and_picture() -> None:
-    body = block_body(
-        render_block(
-            {
-                "version": 1,
-                "now": "N",
-                "next": "X",
-                "done_when": "D",
-                "expectation": [
-                    proposed_expectation(
-                        "Ship it?",
-                        question="Ship it?",
-                        example="Release on Friday.",
-                        picture=VALID_SVG_PICTURE,
-                    )
-                ],
-            }
-        ).rstrip("\n")
+    entry = ruled_expectation(
+        "Ship it?", question="Ship it?", example="Release on Friday.", picture=VALID_SVG_PICTURE
     )
+    body = complete_contract("N", expectation=[entry])
 
     assert expectation_lines(body) == (
         YesNoLine(
             1,
             "Ship it?",
-            None,
-            None,
-            default="later",
+            "yes",
+            RULED_ON,
             question="Ship it?",
             example="Release on Friday.",
             picture=VALID_SVG_PICTURE,
@@ -439,24 +404,21 @@ def test_expectation_lines_is_empty_for_an_unaddressable_body(body: str) -> None
 
 
 def test_expectation_line_state_names_open_or_the_ruling_and_date() -> None:
-    open_line = YesNoLine(1, "Open one", None, None)
     ruled_line = YesNoLine(2, "Settled one", "no", date(2026, 9, 1))
 
-    assert expectation_line_state(open_line) == "open"
+    assert expectation_line_state(_open_line("Open one")) == "open"
     assert expectation_line_state(ruled_line) == "ruled no 2026-09-01"
 
 
 def test_expectation_line_summary_truncates_long_text() -> None:
-    line = YesNoLine(1, "x" * 150, None, None)
-
-    summary = expectation_line_summary(line)
+    summary = expectation_line_summary(_open_line("x" * 150))
 
     assert len(summary) == expectations.EXPECTATION_LINE_TEXT_MAXIMUM
     assert summary.endswith("…")
 
 
 def test_expectation_line_summary_keeps_short_text_unchanged() -> None:
-    line = YesNoLine(1, "Short.", None, None)
+    line = YesNoLine(1, "Short.", "yes", RULED_ON)
 
     assert expectation_line_summary(line) == "Short."
 
@@ -477,7 +439,7 @@ def test_render_block_round_trips_every_field() -> None:
         f"{MINIMAL_BLOCK_TOML}"
         'frozen_until = { trigger = "named trigger", ruled_on = 2026-09-06 }\n'
         'scope = ["docs/plan.md", "src/widget.py"]\n'
-        '[[expectation]]\ntext = "Proposed"\ndefault = "later"\n'
+        '[[expectation]]\ntext = "Deferred"\nruling = "later"\nruled_on = 2026-09-04\n'
         '[[expectation]]\ntext = "Ruled"\nruling = "yes"\nruled_on = 2026-09-05\n'
         '[[slice]]\nindex = 4\ntitle = "Block contract in issue bodies"\n'
         'scope = ["src/aco/workboard.py"]\n'
@@ -502,7 +464,7 @@ def test_render_block_places_scope_before_expectation_and_slice_tables() -> None
         "now": "N",
         "next": "X",
         "done_when": "D",
-        "expectation": [{"text": "E", "default": "later"}],
+        "expectation": [ruled_expectation("E")],
         "slice": [{"index": 1, "title": "Row"}],
         "scope": ["src/widget.py"],
     }
@@ -2178,7 +2140,7 @@ def test_parse_body_orders_schema_defects_deterministically() -> None:
         "frozen_until.ruled_on",
         "frozen_until.odd",
         "expectation[0].text",
-        "expectation[0].default",
+        "expectation[0]",
         "slice[0].index",
         "slice[0].title",
         "slice[0].weird",
@@ -2189,18 +2151,13 @@ def test_parse_body_orders_schema_defects_deterministically() -> None:
 @pytest.mark.parametrize(
     ("entry_toml", "expected_field"),
     [
-        pytest.param('text = "E"\ndefault = "maybe"\n', "expectation[0].default", id="bad-default"),
+        pytest.param('text = "E"\ndefault = "yes"\n', "expectation[0]", id="open-with-default"),
         pytest.param(
             'text = "E"\nruling = "maybe"\nruled_on = 2026-09-06\n',
             "expectation[0].ruling",
             id="bad-ruling",
         ),
-        pytest.param(
-            'text = "E"\ndefault = "yes"\nruling = "yes"\nruled_on = 2026-09-06\n',
-            "expectation[0].default",
-            id="both-default-and-ruling",
-        ),
-        pytest.param('text = "E"\n', "expectation[0].default", id="neither"),
+        pytest.param('text = "E"\n', "expectation[0]", id="neither"),
         pytest.param(
             'text = "E"\nruling = "yes"\nruled_on = "not-a-date"\n',
             "expectation[0].ruled_on",
@@ -2368,7 +2325,7 @@ def test_render_block_places_size_before_expectation_and_slice_tables() -> None:
         "now": "N",
         "next": "X",
         "done_when": "D",
-        "expectation": [{"text": "E", "default": "later"}],
+        "expectation": [ruled_expectation("E")],
         "slice": [{"index": 1, "title": "Row"}],
         "size": "M",
     }
@@ -2437,7 +2394,7 @@ def test_render_block_places_whole_before_expectation_and_slice_tables() -> None
         "now": "N",
         "next": "X",
         "done_when": "D",
-        "expectation": [{"text": "E", "default": "later"}],
+        "expectation": [ruled_expectation("E")],
         "slice": [{"index": 1, "title": "Row"}],
         "whole": "one lane owns every adapter",
     }
@@ -2455,7 +2412,7 @@ def test_parse_body_refuses_scope_as_an_unknown_expectation_key() -> None:
     still refuses by name (the key set of
     `_EXPECTATION_KNOWN_KEYS` is not widened)."""
     toml_text = (
-        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\ndefault = "later"\nscope = ["src"]\n'
+        f'{MINIMAL_BLOCK_TOML}[[expectation]]\ntext = "E"\n{RULED_YES_NO_KEYS}scope = ["src"]\n'
     )
 
     parsed = parse_body(block_body(toml_text))
@@ -2996,7 +2953,7 @@ def test_proposed_expectations_have_neither_fresh_nor_old() -> None:
     issue = board_issue(
         10,
         "Proposed",
-        complete_contract("Claim #10.", expectation=[proposed_expectation("Name it.")]),
+        complete_contract("Claim #10.", expectation=[open_option_entry("Name it.")]),
     )
     projected = projected_board(
         (issue,), (), (), (), BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
@@ -3016,7 +2973,7 @@ def test_one_unruled_entry_among_ruled_ones_keeps_the_item_proposed() -> None:
             expectation=[
                 ruled_expectation("Create it."),
                 ruled_expectation("Change it.", ruling="no"),
-                proposed_expectation("Remove it."),
+                open_option_entry("Remove it."),
             ],
         ),
     )
@@ -3032,9 +2989,9 @@ def test_expectation_progress_counts_open_and_total_entries() -> None:
         "Claim #10.",
         expectation=[
             ruled_expectation("Create it."),
-            proposed_expectation("Change it."),
+            open_option_entry("Change it."),
             ruled_expectation("Remove it.", ruling="no"),
-            proposed_expectation("Scale it.", default="no"),
+            open_option_entry("Scale it."),
             ruled_expectation("Keep it."),
         ],
     )

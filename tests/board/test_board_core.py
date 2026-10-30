@@ -1,11 +1,12 @@
 """The board's own rules driven without any socket.
 
-Each test calls `Board` or `Boards` over the real `aco` adapter against a
-fake `aco` on PATH whose state the test sets, or over a held in-memory
-`DecisionPort` where the order of concurrent decisions is the behaviour; no
-server is started. The served board and `aco serve` itself also prove
-one write at a time and the shutdown drain end-to-end (test_board_server,
-test_board_cli).
+Each test calls `Board` or `Boards` over the board's port on the real `aco`
+over a fake forge, or over a held in-memory `DecisionPort` where the order
+of concurrent decisions is the behaviour; no server is started. Two card
+posts on different items at once are held at the port itself, so the
+second one's wait for its turn is seen in the port log (ABRD-03, ABRD-17).
+The served board and `aco serve` itself also prove the shutdown drain
+end-to-end (test_board_server, test_board_cli).
 """
 
 from __future__ import annotations
@@ -13,18 +14,18 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
-from pathlib import Path
 
 import pytest
-from aco_board_fixtures import FakeAcoRepository, line, option_line, row
+from aco_board_fixtures import CallPhase, PortCall, decision_port
+from board_forge import BoardForge, item_body
+from option_cards import open_option_entry
 
-from aco.board.aco_cli import AcoCli
 from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
+    CardCheck,
     CardDecision,
     CardLine,
-    Decision,
     DecisionResult,
     DecisionStatus,
     ExpectationLine,
@@ -39,53 +40,14 @@ _WAIT_SECONDS = 5
 _LABEL = "repo"
 
 
-@pytest.mark.parametrize(
-    ("stored", "read"),
-    [
-        (line(1, "Guests?", default="later"), (Outcome.LATER, None, None, True)),
-        (line(1, "Links?", ruling="no"), (None, Outcome.NO, date(2026, 10, 1), False)),
-        (line(1, "Older aco without a recommendation?"), (None, None, None, True)),
-    ],
-    ids=["open-with-recommendation", "ruled", "open-without-recommendation"],
-)
-def test_a_snapshot_reads_a_lines_recommendation_and_ruling(
-    repository: FakeAcoRepository,
-    stored: dict[str, object],
-    read: tuple[Outcome | None, Outcome | None, date | None, bool],
-) -> None:
-    repository.set_rulings(row(42, "Share page", stored))
+def test_a_snapshot_reads_a_ruled_yes_no_lines_ruling_and_date(repository: BoardForge) -> None:
+    links = {"text": "Links?", "ruling": "no", "ruled_on": date(2026, 10, 1)}
+    repository.put_item(42, item_body(links), title="Share page")
 
-    [read_line] = Board(AcoCli(directory=repository.directory)).snapshot().lines
+    [read_line] = Board(decision_port(repository)).snapshot().lines
 
     assert isinstance(read_line, YesNoLine)
-    assert read == (read_line.default, read_line.ruling, read_line.ruled_on, read_line.is_open)
-
-
-def test_a_decision_after_writes_closed_is_refused_without_writing(
-    repository: FakeAcoRepository,
-) -> None:
-    repository.set_rulings(row(42, "Share page", line(1, "Guests?")))
-    board = Board(AcoCli(directory=repository.directory))
-    boards = Boards({_LABEL: board})
-    [shown] = board.snapshot().lines
-
-    boards.close_writes()
-
-    result = boards.decide(_LABEL, Decision(42, 1, Outcome.YES, None), shown.fingerprint)
-    assert result == DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
-    assert repository.rule_calls() == []
-
-
-def test_a_decision_is_failed_with_one_sentence_when_aco_cannot_be_run(tmp_path: Path) -> None:
-    not_a_directory = tmp_path / "file"
-    not_a_directory.write_text("")
-    board = Board(AcoCli(directory=not_a_directory))
-
-    result = board.decide_one(Decision(42, 1, Outcome.YES, None), _LABEL, "shown")
-
-    assert result == DecisionResult(
-        DecisionStatus.FAILED, "aco rulings could not be run: Not a directory"
-    )
+    assert (read_line.ruling, read_line.ruled_on) == (Outcome.NO, date(2026, 10, 1))
 
 
 class _HeldDecisions:
@@ -94,36 +56,36 @@ class _HeldDecisions:
     def __init__(self) -> None:
         self.writing = threading.Event()
         self.may_finish = threading.Event()
-        self.ruled: list[Decision] = []
         self.ruled_cards: list[CardDecision] = []
         self.lines: tuple[ExpectationLine, ...] = ()
 
     def expectation_lines(self) -> tuple[ExpectationLine, ...]:
         return self.lines
 
-    def rule(self, decision: Decision) -> DecisionResult:
-        self.writing.set()
-        assert self.may_finish.wait(_WAIT_SECONDS)
-        self.ruled.append(decision)
-        return DecisionResult(DecisionStatus.RULED, "ruled")
-
-    def rule_card(self, decision: CardDecision) -> DecisionResult | CardChanged:
+    def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
+        """Checks the posted card on its own lines, as the real source does on its read."""
+        decision = check(self.lines)
+        assert decision is not None
         self.writing.set()
         assert self.may_finish.wait(_WAIT_SECONDS)
         self.ruled_cards.append(decision)
         return DecisionResult(DecisionStatus.RULED)
 
 
+def _posted(lines: tuple[ExpectationLine, ...], label: str, item: int) -> PostedCard:
+    """Item `item`'s one line among `lines`, posted `A` for `label`."""
+    [shown] = [line for line in lines if line.item == item]
+    return PostedCard(item, (PostedLine(shown.index, wire_fingerprint(label, shown), "A"),), None)
+
+
 def _card_held_in(
-    repository: FakeAcoRepository, label: str, item: int = 7
+    repository: BoardForge, label: str, item: int = 7
 ) -> tuple[_HeldDecisions, PostedCard]:
     """A held port that reads item `item`'s one option line, and that card posted for `label`."""
-    repository.set_rulings(row(item, "Karte", option_line()))
-    [shown] = Board(AcoCli(directory=repository.directory)).snapshot().lines
+    repository.put_item(item, item_body(open_option_entry()))
     decisions = _HeldDecisions()
-    decisions.lines = (shown,)
-    posted = PostedCard(item, (PostedLine(shown.index, wire_fingerprint(label, shown), "A"),), None)
-    return decisions, posted
+    decisions.lines = Board(decision_port(repository)).snapshot().lines
+    return decisions, _posted(decisions.lines, label, item)
 
 
 def _card_waiting_for_its_turn(item: int) -> PostedCard:
@@ -151,8 +113,47 @@ def _signal_when_a_decision_waits_for_its_turn(
     return entered
 
 
+def _each_call_completes_before_the_next_enters(calls: tuple[PortCall, ...]) -> bool:
+    entering, completing = calls[0::2], calls[1::2]
+    return len(entering) == len(completing) and all(
+        (entered.phase, completed.phase) == (CallPhase.ENTERED, CallPhase.COMPLETED)
+        and (entered.operation, entered.item) == (completed.operation, completed.item)
+        for entered, completed in zip(entering, completing, strict=True)
+    )
+
+
+def test_card_posts_on_two_items_at_once_are_both_stored_one_at_a_time(
+    repository: BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ABRD-03, ABRD-17: the second decision makes no port call while the
+    first is inside its write, and neither write is lost."""
+    for item in (42, 7):
+        repository.put_item(item, item_body(open_option_entry()))
+    port = decision_port(repository)
+    lines = Board(port).snapshot().lines
+    first, second = _posted(lines, _LABEL, 42), _posted(lines, _LABEL, 7)
+    boards = Boards({_LABEL: Board(port)})
+    waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
+    held = port.hold_next_rule_card(_WAIT_SECONDS)
+
+    with ThreadPoolExecutor(max_workers=2) as threads:
+        running = threads.submit(boards.decide_card, _LABEL, first)
+        assert held.entered.wait(_WAIT_SECONDS)
+        calls_while_held = port.calls()
+        waiting = threads.submit(boards.decide_card, _LABEL, second)
+        assert waiting_for_turn.wait(_WAIT_SECONDS)
+
+        assert port.calls() == calls_while_held
+        held.release.set()
+        answers = [running.result(_WAIT_SECONDS).status, waiting.result(_WAIT_SECONDS).status]
+
+    assert answers == [DecisionStatus.RULED, DecisionStatus.RULED]
+    assert [repository.stored_entries(item)[0]["ruling"] for item in (42, 7)] == ["A", "A"]
+    assert _each_call_completes_before_the_next_enters(port.calls())
+
+
 def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
-    repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
+    repository: BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """ABRD-17/18/77: one write turn spans every configured repo, and a staged,
     event-driven drain refuses a still-waiting decision the moment stopping
@@ -191,7 +192,7 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
 
 
 def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(
-    repository: FakeAcoRepository, monkeypatch: pytest.MonkeyPatch
+    repository: BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """ABRD-17: the write turn is global, not per repo -- a decision for repo
     B waits while repo A's decision is being written, even though the two

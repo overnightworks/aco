@@ -1,35 +1,75 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { decidedCard, expectDecidedAnswer, openDecidedLine } from './decidedView';
-import { line, row, writeRulings } from './rulingsFixture';
+import { expectDecidedAnswer, openDecidedLine } from './decidedView';
+import { countPosts, pick, picks } from './decideRow';
+import {
+	arrange,
+	item,
+	optionEntry,
+	type CardOption,
+	type Item,
+	type OptionEntry
+} from './itemFixture';
 import { readBoardRuntime } from './runtime';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json, so
-// tests stay isolated from one another despite the shared process.
+// global-setup.ts); each test arranges the whole board, so tests stay
+// isolated from one another despite the shared process.
 test.describe.configure({ mode: 'serial' });
 
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
-function choices(page: Page) {
-	return page.getByRole('group', { name: 'Entscheidung' });
+// aco rules every board pick `via board` on `board_forge.RULING_DAY`; the
+// decided card's How row reads it back.
+const BOARD_PICK_HOW = 'Board · 03.10.2026';
+
+// A today picture tall enough that the question pane scrolls.
+const TALL_PICTURE = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="4000"/>';
+
+const OPTIONS: CardOption[] = [
+	{
+		name: 'Erster Weg',
+		effect: 'Der erste Weg gilt.',
+		same_as_today: true,
+		notice: 'Du merkst nichts.',
+		cost: 'Mehr Code.',
+		undo: 'reversible',
+		undo_how: 'jederzeit',
+		contract: 'Der erste Weg gilt.'
+	},
+	{
+		name: 'Zweiter Weg',
+		effect: 'Der zweite Weg gilt.',
+		same_as_today: true,
+		notice: 'Du merkst es.',
+		cost: 'Weniger Code.',
+		undo: 'reversible',
+		undo_how: 'jederzeit',
+		contract: 'Der zweite Weg gilt.'
+	}
+];
+
+function card(question: string, overrides: Partial<OptionEntry> = {}) {
+	return optionEntry('Satz 1', { question, option: OPTIONS, ...overrides });
 }
 
-async function arrangeLongRepositoryLists(page: Page, directory: string, longWord: string) {
-	writeRulings(
-		directory,
+function listRow(page: Page, question: string) {
+	return page.locator('.tracks').getByTitle(question);
+}
+
+async function arrangeLongRepositoryLists(page: Page, longWord: string) {
+	await arrange(
 		Array.from({ length: 12 }, (_, index) =>
-			row(
+			item(
 				700 + index,
 				`Vorhaben ${index} ${longWord}`,
-				line(1, `Satz ${index} ${longWord}`, {
-					question: `Frage ${index}?`,
-					example: `${longWord}\n${'Vollständiges Beispiel. '.repeat(80)}`,
+				card(`Frage ${index}?`, {
+					text: `Satz ${index} ${longWord}`,
+					option: OPTIONS.map((option) => ({ ...option, contract: longWord })),
 					picture:
-						'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="120"><rect width="1200" height="120" fill="#8a2a63"/></svg>',
-					default: 'yes'
+						'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="3600"><rect width="1200" height="3600" fill="#8a2a63"/></svg>'
 				})
 			)
 		)
@@ -61,7 +101,7 @@ async function expectReturnAndResizeFocus(
 		await expect.poll(() => tracks.evaluate((element) => element.scrollTop)).toBe(scrollPosition);
 		await expect(selected).toHaveAttribute('aria-current', 'true');
 		await page.setViewportSize({ width: 1280, height: 900 });
-		await page.getByText('Notiz', { exact: true }).focus();
+		await page.getByRole('button', { name: 'Other…' }).focus();
 		await page.setViewportSize(viewport);
 		await expect(tracks).toBeFocused();
 	} else {
@@ -74,26 +114,16 @@ async function expectReturnAndResizeFocus(
 test('reactivating the selected desktop row restores the question heading and focus', async ({
 	page
 }, testInfo) => {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	const { appUrl, token } = readBoardRuntime();
 	await page.setViewportSize({ width: 1280, height: 900 });
-	writeRulings(repoDirectory, [
-		row(
-			950,
-			'Reselection',
-			line(1, 'First sentence', {
-				question: 'First?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			})
-		)
-	]);
+	await arrange([item(950, 'Reselection', card('First?', { picture: TALL_PICTURE }))]);
 	await page.goto(`${appUrl}#t=${token}`);
-	const selected = page.getByRole('button', { name: /First\?/ });
+	const selected = listRow(page, 'First?');
 	await selected.click();
 	await expect(page.locator('.stage')).toBeFocused();
-	await page.keyboard.press('Tab');
-	await page.keyboard.press('Tab');
-	await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeFocused();
+	// The stage's tab stops before the first pick: the picture, then the two option disclosures.
+	for (let stop = 0; stop < 4; stop += 1) await page.keyboard.press('Tab');
+	await expect(pick(page, 'A')).toBeFocused();
 	await expect
 		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
 		.toBeGreaterThan(0);
@@ -110,31 +140,19 @@ test('reactivating the selected desktop row restores the question heading and fo
 test('advancing after phone list return and desktop resize focuses the next question', async ({
 	page
 }, testInfo) => {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	const { appUrl, token } = readBoardRuntime();
 	await page.setViewportSize({ width: 390, height: 844 });
-	writeRulings(repoDirectory, [
-		row(
-			951,
-			'Resize',
-			line(1, 'First sentence', {
-				question: 'First?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			}),
-			line(2, 'Second sentence', {
-				question: 'Second?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			})
-		)
+	await arrange([
+		item(951, 'Resize', card('First?', { picture: TALL_PICTURE })),
+		item(961, 'Resize second', card('Second?', { picture: TALL_PICTURE }))
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: /First\?/ }).click();
+	await listRow(page, 'First?').click();
 	await page.getByRole('button', { name: '‹ Open' }).click();
 	await page.screenshot({ path: testInfo.outputPath('phone-return.png') });
 	await page.setViewportSize({ width: 1280, height: 900 });
-	await choices(page).getByRole('button', { name: /Ja/ }).click();
+	await pick(page, 'A').click();
 	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 	await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeInViewport();
 	await expect(page.locator('.stage')).toBeFocused();
@@ -144,40 +162,29 @@ test('advancing after phone list return and desktop resize focuses the next ques
 test('desktop completion preserves deliberately focused other list row', async ({
 	page
 }, testInfo) => {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	const { appUrl, token } = readBoardRuntime();
 	await page.setViewportSize({ width: 1280, height: 900 });
-	writeRulings(repoDirectory, [
-		row(
-			954,
-			'Desktop completion',
-			line(1, 'First sentence', {
-				question: 'First?',
-				example: 'Long example. '.repeat(500),
-				default: 'yes'
-			}),
-			line(2, 'Second sentence', {
-				question: 'Second?',
-				example: 'Long example. '.repeat(500)
-			}),
-			line(3, 'Third sentence', { question: 'Third?' })
-		)
+	await arrange([
+		item(954, 'Desktop completion', card('First?', { picture: TALL_PICTURE })),
+		item(964, 'Desktop completion second', card('Second?', { picture: TALL_PICTURE })),
+		item(974, 'Desktop completion third', card('Third?'))
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
-	await page.getByRole('button', { name: /First\?/ }).click();
-	await choices(page).getByRole('button', { name: /Ja/ }).click();
+	await listRow(page, 'First?').click();
+	await page.locator('.question-pane').evaluate((pane) => {
+		pane.scrollTop = pane.scrollHeight;
+	});
+	await pick(page, 'A').click();
 	await expect
 		.poll(() => page.locator('.question-pane').evaluate((pane) => pane.scrollTop))
 		.toBeGreaterThan(0);
-	const third = page.getByRole('button', { name: /Third\?/ });
+	const third = listRow(page, 'Third?');
 	await third.focus();
 	await expect(third).toBeFocused();
 	await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-	await expect(page.getByRole('button', { name: /Second\?/ })).toHaveAttribute(
-		'aria-current',
-		'true'
-	);
-	await expect(page.locator('.tracks').getByRole('button', { name: /First\?/ })).toHaveCount(0);
+	await expect(listRow(page, 'Second?')).toHaveAttribute('aria-current', 'true');
+	await expect(listRow(page, 'First?')).toHaveCount(0);
 	await expect(third).toBeFocused();
 	await expect(third).toBeInViewport();
 	await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeInViewport();
@@ -189,24 +196,22 @@ test('desktop completion preserves deliberately focused other list row', async (
 
 for (const scenario of ['next question', 'exhausted list', 'focus elsewhere']) {
 	test(`phone list completion keeps visible focus: ${scenario}`, async ({ page }, testInfo) => {
-		const { appUrl, token, repoDirectory } = readBoardRuntime();
+		const { appUrl, token } = readBoardRuntime();
 		await page.setViewportSize({ width: 390, height: 844 });
-		const lines = [line(1, 'First sentence', { question: 'First?', default: 'yes' })];
+		const items: Item[] = [item(952, 'List completion', card('First?'))];
 		if (scenario !== 'exhausted list') {
-			lines.push(line(2, 'Second sentence', { question: 'Second?' }));
+			items.push(item(962, 'List completion second', card('Second?')));
 		}
-		writeRulings(repoDirectory, [row(952, 'List completion', ...lines)]);
+		await arrange(items);
 		await page.clock.install();
 		await page.goto(`${appUrl}#t=${token}`);
-		const first = page.getByRole('button', { name: /First\?/ });
+		const first = listRow(page, 'First?');
 		await first.click();
-		await choices(page).getByRole('button', { name: /Ja/ }).click();
+		await pick(page, 'A').click();
 		await page.getByRole('button', { name: '‹ Open' }).click();
 		await expect(first).toBeFocused();
 		const target =
-			scenario === 'focus elsewhere'
-				? page.getByRole('button', { name: /Second\?/ })
-				: page.locator('.tracks');
+			scenario === 'focus elsewhere' ? listRow(page, 'Second?') : page.locator('.tracks');
 		if (scenario === 'focus elsewhere') await target.focus();
 		await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 		await expect(first).toHaveCount(0);
@@ -227,18 +232,14 @@ for (const viewport of [
 		test('selection during a background reload reaches the question without stale actions', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					953,
-					'Background reload',
-					line(1, 'First sentence', { question: 'First?', default: 'yes' }),
-					line(2, 'Second sentence', { question: 'Second?' })
-				)
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(953, 'Background reload', card('First?')),
+				item(963, 'Background reload second', card('Second?'))
 			]);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /First\?/ }).click();
+			await listRow(page, 'First?').click();
 			let release: (() => void) | undefined;
 			const held = new Promise<void>((resolve) => {
 				release = resolve;
@@ -248,9 +249,9 @@ for (const viewport of [
 				await route.continue();
 			});
 			try {
-				await choices(page).getByRole('button', { name: /Ja/ }).click();
+				await pick(page, 'A').click();
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
-				const second = page.getByRole('button', { name: /Second\?/ });
+				const second = listRow(page, 'Second?');
 				await second.focus();
 				const reload = page.waitForRequest('**/api/board');
 				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
@@ -258,7 +259,9 @@ for (const viewport of [
 				await expect(second).toBeFocused();
 				await second.press('Enter');
 				await expect(page.getByRole('heading', { name: 'Second?', exact: true })).toBeVisible();
-				await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeDisabled();
+				await expect(picks(page).getByRole('button')).toHaveText(['A', 'B']);
+				await expect(pick(page, 'A')).toHaveAttribute('aria-disabled', 'true');
+				await expect(pick(page, 'B')).toHaveAttribute('aria-disabled', 'true');
 				await page.screenshot({ path: testInfo.outputPath('background-loading.png') });
 			} finally {
 				release?.();
@@ -302,56 +305,15 @@ for (const viewport of [
 				.toBeLessThanOrEqual(viewport.width);
 		});
 
-		test('undoing within the 8 s window writes nothing, ever', async ({ page }) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					601,
-					'Guests',
-					line(1, 'Guests may join the call.', { question: 'Guests allowed?', default: 'yes' })
-				)
-			]);
-			let ruleRequests = 0;
-			page.on('request', (request) => {
-				if (request.url().endsWith('/api/rule')) {
-					ruleRequests += 1;
-				}
-			});
-
-			await page.clock.install();
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Guests allowed\?/ }).click();
-			await choices(page).getByRole('button', { name: /Ja/ }).click();
-			await page.getByRole('button', { name: 'Undo', exact: true }).click();
-
-			// The page clock runs past the window: the undo must have cancelled the
-			// write, not merely delayed it, and no real waiting is needed to prove it.
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			expect(ruleRequests).toBe(0);
-			await expect(choices(page).getByRole('button', { name: /Ja/ })).toBeEnabled();
-		});
-
 		test('once the window elapses, exactly one decision is written', async ({ page }, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					602,
-					'Hosts',
-					line(1, 'Hosts may close the room.', { question: 'Hosts allowed?', default: 'no' })
-				)
-			]);
-			let ruleRequests = 0;
-			page.on('request', (request) => {
-				if (request.url().endsWith('/api/rule')) {
-					ruleRequests += 1;
-				}
-			});
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([item(602, 'Hosts', card('Hosts allowed?'))]);
+			const posts = countPosts(page);
 
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Hosts allowed\?/ }).click();
-			await choices(page).getByRole('button', { name: /Nein/ }).click();
+			await listRow(page, 'Hosts allowed?').click();
+			await pick(page, 'B').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible();
@@ -359,110 +321,17 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('unselected.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			await openDecidedLine(page, 'Hosts allowed?');
-			await expectDecidedAnswer(page, 'Nein', 'not recorded · 03.10.2026');
-			expect(ruleRequests).toBe(1);
-		});
-
-		test('deciding moves the stage to the next open card, and the ruled one keeps no buttons', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					605,
-					'Access',
-					line(1, 'Guests may join the call.', {
-						question: 'Guests allowed?',
-						default: 'yes',
-						example: 'Ein langes Beispiel. '.repeat(300)
-					}),
-					line(2, 'Hosts may close the room.', { question: 'Hosts allowed?', default: 'no' })
-				)
-			]);
-
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Guests allowed\?/ }).click();
-			await choices(page).getByRole('button', { name: /Ja/ }).click();
-
-			await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeVisible({
-				timeout: 10_000
-			});
-			await expect(choices(page).getByRole('button', { name: /Nein/ })).toBeVisible();
-			await expect(page.getByRole('heading', { name: 'Hosts allowed?' })).toBeInViewport();
-			await expect(page.locator('.stage')).toBeFocused();
-
-			// The completed question is available only in the read-only Decided card.
-			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
-			await expect(page.getByRole('button', { name: /Guests allowed\?/ })).not.toBeVisible();
-			await openDecidedLine(page, 'Guests allowed?');
-			await expectDecidedAnswer(page, 'Ja', 'not recorded · 03.10.2026');
-			await decidedCard(page).getByText('Show', { exact: true }).click();
-			await expect(page.getByText('Guests may join the call.')).toBeVisible();
-		});
-
-		test('a question changed mid-undo refuses to save and asks for a reload', async ({ page }) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					603,
-					'Changed line',
-					line(1, 'Original sentence.', { question: 'Original question?', default: 'yes' })
-				)
-			]);
-
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Original question\?/ }).click();
-			await choices(page).getByRole('button', { name: /Ja/ }).click();
-
-			// An agent reformulates the line while the operator's undo window is
-			// still open; the board must refuse the stale choice once it writes.
-			writeRulings(repoDirectory, [
-				row(
-					603,
-					'Changed line',
-					line(1, 'A different sentence now.', { question: 'Original question?', default: 'yes' })
-				)
-			]);
-
-			await expect(page.getByText('Diese Zeile hat sich geändert, bitte neu laden')).toBeVisible({
-				timeout: 10_000
-			});
-		});
-
-		test('"Später" is a real, writable outcome, recommended when it is the default', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					604,
-					'Deferred',
-					line(1, 'This can wait a cycle.', { question: 'Deferred question?', default: 'later' })
-				)
-			]);
-
-			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Deferred question\?/ }).click();
-			const recommended = choices(page).getByRole('button', { name: /Später/ });
-			await expect(recommended).toContainText('Empfohlen');
-			await recommended.click();
-
-			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible({ timeout: 10_000 });
-			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
-			await openDecidedLine(page, 'Deferred question?');
-			await expectDecidedAnswer(page, 'Später', 'not recorded · 03.10.2026');
+			await expectDecidedAnswer(page, 'B — Zweiter Weg', BOARD_PICK_HOW);
+			expect(posts.count()).toBe(1);
 		});
 
 		test('eight long repository lists keep selection, focus and all content inside the viewport', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			const { appUrl, token } = readBoardRuntime();
 			const longWord = 'Entscheidungsgrundlage'.repeat(12);
-			await arrangeLongRepositoryLists(page, repoDirectory, longWord);
-			let writes = 0;
-			page.on('request', (request) => {
-				if (request.method() === 'POST') writes += 1;
-			});
+			await arrangeLongRepositoryLists(page, longWord);
+			const posts = countPosts(page);
 			await page.goto(`${appUrl}#t=${token}`);
 			if (viewport.width > 760) {
 				await expect(page.getByRole('heading', { name: 'Frage 0?', exact: true })).toBeVisible();
@@ -476,13 +345,13 @@ for (const viewport of [
 			await page.keyboard.press('Enter');
 			await expect(page.getByRole('heading', { name: 'Frage 11?' })).toBeInViewport();
 			await expect(page.locator('.stage')).toBeFocused();
+			await pick(page, 'B').focus();
 			await page.keyboard.press('Tab');
-			await expect(page.getByText('Notiz', { exact: true })).toBeFocused();
+			await expect(page.getByRole('button', { name: 'Other…' })).toBeFocused();
 			await page.keyboard.press('Enter');
-			await page.keyboard.press('Tab');
 			await expect(page.getByRole('textbox')).toBeFocused();
 			await page.getByRole('textbox').fill(longWord);
-			await expect(page.getByAltText('Bild zur Frage')).toBeVisible();
+			await expect(page.locator('.option-card').getByAltText('Heute').first()).toBeVisible();
 			await expect
 				.poll(() => page.evaluate(() => document.documentElement.scrollWidth))
 				.toBeLessThanOrEqual(viewport.width);
@@ -495,31 +364,27 @@ for (const viewport of [
 				element.scrollTop = 0;
 			});
 			await page.screenshot({ path: testInfo.outputPath('selected.png') });
-			await choices(page)
-				.getByRole('button', { name: 'Nein', exact: true })
-				.scrollIntoViewIfNeeded();
-			await expect(choices(page)).toBeInViewport();
+			await pick(page, 'B').scrollIntoViewIfNeeded();
+			await expect(picks(page)).toBeInViewport();
 			await page.screenshot({ path: testInfo.outputPath('note.png') });
 			await expectReturnAndResizeFocus(page, viewport, scrollPosition);
-			expect(writes).toBe(0);
+			expect(posts.count()).toBe(0);
 		});
 
 		test('separate undo notices stay reachable and cancel every pending write', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(720, 'Mehrere Fragen', line(1, 'Erste Frage'), line(2, 'Zweite Frage'))
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(720, 'Erste Karte', card('Erste Frage')),
+				item(721, 'Zweite Karte', card('Zweite Frage'))
 			]);
-			let writes = 0;
-			page.on('request', (request) => {
-				if (request.method() === 'POST') writes += 1;
-			});
+			const posts = countPosts(page);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
 			for (const name of ['Erste Frage', 'Zweite Frage']) {
-				await page.getByRole('button', { name: new RegExp(name) }).click();
-				await choices(page).getByRole('button', { name: 'Ja', exact: true }).click();
+				await listRow(page, name).click();
+				await pick(page, 'A').click();
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			}
 			await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(2);
@@ -527,7 +392,7 @@ for (const viewport of [
 			await page.getByRole('button', { name: 'Undo', exact: true }).last().click();
 			await page.getByRole('button', { name: 'Undo', exact: true }).click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-			expect(writes).toBe(0);
+			expect(posts.count()).toBe(0);
 		});
 	});
 }

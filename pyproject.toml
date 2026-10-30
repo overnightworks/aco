@@ -73,14 +73,15 @@ containers = ["aco"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_adopt | cmd_board | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_status",
+    "cmd_adopt | cmd_board | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_item | cmd_land | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_status | cmd_withdraw",
+    "board",
     "decide",
     "board_read | policy | report",
     "session",
     "checkout | store",
     "github | state_board",
     "github_graphql",
-    "forge",
+    "forge | rulings",
     "workboard",
     "items | expectations",
     "body",
@@ -88,7 +89,7 @@ layers = [
     "card_rules",
     "usage",
     "lineage_stamp",
-    "protocol | process | board",
+    "protocol | process",
 ]
 # `metrics` sits below `body` so the body-block codec can reach `metrics.Size` for its own
 # `size`/`[[expectation]]` schema, while `items` may still import `body`,
@@ -120,7 +121,7 @@ layers = [
     "cli",
     "server",
     "api | static",
-    "board | aco_cli | token_store",
+    "board | aco_source | token_store",
     "ports",
 ]
 
@@ -128,9 +129,9 @@ layers = [
 name = "Decision board transport does not reach the aco adapter"
 type = "forbidden"
 # The layers contract alone lets `server`, `static`, and `api` import
-# `aco_cli`, which sits below them; only `cli` may wire the adapter in.
+# `aco_source`, which sits below them; only `cli` may wire the adapter in.
 source_modules = ["aco.board.server", "aco.board.static", "aco.board.api"]
-forbidden_modules = ["aco.board.aco_cli"]
+forbidden_modules = ["aco.board.aco_source"]
 allow_indirect_imports = false
 
 [[tool.importlinter.contracts]]
@@ -146,16 +147,37 @@ allowed_importers = ["aco.board"]
 ignore_imports = ["aco.cmd_serve -> aco.board.cli"]
 
 [[tool.importlinter.contracts]]
-name = "The decision board reaches aco only through its command line"
+name = "Only the board's aco source imports aco's session and ruling writer"
 type = "forbidden"
-# The board talks to aco through the installed `aco` CLI and its
-# specified JSON, never through aco's internal modules.
-# `as_packages = false` lists every module of the board as its own source, so
-# the overlap with the forbidden `aco` package does not make the contract
-# keep silently; it holds board -> `aco/__init__`.
+# The board's rules, its transport and its wiring know only the port; the one
+# adapter builds aco's contexts and writes through `decide`, the writer
+# `aco rule` uses. `as_packages = false` lists every module of the board as its
+# own source; true checks only the direct edge, since every board module
+# reaches `aco_source` -- and through it these modules -- by `cli`'s wiring.
 source_modules = ["aco.board", "aco.board.**"]
-forbidden_modules = ["aco"]
-allow_indirect_imports = false
+forbidden_modules = ["aco.session", "aco.decide"]
+ignore_imports = ["aco.board.aco_source -> aco.session", "aco.board.aco_source -> aco.decide"]
+allow_indirect_imports = true
+as_packages = false
+
+[[tool.importlinter.contracts]]
+name = "The decision board imports no forge transport, store or output"
+type = "forbidden"
+# The board reaches the forge and the claim-state store only through aco's
+# own library above them, and prints nothing through aco's report.
+# true checks only the direct edge: the board's aco source reaches every one of
+# these through `session` and `decide`.
+source_modules = ["aco.board", "aco.board.**"]
+forbidden_modules = [
+    "aco.github",
+    "aco.state_board",
+    "aco.store",
+    "aco.checkout",
+    "aco.process",
+    "aco.github_graphql",
+    "aco.report",
+]
+allow_indirect_imports = true
 as_packages = false
 
 [[tool.importlinter.contracts]]
@@ -210,8 +232,7 @@ forbidden_modules = ["subprocess"]
 # import.
 allow_indirect_imports = true
 as_packages = false
-# The decision board's one adapter calls the installed `aco` command line.
-ignore_imports = ["aco.process -> subprocess", "aco.board.aco_cli -> subprocess"]
+ignore_imports = ["aco.process -> subprocess"]
 
 [[tool.importlinter.contracts]]
 name = "Only the gh and git owners run commands"

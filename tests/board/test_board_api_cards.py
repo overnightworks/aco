@@ -1,61 +1,45 @@
 """The board's JSON API deciding option cards through the real server, wire form and
-`aco` adapter against a fake `aco` on PATH (specs/serve.spec.md): reading fresh on every
-listing, keeping no copy of a decision, the repos a card is written to, and what a broken,
-missing or hung `aco` does to a card post."""
+`aco` adapter against the real `aco` over a fake forge (specs/serve.spec.md): reading
+fresh on every listing, keeping no copy of a decision, the repos a card is written to,
+and what a forge that cannot list does to a card post."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
+from datetime import date
 from typing import Any, cast
 
 import pytest
 from aco_board_fixtures import (
     BoardClient,
-    FakeAcoRepository,
+    Lister,
+    RecordedPort,
     first_listed_line,
-    option_line,
-    row,
-    serving,
     serving_two,
 )
+from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body
+from option_cards import open_option_entry
 
-from aco.board.aco_cli import AcoCli
 from aco.board.board import LINE_CHANGED
 
 _ITEM = 42
-Lister = Callable[[BoardClient], list[dict[str, Any]]]
+_OPEN_CARD = item_body(open_option_entry())
+_YES_NO = {"text": "Guests?", "ruling": "yes", "ruled_on": date(2026, 10, 1)}
+_READ = ForgeRequest(ForgeOperation.READ_ITEM, _ITEM)
+_WRITE = ForgeRequest(ForgeOperation.WRITE_BODY, _ITEM)
 
 
-def _rule_call(item: int, index: int, letter: str) -> list[str]:
-    card_hash = option_line()["card_hash"]
-    return [
-        "rule",
-        str(item),
-        "--line",
-        str(index),
-        "--option",
-        letter,
-        f"--card-hash={card_hash}",
-        "--via",
-        "board",
-        "--json",
-    ]
+def _ruled_a() -> dict[str, object]:
+    return {**open_option_entry(), "ruling": "A", "ruled_on": date(2026, 10, 28), "via": "board"}
 
 
 @pytest.mark.parametrize(
-    ("rows", "listed"),
+    ("items", "listed"),
     [
         ((), []),
         (
             (
-                row(
-                    42,
-                    "Share page",
-                    option_line(index=1),
-                    option_line(index=2, ruling="A"),
-                ),
-                row(7, "Login", option_line()),
+                (42, "Share page", item_body(open_option_entry(), _ruled_a())),
+                (7, "Login", _OPEN_CARD),
             ),
             [(42, "Share page", [(1, None), (2, "A")]), (7, "Login", [(1, None)])],
         ),
@@ -63,15 +47,17 @@ def _rule_call(item: int, index: int, letter: str) -> list[str]:
     ids=["nothing", "open-and-ruled-in-acos-order"],
 )
 def test_the_board_lists_every_option_line_under_its_item_in_acos_order(
-    repository: FakeAcoRepository,
+    repository: BoardForge,
     board: BoardClient,
-    rows: tuple[dict[str, object], ...],
+    port: RecordedPort,
+    items: tuple[tuple[int, str, str], ...],
     listed: list[tuple[int, str, list[tuple[int, str | None]]]],
     listed_items: Lister,
 ) -> None:
-    repository.set_rulings(*rows)
+    for number, title, raw_body in items:
+        repository.put_item(number, raw_body, title=title)
 
-    items = listed_items(board)
+    shown = listed_items(board)
 
     assert [
         (
@@ -79,112 +65,73 @@ def test_the_board_lists_every_option_line_under_its_item_in_acos_order(
             item["title"],
             [(entry["index"], entry["ruling"]) for entry in item["lines"]],
         )
-        for item in items
+        for item in shown
     ] == listed
-    assert repository.rule_calls() == []
+    assert port.ruled_items() == []
+    assert repository.body_writes() == []
 
 
 def test_the_board_reads_fresh_on_every_listing(
-    repository: FakeAcoRepository,
-    board: BoardClient,
-    listed_items: Lister,
+    repository: BoardForge, board: BoardClient, listed_items: Lister
 ) -> None:
-    for item, index in [(1, 1), (2, 4)]:
-        repository.set_rulings(row(item, "Changed between loads", option_line(index=index)))
+    repository.put_item(1, _OPEN_CARD, title="Removed between loads")
+    first = listed_items(board)
+    repository.remove_item(1)
+    repository.put_item(2, item_body(_YES_NO, open_option_entry()), title="Added between loads")
 
-        [listed_item] = listed_items(board)
-        [listed_line] = listed_item["lines"]
-        assert (listed_item["number"], listed_line["index"]) == (item, index)
+    second = listed_items(board)
+
+    assert [
+        [(item["number"], [entry["index"] for entry in item["lines"]]) for item in listing]
+        for listing in (first, second)
+    ] == [[(1, [1])], [(2, [1, 2])]]
 
 
 def test_the_board_keeps_no_copy_of_a_decision(
-    repository: FakeAcoRepository,
-    board: BoardClient,
-    listed_items: Lister,
+    repository: BoardForge, board: BoardClient, listed_items: Lister
 ) -> None:
-    repository.set_rulings(row(_ITEM, "Share page", option_line()))
+    repository.put_item(_ITEM, _OPEN_CARD, title="Share page")
     board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
 
-    repository.set_rulings(row(_ITEM, "Share page", option_line()))
+    repository.put_item(_ITEM, _OPEN_CARD, title="Share page")
 
-    assert [item["number"] for item in listed_items(board)] == [_ITEM]
+    assert [(item["number"], item["lines"][0]["ruling"]) for item in listed_items(board)] == [
+        (_ITEM, None)
+    ]
 
 
-def _aco_missing_from_path(
-    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_a_forge_that_cannot_read_the_item_during_a_card_post_keeps_the_line_undecided(
+    repository: BoardForge, board: BoardClient
 ) -> None:
-    del repository
-    monkeypatch.setenv("PATH", str(tmp_path / "no-aco-here"))
-
-
-def _aco_rulings_unreadable(
-    repository: FakeAcoRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    del tmp_path, monkeypatch
-    repository.fail_rulings("ERROR: no forge adapter for host")
-
-
-@pytest.mark.parametrize(
-    ("arrange", "message"),
-    [
-        (_aco_missing_from_path, "aco is not installed on PATH"),
-        (_aco_rulings_unreadable, "aco rulings failed: ERROR: no forge adapter for host"),
-    ],
-    ids=["aco-missing-from-path", "aco-rulings-unreadable"],
-)
-def test_a_broken_aco_during_a_card_post_keeps_the_line_undecided(
-    repository: FakeAcoRepository,
-    board: BoardClient,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    arrange: Callable[[FakeAcoRepository, Path, pytest.MonkeyPatch], None],
-    message: str,
-) -> None:
-    repository.set_rulings(row(_ITEM, "Share page", option_line()))
+    """ABRD-79."""
+    repository.put_item(_ITEM, _OPEN_CARD, title="Share page")
     shown = first_listed_line(board)
-    arrange(repository, tmp_path, monkeypatch)
+    repository.fail_item_reads("no forge adapter for host")
 
     answer = board.decide_card_through_api(_ITEM, [shown], ["A"])
 
-    assert answer.json() == {"status": "failed", "message": message}
-    assert repository.rule_calls() == []
-
-
-def test_a_hung_aco_rule_keeps_the_line_undecided(
-    repository: FakeAcoRepository, listed_items: Lister
-) -> None:
-    repository.set_rulings(row(_ITEM, "Share page", option_line()))
-    repository.delay("rule", 30)
-
-    with serving(AcoCli(directory=repository.directory, timeout_seconds=5)) as board:
-        answer = board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
-        numbers_after = [item["number"] for item in listed_items(board)]
-
-    assert answer.json() == {
-        "status": "failed",
-        "message": "aco rule did not answer within 5 seconds",
-    }
-    assert numbers_after == [_ITEM]
+    assert answer.json() == {"status": "failed", "message": "no forge adapter for host"}
+    assert repository.item_requests() == (_READ,)
 
 
 @pytest.mark.parametrize(
-    ("target_repo", "expected_status", "expected_message"),
-    [("a", "ruled", None), ("b", "failed", LINE_CHANGED)],
+    ("target_repo", "expected_status", "expected_message", "requests"),
+    [("a", "ruled", None, ((_READ, _WRITE), ())), ("b", "failed", LINE_CHANGED, ((), (_READ,)))],
     ids=["its-own-repo", "a-different-repo-with-an-identical-card"],
 )
 def test_a_card_only_writes_the_repo_its_fingerprint_was_read_from(
-    two_repositories: tuple[FakeAcoRepository, FakeAcoRepository],
+    two_repositories: tuple[BoardForge, BoardForge],
     target_repo: str,
     expected_status: str,
     expected_message: str | None,
+    requests: tuple[tuple[ForgeRequest, ...], tuple[ForgeRequest, ...]],
 ) -> None:
     """ABRD-16/21: a card decided against its own repo writes there; posted
     against another configured repo instead -- even one holding an identical
-    card -- it is refused like a changed line, no write in either repo."""
-    repository_a, repository_b = two_repositories
-    identical_card = row(_ITEM, "Share page", option_line())
-    repository_a.set_rulings(identical_card)
-    repository_b.set_rulings(identical_card)
+    card -- it is refused like a changed line on that repo's one read, no
+    write in either repo."""
+    for repository in two_repositories:
+        repository.put_item(_ITEM, _OPEN_CARD, title="Share page")
 
     with serving_two(two_repositories) as board:
         [listed_repo_a, _] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
@@ -193,5 +140,4 @@ def test_a_card_only_writes_the_repo_its_fingerprint_was_read_from(
         answer = board.decide_card_through_api(_ITEM, [listed_in_a], ["A"], repo=target_repo)
 
     assert answer.json() == {"status": expected_status, "message": expected_message}
-    assert repository_a.rule_calls() == ([_rule_call(_ITEM, 1, "A")] if target_repo == "a" else [])
-    assert repository_b.rule_calls() == []
+    assert tuple(repository.item_requests() for repository in two_repositories) == requests

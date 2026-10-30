@@ -95,7 +95,7 @@ class TestGithubRule:
     ) -> None:
         """Spec: RULE-01 — RULED line; the other line stays open."""
         freeze_cli_now(monkeypatch)
-        initial = option_item(card(), YES_NO_LINE)
+        initial = option_item(card(), card())
         reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)
         client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
         result = run_cli(["rule", "90", *arguments], capsys)
@@ -104,7 +104,9 @@ class TestGithubRule:
             "exit": result.status,
             "stdout": result.stdout,
             "stderr": result.stderr,
-            "rulings": [line.ruling for line in written],
+            "rulings": [
+                line.ruling for line in written if isinstance(line, expectations.OptionLine)
+            ],
         }
         assert observed == {"exit": 0, "stdout": sentence, "stderr": "", "rulings": [ruling, None]}
 
@@ -112,7 +114,7 @@ class TestGithubRule:
         "lines,open_remaining",
         [
             pytest.param((card(),), 0, id="none-open"),
-            pytest.param((card(), YES_NO_LINE), 1, id="open-remaining"),
+            pytest.param((card(), card()), 1, id="open-remaining"),
         ],
     )
     def test_json(
@@ -258,6 +260,21 @@ class TestGithubRule:
             "writes": {} if not fails else None,
         }
 
+    def test_a_failed_item_read_refuses_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: RULE-11 -- a forge failure reading the item is no invalid target."""
+        reference = forge.ItemReference(
+            forge.ItemState.OPEN, "Decide something", option_item(card())
+        )
+        failure = forge.ForgeError("item read failed")
+        client = FakeForge(issue_references={90: reference}, scripted_item_reads=[failure])
+        serve_forge(monkeypatch, client)
+        result = run_cli(["rule", "90", *decision(), "--json"], capsys)
+        expected = {"ok": False, "reason": "unavailable", "message": "item read failed"}
+        assert (result.status, result.stderr) == (2, "ERROR: item read failed\n")
+        assert (json_wire(result.stdout), client.item_bodies) == (expected, {})
+
 
 @pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
 @pytest.mark.parametrize(
@@ -293,7 +310,7 @@ class TestGithubRule:
             (
                 (github, "discover_repository"),
                 (github, "GitHubForge"),
-                (board_read, "item_body_or_refuse"),
+                (board_read, "item_or_refuse"),
             ),
             "this command reads the repository's body contract from .aco/board.toml and needs "
             "a checkout (a shallow one is enough): fatal: not a git repository "

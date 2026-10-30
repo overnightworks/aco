@@ -71,9 +71,8 @@ def _allowed_methods(path: str) -> str:
 
 
 _MAX_REQUEST_BYTES = 16 * 1024
-"""A decision is two numbers, an outcome, a fingerprint, and a short note, and a
-card is a fingerprint and a letter per line; anything larger is refused before it
-is read."""
+"""A card is two numbers, a fingerprint and a letter per line, and at most one
+short text; anything larger is refused before it is read."""
 REQUEST_DEADLINE_SECONDS = 10.0
 """How long one socket read or write on a connection may wait, and how long
 a whole request body may take to arrive; a browser sends its small request
@@ -115,9 +114,9 @@ class _BoardServer(ThreadingHTTPServer):
         """Stop listening, then wait for a ruling already being written.
 
         Handler threads are daemons, so the process may exit while one is
-        inside `aco rule`, leaving the ruling's outcome unknown. Closing the
-        boards' writes waits for that write -- as long as the source's own
-        timeout lets it run -- and refuses every later one.
+        inside a ruling's write, leaving its outcome unknown. Closing the
+        boards' writes waits for that write -- as long as aco's own bounded
+        gh and git calls let it run -- and refuses every later one.
         """
         super().server_close()
         self.boards.close_writes()
@@ -358,12 +357,8 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return None
         return body
 
-    def _decide(self, request: api.RuleRequest) -> None:
-        boards = self._server().boards
-        if isinstance(request, api.CardRequest):
-            result = boards.decide_card(request.repo, request.card)
-        else:
-            result = boards.decide(request.repo, request.decision, request.fingerprint)
+    def _decide(self, request: api.CardRequest) -> None:
+        result = self._server().boards.decide_card(request.repo, request.card)
         self._respond(
             HTTPStatus.OK, api.decision_result_json(result).encode("utf-8"), api.JSON_CONTENT_TYPE
         )

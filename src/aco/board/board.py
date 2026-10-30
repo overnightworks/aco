@@ -1,10 +1,11 @@
 """The decision board's own rules, free of any transport.
 
 `Board` reads every expectation line afresh from its `DecisionPort` and
-writes one decision, or one whole option card, at a time through it, with no
-concurrency state of its own. `Boards` composes one or more `Board`s under their
-repo labels: it reads every repo in parallel, isolating a failing repo to its own
-`RepoUnavailable` entry, and owns the one write turn and drain shared across all of them --
+writes one whole option card at a time through it, checking the card on
+that write's own read of its item, with no concurrency state of its own.
+`Boards` composes one or more `Board`s under their repo labels: it reads
+every repo in parallel, isolating a failing repo to its own `RepoUnavailable`
+entry, and owns the one write turn and drain shared across all of them --
 including the single-repo case, so that lock never exists twice.
 """
 
@@ -13,15 +14,15 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 
 from .ports import (
     CardChanged,
     CardDecision,
     CardLine,
-    Decision,
     DecisionPort,
     DecisionResult,
     DecisionSourceUnavailableError,
@@ -38,7 +39,7 @@ SHUTTING_DOWN = "board is shutting down"
 def wire_fingerprint(repo: str, line: ExpectationLine) -> str:
     """The fingerprint a card exposes across the wire: `line`'s own fingerprint
     bound to the `repo` label it was read under. The JSON API and
-    `Boards.decide`'s own repo-binding check share this one function, so a
+    `checked_card`'s own repo-binding check share this one function, so a
     card's content being identical in two configured repos never lets its
     fingerprint satisfy the other repo's check, even with the two labels
     swapped."""
@@ -82,48 +83,16 @@ class Board:
         """A fresh read of the source; raises `DecisionSourceUnavailableError`."""
         return BoardSnapshot(self._decisions.expectation_lines())
 
-    def decide_one(self, decision: Decision, repo: str, fingerprint: str) -> DecisionResult:
-        """Write `decision` unless the open line it names no longer reads as shown.
-
-        The fingerprint comparison is the board's own stale check: the card was
-        built from an earlier read, and an open line whose shown fields changed
-        since must not be ruled blind. It compares `wire_fingerprint(repo, ...)`,
-        not the line's own bare fingerprint, so the same content read under
-        another repo's label never passes here either. A line
-        that is no longer open skips the comparison on purpose: whether it is
-        already ruled, out of range, or its item unknown is the source's own
-        refusal, which `rule` reports.
-
-        Callers serialize writes across every repo (`Boards`); this method
-        itself holds no lock, so it must never run concurrently with another
-        call on the same `Board`.
-        """
-        try:
-            lines = self._decisions.expectation_lines()
-        except DecisionSourceUnavailableError as error:
-            return DecisionResult(DecisionStatus.FAILED, str(error))
-        named = next(
-            (line for line in lines if (line.item, line.index) == (decision.item, decision.index)),
-            None,
-        )
-        if named is not None and named.is_open and wire_fingerprint(repo, named) != fingerprint:
-            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-        return self._decisions.rule(decision)
-
     def decide_card(self, posted: PostedCard, repo: str) -> DecisionResult:
         """Write `posted` with one call unless it no longer reads as the card shown.
 
-        The check and the write share one fresh read, so each hash written is the
-        one the check compared; callers serialize writes as for `decide_one`.
+        The source reads the posted item once and runs `checked_card` on that
+        read before it writes, so each hash written is the one the check
+        compared. Callers serialize writes across every repo (`Boards`); this
+        method itself holds no lock, so it must never run concurrently with
+        another call on the same `Board`.
         """
-        try:
-            lines = self._decisions.expectation_lines()
-        except DecisionSourceUnavailableError as error:
-            return DecisionResult(DecisionStatus.FAILED, str(error))
-        checked = checked_card(posted, repo, lines)
-        if checked is None:
-            return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
-        written = self._decisions.rule_card(checked)
+        written = self._decisions.rule_card(posted.item, partial(checked_card, posted, repo))
         if isinstance(written, CardChanged):
             return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
         return written
@@ -159,7 +128,7 @@ def checked_card(
 class Boards:
     """One or more repos' `Board`s under their labels, sharing one write turn.
 
-    `aco rule` rewrites a whole item body, so two writes at once -- even in
+    A ruling rewrites a whole item body, so two writes at once -- even in
     different repos, since nothing here needs that to be safe -- could each
     leave the outcome of a stopped write unknown; this is the single owner of
     that rule, always, even when only one repo is configured.
@@ -188,25 +157,13 @@ class Boards:
             }
             return tuple(_reading(label, futures[label]) for label in self._boards)
 
-    def decide(self, repo: str, decision: Decision, fingerprint: str) -> DecisionResult:
-        """Write through `repo`'s board; `repo` must already be one of `labels`.
-
-        `fingerprint` is `wire_fingerprint`'s value for the card as shown,
-        bound to `repo`: `Board.decide_one` checks it against the same
-        binding during its own fresh read, so an identical line read under
-        another configured repo's label never satisfies it.
-        """
-        return self._in_turn(lambda: self._boards[repo].decide_one(decision, repo, fingerprint))
-
     def decide_card(self, repo: str, posted: PostedCard) -> DecisionResult:
-        """Write a whole card through `repo`'s board in one turn, as `decide` does a line."""
-        return self._in_turn(lambda: self._boards[repo].decide_card(posted, repo))
-
-    def _in_turn(self, write: Callable[[], DecisionResult]) -> DecisionResult:
+        """Write a whole card through `repo`'s board in the one write turn;
+        `repo` must already be one of `labels`."""
         if not self._take_turn():
             return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
         try:
-            return write()
+            return self._boards[repo].decide_card(posted, repo)
         finally:
             self._end_turn()
 

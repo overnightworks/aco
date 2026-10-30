@@ -14,10 +14,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from aco_board_fixtures import FakeAcoRepository, serving
+from aco_board_fixtures import decision_port, serving
+from board_forge import BoardForge
 
 from aco.board import static
-from aco.board.aco_cli import AcoCli
 from aco.board.board import Boards
 from aco.board.server import start_board
 
@@ -203,9 +203,9 @@ def test_start_board_refuses_to_bind_once_the_shell_is_missing(
     ids=["shell", "asset", "asset-with-query", "asset-with-fragment", "stylesheet"],
 )
 def test_the_shell_and_its_assets_need_no_token(
-    repository: FakeAcoRepository, path: str, content_type: str
+    repository: BoardForge, path: str, content_type: str
 ) -> None:
-    with serving(AcoCli(directory=repository.directory)) as board:
+    with serving(decision_port(repository)) as board:
         response = board.call_api("GET", path, presented=None)
 
     assert response.status == 200
@@ -223,18 +223,18 @@ def test_the_shell_and_its_assets_need_no_token(
         "assets-directory-without-slash",
     ],
 )
-def test_an_unservable_path_answers_404(repository: FakeAcoRepository, path: str) -> None:
-    with serving(AcoCli(directory=repository.directory)) as board:
+def test_an_unservable_path_answers_404(repository: BoardForge, path: str) -> None:
+    with serving(decision_port(repository)) as board:
         response = board.call_api("GET", path, presented=None)
 
     assert response.status == 404
 
 
-def test_posting_to_an_unknown_path_answers_404(repository: FakeAcoRepository) -> None:
+def test_posting_to_an_unknown_path_answers_404(repository: BoardForge) -> None:
     """Unlike `/` and `/assets/**`, a path the board does not route at all stays
     a `404` for POST too: only the shell and the assets have a real `GET`-only
     route to refuse with `405` (server.py's `do_POST` fallback)."""
-    with serving(AcoCli(directory=repository.directory)) as board:
+    with serving(decision_port(repository)) as board:
         response = board.call_api("POST", "/elsewhere", presented=None)
 
     assert response.status == 404
@@ -243,9 +243,9 @@ def test_posting_to_an_unknown_path_answers_404(repository: FakeAcoRepository) -
 @pytest.mark.parametrize("path", ["/", "/assets/index.js", "/assets/index.css"])
 @pytest.mark.parametrize("method", ["PUT", "POST", "HEAD"])
 def test_a_method_the_shell_or_an_asset_does_not_serve_is_refused(
-    repository: FakeAcoRepository, method: str, path: str
+    repository: BoardForge, method: str, path: str
 ) -> None:
-    with serving(AcoCli(directory=repository.directory)) as board:
+    with serving(decision_port(repository)) as board:
         response = board.call_api(method, path, presented=None)
 
     assert response.status == 405
@@ -254,9 +254,9 @@ def test_a_method_the_shell_or_an_asset_does_not_serve_is_refused(
 
 @pytest.mark.parametrize("path", ["/", "/assets/index.js", "/assets/index.css"])
 def test_every_shell_and_asset_answer_carries_the_guard_headers(
-    repository: FakeAcoRepository, path: str
+    repository: BoardForge, path: str
 ) -> None:
-    with serving(AcoCli(directory=repository.directory)) as board:
+    with serving(decision_port(repository)) as board:
         response = board.call_api("GET", path, presented=None)
 
     assert response.headers["Cache-Control"] == "no-store"

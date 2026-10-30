@@ -6,29 +6,15 @@ import {
 	cardOtherRequest,
 	cardPicksRequest,
 	cardUnclearRequest,
-	decisionRequest,
 	LINE_CHANGED_MESSAGE,
 	lineKey,
 	noteOrNull,
 	readDecisionResult
 } from './decision';
 
-describe('lineKey / decisionRequest', () => {
+describe('lineKey', () => {
 	test('the key binds the repo label to the item and line index', () => {
 		expect(lineKey('repo', 42, line({ index: 3 }))).toBe('repo:42:3');
-	});
-
-	test('a decision carries the card fingerprint as read, never a derived one', () => {
-		const card = line({ index: 3, fingerprint: 'fp-abc' });
-
-		expect(decisionRequest('repo', 42, card, 'later', 'a note')).toEqual({
-			repo: 'repo',
-			item: 42,
-			line: 3,
-			fingerprint: 'fp-abc',
-			outcome: 'later',
-			note: 'a note'
-		});
 	});
 });
 

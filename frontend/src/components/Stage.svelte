@@ -1,21 +1,12 @@
 <script lang="ts">
-	import {
-		cardHeading,
-		cardSentence,
-		findSelection,
-		NO_SELECTION_MESSAGE,
-		pictureDataUri,
-		selectionHeading
-	} from '../app/model/boardSummary';
-	import { cardKey, NOTE_MAX_LENGTH, lineKey, noteOrNull } from '../app/model/decision';
+	import { findSelection, NO_SELECTION_MESSAGE, selectionHeading } from '../app/model/boardSummary';
+	import { cardKey, lineKey } from '../app/model/decision';
 	import { locksCard, type DecisionStore } from '../app/state/decision.svelte';
-	import type { Outcome, RepoReading } from '../types';
-	import ChoiceButtons from './ChoiceButtons.svelte';
+	import type { RepoReading } from '../types';
 	import DecideRow from './DecideRow.svelte';
 	import DecidedCard from './DecidedCard.svelte';
 	import GroupCard from './GroupCard.svelte';
 	import OptionCard from './OptionCard.svelte';
-	import RefusalBanner from './RefusalBanner.svelte';
 
 	let {
 		repos,
@@ -29,7 +20,6 @@
 		refreshing: boolean;
 	} = $props();
 
-	let noteText = $state('');
 	let decideRow: DecideRow | undefined = $state();
 
 	const selected = $derived(findSelection(repos, selectedKey));
@@ -48,7 +38,7 @@
 		{#key lineKey(selected.repo, selected.item.number, ruledLine)}
 			<DecidedCard repo={selected.repo} item={selected.item} line={ruledLine} />
 		{/key}
-	{:else if selected.kind === 'card'}
+	{:else}
 		{@const points = selected.points}
 		{@const repoName = selected.repo}
 		{@const itemNumber = selected.item.number}
@@ -106,54 +96,5 @@
 				{/each}
 			{/if}
 		{/key}
-	{:else}
-		{@const yesNoLine = selected.line}
-		{@const activeKey = lineKey(selected.repo, selected.item.number, selected.line)}
-		{@const banner = decisions.banner(activeKey)}
-		{@const locked = locksCard(banner)}
-		<article class="card">
-			<p class="item">
-				#{selected.item.number} · {selected.item.title} · Zeile {selected.line.index}
-			</p>
-			<h2 class="question">{cardHeading(selected.line)}</h2>
-			{#if cardSentence(selected.line) !== null}
-				<p class="sent">{cardSentence(selected.line)}</p>
-			{/if}
-			{#if selected.line.example !== null}
-				<p class="example">{selected.line.example}</p>
-			{/if}
-			{#if selected.line.picture !== null}
-				<img alt="Bild zur Frage" src={pictureDataUri(selected.line.picture)} />
-			{/if}
-			{#if banner !== null}
-				<RefusalBanner {banner} onReload={() => decisions.reloadAfterBanner(activeKey)} />
-			{/if}
-			{#if !locked}
-				<details class="note">
-					<summary>Notiz</summary>
-					<textarea
-						bind:value={noteText}
-						maxlength={NOTE_MAX_LENGTH}
-						placeholder="Optional – wird als „Anmerkung: …“ an den Satz gehängt"></textarea>
-				</details>
-				<ChoiceButtons
-					default={selected.line.default}
-					disabled={decisions.isPending(activeKey) || refreshing}
-					onChoose={(outcome: Outcome) => {
-						if (selected === null) {
-							return;
-						}
-						decisions.decide(
-							selected.repo,
-							selected.item.number,
-							yesNoLine,
-							outcome,
-							noteOrNull(noteText)
-						);
-						noteText = '';
-					}}
-				/>
-			{/if}
-		</article>
 	{/if}
 </section>

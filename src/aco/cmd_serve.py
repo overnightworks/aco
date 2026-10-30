@@ -51,8 +51,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def run(parsed: argparse.Namespace, _context: RunContext) -> int:
-    """Start the decision board. The board talks to aco only through its
-    command line, so the repository context is unused."""
+    """Start the decision board. The board builds its own context for every
+    read and write of each repository it serves, so this one stays unused."""
     if parsed.repo is not None:
         return report.render_error(protocol.ClaimError(_GLOBAL_REPO_MESSAGE))
     # Imported here: only `serve` needs the board package, and loading it for

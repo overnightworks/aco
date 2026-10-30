@@ -302,13 +302,6 @@ class TestBodyCheck:
                 "owner: unknown top-level key owner",
                 id="unknown-key",
             ),
-            pytest.param(
-                f'{MINIMAL_BLOCK_TOML}\n[[expectation]]\ntext = "x"\n'
-                'default = "yes"\nruling = "yes"\n',
-                "expectation[0].default: expectation[0] must be proposed (default) or ruled "
-                "(ruling, ruled_on), not both",
-                id="default-and-ruling",
-            ),
             *(
                 pytest.param(
                     f'{MINIMAL_BLOCK_TOML}\n[[slice]]\nindex = 1\ntitle = "Flip{control}side"\n',

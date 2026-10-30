@@ -93,3 +93,15 @@ test('[ABRD-37] hostile text renders as text', () => {
 	expect(screen.getByRole('heading', { name: hostile })).toBeInTheDocument();
 	expect(container.querySelector('img[onerror]')).toBeNull();
 });
+
+test('[ABRD-37] a hostile item title on a ruled yes/no line shows as text in the meta line', () => {
+	const hostile = '<img src=x onerror=alert(1)>';
+	const { container } = render(DecidedCard, {
+		repo: 'songmaker',
+		item: item({ number: 42, title: hostile }),
+		line: line({ index: 1, text: 'Guests may join.' })
+	});
+
+	expect(screen.getByText(`songmaker › ${hostile}`)).toBeInTheDocument();
+	expect(container.querySelector('img')).toBeNull();
+});

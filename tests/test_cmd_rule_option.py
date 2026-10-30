@@ -63,7 +63,7 @@ class TestRuleOption:
         today = FROZEN_CLI_NOW.date().isoformat()
         client = serve_item(monkeypatch, item_body(card(), newline=newline))
         ruled = run_cli(["rule", "7", *decide("A", via)], capsys)
-        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 A; 1 line(s) still open\n")
+        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 A; 0 line(s) still open\n")
         written = client.item_bodies[7]
         expected = item_body(
             ruled_card(("ruled_on = 2026-10-28", f"ruled_on = {today}"), ('"board"', f'"{via}"')),
@@ -93,7 +93,7 @@ class TestRuleOption:
                 "index": 2,
                 "ruling": "B",
                 "ruled_on": FROZEN_CLI_NOW.date().isoformat(),
-                "open": 1,
+                "open": 0,
             },
         )
 

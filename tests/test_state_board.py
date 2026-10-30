@@ -63,11 +63,11 @@ from aco import (
     board_read,
     checkout,
     cmd_cut,
-    cmd_rulings,
     forge,
     items,
     process,
     protocol,
+    rulings,
     session,
     store,
     workboard,
@@ -171,7 +171,7 @@ _CHILD_A_PROJECTION = _Projection(
     "Build slice A.",
     "Ship slice A.",
     "Slice A is merged.",
-    expectations=({"text": EXPECTATION_TEXT, "default": "yes"},),
+    expectations=(open_option_entry(EXPECTATION_TEXT),),
 )
 _CHILD_B_PROJECTION = _Projection("Build slice B.", "Ship slice B.", "Slice B is merged.")
 
@@ -476,7 +476,7 @@ _RULABLE_PROJECTION = _Projection(
     "Done.",
     expectations=(
         open_option_entry(),
-        {"text": "A second, still-open question?", "default": "later"},
+        open_option_entry("A second, still-open question?"),
     ),
 )
 
@@ -1241,8 +1241,8 @@ def _projected(
 
 
 def _rulings_lines(client: forge.BoardSource, *, storage: Storage) -> tuple[str, ...]:
-    rows = cmd_rulings._rulings_rows(client.list_open_board_issues(), storage=storage)
-    return tuple(cmd_rulings._rulings_row_text(row, storage) for row in rows)
+    rows = rulings.rows(client.list_open_board_issues(), storage=storage)
+    return tuple(rulings.row_text(row, storage) for row in rows)
 
 
 _EXPECTED_BOARD = _projected(_github_fake(), storage=Storage.GITHUB)

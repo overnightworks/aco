@@ -95,9 +95,11 @@ def ruled_card(*edits: tuple[str, str]) -> str:
     return card(card_head(("question = ", RULED_KEYS + "question = "), *edits))
 
 
-def open_option_entry() -> dict[str, object]:
-    """The open option card as the `[[expectation]]` entry a block projection carries."""
-    return tomllib.loads(card())["expectation"][0]
+def open_option_entry(text: str | None = None) -> dict[str, object]:
+    """The open option card as the `[[expectation]]` entry a block projection carries,
+    its `text` replaced when one is given."""
+    entry: dict[str, object] = tomllib.loads(card())["expectation"][0]
+    return entry if text is None else {**entry, "text": text}
 
 
 def card_body(line: str, *, before: str = "", newline: str = "\n") -> str:
@@ -145,7 +147,7 @@ def returned_card(keys: str = RETURNED_ON + RETURNED_NOTE) -> str:
 
 STALE_CARD_HASH = "sha256:" + "0" * 64
 ALREADY_RULED = "line 2 is already ruled; a changed ruling is a new line"
-YES_NO_LINE = '[[expectation]]\ntext = "Alt"\ndefault = "no"\n'
+YES_NO_LINE = '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2026-10-01\n'
 
 
 def item_body(option_line: str, *, yes_no_line: str = YES_NO_LINE, newline: str = "\n") -> str:
@@ -228,9 +230,9 @@ def assert_rewritten_alike(before: str, after: str, storage: body.Storage) -> No
 SECOND_CARD = card(card_head(("Soll dein Song", "Soll dein Lied")))
 
 
-def group_body(third: str = SECOND_CARD) -> str:
-    """Issue #7: line 1 a yes/no line, lines 2 and 3 open option lines."""
-    return card_body(third, before="\n" + YES_NO_LINE + "\n" + card())
+def group_body(third: str = SECOND_CARD, *, yes_no_line: str = YES_NO_LINE) -> str:
+    """Issue #7: line 1 `yes_no_line`, lines 2 and 3 open option lines."""
+    return card_body(third, before="\n" + yes_no_line + "\n" + card())
 
 
 def shown_hash(raw: str, index: int) -> str:

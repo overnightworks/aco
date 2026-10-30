@@ -38,7 +38,6 @@ from board_fixtures import (
     container_with_children,
     idea_body,
     projected_board,
-    proposed_expectation,
     request,
     ruled_expectation,
     slice_entries,
@@ -94,7 +93,7 @@ from github_fixtures import (
     landing_pull_request,
     landing_readiness,
 )
-from option_cards import card, decide
+from option_cards import card, decide, open_option_entry
 from store_fixtures import (
     RaceOnceTransport,
     blob,
@@ -819,7 +818,7 @@ def test_board_shows_open_and_total_instead_of_proposed(
                 "Claim #11.",
                 expectation=[
                     ruled_expectation("Name it."),
-                    proposed_expectation("Settle it.", default="no"),
+                    open_option_entry("Settle it."),
                 ],
             ),
         ),
@@ -1210,7 +1209,7 @@ PULLED_WITH_REFINING_FIRST = (
             id="no_expectation_entry_remains_actionable",
         ),
         pytest.param(
-            (proposed_expectation("Name it.", default="yes"),),
+            (open_option_entry("Name it."),),
             body.ExpectationState.PROPOSED,
             PULLED_WITH_REFINING_FIRST,
             id="proposed_expectations_are_pulled_with_refining_first",
@@ -1223,7 +1222,7 @@ PULLED_WITH_REFINING_FIRST = (
             id="fully_ruled_expectations_remain_actionable",
         ),
         pytest.param(
-            (ruled_expectation("Name it.", ruling="no"), proposed_expectation("Remove it.")),
+            (ruled_expectation("Name it.", ruling="no"), open_option_entry("Remove it.")),
             body.ExpectationState.PROPOSED,
             PULLED_WITH_REFINING_FIRST,
             id="mixed_expectations_are_pulled_with_refining_first",
@@ -1262,9 +1261,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
     unruled = board_issue(
         11,
         "Needs rulings",
-        complete_contract(
-            "Claim #11.", expectation=[proposed_expectation("Name it.", default="no")]
-        ),
+        complete_contract("Claim #11.", expectation=[open_option_entry("Name it.")]),
     )
     blocked, blocked_dependencies = blocked_issue(
         12, "Waits for rulings", block_dependency(11), next_step="Claim #12."
@@ -3762,37 +3759,6 @@ def test_claim_parser_description_names_what_refuses_first() -> None:
     assert "repository-relative" in issue_claim.CLAIM_DESCRIPTION
 
 
-def test_help_lists_commands_in_their_stable_registration_order() -> None:
-    """`aco --help`'s command order is part of the CLI's own contract:
-    `cli._COMMANDS` keeps every command in its original position,
-    including the forge-free and local commands."""
-    parser = issue_claim._parser()
-    subparsers_action = next(
-        action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
-    )
-
-    assert list(subparsers_action.choices) == [
-        "bootstrap",
-        "reset",
-        "status",
-        "board",
-        "serve",
-        "rulings",
-        "next",
-        "start",
-        "claim",
-        "release",
-        "land",
-        "adopt",
-        "rescope",
-        "cut",
-        "rule",
-        "check",
-        "brief",
-        "item",
-    ]
-
-
 def _every_parser(parser: argparse.ArgumentParser) -> Iterator[argparse.ArgumentParser]:
     yield parser
     for action in parser._actions:
@@ -5311,7 +5277,7 @@ def _release_freeing_titled(
 
 def _rulings_of_titled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, title: str) -> list[str]:
     """One item titled `title` whose one open expectation line says `title`."""
-    contract = complete_contract("Rule it.", expectation=[proposed_expectation(title)])
+    contract = complete_contract("Rule it.", expectation=[open_option_entry(title)])
     _configured_board_client(monkeypatch, tmp_path, open_issues=(board_issue(10, title, contract),))
     _write_block_pin(tmp_path)
     return ["--repo", REPOSITORY, "rulings"]

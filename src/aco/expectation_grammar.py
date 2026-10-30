@@ -1,7 +1,10 @@
 """The `[[expectation]]` entry grammar of a work-item body's `aco` block: the
 accepted values, the card-field and picture rules, the defects a stored entry
 can carry, its card hash, and the canonical rendering of the entries. An entry
-carrying `option` tables is an option line; any other is a yes/no line. Pure;
+carrying `withdrawn_on` is a withdrawn line, a question its head took back
+before it was ruled; one carrying `option` tables is an option line; any other
+is a ruled yes/no line, read-only history that no writer adds and no entry may
+hold open. Pure;
 it never imports `body`, which calls it while parsing and rendering a block and
 reports its `FieldDefect` pairs as `ContractDefect`s.
 """
@@ -27,7 +30,6 @@ class FieldDefect(NamedTuple):
     message: str
 
 
-BLOCK_EXPECTATION_DEFAULTS = frozenset({"yes", "no", "later"})
 # A ruled yes/no line stays readable: "later" is a legitimate final answer,
 # an explicit, dated decision to defer, like "yes" and "no".
 BLOCK_EXPECTATION_RULINGS = frozenset({"yes", "no", "later"})
@@ -48,6 +50,8 @@ ASKED_ON = "asked_on"
 # The keys of an open option line sent back to its head, and its optional note.
 RETURNED_ON = "returned_on"
 RETURNED_NOTE = "returned_note"
+# The day a head withdrew a line nobody had ruled; beside `text` the line's only key.
+WITHDRAWN_ON = "withdrawn_on"
 OPTION_COUNT_MINIMUM = 2
 _CARD_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 _PICTURE = "picture"
@@ -100,7 +104,7 @@ OPTION_LINE_KEYS = (
     "reason",
 )
 _OPTION_LINE_ONLY_KEYS = frozenset(OPTION_LINE_KEYS) - {"question", _PICTURE}
-_OPTION_LINE_REFUSED_KEYS = ("default", "example")
+_OPTION_LINE_REFUSED_KEYS = ("example",)
 # Every key of one `[[expectation.option]]` table, in rendering order; an
 # option carries either `picture` or `same_as_today`, and `caption` only
 # beside a picture.
@@ -126,39 +130,19 @@ def _one_of(values: tuple[str, ...]) -> str:
     return f"{', '.join(values[:-1])}, or {values[-1]}"
 
 
-def _block_expectation_variant_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
-    has_default, has_ruling, has_ruled_on = (
-        "default" in entry,
-        "ruling" in entry,
-        "ruled_on" in entry,
-    )
-    if has_default and (has_ruling or has_ruled_on):
-        return [
-            FieldDefect(
-                f"{prefix}.default",
-                f"{prefix} must be proposed (default) or ruled (ruling, ruled_on), not both",
-            )
-        ]
-    if has_default:
-        if entry["default"] not in BLOCK_EXPECTATION_DEFAULTS:
-            return [FieldDefect(f"{prefix}.default", f"{prefix}.default must be yes, no, or later")]
-        return []
-    if has_ruling or has_ruled_on:
-        defects = []
-        if entry.get("ruling") not in BLOCK_EXPECTATION_RULINGS:
-            defects.append(
-                FieldDefect(f"{prefix}.ruling", f"{prefix}.ruling must be yes, no, or later")
-            )
-        if type(entry.get("ruled_on")) is not date:
-            defects.append(
-                FieldDefect(f"{prefix}.ruled_on", f"{prefix}.ruled_on {NOT_A_LOCAL_DATE}")
-            )
-        return defects
-    return [
-        FieldDefect(
-            f"{prefix}.default", f"{prefix} must carry default, or both ruling and ruled_on"
+def _yes_no_ruling_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
+    """A yes/no line is ruled history: one carrying neither `ruling` nor
+    `ruled_on` is an open line no writer may add any more."""
+    if "ruling" not in entry and "ruled_on" not in entry:
+        return [FieldDefect(prefix, f"{prefix} is an open yes/no line; write an option card")]
+    defects = []
+    if entry.get("ruling") not in BLOCK_EXPECTATION_RULINGS:
+        defects.append(
+            FieldDefect(f"{prefix}.ruling", f"{prefix}.ruling must be yes, no, or later")
         )
-    ]
+    if type(entry.get("ruled_on")) is not date:
+        defects.append(FieldDefect(f"{prefix}.ruled_on", f"{prefix}.ruled_on {NOT_A_LOCAL_DATE}"))
+    return defects
 
 
 def _expectation_question_defect(value: object) -> str | None:
@@ -317,7 +301,7 @@ EXPECTATION_OPTIONAL_FIELDS: tuple[tuple[str, Callable[[object], str | None]], .
     (_PICTURE, _expectation_picture_defect),
 )
 _EXPECTATION_KNOWN_KEYS = frozenset(
-    {"text", "default", "ruling", "ruled_on", *(key for key, _ in EXPECTATION_OPTIONAL_FIELDS)}
+    {"text", "ruling", "ruled_on", *(key for key, _ in EXPECTATION_OPTIONAL_FIELDS)}
 )
 _OPTION_TABLES = "option"
 _OPTION_LINE_DECISION_KEYS = ("ruling", "ruled_on", "card_hash", "via")
@@ -329,6 +313,8 @@ _OPTION_LINE_STATE_KEYS = (
     RETURNED_ON,
     RETURNED_NOTE,
 )
+# Every key a line of any form writes before its card keys, in rendering order.
+_LINE_STATE_KEYS = ("text", WITHDRAWN_ON, *_OPTION_LINE_STATE_KEYS)
 _OPTION_LINE_KNOWN_KEYS = frozenset(
     {
         "text",
@@ -343,6 +329,16 @@ _OPTION_LINE_KNOWN_KEYS = frozenset(
 def is_option_line(entry: Mapping[str, object]) -> bool:
     """Whether `entry` is an option line: exactly when it carries `option`."""
     return _OPTION_TABLES in entry
+
+
+def is_withdrawn_line(entry: Mapping[str, object]) -> bool:
+    """Whether `entry` is a withdrawn line: exactly when it carries `withdrawn_on`."""
+    return WITHDRAWN_ON in entry
+
+
+def is_open_line(entry: Mapping[str, object]) -> bool:
+    """Whether `entry` still waits for a ruling: neither ruled nor withdrawn."""
+    return "ruling" not in entry and not is_withdrawn_line(entry)
 
 
 def _field_defect(path: str, reason: str | None) -> list[FieldDefect]:
@@ -644,7 +640,7 @@ def _block_expectation_optional_field_defects(
 def _yes_no_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
     keys = set(entry)
     return [
-        *_block_expectation_variant_defects(prefix, entry),
+        *_yes_no_ruling_defects(prefix, entry),
         *_block_expectation_optional_field_defects(prefix, entry),
         *(
             FieldDefect(
@@ -658,12 +654,35 @@ def _yes_no_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDef
     ]
 
 
+def _withdrawn_line_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
+    """A withdrawn line's defects after `text`: its date, then every other
+    key in the order the entry writes them."""
+    date_reason = None if type(entry[WITHDRAWN_ON]) is date else NOT_A_LOCAL_DATE
+    return [
+        *_field_defect(f"{prefix}.{WITHDRAWN_ON}", date_reason),
+        *(
+            FieldDefect(f"{prefix}.{key}", f"{prefix}.{key} does not belong on a withdrawn line")
+            for key in entry
+            if key not in {"text", WITHDRAWN_ON}
+        ),
+    ]
+
+
+def _entry_form_defects(
+    table: dict[str, object],
+) -> Callable[[str, dict[str, object]], list[FieldDefect]]:
+    """The defects of the form `table` takes, a withdrawn line judged first."""
+    if is_withdrawn_line(table):
+        return _withdrawn_line_defects
+    return _option_line_defects if is_option_line(table) else _yes_no_line_defects
+
+
 def _block_expectation_entry_defects(index: int, entry: object) -> list[FieldDefect]:
     prefix = f"expectation[{index}]"
     if not isinstance(entry, dict):
         return [FieldDefect(prefix, f"{prefix} must be a table")]
     table = cast(dict[str, object], entry)
-    form_defects = _option_line_defects if is_option_line(table) else _yes_no_line_defects
+    form_defects = _entry_form_defects(table)
     defects = [
         *_field_defect(f"{prefix}.text", _non_empty_string_defect(table.get("text"))),
         *form_defects(prefix, table),
@@ -715,7 +734,8 @@ def _rendered_present(table: Mapping[str, object], keys: tuple[str, ...]) -> lis
 
 def render_expectations(data: Mapping[str, object]) -> list[str]:
     """Every `[[expectation]]` entry in canonical order (BODY-88): `text`,
-    `asked_on`, the decided state, `other`, the open line's `returned_on` and
+    a withdrawn line's `withdrawn_on`, `asked_on`, the decided state,
+    `other`, the open line's `returned_on` and
     `returned_note`, the card keys of its form, then each option table;
     a key is written only when present, and a line's own keys always come
     before its option tables, which TOML would otherwise bind them to."""
@@ -723,7 +743,7 @@ def render_expectations(data: Mapping[str, object]) -> list[str]:
     for expectation in cast(list[dict[str, object]], data.get("expectation", [])):
         option_line = is_option_line(expectation)
         lines.extend(("", "[[expectation]]"))
-        lines.extend(_rendered_present(expectation, ("text", "default", *_OPTION_LINE_STATE_KEYS)))
+        lines.extend(_rendered_present(expectation, _LINE_STATE_KEYS))
         card_keys = OPTION_LINE_KEYS if option_line else ("question", "example", _PICTURE)
         lines.extend(_rendered_present(expectation, card_keys))
         for option in cast(list[dict[str, object]], expectation.get(_OPTION_TABLES, [])):

@@ -8,26 +8,25 @@ import {
 	openDecidedLine
 } from './decidedView';
 import {
-	line,
-	optionLine,
-	row,
-	writeRulings,
-	type OptionRulingLine,
-	type RulingOption
-} from './rulingsFixture';
+	arrange,
+	item,
+	optionEntry,
+	yesNoEntry,
+	type CardOption,
+	type OptionEntry
+} from './itemFixture';
 import { readBoardRuntime } from './runtime';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
 const FAILED_MESSAGE = 'Repository konnte nicht gelesen werden.';
 const DONE_COLOUR = 'rgb(28, 115, 80)';
 
-function choice(letter: string, name: string): RulingOption {
+function choice(name: string): CardOption {
 	return {
-		letter,
 		name,
 		effect: `Wirkung von ${name}.`,
 		same_as_today: true,
@@ -39,34 +38,40 @@ function choice(letter: string, name: string): RulingOption {
 	};
 }
 
-function ruledOption(index: number, overrides: Partial<OptionRulingLine>): OptionRulingLine {
-	return optionLine(index, 'Der Sprung bleibt offen.', {
+function sprungCard(options: CardOption[], overrides: Partial<OptionEntry>): OptionEntry {
+	return optionEntry('Der Sprung bleibt offen.', {
 		question: 'Sprung offen lassen?',
 		topic: 'Sprung',
-		options: [choice('A', 'Offen'), choice('B', 'Wie heute')],
+		option: options,
+		...overrides
+	});
+}
+
+/** A ruled card is exempt from the open card's word rules, so its option may carry a one-word name. */
+function ruledOption(overrides: Partial<OptionEntry>): OptionEntry {
+	return sprungCard([choice('Offen'), choice('Wie heute')], {
 		ruling: 'A',
 		ruled_on: '2026-10-02',
 		...overrides
 	});
 }
 
+function openOption(question: string): OptionEntry {
+	return sprungCard([choice('Sprung offen'), choice('Wie heute')], { question });
+}
+
 /** Item 42: three ruled lines of both forms and one open line. */
-function arrangeMixed(repoDirectory: string): void {
-	writeRulings(repoDirectory, [
-		row(
+async function arrangeMixed(): Promise<void> {
+	await arrange([
+		item(
 			42,
 			'Gäste im Gespräch',
-			ruledOption(1, {}),
-			line(2, 'Gäste dürfen über einen Link teilnehmen.', {
-				question: 'Gäste einladen?',
-				ruling: 'no',
-				ruled_on: '2026-10-03'
+			ruledOption({ via: 'board' }),
+			yesNoEntry('Gäste dürfen über einen Link teilnehmen.', 'no', '2026-10-03', {
+				question: 'Gäste einladen?'
 			}),
-			line(3, 'Die Aufzeichnung bleibt ausgeschaltet.', {
-				ruling: 'later',
-				ruled_on: '2026-10-01'
-			}),
-			line(4, 'Der Gastgeber kann beenden.', { question: 'Offene Frage?' })
+			yesNoEntry('Die Aufzeichnung bleibt ausgeschaltet.', 'later', '2026-10-01'),
+			openOption('Offene Frage?')
 		)
 	]);
 }
@@ -77,27 +82,25 @@ const LONG_ANSWER = `Erst am Desktop,\n„dann“ am Handy: ${'Der Sprung bleibt
 
 /** Item 50: option lines ruled the three ways, one yes/no line, then two
  * lines answered in the operator's own words. */
-function arrangeEveryWay(repoDirectory: string): void {
-	writeRulings(repoDirectory, [
-		row(
+async function arrangeEveryWay(): Promise<void> {
+	await arrange([
+		item(
 			50,
 			'Gespräch',
-			ruledOption(1, { question: 'Per Board?', via: 'board', ruled_on: '2026-10-25' }),
-			ruledOption(2, { question: 'Per Chat?', ruling: 'B', via: 'chat', ruled_on: '2026-10-04' }),
-			ruledOption(3, { question: 'Ohne Antwort?', via: 'default', ruled_on: '2026-10-26' }),
-			line(4, 'Gäste dürfen über einen Link teilnehmen.', {
-				question: 'Gäste einladen?',
-				ruling: 'no',
-				ruled_on: '2026-10-03'
+			ruledOption({ question: 'Per Board?', via: 'board', ruled_on: '2026-10-25' }),
+			ruledOption({ question: 'Per Chat?', ruling: 'B', via: 'chat', ruled_on: '2026-10-04' }),
+			ruledOption({ question: 'Ohne Antwort?', via: 'default', ruled_on: '2026-10-26' }),
+			yesNoEntry('Gäste dürfen über einen Link teilnehmen.', 'no', '2026-10-03', {
+				question: 'Gäste einladen?'
 			}),
-			ruledOption(5, {
+			ruledOption({
 				question: 'Nur Desktop?',
 				ruling: 'other',
 				other: SHORT_ANSWER,
 				via: 'board',
 				ruled_on: '2026-10-27'
 			}),
-			ruledOption(6, {
+			ruledOption({
 				question: 'Auch Handy?',
 				ruling: 'other',
 				other: LONG_ANSWER,
@@ -199,8 +202,8 @@ for (const viewport of [
 		test('[ABRD-30] Decided lists the ruled lines per project with the Decided shape and shows the selected card', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrangeMixed(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeMixed();
 			await routeRepositories(page, ['Projekt A', 'Projekt B'], ['Projekt C']);
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
@@ -253,8 +256,8 @@ for (const viewport of [
 		test('[ABRD-37] [ABRD-54] [ABRD-57] the decided card says what was decided, how and when', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			arrangeEveryWay(repoDirectory);
+			const { appUrl, token } = readBoardRuntime();
+			await arrangeEveryWay();
 			await page.goto(`${appUrl}#t=${token}`);
 			await expect(openTab(page)).toHaveText(/^Open 0$/);
 			await expect(decidedTab(page)).toHaveText(/^Decided 6$/);
@@ -294,37 +297,30 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-31] a repository lists the newest date first and a dateless ruled line last', async ({
-			page
-		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					7,
-					'Alt',
-					line(1, 'Ohne Datum?', { ruling: 'yes', ruled_on: null }),
-					line(2, 'Zweiter Oktober?', { ruling: 'yes', ruled_on: '2026-10-02' })
-				),
-				row(8, 'Neu', line(1, 'Dritter Oktober?', { ruling: 'no', ruled_on: '2026-10-03' }))
+		test('[ABRD-31] a repository lists the newest date first', async ({ page }) => {
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(8, 'Alt', yesNoEntry('Zweiter Oktober?', 'yes', '2026-10-02')),
+				item(7, 'Neu', yesNoEntry('Dritter Oktober?', 'no', '2026-10-03'))
 			]);
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
 
-			await expect(decidedList(page).getByRole('button')).toHaveCount(3);
+			await expect(decidedList(page).getByRole('button')).toHaveCount(2);
 			await expect
 				.poll(() =>
 					decidedList(page)
 						.getByRole('button')
 						.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('title')))
 				)
-				.toEqual(['Dritter Oktober?', 'Zweiter Oktober?', 'Ohne Datum?']);
+				.toEqual(['Dritter Oktober?', 'Zweiter Oktober?']);
 		});
 
 		test('[ABRD-31] with nothing ruled Decided reads Nothing decided yet', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [row(9, 'Offen', line(1, 'Noch offen?'))]);
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([item(9, 'Offen', openOption('Noch offen?'))]);
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
 
@@ -361,26 +357,22 @@ for (const viewport of [
 		test('[ABRD-32] Open keeps its row, list position and phone view across Decided, which starts at its first row again', async ({
 			page
 		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(
 					42,
 					'Gäste im Gespräch',
-					line(1, 'Gäste dürfen über einen Link teilnehmen.', { question: 'Gäste einladen?' }),
-					line(2, 'Der Gastgeber kann das Gespräch beenden.', { question: 'Gespräch beenden?' }),
-					line(3, 'Gastzugänge bleiben unverändert.', {
-						question: 'Gastzugänge ändern?',
-						ruling: 'later',
-						ruled_on: '2026-10-03'
+					openOption('Gäste einladen?'),
+					yesNoEntry('Gastzugänge bleiben unverändert.', 'later', '2026-10-03', {
+						question: 'Gastzugänge ändern?'
 					})
 				),
-				row(
+				item(43, 'Gesprächsende', openOption('Gespräch beenden?')),
+				item(
 					41,
 					'Aufzeichnung',
-					line(1, 'Die Aufzeichnung bleibt ausgeschaltet.', {
-						question: 'Aufzeichnen?',
-						ruling: 'no',
-						ruled_on: '2026-10-02'
+					yesNoEntry('Die Aufzeichnung bleibt ausgeschaltet.', 'no', '2026-10-02', {
+						question: 'Aufzeichnen?'
 					})
 				)
 			]);
@@ -436,18 +428,15 @@ for (const viewport of [
 		test('[ABRD-33] a pick waiting out its undo window is not in Decided, and once stored and reloaded it is', async ({
 			page
 		}) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(
-					60,
-					'Eine Frage',
-					line(1, 'Die Gäste dürfen teilnehmen.', { question: 'Gäste zulassen?' })
-				)
-			]);
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([item(60, 'Eine Frage', openOption('Gäste zulassen?'))]);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
-			await page.getByRole('button', { name: /Gäste zulassen/ }).click();
-			await page.getByRole('button', { name: 'Ja', exact: true }).click();
+			await page.locator('.tracks').getByTitle('Gäste zulassen?', { exact: true }).click();
+			await page
+				.getByRole('group', { name: 'Decide' })
+				.getByRole('button', { name: /^Decide A:/ })
+				.click();
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await decidedTab(page).click();
 			await expect(page.getByText('Nothing decided yet')).toBeVisible();

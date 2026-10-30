@@ -13,7 +13,7 @@ logging call reaches the override through `BaseHTTPRequestHandler`'s own
 `self.log_message(...)` -- never by a literal call this package writes, so
 vulture never sees a caller for any of the three.
 
-`argparse.Action.nargs`/`const`/`metavar` stand for the `_ArgumentOptions`
+`argparse.Action.nargs`/`const`/`default`/`metavar` stand for the `_ArgumentOptions`
 keys that `add_argument` receives through `**options`: vulture matches by
 attribute name, and argparse stores each of those keywords as the `Action`
 attribute of the same name, so the names are used.
@@ -51,13 +51,17 @@ The `DecisionKind` members are reached only by construction from a stored
 value (`DecisionKind(value)`) and by iteration when the grammar lists the
 accepted kinds; no code names one of them. `RulingVia.BOARD` and
 `RulingVia.CHAT` are reached the same way, from `--via` and from a stored
-`via`; so are the board's own `RulingVia.CHAT` and `RulingVia.DEFAULT`,
-reached only by construction from the `via` aco stored.
+`via`; so are the board's own `RulingVia.BOARD`, `RulingVia.CHAT` and
+`RulingVia.DEFAULT`, reached only by construction from the `via` aco stored. The board's
+`Outcome.YES`, `Outcome.NO` and `Outcome.LATER` are reached only by
+construction from the ruling of a stored yes/no line, which the board shows
+and never writes.
 """
 
 import argparse
 from datetime import UTC, date, datetime
 
+from aco.board.ports import Outcome as BoardOutcome
 from aco.board.ports import RulingVia as BoardRulingVia
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
 from aco.expectation_grammar import DecisionKind, RulingVia
@@ -152,8 +156,12 @@ _referenced_only_for_vulture = (
     DecisionKind.WORDING,
     RulingVia.BOARD,
     RulingVia.CHAT,
+    BoardRulingVia.BOARD,
     BoardRulingVia.CHAT,
     BoardRulingVia.DEFAULT,
+    BoardOutcome.YES,
+    BoardOutcome.NO,
+    BoardOutcome.LATER,
     _BoardApiRequestHandler.do_GET,
     _BoardApiRequestHandler.do_POST,
     _BoardApiRequestHandler.log_message,
@@ -174,5 +182,6 @@ _referenced_only_for_vulture = (
     _size_class_measurement_for_vulture.last_event_at,
     argparse.Action.nargs,
     argparse.Action.const,
+    argparse.Action.default,
     argparse.Action.metavar,
 )
