@@ -9,7 +9,9 @@ loads nothing from the network, talks to no aco and stores nothing.
 Every card shows the day it was asked, in its list row and its meta line; a card
 of points shows its newest point's day. The list keeps one group per project; the
 project with the newest open card leads, and each group shows
-its open cards newest first, then its With-head cards newest first. A card whose
+its open cards newest first, then its With-head cards newest first. Decided orders
+the same way by the day of the decision, which its row shows, so what was just decided stands
+on top. A card whose
 answer is saving turns its shape and holds its picks while every other card stays
 usable. A project whose read failed stands as its own group with the error. The
 header's Refresh shows the time of the last read; Mitsprache holds Self-refresh,

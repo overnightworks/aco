@@ -451,9 +451,14 @@ function askedOf(x) {
   const shown = x.card ? theirs(c) : mine(c), idx = shown.length ? shown : c.points.map((p, i) => i);
   return idx.map(i => c.points[i].asked_on).sort().at(-1);
 }
+// The day a line was decided: a decision made in this picture counts from today.
+const decidedOf = x => S.decided.get(x.ref)?.date || x.date;
+const dayKey = (x, tab) => tab === "decided" ? decidedOf(x) : askedOf(x);
 const bandOf = (x, tab) => tab === "open" ? RANK[stateOf(x)] : 0;
-const byNewest = tab => (a, b) => bandOf(a, tab) - bandOf(b, tab) || askedOf(b).localeCompare(askedOf(a));
-// Groups stay per project; the project with the newest card of the first band leads, and cards stand newest first.
+const byNewest = tab => (a, b) => bandOf(a, tab) - bandOf(b, tab) || dayKey(b, tab).localeCompare(dayKey(a, tab))
+  || (b.item || 0) - (a.item || 0);
+// Groups stay per project; the project with the newest card of the first band leads, and cards stand newest first
+// (Decided: by the day of the decision, then the higher item).
 function groupsOf(tab) {
   const all = listFor(tab), sort = byNewest(tab);
   const groups = DATA.repos.map(repo => ({repo, rows: all.filter(x => projectOf(x) === repo).sort(sort)}))
@@ -686,7 +691,7 @@ function decidedCard(x) {
   }
   const d = mineDecided;
   const g = h("div", {class: "grid"}, lab("Decided"), val(...d.lines.map(t => h("p", {class: "p"}, t))),
-    lab("How"), val(para("Board · today")),
+    lab("How"), val(para("Board · " + fmtDate(d.date))),
     lab("Contract"), val(h("details", {class: "contract"}, h("summary", null, "Show"),
       h("div", {class: "bind"}, ...d.contracts.map(t => h("p", {class: "p"}, t)),
         h("span", {class: "src"}, c.points.length > 1 ? c.project + " · Item " + c.item : c.points[0].source),
@@ -789,7 +794,7 @@ function decideOther(c, text) {
   record(c, {lines: ["Other: „" + text + "“"], contracts: [text], hash: hashOf(JSON.stringify(c))}, "Decided: Other");
 }
 function record(c, entry, stripText) {
-  S.decided.set(c.ref, entry);
+  S.decided.set(c.ref, {...entry, date: new Date().toISOString().slice(0, 10)});
   S.back.delete(c.ref);
   S.strip = {ref: c.ref, text: stripText + " · " + nameOf(c, mine(c).length), kind: "done"};
   S.sel = nextOpen(); S.tab = "open"; S.view = "card";
@@ -839,7 +844,7 @@ function row(x) {
   else k = S.tab === "agent" ? (S.overruled.has(key) ? "overruled" : "agent") : "done";
   return h("button", {type: "button", class: "row" + (muted ? " muted" : ""), title: titleOf(c, n),
     "aria-current": S.view === "card" && S.sel === key ? "true" : "false", onclick: () => select(key)},
-    shape(k), h("span", {class: "t"}, nameOf(c, n)), h("span", {class: "d"}, dayOf(askedOf(x))));
+    shape(k), h("span", {class: "t"}, nameOf(c, n)), h("span", {class: "d"}, dayOf(dayKey(x, S.tab))));
 }
 
 function renderList() {
