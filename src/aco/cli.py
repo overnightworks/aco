@@ -32,6 +32,7 @@ from . import (
     cmd_serve,
     cmd_start,
     cmd_status,
+    cmd_withdraw,
     github,
     items,
     metrics,
@@ -90,7 +91,6 @@ LANE_RELEASE_HELP = (
     "or a github --merged rerun on a branch no claim holds"
 )
 LONG_OPTION_PREFIX = "--"
-JSON_HELP = "print the result as JSON instead of the human lines"
 AGENT_HELP = (
     f"the acting agent's name; filled from a non-empty {checkout.IDENTITY_ENVIRONMENT_ORDER} "
     "when omitted"
@@ -134,14 +134,6 @@ def _add_reset_parser(commands: usage.Subcommands, name: str) -> None:
     )
 
 
-def _add_json_flag(container: argparse.ArgumentParser) -> None:
-    """The one place `--json` is declared: a command that never
-    calls this has no JSON mode at all, and `main` matches this same
-    spelling when argparse refuses before any namespace is filled, so the
-    flag needs a single owner."""
-    container.add_argument(report.JSON_FLAG, action="store_true", help=JSON_HELP)
-
-
 def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
     status = commands.add_parser(name, help="show repository-wide build claims")
     status.add_argument(
@@ -153,11 +145,11 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
     status.add_argument(
         "--path", metavar="PATH", help="list holders of this path instead of by issue"
     )
-    _add_json_flag(status)
+    report.add_json_flag(status)
 
 
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
-    _add_json_flag(commands.add_parser(name, help="project the open work board, read-only"))
+    report.add_json_flag(commands.add_parser(name, help="project the open work board, read-only"))
 
 
 def _add_serve_parser(commands: usage.Subcommands, name: str) -> None:
@@ -168,7 +160,7 @@ def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
     rulings_command = commands.add_parser(
         name, help="list expectation lines, open and ruled, without writes"
     )
-    _add_json_flag(rulings_command)
+    report.add_json_flag(rulings_command)
 
 
 def _add_next_parser(commands: usage.Subcommands, name: str) -> None:
@@ -177,7 +169,7 @@ def _add_next_parser(commands: usage.Subcommands, name: str) -> None:
         help="name the board's top-priority item to pull",
         description=NEXT_PULL_DESCRIPTION,
     )
-    _add_json_flag(next_command)
+    report.add_json_flag(next_command)
 
 
 def _add_start_parser(commands: usage.Subcommands, name: str) -> None:
@@ -258,7 +250,7 @@ def _add_claim_parser(commands: usage.Subcommands, name: str) -> None:
         metavar="NAME",
         help="allocate the next free value of this named scarce resource and hold it",
     )
-    _add_json_flag(claim)
+    report.add_json_flag(claim)
 
 
 def _add_release_parser(commands: usage.Subcommands, name: str) -> None:
@@ -310,7 +302,7 @@ def _add_release_parser(commands: usage.Subcommands, name: str) -> None:
             "clean worktree whose branch is already merged is removed"
         ),
     )
-    _add_json_flag(release)
+    report.add_json_flag(release)
 
 
 def _add_land_parser(commands: usage.Subcommands, name: str) -> None:
@@ -417,7 +409,7 @@ def _add_rescope_parser(commands: usage.Subcommands, name: str) -> None:
         metavar="REASON",
         help=WHOLE_HELP,
     )
-    _add_json_flag(rescope)
+    report.add_json_flag(rescope)
 
 
 def _add_cut_parser(commands: usage.Subcommands, name: str) -> None:
@@ -446,7 +438,7 @@ def _add_cut_parser(commands: usage.Subcommands, name: str) -> None:
         ),
     )
     cut.add_argument("--not-a-twin", action="store_true", help=NOT_A_TWIN_HELP)
-    _add_json_flag(cut)
+    report.add_json_flag(cut)
 
 
 def _add_rule_parser(commands: usage.Subcommands, name: str) -> None:
@@ -454,7 +446,7 @@ def _add_rule_parser(commands: usage.Subcommands, name: str) -> None:
         name, help="rule one proposed expectation line, transcribing the operator's word"
     )
     cmd_rule.add_arguments(rule)
-    _add_json_flag(rule)
+    report.add_json_flag(rule)
 
 
 def _parse_check_subject(value: str) -> int | str | cmd_check.CheckInput:
@@ -488,7 +480,7 @@ def _add_check_parser(commands: usage.Subcommands, name: str) -> None:
             f"{cmd_check.STDIN_SUBJECT} reads a body from stdin"
         ),
     )
-    _add_json_flag(check)
+    report.add_json_flag(check)
 
 
 def _add_brief_parser(commands: usage.Subcommands, name: str) -> None:
@@ -503,7 +495,7 @@ def _add_brief_parser(commands: usage.Subcommands, name: str) -> None:
         default=None,
         help=f"also print this lane step's own rules and checks from {workboard.BRIEF_CONFIG_PATH}",
     )
-    _add_json_flag(brief)
+    report.add_json_flag(brief)
 
 
 def _nonblank_title(value: str) -> str:
@@ -558,7 +550,7 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
     )
     new.add_argument("--whole", metavar="REASON", help=ITEM_WHOLE_HELP)
     new.add_argument("--not-a-twin", action="store_true", help=NOT_A_TWIN_HELP)
-    _add_json_flag(new)
+    report.add_json_flag(new)
     show = item_commands.add_parser(
         "show",
         help="print one item's header and its stored body, display controls escaped"
@@ -567,7 +559,7 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
     show.add_argument(
         "item", type=workboard.parse_item_reference, help=f"the item to show, {ITEM_REF_HELP}"
     )
-    _add_json_flag(show)
+    report.add_json_flag(show)
     edit = item_commands.add_parser(
         "edit", help="replace one item's body from stdin, aco keeping its own record fields"
     )
@@ -591,14 +583,14 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
         choices=ITEM_EDIT_KINDS,
         help=f"set only this item's kind (any storage); {refuses_stdin}",
     )
-    _add_json_flag(edit)
+    report.add_json_flag(edit)
     close = item_commands.add_parser(
         "close", help="close a state-ref item; the file stays, next and board let it go"
     )
     close.add_argument(
         "item", type=workboard.parse_item_reference, help=f"the item to close, {ITEM_REF_HELP}"
     )
-    _add_json_flag(close)
+    report.add_json_flag(close)
 
 
 def _add_subcommands(parser: usage.UsageErrorParser, dest: str) -> usage.Subcommands:
@@ -673,6 +665,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "rescope": _RepositoryCommand(_add_rescope_parser, cmd_rescope.run, resolves_agent=True),
     "cut": _RepositoryCommand(_add_cut_parser, cmd_cut.run),
     "rule": _RepositoryCommand(_add_rule_parser, cmd_rule.run),
+    "withdraw": _RepositoryCommand(cmd_withdraw.add_parser, cmd_withdraw.run),
     "check": _RepositoryCommand(_add_check_parser, cmd_check.run),
     "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),
     "item": _RepositoryCommand(_add_item_parser, cmd_item.run),

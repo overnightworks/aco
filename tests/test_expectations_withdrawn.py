@@ -23,8 +23,9 @@ from option_cards import (
     serve_item,
     unclear,
 )
+from store_fixtures import decoded_item_record
 
-from aco import body, expectations, items, rulings, state_board
+from aco import body, expectations, rulings, state_board
 from aco.board import ports
 
 WITHDRAWN_TEXT = "Soll der Song offen bleiben?"
@@ -161,20 +162,7 @@ class TestRuleRefusesAWithdrawnLine:
 def test_the_state_ref_record_write_keeps_the_tombstone() -> None:
     """Spec: BODY-88, BODY-104 -- the store's `[record]` rewrite under `state-ref`."""
     raw = block_body((MINIMAL_BLOCK_TOML + "\n" + withdrawn() + "\n" + card()).rstrip("\n"))
-    record = items.ItemRecord(
-        number=1,
-        title="Karte",
-        state=items.RecordState.OPEN,
-        kind="task",
-        labels=(),
-        blocked_by=(),
-        parent=None,
-        origin=None,
-        created_at="2026-10-01T00:00:00Z",
-        updated_at="2026-10-03T00:00:00Z",
-        closed_at=None,
-    )
-    written = state_board._with_record(raw, record)
+    written = state_board._with_record(raw, decoded_item_record())
     lines = expectations.expectation_lines(written, storage=body.Storage.STATE_REF)
     assert withdrawn() in written
     assert [line.form for line in lines] == [
@@ -227,11 +215,15 @@ class TestNextAndBoardNeverReadItAsOpenOrRuled:
     def test_a_withdrawn_line_never_dates_the_ruling(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: NEXT-48 -- beside a ruled line, the age is the ruled line's alone."""
+        """Spec: NEXT-48 -- beside a ruled line, the age is the ruled line's alone: a
+        withdrawal older than every trunk commit leaves a ruling newer than all of them."""
+        ruled_after_every_commit = (
+            '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2099-12-31\n'
+        )
         serve_board(
             monkeypatch,
-            (7, lines_body(YES_NO_LINE)),
-            (8, lines_body(YES_NO_LINE, withdrawn(day="2099-01-01"))),
+            (7, lines_body(ruled_after_every_commit)),
+            (8, lines_body(ruled_after_every_commit, withdrawn(day="2000-01-01"))),
         )
         shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"]
         ages = {item["number"]: item["ruling_landings"] for item in shown}

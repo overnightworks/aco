@@ -15,6 +15,7 @@ from board_fixtures import MINIMAL_BLOCK_TOML, block_body, container_issue
 from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import FakeForge, serve_forge
 from option_cards import assert_rewritten_alike, card, decide, ruled_card
+from store_fixtures import decoded_item_record
 
 from aco import body, cmd_item, cmd_rescope, forge, items, session, state_board
 
@@ -170,19 +171,7 @@ def test_the_state_ref_record_write_keeps_option_lines(
 ) -> None:
     """Spec: BODY-88 -- the one `[record]` composer behind create, update and close."""
     raw = item_body(item, newline=newline, record=existing)
-    record = items.ItemRecord(
-        number=1,
-        title="Karte",
-        state=state,
-        kind="task",
-        labels=(),
-        blocked_by=(),
-        parent=None,
-        origin=None,
-        created_at="2026-10-01T00:00:00Z",
-        updated_at="2026-10-03T00:00:00Z",
-        closed_at=closed_at,
-    )
+    record = decoded_item_record(state=state, closed_at=closed_at)
     written = state_board._with_record(raw, record)
     assert_rewritten_alike(raw, written, body.Storage.STATE_REF)
     assert state_board._with_record(written, record) == written

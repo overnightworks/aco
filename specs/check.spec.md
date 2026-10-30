@@ -385,8 +385,8 @@ Setup: bare-remote
 ```console
 $ aco body
 2> usage: aco [-h] [--version] [--repo REPO]
-2>            {bootstrap,reset,status,board,serve,rulings,next,start,claim,release,land,adopt,rescope,cut,rule,check,brief,item}
+2>            {bootstrap,reset,status,board,serve,rulings,next,start,claim,release,land,adopt,rescope,cut,rule,withdraw,check,brief,item}
 2>            ...
-2> aco: error: argument command: invalid choice: 'body' (choose from bootstrap, reset, status, board, serve, rulings, next, start, claim, release, land, adopt, rescope, cut, rule, check, brief, item)
+2> aco: error: argument command: invalid choice: 'body' (choose from bootstrap, reset, status, board, serve, rulings, next, start, claim, release, land, adopt, rescope, cut, rule, withdraw, check, brief, item)
 exit 2
 ```

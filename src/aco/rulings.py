@@ -30,9 +30,7 @@ class Row:
             (
                 line.asked_on
                 for line in self.lines
-                if isinstance(line, expectations.OptionLine)
-                and line.ruling is None
-                and line.asked_on is not None
+                if expectations.is_open(line) and line.asked_on is not None
             ),
             default=None,
         )

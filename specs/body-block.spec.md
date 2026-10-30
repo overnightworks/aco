@@ -217,7 +217,8 @@ endings cannot change it.
 
 ## Withdrawn lines
 
-A head may withdraw a line nobody has ruled: the entry
+A head withdraws a line nobody has ruled with `aco withdraw`
+(`specs/withdraw.spec.md`): the entry
 keeps its place and its `text` and gains `withdrawn_on`, so every later line
 keeps its index. Inside one entry the refusals print in this order: `text`,
 `withdrawn_on`, then every other key in the order the entry writes them.

@@ -50,7 +50,9 @@ class TestCommitted:
         self, storage: body.Storage, clone: Path
     ) -> None:
         context, client = world(storage, item_with(card(), card()), clone)
-        committed = decide.rule(context, decide.fresh_item(context, 90), [choose(2)], TODAY)
+        committed = decide.rule(
+            context, decide.fresh_item(context, 90, command="rule"), [choose(2)], TODAY
+        )
         written = client.item_bodies[90]
         assert committed.lines == tuple(expectations.expectation_lines(written, storage=storage))
         assert option_rulings(committed.lines) == [None, "A"]
@@ -59,23 +61,49 @@ class TestCommitted:
         self, storage: body.Storage, clone: Path
     ) -> None:
         context, _ = world(storage, item_with(card()), clone)
-        committed = decide.rule(context, decide.fresh_item(context, 90), [choose(1)], TODAY)
+        committed = decide.rule(
+            context, decide.fresh_item(context, 90, command="rule"), [choose(1)], TODAY
+        )
         assert (committed.number, committed.title) == (90, TITLE)
 
     def test_committed_counts_the_lines_still_open(
         self, storage: body.Storage, clone: Path
     ) -> None:
         context, _ = world(storage, item_with(card(), card(), card()), clone)
-        committed = decide.rule(context, decide.fresh_item(context, 90), [choose(2)], TODAY)
+        committed = decide.rule(
+            context, decide.fresh_item(context, 90, command="rule"), [choose(2)], TODAY
+        )
         assert committed.open_remaining == 2
 
     def test_two_named_lines_land_in_one_write(self, storage: body.Storage, clone: Path) -> None:
         context, client = world(storage, item_with(card(), card()), clone)
         committed = decide.rule(
-            context, decide.fresh_item(context, 90), [choose(1), choose(2)], TODAY
+            context, decide.fresh_item(context, 90, command="rule"), [choose(1), choose(2)], TODAY
         )
         assert len(client.body_writes) == 1
         assert option_rulings(committed.lines) == ["A", "A"]
+
+    def test_withdraw_writes_every_named_line_once_and_counts_the_rest(
+        self, storage: body.Storage, clone: Path
+    ) -> None:
+        context, client = world(storage, item_with(card(), card(), card()), clone)
+        fresh = decide.fresh_item(context, 90, command="withdraw")
+        committed = decide.withdraw(context, fresh, [1, 3], TODAY)
+        written = client.item_bodies[90]
+        forms = [line.form for line in committed.lines]
+        withdrawn, options = expectations.LineForm.WITHDRAWN, expectations.LineForm.OPTIONS
+        assert len(client.body_writes) == 1
+        assert committed.lines == tuple(expectations.expectation_lines(written, storage=storage))
+        assert (forms, committed.open_remaining) == ([withdrawn, options, withdrawn], 1)
+
+    def test_withdraw_refusing_a_later_line_writes_nothing(
+        self, storage: body.Storage, clone: Path
+    ) -> None:
+        context, client = world(storage, item_with(card(), ruled_card()), clone)
+        fresh = decide.fresh_item(context, 90, command="withdraw")
+        with pytest.raises(expectations.ExpectationAlreadyRuledError):
+            decide.withdraw(context, fresh, [1, 2], TODAY)
+        assert client.body_writes == []
 
     @pytest.mark.parametrize(
         "item_body,named,refusal",
@@ -115,7 +143,7 @@ class TestCommitted:
         clone: Path,
     ) -> None:
         context, client = world(storage, item_body, clone)
-        fresh = decide.fresh_item(context, 90)
+        fresh = decide.fresh_item(context, 90, command="rule")
         with pytest.raises(refusal):
             decide.rule(context, fresh, named, TODAY)
         assert client.body_writes == []
@@ -139,11 +167,30 @@ class TestCommitted:
         context, client = world(storage, item_with(card()), clone)
         client.issue_references[90] = reference
         with pytest.raises(decide.InvalidTargetError):
-            decide.fresh_item(context, 90)
+            decide.fresh_item(context, 90, command="rule")
         assert client.body_writes == []
+
+
+def test_the_gate_names_the_command_it_guards(clone: Path) -> None:
+    context, client = world(body.Storage.GITHUB, item_with(card()), clone)
+    client.issue_references[90] = forge.ItemReference(
+        forge.ItemState.OPEN, TITLE, "no block", is_landing=True
+    )
+    with pytest.raises(decide.InvalidTargetError) as refused:
+        decide.fresh_item(context, 90, command="withdraw")
+    assert str(refused.value) == "#90 is a pull request, not an issue; withdraw needs an issue"
+
+
+def test_a_failed_item_read_stays_a_forge_failure(clone: Path) -> None:
+    """Spec: RULE-11, WITHDRAW-13 -- a forge failure is `unavailable`, never a bad target."""
+    context, client = world(body.Storage.GITHUB, item_with(card()), clone)
+    client.scripted_item_reads.append(forge.ForgeError("item read failed"))
+    with pytest.raises(forge.ForgeError) as failed:
+        decide.fresh_item(context, 90, command="rule")
+    assert not isinstance(failed.value, decide.InvalidTargetError)
 
 
 def test_the_gate_reads_the_item_once(clone: Path) -> None:
     context, client = world(body.Storage.GITHUB, item_with(card()), clone)
-    decide.fresh_item(context, 90)
+    decide.fresh_item(context, 90, command="rule")
     assert client.issue_reference_lookups == [90]
