@@ -1,9 +1,11 @@
 """The board's JSON wire form, free of any socket.
 
-Turns a `BoardSnapshot` into the answer of `GET /api/board`, a request body
+Turns each repo's rows into the answer of `GET /api/board`, a request body
 into a `CardRequest` for a whole option card, and a decision's result or a
-refusal into its JSON answer. The transport
-decides when to answer; this module owns what the answer and the request look like.
+refusal into its JSON answer. Every line is `aco rulings --json`'s own
+rendering of it; this module only adds an option line's fingerprint and
+leaves withdrawn lines out. The transport decides when to answer; this
+module owns what the answer and the request look like.
 """
 
 from __future__ import annotations
@@ -13,20 +15,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
+from .. import expectation_grammar, expectations, rulings
 from .board import RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
-    OPTION_LETTERS,
-    OPTIONS_FORM,
-    OTHER,
-    UNCLEAR,
     CardAnswer,
-    CardOption,
     DecisionResult,
-    ExpectationLine,
-    OptionLetter,
-    OptionLine,
-    OtherAnswer,
     OtherCardAnswer,
     PostedCard,
     PostedLine,
@@ -34,6 +28,14 @@ from .ports import (
 )
 
 JSON_CONTENT_TYPE = "application/json"
+
+_OTHER = "other"
+"""The card post's key for one answer in the operator's own words (ABRD-77)."""
+_UNCLEAR = "unclear"
+"""The card post's key that sends the card back to its head (ABRD-77)."""
+_OPTION_LETTERS = frozenset(expectation_grammar.OPTION_LETTERS)
+"""aco's option letters, each on its own: a bare `in` on aco's letter string
+would also accept an empty text or a run of letters."""
 
 
 @dataclass(frozen=True)
@@ -56,13 +58,11 @@ def board_json(readings: Sequence[RepoReading]) -> str:
 def _repo_json(reading: RepoReading) -> dict[str, object]:
     if isinstance(reading, RepoUnavailable):
         return {"name": reading.name, "error": reading.reason, "items": []}
-    lines_by_item: dict[int, list[ExpectationLine]] = {}
-    for line in reading.lines:
-        lines_by_item.setdefault(line.item, []).append(line)
+    items = (_item_json(row, reading.name) for row in reading.rows)
     return {
         "name": reading.name,
         "error": None,
-        "items": [_item_json(lines, reading.name) for lines in lines_by_item.values()],
+        "items": [item for item in items if item is not None],
     }
 
 
@@ -136,7 +136,7 @@ def _card_answer(fields: dict[str, object], *, picked: bool) -> tuple[CardAnswer
     """The card's answer in a one-tuple, None when the keys break the rules: picks
     name no `other`, `unclear` or `note`; otherwise exactly one of `other` (no
     note) and `unclear` (an optional note) is named."""
-    other, unclear, note = fields.get(OTHER), fields.get(UNCLEAR), fields.get("note")
+    other, unclear, note = fields.get(_OTHER), fields.get(_UNCLEAR), fields.get("note")
     if picked:
         return (None,) if other is unclear is note is None else None
     if other is not None:
@@ -147,73 +147,27 @@ def _card_answer(fields: dict[str, object], *, picked: bool) -> tuple[CardAnswer
     return None
 
 
-def _item_json(lines: list[ExpectationLine], repo: str) -> dict[str, object]:
-    first = lines[0]
-    return {
-        "number": first.item,
-        "title": first.item_title,
-        "lines": [_line_json(line, repo) for line in lines],
-    }
+def _item_json(row: rulings.Row, repo: str) -> dict[str, object] | None:
+    """The row with its withdrawn lines left out; None when no other line is
+    left, since an item of only withdrawn lines is not listed (ABRD-60)."""
+    lines = [
+        _line_json(line, row.number, repo)
+        for line in row.lines
+        if not isinstance(line, expectations.WithdrawnLine)
+    ]
+    if not lines:
+        return None
+    return {"number": row.number, "title": row.title, "lines": lines}
 
 
-def _line_json(line: ExpectationLine, repo: str) -> dict[str, object]:
-    if isinstance(line, OptionLine):
-        return _option_line_json(line, repo)
-    return {
-        "index": line.index,
-        "text": line.text,
-        "question": line.question,
-        "example": line.example,
-        "picture": line.picture,
-        "ruling": line.ruling,
-        "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
-        "fingerprint": wire_fingerprint(repo, line),
-    }
-
-
-def _option_line_json(line: OptionLine, repo: str) -> dict[str, object]:
-    """ABRD-34: pictures stay SVG text for the browser to turn into data URIs."""
-    return {
-        "index": line.index,
-        "form": OPTIONS_FORM,
-        "text": line.text,
-        "question": line.question,
-        "problem": line.problem,
-        "picture": line.picture,
-        "caption": line.caption,
-        "decision_kind": line.decision_kind,
-        "area": line.area,
-        "topic": line.topic,
-        "recommended": line.recommended,
-        "reason": line.reason,
-        "options": [_card_option_json(option) for option in line.options],
-        "ruling": OTHER if isinstance(line.ruling, OtherAnswer) else line.ruling,
-        "ruled_on": line.ruled_on.isoformat() if line.ruled_on is not None else None,
-        "via": line.via,
-        "other": line.ruling.text if isinstance(line.ruling, OtherAnswer) else None,
-        "returned_on": line.returned_on.isoformat() if line.returned_on is not None else None,
-        "returned_note": line.returned_note,
-        "fingerprint": wire_fingerprint(repo, line),
-    }
-
-
-def _card_option_json(option: CardOption) -> dict[str, object]:
-    result: dict[str, object] = {"same_as_today": True}
-    if option.picture is not None:
-        result = {"picture": option.picture}
-    if option.caption is not None:
-        result["caption"] = option.caption
-    return {
-        "letter": option.letter,
-        "name": option.name,
-        "effect": option.effect,
-        **result,
-        "notice": option.notice,
-        "cost": option.cost,
-        "undo": option.undo,
-        "undo_how": option.undo_how,
-        "contract": option.contract,
-    }
+def _line_json(
+    line: expectations.YesNoLine | expectations.OptionLine, item: int, repo: str
+) -> dict[str, object]:
+    """`aco rulings --json`'s line; an option line adds its fingerprint last."""
+    rendered = rulings.line_json(line)
+    if isinstance(line, expectations.OptionLine):
+        rendered["fingerprint"] = wire_fingerprint(repo, item, line)
+    return rendered
 
 
 def _json_object(raw: bytes) -> dict[str, object] | None:
@@ -229,7 +183,7 @@ def _json_object(raw: bytes) -> dict[str, object] | None:
 
 
 def _is_note_text(note: object) -> TypeGuard[str]:
-    """Short text a command-line argument can carry: no NUL, no lone surrogate."""
+    """Short UTF-8 text: no NUL, no lone surrogate (ABRD-05)."""
     if not isinstance(note, str) or len(note.strip()) > NOTE_MAX_LENGTH or "\0" in note:
         return False
     try:
@@ -239,8 +193,8 @@ def _is_note_text(note: object) -> TypeGuard[str]:
     return True
 
 
-def _is_option_letter(value: object) -> TypeGuard[OptionLetter]:
-    return isinstance(value, str) and value in OPTION_LETTERS
+def _is_option_letter(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and value in _OPTION_LETTERS
 
 
 def _note(raw: str | None) -> str | None:

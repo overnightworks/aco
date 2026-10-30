@@ -1,148 +1,19 @@
 """The board's one narrow interface to its decision source.
 
-The board reads expectation lines and writes rulings through `DecisionPort`
-only; `aco_source.AcoSource` is its one implementation, running aco's own
-library in process. Truth stays with the source: the board keeps no copy of
-a line or a ruling.
+The board reads aco's rows and writes rulings through `DecisionPort` only;
+`aco_source.AcoSource` is its one implementation, running aco's own library
+in process. Truth stays with the source: the board keeps no copy of a line or
+a ruling, and reads aco's own types rather than copies of them.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import date
 from enum import StrEnum
-from typing import Literal, Protocol, get_args
+from typing import Protocol
 
-
-class Outcome(StrEnum):
-    YES = "yes"
-    NO = "no"
-    LATER = "later"
-
-
-class RulingVia(StrEnum):
-    """How an option line's ruling reached aco (RUL-15), in the board's own
-    vocabulary."""
-
-    BOARD = "board"
-    CHAT = "chat"
-    DEFAULT = "default"
-
-
-OTHER = "other"
-"""Both the `ruling` value and the key that carries the operator's own answer
-(RUL-16) on the board's wire."""
-
-UNCLEAR = "unclear"
-"""The key that sends an option line back to its head; never a `ruling` value."""
-
-OptionLetter = Literal["A", "B", "C", "D"]
-"""The letters of an option line's options, by position."""
-
-OPTION_LETTERS: tuple[OptionLetter, ...] = get_args(OptionLetter)
-
-
-@dataclass(frozen=True)
-class OtherAnswer:
-    """An option line's ruling when the operator answered in his own words,
-    kept verbatim."""
-
-    text: str
-
-
-OPTIONS_FORM = "options"
-"""The `form` that marks an option line on the board's wire."""
-
-
-@dataclass(frozen=True)
-class YesNoLine:
-    """A ruled yes/no line: read-only history the board shows and never writes."""
-
-    item: int
-    item_title: str
-    index: int
-    text: str
-    question: str | None
-    example: str | None
-    picture: str | None
-    ruling: Outcome
-    ruled_on: date | None
-
-    @property
-    def fingerprint(self) -> str:
-        """Names the fields the line's decided card renders as its text. The
-        ruling and its date are left out: a yes/no line is read-only history,
-        so no card for it is ever submitted."""
-        shown = json.dumps(
-            [
-                self.item,
-                self.item_title,
-                self.index,
-                self.text,
-                self.question,
-                self.example,
-                self.picture,
-            ],
-            ensure_ascii=False,
-        )
-        return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
-
-
-@dataclass(frozen=True)
-class CardOption:
-    letter: OptionLetter
-    name: str
-    effect: str
-    picture: str | None
-    """The option's RESULT picture as stored; None marks `same_as_today`."""
-    caption: str | None
-    notice: str
-    cost: str
-    undo: str
-    undo_how: str
-    contract: str
-
-
-@dataclass(frozen=True)
-class OptionLine:
-    item: int
-    item_title: str
-    index: int
-    text: str
-    question: str
-    problem: str
-    picture: str
-    caption: str
-    decision_kind: str
-    area: str
-    topic: str
-    recommended: OptionLetter
-    reason: str
-    options: tuple[CardOption, ...]
-    ruling: OptionLetter | OtherAnswer | None
-    ruled_on: date | None
-    via: RulingVia | None
-    returned_on: date | None
-    returned_note: str | None
-    card_hash: str
-
-    @property
-    def is_open(self) -> bool:
-        return self.ruling is None
-
-    @property
-    def fingerprint(self) -> str:
-        """The card hash already covers every field the card shows; the item
-        number and line index tell the card apart across items."""
-        shown = json.dumps([self.item, self.index, self.card_hash], ensure_ascii=False)
-        return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
-
-
-ExpectationLine = YesNoLine | OptionLine
-
+from .. import expectations, rulings
 
 NOTE_MAX_LENGTH = 280
 """The longest note a decision may carry, after trimming. The item body stores
@@ -174,7 +45,7 @@ class PostedLine:
 
     index: int
     fingerprint: str
-    letter: OptionLetter | None
+    letter: str | None
 
 
 @dataclass(frozen=True)
@@ -192,7 +63,7 @@ class CardLine:
 
     index: int
     card_hash: str
-    letter: OptionLetter | None
+    letter: str | None
 
 
 @dataclass(frozen=True)
@@ -227,14 +98,16 @@ class DecisionSourceUnavailableError(Exception):
     """The source could not be read; the message says why in one sentence."""
 
 
-type CardCheck = Callable[[Sequence[ExpectationLine]], CardDecision | None]
-"""The board's own check of a posted card against an item's lines just read:
-the card as a decision on them, or None when it no longer reads as shown."""
+type CardCheck = Callable[[Sequence[expectations.ExpectationLine]], CardDecision | None]
+"""The board's own check of a posted card against aco's lines of the one item
+just read: the card as a decision on them, or None when it no longer reads as
+shown."""
 
 
 class DecisionPort(Protocol):
-    def expectation_lines(self) -> tuple[ExpectationLine, ...]:
-        """Every expectation line, open and ruled, in the source's own order.
+    def rows(self) -> tuple[rulings.Row, ...]:
+        """Every open item with expectation lines, as `aco rulings` reads them,
+        in its order (RUL-03).
 
         Raises `DecisionSourceUnavailableError` when the source cannot answer.
         """

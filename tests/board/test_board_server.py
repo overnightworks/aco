@@ -34,13 +34,8 @@ from aco_board_fixtures import (
 from board_forge import BoardForge, ForgeRequest, item_body
 from option_cards import open_option_entry
 
-from aco.board.ports import (
-    CardChanged,
-    CardCheck,
-    DecisionResult,
-    ExpectationLine,
-    OptionLine,
-)
+from aco import rulings
+from aco.board.ports import CardChanged, CardCheck, DecisionResult
 from aco.board.server import LOOPBACK_HOST, read_before_deadline
 
 _OPEN_CARD = item_body(open_option_entry())
@@ -217,10 +212,10 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
     port = decision_port(repository)
 
     class ReadAfterTheBrowserLeft:
-        def expectation_lines(self) -> tuple[ExpectationLine, ...]:
+        def rows(self) -> tuple[rulings.Row, ...]:
             assert browser_left.wait(timeout=10)
             try:
-                return port.expectation_lines()
+                return port.rows()
             finally:
                 read_returned.set()
 
@@ -237,7 +232,7 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
         _wait_for_request_handlers()
 
     entered = [call.operation for call in port.calls() if call.phase is CallPhase.ENTERED]
-    assert entered == [PortOperation.EXPECTATION_LINES]
+    assert entered == [PortOperation.ROWS]
     assert "Traceback" not in capsys.readouterr().err
 
 
@@ -272,11 +267,12 @@ def test_a_browser_leaving_during_a_held_ruling_still_rules_and_frees_the_turn(
 class _HugeLineSource:
     """One open line far larger than the socket buffers between board and client."""
 
-    def __init__(self, small_line: OptionLine) -> None:
-        self._huge_line = replace(small_line, text="x" * (32 * 1024 * 1024))
+    def __init__(self, small_row: rulings.Row) -> None:
+        huge_lines = tuple(replace(line, text="x" * (32 * 1024 * 1024)) for line in small_row.lines)
+        self._huge_row = replace(small_row, lines=huge_lines)
 
-    def expectation_lines(self) -> tuple[ExpectationLine, ...]:
-        return (self._huge_line,)
+    def rows(self) -> tuple[rulings.Row, ...]:
+        return (self._huge_row,)
 
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
         raise AssertionError("listing the board must not write")
@@ -286,11 +282,10 @@ def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
     repository: BoardForge, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repository.put_item(42, _OPEN_CARD, title="Share page")
-    [small_line] = decision_port(repository).expectation_lines()
-    assert isinstance(small_line, OptionLine)
+    [small_row] = decision_port(repository).rows()
     with (
         serving(
-            _HugeLineSource(small_line), request_deadline_seconds=_SHORT_DEADLINE_SECONDS
+            _HugeLineSource(small_row), request_deadline_seconds=_SHORT_DEADLINE_SECONDS
         ) as board,
         board.holding_unread(
             f"GET /api/board HTTP/1.1\r\nHost: x\r\nX-Board-Token: {board.token}\r\n\r\n".encode()
@@ -307,7 +302,7 @@ def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
 class _BrokenPipeSource:
     """A decision source whose own pipe breaks: a server defect, not a client leaving."""
 
-    def expectation_lines(self) -> tuple[ExpectationLine, ...]:
+    def rows(self) -> tuple[rulings.Row, ...]:
         raise BrokenPipeError("aco's pipe broke")
 
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:

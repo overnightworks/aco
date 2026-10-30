@@ -219,6 +219,26 @@ def test_a_card_changed_on_the_state_ref_since_the_page_read_writes_nothing(
     assert checkout.tip() == tip
 
 
+def test_after_a_withdrawal_a_fresh_read_lists_the_rest_of_the_card_and_it_posts(
+    checkout: _StateRefCheckout,
+    state_ref_board: BoardClient,
+    listed_items: Lister,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """ABRD-60, ABRD-78: the withdrawn line is not listed, the survivor keeps
+    its index, and the remaining card is stored in one state-ref commit."""
+    _line_withdrawn(capsys)
+    shown = _first_card(state_ref_board, listed_items)
+    commits = checkout.commits()
+
+    answered = state_ref_board.decide_card_through_api(_FIRST, shown, ["B"])
+
+    assert [(line["index"], line["text"]) for line in shown] == [(2, _QUESTION)]
+    assert answered.json() == {"status": "ruled", "message": None}
+    assert [entry.get("ruling") for entry in checkout.entries(_FIRST_ID)] == [None, "B"]
+    assert checkout.commits() == commits + 1
+
+
 def test_a_write_after_a_stale_read_refuses_and_keeps_the_other_writers_ruling(
     checkout: _StateRefCheckout,
     state_ref_board: BoardClient,

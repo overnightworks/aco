@@ -225,6 +225,8 @@ def test_a_card_post_missing_a_point_or_naming_a_changed_line_reads_the_item_and
     """ABRD-79."""
     listed = show(_cards(*_CARDS[:count]))
     listed[9] = {**listed[2], "index": 9}
+    # The wire lists no fingerprint on a yes/no line; a post naming one carries any.
+    listed[1] = {**listed[1], "fingerprint": "shown-as-yes-no"}
     if later is not None:
         later(repository)
     options = ["A"] * len(posted)
