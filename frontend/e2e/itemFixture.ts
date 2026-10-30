@@ -1,7 +1,7 @@
 /**
  * Arranges the work items the board's real `aco` reads, through the control
  * endpoint `tests/support/e2e_server.py` serves beside the board. An entry
- * carries the body grammar's own keys (`specs/rulings.spec.md`): aco renders
+ * carries the body grammar's own keys (`specs/body-block.spec.md`): aco renders
  * the item body, computes every card hash and refuses an entry its grammar
  * refuses, so a spec arranges only bodies aco itself would read. A line's
  * index is its position among its item's entries.
