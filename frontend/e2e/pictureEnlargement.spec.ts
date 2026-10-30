@@ -1,10 +1,10 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { optionLine, row, writeRulings, type RulingOption } from './rulingsFixture';
+import { arrange, item, optionEntry, type CardOption } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json.
+// global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
 interface Box {
@@ -28,9 +28,8 @@ function picture(label: string, width: number, height: number): string {
 	);
 }
 
-function option(letter: string, name: string, effect: string, caption?: string): RulingOption {
+function option(letter: string, name: string, effect: string, caption?: string): CardOption {
 	return {
-		letter,
 		name,
 		effect,
 		picture: picture(`Ergebnis ${letter}`, 360, 120),
@@ -43,16 +42,16 @@ function option(letter: string, name: string, effect: string, caption?: string):
 	};
 }
 
-function arrange(directory: string): void {
-	writeRulings(directory, [
-		row(
+async function arrangeCard(): Promise<void> {
+	await arrange([
+		item(
 			1900,
 			'Bild vergrößern',
-			optionLine(1, 'Das Bild lässt sich vergrößern.', {
+			optionEntry('Das Bild lässt sich vergrößern.', {
 				question: QUESTION,
 				picture: picture('Heute', 420, 140),
 				caption: TODAY_CAPTION,
-				options: [
+				option: [
 					option('A', 'Weg A', 'Wirkung von Weg A.', A_CAPTION),
 					option('B', B_NAME, B_EFFECT)
 				]
@@ -62,8 +61,8 @@ function arrange(directory: string): void {
 }
 
 async function openCard(page: Page, phone: boolean): Promise<Locator> {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
-	arrange(repoDirectory);
+	const { appUrl, token } = readBoardRuntime();
+	await arrangeCard();
 	await page.goto(`${appUrl}#t=${token}`);
 	await page.locator('.tracks').getByTitle(QUESTION).click();
 	if (phone) await expect(page.locator('.question-pane')).toBeVisible();

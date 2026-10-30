@@ -3,30 +3,33 @@ import { expect, test } from './consoleGuard';
 import { expectDecidedAnswer, openDecidedLine } from './decidedView';
 import { countPosts, pick, picks } from './decideRow';
 import {
-	optionLine,
-	row,
-	writeRulings,
-	type OptionRulingLine,
-	type RulingOption
-} from './rulingsFixture';
+	arrange,
+	item,
+	optionEntry,
+	type CardOption,
+	type Item,
+	type OptionEntry
+} from './itemFixture';
 import { readBoardRuntime } from './runtime';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); each test overwrites the whole of rulings.json, so
-// tests stay isolated from one another despite the shared process.
+// global-setup.ts); each test arranges the whole board, so tests stay
+// isolated from one another despite the shared process.
 test.describe.configure({ mode: 'serial' });
 
 // Just past the app's undo window; the page clock is driven, never waited.
 const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
 
-// The fake aco stores every board pick as `--via board` on this date
-// (`aco_board_fixtures`); the decided card's How row reads it back.
+// aco rules every board pick `via board` on `board_forge.RULING_DAY`; the
+// decided card's How row reads it back.
 const BOARD_PICK_HOW = 'Board · 03.10.2026';
 
-const OPTIONS: RulingOption[] = [
+// A today picture tall enough that the question pane scrolls.
+const TALL_PICTURE = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="4000"/>';
+
+const OPTIONS: CardOption[] = [
 	{
-		letter: 'A',
 		name: 'Erster Weg',
 		effect: 'Der erste Weg gilt.',
 		same_as_today: true,
@@ -37,7 +40,6 @@ const OPTIONS: RulingOption[] = [
 		contract: 'Der erste Weg gilt.'
 	},
 	{
-		letter: 'B',
 		name: 'Zweiter Weg',
 		effect: 'Der zweite Weg gilt.',
 		same_as_today: true,
@@ -49,27 +51,25 @@ const OPTIONS: RulingOption[] = [
 	}
 ];
 
-function card(index: number, question: string, overrides: Partial<OptionRulingLine> = {}) {
-	return optionLine(index, `Satz ${index}`, { question, options: OPTIONS, ...overrides });
+function card(question: string, overrides: Partial<OptionEntry> = {}) {
+	return optionEntry('Satz 1', { question, option: OPTIONS, ...overrides });
 }
 
 function listRow(page: Page, question: string) {
 	return page.locator('.tracks').getByTitle(question);
 }
 
-async function arrangeLongRepositoryLists(page: Page, directory: string, longWord: string) {
-	writeRulings(
-		directory,
+async function arrangeLongRepositoryLists(page: Page, longWord: string) {
+	await arrange(
 		Array.from({ length: 12 }, (_, index) =>
-			row(
+			item(
 				700 + index,
 				`Vorhaben ${index} ${longWord}`,
-				card(1, `Frage ${index}?`, {
+				card(`Frage ${index}?`, {
 					text: `Satz ${index} ${longWord}`,
-					problem: `${longWord}\n${'Vollständiges Problem. '.repeat(80)}`,
-					options: OPTIONS.map((option) => ({ ...option, effect: longWord })),
+					option: OPTIONS.map((option) => ({ ...option, contract: longWord })),
 					picture:
-						'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="120"><rect width="1200" height="120" fill="#8a2a63"/></svg>'
+						'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="3600"><rect width="1200" height="3600" fill="#8a2a63"/></svg>'
 				})
 			)
 		)
@@ -114,11 +114,9 @@ async function expectReturnAndResizeFocus(
 test('reactivating the selected desktop row restores the question heading and focus', async ({
 	page
 }, testInfo) => {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	const { appUrl, token } = readBoardRuntime();
 	await page.setViewportSize({ width: 1280, height: 900 });
-	writeRulings(repoDirectory, [
-		row(950, 'Reselection', card(1, 'First?', { problem: 'Long problem. '.repeat(500) }))
-	]);
+	await arrange([item(950, 'Reselection', card('First?', { picture: TALL_PICTURE }))]);
 	await page.goto(`${appUrl}#t=${token}`);
 	const selected = listRow(page, 'First?');
 	await selected.click();
@@ -142,11 +140,11 @@ test('reactivating the selected desktop row restores the question heading and fo
 test('advancing after phone list return and desktop resize focuses the next question', async ({
 	page
 }, testInfo) => {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	const { appUrl, token } = readBoardRuntime();
 	await page.setViewportSize({ width: 390, height: 844 });
-	writeRulings(repoDirectory, [
-		row(951, 'Resize', card(1, 'First?', { problem: 'Long problem. '.repeat(500) })),
-		row(961, 'Resize second', card(1, 'Second?', { problem: 'Long problem. '.repeat(500) }))
+	await arrange([
+		item(951, 'Resize', card('First?', { picture: TALL_PICTURE })),
+		item(961, 'Resize second', card('Second?', { picture: TALL_PICTURE }))
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
@@ -164,16 +162,12 @@ test('advancing after phone list return and desktop resize focuses the next ques
 test('desktop completion preserves deliberately focused other list row', async ({
 	page
 }, testInfo) => {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
+	const { appUrl, token } = readBoardRuntime();
 	await page.setViewportSize({ width: 1280, height: 900 });
-	writeRulings(repoDirectory, [
-		row(954, 'Desktop completion', card(1, 'First?', { problem: 'Long problem. '.repeat(500) })),
-		row(
-			964,
-			'Desktop completion second',
-			card(1, 'Second?', { problem: 'Long problem. '.repeat(500) })
-		),
-		row(974, 'Desktop completion third', card(1, 'Third?'))
+	await arrange([
+		item(954, 'Desktop completion', card('First?', { picture: TALL_PICTURE })),
+		item(964, 'Desktop completion second', card('Second?', { picture: TALL_PICTURE })),
+		item(974, 'Desktop completion third', card('Third?'))
 	]);
 	await page.clock.install();
 	await page.goto(`${appUrl}#t=${token}`);
@@ -202,13 +196,13 @@ test('desktop completion preserves deliberately focused other list row', async (
 
 for (const scenario of ['next question', 'exhausted list', 'focus elsewhere']) {
 	test(`phone list completion keeps visible focus: ${scenario}`, async ({ page }, testInfo) => {
-		const { appUrl, token, repoDirectory } = readBoardRuntime();
+		const { appUrl, token } = readBoardRuntime();
 		await page.setViewportSize({ width: 390, height: 844 });
-		const rows = [row(952, 'List completion', card(1, 'First?'))];
+		const items: Item[] = [item(952, 'List completion', card('First?'))];
 		if (scenario !== 'exhausted list') {
-			rows.push(row(962, 'List completion second', card(1, 'Second?')));
+			items.push(item(962, 'List completion second', card('Second?')));
 		}
-		writeRulings(repoDirectory, rows);
+		await arrange(items);
 		await page.clock.install();
 		await page.goto(`${appUrl}#t=${token}`);
 		const first = listRow(page, 'First?');
@@ -238,10 +232,10 @@ for (const viewport of [
 		test('selection during a background reload reaches the question without stale actions', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(953, 'Background reload', card(1, 'First?')),
-				row(963, 'Background reload second', card(1, 'Second?'))
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(953, 'Background reload', card('First?')),
+				item(963, 'Background reload second', card('Second?'))
 			]);
 			await page.clock.install();
 			await page.goto(`${appUrl}#t=${token}`);
@@ -312,8 +306,8 @@ for (const viewport of [
 		});
 
 		test('once the window elapses, exactly one decision is written', async ({ page }, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [row(602, 'Hosts', card(1, 'Hosts allowed?'))]);
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([item(602, 'Hosts', card('Hosts allowed?'))]);
 			const posts = countPosts(page);
 
 			await page.clock.install();
@@ -334,9 +328,9 @@ for (const viewport of [
 		test('eight long repository lists keep selection, focus and all content inside the viewport', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
+			const { appUrl, token } = readBoardRuntime();
 			const longWord = 'Entscheidungsgrundlage'.repeat(12);
-			await arrangeLongRepositoryLists(page, repoDirectory, longWord);
+			await arrangeLongRepositoryLists(page, longWord);
 			const posts = countPosts(page);
 			await page.goto(`${appUrl}#t=${token}`);
 			if (viewport.width > 760) {
@@ -380,10 +374,10 @@ for (const viewport of [
 		test('separate undo notices stay reachable and cancel every pending write', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token, repoDirectory } = readBoardRuntime();
-			writeRulings(repoDirectory, [
-				row(720, 'Erste Karte', card(1, 'Erste Frage')),
-				row(721, 'Zweite Karte', card(1, 'Zweite Frage'))
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([
+				item(720, 'Erste Karte', card('Erste Frage')),
+				item(721, 'Zweite Karte', card('Zweite Frage'))
 			]);
 			const posts = countPosts(page);
 			await page.clock.install();

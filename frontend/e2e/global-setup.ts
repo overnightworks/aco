@@ -1,7 +1,8 @@
 /**
  * The E2E launcher: starts the real board server
- * (`tests/support/e2e_server.py`, the real `aco.board.server` behind a
- * fake `aco`) and points every spec straight at the port it prints -- it
+ * (`tests/support/e2e_server.py`, the real `aco.board.server` and the real
+ * `aco` over a test forge, with a control endpoint that arranges it) and
+ * points every spec straight at the port it prints -- it
  * serves the committed, built SPA itself, so no dev server and no proxy are
  * involved. Returning a teardown closure -- Playwright's own pattern --
  * needs no separate `global-teardown.ts`.
@@ -19,7 +20,7 @@ interface BoardReady {
 	host: string;
 	port: number;
 	token: string;
-	repo_directory: string;
+	control_url: string;
 }
 
 function startBoardServer(): Promise<{
@@ -53,7 +54,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 
 	writeFileSync(
 		RUNTIME_FILE,
-		JSON.stringify({ appUrl, token: ready.token, repoDirectory: ready.repo_directory })
+		JSON.stringify({ appUrl, token: ready.token, controlUrl: ready.control_url })
 	);
 
 	return async () => {
