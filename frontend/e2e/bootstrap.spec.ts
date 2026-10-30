@@ -1,12 +1,11 @@
-import { rmSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
 import { expect, test } from './consoleGuard';
+import { arrange } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 const EMPTY_BOARD_MESSAGE = 'All decided';
 
 // One shared board server backs every test in this file (see
-// global-setup.ts); a run toggling its fake `aco` must not race another.
+// global-setup.ts); each test arranges the whole board and must not race another.
 test.describe.configure({ mode: 'serial' });
 
 test('a fresh tab with no link shows access is missing', async ({ page }) => {
@@ -21,6 +20,7 @@ test('the token bootstraps from the URL fragment, never reaches a request, and t
 	page
 }) => {
 	const { appUrl, token } = readBoardRuntime();
+	await arrange([]);
 	const requestedUrls: string[] = [];
 	page.on('request', (request) => requestedUrls.push(request.url()));
 
@@ -35,14 +35,13 @@ test('the token bootstraps from the URL fragment, never reaches a request, and t
 });
 
 test('aco being unreachable shows the unavailable state', async ({ page }) => {
-	const { appUrl, token, repoDirectory } = readBoardRuntime();
-	const failureFile = path.join(repoDirectory, 'rulings-failure.txt');
-	writeFileSync(failureFile, 'ERROR: no forge adapter for host');
+	const { appUrl, token } = readBoardRuntime();
+	await arrange([], { listingFailure: 'no forge adapter for host' });
 
 	try {
 		await page.goto(`${appUrl}#t=${token}`);
 		await expect(page.getByRole('alert')).toContainText('aco antwortet nicht');
 	} finally {
-		rmSync(failureFile);
+		await arrange([]);
 	}
 });
