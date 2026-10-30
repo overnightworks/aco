@@ -25,7 +25,7 @@ class Outcome(StrEnum):
 
 class RulingVia(StrEnum):
     """How an option line's ruling reached aco (RUL-15), in the board's own
-    vocabulary until its wire takes aco's line JSON."""
+    vocabulary."""
 
     BOARD = "board"
     CHAT = "chat"

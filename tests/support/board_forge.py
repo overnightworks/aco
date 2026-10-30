@@ -131,7 +131,7 @@ class BoardForge:
 
     def edit_before_next_read(self, number: int, raw_body: str) -> None:
         """Item `number` holds `raw_body` from its next read on: a card changed
-        between the board's check and aco's own read."""
+        after the page read, first seen by the decision's one read of it."""
         state = self._state()
         state.edits_before_read[number] = raw_body
         self._replace_state(state)
