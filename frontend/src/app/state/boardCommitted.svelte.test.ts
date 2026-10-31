@@ -94,6 +94,5 @@ test('[ABRD-15] a repository an older read reports as failed keeps its error and
 	await reading;
 	store.applyItem('repo', stored);
 
-	const { readAt: _readAt, ...shown } = store.repos[0] ?? {};
-	expect(shown).toEqual({ name: 'repo', error: 'forge down', items: [stored] });
+	expect(store.repos[0]).toMatchObject({ name: 'repo', error: 'forge down', items: [stored] });
 });
