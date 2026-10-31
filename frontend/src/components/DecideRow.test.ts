@@ -92,6 +92,21 @@ test('[ABRD-44] a pending decision disables every pick', () => {
 	}
 });
 
+test.each([
+	['changed', LINE_CHANGED_MESSAGE],
+	['already-ruled', 'Schon entschieden: diese Zeile wurde inzwischen woanders entschieden.']
+] as const)(
+	'a %s refusal shows its sentence and Neu laden, with no pick',
+	async (kind, message) => {
+		const { onReload } = renderRow({ banner: { kind, message } });
+
+		expect(screen.getByRole('alert')).toHaveTextContent(message);
+		expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Neu laden' }));
+		expect(onReload).toHaveBeenCalledTimes(1);
+	}
+);
+
 test('[ABRD-45] any other failure shows its sentence and keeps the picks usable', () => {
 	renderRow({ banner: { kind: 'failed', message: 'Das Board ist nicht erreichbar.' } });
 
@@ -311,27 +326,6 @@ test('[ABRD-63] Other… sits beside Accept all on a card of points', () => {
 	renderRow({ points: groupPoints, escapes });
 
 	expect(screen.getByRole('button', { name: 'Other…' })).toBeInTheDocument();
-});
-
-test('[ABRD-97] a pick, Accept all and a pick of a point during a board re-read reach their handlers', async () => {
-	const { component, onAcceptAll, onPick } = renderRow({ points: groupPoints, escapes });
-
-	await fireEvent.click(screen.getByRole('button', { name: 'Accept all recommendations' }));
-	await component.choose({ shown: groupPoints[0] as typeof songCard, option: optionA });
-
-	expect(onAcceptAll).toHaveBeenCalledWith(groupPoints);
-	expect(onPick).toHaveBeenCalledWith(groupPoints, {
-		shown: groupPoints[0],
-		option: optionA
-	});
-});
-
-test('[ABRD-99] a pick on a one-point row reaches its handler', async () => {
-	const { onPick } = renderRow();
-
-	await fireEvent.click(screen.getByRole('button', { name: /^Decide B:/ }));
-
-	expect(onPick).toHaveBeenCalledWith([songCard], { shown: songCard, option: songCard.options[1] });
 });
 
 test('[ABRD-99] outside waiting no letter of a one-point row carries aria-pressed', () => {

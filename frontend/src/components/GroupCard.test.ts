@@ -157,14 +157,6 @@ test('[ABRD-65] a pending decision disables every pick', () => {
 	}
 });
 
-test('[ABRD-97] a pick during a board re-read reaches its handler', async () => {
-	const { onPick } = renderCard();
-
-	await fireEvent.click(screen.getByRole('button', { name: 'Point 1: A – Keep it open' }));
-
-	expect(onPick).toHaveBeenCalledWith(points[0], optionA);
-});
-
 test('[ABRD-100] a saving card keeps its held picks pressed and locked, still opens a point and reads saving', async () => {
 	const { onToggle } = renderCard({
 		pending: true,

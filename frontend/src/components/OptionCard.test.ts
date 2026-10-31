@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { expect, test } from 'vitest';
-import { META_LABEL } from '../app/model/optionCard';
+import { KIND_LABEL, META_LABEL, UNDO_LABEL } from '../app/model/optionCard';
 import { cardOption, optionLine, PICTURE } from '../test-support/board';
 import OptionCard from './OptionCard.svelte';
 
@@ -130,7 +130,15 @@ test('hostile texts render as text and the picture stays out of the DOM tree', (
 });
 
 test('[ABRD-100] a saving card reads saving between its kind and its undo token', () => {
-	render(OptionCard, { repo: 'songmaker', item: 1843, line: openCard(), saving: true });
+	const { container } = render(OptionCard, {
+		repo: 'songmaker',
+		item: 1843,
+		line: openCard(),
+		saving: true
+	});
 
-	expect(screen.getByText(META_LABEL.saving)).toBeInTheDocument();
+	const tokens = [...(container.querySelector('.props')?.children ?? [])]
+		.filter((token) => !token.classList.contains('sep'))
+		.map((token) => token.textContent?.trim());
+	expect(tokens).toEqual([KIND_LABEL.product, META_LABEL.saving, UNDO_LABEL.reversible]);
 });

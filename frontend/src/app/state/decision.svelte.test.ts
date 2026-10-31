@@ -256,3 +256,90 @@ test.each([
 
 	expect(store.isPending(songKey)).toBe(false);
 });
+
+const secondCard = optionLine({
+	index: 5,
+	fingerprint: 'fp-second',
+	options: [optionA, optionB]
+});
+const twoPoints = [songCard, secondCard];
+
+function heldSend() {
+	let answer: (result: DecisionResult) => void = () => {};
+	const held = new Promise<DecisionResult>((resolve) => {
+		answer = resolve;
+	});
+	return { send: vi.fn(() => held) as unknown as typeof postDecision, answer };
+}
+
+test.each([
+	[
+		'a pick',
+		(store: DecisionStore) =>
+			store.choose('repo', 42, songPoints, { shown: songCard, option: optionB })
+	],
+	['Accept all', (store: DecisionStore) => store.acceptAll('repo', 42, songPoints)]
+])('[ABRD-100] %s holds its picks in the window and while saving', async (_name, decide) => {
+	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const { send } = heldSend();
+	const store = new DecisionStore('token', wiring, send);
+	expect(store.held(songKey)).toBeNull();
+
+	decide(store);
+	const picks = store.picks(songKey, songPoints);
+	expect(store.held(songKey)).toEqual(picks);
+	expect(picks).toHaveLength(1);
+
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(store.isSaving(songKey)).toBe(true);
+	expect(store.held(songKey)).toEqual(picks);
+});
+
+test.each([
+	['Other', (store: DecisionStore) => store.decideOther('repo', 42, twoPoints, 'my own answer')],
+	['Unclear', (store: DecisionStore) => store.decideUnclear('repo', 42, twoPoints, 'a note')]
+])(
+	'[ABRD-100] an %s answer holds no picks, even where a point was picked before it',
+	async (_name, decide) => {
+		const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+		const { send } = heldSend();
+		const store = new DecisionStore('token', wiring, send);
+		store.choose('repo', 42, twoPoints, { shown: songCard, option: optionA });
+		expect(store.picks(songKey, twoPoints)).toHaveLength(1);
+
+		decide(store);
+		expect(store.held(songKey)).toEqual([]);
+
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+		expect(store.isSaving(songKey)).toBe(true);
+		expect(store.held(songKey)).toEqual([]);
+	}
+);
+
+test.each([
+	['answers', false],
+	['fails', true]
+])(
+	'[ABRD-100] a card is pending from Neu laden until the read %s, and free after it',
+	async (_name, fails) => {
+		let finish: () => void = () => {};
+		const read = new Promise<void>((resolve, reject) => {
+			finish = fails ? () => reject(new Error('unreachable')) : resolve;
+		});
+		const { wiring } = readyBoard();
+		const store = new DecisionStore(
+			'token',
+			{ ...wiring, reload: () => read },
+			sender(storedAnswer(storedSong))
+		);
+		expect(store.isPending(songKey)).toBe(false);
+
+		const reloading = store.reloadAfterBanner(songKey).catch(() => {});
+		expect(store.isPending(songKey)).toBe(true);
+		expect(store.isPending(cardKey('repo', 43))).toBe(false);
+
+		finish();
+		await reloading;
+		expect(store.isPending(songKey)).toBe(false);
+	}
+);

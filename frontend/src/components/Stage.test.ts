@@ -419,7 +419,7 @@ test("[ABRD-99] [ABRD-100] a held pick lights its letter from the click and Savi
 	answer(storedAnswer(item()));
 });
 
-test('[ABRD-97] a refused answer brings back Other… and Unclear in place of Saving', async () => {
+test('[ABRD-97] a failed answer brings back Other… and Unclear in place of Saving', async () => {
 	const card = optionLine({ index: 2 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const decisions = storeAnswering({ status: 'failed', message: 'aco unavailable' });
