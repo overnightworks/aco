@@ -22,7 +22,10 @@
 </script>
 
 <div class="option-card">
-	<CardFrame meta={{ ...cardMeta(repo, line), ...(saving && { saving: true as const }) }} title={line.question}>
+	<CardFrame
+		meta={{ ...cardMeta(repo, line), ...(saving && { saving: true as const }) }}
+		title={line.question}
+	>
 		<OptionRows {repo} {item} {line} />
 		{@render children?.()}
 	</CardFrame>

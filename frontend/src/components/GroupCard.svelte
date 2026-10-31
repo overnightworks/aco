@@ -50,7 +50,10 @@
 </script>
 
 <div class="option-card">
-	<CardFrame meta={{ ...pointsMeta(repo, points), ...(saving && { saving: true as const }) }} title={cardTitle(points)}>
+	<CardFrame
+		meta={{ ...pointsMeta(repo, points), ...(saving && { saving: true as const }) }}
+		title={cardTitle(points)}
+	>
 		{#each points as point, position (point.index)}
 			{@const number = position + 1}
 			{@const isOpen = open === point.index}

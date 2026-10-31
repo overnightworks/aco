@@ -82,12 +82,7 @@
 			value={draft}
 			oninput={(event) => onDraft(event.currentTarget.value)}></textarea>
 		<div class="acts">
-			<button
-				type="button"
-				class="send"
-				disabled={blocked(open)}
-				onclick={() => send(open)}
-			>
+			<button type="button" class="send" disabled={blocked(open)} onclick={() => send(open)}>
 				{ESCAPE_LABEL.send}
 			</button>
 		</div>

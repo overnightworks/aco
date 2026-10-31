@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
+import { META_LABEL } from '../app/model/optionCard';
 import { cardOption, optionLine } from '../test-support/board';
 import type { OptionLine } from '../types';
 import GroupCard from './GroupCard.svelte';
@@ -27,7 +28,8 @@ function renderCard(
 		picks: { shown: OptionLine; option: ReturnType<typeof cardOption> }[];
 		locked: boolean;
 		pending: boolean;
-		refreshing: boolean;
+		waiting: boolean;
+		saving: boolean;
 	}> = {}
 ) {
 	const handlers = { onToggle: vi.fn(), onPick: vi.fn() };
@@ -39,7 +41,8 @@ function renderCard(
 		picks: [],
 		locked: false,
 		pending: false,
-		refreshing: false,
+		waiting: false,
+		saving: false,
 		...handlers,
 		...overrides
 	});
@@ -154,12 +157,41 @@ test('[ABRD-65] a pending decision disables every pick', () => {
 	}
 });
 
-test('defect:#398 picks shown during a board re-read answer nothing', async () => {
-	const { onPick } = renderCard({ refreshing: true });
+test('[ABRD-97] a pick during a board re-read reaches its handler', async () => {
+	const { onPick } = renderCard();
 
 	await fireEvent.click(screen.getByRole('button', { name: 'Point 1: A – Keep it open' }));
 
-	expect(onPick).not.toHaveBeenCalled();
+	expect(onPick).toHaveBeenCalledWith(points[0], optionA);
+});
+
+test('[ABRD-100] a saving card keeps its held picks pressed and locked, still opens a point and reads saving', async () => {
+	const { onToggle } = renderCard({
+		pending: true,
+		waiting: true,
+		saving: true,
+		picks: points.map((shown) => ({ shown, option: optionB }))
+	});
+
+	const pressed = screen.getAllByRole('button', { pressed: true });
+	expect(pressed).toHaveLength(3);
+	for (const pick of pressed) {
+		expect(pick).toBeDisabled();
+		expect(pick).toHaveClass('chosen');
+	}
+	for (const pick of screen.getAllByRole('button', { pressed: false })) {
+		expect(pick).toBeDisabled();
+		expect(pick).not.toHaveClass('recommended');
+	}
+	await fireEvent.click(screen.getByRole('button', { name: /Question 3\?/ }));
+	expect(onToggle).toHaveBeenCalledWith(3);
+	expect(screen.getByText(META_LABEL.saving)).toBeInTheDocument();
+});
+
+test('[ABRD-99] a waiting Other answer marks no pick', () => {
+	renderCard({ pending: true, waiting: true, picks: [] });
+
+	expect(screen.queryByRole('button', { pressed: true })).toBeNull();
 });
 
 test('[ABRD-45] a card that needs Neu laden hides its picks and keeps its rows', () => {
@@ -179,7 +211,8 @@ test('[ABRD-84] hostile texts render as text, never as markup', () => {
 		picks: [],
 		locked: false,
 		pending: false,
-		refreshing: false,
+		waiting: false,
+		saving: false,
 		onToggle: vi.fn(),
 		onPick: vi.fn()
 	});
