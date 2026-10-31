@@ -8,6 +8,7 @@ import {
 	firstDecidedKey,
 	firstOpenKey,
 	nextOpenAfter,
+	clockTime,
 	stageAfterReturned,
 	openList,
 	outcomeLabel,
@@ -631,4 +632,26 @@ describe('stageAfterReturned', () => {
 
 		expect(stageAfterReturned(repos, 'repo:2:card')).toBe('repo:2:card');
 	});
+
+	test('[ABRD-101] the next open card may be the kept card of a failed repository', () => {
+		const repos = [
+			repo({ items: [item({ number: 1, lines: [optionLine({ returned_on: '2026-10-27' })] })] }),
+			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [optionLine()] })] })
+		];
+
+		expect(stageAfterReturned(repos, 'repo:1:card')).toBe('broken:9:card');
+	});
+});
+
+describe('clockTime', () => {
+	test.each([
+		{ moment: new Date(2026, 9, 31, 14, 5), expected: '14:05' },
+		{ moment: new Date(2026, 9, 31, 9, 41), expected: '09:41' },
+		{ moment: new Date(2026, 9, 31, 0, 7), expected: '00:07' }
+	])(
+		'[ABRD-101] a read at $expected reads as HH:MM on the 24-hour clock',
+		({ moment, expected }) => {
+			expect(clockTime(moment)).toBe(expected);
+		}
+	);
 });

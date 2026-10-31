@@ -161,7 +161,7 @@ test.each([
 	}
 );
 
-test('[ABRD-33] a stored answer for a kept card shows in place and an older read keeps it', async () => {
+test('[ABRD-33] a stored answer for a kept card shows in place and a later failed read keeps it', async () => {
 	const store = new BoardStore();
 	await store.load(
 		't',

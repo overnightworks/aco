@@ -72,6 +72,33 @@ test('[ABRD-98] an older read that omits the item and answers first shows it onc
 	expect(store.repos[0]?.items).toEqual([neighbour, stored]);
 });
 
+test.each([
+	['readable with the old item', () => repo({ items: [open] })],
+	['failed', () => repo({ error: 'forge down', items: [] })]
+])(
+	'[ABRD-98] a read sent before the answer to a kept card and answered after it, %s, keeps the stored item',
+	async (_case, answered) => {
+		const store = await loaded([repo({ items: [open] })]);
+		await store.load(
+			'token',
+			async () =>
+				({
+					ok: true,
+					status: 200,
+					json: async () => ({ repos: [repo({ error: 'forge down', items: [] })] })
+				}) as Response
+		);
+		const reads = heldReads();
+
+		const reading = store.load('token', reads.fetchImpl);
+		store.applyItem('repo', stored);
+		reads.answer(0, [answered()]);
+		await reading;
+
+		expect(store.repos[0]?.items).toEqual([stored]);
+	}
+);
+
 test('[ABRD-98] a read sent after the answer applies its own row', async () => {
 	const store = await loaded([repo({ items: [open] })]);
 	store.applyItem('repo', stored);

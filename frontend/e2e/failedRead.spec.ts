@@ -139,9 +139,11 @@ for (const viewport of [
 
 			await arrange(board(true));
 			await show(page, phone, NEIGHBOUR_QUESTION);
+			const posts = countPosts(page);
 			await pick(page, 'A').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect.poll(() => storedLine(42, 1)).toMatchObject({ ruling: 'A', via: 'board' });
+			await expect.poll(posts.count).toBe(1);
 		});
 
 		test('[ABRD-102] a first load that fails shows aco antwortet nicht. and the failure, no list', async ({
