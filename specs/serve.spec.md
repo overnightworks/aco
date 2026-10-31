@@ -144,7 +144,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## Multiple repositories
 
 - [ ] [ABRD-14] `aco serve --repo PATH` (repeatable) configures the repos served, labelled `<repo>` by each resolved directory's name; without `--repo`, the current directory is the one repository.
-- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails, a gh or git call past its bound included, carries its own sentence and no items, others unaffected (E-ABRD-06); the page shows it per ABRD-101.
+- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails, a gh or git call past its bound included, carries its own sentence and no items, others unaffected (E-ABRD-06).
 - [ ] [ABRD-16] A decision naming a `repo` outside the configured labels is refused `bad request: decision` before any forge request (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running write in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
