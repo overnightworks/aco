@@ -52,6 +52,13 @@ async function show(page: Page, phone: boolean, question: string): Promise<void>
 	await listRow(page, question).click();
 }
 
+/** The Decided tab counts `count` lines; a phone returns to its list first. */
+async function expectDecided(page: Page, phone: boolean, count: number): Promise<void> {
+	const back = page.getByRole('button', { name: '‹ Open' });
+	if (phone && (await back.isVisible())) await back.click();
+	await expect(page.getByRole('button', { name: `Decided ${count}`, exact: true })).toBeVisible();
+}
+
 async function visit(page: Page): Promise<void> {
 	const { appUrl, token } = readBoardRuntime();
 	await page.clock.install();
@@ -190,7 +197,7 @@ for (const viewport of [
 			} finally {
 				post.release();
 			}
-			await expect(page.getByRole('button', { name: /^Decided 3$/ })).toBeVisible();
+			await expectDecided(page, phone, 3);
 			await expect.poll(() => storedLine(31, 1)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 		test('[ABRD-97] a Neu laden read held while another card saves keeps its Saving and its letter, and every other click counts', async ({
@@ -241,7 +248,7 @@ for (const viewport of [
 				post.release();
 			}
 			await expect.poll(() => storedLine(42, 1)).toMatchObject({ ruling: 'A', via: 'board' });
-			await expect(page.getByRole('button', { name: /^Decided 1$/ })).toBeVisible();
+			await expectDecided(page, phone, 1);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect.poll(() => storedLine(43, 1)).toMatchObject({ ruling: 'B', via: 'board' });
 			await expect

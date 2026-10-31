@@ -108,10 +108,6 @@
 		border-color: var(--line-strong);
 		color: var(--fg);
 	}
-	.escapes button.quiet:disabled {
-		opacity: 0.55;
-		cursor: default;
-	}
 	.panel {
 		flex-basis: 100%;
 		margin-top: 8px;

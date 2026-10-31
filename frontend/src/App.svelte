@@ -408,7 +408,7 @@
 		border-radius: 12px;
 		background: white;
 	}
-	.question-pane :global(button:disabled) {
+	.question-pane :global(button:disabled:not(.chosen)) {
 		opacity: 0.55;
 		cursor: default;
 	}

@@ -258,10 +258,6 @@
 	.decide-row button.pick:not(.recommended):hover:enabled {
 		border-color: var(--fg-2);
 	}
-	.decide-row button.pick:disabled:not(.chosen) {
-		opacity: 0.55;
-		cursor: default;
-	}
 	.decide-row button.pick.recommended {
 		border-color: var(--accent);
 		color: var(--accent);

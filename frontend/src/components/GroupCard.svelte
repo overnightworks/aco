@@ -188,10 +188,6 @@
 	.point button.pick:not(.recommended):not(.chosen):hover:enabled {
 		border-color: var(--fg-2);
 	}
-	.point button.pick:disabled:not(.chosen) {
-		opacity: 0.55;
-		cursor: default;
-	}
 	@media (max-width: 760px) {
 		.point {
 			grid-template-columns: minmax(0, 1fr);
