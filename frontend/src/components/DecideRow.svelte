@@ -3,9 +3,11 @@
 	import {
 		acceptAllConfirmation,
 		confirmationFor,
+		pickedLetter,
 		type Confirmation,
 		type Pick
 	} from '../app/model/card';
+	import { STATE_LABEL } from '../app/model/boardSummary';
 	import {
 		CONFIRM_LABEL,
 		chosenText,
@@ -18,13 +20,15 @@
 	import type { OptionLine } from '../types';
 	import EscapeRow from './EscapeRow.svelte';
 	import RefusalBanner from './RefusalBanner.svelte';
+	import StateShape from './StateShape.svelte';
 	import WarnMark from './WarnMark.svelte';
 
 	let {
 		points,
-		chosen,
+		picks,
 		pending,
-		refreshing,
+		waiting,
+		saving,
 		banner,
 		onPick,
 		onAcceptAll,
@@ -33,16 +37,19 @@
 	}: {
 		/** The card's points as shown now. */
 		points: readonly OptionLine[];
-		/** How many of the points have a live pick. */
-		chosen: number;
+		/** The picks shown: the held ones while the answer waits, else the live ones. */
+		picks: readonly Pick[];
 		pending: boolean;
-		refreshing: boolean;
+		/** The answer waits in its undo window or is being saved: the picks are held. */
+		waiting: boolean;
+		/** The answer is being saved (ABRD-100). */
+		saving: boolean;
 		banner: DecisionBanner | null;
 		onPick: (shown: readonly OptionLine[], pick: Pick) => void;
 		onAcceptAll: (shown: readonly OptionLine[]) => void;
 		onReload: () => void;
 		/** The escapes (Other…, Unclear) and their panel; absent where the card offers none. */
-		escapes?: Omit<ComponentProps<typeof EscapeRow>, 'points' | 'pending' | 'refreshing'>;
+		escapes?: Omit<ComponentProps<typeof EscapeRow>, 'points' | 'pending'>;
 	} = $props();
 
 	const titleId = $props.id();
@@ -98,7 +105,6 @@
 	/** A pick of the card, from this row or from a point's row: asks first when
 	 * the option cannot be taken back. */
 	export async function choose(pick: Pick) {
-		if (refreshing) return;
 		const shown = points;
 		const confirmation = confirmationFor(shown, pick);
 		if (confirmation === null) {
@@ -109,7 +115,6 @@
 	}
 
 	async function acceptAll() {
-		if (refreshing) return;
 		const shown = points;
 		const confirmation = acceptAllConfirmation(shown);
 		if (confirmation === null) {
@@ -138,23 +143,24 @@
 						type="button"
 						class="pick recommended wide"
 						disabled={pending}
-						aria-disabled={refreshing}
 						aria-label={GROUP_LABEL.acceptAllName}
 						onclick={acceptAll}
 					>
 						{GROUP_LABEL.acceptAll}
 					</button>
-					<span class="count">{chosenText(chosen, points.length)}</span>
+					<span class="count">{chosenText(picks.length, points.length)}</span>
 				{:else}
 					{#each points as line (line.index)}
+						{@const held = pickedLetter(picks, line)}
 						<div class="picks" role="group" aria-label={ROW_LABEL.decide}>
 							{#each line.options as option (option.letter)}
 								<button
 									type="button"
 									class="pick"
-									class:recommended={option.letter === line.recommended}
+									class:recommended={!waiting && option.letter === line.recommended}
+									class:chosen={waiting && option.letter === held}
 									disabled={pending}
-									aria-disabled={refreshing}
+									aria-pressed={waiting ? option.letter === held : undefined}
 									aria-label={pickLabel(option)}
 									onclick={() => choose({ shown: line, option })}
 								>
@@ -164,8 +170,13 @@
 						</div>
 					{/each}
 				{/if}
-				{#if escapes !== undefined}
-					<EscapeRow {points} {pending} {refreshing} {...escapes} />
+				{#if saving}
+					<span class="saving">
+						<span aria-hidden="true"><StateShape state="saving" /></span>
+						{STATE_LABEL.saving}
+					</span>
+				{:else if escapes !== undefined}
+					<EscapeRow {points} {pending} {...escapes} />
 				{/if}
 			</div>
 		{/if}
@@ -244,16 +255,31 @@
 		background: var(--surface);
 		font-weight: 700;
 	}
-	.decide-row button.pick:not(.recommended):hover:enabled:not([aria-disabled='true']) {
+	.decide-row button.pick:not(.recommended):hover:enabled {
 		border-color: var(--fg-2);
 	}
-	.decide-row button.pick[aria-disabled='true'] {
+	.decide-row button.pick:disabled:not(.chosen) {
 		opacity: 0.55;
 		cursor: default;
 	}
 	.decide-row button.pick.recommended {
 		border-color: var(--accent);
 		color: var(--accent);
+	}
+	.decide-row button.pick.chosen {
+		border-color: var(--accent);
+		background: var(--accent);
+		color: var(--accent-fg);
+	}
+	.saving {
+		display: inline-flex;
+		gap: 6px;
+		align-items: center;
+		height: 40px;
+		margin-left: auto;
+		padding: 0 12px;
+		color: var(--good);
+		font-weight: 600;
 	}
 	.decide-row button.pick.wide {
 		padding: 0 20px;

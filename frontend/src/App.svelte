@@ -90,7 +90,7 @@
 	$effect(() => {
 		// Also after a stored answer is applied in place: its card may leave the list.
 		void board.repos;
-		if (board.status === 'ready' && !board.refreshing) {
+		if (board.status === 'ready') {
 			if (!initialized) {
 				selectedKey = firstOpenKey(board.repos);
 				initialized = true;
@@ -185,12 +185,14 @@
 	{:else if board.status === 'unavailable'}
 		<p role="alert">aco antwortet nicht. {board.error}</p>
 	{:else if decisions !== null}
+		{@const store = decisions}
 		<div class="split" hidden={view !== 'open'} class:show-question={showQuestion}>
 			<div class="tracks" bind:this={tracks} tabindex="-1">
 				<TrackList
 					repos={board.repos}
 					view="open"
 					{selectedKey}
+					saving={(key) => store.isSaving(key)}
 					onSelect={(key) => {
 						selectedKey = key;
 						showQuestion = true;
@@ -205,7 +207,7 @@
 			</div>
 			<div class="question-pane" bind:this={question} tabindex="-1">
 				<div class="inner">
-					<Stage repos={board.repos} {selectedKey} {decisions} refreshing={board.refreshing} />
+					<Stage repos={board.repos} {selectedKey} {decisions} />
 				</div>
 			</div>
 		</div>
@@ -216,6 +218,7 @@
 						repos={board.repos}
 						view="decided"
 						selectedKey={decidedKey}
+						saving={(key) => store.isSaving(key)}
 						onSelect={(key) => {
 							decidedKey = key;
 							showDecidedCard = true;
@@ -225,12 +228,7 @@
 				</div>
 				<div class="question-pane" bind:this={decidedQuestion} tabindex="-1">
 					<div class="inner">
-						<Stage
-							repos={board.repos}
-							selectedKey={decidedKey}
-							{decisions}
-							refreshing={board.refreshing}
-						/>
+						<Stage repos={board.repos} selectedKey={decidedKey} {decisions} />
 					</div>
 				</div>
 			</div>

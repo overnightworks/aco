@@ -45,6 +45,12 @@ export const UNDO_LABEL: Record<Undo, string> = {
 	final: 'final'
 };
 
+/** The meta tokens between the kind and the undo token. */
+export const META_LABEL = {
+	withHead: 'with head',
+	saving: 'saving'
+} as const;
+
 /** A yes/no line carries no `form` at all (ABRD-34). */
 export function isOptionLine(line: ExpectationLine): line is OptionLine {
 	return 'form' in line;
@@ -59,6 +65,8 @@ export interface FrameMeta {
 	kind?: string;
 	/** The line was sent back to its head (ABRD-61). */
 	withHead?: true;
+	/** The card's answer is being saved (ABRD-100). */
+	saving?: true;
 	undo?: Undo;
 }
 

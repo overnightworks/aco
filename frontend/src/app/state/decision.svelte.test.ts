@@ -219,7 +219,7 @@ test('[ABRD-65] a pending Other answer marks the card pending so no pick can joi
 	expect(store.isPending(songKey)).toBe(true);
 });
 
-test('[ABRD-97] a card posts from the end of its window until its answer is applied, and Undo then does nothing', async () => {
+test('[ABRD-97] a card saves from the end of its window until its answer is applied, and Undo then does nothing', async () => {
 	let answer: (result: DecisionResult) => void = () => {};
 	const held = new Promise<DecisionResult>((resolve) => {
 		answer = resolve;
@@ -232,12 +232,14 @@ test('[ABRD-97] a card posts from the end of its window until its answer is appl
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(store.pendingEntries).toEqual([]);
+	expect(store.isSaving(songKey)).toBe(true);
 	expect(store.isPending(songKey)).toBe(true);
 	store.undo(songKey);
 	expect(store.isPending(songKey)).toBe(true);
 	expect(send).toHaveBeenCalledTimes(1);
 	answer(storedAnswer(storedSong));
 	await vi.advanceTimersByTimeAsync(0);
+	expect(store.isSaving(songKey)).toBe(false);
 	expect(store.isPending(songKey)).toBe(false);
 	expect(board.repos[0]?.items).toEqual([storedSong]);
 });
@@ -245,7 +247,7 @@ test('[ABRD-97] a card posts from the end of its window until its answer is appl
 test.each([
 	['a refused', { status: 'already_ruled', message: 'line 3 is already ruled' } as DecisionResult],
 	['a failed', { status: 'failed', message: 'aco unavailable' } as DecisionResult]
-])('[ABRD-97] %s answer releases the posting card', async (_name, refusal) => {
+])('[ABRD-97] %s answer releases the saving card', async (_name, refusal) => {
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, sender(refusal));
 

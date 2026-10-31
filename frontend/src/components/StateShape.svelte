@@ -19,7 +19,15 @@
 				stroke-linejoin="round"
 			/>
 		{:else}
-			<circle cx="7" cy="7" r="5.6" fill="none" stroke="currentColor" stroke-width="1.6" />
+			<circle
+				cx="7"
+				cy="7"
+				r="5.6"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.6"
+				stroke-dasharray={state === 'saving' ? '2.4 2.2' : undefined}
+			/>
 			{#if state === 'back'}
 				<path
 					d="M8.6 4.6 6.2 7l2.4 2.4"
@@ -43,8 +51,22 @@
 	.back {
 		color: var(--fg-3);
 	}
-	.done {
+	.done,
+	.saving {
 		color: var(--good);
+	}
+	.saving svg {
+		animation: turn 1.6s linear infinite;
+	}
+	@keyframes turn {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.saving svg {
+			animation: none;
+		}
 	}
 	svg {
 		display: block;

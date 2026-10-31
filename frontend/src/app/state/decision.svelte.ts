@@ -3,14 +3,15 @@
  * waits here, cancellable, until `UNDO_SECONDS` elapse, then becomes exactly
  * one `POST /api/rule`. An option card is decided as a whole: the store holds
  * its picks and its open point, and starts the window once every point is
- * chosen. `Stage.svelte` reads whether a card is mid-undo, posting or
- * refused; `App.svelte` renders one `UndoStrip` per still-pending entry.
+ * chosen. `Stage.svelte` reads whether a card is waiting (in its undo window
+ * or saving), reading again after a refusal, or refused, and which picks a
+ * waiting answer holds; `App.svelte` renders one `UndoStrip` per still-pending entry.
  * A stored answer carries the written item, which `BoardStore.applyItem`
  * (`board.svelte.ts`) shows in place; `reload` re-reads only for `Neu laden`.
  */
 
 import { untrack } from 'svelte';
-import { SvelteSet } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { postDecision } from '../../client';
 import type { BoardItem, DecisionRequest, OptionLine, RepoReading } from '../../types';
 import { findSelection, type StripState } from '../model/boardSummary';
@@ -63,6 +64,8 @@ interface PendingEntry {
 	message: string;
 	state: StripState;
 	timer: ReturnType<typeof setTimeout>;
+	/** The picks this answer posts: a pick's or Accept all's, none for an escape answer. */
+	held: readonly Pick[];
 	/** The panel `Undo` reopens, for an escape answer only. */
 	reopens: EscapePanel | null;
 }
@@ -90,8 +93,11 @@ function withoutKey<Value>(record: Record<string, Value>, key: string): Record<s
 export class DecisionStore {
 	#pending: Record<string, PendingEntry> = $state({});
 	#banners: Record<string, DecisionBanner> = $state({});
-	/** The cards whose window ended and whose POST has not been answered yet. */
-	readonly #posting = new SvelteSet<string>();
+	/** The cards whose window ended and whose POST has not been answered yet,
+	 * each with the picks that POST holds. */
+	readonly #saving = new SvelteMap<string, readonly Pick[]>();
+	/** The cards whose own `Neu laden` read after a refusal has not been answered yet. */
+	readonly #reading = new SvelteSet<string>();
 	/** The key this store itself just wrote a ruling for, its item applied --
 	 * `App.svelte` advances the stage off it (`boardSummary.nextOpenAfter`)
 	 * when it is still the one shown, never for a manual reload after a
@@ -124,9 +130,21 @@ export class DecisionStore {
 		}));
 	}
 
-	/** Whether the card is in its undo window or posting. */
+	/** Whether the card's controls are disabled: in its undo window, saving, or
+	 * reading again after a refusal. */
 	isPending(key: string): boolean {
-		return key in this.#pending || this.#posting.has(key);
+		return key in this.#pending || this.#saving.has(key) || this.#reading.has(key);
+	}
+
+	/** Whether the card's window ended and its POST has not been answered yet. */
+	isSaving(key: string): boolean {
+		return this.#saving.has(key);
+	}
+
+	/** The picks the card's waiting answer holds (in its undo window or saving),
+	 * or null while the card is not waiting. */
+	held(key: string): readonly Pick[] | null {
+		return this.#pending[key]?.held ?? this.#saving.get(key) ?? null;
 	}
 
 	banner(key: string): DecisionBanner | null {
@@ -232,7 +250,8 @@ export class DecisionStore {
 				key,
 				cardPicksRequest(repo, item, picks),
 				pickedText(points, picks),
-				'done'
+				'done',
+				picks
 			);
 		}
 	}
@@ -246,6 +265,7 @@ export class DecisionStore {
 			cardOtherRequest(repo, item, shown, answer),
 			pendingOtherText(cardName(shown)),
 			'done',
+			[],
 			{ kind: 'other', shown }
 		);
 	}
@@ -259,6 +279,7 @@ export class DecisionStore {
 			cardUnclearRequest(repo, item, shown, note),
 			cardName(shown),
 			'back',
+			[],
 			{ kind: 'unclear', shown }
 		);
 	}
@@ -268,11 +289,12 @@ export class DecisionStore {
 		request: DecisionRequest,
 		message: string,
 		state: StripState,
+		held: readonly Pick[],
 		reopens: EscapePanel | null = null
 	): void {
 		this.#banners = withoutKey(this.#banners, key);
-		const timer = setTimeout(() => void this.#commit(key, request), this.undoSeconds * 1000);
-		this.#pending = { ...this.#pending, [key]: { request, message, state, timer, reopens } };
+		const timer = setTimeout(() => void this.#commit(key, request, held), this.undoSeconds * 1000);
+		this.#pending = { ...this.#pending, [key]: { request, message, state, timer, held, reopens } };
 	}
 
 	/** Cancels a still-pending decision; a no-op once it already wrote or was undone.
@@ -292,23 +314,29 @@ export class DecisionStore {
 	}
 
 	/** The operator's own "Neu laden" after a refusal: drop it and re-read; the
-	 * picks of unchanged points stay, those of changed points go with the re-read. */
+	 * picks of unchanged points stay, those of changed points go with the re-read.
+	 * This card alone is disabled until the read answers, however it ends. */
 	async reloadAfterBanner(key: string): Promise<void> {
 		this.#banners = withoutKey(this.#banners, key);
-		await this.board.reload();
+		this.#reading.add(key);
+		try {
+			await this.board.reload();
+		} finally {
+			this.#reading.delete(key);
+		}
 	}
 
-	async #commit(key: string, request: DecisionRequest): Promise<void> {
+	async #commit(key: string, request: DecisionRequest, held: readonly Pick[]): Promise<void> {
 		this.#pending = withoutKey(this.#pending, key);
-		this.#posting.add(key);
+		this.#saving.set(key, held);
 		let outcome: DecisionOutcome;
 		try {
 			outcome = readDecisionResult(await this.send(this.token, request));
 		} catch {
 			outcome = { kind: 'failed', message: BOARD_UNREACHABLE_MESSAGE };
 		}
-		// One synchronous step: the card leaves posting as its answer is applied.
-		this.#posting.delete(key);
+		// One synchronous step: the card stops saving as its answer is applied.
+		this.#saving.delete(key);
 		if (outcome.kind === 'ruled') {
 			this.#picks = withoutKey(this.#picks, key);
 			this.#dropDrafts(key, ['other', 'unclear']);

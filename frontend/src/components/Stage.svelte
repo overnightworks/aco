@@ -11,13 +11,11 @@
 	let {
 		repos,
 		selectedKey,
-		decisions,
-		refreshing
+		decisions
 	}: {
 		repos: RepoReading[];
 		selectedKey: string | null;
 		decisions: DecisionStore;
-		refreshing: boolean;
 	} = $props();
 
 	let decideRow: DecideRow | undefined = $state();
@@ -44,15 +42,18 @@
 		{@const itemNumber = selected.item.number}
 		{@const optionKey = cardKey(repoName, itemNumber)}
 		{@const banner = decisions.banner(optionKey)}
-		{@const picks = decisions.picks(optionKey, points)}
+		{@const held = decisions.held(optionKey)}
+		{@const picks = held ?? decisions.picks(optionKey, points)}
+		{@const saving = decisions.isSaving(optionKey)}
 		{@const openPanel = decisions.panel(optionKey)}
 		{#snippet decide()}
 			<DecideRow
 				bind:this={decideRow}
 				{points}
-				chosen={picks.length}
+				{picks}
 				pending={decisions.isPending(optionKey)}
-				{refreshing}
+				waiting={held !== null}
+				{saving}
 				{banner}
 				onPick={(shown, pick) => decisions.choose(repoName, itemNumber, shown, pick)}
 				onAcceptAll={(shown) => decisions.acceptAll(repoName, itemNumber, shown)}
@@ -82,7 +83,8 @@
 					{picks}
 					locked={locksCard(banner)}
 					pending={decisions.isPending(optionKey)}
-					{refreshing}
+					waiting={held !== null}
+					{saving}
 					onToggle={(index) => decisions.togglePoint(optionKey, index)}
 					onPick={(shown, option) => decideRow?.choose({ shown, option })}
 				>
@@ -90,7 +92,7 @@
 				</GroupCard>
 			{:else}
 				{#each points as only (only.index)}
-					<OptionCard repo={repoName} item={itemNumber} line={only}>
+					<OptionCard repo={repoName} item={itemNumber} line={only} {saving}>
 						{@render decide()}
 					</OptionCard>
 				{/each}
