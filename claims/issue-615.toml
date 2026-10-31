@@ -1,0 +1,7 @@
+claim_id = "4680ffcc111b46e89ef109df2f6e2264"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "eec023f4085aead3e1713cd4ed2ea25db65e4bb7"
+branch = "claude/issue-615-the-frontend-s-dev-only-minimatch-moves"
+scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
+opened_commit = "c138011bcd7130eface9f658098750afb5bd060b"
