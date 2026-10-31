@@ -1,8 +1,0 @@
-claim_id = "79e233af6b1b4956938ba18d5dd71fbe"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "6bd723c966a778b5daab0e41ab4ec26df9203f8f"
-branch = "claude/issue-329-the-frontend-allows-node-24-and-26-and-b"
-scope = [".github/workflows/ci.yml", "frontend/package.json", "frontend/pnpm-lock.yaml", "src/aco/board/static"]
-opened_commit = "c29b5e5f968a71fad21a8ad0659c5233fbb49913"
-whole_reason = "Two frontend files plus the generated static directory, which is rebuilt only if Node 26 changes the build"
