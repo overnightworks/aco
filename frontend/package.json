@@ -43,6 +43,7 @@
 	},
 	"pnpm": {
 		"overrides": {
+			"minimatch": "11.0.3",
 			"undici": "8.12.2",
 			"zod": "4.6.6"
 		}
