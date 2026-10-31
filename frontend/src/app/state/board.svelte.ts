@@ -4,8 +4,10 @@
  */
 
 import { untrack } from 'svelte';
+import { SvelteDate } from 'svelte/reactivity';
 import { BoardApiError, fetchBoard } from '../../client';
 import type { BoardItem, RepoReading } from '../../types';
+import { SERVER_SILENT_SENTENCE, type ShownRepo } from '../model/boardSummary';
 
 export type BoardStatus = 'no-access' | 'loading' | 'unavailable' | 'ready';
 
@@ -18,16 +20,12 @@ interface StoredAnswer {
 
 /** A read's rows for an item apply only if the read was sent after the item's
  * stored answer arrived (ABRD-98); otherwise the answer's item stands in its
- * place, appended when the read omits it. A repository showing an error keeps it. */
-function withStoredAnswers(
-	repos: RepoReading[],
-	answers: StoredAnswer[],
-	sent: number
-): RepoReading[] {
+ * place, appended when the read omits it. */
+function withStoredAnswers(repos: ShownRepo[], answers: StoredAnswer[], sent: number): ShownRepo[] {
 	const standing = answers.filter(({ after }) => sent <= after);
 	return repos.map((reading) => {
 		const own = standing.filter(({ repo }) => repo === reading.name);
-		if (reading.error !== null || own.length === 0) return reading;
+		if (own.length === 0) return reading;
 		const replaced = reading.items.map(
 			(item) => own.find((answer) => answer.item.number === item.number)?.item ?? item
 		);
@@ -38,6 +36,16 @@ function withStoredAnswers(
 	});
 }
 
+/** The page's reading of a read's answer: a repository that read takes the
+ * arrival time; one that failed keeps the items and time of its last reading. */
+function shownRepos(answered: RepoReading[], current: ShownRepo[], arrived: Date): ShownRepo[] {
+	return answered.map((reading) => {
+		if (reading.error === null) return { ...reading, readAt: arrived };
+		const kept = current.find(({ name }) => name === reading.name);
+		return { ...reading, items: kept?.items ?? [], readAt: kept?.readAt ?? null };
+	});
+}
+
 export class BoardStore {
 	#readsSent = 0;
 	/** The number of the read that produced `repos`. */
@@ -45,7 +53,7 @@ export class BoardStore {
 	#answers: Record<string, StoredAnswer> = {};
 
 	status: BoardStatus = $state('no-access');
-	repos: RepoReading[] = $state([]);
+	repos: ShownRepo[] = $state([]);
 	error: string | null = $state(null);
 
 	setNoAccess(): void {
@@ -59,15 +67,21 @@ export class BoardStore {
 		// loading state would tear down what the person is working in, such as
 		// an open confirmation.
 		// Untracked: the caller's effect must not subscribe to the status it triggers.
-		if (untrack(() => this.status) !== 'ready') this.status = 'loading';
+		const wasReady = untrack(() => this.status) === 'ready';
+		if (!wasReady) this.status = 'loading';
 		this.error = null;
 		const sent = ++this.#readsSent;
 		try {
 			const board = await fetchBoard(token, fetchImpl);
 			this.#readingSent = sent;
-			this.repos = withStoredAnswers(board.repos, Object.values(this.#answers), sent);
+			const shown = shownRepos(board.repos, this.repos, new SvelteDate(Date.now()));
+			this.repos = withStoredAnswers(shown, Object.values(this.#answers), sent);
 			this.status = 'ready';
 		} catch (error) {
+			if (wasReady) {
+				this.repos = this.repos.map((reading) => ({ ...reading, error: SERVER_SILENT_SENTENCE }));
+				return;
+			}
 			this.repos = [];
 			this.error = error instanceof BoardApiError ? error.message : 'network error';
 			this.status = 'unavailable';

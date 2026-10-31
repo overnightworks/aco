@@ -7,6 +7,7 @@
 		firstOpenKey,
 		type ListView,
 		OPEN_TAB_LABEL,
+		SERVER_SILENT_SENTENCE,
 		DECIDED_TAB_LABEL,
 		tabCounts
 	} from './app/model/boardSummary';
@@ -183,7 +184,7 @@
 	{:else if board.status === 'loading'}
 		<p role="status">Lädt…</p>
 	{:else if board.status === 'unavailable'}
-		<p role="alert">aco antwortet nicht. {board.error}</p>
+		<p role="alert">{SERVER_SILENT_SENTENCE} {board.error}</p>
 	{:else if decisions !== null}
 		{@const store = decisions}
 		<div class="split" hidden={view !== 'open'} class:show-question={showQuestion}>

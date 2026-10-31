@@ -26,6 +26,24 @@ export const EMPTY_LIST_TEXT = 'No project is waiting for you.';
 export const EMPTY_DECIDED_TITLE = 'Nothing decided yet';
 export const EMPTY_DECIDED_TEXT = 'Your decisions show here with their answer and date.';
 export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
+export const NOT_READ_LABEL = 'Not read';
+export const LAST_READ_LABEL = 'last read';
+/** What a read that fails whole says, on the first load and on a ready board alike. */
+export const SERVER_SILENT_SENTENCE = 'aco antwortet nicht.';
+
+/** A repository as the page shows it: its reading, with the arrival time of its
+ * last successful read, `null` before one. A sentence beside items is a failed
+ * repository that keeps its last cards. */
+export type ShownRepo = RepoReading & { readAt: Date | null };
+
+/** What the list and selection functions read: a reading with or without its
+ * read time, so a stage that never shows the time takes plain readings. */
+type Readings = (RepoReading & { readAt?: Date | null })[];
+
+/** A read time as `HH:MM` on the 24-hour clock of the browser's time zone. */
+export function clockTime(moment: Date): string {
+	return moment.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
 
 const OUTCOME_LABEL: Record<Outcome, string> = {
 	yes: 'Ja',
@@ -106,8 +124,12 @@ interface ListRow<State extends RowState = RowState> {
 	title: string;
 }
 
-type ListGroup<Row extends ListRow> =
-	{ repo: string; error: string } | { repo: string; rows: Row[] };
+interface ListGroup<Row extends ListRow> {
+	repo: string;
+	error: string | null;
+	readAt: Date | null;
+	rows: Row[];
+}
 
 export interface RowList<Row extends ListRow = ListRow> {
 	groups: ListGroup<Row>[];
@@ -158,24 +180,25 @@ function decidedRows(reading: RepoReading): ListRow<'done'>[] {
 		.map(({ item, line }) => decidedRow(reading.name, item.number, line));
 }
 
-/** One group per repository that failed or has a row, in configured order; a
- * readable repository without one is quiet. */
+/** One group per repository that failed or has a row, in configured order, a
+ * failed one with the rows it kept; a readable repository without one is quiet. */
 function groupedRows<Row extends ListRow>(
-	repos: RepoReading[],
+	repos: Readings,
 	rowsFor: (reading: RepoReading) => Row[]
 ): RowList<Row> {
 	const groups: ListGroup<Row>[] = [];
 	const quiet: string[] = [];
 	for (const reading of repos) {
-		if (reading.error !== null) {
-			groups.push({ repo: reading.name, error: reading.error });
-			continue;
-		}
 		const rows = rowsFor(reading);
-		if (rows.length === 0) {
+		if (reading.error === null && rows.length === 0) {
 			quiet.push(reading.name);
 		} else {
-			groups.push({ repo: reading.name, rows });
+			groups.push({
+				repo: reading.name,
+				error: reading.error,
+				readAt: reading.readAt ?? null,
+				rows
+			});
 		}
 	}
 	return { groups, quiet };
@@ -183,30 +206,30 @@ function groupedRows<Row extends ListRow>(
 
 /** The open list: one group per repository that failed or has an open card,
  * its cards in aco's order, those with their head after the others. */
-export function openList(repos: RepoReading[]): RowList<ListRow<OpenRowState>> {
+export function openList(repos: Readings): RowList<ListRow<OpenRowState>> {
 	return groupedRows(repos, openRows);
 }
 
 /** The Decided list: one group per repository that failed or has a ruled
  * line. The picture names quiet projects only on Open, so `quiet` stays
  * empty. */
-export function decidedList(repos: RepoReading[]): RowList<ListRow<'done'>> {
+export function decidedList(repos: Readings): RowList<ListRow<'done'>> {
 	return { groups: groupedRows(repos, decidedRows).groups, quiet: [] };
 }
 
 function rowsOf<Row extends ListRow>(list: RowList<Row>): Row[] {
-	return list.groups.flatMap((group) => ('rows' in group ? group.rows : []));
+	return list.groups.flatMap((group) => group.rows);
 }
 
-function listedRows(repos: RepoReading[]): ListRow<OpenRowState>[] {
+function listedRows(repos: Readings): ListRow<OpenRowState>[] {
 	return rowsOf(openList(repos));
 }
 
-export function firstOpenKey(repos: RepoReading[]): string | null {
+export function firstOpenKey(repos: Readings): string | null {
 	return listedRows(repos)[0]?.key ?? null;
 }
 
-export function firstDecidedKey(repos: RepoReading[]): string | null {
+export function firstDecidedKey(repos: Readings): string | null {
 	return rowsOf(decidedList(repos))[0]?.key ?? null;
 }
 
@@ -218,12 +241,12 @@ function lineSelection(repo: string, item: BoardItem, line: ExpectationLine): Se
  * its item, a line key a ruled line (shown read-only).
  * An open option line is a point of its card and never selected on its own.
  * A key whose data has disappeared reads the same as no selection. */
-export function findSelection(repos: RepoReading[], key: string | null): Selection | null {
+export function findSelection(repos: Readings, key: string | null): Selection | null {
 	if (key === null) {
 		return null;
 	}
 	for (const reading of repos) {
-		for (const item of reading.error === null ? reading.items : []) {
+		for (const item of reading.items) {
 			const points = openPoints(item);
 			if (points.length > 0 && cardKey(reading.name, item.number) === key) {
 				return { kind: 'card', repo: reading.name, item, points };
@@ -245,7 +268,7 @@ export function selectionHeading(selection: Selection): string {
 /** The card the stage moves to once `key` is decided: of the other open
  * rows, the first with the best rank in list order, so an option card comes
  * before one with its head; `null` once nothing else is open. */
-export function nextOpenAfter(repos: RepoReading[], key: string): string | null {
+export function nextOpenAfter(repos: Readings, key: string): string | null {
 	const others = listedRows(repos).filter((row) => row.key !== key);
 	const bestRank = Math.min(...others.map((row) => ROW_RANK[row.state]));
 	return others.find((row) => ROW_RANK[row.state] === bestRank)?.key ?? null;
@@ -253,12 +276,12 @@ export function nextOpenAfter(repos: RepoReading[], key: string): string | null 
 
 /** Where the stage goes once `key` is sent back to its head: the first other
  * open row, else the card itself, which now reads `with head`. */
-export function stageAfterReturned(repos: RepoReading[], key: string): string {
+export function stageAfterReturned(repos: Readings, key: string): string {
 	return listedRows(repos).find((row) => row.key !== key && row.state === 'open')?.key ?? key;
 }
 
 /** What the header's two tabs count: the rows the open list shows and the
  * ruled lines the Decided view lists. */
-export function tabCounts(repos: RepoReading[]): { open: number; decided: number } {
+export function tabCounts(repos: Readings): { open: number; decided: number } {
 	return { open: listedRows(repos).length, decided: rowsOf(decidedList(repos)).length };
 }

@@ -2,16 +2,23 @@ import { render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 import { cardKey } from '../app/model/decision';
 import { item, line, optionLine, repo } from '../test-support/board';
-import type { ListView } from '../app/model/boardSummary';
+import {
+	clockTime,
+	LAST_READ_LABEL,
+	NOT_READ_LABEL,
+	type ListView
+} from '../app/model/boardSummary';
 import TrackList from './TrackList.svelte';
 
+type Reading = ReturnType<typeof repo> & { readAt?: Date | null };
+
 function renderList(
-	repos: ReturnType<typeof repo>[],
+	repos: Reading[],
 	overrides: { selectedKey?: string | null; view?: ListView; saving?: string[] } = {}
 ) {
 	const onSelect = vi.fn();
 	const rendered = render(TrackList, {
-		repos,
+		repos: repos.map((reading) => ({ readAt: null, ...reading })),
 		view: overrides.view ?? 'open',
 		selectedKey: overrides.selectedKey ?? null,
 		saving: (key: string) => overrides.saving?.includes(key) ?? false,
@@ -97,12 +104,11 @@ test('[ABRD-49] ruled lines and ruled-only repositories leave the groups and sta
 });
 
 test('[ABRD-49] a failed repository shows its alert, and with no open line no All decided', () => {
-	renderList([
-		repo({ name: 'b', error: 'aco rulings failed: ERROR: no forge adapter', items: [] }),
-		repo({ name: 'idle', items: [] })
-	]);
+	const sentence = 'aco rulings failed: ERROR: no forge adapter';
+	renderList([repo({ name: 'b', error: sentence, items: [] }), repo({ name: 'idle', items: [] })]);
 
-	expect(screen.getByRole('alert')).toHaveTextContent('b: aco rulings failed');
+	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('b');
+	expect(screen.getByRole('alert')).toHaveTextContent(`${NOT_READ_LABEL} ${sentence}`);
 	expect(screen.getByText('Nothing open: idle')).toBeInTheDocument();
 	expect(screen.queryByText('All decided')).not.toBeInTheDocument();
 });
@@ -139,11 +145,12 @@ test('[ABRD-15] hostile titles, topics, repository names and errors are shown as
 		})
 	]);
 
-	expect(screen.getByRole('alert')).toHaveTextContent(`${hostileName}: ${hostileError}`);
+	expect(screen.getByRole('heading', { name: hostileName })).toBeInTheDocument();
+	expect(screen.getByRole('alert')).toHaveTextContent(hostileError);
 	expect(screen.getByText(hostileTopic)).toBeInTheDocument();
 	expect(screen.getAllByTitle(hostileQuestion)).toHaveLength(2);
 	expect(container.querySelectorAll('script, img')).toHaveLength(0);
-	expect(container.querySelectorAll('svg')).toHaveLength(2);
+	expect(container.querySelectorAll('svg')).toHaveLength(3);
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
@@ -220,7 +227,8 @@ test('[ABRD-31] a failed repository shows its alert in the decided list and no N
 		}
 	);
 
-	expect(screen.getByRole('alert')).toHaveTextContent('broken: down');
+	expect(screen.getByRole('heading', { name: 'broken' })).toBeInTheDocument();
+	expect(screen.getByRole('alert')).toHaveTextContent(`${NOT_READ_LABEL} down`);
 	expect(screen.queryByText('Nothing decided yet')).not.toBeInTheDocument();
 	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
 });
@@ -251,4 +259,36 @@ test('[ABRD-100] a saving row with its head shows Saving, unmuted', () => {
 
 	const row = screen.getByRole('button', { name: 'Saving Sprung' });
 	expect(within(row).getByText('Sprung')).not.toHaveClass('muted');
+});
+
+test('[ABRD-101] a failed repository without a kept card names no read time', () => {
+	renderList([repo({ name: 'fresh', error: 'down', items: [] })]);
+
+	expect(screen.getByRole('alert')).not.toHaveTextContent(LAST_READ_LABEL);
+	expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
+test('[ABRD-101] a failed repository keeps its cards as selectable rows after the time they were read', () => {
+	const readAt = new Date(2026, 9, 31, 9, 41);
+	const { onSelect } = renderList(
+		[
+			{
+				...repo({
+					name: 'kept',
+					error: 'down',
+					items: [item({ number: 42, lines: [optionLine({ topic: 'Sprung' })] })]
+				}),
+				readAt
+			}
+		],
+		{ selectedKey: cardKey('kept', 42) }
+	);
+
+	expect(screen.getByRole('alert')).toHaveTextContent(
+		`${NOT_READ_LABEL} down ${LAST_READ_LABEL} ${clockTime(readAt)}`
+	);
+	const row = screen.getByRole('button', { name: 'Open Sprung' });
+	expect(row).toHaveAttribute('aria-current', 'true');
+	row.click();
+	expect(onSelect).toHaveBeenCalledWith(cardKey('kept', 42));
 });
