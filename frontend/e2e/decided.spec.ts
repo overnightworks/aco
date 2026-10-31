@@ -7,6 +7,7 @@ import {
 	expectDecidedAnswer,
 	openDecidedLine
 } from './decidedView';
+import { routeRepositories } from './decideRow';
 import {
 	arrange,
 	item,
@@ -158,25 +159,6 @@ const EVERY_WAY = [
 	}
 ];
 
-async function routeRepositories(
-	page: Page,
-	names: string[],
-	failedNames: string[] = []
-): Promise<void> {
-	await page.route('**/api/board', async (route) => {
-		const response = await route.fetch();
-		const board = await response.json();
-		await route.fulfill({
-			json: {
-				repos: [
-					...names.map((name) => ({ ...board.repos[0], name })),
-					...failedNames.map((name) => ({ name, error: FAILED_MESSAGE, items: [] }))
-				]
-			}
-		});
-	});
-}
-
 async function shootWithShapes(page: Page, outputPath: (name: string) => string, name: string) {
 	await page.screenshot({ path: outputPath(`${name}.png`) });
 	await page.evaluate(() => {
@@ -204,16 +186,19 @@ for (const viewport of [
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
 			await arrangeMixed();
-			await routeRepositories(page, ['Projekt A', 'Projekt B'], ['Projekt C']);
+			await routeRepositories(page, ['Projekt A', 'Projekt B', 'Projekt C'], () => ({
+				'Projekt C': FAILED_MESSAGE
+			}));
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
 
 			const list = decidedList(page);
 			await expect(list.getByRole('heading', { level: 2 })).toHaveText([
 				/^Projekt A\s+3$/,
-				/^Projekt B\s+3$/
+				/^Projekt B\s+3$/,
+				'Projekt C'
 			]);
-			await expect(list.getByRole('alert')).toHaveText(`Projekt C: ${FAILED_MESSAGE}`);
+			await expect(list.getByRole('alert')).toHaveText(`Not read ${FAILED_MESSAGE}`);
 			const rows = list.getByRole('button');
 			await expect(rows).toHaveCount(6);
 			await expect(rows.getByRole('img', { name: 'Decided' })).toHaveCount(6);
@@ -349,7 +334,8 @@ for (const viewport of [
 			await page.goto(`${appUrl}#t=${token}`);
 			await decidedTab(page).click();
 
-			await expect(decidedList(page).getByRole('alert')).toContainText('unavailable');
+			await expect(decidedList(page).getByRole('heading', { name: 'unavailable' })).toBeVisible();
+			await expect(decidedList(page).getByRole('alert')).toContainText(FAILED_MESSAGE);
 			await expect(page.getByText('Nothing decided yet')).toHaveCount(0);
 			await expect(page.getByText(/Nothing open/)).toBeHidden();
 		});
