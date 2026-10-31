@@ -13,7 +13,7 @@ its open cards newest first, then its With-head cards newest first. Decided orde
 the same way by the day of the decision, which its row shows, so what was just decided stands
 on top. A card whose
 answer is saving turns its shape and holds its picks while every other card stays
-usable. A project whose read failed stands as its own group with the error. The
+usable. A project whose read failed stands as its own group with the error, and keeps its last cards, still decidable, with the time they were read. The
 header's Refresh shows the time of the last read; Mitsprache holds Self-refresh,
 30 minutes by default.
 

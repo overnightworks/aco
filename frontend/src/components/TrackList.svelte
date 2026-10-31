@@ -1,19 +1,23 @@
 <script lang="ts">
 	import {
+		clockTime,
 		DECIDED_TAB_LABEL,
 		decidedList,
 		EMPTY_DECIDED_TEXT,
 		EMPTY_DECIDED_TITLE,
 		EMPTY_LIST_TEXT,
 		EMPTY_LIST_TITLE,
+		LAST_READ_LABEL,
 		LIST_REGION_LABEL,
+		NOT_READ_LABEL,
 		openList,
 		QUIET_PREFIX,
 		type ListView,
-		type RowList
+		type RowList,
+		type ShownRepo
 	} from '../app/model/boardSummary';
-	import type { RepoReading } from '../types';
 	import StateShape from './StateShape.svelte';
+	import WarnMark from './WarnMark.svelte';
 
 	let {
 		repos,
@@ -22,7 +26,7 @@
 		saving,
 		onSelect
 	}: {
-		repos: RepoReading[];
+		repos: ShownRepo[];
 		view: ListView;
 		selectedKey: string | null;
 		/** Whether the card's answer is being saved. */
@@ -38,28 +42,36 @@
 
 <section aria-label={regionLabel}>
 	{#each list.groups as group (group.repo)}
-		{#if 'error' in group}
-			<p role="alert">{group.repo}: {group.error}</p>
-		{:else}
+		{#if group.error === null}
 			<h2 class="group"><span>{group.repo}</span> <span>{group.rows.length}</span></h2>
-			<ul>
-				{#each group.rows as row (row.key)}
-					{@const shown = saving(row.key) ? 'saving' : row.state}
-					<li>
-						<button
-							type="button"
-							class="row"
-							title={row.title}
-							aria-current={row.key === selectedKey}
-							onclick={() => onSelect(row.key)}
-						>
-							<StateShape state={shown} />
-							<span class="label" class:muted={shown === 'back'}>{row.label}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
+		{:else}
+			<h2 class="group bad"><span>{group.repo}</span></h2>
+			<p class="bad-line" role="alert">
+				<span class="mark"><WarnMark /></span>
+				<b>{NOT_READ_LABEL}</b>
+				<span>{group.error}</span>
+				{#if group.readAt !== null}
+					<span class="read-at">{LAST_READ_LABEL} {clockTime(group.readAt)}</span>
+				{/if}
+			</p>
 		{/if}
+		<ul>
+			{#each group.rows as row (row.key)}
+				{@const shown = saving(row.key) ? 'saving' : row.state}
+				<li>
+					<button
+						type="button"
+						class="row"
+						title={row.title}
+						aria-current={row.key === selectedKey}
+						onclick={() => onSelect(row.key)}
+					>
+						<StateShape state={shown} />
+						<span class="label" class:muted={shown === 'back'}>{row.label}</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
 	{/each}
 	{#if list.groups.length === 0}
 		<div class="empty"><b>{emptyTitle}</b>{emptyText}</div>
@@ -69,9 +81,25 @@
 </section>
 
 <style>
-	[role='alert'] {
+	.bad-line {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 8px;
 		margin: 0;
-		padding: 16px 24px 0;
+		padding: 0 24px 8px;
+		font-size: 13px;
+		color: var(--fg-2);
+	}
+	.bad-line b,
+	.mark {
+		color: var(--warn);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.read-at {
+		color: var(--fg-3);
+		white-space: nowrap;
 	}
 	.group {
 		display: flex;
@@ -84,6 +112,9 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--fg-3);
+	}
+	.group.bad {
+		color: var(--warn);
 	}
 	ul {
 		list-style: none;
@@ -135,6 +166,7 @@
 	}
 	@media (max-width: 760px) {
 		.group,
+		.bad-line,
 		.row {
 			padding-left: 16px;
 			padding-right: 16px;

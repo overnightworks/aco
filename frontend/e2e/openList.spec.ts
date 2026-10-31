@@ -148,18 +148,20 @@ for (const viewport of [
 			await expect(page.getByText('No project is waiting for you.')).toBeVisible();
 			await page.screenshot({ path: testInfo.outputPath('all-decided.png') });
 
+			const sentence = 'Repository konnte nicht gelesen werden.';
 			await page.route('**/api/board', (route) =>
 				route.fulfill({
 					json: {
 						repos: [
 							{ name: 'quiet', error: null, items: [] },
-							{ name: 'broken', error: 'Repository konnte nicht gelesen werden.', items: [] }
+							{ name: 'broken', error: sentence, items: [] }
 						]
 					}
 				})
 			);
 			await page.reload();
-			await expect(page.getByRole('alert')).toContainText('broken');
+			await expect(page.getByRole('heading', { name: 'broken' })).toBeVisible();
+			await expect(page.getByRole('alert')).toContainText(`Not read ${sentence}`);
 			await expect(page.getByText('Nothing open: quiet')).toBeVisible();
 			await expect(page.getByText('All decided')).toHaveCount(0);
 			await page.screenshot({ path: testInfo.outputPath('failed-and-quiet.png') });

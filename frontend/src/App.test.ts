@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App.svelte';
+import { NOT_READ_LABEL } from './app/model/boardSummary';
 import { item, line, optionLine, repo } from './test-support/board';
 
 function fakeFetch(status: number, body: unknown) {
@@ -120,5 +121,6 @@ test('an empty successful repository does not hide another repository error', as
 		})
 	);
 	render(App, { token: 'a-token' });
-	expect(await screen.findByRole('alert')).toHaveTextContent('broken: Read failed');
+	expect(await screen.findByRole('heading', { name: 'broken' })).toBeInTheDocument();
+	expect(screen.getByRole('alert')).toHaveTextContent(`${NOT_READ_LABEL} Read failed`);
 });

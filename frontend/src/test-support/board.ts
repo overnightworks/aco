@@ -138,7 +138,7 @@ export function readyBoard(repos: RepoReading[] = [repo()]) {
 		json: async () => ({ repos })
 	})) as unknown as typeof fetch;
 	const store = new BoardStore();
-	store.repos = repos;
+	store.repos = repos.map((reading) => ({ ...reading, readAt: null }));
 	store.status = 'ready';
 	const wiring: DecisionBoard = {
 		reload: () => store.load('token', fetchImpl),

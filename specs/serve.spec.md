@@ -43,8 +43,8 @@ resolved directory's name.
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
-| one configured repo's read fails or times out | ABRD-15 | ABRD-15 |
-| every configured repo's read fails or times out | ABRD-20 | ABRD-20 |
+| one configured repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
+| every configured repo's read fails or times out | ABRD-20, ABRD-102 | ABRD-20 |
 | an `/api/` request without the right token | ABRD-10 | ABRD-10 |
 | a decision naming a repo outside the configured ones | — | ABRD-16 |
 | a card's fingerprint submitted against a different configured repo | — | ABRD-21 |
@@ -99,6 +99,8 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-48] Option card rows carry the Open, With head (ABRD-61) or Saving (ABRD-100) shape; each shape names its state, each row's title is its question or name (ABRD-82).
 - [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
+- [ ] [ABRD-101] A repository whose read failed is a group under its name with the warn mark, `Not read` and its sentence; read before, it keeps its last rows, decidable on Open, after `last read HH:MM`.
+- [ ] [ABRD-102] A read that fails whole keeps every repository's rows as ABRD-101 with `aco antwortet nicht.` once the page has read; a first load that fails shows `aco antwortet nicht.` and the failure.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board` and the tabs `Open n` and `Decided n`: n counts the open list's rows and the ruled lines Decided lists.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
@@ -134,7 +136,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-52] An option card's Decide row sticks to the pane's foot while the card runs on beneath it and then casts a shadow over that content; at the card's end it rests in place without one.
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
-`frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`,
+`frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
 `frontend/e2e/groupCard.spec.ts`, `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`,
 `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
@@ -142,7 +144,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## Multiple repositories
 
 - [ ] [ABRD-14] `aco serve --repo PATH` (repeatable) configures the repos served, labelled `<repo>` by each resolved directory's name; without `--repo`, the current directory is the one repository.
-- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails, a gh or git call past its bound included, carries its own sentence and no items, others unaffected (E-ABRD-06).
+- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails or times out carries its own sentence and no items, others unaffected (E-ABRD-06); the page shows it per ABRD-101.
 - [ ] [ABRD-16] A decision naming a `repo` outside the configured labels is refused `bad request: decision` before any forge request (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running write in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
@@ -159,7 +161,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
 - [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
-- [ ] [ABRD-20] Once every configured repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
+- [ ] [ABRD-20] Once every configured repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06); the page shows it per ABRD-102.
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` is a ruled yes/no line, with no `default` and no fingerprint (E-ABRD-03). No line offers an outcome.
