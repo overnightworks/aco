@@ -265,11 +265,8 @@ const secondCard = optionLine({
 const twoPoints = [songCard, secondCard];
 
 function heldSend() {
-	let answer: (result: DecisionResult) => void = () => {};
-	const held = new Promise<DecisionResult>((resolve) => {
-		answer = resolve;
-	});
-	return { send: vi.fn(() => held) as unknown as typeof postDecision, answer };
+	const held = new Promise<DecisionResult>(() => {});
+	return { send: vi.fn(() => held) as unknown as typeof postDecision };
 }
 
 test.each([
@@ -279,7 +276,7 @@ test.each([
 			store.choose('repo', 42, songPoints, { shown: songCard, option: optionB })
 	],
 	['Accept all', (store: DecisionStore) => store.acceptAll('repo', 42, songPoints)]
-])('[ABRD-100] %s holds its picks in the window and while saving', async (_name, decide) => {
+])('[ABRD-99] %s holds its picks in the window and while saving', async (_name, decide) => {
 	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
 	const { send } = heldSend();
 	const store = new DecisionStore('token', wiring, send);
@@ -299,7 +296,7 @@ test.each([
 	['Other', (store: DecisionStore) => store.decideOther('repo', 42, twoPoints, 'my own answer')],
 	['Unclear', (store: DecisionStore) => store.decideUnclear('repo', 42, twoPoints, 'a note')]
 ])(
-	'[ABRD-100] an %s answer holds no picks, even where a point was picked before it',
+	'[ABRD-99] an %s answer holds no picks, even where a point was picked before it',
 	async (_name, decide) => {
 		const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
 		const { send } = heldSend();
@@ -320,18 +317,14 @@ test.each([
 	['answers', false],
 	['fails', true]
 ])(
-	'[ABRD-100] a card is pending from Neu laden until the read %s, and free after it',
+	'[ABRD-45] a card is pending from Neu laden until the read %s, and free after it',
 	async (_name, fails) => {
 		let finish: () => void = () => {};
 		const read = new Promise<void>((resolve, reject) => {
 			finish = fails ? () => reject(new Error('unreachable')) : resolve;
 		});
 		const { wiring } = readyBoard();
-		const store = new DecisionStore(
-			'token',
-			{ ...wiring, reload: () => read },
-			sender(storedAnswer(storedSong))
-		);
+		const store = new DecisionStore('token', { ...wiring, reload: () => read });
 		expect(store.isPending(songKey)).toBe(false);
 
 		const reloading = store.reloadAfterBanner(songKey).catch(() => {});
