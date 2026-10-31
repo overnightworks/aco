@@ -13,7 +13,7 @@ its open cards newest first, then its With-head cards newest first. Decided orde
 the same way by the day of the decision, which its row shows, so what was just decided stands
 on top. A card whose
 answer is saving turns its shape and holds its picks while every other card stays
-usable. A pick marks its letter from the click, and no read locks the page. A project whose read failed stands as its own group with the error. The
+usable. A project whose read failed stands as its own group with the error. The
 header's Refresh shows the time of the last read; Mitsprache holds Self-refresh,
 30 minutes by default.
 
@@ -35,8 +35,11 @@ after the same window, under a grey "With head" strip; a card already with its h
 once, all or none. A card of points shows its name (area and count) as title and the picture's
 point rows: one point open at a time, a pick per point, "Accept all" with the number chosen,
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
-point is chosen. It still lacks Mitsprache and the agent list, and the v5 additions: asked dates,
-newest-first order, the Refresh button with the time of the last read, and Self-refresh. A ruled yes/no line is read-only history in Decided; an open one is
+point is chosen. A pick marks its letter from the click; a card whose answer is saving shows
+the picture's saving state while every other card stays usable; no read locks the page.
+It still lacks Mitsprache and the agent list, and the v5 additions: asked dates,
+newest-first order, the Refresh button with the time of the last read, and Self-refresh.
+A ruled yes/no line is read-only history in Decided; an open one is
 refused by aco's grammar, so its item drops from the board like any malformed item.
 The list groups open cards and decided lines per project with the picture's Open,
 With-head, Saving and Decided shapes (Decided shows the selected line's card in the
