@@ -19,11 +19,14 @@
 		repos,
 		view,
 		selectedKey,
+		saving,
 		onSelect
 	}: {
 		repos: RepoReading[];
 		view: ListView;
 		selectedKey: string | null;
+		/** Whether the card's answer is being saved. */
+		saving: (key: string) => boolean;
 		onSelect: (key: string) => void;
 	} = $props();
 
@@ -41,6 +44,7 @@
 			<h2 class="group"><span>{group.repo}</span> <span>{group.rows.length}</span></h2>
 			<ul>
 				{#each group.rows as row (row.key)}
+					{@const shown = saving(row.key) ? 'saving' : row.state}
 					<li>
 						<button
 							type="button"
@@ -49,8 +53,8 @@
 							aria-current={row.key === selectedKey}
 							onclick={() => onSelect(row.key)}
 						>
-							<StateShape state={row.state} />
-							<span class="label" class:muted={row.state === 'back'}>{row.label}</span>
+							<StateShape state={shown} />
+							<span class="label" class:muted={shown === 'back'}>{row.label}</span>
 						</button>
 					</li>
 				{/each}

@@ -219,7 +219,7 @@ test('[ABRD-65] a pending Other answer marks the card pending so no pick can joi
 	expect(store.isPending(songKey)).toBe(true);
 });
 
-test('[ABRD-97] a card posts from the end of its window until its answer is applied, and Undo then does nothing', async () => {
+test('[ABRD-97] a card saves from the end of its window until its answer is applied, and Undo then does nothing', async () => {
 	let answer: (result: DecisionResult) => void = () => {};
 	const held = new Promise<DecisionResult>((resolve) => {
 		answer = resolve;
@@ -232,12 +232,14 @@ test('[ABRD-97] a card posts from the end of its window until its answer is appl
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(store.pendingEntries).toEqual([]);
+	expect(store.isSaving(songKey)).toBe(true);
 	expect(store.isPending(songKey)).toBe(true);
 	store.undo(songKey);
 	expect(store.isPending(songKey)).toBe(true);
 	expect(send).toHaveBeenCalledTimes(1);
 	answer(storedAnswer(storedSong));
 	await vi.advanceTimersByTimeAsync(0);
+	expect(store.isSaving(songKey)).toBe(false);
 	expect(store.isPending(songKey)).toBe(false);
 	expect(board.repos[0]?.items).toEqual([storedSong]);
 });
@@ -245,7 +247,7 @@ test('[ABRD-97] a card posts from the end of its window until its answer is appl
 test.each([
 	['a refused', { status: 'already_ruled', message: 'line 3 is already ruled' } as DecisionResult],
 	['a failed', { status: 'failed', message: 'aco unavailable' } as DecisionResult]
-])('[ABRD-97] %s answer releases the posting card', async (_name, refusal) => {
+])('[ABRD-97] %s answer releases the saving card', async (_name, refusal) => {
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, sender(refusal));
 
@@ -254,3 +256,83 @@ test.each([
 
 	expect(store.isPending(songKey)).toBe(false);
 });
+
+const secondCard = optionLine({
+	index: 5,
+	fingerprint: 'fp-second',
+	options: [optionA, optionB]
+});
+const twoPoints = [songCard, secondCard];
+
+function heldSend() {
+	const held = new Promise<DecisionResult>(() => {});
+	return { send: vi.fn(() => held) as unknown as typeof postDecision };
+}
+
+test.each([
+	[
+		'a pick',
+		(store: DecisionStore) =>
+			store.choose('repo', 42, songPoints, { shown: songCard, option: optionB })
+	],
+	['Accept all', (store: DecisionStore) => store.acceptAll('repo', 42, songPoints)]
+])('[ABRD-99] %s holds its picks in the window and while saving', async (_name, decide) => {
+	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const { send } = heldSend();
+	const store = new DecisionStore('token', wiring, send);
+	expect(store.held(songKey)).toBeNull();
+
+	decide(store);
+	const picks = store.picks(songKey, songPoints);
+	expect(store.held(songKey)).toEqual(picks);
+	expect(picks).toHaveLength(1);
+
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(store.isSaving(songKey)).toBe(true);
+	expect(store.held(songKey)).toEqual(picks);
+});
+
+test.each([
+	['Other', (store: DecisionStore) => store.decideOther('repo', 42, twoPoints, 'my own answer')],
+	['Unclear', (store: DecisionStore) => store.decideUnclear('repo', 42, twoPoints, 'a note')]
+])(
+	'[ABRD-99] an %s answer holds no picks, even where a point was picked before it',
+	async (_name, decide) => {
+		const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+		const { send } = heldSend();
+		const store = new DecisionStore('token', wiring, send);
+		store.choose('repo', 42, twoPoints, { shown: songCard, option: optionA });
+		expect(store.picks(songKey, twoPoints)).toHaveLength(1);
+
+		decide(store);
+		expect(store.held(songKey)).toEqual([]);
+
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+		expect(store.isSaving(songKey)).toBe(true);
+		expect(store.held(songKey)).toEqual([]);
+	}
+);
+
+test.each([
+	['answers', false],
+	['fails', true]
+])(
+	'[ABRD-45] a card is pending from Neu laden until the read %s, and free after it',
+	async (_name, fails) => {
+		let finish: () => void = () => {};
+		const read = new Promise<void>((resolve, reject) => {
+			finish = fails ? () => reject(new Error('unreachable')) : resolve;
+		});
+		const { wiring } = readyBoard();
+		const store = new DecisionStore('token', { ...wiring, reload: () => read });
+		expect(store.isPending(songKey)).toBe(false);
+
+		const reloading = store.reloadAfterBanner(songKey).catch(() => {});
+		expect(store.isPending(songKey)).toBe(true);
+		expect(store.isPending(cardKey('repo', 43))).toBe(false);
+
+		finish();
+		await reloading;
+		expect(store.isPending(songKey)).toBe(false);
+	}
+);

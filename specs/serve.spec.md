@@ -28,13 +28,13 @@ resolved directory's name.
 | an item whose block is malformed or unreadable | ABRD-07 | ABRD-41 |
 | an item with open option lines | ABRD-82 | ABRD-77 |
 | an item with two or more open option lines | ABRD-83, ABRD-84, ABRD-85 | ABRD-86, ABRD-87, ABRD-88, ABRD-89, ABRD-90, ABRD-91, ABRD-92 |
-| an option line, open or ruled | ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-78 |
+| an option line, open or ruled | ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-99, ABRD-100, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-78 |
 | a withdrawn line | ABRD-60 | ABRD-41 |
 | a post without `lines` | — | ABRD-40 |
 | its card changed, withdrawn, gone or closed since the page read it | — | ABRD-41 |
 | a card post answering `other` | — | ABRD-64 |
 | a card post answering `unclear` | — | ABRD-70, ABRD-71 |
-| a card posting, from its undo window's end to its answer | — | ABRD-97 |
+| a card saving, from its undo window's end to its answer applied | — | ABRD-97, ABRD-100 |
 | a read sent before an item's stored answer arrived | ABRD-98 | — |
 | a card post naming every open option line of its item | — | ABRD-77, ABRD-78, ABRD-80 |
 | a card post missing an open option line, or naming a changed or non-option line | — | ABRD-79 |
@@ -90,13 +90,13 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
 - [ ] [ABRD-38] Each option on an option card is a button that opens its Result (picture or `= TODAY`), You notice, Cost, Undo and Contract behind `Show`; opening one closes the other.
 - [ ] [ABRD-43] Each Today and Result picture on an option card is an `Enlarge picture` button opening it with its caption in a modal dialog; `Close` or `Esc` closes it and focus returns to the button.
-- [ ] [ABRD-44] A one-point card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window, then posts the card (ABRD-77); once stored, it moves to Decided.
-- [ ] [ABRD-45] A refused post shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide the picks and `Accept all` behind `Neu laden`, and any other failure keeps them.
+- [ ] [ABRD-44] A one-point card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window (ABRD-99), then posts the card (ABRD-77); once stored, it moves to Decided.
+- [ ] [ABRD-45] A refused post shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide picks and `Accept all` behind `Neu laden`, whose read locks only that card; other failures keep them.
 - [ ] [ABRD-46] A `final` pick first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` records it, and the window starts once every point is chosen (ABRD-87).
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` keeps the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
 - [ ] [ABRD-58] A one-point card's pick shows a strip above it for its 8 s window: the Decided shape, `Decided: <letter> — <option> · <topic>` and `Undo`, in view as the card scrolls and atop a phone's list.
 - [ ] [ABRD-59] A pick that starts a window focuses its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. An ended window removes its strip; ABRD-50 applies.
-- [ ] [ABRD-48] Option card rows carry the Open or With head (ABRD-61) shape; each shape names its state, each row's title is its question or name (ABRD-82).
+- [ ] [ABRD-48] Option card rows carry the Open, With head (ABRD-61) or Saving (ABRD-100) shape; each shape names its state, each row's title is its question or name (ABRD-82).
 - [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
@@ -104,7 +104,11 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
 - [ ] [ABRD-63] An open option card's Decide row ends in `Other…`, beside the picks or `Accept all`; it opens a panel with a textarea (`Your answer`, up to 280 characters, focused) and `Send`, disabled while blank.
 - [ ] [ABRD-64] A card post's `other` (ABRD-78) is the trimmed answer within ABRD-05, written once for every posted line with `via board` (E-ABRD-13).
-- [ ] [ABRD-65] `Other…` and `Send` hide with the picks and `Accept all` (ABRD-45), disable while a decision on the card waits and ignore clicks while the board reloads, so a pick and an Other never both post.
+- [ ] [ABRD-65] `Other…` and `Send` hide with the picks and `Accept all` (ABRD-45) and disable while a decision on the card waits (ABRD-99), so a pick and an Other never both post.
+- [ ] [ABRD-97] A card is saving (ABRD-100) from its undo window's end until its answer is applied: its picks, `Accept all`, `Other…`, `Unclear` and `Send` take no click; any other card stays usable, in a read too.
+- [ ] [ABRD-98] A read's rows for an item apply only if the read was sent after that item's last stored answer arrived; until then the page keeps the item that answer carried.
+- [ ] [ABRD-99] From the start of its undo window until its answer is applied, a card marks its chosen letters at full strength and dims the rest, without the accent; an `Other…` or `Unclear` answer marks none.
+- [ ] [ABRD-100] A saving card's row shows the Saving shape (a dashed ring, turning unless motion is reduced), also with its head; its meta reads `saving`; `Saving` replaces `Other…` and `Unclear`.
 - [ ] [ABRD-66] The typed answer is kept per card: closing the panel, switching cards, `Undo` and a failed post keep it; `Undo` reopens the panel with it, and a stored decision drops it.
 - [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Decided: Other · <name>` (ABRD-82) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
 - [ ] [ABRD-68] `Send` posts the card as shown when the panel opened, so a card changed since is refused (ABRD-02); the answer stays in the draft.
@@ -154,8 +158,6 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
 - [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
 - [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
-- [ ] [ABRD-97] From the end of its undo window until its answer is applied, a card is posting: its picks, `Accept all`, `Other…`, `Unclear` and `Send` take no click; every other card stays usable.
-- [ ] [ABRD-98] A read's rows for an item apply only if the read was sent after that item's last stored answer arrived; until then the page keeps the item that answer carried.
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every configured repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06).
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.

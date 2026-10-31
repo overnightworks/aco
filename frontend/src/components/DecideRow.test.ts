@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import type { Pick } from '../app/model/card';
 import { LINE_CHANGED_MESSAGE } from '../app/model/decision';
+import { STATE_LABEL } from '../app/model/boardSummary';
 import type { DecisionBanner } from '../app/state/decision.svelte';
 import { cardOption, optionLine } from '../test-support/board';
 import DecideRow from './DecideRow.svelte';
@@ -26,10 +28,11 @@ const escapes = {
 function renderRow(
 	overrides: {
 		pending?: boolean;
-		refreshing?: boolean;
+		waiting?: boolean;
+		saving?: boolean;
 		banner?: DecisionBanner | null;
 		points?: (typeof songCard)[];
-		chosen?: number;
+		picks?: Pick[];
 		escapes?: typeof escapes;
 	} = {}
 ) {
@@ -38,9 +41,10 @@ function renderRow(
 	const onReload = vi.fn();
 	const { container, component } = render(DecideRow, {
 		points: [songCard],
-		chosen: 0,
+		picks: [],
 		pending: false,
-		refreshing: false,
+		waiting: false,
+		saving: false,
 		banner: null,
 		onPick,
 		onAcceptAll,
@@ -86,17 +90,6 @@ test('[ABRD-44] a pending decision disables every pick', () => {
 	for (const pick of screen.getAllByRole('button')) {
 		expect(pick).toBeDisabled();
 	}
-});
-
-test('defect:#398 picks shown during a board re-read answer nothing', async () => {
-	const { onPick } = renderRow({ refreshing: true });
-
-	for (const pick of screen.getAllByRole('button')) {
-		expect(pick).toHaveAttribute('aria-disabled', 'true');
-	}
-	await fireEvent.click(screen.getByRole('button', { name: /^Decide B:/ }));
-
-	expect(onPick).not.toHaveBeenCalled();
 });
 
 test.each([
@@ -233,7 +226,11 @@ afterEach(() => {
 });
 
 test('[ABRD-89] a card of points leads its Decide row with Accept all in the accent, then the count, then the escapes', () => {
-	renderRow({ points: groupPoints, chosen: 1, escapes });
+	renderRow({
+		points: groupPoints,
+		picks: [{ shown: groupPoints[0] as typeof songCard, option: optionA }],
+		escapes
+	});
 
 	const names = screen.getAllByRole('button').map((button) => button.textContent?.trim());
 	expect(names).toEqual(['Accept all', 'Other…', 'Unclear']);
@@ -308,20 +305,6 @@ test('[ABRD-47] confirming a final pick picks the option on the card as shown', 
 	expect(onPick).toHaveBeenCalledWith(shown, { shown: finalPoint, option: finalB });
 });
 
-test('defect:#398 Accept all and a pick during a board re-read answer nothing', async () => {
-	const { component, onAcceptAll, onPick } = renderRow({ points: groupPoints, refreshing: true });
-
-	await fireEvent.click(screen.getByRole('button', { name: 'Accept all recommendations' }));
-	await component.choose({ shown: groupPoints[0] as typeof songCard, option: optionA });
-
-	expect(screen.getByRole('button', { name: 'Accept all recommendations' })).toHaveAttribute(
-		'aria-disabled',
-		'true'
-	);
-	expect(onAcceptAll).not.toHaveBeenCalled();
-	expect(onPick).not.toHaveBeenCalled();
-});
-
 test('[ABRD-65] a pending card disables Accept all', () => {
 	renderRow({ points: groupPoints, pending: true, escapes });
 
@@ -343,4 +326,66 @@ test('[ABRD-63] Other… sits beside Accept all on a card of points', () => {
 	renderRow({ points: groupPoints, escapes });
 
 	expect(screen.getByRole('button', { name: 'Other…' })).toBeInTheDocument();
+});
+
+test('[ABRD-99] outside waiting no letter of a one-point row carries aria-pressed', () => {
+	renderRow();
+
+	const picks = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button');
+	for (const pick of picks) {
+		expect(pick).not.toHaveAttribute('aria-pressed');
+	}
+});
+
+test('[ABRD-99] a waiting one-point row presses the held letter and disables the rest, without the accent', () => {
+	const held = songCard.options[0] as (typeof songCard.options)[number];
+	renderRow({ waiting: true, pending: true, picks: [{ shown: songCard, option: held }] });
+
+	const picks = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button');
+	expect(picks.map((pick) => pick.getAttribute('aria-pressed'))).toEqual([
+		'true',
+		'false',
+		'false'
+	]);
+	for (const pick of picks) {
+		expect(pick).toBeDisabled();
+		expect(pick).not.toHaveClass('recommended');
+	}
+	expect(picks[0]).toHaveClass('chosen');
+	expect(picks[1]).not.toHaveClass('chosen');
+});
+
+test('[ABRD-99] a waiting row after an Other answer presses no letter', () => {
+	renderRow({ waiting: true, pending: true, picks: [], escapes });
+
+	const picks = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button');
+	expect(picks.map((pick) => pick.getAttribute('aria-pressed'))).toEqual([
+		'false',
+		'false',
+		'false'
+	]);
+});
+
+test('[ABRD-100] a saving one-point row shows Saving in place of Other… and Unclear', () => {
+	renderRow({ waiting: true, saving: true, pending: true, escapes });
+
+	expect(screen.getByText(STATE_LABEL.saving)).toBeInTheDocument();
+	expect(screen.queryByRole('button', { name: 'Other…' })).toBeNull();
+	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
+});
+
+test('[ABRD-100] a saving card of points locks Accept all, keeps its count and shows Saving', () => {
+	renderRow({
+		points: groupPoints,
+		waiting: true,
+		saving: true,
+		pending: true,
+		picks: groupPoints.map((point) => ({ shown: point, option: optionA })),
+		escapes
+	});
+
+	expect(screen.getByRole('button', { name: 'Accept all recommendations' })).toBeDisabled();
+	expect(screen.getByText('3 of 3 chosen')).toBeInTheDocument();
+	expect(screen.getByText(STATE_LABEL.saving)).toBeInTheDocument();
+	expect(screen.queryByRole('button', { name: 'Other…' })).toBeNull();
 });

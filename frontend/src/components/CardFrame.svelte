@@ -1,36 +1,44 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { type FrameMeta, UNDO_LABEL } from '../app/model/optionCard';
+	import { type FrameMeta, META_LABEL, UNDO_LABEL } from '../app/model/optionCard';
 	import WarnMark from './WarnMark.svelte';
 
 	let { meta, title, children }: { meta: FrameMeta; title: string; children: Snippet } = $props();
+
+	interface Token {
+		text: string;
+		final: boolean;
+	}
+
+	// The picture's order: kind, with head, saving, then the undo token.
+	const tokens: Token[] = $derived([
+		...(meta.kind !== undefined ? [{ text: meta.kind, final: false }] : []),
+		...(meta.withHead ? [{ text: META_LABEL.withHead, final: false }] : []),
+		...(meta.saving ? [{ text: META_LABEL.saving, final: false }] : []),
+		...(meta.undo !== undefined
+			? [{ text: UNDO_LABEL[meta.undo], final: meta.undo === 'final' }]
+			: [])
+	]);
 </script>
 
 <div class="frame">
 	<p class="meta">
 		<span class="where">{meta.where}</span>
-		{#if meta.kind !== undefined || meta.undo !== undefined}
+		{#if tokens.length > 0}
 			<span class="sep lead" aria-hidden="true">·</span>
 			<span class="props">
-				{#if meta.kind !== undefined}
-					<span>{meta.kind}</span>
-				{/if}
-				{#if meta.withHead}
-					{#if meta.kind !== undefined}
+				{#each tokens as token, position (token.text)}
+					{#if position > 0}
 						<span class="sep" aria-hidden="true">·</span>
 					{/if}
-					<span>with head</span>
-				{/if}
-				{#if (meta.kind !== undefined || meta.withHead) && meta.undo !== undefined}
-					<span class="sep" aria-hidden="true">·</span>
-				{/if}
-				{#if meta.undo === 'final'}
-					<span class="final">
-						<WarnMark />{UNDO_LABEL[meta.undo]}
-					</span>
-				{:else if meta.undo !== undefined}
-					<span>{UNDO_LABEL[meta.undo]}</span>
-				{/if}
+					{#if token.final}
+						<span class="final">
+							<WarnMark />{token.text}
+						</span>
+					{:else}
+						<span>{token.text}</span>
+					{/if}
+				{/each}
 			</span>
 		{/if}
 	</p>

@@ -14,7 +14,6 @@ function renderRow(
 		panel: typeof otherPanel | typeof unclearPanel | null;
 		draft: string;
 		pending: boolean;
-		refreshing: boolean;
 	}> = {}
 ) {
 	const handlers = {
@@ -28,7 +27,6 @@ function renderRow(
 		panel: null,
 		draft: '',
 		pending: false,
-		refreshing: false,
 		...handlers,
 		...overrides
 	});
@@ -89,16 +87,6 @@ test('[ABRD-65] a pending decision disables Other… and Send', () => {
 	expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-test('[ABRD-65] while the board refreshes Other… and Send do nothing', async () => {
-	const { onOpen, onSend } = renderRow({ panel: otherPanel, draft: 'x', refreshing: true });
-
-	await fireEvent.click(screen.getByRole('button', { name: 'Send' }));
-	await fireEvent.click(screen.getByRole('button', { name: 'Other…' }));
-
-	expect(onSend).not.toHaveBeenCalled();
-	expect(onOpen).not.toHaveBeenCalled();
-});
-
 test('[ABRD-72] an open card offers Other… then Unclear, and Unclear opens its panel with the card as shown', async () => {
 	const { onOpen } = renderRow();
 
@@ -143,16 +131,6 @@ test('[ABRD-75] a pending decision disables Unclear and its Send', () => {
 		true
 	);
 	expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);
-});
-
-test('[ABRD-75] while the board refreshes Unclear and its Send do nothing', async () => {
-	const { onOpen, onSend } = renderRow({ panel: unclearPanel, refreshing: true });
-
-	await fireEvent.click(screen.getByRole('button', { name: 'Send' }));
-	await fireEvent.click(screen.getByRole('button', { name: 'Other…' }));
-
-	expect(onSend).not.toHaveBeenCalled();
-	expect(onOpen).not.toHaveBeenCalled();
 });
 
 test('[ABRD-72] a card of points offers no Unclear once any point is with its head', () => {

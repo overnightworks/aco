@@ -15,7 +15,6 @@
 		panel,
 		draft,
 		pending,
-		refreshing,
 		onOpen,
 		onClose,
 		onDraft,
@@ -28,7 +27,6 @@
 		/** The text of the open panel's kind. */
 		draft: string;
 		pending: boolean;
-		refreshing: boolean;
 		onOpen: (kind: EscapeKind, shown: readonly OptionLine[]) => void;
 		onClose: () => void;
 		onDraft: (text: string) => void;
@@ -41,7 +39,6 @@
 	const kinds: EscapeKind[] = $derived(hasHead(points) ? ['other'] : ['other', 'unclear']);
 
 	async function toggle(kind: EscapeKind) {
-		if (refreshing) return;
 		if (panel?.kind === kind) {
 			onClose();
 			return;
@@ -56,7 +53,7 @@
 	}
 
 	function send(open: EscapePanel) {
-		if (refreshing || blocked(open)) return;
+		if (blocked(open)) return;
 		onSend(open, draft);
 	}
 </script>
@@ -68,7 +65,6 @@
 			class="quiet"
 			aria-expanded={panel?.kind === kind}
 			disabled={pending}
-			aria-disabled={refreshing}
 			onclick={() => toggle(kind)}
 		>
 			{ESCAPE_LABEL[kind].button}
@@ -86,13 +82,7 @@
 			value={draft}
 			oninput={(event) => onDraft(event.currentTarget.value)}></textarea>
 		<div class="acts">
-			<button
-				type="button"
-				class="send"
-				disabled={blocked(open)}
-				aria-disabled={refreshing}
-				onclick={() => send(open)}
-			>
+			<button type="button" class="send" disabled={blocked(open)} onclick={() => send(open)}>
 				{ESCAPE_LABEL.send}
 			</button>
 		</div>
@@ -113,15 +103,10 @@
 		color: var(--fg-2);
 		font-weight: 600;
 	}
-	.escapes button.quiet:hover:enabled:not([aria-disabled='true']),
+	.escapes button.quiet:hover:enabled,
 	.escapes button.quiet[aria-expanded='true'] {
 		border-color: var(--line-strong);
 		color: var(--fg);
-	}
-	.escapes button[aria-disabled='true'],
-	.acts button[aria-disabled='true'] {
-		opacity: 0.55;
-		cursor: default;
 	}
 	.panel {
 		flex-basis: 100%;

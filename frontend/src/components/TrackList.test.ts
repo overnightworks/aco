@@ -1,18 +1,20 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
+import { cardKey } from '../app/model/decision';
 import { item, line, optionLine, repo } from '../test-support/board';
 import type { ListView } from '../app/model/boardSummary';
 import TrackList from './TrackList.svelte';
 
 function renderList(
 	repos: ReturnType<typeof repo>[],
-	overrides: { selectedKey?: string | null; view?: ListView } = {}
+	overrides: { selectedKey?: string | null; view?: ListView; saving?: string[] } = {}
 ) {
 	const onSelect = vi.fn();
 	const rendered = render(TrackList, {
 		repos,
 		view: overrides.view ?? 'open',
 		selectedKey: overrides.selectedKey ?? null,
+		saving: (key: string) => overrides.saving?.includes(key) ?? false,
 		onSelect
 	});
 	return { onSelect, container: rendered.container };
@@ -221,4 +223,32 @@ test('[ABRD-31] a failed repository shows its alert in the decided list and no N
 	expect(screen.getByRole('alert')).toHaveTextContent('broken: down');
 	expect(screen.queryByText('Nothing decided yet')).not.toBeInTheDocument();
 	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
+});
+
+test('[ABRD-100] a saving row is named by the Saving shape and its topic', () => {
+	renderList([repo({ items: [item({ number: 42, lines: [optionLine({ topic: 'Sprung' })] })] })], {
+		saving: [cardKey('repo', 42)]
+	});
+
+	const row = screen.getByRole('button', { name: 'Saving Sprung' });
+	expect(within(row).getByRole('img', { name: 'Saving' })).toBeInTheDocument();
+});
+
+test('[ABRD-100] a saving row with its head shows Saving, unmuted', () => {
+	renderList(
+		[
+			repo({
+				items: [
+					item({
+						number: 42,
+						lines: [optionLine({ topic: 'Sprung', returned_on: '2026-10-27' })]
+					})
+				]
+			})
+		],
+		{ saving: [cardKey('repo', 42)] }
+	);
+
+	const row = screen.getByRole('button', { name: 'Saving Sprung' });
+	expect(within(row).getByText('Sprung')).not.toHaveClass('muted');
 });

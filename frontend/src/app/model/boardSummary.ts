@@ -76,8 +76,9 @@ interface DecidedSelection extends Located {
 export type Selection = CardSelection | DecidedSelection;
 
 /** How a row reads at a glance: an option card is `open`, or `back` once the
- * operator sent one of its lines to its head; a ruled line is `done`. */
-export type RowState = OpenRowState | 'done';
+ * operator sent one of its lines to its head, or `saving` while its answer is
+ * being saved; a ruled line is `done`. */
+export type RowState = OpenRowState | 'saving' | 'done';
 type OpenRowState = 'open' | 'back';
 
 /** The two tabs that list rows. */
@@ -90,6 +91,7 @@ export type StripState = Extract<RowState, 'done' | 'back'>;
 export const STATE_LABEL: Record<RowState, string> = {
 	open: 'Open',
 	back: 'With head',
+	saving: 'Saving',
 	done: 'Decided'
 };
 

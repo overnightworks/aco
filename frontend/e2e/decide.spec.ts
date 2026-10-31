@@ -257,7 +257,10 @@ for (const viewport of [
 				await posted;
 				await expect(pick(page, 'A')).toBeDisabled();
 				await expect(pick(page, 'B')).toBeDisabled();
-				await expect(page.getByRole('button', { name: 'Other…' })).toBeDisabled();
+				await expect(
+					page.locator('.decide-row').getByText('Saving', { exact: true })
+				).toBeVisible();
+				await expect(page.getByRole('button', { name: 'Other…' })).toHaveCount(0);
 
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 				await listRow(page, 'Second?').click();

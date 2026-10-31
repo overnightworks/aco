@@ -22,7 +22,8 @@
 		picks,
 		locked,
 		pending,
-		refreshing,
+		waiting,
+		saving,
 		onToggle,
 		onPick,
 		children
@@ -38,7 +39,10 @@
 		/** The card needs `Neu laden` before it can be decided. */
 		locked: boolean;
 		pending: boolean;
-		refreshing: boolean;
+		/** The card's answer waits in its undo window or is being saved: its picks stay marked. */
+		waiting: boolean;
+		/** The card's answer is being saved (ABRD-100). */
+		saving: boolean;
 		onToggle: (index: number) => void;
 		onPick: (point: OptionLine, option: CardOption) => void;
 		children?: Snippet;
@@ -46,7 +50,10 @@
 </script>
 
 <div class="option-card">
-	<CardFrame meta={pointsMeta(repo, points)} title={cardTitle(points)}>
+	<CardFrame
+		meta={{ ...pointsMeta(repo, points), ...(saving && { saving: true as const }) }}
+		title={cardTitle(points)}
+	>
 		{#each points as point, position (point.index)}
 			{@const number = position + 1}
 			{@const isOpen = open === point.index}
@@ -83,15 +90,12 @@
 								<button
 									type="button"
 									class="pick"
-									class:recommended={option.letter === point.recommended}
+									class:recommended={!waiting && option.letter === point.recommended}
 									class:chosen={option.letter === picked}
 									aria-pressed={option.letter === picked}
 									disabled={pending}
-									aria-disabled={refreshing}
 									aria-label={pointPickLabel(number, option)}
-									onclick={() => {
-										if (!refreshing) onPick(point, option);
-									}}
+									onclick={() => onPick(point, option)}
 								>
 									{option.letter}
 								</button>
@@ -181,12 +185,8 @@
 		background: var(--accent);
 		color: var(--accent-fg);
 	}
-	.point button.pick:not(.recommended):not(.chosen):hover:enabled:not([aria-disabled='true']) {
+	.point button.pick:not(.recommended):not(.chosen):hover:enabled {
 		border-color: var(--fg-2);
-	}
-	.point button.pick[aria-disabled='true'] {
-		opacity: 0.55;
-		cursor: default;
 	}
 	@media (max-width: 760px) {
 		.point {
