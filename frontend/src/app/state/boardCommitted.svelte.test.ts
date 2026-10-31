@@ -85,7 +85,7 @@ test('[ABRD-98] a read sent after the answer applies its own row', async () => {
 	expect(store.repos[0]?.items).toEqual([newer]);
 });
 
-test('[ABRD-15] a repository an older read reports as failed keeps its error and no items after the answer', async () => {
+test('[ABRD-15] a repository an older read reports as failed keeps its error and its items, and the answer reaches them', async () => {
 	const store = await loaded([repo({ items: [open] })]);
 	const reads = heldReads();
 
@@ -94,5 +94,6 @@ test('[ABRD-15] a repository an older read reports as failed keeps its error and
 	await reading;
 	store.applyItem('repo', stored);
 
-	expect(store.repos[0]).toEqual({ name: 'repo', error: 'forge down', items: [] });
+	const { readAt: _readAt, ...shown } = store.repos[0] ?? {};
+	expect(shown).toEqual({ name: 'repo', error: 'forge down', items: [stored] });
 });
