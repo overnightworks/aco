@@ -1,0 +1,8 @@
+claim_id = "fb46681cfdb94da38a48dc30ba29dd64"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "eec023f4085aead3e1713cd4ed2ea25db65e4bb7"
+branch = "claude/issue-610-s5b-the-saving-look-and-no-page-wide-loc"
+scope = ["docs/board/README.md", "frontend/e2e/decide.spec.ts", "frontend/e2e/saving.spec.ts", "frontend/src/App.svelte", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/optionCard.ts", "frontend/src/app/state/board.svelte.test.ts", "frontend/src/app/state/board.svelte.ts", "frontend/src/app/state/decision.svelte.test.ts", "frontend/src/app/state/decision.svelte.ts", "frontend/src/components/CardFrame.svelte", "frontend/src/components/DecideRow.svelte", "frontend/src/components/DecideRow.test.ts", "frontend/src/components/EscapeRow.svelte", "frontend/src/components/EscapeRow.test.ts", "frontend/src/components/GroupCard.svelte", "frontend/src/components/GroupCard.test.ts", "frontend/src/components/OptionCard.svelte", "frontend/src/components/OptionCard.test.ts", "frontend/src/components/Stage.svelte", "frontend/src/components/Stage.test.ts", "frontend/src/components/StateShape.svelte", "frontend/src/components/TrackList.svelte", "frontend/src/components/TrackList.test.ts", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "18d6ba8157be59ec5063f0f3b19bd0b333feeb6a"
+whole_reason = "One ruled line (#564 line 3) and its ruling of 31.10.2026 in one owner, the page: the saving look alone spans ten of the thirteen frontend production files, so splitting off the gate's removal reaches no budget and only doubles lanes, static rebuilds and drives; about +95 and -50 lines, plus the spec, the README and their tests."
