@@ -81,9 +81,6 @@
 </section>
 
 <style>
-	.bad {
-		color: var(--warn);
-	}
 	.bad-line {
 		display: flex;
 		flex-wrap: wrap;
@@ -115,6 +112,9 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--fg-3);
+	}
+	.group.bad {
+		color: var(--warn);
 	}
 	ul {
 		list-style: none;
