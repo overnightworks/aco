@@ -28,6 +28,12 @@ export const EMPTY_DECIDED_TEXT = 'Your decisions show here with their answer an
 export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
 export const NOT_READ_LABEL = 'Not read';
 export const LAST_READ_LABEL = 'last read';
+export const REFRESH_LABEL = 'Refresh';
+export const READING_LABEL = 'Reading…';
+/** The page reads again on return to the tab once its last read is older than this. */
+export const STALE_AFTER_SECONDS = 10;
+/** How often the page reads on its own: the default Mitsprache's Self-refresh starts from. */
+export const SELF_REFRESH_MINUTES = 30;
 /** What a read that fails whole says, on the first load and on a ready board alike. */
 export const SERVER_SILENT_SENTENCE = 'aco antwortet nicht.';
 
@@ -43,6 +49,25 @@ type Readings = (RepoReading & { readAt?: Date | null })[];
 /** A read time as `HH:MM` on the 24-hour clock of the browser's time zone. */
 export function clockTime(moment: Date): string {
 	return moment.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** The page's last read: the latest arrival among its repositories, `null`
+ * before one. A failed repository keeps its time, so a failure never moves it. */
+export function lastReadAt(repos: ShownRepo[]): Date | null {
+	const times = repos.flatMap(({ readAt }) => (readAt === null ? [] : [readAt.getTime()]));
+	return times.length === 0 ? null : new Date(Math.max(...times));
+}
+
+/** Whether the last read is over `STALE_AFTER_SECONDS` old at `now`, or none happened. */
+export function isStale(repos: ShownRepo[], now: Date): boolean {
+	const last = lastReadAt(repos);
+	return last === null || now.getTime() - last.getTime() > STALE_AFTER_SECONDS * 1000;
+}
+
+/** What Refresh is called, for the eye and for a screen reader alike. */
+export function refreshName(reading: boolean, readAt: Date | null): string {
+	const label = reading ? READING_LABEL : REFRESH_LABEL;
+	return readAt === null ? label : `${label} · read ${clockTime(readAt)}`;
 }
 
 const OUTCOME_LABEL: Record<Outcome, string> = {

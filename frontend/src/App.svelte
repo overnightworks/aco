@@ -9,18 +9,25 @@
 		OPEN_TAB_LABEL,
 		SERVER_SILENT_SENTENCE,
 		DECIDED_TAB_LABEL,
+		SELF_REFRESH_MINUTES,
+		isStale,
+		lastReadAt,
 		tabCounts
 	} from './app/model/boardSummary';
 	import { BoardStore } from './app/state/board.svelte';
+	import { cardKey } from './app/model/decision';
 	import { DecisionStore } from './app/state/decision.svelte';
+	import RefreshButton from './components/RefreshButton.svelte';
 	import Stage from './components/Stage.svelte';
 	import TrackList from './components/TrackList.svelte';
 	import UndoStrip from './components/UndoStrip.svelte';
 
 	let { token }: { token: string | null } = $props();
 
-	const board = new BoardStore();
 	let decisions: DecisionStore | null = $state(null);
+	const board = new BoardStore(
+		(repo, item) => (decisions?.held(cardKey(repo, item.number)) ?? null) !== null
+	);
 	let selectedKey: string | null = $state(null);
 	let showQuestion = $state(false);
 	let decidedKey: string | null = $state(null);
@@ -127,6 +134,24 @@
 		}
 	});
 
+	// The page also reads when the tab comes back to a stale reading and on its
+	// timer, never while hidden; both go away with the token.
+	$effect(() => {
+		if (token === null) return;
+		const readIfVisible = (onlyStale: boolean) => {
+			if (document.visibilityState !== 'visible') return;
+			if (onlyStale && !isStale(board.repos, new Date())) return;
+			void board.load(token);
+		};
+		const onVisibility = () => readIfVisible(true);
+		document.addEventListener('visibilitychange', onVisibility);
+		const timer = setInterval(() => readIfVisible(false), SELF_REFRESH_MINUTES * 60_000);
+		return () => {
+			document.removeEventListener('visibilitychange', onVisibility);
+			clearInterval(timer);
+		};
+	});
+
 	// Once a decision this tab made lands and its item is applied, the
 	// stage leaves the now-ruled card for the next open one -- but only while
 	// it is still the card shown, never yanking the operator off a different
@@ -177,6 +202,14 @@
 					onclick={openDecided}>{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span></button
 				>
 			</nav>
+			{#if token !== null}
+				{@const readToken = token}
+				<RefreshButton
+					reading={board.reading}
+					readAt={lastReadAt(board.repos)}
+					onRefresh={() => void board.load(readToken)}
+				/>
+			{/if}
 		{/if}
 	</header>
 	{#if board.status === 'no-access'}
@@ -418,6 +451,12 @@
 		border: 1px dashed #c9c4d4;
 		border-radius: 12px;
 		background: #eceaf1;
+	}
+	.top > :global(.refresh) {
+		flex-shrink: 0;
+	}
+	.card-view > :global(.refresh) {
+		margin-left: auto;
 	}
 	.back {
 		display: none;
