@@ -149,3 +149,26 @@ test('[ABRD-98] a read that starts after the answer applies its row once the ans
 
 	expect(store.repos[0]?.items).toEqual([open]);
 });
+
+test('[ABRD-105] a stored answer stands once beside the same card that waits again', async () => {
+	let waiting = false;
+	const store = new BoardStore(() => waiting);
+	await store.load(
+		'token',
+		async () =>
+			({
+				ok: true,
+				status: 200,
+				json: async () => ({ repos: [repo({ items: [open] })] })
+			}) as Response
+	);
+	const reads = heldReads();
+
+	const reading = store.load('token', reads.fetchImpl);
+	store.applyItem('repo', stored);
+	waiting = true;
+	reads.answer(0, [repo({ items: [neighbour] })]);
+	await reading;
+
+	expect(store.repos[0]?.items).toEqual([neighbour, stored]);
+});
