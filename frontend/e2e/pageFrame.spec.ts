@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { readBoardRuntime } from './runtime';
+import { REFRESH_LABEL } from '../src/app/model/boardSummary';
 import { cardOption, item, line, optionLine, repo } from '../src/test-support/board';
 
 const SENTENCE = 'Der Song bleibt beim Sprung offen und die App merkt sich die Stelle im Gespräch.';
@@ -74,6 +75,13 @@ async function height(locator: Locator) {
 	return (await locator.boundingBox())?.height;
 }
 
+/** Whether both boxes sit on one header line: their vertical centres agree within a pixel. */
+async function sameLine(first: Locator, second: Locator) {
+	const [one, two] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+	if (one === null || two === null) return false;
+	return Math.abs(one.y + one.height / 2 - (two.y + two.height / 2)) <= 1;
+}
+
 async function top(locator: Locator) {
 	return (await locator.boundingBox())?.y ?? 0;
 }
@@ -91,7 +99,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px page frame`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-51] the header holds the brand and the Open and Decided tabs', async ({
+		test('[ABRD-51] the header holds the brand, the Open and Decided tabs and Refresh', async ({
 			page
 		}, testInfo) => {
 			await openBoard(page);
@@ -112,6 +120,13 @@ for (const viewport of [
 			await expect(open).toHaveAttribute('aria-current', 'page');
 			await expect(open).toHaveCSS('background-color', 'rgb(24, 21, 31)');
 			await expect(page.getByRole('button', { name: /^(Agent|Mitsprache)/ })).toHaveCount(0);
+			const refresh = page.getByRole('button', { name: /^Refresh · read / });
+			await expect(refresh).toBeVisible();
+			await expect(refresh.getByText(REFRESH_LABEL, { exact: true })).toBeVisible({
+				visible: !isPhone
+			});
+			expect(await sameLine(views, refresh)).toBe(true);
+			if (!isPhone) expect(await sameLine(brand, refresh)).toBe(true);
 			await screenshots(page, testInfo.outputPath.bind(testInfo), 'header-open');
 
 			await decided.click();
@@ -174,6 +189,9 @@ for (const viewport of [
 			await row.click();
 			await expect(page.getByRole('button', { name: '‹ Open', exact: true })).toBeVisible();
 			await expect(views).toBeHidden();
+			const refresh = page.getByRole('button', { name: /^Refresh · read / });
+			await expect(refresh).toBeVisible();
+			expect(await sameLine(back, refresh)).toBe(true);
 			expect(await height(page.locator('header'))).toBe(52);
 			await expect(card).toHaveCSS('border-top-width', '0px');
 			await expect(card).toHaveCSS('padding-left', '0px');
