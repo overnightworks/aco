@@ -103,7 +103,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-101] A repository whose read failed is a group under its name with the warn mark, `Not read` and its sentence; read before, it keeps its last rows, decidable on Open, after `last read HH:MM`.
 - [ ] [ABRD-102] A read that fails whole keeps every repository's rows as ABRD-101 with `aco antwortet nicht.` once the page has read; a first load that fails shows `aco antwortet nicht.` and the failure.
 - [ ] [ABRD-103] The page reads on load, on Refresh, on return to the tab when its last read is over 10 s old, and every 30 minutes while visible; a read asked for during one runs once after it.
-- [ ] [ABRD-104] Refresh shows a turning arrow, `Refresh` (`Reading…` while a read runs, `aria-busy`, still clickable) and the last read's `HH:MM`; its name reads `Refresh · read HH:MM`, or `Reading… · read HH:MM`; phones hide the label.
+- [ ] [ABRD-104] Refresh shows a turning arrow, `Refresh` (`Reading…` and `aria-busy` while a read runs, still clickable) and the last read's `HH:MM`, named `<label> · read HH:MM`; phones hide the label.
 - [ ] [ABRD-105] A read leaves the item of a card that waits (ABRD-99) as shown, kept when the read omits it; a read that answers once the card no longer waits applies as ABRD-98 allows.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n` and `Decided n` and Refresh (ABRD-104): n counts the open list's rows and the ruled lines Decided lists.
