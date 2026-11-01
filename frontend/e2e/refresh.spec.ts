@@ -144,6 +144,7 @@ for (const viewport of [
 
 			await refreshButton(page).click();
 
+			await expect(refreshButton(page)).toHaveAttribute('aria-busy', 'false');
 			await showList(page, phone);
 			await expect(row(page, 'Zweite?')).toBeVisible();
 			await expect(row(page, 'Erste?')).toBeVisible();
