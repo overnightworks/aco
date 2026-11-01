@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { READING_LABEL, REFRESH_LABEL, clockTime, refreshName } from '../app/model/boardSummary';
+	import { clockTime, refreshLabel, refreshName } from '../app/model/boardSummary';
 
 	let {
 		reading,
@@ -38,7 +38,7 @@
 			/>
 		</svg>
 	</span>
-	<span class="label">{reading ? READING_LABEL : REFRESH_LABEL}</span>
+	<span class="label">{refreshLabel(reading)}</span>
 	{#if readAt !== null}<span class="at">{clockTime(readAt)}</span>{/if}
 </button>
 

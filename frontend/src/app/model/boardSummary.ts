@@ -64,9 +64,14 @@ export function isStale(repos: ShownRepo[], now: Date): boolean {
 	return last === null || now.getTime() - last.getTime() > STALE_AFTER_SECONDS * 1000;
 }
 
+/** The word Refresh shows: the one owner of what it is called while it reads or not. */
+export function refreshLabel(reading: boolean): string {
+	return reading ? READING_LABEL : REFRESH_LABEL;
+}
+
 /** What Refresh is called, for the eye and for a screen reader alike. */
 export function refreshName(reading: boolean, readAt: Date | null): string {
-	const label = reading ? READING_LABEL : REFRESH_LABEL;
+	const label = refreshLabel(reading);
 	return readAt === null ? label : `${label} · read ${clockTime(readAt)}`;
 }
 
