@@ -265,8 +265,8 @@ dialog.big{max-width:calc(100vw - 32px);padding:var(--s4)}
   font-size:var(--fs-caption);font-weight:550;padding:0 var(--s2);border-radius:8px;white-space:nowrap}
 .refresh:hover{background:var(--surface-2);color:var(--fg)}
 .refresh .rat{color:var(--fg-3,var(--fg-2));font-weight:450}
-.refresh:disabled{cursor:progress}
-.refresh:disabled .gear{animation:turn 1s linear infinite;transform-origin:50% 50%}
+.refresh[aria-busy='true']{cursor:progress}
+.refresh[aria-busy='true'] .gear{animation:turn 1s linear infinite;transform-origin:50% 50%}
 .setting{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5);padding-top:var(--s4);border-top:1px solid var(--line)}
 .pick:disabled{cursor:not-allowed}
 .pick:disabled:not(.sel){opacity:.4}
@@ -728,9 +728,10 @@ function refreshSetting() {
 function renderRefresh() {
   const at = clock(S.readAt);
   $("refresh").replaceChildren(h("span", {class: "gear", "aria-hidden": "true", html: '<svg viewBox="0 0 16 16" width="15" height="15"><path d="M13 8a5 5 0 1 1-1.5-3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 1.8v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'}), h("span", {class: "rlab"}, S.reading ? "Reading…" : "Refresh"), h("span", {class: "rat"}, at));
-  $("refresh").setAttribute("aria-label", "Refresh · read " + at);
-  $("refresh").title = "Refresh · read " + at;
-  $("refresh").disabled = S.reading;
+  const name = (S.reading ? "Reading…" : "Refresh") + " · read " + at;
+  $("refresh").setAttribute("aria-label", name);
+  $("refresh").title = name;
+  $("refresh").setAttribute("aria-busy", String(S.reading));
 }
 
 // ---------- actions ----------

@@ -36,6 +36,7 @@ resolved directory's name.
 | a card post answering `unclear` | — | ABRD-70, ABRD-71 |
 | a card saving, from its undo window's end to its answer applied | — | ABRD-97, ABRD-100 |
 | a read sent before an item's stored answer arrived | ABRD-98 | — |
+| a read while a card waits | ABRD-105 | — |
 | a card post naming every open option line of its item | — | ABRD-77, ABRD-78, ABRD-80 |
 | a card post missing an open option line, or naming a changed or non-option line | — | ABRD-79 |
 | a card post naming a line already ruled | — | ABRD-80 |
@@ -101,8 +102,11 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-101] A repository whose read failed is a group under its name with the warn mark, `Not read` and its sentence; read before, it keeps its last rows, decidable on Open, after `last read HH:MM`.
 - [ ] [ABRD-102] A read that fails whole keeps every repository's rows as ABRD-101 with `aco antwortet nicht.` once the page has read; a first load that fails shows `aco antwortet nicht.` and the failure.
+- [ ] [ABRD-103] The page reads on load, on Refresh, on return to the tab when its last read is over 10 s old, and every 30 minutes while visible; a read asked for during one runs once after it.
+- [ ] [ABRD-104] Refresh shows a turning arrow, `Refresh` (`Reading…` while a read runs, `aria-busy`, still clickable) and the last read's `HH:MM`; its name reads `Refresh · read HH:MM`, or `Reading… · read HH:MM`; phones hide the label.
+- [ ] [ABRD-105] A read leaves the item of a card that waits (ABRD-99) as shown, kept when the read omits it; a read that answers once the card no longer waits applies as ABRD-98 allows.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
-- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board` and the tabs `Open n` and `Decided n`: n counts the open list's rows and the ruled lines Decided lists.
+- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n` and `Decided n` and Refresh (ABRD-104): n counts the open list's rows and the ruled lines Decided lists.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
 - [ ] [ABRD-63] An open option card's Decide row ends in `Other…`, beside the picks or `Accept all`; it opens a panel with a textarea (`Your answer`, up to 280 characters, focused) and `Send`, disabled while blank.
 - [ ] [ABRD-64] A card post's `other` (ABRD-78) is the trimmed answer within ABRD-05, written once for every posted line with `via board` (E-ABRD-13).
@@ -138,7 +142,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
 `frontend/e2e/groupCard.spec.ts`, `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`,
-`frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
+`frontend/e2e/refresh.spec.ts`, `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories
