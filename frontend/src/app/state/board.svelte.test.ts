@@ -251,9 +251,12 @@ test('[ABRD-105] a read that answers once the card no longer waits applies its i
 	let waiting = true;
 	const store = new BoardStore(() => waiting);
 	await store.load('t', fakeFetch(200, { repos: [repo({ items: [shown] })] }));
-	waiting = false;
+	const reads = heldReads();
 
-	await store.load('t', fakeFetch(200, { repos: [repo({ items: [changed] })] }));
+	const reading = store.load('t', reads.fetchImpl);
+	waiting = false;
+	reads.answer(0, [repo({ items: [changed] })]);
+	await reading;
 
 	expect(store.repos[0]?.items).toEqual([changed]);
 });
