@@ -86,6 +86,15 @@ async function top(locator: Locator) {
 	return (await locator.boundingBox())?.y ?? 0;
 }
 
+async function left(locator: Locator) {
+	return (await locator.boundingBox())?.x ?? 0;
+}
+
+async function right(locator: Locator) {
+	const box = await locator.boundingBox();
+	return (box?.x ?? 0) + (box?.width ?? 0);
+}
+
 async function bottom(locator: Locator) {
 	const box = await locator.boundingBox();
 	return (box?.y ?? 0) + (box?.height ?? 0);
@@ -176,6 +185,10 @@ for (const viewport of [
 
 			if (!isPhone) {
 				await openTheCard(page, false);
+				const refresh = page.getByRole('button', { name: /^Refresh · read / });
+				const gapBeforeRow = (await left(refresh)) - (await right(views));
+				await page.locator('.tracks').getByRole('button').first().click();
+				expect((await left(refresh)) - (await right(views))).toBeCloseTo(gapBeforeRow, 0);
 				await expect(back).toBeHidden();
 				await expect(views).toBeVisible();
 				await expect(card).toHaveCSS('border-top-width', '1px');
@@ -192,6 +205,8 @@ for (const viewport of [
 			const refresh = page.getByRole('button', { name: /^Refresh · read / });
 			await expect(refresh).toBeVisible();
 			expect(await sameLine(back, refresh)).toBe(true);
+			await expect(refresh.locator('.at')).toBeVisible();
+			await expect(refresh.getByText(REFRESH_LABEL, { exact: true })).toBeHidden();
 			expect(await height(page.locator('header'))).toBe(52);
 			await expect(card).toHaveCSS('border-top-width', '0px');
 			await expect(card).toHaveCSS('padding-left', '0px');

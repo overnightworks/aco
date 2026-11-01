@@ -455,9 +455,6 @@
 	.top > :global(.refresh) {
 		flex-shrink: 0;
 	}
-	.card-view > :global(.refresh) {
-		margin-left: auto;
-	}
 	.back {
 		display: none;
 	}
@@ -489,6 +486,9 @@
 		}
 		.card-view nav {
 			display: none;
+		}
+		.card-view > :global(.refresh) {
+			margin-left: auto;
 		}
 		nav {
 			gap: 2px;
