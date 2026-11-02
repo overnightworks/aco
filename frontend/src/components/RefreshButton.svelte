@@ -84,6 +84,9 @@
 		.refresh[aria-busy='true'] {
 			box-shadow: inset 0 0 0 2px var(--fg-3);
 		}
+		.refresh[aria-busy='true']:focus-visible {
+			box-shadow: inset 0 0 0 4px var(--fg-3);
+		}
 		.refresh[aria-busy='true'] .arrow {
 			animation: none;
 		}

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { countBoardReads, pick, routeRepositories, servedRepository } from './decideRow';
 import { arrange, item, optionEntry, type CardOption } from './itemFixture';
@@ -196,6 +196,7 @@ for (const viewport of [
 			});
 			const reads = countBoardReads(page);
 			const button = refreshButton(page);
+			let readingEdge: { ring: Buffer; cue: Buffer } | undefined;
 
 			try {
 				await button.click();
@@ -210,6 +211,7 @@ for (const viewport of [
 				await button.press('Enter');
 				await expect(button).toHaveCSS('outline-style', 'solid');
 				await expect(button).not.toHaveCSS('box-shadow', 'none');
+				readingEdge = await edgeBands(button);
 			} finally {
 				release?.();
 			}
@@ -217,9 +219,24 @@ for (const viewport of [
 			await expect(button).toHaveAttribute('aria-busy', 'false');
 			await expect(button).toHaveCSS('box-shadow', 'none');
 			await expect(button).toBeFocused();
+			const idleEdge = await edgeBands(button);
+			expect(readingEdge?.ring.equals(idleEdge.ring)).toBe(true);
+			expect(readingEdge?.cue.equals(idleEdge.cue)).toBe(false);
 			expect(reads.count()).toBe(2);
 		});
 	});
+}
+
+// Pixels of the focus ring band (0-2 px in) and of the band inside it, on a stretch of the top edge clear of the corner radius and the content.
+async function edgeBands(button: Locator): Promise<{ ring: Buffer; cue: Buffer }> {
+	const box = await button.boundingBox();
+	if (!box) throw new Error('Refresh button has no box');
+	const page = button.page();
+	const stretch = { x: box.x + 12, width: 12, height: 2 };
+	return {
+		ring: await page.screenshot({ clip: { ...stretch, y: box.y } }),
+		cue: await page.screenshot({ clip: { ...stretch, y: box.y + 2 } })
+	};
 }
 
 test.describe('timers and return to the tab', () => {
