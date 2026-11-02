@@ -159,7 +159,7 @@ for (const viewport of [
 			});
 			await page.goto(`${appUrl}#t=${token}`);
 
-			await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+			await expect(page.locator('.tracks').getByRole('heading', { level: 2 })).toHaveText([
 				/^newer\s+1$/,
 				/^older\s+1$/
 			]);
