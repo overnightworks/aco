@@ -267,6 +267,8 @@ dialog.big{max-width:calc(100vw - 32px);padding:var(--s4)}
 .refresh .rat{color:var(--fg-3,var(--fg-2));font-weight:450}
 .refresh[aria-busy='true']{cursor:progress}
 .refresh[aria-busy='true'] .gear{animation:turn 1s linear infinite;transform-origin:50% 50%}
+/* Without motion, a running read shows a ring instead of the turning gear. */
+@media (prefers-reduced-motion:reduce){.refresh[aria-busy='true']{box-shadow:inset 0 0 0 2px var(--fg-3)}}
 .setting{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5);padding-top:var(--s4);border-top:1px solid var(--line)}
 .pick:disabled{cursor:not-allowed}
 .pick:disabled:not(.sel){opacity:.4}

@@ -82,8 +82,7 @@
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.refresh[aria-busy='true'] {
-			outline: 1px dashed var(--fg-3);
-			outline-offset: -1px;
+			box-shadow: inset 0 0 0 2px var(--fg-3);
 		}
 		.refresh[aria-busy='true'] .arrow {
 			animation: none;

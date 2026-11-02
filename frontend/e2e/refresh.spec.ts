@@ -181,7 +181,7 @@ for (const viewport of [
 			await expect(pick(page, 'A')).toBeEnabled();
 		});
 
-		test('[ABRD-104] a slow read shows Reading… busy and clickable, turns the arrow and asks for one more read', async ({
+		test('[ABRD-104] a slow read shows Reading… busy and clickable, turns the arrow, marks reading with a ring under reduced motion that keyboard focus keeps and asks for one more read', async ({
 			page
 		}, testInfo) => {
 			await arrange([item(61, 'First', card('Erste?'))]);
@@ -206,13 +206,16 @@ for (const viewport of [
 				await page.screenshot({ path: testInfo.outputPath('reading.png') });
 				await page.emulateMedia({ reducedMotion: 'reduce' });
 				await expect(button.locator('.arrow')).toHaveCSS('animation-name', 'none');
-				await expect(button).toHaveCSS('outline-style', 'dashed');
-				await button.click();
+				await expect(button).not.toHaveCSS('box-shadow', 'none');
+				await button.press('Enter');
+				await expect(button).toHaveCSS('outline-style', 'solid');
+				await expect(button).not.toHaveCSS('box-shadow', 'none');
 			} finally {
 				release?.();
 			}
 
 			await expect(button).toHaveAttribute('aria-busy', 'false');
+			await expect(button).toHaveCSS('box-shadow', 'none');
 			await expect(button).toBeFocused();
 			expect(reads.count()).toBe(2);
 		});
