@@ -1,7 +1,0 @@
-claim_id = "ee44ee151236462d9ee592419cd34865"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "4ba7b1fe18255b462a36cc6491b435a1e04d0f2b"
-branch = "claude/issue-625-release-v7-0-0"
-scope = ["src/aco/__init__.py"]
-opened_commit = "3fa377618d57d2c651720d8428eb8009cb21c0a0"
