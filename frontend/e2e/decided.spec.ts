@@ -24,6 +24,7 @@ import { UNDO_SECONDS } from '../src/app/model/decision';
 test.describe.configure({ mode: 'serial' });
 
 const FAILED_MESSAGE = 'Repository konnte nicht gelesen werden.';
+const ASKED_ON = '2026-10-01';
 const DONE_COLOUR = 'rgb(28, 115, 80)';
 
 function choice(name: string): CardOption {
@@ -52,6 +53,7 @@ function sprungCard(options: CardOption[], overrides: Partial<OptionEntry>): Opt
 function ruledOption(overrides: Partial<OptionEntry>): OptionEntry {
 	return sprungCard([choice('Offen'), choice('Wie heute')], {
 		ruling: 'A',
+		asked_on: ASKED_ON,
 		ruled_on: '2026-10-02',
 		...overrides
 	});
@@ -119,6 +121,7 @@ const EVERY_WAY = [
 		title: 'Per Board?',
 		answer: 'A — Offen',
 		how: 'Board · 25.10.2026',
+		asked: 'Asked 01.10.2026',
 		area: 'Bereich',
 		binding: ['Vertrag von Offen.', OPTION_TEXT]
 	},
@@ -126,6 +129,7 @@ const EVERY_WAY = [
 		title: 'Per Chat?',
 		answer: 'B — Wie heute',
 		how: 'From chat · 04.10.2026',
+		asked: 'Asked 01.10.2026',
 		area: 'Bereich',
 		binding: ['Vertrag von Wie heute.', OPTION_TEXT]
 	},
@@ -133,6 +137,7 @@ const EVERY_WAY = [
 		title: 'Ohne Antwort?',
 		answer: 'A — Offen',
 		how: 'Recommendation kept – no answer · 26.10.2026',
+		asked: 'Asked 01.10.2026',
 		area: 'Bereich',
 		binding: ['Vertrag von Offen.', OPTION_TEXT]
 	},
@@ -147,6 +152,7 @@ const EVERY_WAY = [
 		title: 'Nur Desktop?',
 		answer: `Other: „${SHORT_ANSWER}“`,
 		how: 'Board · 27.10.2026',
+		asked: 'Asked 01.10.2026',
 		area: 'Bereich',
 		binding: [SHORT_ANSWER]
 	},
@@ -154,6 +160,7 @@ const EVERY_WAY = [
 		title: 'Auch Handy?',
 		answer: `Other: „${LONG_ANSWER}“`,
 		how: 'From chat · 27.10.2026',
+		asked: 'Asked 01.10.2026',
 		area: 'Bereich',
 		binding: [LONG_ANSWER]
 	}
@@ -249,11 +256,16 @@ for (const viewport of [
 
 			for (const [
 				position,
-				{ title, answer, how, area, binding: sentences }
+				{ title, answer, how, asked, area, binding: sentences }
 			] of EVERY_WAY.entries()) {
 				await openDecidedLine(page, title);
 				const card = decidedCard(page);
 				await expect(card.locator('.meta')).toContainText(`repo › ${area}`);
+				if (asked === undefined) {
+					await expect(card.locator('.meta')).not.toContainText('Asked');
+				} else {
+					await expect(card.locator('.meta')).toContainText(asked);
+				}
 				await expect(card.getByRole('heading', { name: title, exact: true })).toBeVisible();
 				await expect(card.getByRole('term')).toHaveText(['Decided', 'How', 'Contract']);
 				await expect(

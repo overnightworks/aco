@@ -66,8 +66,8 @@ for (const viewport of [
 
 			const rows = page.locator('.tracks').getByRole('button');
 			await expect(rows).toHaveCount(2);
-			await expect(rows.nth(0)).toHaveAccessibleName('Open Offen');
-			await expect(rows.nth(1)).toHaveAccessibleName('With head Zurückgegeben');
+			await expect(rows.nth(0)).toHaveAccessibleName(/^Open Offen \d{2}\.\d{2}\.$/);
+			await expect(rows.nth(1)).toHaveAccessibleName(/^With head Zurückgegeben \d{2}\.\d{2}\.$/);
 			await expect(rows.nth(1).getByRole('img', { name: 'With head' })).toBeVisible();
 			const labelColour = (label: string) =>
 				rows
@@ -79,7 +79,7 @@ for (const viewport of [
 			await rows.nth(1).click();
 			const card = page.locator('.option-card');
 			await expect(card.locator('.meta')).toHaveText(
-				/^\s*repo › Bereich\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*$/
+				/^\s*repo › Bereich\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
 			);
 			await expect(card.getByRole('group', { name: 'Decide' }).getByRole('button')).toHaveCount(2);
 			await page.screenshot({ path: testInfo.outputPath('with-head-card.png') });

@@ -141,7 +141,9 @@ for (const viewport of [
 
 			const card = page.locator('.option-card');
 			await expect(card.locator('.meta')).toHaveText(
-				new RegExp(`^\\s*${REPOSITORY} › Song-Seite\\s*·\\s*Product\\s*·\\s*reversible\\s*$`)
+				new RegExp(
+					`^\\s*${REPOSITORY} › Song-Seite\\s*·\\s*Product\\s*·\\s*reversible\\s*·\\s*Asked \\d{2}\\.\\d{2}\\.\\d{4}\\s*$`
+				)
 			);
 			await expect(card.getByRole('heading', { name: SONG_QUESTION, exact: true })).toBeVisible();
 			await expect(card.getByRole('term')).toHaveText([
@@ -205,6 +207,7 @@ for (const viewport of [
 			await expect(card.locator('.meta')).toContainText('Data & risk');
 			await expect(card.locator('.meta .final')).toHaveText('final');
 			await expect(card.locator('.meta')).not.toContainText('reversible');
+			await expect(card.locator('.meta')).toContainText(/Asked \d{2}\.\d{2}\.\d{4}$/);
 			await expect(card.getByRole('listitem')).toHaveCount(4);
 			await expect(card.getByRole('listitem').nth(3)).toContainText('Weg D');
 			await page.screenshot({ path: testInfo.outputPath('final-card.png') });

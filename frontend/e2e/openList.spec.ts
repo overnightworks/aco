@@ -104,7 +104,7 @@ for (const viewport of [
 			await expect(page.getByRole('heading', { name: 'webauth' })).toHaveCount(0);
 			const rows = tracks.getByRole('button');
 			await expect(rows).toHaveCount(4);
-			await expect(rows.nth(0)).toHaveAccessibleName('Open Sprung');
+			await expect(rows.nth(0)).toHaveAccessibleName(/^Open Sprung \d{2}\.\d{2}\.$/);
 			await expect(rows.nth(0)).toHaveAttribute('title', SONG_QUESTION);
 			await expect(rows.nth(0).getByRole('img', { name: 'Open' })).toBeVisible();
 			await expect(page.getByText('Nothing open: webauth')).toBeVisible();
@@ -134,6 +134,38 @@ for (const viewport of [
 				await first.click();
 				await expect(page.locator('.option-card')).toBeVisible();
 			}
+		});
+
+		test('[ABRD-107] the repository with the newest card leads and first load selects its first row', async ({
+			page
+		}) => {
+			const { appUrl, token } = readBoardRuntime();
+			await arrange([item(7, 'Sprung', songLine('Sprung'))]);
+			await page.route('**/api/board', async (route) => {
+				const board = await (await route.fetch()).json();
+				const [source] = board.repos;
+				const newerItems = source.items.map((entry: { lines: object[] }) => ({
+					...entry,
+					lines: entry.lines.map((line) => ({ ...line, topic: 'Neuer', asked_on: '2030-01-01' }))
+				}));
+				await route.fulfill({
+					json: {
+						repos: [
+							{ ...source, name: 'older' },
+							{ ...source, name: 'newer', items: newerItems }
+						]
+					}
+				});
+			});
+			await page.goto(`${appUrl}#t=${token}`);
+
+			await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+				/^newer\s+1$/,
+				/^older\s+1$/
+			]);
+			const first = page.locator('.tracks').getByRole('button').first();
+			await expect(first).toHaveAccessibleName(/^Open Neuer \d{2}\.\d{2}\.$/);
+			await expect(first).toHaveAttribute('aria-current', 'true');
 		});
 
 		test('[ABRD-49] an empty board reads All decided, a failure beside an empty repository does not', async ({

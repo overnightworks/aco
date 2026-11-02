@@ -204,9 +204,11 @@ for (const viewport of [
 
 			const rows = page.locator('.tracks').getByRole('button');
 			await expect(rows).toHaveCount(2);
-			await expect(rows.nth(0)).toHaveAccessibleName(`Open ${CARD_NAME}`);
+			await expect(rows.nth(0)).toHaveAccessibleName(
+				new RegExp(`^Open ${CARD_NAME} \\d{2}\\.\\d{2}\\.$`)
+			);
 			await expect(rows.nth(0)).toHaveAttribute('title', CARD_NAME);
-			await expect(rows.nth(1)).toHaveAccessibleName('Open Thema 1');
+			await expect(rows.nth(1)).toHaveAccessibleName(/^Open Thema 1 \d{2}\.\d{2}\.$/);
 			await expect(page.getByRole('button', { name: 'Open 2', exact: true })).toBeVisible();
 			await shoot(page, testInfo, 'list');
 		});
@@ -218,7 +220,7 @@ for (const viewport of [
 			await open(page, phone);
 
 			await expect(card(page).locator('.meta')).toHaveText(
-				/^\s*repo › Song-Seite\s*·\s*Product\s*·\s*reversible\s*$/
+				/^\s*repo › Song-Seite\s*·\s*Product\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
 			);
 			await expect(card(page).getByRole('heading', { name: CARD_NAME, exact: true })).toBeVisible();
 			await expect(card(page).getByText('Problem', { exact: true })).toHaveCount(0);
@@ -521,7 +523,7 @@ for (const viewport of [
 			}
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await expect(page.locator('.tracks').getByTitle(CARD_NAME)).toHaveAccessibleName(
-				`With head ${CARD_NAME}`
+				new RegExp(`^With head ${CARD_NAME} \\d{2}\\.\\d{2}\\.$`)
 			);
 			await showCard(page, phone, CARD_NAME);
 			await expect(card(page).locator('.meta')).toContainText('with head');
@@ -544,12 +546,14 @@ for (const viewport of [
 
 			const name = 'Song-Seite / Bibliothek · 2 points';
 			const rows = page.locator('.tracks').getByRole('button');
-			await expect(rows.nth(0)).toHaveAccessibleName('Open Offen');
-			await expect(rows.nth(1)).toHaveAccessibleName(`With head ${name}`);
+			await expect(rows.nth(0)).toHaveAccessibleName(/^Open Offen \d{2}\.\d{2}\.$/);
+			await expect(rows.nth(1)).toHaveAccessibleName(
+				new RegExp(`^With head ${name} \\d{2}\\.\\d{2}\\.$`)
+			);
 			await expect(rows.nth(1).getByRole('img', { name: 'With head' })).toBeVisible();
 			await showCard(page, phone, name);
 			await expect(card(page).locator('.meta')).toHaveText(
-				/^\s*repo › Song-Seite \/ Bibliothek\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*$/
+				/^\s*repo › Song-Seite \/ Bibliothek\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
 			);
 			await expect(card(page).getByRole('heading', { name, exact: true })).toBeVisible();
 			await expect(page.getByRole('button', { name: 'Unclear' })).toHaveCount(0);
@@ -586,7 +590,7 @@ for (const viewport of [
 			await visit(page);
 
 			await expect(page.locator('.tracks').getByTitle('Eine Frage?')).toHaveAccessibleName(
-				'Open Einzel'
+				/^Open Einzel \d{2}\.\d{2}\.$/
 			);
 			await showCard(page, phone, 'Eine Frage?');
 			await expect(
