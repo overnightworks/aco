@@ -74,18 +74,18 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 
 ## Reading the lines
 
-- [ ] [ABRD-06] Each page load reads one open-item listing per configured repo and shows each open line in RUL-03's order, option lines as one card per item (ABRD-82); no copy is kept.
+- [ ] [ABRD-06] Each page load reads one open-item listing per configured repo and shows each repo's open lines in RUL-03's order, option lines as one card per item (ABRD-82); no copy is kept.
 - [ ] [ABRD-07] An item whose block aco's grammar refuses, or that the store cannot read, is not listed, as RUL-20; its repository stays readable.
 
 ## Browser decision flow
 
-- [ ] [ABRD-28] The decision list groups open rows by repository under its name and count; a row shows its state shape and an option card's name (ABRD-82).
+- [ ] [ABRD-28] The decision list groups open rows by repository under its name and count (ABRD-107); a row shows its state shape, an option card's name (ABRD-82) and its day (ABRD-106).
 - [ ] [ABRD-29] Within a repository, option cards come in aco's order, with-head cards after (ABRD-61). First load selects the first row; desktop shows its card, phones the list until a row is tapped.
-- [ ] [ABRD-30] Decided groups the ruled lines of open board items by repository under its name and count; a row shows the Decided shape and an option line's topic, or a yes/no line's short question or sentence.
+- [ ] [ABRD-30] Decided groups open items' ruled lines by repository under name and count; a row shows the Decided shape, an option line's topic or a yes/no line's short question or sentence, and its day (ABRD-106).
 - [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
 - [ ] [ABRD-33] During undo a question stays open; only its stored answer, applied in place without a read, moves it to Decided.
-- [ ] [ABRD-36] A card with one open option line shows: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, question, Problem, Today, options A-D, Recommendation and Decide (ABRD-44).
+- [ ] [ABRD-36] A one-point card shows: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, `Asked` (ABRD-106), question, Problem, Today, options A-D, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), `not recorded` for a yes/no line; then ` · ` and the ruling date as `DD.MM.YYYY`.
 - [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
@@ -99,12 +99,14 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-59] A pick that starts a window focuses its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. An ended window removes its strip; ABRD-50 applies.
 - [ ] [ABRD-48] Option card rows carry the Open, With head (ABRD-61) or Saving (ABRD-100) shape; each shape names its state, each row's title is its question or name (ABRD-82).
 - [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
-- [ ] [ABRD-49] Readable repositories with nothing open are named once under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
+- [ ] [ABRD-49] Readable repositories with nothing open are named once, in configured order, under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-101] A repository whose read failed is a group under its name with the warn mark, `Not read` and its sentence; read before, it keeps its last rows, decidable on Open, after `last read HH:MM`.
 - [ ] [ABRD-102] A read that fails whole keeps every repository's rows as ABRD-101 with `aco antwortet nicht.` once the page has read; a first load that fails shows `aco antwortet nicht.` and the failure.
 - [ ] [ABRD-103] The page reads on load, on Refresh, on return to the tab when its last read is over 10 s old, and every 30 minutes while visible; a read asked for during one runs once after it.
 - [ ] [ABRD-104] Refresh shows a turning arrow, `Refresh` (`Reading…` and `aria-busy` while a read runs, still clickable) and the last read's `HH:MM`, named `<label> · read HH:MM`; phones hide the label.
 - [ ] [ABRD-105] A read leaves the item of a card that waits (ABRD-99) as shown, kept when the read omits it; a read that answers once the card no longer waits applies as ABRD-98 allows.
+- [ ] [ABRD-106] A card's meta ends in `Asked DD.MM.YYYY` when its line carries `asked_on`, a card of points its newest point's day; its row shows that day as `DD.MM.`, a Decided row its decision day.
+- [ ] [ABRD-107] On both tabs groups stand by their first row: open before with head, then the newest day, then the higher item; a failed repository with kept cards too, one without cards after every other group.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n` and `Decided n` and Refresh (ABRD-104): n counts the open list's rows and the ruled lines Decided lists.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
@@ -127,7 +129,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-75] After the window it posts the card with `unclear` and the trimmed note, none if blank (ABRD-77); `Unclear` locks, and posting and refusal follow ABRD-65, ABRD-66 and ABRD-68 for `Other…`.
 - [ ] [ABRD-76] Once the post answers `returned` (ABRD-71), the stage moves to the list's first Open row, else stays on the card, now with its head; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-82] An item's open option lines (its points) are one card with one Open row and one name: a one-point card's topic, else `<area> · <n> points`, distinct areas joined by ` / ` in point order.
-- [ ] [ABRD-83] A card of two or more points has its name as title and no Problem; its meta reads `<repo> › ` with ABRD-82's areas, its distinct kinds, `with head` (ABRD-61), `final` or `reversible`.
+- [ ] [ABRD-83] A card of several points has its name as title and no Problem; its meta reads `<repo> › ` with ABRD-82's areas, its distinct kinds, `with head` (ABRD-61), `final` or `reversible`, `Asked` (ABRD-106).
 - [ ] [ABRD-84] Its points are rows in aco's order: `<k>`, the question, a warn mark when an option is `final`, one pick per option (the recommended one in the accent); no point is open at first.
 - [ ] [ABRD-85] Activating a point's question opens its Problem, Today, Options and Recommendation as on a one-point card and closes any other point; activating it again closes it.
 - [ ] [ABRD-86] A pick marks its point chosen (`aria-pressed`) and posts nothing; the Decide row reads `<c> of <n> chosen` on desktop; a pick on the open point opens the first unchosen point instead.
