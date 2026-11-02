@@ -109,7 +109,12 @@ describe('the selection helpers follow the shown order', () => {
 	});
 
 	test('[ABRD-29] after a decision the next card is the first open one in shown order', () => {
-		expect(nextOpenAfter(repos, 'newer:1:card')).toBe('older:1:card');
+		const spanning = [
+			repo({ name: 'older', items: [openCard(1, '2026-10-01')] }),
+			repo({ name: 'newer', items: [openCard(1, '2026-10-20'), openCard(2, '2026-10-21')] })
+		];
+
+		expect(nextOpenAfter(spanning, 'newer:2:card')).toBe('newer:1:card');
 	});
 
 	test('[ABRD-31] the first decided key is the first row of the leading group', () => {
