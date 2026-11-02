@@ -21,6 +21,7 @@ import {
 	chosenOption,
 	contractTexts,
 	decidedText,
+	displayDate,
 	type FrameMeta,
 	isOptionLine
 } from './optionCard';
@@ -34,12 +35,6 @@ export const HOW_LABEL: Record<RulingVia, string> = {
 export const NOT_RECORDED = 'not recorded';
 
 const HOW_DATE_SEPARATOR = ' · ';
-
-/** `2026-10-25` as `25.10.2026`, the picture's date. */
-export function displayDate(isoDate: string): string {
-	const [year, month, day] = isoDate.split('-');
-	return `${day}.${month}.${year}`;
-}
 
 /** The way a line was decided, then its date. Only an option line carries a
  * `via`; a yes/no line never does. */
@@ -79,6 +74,6 @@ export function decidedMeta(repo: string, item: BoardItem, line: ExpectationLine
 	if (!isOptionLine(line)) {
 		return { where: `${repo} › ${item.title}` };
 	}
-	const { where, kind } = cardMeta(repo, line);
-	return { where, kind };
+	const { where, kind, asked } = cardMeta(repo, line);
+	return { where, kind, ...(asked !== undefined && { asked }) };
 }

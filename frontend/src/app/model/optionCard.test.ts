@@ -8,8 +8,13 @@ import {
 	hasFinalOption,
 	hasHead,
 	CONTRACT_SUMMARY,
+	askedText,
 	contractTexts,
 	decidedText,
+	displayDate,
+	displayDay,
+	META_LABEL,
+	newestAskedOn,
 	isOptionLine,
 	isStuck,
 	joinedAreas,
@@ -29,11 +34,46 @@ import {
 	verdictLabel
 } from './optionCard';
 
+describe('dates', () => {
+	test('[ABRD-54] displayDate writes an ISO date as day, month and year', () => {
+		expect(displayDate('2026-10-05')).toBe('05.10.2026');
+	});
+
+	test('[ABRD-106] displayDay writes it as day and month with a closing dot', () => {
+		expect(displayDay('2026-10-05')).toBe('05.10.');
+	});
+
+	test('[ABRD-106] askedText ends the meta in the label and the full date', () => {
+		expect(askedText('2026-10-05')).toBe(`${META_LABEL.asked} 05.10.2026`);
+	});
+});
+
+describe('newestAskedOn', () => {
+	test('[ABRD-106] a card of points takes the newest day of its points', () => {
+		const points = [
+			optionLine({ asked_on: '2026-10-05' }),
+			optionLine({ asked_on: '2026-10-12' }),
+			optionLine({ asked_on: '2026-10-09' })
+		];
+
+		expect(newestAskedOn(points)).toBe('2026-10-12');
+	});
+
+	test('[ABRD-106] points without an asked day have none', () => {
+		expect(newestAskedOn([optionLine({ asked_on: null })])).toBeNull();
+	});
+});
+
 describe('cardMeta', () => {
-	test('names repository and area, the kind, and reversible when no option is final', () => {
+	test('[ABRD-106] names repository and area, the kind, and reversible when no option is final', () => {
 		const meta = cardMeta('songmaker', optionLine({ area: 'Song page', decision_kind: 'money' }));
 
-		expect(meta).toEqual({ where: 'songmaker › Song page', kind: 'Money', undo: 'reversible' });
+		expect(meta).toEqual({
+			where: 'songmaker › Song page',
+			kind: 'Money',
+			undo: 'reversible',
+			asked: '2026-10-20'
+		});
 	});
 
 	test('[ABRD-61] marks a returned line as with head', () => {
@@ -93,8 +133,19 @@ describe('pointsMeta', () => {
 		expect(pointsMeta('songmaker', points)).toEqual({
 			where: 'songmaker › Song-Seite / Bibliothek',
 			kind: 'Product / Technical',
-			undo: 'final'
+			undo: 'final',
+			asked: '2026-10-20'
 		});
+	});
+
+	test('[ABRD-106] the asked day is the newest of the points, whatever their order', () => {
+		const points = [
+			optionLine({ asked_on: '2026-10-05' }),
+			optionLine({ asked_on: '2026-10-12' }),
+			optionLine({ asked_on: '2026-10-09' })
+		];
+
+		expect(pointsMeta('songmaker', points).asked).toBe('2026-10-12');
 	});
 
 	test('[ABRD-83] says with head as soon as one point is', () => {

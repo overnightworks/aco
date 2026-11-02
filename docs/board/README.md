@@ -38,8 +38,7 @@ point rows: one point open at a time, a pick per point, "Accept all" with the nu
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
 point is chosen. A pick marks its letter from the click; a card whose answer is saving shows
 the picture's saving state while every other card stays usable; no read locks the page.
-It still lacks Mitsprache and the agent list, and the v5 additions: asked dates,
-newest-first order and Self-refresh.
+It still lacks Mitsprache and the agent list, and the v5 addition Self-refresh.
 A ruled yes/no line is read-only history in Decided; an open one is
 refused by aco's grammar, so its item drops from the board like any malformed item.
 The list groups open cards and decided lines per project with the picture's Open,

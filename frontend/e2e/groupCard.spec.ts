@@ -196,7 +196,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px card of points`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-82] an item’s open option lines are one Open row named by area and count, beside another open row, and the tab counts rows', async ({
+		test('[ABRD-82] [ABRD-106] an item’s open option lines are one Open row named by area and count, beside another open row, and the tab counts rows', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -204,21 +204,23 @@ for (const viewport of [
 
 			const rows = page.locator('.tracks').getByRole('button');
 			await expect(rows).toHaveCount(2);
-			await expect(rows.nth(0)).toHaveAccessibleName(`Open ${CARD_NAME}`);
+			await expect(rows.nth(0)).toHaveAccessibleName(
+				new RegExp(`^Open ${CARD_NAME} \\d{2}\\.\\d{2}\\.$`)
+			);
 			await expect(rows.nth(0)).toHaveAttribute('title', CARD_NAME);
-			await expect(rows.nth(1)).toHaveAccessibleName('Open Thema 1');
+			await expect(rows.nth(1)).toHaveAccessibleName(/^Open Thema 1 \d{2}\.\d{2}\.$/);
 			await expect(page.getByRole('button', { name: 'Open 2', exact: true })).toBeVisible();
 			await shoot(page, testInfo, 'list');
 		});
 
-		test('[ABRD-83] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all, the count, Other… and Unclear', async ({
+		test('[ABRD-83] [ABRD-106] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all, the count, Other… and Unclear', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
 			await open(page, phone);
 
 			await expect(card(page).locator('.meta')).toHaveText(
-				/^\s*repo › Song-Seite\s*·\s*Product\s*·\s*reversible\s*$/
+				/^\s*repo › Song-Seite\s*·\s*Product\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
 			);
 			await expect(card(page).getByRole('heading', { name: CARD_NAME, exact: true })).toBeVisible();
 			await expect(card(page).getByText('Problem', { exact: true })).toHaveCount(0);
@@ -521,7 +523,7 @@ for (const viewport of [
 			}
 			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 			await expect(page.locator('.tracks').getByTitle(CARD_NAME)).toHaveAccessibleName(
-				`With head ${CARD_NAME}`
+				new RegExp(`^With head ${CARD_NAME} \\d{2}\\.\\d{2}\\.$`)
 			);
 			await showCard(page, phone, CARD_NAME);
 			await expect(card(page).locator('.meta')).toContainText('with head');
@@ -530,7 +532,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'with-head');
 		});
 
-		test('[ABRD-61] points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
+		test('[ABRD-61] [ABRD-106] points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
 			page
 		}, testInfo) => {
 			await arrange([
@@ -544,12 +546,14 @@ for (const viewport of [
 
 			const name = 'Song-Seite / Bibliothek · 2 points';
 			const rows = page.locator('.tracks').getByRole('button');
-			await expect(rows.nth(0)).toHaveAccessibleName('Open Offen');
-			await expect(rows.nth(1)).toHaveAccessibleName(`With head ${name}`);
+			await expect(rows.nth(0)).toHaveAccessibleName(/^Open Offen \d{2}\.\d{2}\.$/);
+			await expect(rows.nth(1)).toHaveAccessibleName(
+				new RegExp(`^With head ${name} \\d{2}\\.\\d{2}\\.$`)
+			);
 			await expect(rows.nth(1).getByRole('img', { name: 'With head' })).toBeVisible();
 			await showCard(page, phone, name);
 			await expect(card(page).locator('.meta')).toHaveText(
-				/^\s*repo › Song-Seite \/ Bibliothek\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*$/
+				/^\s*repo › Song-Seite \/ Bibliothek\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
 			);
 			await expect(card(page).getByRole('heading', { name, exact: true })).toBeVisible();
 			await expect(page.getByRole('button', { name: 'Unclear' })).toHaveCount(0);
@@ -578,7 +582,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-36] a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
+		test('[ABRD-36] [ABRD-106] a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
 			page
 		}) => {
 			await arrange([item(8, 'Offen', point(1, { topic: 'Einzel', question: 'Eine Frage?' }))]);
@@ -586,7 +590,7 @@ for (const viewport of [
 			await visit(page);
 
 			await expect(page.locator('.tracks').getByTitle('Eine Frage?')).toHaveAccessibleName(
-				'Open Einzel'
+				/^Open Einzel \d{2}\.\d{2}\.$/
 			);
 			await showCard(page, phone, 'Eine Frage?');
 			await expect(

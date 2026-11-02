@@ -23,7 +23,7 @@ import {
 	tabCounts
 } from './boardSummary';
 
-test('first selection follows configured order, skipping unread repos and ruled-only groups', () => {
+test('first selection is the first row shown, skipping unread repos and ruled-only groups', () => {
 	const repos = [
 		repo({ name: 'failed', error: 'Read failed', items: [] }),
 		repo({
@@ -34,7 +34,7 @@ test('first selection follows configured order, skipping unread repos and ruled-
 				item({ number: 2, lines: [optionLine({ index: 1 })] })
 			]
 		}),
-		repo({ name: 'last', items: [item({ lines: [optionLine()] })] })
+		repo({ name: 'last', items: [item({ number: 1, lines: [optionLine()] })] })
 	];
 	expect(firstOpenKey(repos)).toBe('first:5:card');
 	expect(firstOpenKey([])).toBeNull();
@@ -42,18 +42,18 @@ test('first selection follows configured order, skipping unread repos and ruled-
 });
 
 describe('openList', () => {
-	test('[ABRD-101] groups follow configured order, a failed repository without cards as a group with its sentence', () => {
+	test('[ABRD-101] groups tied on day and item keep configured order, a failed repository without cards a group after them with its sentence', () => {
 		const { groups } = openList([
 			repo({ name: 'zeta', items: [item({ number: 1, lines: [optionLine({ index: 1 })] })] }),
 			repo({ name: 'broken', error: 'aco failed', items: [] }),
-			repo({ name: 'alpha', items: [item({ number: 2, lines: [optionLine({ index: 1 })] })] })
+			repo({ name: 'alpha', items: [item({ number: 1, lines: [optionLine({ index: 1 })] })] })
 		]);
 
-		expect(groups.map((group) => group.repo)).toEqual(['zeta', 'broken', 'alpha']);
-		expect(groups[1]).toEqual({ repo: 'broken', error: 'aco failed', readAt: null, rows: [] });
+		expect(groups.map((group) => group.repo)).toEqual(['zeta', 'alpha', 'broken']);
+		expect(groups[2]).toEqual({ repo: 'broken', error: 'aco failed', readAt: null, rows: [] });
 	});
 
-	test('[ABRD-28] a row carries its key, state, label and the full question as its title', () => {
+	test('[ABRD-28] [ABRD-106] a row carries its key, state, label and the full question as its title', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
@@ -76,8 +76,22 @@ describe('openList', () => {
 				error: null,
 				readAt: null,
 				rows: [
-					{ key: 'a:7:card', state: 'open', label: 'Sprung', title: 'Keep the song open?' },
-					{ key: 'a:8:card', state: 'open', label: 'Gäste', title: 'Guests allowed?' }
+					{
+						key: 'a:7:card',
+						itemNumber: 7,
+						state: 'open',
+						label: 'Sprung',
+						day: '2026-10-20',
+						title: 'Keep the song open?'
+					},
+					{
+						key: 'a:8:card',
+						itemNumber: 8,
+						state: 'open',
+						label: 'Gäste',
+						day: '2026-10-20',
+						title: 'Guests allowed?'
+					}
 				]
 			}
 		]);
@@ -111,8 +125,22 @@ describe('openList', () => {
 				error: null,
 				readAt: null,
 				rows: [
-					{ key: 'a:7:card', state: 'open', label: name, title: name },
-					{ key: 'a:8:card', state: 'open', label: 'Gäste', title: 'Guests allowed?' }
+					{
+						key: 'a:7:card',
+						itemNumber: 7,
+						state: 'open',
+						label: name,
+						day: '2026-10-20',
+						title: name
+					},
+					{
+						key: 'a:8:card',
+						itemNumber: 8,
+						state: 'open',
+						label: 'Gäste',
+						day: '2026-10-20',
+						title: 'Guests allowed?'
+					}
 				]
 			}
 		]);
@@ -230,7 +258,7 @@ describe('decidedList', () => {
 		return group?.rows.map((row) => row.key) ?? [];
 	}
 
-	test('[ABRD-30] groups ruled lines per repository in configured order, a failed one as a group with its kept rows and a repository with nothing ruled absent', () => {
+	test('[ABRD-30] groups ruled lines per repository, tied groups in configured order, a failed one as a group with its kept rows and a repository with nothing ruled absent', () => {
 		const { groups, quiet } = decidedList([
 			repo({
 				name: 'first',
@@ -248,7 +276,7 @@ describe('decidedList', () => {
 			repo({ name: 'untouched', items: [item({ lines: [optionLine()] })] }),
 			repo({
 				name: 'last',
-				items: [item({ lines: [optionLine({ ruling: 'A', ruled_on: '2026-10-02' })] })]
+				items: [item({ lines: [optionLine({ ruling: 'A', ruled_on: '2026-09-30' })] })]
 			})
 		]);
 
@@ -288,9 +316,30 @@ describe('decidedList', () => {
 
 		const [group] = groups;
 		expect(group && 'rows' in group ? group.rows : []).toEqual([
-			{ key: 'repo:4:1', state: 'done', label: 'Sprung', title: 'Keep the song open?' },
-			{ key: 'repo:4:2', state: 'done', label: 'Guests allowed?', title: 'Guests allowed?' },
-			{ key: 'repo:4:3', state: 'done', label: 'Dark mode?', title: 'Dark mode?' }
+			{
+				key: 'repo:4:1',
+				itemNumber: 4,
+				state: 'done',
+				label: 'Sprung',
+				day: '2026-10-02',
+				title: 'Keep the song open?'
+			},
+			{
+				key: 'repo:4:2',
+				itemNumber: 4,
+				state: 'done',
+				label: 'Guests allowed?',
+				day: '2026-10-01',
+				title: 'Guests allowed?'
+			},
+			{
+				key: 'repo:4:3',
+				itemNumber: 4,
+				state: 'done',
+				label: 'Dark mode?',
+				day: '2026-09-30',
+				title: 'Dark mode?'
+			}
 		]);
 	});
 
