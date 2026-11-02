@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/svelte';
+import { cleanup, render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 import { cardKey } from '../app/model/decision';
+import { displayDay } from '../app/model/optionCard';
 import { item, line, optionLine, repo } from '../test-support/board';
 import {
 	clockTime,
@@ -47,9 +48,37 @@ test('[ABRD-48] an option row shows its topic, the Open shape and its question a
 		})
 	]);
 
-	const row = screen.getByRole('button', { name: 'Open Sprung' });
+	const row = screen.getByRole('button', { name: /^Open Sprung/ });
 	expect(row).toHaveAttribute('title', 'Keep the song open?');
 	expect(within(row).getByRole('img', { name: 'Open' })).toBeInTheDocument();
+});
+
+test('[ABRD-106] an open row ends in the day it was asked, a decided row in its decision day', () => {
+	renderList([
+		repo({
+			items: [item({ lines: [optionLine({ topic: 'Sprung', asked_on: '2026-10-05' })] })]
+		})
+	]);
+	expect(
+		screen.getByRole('button', { name: `Open Sprung ${displayDay('2026-10-05')}` })
+	).toBeVisible();
+	cleanup();
+
+	renderList(
+		[
+			repo({
+				items: [
+					item({
+						lines: [optionLine({ topic: 'Sprung', ruling: 'A', ruled_on: '2026-10-02' })]
+					})
+				]
+			})
+		],
+		{ view: 'decided' }
+	);
+	expect(
+		screen.getByRole('button', { name: `Decided Sprung ${displayDay('2026-10-02')}` })
+	).toBeVisible();
 });
 
 test('[ABRD-61] a returned option row shows its topic, the With head shape and a muted label', () => {
@@ -59,7 +88,7 @@ test('[ABRD-61] a returned option row shows its topic, the With head shape and a
 		})
 	]);
 
-	const row = screen.getByRole('button', { name: 'With head Sprung' });
+	const row = screen.getByRole('button', { name: /^With head Sprung/ });
 	expect(within(row).getByRole('img', { name: 'With head' })).toBeInTheDocument();
 	expect(within(row).getByText('Sprung')).toHaveClass('muted');
 });
@@ -81,7 +110,7 @@ test('[ABRD-28] a short topic labels the row and the question titles it instead 
 		})
 	]);
 
-	expect(screen.getByRole('button', { name: 'Open Gäste' })).toHaveAttribute(
+	expect(screen.getByRole('button', { name: /^Open Gäste/ })).toHaveAttribute(
 		'title',
 		'Guests allowed?'
 	);
@@ -200,10 +229,10 @@ test('[ABRD-30] a decided row is named Decided with its label, carries the Decid
 		{ view: 'decided' }
 	);
 
-	const row = screen.getByRole('button', { name: 'Decided Sprung' });
+	const row = screen.getByRole('button', { name: /^Decided Sprung/ });
 	expect(within(row).getByRole('img', { name: 'Decided' })).toBeInTheDocument();
 	expect(within(row).getByText('Sprung')).not.toHaveClass('muted');
-	expect(screen.getByRole('button', { name: 'Decided Guests?' })).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: /^Decided Guests?/ })).toBeInTheDocument();
 	expect(screen.getAllByRole('button')).toHaveLength(2);
 	expect(screen.getByRole('region', { name: 'Decided' })).toBeInTheDocument();
 	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('repo 2');
@@ -238,7 +267,7 @@ test('[ABRD-100] a saving row is named by the Saving shape and its topic', () =>
 		saving: [cardKey('repo', 42)]
 	});
 
-	const row = screen.getByRole('button', { name: 'Saving Sprung' });
+	const row = screen.getByRole('button', { name: /^Saving Sprung/ });
 	expect(within(row).getByRole('img', { name: 'Saving' })).toBeInTheDocument();
 });
 
@@ -257,7 +286,7 @@ test('[ABRD-100] a saving row with its head shows Saving, unmuted', () => {
 		{ saving: [cardKey('repo', 42)] }
 	);
 
-	const row = screen.getByRole('button', { name: 'Saving Sprung' });
+	const row = screen.getByRole('button', { name: /^Saving Sprung/ });
 	expect(within(row).getByText('Sprung')).not.toHaveClass('muted');
 });
 
@@ -287,7 +316,7 @@ test('[ABRD-101] a failed repository keeps its cards as selectable rows after th
 	expect(screen.getByRole('alert')).toHaveTextContent(
 		`${NOT_READ_LABEL} down ${LAST_READ_LABEL} ${clockTime(readAt)}`
 	);
-	const row = screen.getByRole('button', { name: 'Open Sprung' });
+	const row = screen.getByRole('button', { name: /^Open Sprung/ });
 	expect(row).toHaveAttribute('aria-current', 'true');
 	row.click();
 	expect(onSelect).toHaveBeenCalledWith(cardKey('kept', 42));

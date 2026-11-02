@@ -5,7 +5,6 @@ import {
 	bindingSentences,
 	decidedAnswer,
 	decidedMeta,
-	displayDate,
 	HOW_LABEL,
 	howText,
 	NOT_RECORDED
@@ -29,12 +28,6 @@ describe('howText', () => {
 		expect(howText(line({ ruling: 'no', ruled_on: '2026-10-25' }))).toBe(
 			`${NOT_RECORDED} · 25.10.2026`
 		);
-	});
-});
-
-describe('displayDate', () => {
-	test('[ABRD-54] writes an ISO date as day, month and year', () => {
-		expect(displayDate('2026-10-05')).toBe('05.10.2026');
 	});
 });
 
@@ -100,7 +93,17 @@ describe('decidedMeta', () => {
 	test('[ABRD-37] an option line names repository, area and kind without the undo token', () => {
 		const meta = decidedMeta('songmaker', item(), optionLine({ area: 'Song page' }));
 
-		expect(meta).toEqual({ where: 'songmaker › Song page', kind: 'Product' });
+		expect(meta).toEqual({
+			where: 'songmaker › Song page',
+			kind: 'Product',
+			asked: '2026-10-20'
+		});
+	});
+
+	test('[ABRD-106] a ruled option line older than asked_on has no asked day', () => {
+		const meta = decidedMeta('songmaker', item(), optionLine({ asked_on: null }));
+
+		expect(meta).not.toHaveProperty('asked');
 	});
 
 	test('[ABRD-37] a yes/no line names the repository and the item title alone', () => {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { expect, test } from 'vitest';
-import { KIND_LABEL, META_LABEL, UNDO_LABEL } from '../app/model/optionCard';
+import { askedText, KIND_LABEL, META_LABEL, UNDO_LABEL } from '../app/model/optionCard';
 import { cardOption, optionLine, PICTURE } from '../test-support/board';
 import OptionCard from './OptionCard.svelte';
 
@@ -140,5 +140,10 @@ test('[ABRD-100] a saving card reads saving between its kind and its undo token'
 	const tokens = [...(container.querySelector('.props')?.children ?? [])]
 		.filter((token) => !token.classList.contains('sep'))
 		.map((token) => token.textContent?.trim());
-	expect(tokens).toEqual([KIND_LABEL.product, META_LABEL.saving, UNDO_LABEL.reversible]);
+	expect(tokens).toEqual([
+		KIND_LABEL.product,
+		META_LABEL.saving,
+		UNDO_LABEL.reversible,
+		askedText('2026-10-20')
+	]);
 });

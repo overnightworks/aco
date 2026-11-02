@@ -16,6 +16,7 @@
 		type RowList,
 		type ShownRepo
 	} from '../app/model/boardSummary';
+	import { displayDay } from '../app/model/optionCard';
 	import StateShape from './StateShape.svelte';
 	import WarnMark from './WarnMark.svelte';
 
@@ -68,6 +69,7 @@
 					>
 						<StateShape state={shown} />
 						<span class="label" class:muted={shown === 'back'}>{row.label}</span>
+						<span class="day">{displayDay(row.day)}</span>
 					</button>
 				</li>
 			{/each}
@@ -145,6 +147,11 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.day {
+		flex: none;
+		font-size: 13px;
+		color: var(--fg-3);
 	}
 	.muted {
 		color: var(--fg-3);

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { type FrameMeta, META_LABEL, UNDO_LABEL } from '../app/model/optionCard';
+	import { askedText, type FrameMeta, META_LABEL, UNDO_LABEL } from '../app/model/optionCard';
 	import WarnMark from './WarnMark.svelte';
 
 	let { meta, title, children }: { meta: FrameMeta; title: string; children: Snippet } = $props();
@@ -10,14 +10,15 @@
 		final: boolean;
 	}
 
-	// The picture's order: kind, with head, saving, then the undo token.
+	// The picture's order: kind, with head, saving, the undo token, then the day asked.
 	const tokens: Token[] = $derived([
 		...(meta.kind !== undefined ? [{ text: meta.kind, final: false }] : []),
 		...(meta.withHead ? [{ text: META_LABEL.withHead, final: false }] : []),
 		...(meta.saving ? [{ text: META_LABEL.saving, final: false }] : []),
 		...(meta.undo !== undefined
 			? [{ text: UNDO_LABEL[meta.undo], final: meta.undo === 'final' }]
-			: [])
+			: []),
+		...(meta.asked !== undefined ? [{ text: askedText(meta.asked), final: false }] : [])
 	]);
 </script>
 

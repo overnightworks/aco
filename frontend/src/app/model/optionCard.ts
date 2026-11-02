@@ -45,11 +45,29 @@ export const UNDO_LABEL: Record<Undo, string> = {
 	final: 'final'
 };
 
-/** The meta tokens between the kind and the undo token. */
+/** The meta tokens: kind, `withHead`, `saving`, the undo token, then `asked`
+ * with the day (ABRD-106). */
 export const META_LABEL = {
 	withHead: 'with head',
-	saving: 'saving'
+	saving: 'saving',
+	asked: 'Asked'
 } as const;
+
+/** `2026-10-25` as `25.10.2026`, the picture's date. */
+export function displayDate(isoDate: string): string {
+	const [year, month, day] = isoDate.split('-');
+	return `${day}.${month}.${year}`;
+}
+
+/** `2026-10-25` as `25.10.`, the day a list row shows. */
+export function displayDay(isoDate: string): string {
+	return displayDate(isoDate).slice(0, 6);
+}
+
+/** The last meta token: `Asked 25.10.2026`. */
+export function askedText(isoDate: string): string {
+	return `${META_LABEL.asked} ${displayDate(isoDate)}`;
+}
 
 /** A yes/no line carries no `form` at all (ABRD-34). */
 export function isOptionLine(line: ExpectationLine): line is OptionLine {
@@ -68,6 +86,8 @@ export interface FrameMeta {
 	/** The card's answer is being saved (ABRD-100). */
 	saving?: true;
 	undo?: Undo;
+	/** The ISO day the card was asked, when its line carries one (ABRD-106). */
+	asked?: string;
 }
 
 export interface CardMeta extends FrameMeta {
@@ -85,6 +105,13 @@ export function hasHead(points: readonly OptionLine[]): boolean {
 	return points.some((point) => point.returned_on !== null);
 }
 
+/** The newest `asked_on` of the points, `null` when none carries one (a ruled
+ * line older than `asked_on`, BODY-103). */
+export function newestAskedOn(points: readonly OptionLine[]): string | null {
+	const days = points.flatMap((point) => (point.asked_on === null ? [] : [point.asked_on]));
+	return days.length === 0 ? null : days.reduce((newest, day) => (day > newest ? day : newest));
+}
+
 /** The areas of a card's points, each once, in point order, joined by a slash
  * (the middle dot already separates a card's name from its count). */
 export function joinedAreas(points: readonly OptionLine[]): string {
@@ -95,11 +122,13 @@ export function joinedAreas(points: readonly OptionLine[]): string {
  * whether any point is with its head, and whether any answer cannot be taken back. */
 export function pointsMeta(repo: string, points: readonly OptionLine[]): CardMeta {
 	const kinds = [...new Set(points.map((point) => KIND_LABEL[point.decision_kind]))];
+	const asked = newestAskedOn(points);
 	return {
 		where: `${repo} › ${joinedAreas(points)}`,
 		kind: kinds.join(JOIN_SEPARATOR),
 		...(hasHead(points) && { withHead: true as const }),
-		undo: points.some(hasFinalOption) ? 'final' : 'reversible'
+		undo: points.some(hasFinalOption) ? 'final' : 'reversible',
+		...(asked !== null && { asked })
 	};
 }
 

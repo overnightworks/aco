@@ -15,7 +15,7 @@ import type {
 } from '../../types';
 import { cardName, cardTitle, openPoints } from './card';
 import { cardKey, lineKey } from './decision';
-import { hasHead, isOptionLine } from './optionCard';
+import { hasHead, isOptionLine, newestAskedOn } from './optionCard';
 
 export const OPEN_TAB_LABEL = 'Open';
 export const DECIDED_TAB_LABEL = 'Decided';
@@ -126,8 +126,10 @@ export type Selection = CardSelection | DecidedSelection;
 /** How a row reads at a glance: an option card is `open`, or `back` once the
  * operator sent one of its lines to its head, or `saving` while its answer is
  * being saved; a ruled line is `done`. */
-export type RowState = OpenRowState | 'saving' | 'done';
+export type RowState = OrderedRowState | 'saving';
 type OpenRowState = 'open' | 'back';
+/** The states a row is ordered by: what the list holds, never the shown `saving`. */
+type OrderedRowState = OpenRowState | 'done';
 
 /** The two tabs that list rows. */
 export type ListView = 'open' | 'decided';
@@ -144,12 +146,15 @@ export const STATE_LABEL: Record<RowState, string> = {
 };
 
 /** Lower comes first; `nextOpenAfter` and the open list both order by it. */
-const ROW_RANK: Record<OpenRowState, number> = { open: 0, back: 1 };
+const ROW_RANK: Record<OrderedRowState, number> = { done: 0, open: 0, back: 1 };
 
-interface ListRow<State extends RowState = RowState> {
+interface ListRow<State extends OrderedRowState = OrderedRowState> {
 	key: string;
+	itemNumber: number;
 	state: State;
 	label: string;
+	/** The ISO day shown after the label: the day asked, or the decision day. */
+	day: string;
 	/** The full question, for the row's tooltip. */
 	title: string;
 }
@@ -167,11 +172,13 @@ export interface RowList<Row extends ListRow = ListRow> {
 	quiet: string[];
 }
 
-function decidedRow(repo: string, itemNumber: number, line: ExpectationLine): ListRow<'done'> {
+function decidedRow(repo: string, itemNumber: number, line: RuledLine): ListRow<'done'> {
 	return {
 		key: lineKey(repo, itemNumber, line),
+		itemNumber,
 		state: 'done',
 		label: isOptionLine(line) ? line.topic : cardHeading(line),
+		day: line.ruled_on,
 		title: cardHeading(line)
 	};
 }
@@ -179,8 +186,11 @@ function decidedRow(repo: string, itemNumber: number, line: ExpectationLine): Li
 function cardRow(repo: string, itemNumber: number, points: OptionLine[]): ListRow<OpenRowState> {
 	return {
 		key: cardKey(repo, itemNumber),
+		itemNumber,
 		state: hasHead(points) ? 'back' : 'open',
 		label: cardName(points),
+		// BODY-101: an open option line carries `asked_on`.
+		day: newestAskedOn(points) as string,
 		title: cardTitle(points)
 	};
 }
@@ -210,8 +220,27 @@ function decidedRows(reading: RepoReading): ListRow<'done'>[] {
 		.map(({ item, line }) => decidedRow(reading.name, item.number, line));
 }
 
-/** One group per repository that failed or has a row, in configured order, a
- * failed one with the rows it kept; a readable repository without one is quiet. */
+/** Band, then newest day, then higher item: the order of rows across a list. */
+function compareRows(left: ListRow, right: ListRow): number {
+	return (
+		ROW_RANK[left.state] - ROW_RANK[right.state] ||
+		right.day.localeCompare(left.day) ||
+		right.itemNumber - left.itemNumber
+	);
+}
+
+/** A group stands by its first row; one without rows stands after every other. */
+function compareGroups(left: ListGroup<ListRow>, right: ListGroup<ListRow>): number {
+	const [leftFirst, rightFirst] = [left.rows[0], right.rows[0]];
+	if (leftFirst === undefined || rightFirst === undefined) {
+		return Number(leftFirst === undefined) - Number(rightFirst === undefined);
+	}
+	return compareRows(leftFirst, rightFirst);
+}
+
+/** One group per repository that failed or has a row, by its first row (a stable
+ * sort, so ties keep configured order), a failed one with the rows it kept; a
+ * readable repository without one is quiet. */
 function groupedRows<Row extends ListRow>(
 	repos: Readings,
 	rowsFor: (reading: RepoReading) => Row[]
@@ -231,7 +260,7 @@ function groupedRows<Row extends ListRow>(
 			});
 		}
 	}
-	return { groups, quiet };
+	return { groups: groups.sort(compareGroups), quiet };
 }
 
 /** The open list: one group per repository that failed or has an open card,
