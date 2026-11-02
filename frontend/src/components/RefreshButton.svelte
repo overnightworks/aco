@@ -81,6 +81,10 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
+		.refresh[aria-busy='true'] {
+			outline: 1px dashed var(--fg-3);
+			outline-offset: -1px;
+		}
 		.refresh[aria-busy='true'] .arrow {
 			animation: none;
 		}

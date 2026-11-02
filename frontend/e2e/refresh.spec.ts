@@ -206,6 +206,7 @@ for (const viewport of [
 				await page.screenshot({ path: testInfo.outputPath('reading.png') });
 				await page.emulateMedia({ reducedMotion: 'reduce' });
 				await expect(button.locator('.arrow')).toHaveCSS('animation-name', 'none');
+				await expect(button).toHaveCSS('outline-style', 'dashed');
 				await button.click();
 			} finally {
 				release?.();
