@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { item, repo } from '../../test-support/board';
+import { heldReads, item, repo } from '../../test-support/board';
 import type { BoardItem } from '../../types';
 import { SERVER_SILENT_SENTENCE } from '../model/boardSummary';
 import { BoardStore } from './board.svelte';
@@ -174,4 +174,89 @@ test('[ABRD-33] a stored answer for a kept card shows in place and a later faile
 	await store.load('t', fakeFetch(200, { repos: [flawed('b', 'gh down')] }));
 
 	expect(store.repos[0]?.items).toEqual([stored]);
+});
+
+const shown = item({ number: 42, title: 'Shown' });
+const changed = item({ number: 42, title: 'Changed' });
+const refused = item({ number: 43, title: 'Refused' });
+const renewed = item({ number: 43, title: 'Renewed' });
+
+test('[ABRD-103] reads asked for during a read run once after it, and every caller settles with that one', async () => {
+	const store = new BoardStore();
+	const reads = heldReads();
+	const first = store.load('t', reads.fetchImpl);
+	const waiting = [1, 2, 3].map(() => store.load('t', reads.fetchImpl));
+
+	const startedWhileHeld = reads.started();
+	reads.answer(0, [repo({ items: [shown] })]);
+	await first;
+	await vi.waitFor(() => expect(reads.started()).toBe(2));
+	reads.answer(1, [repo({ items: [changed] })]);
+	await Promise.all(waiting);
+
+	expect(startedWhileHeld).toBe(1);
+	expect(reads.started()).toBe(2);
+	expect(store.repos[0]?.items).toEqual([changed]);
+	expect(store.reading).toBe(false);
+});
+
+test('[ABRD-103] a read asked for after a refusal starts only once the running read answered and shows the content after it', async () => {
+	const store = new BoardStore();
+	const reads = heldReads();
+	const running = store.load('t', reads.fetchImpl);
+	const afterRefusal = store.load('t', reads.fetchImpl);
+
+	reads.answer(0, [repo({ items: [refused] })]);
+	await running;
+	await vi.waitFor(() => expect(reads.started()).toBe(2));
+	reads.answer(1, [repo({ items: [renewed] })]);
+	await afterRefusal;
+
+	expect(store.repos[0]?.items).toEqual([renewed]);
+});
+
+test('[ABRD-103] a read waiting when the token goes settles without reading', async () => {
+	const store = new BoardStore();
+	const reads = heldReads();
+	const running = store.load('t', reads.fetchImpl);
+	const waiting = store.load('t', reads.fetchImpl);
+
+	store.setNoAccess();
+	reads.answer(0, [repo()]);
+	await running;
+	await waiting;
+
+	expect(reads.started()).toBe(1);
+	expect(store.status).toBe('no-access');
+});
+
+test('[ABRD-105] a read leaves the item of a card that waits as shown, and appends it when the read omits it', async () => {
+	const store = new BoardStore((_repo, candidate) => candidate.number === shown.number);
+	await store.load('t', fakeFetch(200, { repos: [repo({ items: [shown, refused] })] }));
+	const reads = heldReads();
+
+	const changing = store.load('t', reads.fetchImpl);
+	reads.answer(0, [repo({ items: [changed, renewed] })]);
+	await changing;
+	const afterChange = readingsOf(store)[0]?.items;
+	const omitting = store.load('t', reads.fetchImpl);
+	reads.answer(1, [repo({ items: [renewed] })]);
+	await omitting;
+
+	expect(afterChange).toEqual([shown, renewed]);
+	expect(store.repos[0]?.items).toEqual([renewed, shown]);
+});
+
+test('[ABRD-105] a read that answers once the card no longer waits applies its item', async () => {
+	let waiting = true;
+	const store = new BoardStore(() => waiting);
+	await store.load('t', fakeFetch(200, { repos: [repo({ items: [shown] })] }));
+	const reads = heldReads();
+
+	const reading = store.load('t', reads.fetchImpl);
+	waiting = false;
+	reads.answer(0, [repo({ items: [changed] })]);
+	await reading;
+
+	expect(store.repos[0]?.items).toEqual([changed]);
 });

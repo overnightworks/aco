@@ -18,16 +18,49 @@ interface StoredAnswer {
 	after: number;
 }
 
-/** A read's rows for an item apply only if the read was sent after the item's
- * stored answer arrived (ABRD-98); otherwise the answer's item stands in its
- * place, appended when the read omits it. */
-function withStoredAnswers(repos: ShownRepo[], answers: StoredAnswer[], sent: number): ShownRepo[] {
-	const standing = answers.filter(({ after }) => sent <= after);
+/** An item the page keeps as shown against a read. */
+interface StandingItem {
+	repo: string;
+	item: BoardItem;
+}
+
+/** Whether the card of `item` waits for its answer, so a read must leave it as shown. */
+export type WaitsPredicate = (repo: string, item: BoardItem) => boolean;
+
+/** The items a read may not replace: a stored answer's item, when the read was
+ * sent before the answer arrived (ABRD-98). */
+function storedItems(answers: StoredAnswer[], sent: number): StandingItem[] {
+	return answers.filter(({ after }) => sent <= after).map(({ repo, item }) => ({ repo, item }));
+}
+
+/** Those, and the items of cards that wait, as shown (ABRD-105); a waiting
+ * card's item is the newer of the two. */
+function standingItems(
+	current: ShownRepo[],
+	answers: StoredAnswer[],
+	sent: number,
+	waits: WaitsPredicate
+): StandingItem[] {
+	const waiting = current.flatMap((reading) =>
+		reading.items
+			.filter((item) => waits(reading.name, item))
+			.map((item) => ({ repo: reading.name, item }))
+	);
+	const answered = storedItems(answers, sent).filter(
+		(stored) =>
+			!waiting.some(({ repo, item }) => repo === stored.repo && item.number === stored.item.number)
+	);
+	return [...answered, ...waiting];
+}
+
+/** A read's rows for an item that stands apply only as the standing item
+ * allows: it takes the item's place, appended when the read omits it. */
+function withStandingItems(repos: ShownRepo[], standing: StandingItem[]): ShownRepo[] {
 	return repos.map((reading) => {
 		const own = standing.filter(({ repo }) => repo === reading.name);
 		if (own.length === 0) return reading;
 		const replaced = reading.items.map(
-			(item) => own.find((answer) => answer.item.number === item.number)?.item ?? item
+			(item) => own.find((kept) => kept.item.number === item.number)?.item ?? item
 		);
 		const omitted = own
 			.map(({ item }) => item)
@@ -46,23 +79,79 @@ function shownRepos(answered: RepoReading[], current: ShownRepo[], arrived: Date
 	});
 }
 
+interface ReadRequest {
+	token: string;
+	fetchImpl: typeof fetch;
+}
+
+/** The one read that waits for the running one; later callers join it and the
+ * last caller's request is the one it sends. */
+interface QueuedRead {
+	request: ReadRequest;
+	done: Promise<void>;
+}
+
 export class BoardStore {
 	#readsSent = 0;
 	/** The number of the read that produced `repos`. */
 	#readingSent = 0;
 	#answers: Record<string, StoredAnswer> = {};
+	#running: Promise<void> | null = null;
+	#queued: QueuedRead | null = null;
 
 	status: BoardStatus = $state('no-access');
 	repos: ShownRepo[] = $state([]);
 	error: string | null = $state(null);
+	/** Whether a read runs or waits for the running one. */
+	reading = $state(false);
+
+	constructor(private readonly waits: WaitsPredicate = () => false) {}
 
 	setNoAccess(): void {
+		// A read still in flight answers a token that is gone: it is older than
+		// the reading now shown, and so ignored.
+		this.#readingSent = this.#readsSent;
+		this.#running = null;
+		this.#queued = null;
+		this.reading = false;
 		this.status = 'no-access';
 		this.repos = [];
 		this.error = null;
 	}
 
-	async load(token: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+	/** Reads the board, one read at a time: a call during a read settles with the
+	 * one read that starts after it, however many calls wait. */
+	load(token: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+		const request = { token, fetchImpl };
+		if (this.#running === null) return this.#start(request);
+		this.#queued ??= this.#queue(this.#running, request);
+		this.#queued.request = request;
+		return this.#queued.done;
+	}
+
+	#queue(after: Promise<void>, request: ReadRequest): QueuedRead {
+		const queued: QueuedRead = { request, done: Promise.resolve() };
+		queued.done = after.then(() => {
+			// Cleared by `setNoAccess`: the token went, so this settles without reading.
+			if (this.#queued !== queued) return;
+			this.#queued = null;
+			return this.#start(queued.request);
+		});
+		return queued;
+	}
+
+	#start(request: ReadRequest): Promise<void> {
+		this.reading = true;
+		const run: Promise<void> = this.#read(request).finally(() => {
+			if (this.#running !== run) return;
+			this.#running = null;
+			this.reading = this.#queued !== null;
+		});
+		this.#running = run;
+		return run;
+	}
+
+	async #read({ token, fetchImpl }: ReadRequest): Promise<void> {
 		// A ready board stays on screen while it is re-read: replacing it with a
 		// loading state would tear down what the person is working in, such as
 		// an open confirmation.
@@ -73,11 +162,14 @@ export class BoardStore {
 		const sent = ++this.#readsSent;
 		try {
 			const board = await fetchBoard(token, fetchImpl);
+			if (sent <= this.#readingSent) return;
 			this.#readingSent = sent;
 			const shown = shownRepos(board.repos, this.repos, new SvelteDate(Date.now()));
-			this.repos = withStoredAnswers(shown, Object.values(this.#answers), sent);
+			const standing = standingItems(this.repos, Object.values(this.#answers), sent, this.waits);
+			this.repos = withStandingItems(shown, standing);
 			this.status = 'ready';
 		} catch (error) {
+			if (sent <= this.#readingSent) return;
 			if (wasReady) {
 				this.repos = this.repos.map((reading) => ({ ...reading, error: SERVER_SILENT_SENTENCE }));
 				return;
@@ -92,6 +184,9 @@ export class BoardStore {
 	 * it against any read sent before this answer arrived. */
 	applyItem(repo: string, item: BoardItem): void {
 		this.#answers[`${repo}:${item.number}`] = { repo, item, after: this.#readsSent };
-		this.repos = withStoredAnswers(this.repos, Object.values(this.#answers), this.#readingSent);
+		this.repos = withStandingItems(
+			this.repos,
+			storedItems(Object.values(this.#answers), this.#readingSent)
+		);
 	}
 }

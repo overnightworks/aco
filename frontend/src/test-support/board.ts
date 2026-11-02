@@ -147,6 +147,27 @@ export function readyBoard(repos: RepoReading[] = [repo()]) {
 	return { store, wiring, reads: () => vi.mocked(fetchImpl).mock.calls.length };
 }
 
+/** A fetch whose reads answer or fail when released, in the order the test
+ * chooses; `started` counts the reads sent so far. */
+export function heldReads() {
+	const releases: { answer: (repos: RepoReading[]) => void; fail: () => void }[] = [];
+	const fetchImpl = vi.fn(
+		() =>
+			new Promise((resolve, reject) => {
+				releases.push({
+					answer: (repos) => resolve({ ok: true, status: 200, json: async () => ({ repos }) }),
+					fail: () => reject(new TypeError('no network'))
+				});
+			})
+	) as unknown as typeof fetch;
+	return {
+		fetchImpl,
+		started: () => releases.length,
+		answer: (index: number, repos: RepoReading[]) => releases[index]?.answer(repos),
+		fail: (index: number) => releases[index]?.fail()
+	};
+}
+
 /** A `DecisionBoard` for component tests that do not look at the board: a
  * re-read that does nothing unless given, and an apply that shows nothing. */
 export function inertBoard(reload: () => Promise<void> = async () => {}): DecisionBoard {
