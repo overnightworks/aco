@@ -145,8 +145,8 @@ export const STATE_LABEL: Record<RowState, string> = {
 	done: 'Decided'
 };
 
-/** Lower comes first; rows and groups of both tabs, and `nextOpenAfter`, order by it
- * through `compareRows`. */
+/** Lower comes first; `openRows` and `nextOpenAfter` order by it, and `compareRows`
+ * orders the groups of both tabs by it. */
 const ROW_RANK: Record<OrderedRowState, number> = { done: 0, open: 0, back: 1 };
 
 interface ListRow<State extends OrderedRowState = OrderedRowState> {

@@ -109,7 +109,7 @@ export function hasHead(points: readonly OptionLine[]): boolean {
  * line older than `asked_on`, BODY-103). */
 export function newestAskedOn(points: readonly OptionLine[]): string | null {
 	const days = points.flatMap((point) => (point.asked_on === null ? [] : [point.asked_on]));
-	return [...days].sort().at(-1) ?? null;
+	return [...days].sort((left, right) => left.localeCompare(right)).at(-1) ?? null;
 }
 
 /** The areas of a card's points, each once, in point order, joined by a slash

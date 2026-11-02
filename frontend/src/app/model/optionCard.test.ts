@@ -65,7 +65,7 @@ describe('newestAskedOn', () => {
 });
 
 describe('cardMeta', () => {
-	test('names repository and area, the kind, and reversible when no option is final', () => {
+	test('[ABRD-106] names repository and area, the kind, and reversible when no option is final', () => {
 		const meta = cardMeta('songmaker', optionLine({ area: 'Song page', decision_kind: 'money' }));
 
 		expect(meta).toEqual({
