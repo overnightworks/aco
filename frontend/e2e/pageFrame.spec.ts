@@ -138,18 +138,18 @@ for (const viewport of [
 			if (!isPhone) expect(await sameLine(brand, refresh)).toBe(true);
 			await screenshots(page, testInfo.outputPath.bind(testInfo), 'header-open');
 
-			await decided.click();
-
-			await expect(decided).toHaveAttribute('aria-current', 'page');
-			await expect(page.getByRole('region', { name: 'Decided', exact: true })).toBeVisible();
-			await screenshots(page, testInfo.outputPath.bind(testInfo), 'header-decided');
-
 			if (!isPhone) {
 				await openTheCard(page, false);
 				const gapBeforeRow = (await left(refresh)) - (await right(views));
 				await page.locator('.tracks').getByRole('button').first().click();
 				expect((await left(refresh)) - (await right(views))).toBeCloseTo(gapBeforeRow, 0);
 			}
+
+			await decided.click();
+
+			await expect(decided).toHaveAttribute('aria-current', 'page');
+			await expect(page.getByRole('region', { name: 'Decided', exact: true })).toBeVisible();
+			await screenshots(page, testInfo.outputPath.bind(testInfo), 'header-decided');
 		});
 
 		test('[ABRD-52] the Decide row rests on the pane foot with a shadow, then in place without one', async ({
