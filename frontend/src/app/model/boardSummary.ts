@@ -145,7 +145,8 @@ export const STATE_LABEL: Record<RowState, string> = {
 	done: 'Decided'
 };
 
-/** Lower comes first; `nextOpenAfter` and the open list both order by it. */
+/** Lower comes first; rows and groups of both tabs, and `nextOpenAfter`, order by it
+ * through `compareRows`. */
 const ROW_RANK: Record<OrderedRowState, number> = { done: 0, open: 0, back: 1 };
 
 interface ListRow<State extends OrderedRowState = OrderedRowState> {
@@ -260,7 +261,8 @@ function groupedRows<Row extends ListRow>(
 			});
 		}
 	}
-	return { groups: groups.sort(compareGroups), quiet };
+	groups.sort(compareGroups);
+	return { groups, quiet };
 }
 
 /** The open list: one group per repository that failed or has an open card,
