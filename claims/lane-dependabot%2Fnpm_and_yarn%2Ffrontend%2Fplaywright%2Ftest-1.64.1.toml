@@ -1,0 +1,7 @@
+claim_id = "af4890a4f17940458f09930518e8ac5e"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "c4d5703d148c1bcac5ebc3614c29d635ac07f9e6"
+branch = "dependabot/npm_and_yarn/frontend/playwright/test-1.64.1"
+scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
+opened_commit = "7c4a241413b26a2a4d53e0590b28144bbeef6acc"
