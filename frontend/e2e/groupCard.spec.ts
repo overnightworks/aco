@@ -196,7 +196,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px card of points`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-82] an item’s open option lines are one Open row named by area and count, beside another open row, and the tab counts rows', async ({
+		test('[ABRD-82] [ABRD-106] an item’s open option lines are one Open row named by area and count, beside another open row, and the tab counts rows', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -213,7 +213,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'list');
 		});
 
-		test('[ABRD-83] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all, the count, Other… and Unclear', async ({
+		test('[ABRD-83] [ABRD-106] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all, the count, Other… and Unclear', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -532,7 +532,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'with-head');
 		});
 
-		test('[ABRD-61] points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
+		test('[ABRD-61] [ABRD-106] points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
 			page
 		}, testInfo) => {
 			await arrange([
@@ -582,7 +582,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-36] a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
+		test('[ABRD-36] [ABRD-106] a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
 			page
 		}) => {
 			await arrange([item(8, 'Offen', point(1, { topic: 'Einzel', question: 'Eine Frage?' }))]);

@@ -53,7 +53,7 @@ describe('openList', () => {
 		expect(groups[2]).toEqual({ repo: 'broken', error: 'aco failed', readAt: null, rows: [] });
 	});
 
-	test('[ABRD-28] a row carries its key, state, label and the full question as its title', () => {
+	test('[ABRD-28] [ABRD-106] a row carries its key, state, label and the full question as its title', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 import { cardKey } from '../app/model/decision';
 import { displayDay } from '../app/model/optionCard';
@@ -53,7 +53,7 @@ test('[ABRD-48] an option row shows its topic, the Open shape and its question a
 	expect(within(row).getByRole('img', { name: 'Open' })).toBeInTheDocument();
 });
 
-test('[ABRD-106] an open row ends in the day it was asked, a decided row in its decision day', () => {
+test('[ABRD-106] an open row ends in the day it was asked', () => {
 	renderList([
 		repo({
 			items: [item({ lines: [optionLine({ topic: 'Sprung', asked_on: '2026-10-05' })] })]
@@ -62,8 +62,28 @@ test('[ABRD-106] an open row ends in the day it was asked, a decided row in its 
 	expect(
 		screen.getByRole('button', { name: `Open Sprung ${displayDay('2026-10-05')}` })
 	).toBeVisible();
-	cleanup();
+});
 
+test('[ABRD-106] a card of several points ends in the newest day of its points, whatever their order', () => {
+	renderList([
+		repo({
+			items: [
+				item({
+					lines: [
+						optionLine({ index: 1, area: 'Bereich', asked_on: '2026-10-05' }),
+						optionLine({ index: 2, area: 'Bereich', asked_on: '2026-10-12' }),
+						optionLine({ index: 3, area: 'Bereich', asked_on: '2026-10-09' })
+					]
+				})
+			]
+		})
+	]);
+	expect(
+		screen.getByRole('button', { name: `Open Bereich · 3 points ${displayDay('2026-10-12')}` })
+	).toBeVisible();
+});
+
+test('[ABRD-106] a decided row ends in its decision day', () => {
 	renderList(
 		[
 			repo({
@@ -232,7 +252,7 @@ test('[ABRD-30] a decided row is named Decided with its label, carries the Decid
 	const row = screen.getByRole('button', { name: /^Decided Sprung/ });
 	expect(within(row).getByRole('img', { name: 'Decided' })).toBeInTheDocument();
 	expect(within(row).getByText('Sprung')).not.toHaveClass('muted');
-	expect(screen.getByRole('button', { name: /^Decided Guests?/ })).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: /^Decided Guests\?/ })).toBeInTheDocument();
 	expect(screen.getAllByRole('button')).toHaveLength(2);
 	expect(screen.getByRole('region', { name: 'Decided' })).toBeInTheDocument();
 	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('repo 2');

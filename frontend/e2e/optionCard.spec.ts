@@ -131,7 +131,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px option card`, () => {
 		test.use({ viewport });
 
-		test('an open option line shows the whole card, every option closed, and offers the Decide picks', async ({
+		test('[ABRD-106] an open option line shows the whole card, every option closed, and offers the Decide picks', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -197,7 +197,9 @@ for (const viewport of [
 				.toBeLessThanOrEqual(viewport.width);
 		});
 
-		test('a card with a final option says final in its meta line', async ({ page }, testInfo) => {
+		test('[ABRD-106] a card with a final option says final in its meta line', async ({
+			page
+		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
 			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);

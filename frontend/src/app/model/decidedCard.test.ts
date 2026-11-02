@@ -101,7 +101,11 @@ describe('decidedMeta', () => {
 	});
 
 	test('[ABRD-106] a ruled option line older than asked_on has no asked day', () => {
-		const meta = decidedMeta('songmaker', item(), optionLine({ asked_on: null }));
+		const meta = decidedMeta(
+			'songmaker',
+			item(),
+			optionLine({ asked_on: null, ruling: 'A', ruled_on: '2026-10-25' })
+		);
 
 		expect(meta).not.toHaveProperty('asked');
 	});

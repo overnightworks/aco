@@ -245,7 +245,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-37] [ABRD-54] [ABRD-57] the decided card says what was decided, how and when', async ({
+		test('[ABRD-37] [ABRD-54] [ABRD-57] [ABRD-106] the decided card says what was decided, how and when', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
