@@ -138,6 +138,16 @@ describe('pointsMeta', () => {
 		});
 	});
 
+	test('[ABRD-106] the asked day is the newest of the points, whatever their order', () => {
+		const points = [
+			optionLine({ asked_on: '2026-10-05' }),
+			optionLine({ asked_on: '2026-10-12' }),
+			optionLine({ asked_on: '2026-10-09' })
+		];
+
+		expect(pointsMeta('songmaker', points).asked).toBe('2026-10-12');
+	});
+
 	test('[ABRD-83] says with head as soon as one point is', () => {
 		const points = [optionLine(), optionLine({ returned_on: '2026-10-27' })];
 
