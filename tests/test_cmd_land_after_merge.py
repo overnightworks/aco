@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
 import pytest
+from board_fixtures import board_issue, complete_contract
 from cli_fixtures import (
     MainBranchState,
     init_bare_repository,
@@ -27,6 +29,7 @@ from github_fixtures import (
 )
 
 from aco import checkout, store
+from aco.workboard import MergeMethod
 
 
 class TrunkState(Enum):
@@ -184,6 +187,43 @@ def package_world(
     expected = {"package.trunk": case.package.value, "package.lane": None}
     assert observed == expected
     return PackageWorld(landed.landing, case)
+
+
+@dataclass(frozen=True)
+class LaggingListingCase:
+    other_open: tuple[int, ...]
+    next_line: str
+
+    @property
+    def next_number(self) -> int | None:
+        return self.other_open[0] if self.other_open else None
+
+
+@dataclass
+class LaggingListingWorld:
+    landing: LaneLandingWorld
+    case: LaggingListingCase
+
+
+@pytest.fixture
+def lagging_world(
+    request: pytest.FixtureRequest,
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> LaggingListingWorld:
+    case: LaggingListingCase = request.param
+
+    def arrange(client: FakeForge, _head: str) -> None:
+        client.board_issues = tuple(
+            board_issue(
+                number, "Other card" if number != 72 else "Landed card", complete_contract("Go.")
+            )
+            for number in (72, *case.other_open)
+        )
+
+    landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+    return LaggingListingWorld(landed.landing, case)
 
 
 def delete_recorded_head(clone: Path, remote: str) -> int:
@@ -606,3 +646,48 @@ class TestLandAfterMerge:
             "release.sentence-equal": True,
         }
         assert observed == expected
+
+    @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
+    @pytest.mark.parametrize(
+        "lagging_world",
+        [
+            pytest.param(
+                LaggingListingCase(other_open=(80,), next_line="next: #80"),
+                id="names-the-other-open-item",
+            ),
+            pytest.param(LaggingListingCase(other_open=(), next_line="next: none"), id="none-left"),
+        ],
+        indirect=True,
+    )
+    def test_next_never_names_the_item_the_release_closed(
+        self,
+        lagging_world: LaggingListingWorld,
+        as_json: bool,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Spec: LAND-82. The forge's open listing still shows the closed item."""
+        capsys.readouterr()
+        if as_json:
+            forge = lagging_world.landing.forge
+            forge.merge_landing(
+                12,
+                head_sha=forge.landings[12].head_sha,
+                method=MergeMethod.MERGE,
+                title="Merge #12",
+                body="Work-Item: #72",
+            )
+            result = run_cli(
+                ["release", "72", "--merged", "12", "--branch", "codex/issue-72-claims", "--json"],
+                capsys,
+            )
+            printed = json.loads(result.stdout)["next"]
+            expected_next = lagging_world.case.next_number
+        else:
+            result = run_cli(["land", "12"], capsys)
+            printed = [
+                line.split(" score")[0]
+                for line in result.stdout.splitlines()
+                if line.startswith("next:")
+            ]
+            expected_next = [lagging_world.case.next_line]
+        assert {"exit": result.status, "next": printed} == {"exit": 0, "next": expected_next}

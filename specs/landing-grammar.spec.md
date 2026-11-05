@@ -41,7 +41,7 @@ matching line.
 | single `Work-Item:` trailer | LAND-01 | LAND-48 | LAND-47, LAND-52, LAND-59 | LAND-42 |
 | repeated `Work-Item:` trailer | LAND-02 | LAND-48 | LAND-52, LAND-59 | LAND-42 |
 | control byte inside a trailer value | — (lands nothing, LAND-42) | LAND-03 | — | — |
-| valid `Work-Item:` + closing reference | — | LAND-04 | LAND-29, LAND-49 | LAND-41 |
+| valid `Work-Item:` + closing reference | — | LAND-04 | LAND-29, LAND-49, LAND-82 | LAND-41 |
 | valid `No-Item:` + lane claim | — | LAND-05 | LAND-37 | — |
 | `No-Item: deps` PR with configured dependency paths | — | LAND-71..77 | — | — |
 | `No-Item: deps` PR without configured dependency paths | — | LAND-70 | — | — |
@@ -164,6 +164,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-29] `release <n> --merged <pr>` succeeds once the pull request merged into default and its merge commit's `Work-Item:` trailer names this item; LAND-55 closes an open one first unless REL-47.
 - [ ] [LAND-69] A pull request's merge commit is the commit GitHub recorded for its merge: a merge commit, or the one squash commit `aco land` lands with LANDCMD-27; LAND-29, 62, and 64 read either alike.
 - [ ] [LAND-49] A successful `--merged` release prints `freed: <label>, <label>` (or `none`) and `next: <label> score <s>: <title>` (or `none`); `--json` carries `"freed": [n,...]` and `"next": n`/`null`.
+- [ ] [LAND-82] A successful release's `next:` (and `--json` `next`) never names the item it closed, even while the forge's open listing still shows that item.
 - [ ] [LAND-30] A pull request that is not merged refuses `pull request #<n> is not merged`, exit `2`, before anything is written.
 - [ ] [LAND-31] A pull request merged into a branch other than the default refuses `pull request #<n> merged into '<branch>', not the default branch '<default>'`, exit `2`.
 - [ ] [LAND-32] A pull request body's own classification defect (LAND-06..LAND-11) refuses `pull request #<n> <that same defect sentence>`, exit `2` -- `check` only; a lane release reads its trailer (LAND-64).
