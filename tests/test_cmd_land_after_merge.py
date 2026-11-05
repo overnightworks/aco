@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -28,6 +29,7 @@ from github_fixtures import (
 )
 
 from aco import checkout, store
+from aco.workboard import MergeMethod
 
 
 class TrunkState(Enum):
@@ -191,6 +193,10 @@ def package_world(
 class LaggingListingCase:
     other_open: tuple[int, ...]
     next_line: str
+
+    @property
+    def next_number(self) -> int | None:
+        return self.other_open[0] if self.other_open else None
 
 
 @dataclass
@@ -641,6 +647,7 @@ class TestLandAfterMerge:
         }
         assert observed == expected
 
+    @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
     @pytest.mark.parametrize(
         "lagging_world",
         [
@@ -653,18 +660,34 @@ class TestLandAfterMerge:
         indirect=True,
     )
     def test_next_never_names_the_item_the_release_closed(
-        self, lagging_world: LaggingListingWorld, capsys: pytest.CaptureFixture[str]
+        self,
+        lagging_world: LaggingListingWorld,
+        as_json: bool,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Spec: LAND-82. The forge's open listing still shows the closed item."""
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
-        observed = {
-            "exit": result.status,
-            "next": [
+        if as_json:
+            forge = lagging_world.landing.forge
+            forge.merge_landing(
+                12,
+                head_sha=forge.landings[12].head_sha,
+                method=MergeMethod.MERGE,
+                title="Merge #12",
+                body="Work-Item: #72",
+            )
+            result = run_cli(
+                ["release", "72", "--merged", "12", "--branch", "codex/issue-72-claims", "--json"],
+                capsys,
+            )
+            printed = json.loads(result.stdout)["next"]
+            expected_next = lagging_world.case.next_number
+        else:
+            result = run_cli(["land", "12"], capsys)
+            printed = [
                 line.split(" score")[0]
                 for line in result.stdout.splitlines()
                 if line.startswith("next:")
-            ],
-        }
-        expected = {"exit": 0, "next": [lagging_world.case.next_line]}
-        assert observed == expected
+            ]
+            expected_next = [lagging_world.case.next_line]
+        assert {"exit": result.status, "next": printed} == {"exit": 0, "next": expected_next}
