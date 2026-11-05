@@ -94,17 +94,17 @@ def _release_landing(
     storage: body.Storage,
     trunk_ref: str,
 ) -> _ReleaseLanding:
-    """A merged release's own board read of `new_state`, the
-    claims its release transition left: fetched once, lazily, only after
-    that transition already committed -- the caller wraps this in one broad
-    `forge.ForgeError` catch, so a forge hiccup here can never undo or fail
-    a release that already stood. The dependency fetch below is the one
-    round trip both `workboard.freed_item_numbers` and `board_read.build_board` need for
-    this same candidate set; passing it into `board_read.build_board` keeps this a
-    single fetch rather than two. The board walks `trunk_ref`, the ref the
-    release judged its landing on (LANDCMD-21)."""
+    """A merged release's board read of `new_state`, the claims its release
+    transition left; the caller's broad `forge.ForgeError` catch keeps a forge
+    hiccup from failing the release. One dependency fetch serves `freed_item_numbers`
+    and `build_board`, which walks `trunk_ref` (LANDCMD-21). The open listing can
+    lag the close, so the landed item is left out of it (LAND-82)."""
     client = context.forge
-    issues = client.list_open_board_issues()
+    issues = tuple(
+        issue
+        for issue in client.list_open_board_issues()
+        if landed != workboard.IssueReference(client.repository.path, issue.number)
+    )
     dependencies = board_read.fetch_validated_dependencies(client, issues)
     freed = () if landed is None else workboard.freed_item_numbers(dependencies, landed)
     projected = board_read.build_board(
