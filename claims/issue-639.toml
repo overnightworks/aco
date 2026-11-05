@@ -1,7 +1,0 @@
-claim_id = "3f590cc003fb41a79062774e4b7a8181"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "9b91985f1886e753cd219ce02c24c91b933e6e14"
-branch = "claude/issue-639-next-skips-closed"
-scope = ["specs/landing-grammar.spec.md", "src/aco/cmd_release.py", "tests/test_cmd_land_after_merge.py"]
-opened_commit = "44eb264cc322391bb0c74a6165020bfa47c9ec22"
