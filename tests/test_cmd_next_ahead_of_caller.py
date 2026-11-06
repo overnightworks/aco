@@ -3,17 +3,26 @@
 row of the list's scenario matrix."""
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-from board_fixtures import board_issue, complete_contract
+from board_fixtures import REPOSITORY, board_issue, complete_contract
 from cli_fixtures import freeze_cli_now, real_git, run_cli
 from github_fixtures import FakeForge
 
 from aco import ahead_of_caller, board_read, forge, github, session
 
 LIST_PATH = ".aco/ahead-of-caller.toml"
+# `gh api <endpoint> ...` answers with the file named after the endpoint, else HTTP 404.
+FAKE_GH = (
+    "#!/bin/sh\n"
+    'answer="$FAKE_GH_ANSWERS/$(printf %s "$2" | tr / _)"\n'
+    '[ -f "$answer" ] && exec cat "$answer"\n'
+    'echo "gh: Not Found (HTTP 404)" >&2\n'
+    "exit 1\n"
+)
 TOP_WORK_LINES = (
     "#11 score -10: Top work\nNext: Claim #11.\n"
     "Run: aco start 11 --slug=top-work --scope <paths>\nscope unknown\n"
@@ -29,36 +38,59 @@ def code(path: str, item: str, reason: str = "kept for later") -> str:
 @dataclass
 class World:
     """A GitHub-hosted board with one open item, `#11`, and whatever the trunk's list says;
-    `others` serves the other repositories by `OWNER/REPO`, `own` this one."""
+    `own` serves this repository, a `gh` on `PATH` the other ones."""
 
     clone: Path
     monkeypatch: pytest.MonkeyPatch
+    answers: Path
     own: FakeForge = field(
         default_factory=lambda: FakeForge(
             board_issues=(board_issue(11, "Top work", complete_contract("Claim #11.")),)
         )
     )
-    others: dict[str, FakeForge] = field(default_factory=dict)
 
-    def commit_list(self, text: str) -> None:
+    def commit_list(self, text: str | bytes) -> None:
         self.write_list(text)
         real_git(self.clone, "add", "-f", LIST_PATH)
         real_git(self.clone, "commit", "-q", "-m", "list code built ahead of its caller")
         real_git(self.clone, "push", "-q", "origin", "main")
 
-    def write_list(self, text: str) -> None:
-        (self.clone / LIST_PATH).write_text(text)
+    def write_list(self, text: str | bytes) -> None:
+        target = self.clone / LIST_PATH
+        if isinstance(text, bytes):
+            target.write_bytes(text)
+        else:
+            target.write_text(text)
+
+    def foreign_issue(self, repository: str, number: int, *, state: str) -> None:
+        answer = f'{{"state":"{state}","title":"Other","body":"","is_landing":false}}'
+        endpoint = f"repos/{repository}/issues/{number}".replace("/", "_")
+        (self.answers / endpoint).write_text(answer)
 
     def serve(self) -> None:
+        adapter = github.GitHubForge
         self.monkeypatch.setattr(
-            github, "GitHubForge", lambda repository: self.others.get(repository.path, self.own)
+            github,
+            "GitHubForge",
+            lambda repository: self.own if repository.path == REPOSITORY else adapter(repository),
         )
 
 
 @pytest.fixture
-def world(monkeypatch: pytest.MonkeyPatch, github_clone: Path, github_world: Path) -> World:
+def world(
+    monkeypatch: pytest.MonkeyPatch, github_clone: Path, github_world: Path, tmp_path: Path
+) -> World:
     freeze_cli_now(monkeypatch)
-    return World(github_clone, monkeypatch)
+    shims = tmp_path / "gh-bin"
+    answers = tmp_path / "gh-answers"
+    shims.mkdir()
+    answers.mkdir()
+    fake_gh = shims / "gh"
+    fake_gh.write_text(FAKE_GH)
+    fake_gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{shims}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_GH_ANSWERS", str(answers))
+    return World(github_clone, monkeypatch, answers)
 
 
 def next_json(capsys: pytest.CaptureFixture[str]) -> tuple[int | str | None, dict[str, object]]:
@@ -146,7 +178,7 @@ def test_a_closed_item_of_another_repository_is_read_from_that_repository(
 ) -> None:
     """Spec: AHEAD-11, NEXT-54 (matrix row 3)."""
     world.commit_list(code("src/mcp.py", "owner/other#5"))
-    world.others["owner/other"] = FakeForge(closed_issues={5})
+    world.foreign_issue("owner/other", 5, state="closed")
     world.serve()
 
     text = run_cli(["next"], capsys)
