@@ -1,12 +1,12 @@
 # `aco rule`
 
-`aco rule ITEM --line N --option X --via board|chat|default --card-hash HASH` or
-`aco rule ITEM --line N --other TEXT --via board|chat --card-hash HASH`, or
+`aco rule ITEM --line N --option X --via chat|default --card-hash HASH` or
+`aco rule ITEM --line N --other TEXT --via chat --card-hash HASH`, or
 `aco rule ITEM --line N --unclear [--note TEXT] --card-hash HASH`, moves one
 proposed `[[expectation]]` line to ruled (or, with `--unclear`, sends an open
 option line back to its head), transcribing the operator's own word (a head proposes by editing the body and withdraws with `aco withdraw`; this command decides); `--line` may repeat to rule several lines of one item in one body write, all or none. `--via` says how the
-decision reached aco: `board` the operator clicked, `chat` a head transcribes
-his word, `default` he left the card unanswered and its recommendation stands.
+decision reached aco: `chat` a head transcribes his word, `default` he left the
+card unanswered and its recommendation stands. `--via board` is not a choice: only `aco serve`'s decision board writes `board`, in process.
 `--help` lists every flag here, `--unclear` included, each with a help line. A yes/no line cannot be ruled by this command. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This command's writer is the
 one write path for a ruling (`board --serve`'s own
 `POST /rule` form is retired; `aco serve`'s decision board writes through this
@@ -112,6 +112,7 @@ withdrawn one.
   - with several `--line`, one written before the first `--line`: `<flag> before the first --line belongs to no line`
   - a second one for the same line, with one `--line` too: `line <k> has a second <flag>`; `--line 2 --option A --option B` refuses `line 2 has a second --option`
 - [ ] [RULE-35] A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call and any other refusal of this file (see E-RULE-13).
+- [ ] [RULE-39] `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call; the choices are `chat` and `default` (see E-RULE-10).
 - [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 
@@ -131,7 +132,7 @@ withdrawn one.
 
 - `aco rule` never accepts two kinds of outcome, or none: `--option`/`--other`/`--unclear` are one mutually exclusive, required group, and `--option`, `--other`, `--unclear`, `--via` and `--card-hash` appear in `--help` with a help line each.
 - `aco rule --unclear` never stores `via` or `card_hash`: it decides nothing.
-- `aco rule` never checks who typed `--via`: it records what the writer was told. By operator ruling it is a tripwire for cooperative agents; an agent of the operator's own user that types `--via board` is not stopped, and the forge's edit history is the record after the fact.
+- `aco rule` never checks who typed `--via`: it records what the writer was told. By operator ruling it is a tripwire for cooperative agents; an agent of the operator's own user that types `--via chat` for a word the operator never spoke is not stopped, and the forge's edit history is the record after the fact.
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
 - `aco rule` never rewrites a byte outside the ruled entries: the body's surrounding bytes stay exactly as written.
 - `aco rule` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it ever resolves the forge or the item.
@@ -238,13 +239,17 @@ exit 2
 $ aco rule 7 --line 2 --option A --card-hash <hash>
 2> ERROR: --option needs --via and --card-hash
 exit 2
+$ aco rule 7 --line 2 --option A --via board --card-hash <hash>
+2> usage: aco rule [-h] ...
+2> aco rule: error: argument --via: invalid choice: 'board' (choose from chat, default)
+exit 2
 $ aco rule 7 --line 2 --option A --via chat --card-hash <hash> --note "Ja."
 2> ERROR: --note does not go with --option; keep the operator's word in the item's journal
 exit 2
 $ aco rule 7 --line 1 --option A --via chat --card-hash <hash>
 2> ERROR: line 1 is a yes/no line; --option rules only an option line
 exit 2
-$ aco rule 7 --line 2 --option A --via board --card-hash <stale> --json
+$ aco rule 7 --line 2 --option A --via chat --card-hash <stale> --json
 2> ERROR: line 2 changed since its card was shown; show it again and rule what it shows now
 {"ok": false, "reason": "card_changed", "message": "line 2 changed since its card was shown; show it again and rule what it shows now"}
 exit 2
@@ -283,7 +288,7 @@ exit 2
 $ aco rule 7 --line 1 --other "Nur am Desktop." --via chat --card-hash <hash>
 2> ERROR: line 1 is a yes/no line; --other rules only an option line
 exit 2
-$ aco rule 7 --line 2 --other "Nur am Desktop." --via board --card-hash <stale> --json
+$ aco rule 7 --line 2 --other "Nur am Desktop." --via chat --card-hash <stale> --json
 2> ERROR: line 2 changed since its card was shown; show it again and rule what it shows now
 {"ok": false, "reason": "card_changed", "message": "line 2 changed since its card was shown; show it again and rule what it shows now"}
 exit 2

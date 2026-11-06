@@ -89,8 +89,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         _VIA,
         action=_RecordGivenFlag,
-        choices=[via.value for via in expectation_grammar.RulingVia],
-        help="board, chat, or default when a presented card stayed unanswered",
+        choices=[
+            via.value
+            for via in expectation_grammar.RulingVia
+            if via is not expectation_grammar.RulingVia.BOARD
+        ],
+        help="chat, or default when a presented card stayed unanswered",
     )
     parser.add_argument(
         _CARD_HASH,

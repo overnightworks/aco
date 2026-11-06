@@ -69,7 +69,6 @@ class TestSeveralLinesInOneWrite:
     @pytest.mark.parametrize(
         ("kind", "letters", "via", "ruled", "text"),
         [
-            pytest.param("option", "AB", "board", "AB", "lines 2 A, 3 B", id="option-board"),
             pytest.param("option", "AB", "chat", "AB", "lines 2 A, 3 B", id="option-chat"),
             pytest.param("option", "AA", "default", "AA", "lines 2 A, 3 A", id="option-default"),
             pytest.param(
@@ -121,7 +120,7 @@ class TestSeveralLinesInOneWrite:
                 },
                 id=f"option-{via}",
             )
-            for via in ("board", "chat")
+            for via in ("chat",)
         ]
         + [
             pytest.param(
@@ -400,13 +399,13 @@ class TestRefusedBeforeAnyForgeCall:
             pytest.param(
                 [
                     *lines_of("option", (2, "A", HASH_2), (3, "B", HASH_3)),
-                    *("--via", "board"),
+                    *("--via", "default"),
                 ],
                 NOT_GIVEN_TWICE.format(flag="--via"),
                 id="RULE-35-via",
             ),
             pytest.param(
-                [*lines_of("option", (2, "A", HASH_2)), "--via", "board"],
+                [*lines_of("option", (2, "A", HASH_2)), "--via", "default"],
                 NOT_GIVEN_TWICE.format(flag="--via"),
                 id="RULE-35-via-one-line",
             ),
@@ -427,7 +426,7 @@ class TestRefusedBeforeAnyForgeCall:
                 [
                     *("--line", "2", "--option", "A", "--card-hash", HASH_2),
                     *("--line", "2", "--option", "B", "--card-hash", HASH_2),
-                    *("--via", "chat", "--via", "board"),
+                    *("--via", "chat", "--via", "default"),
                 ],
                 NOT_GIVEN_TWICE.format(flag="--via"),
                 id="RULE-35-before-RULE-33",
@@ -455,6 +454,20 @@ class TestRefusedBeforeAnyForgeCall:
             {"ok": False, "reason": "invalid_usage", "message": message},
         )
         assert (client.issue_reference_lookups, client.body_writes) == ([], [])
+
+
+@pytest.mark.usefixtures("github_clone")
+def test_via_board_is_refused_as_an_invalid_choice(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: RULE-09 -- the board writes `board` rulings in process; the command offers chat and default."""
+    client = serve_item(monkeypatch, group_body())
+    command = ["rule", "7", *lines_of("option", (2, "A", HASH_2), via="board")]
+    refused = run_cli(command, capsys)
+
+    assert refused.status == 2
+    assert "invalid choice: 'board'" in refused.stderr
+    assert client.body_writes == []
 
 
 def refusal_call(
@@ -508,7 +521,7 @@ class TestOneRefusedLineStoresNone:
                 card(),
                 STALE_CARD_HASH,
                 "A",
-                "board",
+                "chat",
                 "line 3 changed since its card was shown; show it again and rule what it shows now",
                 "card_changed",
                 3,
@@ -519,7 +532,7 @@ class TestOneRefusedLineStoresNone:
                 card(),
                 STALE_CARD_HASH,
                 "",
-                "board",
+                "chat",
                 "line 3 changed since its card was shown; show it again and rule what it shows now",
                 "card_changed",
                 3,
