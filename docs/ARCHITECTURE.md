@@ -7,7 +7,8 @@ only what no spec owns.
 ## Context and Scope
 
 aco coordinates agents working in one repository. Claims live in git, work
-items live on the forge, and the commands join the two. It keeps no server of its own.
+items live on the forge, and the commands join the two. It runs no lease or
+coordination server; the state ref is the serialization point.
 
 ```mermaid
 flowchart LR
@@ -15,7 +16,7 @@ flowchart LR
     Head --> Helper["helper agents<br/>(lane workflow, skills)"]
     Head --> ACO["aco"]
     Helper --> ACO
-    Operator -->|"decides by page"| ACO
+    Operator -.->|"decides by page (frozen board)"| ACO
     ACO -->|"fetch, CAS push"| Remote[("canonical remote<br/>refs/aco/state")]
     ACO -->|"gh"| Forge[("forge: GitHub<br/>issues, pull requests")]
 ```
@@ -89,11 +90,11 @@ sequenceDiagram
 
 ## Deployment View
 
-aco is a CLI installed per machine (`uv tool install`); every machine reaches
-the same state ref on the canonical remote, which is the only shared state
+aco is a CLI installed per machine (the README owns installation); every
+machine reaches the same state ref on the canonical remote, which is the only shared state
 besides the forge. The board is a local process the operator starts with
-`aco serve`; it is not a service and holds no state of its own. Nothing else
-is deployed.
+`aco serve`; it is not a service and keeps no coordination state of its own,
+only its access token file (`specs/serve.spec.md`). Nothing else is deployed.
 
 ## Crosscutting Concepts
 
@@ -109,16 +110,14 @@ the canonical remote. The board adds its own boundary, described in
 
 ### Proof strategy
 
-`specs/` owns each command's behaviour, with criterion IDs (for example
-`LANDCMD-50`) that tests cite. CI is the gate; its `quality` job runs the
+`specs/` owns each command's behaviour, with criterion IDs that tests cite. CI is the gate; its `quality` job runs the
 fleet quality gate, whose ratchets over `quality/baseline.toml` let size and
 complexity shrink but not grow.
 
 ### Errors and persistence
 
-Persistence is the state ref plus the forge's items. A failure that could corrupt either stops loudly with a typed error
-and an exit code from the spec. A rejected push is retried on the new tip
-(`specs/ref-store-cas.spec.md`).
+Persistence is the state ref plus the forge's items. A failure that could
+corrupt either stops loudly with a typed error and an exit code from the spec.
 
 ## Constraints and reasons
 
