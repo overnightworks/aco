@@ -114,11 +114,6 @@ the canonical remote. The board adds its own boundary, described in
 fleet quality gate, whose ratchets over `quality/baseline.toml` let size and
 complexity shrink but not grow.
 
-### Errors and persistence
-
-Persistence is the state ref plus the forge's items. A failure that could
-corrupt either stops loudly with a typed error and an exit code from the spec.
-
 ## Constraints and reasons
 
 - Claims live in the state ref, one tree of `claims/` and `resources/`. The
