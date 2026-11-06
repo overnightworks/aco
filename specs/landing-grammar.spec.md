@@ -176,7 +176,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-64] For a lane release, a merge commit off the trunk, with no trailer, or with a malformed `No-Item:` trailer refuses `merge commit <sha> of pull request #<n> <that defect sentence>`, exit `2`.
 - [ ] [LAND-66] For a lane release, a merge commit whose trailer carries `Work-Item:`, valid or malformed, refuses `merge commit <sha> of pull request #<n> carries \`Work-Item: <value>\`; <LAND-67>`, exit `2`.
 - [ ] [LAND-67] LAND-66's rule and way out read `an issue-less lane needs a \`No-Item: <docs|fix|deps>\` trailer; release it with --abandoned "landed as PR #<n> with a malformed trailer"`.
-- [ ] [LAND-55] Unless REL-47 applies, a still-open work item whose landing pull request verifies is closed by this release: a comment `landed by PR #<n>`, then the close — never a refusal (replaces retired LAND-36).
+- [ ] [LAND-55] Unless REL-47 applies, a still-open work item whose landing pull request verifies is closed by this release: a comment `landed by PR #<n>`, then the close — never a refusal.
 - [ ] [LAND-63] A rerun of LAND-55's own close that finds its `landed by PR #<n>` comment already posted skips it and closes straight away, never posting it twice.
 - LAND-36 (retired).
 - [ ] [LAND-37] `release --merged <pr>` for a lane, against a merge commit trailer carrying only `No-Item: docs`, releases the claim without reading any closing reference or pull request body.
