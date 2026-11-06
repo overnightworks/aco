@@ -107,7 +107,5 @@ landing grammar, storage pin, state ref transport) are in
 
 ## Documentation
 
-`specs/` holds the behaviour contracts, [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-the mental model and the parts kept although unused, and
-[`docs/board/mockup.html`](docs/board/mockup.html) the frozen picture of the
-board surface.
+`specs/` holds the behaviour contracts, and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+the mental model and the parts kept although unused.
