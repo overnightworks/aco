@@ -94,13 +94,11 @@ def test_an_item_takes_the_forms_of_this_repository_or_another(
         ],
         (
             listing(VALID_ENTRY) + listing(VALID_ENTRY.replace('"#12"', '"12"')),
-            ".aco/ahead-of-caller.toml: code entry 2 repeats the path and item of an "
-            "earlier entry",
+            ".aco/ahead-of-caller.toml: code entry 2 repeats the path and item of an earlier entry",
         ),
         (
             listing('path = "a.py"\nitem = "x1"\nreason = ""\n'),
-            ".aco/ahead-of-caller.toml: code entry 1 has a reason that is not one "
-            "non-empty line",
+            ".aco/ahead-of-caller.toml: code entry 1 has a reason that is not one non-empty line",
         ),
     ],
 )
