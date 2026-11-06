@@ -42,6 +42,21 @@ export function sameAsTodayOption(overrides: Partial<CardOption> = {}): CardOpti
 	return fields as unknown as CardOption;
 }
 
+/** An option that gives no result: its effect stands alone. */
+export function resultlessOption(overrides: Partial<CardOption> = {}): CardOption {
+	const fields: Record<string, unknown> = { ...cardOption(), ...overrides };
+	delete fields.picture;
+	return fields as unknown as CardOption;
+}
+
+/** An option line whose card leaves out the TODAY picture and its caption. */
+export function picturelessOptionLine(overrides: Partial<OptionLine> = {}): OptionLine {
+	const fields: Record<string, unknown> = { ...optionLine(), ...overrides };
+	delete fields.picture;
+	delete fields.caption;
+	return fields as unknown as OptionLine;
+}
+
 export function optionLine(overrides: Partial<OptionLine> = {}): OptionLine {
 	return {
 		index: 1,

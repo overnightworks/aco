@@ -143,7 +143,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
-`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`,
+`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`,
 `frontend/e2e/refresh.spec.ts`, `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
