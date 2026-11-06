@@ -95,8 +95,8 @@ sequenceDiagram
 
 aco is a CLI installed per machine (the README owns installation); every
 machine reaches the same state ref on the canonical remote, which is the
-only shared state besides the forge. The board is a local process the operator starts with
-`aco serve`; it is not a service and keeps no coordination state of its own,
+only shared state besides the forge. The board is a local process the
+operator starts with `aco serve`; it is not a service and keeps no coordination state of its own,
 only its access token file (`specs/serve.spec.md`). Nothing else is deployed.
 
 ## Crosscutting Concepts
@@ -113,9 +113,10 @@ the canonical remote. The board adds its own boundary, described in
 
 ### Proof strategy
 
-`specs/` owns each command's behaviour, with criterion IDs that tests cite. CI is the
-gate; its `quality` job runs the fleet quality gate, whose ratchets over
-`quality/baseline.toml` let size and complexity shrink but not grow.
+`specs/` owns each command's behaviour, with criterion IDs that tests
+cite. CI is the gate; its `quality` job runs the fleet quality gate,
+whose ratchets over `quality/baseline.toml` let size and complexity shrink
+but not grow.
 
 ## Constraints and reasons
 
