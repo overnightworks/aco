@@ -1,8 +1,0 @@
-claim_id = "e4d92cb8bd794db89a6e60455c9ba851"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "e3e314cc416da6a702d6c3ad9eb033658a6d3bca"
-branch = "claude/issue-667-truth-fixes"
-scope = ["README.md", "specs/landing-grammar.spec.md", "specs/release.spec.md", "specs/reset.spec.md", "src/aco/cli.py", "src/aco/report.py", "tests/test_cli.py"]
-opened_commit = "47042b609fad021e41d973c5ff58144219af0b93"
-whole_reason = "Seven one-sentence truth fixes from one audit across help texts, specs and the README; one lane spares six reviews and CI runs for single sentences."
