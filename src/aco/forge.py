@@ -314,17 +314,6 @@ class BoardSource(Protocol):
 class ForgeReader(BoardSource, Protocol):
     def item_reference(self, number: int) -> ItemReference: ...
 
-    def item_references(self, numbers: Iterable[int]) -> Mapping[int, ItemReference]:
-        """Every one of `numbers`, read in as few round trips as the adapter
-        can manage rather than one per number: a closed item's
-        own board-estimate size is the one caller today (`cli._closed_item_
-        sizes`), and its own history only ever grows, so a per-number round
-        trip there stays the board's dominant cost as a repository ages. A
-        number this adapter cannot resolve at all reads exactly like
-        `item_reference`'s own single-read case -- `ItemState.MISSING`, no
-        body -- never dropped from the result silently."""
-        ...
-
     def landing(self, number: int) -> Landing: ...
 
     def pull_request_changes(self, number: int) -> PullRequestChanges: ...

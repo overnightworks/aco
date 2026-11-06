@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import body, checkout, forge, metrics, protocol, store, workboard
+from . import body, checkout, forge, protocol, store, workboard
 from .session import RunContext
 
 
@@ -175,21 +175,11 @@ def fetch_validated_dependencies(
 
 @dataclass(frozen=True)
 class ClaimHistory:
-    """The store's own git-history reads one board build needs:
-    bundled into one parameter so `build_board` stays under the five-argument
-    ceiling instead of growing a `claim_ages`-shaped parameter every time
-    another history read joins it. `ages`, `lane_events`, and
-    `unparsed_lifecycle_commits` are always read from the same
-    already-fetched `ClaimState` (`_claim_history` below), never from two
-    different observations."""
+    """The store's own git-history read one board build needs, bundled so
+    `build_board` stays under the five-argument ceiling: `ages` is read from
+    an already-fetched `ClaimState`, never from a second observation."""
 
     ages: Mapping[str, datetime] = field(default_factory=dict)
-    lane_events: tuple[metrics.LaneEvent, ...] = ()
-    # Claim-shaped `refs/aco/state` commits `store.claim_lifecycle` could not
-    # parse -- older history predating the `item:` trailer,
-    # or a foreign commit merely shaped like one -- counted rather than
-    # silently dropped.
-    unparsed_lifecycle_commits: int = 0
 
 
 @dataclass(frozen=True)
@@ -202,31 +192,6 @@ class LandingReads:
 
     dependencies: dict[int, tuple[workboard.IssueDependency, ...]]
     trunk_ref: str
-
-
-def _closed_item_sizes(
-    client: forge.ForgeReader, numbers: frozenset[int], storage: body.Storage
-) -> dict[int, metrics.Size | None]:
-    """Each closed (or vanished) item's own current size, read through one
-    batched forge/state fetch: a completed lane
-    for a since-closed item still belongs in its size class's own measured
-    lanes -- most lanes close their item on landing, so without this the
-    size classes `aco board` estimates from would stay almost always empty.
-    `ItemState.MISSING` (a deleted or renumbered item) and a bodyless
-    reference both read as no size, exactly like an open item that never
-    carried a `size` key. `client.item_references` -- not one `item_
-    reference` call per number -- is what turned this from the board's own
-    dominant cost (32 serial round trips, 12.8 of an 18s build) into a
-    single round trip that stays flat as the closed-item history grows."""
-    references = client.item_references(numbers)
-    return {
-        number: (
-            None
-            if (raw_body := references[number].body) is None
-            else body.parse_body(raw_body, storage=storage).size
-        )
-        for number in numbers
-    }
 
 
 def _trunk_landing_items(
@@ -276,33 +241,22 @@ def build_board(
         for issue in issues
         if issue.kind is body.ItemKind.CONTAINER and issue.children_total
     )
-    # Open and recently-merged pull requests, the closed-item size batch
-    # (one `item_references` round trip rather than the 32
-    # serial single-item reads this used to pay before the pool ever
-    # started), and each container's children are independent reads once
-    # `since` is known, so fetching them on separate threads instead of one
-    # after another overlaps their `gh` subprocess wait time. Children get
+    # Open and recently-merged pull requests and each container's children are
+    # independent reads once `since` is known, so fetching them on separate
+    # threads instead of one after another overlaps their `gh` subprocess wait
+    # time. Children get
     # their own executor (`_fetch_children`) so their concurrency stays
-    # capped at `BOARD_CHILD_FETCH_CONCURRENCY` even once these three base
+    # capped at `BOARD_CHILD_FETCH_CONCURRENCY` even once these two base
     # reads finish and free their own pool's workers. The dependency wave
     # runs afterward instead (below), so it never overlaps them. The readers in
     # `github.py` fan out further inside each call, up to
     # `PARALLEL_FETCH_CONCURRENCY` workers.
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=2) as pool:
         open_pull_requests = pool.submit(client.list_open_board_pull_requests)
         merged_pull_requests = pool.submit(client.list_recent_merged_board_pull_requests, since)
-        closed_item_sizes_future = pool.submit(
-            _closed_item_sizes,
-            client,
-            workboard.closed_item_numbers(
-                history.lane_events, frozenset(issue.number for issue in issues)
-            ),
-            config.storage,
-        )
         children = _fetch_children(client, container_numbers)
         open_pull_request_rows = open_pull_requests.result()
         merged_pull_request_rows = merged_pull_requests.result()
-        closed_item_sizes = closed_item_sizes_future.result()
     # The same forge relation `cmd_cut._cut_target` refuses a nested container on,
     # so `next` never proposes a `cut` that `cut` refuses.
     nesting_parents = {
@@ -344,9 +298,6 @@ def build_board(
             requests=client.requests,
             reopened_at=reopened_at,
             claim_ages=history.ages,
-            lane_events=history.lane_events,
-            unparsed_lifecycle_commits=history.unparsed_lifecycle_commits,
-            closed_item_sizes=closed_item_sizes,
             open_pull_requests_supported=client.lists_pull_requests,
         )
     )
@@ -362,28 +313,8 @@ def claim_ages(worktree: Path, state: protocol.ClaimState) -> dict[str, datetime
     return store.claim_ages(worktree=worktree, tip=state.tip, claims=state.claims.values())
 
 
-def _claim_lifecycle(worktree: Path, state: protocol.ClaimState) -> store.ClaimLifecycle:
-    """Every claim's own ref-history lifecycle in an already-fetched state --
-    one batched `store.claim_lifecycle` walk of `state.tip`'s
-    history, mirroring `claim_ages`'s own no-refetch seam: a fresh fetch of
-    `refs/aco/state` never happens twice for the one board build that
-    already read it."""
-    if state.tip is None:
-        return store.ClaimLifecycle(events=(), unparsed=0)
-    return store.claim_lifecycle(worktree=worktree, tip=state.tip)
-
-
 def _claim_history(worktree: Path, state: protocol.ClaimState) -> ClaimHistory:
-    """`build_board`'s own bundle of the two store history reads a full board
-    build needs, from one already-fetched state -- `board` and
-    `next` both read this rather than `claim_ages` and `_claim_lifecycle`
-    separately."""
-    lifecycle = _claim_lifecycle(worktree, state)
-    return ClaimHistory(
-        ages=claim_ages(worktree, state),
-        lane_events=lifecycle.events,
-        unparsed_lifecycle_commits=lifecycle.unparsed,
-    )
+    return ClaimHistory(ages=claim_ages(worktree, state))
 
 
 @dataclass(frozen=True)

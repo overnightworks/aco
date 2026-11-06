@@ -9,7 +9,7 @@
 "GitHubForge._landing" = 28
 
 [ccn."src/aco/workboard.py"]
-"build_board" = 31
+"build_board" = 26
 
 [ccn."tests/test_cmd_status.py"]
 "check_status.check" = 19
@@ -17,19 +17,19 @@
 [file_lines]
 "src/aco/body.py" = 1235
 "src/aco/checkout.py" = 2025
-"src/aco/cli.py" = 834
+"src/aco/cli.py" = 833
 "src/aco/cmd_claim.py" = 1136
 "src/aco/cmd_release.py" = 921
-"src/aco/github.py" = 1580
-"src/aco/protocol.py" = 1876
+"src/aco/github.py" = 1572
+"src/aco/protocol.py" = 1875
 "src/aco/state_board.py" = 928
-"src/aco/store.py" = 2087
-"src/aco/workboard.py" = 3131
+"src/aco/store.py" = 1802
+"src/aco/workboard.py" = 2927
 "tests/support/cli_fixtures.py" = 890
 "tests/support/github_fixtures.py" = 832
-"tests/test_board.py" = 4068
+"tests/test_board.py" = 3609
 "tests/test_checkout.py" = 2040
-"tests/test_cli.py" = 12282
+"tests/test_cli.py" = 12117
 "tests/test_cmd_adopt.py" = 1646
 "tests/test_cmd_cut.py" = 1069
 "tests/test_cmd_land_after_merge_rerun.py" = 873
@@ -37,13 +37,13 @@
 "tests/test_cmd_release_cleanup.py" = 804
 "tests/test_cmd_rescope_checkout.py" = 1087
 "tests/test_cmd_reset.py" = 952
-"tests/test_github.py" = 3100
+"tests/test_github.py" = 2841
 "tests/test_protocol.py" = 802
 "tests/test_state_board.py" = 5940
-"tests/test_store.py" = 5440
+"tests/test_store.py" = 5114
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 96
+"build_board" = 82
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 84
@@ -69,19 +69,15 @@
 "GitHubForge._landing" = 60
 
 [function_lines."src/aco/store.py"]
-"claim_lifecycle" = 62
-"commit_transition" = 62
+"commit_transition" = 60
 
 [function_lines."src/aco/workboard.py"]
-"_board_item" = 98
-"build_board" = 112
+"_board_item" = 97
+"build_board" = 95
 
 [function_lines."tests/support/github_fixtures.py"]
 "landed_observations" = 61
 "lane_landing_world" = 71
-
-[function_lines."tests/test_board.py"]
-"test_estimate_changes_only_when_its_own_size_classs_measured_lanes_change" = 61
 
 [function_lines."tests/test_checkout.py"]
 "_trunk_history_repository" = 62
@@ -126,9 +122,6 @@
 "check_status" = 91
 "check_status.check" = 72
 
-[function_lines."tests/test_github.py"]
-"test_github_adapter_item_references_reads_every_number_from_one_batch" = 64
-
 [function_lines."tests/test_state_board.py"]
 "TestCliStateRefForge.test_cut_adopts_the_child_after_a_partial_failure_from_a_competing_write" = 110
 "TestCliStateRefForge.test_cut_removes_the_slice_row_byte_exact_and_a_fresh_board_shows_the_child" = 68
@@ -139,7 +132,6 @@
 "TestCliStateRefForge.test_whole_state_ref_paths_preserve_state" = 111
 
 [function_lines."tests/test_store.py"]
-"test_claim_lifecycle_reads_intervals_from_real_ref_history" = 62
 "test_commit_transition_preserves_items_across_claim_rescope_and_release" = 63
 "test_commit_transition_ten_thread_contention_lands_every_distinct_key" = 66
 "test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the_ref" = 73

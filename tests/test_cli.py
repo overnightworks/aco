@@ -97,7 +97,6 @@ from option_cards import card, decide, open_option_entry
 from store_fixtures import (
     RaceOnceTransport,
     blob,
-    claim_intent,
     lineage_observation,
     push_raw_state_tree,
     raw_tree,
@@ -120,7 +119,6 @@ from aco import (
     github,
     items,
     lineage_stamp,
-    metrics,
     process,
     protocol,
     report,
@@ -197,9 +195,6 @@ class _MinimalForgeReader:
 
     def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
         return dict.fromkeys(numbers)
-
-    def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        return dict.fromkeys(numbers, forge.ItemReference(state=forge.ItemState.MISSING))
 
     def landing(self, number: int) -> forge.Landing:
         raise NotImplementedError
@@ -429,7 +424,6 @@ def test_board_projects_fixture_json_without_github_writes(
         "landings",
         "uncut",
         "requests",
-        "measurements",
     }
     assert (payload["ok"], payload["reason"]) == (True, "projected")
     first = payload["items"][0]
@@ -480,7 +474,7 @@ def test_board_json_pins_the_raw_envelope_text_for_a_single_item(
         '"stage": "text-only", "age_days": 1, "idle_days": 1, "active_claim": null, '
         '"claim_age": null, "claim_old": false, "unblocks_count": 0, "score": -10, '
         '"actionable": true, "actionable_reason": null, "size": null, "has_slices": false, '
-        '"estimate": null, "open_blockers": [], "foreign_blockers": []}], '
+        '"open_blockers": [], "foreign_blockers": []}], '
         '"ready_now": [{"number": 10, "title": "Plain item", "labels": [], "kind": null, '
         '"priority_category": 6, "priority_bucket": "unlabelled", "priority_order": 0, '
         '"container": null, "container_parent": null, "scope": null, '
@@ -492,107 +486,23 @@ def test_board_json_pins_the_raw_envelope_text_for_a_single_item(
         '"stage": "text-only", "age_days": 1, "idle_days": 1, "active_claim": null, '
         '"claim_age": null, "claim_old": false, "unblocks_count": 0, "score": -10, '
         '"actionable": true, "actionable_reason": null, "size": null, "has_slices": false, '
-        '"estimate": null, "open_blockers": [], "foreign_blockers": []}], "stale": [], '
-        '"recovery": [], "landings": [], "uncut": [], "requests": 3, '
-        '"measurements": {"classes": [], "unfinished": 0, "unparsed": 0, "since": null, '
-        '"as_of": "2026-08-21"}}\n'
+        '"open_blockers": [], "foreign_blockers": []}], "stale": [], '
+        '"recovery": [], "landings": [], "uncut": [], "requests": 3}\n'
     )
-
-
-def _lane(item: str, day: int, hours: int) -> metrics.LaneEvent:
-    return metrics.LaneEvent(
-        item=item,
-        size=None,
-        claimed_at=datetime(2026, 8, day, tzinfo=UTC),
-        released_at=datetime(2026, 8, day, hours, tzinfo=UTC),
-        rescopes=0,
-    )
-
-
-def test_board_shows_measured_estimates(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Pinned through the CLI rather than only through
-    `workboard.build_board` directly: one `FakeForge` board build shows every
-    estimate state -- a class with `n >= 3` measured lanes (two of them
-    completed by items that have since closed, R2's own closed-item join),
-    one with `n < 3` ("schwach"), and an item with no `size` at all ("keine
-    Größe") -- through `--json`."""
-    client = FakeForge()
-    client.board_issues = (
-        board_issue(30, "Measured M", complete_contract("Ship #30.", size="M")),
-        board_issue(31, "Weak S", complete_contract("Ship #31.", size="S")),
-        board_issue(32, "Unsized", complete_contract("Ship #32.")),
-    )
-    client.issue_references[33] = forge.ItemReference(
-        forge.ItemState.CLOSED, body=complete_contract("Closed.", size="M")
-    )
-    client.issue_references[34] = forge.ItemReference(
-        forge.ItemState.CLOSED, body=complete_contract("Closed.", size="M")
-    )
-    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-    _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
-    monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
-    lane_events = (
-        _lane("30", 10, 4),
-        _lane("33", 11, 5),
-        _lane("34", 12, 6),
-        _lane("31", 15, 2),
-    )
-    _patch_store_write(monkeypatch, lane_events=lane_events)
-    measured_size, measured_median_hours, measured_sample_count = "M", 5, 3
-    board_args = ["--repo", REPOSITORY, "board"]
-
-    assert issue_claim.main([*board_args, "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    thirty = next(item for item in payload["items"] if item["number"] == 30)
-    thirty_one = next(item for item in payload["items"] if item["number"] == 31)
-    thirty_two = next(item for item in payload["items"] if item["number"] == 32)
-    assert thirty["estimate"] == {
-        "item": "30",
-        "size": measured_size,
-        "median_hours": measured_median_hours,
-        "n": measured_sample_count,
-        "weak": False,
-    }
-    assert thirty_one["estimate"]["weak"] is True
-    assert thirty_two["size"] is None
-    assert thirty_two["estimate"] is None
-    assert payload["measurements"]["classes"]
-    # Both closed items come from one batched read -- open
-    # issues, open PRs, merged PRs, and that one batch, never one per item.
-    assert sorted(client.issue_reference_lookups) == [33, 34]
-    assert payload["requests"] == client.requests == 4
-
-
-def test_board_shows_the_empty_measurements_sentence_with_nothing_measured(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """The fourth estimate/Messungen state: with no
-    lifecycle data read at all, `--json` shows the board's own
-    empty-measurements sentinel (`since: null`), never a fabricated
-    estimate."""
-    _single_item_board_environment(monkeypatch, tmp_path)
-
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["measurements"]["classes"] == []
-    assert payload["measurements"]["since"] is None
 
 
 def test_board_projects_with_no_state_ref_bootstrapped_at_all(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """A repository that has never bootstrapped `refs/aco/state` still boards
-    cleanly: `board_read.claim_ages`/`board_read._claim_lifecycle` both read a missing
-    ref as empty rather than crashing, so `measurements` shows the
-    empty-measurements sentence and no claim ages are read at all."""
+    cleanly: `board_read.claim_ages` reads a missing ref as empty rather than
+    crashing, so no claim ages are read at all."""
     _single_item_board_environment(monkeypatch, tmp_path)
     _patch_store_write(monkeypatch, tip=None)
 
     assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["measurements"]["classes"] == []
+    assert payload["ok"] is True
 
 
 def test_board_reports_requests_equal_to_the_adapters_own_invocation_count(
@@ -2671,65 +2581,6 @@ def test_status_refuses_a_state_ref_claim_key_whose_issue_number_is_unreadable(
         )
     else:
         assert captured.err == f"ERROR: {refusal}\n"
-
-
-@pytest.mark.parametrize("number", [*_UNREADABLE_NUMBERS, pytest.param("docs/x", id="lane")])
-@pytest.mark.parametrize("command", [["board", "--json"], ["next"], ["next", "--json"]])
-def test_board_and_next_read_an_unreadable_lifecycle_trailer_item_like_a_lane(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    number: str,
-    command: list[str],
-) -> None:
-    """Spec: BOARD-56. A claim commit on `refs/aco/state` whose `item:`
-    trailer is no ASCII number of at most 18 digits neither stops the read nor
-    counts as unparsed."""
-    repo, remote, _seeded_oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
-    store.commit_transition(
-        observed=fresh_observation(repo, remote),
-        subject=store.ClaimTransitionSubject("claim a corrupted item", item=number),
-        intent=claim_intent(),
-    )
-    capsys.readouterr()
-
-    status = issue_claim.main(command)
-
-    assert status == 0
-    output = capsys.readouterr().out
-    if command == ["board", "--json"]:
-        assert json.loads(output)["measurements"]["unparsed"] == 0
-
-
-@pytest.mark.parametrize(
-    "number",
-    [
-        pytest.param("٧٢", id="non-ascii-digits"),
-        pytest.param("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1), id="past-the-bound"),
-        pytest.param("docs/x", id="lane"),
-    ],
-)
-def test_board_lends_no_closed_item_size_to_an_unreadable_trailer_item(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    number: str,
-) -> None:
-    """Spec: BOARD-56. A completed lane whose `item:` trailer reads as no
-    ASCII number of at most 18 digits joins no closed item's size, though
-    closed items 72 and `7` x 19 carry a size it would otherwise join --
-    `٧٢` reads as 72 under `str.isdigit`, and the 19 digits as an item
-    past the bound."""
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=_TOP_AND_BLOCKED[1:2])
-    for lookalike in (72, int("7" * (protocol.MAXIMUM_ISSUE_NUMBER_DIGITS + 1))):
-        client.issue_references[lookalike] = forge.ItemReference(
-            forge.ItemState.CLOSED, body=complete_contract("Closed.", size="M")
-        )
-    _patch_store_write(monkeypatch, lane_events=(_lane(number, 10, 4),))
-
-    assert issue_claim.main(["--repo", REPOSITORY, "board", "--json"]) == 0
-
-    assert json.loads(capsys.readouterr().out)["measurements"]["classes"] == []
 
 
 def test_start_under_state_ref_claims_the_worktree_it_builds(
@@ -8193,8 +8044,6 @@ class _FakeStore:
         consumed_ids: frozenset[protocol.ClaimId] | None = None,
         resources: Mapping[str, protocol.ResourceRecord] | None = None,
         items: Mapping[str, protocol.ObjectId] | None = None,
-        lane_events: tuple[metrics.LaneEvent, ...] = (),
-        unparsed_lifecycle_commits: int = 0,
     ) -> None:
         live = dict(claims or {})
         derived_ids = frozenset(claim.claim_id for claim in live.values())
@@ -8217,8 +8066,6 @@ class _FakeStore:
         )
         self.transitions: list[protocol.ClaimTransitionIntent] = []
         self._ages = dict(ages or {})
-        self._lane_events = lane_events
-        self._unparsed_lifecycle_commits = unparsed_lifecycle_commits
 
     def fetch_state(self, *, worktree: Path, remote: str) -> protocol.ClaimState:
         return self.state
@@ -8253,11 +8100,6 @@ class _FakeStore:
     ) -> dict[str, datetime]:
         return {claim.claim_id: self._ages.get(claim.claim_id, _STATUS_NOW) for claim in claims}
 
-    def claim_lifecycle(self, *, worktree: Path, tip: protocol.ObjectId) -> store.ClaimLifecycle:
-        return store.ClaimLifecycle(
-            events=self._lane_events, unparsed=self._unparsed_lifecycle_commits
-        )
-
 
 def _patch_store_write(
     monkeypatch: pytest.MonkeyPatch,
@@ -8267,8 +8109,6 @@ def _patch_store_write(
     consumed_ids: frozenset[protocol.ClaimId] | None = None,
     resources: Mapping[str, protocol.ResourceRecord] | None = None,
     items: Mapping[str, protocol.ObjectId] | None = None,
-    lane_events: tuple[metrics.LaneEvent, ...] = (),
-    unparsed_lifecycle_commits: int = 0,
 ) -> _FakeStore:
     fake = _FakeStore(
         {protocol.claim_key(claim.identity, claim.branch): claim for claim in claims},
@@ -8277,14 +8117,11 @@ def _patch_store_write(
         consumed_ids=consumed_ids,
         resources=resources,
         items=items,
-        lane_events=lane_events,
-        unparsed_lifecycle_commits=unparsed_lifecycle_commits,
     )
     monkeypatch.setattr(store, "fetch_state", fake.fetch_state)
     monkeypatch.setattr(store, "peek_state", fake.peek_state)
     monkeypatch.setattr(store, "commit_transition", fake.commit_transition)
     monkeypatch.setattr(store, "claim_ages", fake.claim_ages)
-    monkeypatch.setattr(store, "claim_lifecycle", fake.claim_lifecycle)
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
     )
@@ -12005,7 +11842,6 @@ _REAL_STORE_FETCH_STATE = store.fetch_state
 _REAL_STORE_PEEK_STATE = store.peek_state
 _REAL_STORE_COMMIT_TRANSITION = store.commit_transition
 _REAL_STORE_CLAIM_AGES = store.claim_ages
-_REAL_STORE_CLAIM_LIFECYCLE = store.claim_lifecycle
 
 
 def _use_real_store(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -12014,7 +11850,6 @@ def _use_real_store(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(store, "peek_state", _REAL_STORE_PEEK_STATE)
     monkeypatch.setattr(store, "commit_transition", _REAL_STORE_COMMIT_TRANSITION)
     monkeypatch.setattr(store, "claim_ages", _REAL_STORE_CLAIM_AGES)
-    monkeypatch.setattr(store, "claim_lifecycle", _REAL_STORE_CLAIM_LIFECYCLE)
 
 
 def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:

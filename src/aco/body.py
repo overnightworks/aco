@@ -21,7 +21,7 @@ from datetime import date
 from enum import Enum, StrEnum
 from typing import TypeGuard, cast
 
-from . import expectation_grammar, metrics, protocol
+from . import expectation_grammar, protocol
 from .expectation_grammar import NOT_A_LOCAL_DATE, block_expectation_defects, render_expectations
 
 # CommonMark fence delimiters: at most 3 leading spaces, then a run of 3+
@@ -60,14 +60,18 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
         "slice",
     }
 )
-# A work item's own size class, read straight from
-# `metrics.Size` -- the one owner of the three letters and their order --
-# rather than a second enum here. A top-level block key, not a `[record]`
-# one: `[record]` is a `Storage.STATE_REF`-only table (BODY-15), while an
-# estimate is offered for every item regardless of storage, and this
-# module may never import `github`/`state_board` to give a GitHub-stored
-# item a second write path.
-SIZE_VALUES = frozenset(size.value for size in metrics.Size)
+
+
+# A top-level block key, not a `[record]` one: that table is `Storage.STATE_REF`-only
+# (BODY-15), while a size is offered for every item.
+class Size(StrEnum):
+    """A work item's size class, declared S, M, L so iteration reads in size order."""
+
+    SMALL = "S"
+    MEDIUM = "M"
+    LARGE = "L"
+
+
 BLOCK_VERSION = 1
 
 
@@ -257,10 +261,8 @@ class ParsedBody:
     scope: tuple[str, ...] | None
     slices: tuple[SliceRow, ...]
     read_state: BodyReadState
-    # The block's own top-level `size`, or `None` for a body
-    # that names no size at all -- absent means "no estimate", never a
-    # default class a reader would have to guess.
-    size: metrics.Size | None = None
+    # The block's own top-level `size`; absent means "no estimate", never a default class.
+    size: Size | None = None
     # The block's own top-level `whole` reason, or `None` when
     # the item names none -- `claim`/`start`'s own fallback for `--whole`
     # when the call itself names none, read here rather than re-parsed at
@@ -426,10 +428,8 @@ def _block_scope_defects(data: dict[str, object]) -> list[ContractDefect]:
 
 
 def _block_size_defect(data: dict[str, object]) -> ContractDefect | None:
-    if "size" not in data:
-        return None
-    value = data["size"]
-    if isinstance(value, str) and value in SIZE_VALUES:
+    value = data.get("size")
+    if "size" not in data or (isinstance(value, str) and value in Size):
         return None
     return ContractDefect("size", "size must be S, M, or L")
 
@@ -756,7 +756,7 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
         scope=_canonical_scope(data["scope"]) if "scope" in data else None,
         slices=_block_slices(data),
         read_state=BodyReadState.VALID,
-        size=metrics.Size(data["size"]) if "size" in data else None,
+        size=Size(data["size"]) if "size" in data else None,
         whole=cast(str, data["whole"]) if "whole" in data else None,
         record=cast("Mapping[str, object] | None", record),
     )

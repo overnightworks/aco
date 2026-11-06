@@ -135,8 +135,7 @@ def transition_item_identifier(identity: ClaimIdentity, branch: str) -> str:
     issue number as text, or a lane's own branch: computed
     once from the identity/branch every caller already has, and stored
     verbatim in the commit's own `item:` trailer (`store._transition_message`)
-    for `claim_lifecycle` to read back unparsed, matching
-    `metrics.LaneEvent.item`'s own bare shape -- never a second grammar a
+    -- never a second grammar a
     reader has to reconstruct from the commit's human-prose subject line.
     `store.transition_subject` also reads this for the identifier half of its
     own `"claim issue 42"`/`"rescope lane docs/x"` prose.

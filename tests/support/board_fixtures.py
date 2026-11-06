@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from types import MappingProxyType
 
-from aco import metrics, protocol, workboard
+from aco import protocol, workboard
 from aco.body import (
     BLOCK_FENCE_INFO,
     ItemKind,
@@ -91,9 +91,6 @@ def projected_board(
     children: Mapping[int, tuple[workboard.ChildItem, ...]] = MappingProxyType({}),
     dependencies: Mapping[int, tuple[workboard.IssueDependency, ...]] = MappingProxyType({}),
     open_pull_requests_supported: bool = True,
-    lane_events: tuple[metrics.LaneEvent, ...] = (),
-    closed_item_sizes: Mapping[int, metrics.Size | None] = MappingProxyType({}),
-    unparsed_lifecycle_commits: int = 0,
 ) -> workboard.Board:
     """`workboard.build_board` for scenarios that do not turn on which repository is projected."""
     observed_at = now or datetime(2026, 8, 21, tzinfo=UTC)
@@ -112,9 +109,6 @@ def projected_board(
             dependencies=dependencies,
             claim_ages={claim.claim_id: observed_at for claim in claims},
             open_pull_requests_supported=open_pull_requests_supported,
-            lane_events=lane_events,
-            closed_item_sizes=closed_item_sizes,
-            unparsed_lifecycle_commits=unparsed_lifecycle_commits,
         )
     )
 
