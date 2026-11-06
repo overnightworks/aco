@@ -3,6 +3,6 @@ agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
 role = "builder"
 base = "5cda0c33183bf4330dd2588ffee3bdc0bb159607"
 branch = "claude/issue-651-asked-on-utc-and-order"
-scope = ["quality/baseline.toml", "specs/body-block.spec.md", "specs/rule.spec.md", "src/aco/cmd_rule.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests", "tests/test_cmd_rule_asked_on_order.py", "tests/test_expectation_grammar_asked_on_order.py"]
+scope = ["quality/baseline.toml", "specs/body-block.spec.md", "specs/rule.spec.md", "src/aco/cmd_rule.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "tests"]
 opened_commit = "02365d94f020406341f7f8834e78d9147e708ebb"
 whole_reason = "The order rule is one invariant held in the grammar and at aco rule's write, with its two specs and one new test module each."
