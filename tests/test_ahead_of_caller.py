@@ -43,46 +43,78 @@ def test_an_item_takes_the_forms_of_this_repository_or_another(
 
 
 @pytest.mark.parametrize(
-    ("text", "fragment"),
+    ("text", "sentence"),
     [
-        ("code = [", "not valid TOML"),
-        ("[[cod]]\n", "unknown top-level key 'cod'"),
-        (f"extra = 1\n{listing(VALID_ENTRY)}", "unknown top-level key 'extra'"),
-        ("code = 3\n", "'code' must be an array of tables"),
-        ("code = [1]\n", "'code' must be an array of tables"),
-        (listing('path = "a.py"\nitem = "#1"\n'), "code entry 1 lacks 'reason'"),
-        (listing(VALID_ENTRY + 'more = "x"\n'), "code entry 1 has the unknown key 'more'"),
-        (listing('path = 3\nitem = "#1"\nreason = "why"\n'), "'path' that is not a string"),
-        (listing('path = "/a.py"\nitem = "#1"\nreason = "why"\n'), "path that is not repo"),
-        (listing('path = "a\\\\b.py"\nitem = "#1"\nreason = "why"\n'), "path that is not repo"),
-        (listing('path = ""\nitem = "#1"\nreason = "why"\n'), "path that is not repo"),
-        (listing('path = "a/../b.py"\nitem = "#1"\nreason = "why"\n'), "path that holds a '..'"),
-        (listing('path = "a.py"\nitem = "#1"\nreason = ""\n'), "reason that is not one non-empty"),
+        ("[[cod]]\n", ".aco/ahead-of-caller.toml has the unknown top-level key 'cod'"),
         (
-            listing('path = "a.py"\nitem = "#1"\nreason = "  "\n'),
-            "reason that is not one non-empty",
+            f"extra = 1\n{listing(VALID_ENTRY)}",
+            ".aco/ahead-of-caller.toml has the unknown top-level key 'extra'",
+        ),
+        ("code = 3\n", ".aco/ahead-of-caller.toml: 'code' must be an array of tables"),
+        ("code = [1]\n", ".aco/ahead-of-caller.toml: 'code' must be an array of tables"),
+        (
+            listing('path = "a.py"\nitem = "#1"\n'),
+            ".aco/ahead-of-caller.toml: code entry 1 lacks 'reason'",
         ),
         (
-            listing('path = "a.py"\nitem = "#1"\nreason = "a\\nb"\n'),
-            "reason that is not one non-empty",
+            listing(VALID_ENTRY + 'more = "x"\n'),
+            ".aco/ahead-of-caller.toml: code entry 1 has the unknown key 'more'",
         ),
-        (listing('path = "a.py"\nitem = "x1"\nreason = "why"\n'), "item 'x1'"),
-        (listing('path = "a.py"\nitem = "owner/repo"\nreason = "why"\n'), "item 'owner/repo'"),
-        (listing('path = "a.py"\nitem = "owner/repo#x"\nreason = "why"\n'), "item 'owner/repo#x'"),
-        (listing('path = "a.py"\nitem = "a/b/c#1"\nreason = "why"\n'), "item 'a/b/c#1'"),
+        (
+            listing('path = 3\nitem = "#1"\nreason = "why"\n'),
+            ".aco/ahead-of-caller.toml: code entry 1 has 'path' that is not a string",
+        ),
+        *[
+            (
+                listing(f'path = "{path}"\nitem = "#1"\nreason = "why"\n'),
+                ".aco/ahead-of-caller.toml: code entry 1 has a path that is not "
+                "repository-relative with forward slashes",
+            )
+            for path in ("/a.py", "a\\\\b.py", "")
+        ],
+        (
+            listing('path = "a/../b.py"\nitem = "#1"\nreason = "why"\n'),
+            ".aco/ahead-of-caller.toml: code entry 1 has a path that holds a '..' segment",
+        ),
+        *[
+            (
+                listing(f'path = "a.py"\nitem = "#1"\nreason = "{reason}"\n'),
+                ".aco/ahead-of-caller.toml: code entry 1 has a reason that is not one "
+                "non-empty line",
+            )
+            for reason in ("", "  ", "a\\nb")
+        ],
+        *[
+            (
+                listing(f'path = "a.py"\nitem = "{item}"\nreason = "why"\n'),
+                f".aco/ahead-of-caller.toml: code entry 1 has an item '{item}' that is not "
+                "aco-xxxxxx, #n, n or OWNER/REPO#n",
+            )
+            for item in ("x1", "owner/repo", "owner/repo#x", "a/b/c#1")
+        ],
         (
             listing(VALID_ENTRY) + listing(VALID_ENTRY.replace('"#12"', '"12"')),
-            "code entry 2 repeats the path and item",
+            ".aco/ahead-of-caller.toml: code entry 2 repeats the path and item of an "
+            "earlier entry",
+        ),
+        (
+            listing('path = "a.py"\nitem = "x1"\nreason = ""\n'),
+            ".aco/ahead-of-caller.toml: code entry 1 has a reason that is not one "
+            "non-empty line",
         ),
     ],
 )
-def test_a_malformed_file_is_refused_with_one_sentence_naming_the_field(
-    text: str, fragment: str
-) -> None:
-    """Spec: AHEAD-04, AHEAD-05, AHEAD-06, AHEAD-07, AHEAD-08, AHEAD-09."""
-    sentence = unavailable_sentence(text)
+def test_a_malformed_file_is_refused_with_its_spec_sentence(text: str, sentence: str) -> None:
+    """Spec: AHEAD-04..AHEAD-09, AHEAD-16..AHEAD-19."""
+    assert unavailable_sentence(text) == sentence
 
-    assert fragment in sentence
+
+def test_bad_toml_is_refused_with_the_parsers_text_after_the_spec_sentence() -> None:
+    """Spec: AHEAD-04."""
+    sentence = unavailable_sentence("code = [")
+
+    assert sentence.startswith(".aco/ahead-of-caller.toml is not valid TOML: ")
+    assert len(sentence) > len(".aco/ahead-of-caller.toml is not valid TOML: ")
 
 
 def test_the_same_path_may_wait_on_two_items() -> None:
