@@ -48,7 +48,7 @@ withdrawn one.
 | a misplaced `--option` or `--card-hash`, one `--line` included | RULE-34 | RULE-09 | — |
 | a named line without its own `--option` or `--card-hash` | RULE-15 | RULE-09 | — |
 | `--other`, `--note` or `--via` given twice | RULE-35 | RULE-09 | — |
-| `--via board` | RULE-39 | RULE-09 | — |
+| `--via board` | RULE-39 | OUT-06 | — |
 | line `N` is a yes/no line, `--option`, `--other` or `--unclear` | RULE-16 | RULE-09 | — |
 | its card changed since it was shown | RULE-17 | RULE-09 | — |
 | line `N` was withdrawn by its head | RULE-37 | RULE-09 | — |
