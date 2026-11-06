@@ -411,7 +411,7 @@ class TestLandMergeMethod:
                     trunk_config='merge_method = "squash"\n',
                     methods=frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH}),
                 ),
-                id="pinned-squash-beats-the-default",
+                id="pinned-squash-lands-a-squash",
             ),
             pytest.param(
                 MergeCase(

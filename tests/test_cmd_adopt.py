@@ -47,7 +47,7 @@ OVERLONG_ISSUE_NUMBER = "1" * 4301
 def _publish_branch_tip(clone: Path, message: str) -> str:
     """A fresh commit adding an empty file on top of `clone`'s `HEAD` (a squash landing needs a
     change), forced onto the remote as the pull request's head branch; no local ref moves."""
-    empty_blob = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    empty_blob = real_git(clone, "hash-object", "-w", "--no-filters", "/dev/null").stdout.strip()
     real_git(clone, "update-index", "--add", "--cacheinfo", f"100644,{empty_blob},{message}.txt")
     tree = real_git(clone, "write-tree").stdout.strip()
     real_git(clone, "reset", "-q")
