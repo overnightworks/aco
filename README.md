@@ -38,14 +38,17 @@ flowchart LR
     merge -->|aco next| item
 ```
 
-Set `ACO_AGENT` to the agent's name once: `start` refuses in a plain
-shell without it. A repository adopts aco by landing one commit that adds an
+Identity comes from the first of `ACO_AGENT`, `GROK_SESSION_ID`,
+`CLAUDE_CODE_SESSION_ID` that is set; `start` refuses when none is set or that
+one is unusable (START-03).
+A repository adopts aco by landing one commit that adds an
 empty `.aco/board.toml` and nothing else, then runs `aco bootstrap` once to
 create the state ref (`specs/bootstrap.spec.md`, `specs/storage-pin.spec.md`).
-After that: `aco next` names the item to pull, `aco start <n>` creates its
-worktree and branch and claims its scope, `aco brief <n>` prints what a builder
-starts from, and `aco land <pull request> --head <sha>`, from a clean
-default-branch checkout, merges a green pull request pinned to the head the
+After that: `aco next` names the one next action (pull, cut, check or close
+an item), `aco start <n>` creates its worktree and branch and claims its
+scope, `aco brief <n>` prints what a builder starts from, and
+`aco land <pull request> --head <sha>`, from a clean default-branch checkout,
+merges a green pull request pinned to the head the
 reviewers saw and releases the claim (`specs/start.spec.md`,
 `specs/brief.spec.md`, `specs/land.spec.md`).
 

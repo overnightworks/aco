@@ -46,13 +46,13 @@ from .session import (
 )
 
 NEXT_PULL_DESCRIPTION = (
-    "Pulling is not dispatching: an item whose expectations are still unruled is "
-    "named here with refining as its first step, while dispatching a builder onto "
-    "it waits for the operator's ruling. An item labelled "
-    f"{workboard.NEEDS_OPERATOR_LABEL} waits on the operator and is never pulled; set or "
-    f"remove the label with gh issue edit <n> --add-label/--remove-label "
-    f"{workboard.NEEDS_OPERATOR_LABEL}, or under storage = state-ref by piping a body whose "
-    "[record] labels add or drop it to aco item edit <item-id>."
+    "Name the one next action: pull, cut, check or close an item. Pulling is not "
+    "dispatching: an item whose expectations are still unruled is named here with "
+    "refining as its first step, while dispatching a builder onto it waits for the "
+    f"operator's ruling. An item labelled {workboard.NEEDS_OPERATOR_LABEL} waits on the "
+    "operator and is never pulled; set or remove the label with gh issue edit <n> "
+    f"--add-label/--remove-label {workboard.NEEDS_OPERATOR_LABEL}, or under storage = "
+    "state-ref by piping a body whose [record] labels add or drop it to aco item edit <item-id>."
 )
 CLAIM_DESCRIPTION = (
     "Refuses before the first edit unless the checkout is a linked, isolated "
@@ -148,7 +148,8 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
 
 
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
-    report.add_json_flag(commands.add_parser(name, help="project the open work board, read-only"))
+    board = commands.add_parser(name, help="project the open work board, read-only")
+    report.add_json_flag(board, "JSON only")
 
 
 def _add_serve_parser(commands: usage.Subcommands, name: str) -> None:
@@ -156,16 +157,15 @@ def _add_serve_parser(commands: usage.Subcommands, name: str) -> None:
 
 
 def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
-    rulings_command = commands.add_parser(
-        name, help="list expectation lines, open and ruled, without writes"
+    cmd_rulings.add_arguments(
+        commands.add_parser(name, help="list expectation lines, open and ruled, without writes")
     )
-    cmd_rulings.add_arguments(rulings_command)
 
 
 def _add_next_parser(commands: usage.Subcommands, name: str) -> None:
     next_command = commands.add_parser(
         name,
-        help="name the board's top-priority item to pull",
+        help="name the one next action: pull, cut, check or close an item",
         description=NEXT_PULL_DESCRIPTION,
     )
     report.add_json_flag(next_command)
@@ -535,7 +535,7 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
         "--origin",
         type=items.parse_origin,
         metavar="FORGE#N",
-        help="bind this lane to a foreign forge issue, e.g. gitlab#42",
+        help="bind this item to a foreign forge issue, e.g. gitlab#42 (state-ref storage only)",
     )
     new.add_argument(
         "--scope",
