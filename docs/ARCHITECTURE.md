@@ -35,7 +35,7 @@ flowchart LR
     CLI --> Port["forge port<br/>forge.py"]
     Port --> GitHub["GitHub adapter<br/>github.py"]
     Port --> StateBoard["state-ref item store<br/>state_board.py"]
-    Board["board (aco serve)<br/>board/, frontend/"] -->|"same library code, in process"| CLI
+    Board["board (aco serve)<br/>board/, frontend/"] -->|"same library code, in process"| Library["library modules<br/>decide, expectations, forge, protocol, rulings, session"]
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
