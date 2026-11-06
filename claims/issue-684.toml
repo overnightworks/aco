@@ -1,0 +1,8 @@
+claim_id = "02b692b96d1d42b68916f56ff6c12a2b"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "11a24cc6dda56793d78b55205b8e2dc4ab1a787a"
+branch = "claude/issue-684-strip-provenance-from-tests-and-frontend"
+scope = ["frontend/src/app/model/optionCard.ts", "src/aco/board/static", "tests"]
+opened_commit = "9e792c1d0a7b8145045ade7f5c9b8a8c5b3e5e65"
+whole_reason = "One rule applied to test prose and one frontend comment; no assertion changes, and the static assets are the frontend comment's generated output."
