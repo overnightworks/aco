@@ -230,7 +230,7 @@ DETECTOR_TABLE: tuple[tuple[str, str, bool], ...] = (
     ("call_with_parens", "relative_scope_entry()", True),
     ("dotted_attribute_upper_snake", "CheckoutKind.MAIN", True),
     ("plain_snake_case", "load_brief_config", True),
-    ("dotted_attribute_lower_snake", "store.claim_lifecycle", True),
+    ("dotted_attribute_lower_snake", "store.claim_ages", True),
     ("long_snake_case", "test_run_starts_the_session", True),
     ("backticked_command_and_flag", "`aco claim --scope`", False),
     ("backticked_contract_file", "`board.toml`", False),

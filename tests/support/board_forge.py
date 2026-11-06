@@ -209,9 +209,6 @@ class BoardForge:
         state.items[number].body = body
         self._replace_state(state)
 
-    def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        _unsupported("item_references")
-
     def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
         _unsupported("list_board_dependencies")
 

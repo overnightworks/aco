@@ -2,6 +2,18 @@
 mandatory_jobs = ["check (3.14)", "Package smoke (wheel, sdist, tool install without Node)", "Frontend (svelte-check, lint, knip, vitest, assets fresh)", "E2E (Playwright, desktop)"]
 legacy = "fail"
 
+[[gate.loosened]]
+what = 'import contract "Layers" changes layers'
+item = "#665"
+date = 2026-11-06
+reason = "aco.metrics leaves with the size statistics, so the row that held it beside expectation_grammar loses it"
+
+[[gate.loosened]]
+what = 'import contract "items does not import metrics" removed'
+item = "#665"
+date = 2026-11-06
+reason = "the contract forbade items to import aco.metrics, a module that no longer exists"
+
 [[root.allow]]
 entry = "frontend/"
 reason = "the web client, built apart from the Python package"

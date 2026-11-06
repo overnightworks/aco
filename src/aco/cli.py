@@ -35,7 +35,6 @@ from . import (
     cmd_withdraw,
     github,
     items,
-    metrics,
     protocol,
     report,
     session,
@@ -545,8 +544,8 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
     )
     new.add_argument(
         "--size",
-        choices=tuple(metrics.Size),
-        help="this item's size class, for the board's own measured estimate; default none",
+        choices=tuple(body.Size),
+        help="this item's size class; default none",
     )
     new.add_argument("--whole", metavar="REASON", help=ITEM_WHOLE_HELP)
     new.add_argument("--not-a-twin", action="store_true", help=NOT_A_TWIN_HELP)
@@ -570,7 +569,7 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
     refuses_stdin = "reads no stdin; a piped or redirected body is refused"
     one_field.add_argument(
         "--size",
-        choices=tuple(metrics.Size),
+        choices=tuple(body.Size),
         help=f"set only this item's size class (any storage); {refuses_stdin}",
     )
     one_field.add_argument(

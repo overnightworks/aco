@@ -417,7 +417,7 @@ class FakeForge:
         return served if scripted is None else replace(served, body=scripted)
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        """One `_run()` for the whole batch, like the real adapter's one GraphQL block."""
+        """Stands in for the state-ref board's batched read that `item close` uses."""
         ordered = tuple(dict.fromkeys(numbers))
         if not ordered:
             return {}
