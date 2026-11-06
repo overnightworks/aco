@@ -1,7 +1,8 @@
 # `aco rulings`
 
-`aco rulings` lists every open board item that carries at least one
-`[[expectation]]` line, fully ruled ones too, read-only. This file owns its
+`aco rulings [<item>]` lists every open board item that carries at least one
+`[[expectation]]` line, fully ruled ones too, read-only; with `<item>` it lists
+that one issue, open or closed. This file owns its
 row and per-line text, its ordering, its `--json` shape, and its empty-board
 sentence. It cites the forge-resolution precondition `specs/board.spec.md`
 owns (BOARD-01/BOARD-02/BOARD-42) rather than restating it, and the
@@ -21,6 +22,9 @@ it, `<k>` an expectation line's 1-based index.
 | several such items | RUL-03 | RUL-05, RUL-10 |
 | an item whose block is malformed or unreadable | RUL-20 | RUL-20 |
 | a state-ref item whose record link names a missing id, or one blocker twice | RUL-21 | RUL-21 |
+| `<item>` an open or closed issue | RUL-24 | RUL-24 |
+| `<item>` exists in neither number space | RUL-25 | RUL-25 |
+| `<item>` names a pull request | RUL-26 | RUL-26 |
 | an item whose every line is already ruled or withdrawn | RUL-01, RUL-04 | RUL-05, RUL-10 |
 | a ruled line | RUL-02 | RUL-05, RUL-10, RUL-12 |
 | a withdrawn line | RUL-22 | RUL-23 |
@@ -41,6 +45,12 @@ it, `<k>` an expectation line's 1-based index.
 - [ ] [RUL-22] A withdrawn line prints `  <k> withdrawn <date>: <summary>`, capped and escaped as RUL-02 and RUL-11; it counts in `<total>`, never in `<open>` (see E-RUL-08).
 - [ ] [RUL-20] An item whose block is malformed, or which the store cannot read (PIN-14, PIN-15), is listed in neither text nor `--json`.
 - [ ] [RUL-21] Under `storage = "state-ref"`, `aco rulings` validates no record link: a missing `record.parent`/`blocked_by` id or a doubled blocker still lists the item; a foreign file name refuses (PIN-36).
+
+## One named item
+
+- [ ] [RUL-24] `aco rulings <item>` reads that one issue, open or closed, and prints it alone in RUL-01's and RUL-05's shapes; with no expectation line, RUL-07's or RUL-08's empty output (see E-RUL-09).
+- [ ] [RUL-25] An `<item>` in neither number space prints `REFUSED: <label> does not exist in <repository>` on stderr, exit `2`; `--json` is CHECK-03's `missing` envelope (see E-RUL-10).
+- [ ] [RUL-26] An `<item>` naming a pull request prints `ERROR: #<n> is a pull request, not an issue; rulings needs an issue`, exit `2`; `--json` reason `not_an_issue` (see E-RUL-10).
 
 ## `--json`
 
@@ -69,6 +79,8 @@ An option line's keys after `returned_note` are `question`, `problem`, `picture`
 | refusal | `reason` |
 |---|---|
 | PIN-04 (`--repo` under `storage = state-ref`) | `invalid_usage` |
+| RUL-25 (`<item>` in neither number space) | `missing` |
+| RUL-26 (`<item>` is a pull request) | `not_an_issue` |
 | BOARD-02 (no forge adapter for host), PIN-05 (no resolvable default branch) | `unavailable` |
 
 ## Empty board
@@ -243,4 +255,32 @@ exit 0
 $ aco rulings --json
 {"ok": true, "reason": "listed", "rulings": [{"number": 13, "title": "Withdrawn question", "open": 0, "total": 2, "lines": [{"index": 1, "text": "Settled decision 0.", "ruling": "yes", "ruled_on": "2026-09-19"}, {"index": 2, "form": "withdrawn", "text": "Ship it?", "withdrawn_on": "2026-10-29"}]}]}
 exit 0
+```
+
+### E-RUL-09 — one closed item
+
+Setup: bare-remote, fake `gh`, issue `#13` closed, its body as E-RUL-08
+
+```console
+$ aco rulings 13
+#13 0/2: Withdrawn question
+  1 ruled yes 2026-09-19: Settled decision 0.
+  2 withdrawn 2026-10-29: Ship it?
+exit 0
+```
+
+### E-RUL-10 — a missing number and a pull request number
+
+Setup: bare-remote, fake `gh`, no issue or pull request `#81`, pull request `#82`
+
+```console
+$ aco rulings 81
+2> REFUSED: #81 does not exist in <owner>/<repo>
+exit 2
+$ aco rulings 81 --json
+{"ok": false, "reason": "missing", "kind": "missing", "number": 81, "message": "does not exist in <owner>/<repo>"}
+exit 2
+$ aco rulings 82
+2> ERROR: #82 is a pull request, not an issue; rulings needs an issue
+exit 2
 ```

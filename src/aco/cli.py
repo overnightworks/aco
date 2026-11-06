@@ -160,7 +160,7 @@ def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
     rulings_command = commands.add_parser(
         name, help="list expectation lines, open and ruled, without writes"
     )
-    report.add_json_flag(rulings_command)
+    cmd_rulings.add_arguments(rulings_command)
 
 
 def _add_next_parser(commands: usage.Subcommands, name: str) -> None:
