@@ -150,8 +150,8 @@ but not grow.
   because an option without one is upkeep with no user.
 - The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
   decision surface: it shows only the questions that are his, from several
-  repositories (`specs/serve.spec.md` ABRD-14); frozen and unused today, known and deliberately kept, not unnoticed
-  dead code.
+  repositories (`specs/serve.spec.md` ABRD-14); frozen and unused today. It is known and
+  deliberately kept, not unnoticed dead code.
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
   the item commands still carries both storage paths. It is known and
