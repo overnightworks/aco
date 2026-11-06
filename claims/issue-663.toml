@@ -1,0 +1,8 @@
+claim_id = "7cd42771a61940e7824315abf718e20c"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "e2ae053f375695a0f220cce1e70874e7eee53f54"
+branch = "claude/issue-663-decision-records-leave"
+scope = ["README.md", "docs/ARCHITECTURE.md", "docs/decisions/0001-claim-state-without-a-ledger-issue.md", "docs/decisions/0002-keep-the-item-store-and-the-board.md", "src/aco/body.py", "src/aco/github.py"]
+opened_commit = "6e38e106c2bc219f3eab798df6cf270d4ceec026"
+whole_reason = "One move of standing facts from two records into one architecture document, with the citations that point at them; split, the repository would carry two owners of the same facts or links into nothing."
