@@ -1,8 +1,0 @@
-claim_id = "e71067389866484e9c8f9965e6adaa89"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "4e62611a528e643dbe3ac4f12e238c16c950200f"
-branch = "claude/issue-397-rulings-one-item"
-scope = ["quality/baseline.toml", "specs/rulings.spec.md", "src/aco/board_read.py", "src/aco/cli.py", "src/aco/cmd_rulings.py", "src/aco/rulings.py", "tests/test_cmd_rulings_one_item.py"]
-opened_commit = "c92421f3d3bafd8eb331428e2996cd505840a043"
-whole_reason = "One optional argument touches the command, its parser and its spec, with one new test module."
