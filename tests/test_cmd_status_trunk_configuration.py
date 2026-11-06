@@ -40,11 +40,13 @@ def test_status_refuses_whole_when_the_trunk_holds_a_directory_at_the_board_conf
     result = run_cli(argv, capsys)
 
     assert result.status == 2
+    assert result.stderr.startswith("ERROR: ")
+    assert workboard.CONFIG_PATH.as_posix() in result.stderr
     if "--json" in argv:
         payload = json.loads(result.stdout)
-        assert (payload["ok"], payload["reason"]) == (False, "unavailable")
+        assert payload["ok"] is False
+        assert payload["reason"] == "unavailable"
+        assert "claims" not in payload
         assert workboard.CONFIG_PATH.as_posix() in payload["message"]
     else:
         assert result.stdout == ""
-        assert result.stderr.startswith("ERROR: ")
-        assert workboard.CONFIG_PATH.as_posix() in result.stderr
