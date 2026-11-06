@@ -46,13 +46,15 @@ flowchart LR
   (`specs/body-block.spec.md`).
 - Wide-scope thresholds are constants of the protocol, not configuration, so
   two fleets in one repository cannot disagree on what "too wide" means.
-- The **forge port** (`forge.py`) is the only way commands reach a forge. It
-  raises typed errors (`ForgeNotFoundError`, `ForgePermissionDeniedError`,
-  `ForgeTransientError` and the rest of its family), so no caller matches
-  error text. An adapter that cannot do an operation raises
-  `ForgeUnsupportedError`. The one capability a caller branches on is
-  `BoardSource.lists_pull_requests`. GitHub is the only adapter; another forge
-  attaches at this port without a rewrite of the commands.
+- The **forge port** (`forge.py`) is the seam most commands use to reach a
+  forge. It raises typed errors (`ForgeNotFoundError`,
+  `ForgePermissionDeniedError`, `ForgeTransientError` and the rest of its
+  family), so no caller matches error text. An adapter that cannot do an
+  operation raises `ForgeUnsupportedError`. The one capability a caller
+  branches on is `BoardSource.lists_pull_requests`. GitHub is the only adapter.
+  The seam is not exclusive: `cmd_land` and `cmd_release` call `GitHubForge`
+  directly for merge and close operations, so another forge needs its own
+  contract for them before it can attach (the module docstring of `forge.py`).
 
 ## Kept although unused
 
