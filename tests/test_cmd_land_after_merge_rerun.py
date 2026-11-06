@@ -828,11 +828,10 @@ class TestLandAfterMergeRerun:
         [
             pytest.param(
                 RerunCase(
-                    title="Merge pull request #12",
                     merge_body="ordinary merge without classification",
                     merge_trailers="",
                     merge_message=(
-                        "Merge pull request #12\n\nordinary merge without classification\n"
+                        "feat: land the lane (#12)\n\nordinary merge without classification\n"
                     ),
                     status=2,
                     stdout="",
