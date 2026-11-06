@@ -1,7 +1,0 @@
-claim_id = "e13ccccb478d49c192cdcdbee03ccd87"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "d6d8b69e2e936556595ed0b3de60e95943ee82ef"
-branch = "dependabot/npm_and_yarn/frontend/jsdom-30.1.3"
-scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
-opened_commit = "be0f98e64382a2d4c276b41607ee2249bbf9b5d6"
