@@ -75,7 +75,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 ## Fetch anchor and lineage stamp, one per worktree
 
 - [ ] [CAS-07] A fetch of a present ref never creates the shared local `refs/aco/state`; the tip lands only in `refs/worktree/aco/state`, never read back from `FETCH_HEAD` (see E-CAS-02).
-- CAS-08 (retired 20.09.2026): the anchor write it named is no longer a step of its own; the fetch that lands the tip in `refs/worktree/aco/state` (CAS-07) fails as one `cannot fetch` refusal.
+- CAS-08 (retired).
 - [ ] [CAS-50] A fetch that lands the tip but cannot read it back from `refs/worktree/aco/state` refuses `cannot read the fetched tip at refs/worktree/aco/state: <detail>`.
 - [ ] [CAS-09] This worktree's own last-observed tip is stamped at `<git-dir>/aco/last-oid` -- private to it, never shared with another linked worktree of the same checkout.
 - [ ] [CAS-10] A worktree with no stamp yet at `<git-dir>/aco/last-oid` accepts any tip its first fetch reads, never refusing `... the ref may have been rewritten` (CAS-11).
@@ -176,7 +176,7 @@ tree's structural shape before that content is ever parsed.
 
 ## `aco reset`
 
-`aco reset` (operator-ruled 15.09.2026/16.09.2026) is the one
+`aco reset` is the one
 recovery path over a broken or rewritten `refs/aco/state`: a mandatory
 export, no silent data loss, and a live claim in a state this aco can read
 always refuses it outright, `--confirm` or not; a state whose schema it

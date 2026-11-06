@@ -8,9 +8,8 @@ option line back to its head), transcribing the operator's own word (a head prop
 decision reached aco: `chat` a head transcribes his word, `default` he left the
 card unanswered and its recommendation stands. `--via board` is not a choice: only `aco serve`'s decision board writes `board`, in process.
 `--help` lists every flag here, `--unclear` included, each with a help line. A yes/no line cannot be ruled by this command. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This command's writer is the
-one write path for a ruling (`board --serve`'s own
-`POST /rule` form is retired; `aco serve`'s decision board writes through this
-command's writer in process, `specs/serve.spec.md` ABRD-78). This
+one write path for a ruling; `aco serve`'s decision board writes through this
+command's writer in process (`specs/serve.spec.md` ABRD-78). This
 file owns the ruling's own refusals -- an already-ruled
 line, an out-of-range one -- the `RULED` line, its own `reason` vocabulary,
 and the target refusals: a missing item, a pull-request target and a
@@ -65,7 +64,7 @@ withdrawn one.
 
 - [ ] [RULE-01] A still-open option line makes `aco rule ITEM --line N` with `--option` or `--other` print `RULED #<n> line <k> <ruling>; <m> line(s) still open` on stdout, exit `0` (see E-RULE-01).
 - [ ] [RULE-02] `--json` on the same call prints `specs/output.spec.md`'s envelope with `reason: "ruled"`, then `"item": <n>, "index": <k>, "ruling": "<ruling>", "ruled_on": "<date>", "open": <m>`.
-- RULE-03 (retired 27.10.2026): the note on a yes/no ruling went with the yes/no outcome flags; `--note` now only goes with `--unclear` (RULE-23).
+- RULE-03 (retired).
 - [ ] [RULE-12] A ruling retains the card's `question`, `problem`, `picture`, `caption` unchanged, invents none, and adds only RULE-14's keys, plus `other` for `--other` (E-RULE-08).
 - [ ] [RULE-14] `--option X` on an open option line prints RULE-01/RULE-02 with `X` as `<ruling>`; the line gains `ruling`, today's UTC `ruled_on`, `card_hash` and `via`, no other key changes (see E-RULE-10).
 - [ ] [RULE-22] `--unclear` on an open option line prints `RETURNED #<n> line <k> to its head; <m> line(s) still open`, exit `0`; `--json` is `reason: "returned"` with `"item"`, `"index"`, `"returned_on"`, `"open"`.
@@ -82,10 +81,10 @@ withdrawn one.
 
 - [ ] [RULE-04] `--line N` naming an already-ruled entry refuses `line <k> is already ruled; a changed ruling is a new line`, exit `2`, before any write (see E-RULE-03).
 - [ ] [RULE-05] `--line N` outside the item's own expectation lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write (see E-RULE-04); `<m>` counts withdrawn lines.
-- RULE-06 (retired 27.10.2026): the refusal for a forge that cannot write the item body went with the forge capability table, which no adapter ever answered `UNSUPPORTED` for the body write (audit #331 finding 17).
+- RULE-06 (retired).
 - [ ] [RULE-07] An item no reference resolves refuses `#<n> does not exist`, exit `2`, before any write.
 - [ ] [RULE-08] An item that is a pull request refuses `#<n> is a pull request, not an issue; rule needs an issue`, exit `2`, before any write.
-- RULE-13 (retired 27.10.2026): the refusal of a yes/no outcome on an option line went with the yes/no outcome flags, which now fail as unrecognized arguments (exit `2`).
+- RULE-13 (retired).
 - [ ] [RULE-15] A flag combination below refuses its sentence, exit `2`, before any forge call, after RULE-33 and RULE-34 (see E-RULE-10, E-RULE-13):
   - with several `--line` and `--option` given, a named line without its own `--option` after it: `line <k> needs its own --option after it`
   - with several `--line`, a named line without its own `--card-hash` after it: `line <k> needs its own --card-hash after it`; the two count bullets are judged line by line in written order, `--option` before `--card-hash`, so line 2 without a hash refuses before line 3 without an option
@@ -134,7 +133,7 @@ withdrawn one.
 
 - `aco rule` never accepts two kinds of outcome, or none: `--option`/`--other`/`--unclear` are one mutually exclusive, required group, and `--option`, `--other`, `--unclear`, `--via` and `--card-hash` appear in `--help` with a help line each.
 - `aco rule --unclear` never stores `via` or `card_hash`: it decides nothing.
-- `aco rule` never checks who typed `--via`: it records what the writer was told. By operator ruling it is a tripwire for cooperative agents; an agent of the operator's own user that types `--via chat` for a word the operator never spoke is not stopped, and the forge's edit history is the record after the fact.
+- `aco rule` never checks who typed `--via`: it records what the writer was told. It is a tripwire for cooperative agents; an agent of the operator's own user that types `--via chat` for a word the operator never spoke is not stopped, and the forge's edit history is the record after the fact.
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
 - `aco rule` never rewrites a byte outside the ruled entries: the body's surrounding bytes stay exactly as written.
 - `aco rule` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it ever resolves the forge or the item.
