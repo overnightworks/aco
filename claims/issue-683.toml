@@ -1,8 +1,0 @@
-claim_id = "d3f7950126ac4ad3a17ea80ad6aad379"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "11a24cc6dda56793d78b55205b8e2dc4ab1a787a"
-branch = "claude/issue-683-strip-provenance-from-source-comments"
-scope = ["src/aco/board_read.py", "src/aco/body.py", "src/aco/checkout.py", "src/aco/cmd_board.py", "src/aco/cmd_claim.py", "src/aco/cmd_cut.py", "src/aco/cmd_item.py", "src/aco/cmd_next.py", "src/aco/cmd_release.py", "src/aco/cmd_reset.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "src/aco/github.py", "src/aco/items.py", "src/aco/protocol.py", "src/aco/state_board.py", "src/aco/store.py", "src/aco/workboard.py"]
-opened_commit = "4042411c1eaabfb7c79ea1becc8c39514ac252d3"
-whole_reason = "One rule applied to comments and docstrings only, across the source tree; no code line changes, so one review covers the pattern once."
