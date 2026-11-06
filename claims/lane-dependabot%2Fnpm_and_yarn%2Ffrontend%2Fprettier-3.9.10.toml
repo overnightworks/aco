@@ -1,0 +1,7 @@
+claim_id = "c2d69ed82c8b49ca9c2694bf1c6b1a0f"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "4b3ac7f0f9c38bbaa3c94dfc4a520106b6a8eda1"
+branch = "dependabot/npm_and_yarn/frontend/prettier-3.9.10"
+scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
+opened_commit = "c08049c9b5411ef9b49f8f0abb3f688f05ceee8d"
