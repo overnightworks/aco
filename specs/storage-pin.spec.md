@@ -37,8 +37,8 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 forge, a narrower set than "any store command" -- see `## Never` for the
 exact commands that never do.
 
-\*\* `release --merged` under `storage = "state-ref"` is no longer a pin
-precondition (PIN-12, retired): `<sha|empty>` verifies and closes the named
+\*\* `release --merged` under `storage = "state-ref"` is not a pin
+precondition: `<sha|empty>` verifies and closes the named
 issue itself, and only an issue-less lane still refuses -- that grammar,
 including the surviving refusal, is `specs/landing-grammar.spec.md`'s own
 (LAND-47, LAND-52, LAND-56, LAND-59), not restated here.
@@ -117,10 +117,10 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 ## Commands refused by the wrong pin
 
-- PIN-09 (retired 26.09.2026): `aco item new` under `storage = "github"` no longer refuses; it creates the GitHub issue itself (`specs/item.spec.md` ITEM-26..ITEM-35).
+- PIN-09 (retired).
 - [ ] [PIN-10] `aco item edit ITEM` under `storage = "github"` refuses `forge issues are edited on the forge; aco never governs them`.
 - [ ] [PIN-11] `aco item close ITEM` under `storage = "github"` refuses `the forge closes its issues; aco never governs them`.
-- PIN-12 (retired 19.09.2026): the outright `release --merged` refusal it named under `storage = "state-ref"` no longer exists; `--merged <sha|empty>` verifies and closes the named issue itself (`specs/landing-grammar.spec.md` LAND-47/LAND-52/LAND-59), and only an issue-less lane still refuses (LAND-56).
+- PIN-12 (retired).
 
 ## The state-ref item file, one layer above the block
 

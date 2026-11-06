@@ -15,8 +15,8 @@ refusals are `specs/storage-pin.spec.md`'s (PIN-01/PIN-32);
 order, `ok`, `message`) that wraps BOARD-11's own top-level keys. `board`'s
 own ranking, scoring, and per-item field semantics (`score`, ...) are
 not graded here; the per-item fields `age_days`, `claim_age`, `freed_days`
-and `priority_bucket` and the top-level `stale` key are public output
-(operator ruling 25.10.2026); each item's own
+and `priority_bucket` and the top-level `stale` key are public output;
+each item's own
 `actionable`/`actionable_reason` fields are the one pair this file grades,
 since `next`'s own SKIPPED list (`specs/next.spec.md`) reuses that exact
 reason text.
@@ -43,10 +43,10 @@ reason text.
 
 ## No `--json`
 
-- BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52 (retired 04.10.2026): `--html`'s static page and `--serve`'s loopback server -- the page itself, its token subsystem, and its request/response wire contract -- no longer exist; `aco serve` (`specs/serve.spec.md`) is the one decision board now, reading its own rulings through `aco rulings --json` and writing through `aco rule` instead of this command's `--json`.
+- BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52 (retired).
 
-- BOARD-55 (retired 23.10.2026): the `--serve` refusal pointing at `aco-board serve` went with the flag itself; `aco board --serve` is now an unknown argument like any other.
-- BOARD-27, BOARD-31, BOARD-56 (retired 06.11.2026, issue #665): `board --json` no longer computes size statistics, so the top-level `measurements` object, its `classes` entries and the lane-history trailer rule that fed them are gone; BOARD-26 keeps an item's own `size`.
+- BOARD-55 (retired).
+- BOARD-27, BOARD-31, BOARD-56 (retired).
 
 - [ ] [BOARD-44] `aco board` naming no `--json` refuses `aco board requires --json`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
 
@@ -61,7 +61,7 @@ does, before either reads a single issue -- cited there, not restated.
 - [ ] [BOARD-01] `board` reaches the same absent- or untracked-`.aco/board.toml` refusal `specs/storage-pin.spec.md` owns (PIN-01/PIN-32), exit `2`, before the host check above ever runs.
 - [ ] [BOARD-42] Under `storage = "state-ref"`, `board`/`next`/`rulings` resolve the state-ref forge like `item show`/`edit`/`close`; `--repo` there refuses the same as those (PIN-04, PIN-05).
 
-- BOARD-03, BOARD-04, BOARD-05, BOARD-06, BOARD-07, BOARD-09, BOARD-10, BOARD-24, BOARD-25, BOARD-29, BOARD-30 (retired 20.09.2026): the fixed-width text table (`board.render`) they described no longer exists; `--json`'s own item fields, `landings` array, and `uncut` array (BOARD-11..14, BOARD-26) carried the equivalent facts, `--html`'s own sections (retired in turn, 04.10.2026) alongside them while that page still existed.
+- BOARD-03, BOARD-04, BOARD-05, BOARD-06, BOARD-07, BOARD-09, BOARD-10, BOARD-24, BOARD-25, BOARD-29, BOARD-30 (retired).
 
 ## `--json`
 

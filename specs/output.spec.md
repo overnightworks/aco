@@ -9,8 +9,7 @@ may and may not carry -- and applies to every command whose own spec cites
 `release`, `cut`, and `item` are its last
 (`specs/release.spec.md`, `specs/cut.spec.md`, `specs/item.spec.md`), each
 naming its own `reason` vocabulary with examples. Every `--json` command's
-own spec now cites this file (`check <sha>` was the last printer that
-still built an object of its own), including the refusals that fire
+own spec cites this file, including the refusals that fire
 before the
 named command starts (OUT-05) and the ones the argument parser itself
 raises on the way into a command that declares `--json` (OUT-06).
@@ -36,7 +35,7 @@ raises on the way into a command that declares `--json` (OUT-06).
 - [ ] [OUT-07] The exit code answers before the object does: a refusal is never exit `0`, so a caller reads the code, then `ok` and `reason`, then the payload keys.
 - [ ] [OUT-08] On every command, `--repo` not shaped OWNER/REPO refuses `repository must be OWNER/REPO, not '<value>'`, exit `2`, before any git or forge call; with `--json` as OUT-06 (see E-OUT-05).
 - [ ] [OUT-09] On every command, a long option spelled short of its full name is never read as that option: it is a parser refusal, exit `2`, with `--json` as OUT-06 (see E-OUT-06).
-- OUT-04 (retired 20.09.2026): the `{"ok": false, "error": "<sentence>"}` fallback it kept for a command whose own spec cited no `OUT-nn` no longer exists; every `--json` command cites this file now.
+- OUT-04 (retired).
 
 ## Never
 

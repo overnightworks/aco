@@ -65,7 +65,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-02] The same against an open issue that is not a container refuses `#<n> is not a container`, exit `2`.
 - [ ] [CUT-03] The same against a container that is itself a child of another item refuses `#<n> is itself a child of <ref>; nested containers are not supported`, exit `2`.
 - [ ] [CUT-34] `aco next` never proposes a cut CUT-03 refuses: it names a nested container's repair under `SKIPPED` instead (`specs/next.spec.md` NEXT-25, E-NEXT-09).
-- CUT-04 (retired 27.10.2026): the refusal for a forge that cannot create, link or write a cut slice went with the forge capability table, which no adapter ever answered `UNSUPPORTED` for a cut write (audit #331 finding 17).
+- CUT-04 (retired).
 
 ## The body precondition
 
@@ -88,7 +88,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-12] `aco cut ... --json` prints `specs/output.spec.md`'s envelope, `reason` `cut` or `adopted` (CUT-13), then `container`, `row`, `child` (see E-CUT-02).
 - [ ] [CUT-25] A fresh child's block: `now = "Cut from <label>"`, `next = "Build this slice; claim it with aco start."`, the row's `done_when` or `""`, `scope` (CUT-20), below a `Parent: <label>` line (E-CUT-07).
 - [ ] [CUT-37] With no linked row (CUT-10) the child's block keeps CUT-25's `now` and `next`, and its `done_when` stays `""` -- no row to take one from -- so `next` skips it (BODY-51) until it is filled.
-- CUT-36 (removed 02.10.2026): its refusal of a linked row without `done_when` never landed; such a row cuts, and its child's `done_when` stays `""` (CUT-25).
+- CUT-36 (removed).
 
 ## Adopting instead of duplicating
 

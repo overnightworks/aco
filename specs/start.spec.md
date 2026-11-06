@@ -1,7 +1,7 @@
 # `aco start`
 
 `aco start <item> [--scope PATH]... [--slug SLUG] [--whole REASON] [--out-of-order REASON]`
-replaces the four-line dance a dispatcher used to type by hand -- `git fetch`, `git worktree
+runs the four steps of starting a lane -- `git fetch`, `git worktree
 add ../<repo>-worktrees/issue-<n>-<slug> -b <prefix>/issue-<n>-<slug>`, `cd`, `aco claim <n>` --
 with one command. This file owns the worktree/branch it builds or resumes, the slug and prefix
 it derives, its own refusals, and how it mints or reuses the claim id underneath. It never
