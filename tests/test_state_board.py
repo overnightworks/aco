@@ -351,8 +351,8 @@ def _task_item(parent: str | None, title: str = "Slice A") -> bytes:
 
 
 def _blank_title_item(parent: str | None = None) -> bytes:
-    """The item `item new --title ""` wrote before blank titles were refused: a complete
-    `[record]` whose only defect is its empty title, under `parent`."""
+    """A complete `[record]` whose only defect is its empty title,
+    under `parent`."""
     return _task_item(parent, title="")
 
 
@@ -3761,8 +3761,8 @@ class TestCliStateRefForge:
         planted: str,
         neighbours: dict[str, bytes],
     ) -> None:
-        """An item `item new --title ""` wrote,
-        planted by hand beside `neighbours`, does not stop `item new` or
+        """An item with an empty title, planted by hand beside `neighbours`,
+        does not stop `item new` or
         `item show` of any other item -- its own child included, whose
         header needs only the parent's id -- nor (ITEM-53,
         ITEM-54, PIN-29), `item close` of an item it is neither, nor the
