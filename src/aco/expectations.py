@@ -481,6 +481,16 @@ def _refuse_a_changed_card(index: int, entry: dict[str, object], shown_card_hash
         )
 
 
+def _refuse_an_asked_on_after_today(index: int, entry: dict[str, object], today: date) -> None:
+    """A line asked after today's UTC date would be ruled before it was asked."""
+    asked_on = entry.get(ASKED_ON)
+    if isinstance(asked_on, date) and asked_on > today:
+        raise ExpectationOptionChoiceError(
+            f"line {index} has asked_on {asked_on}, after today's UTC date {today}; "
+            "asked_on must be today's UTC date or earlier"
+        )
+
+
 def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionChoice) -> None:
     """The choice checks after the card's: a letter is on it and, kept as
     recommended, is the recommended one, in that order. An own answer needs no
@@ -506,8 +516,8 @@ def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> 
     own -- and keeps every other key, so its stored hash is the hash of the
     card it shows -- and drops `returned_on` and `returned_note` of a line that
     was with its head. Refuses as `_open_entry` does, then a default ruling of
-    a line with its head, a changed card, and as `_refuse_a_wrong_choice` does,
-    before any write."""
+    a line with its head, a changed card, and as `_refuse_a_wrong_choice` does, then an
+    `asked_on` after `ruled_on`, before any write."""
     answer = choice.answer
     if isinstance(answer, OtherAnswer):
         ruling, own_answer, flag = OTHER, {OTHER: answer.text}, _OTHER_FLAG
@@ -521,6 +531,7 @@ def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> 
             )
         _refuse_a_changed_card(index, entry, choice.shown_card_hash)
         _refuse_a_wrong_choice(index, entry, choice)
+        _refuse_an_asked_on_after_today(index, entry, ruled_on)
         return {
             **{key: value for key, value in entry.items() if key not in _RETURNED_KEYS},
             "ruling": ruling,

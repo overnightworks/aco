@@ -33,7 +33,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
-| option line defective | BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91, BODY-93, BODY-101, BODY-102, BODY-107 | BODY-50 | BODY-52 |
+| option line defective | BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91, BODY-93, BODY-101, BODY-102, BODY-107, BODY-108 | BODY-50 | BODY-52 |
 | complete option line, open or ruled | BODY-85, BODY-89 | — | — |
 | option line ruled `other` | BODY-92 | — | — |
 | an open option line with its head | BODY-94 | — | — |
@@ -120,7 +120,7 @@ otherwise one carrying `option` is an option line; any other is a ruled yes/no
 line, read-only history judged by BODY-26..BODY-42. Its keys, in the order a rewrite
 writes them:
 
-- `text`, then `asked_on` (a TOML local date: the day the head asked the line, required until it is ruled, never covered by the card hash; the head writes it with the card, aco never writes or changes it, and a line sent back and asked again carries the day it is asked again), then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open), and `other` exactly when `ruling` is `other`, then `returned_on` and an optional `returned_note` while the line is open and with its head;
+- `text`, then `asked_on` (a TOML local date: today's UTC date when the head asked the line, as `ruled_on` is dated, required until it is ruled, never covered by the card hash; the head writes it with the card, aco never writes or changes it, and a line sent back and asked again carries the day it is asked again), then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open), and `other` exactly when `ruling` is `other`, then `returned_on` and an optional `returned_note` while the line is open and with its head;
 - `question`, `problem`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required, and `picture` (TODAY) with its `caption`, each optional;
 - 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then at most one of `picture` with an optional `caption` and `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
 
@@ -141,7 +141,7 @@ one decision in two to five words, for example `Song stays open`.
 The options' letters are `A`..`D` by position and never stored; `<L>` below
 is the present letters, for example `A, B`. A line ruled `other` is bound by
 `other`, not by its `text` or options. Inside one entry the refusals print
-in this order: `text`, `asked_on`, decided state, line keys, options, pictures, picture
+in this order: `text`, `asked_on`, decided state (BODY-108 right after its `ruled_on`), line keys, options, pictures, picture
 budget, unknown keys, the card rules of BODY-95..BODY-99, and last BODY-87, only when no
 other refusal fired.
 
@@ -209,6 +209,7 @@ other refusal fired.
 - [ ] [BODY-101] An open or returned option line without `asked_on` prints `body malformed: expectation[0].asked_on: expectation[0].asked_on is required`, exit `2` (see E-BODY-17).
 - [ ] [BODY-102] An `asked_on` that is no TOML local date (a datetime too) prints `body malformed: expectation[0].asked_on: expectation[0].asked_on must be a TOML local date`, exit `2` (see E-BODY-17).
 - [ ] [BODY-103] A ruled option line may lack `asked_on`: `body ok`, exit `0`; its card hash is the same with and without the key, so BODY-87 never fires on it (see E-BODY-17).
+- [ ] [BODY-108] A ruled line whose `ruled_on` is before its `asked_on` prints `body malformed: expectation[0].ruled_on: expectation[0].ruled_on <date> is before asked_on <date>`, exit `2` (see E-BODY-17).
 
 The card hash belongs to option lines and covers every key listed above except
 the decided state. It never covers the item title, the index, `asked_on`, `ruling`, `ruled_on`,
@@ -982,6 +983,7 @@ Setup: bare-remote, `storage = "github"`; E-BODY-10's card
 
 E-BODY-10's card without its `asked_on` line prints `2> body malformed: expectation[0].asked_on: expectation[0].asked_on is required`, exit `2`; the same with `asked_on = "2026-10-28"` or `asked_on = 2026-10-28T10:00:00` prints `2> body malformed: expectation[0].asked_on: expectation[0].asked_on must be a TOML local date`, exit `2`.
 With the `ruling`, `ruled_on` and `via` of E-BODY-12, the `card_hash` E-BODY-10 states and no `asked_on` it prints `body ok`, exit `0`: the key is outside the hash.
+With that ruled line's `asked_on = 2026-10-28` kept and `ruled_on = 2026-10-27` it prints `2> body malformed: expectation[0].ruled_on: expectation[0].ruled_on 2026-10-27 is before asked_on 2026-10-28`, exit `2`; with `ruled_on = 2026-10-28` it prints `body ok`, exit `0`.
 
 ### E-BODY-18 — an open yes/no line
 

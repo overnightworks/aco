@@ -53,6 +53,7 @@ withdrawn one.
 | line `N` was withdrawn by its head | RULE-37 | RULE-09 | — |
 | `--option` names a letter not on the card | RULE-18 | RULE-09 | — |
 | `--via default` names another letter than the recommended one | RULE-19 | RULE-09 | — |
+| `--option` or `--other` on a line asked after today's UTC date | RULE-38 | RULE-09 | — |
 | item does not exist | RULE-07 | RULE-09 | — |
 | item is a pull request | RULE-08 | RULE-09 | — |
 | item body malformed | RULE-28 | RULE-09 | — |
@@ -99,11 +100,12 @@ withdrawn one.
 - [ ] [RULE-18] A letter not on the card refuses `line <k> has no option <X>; its options are <L>`, exit `2`, before any write, after RULE-17 (see E-RULE-10).
 - [ ] [RULE-19] `--via default` with a letter other than the card's `recommended` refuses `--via default keeps only the recommended option <R>, not <X>`, exit `2`, before any write, after RULE-18.
 - [ ] [RULE-21] A blank or all-whitespace `--other` refuses `--other needs a non-empty answer`, exit `2`, before any forge call, after RULE-15 (see E-RULE-11).
+- [ ] [RULE-38] `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (see E-RULE-16), exit `2`, before any write, after RULE-19.
 - [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-26] A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
 - [ ] [RULE-27] `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-28] A MALFORMED item body refuses `#<n> <body defect sentence>; rule needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref` (see E-OUT-02).
-- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 24, 26..28, 33..35, 37) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
+- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 38, 24, 26..28, 33..35, 37) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
 - [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `brief`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
 - [ ] [RULE-33] A `--line` naming a line an earlier `--line` named refuses `line <k> is named twice`, exit `2`, before any forge call, after RULE-35 (see E-RULE-13).
 - [ ] [RULE-34] A misplaced `--option` or `--card-hash` refuses its sentence below, exit `2`, before any forge call, after RULE-35; it and RULE-33 judge the flags in the order written (see E-RULE-13):
@@ -120,7 +122,7 @@ withdrawn one.
 | RULE-04 (already ruled) | `already_ruled` |
 | RULE-05 (out of range) | `line_out_of_range` |
 | RULE-07 (missing item), RULE-08 (pull-request target), RULE-28 (malformed body) | `invalid_item` |
-| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter), RULE-33 (a line named twice), RULE-34 (a misplaced `--option` or `--card-hash`), RULE-35 (a flag given twice) | `invalid_usage` |
+| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter), RULE-38 (asked after today's UTC date), RULE-33 (a line named twice), RULE-34 (a misplaced `--option` or `--card-hash`), RULE-35 (a flag given twice) | `invalid_usage` |
 | RULE-17 (the card changed), RULE-37 (the line was withdrawn) | `card_changed` |
 | RULE-24 (already with its head), RULE-27 (`--via default` on such a line) | `with_head` |
 | RULE-11 (the write itself fails) | `unavailable` |
@@ -403,4 +405,14 @@ exit 2
 $ aco rule <item-id> --line 3 --option A --via chat --card-hash <hash>
 RULED <item-id> line 3 A; 0 line(s) still open
 exit 0
+```
+
+### E-RULE-16 — a line asked after today's UTC date refuses before any write
+
+Setup: bare-remote, bootstrapped, `<item-id>` open with an open option line 1 whose `asked_on` is the day after `<today>`, the runner's own today's UTC date
+
+```console
+$ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash>
+2> ERROR: line 1 has asked_on <tomorrow>, after today's UTC date <today>; asked_on must be today's UTC date or earlier
+exit 2
 ```
