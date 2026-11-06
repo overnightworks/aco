@@ -1,8 +1,0 @@
-claim_id = "a5c75c64d3ae4ebc878f655dbab3f2e5"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "e2ae053f375695a0f220cce1e70874e7eee53f54"
-branch = "claude/issue-665-size-statistics-leave"
-scope = ["pyproject.toml", "quality/config.toml", "scripts/spec_lint.py", "specs/board.spec.md", "specs/body-block.spec.md", "src/aco/board_read.py", "src/aco/body.py", "src/aco/cli.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_graphql.py", "src/aco/metrics.py", "src/aco/protocol.py", "src/aco/state_board.py", "src/aco/store.py", "src/aco/workboard.py", "tests"]
-opened_commit = "3f190778f683c1a991a2bef34b104f8c0ea55427"
-whole_reason = "One feature leaves whole: its computation, its --json keys, its spec rows and its tests; split, a spec or the code would describe the other half that is gone."
