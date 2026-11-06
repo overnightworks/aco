@@ -22,21 +22,17 @@ flowchart LR
   `specs/storage-pin.spec.md`). Its tree is the current state: `claims/`,
   `resources/`, `ids/`, `schema.toml` (the format version) and, for a repository
   without a forge, items. The commit message names the transition.
-  A released claim is absent from the tree and readable at the parent commit,
-  so there is no second history ref.
+  A released claim is absent from the tree and readable at the parent commit.
 - A transition is a pure function from the observed state and a typed intent
   to a new tree (`protocol.apply`). The store commits it on the observed tip
   and pushes with a plain fast-forward `git push`, never `--force` and never
-  `--force-with-lease`, because a matching lease can replace history. Only
-  `aco reset --confirm` forces: it deletes the ref with `--force-with-lease`
-  (CAS-43), as the documented recovery procedure. A
+  `--force-with-lease`. Only `aco reset --confirm` forces: it deletes the ref
+  with `--force-with-lease` (CAS-43), as the documented recovery procedure. A
   rejected push is not a failure by itself. The wire contract and the retry
   and failure semantics, including rejections that are not a race, are in
   `specs/ref-store-cas.spec.md`.
-- A resource (a number that must stay unique repository-wide) is allocated in
-  the same commit as the claim that requests it, so two lanes racing for it
-  serialize on the one ref. `specs/claim-record.spec.md` owns the allocation
-  outcomes.
+- A resource is a number that must stay unique repository-wide.
+  `specs/claim-record.spec.md` owns the allocation outcomes.
 - Ownership of item facts on GitHub: kind is the forge's native issue type
   (`Container`, `Task`, `Bug` or `Feature`; an unrecognized type maps to no
   kind, never guessed from a label), and parent and blocker relations are the
@@ -44,8 +40,6 @@ flowchart LR
   the `Parent:` recovery line `cut` writes; its owners are
   `specs/cut.spec.md` (CUT-25) and `specs/body-block.spec.md`. An item's
   contract is one fenced TOML block, specified in `specs/body-block.spec.md`.
-- Wide-scope thresholds are constants of the protocol, not configuration, so
-  two fleets in one repository cannot disagree on what "too wide" means.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
   forge. It raises typed errors (`ForgeNotFoundError`,
   `ForgePermissionDeniedError`, `ForgeTransientError` and the rest of its
@@ -57,6 +51,41 @@ flowchart LR
   `cmd_item` on `StateRefBoard` and `cmd_release` on both, so another forge
   needs its own contract for them before it can attach (the module docstring
   of `forge.py`).
+
+## Architectural Decisions
+
+One line per standing choice: the rule, its reason and the rejected
+alternative that keeps coming back.
+
+- Claims live in the state ref, one tree of `claims/` and `resources/`. The
+  ref has one serialization point, and one transition changes claim and
+  resource together. Rejected: per-item claim comments, because the comment
+  API has no conditional write, so two agents can both post and neither loses,
+  and a lane without an issue has no comment to hold; the assignee as the
+  lock, because it has no compare-and-swap and names a forge account, not the
+  agent and session holding the claim; Projects v2 fields, because they have
+  no demonstrated compare-and-swap and add a synchronisation step and GraphQL
+  coupling; one ref per key plus a resources ref, because a resource-holding
+  claim would have its hold and its number in two owners that can disagree,
+  and making them one transition needs `git push --atomic` across refs, which
+  is unverified on the hosts.
+- The state ref advances by a plain fast-forward push. A push already accepts
+  fast-forwards and rejects the rest, which is the serialization needed, and a
+  matching `--force-with-lease` can replace history. Rejected: the lease,
+  because it opens that history-loss path.
+- A released claim is absent from the tree and readable at the parent commit.
+  The commit message names the transition. Rejected: a second history ref,
+  because the parent commit already holds the history.
+- A resource is allocated in the same commit as the claim that requests it, so
+  two lanes racing for it serialize on the one ref and the loser re-applies
+  its intent and gets the next number. No cross-key invariant then rests on a
+  server capability.
+- Wide-scope thresholds are protocol constants, not configuration, so two
+  fleets in one repository cannot disagree on what "too wide" means.
+- The state-ref item store and the board stay although nobody uses them (see
+  "Kept although unused"). Rejected: deleting them, because the operator may
+  still take them into use and a repository without a forge, or deciding by
+  page, would then need a rebuild.
 
 ## Kept although unused
 
