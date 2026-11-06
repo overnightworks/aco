@@ -78,6 +78,7 @@ layers = [
     "decide",
     "board_read | policy | report",
     "session",
+    "ahead_of_caller",
     "checkout | store",
     "github | state_board",
     "github_graphql",

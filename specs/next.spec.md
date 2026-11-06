@@ -64,6 +64,12 @@ other printable space are text.
 | a closable container or recovery item, any rank | NEXT-18, NEXT-19, NEXT-28 | NEXT-14 |
 | neither exists | NEXT-20 | NEXT-14 |
 | any item under `storage = "state-ref"` | its id, as labels print it | NEXT-35 |
+| the trunk lists code built ahead of a closed, missing, pull request or unreadable item | NEXT-49 | NEXT-51 |
+| the trunk lists it beside an open item only | NEXT-49 | NEXT-51 |
+| the list is malformed or cannot be read | NEXT-50 | NEXT-52 |
+| a red entry, no actionable item | NEXT-53 | NEXT-53 |
+| an entry names an item of this repository or of another | NEXT-54 | NEXT-54 |
+| an entry's state is closed, missing, a pull request, unreadable | NEXT-55 | NEXT-51 |
 
 ## No actionable item
 
@@ -127,7 +133,7 @@ other printable space are text.
 - [ ] [NEXT-11] A work-item action's `reason` is `work_item` (`ok: true`), adding `number`, `score`, `title`, `next`, `command`, `ruling_landings`/`ruling_old`/`ruling_hint` per NEXT-04 (E-NEXT-07).
 - [ ] [NEXT-12] A cut proposal's `reason` is `"cut_slice"` (`ok: true`), the object adding `number`, `title`, `slice`, `cut_title`, `command` (see E-NEXT-07).
 - [ ] [NEXT-13] A close or check proposal's `reason` is `"close_container"` or `"check_container"` (`ok: true`), adding `number`, `closed`, `total`, `next_step` (`null` on close), never `command`.
-- [ ] [NEXT-14] The object always carries `recovery` (`{number, title, step}` each), `skipped` (`{number, reason}` each), `close` and `waiting_on_operator` (bare number arrays), independent of `reason`; see NEXT-44.
+- [ ] [NEXT-14] The object always carries `recovery` (`{number, title, step}`), `skipped` (`{number, reason}`), `close`, `waiting_on_operator` (bare number arrays), whatever `reason`; see NEXT-44, NEXT-51, NEXT-52.
 - [ ] [NEXT-15] `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope}` each, uncapped), and `scope_unknown` (a bare number array).
 - [ ] [NEXT-44] The object always carries `ideas`, a bare number array after `waiting_on_operator`, `[]` when no item carries the idea label (NEXT-43).
 - [ ] [NEXT-46] The object always carries `with_head`, after `ideas`: `{number, lines}` per item named by NEXT-45, `lines` the bare line indexes, `[]` when no line is with its head.
@@ -141,9 +147,21 @@ other printable space are text.
 | PIN-04 (`--repo` under `storage = state-ref`) | `invalid_usage` |
 | BOARD-02 (no forge adapter for host), PIN-05 (no resolvable default branch) | `unavailable` |
 
+## Code built ahead of its caller
+
+`specs/ahead-of-caller.spec.md` owns the list and what makes an entry red; this section owns what `next` prints and carries.
+
+- [ ] [NEXT-49] After `with head:`, before `SKIPPED`, text prints a line per red entry: `ahead of caller: <path>: item <item> <state> (<reason>)`, `<state>` per NEXT-55.
+- [ ] [NEXT-50] A malformed or unreadable list prints the one line `ahead of caller: unavailable (<sentence>)`; the rest is unchanged. Every foreign part of these lines is escaped as NEXT-37 does.
+- [ ] [NEXT-51] `--json` always carries `ahead_of_caller` after `with_head`: `{path, item, reason, state, error}`; `state` is `open`, `closed`, `missing`, `pull_request`, `unreadable`; `error` else `null`.
+- [ ] [NEXT-52] `--json` always carries `ahead_of_caller_unavailable` after `ahead_of_caller`: `null`, or the sentence NEXT-50 prints, and then `ahead_of_caller` is `[]`.
+- [ ] [NEXT-53] A red entry or an unavailable list never changes the exit status: a red entry beside `No actionable item.` prints its line and exits `3`, as today.
+- [ ] [NEXT-54] `<item>` is this repository's item as NEXT-35 names it (the bare number under `github`, the `aco-xxxxxx` id under `state-ref`), else `<owner>/<repo>#<n>`; `--json` `item` is that number, id or string.
+- [ ] [NEXT-55] `<state>` reads `is closed` for `closed`, `is not found or not accessible` for `missing`, `is a pull request` for `pull_request`, `is unreadable: <error>` for `unreadable`; open prints no line.
+
 ## Never
 
-- `aco next` never writes anything: it is a pure projection over the same read `board` performs.
+- `aco next` never writes anything: it is a pure projection: it reads what `board` reads, plus the trunk's ahead-of-caller list and the state of each item that list names (NEXT-49..55).
 - `close:` never fires the cut proposal's own `Next:`/`Run:` lines: a closable container's own action, when it is also the top action, never carries a command -- NEXT-06/NEXT-07 already refuse to invent one.
 - `parallel:`/`scope unknown:` never occupy or place a `board.recovery` item: a landed-but-open item is `close:`'s domain alone, never a `parallel:` candidate or an occupant that could crowd out a real free item behind it.
 - The first action's own row is never repeated inside `parallel:`'s candidate list, whatever its own scope is.
@@ -454,5 +472,24 @@ with head: #7 line 2
 exit 0
 $ aco next --json
 {"ok": true, ..., "ideas": [], "with_head": [{"number": 7, "lines": [2]}], ...}
+exit 0
+```
+
+### E-NEXT-17 — code built ahead of a closed item
+
+Setup: bare-remote, fake `gh`, run from the main checkout, the trunk holds `.aco/ahead-of-caller.toml` with `[[code]]` `path = "src/token.py"`, `item = "#12"`, `reason = "token helper"`; `#12` is closed, `#11` a scopeless open item
+
+```console
+$ aco next
+#11 score -10: Top work
+Next: Claim #11.
+Run: aco start 11 --slug=top-work --scope <paths>
+scope unknown
+parallel: unknown (first action names no scope)
+close: none
+ahead of caller: src/token.py: item 12 is closed (token helper)
+exit 0
+$ aco next --json
+{"ok": true, ..., "with_head": [], "ahead_of_caller": [{"path": "src/token.py", "item": 12, "reason": "token helper", "state": "closed", "error": null}], "ahead_of_caller_unavailable": null, ...}
 exit 0
 ```

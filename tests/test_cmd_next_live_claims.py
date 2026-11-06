@@ -120,5 +120,7 @@ def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_ever
             "waiting_on_operator": [],
             "ideas": [],
             "with_head": [],
+            "ahead_of_caller": [],
+            "ahead_of_caller_unavailable": None,
         },
     )

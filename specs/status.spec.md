@@ -26,6 +26,7 @@ shared sink `specs/ref-store-cas.spec.md`'s own preamble already documents.
 | a claim overlapping another's scope | STAT-06 | STAT-08 | — | — |
 | a matching claim, `lane_shared` configured | STAT-19, STAT-20 | STAT-22 | STAT-23 | STAT-22 |
 | the trunk's committed `board.toml` refuses | STAT-21 | STAT-22 | STAT-23 | STAT-22 |
+| the trunk's `.aco/board.toml` holds no file | STAT-33 | STAT-33 | STAT-33 | STAT-33 |
 | one holder, no extra fields | — | STAT-07, STAT-09 | STAT-11 | STAT-13 |
 | more than one holder of one path | — | — | STAT-12 | STAT-13 |
 | `storage = "state-ref"` | STAT-14 | STAT-15 | — | — |
@@ -66,7 +67,8 @@ the peer and its claim id, never the meeting paths.
 
 - [ ] [STAT-19] Text `aco status` over a claim ends with one line `lane-shared: <entry>, <entry>`, each entry the trunk's committed `lane_shared` names (PIN-37); none configured or no trunk (STAT-31), no such line.
 - [ ] [STAT-20] An entry naming no file the trunk tracks -- a directory, a missing file -- shows as `<entry> (names no file)`, never as a bare grant (see E-STAT-06).
-- [ ] [STAT-21] A trunk copy that refuses (an unknown key, PIN-38, PIN-39) shows `lane-shared: unavailable (<sentence>)` instead; the claims still print, exit unchanged (see E-STAT-06).
+- [ ] [STAT-21] A trunk copy whose content refuses (an unknown key, PIN-38, PIN-39) shows `lane-shared: unavailable (<sentence>)` instead; the claims still print, exit unchanged (see E-STAT-06).
+- [ ] [STAT-33] The trunk's `.aco/board.toml` holding no file refuses `aco status` whole before any claim prints, with or without `--path`: `unavailable`, exit `2`, under `--json` `reason: "unavailable"`.
 - [ ] [STAT-22] `--json`, also with `--path`, ends with `"lane_shared": [{"path", "names_a_file"}, ...]` and `"lane_shared_unavailable": null`; on STAT-21's defect `null` and `"<sentence>"`.
 - [ ] [STAT-23] `aco status --path P` with no holder prints `LANE-SHARED P` when P is a file an entry names (STAT-20); STAT-21's line follows the answer (see E-STAT-06).
 
@@ -105,7 +107,7 @@ the peer and its claim id, never the meeting paths.
 
 ## Never
 
-- `aco status` never guesses the trunk after a failed read of `<remote>/HEAD`: it reports `unavailable` with git's own text, exit `2` (STAT-18); STAT-21 stays for a defective trunk copy.
+- `aco status` never guesses the trunk after a failed read of `<remote>/HEAD`: it reports `unavailable` with git's own text, exit `2` (STAT-18); STAT-21 stays for a defective trunk copy, STAT-33 refuses a copy that holds no file.
 - `aco status --path` never reads a claim's committer-date age: a lineage break in an unrelated claim's `opened_commit` never stops its answer, unlike the plain (non-`--path`) read, which surfaces that break by CLAIM-50's own sentence.
 - `aco status` never writes: it is a pure read of the fetched state, never a compare-and-swap transition -- only `aco bootstrap`'s ordinary path creates `refs/aco/state` (`specs/ref-store-cas.spec.md`'s own Never line; `aco reset --confirm` reaches the same creation, CAS-44/CAS-46), and no other command here writes it either.
 - `aco status --json`'s `"issue"` field is never the state-ref item id, even under that pin (STAT-15).

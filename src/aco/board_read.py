@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import body, checkout, forge, protocol, store, workboard
+from . import ahead_of_caller, body, checkout, forge, github, protocol, store, workboard
 from .session import RunContext
 
 
@@ -418,3 +418,35 @@ def require_readable_item(client: forge.ForgeReader, issue: workboard.Issue | No
     unreadable, so this does nothing there."""
     if issue is not None and issue.unreadable is not None:
         client.item_reference(issue.number)
+
+
+def _item_state(
+    target: ahead_of_caller.ItemTarget, own_forge: forge.ForgeReader
+) -> tuple[ahead_of_caller.ItemState, str | None]:
+    reader = own_forge if target.repository is None else github.GitHubForge(target.repository)
+    try:
+        return ahead_of_caller.state_of(reader.item_reference(target.number)), None
+    except protocol.ClaimError as error:
+        return ahead_of_caller.ItemState.UNREADABLE, str(error)
+
+
+def ahead_of_caller_reading(
+    context: RunContext,
+) -> tuple[ahead_of_caller.JudgedEntry, ...] | ahead_of_caller.Unavailable:
+    """The trunk's list of code built ahead of its caller with each entry's
+    item read once per distinct reference, or why the list is unavailable.
+    The trunk's copy counts, never the worktree's."""
+    try:
+        text = checkout.file_at_revision(
+            ahead_of_caller.LIST_PATH, revision=context.trunk_ref, directory=context.toplevel
+        )
+    except (protocol.ClaimError, UnicodeDecodeError) as error:
+        return ahead_of_caller.Unavailable(f"{ahead_of_caller.LIST_PATH} cannot be read: {error}")
+    parsed = ahead_of_caller.parse(text or "")
+    if isinstance(parsed, ahead_of_caller.Unavailable):
+        return parsed
+    states = {
+        target: _item_state(target, context.forge)
+        for target in dict.fromkeys(entry.item for entry in parsed)
+    }
+    return tuple(ahead_of_caller.JudgedEntry(entry, *states[entry.item]) for entry in parsed)
