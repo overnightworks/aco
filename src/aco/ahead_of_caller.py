@@ -135,13 +135,15 @@ def parse(text: str) -> tuple[Entry, ...] | Unavailable:
     if not isinstance(tables, list) or not all(isinstance(table, dict) for table in tables):
         return Unavailable(f"{LIST_PATH}: 'code' must be an array of tables")
     entries: list[Entry] = []
+    seen: set[tuple[str, ItemTarget]] = set()
     for position, table in enumerate(tables, start=1):
         parsed = _entry_or_sentence(position, table)
         if isinstance(parsed, str):
             return Unavailable(parsed)
-        if any((parsed.path, parsed.item) == (seen.path, seen.item) for seen in entries):
+        if (parsed.path, parsed.item) in seen:
             return Unavailable(
                 f"{LIST_PATH}: code entry {position} repeats the path and item of an earlier entry"
             )
+        seen.add((parsed.path, parsed.item))
         entries.append(parsed)
     return tuple(entries)

@@ -273,16 +273,17 @@ def _ahead_item_name(target: ahead_of_caller.ItemTarget, storage: body.Storage) 
     return f"{target.repository.path}#{target.number}"
 
 
+_AHEAD_STATE_PHRASES = {
+    ahead_of_caller.ItemState.CLOSED: "is closed",
+    ahead_of_caller.ItemState.MISSING: "is not found or not accessible",
+    ahead_of_caller.ItemState.PULL_REQUEST: "is a pull request",
+}
+
+
 def _ahead_state_phrase(judged: ahead_of_caller.JudgedEntry) -> str:
-    match judged.state:
-        case ahead_of_caller.ItemState.CLOSED:
-            return "is closed"
-        case ahead_of_caller.ItemState.MISSING:
-            return "is not found or not accessible"
-        case ahead_of_caller.ItemState.PULL_REQUEST:
-            return "is a pull request"
-        case _:
-            return f"is unreadable: {protocol.terminal_text(str(judged.error))}"
+    if judged.state is ahead_of_caller.ItemState.UNREADABLE:
+        return f"is unreadable: {protocol.terminal_text(str(judged.error))}"
+    return _AHEAD_STATE_PHRASES[judged.state]
 
 
 def _ahead_lines(
