@@ -731,7 +731,9 @@ class TestLandAfterMergeRerun:
                 RerunCase(
                     preparation=RerunPreparation.FAILED_LAND,
                     close_error="forge unreachable (simulated)",
-                    merge_message="Merge pull request #12\n\nCloses #72\n\nWork-Item: #72\n",
+                    merge_message="feat: land the lane (#12)\n\nCloses #72\n\nWork-Item: #72\n",
+                    merge_parents=1,
+                    lane_ancestor=1,
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
                     "release (forge unreachable (simulated)); re-run aco land 12\n",
@@ -747,7 +749,9 @@ class TestLandAfterMergeRerun:
                     body="No-Item: fix",
                     merge_body="No-Item: fix",
                     merge_trailers="No-Item: fix\n",
-                    merge_message="Merge pull request #12\n\nNo-Item: fix\n",
+                    merge_message="feat: land the lane (#12)\n\nNo-Item: fix\n",
+                    merge_parents=1,
+                    lane_ancestor=1,
                     delete_error="delete branch failed (simulated)",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
@@ -767,7 +771,9 @@ class TestLandAfterMergeRerun:
                     "follow-up incomplete: "
                     "release (forge unreachable (simulated)); re-run aco land 12\n",
                     changed_body="Advances #72",
-                    merge_message="Merge pull request #12\n\nCloses #72\n\nWork-Item: #72\n",
+                    merge_message="feat: land the lane (#12)\n\nCloses #72\n\nWork-Item: #72\n",
+                    merge_parents=1,
+                    lane_ancestor=1,
                 ),
                 id="merge-trailer-survives-body-edit",
             ),

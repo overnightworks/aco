@@ -119,7 +119,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 ## Merge, composed by `aco land`
 
 - [ ] [LANDCMD-12] `aco land` merges pinned to the head sha read during preflight, never an unpinned re-read, with the method LANDCMD-27 picks: a merge commit or one squash commit, never a rebase.
-- [ ] [LANDCMD-27] `merge_method` `"merge"`/`"squash"` in `<path>` picks the method; else a merge commit if GitHub's allowed methods (LANDCMD-39) include one, else a squash.
+- [ ] [LANDCMD-27] `merge_method` `"merge"`/`"squash"` in `<path>` picks the method; else a squash if GitHub's allowed methods (LANDCMD-39) include one, else a merge commit (E-LANDCMD-27).
 - [ ] [LANDCMD-39] GitHub's allowed methods are `allow_merge_commit`/`allow_squash_merge`/`allow_rebase_merge` (all three where withheld), narrowed by every rule on `<branch>` (LANDCMD-42).
 - [ ] [LANDCMD-42] A `pull_request` rule narrows them to its `allowed_merge_methods` (not at all without that list), a `required_linear_history` rule drops `merge`, and a plan without rulesets narrows nothing.
 - [ ] [LANDCMD-40] A pin non-empty allowed methods exclude refuses `board.toml merge_method <m> is not allowed on <branch>: GitHub allows <list>`, exit `2`, before any write, after LANDCMD-28 (E-LANDCMD-40).
@@ -328,6 +328,20 @@ exit 0
 ```
 
 `main` gains one squash commit titled `<title> (#57)` (LANDCMD-29), never a merge commit the ruleset forbids.
+
+### E-LANDCMD-27 — an unpinned repository allowing both methods lands one squash commit
+
+Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, no `merge_method` in `<path>`, the repository's settings allowing a merge commit and a squash, no ruleset
+
+```console
+$ aco land 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+exit 0
+```
+
+`main` gains one squash commit titled `<title> (#57)` (LANDCMD-29) whose message is as LANDCMD-13 says, never a merge commit.
 
 ### E-LANDCMD-40 — a pin the default branch's rules exclude refuses before any write
 

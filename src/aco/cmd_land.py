@@ -341,11 +341,10 @@ def _land_merge_method(
     pinned: workboard.MergeMethod | None, client: github.GitHubForge, number: int, branch: str
 ) -> workboard.MergeMethod:
     """The method `aco land` merges pull request `number` into `branch` with: the board
-    configuration's own pin, refused where
-    the forge's allowed methods exclude it; otherwise a merge commit wherever
-    the forge allows one, and a squash where it allows a squash but no merge
-    commit -- never a rebase, so a forge allowing no method at all, or only a
-    rebase to an unpinned land, refuses."""
+    configuration's own pin, refused where the forge's allowed methods exclude it;
+    otherwise a squash wherever the forge allows one, and a merge commit where it
+    allows a merge commit but no squash -- never a rebase, so a forge allowing no
+    method at all, or only a rebase, to an unpinned land refuses."""
     allowed = _land_read(
         number, "its merge rules", lambda: _forge_allowed_merge_methods(client, number, branch)
     )
@@ -359,7 +358,7 @@ def _land_merge_method(
                 f"GitHub allows {allowed_list}"
             )
         return pinned
-    for method in (workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH):
+    for method in (workboard.MergeMethod.SQUASH, workboard.MergeMethod.MERGE):
         if method in allowed:
             return method
     raise protocol.ClaimUnavailableError(f"GitHub allows no merge method aco can use on {branch}")
