@@ -112,29 +112,17 @@ class TransitionIntent(StrEnum):
     LANDING = "landing"
 
 
-@dataclass(frozen=True)
-class _TransitionKind:
-    """One transition intent type's own registration: the commit message's
-    `intent:` trailer label `_transition_message` writes, paired with whether
-    this intent is claim-shaped -- carries `claim_id:` and a mandatory `item:`
-    trailer on write. `LandingIntent`, the one intent that is both claim- and
-    item-write-shaped, is one more row here, never a second place to update."""
-
-    label: TransitionIntent
-    claim_shaped: bool
-
-
 # ref-store-cas.spec.md, CAS-06: `intent: claim` / `rescope` / `release` / `item_write`
 # / `landing` (`LandingIntent`'s atomic close-and-release).
-_TRANSITION_KINDS: dict[type[ClaimTransitionIntent], _TransitionKind] = {
-    ClaimIntent: _TransitionKind(label=TransitionIntent.CLAIM, claim_shaped=True),
-    RescopeIntent: _TransitionKind(label=TransitionIntent.RESCOPE, claim_shaped=True),
-    ReleaseIntent: _TransitionKind(label=TransitionIntent.RELEASE, claim_shaped=True),
-    ItemWriteIntent: _TransitionKind(label=TransitionIntent.ITEM_WRITE, claim_shaped=False),
+_TRANSITION_LABELS: dict[type[ClaimTransitionIntent], TransitionIntent] = {
+    ClaimIntent: TransitionIntent.CLAIM,
+    RescopeIntent: TransitionIntent.RESCOPE,
+    ReleaseIntent: TransitionIntent.RELEASE,
+    ItemWriteIntent: TransitionIntent.ITEM_WRITE,
     # A close commits as the item write it is; its live-claim check is a
     # precondition of `apply`, not a trailer of its own.
-    ItemCloseIntent: _TransitionKind(label=TransitionIntent.ITEM_WRITE, claim_shaped=False),
-    LandingIntent: _TransitionKind(label=TransitionIntent.LANDING, claim_shaped=True),
+    ItemCloseIntent: TransitionIntent.ITEM_WRITE,
+    LandingIntent: TransitionIntent.LANDING,
 }
 
 # `git ls-remote --exit-code` (git(1)): 2 is "no matching refs" -- the only
@@ -1218,76 +1206,37 @@ def _write_incremental_state_tree(
 
 @dataclass(frozen=True)
 class TransitionSubject:
-    """An item write's own commit-message identity: `text` is
-    the human-facing subject line (`"write item aco-xxxxxx"`). An item
-    write carries no `item:` trailer at all -- `item_id` on the intent
-    itself already names the file -- so this subject carries no `item`
-    field; a claim-shaped transition instead builds a `ClaimTransitionSubject`
-    below, whose `item` is mandatory rather than an easy-to-forget default.
+    """One transition's own commit-message identity: `text` is the
+    human-facing subject line (`"claim issue 42"`, `"write item aco-xxxxxx"`).
     """
 
     text: str
 
 
-@dataclass(frozen=True)
-class ClaimTransitionSubject:
-    """One claim-shaped transition's own commit-message identity:
-    `text` is the human-facing subject line
-    (`transition_subject`'s own `"claim issue 42"` prose) and `item`
-    -- `protocol.transition_item_identifier`'s own bare identifier -- is
-    mandatory: every claim/rescope/release produces a machine-readable
-    `item:` trailer, never reconstructed from `text`. Paired into one value since every
-    caller already builds both from the same identity/branch at once,
-    keeping `commit_transition` under the five-argument ceiling.
-    """
-
-    text: str
-    item: str
-
-
-def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> ClaimTransitionSubject:
-    """One claim-shaped transition's own `ClaimTransitionSubject` (ref-store-cas.spec.md, CAS-06):
-    `text` is `claim issue 42`, `rescope
-    lane docs/lane-cleanup`, and so on -- `action` plus `issue`/`lane` plus
-    `transition_item_identifier`'s own bare identifier; `item` is
-    that same identifier again, carried separately into the commit's own
-    mandatory `item:` trailer rather than reconstructed from `text`."""
+def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> TransitionSubject:
+    """One claim-shaped transition's own `TransitionSubject` (ref-store-cas.spec.md, CAS-06):
+    `text` is `claim issue 42`, `rescope lane docs/lane-cleanup`, and so on --
+    `action` plus `issue`/`lane` plus `transition_item_identifier`'s own bare identifier."""
     kind = "lane" if isinstance(identity, LaneIdentity) else "issue"
-    item = transition_item_identifier(identity, branch)
-    return ClaimTransitionSubject(f"{action} {kind} {item}", item=item)
+    return TransitionSubject(f"{action} {kind} {transition_item_identifier(identity, branch)}")
 
 
-def _transition_message(
-    subject: TransitionSubject | ClaimTransitionSubject, intent: ClaimTransitionIntent
-) -> str:
+def _transition_message(subject: TransitionSubject, intent: ClaimTransitionIntent) -> str:
     """The commit message trailer for one transition (ref-store-cas.spec.md, CAS-06):
     every intent carries `operation_id`, the one field `_find_operation_id`'s
-    replay search reads back; a claim-shaped intent also names its `claim_id` and its own
-    `item` (`subject.item`), an item write its `item_id` instead and no
-    `item:` line at all, and a landing -- the one intent that is both --
-    names `item_id` and `claim_id` together, plus its own `item:` line.
-    `subject`'s own type already matches `intent`'s (`commit_transition`'s own
-    contract): the assert here is the one place that pairing would show up
-    as a bug, not a second place callers must get right.
+    replay search reads back; a claim-shaped intent also names its `claim_id`,
+    an item write its `item_id` instead, and a landing -- the one intent that
+    is both -- names `item_id` and `claim_id` together.
     """
-    kind = _TRANSITION_KINDS[type(intent)]
-    assert kind.claim_shaped == isinstance(subject, ClaimTransitionSubject), (  # noqa: S101 - an intent is always paired with its own subject kind
-        f"{type(intent).__name__} is claim_shaped={kind.claim_shaped} but its subject is "
-        f"{type(subject).__name__}"
-    )
+    label = _TRANSITION_LABELS[type(intent)]
     if isinstance(intent, LandingIntent):
         subject_field = f"item_id: {intent.item_id}\nclaim_id: {intent.claim_id}"
     elif isinstance(intent, ItemWriteIntent | ItemCloseIntent):
         subject_field = f"item_id: {intent.item_id}"
     else:
         subject_field = f"claim_id: {intent.claim_id}"
-    item_line = f"item: {subject.item}\n" if isinstance(subject, ClaimTransitionSubject) else ""
     return (
-        f"{subject.text}\n\n"
-        f"operation_id: {intent.operation_id}\n"
-        f"{subject_field}\n"
-        f"{item_line}"
-        f"intent: {kind.label}\n"
+        f"{subject.text}\n\noperation_id: {intent.operation_id}\n{subject_field}\nintent: {label}\n"
     )
 
 
@@ -1354,16 +1303,12 @@ def _pushed(
 def commit_transition(
     *,
     observed: Observation,
-    subject: TransitionSubject | ClaimTransitionSubject,
+    subject: TransitionSubject,
     intent: ClaimTransitionIntent,
     transport: PushTransport | None = None,
 ) -> ClaimState:
     """Apply and push one claim/rescope/release/item-write/landing
-    transition: the production caller of `protocol.apply`. A
-    claim-shaped `subject`'s own `item` --
-    `protocol.transition_item_identifier(identity, branch)` -- becomes the
-    commit's own `item:` trailer, a landing included; an
-    item write's plain `TransitionSubject` carries no such field at all.
+    transition: the production caller of `protocol.apply`.
 
     The first attempt applies `intent` to the command's own `observed`
     state and reads nothing itself. Unlike `bootstrap`'s fixed

@@ -5199,9 +5199,7 @@ class TestCliStateRefForge:
         assert issue_claim.main(["item", "close", str(CLOSE_BLOCKER_NUMBER)]) == 0
         store.commit_transition(
             observed=fresh_observation(worktree, f"file://{bare_remote}"),
-            subject=store.ClaimTransitionSubject(
-                f"claim issue {CLOSE_BLOCKER_NUMBER}", item=str(CLOSE_BLOCKER_NUMBER)
-            ),
+            subject=store.TransitionSubject(f"claim issue {CLOSE_BLOCKER_NUMBER}"),
             intent=protocol.ClaimIntent(
                 identity=protocol.IssueIdentity(CLOSE_BLOCKER_NUMBER),
                 agent="Codex Sol",

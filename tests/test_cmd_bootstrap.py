@@ -117,7 +117,7 @@ def test_bootstrap_whose_creation_push_is_rejected_by_a_rival_leaves_the_rivals_
             store.bootstrap(worktree=rival_checkout, remote=remote)
             store.commit_transition(
                 observed=fresh_observation(rival_checkout, remote),
-                subject=store.ClaimTransitionSubject("claim issue 7", item="7"),
+                subject=store.TransitionSubject("claim issue 7"),
                 intent=claim_intent(
                     identity=protocol.IssueIdentity(7), claim_id="rival-claim", operation_id="rival"
                 ),

@@ -6837,7 +6837,7 @@ def _land_real_claim(
 ) -> protocol.ActiveClaim:
     claim_state = store.commit_transition(
         observed=fresh_observation(worktree, remote),
-        subject=store.ClaimTransitionSubject(f"claim issue {issue}", item=str(issue)),
+        subject=store.TransitionSubject(f"claim issue {issue}"),
         intent=protocol.ClaimIntent(
             identity=protocol.IssueIdentity(issue),
             agent="Codex Sol",
@@ -7285,7 +7285,7 @@ def test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state(
 
     new_state = store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
-        subject=store.ClaimTransitionSubject("release issue 10", item="10"),
+        subject=store.TransitionSubject("release issue 10"),
         intent=protocol.LandingIntent(
             item_id=item_id,
             item_expected=open_oid,
@@ -7407,7 +7407,7 @@ def test_a_pinned_claim_refuses_once_its_item_closes_between_its_rejection_and_r
             intent=close,
         )
     )
-    subject = store.ClaimTransitionSubject("claim issue 10", item="10")
+    subject = store.TransitionSubject("claim issue 10")
     claim = _claim_pinned_to_item(10, open_oid)
 
     observed = fresh_observation(worktree, bare_remote)
@@ -7441,7 +7441,7 @@ def test_a_pinned_claim_on_an_unchanged_open_item_lands_past_an_unrelated_racer(
 
     new_state = store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
-        subject=store.ClaimTransitionSubject("claim issue 10", item="10"),
+        subject=store.TransitionSubject("claim issue 10"),
         intent=claim,
         transport=racer,
     )
@@ -7480,7 +7480,7 @@ def test_landing_intent_refuses_a_stale_item_oid_without_writing_anything(
         operation_id="land-op-10-stale",
     )
 
-    subject = store.ClaimTransitionSubject("release issue 10", item="10")
+    subject = store.TransitionSubject("release issue 10")
     observed = fresh_observation(worktree, bare_remote)
     with pytest.raises(protocol.ClaimUnavailableError, match="was written since it was read"):
         store.commit_transition(

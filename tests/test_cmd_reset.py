@@ -442,7 +442,7 @@ def test_reset_refuses_live_claims_and_touches_nothing(
     ):
         store.commit_transition(
             observed=fresh_observation(clone, "origin"),
-            subject=store.ClaimTransitionSubject("claim reset example", item=branch),
+            subject=store.TransitionSubject("claim reset example"),
             intent=claim_intent(
                 identity=identity,
                 agent=agent,
@@ -889,12 +889,12 @@ def test_reset_bundle_restores_the_released_history(
     store.bootstrap(worktree=clone, remote="origin")
     store.commit_transition(
         observed=fresh_observation(clone, "origin"),
-        subject=store.ClaimTransitionSubject("claim issue 42", item="42"),
+        subject=store.TransitionSubject("claim issue 42"),
         intent=claim_intent(claim_id=claim_id),
     )
     store.commit_transition(
         observed=fresh_observation(clone, "origin"),
-        subject=store.ClaimTransitionSubject("release issue 42", item="42"),
+        subject=store.TransitionSubject("release issue 42"),
         intent=protocol.ReleaseIntent(
             claim_id=protocol.ClaimId(claim_id),
             agent="Ada",

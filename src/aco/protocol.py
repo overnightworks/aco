@@ -130,12 +130,8 @@ ClaimIdentity = IssueIdentity | LaneIdentity
 
 def transition_item_identifier(identity: ClaimIdentity, branch: str) -> str:
     """The bare work item a claim/rescope/release transition names -- an
-    issue number as text, or a lane's own branch: computed
-    once from the identity/branch every caller already has, and stored
-    verbatim in the commit's own `item:` trailer (`store._transition_message`),
-    never a second grammar reconstructed from the commit's human-prose subject line.
-    `store.transition_subject` also reads this for the identifier half of its
-    own `"claim issue 42"`/`"rescope lane docs/x"` prose.
+    issue number as text, or a lane's own branch. `store.transition_subject`
+    ends its `"claim issue 42"`/`"rescope lane docs/x"` subject line with it.
     """
     if isinstance(identity, LaneIdentity):
         return branch
@@ -1635,13 +1631,10 @@ def _claim_toml_text(
 
 def _claim_toml_scope(data: Mapping[str, object], *, key: str, tip: ObjectId) -> tuple[str, ...]:
     """`data`'s `scope` field, projected through the one canonicalizer
-    (`valid_scope`) every live claim's scope already passes through at
-    creation and rescope: a claim file
-    written before that canonical order existed can still carry its paths
-    in typed order, so a read here must sort it rather than compare
-    against it unsorted. Never rewrites the ref (this is a read), and
-    never refuses a valid-but-unsorted legacy record -- only content
-    `valid_scope` itself would refuse from a fresh request, such as a
+    (`valid_scope`), the one canonicalizer a claim's scope passes through at
+    creation and rescope: a claim file whose paths are in another order reads
+    back equal to its canonical form. A read never rewrites the ref, and it
+    refuses only content `valid_scope` refuses from a fresh request, such as a
     non-repository-relative or duplicated path."""
     raw = data.get("scope")
     if not isinstance(raw, list) or not raw or any(not isinstance(entry, str) for entry in raw):
