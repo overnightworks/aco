@@ -28,8 +28,8 @@
 "tests/support/cli_fixtures.py" = 890
 "tests/support/github_fixtures.py" = 832
 "tests/test_board.py" = 3590
-"tests/test_checkout.py" = 2040
-"tests/test_cli.py" = 12105
+"tests/test_checkout.py" = 2039
+"tests/test_cli.py" = 12104
 "tests/test_cmd_adopt.py" = 1646
 "tests/test_cmd_cut.py" = 1069
 "tests/test_cmd_land_after_merge_rerun.py" = 873
@@ -38,9 +38,9 @@
 "tests/test_cmd_rescope_checkout.py" = 1087
 "tests/test_cmd_reset.py" = 952
 "tests/test_github.py" = 2841
-"tests/test_protocol.py" = 802
-"tests/test_state_board.py" = 5940
-"tests/test_store.py" = 5114
+"tests/test_protocol.py" = 801
+"tests/test_state_board.py" = 5937
+"tests/test_store.py" = 5109
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 82
