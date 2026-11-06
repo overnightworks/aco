@@ -57,7 +57,7 @@ def test_a_block_whole_reason_refuses_tab_and_every_display_control(character: s
 
 @pytest.mark.parametrize("character", DISPLAY_CONTROLS, ids=CONTROL_IDS)
 def test_a_branch_refuses_tab_and_every_display_control(character: str) -> None:
-    """Spec: defect:#417"""
+    """A branch holding TAB or a display control is not one bounded line."""
     payload: dict[str, object] = {"branch": f"ada/{character}work"}
 
     with pytest.raises(protocol.ClaimError, match="must be one bounded non-empty line"):

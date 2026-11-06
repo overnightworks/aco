@@ -423,8 +423,8 @@ def test_expectation_line_summary_keeps_short_text_unchanged() -> None:
 
 
 def _slice_pull_request_body(epic: int) -> str:
-    """A genuine slice-to-epic pull request body, in the shape observed
-    verbatim in atelier-2: the epic is named twice, once in
+    """A genuine slice-to-epic pull request body, in the shape a real
+    repository produces: the epic is named twice, once in
     substantive prose and again in a dedicated, non-closing trailer line.
     Both mentions are required — see
     `test_a_dedicated_reference_line_without_corroboration_confers_no_stage`
@@ -1527,7 +1527,7 @@ def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work
         ),
         pytest.param(
             122,
-            # The ruled shape (06.09.2026): several still-open rows are named
+            # Several still-open rows are named
             # by index, not by re-deriving it from a name string.
             slice_entries("Fifth slice", "Sixth slice", "Seventh slice", first_index=5),
             (
@@ -2710,9 +2710,9 @@ def test_board_reports_open_local_and_foreign_dependencies_as_blockers() -> None
     assert item.actionable_reason == "blocked by #3, overnightworks/other-repo#7"
 
 
-def test_board_json_splits_local_and_foreign_blockers_only_in_block_mode() -> None:
+def test_board_json_splits_local_and_foreign_blockers() -> None:
     """`open_blockers` keeps its local-int-only shape;
-    `foreign_blockers` is a separate key, present only under the block pin."""
+    `foreign_blockers` is a separate key."""
     issue = board_issue(300, "Depends on two", block_body(MINIMAL_BLOCK_TOML))
     dependencies = {
         300: (
@@ -2786,8 +2786,8 @@ def test_board_never_frees_on_a_closed_foreign_dependency_alone() -> None:
 
 
 def test_board_treats_a_same_repository_pull_request_dependency_like_any_other() -> None:
-    """Block mode has no `blocker-is-a-PR` check (prose-only): a same-
-    repository PR dependency follows its own open/closed state."""
+    """A same-repository pull request dependency follows its own
+    open/closed state like any other."""
     issue = board_issue(303, "PR blocker", block_body(MINIMAL_BLOCK_TOML))
     dependencies = {303: (block_dependency(88, is_pull_request=True),)}
     projected = projected_board(

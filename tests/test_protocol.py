@@ -138,8 +138,7 @@ def test_claim_scope_must_be_canonical_repository_relative_paths(scope: object, 
 
 
 def test_claim_scope_keeps_a_path_with_a_printable_space() -> None:
-    """Head ruling of 28.09.2026: NBSP is text, not a
-    display control, so a scope path carrying it stays a valid entry."""
+    """NBSP is text, not a display control, so a scope path carrying it stays a valid entry."""
     path = "docs/a\N{NO-BREAK SPACE}b.md"
 
     assert protocol.valid_scope([path]) == (path,)
@@ -798,5 +797,5 @@ def test_an_exclusive_claim_refuses_any_holder_of_its_branch_and_replays_unchang
 def test_decimal_number_reads_only_ascii_digits_up_to_the_bound(
     text: str, number: int | None
 ) -> None:
-    """Spec: CLAIM-64, BOARD-56, REL-60."""
+    """Spec: CLAIM-64, REL-60."""
     assert protocol.decimal_number_or_none(text) == number

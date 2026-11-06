@@ -351,8 +351,8 @@ def _task_item(parent: str | None, title: str = "Slice A") -> bytes:
 
 
 def _blank_title_item(parent: str | None = None) -> bytes:
-    """The item `item new --title ""` wrote before blank titles were refused: a complete
-    `[record]` whose only defect is its empty title, under `parent`."""
+    """A complete `[record]` whose only defect is its empty title,
+    under `parent`."""
     return _task_item(parent, title="")
 
 
@@ -1259,7 +1259,7 @@ EXPECTED_RULINGS_LINES_BY_STORAGE = {
     Storage.STATE_REF: _rulings_lines(_github_fake(), storage=Storage.STATE_REF),
 }
 # `state-ref` projects the identical scenario, never `_EXPECTED_BOARD` itself
-# `replace`d: `item.actionable_reason` is now baked
+# `replace`d: `item.actionable_reason` is baked
 # in at build time from `config.storage`, exactly like every other field a
 # real `state-ref` pin changes, so reusing the `Storage.GITHUB`-built board
 # for a different storage's own payload would silently keep its stale `#n`
@@ -1837,7 +1837,7 @@ def _enter_claim_lane(
 
 def _first_ruling_date(capsys: pytest.CaptureFixture[str]) -> str:
     """`rulings --json`'s first listed line's own `ruled_on` (the
-    envelope: the array now sits under the `rulings` key), read back so a
+    envelope: the array sits under the `rulings` key), read back so a
     README-sequence assertion never has to guess the wall clock."""
     payload = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())
     return str(payload["rulings"][0]["lines"][0]["ruled_on"])
@@ -3127,10 +3127,7 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         """`board_read.build_board` reads `lists_pull_requests` (`False`): a live claim with
-        a branch and no pull request is in flight, not waiting for a landed signal.
-
-        Spec: defect:#447
-        """
+        a branch and no pull request is in flight, not waiting for a landed signal."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
         built = board_read.build_board(
@@ -3407,7 +3404,7 @@ class TestCliStateRefForge:
         piped body as github does -- prose above a block its flags build,
         or a piped block the flags agree with -- never dropping it; every
         section left empty is named on stderr, one line each. Stdin carries
-        a body only as a file or a pipe (head ruling 01.10.2026): the socket
+        a body only as a file or a pipe: the socket
         an agent harness hands over is never read, so the command returns."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
@@ -3764,8 +3761,8 @@ class TestCliStateRefForge:
         planted: str,
         neighbours: dict[str, bytes],
     ) -> None:
-        """An item `item new --title ""` once wrote,
-        planted by hand beside `neighbours`, no longer stops `item new` or
+        """An item with an empty title, planted by hand beside `neighbours`,
+        does not stop `item new` or
         `item show` of any other item -- its own child included, whose
         header needs only the parent's id -- nor (ITEM-53,
         ITEM-54, PIN-29), `item close` of an item it is neither, nor the
