@@ -1023,12 +1023,12 @@ def recorded_default_branch(remote: str, *, directory: Path | None = None) -> st
 def is_default_branch(branch: str, default_branch: str | None) -> bool:
     """Whether `branch` is the repository's default branch:
     `default_branch` -- `recorded_default_branch`'s answer -- or the
-    historical `{"main", "master"}` guess when none is recorded.
+    `{"main", "master"}` fallback guess when none is recorded.
 
     `claim`'s own worktree precondition (`_validate_worktree_branch`) alone,
     since a fresh claim is created by literally standing in the worktree it
     claims -- there is no attacker-reachable payload location to spoof
-    here, so the historical guess stays an accepted risk.
+    here, so the fallback guess stays an accepted risk.
     `rescope` denies outright when no default branch is recorded, rather than share this guess.
     """
     if default_branch is not None:
@@ -1076,7 +1076,7 @@ def trunk_ref(remote: str, *, directory: Path) -> str:
 def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) -> str:
     """`remote`'s trunk ref in `directory`: `recorded_head` -- `remote`'s
     recorded `HEAD` as `recorded_head_ref` read it -- or, when `remote`
-    never recorded one or it dangles, the historical `{main, master}` guess,
+    never recorded one or it dangles, the `{main, master}` fallback guess,
     `remote`'s own before the local branch. A `RunContext` asks
     this once per directory, and again only after its run's fetch, so a trunk is never resolved
     from a `HEAD` read before it.

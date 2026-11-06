@@ -485,8 +485,8 @@ def _matching_store_claim(
     """The live store claim an interrupted, replayed `claim` invocation may
     reuse (claim-record.spec.md, CLAIM-13): same identity, agent, role, branch, scope, *and*
     claim id -- `protocol.apply` itself only replays on an exact claim-id match
-    (claim-record.spec.md, CLAIM-13), so a CLI-level replay
-    check that skips this slice's dispatch rules must use the same test, not
+    so a CLI-level replay
+    check that skips `claim`'s dispatch rules must use the same test, not
     the ledger's looser field-only match. Issueless lanes keep the
     one-claim-per-branch contract; only a numbered item gets replay
     detection at all.

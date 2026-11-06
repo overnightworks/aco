@@ -103,8 +103,8 @@ RECOVERY_STEP = "close or re-project"
 # A slice's pull request must never close its still-open epic — that would
 # retire the epic before its remaining slices exist. This repository's
 # established substitute is a whole line opening with one of these markers
-# (for example "Part of #79.", "Refs #956
-# and #80", "Refs #<n> ..."). Anchoring to the start of the line
+# (for example "Part of #79.", "Refs #956 and #80",
+# "Refs #<n> ..."). Anchoring to the start of the line
 # is what keeps a casual mid-paragraph mention — "as noted in #79's plan" —
 # from ever counting; only a dedicated reference line does. This is still a
 # syntactic marker, not a validated relation: GitHub has no structured field
@@ -1436,8 +1436,8 @@ def landing_rows(
     commit's own trailer names as landed, across the trunk walk's own depth
     -- the one source under both storages, independent of whether that item
     is still open. `github` alone adds one more row per item a merged pull
-    request plainly landed with no trailer of its own (`github`'s squash
-    convention before this repository trailer-tagged every landing),
+    request plainly landed with no trailer of its own (a squash merge
+    whose commit carries no trailer),
     deduplicated against the trunk rows, trailer path first. Newest first,
     so a reader sees the most recent landing at the top -- two rows landed
     at the same instant fall back to `_landing_row_tie_break_key`, negated
@@ -2327,7 +2327,7 @@ def _storage_item_name[ForgeName: (int, str)](
     `storage = STATE_REF` `items.format_item_id`'s `aco-xxxxxx` -- an id
     `parse_item_reference` accepts right back, so what a command prints is
     what the next command takes -- and under `GITHUB` the caller's own
-    forge form, byte-identical to every such name before the pin existed.
+    forge form, byte-identical to the name the forge prints.
     A number past `aco-ffffff` (`names_no_item`) -- a stored claim may
     still carry one -- keeps the forge form under either pin, since no id
     names it and a dressed-up `aco-1000000` would not parse back. `board`

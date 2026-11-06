@@ -353,7 +353,7 @@ class ExpectationOutOfRangeError(protocol.ClaimError):
 
 
 class ExpectationWithdrawnError(protocol.ClaimError):
-    """A ruling aimed at a line its head withdrew: nobody answers it any more."""
+    """A ruling aimed at a line its head withdrew: nobody answers it."""
 
 
 class ExpectationLineFormError(protocol.ClaimError):

@@ -1135,7 +1135,7 @@ def _slice_line_defects(slices: tuple[SliceRow, ...]) -> tuple[ContractDefect, .
     `protocol.is_display_control` character is a defect; a
     row's `done_when` keeps the same rule, since `cut` copies it into the
     child's one-line `done_when`. `board` and `next` keep
-    reading a body stored before this rule, and `next` names such a row
+    reading a stored body that breaks this rule, and `next` names such a row
     instead of printing its `cut` (`unprintable_slice_line_key`)."""
     return tuple(
         defect
