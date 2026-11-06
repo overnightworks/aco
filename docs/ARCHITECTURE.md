@@ -31,13 +31,12 @@ flowchart LR
   `specs/claim-record.spec.md` owns the allocation outcomes.
 - On GitHub, kind is the forge's native issue type (`Container`, `Task`,
   `Bug` or `Feature`; an unrecognized type maps to no kind, never guessed from
-  a label), and parent and blocker relations are the forge's sub-issue and
-  blocked-by relations. An item's contract is one fenced TOML block, specified
-  in `specs/body-block.spec.md`.
+  a label). An item's contract is one fenced TOML block, specified in
+  `specs/body-block.spec.md`.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
-  forge. Its errors are typed (`ForgeNotFoundError`,
+  forge. Its error types are `ForgeNotFoundError`,
   `ForgePermissionDeniedError`, `ForgeTransientError` and the rest of its
-  family). An adapter that cannot do an operation raises
+  family. An adapter that cannot do an operation raises
   `ForgeUnsupportedError`. The one capability a caller
   branches on is `BoardSource.lists_pull_requests`. GitHub is the only forge
   adapter; the state-ref item store implements the same port. The seam is not
