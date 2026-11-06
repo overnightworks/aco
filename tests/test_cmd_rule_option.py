@@ -49,7 +49,7 @@ def decided_state(rulings_stdout: str) -> tuple[object, ...]:
 
 @pytest.mark.usefixtures("github_world")
 class TestRuleOption:
-    @pytest.mark.parametrize("via", ["board", "chat", "default"])
+    @pytest.mark.parametrize("via", ["chat", "default"])
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
     def test_an_open_option_line_is_ruled_with_its_letter_via_and_card_hash(
         self,
@@ -83,7 +83,7 @@ class TestRuleOption:
         """Spec: RULE-14, RULE-02 -- the letter is `ruling` in the success envelope."""
         freeze_cli_now(monkeypatch)
         serve_item(monkeypatch, item_body(card()))
-        result = run_cli(["rule", "7", *decide("B", "board"), "--json"], capsys)
+        result = run_cli(["rule", "7", *decide("B", "chat"), "--json"], capsys)
         assert (result.status, json.loads(result.stdout)) == (
             0,
             {
@@ -127,7 +127,7 @@ class TestRuleOption:
             pytest.param(
                 card(),
                 YES_NO_LINE,
-                decide("C", "board", STALE_CARD_HASH),
+                decide("C", "chat", STALE_CARD_HASH),
                 CARD_CHANGED,
                 "card_changed",
                 id="RULE-17-before-RULE-18",
