@@ -293,7 +293,7 @@ class TestLandMerge:
                 MergeCase(
                     Landed(),
                     oversized_foreign_text=True,
-                    head_config=('priority_labels = ["ux"]\nidea_label = "idea"\n'),
+                    head_config='priority_labels = ["ux"]\nidea_label = "idea"\n',
                 ),
                 id="only-non-governing-settings-changed",
             ),

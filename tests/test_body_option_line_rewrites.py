@@ -6,13 +6,12 @@ old-only, new-only and mixed items, LF and CRLF, `github` and `state-ref`."""
 from __future__ import annotations
 
 import dataclasses
-from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, container_issue
-from cli_fixtures import real_git, run_cli, track_board_config
+from cli_fixtures import run_cli
 from github_fixtures import FakeForge, serve_forge
 from option_cards import assert_rewritten_alike, card, decide, ruled_card
 from store_fixtures import decoded_item_record
@@ -107,13 +106,10 @@ class TestCommandRewrites:
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
-        github_world: Path,
         item: str,
         newline: str,
     ) -> None:
         """Spec: BODY-88, CUT-11 -- removing a slice row re-renders the container's block."""
-        track_board_config(github_world, 'idea_label = "idea"\n')
-        assert real_git(github_world, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
         row = '\n[[slice]]\nindex = 1\ntitle = "Slice A"\ndone_when = "D"\n'
         raw = item_body(item, newline=newline, extra=row)
         container = dataclasses.replace(container_issue(79, ""), body=raw)
