@@ -1630,9 +1630,8 @@ def _claim_toml_text(
 
 
 def _claim_toml_scope(data: Mapping[str, object], *, key: str, tip: ObjectId) -> tuple[str, ...]:
-    """`data`'s `scope` field, projected through the one canonicalizer
-    (`valid_scope`), the one canonicalizer a claim's scope passes through at
-    creation and rescope: a claim file whose paths are in another order reads
+    """`data`'s `scope` field, projected through `valid_scope`, the one
+    canonicalizer a claim's scope passes through at creation and rescope: a claim file whose paths are in another order reads
     back equal to its canonical form. A read never rewrites the ref, and it
     refuses only content `valid_scope` refuses from a fresh request, such as a
     non-repository-relative or duplicated path."""

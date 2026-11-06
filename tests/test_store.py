@@ -1825,13 +1825,10 @@ def _raw_commit_message(remote: Path, commit: str) -> str:
 def test_commit_transition_writes_the_exact_trailer_block_for_a_claim_and_a_landing(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """`_transition_message`'s trailer block is the
-    one machine-readable shape `_find_operation_id`
-    read back key by key, in order -- pin every `key: value` line of a
-    claim transition's and a landing transition's own commit, read back
-    from the real pushed commit through `commit_transition`'s public write
-    path, never `_transition_message` called directly (which could drift
-    from what a real commit actually carries)."""
+    """Pins every `key: value` line of a claim transition's and a landing
+    transition's own commit, read from the real pushed commit through
+    `commit_transition`'s public write path, never `_transition_message`
+    called directly (which could drift from what a real commit carries)."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
 
     claim_state = store.commit_transition(
