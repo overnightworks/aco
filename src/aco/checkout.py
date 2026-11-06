@@ -446,7 +446,7 @@ def _validate_worktree_branch(
     cwd otherwise -- `claim`'s own precondition, since a fresh claim is
     created by literally standing in the worktree it claims. `default_branch`
     is the canonical remote's recorded default branch, or `None` when none
-    is recorded. `rescope` no longer shares this:
+    is recorded. `rescope` does not use this:
     it judges an already-resolved `PathCheckout` instead, via
     `refuse_shared_checkout` below, so a rescope invoked from a foreign cwd
     is not silently judged by the wrong checkout.
@@ -1023,12 +1023,12 @@ def recorded_default_branch(remote: str, *, directory: Path | None = None) -> st
 def is_default_branch(branch: str, default_branch: str | None) -> bool:
     """Whether `branch` is the repository's default branch:
     `default_branch` -- `recorded_default_branch`'s answer -- or the
-    historical `{"main", "master"}` guess when none is recorded.
+    `{"main", "master"}` fallback guess when none is recorded.
 
     `claim`'s own worktree precondition (`_validate_worktree_branch`) alone,
     since a fresh claim is created by literally standing in the worktree it
     claims -- there is no attacker-reachable payload location to spoof
-    here, so the historical guess stays an accepted risk.
+    here, so the fallback guess stays an accepted risk.
     `rescope` denies outright when no default branch is recorded, rather than share this guess.
     """
     if default_branch is not None:
@@ -1076,7 +1076,7 @@ def trunk_ref(remote: str, *, directory: Path) -> str:
 def trunk_ref_after(remote: str, recorded_head: str | None, *, directory: Path) -> str:
     """`remote`'s trunk ref in `directory`: `recorded_head` -- `remote`'s
     recorded `HEAD` as `recorded_head_ref` read it -- or, when `remote`
-    never recorded one or it dangles, the historical `{main, master}` guess,
+    never recorded one or it dangles, the `{main, master}` fallback guess,
     `remote`'s own before the local branch. A `RunContext` asks
     this once per directory, and again only after its run's fetch, so a trunk is never resolved
     from a `HEAD` read before it.
@@ -1151,7 +1151,7 @@ def _git_hex_placeholder(character: str) -> str:
 # -z`'s own record terminator, so splitting the whole raw stream on it
 # (`trunk_landings`, below) reads every record's four fields *and* the
 # boundary between records through the one byte git forbids inside a commit
-# message -- unlike the historical `\x1f` separator this replaces, which git
+# message -- unlike a `\x1f` separator, which git
 # never escapes inside a trailer *value* (a
 # probed value `#12\x1f#13` survived verbatim and silently split into two
 # fabricated work items).
@@ -1380,8 +1380,8 @@ def branch_prefix_for_identity() -> str:
 
 def refuse_unsafe_start_branch(branch: str, *, prefix: str) -> None:
     """Refuse `start`'s own built branch name before any git write (an unsafe `ACO_AGENT` first
-    word used to reach `git
-    worktree add` before the claim machinery ever validated the resulting
+    word would reach `git
+    worktree add` before the claim machinery validated the resulting
     branch, so an invalid name could leave an orphan worktree and branch
     behind). `slug_from_title`/`validate_slug` already bind the slug's own
     shape and `number` is always an int, so the one unsanitized ingredient
@@ -1598,7 +1598,7 @@ def existing_start_worktree(path: Path, branch: str) -> bool:
 
 def _attach_command(path: Path, branch: str) -> str:
     """The git command that puts the detached worktree at `path` on
-    `branch` (head ruling 27.09.2026: printed advice runs as printed):
+    `branch` (printed advice runs as printed):
     `switch -c` creates a branch that does not exist yet, plain `switch`
     checks out one that does."""
     create = () if branch_exists(branch) else ("-c",)
@@ -1886,7 +1886,7 @@ def _trunk_no_item_landing_defect(
 
 def _lane_work_item_trailer_defect(work_item_values: tuple[str, ...], pull_request: int) -> str:
     """The lane rule a `Work-Item:` trailer breaks, valid or malformed alike, ending in the only
-    way out: a landed trailer can no longer
+    way out: a landed trailer cannot
     change, so the lane is released as abandoned with the landing named."""
     values = ", ".join(work_item_values)
     return (

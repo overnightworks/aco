@@ -291,8 +291,7 @@ def _delivered_content_fields(
     `items.parse_item_record`'s own `.get(key, [])` default, which would
     turn an omitted `labels`/`blocked_by` into an emptied one rather than
     `stored`'s own value. A body with no `[record]` at all -- every
-    `rule`/`ask`/`cut` write already composes one -- changes nothing here,
-    exactly `update_item_body`'s behaviour before this issue. Every other
+    `rule`/`ask`/`cut` write already composes one -- changes nothing here. Every other
     record field (`parent`, `state`, `origin`, `kind`, the three
     timestamps) stays `stored`'s own regardless of what a delivered record
     names for it -- `update_item_body` itself, never this helper, owns
@@ -903,7 +902,7 @@ class StateRefBoard:
         transition actually commits, to fold it into this instance's own
         in-memory view -- this method itself writes nothing. Unlike
         `close_item`, it refuses beside an entry that names no item, before
-        any write (PIN-13; head ruling 01.10.2026)."""
+        any write (PIN-13)."""
         self._refuse_a_foreign_entry()
         return self._closing_write(number)
 

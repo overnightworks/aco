@@ -24,9 +24,8 @@ class _BoardReason(StrEnum):
 
 
 class _BoardNoModeUsageError(protocol.ClaimError):
-    """No `--json` given (BOARD-44): the retired text table
-    leaves `board` with no default mode of its own any
-    more, so a bare `aco board` must name `--json` instead of guessing."""
+    """No `--json` given (BOARD-44): `board` has no
+    default mode of its own, so a bare `aco board` must name `--json` instead of guessing."""
 
 
 _BOARD_NO_MODE_MESSAGE = "aco board requires --json"

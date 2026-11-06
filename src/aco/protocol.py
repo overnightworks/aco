@@ -945,9 +945,9 @@ def item_id_of_filename(filename: str) -> str | None:
 class ResourceRecord:
     """`resources/<name>.toml`: the never-reuse set for one resource name.
 
-    `occupied` never shrinks: a released value stays in it forever (today's
-    contract), so neither an auto nor an explicit intent can ever reassign a
-    value this resource has already given out.
+    `occupied` never shrinks: a released value stays in it forever, so neither
+    an auto nor an explicit intent can ever reassign a value this resource
+    has already given out.
     """
 
     name: str
@@ -1102,8 +1102,8 @@ class ReleaseIntent:
     `outcome` (`MergedRelease` | `AbandonedRelease`) carries no tree effect
     of its own -- `apply` never inspects it -- but is carried on the intent
     for the commit message `store.py` builds from this transition, and for
-    `MergedRelease`'s own pre-`apply` forge verification (criterion 9,
-    unchanged from today: failure there never reaches `apply` at all).
+    `MergedRelease`'s own pre-`apply` forge verification (failure there
+    never reaches `apply` at all).
     """
 
     claim_id: ClaimId
@@ -1227,7 +1227,7 @@ def claimant_text(agent: str, role: str) -> str:
 
 def _claim_matches_intent(claim: ActiveClaim, intent: ClaimIntent) -> bool:
     """Whether `claim` is the exact live claim an interrupted, replayed
-    `intent` would have produced (criterion 2): same identity, claimant,
+    `intent` would have produced (claim-record.spec.md, CLAIM-13): same identity, claimant,
     branch, and scope."""
     return (
         _same_identity(claim.identity, intent.identity)
@@ -1272,7 +1272,7 @@ def _resolved_resource(
     Auto intent (`resource_value` omitted): the least positive integer not
     yet in `occupied`. Explicit intent: refuse when the value is already in
     `occupied` -- live or released, since a released value is never reused
-    (§1 "one allocation owner: this file is the never-reuse set") -- naming
+    (claim-record.spec.md, CLAIM-43) -- naming
     the current holder when there is one.
     """
     if intent.resource_name is None:
@@ -1599,7 +1599,7 @@ def _toml_int_array(values: tuple[int, ...]) -> str:
 
 
 def serialize_claim_toml(claim: ActiveClaim) -> str:
-    """The `claims/<key>.toml` content for one live claim (§1)."""
+    """The `claims/<key>.toml` content for one live claim (claim-record.spec.md, CLAIM-05)."""
     lines = [
         f"claim_id = {toml_string(claim.claim_id)}",
         f"agent = {toml_string(claim.agent)}",
@@ -1679,9 +1679,9 @@ def _claim_toml_resource(
 def parse_claim_toml(content: str, *, key: str, tip: ObjectId) -> ActiveClaim:
     """Parse one fetched `claims/<key>.toml` blob into its `ActiveClaim`.
 
-    A malformed claim file fails the whole read loud (ruling: a commit is
-    the unit a writer writes, so a broken tree is corrupt state, never a
-    single quarantinable claim).
+    A malformed claim file fails the whole read loud (a commit is the
+    unit a writer writes, so a broken tree is corrupt state, never a single
+    quarantinable claim).
     """
     try:
         data = tomllib.loads(content)
@@ -1732,7 +1732,7 @@ def parse_claim_toml(content: str, *, key: str, tip: ObjectId) -> ActiveClaim:
 
 
 def serialize_resource_toml(record: ResourceRecord) -> str:
-    """The `resources/<name>.toml` content for one resource's occupied set (§1)."""
+    """The `resources/<name>.toml` content of one resource (ref-store-cas.spec.md, CAS-35)."""
     return f"occupied = {_toml_int_array(record.occupied)}\n"
 
 

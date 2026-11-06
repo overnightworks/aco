@@ -19,8 +19,7 @@ from . import items, protocol
 
 # The body-block codec: parsed, validated,
 # and rendered in `body.py`, one layer below this module. Every reader
-# imports the names it needs from `body` directly (operator ruling
-# 16.09.2026); `workboard.py` itself imports only what
+# imports the names it needs from `body` directly; `workboard.py` itself imports only what
 # its own board-builder code below actually calls.
 from .body import (
     BLOCK_FENCE_INFO,
@@ -104,8 +103,8 @@ RECOVERY_STEP = "close or re-project"
 # A slice's pull request must never close its still-open epic — that would
 # retire the epic before its remaining slices exist. This repository's
 # established substitute is a whole line opening with one of these markers
-# (observed verbatim in atelier-2 PRs #848 "Part of #79.", #960 "Refs #956
-# and #80", #965/#967 "Refs #<n> ..."). Anchoring to the start of the line
+# (for example "Part of #79.", "Refs #956 and #80",
+# "Refs #<n> ..."). Anchoring to the start of the line
 # is what keeps a casual mid-paragraph mention — "as noted in #79's plan" —
 # from ever counting; only a dedicated reference line does. This is still a
 # syntactic marker, not a validated relation: GitHub has no structured field
@@ -776,7 +775,7 @@ def parse_config(text: str, path: Path) -> BoardConfig:
 
 
 # The repository-owned rules a lane step's dispatch brief prints:
-# a repository used to carry these ~25 lines by hand in every
+# a repository would otherwise carry these ~25 lines by hand in every
 # dispatch, pasted fresh each time. `.aco/brief.toml` gives it one
 # tracked owner instead, read only when `aco brief --step` asks for it.
 BRIEF_CONFIG_PATH = Path(".aco/brief.toml")
@@ -1437,8 +1436,8 @@ def landing_rows(
     commit's own trailer names as landed, across the trunk walk's own depth
     -- the one source under both storages, independent of whether that item
     is still open. `github` alone adds one more row per item a merged pull
-    request plainly landed with no trailer of its own (`github`'s squash
-    convention before this repository trailer-tagged every landing),
+    request plainly landed with no trailer of its own (a squash merge
+    whose commit carries no trailer),
     deduplicated against the trunk rows, trailer path first. Newest first,
     so a reader sees the most recent landing at the top -- two rows landed
     at the same instant fall back to `_landing_row_tie_break_key`, negated
@@ -1472,13 +1471,13 @@ def board_rank(item: BoardItem) -> tuple[int, int, int, int, int]:
     `build_board` sorts by this key; any caller that needs to know whether
     one item outranks another — the out-of-order warning, for instance —
     reads this instead of re-deriving its own notion of "ahead", which is
-    exactly how `board` and `next` fell out of agreement before.
+    exactly how `board` and `next` would fall out of agreement.
 
-    `priority_order` only reorders inside the critical category (§2): a Bug
-    and a labelled critical item at equal score still resolve by label index
-    there, byte-for-byte as before this category was widened. `container_parent`
+    `priority_order` only reorders inside the critical category: a Bug
+    and a labelled critical item at equal score resolve by label index
+    there. `container_parent`
     falls back to the item's own number, so outside the completion category
-    every group has exactly one member and the tuple degenerates to today's
+    every group has exactly one member and the tuple degenerates to the plain
     number tie-break.
     """
     return (
@@ -1726,8 +1725,8 @@ class BoardBuildInputs:
     # git history because this build stays pure. Keyed by claim_id.
     claim_ages: Mapping[str, datetime] = field(default_factory=dict)
     # The board source's own fact (`BoardSource.lists_pull_requests`), never the storage
-    # pin: a source that cannot list pull requests at all -- `state-ref`
-    # today, honestly, not by name -- still has an in-flight signal (a live
+    # pin: a source that cannot list pull requests at all (as `state-ref`
+    # cannot) still has an in-flight signal (a live
     # claim with a branch) but no landed one, so the two stay independent
     # booleans instead of one storage-shaped flag.
     open_pull_requests_supported: bool = True
@@ -1861,7 +1860,7 @@ def highest_scored_actionable(board: Board) -> BoardItem | None:
 
 @dataclass(frozen=True)
 class WorkItemAction:
-    """Claim `item` -- today's `next` target. `scope` is the paths that
+    """Claim `item` -- `next`'s target. `scope` is the paths that
     claim occupies: the item's own top-level `scope`, else its one
     `[[slice]]` row's -- the row a retyped nested container keeps -- else `None`, unknown."""
 
@@ -2056,8 +2055,7 @@ class ParallelCandidate:
 
 @dataclass(frozen=True)
 class ParallelSet:
-    """`next`'s own parallel-capacity projection (Operator
-    19.09.2026: "ist das die maximale Auslastung?"): a priority-preserving
+    """`next`'s own parallel-capacity projection: a priority-preserving
     greedy walk of `_qualifying_actions`, occupying live claims' scopes and
     the first action's own scope before it starts, then placing each further
     candidate that stays disjoint from everything occupied so far and
@@ -2245,8 +2243,8 @@ def _project_blocker_references(entry: dict[str, object], key: str, repository: 
 
 def _project_uncut_row_scope(finding: dict[str, object]) -> None:
     """Drop a `None` `scope` from one uncut row's JSON dict rather than
-    printing it: the public shape before this lane was
-    `{"index", "title"}` with no third key, and `board --json` still owes
+    printing it: the public shape is
+    `{"index", "title"}` with no third key, and `board --json` owes
     that to a row that names no scope of its own -- only a row that
     actually carries one gains the extra `"scope"` key, canonical and
     non-empty. A row's `done_when` is `cut`'s to read, never
@@ -2329,7 +2327,7 @@ def _storage_item_name[ForgeName: (int, str)](
     `storage = STATE_REF` `items.format_item_id`'s `aco-xxxxxx` -- an id
     `parse_item_reference` accepts right back, so what a command prints is
     what the next command takes -- and under `GITHUB` the caller's own
-    forge form, byte-identical to every such name before the pin existed.
+    forge form, byte-identical to the name the forge prints.
     A number past `aco-ffffff` (`names_no_item`) -- a stored claim may
     still carry one -- keeps the forge form under either pin, since no id
     names it and a dressed-up `aco-1000000` would not parse back. `board`
