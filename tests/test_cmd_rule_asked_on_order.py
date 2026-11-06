@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from cli_fixtures import freeze_cli_now
+from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
 from option_cards import (
     assert_refusal_writes_nothing,
     card,
@@ -13,6 +13,8 @@ from option_cards import (
     other_arguments,
     serve_item,
 )
+
+from aco import body
 
 ASKED_TOMORROW = "asked_on = 2026-08-22\n"
 
@@ -44,3 +46,16 @@ class TestAskedAfterToday:
             "asked_on must be today's UTC date or earlier",
             "invalid_usage",
         )
+
+    def test_a_line_asked_today_is_ruled_on_the_day_it_was_asked(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: RULE-38 -- the same UTC day is valid."""
+        freeze_cli_now(monkeypatch)
+        today = FROZEN_CLI_NOW.date()
+        line = card(card_head(("asked_on = 2026-08-20", f"asked_on = {today.isoformat()}")))
+        client = serve_item(monkeypatch, item_body(line))
+        ruled = run_cli(["rule", "7", *decide("A", "chat")], capsys)
+        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 A; 0 line(s) still open\n")
+        written = body.locate_block(client.item_bodies[7]).data["expectation"][1]
+        assert (written["asked_on"], written["ruled_on"]) == (today, today)

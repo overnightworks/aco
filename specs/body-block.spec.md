@@ -983,7 +983,7 @@ Setup: bare-remote, `storage = "github"`; E-BODY-10's card
 
 E-BODY-10's card without its `asked_on` line prints `2> body malformed: expectation[0].asked_on: expectation[0].asked_on is required`, exit `2`; the same with `asked_on = "2026-10-28"` or `asked_on = 2026-10-28T10:00:00` prints `2> body malformed: expectation[0].asked_on: expectation[0].asked_on must be a TOML local date`, exit `2`.
 With the `ruling`, `ruled_on` and `via` of E-BODY-12, the `card_hash` E-BODY-10 states and no `asked_on` it prints `body ok`, exit `0`: the key is outside the hash.
-The same ruled line with `ruled_on = 2026-10-27` prints `2> body malformed: expectation[0].ruled_on: expectation[0].ruled_on 2026-10-27 is before asked_on 2026-10-28`, exit `2`; with `ruled_on = 2026-10-28` it prints `body ok`, exit `0`.
+With that ruled line's `asked_on = 2026-10-28` kept and `ruled_on = 2026-10-27` it prints `2> body malformed: expectation[0].ruled_on: expectation[0].ruled_on 2026-10-27 is before asked_on 2026-10-28`, exit `2`; with `ruled_on = 2026-10-28` it prints `body ok`, exit `0`.
 
 ### E-BODY-18 — an open yes/no line
 

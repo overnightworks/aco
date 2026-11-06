@@ -100,7 +100,7 @@ withdrawn one.
 - [ ] [RULE-18] A letter not on the card refuses `line <k> has no option <X>; its options are <L>`, exit `2`, before any write, after RULE-17 (see E-RULE-10).
 - [ ] [RULE-19] `--via default` with a letter other than the card's `recommended` refuses `--via default keeps only the recommended option <R>, not <X>`, exit `2`, before any write, after RULE-18.
 - [ ] [RULE-21] A blank or all-whitespace `--other` refuses `--other needs a non-empty answer`, exit `2`, before any forge call, after RULE-15 (see E-RULE-11).
-- [ ] [RULE-38] `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (E-RULE-16), exit `2`, before any write, after RULE-19.
+- [ ] [RULE-38] `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (see E-RULE-16), exit `2`, before any write, after RULE-19.
 - [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-26] A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
 - [ ] [RULE-27] `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.

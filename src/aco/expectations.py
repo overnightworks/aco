@@ -483,7 +483,7 @@ def _refuse_a_changed_card(index: int, entry: dict[str, object], shown_card_hash
 
 def _refuse_an_asked_on_after_today(index: int, entry: dict[str, object], today: date) -> None:
     """A line asked after today's UTC date would be ruled before it was asked."""
-    asked_on = entry.get("asked_on")
+    asked_on = entry.get(ASKED_ON)
     if isinstance(asked_on, date) and asked_on > today:
         raise ExpectationOptionChoiceError(
             f"line {index} has asked_on {asked_on}, after today's UTC date {today}; "
