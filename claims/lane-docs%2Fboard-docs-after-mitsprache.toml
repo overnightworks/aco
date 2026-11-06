@@ -1,7 +1,0 @@
-claim_id = "8e7752c3471d4b1e9d3aae6ab9327fb5"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "5cda0c33183bf4330dd2588ffee3bdc0bb159607"
-branch = "docs/board-docs-after-mitsprache"
-scope = ["docs/board/README.md", "frontend/src/app/model/boardSummary.ts", "specs/serve.spec.md"]
-opened_commit = "fb519f0e326ea51ca72be1a655eeaf4e7dadd5b2"
