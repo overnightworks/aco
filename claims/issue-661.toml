@@ -1,8 +1,0 @@
-claim_id = "51f9acec10944592b6e927bcbb3a3740"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "0ff179689bfe99688724e12041fadd18b14281c7"
-branch = "claude/issue-661-squash-by-default"
-scope = ["README.md", "specs/land.spec.md", "src/aco/cmd_land.py", "tests/test_cmd_adopt.py", "tests/test_cmd_land_after_merge_rerun.py", "tests/test_cmd_land_merge.py", "tests/test_cmd_land_merge_message.py", "tests/test_github.py"]
-opened_commit = "d8f1399fafa0cf3d2b9d6728c9f39f56b1175ba3"
-whole_reason = "One default with its spec, README row and the four test modules that pin it; splitting would land a spec that the code contradicts."
