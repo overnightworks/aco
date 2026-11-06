@@ -610,7 +610,7 @@ def test_board_dedupes_a_landing_between_the_trunk_trailer_and_a_squash_pull_req
 def test_board_naming_no_output_mode_refuses_before_any_read(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """BOARD-44: the retired text table left `board` with no
+    """BOARD-44: `board` has no
     default mode, so a bare `aco board` must name `--json` instead of
     reading a forge, a pin, or a repository just to guess."""
     status = issue_claim.main(["board"])
@@ -620,7 +620,7 @@ def test_board_naming_no_output_mode_refuses_before_any_read(
 
 
 def test_board_serve_flag_is_an_unknown_argument(capsys: pytest.CaptureFixture[str]) -> None:
-    """The retired `aco board --serve` is no longer declared, so argparse
+    """`aco board --serve` is not declared, so argparse
     refuses it like any unknown flag (BOARD-44's neighbour)."""
     with pytest.raises(SystemExit) as refused:
         issue_claim.main(["board", "--serve"])
@@ -671,14 +671,14 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
 
     assert observed_children_calls == [30]
     # Open issues, open PRs, merged PRs, and exactly one `list_children`
-    # call (for #30, never #20) -- claims come from the store now,
+    # call (for #30, never #20) -- claims come from the store,
     # never from a ledger-comments request. No issue here names a
     # blocker, so `list_board_blockers` never runs -- an empty numbers set
     # costs no request, on the fake exactly as on the real adapter.
     assert payload["requests"] == client.requests == 4
 
 
-def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
+def test_board_skips_the_dependency_list_for_a_zero_blocker_item(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """An
@@ -709,8 +709,8 @@ def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
 
     assert observed_dependency_calls == [11]
     # Open issues, open PRs, merged PRs, and exactly one dependency lookup
-    # (for #11, never #10) -- block mode never calls `list_board_blockers`,
-    # and claims come from the store now, never a ledger
+    # (for #11, never #10) -- the board never calls `list_board_blockers`,
+    # and claims come from the store, never a ledger
     # comments request.
     assert payload["requests"] == client.requests == 4
 
@@ -4087,8 +4087,8 @@ def test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line(
     it keeps naming the container's own words. `next
     --json` carries the same split as two fields: `slice` is that human
     step, `cut_title` is the title `cut` accepts -- a JSON consumer must
-    build `--title` from `cut_title`, never `slice` (the README used to say
-    otherwise). The child each cut writes carries `cut`'s own fixed `next`
+    build `--title` from `cut_title`, never `slice` (the README says
+    so). The child each cut writes carries `cut`'s own fixed `next`
     (CUT-25), never the container's `next` line."""
     toml_text = (
         f'version = 1\nnow = "N"\nnext = "{_DIFFERING_NEXT_LINE}"\ndone_when = "D"\n'
@@ -4413,10 +4413,9 @@ def _uncut_row_case(
 _CUT_ROUND_TRIP_CASES = (
     # next=no, uncut=yes -- an uncut row on its own already qualifies.
     _uncut_row_case("uncut_row_only", 184, "", "Scheibe E"),
-    # next=yes, uncut=yes, and they disagree -- seven live
-    # atelier-2 containers where `next` printed the `Next` line's prose and
-    # `cut` refused it, because the row it actually links carries a
-    # different title.
+    # next=yes, uncut=yes, and they disagree --
+    # `next` prints the `Next` line's prose and `cut` refuses it, because
+    # the row it actually links carries a different title.
     _uncut_row_case("next_and_differing_uncut_row", 186, _DIFFERING_NEXT_LINE, "Scheibe F"),
     # The remaining combinations -- no uncut row, whether or not the `Next`
     # line still names work -- close the container instead of cutting a
@@ -5867,8 +5866,8 @@ def test_next_parallel_set_never_lets_a_recovery_item_occupy_or_candidate(
     """A landed-but-open item is `workboard.zero_cost_closes`'
     own domain, never `workboard.parallel_set`'s. `landed_but_open` (#71) and
     `free_item` (#72) name the same scope, and board order visits #71
-    first -- pre-fix, the walk occupied that scope for #71 and silently
-    dropped #72 as "overlapping", even though #71 was never real work in
+    first -- the walk must not occupy that scope for #71 and silently
+    drop #72 as "overlapping", since #71 is never real work in
     flight. #72 must still surface in `parallel:`, and #71 only under
     `close:`, never as a candidate of its own."""
     top_ranked = board_issue(

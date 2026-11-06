@@ -384,17 +384,17 @@ def test_peek_state_reads_the_current_tip_without_touching_the_anchor_or_lineage
 def test_peek_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     bare_remote: Path, worktree: Path, tmp_path: Path
 ) -> None:
-    """`peek_state` used to read the
+    """`peek_state` does not read the
     fetched tip from `FETCH_HEAD`, the one file any `git fetch` in this
-    worktree overwrites regardless of what it fetches -- exactly what a
-    fixer agent's own concurrent `git fetch origin <branch>` did to `aco
+    worktree overwrites regardless of what it fetches -- such as a fixer
+    agent's own concurrent `git fetch origin <branch>` during `aco
     rescope`, which shares this same fetch-then-read shape. A foreign fetch
-    landing between `peek_state`'s own fetch and its read of the tip left
+    landing between `peek_state`'s own fetch and its read of the tip leaves
     `FETCH_HEAD` pointing at that branch's own tip, an ordinary commit whose
-    tree carries no `schema.toml` at all: read as the state tip, it failed
-    with `MalformedStateTreeError`. `peek_state` now reads the tip from
+    tree carries no `schema.toml` at all: read as the state tip, it would fail
+    with `MalformedStateTreeError`. `peek_state` reads the tip from
     `_ls_remote_state`'s own answer instead, so a foreign fetch racing it
-    this way can no longer change what it observes.
+    this way cannot change what it observes.
     """
     created = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     reader = tmp_path / "reader"
@@ -494,9 +494,7 @@ def test_fetch_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     in this worktree between the store's own fetch and its read must not
     change what `fetch_state` observes. `fetch_state` reads the tip back from
     `_FETCH_ANCHOR_REF` by name (`_fetch_into_anchor`), never from the shared
-    `FETCH_HEAD` file the foreign fetch also overwrites, so this passes today;
-    it fails against the previous `FETCH_HEAD`-reading implementation, which
-    shared this exact race with `peek_state`'s old one.
+    `FETCH_HEAD` file the foreign fetch also overwrites.
     """
     created = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     reader = tmp_path / "reader"
@@ -663,8 +661,7 @@ def _entry_object(worktree: Path, mode: str) -> str:
             "100644",
             id="resources",
         ),
-        # A name git would quote (non-ASCII) used to vanish from every read
-        # instead of refusing.
+        # A name git would quote (non-ASCII) must refuse, not vanish from every read.
         pytest.param(
             store.CLAIMS_DIRECTORY, "ä", "is not a claim file", "100644", id="claims-quoted"
         ),
@@ -757,7 +754,7 @@ def test_fetch_state_canonicalizes_a_stored_unsorted_scope_without_rewriting_the
     The read must never rewrite the ref, and a replayed claim intent (the
     same identity, claimant, branch, and scope, differently typed) must
     still match the now-canonical stored claim -- criterion 2's idempotent
-    replay, which a raw order mismatch used to break -- and a release by
+    replay, which a raw order mismatch would break -- and a release by
     claim id must still succeed regardless of the stored order.
     """
     schema_blob = blob(worktree, b"version = 2\n")
@@ -1911,10 +1908,9 @@ def test_claim_ages_survives_a_gc_prune_of_the_just_fetched_history(
     """An unanchored fetch lands the
     fetched commits only in `FETCH_HEAD`, which is not a ref and roots
     nothing once the fetch subprocess exits -- a `git gc --prune=now` run
-    against this same checkout right after `fetch_state` returns collected
-    every commit `claim_ages`'s own `git log` walk needs next, in the
-    audit's reproduced incident (nothing else in this worktree references
-    the state ref's history). `fetch_state` now anchors the fetched tip in
+    against this same checkout right after `fetch_state` returns collects
+    every commit `claim_ages`'s own `git log` walk needs next (nothing else
+    in this worktree references the state ref's history). `fetch_state` anchors the fetched tip in
     its own per-worktree ref namespace (`_fetch_into_anchor`), so the walk
     survives the same prune.
     """
@@ -2966,8 +2962,7 @@ def test_commit_transition_item_create_adds_a_file_and_preserves_the_claim_ledge
 ) -> None:
     """A create lands `items/<id>.md` while `claims/`, `ids/`, and
     `resources/` stay byte-identical -- the same subtree-reuse seam
-    `_write_incremental_state_tree` already gives claim/rescope/release,
-    now proven from the item-write side."""
+    `_write_incremental_state_tree` already gives claim/rescope/release."""
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     store.commit_transition(
         observed=fresh_observation(worktree, bare_remote),
@@ -3112,7 +3107,7 @@ def test_commit_transition_two_threads_creating_different_item_ids_both_land(
     tmp_path: Path, bare_remote: Path
 ) -> None:
     """The same two-racer shape as the ten-thread claim
-    contention test above, now proven for item writes -- two real threads, a
+    contention test above, for item writes -- two real threads, a
     barrier, no sleeps. Distinct ids never contend, so both creates land
     (the sequential version of this claim is
     `test_commit_transition_two_writers_different_item_ids_both_land`)."""

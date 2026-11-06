@@ -429,7 +429,7 @@ def test_parser_refusal(
     sentence: str,
 ) -> None:
     """Spec: Never 1 — parser requires exactly one of --option, --other, --unclear, refuses
-    the retired yes/no flags and a known --via before command entry."""
+    the yes/no flags and a known --via before command entry."""
 
     def forbidden(*args, **kwargs):
         pytest.fail("invalid outcomes reached the rule command entry")

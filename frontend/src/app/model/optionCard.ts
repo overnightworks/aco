@@ -3,7 +3,7 @@
  * the one vocabulary owner for every string on the option card, so
  * `OptionCard.svelte` and the list and Decided views carry no wording of
  * their own. The row labels are the ruled English words of the decision
- * card (#13 line 12); the rest of the page keeps its German.
+ * card; the rest of the page keeps its German.
  */
 
 import type { CardOption, DecisionKind, ExpectationLine, OptionLine, Undo } from '../../types';
@@ -163,7 +163,7 @@ export const CONFIRM_LABEL = {
 	cancel: 'Cancel'
 } as const;
 
-/** Only a pick that cannot be taken back asks first (#13 line 12). */
+/** Only a pick that cannot be taken back asks first. */
 export function asksToConfirm(option: CardOption): boolean {
 	return option.undo === 'final';
 }

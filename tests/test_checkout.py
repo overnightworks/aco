@@ -592,11 +592,10 @@ def _scratch_git_repository(tmp_path: Path, *init_options: str) -> Path:
 def test_dirty_paths_reads_a_modified_tracked_file_from_real_git_status(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Regression for the truncated-name bug: `git_output`
-    used to `.strip()` its whole decoded output, which ate the leading space
-    of a modified file's ` M path` porcelain line before `_dirty_paths`
-    sliced off the fixed three-character status prefix -- `README.md` came
-    back as `EADME.md`. A fake that hands `_dirty_paths` a hand-typed string
+    """`git_output` keeps the leading space of a modified file's ` M path`
+    porcelain line, which `_dirty_paths` needs before it slices off the fixed
+    three-character status prefix; stripping the whole output turns
+    `README.md` into `EADME.md`. A fake that hands `_dirty_paths` a hand-typed string
     with the leading space intact cannot catch this; only the real reader
     against real git output can."""
     repository = _scratch_git_repository(tmp_path)
@@ -610,7 +609,7 @@ def test_dirty_paths_reads_an_untracked_file_from_real_git_status(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The untracked `?? path` line has no leading space to lose, which is
-    why the truncation bug above went unnoticed."""
+    why a truncated name would go unnoticed there."""
     repository = _scratch_git_repository(tmp_path)
     (repository / "extra.txt").write_text("new\n")
     monkeypatch.chdir(repository)
@@ -1275,8 +1274,8 @@ def test_trunk_landings_classifies_a_control_byte_inside_a_trailer_value_as_one_
     tmp_path: Path, byte: str
 ) -> None:
     """Git never escapes `\\x1f`, `\\x1e`, or
-    `\\x01` inside a trailer value -- exactly the bytes the historical
-    `\\x1f`-separated framing used to split repeated trailer values -- so a
+    `\\x01` inside a trailer value -- exactly the bytes a
+    `\\x1f`-separated framing would split repeated trailer values -- so a
     value that happens to contain one of them must read back as the one
     literal value git actually recorded, never as two fabricated work items.
     The NUL/newline framing reads it as data: `trunk_commit_classification`

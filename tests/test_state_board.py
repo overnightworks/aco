@@ -3127,10 +3127,7 @@ class TestCliStateRefForge:
         worktree: Path,
     ) -> None:
         """`board_read.build_board` reads `lists_pull_requests` (`False`): a live claim with
-        a branch and no pull request is in flight, not waiting for a landed signal.
-
-        Spec: defect:#447
-        """
+        a branch and no pull request is in flight, not waiting for a landed signal."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
         built = board_read.build_board(
@@ -3407,7 +3404,7 @@ class TestCliStateRefForge:
         piped body as github does -- prose above a block its flags build,
         or a piped block the flags agree with -- never dropping it; every
         section left empty is named on stderr, one line each. Stdin carries
-        a body only as a file or a pipe (head ruling 01.10.2026): the socket
+        a body only as a file or a pipe : the socket
         an agent harness hands over is never read, so the command returns."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
