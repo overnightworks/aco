@@ -4,9 +4,10 @@ Every migrated command's `--json` object is built and printed through one
 shared, nameless envelope. This file owns the envelope's own
 shape -- key order, when `ok` is `true`, and what `reason` and `message`
 may and may not carry -- and applies to every command whose own spec cites
-`OUT-nn`, each naming its own `reason` vocabulary with examples
-(`specs/rule.spec.md`, `specs/brief.spec.md`, `specs/release.spec.md`,
-`specs/cut.spec.md`, `specs/item.spec.md`). Every `--json` command's
+`OUT-nn`; `rule`, `brief`, `release`, `cut` and `item` each name their
+own `reason` vocabulary with examples (`specs/rule.spec.md`,
+`specs/brief.spec.md`, `specs/release.spec.md`, `specs/cut.spec.md`,
+`specs/item.spec.md`). Every `--json` command's
 own spec cites this file, including the refusals that fire
 before the
 named command starts (OUT-05) and the ones the argument parser itself
