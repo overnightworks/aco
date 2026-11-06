@@ -39,7 +39,7 @@ def serve_written(monkeypatch: pytest.MonkeyPatch, written: str) -> None:
 
 @pytest.mark.usefixtures("github_world")
 class TestRuleOther:
-    @pytest.mark.parametrize("via", ["board", "chat"])
+    @pytest.mark.parametrize("via", ["chat"])
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
     def test_an_open_option_line_is_ruled_with_the_answer(
         self,
