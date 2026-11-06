@@ -14,7 +14,7 @@ is the pull request number as given, `<sha>` its merge commit, `<state>`
 GitHub's own `mergeable_state`, `<name>`/`<conclusion>` one check's own name
 and conclusion, `<path>` the board configuration `.aco/board.toml`,
 `<setting>` one of the two settings in it a head may not change, `storage`
-and `canonical_remote` (`priority_labels`, `idea_label`, `body_contract`, and
+and `canonical_remote` (`priority_labels`, `idea_label`, and
 `merge_method` may change), `<title>` the pull request's own title, a "head" the pull request's own head commit read during
 preflight, `<actual>` that head's full sha, and `<reviewed>` the head its reviewers saw, the `--head` value lowercased: its
 full sha or a prefix of at least 7 hex digits. "Checks" is every check run GitHub reports for the head sha
