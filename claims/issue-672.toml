@@ -1,0 +1,8 @@
+claim_id = "1ca86cb5405944a0a89396ba3c310461"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "ee851ecd945dd85b6d8fd9155322601c255c38eb"
+branch = "claude/issue-672-refuse-body-contract-as-an-unknown-board"
+scope = [".aco/board.toml", "README.md", "specs/land.spec.md", "src/aco/body.py", "src/aco/workboard.py", "tests"]
+opened_commit = "aa39608cf4ffd88af96d27fe831b06cc25812c36"
+whole_reason = "One configuration key leaves: its parser, its pin, its documentation rows and the test fixtures that write it; split, aco would refuse a key its own repository or its fixtures still pin."
