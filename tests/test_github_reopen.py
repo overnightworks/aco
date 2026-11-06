@@ -57,6 +57,7 @@ def test_reopened_at_of_nothing_costs_no_round_trip() -> None:
         pytest.param({"n0": reopen_node("2026-10-28T00:50:28Z", "2026-10-29T00:50:28Z")}, id="two"),
         pytest.param({"n0": {"timelineItems": {"nodes": "none"}}}, id="nodes-not-a-list"),
         pytest.param({"n0": {"timelineItems": {"nodes": [{}]}}}, id="event-without-time"),
+        pytest.param(None, id="no-repository"),
     ],
 )
 def test_reopened_at_refuses_an_answer_it_cannot_read(repository: object) -> None:
@@ -123,6 +124,47 @@ def test_reopened_at_splits_more_numbers_than_one_block_over_several_round_trips
                 }
             ),
             id="error-on-an-alias-not-asked-for",
+        ),
+        pytest.param(json.dumps(["unexpected"]), id="response-not-an-object"),
+        pytest.param(
+            json.dumps(
+                {
+                    "data": {"repository": None},
+                    "errors": [{"type": "NOT_FOUND", "path": ["repository", "n0"]}],
+                }
+            ),
+            id="repository-not-a-mapping",
+        ),
+        pytest.param(
+            json.dumps({"data": {"repository": {"n0": None}}, "errors": []}),
+            id="no-errors",
+        ),
+        pytest.param(
+            json.dumps(
+                {
+                    "data": {"repository": {}},
+                    "errors": [{"type": "NOT_FOUND", "path": ["repository", "n0"]}],
+                }
+            ),
+            id="alias-missing-from-repository",
+        ),
+        pytest.param(
+            json.dumps(
+                {
+                    "data": {"repository": {"n0": None}},
+                    "errors": [{"type": "NOT_FOUND", "path": ["repository"]}],
+                }
+            ),
+            id="error-path-wrong-length",
+        ),
+        pytest.param(
+            json.dumps(
+                {
+                    "data": {"repository": {"n0": None}},
+                    "errors": [{"type": "NOT_FOUND", "path": ["repository", []]}],
+                }
+            ),
+            id="error-path-alias-not-a-string",
         ),
     ],
 )

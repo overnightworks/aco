@@ -416,15 +416,6 @@ class FakeForge:
             raise scripted
         return served if scripted is None else replace(served, body=scripted)
 
-    def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        """One `_run()` for the whole batch."""
-        ordered = tuple(dict.fromkeys(numbers))
-        if not ordered:
-            return {}
-        self._run()
-        self.issue_reference_lookups.extend(ordered)
-        return {number: self._item_reference_value(number) for number in ordered}
-
     def default_branch(self) -> str:
         self._run()
         if self.default_branch_error is not None:

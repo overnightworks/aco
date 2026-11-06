@@ -134,9 +134,8 @@ def transition_item_identifier(identity: ClaimIdentity, branch: str) -> str:
     """The bare work item a claim/rescope/release transition names -- an
     issue number as text, or a lane's own branch: computed
     once from the identity/branch every caller already has, and stored
-    verbatim in the commit's own `item:` trailer (`store._transition_message`)
-    -- never a second grammar a
-    reader has to reconstruct from the commit's human-prose subject line.
+    verbatim in the commit's own `item:` trailer (`store._transition_message`),
+    never a second grammar reconstructed from the commit's human-prose subject line.
     `store.transition_subject` also reads this for the identifier half of its
     own `"claim issue 42"`/`"rescope lane docs/x"` prose.
     """

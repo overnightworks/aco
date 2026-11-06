@@ -3338,11 +3338,9 @@ def test_trunk_commit_classification_refuses_a_contradictory_trailer_block(
 
 @pytest.mark.parametrize(
     ("size", "expected"),
-    [pytest.param(None, None, id="no-size"), pytest.param("M", body.Size.MEDIUM, id="medium")],
+    [pytest.param(None, None, id="no-size"), pytest.param("M", "M", id="medium")],
 )
-def test_build_board_carries_an_items_own_size(
-    size: str | None, expected: body.Size | None
-) -> None:
+def test_board_json_carries_an_items_own_size(size: str | None, expected: str | None) -> None:
     entries = {} if size is None else {"size": size}
     issue = board_issue(200, "Item 200", complete_contract("Do it.", **entries))
 
@@ -3350,7 +3348,7 @@ def test_build_board_carries_an_items_own_size(
         (issue,), (), (), (), BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    assert projected.items[0].size is expected
+    assert _payload_items(workboard.board_payload(projected))[0]["size"] == expected
 
 
 @pytest.mark.parametrize(
