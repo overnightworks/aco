@@ -64,9 +64,9 @@ the canonical remote. The board adds its own boundary, described in
   ref is the one serialization point, and a claim needs no issue, so a lane
   without one can hold it.
 - Kind and the parent and blocker relations live on the forge's native
-  fields, so each fact has one owner and the body never carries a second copy
-  that can disagree. What the body still repeats is owned by
-  `specs/cut.spec.md` and `specs/body-block.spec.md`.
+  fields, so each fact has one owner: no reader derives a kind, parent or
+  blocker from the body. The `Parent:` line `aco cut` writes is a recovery
+  marker (`specs/cut.spec.md`, `specs/body-block.spec.md`).
 - Forge errors are typed, so no caller matches error text.
 - The state ref advances by a plain fast-forward push. A push already accepts
   fast-forwards and rejects the rest, which is the serialization needed; a
