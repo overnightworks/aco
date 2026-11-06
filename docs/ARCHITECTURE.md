@@ -18,13 +18,13 @@ flowchart LR
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
-  (`canonical_remote` in `.aco/board.toml`; its default is set by PIN-50 in
-  `specs/storage-pin.spec.md`). Its tree is the current state: `claims/`,
+  (`canonical_remote` in `.aco/board.toml`; `specs/storage-pin.spec.md` owns
+  its default). Its tree is the current state: `claims/`,
   `resources/`, `ids/`, `schema.toml` (the format version) and, for a repository
   without a forge, items.
 - A transition is a pure function from the observed state and a typed intent
   to a new state (`protocol.apply`). The store commits it on the observed tip.
-  Only `aco reset --confirm` forces (CAS-43). A rejected push is not a failure
+  Only `aco reset --confirm` forces. A rejected push is not a failure
   by itself. The wire contract and the retry and failure semantics, including
   rejections that are not a race, are in `specs/ref-store-cas.spec.md`.
 - A resource is a number that must stay unique repository-wide.
@@ -47,60 +47,63 @@ flowchart LR
   needs its own contract for them before it can attach (the module docstring
   of `forge.py`).
 
-## Architectural Decisions
-
-One line per standing choice: the rule, its reason and the rejected
-alternative that keeps coming back.
+## Constraints and reasons
 
 - Claims live in the state ref, one tree of `claims/` and `resources/`. The ref
-  has one serialization point. Rejected: per-item claim comments, because the
-  comment API has no conditional write, so two agents can both post and neither
-  loses, and a lane without an issue has no comment to hold; the assignee as the
-  lock, because it has no compare-and-swap and names a forge account, not the
-  agent and session holding the claim; Projects v2 fields, because they have no
-  demonstrated compare-and-swap and add a synchronisation step and tie the
-  claim's compare-and-swap, which is a pure git push today, to a forge API; one
-  ref per key plus a resources ref, because a resource-holding claim would have
-  its hold and its number in two owners that can disagree, and making them one
-  transition needs `git push --atomic` across refs, which is unverified on
-  GitHub.
+  is the one serialization point, and a claim needs no issue, so a lane
+  without one can hold it.
 - The state ref advances by a plain fast-forward push. A push already accepts
-  fast-forwards and rejects the rest, which is the serialization needed, and a
-  matching `--force-with-lease` can replace history. Rejected: the lease,
-  because it opens that history-loss path.
+  fast-forwards and rejects the rest, which is the serialization needed; a
+  matching `--force-with-lease` can replace history, so it is not used.
 - A released claim is absent from the tree and readable at the parent commit.
-  The commit message names the transition. Rejected: a second history ref,
-  because the parent commit already holds the history.
+  The commit message names the transition, so the parent commit is the whole
+  history.
 - A resource is allocated in the same commit as the claim that requests it, so
   two lanes racing for it serialize on the one ref. No cross-key invariant
-  then rests on a server capability.
+  rests on a server capability.
 - The storage pin is read from configuration and never chosen at run time from
-  forge capabilities. Rejected: runtime capability selection, because a forge
-  plan change would silently move a fact's owner without a migration.
+  forge capabilities, so a forge plan change cannot silently move a fact's
+  owner without a migration.
 - Wide-scope thresholds are protocol constants, not configuration, so two
   fleets in one repository cannot disagree on what "too wide" means.
-- The state-ref item store and the board stay although nobody uses them (see
-  "Kept although unused"). Rejected: deleting them, because the operator may
-  still take them into use and a repository without a forge, or deciding by
-  page, would then need a rebuild.
+- Configuration in `.aco/board.toml` holds only settings with a caller today.
+- The state-ref item store and the board are kept although nobody uses them.
+  The store keeps items as files in the state ref for a repository without a
+  forge (`specs/storage-pin.spec.md`). The board (`aco serve`, `src/aco/board/`,
+  `frontend/`) lets the operator decide by page; it is frozen, and nothing more
+  is built at it. Every change to `session`, `store` and the item commands
+  still carries both storage paths. An audit of unused parts names both as
+  kept and does not raise them as new findings.
 
-## Kept although unused
+## Not chosen
 
-Two parts have no user today and stay by the operator's ruling of 06.11.2026
-(#658). Of the state-ref item store (`storage = "state-ref"`, `aco item`):
-„nein wir behalten ihn, und auch das board! das wird noch nichtgenutzt aber
-ggf überlege ich es mir ja noch! wir könne beides irgendwo vermerken, falls
-die entscheidung nochmal kommt!“
-
-- **The state-ref item store** keeps items as files in the state ref for a
-  repository without a forge (`specs/storage-pin.spec.md`).
-- **The board** (`aco serve`, `src/aco/board/`, `frontend/`) lets the
-  operator decide by page. It is frozen: nothing more is built at it
-  (aco#648).
-
-A later ballast audit names both as kept and refreshes the numbers in #658
-(size, usage, upkeep); it does not raise them as new findings. Every change to
-`session`, `store` and the item commands still carries both storage paths.
+- Per-item claim comments: the comment API has no conditional write, so two
+  agents can both post and neither loses, and a lane without an issue has no
+  comment to hold. Reopens if the forge's comment API gains a conditional
+  write.
+- The assignee as the lock: it has no compare-and-swap and names a forge
+  account, not the agent and session holding the claim. Reopens if a forge
+  offers an atomic assignee swap that identifies the session.
+- Projects v2 fields: no demonstrated compare-and-swap, an added
+  synchronisation step, and it ties the claim's compare-and-swap, a pure git
+  push today, to a forge API. Reopens if a forge field offers a verified
+  compare-and-swap.
+- One ref per key plus a resources ref: a resource-holding claim would have its
+  hold and its number in two owners that can disagree, and one transition over
+  both needs `git push --atomic` across refs. Reopens when that is verified on
+  the forge.
+- `--force-with-lease` for the state ref: it opens a history-loss path. Reopens
+  if a lease can be made to reject non-fast-forward updates.
+- A second history ref: the parent commit already holds the history. Reopens if
+  a reader needs history that the parent chain cannot give.
+- Runtime capability selection of the storage owner: a forge plan change would
+  silently move a fact's owner without a migration. Reopens if the move gets a
+  migration that runs with it.
+- Renaming `.aco/board.toml`: it costs a migration to buy a better name.
+  Reopens when a migration is needed anyway.
+- Deleting the state-ref item store and the board: the operator may still take
+  them into use, and a repository without a forge, or deciding by page, would
+  then need a rebuild. Reopens when the operator decides to drop them.
 
 ## Crosscutting Concepts
 
