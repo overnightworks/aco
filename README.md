@@ -107,7 +107,8 @@ landing grammar, storage pin, state ref transport) are in
 
 ## Documentation
 
-`specs/` holds the behaviour contracts, `docs/decisions/` the decision record
-([claim state without a ledger issue](docs/decisions/0001-claim-state-without-a-ledger-issue.md)),
+`specs/` holds the behaviour contracts, `docs/decisions/` the decision records
+([claim state without a ledger issue](docs/decisions/0001-claim-state-without-a-ledger-issue.md),
+[keep the item store and the board](docs/decisions/0002-keep-the-item-store-and-the-board.md)),
 and [`docs/board/mockup.html`](docs/board/mockup.html) the frozen picture of the
 board surface.
