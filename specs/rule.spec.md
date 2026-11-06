@@ -112,7 +112,7 @@ withdrawn one.
 - [ ] [RULE-34] A misplaced `--option` or `--card-hash` refuses its sentence below, exit `2`, before any forge call, after RULE-35; it and RULE-33 judge the flags in the order written (see E-RULE-13):
   - with several `--line`, one written before the first `--line`: `<flag> before the first --line belongs to no line`
   - a second one for the same line, with one `--line` too: `line <k> has a second <flag>`; `--line 2 --option A --option B` refuses `line 2 has a second --option`
-- [ ] [RULE-35] A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call and any other refusal of this file but RULE-39 and the parser's own refusals (see E-RULE-13).
+- [ ] [RULE-35] A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call or refusal but RULE-39 and the parser's (E-RULE-13).
 - [ ] [RULE-39] `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call and any other refusal of this file, RULE-35 included; the choices are `chat` and `default` (see E-RULE-10).
 - [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
