@@ -20,7 +20,7 @@ The list of code built ahead of its caller: one entry per piece of code, naming 
 ## The file
 
 - [ ] [AHEAD-01] The file is `.aco/ahead-of-caller.toml`. A missing file, an empty file, or a file without `code` holds no entries.
-- [ ] [AHEAD-02] A trunk file git cannot show, or whose bytes are no UTF-8, makes the list unavailable with `<list> cannot be read: <error>`, `<error>` the failure's text; a directory there is AHEAD-04's bad TOML.
+- [ ] [AHEAD-02] A trunk path that holds no file (a directory, say) or a file git cannot show, or whose bytes are no UTF-8, makes the list unavailable with `<list> cannot be read: <error>`, `<error>` the failure's text.
 - [ ] [AHEAD-15] A trunk that does not resolve refuses `aco next` whole as `unavailable` with git's text (`specs/next.spec.md`, Refusals), so the list is never read as no file.
 - [ ] [AHEAD-03] Only the trunk's copy counts: a file that exists only in the worktree is ignored.
 - [ ] [AHEAD-04] The top level holds only `code`, an array of tables. Bad TOML refuses `<list> is not valid TOML: <error>`, `<error>` the parser's text.

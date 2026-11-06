@@ -289,7 +289,7 @@ def file_at_revision(path: str, *, revision: str, directory: Path) -> str | None
     absent file."""
     if not path_is_tracked(path, directory=directory, revision=revision):
         return None
-    result = _git_run(["show", f"{revision}:{path}"], directory=directory)
+    result = _git_run(["cat-file", "blob", f"{revision}:{path}"], directory=directory)
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     return result.stdout.decode()

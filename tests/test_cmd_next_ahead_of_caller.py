@@ -364,7 +364,8 @@ def test_a_trunk_path_that_is_a_directory_is_unavailable_never_no_file(
 
     carried = payload["ahead_of_caller_unavailable"]
     assert isinstance(carried, str)
-    assert carried.startswith(f"{LIST_PATH} is not valid TOML: ")
+    assert carried.startswith(f"{LIST_PATH} cannot be read: ")
+    assert "is not valid TOML" not in carried
     assert (printed.status, printed.stdout) == (
         0,
         TOP_WORK_LINES + f"ahead of caller: unavailable ({carried})\n",
