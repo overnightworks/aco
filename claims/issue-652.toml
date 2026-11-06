@@ -1,8 +1,0 @@
-claim_id = "d5638dc93b8445519f5db766cc0c07d9"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "e1e302e68c1061f626ed4c7912165465f6c642fb"
-branch = "claude/issue-652-an-option-card-may-leave-out-its-picture"
-scope = ["docs/board/README.md", "frontend/e2e", "frontend/src", "quality/baseline.toml", "specs/body-block.spec.md", "specs/rulings.spec.md", "specs/serve.spec.md", "src/aco/board/static", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "src/aco/rulings.py", "tests"]
-opened_commit = "923d39c20b40c9deb5ae4ba31461b4fa173b7307"
-whole_reason = "One grammar rule changes in the checker, the JSON reader and the board view together: a checker that accepts a card without pictures while the board cannot draw it would drop that item from the board."
