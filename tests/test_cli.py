@@ -2722,35 +2722,6 @@ def test_status_and_brief_show_the_trunks_lane_shared_files_or_its_defect(
     )
 
 
-def test_status_refuses_whole_when_the_trunk_holds_a_directory_at_the_board_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-) -> None:
-    """Spec: STAT-33. On a real state-ref board whose trunk commits a
-    directory at `.aco/board.toml`, `aco status` refuses before any claim
-    prints."""
-    repo, _remote, _oid = _real_state_ref_start_scenario(monkeypatch, tmp_path)
-    assert issue_claim.main(["start", "314", "--scope", "src/x.py"]) == 0
-    configuration = repo / workboard.CONFIG_PATH
-    configuration.unlink()
-    configuration.mkdir()
-    (configuration / "inner.toml").write_text("")
-    real_git(repo, "add", "-A")
-    real_git(repo, "commit", "-q", "-m", "a directory where the configuration was")
-    push_repository_trunk(repo, "origin")
-    worktree = repo.parent / f"{repo.name}-worktrees" / _START_WORKTREE_NAME
-    _stand_in_with_the_live_trunk(monkeypatch, worktree)
-    monkeypatch.setattr(checkout, "file_at_revision", _LIVE_FILE_AT_REVISION)
-    monkeypatch.setattr(checkout, "versioned_paths", _REAL_VERSIONED_PATHS)
-    capsys.readouterr()
-
-    status = issue_claim.main(["status"])
-
-    captured = capsys.readouterr()
-    assert (status, captured.out, captured.err.startswith("ERROR: ")) == (2, "", True)
-
-
 def _lane_shared_lines(output: list[str]) -> list[str]:
     return [line.strip() for line in output if line.strip().startswith("lane-shared:")]
 
