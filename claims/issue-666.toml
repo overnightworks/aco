@@ -1,0 +1,8 @@
+claim_id = "0c768b3d5a884aebb3c24723ae58a860"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "e2ae053f375695a0f220cce1e70874e7eee53f54"
+branch = "claude/issue-666-small-ballast-leaves"
+scope = [".aco/brief.toml", ".github/workflows/ci.yml", "docs/board/README.md", "docs/board/mockup.html", "pyproject.toml", "quality/config.toml", "specs/rule.spec.md", "src/aco/cmd_rule.py", "tests/test_cmd_rule_group.py", "uv.lock"]
+opened_commit = "2074f86e796299d6ff45d6956d9cbc5a2da56766"
+whole_reason = "Five small removals from one audit, each a few lines; one lane avoids five reviews and five CI runs for config and docs lines."
