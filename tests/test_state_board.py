@@ -3761,8 +3761,8 @@ class TestCliStateRefForge:
         planted: str,
         neighbours: dict[str, bytes],
     ) -> None:
-        """An item `item new --title ""` once wrote,
-        planted by hand beside `neighbours`, no longer stops `item new` or
+        """An item `item new --title ""` wrote,
+        planted by hand beside `neighbours`, does not stop `item new` or
         `item show` of any other item -- its own child included, whose
         header needs only the parent's id -- nor (ITEM-53,
         ITEM-54, PIN-29), `item close` of an item it is neither, nor the
