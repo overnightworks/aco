@@ -45,9 +45,10 @@ A repository adopts aco by landing one commit that adds an
 empty `.aco/board.toml` and nothing else, then runs `aco bootstrap` once to
 create the state ref (`specs/bootstrap.spec.md`, `specs/storage-pin.spec.md`).
 After that: `aco next` names the one next action (pull, cut, check or close
-an item), `aco start <n>` creates its worktree and branch and claims its scope, `aco brief <n>` prints what a builder
-starts from, and `aco land <pull request> --head <sha>`, from a clean
-default-branch checkout, merges a green pull request pinned to the head the
+an item), `aco start <n>` creates its worktree and branch and claims its
+scope, `aco brief <n>` prints what a builder starts from, and
+`aco land <pull request> --head <sha>`, from a clean default-branch checkout,
+merges a green pull request pinned to the head the
 reviewers saw and releases the claim (`specs/start.spec.md`,
 `specs/brief.spec.md`, `specs/land.spec.md`).
 

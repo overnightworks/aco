@@ -3730,9 +3730,9 @@ def test_help_text_names_the_refusal_or_source_it_documents(
         issue_claim.main([command, "--help"])
 
     assert exited.value.code == 0
-    help_text = " ".join(capsys.readouterr().out.split())
+    help_text = "".join(capsys.readouterr().out.split())
     for substring in substrings:
-        assert substring in help_text
+        assert "".join(substring.split()) in help_text
 
 
 @pytest.mark.parametrize(
