@@ -1,0 +1,7 @@
+claim_id = "b34a0f7489c54fe5a252fdd941c47eb0"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "45502f3b34963e7181972a2e1731ddfe48e1c971"
+branch = "dependabot/npm_and_yarn/frontend/knip-6.44.1"
+scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
+opened_commit = "79a8c8e0537910212360efb02c23f74681b0e04c"
