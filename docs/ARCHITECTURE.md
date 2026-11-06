@@ -20,26 +20,25 @@ flowchart LR
 - The **state ref** is one git ref on the configured canonical remote
   (`canonical_remote` in `.aco/board.toml`; `specs/storage-pin.spec.md` owns
   its default). Its tree is the current state: `claims/`,
-  `resources/`, `ids/`, `schema.toml` (the format version) and, for a repository
-  without a forge, items.
+  `resources/`, `ids/`, `schema.toml` (the format version) and, for a
+  repository without a forge, items.
 - A transition is a pure function from the observed state and a typed intent
   to a new state (`protocol.apply`). The store commits it on the observed tip.
-  Only `aco reset --confirm` forces. A rejected push is not a failure
-  by itself. The wire contract and the retry and failure semantics, including
-  rejections that are not a race, are in `specs/ref-store-cas.spec.md`.
-- A resource is a number that must stay unique repository-wide.
+  A rejected push is not a failure by itself. The wire contract, the retry and
+  failure semantics and the one forced write are in
+  `specs/ref-store-cas.spec.md`.
+- A resource is a number that must stay unique per resource name.
   `specs/claim-record.spec.md` owns the allocation outcomes.
-- Ownership of item facts on GitHub: kind is the forge's native issue type
-  (`Container`, `Task`, `Bug` or `Feature`; an unrecognized type maps to no
-  kind, never guessed from a label), and parent and blocker relations are the
-  forge's sub-issue and blocked-by relations. The body repeats neither beyond
-  what `specs/cut.spec.md` and `specs/body-block.spec.md` own. An item's
-  contract is one fenced TOML block, specified in `specs/body-block.spec.md`.
+- On GitHub, kind is the forge's native issue type (`Container`, `Task`,
+  `Bug` or `Feature`; an unrecognized type maps to no kind, never guessed from
+  a label), and parent and blocker relations are the forge's sub-issue and
+  blocked-by relations. An item's contract is one fenced TOML block, specified
+  in `specs/body-block.spec.md`.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
-  forge. It raises typed errors (`ForgeNotFoundError`,
+  forge. Its errors are typed (`ForgeNotFoundError`,
   `ForgePermissionDeniedError`, `ForgeTransientError` and the rest of its
-  family), so no caller matches error text. An adapter that cannot do an
-  operation raises `ForgeUnsupportedError`. The one capability a caller
+  family). An adapter that cannot do an operation raises
+  `ForgeUnsupportedError`. The one capability a caller
   branches on is `BoardSource.lists_pull_requests`. GitHub is the only forge
   adapter; the state-ref item store implements the same port. The seam is not
   exclusive: `cmd_land` depends on `GitHubForge` for the whole landing,
@@ -47,11 +46,28 @@ flowchart LR
   needs its own contract for them before it can attach (the module docstring
   of `forge.py`).
 
+## Crosscutting Concepts
+
+### Trust
+
+The trust model is cooperating clients: the state ref and `aco rule --via` are
+aids for cooperative agents (`specs/rule.spec.md` declares `--via` a
+tripwire). Against anyone else the forge's permissions enforce who may write,
+and its edit history records afterward what was written; it does not stop an
+agent acting under the operator's own identity. Claimants need push rights to
+the canonical remote. The board adds its own boundary, described in
+`specs/serve.spec.md`.
+
 ## Constraints and reasons
 
-- Claims live in the state ref, one tree of `claims/` and `resources/`. The ref
-  is the one serialization point, and a claim needs no issue, so a lane
+- Claims live in the state ref, one tree of `claims/` and `resources/`. The
+  ref is the one serialization point, and a claim needs no issue, so a lane
   without one can hold it.
+- Kind and the parent and blocker relations live on the forge's native
+  fields, so each fact has one owner and the body never carries a second copy
+  that can disagree. What the body still repeats is owned by
+  `specs/cut.spec.md` and `specs/body-block.spec.md`.
+- Forge errors are typed, so no caller matches error text.
 - The state ref advances by a plain fast-forward push. A push already accepts
   fast-forwards and rejects the rest, which is the serialization needed; a
   matching `--force-with-lease` can replace history, so it is not used.
@@ -66,14 +82,15 @@ flowchart LR
   owner without a migration.
 - Wide-scope thresholds are protocol constants, not configuration, so two
   fleets in one repository cannot disagree on what "too wide" means.
-- Configuration in `.aco/board.toml` holds only settings with a caller today.
+- Configuration in `.aco/board.toml` holds only settings with a caller today,
+  because an option without a caller is upkeep with no user.
 - The state-ref item store and the board are kept although nobody uses them.
   The store keeps items as files in the state ref for a repository without a
-  forge (`specs/storage-pin.spec.md`). The board (`aco serve`, `src/aco/board/`,
-  `frontend/`) lets the operator decide by page; it is frozen, and nothing more
-  is built at it. Every change to `session`, `store` and the item commands
-  still carries both storage paths. An audit of unused parts names both as
-  kept and does not raise them as new findings.
+  forge (`specs/storage-pin.spec.md`). The board (`aco serve`,
+  `src/aco/board/`, `frontend/`) lets the operator decide by page; it is
+  frozen, and nothing more is built at it. Every change to `session`, `store`
+  and the item commands still carries both storage paths. Both are known and
+  deliberately kept; they are not unnoticed dead code.
 
 ## Not chosen
 
@@ -88,14 +105,14 @@ flowchart LR
   synchronisation step, and it ties the claim's compare-and-swap, a pure git
   push today, to a forge API. Reopens if a forge field offers a verified
   compare-and-swap.
-- One ref per key plus a resources ref: a resource-holding claim would have its
-  hold and its number in two owners that can disagree, and one transition over
-  both needs `git push --atomic` across refs. Reopens when that is verified on
-  the forge.
-- `--force-with-lease` for the state ref: it opens a history-loss path. Reopens
-  if a lease can be made to reject non-fast-forward updates.
-- A second history ref: the parent commit already holds the history. Reopens if
-  a reader needs history that the parent chain cannot give.
+- One ref per key plus a resources ref: a resource-holding claim would have
+  its hold and its number in two owners that can disagree, and one transition
+  over both needs `git push --atomic` across refs. Reopens when that is
+  verified on the forge.
+- `--force-with-lease` for advancing the state ref: it opens a history-loss
+  path. Reopens if a lease can be made to reject non-fast-forward updates.
+- A second history ref: the parent commit already holds the history. Reopens
+  if a reader needs history that the parent chain cannot give.
 - Runtime capability selection of the storage owner: a forge plan change would
   silently move a fact's owner without a migration. Reopens if the move gets a
   migration that runs with it.
@@ -104,15 +121,3 @@ flowchart LR
 - Deleting the state-ref item store and the board: the operator may still take
   them into use, and a repository without a forge, or deciding by page, would
   then need a rebuild. Reopens when the operator decides to drop them.
-
-## Crosscutting Concepts
-
-### Trust
-
-The trust model is cooperating clients: the state ref and `aco rule --via` are
-aids for cooperative agents (`specs/rule.spec.md` declares `--via` a tripwire),
-and the forge's permissions and edit history are the boundary against anyone
-else.
-Claimants need push rights to the canonical remote. The board adds its own
-boundary: every `/api/` request must carry the token before any forge request
-is made (`specs/serve.spec.md`).
