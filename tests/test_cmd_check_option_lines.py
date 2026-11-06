@@ -126,7 +126,7 @@ class TestOptionLineCheck:
                     malformed(f"{E}.caption", f"{E}.caption needs a picture beside it"),
                     malformed(f"{E}.drawing", f"unknown key {E}.drawing"),
                 ],
-                id="BODY-72-today-picture-renamed",
+                id="BODY-107-today-picture-renamed",
             ),
             pytest.param(
                 card(None, card_option_a(), card_option_b(("contract = ", "promise = "))),

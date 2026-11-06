@@ -109,7 +109,7 @@ _OPTION_LINE_OPTIONAL_KEYS = frozenset({_PICTURE, _CAPTION})
 _OPTION_LINE_ONLY_KEYS = frozenset(OPTION_LINE_KEYS) - {"question", _PICTURE}
 _OPTION_LINE_REFUSED_KEYS = ("example",)
 # Every key of one `[[expectation.option]]` table, in rendering order; an
-# option carries either `picture` or `same_as_today`, and `caption` only
+# option carries at most one of `picture` and `same_as_today`, and `caption` only
 # beside a picture.
 OPTION_KEYS = (
     "name",
