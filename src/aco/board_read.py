@@ -445,5 +445,8 @@ def ahead_of_caller_reading(
     parsed = ahead_of_caller.parse(text or "")
     if isinstance(parsed, ahead_of_caller.Unavailable):
         return parsed
-    states = {entry.item: _item_state(entry.item, context.forge) for entry in parsed}
+    states = {
+        target: _item_state(target, context.forge)
+        for target in dict.fromkeys(entry.item for entry in parsed)
+    }
     return tuple(ahead_of_caller.JudgedEntry(entry, *states[entry.item]) for entry in parsed)

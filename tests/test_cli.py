@@ -884,6 +884,8 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
     "waiting_on_operator": [],
     "ideas": [],
     "with_head": [],
+    "ahead_of_caller": [],
+    "ahead_of_caller_unavailable": None,
 }
 
 
@@ -1005,10 +1007,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
                 "ruling_landings": None,
                 "ruling_old": None,
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-                "close": [],
-                "waiting_on_operator": [230],
-                "ideas": [],
-                "with_head": [],
+                **(_NOTHING_NAMED_JSON | {"waiting_on_operator": [230]}),
             },
             id="json_lists_the_item_waiting_on_the_operator_apart_from_skipped",
         ),
@@ -1042,10 +1041,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
                 "ruling_landings": None,
                 "ruling_old": None,
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-                "close": [443],
-                "waiting_on_operator": [441, 442],
-                "ideas": [],
-                "with_head": [],
+                **(_NOTHING_NAMED_JSON | {"close": [443], "waiting_on_operator": [441, 442]}),
             },
             id="json_lists_operator_held_containers_as_waiting_and_a_closable_one_under_close",
         ),
@@ -1089,6 +1085,7 @@ def test_next_json_pins_the_raw_envelope_text_for_a_work_item_success(
         '"skipped": [{"number": 12, "reason": "blocked by #11"}], '
         '"parallel": {"first_scope_unknown": true, "candidates": [], "scope_unknown": []}, '
         '"close": [], "waiting_on_operator": [], "ideas": [], "with_head": [], '
+        '"ahead_of_caller": [], "ahead_of_caller_unavailable": null, '
         '"number": 11, "score": 10, '
         '"title": "Top work", "next": "Claim #11.", '
         '"command": "aco claim 11 --scope <paths>", "ruling_landings": null, '

@@ -74,6 +74,11 @@ other key is refused by name (`specs/storage-pin.spec.md`).
 | `lane_shared` | repository files a lane may change beyond its scope |
 | `dependency_paths` | paths a `No-Item: deps` pull request may change; a trailing `/` covers a directory |
 
+Code built ahead of its caller is listed in a tracked
+`.aco/ahead-of-caller.toml` as `[[code]]` entries (`path`, `item`, `reason`);
+`aco next` prints a line for each entry whose item is closed, missing, a pull
+request or unreadable (`specs/ahead-of-caller.spec.md`).
+
 ## Board
 
 `aco board --json` projects the open work board read-only for agents and
