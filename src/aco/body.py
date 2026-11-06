@@ -5,7 +5,7 @@ fenced block -- the `[[expectation]]`/`[[slice]]` arrays, `scope`/`size`/
 codec for its own board-builder domain (`Contract`, `ParsedBody`,
 `BodyReadState`, `Storage`, `ItemKind`, ... are all board-domain field types
 too, read straight off a parsed body); `items.py` and `state_board.py`
-import it for the same one schema `workboard.py` used to own alone. This module
+import it for the same one schema. This module
 never imports `workboard`, `items`, or `state_board` back (Layers contract):
 `items` may import this module, never the reverse, so a value both this
 codec and `items.py` need (`ORIGIN_PATTERN`) is owned here instead.
@@ -1024,8 +1024,8 @@ def _render_record(data: Mapping[str, object]) -> list[str]:
 def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     """The canonical `aco` block interior for `data`:
     schema key order, TOML-safe strings, unquoted dates, ending in
-    `newline` so a following fence line starts clean. Production caller:
-    block-mode `cut`; there is no standalone validator."""
+    `newline` so a following fence line starts clean. Callers: `replace_block`,
+    `prose_above_fresh_block`; there is no standalone validator."""
     lines = [f"version = {data['version']}"]
     lines.extend(
         f"{key} = {protocol.toml_string(data[key])}" for key in ("now", "next", "done_when")
@@ -1135,7 +1135,7 @@ def _slice_line_defects(slices: tuple[SliceRow, ...]) -> tuple[ContractDefect, .
     `protocol.is_display_control` character is a defect; a
     row's `done_when` keeps the same rule, since `cut` copies it into the
     child's one-line `done_when`. `board` and `next` keep
-    reading a body stored before this rule, and `next` names such a row
+    reading a stored body that breaks this rule, and `next` names such a row
     instead of printing its `cut` (`unprintable_slice_line_key`)."""
     return tuple(
         defect

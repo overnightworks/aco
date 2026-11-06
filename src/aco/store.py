@@ -103,10 +103,9 @@ _STATE_TOP_LEVEL_NAMES = frozenset(
 
 
 class TransitionIntent(StrEnum):
-    """The commit message's own `intent:` trailer label (§1 "Commit
-    message"), the house `StrEnum` protocol-token type used
-    everywhere else in the package -- a loose string here would let a typo
-    in `_transition_message` pass unnoticed."""
+    """The commit message's own `intent:` trailer label (ref-store-cas.spec.md, CAS-06), the house
+    `StrEnum` protocol-token type used everywhere else in the package -- a loose
+    string here would let a typo in `_transition_message` pass unnoticed."""
 
     CLAIM = "claim"
     RESCOPE = "rescope"
@@ -127,7 +126,7 @@ class _TransitionKind:
     claim_shaped: bool
 
 
-# §1 "Commit message": `intent: claim` / `rescope` / `release` / `item_write`
+# ref-store-cas.spec.md, CAS-06: `intent: claim` / `rescope` / `release` / `item_write`
 # / `landing` (`LandingIntent`'s atomic close-and-release).
 _TRANSITION_KINDS: dict[type[ClaimTransitionIntent], _TransitionKind] = {
     ClaimIntent: _TransitionKind(label=TransitionIntent.CLAIM, claim_shaped=True),
@@ -141,7 +140,7 @@ _TRANSITION_KINDS: dict[type[ClaimTransitionIntent], _TransitionKind] = {
 }
 
 # `git ls-remote --exit-code` (git(1)): 2 is "no matching refs" -- the only
-# outcome this store ever reads as `EMPTY_STATE` (criterion 6). 128 is the
+# outcome this store ever reads as `EMPTY_STATE` (ref-store-cas.spec.md, CAS-02, CAS-04). 128 is the
 # generic auth/transport failure and must never be read as empty.
 _LS_REMOTE_EXIT_NO_MATCH = 2
 
@@ -157,7 +156,7 @@ _MERGE_BASE_EXIT_NOT_ANCESTOR = 1
 # a narrower race than a live claim.
 _MAX_BOOTSTRAP_ATTEMPTS = 8
 
-# Retry exhaustion for a live claim/rescope/release transition (criterion 5):
+# Retry exhaustion for a live claim/rescope/release transition (ref-store-cas.spec.md, CAS-15..17):
 # 32 attempts, then `_retry_exhaustion_error` -- never "held by X" for a
 # different-key loser.
 _MAX_TRANSITION_ATTEMPTS = 32
@@ -182,9 +181,9 @@ _STATE_FETCH_OPTIONS = (
 
 # `fetch_state` fetches `STATE_REF` straight into this ref through the
 # fetch's own destination refspec, instead of reading the tip back from
-# `FETCH_HEAD`. One mechanism now settles two separate problems:
+# `FETCH_HEAD`. One mechanism settles two separate problems:
 # - it roots the fetched commits so they survive a `git gc --prune=now` run
-#   against this checkout right after the fetch (reproduced in the audit, and again by
+#   against this checkout right after the fetch (covered by
 #   `test_claim_ages_survives_a_gc_prune_of_the_just_fetched_history`);
 # - it decouples the read from `FETCH_HEAD`, so a concurrent `git fetch`
 #   anywhere else in this same worktree -- which overwrites the one shared
@@ -225,7 +224,7 @@ EXPORT_BUNDLE_REF = "refs/worktree/aco/reset-export"
 
 
 class PushTransport(Protocol):
-    """The store's injectable push boundary (criterion 3's seam).
+    """The store's injectable push boundary.
 
     A production implementation performs an ordinary `git push`. A test fake
     can additionally advance the observed remote state and *then* raise, to
@@ -389,7 +388,7 @@ def claim_ages(
     pair per claim.
 
     Refuses with `StateLineageError` for a claim whose `opened_commit` the
-    walk never reaches (§1 "Status age..."): a claim's age display reads
+    walk never reaches (claim-record.spec.md, CLAIM-50): a claim's age display reads
     real history, it never guesses across a lineage break.
     """
     claim_list = tuple(claims)
@@ -412,7 +411,7 @@ def _ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
     """Probe `STATE_REF` on `remote` without fetching it.
 
     Only `_LS_REMOTE_EXIT_NO_MATCH` (2, "no matching refs") is ever read as
-    absent (criterion 6): every other nonzero exit -- 128 and any other code
+    absent (ref-store-cas.spec.md, CAS-04): every other nonzero exit -- 128 and any other code
     git might use -- is an auth or transport failure and must fail loud
     instead of being mistaken for emptiness.
     """
@@ -536,8 +535,7 @@ def _direct_children(entries: dict[str, _ListedEntry], directory: str) -> dict[s
     """Only `directory`'s immediate children from a full recursive `_list_tree`
     listing, keyed by their own name -- never a nested descendant: `claims`,
     `ids`, and `resources` are flat directories by contract, so a deeper path
-    is exactly the malformed shape the caller must reject, the same shape a
-    non-recursive `ls-tree` on the subtree's own oid used to reject.
+    is exactly the malformed shape the caller must reject.
     """
     prefix = f"{directory}/"
     return {
@@ -558,7 +556,7 @@ def _read_state_archive(
 ) -> dict[str, bytes]:
     """Every blob's raw bytes under `tree_oid`, read via one `git archive`
     instead of one `cat-file -p` per file:
-    a state tree with hundreds of claims used to cost one process per file
+    a state tree with hundreds of claims would cost one process per file
     to read; this costs one regardless of how many. `tarfile` owns the
     framing, never a hand-rolled parse of git's batch output.
 
@@ -570,7 +568,7 @@ def _read_state_archive(
     than asking git to archive everything by accident.
 
     A missing object fails the whole `git archive` loud, the same doctrine a
-    per-blob read used to enforce (ruling 9c): a broken tree is corrupt
+    per-blob read would enforce: a broken tree is corrupt
     state, never a single quarantinable claim.
     """
     if paths is not None:
@@ -708,7 +706,7 @@ def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
     `claims/`, `ids/`, `resources/`, `items/` are present.
 
     One recursive `ls-tree` for structure and one `git archive` for every
-    blob's bytes replace what used to be one `ls-tree` and one
+    blob's bytes stand in for one `ls-tree` and one
     `cat-file -p` per entry -- the process count this function pays is fixed
     regardless of how many claims, ids, or resources the tree holds. `items/`
     is recognized here and its id -> blob oid structure is
@@ -717,7 +715,7 @@ def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
     lazily and separately by `read_item_files`, never folded into
     `ClaimState`.
 
-    A defect anywhere fails the whole read loud (ruling 9c): a commit is the
+    A defect anywhere fails the whole read loud: a commit is the
     unit a writer writes, so a broken tree is corrupt state, never a single
     quarantinable claim.
     """
@@ -769,7 +767,7 @@ def read_item_files(worktree: Path, tip: ObjectId) -> Mapping[str, bytes]:
     repository is in.
 
     Structural shape only: every entry must be a file (`_require_item_file`;
-    a broken tree is corrupt state, ruling 9c). The file-name rule is
+    a broken tree is corrupt state). The file-name rule is
     `protocol.item_id_of_filename`'s and the `[record]` content grammar
     stays `items.py`'s.
     """
@@ -1250,8 +1248,8 @@ class ClaimTransitionSubject:
 
 
 def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> ClaimTransitionSubject:
-    """One claim-shaped transition's own `ClaimTransitionSubject` (§1
-    "Commit message"): `text` is `claim issue 42`, `rescope
+    """One claim-shaped transition's own `ClaimTransitionSubject` (ref-store-cas.spec.md, CAS-06):
+    `text` is `claim issue 42`, `rescope
     lane docs/lane-cleanup`, and so on -- `action` plus `issue`/`lane` plus
     `transition_item_identifier`'s own bare identifier; `item` is
     that same identifier again, carried separately into the commit's own
@@ -1264,10 +1262,9 @@ def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> Cla
 def _transition_message(
     subject: TransitionSubject | ClaimTransitionSubject, intent: ClaimTransitionIntent
 ) -> str:
-    """The commit message trailer for one transition (§1 "Commit message";
-    widened for item writes, atomic landings and `item:`): every intent carries
-    `operation_id`, the one field `_find_operation_id`'s replay search
-    reads back; a claim-shaped intent also names its `claim_id` and its own
+    """The commit message trailer for one transition (ref-store-cas.spec.md, CAS-06):
+    every intent carries `operation_id`, the one field `_find_operation_id`'s
+    replay search reads back; a claim-shaped intent also names its `claim_id` and its own
     `item` (`subject.item`), an item write its `item_id` instead and no
     `item:` line at all, and a landing -- the one intent that is both --
     names `item_id` and `claim_id` together, plus its own `item:` line.

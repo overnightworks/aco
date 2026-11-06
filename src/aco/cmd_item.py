@@ -643,7 +643,7 @@ class _ItemCloseResult:
     """Everything `_print_item_close_result` needs for one `item close`,
     bundled so the printer itself takes one argument instead
     of PLR0913's five-scalar ceiling. `freed` is the freed numbers, or
-    the hint that replaced them when that read refused."""
+    a hint when that read refused."""
 
     item_id: str
     number: int

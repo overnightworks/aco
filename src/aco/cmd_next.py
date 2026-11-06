@@ -137,7 +137,7 @@ def _next_action_payload(
     action: workboard.NextAction, storage: body.Storage, *, site: _PullSite
 ) -> dict[str, object]:
     """The action-specific fields `_next_json` adds beyond `recovery`/`skipped`
-    -- `_next_action_reason` now carries what an `"action"` key used to."""
+    -- `_next_action_reason` names the action, so no `"action"` key is needed."""
     number = workboard.item_json_reference(workboard.next_action_item(action).number, storage)
     if isinstance(action, workboard.WorkItemAction):
         item = action.item

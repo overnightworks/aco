@@ -135,7 +135,7 @@ def _one_of(values: tuple[str, ...]) -> str:
 
 def _yes_no_ruling_defects(prefix: str, entry: dict[str, object]) -> list[FieldDefect]:
     """A yes/no line is ruled history: one carrying neither `ruling` nor
-    `ruled_on` is an open line no writer may add any more."""
+    `ruled_on` is an open line no writer adds."""
     if "ruling" not in entry and "ruled_on" not in entry:
         return [FieldDefect(prefix, f"{prefix} is an open yes/no line; write an option card")]
     defects = []

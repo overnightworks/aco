@@ -123,8 +123,8 @@ class _CutOutcome:
 
 def _print_cut_result(outcome: _CutOutcome, storage: body.Storage, *, as_json: bool) -> None:
     """Print `cut`'s result: the text form's `CUT`/`ADOPTED` verb becomes
-    `--json`'s own `reason` -- `adopted` no longer needs its
-    own boolean sibling once the envelope's `reason` already names it."""
+    `--json`'s own `reason`, so `adopted` has no boolean sibling: the
+    envelope's `reason` already names it."""
     if as_json:
         report.emit_json(
             True,
