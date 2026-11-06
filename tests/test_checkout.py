@@ -1102,7 +1102,7 @@ def test_trunk_ref_after_falls_back_to_the_local_branch_name_when_remote_head_wa
     tmp_path: Path,
 ) -> None:
     """A clone that never recorded its remote's `HEAD` still resolves
-    through the historical `{main, master}` guess, generalized
+    through the `{main, master}` fallback guess, generalized
     to the caller's own remote name rather than `origin` alone."""
     repository = _scratch_git_repository(tmp_path)
     recorded_head = checkout.recorded_head_ref("hub", directory=repository)

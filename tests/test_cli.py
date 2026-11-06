@@ -10163,7 +10163,7 @@ ARGPARSE_USAGE_REFUSALS = [
     pytest.param(
         ["board", "--html"],
         "unrecognized arguments: --html",
-        id="board-naming-the-retired-html-flag",
+        id="board-refusing-an-html-flag",
     ),
     pytest.param(
         ["release", "42", "--merged", "--jso"],

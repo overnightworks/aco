@@ -2786,8 +2786,8 @@ def test_board_never_frees_on_a_closed_foreign_dependency_alone() -> None:
 
 
 def test_board_treats_a_same_repository_pull_request_dependency_like_any_other() -> None:
-    """There is no `blocker-is-a-PR` check: a same-
-    repository PR dependency follows its own open/closed state."""
+    """A same-repository pull request dependency follows its own
+    open/closed state like any other."""
     issue = board_issue(303, "PR blocker", block_body(MINIMAL_BLOCK_TOML))
     dependencies = {303: (block_dependency(88, is_pull_request=True),)}
     projected = projected_board(

@@ -1259,7 +1259,7 @@ EXPECTED_RULINGS_LINES_BY_STORAGE = {
     Storage.STATE_REF: _rulings_lines(_github_fake(), storage=Storage.STATE_REF),
 }
 # `state-ref` projects the identical scenario, never `_EXPECTED_BOARD` itself
-# `replace`d: `item.actionable_reason` is now baked
+# `replace`d: `item.actionable_reason` is baked
 # in at build time from `config.storage`, exactly like every other field a
 # real `state-ref` pin changes, so reusing the `Storage.GITHUB`-built board
 # for a different storage's own payload would silently keep its stale `#n`
@@ -1837,7 +1837,7 @@ def _enter_claim_lane(
 
 def _first_ruling_date(capsys: pytest.CaptureFixture[str]) -> str:
     """`rulings --json`'s first listed line's own `ruled_on` (the
-    envelope: the array now sits under the `rulings` key), read back so a
+    envelope: the array sits under the `rulings` key), read back so a
     README-sequence assertion never has to guess the wall clock."""
     payload = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())
     return str(payload["rulings"][0]["lines"][0]["ruled_on"])
