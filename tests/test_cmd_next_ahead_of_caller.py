@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract
-from cli_fixtures import freeze_cli_now, real_git, run_cli
+from cli_fixtures import CliRun, freeze_cli_now, real_git, run_cli
 from github_fixtures import FakeForge
 
 from aco import ahead_of_caller, board_read, forge, github, session
@@ -93,9 +93,17 @@ def world(
     return World(github_clone, monkeypatch, answers)
 
 
-def next_json(capsys: pytest.CaptureFixture[str]) -> tuple[int | str | None, dict[str, object]]:
+def next_both(
+    capsys: pytest.CaptureFixture[str],
+) -> tuple[CliRun, int | str | None, dict[str, object]]:
+    """The text run, then the `--json` run's exit status and payload."""
+    printed = run_cli(["next"], capsys)
     result = run_cli(["next", "--json"], capsys)
-    return result.status, json.loads(result.stdout)
+    return printed, result.status, json.loads(result.stdout)
+
+
+def entry(path: str, item: int | str, state: str, error: str | None = None) -> dict[str, object]:
+    return {"path": path, "item": item, "reason": "kept for later", "state": state, "error": error}
 
 
 def test_an_open_item_prints_no_line_and_is_carried_open(
@@ -105,21 +113,12 @@ def test_an_open_item_prints_no_line_and_is_carried_open(
     world.commit_list(code("src/token.py", "#12"))
     world.serve()
 
-    text = run_cli(["next"], capsys)
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
-    assert (text.status, text.stdout) == (0, TOP_WORK_LINES)
+    assert (printed.status, printed.stdout) == (0, TOP_WORK_LINES)
     assert (status, payload["ahead_of_caller"], payload["ahead_of_caller_unavailable"]) == (
         0,
-        [
-            {
-                "path": "src/token.py",
-                "item": 12,
-                "reason": "kept for later",
-                "state": "open",
-                "error": None,
-            }
-        ],
+        [entry("src/token.py", 12, "open")],
         None,
     )
 
@@ -152,25 +151,13 @@ def test_an_item_that_is_not_open_turns_its_entry_red(
     world.own.issue_references[12] = reference
     world.serve()
 
-    text = run_cli(["next"], capsys)
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
-    assert (text.status, text.stdout) == (
+    assert (printed.status, printed.stdout) == (
         0,
         TOP_WORK_LINES + f"ahead of caller: src/token.py: item 12 {phrase} (kept for later)\n",
     )
-    assert (status, payload["ahead_of_caller"]) == (
-        0,
-        [
-            {
-                "path": "src/token.py",
-                "item": 12,
-                "reason": "kept for later",
-                "state": state,
-                "error": None,
-            }
-        ],
-    )
+    assert (status, payload["ahead_of_caller"]) == (0, [entry("src/token.py", 12, state)])
 
 
 def test_a_closed_item_of_another_repository_is_read_from_that_repository(
@@ -181,24 +168,15 @@ def test_a_closed_item_of_another_repository_is_read_from_that_repository(
     world.foreign_issue("owner/other", 5, state="closed")
     world.serve()
 
-    text = run_cli(["next"], capsys)
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
-    assert text.stdout == (
+    assert printed.stdout == (
         TOP_WORK_LINES
         + "ahead of caller: src/mcp.py: item owner/other#5 is closed (kept for later)\n"
     )
     assert (status, payload["ahead_of_caller"]) == (
         0,
-        [
-            {
-                "path": "src/mcp.py",
-                "item": "owner/other#5",
-                "reason": "kept for later",
-                "state": "closed",
-                "error": None,
-            }
-        ],
+        [entry("src/mcp.py", "owner/other#5", "closed")],
     )
     assert world.own.issue_reference_lookups == []
 
@@ -206,42 +184,26 @@ def test_a_closed_item_of_another_repository_is_read_from_that_repository(
 def test_a_forge_error_on_one_item_leaves_the_other_entry_judged_and_the_exit_unchanged(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: AHEAD-14, NEXT-49 (matrix row 6)."""
+    """Spec: AHEAD-14, NEXT-49, NEXT-51 (matrix row 6)."""
     world.commit_list(code("src/a.py", "20") + code("src/b.py", "21"))
-    world.own.scripted_item_reads = [forge.ForgeTransientError("GitHub timed out")]
+    timed_out = forge.ForgeTransientError("GitHub timed out")
+    world.own.scripted_item_reads = [timed_out, None, timed_out, None]
     world.own.closed_issues = {21}
     world.serve()
 
-    result = run_cli(["next"], capsys)
+    printed, status, payload = next_both(capsys)
 
-    assert (result.status, result.stdout) == (
+    assert (printed.status, printed.stdout) == (
         0,
         TOP_WORK_LINES
         + "ahead of caller: src/a.py: item 20 is unreadable: GitHub timed out (kept for later)\n"
         + "ahead of caller: src/b.py: item 21 is closed (kept for later)\n",
     )
-
-
-def test_a_forge_error_is_carried_as_the_entrys_error(
-    world: World, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: NEXT-51 (matrix row 6, `--json`)."""
-    world.commit_list(code("src/a.py", "20"))
-    world.own.scripted_item_reads = [forge.ForgeTransientError("GitHub timed out")]
-    world.serve()
-
-    status, payload = next_json(capsys)
-
     assert (status, payload["ahead_of_caller"]) == (
         0,
         [
-            {
-                "path": "src/a.py",
-                "item": 20,
-                "reason": "kept for later",
-                "state": "unreadable",
-                "error": "GitHub timed out",
-            }
+            entry("src/a.py", 20, "unreadable", "GitHub timed out"),
+            entry("src/b.py", 21, "closed"),
         ],
     )
 
@@ -254,13 +216,17 @@ def test_two_entries_naming_one_item_read_it_once_and_are_both_judged(
     world.own.closed_issues = {12}
     world.serve()
 
-    result = run_cli(["next"], capsys)
+    printed, status, payload = next_both(capsys)
 
-    assert world.own.issue_reference_lookups == [12]
-    assert result.stdout.splitlines()[-2:] == [
+    assert world.own.issue_reference_lookups == [12, 12]
+    assert printed.stdout.splitlines()[-2:] == [
         "ahead of caller: src/a.py: item 12 is closed (kept for later)",
         "ahead of caller: src/b.py: item 12 is closed (kept for later)",
     ]
+    assert (status, payload["ahead_of_caller"]) == (
+        0,
+        [entry("src/a.py", 12, "closed"), entry("src/b.py", 12, "closed")],
+    )
 
 
 @pytest.mark.parametrize("text", [None, "", "# nothing yet\n", "code = []\n"])
@@ -272,33 +238,66 @@ def test_no_entries_print_no_line_and_carry_empty_keys(
         world.commit_list(text)
     world.serve()
 
-    printed = run_cli(["next"], capsys)
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
     assert (printed.stdout, status) == (TOP_WORK_LINES, 0)
     assert (payload["ahead_of_caller"], payload["ahead_of_caller_unavailable"]) == ([], None)
 
 
+@pytest.mark.parametrize(
+    ("text", "sentence"),
+    [
+        ("[[cod]]\n", f"{LIST_PATH} has the unknown top-level key 'cod'"),
+        ("code = 3\n", f"{LIST_PATH}: 'code' must be an array of tables"),
+        (
+            code("a.py", "#1").replace('reason = "kept for later"\n', ""),
+            f"{LIST_PATH}: code entry 1 lacks 'reason'",
+        ),
+        (
+            code("a.py", "#1") + 'more = "x"\n',
+            f"{LIST_PATH}: code entry 1 has the unknown key 'more'",
+        ),
+        (
+            code("/a.py", "#1"),
+            f"{LIST_PATH}: code entry 1 has a path that is not repository-relative with "
+            "forward slashes",
+        ),
+        (
+            code("a/../b.py", "#1"),
+            f"{LIST_PATH}: code entry 1 has a path that holds a '..' segment",
+        ),
+        (
+            code("a.py", "#1", reason="a\\nb"),
+            f"{LIST_PATH}: code entry 1 has a reason that is not one non-empty line",
+        ),
+        (
+            code("a.py", "x1"),
+            f"{LIST_PATH}: code entry 1 has an item 'x1' that is not aco-xxxxxx, #n, n or "
+            "OWNER/REPO#n",
+        ),
+        (
+            code("a.py", "#1") + code("a.py", "1"),
+            f"{LIST_PATH}: code entry 2 repeats the path and item of an earlier entry",
+        ),
+    ],
+)
 def test_a_malformed_file_prints_the_unavailable_line_and_the_rest_of_the_output(
-    world: World, capsys: pytest.CaptureFixture[str]
+    world: World, capsys: pytest.CaptureFixture[str], text: str, sentence: str
 ) -> None:
-    """Spec: NEXT-50, NEXT-52 (matrix row 10)."""
-    world.commit_list("[[cod]]\n")
+    """Spec: AHEAD-04..AHEAD-09, NEXT-50, NEXT-52 (matrix row 10)."""
+    world.commit_list(text)
     world.serve()
 
-    printed = run_cli(["next"], capsys)
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
-    sentence = f"{LIST_PATH} has the unknown top-level key 'cod'"
+    carried = payload["ahead_of_caller_unavailable"]
+    assert isinstance(carried, str)
+    assert carried == sentence
     assert (printed.status, printed.stdout) == (
         0,
-        TOP_WORK_LINES + f"ahead of caller: unavailable ({sentence})\n",
+        TOP_WORK_LINES + f"ahead of caller: unavailable ({carried})\n",
     )
-    assert (status, payload["ahead_of_caller"], payload["ahead_of_caller_unavailable"]) == (
-        0,
-        [],
-        sentence,
-    )
+    assert (status, payload["ahead_of_caller"]) == (0, [])
 
 
 def test_a_file_only_in_the_worktree_is_ignored(
@@ -309,9 +308,45 @@ def test_a_file_only_in_the_worktree_is_ignored(
     world.own.closed_issues = {12}
     world.serve()
 
-    printed = run_cli(["next"], capsys)
+    printed, status, payload = next_both(capsys)
 
     assert printed.stdout == TOP_WORK_LINES
+    assert (status, payload["ahead_of_caller"], payload["ahead_of_caller_unavailable"]) == (
+        0,
+        [],
+        None,
+    )
+
+
+def test_a_trunk_that_cannot_be_resolved_refuses_next_whole_never_reads_no_file(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: AHEAD-15 (matrix row 12)."""
+    world.commit_list(code("src/token.py", "12"))
+    real_git(world.clone, "update-ref", "refs/remotes/origin/renamed", "refs/remotes/origin/main")
+    real_git(world.clone, "update-ref", "-d", "refs/remotes/origin/main")
+    real_git(world.clone, "symbolic-ref", "-d", "refs/remotes/origin/HEAD")
+    world.serve()
+
+    printed, status, payload = next_both(capsys)
+
+    assert (printed.status, printed.stdout) == (2, "")
+    assert printed.stderr.startswith("ERROR: cannot determine the trunk")
+    assert (status, payload["ok"], payload["reason"]) == (2, False, "unavailable")
+    assert "ahead_of_caller" not in payload
+
+
+def test_a_trunk_git_cannot_show_makes_the_list_unavailable_never_no_file(world: World) -> None:
+    """Spec: AHEAD-02."""
+    world.commit_list(code("src/token.py", "12"))
+    real_git(world.clone, "update-ref", "refs/remotes/origin/renamed", "refs/remotes/origin/main")
+    real_git(world.clone, "update-ref", "-d", "refs/remotes/origin/main")
+    real_git(world.clone, "symbolic-ref", "-d", "refs/remotes/origin/HEAD")
+
+    reading = board_read.ahead_of_caller_reading(session.run_context(None))
+
+    assert isinstance(reading, ahead_of_caller.Unavailable)
+    assert reading.sentence.startswith(f"{LIST_PATH} cannot be read: cannot determine the trunk")
 
 
 def test_a_trunk_path_that_is_a_directory_is_unavailable_never_no_file(
@@ -325,10 +360,16 @@ def test_a_trunk_path_that_is_a_directory_is_unavailable_never_no_file(
     real_git(world.clone, "push", "-q", "origin", "main")
     world.serve()
 
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
+    carried = payload["ahead_of_caller_unavailable"]
+    assert isinstance(carried, str)
+    assert carried.startswith(f"{LIST_PATH} is not valid TOML: ")
+    assert (printed.status, printed.stdout) == (
+        0,
+        TOP_WORK_LINES + f"ahead of caller: unavailable ({carried})\n",
+    )
     assert (status, payload["ahead_of_caller"]) == (0, [])
-    assert payload["ahead_of_caller_unavailable"] is not None
 
 
 def test_a_red_entry_beside_no_actionable_item_prints_and_keeps_exit_three(
@@ -340,12 +381,13 @@ def test_a_red_entry_beside_no_actionable_item_prints_and_keeps_exit_three(
     world.own.closed_issues = {12}
     world.serve()
 
-    printed = run_cli(["next"], capsys)
+    printed, status, payload = next_both(capsys)
 
     assert (printed.status, printed.stdout) == (
         3,
         NO_ACTION_LINES + "ahead of caller: src/token.py: item 12 is closed (kept for later)\n",
     )
+    assert (status, payload["ahead_of_caller"]) == (3, [entry("src/token.py", 12, "closed")])
 
 
 def test_control_characters_in_a_path_and_an_error_are_escaped_in_text_only(
@@ -357,8 +399,7 @@ def test_control_characters_in_a_path_and_an_error_are_escaped_in_text_only(
     world.own.scripted_item_reads = [unreadable, unreadable]
     world.serve()
 
-    printed = run_cli(["next"], capsys)
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
     assert printed.stdout.splitlines()[-1] == (
         "ahead of caller: a\\x1b[2J.py: item 20 is unreadable: bad\\x1b[2J (why\\u202e)"
@@ -377,21 +418,6 @@ def test_control_characters_in_a_path_and_an_error_are_escaped_in_text_only(
     )
 
 
-def test_a_trunk_that_cannot_be_resolved_makes_the_list_unavailable_never_no_file(
-    world: World,
-) -> None:
-    """Spec: AHEAD-02 (matrix row 12)."""
-    world.commit_list(code("src/token.py", "12"))
-    real_git(world.clone, "update-ref", "refs/remotes/origin/renamed", "refs/remotes/origin/main")
-    real_git(world.clone, "update-ref", "-d", "refs/remotes/origin/main")
-    real_git(world.clone, "symbolic-ref", "-d", "refs/remotes/origin/HEAD")
-
-    reading = board_read.ahead_of_caller_reading(session.run_context(None))
-
-    assert isinstance(reading, ahead_of_caller.Unavailable)
-    assert reading.sentence.startswith(f"{LIST_PATH} cannot be read: cannot determine the trunk")
-
-
 def test_a_list_that_is_no_utf8_is_unavailable_and_the_rest_of_the_output_prints(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -399,8 +425,7 @@ def test_a_list_that_is_no_utf8_is_unavailable_and_the_rest_of_the_output_prints
     world.commit_list(b"\xff\xfe[[code]]\n")
     world.serve()
 
-    printed = run_cli(["next"], capsys)
-    status, payload = next_json(capsys)
+    printed, status, payload = next_both(capsys)
 
     sentence = (
         f"{LIST_PATH} cannot be read: 'utf-8' codec can't decode byte 0xff in position 0: "
