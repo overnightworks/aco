@@ -96,8 +96,9 @@ sequenceDiagram
 aco is a CLI installed per machine (the README owns installation); every
 machine reaches the same state ref on the canonical remote, which is the
 only shared state besides the forge. The board is a local process the
-operator starts with `aco serve`; it is not a service and keeps no coordination state of its own,
-only its access token file (`specs/serve.spec.md`). Nothing else is deployed.
+operator starts with `aco serve`; it is not a service and keeps no
+coordination state of its own, only its access token file
+(`specs/serve.spec.md`). Nothing else is deployed.
 
 ## Crosscutting Concepts
 
