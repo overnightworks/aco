@@ -94,9 +94,9 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-25] An `expectation` key that is not an array of tables prints `body malformed: expectation: expectation must be an array of tables` on stderr, exit `2`.
 - [ ] [BODY-26] An `[[expectation]]` entry that is not a table prints `body malformed: expectation[0]: expectation[0] must be a table` on stderr, exit `2`.
 - [ ] [BODY-27] An entry whose `text` is missing, blank or not a string prints `body malformed: expectation[0].text: expectation[0].text must be a non-empty string`, exit `2`.
-- BODY-28 (retired 29.10.2026): `default` is no longer a yes/no line's key, so it cannot clash with a ruling; on any line it is an unknown key (BODY-33).
+- BODY-28 (retired).
 - [ ] [BODY-29] A yes/no entry carrying neither `ruling` nor `ruled_on` prints `body malformed: expectation[0]: expectation[0] is an open yes/no line; write an option card`, exit `2` (see E-BODY-18).
-- BODY-30 (retired 29.10.2026): `default` has no accepted values any more; a yes/no line is ruled history, and `default` on it is an unknown key (BODY-33).
+- BODY-30 (retired).
 - [ ] [BODY-31] A yes/no entry whose `ruling` is not `yes`, `no` or `later` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be yes, no, or later`, exit `2`.
 - [ ] [BODY-32] A ruled entry whose `ruled_on` is not a TOML local date prints `body malformed: expectation[0].ruled_on: expectation[0].ruled_on must be a TOML local date`, exit `2`.
 - [ ] [BODY-33] An entry key its form does not know (a yes/no line: the six keys above) prints `body malformed: expectation[0].<key>: unknown key expectation[0].<key>`, exit `2`; BODY-79/83/84 come first.

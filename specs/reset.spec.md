@@ -1,6 +1,6 @@
 # `aco reset`
 
-`aco reset` (operator-ruled 15.09.2026/16.09.2026) is the one
+`aco reset` is the one
 recovery path over a broken or rewritten `refs/aco/state`, its own five-step
 shape owned start to finish by `specs/ref-store-cas.spec.md` (CAS-39..46)
 along with the mandatory export and its bundle naming, the live-claim
