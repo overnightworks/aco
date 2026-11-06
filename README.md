@@ -9,8 +9,7 @@ exact behaviour is in its spec under `specs/`.
 ## What aco is for, and is not
 
 A capability belongs in `aco` only if it holds what an agent would forget or
-cannot know alone and no native tool does it better. Git, `gh` and the forge
-own commits, branches, pull requests and issue text; GitHub through `gh` is the
+cannot know alone and no native tool does it better. GitHub through `gh` is the
 one forge adapter. The rest is in [`docs/VISION.md`](docs/VISION.md).
 
 ## Install
@@ -104,5 +103,6 @@ landing grammar, storage pin, state ref transport) are in
 ## Documentation
 
 [`docs/VISION.md`](docs/VISION.md) says why aco exists and what it is not,
-`specs/` holds the behaviour contracts, and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-the mental model and the parts kept although unused.
+`specs/` holds the behaviour contracts, and
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) the mental model and the parts
+kept although unused.

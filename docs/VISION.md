@@ -10,18 +10,19 @@ state in their head.
   repository. They pull, claim, cut and land work items with it.
 - Their helpers (builders, reviewers, landers), which work under a head's
   claim.
-- The operator, who decides in chat. aco records his word on an item and
-  shows which of his decisions are still open.
+- The operator, who decides in chat and sees which of his decisions are
+  still open.
 
-## What it holds
+## What it does
 
-- Who holds which files right now, in one compare-and-swap git ref, so two
-  lanes never build on the same paths unawares.
-- Which item to pull next, and why another one is blocked or skipped.
-- That a landing merges exactly the commit the reviewers saw, and what it
-  freed.
-- The work-item contract: one typed block per item that every agent reads the
-  same way.
+- It knows who holds which files right now, in one compare-and-swap git ref,
+  so no two lanes build on the same paths unawares.
+- It names the next item to pull, and says why another one is blocked or
+  skipped.
+- It lands exactly the commit the reviewers saw, then reports what the
+  landing freed.
+- It keeps one typed contract per work item that every agent reads the same
+  way, and records each of the operator's decisions in it.
 
 ## What it deliberately is not
 
