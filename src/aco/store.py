@@ -103,7 +103,7 @@ _STATE_TOP_LEVEL_NAMES = frozenset(
 
 
 class TransitionIntent(StrEnum):
-    """The commit message's own `intent:` trailer label (CAS-06), the house
+    """The commit message's own `intent:` trailer label (ref-store-cas.spec.md, CAS-06), the house
     `StrEnum` protocol-token type used everywhere else in the package -- a loose
     string here would let a typo in `_transition_message` pass unnoticed."""
 
@@ -126,7 +126,7 @@ class _TransitionKind:
     claim_shaped: bool
 
 
-# CAS-06: `intent: claim` / `rescope` / `release` / `item_write`
+# ref-store-cas.spec.md, CAS-06: `intent: claim` / `rescope` / `release` / `item_write`
 # / `landing` (`LandingIntent`'s atomic close-and-release).
 _TRANSITION_KINDS: dict[type[ClaimTransitionIntent], _TransitionKind] = {
     ClaimIntent: _TransitionKind(label=TransitionIntent.CLAIM, claim_shaped=True),
@@ -140,7 +140,7 @@ _TRANSITION_KINDS: dict[type[ClaimTransitionIntent], _TransitionKind] = {
 }
 
 # `git ls-remote --exit-code` (git(1)): 2 is "no matching refs" -- the only
-# outcome this store ever reads as `EMPTY_STATE` (criterion 6). 128 is the
+# outcome this store ever reads as `EMPTY_STATE` (ref-store-cas.spec.md, CAS-02, CAS-04). 128 is the
 # generic auth/transport failure and must never be read as empty.
 _LS_REMOTE_EXIT_NO_MATCH = 2
 
@@ -156,7 +156,7 @@ _MERGE_BASE_EXIT_NOT_ANCESTOR = 1
 # a narrower race than a live claim.
 _MAX_BOOTSTRAP_ATTEMPTS = 8
 
-# Retry exhaustion for a live claim/rescope/release transition (criterion 5):
+# Retry exhaustion for a live claim/rescope/release transition (ref-store-cas.spec.md, CAS-15..17):
 # 32 attempts, then `_retry_exhaustion_error` -- never "held by X" for a
 # different-key loser.
 _MAX_TRANSITION_ATTEMPTS = 32
@@ -224,7 +224,7 @@ EXPORT_BUNDLE_REF = "refs/worktree/aco/reset-export"
 
 
 class PushTransport(Protocol):
-    """The store's injectable push boundary (criterion 3's seam).
+    """The store's injectable push boundary.
 
     A production implementation performs an ordinary `git push`. A test fake
     can additionally advance the observed remote state and *then* raise, to
@@ -388,7 +388,7 @@ def claim_ages(
     pair per claim.
 
     Refuses with `StateLineageError` for a claim whose `opened_commit` the
-    walk never reaches (CLAIM-50): a claim's age display reads
+    walk never reaches (claim-record.spec.md, CLAIM-50): a claim's age display reads
     real history, it never guesses across a lineage break.
     """
     claim_list = tuple(claims)
@@ -411,7 +411,7 @@ def _ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
     """Probe `STATE_REF` on `remote` without fetching it.
 
     Only `_LS_REMOTE_EXIT_NO_MATCH` (2, "no matching refs") is ever read as
-    absent (criterion 6): every other nonzero exit -- 128 and any other code
+    absent (ref-store-cas.spec.md, CAS-04): every other nonzero exit -- 128 and any other code
     git might use -- is an auth or transport failure and must fail loud
     instead of being mistaken for emptiness.
     """
@@ -535,8 +535,7 @@ def _direct_children(entries: dict[str, _ListedEntry], directory: str) -> dict[s
     """Only `directory`'s immediate children from a full recursive `_list_tree`
     listing, keyed by their own name -- never a nested descendant: `claims`,
     `ids`, and `resources` are flat directories by contract, so a deeper path
-    is exactly the malformed shape the caller must reject, the same shape a
-    non-recursive `ls-tree` on the subtree's own oid rejects.
+    is exactly the malformed shape the caller must reject.
     """
     prefix = f"{directory}/"
     return {
@@ -1249,7 +1248,7 @@ class ClaimTransitionSubject:
 
 
 def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> ClaimTransitionSubject:
-    """One claim-shaped transition's own `ClaimTransitionSubject` (CAS-06):
+    """One claim-shaped transition's own `ClaimTransitionSubject` (ref-store-cas.spec.md, CAS-06):
     `text` is `claim issue 42`, `rescope
     lane docs/lane-cleanup`, and so on -- `action` plus `issue`/`lane` plus
     `transition_item_identifier`'s own bare identifier; `item` is
@@ -1263,9 +1262,9 @@ def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> Cla
 def _transition_message(
     subject: TransitionSubject | ClaimTransitionSubject, intent: ClaimTransitionIntent
 ) -> str:
-    """The commit message trailer for one transition (CAS-06): every intent carries
-    `operation_id`, the one field `_find_operation_id`'s replay search
-    reads back; a claim-shaped intent also names its `claim_id` and its own
+    """The commit message trailer for one transition (ref-store-cas.spec.md, CAS-06):
+    every intent carries `operation_id`, the one field `_find_operation_id`'s
+    replay search reads back; a claim-shaped intent also names its `claim_id` and its own
     `item` (`subject.item`), an item write its `item_id` instead and no
     `item:` line at all, and a landing -- the one intent that is both --
     names `item_id` and `claim_id` together, plus its own `item:` line.

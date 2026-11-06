@@ -1151,7 +1151,7 @@ def _git_hex_placeholder(character: str) -> str:
 # -z`'s own record terminator, so splitting the whole raw stream on it
 # (`trunk_landings`, below) reads every record's four fields *and* the
 # boundary between records through the one byte git forbids inside a commit
-# message -- unlike the historical `\x1f` separator this replaces, which git
+# message -- unlike a `\x1f` separator, which git
 # never escapes inside a trailer *value* (a
 # probed value `#12\x1f#13` survived verbatim and silently split into two
 # fabricated work items).

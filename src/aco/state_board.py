@@ -292,7 +292,7 @@ def _delivered_content_fields(
     turn an omitted `labels`/`blocked_by` into an emptied one rather than
     `stored`'s own value. A body with no `[record]` at all -- every
     `rule`/`ask`/`cut` write already composes one -- changes nothing here,
-    exactly `update_item_body`'s behaviour before this issue. Every other
+    as in `update_item_body`. Every other
     record field (`parent`, `state`, `origin`, `kind`, the three
     timestamps) stays `stored`'s own regardless of what a delivered record
     names for it -- `update_item_body` itself, never this helper, owns

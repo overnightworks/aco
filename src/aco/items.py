@@ -117,8 +117,8 @@ def is_item_number(number: int) -> bool:
 
 def item_id_from_filename(filename: str) -> str:
     """The item id `filename` names, or a loud refusal: every file directly
-    under `items/` must be `aco-<six hex>.md`, never anything else (ruling
-    "a broken tree is corrupt state"). Which name is an item
+    under `items/` must be `aco-<six hex>.md`, never anything else (a broken tree is
+    corrupt state). Which name is an item
     is `protocol.item_id_of_filename`'s to answer; this is the refusal a
     whole-board read raises beside a foreign entry (PIN-13)."""
     item_id = item_id_of_filename(filename)

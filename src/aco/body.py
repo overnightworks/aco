@@ -1024,8 +1024,8 @@ def _render_record(data: Mapping[str, object]) -> list[str]:
 def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     """The canonical `aco` block interior for `data`:
     schema key order, TOML-safe strings, unquoted dates, ending in
-    `newline` so a following fence line starts clean. Production caller:
-    `cut`; there is no standalone validator."""
+    `newline` so a following fence line starts clean. Callers: `replace_block`,
+    `prose_above_fresh_block`; there is no standalone validator."""
     lines = [f"version = {data['version']}"]
     lines.extend(
         f"{key} = {protocol.toml_string(data[key])}" for key in ("now", "next", "done_when")

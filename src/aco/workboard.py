@@ -1725,8 +1725,8 @@ class BoardBuildInputs:
     # git history because this build stays pure. Keyed by claim_id.
     claim_ages: Mapping[str, datetime] = field(default_factory=dict)
     # The board source's own fact (`BoardSource.lists_pull_requests`), never the storage
-    # pin: a source that cannot list pull requests at all, as `state-ref`
-    # cannot -- still has an in-flight signal (a live
+    # pin: a source that cannot list pull requests at all (as `state-ref`
+    # cannot) still has an in-flight signal (a live
     # claim with a branch) but no landed one, so the two stay independent
     # booleans instead of one storage-shaped flag.
     open_pull_requests_supported: bool = True
@@ -2243,8 +2243,8 @@ def _project_blocker_references(entry: dict[str, object], key: str, repository: 
 
 def _project_uncut_row_scope(finding: dict[str, object]) -> None:
     """Drop a `None` `scope` from one uncut row's JSON dict rather than
-    printing it: the public shape before this lane was
-    `{"index", "title"}` with no third key, and `board --json` still owes
+    printing it: the public shape is
+    `{"index", "title"}` with no third key, and `board --json` owes
     that to a row that names no scope of its own -- only a row that
     actually carries one gains the extra `"scope"` key, canonical and
     non-empty. A row's `done_when` is `cut`'s to read, never

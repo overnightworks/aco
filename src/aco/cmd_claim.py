@@ -483,9 +483,9 @@ def _matching_store_claim(
     observed: protocol.ClaimState, request: protocol.ClaimRequest
 ) -> protocol.ActiveClaim | None:
     """The live store claim an interrupted, replayed `claim` invocation may
-    reuse (criterion 2): same identity, agent, role, branch, scope, *and*
+    reuse (claim-record.spec.md, CLAIM-13): same identity, agent, role, branch, scope, *and*
     claim id -- `protocol.apply` itself only replays on an exact claim-id match
-    (CLAIM-13), so a CLI-level replay
+    (claim-record.spec.md, CLAIM-13), so a CLI-level replay
     check that skips this slice's dispatch rules must use the same test, not
     the ledger's looser field-only match. Issueless lanes keep the
     one-claim-per-branch contract; only a numbered item gets replay
@@ -669,10 +669,9 @@ def _reject_scope_mismatch(
     `run` fetches once, whether for a derived scope or for its
     slice-rule checks, so this costs no second forge read. A target item
     outside the fetched open list, or one with no `scope` field of its own,
-    has nothing to differ from and is silently accepted, exactly as before
-    this field existed. A derived scope always came from this same body, so
-    the comparison here is trivially satisfied -- never an extra read, just
-    an inexpensive no-op check."""
+    has nothing to differ from and is silently accepted. A derived scope always
+    comes from this same body, so the comparison here is trivially satisfied
+    -- never an extra read, just an inexpensive no-op check."""
     issue = open_by_number.get(target_issue)
     if issue is None:
         return
@@ -889,8 +888,7 @@ def checked_claim(
     open_by_number: dict[int, workboard.Issue] | None = None
     if requested.scope or not isinstance(requested.identity, protocol.IssueIdentity):
         # Scope already final (given, or a lane's own required value): the
-        # local shape checks run first, exactly as before this field
-        # existed, so a comma or width refusal never touches the store or
+        # local shape checks run first, so a comma or width refusal never touches the store or
         # resolves the repository toplevel -- unless the scope is actually
         # wide and names no `--whole` of its own, in which case the width
         # gate's own lazy fallback resolves the toplevel itself

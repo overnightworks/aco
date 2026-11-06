@@ -362,9 +362,8 @@ class GitHubForge:
         an increment and under-count.
 
         Forwards `input_data` only when a caller actually passed one: tests
-        across this suite inject `run=` callables shaped like `_gh` was
-        called before this method existed, most of them taking no
-        `input_data` keyword at all, and this preserves that call shape
+        across this suite inject `run=` callables shaped like `_gh`, most of
+        them taking no `input_data` keyword at all, and this preserves that call shape
         exactly rather than widening every fixture's signature for a
         counting concern they have nothing to do with.
         """
