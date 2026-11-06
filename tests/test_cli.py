@@ -4413,7 +4413,6 @@ def _uncut_row_case(
 _CUT_ROUND_TRIP_CASES = (
     # next=no, uncut=yes -- an uncut row on its own already qualifies.
     _uncut_row_case("uncut_row_only", 184, "", "Scheibe E"),
-    # next=yes, uncut=yes, and they disagree --
     # next=yes, uncut=yes, and they disagree -- a container whose `Next` line
     # differs from its uncut row's title; `next` must print the cut that links
     # the row, since `cut` refuses the `Next` line's prose.
