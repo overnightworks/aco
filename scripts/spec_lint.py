@@ -65,7 +65,7 @@ MAX_CRITERION_LENGTH = 200
 CRITERION_PATTERN = re.compile(r"^- \[ \] \[([A-Z]+-\d+)\](.*)$")
 EXAMPLE_HEADING_PATTERN = re.compile(r"^### (E-[A-Za-z0-9]+-\d+)\b")
 # A retirement note is a checkbox-less bullet naming the retired id(s), e.g.
-# ``- LAND-36 (retired 19.09.2026, issue #359): ...``.
+# ``- LAND-36 (retired).``.
 RETIRED_NOTE_PATTERN = re.compile(
     r"^-\s*([A-Z]+-\d+(?:\s*,\s*[A-Z]+-\d+)*)\s*\((?:retired|removed)\b", re.IGNORECASE
 )

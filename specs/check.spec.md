@@ -60,7 +60,7 @@ vocabulary is `valid`, `malformed`, `incomplete` and `unavailable`.
 | `-`, outside a git checkout | CHECK-25 (CHECK-10) | CHECK-25 |
 | `-`, `storage = "state-ref"` vs default `"github"` | CHECK-22 (BODY-15, BODY-16) | CHECK-22 |
 | `-`, `--repo` given | CHECK-23 | CHECK-23 |
-| `aco body`, the command this one replaced | CHECK-16 | CHECK-16 |
+| `aco body` | CHECK-16 | CHECK-16 |
 
 ## `--json`'s own envelope
 
@@ -163,7 +163,7 @@ owns only the CLI-level framing around it.
 - Under `storage = "state-ref"`, `check <n>` never reaches the pull-request path: no number under that storage is ever reported as a landing, so every `<n>` resolves to ISSUE or MISSING.
 - `check -` outcomes follow the same exit rule: `valid` is exit `0`; `malformed`, `incomplete`, and `unavailable` are all exit `2`.
 - `check` never names its subject any other way than as `specs/landing-grammar.spec.md`'s `<label>` in every number mode and as the `<sha>` it was asked about in the trunk mode (CHECK-12, CHECK-13).
-- `blocked` (CHECK-08) is the only outcome that exits `3`; every other refusal exits `2` (see the `reason`/exit table above), and no outcome exits `1` any more.
+- `blocked` (CHECK-08) is the only outcome that exits `3`; every other refusal exits `2` (see the `reason`/exit table above), and no outcome exits `1`.
 - The trunk mode never reads a forge: a commit's own trailer is local history, so `check <sha>` answers from the walked trunk alone.
 - No mode of `check` ever prints a `refused` key: `specs/output.spec.md`'s envelope names every refusal by `reason` and `message` instead.
 

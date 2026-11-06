@@ -54,15 +54,15 @@ resolved directory's name.
 
 ## Writing a decision
 
-- ABRD-01 (removed 29.10.2026): the board writes no yes/no outcome; a card post is one write of its item (ABRD-78).
+- ABRD-01 (removed).
 - [ ] [ABRD-02] A card whose shown fields (an option line's `card_hash`, ABRD-35) changed since shown is refused on its fresh read `Diese Zeile hat sich geändert, bitte neu laden`, nothing written (E-ABRD-02).
 - [ ] [ABRD-03] The board writes one decision at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
 - [ ] [ABRD-04] Stopping the board waits for a write already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, nothing written.
 - [ ] [ABRD-05] A note or answer is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other refuses it before any forge request; a blank note is no note, a blank answer is refused.
-- ABRD-39 (removed 30.10.2026): there is no argv; the hash stored is the fresh read's (ABRD-78).
+- ABRD-39 (removed).
 - [ ] [ABRD-40] A post without `lines` answers 400 `bad request: decision`, no forge request (ABRD-77).
 - [ ] [ABRD-41] A card changed, withdrawn, gone, closed or unreadable on its fresh read is `failed` `Diese Zeile hat sich geändert, bitte neu laden`; a ruled line `already_ruled`; else `failed`, aco's sentence.
-- ABRD-42 (removed 29.10.2026): folded into ABRD-40.
+- ABRD-42 (removed).
 
 - [ ] [ABRD-77] A post with `lines` decides one card: `repo`, `item`, and `lines` of `{"line", "fingerprint"}`, each with its own `option`, or one `other` or `unclear` for all (card key rules, see E-ABRD-15).
 - [ ] [ABRD-78] It reads item `<n>` once and writes its body once through aco's writer: every posted line, `via board` for an option or `other`, each with that read's card hash, or every line back to its head.
@@ -208,7 +208,7 @@ that logs every request; `aco serve` runs aco's library over it in that
 directory (E-ABRD-02 through E-ABRD-05: `--repo` not given, so the one repo
 is labelled by that directory's name) and each example sends one request.
 
-- E-ABRD-01 (removed 29.10.2026): the board writes no yes/no outcome, so there is no example (ABRD-01).
+- E-ABRD-01 (removed).
 
 ### E-ABRD-02 -- a changed card refuses the stale post
 
