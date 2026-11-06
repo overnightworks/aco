@@ -4,17 +4,41 @@ For an agent or maintainer who needs aco's mental model before changing it.
 Behaviour, printed literals and exit codes are in `specs/`; this page holds
 only what no spec owns.
 
-## Mental model
+## Context and Scope
 
 aco coordinates agents working in one repository. Claims live in git, work
-items live on the forge, and the commands join the two.
+items live on the forge, and the commands join the two. It runs no lease or
+coordination server; the state ref is the serialization point.
 
 ```mermaid
 flowchart LR
-    CLI["aco commands"] --> Store["state ref<br/>refs/aco/state"]
-    CLI --> Port["forge port"]
-    Port --> GitHub["GitHub adapter"]
-    Board["board (aco serve)"] -->|"same library code, in process"| CLI
+    Operator(["operator"]) --> Head["head agent<br/>(session)"]
+    Head --> Helper["helper agents<br/>(lane workflow, skills)"]
+    Head --> ACO["aco"]
+    Helper --> ACO
+    Operator -.->|"decides by page (frozen board)"| ACO
+    ACO -->|"fetch, CAS push"| Remote[("canonical remote<br/>refs/aco/state")]
+    ACO -->|"gh"| Forge[("forge: GitHub<br/>issues, pull requests")]
+```
+
+Git and the forge own commits, branches, pull requests and issue text; the
+README holds installation and the lane in user terms.
+
+## Building Block View
+
+```mermaid
+flowchart LR
+    CLI["aco commands<br/>cmd_*.py, cli.py"] --> Session["session, store"]
+    Session --> Protocol["protocol.apply<br/>(pure transitions)"]
+    Session --> Store["state ref<br/>refs/aco/state"]
+    CLI --> Body["item body block<br/>body.py"]
+    CLI --> Port["forge port<br/>forge.py"]
+    Port --> GitHub["GitHub adapter<br/>github.py"]
+    Port --> StateBoard["state-ref item store<br/>state_board.py"]
+    Board -->|"same library code, in process"| Session
+    Board --> Protocol
+    Board --> Port
+    Board --> Decisions["decide, rulings,<br/>expectations, expectation_grammar"]
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
@@ -45,6 +69,37 @@ flowchart LR
   needs its own contract for them before it can attach (the module docstring
   of `forge.py`).
 
+## Runtime View
+
+The core flow of one lane; behaviour is in `specs/start.spec.md`,
+`specs/claim.spec.md`, `specs/land.spec.md` and `specs/release.spec.md`.
+
+```mermaid
+sequenceDiagram
+    participant H as head or helper
+    participant A as aco
+    participant R as state ref (remote)
+    participant F as forge
+    H->>A: aco start n
+    A->>F: read item and its contract
+    A->>R: claim transition, push on the observed tip
+    A-->>H: worktree and branch
+    H->>F: push branch, open pull request
+    H->>A: aco land pr --head sha
+    A->>F: check pinned head, merge
+    A->>R: release transition
+    A-->>H: freed items
+```
+
+## Deployment View
+
+aco is a CLI installed per machine (the README owns installation); every
+machine reaches the same state ref on the canonical remote, which is the
+only shared state besides the forge. The board is a local process the
+operator starts with `aco serve`; it is not a service and keeps no
+coordination state of its own, only its access token file
+(`specs/serve.spec.md`). Nothing else is deployed.
+
 ## Crosscutting Concepts
 
 ### Trust
@@ -56,6 +111,13 @@ and its edit history records afterward what was written; neither stops an
 agent acting under the operator's own identity. Claimants need push rights to
 the canonical remote. The board adds its own boundary, described in
 `specs/serve.spec.md`.
+
+### Proof strategy
+
+`specs/` owns each command's behaviour, with criterion IDs that tests
+cite. CI is the gate; its `quality` job runs the fleet quality gate,
+whose ratchets over `quality/baseline.toml` let size and complexity shrink
+but not grow.
 
 ## Constraints and reasons
 
@@ -122,3 +184,15 @@ the canonical remote. The board adds its own boundary, described in
 - Deleting the state-ref item store and the board: the operator may still take
   them into use, and a repository without a forge, or deciding by page, would
   then need a rebuild. Reopens when the operator decides to drop them.
+
+## Risks and Technical Debt
+
+- Two storage paths and the frozen board are carried by `session`, `store` and
+  the item commands (see Constraints and reasons).
+- The forge seam is not exclusive: landing, item and release depend on
+  concrete adapters, so a second forge is more than one adapter.
+- GitHub access goes through the `gh` CLI, whose output and permissions aco
+  does not control; errors are typed at the adapter, not prevented.
+- Trust is cooperative; see Trust above.
+- Files and functions above the size thresholds are listed in
+  `quality/baseline.toml` and shrink only in owned slices.
