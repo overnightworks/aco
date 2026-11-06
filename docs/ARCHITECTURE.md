@@ -14,19 +14,22 @@ flowchart LR
     CLI["aco commands"] --> Store["state ref<br/>refs/aco/state"]
     CLI --> Port["forge port"]
     Port --> GitHub["GitHub adapter"]
-    Board["board (aco serve)"] --> CLI
+    Board["board (aco serve)"] -->|"same library code, in process"| CLI
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
   (`canonical_remote` in `.aco/board.toml`; its default is set by PIN-50 in
-  `specs/storage-pin.spec.md`). Its tree is the current state: `claims/`, `resources/`, `ids/` and, for a
-  repository without a forge, items. The commit message names the transition.
+  `specs/storage-pin.spec.md`). Its tree is the current state: `claims/`,
+  `resources/`, `ids/` and, for a repository without a forge, items. The
+  commit message names the transition.
   A released claim is absent from the tree and readable at the parent commit,
   so there is no second history ref.
 - A transition is a pure function from the observed state and a typed intent
   to a new tree (`protocol.apply`). The store commits it on the observed tip
   and pushes with a plain fast-forward `git push`, never `--force` and never
-  `--force-with-lease`, because a matching lease can replace history. A
+  `--force-with-lease`, because a matching lease can replace history. Only
+  `aco reset --confirm` forces: it deletes the ref with `--force-with-lease`
+  (CAS-43), as the documented recovery procedure. A
   rejected push is not a failure by itself. The wire contract and the retry
   and failure semantics, including rejections that are not a race, are in
   `specs/ref-store-cas.spec.md`.
@@ -39,8 +42,8 @@ flowchart LR
   forge's sub-issue and blocked-by relations. The body repeats neither, except
   the `Parent:` recovery line `cut` writes; its owners are
   `specs/cut.spec.md` (CUT-25) and `specs/body-block.spec.md`. An item's
-  contract is one fenced TOML block whose keys are protocol and whose values are the operator's prose
-  (`specs/body-block.spec.md`).
+  contract is one fenced TOML block whose keys are protocol and whose values
+  are the operator's prose (`specs/body-block.spec.md`).
 - Wide-scope thresholds are constants of the protocol, not configuration, so
   two fleets in one repository cannot disagree on what "too wide" means.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
