@@ -3404,7 +3404,7 @@ class TestCliStateRefForge:
         piped body as github does -- prose above a block its flags build,
         or a piped block the flags agree with -- never dropping it; every
         section left empty is named on stderr, one line each. Stdin carries
-        a body only as a file or a pipe : the socket
+        a body only as a file or a pipe: the socket
         an agent harness hands over is never read, so the command returns."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
 
