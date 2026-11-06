@@ -14,9 +14,8 @@ the same way by the day of the decision, which its row shows, so what was just d
 on top. A card whose
 answer is saving turns its shape and holds its picks while every other card stays
 usable. A project whose read failed stands as its own group with the error, and keeps its last cards, still decidable, with the time they were read. The
-header's Refresh shows the time of the last read; Mitsprache holds Self-refresh,
-30 minutes by default. The shipped page reads on Refresh, on return to the tab and every
-30 minutes until Mitsprache's Self-refresh sets it.
+header's Refresh shows the time of the last read. The page reads
+on Refresh, on return to the tab and every 30 minutes.
 
 The shipped board shows a card of one option line as the picture's card: meta line,
 question, PROBLEM, TODAY (only when the card has a picture), OPTIONS A to D with name and effect, RECOMMENDATION and
@@ -38,7 +37,7 @@ point rows: one point open at a time, a pick per point, "Accept all" with the nu
 and "Other…" and "Unclear" for the whole card. Its answer posts after one undo window, once every
 point is chosen. A pick marks its letter from the click; a card whose answer is saving shows
 the picture's saving state while every other card stays usable; no read locks the page.
-It still lacks Mitsprache and the agent list, and the v5 addition Self-refresh.
+The picture's Mitsprache page, Agent tab, Overrule and Self-refresh are not part of the target: the board stays as it is, and the operator decides in chat.
 A ruled yes/no line is read-only history in Decided; an open one is
 refused by aco's grammar, so its item drops from the board like any malformed item.
 The list groups open cards and decided lines per project with the picture's Open,

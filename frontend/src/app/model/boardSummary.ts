@@ -32,7 +32,7 @@ export const REFRESH_LABEL = 'Refresh';
 export const READING_LABEL = 'Reading…';
 /** The page reads again on return to the tab once its last read is older than this. */
 export const STALE_AFTER_SECONDS = 10;
-/** How often the page reads on its own: the default Mitsprache's Self-refresh starts from. */
+/** How often the page reads on its own. */
 export const SELF_REFRESH_MINUTES = 30;
 /** What a read that fails whole says, on the first load and on a ready board alike. */
 export const SERVER_SILENT_SENTENCE = 'aco antwortet nicht.';
