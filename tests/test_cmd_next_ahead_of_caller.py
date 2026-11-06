@@ -247,7 +247,6 @@ def test_no_entries_print_no_line_and_carry_empty_keys(
 @pytest.mark.parametrize(
     ("text", "sentence"),
     [
-        ("[[code\n", None),
         ("[[cod]]\n", f"{LIST_PATH} has the unknown top-level key 'cod'"),
         ("code = 3\n", f"{LIST_PATH}: 'code' must be an array of tables"),
         (
@@ -287,9 +286,25 @@ def test_no_entries_print_no_line_and_carry_empty_keys(
     ],
 )
 def test_a_malformed_file_prints_the_unavailable_line_and_the_rest_of_the_output(
-    world: World, capsys: pytest.CaptureFixture[str], text: str, sentence: str | None
+    world: World, capsys: pytest.CaptureFixture[str], text: str, sentence: str
 ) -> None:
-    """Spec: AHEAD-04..AHEAD-09, NEXT-50, NEXT-52 (matrix row 10)."""
+    """Spec: AHEAD-04..AHEAD-09, AHEAD-16..AHEAD-18, AHEAD-21, AHEAD-22, NEXT-50, NEXT-52
+    (matrix row 10)."""
+    assert unavailable_line_after(world, capsys, text) == sentence
+
+
+def test_a_file_that_is_no_toml_carries_the_parsers_text_in_the_unavailable_line(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: AHEAD-04, NEXT-50, NEXT-52 (matrix row 10)."""
+    carried = unavailable_line_after(world, capsys, "[[code\n")
+
+    assert carried.startswith(f"{LIST_PATH} is not valid TOML: ")
+
+
+def unavailable_line_after(world: World, capsys: pytest.CaptureFixture[str], text: str) -> str:
+    """Commit `text`, run `next` both ways, assert the rest of the output prints
+    beside the unavailable line, and return the sentence it carries."""
     world.commit_list(text)
     world.serve()
 
@@ -297,15 +312,12 @@ def test_a_malformed_file_prints_the_unavailable_line_and_the_rest_of_the_output
 
     carried = payload["ahead_of_caller_unavailable"]
     assert isinstance(carried, str)
-    if sentence is None:
-        assert carried.startswith(f"{LIST_PATH} is not valid TOML: ")
-    else:
-        assert carried == sentence
     assert (printed.status, printed.stdout) == (
         0,
         TOP_WORK_LINES + f"ahead of caller: unavailable ({carried})\n",
     )
     assert (status, payload["ahead_of_caller"]) == (0, [])
+    return carried
 
 
 def test_a_file_only_in_the_worktree_is_ignored(
@@ -347,7 +359,7 @@ def test_a_trunk_that_cannot_be_resolved_refuses_next_whole_never_reads_no_file(
 def test_a_trunk_path_that_is_a_directory_is_unavailable_never_no_file(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: AHEAD-02 (matrix row 13)."""
+    """Spec: AHEAD-02, AHEAD-20 (matrix row 13)."""
     (world.clone / LIST_PATH).mkdir(parents=True)
     (world.clone / LIST_PATH / "inner.txt").write_text("x\n")
     real_git(world.clone, "add", "-f", LIST_PATH)
@@ -360,6 +372,7 @@ def test_a_trunk_path_that_is_a_directory_is_unavailable_never_no_file(
     carried = payload["ahead_of_caller_unavailable"]
     assert isinstance(carried, str)
     assert carried.startswith(f"{LIST_PATH} cannot be read: ")
+    assert carried.removeprefix(f"{LIST_PATH} cannot be read: ").strip()
     assert "is not valid TOML" not in carried
     assert (printed.status, printed.stdout) == (
         0,
@@ -417,15 +430,18 @@ def test_control_characters_in_a_path_and_an_error_are_escaped_in_text_only(
 def test_a_list_that_is_no_utf8_is_unavailable_and_the_rest_of_the_output_prints(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: AHEAD-02 (matrix row 10)."""
-    world.commit_list(b"\xff\xfe[[code]]\n")
+    """Spec: AHEAD-02, AHEAD-20 (matrix row 10)."""
+    committed = b"\xff\xfe[[code]]\n"
+    with pytest.raises(UnicodeDecodeError) as decoding:
+        committed.decode("utf-8")
+    world.commit_list(committed)
     world.serve()
 
     printed, status, payload = next_both(capsys)
 
     carried = payload["ahead_of_caller_unavailable"]
     assert isinstance(carried, str)
-    assert carried.startswith(f"{LIST_PATH} cannot be read: ")
+    assert carried == f"{LIST_PATH} cannot be read: {decoding.value}"
     assert (printed.status, printed.stdout) == (
         0,
         TOP_WORK_LINES + f"ahead of caller: unavailable ({carried})\n",

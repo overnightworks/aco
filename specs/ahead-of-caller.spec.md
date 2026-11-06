@@ -10,7 +10,7 @@ The list of code built ahead of its caller: one entry per piece of code, naming 
 | the trunk cannot be resolved | AHEAD-15 | — |
 | the trunk's file cannot be read | AHEAD-02, AHEAD-20 | — |
 | the file is only in the worktree | AHEAD-03 | — |
-| the file is malformed | AHEAD-04..AHEAD-09, AHEAD-16..AHEAD-22 | — |
+| the file is malformed | AHEAD-04..AHEAD-09, AHEAD-16..AHEAD-19, AHEAD-21, AHEAD-22 | — |
 | an entry names an item of this repository | AHEAD-10 | AHEAD-12 |
 | an entry names an item of another repository | AHEAD-11 | AHEAD-12 |
 | two entries name one item | AHEAD-13 | AHEAD-12 |
