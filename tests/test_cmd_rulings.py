@@ -273,7 +273,7 @@ def test_rulings_json(
 
 
 RULED_YES_NO = '[[expectation]]\ntext = "Alt"\nruling = "yes"\nruled_on = 2026-10-28\n'
-CARD_DAY = "asked_on = 2026-10-28"
+CARD_DAY = "asked_on = 2026-08-20"
 
 
 def _item_of(number: int, *lines: str) -> workboard.Issue:
@@ -286,7 +286,7 @@ def _open_card(day: str) -> str:
 
 def _ruled_card(day: str | None) -> str:
     edit = (CARD_DAY + "\n", "") if day is None else (CARD_DAY, f"asked_on = {day}")
-    return ruled_card(edit)
+    return ruled_card(edit, ("ruled_on = 2026-10-28", "ruled_on = 2026-11-01"))
 
 
 def _returned_card(day: str) -> str:

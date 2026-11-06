@@ -33,7 +33,7 @@ from aco import body, expectations, forge
 from aco import decide as decide_module
 from aco.expectation_grammar import card_hash
 
-ASKED_ON = "asked_on = 2026-10-28\n"
+ASKED_ON = "asked_on = 2026-08-20\n"
 TODAY = date(2026, 10, 29)
 
 
@@ -111,7 +111,7 @@ class TestAskedOnRulings:
         """Spec: RUL-19."""
         listed = self.line_json(monkeypatch, capsys, card())
         keys = list(listed)
-        assert listed["asked_on"] == "2026-10-28"
+        assert listed["asked_on"] == "2026-08-20"
         assert keys[keys.index("text") + 1] == "asked_on"
 
     def test_a_ruled_line_stored_without_it_prints_null(

@@ -558,7 +558,7 @@ class TestOptionLineRulings:
             "form": "options",
             "text": "Ein Klick auf den Ursprungs-Link springt in der App: die Version klappt "
             "auf, der Take ist markiert, der Song bleibt offen.",
-            "asked_on": "2026-10-28",
+            "asked_on": "2026-08-20",
             "ruling": None,
             "ruled_on": None,
             "card_hash": GOLDEN_CARD_HASH,

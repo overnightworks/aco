@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from option_cards import E, card_body, check_defects, malformed, ruled_card
 
-ASKED_ON = "asked_on = 2026-10-28\n"
+ASKED_ON = "asked_on = 2026-08-20\n"
 RULED_ON = "ruled_on = 2026-10-28\n"
 
 
@@ -15,12 +15,12 @@ class TestRuledBeforeAsked:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: BODY-108 -- the refusal names both dates."""
-        line = ruled_card().replace(RULED_ON, "ruled_on = 2026-10-27\n", 1)
+        line = ruled_card().replace(RULED_ON, "ruled_on = 2026-08-19\n", 1)
         status, defects = check_defects(capsys, card_body(line))
         assert defects == [
             malformed(
                 f"{E}.ruled_on",
-                f"{E}.ruled_on 2026-10-27 is before asked_on 2026-10-28",
+                f"{E}.ruled_on 2026-08-19 is before asked_on 2026-08-20",
             )
         ]
         assert status == 2
@@ -28,8 +28,8 @@ class TestRuledBeforeAsked:
     @pytest.mark.parametrize(
         "ruled_on",
         [
-            pytest.param("2026-10-28", id="same-day"),
-            pytest.param("2026-10-29", id="later"),
+            pytest.param("2026-08-20", id="same-day"),
+            pytest.param("2026-08-21", id="later"),
         ],
     )
     def test_a_line_ruled_on_or_after_the_day_it_was_asked_is_accepted(
