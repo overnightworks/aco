@@ -18,7 +18,8 @@ flowchart LR
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
-  (`canonical_remote` in `.aco/board.toml`, default `origin`). Its
+  (`canonical_remote` in `.aco/board.toml`; its default is PIN-50 in
+  `specs/storage-pin.spec.md`). Its
   tree is the current state: `claims/`, `resources/`, `ids/` and, for a
   repository without a forge, items. The commit message names the transition.
   A released claim is absent from the tree and readable at the parent commit,
